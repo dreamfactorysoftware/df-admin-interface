@@ -1,1418 +1,2883 @@
 /**
- * React-Compatible Test Data Factories for API Documentation Testing
- * 
- * Comprehensive factory functions for generating mock API documentation data,
- * service configurations, and user interaction scenarios. Optimized for Vitest 2.1+
- * and React Testing Library workflows with enhanced TypeScript type safety.
- * 
- * Features:
- * - Factory functions replacing Angular test fixture patterns
- * - React Query and SWR hook testing support  
- * - OpenAPI specification generation with configurable parameters
- * - Service authentication and security testing coverage
- * - Schema validation mock data for database connections
- * - User interaction simulation for form workflows
- * - MSW integration for realistic API mocking
- * - Performance optimized for 10x faster test execution
+ * @fileoverview React-compatible test data factories for API documentation component testing
+ * @description Generates mock API documentation data, service configurations, and user interaction scenarios
+ * Optimized for Vitest 2.1+ and React Testing Library testing workflows with comprehensive F-006 feature coverage
  * 
  * @version 1.0.0
- * @framework React 19/Next.js 15.1/Vitest 2.1+
+ * @license MIT
+ * @author DreamFactory Team
+ * 
+ * Features:
+ * - Factory functions compatible with Vitest 2.1+ testing framework per enhanced test execution requirements
+ * - React Testing Library integration for component testing data generation
+ * - TypeScript type safety for test data generation per code quality standards
+ * - Mock data generation for React Query and SWR hook testing per state management requirements
+ * - Comprehensive coverage of API documentation testing scenarios per F-006 feature requirements
+ * - MSW handler factories for realistic API mocking during development and testing
+ * - OpenAPI specification generation with configurable parameters
+ * - Performance testing data for build time optimization
+ * - Accessibility testing mock data for WCAG 2.1 AA compliance
  */
 
-import { faker } from '@faker-js/faker';
 import type { 
-  Service, 
-  ServiceConfiguration, 
-  ServiceRow,
+  Service,
   ServiceType,
-  ServiceTypeDefinition,
-  APIEndpointConfig,
-  OpenAPIConfig,
-  APIGenerationWorkflow,
-  ServiceTestResult,
-  ServiceHealthStatus,
-  ServiceMetrics,
+  ServiceRow,
+  OpenAPISpec,
+  OpenAPIOperation,
+  OpenAPIPath,
+  OpenAPISchema,
+  OpenAPIResponse,
+  OpenAPIParameter,
+  EndpointConfig,
+  GenerationStep,
+  WizardState,
+  GenerationProgress,
+  GenerationResult,
+  ServiceDeploymentConfig,
+  DeploymentStatus,
   HTTPMethod,
-  EndpointParameter,
-  AuthenticationConfig,
-  ValidationConfig,
-  OpenAPIPreview,
-  APIGenerationResult
-} from 'src/types/service';
+  ServiceStatus,
+  ServiceCategory,
+  ServiceFormConfig,
+  ServiceFormState,
+  ServiceConfigSchema,
+  ConfigFieldType,
+  ServiceError,
+  ServiceValidationError,
+  GenerationError
+} from '@/types/services'
 
-// ============================================================================
-// CORE FACTORY CONFIGURATION TYPES
-// ============================================================================
+import type {
+  TestScenario,
+  TestFixtureFactory,
+  MSWHandler,
+  ApiMockGenerators,
+  PerformanceMetrics,
+  DatabaseServiceMockFactory,
+  AuthMockFactory,
+  ComponentTestUtils,
+  FormTestHelpers,
+  AccessibilityTestConfig,
+  TestingContext
+} from '@/types/testing'
 
-/**
- * Configuration options for test data factory customization
- */
-export interface FactoryOptions {
-  /** Enable realistic data generation using faker.js */
-  useRealisticData?: boolean;
-  /** Seed value for consistent test data across test runs */
-  seed?: number;
-  /** Override default values with custom data */
-  overrides?: Record<string, any>;
-  /** Enable performance optimization for large datasets */
-  optimizeForPerformance?: boolean;
-  /** Include debug information in generated data */
-  includeDebugInfo?: boolean;
-}
+import type { 
+  ApiResponse, 
+  ApiError, 
+  ListResponse 
+} from '@/types/api'
 
-/**
- * Database-specific factory configuration
- */
-export interface DatabaseFactoryOptions extends FactoryOptions {
-  /** Database type for connection testing */
-  databaseType?: 'mysql' | 'postgresql' | 'mongodb' | 'oracle' | 'snowflake' | 'sql_server';
-  /** Include connection pooling configuration */
-  includePooling?: boolean;
-  /** Include SSL/TLS configuration */
-  includeSSL?: boolean;
-  /** Schema size for large dataset testing */
-  schemaSize?: 'small' | 'medium' | 'large' | 'xlarge';
-}
+import type { faker } from '@faker-js/faker'
+
+// =================================================================================================
+// CORE FACTORY CONFIGURATION
+// =================================================================================================
 
 /**
- * API documentation-specific factory configuration  
+ * Factory configuration options for customizing mock data generation
+ * Enhanced for React Testing Library and Vitest integration patterns
  */
-export interface ApiDocsFactoryOptions extends FactoryOptions {
-  /** OpenAPI specification version */
-  openApiVersion?: '3.0.0' | '3.0.1' | '3.0.2' | '3.0.3' | '3.1.0';
-  /** Include advanced security schemes */
-  includeAdvancedSecurity?: boolean;
-  /** Number of endpoints to generate */
-  endpointCount?: number;
-  /** Include example data in specifications */
-  includeExamples?: boolean;
-  /** Enable comprehensive validation schemas */
-  includeValidationSchemas?: boolean;
-}
-
-/**
- * User interaction factory configuration
- */
-export interface UserInteractionFactoryOptions extends FactoryOptions {
-  /** Interaction type for form testing */
-  interactionType?: 'create' | 'edit' | 'delete' | 'test' | 'deploy';
-  /** Include error scenarios */
-  includeErrors?: boolean;
-  /** Validation state configuration */
-  validationState?: 'valid' | 'invalid' | 'pending';
-  /** Include optimistic update scenarios */
-  includeOptimisticUpdates?: boolean;
-}
-
-// ============================================================================
-// DEFAULT FACTORY CONFIGURATIONS
-// ============================================================================
-
-const DEFAULT_FACTORY_OPTIONS: Required<FactoryOptions> = {
-  useRealisticData: true,
-  seed: 12345,
-  overrides: {},
-  optimizeForPerformance: false,
-  includeDebugInfo: false,
-};
-
-const DEFAULT_DATABASE_OPTIONS: Required<DatabaseFactoryOptions> = {
-  ...DEFAULT_FACTORY_OPTIONS,
-  databaseType: 'mysql',
-  includePooling: false,
-  includeSSL: false,
-  schemaSize: 'medium',
-};
-
-const DEFAULT_API_DOCS_OPTIONS: Required<ApiDocsFactoryOptions> = {
-  ...DEFAULT_FACTORY_OPTIONS,
-  openApiVersion: '3.0.3',
-  includeAdvancedSecurity: false,
-  endpointCount: 5,
-  includeExamples: true,
-  includeValidationSchemas: true,
-};
-
-const DEFAULT_USER_INTERACTION_OPTIONS: Required<UserInteractionFactoryOptions> = {
-  ...DEFAULT_FACTORY_OPTIONS,
-  interactionType: 'create',
-  includeErrors: false,
-  validationState: 'valid',
-  includeOptimisticUpdates: true,
-};
-
-// ============================================================================
-// CORE UTILITY FUNCTIONS
-// ============================================================================
-
-/**
- * Initialize faker with consistent seed for reproducible test data
- */
-function initializeFaker(seed: number): void {
-  faker.seed(seed);
-}
-
-/**
- * Apply overrides to generated data object
- */
-function applyOverrides<T extends Record<string, any>>(
-  data: T, 
-  overrides: Record<string, any>
-): T {
-  return { ...data, ...overrides };
-}
-
-/**
- * Generate unique identifier with optional prefix
- */
-function generateId(prefix?: string): string {
-  const id = faker.string.uuid();
-  return prefix ? `${prefix}_${id}` : id;
-}
-
-/**
- * Generate realistic database connection string
- */
-function generateConnectionString(type: string, config: any): string {
-  switch (type) {
-    case 'mysql':
-      return `mysql://${config.username}:${config.password}@${config.host}:${config.port}/${config.database}`;
-    case 'postgresql':
-      return `postgresql://${config.username}:${config.password}@${config.host}:${config.port}/${config.database}`;
-    case 'mongodb':
-      return `mongodb://${config.username}:${config.password}@${config.host}:${config.port}/${config.database}`;
-    default:
-      return `${type}://${config.host}:${config.port}/${config.database}`;
+export interface FactoryConfig {
+  /** Enable realistic data generation using Faker.js */
+  realistic?: boolean
+  
+  /** Seed for consistent test data across test runs */
+  seed?: number
+  
+  /** Locale for internationalized data generation */
+  locale?: string
+  
+  /** Performance optimization for large dataset generation */
+  performance?: {
+    useCache?: boolean
+    batchSize?: number
+    maxItems?: number
+  }
+  
+  /** Vitest-specific configuration */
+  vitest?: {
+    mockDepth?: number
+    enableSnapshots?: boolean
+    coverageThreshold?: number
+  }
+  
+  /** React Query/SWR testing optimizations */
+  queryOptimization?: {
+    enableCaching?: boolean
+    staleTime?: number
+    cacheTime?: number
+    enableOptimistic?: boolean
   }
 }
 
-// ============================================================================
+/**
+ * Default factory configuration optimized for React ecosystem testing
+ */
+const DEFAULT_FACTORY_CONFIG: Required<FactoryConfig> = {
+  realistic: true,
+  seed: 12345,
+  locale: 'en',
+  performance: {
+    useCache: true,
+    batchSize: 100,
+    maxItems: 1000
+  },
+  vitest: {
+    mockDepth: 3,
+    enableSnapshots: true,
+    coverageThreshold: 90
+  },
+  queryOptimization: {
+    enableCaching: true,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    cacheTime: 10 * 60 * 1000, // 10 minutes
+    enableOptimistic: true
+  }
+}
+
+// =================================================================================================
+// OPENAPI SPECIFICATION FACTORIES
+// =================================================================================================
+
+/**
+ * OpenAPI specification factory for comprehensive API documentation testing
+ * Generates valid OpenAPI 3.0+ specifications with configurable complexity
+ */
+export class OpenAPISpecificationFactory implements TestFixtureFactory<OpenAPISpec> {
+  private config: Required<FactoryConfig>
+  
+  constructor(config: FactoryConfig = {}) {
+    this.config = { ...DEFAULT_FACTORY_CONFIG, ...config }
+  }
+  
+  /**
+   * Creates a complete OpenAPI specification with realistic endpoints
+   */
+  create(overrides: Partial<OpenAPISpec> = {}): OpenAPISpec {
+    const baseSpec: OpenAPISpec = {
+      openapi: '3.0.3',
+      info: {
+        title: 'DreamFactory Database API',
+        version: '1.0.0',
+        description: 'Auto-generated REST API for database operations',
+        contact: {
+          name: 'DreamFactory Support',
+          email: 'support@dreamfactory.com',
+          url: 'https://dreamfactory.com/support'
+        },
+        license: {
+          name: 'MIT',
+          url: 'https://opensource.org/licenses/MIT'
+        },
+        termsOfService: 'https://dreamfactory.com/terms'
+      },
+      servers: [
+        {
+          url: 'https://api.example.com/api/v2',
+          description: 'Production server'
+        },
+        {
+          url: 'https://staging-api.example.com/api/v2',
+          description: 'Staging server'
+        },
+        {
+          url: 'http://localhost:8000/api/v2',
+          description: 'Development server'
+        }
+      ],
+      paths: this.createPaths(),
+      components: {
+        schemas: this.createSchemas(),
+        responses: this.createResponses(),
+        parameters: this.createParameters(),
+        securitySchemes: this.createSecuritySchemes()
+      },
+      security: [
+        { apiKey: [] },
+        { bearerAuth: [] }
+      ],
+      tags: this.createTags(),
+      'x-dreamfactory': {
+        serviceId: 1,
+        serviceName: 'mysql_db',
+        serviceType: 'database',
+        generated: new Date().toISOString(),
+        generator: {
+          name: 'DreamFactory Admin Interface',
+          version: '5.0.0'
+        },
+        cache: {
+          ttl: 300,
+          strategy: 'intelligent'
+        },
+        performance: {
+          optimizations: ['lazy-loading', 'virtual-scrolling', 'request-batching'],
+          benchmarks: {
+            generateTime: 2.5,
+            specSize: 125000,
+            endpointCount: 24
+          }
+        }
+      },
+      'x-nextjs': {
+        apiRoutes: {
+          'GET /users': {
+            path: '/api/v2/users',
+            method: 'GET',
+            handler: 'getUsersHandler'
+          },
+          'POST /users': {
+            path: '/api/v2/users',
+            method: 'POST',
+            handler: 'createUserHandler'
+          }
+        },
+        serverless: true,
+        edge: true,
+        middleware: ['auth', 'cors', 'rate-limit']
+      }
+    }
+    
+    return { ...baseSpec, ...overrides }
+  }
+  
+  /**
+   * Creates multiple OpenAPI specifications for testing large datasets
+   */
+  createMany(count: number, overrides: Partial<OpenAPISpec> = {}): OpenAPISpec[] {
+    return Array.from({ length: count }, (_, index) => 
+      this.create({
+        ...overrides,
+        info: {
+          ...overrides.info,
+          title: `${overrides.info?.title || 'API'} ${index + 1}`,
+          version: `1.${index}.0`
+        }
+      })
+    )
+  }
+  
+  /**
+   * Creates invalid OpenAPI specification for error testing
+   */
+  createInvalid(invalidFields: (keyof OpenAPISpec)[] = ['openapi']): Partial<OpenAPISpec> {
+    const spec = this.create()
+    const invalid: Partial<OpenAPISpec> = {}
+    
+    invalidFields.forEach(field => {
+      switch (field) {
+        case 'openapi':
+          // @ts-expect-error - Intentionally invalid version for testing
+          invalid.openapi = '2.0.0' // Invalid version
+          break
+        case 'info':
+          // @ts-expect-error - Missing required title field
+          invalid.info = { version: '1.0.0' }
+          break
+        case 'paths':
+          // @ts-expect-error - Invalid path structure
+          invalid.paths = 'invalid-paths'
+          break
+      }
+    })
+    
+    return { ...spec, ...invalid }
+  }
+  
+  /**
+   * Creates OpenAPI spec with related service configuration
+   */
+  createWithRelations(relations: Record<string, unknown>): OpenAPISpec {
+    const spec = this.create()
+    
+    if (relations.service) {
+      const service = relations.service as Service
+      spec['x-dreamfactory'] = {
+        ...spec['x-dreamfactory']!,
+        serviceId: service.id,
+        serviceName: service.name,
+        serviceType: service.type
+      }
+    }
+    
+    if (relations.endpoints) {
+      const endpoints = relations.endpoints as EndpointConfig[]
+      spec.paths = this.createPathsFromEndpoints(endpoints)
+    }
+    
+    return spec
+  }
+  
+  /**
+   * Creates realistic API paths with full CRUD operations
+   */
+  private createPaths(): Record<string, OpenAPIPath> {
+    return {
+      '/users': {
+        get: this.createOperation('get', 'users', 'Get all users'),
+        post: this.createOperation('post', 'users', 'Create a new user')
+      },
+      '/users/{id}': {
+        get: this.createOperation('get', 'users', 'Get user by ID'),
+        put: this.createOperation('put', 'users', 'Update user'),
+        patch: this.createOperation('patch', 'users', 'Partially update user'),
+        delete: this.createOperation('delete', 'users', 'Delete user'),
+        parameters: [{
+          name: 'id',
+          in: 'path',
+          required: true,
+          description: 'User ID',
+          schema: { type: 'integer', minimum: 1 }
+        }]
+      },
+      '/products': {
+        get: this.createOperation('get', 'products', 'Get all products'),
+        post: this.createOperation('post', 'products', 'Create a new product')
+      },
+      '/products/{id}': {
+        get: this.createOperation('get', 'products', 'Get product by ID'),
+        put: this.createOperation('put', 'products', 'Update product'),
+        delete: this.createOperation('delete', 'products', 'Delete product'),
+        parameters: [{
+          name: 'id',
+          in: 'path',
+          required: true,
+          description: 'Product ID',
+          schema: { type: 'integer', minimum: 1 }
+        }]
+      },
+      '/orders': {
+        get: this.createOperation('get', 'orders', 'Get all orders'),
+        post: this.createOperation('post', 'orders', 'Create a new order')
+      }
+    }
+  }
+  
+  /**
+   * Creates OpenAPI operation for specific HTTP method and resource
+   */
+  private createOperation(method: string, resource: string, summary: string): OpenAPIOperation {
+    const operation: OpenAPIOperation = {
+      operationId: `${method}${resource.charAt(0).toUpperCase() + resource.slice(1)}`,
+      summary,
+      description: `${summary} with comprehensive validation and error handling`,
+      tags: [resource],
+      responses: {
+        '200': {
+          description: 'Successful operation',
+          content: {
+            'application/json': {
+              schema: method === 'get' && !summary.includes('by ID') 
+                ? { 
+                    type: 'object',
+                    properties: {
+                      data: {
+                        type: 'array',
+                        items: { $ref: `#/components/schemas/${resource.slice(0, -1)}` }
+                      },
+                      meta: { $ref: '#/components/schemas/PaginationMeta' }
+                    }
+                  }
+                : { $ref: `#/components/schemas/${resource.slice(0, -1)}` }
+            }
+          }
+        },
+        '400': { $ref: '#/components/responses/BadRequest' },
+        '401': { $ref: '#/components/responses/Unauthorized' },
+        '403': { $ref: '#/components/responses/Forbidden' },
+        '404': { $ref: '#/components/responses/NotFound' },
+        '422': { $ref: '#/components/responses/ValidationError' },
+        '500': { $ref: '#/components/responses/InternalServerError' }
+      },
+      security: [{ apiKey: [] }, { bearerAuth: [] }]
+    }
+    
+    // Add request body for POST and PUT operations
+    if (['post', 'put', 'patch'].includes(method)) {
+      operation.requestBody = {
+        required: method !== 'patch',
+        content: {
+          'application/json': {
+            schema: { $ref: `#/components/schemas/${resource.slice(0, -1)}Input` }
+          }
+        }
+      }
+    }
+    
+    // Add query parameters for GET operations
+    if (method === 'get' && !summary.includes('by ID')) {
+      operation.parameters = [
+        {
+          name: 'limit',
+          in: 'query',
+          description: 'Number of items to return',
+          schema: { type: 'integer', minimum: 1, maximum: 1000, default: 25 }
+        },
+        {
+          name: 'offset',
+          in: 'query',
+          description: 'Number of items to skip',
+          schema: { type: 'integer', minimum: 0, default: 0 }
+        },
+        {
+          name: 'filter',
+          in: 'query',
+          description: 'SQL-style filter conditions',
+          schema: { type: 'string' }
+        },
+        {
+          name: 'fields',
+          in: 'query',
+          description: 'Comma-separated list of fields to return',
+          schema: { type: 'string' }
+        },
+        {
+          name: 'order',
+          in: 'query',
+          description: 'Field to order by',
+          schema: { type: 'string' }
+        }
+      ]
+    }
+    
+    return operation
+  }
+  
+  /**
+   * Creates reusable schema components
+   */
+  private createSchemas(): Record<string, OpenAPISchema> {
+    return {
+      User: {
+        type: 'object',
+        required: ['id', 'email', 'first_name', 'last_name'],
+        properties: {
+          id: { type: 'integer', readOnly: true, example: 1 },
+          email: { type: 'string', format: 'email', example: 'user@example.com' },
+          first_name: { type: 'string', minLength: 1, maxLength: 50, example: 'John' },
+          last_name: { type: 'string', minLength: 1, maxLength: 50, example: 'Doe' },
+          phone: { type: 'string', nullable: true, example: '+1-555-123-4567' },
+          is_active: { type: 'boolean', default: true },
+          created_date: { type: 'string', format: 'date-time', readOnly: true },
+          last_modified_date: { type: 'string', format: 'date-time', readOnly: true }
+        }
+      },
+      UserInput: {
+        type: 'object',
+        required: ['email', 'first_name', 'last_name'],
+        properties: {
+          email: { type: 'string', format: 'email' },
+          first_name: { type: 'string', minLength: 1, maxLength: 50 },
+          last_name: { type: 'string', minLength: 1, maxLength: 50 },
+          phone: { type: 'string', nullable: true },
+          is_active: { type: 'boolean', default: true }
+        }
+      },
+      Product: {
+        type: 'object',
+        required: ['id', 'name', 'price'],
+        properties: {
+          id: { type: 'integer', readOnly: true, example: 1 },
+          name: { type: 'string', minLength: 1, maxLength: 100, example: 'Laptop' },
+          description: { type: 'string', nullable: true, example: 'High-performance laptop' },
+          price: { type: 'number', minimum: 0, example: 999.99 },
+          category_id: { type: 'integer', example: 1 },
+          in_stock: { type: 'boolean', default: true },
+          created_date: { type: 'string', format: 'date-time', readOnly: true },
+          last_modified_date: { type: 'string', format: 'date-time', readOnly: true }
+        }
+      },
+      ProductInput: {
+        type: 'object',
+        required: ['name', 'price'],
+        properties: {
+          name: { type: 'string', minLength: 1, maxLength: 100 },
+          description: { type: 'string', nullable: true },
+          price: { type: 'number', minimum: 0 },
+          category_id: { type: 'integer' },
+          in_stock: { type: 'boolean', default: true }
+        }
+      },
+      Order: {
+        type: 'object',
+        required: ['id', 'user_id', 'total', 'status'],
+        properties: {
+          id: { type: 'integer', readOnly: true, example: 1 },
+          user_id: { type: 'integer', example: 1 },
+          total: { type: 'number', minimum: 0, example: 1299.98 },
+          status: { 
+            type: 'string', 
+            enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled'],
+            example: 'pending'
+          },
+          order_items: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/OrderItem' }
+          },
+          created_date: { type: 'string', format: 'date-time', readOnly: true },
+          last_modified_date: { type: 'string', format: 'date-time', readOnly: true }
+        }
+      },
+      OrderItem: {
+        type: 'object',
+        required: ['product_id', 'quantity', 'price'],
+        properties: {
+          product_id: { type: 'integer', example: 1 },
+          quantity: { type: 'integer', minimum: 1, example: 2 },
+          price: { type: 'number', minimum: 0, example: 999.99 }
+        }
+      },
+      PaginationMeta: {
+        type: 'object',
+        properties: {
+          count: { type: 'integer', example: 25 },
+          offset: { type: 'integer', example: 0 },
+          limit: { type: 'integer', example: 25 },
+          total: { type: 'integer', example: 150 }
+        }
+      },
+      Error: {
+        type: 'object',
+        required: ['error'],
+        properties: {
+          error: {
+            type: 'object',
+            required: ['code', 'message'],
+            properties: {
+              code: { type: 'integer', example: 400 },
+              message: { type: 'string', example: 'Bad Request' },
+              details: { type: 'string', nullable: true }
+            }
+          }
+        }
+      },
+      ValidationError: {
+        type: 'object',
+        required: ['error'],
+        properties: {
+          error: {
+            type: 'object',
+            required: ['code', 'message', 'validation_errors'],
+            properties: {
+              code: { type: 'integer', example: 422 },
+              message: { type: 'string', example: 'Validation failed' },
+              validation_errors: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  required: ['field', 'message'],
+                  properties: {
+                    field: { type: 'string', example: 'email' },
+                    message: { type: 'string', example: 'Email is required' }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  /**
+   * Creates reusable response components
+   */
+  private createResponses(): Record<string, OpenAPIResponse> {
+    return {
+      BadRequest: {
+        description: 'Bad Request',
+        content: {
+          'application/json': {
+            schema: { $ref: '#/components/schemas/Error' }
+          }
+        }
+      },
+      Unauthorized: {
+        description: 'Authentication required',
+        content: {
+          'application/json': {
+            schema: { $ref: '#/components/schemas/Error' }
+          }
+        }
+      },
+      Forbidden: {
+        description: 'Insufficient permissions',
+        content: {
+          'application/json': {
+            schema: { $ref: '#/components/schemas/Error' }
+          }
+        }
+      },
+      NotFound: {
+        description: 'Resource not found',
+        content: {
+          'application/json': {
+            schema: { $ref: '#/components/schemas/Error' }
+          }
+        }
+      },
+      ValidationError: {
+        description: 'Validation error',
+        content: {
+          'application/json': {
+            schema: { $ref: '#/components/schemas/ValidationError' }
+          }
+        }
+      },
+      InternalServerError: {
+        description: 'Internal server error',
+        content: {
+          'application/json': {
+            schema: { $ref: '#/components/schemas/Error' }
+          }
+        }
+      }
+    }
+  }
+  
+  /**
+   * Creates reusable parameter components
+   */
+  private createParameters(): Record<string, OpenAPIParameter> {
+    return {
+      IdPath: {
+        name: 'id',
+        in: 'path',
+        required: true,
+        description: 'Resource ID',
+        schema: { type: 'integer', minimum: 1 }
+      },
+      LimitQuery: {
+        name: 'limit',
+        in: 'query',
+        description: 'Number of items to return',
+        schema: { type: 'integer', minimum: 1, maximum: 1000, default: 25 }
+      },
+      OffsetQuery: {
+        name: 'offset',
+        in: 'query',
+        description: 'Number of items to skip',
+        schema: { type: 'integer', minimum: 0, default: 0 }
+      },
+      FilterQuery: {
+        name: 'filter',
+        in: 'query',
+        description: 'SQL-style filter conditions',
+        schema: { type: 'string' }
+      }
+    }
+  }
+  
+  /**
+   * Creates security scheme definitions
+   */
+  private createSecuritySchemes(): Record<string, any> {
+    return {
+      apiKey: {
+        type: 'apiKey',
+        in: 'header',
+        name: 'X-DreamFactory-API-Key',
+        description: 'API key for authentication'
+      },
+      bearerAuth: {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        description: 'JWT token authentication'
+      }
+    }
+  }
+  
+  /**
+   * Creates API documentation tags
+   */
+  private createTags(): Array<{ name: string; description?: string }> {
+    return [
+      { name: 'users', description: 'User management operations' },
+      { name: 'products', description: 'Product catalog operations' },
+      { name: 'orders', description: 'Order processing operations' }
+    ]
+  }
+  
+  /**
+   * Creates paths from endpoint configurations
+   */
+  private createPathsFromEndpoints(endpoints: EndpointConfig[]): Record<string, OpenAPIPath> {
+    const paths: Record<string, OpenAPIPath> = {}
+    
+    endpoints.forEach(endpoint => {
+      if (!paths[endpoint.path]) {
+        paths[endpoint.path] = {}
+      }
+      
+      const method = endpoint.method.toLowerCase() as keyof OpenAPIPath
+      paths[endpoint.path][method] = this.createOperationFromEndpoint(endpoint)
+    })
+    
+    return paths
+  }
+  
+  /**
+   * Creates OpenAPI operation from endpoint configuration
+   */
+  private createOperationFromEndpoint(endpoint: EndpointConfig): OpenAPIOperation {
+    return {
+      operationId: endpoint.operationId || `${endpoint.method.toLowerCase()}${endpoint.path.replace(/[^a-zA-Z0-9]/g, '')}`,
+      summary: endpoint.description || `${endpoint.method} operation`,
+      description: endpoint.description,
+      tags: endpoint.tags || [],
+      parameters: endpoint.pathParameters?.map(param => ({
+        name: param.name,
+        in: 'path' as const,
+        required: param.required,
+        description: param.description,
+        schema: { type: param.type as any }
+      })),
+      requestBody: endpoint.requestBody,
+      responses: endpoint.responses || {
+        '200': { description: 'Successful operation' }
+      },
+      security: endpoint.security?.map(sec => ({ [sec.type]: [] }))
+    }
+  }
+}
+
+// =================================================================================================
 // SERVICE CONFIGURATION FACTORIES
-// ============================================================================
+// =================================================================================================
 
 /**
- * Generate complete database service configuration for testing
+ * Service configuration factory for database service testing
+ * Generates realistic service configurations with proper validation schemas
  */
-export function createDatabaseServiceFactory(
-  options: Partial<DatabaseFactoryOptions> = {}
-): Service {
-  const config = { ...DEFAULT_DATABASE_OPTIONS, ...options };
-  initializeFaker(config.seed);
-
-  const serviceConfig: ServiceConfiguration = {
-    host: config.useRealisticData ? faker.internet.domainName() : 'localhost',
-    port: config.useRealisticData ? faker.internet.port() : 3306,
-    database: config.useRealisticData ? faker.database.name() : 'test_db',
-    username: config.useRealisticData ? faker.internet.userName() : 'testuser',
-    password: config.useRealisticData ? faker.internet.password() : 'testpass',
-    maxConnections: config.includePooling ? faker.number.int({ min: 5, max: 50 }) : undefined,
-    connectionTimeout: config.includePooling ? faker.number.int({ min: 5000, max: 30000 }) : undefined,
-    sslMode: config.includeSSL ? faker.helpers.arrayElement(['require', 'prefer', 'disable']) : undefined,
-    sslCert: config.includeSSL ? '/path/to/cert.pem' : undefined,
-  };
-
-  const service: Service = {
-    id: faker.number.int({ min: 1, max: 1000 }),
-    name: config.useRealisticData ? 
-      faker.company.name().toLowerCase().replace(/[^a-z0-9]/g, '_') : 
-      'test_service',
-    label: config.useRealisticData ? 
-      `${faker.company.name()} ${config.databaseType.toUpperCase()} Database` :
-      'Test Database Service',
-    description: config.useRealisticData ?
-      faker.lorem.sentence() :
-      'Test database service for API generation',
-    isActive: faker.datatype.boolean({ probability: 0.8 }),
-    type: config.databaseType as ServiceType,
-    mutable: true,
-    deletable: true,
-    createdDate: faker.date.past({ years: 1 }).toISOString(),
-    lastModifiedDate: faker.date.recent({ days: 30 }).toISOString(),
-    createdById: faker.number.int({ min: 1, max: 100 }),
-    lastModifiedById: faker.number.int({ min: 1, max: 100 }),
-    config: serviceConfig,
-    serviceDocByServiceId: null,
-    refresh: false,
-    tags: config.useRealisticData ? 
-      faker.helpers.arrayElements(['production', 'staging', 'development'], { min: 0, max: 2 }) :
-      ['test'],
-    version: '1.0.0',
-    healthStatus: createServiceHealthStatusFactory({ seed: config.seed }),
-    metrics: createServiceMetricsFactory({ seed: config.seed }),
-  };
-
-  return applyOverrides(service, config.overrides);
-}
-
-/**
- * Generate service row data for table display testing
- */
-export function createServiceRowFactory(
-  options: Partial<DatabaseFactoryOptions> = {}
-): ServiceRow {
-  const config = { ...DEFAULT_DATABASE_OPTIONS, ...options };
-  initializeFaker(config.seed);
-
-  const serviceRow: ServiceRow = {
-    id: faker.number.int({ min: 1, max: 1000 }),
-    name: config.useRealisticData ? 
-      faker.company.name().toLowerCase().replace(/[^a-z0-9]/g, '_') : 
-      'test_service',
-    label: config.useRealisticData ? 
-      `${faker.company.name()} Database` :
-      'Test Service',
-    description: config.useRealisticData ?
-      faker.lorem.sentence() :
-      'Test database service',
-    type: config.databaseType as ServiceType,
-    group: 'Database',
-    scripting: faker.helpers.arrayElement(['V8js', 'Python', 'PHP', 'NodeJS']),
-    active: faker.datatype.boolean({ probability: 0.8 }),
-    deletable: true,
-    healthStatus: createServiceHealthStatusFactory({ seed: config.seed }),
-    lastTested: faker.date.recent({ days: 7 }).toISOString(),
-    connectionStatus: faker.helpers.arrayElement(['connected', 'disconnected', 'testing', 'error']),
-  };
-
-  return applyOverrides(serviceRow, config.overrides);
-}
-
-/**
- * Generate service type definition for configuration testing
- */
-export function createServiceTypeDefinitionFactory(
-  options: Partial<DatabaseFactoryOptions> = {}
-): ServiceTypeDefinition {
-  const config = { ...DEFAULT_DATABASE_OPTIONS, ...options };
-  initializeFaker(config.seed);
-
-  const serviceType: ServiceTypeDefinition = {
-    name: config.databaseType,
-    label: `${config.databaseType.toUpperCase()} Database`,
-    description: config.useRealisticData ?
-      faker.lorem.sentences(2) :
-      `${config.databaseType} database service type`,
-    group: 'Database',
-    class: `DreamFactory\\Core\\${config.databaseType.charAt(0).toUpperCase() + config.databaseType.slice(1)}\\Services\\${config.databaseType.charAt(0).toUpperCase() + config.databaseType.slice(1)}`,
-    configSchema: createConfigSchemaFactory(config),
-    capabilities: {
-      supportsGeneratedAPIs: true,
-      supportsCustomAPIs: false,
-      supportsSchemaDiscovery: true,
-      supportsTransactions: config.databaseType !== 'mongodb',
-      supportsStoredProcedures: ['mysql', 'postgresql', 'sql_server', 'oracle'].includes(config.databaseType),
-      supportsCaching: true,
-      supportsFiltering: true,
-      supportsPagination: true,
-      supportsRelationships: config.databaseType !== 'mongodb',
-      supportsEventScripts: true,
-      requiresAuthentication: true,
-      connectionTesting: true,
-    },
-    documentation: {
-      url: `https://docs.dreamfactory.com/services/${config.databaseType}`,
-      version: '2.0',
-    },
-    icon: `df-${config.databaseType}`,
-    category: 'basic',
-    deprecated: false,
-  };
-
-  return applyOverrides(serviceType, config.overrides);
-}
-
-/**
- * Generate configuration schema for service setup testing
- */
-function createConfigSchemaFactory(
-  config: Required<DatabaseFactoryOptions>
-): any[] {
-  const baseSchema = [
-    {
-      name: 'host',
-      label: 'Host',
-      type: 'string',
-      description: 'Database server hostname or IP address',
-      alias: 'host',
-      required: true,
-      category: 'basic',
-    },
-    {
-      name: 'port',
-      label: 'Port',
-      type: 'integer',
-      description: 'Database server port number',
-      alias: 'port',
-      required: false,
-      default: config.databaseType === 'mysql' ? 3306 : 
-               config.databaseType === 'postgresql' ? 5432 :
-               config.databaseType === 'mongodb' ? 27017 : 5432,
-      category: 'basic',
-    },
-    {
-      name: 'database',
-      label: 'Database',
-      type: 'string',
-      description: 'Database name or schema',
-      alias: 'database',
-      required: true,
-      category: 'basic',
-    },
-    {
-      name: 'username',
-      label: 'Username',
-      type: 'string',
-      description: 'Database authentication username',
-      alias: 'username',
-      required: true,
-      category: 'basic',
-    },
-    {
-      name: 'password',
-      label: 'Password',
-      type: 'password',
-      description: 'Database authentication password',
-      alias: 'password',
-      required: true,
-      category: 'basic',
-    },
-  ];
-
-  if (config.includePooling) {
-    baseSchema.push(
+export class ServiceConfigurationFactory implements TestFixtureFactory<Service> {
+  private config: Required<FactoryConfig>
+  private openApiFactory: OpenAPISpecificationFactory
+  
+  constructor(config: FactoryConfig = {}) {
+    this.config = { ...DEFAULT_FACTORY_CONFIG, ...config }
+    this.openApiFactory = new OpenAPISpecificationFactory(config)
+  }
+  
+  /**
+   * Creates a complete database service configuration
+   */
+  create(overrides: Partial<Service> = {}): Service {
+    const baseService: Service = {
+      id: 1,
+      name: 'mysql_customers',
+      label: 'Customer Database',
+      description: 'MySQL database containing customer and order data',
+      isActive: true,
+      type: 'mysql',
+      mutable: true,
+      deletable: true,
+      createdDate: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+      lastModifiedDate: new Date().toISOString(),
+      createdById: 1,
+      lastModifiedById: 1,
+      config: {
+        host: 'localhost',
+        port: 3306,
+        database: 'customers',
+        username: 'df_user',
+        password: '***',
+        driver: 'mysql',
+        options: {
+          charset: 'utf8mb4',
+          collation: 'utf8mb4_unicode_ci'
+        },
+        attributes: {
+          persistent: false,
+          timeout: 30,
+          retry_count: 3,
+          ssl: {
+            enabled: false
+          }
+        }
+      },
+      serviceDocByServiceId: null,
+      refresh: false,
+      status: 'active',
+      health: {
+        status: 'healthy',
+        lastCheck: new Date().toISOString(),
+        message: 'Connection established successfully',
+        metrics: {
+          responseTime: 45,
+          errorRate: 0,
+          throughput: 150
+        }
+      },
+      cache: {
+        lastUpdate: new Date().toISOString(),
+        ttl: 300,
+        invalidation: 'automatic'
+      },
+      openapi: {
+        specUrl: '/api/v2/mysql_customers/_schema',
+        generatedAt: new Date().toISOString(),
+        version: '3.0.3',
+        endpointCount: 24
+      }
+    }
+    
+    return { ...baseService, ...overrides }
+  }
+  
+  /**
+   * Creates multiple service configurations for testing
+   */
+  createMany(count: number, overrides: Partial<Service> = {}): Service[] {
+    return Array.from({ length: count }, (_, index) => 
+      this.create({
+        ...overrides,
+        id: index + 1,
+        name: `${overrides.name || 'test_service'}_${index + 1}`,
+        label: `${overrides.label || 'Test Service'} ${index + 1}`
+      })
+    )
+  }
+  
+  /**
+   * Creates invalid service configuration for error testing
+   */
+  createInvalid(invalidFields: (keyof Service)[] = ['name']): Partial<Service> {
+    const service = this.create()
+    const invalid: Partial<Service> = {}
+    
+    invalidFields.forEach(field => {
+      switch (field) {
+        case 'name':
+          // @ts-expect-error - Invalid name for testing
+          invalid.name = ''
+          break
+        case 'type':
+          // @ts-expect-error - Invalid type for testing
+          invalid.type = 'invalid_type'
+          break
+        case 'config':
+          invalid.config = {}
+          break
+      }
+    })
+    
+    return { ...service, ...invalid }
+  }
+  
+  /**
+   * Creates service with related OpenAPI specification
+   */
+  createWithRelations(relations: Record<string, unknown>): Service {
+    const service = this.create()
+    
+    if (relations.openapi) {
+      const openapi = relations.openapi as OpenAPISpec
+      service.openapi = {
+        specUrl: `/api/v2/${service.name}/_schema`,
+        generatedAt: new Date().toISOString(),
+        version: openapi.openapi,
+        endpointCount: Object.keys(openapi.paths).length
+      }
+    }
+    
+    return service
+  }
+  
+  /**
+   * Creates service type configuration for form testing
+   */
+  createServiceType(type: ServiceCategory = 'database'): ServiceType {
+    const serviceTypes: Record<ServiceCategory, ServiceType> = {
+      database: {
+        name: 'mysql',
+        label: 'MySQL Database',
+        description: 'MySQL database connector with full CRUD operations',
+        group: 'database',
+        class: 'DreamFactory\\Core\\Database\\Services\\MySQLService',
+        configSchema: this.createDatabaseConfigSchema(),
+        icon: 'database',
+        color: '#4285f4',
+        supportsMultipleInstances: true,
+        minimumVersion: '4.0.0',
+        licenseRequired: false,
+        capabilities: {
+          apiGeneration: true,
+          realTime: false,
+          transactions: true,
+          batchOperations: true,
+          eventScripts: true
+        },
+        react: {
+          customFormComponent: 'DatabaseServiceForm',
+          validationSchema: undefined, // Would contain Zod schema
+          defaultValues: {
+            host: 'localhost',
+            port: 3306,
+            driver: 'mysql'
+          },
+          fieldGroups: [
+            {
+              name: 'connection',
+              label: 'Connection Settings',
+              fields: ['host', 'port', 'database', 'username', 'password'],
+              collapsible: false
+            },
+            {
+              name: 'options',
+              label: 'Advanced Options',
+              fields: ['charset', 'collation', 'timeout'],
+              collapsible: true
+            }
+          ]
+        },
+        nextjs: {
+          apiRoutes: {
+            test: '/api/services/test-connection',
+            deploy: '/api/services/deploy',
+            preview: '/api/services/preview',
+            validate: '/api/services/validate'
+          },
+          ssrSupported: true,
+          edgeCompatible: false
+        }
+      },
+      email: {
+        name: 'smtp',
+        label: 'SMTP Email',
+        description: 'SMTP email service for notifications',
+        group: 'email',
+        configSchema: [],
+        capabilities: {}
+      },
+      file: {
+        name: 's3',
+        label: 'Amazon S3',
+        description: 'Amazon S3 file storage service',
+        group: 'file',
+        configSchema: [],
+        capabilities: {}
+      },
+      oauth: {
+        name: 'oauth_google',
+        label: 'Google OAuth',
+        description: 'Google OAuth authentication provider',
+        group: 'oauth',
+        configSchema: [],
+        capabilities: {}
+      },
+      ldap: {
+        name: 'ldap',
+        label: 'LDAP',
+        description: 'LDAP directory service',
+        group: 'ldap',
+        configSchema: [],
+        capabilities: {}
+      },
+      saml: {
+        name: 'saml',
+        label: 'SAML SSO',
+        description: 'SAML single sign-on provider',
+        group: 'saml',
+        configSchema: [],
+        capabilities: {}
+      },
+      script: {
+        name: 'nodejs',
+        label: 'Node.js Script',
+        description: 'Server-side Node.js scripting',
+        group: 'script',
+        configSchema: [],
+        capabilities: {}
+      },
+      cache: {
+        name: 'redis',
+        label: 'Redis Cache',
+        description: 'Redis caching service',
+        group: 'cache',
+        configSchema: [],
+        capabilities: {}
+      },
+      push: {
+        name: 'fcm',
+        label: 'Firebase Push',
+        description: 'Firebase Cloud Messaging',
+        group: 'push',
+        configSchema: [],
+        capabilities: {}
+      },
+      remote_web: {
+        name: 'rest',
+        label: 'REST Service',
+        description: 'Remote REST web service',
+        group: 'remote_web',
+        configSchema: [],
+        capabilities: {}
+      },
+      soap: {
+        name: 'soap',
+        label: 'SOAP Service',
+        description: 'SOAP web service connector',
+        group: 'soap',
+        configSchema: [],
+        capabilities: {}
+      },
+      rpc: {
+        name: 'jsonrpc',
+        label: 'JSON-RPC',
+        description: 'JSON-RPC service connector',
+        group: 'rpc',
+        configSchema: [],
+        capabilities: {}
+      },
+      http: {
+        name: 'http',
+        label: 'HTTP Service',
+        description: 'Generic HTTP service connector',
+        group: 'http',
+        configSchema: [],
+        capabilities: {}
+      },
+      api_key: {
+        name: 'api_key',
+        label: 'API Key Auth',
+        description: 'API key authentication service',
+        group: 'api_key',
+        configSchema: [],
+        capabilities: {}
+      },
+      jwt: {
+        name: 'jwt',
+        label: 'JWT Auth',
+        description: 'JWT token authentication service',
+        group: 'jwt',
+        configSchema: [],
+        capabilities: {}
+      },
+      custom: {
+        name: 'custom',
+        label: 'Custom Service',
+        description: 'Custom service implementation',
+        group: 'custom',
+        configSchema: [],
+        capabilities: {}
+      }
+    }
+    
+    return serviceTypes[type]
+  }
+  
+  /**
+   * Creates database service configuration schema for forms
+   */
+  private createDatabaseConfigSchema(): ServiceConfigSchema[] {
+    return [
       {
-        name: 'max_connections',
-        label: 'Max Connections',
-        type: 'integer',
-        description: 'Maximum number of concurrent connections',
-        alias: 'maxConnections',
-        required: false,
-        default: 10,
-        category: 'advanced',
+        name: 'host',
+        label: 'Host',
+        type: 'string',
+        description: 'Database server hostname or IP address',
+        required: true,
+        default: 'localhost',
+        validation: {
+          pattern: '^[a-zA-Z0-9.-]+$',
+          minLength: 1,
+          maxLength: 255
+        },
+        reactHookForm: {
+          dependencies: ['port'],
+          customValidation: (value: string) => {
+            if (!value.trim()) return 'Host is required'
+            return true
+          },
+          debounceMs: 300
+        }
       },
       {
-        name: 'connection_timeout',
-        label: 'Connection Timeout',
+        name: 'port',
+        label: 'Port',
         type: 'integer',
-        description: 'Connection timeout in milliseconds',
-        alias: 'connectionTimeout',
-        required: false,
-        default: 30000,
-        category: 'advanced',
-      }
-    );
-  }
-
-  if (config.includeSSL) {
-    baseSchema.push(
+        description: 'Database server port number',
+        required: true,
+        default: 3306,
+        validation: {
+          min: 1,
+          max: 65535
+        }
+      },
       {
-        name: 'ssl_mode',
-        label: 'SSL Mode',
+        name: 'database',
+        label: 'Database Name',
+        type: 'string',
+        description: 'Name of the database to connect to',
+        required: true,
+        validation: {
+          minLength: 1,
+          maxLength: 64,
+          pattern: '^[a-zA-Z0-9_]+$'
+        }
+      },
+      {
+        name: 'username',
+        label: 'Username',
+        type: 'string',
+        description: 'Database username',
+        required: true,
+        validation: {
+          minLength: 1,
+          maxLength: 32
+        }
+      },
+      {
+        name: 'password',
+        label: 'Password',
+        type: 'password',
+        description: 'Database password',
+        required: true,
+        validation: {
+          minLength: 1
+        }
+      },
+      {
+        name: 'charset',
+        label: 'Character Set',
         type: 'picklist',
-        description: 'SSL/TLS connection mode',
-        alias: 'sslMode',
-        required: false,
-        picklist: ['disable', 'allow', 'prefer', 'require', 'verify-ca', 'verify-full'],
-        default: 'prefer',
-        category: 'security',
+        description: 'Database character encoding',
+        default: 'utf8mb4',
+        picklist: [
+          { label: 'UTF-8 MB4', value: 'utf8mb4' },
+          { label: 'UTF-8', value: 'utf8' },
+          { label: 'Latin1', value: 'latin1' }
+        ]
+      },
+      {
+        name: 'ssl_enabled',
+        label: 'Enable SSL',
+        type: 'boolean',
+        description: 'Use SSL/TLS encryption for database connections',
+        default: false
       },
       {
         name: 'ssl_cert',
         label: 'SSL Certificate',
         type: 'file_certificate',
-        description: 'Client SSL certificate file',
-        alias: 'sslCert',
-        required: false,
-        category: 'security',
+        description: 'SSL certificate file for secure connections',
+        conditional: {
+          field: 'ssl_enabled',
+          operator: 'equals',
+          value: true
+        }
+      },
+      {
+        name: 'connection_timeout',
+        label: 'Connection Timeout',
+        type: 'integer',
+        description: 'Connection timeout in seconds',
+        default: 30,
+        validation: {
+          min: 5,
+          max: 300
+        }
       }
-    );
+    ]
   }
-
-  return baseSchema;
+  
+  /**
+   * Creates service row data for table display testing
+   */
+  createServiceRow(overrides: Partial<ServiceRow> = {}): ServiceRow {
+    const baseRow: ServiceRow = {
+      id: 1,
+      name: 'mysql_customers',
+      label: 'Customer Database',
+      description: 'MySQL database for customer management',
+      type: 'mysql',
+      scripting: 'Yes',
+      active: true,
+      deletable: true,
+      category: 'database',
+      status: 'active',
+      lastActivity: new Date().toISOString(),
+      endpointCount: 24,
+      healthStatus: 'healthy'
+    }
+    
+    return { ...baseRow, ...overrides }
+  }
 }
 
-// ============================================================================
-// SERVICE TESTING FACTORIES
-// ============================================================================
+// =================================================================================================
+// API GENERATION FACTORIES
+// =================================================================================================
 
 /**
- * Generate service health status for monitoring testing
+ * API generation workflow factory for testing generation wizards
+ * Creates realistic generation steps, progress tracking, and results
  */
-export function createServiceHealthStatusFactory(
-  options: Partial<FactoryOptions> = {}
-): ServiceHealthStatus {
-  const config = { ...DEFAULT_FACTORY_OPTIONS, ...options };
-  initializeFaker(config.seed);
-
-  const healthStatus: ServiceHealthStatus = {
-    status: faker.helpers.arrayElement(['healthy', 'degraded', 'unhealthy', 'unknown']),
-    lastChecked: faker.date.recent({ hours: 1 }).toISOString(),
-    responseTime: faker.number.int({ min: 50, max: 2000 }),
-    errorCount: faker.number.int({ min: 0, max: 10 }),
-    uptime: faker.number.float({ min: 95.0, max: 100.0, fractionDigits: 2 }),
-  };
-
-  return applyOverrides(healthStatus, config.overrides);
-}
-
-/**
- * Generate service metrics for performance testing
- */
-export function createServiceMetricsFactory(
-  options: Partial<FactoryOptions> = {}
-): ServiceMetrics {
-  const config = { ...DEFAULT_FACTORY_OPTIONS, ...options };
-  initializeFaker(config.seed);
-
-  const metrics: ServiceMetrics = {
-    requestCount: faker.number.int({ min: 100, max: 10000 }),
-    errorRate: faker.number.float({ min: 0.0, max: 5.0, fractionDigits: 2 }),
-    averageResponseTime: faker.number.int({ min: 50, max: 1000 }),
-    lastActivity: faker.date.recent({ hours: 2 }).toISOString(),
-    dataVolume: {
-      read: faker.number.int({ min: 1000000, max: 100000000 }),
-      written: faker.number.int({ min: 500000, max: 50000000 }),
-    },
-  };
-
-  return applyOverrides(metrics, config.overrides);
-}
-
-/**
- * Generate service test result for connection testing
- */
-export function createServiceTestResultFactory(
-  options: Partial<DatabaseFactoryOptions> = {}
-): ServiceTestResult {
-  const config = { ...DEFAULT_DATABASE_OPTIONS, ...options };
-  initializeFaker(config.seed);
-
-  const isSuccess = faker.datatype.boolean({ probability: 0.8 });
-
-  const testResult: ServiceTestResult = {
-    success: isSuccess,
-    connectionTime: faker.number.int({ min: 100, max: 5000 }),
-    message: isSuccess ? 
-      'Connection successful' : 
-      'Connection failed: Unable to connect to database',
-    details: isSuccess ? {
-      host: config.useRealisticData ? faker.internet.domainName() : 'localhost',
-      port: config.useRealisticData ? faker.internet.port() : 3306,
-      database: config.useRealisticData ? faker.database.name() : 'test_db',
-      version: faker.system.semver(),
-      features: faker.helpers.arrayElements([
-        'transactions', 'stored_procedures', 'views', 'triggers', 'foreign_keys'
-      ], { min: 2, max: 5 }),
-    } : undefined,
-    error: !isSuccess ? {
-      code: faker.helpers.arrayElement(['CONNECTION_REFUSED', 'AUTHENTICATION_FAILED', 'DATABASE_NOT_FOUND']),
-      message: faker.helpers.arrayElement([
-        'Connection refused by database server',
-        'Authentication failed for user',
-        'Database does not exist'
-      ]),
-      stack: config.includeDebugInfo ? faker.lorem.paragraphs(3) : undefined,
-    } : undefined,
-  };
-
-  return applyOverrides(testResult, config.overrides);
-}
-
-// ============================================================================
-// API DOCUMENTATION FACTORIES
-// ============================================================================
-
-/**
- * Generate OpenAPI specification configuration for documentation testing
- */
-export function createOpenAPIConfigFactory(
-  options: Partial<ApiDocsFactoryOptions> = {}
-): OpenAPIConfig {
-  const config = { ...DEFAULT_API_DOCS_OPTIONS, ...options };
-  initializeFaker(config.seed);
-
-  const openApiConfig: OpenAPIConfig = {
-    version: config.openApiVersion,
-    info: {
-      title: config.useRealisticData ? 
-        `${faker.company.name()} API Documentation` :
-        'Test API Documentation',
-      description: config.useRealisticData ?
-        faker.lorem.paragraph() :
-        'API documentation for testing purposes',
-      version: faker.system.semver(),
-      contact: {
-        name: config.useRealisticData ? faker.person.fullName() : 'Test Developer',
-        email: config.useRealisticData ? faker.internet.email() : 'test@example.com',
-        url: config.useRealisticData ? faker.internet.url() : 'https://example.com',
-      },
-      license: {
-        name: 'MIT',
-        url: 'https://opensource.org/licenses/MIT',
-      },
-    },
-    servers: [
-      {
-        url: config.useRealisticData ? faker.internet.url() : 'https://api.example.com',
-        description: config.useRealisticData ? 
-          `${faker.helpers.arrayElement(['Production', 'Staging', 'Development'])} Server` :
-          'Test Server',
-      },
-    ],
-    security: config.includeAdvancedSecurity ? [
-      { 'BearerAuth': [] },
-      { 'ApiKeyAuth': [] },
-      { 'OAuth2': ['read', 'write'] },
-    ] : [
-      { 'BearerAuth': [] },
-    ],
-    tags: [
-      {
-        name: 'database',
-        description: 'Database operations',
-      },
-      {
-        name: 'authentication',
-        description: 'Authentication endpoints',
-      },
-    ],
-    components: {
-      schemas: {},
-      responses: {},
-      parameters: {},
-    },
-  };
-
-  return applyOverrides(openApiConfig, config.overrides);
-}
-
-/**
- * Generate API endpoint configuration for testing
- */
-export function createAPIEndpointConfigFactory(
-  options: Partial<ApiDocsFactoryOptions> = {}
-): APIEndpointConfig {
-  const config = { ...DEFAULT_API_DOCS_OPTIONS, ...options };
-  initializeFaker(config.seed);
-
-  const endpointConfig: APIEndpointConfig = {
-    serviceName: config.useRealisticData ? 
-      faker.company.name().toLowerCase().replace(/[^a-z0-9]/g, '_') :
-      'test_service',
-    resource: config.useRealisticData ? faker.database.collation() : 'users',
-    methods: faker.helpers.arrayElements(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as HTTPMethod[], 
-                                       { min: 1, max: 5 }),
-    parameters: Array.from({ length: faker.number.int({ min: 1, max: 5 }) }, () => 
-      createEndpointParameterFactory(config)
-    ),
-    authentication: createAuthenticationConfigFactory(config),
-    caching: {
-      enabled: faker.datatype.boolean({ probability: 0.7 }),
-      ttl: faker.number.int({ min: 300, max: 3600 }),
-      key: config.useRealisticData ? faker.string.alphanumeric(8) : 'cache_key',
-      tags: faker.helpers.arrayElements(['database', 'user', 'api'], { min: 1, max: 3 }),
-    },
-    rateLimit: {
-      enabled: faker.datatype.boolean({ probability: 0.6 }),
-      requests: faker.number.int({ min: 100, max: 1000 }),
-      window: faker.number.int({ min: 60, max: 3600 }),
-      message: 'Rate limit exceeded. Please try again later.',
-      headers: true,
-    },
-    validation: createValidationConfigFactory(config),
-    transformation: {
-      request: [],
-      response: [],
-    },
-    documentation: {
-      summary: config.useRealisticData ?
-        faker.lorem.sentence() :
-        'Test API endpoint',
-      description: config.useRealisticData ?
-        faker.lorem.paragraph() :
-        'Test endpoint for API documentation',
-      tags: ['database'],
-      examples: config.includeExamples ? {
-        request: { id: 1, name: 'test' },
-        response: { success: true, data: {} },
-      } : undefined,
-    },
-  };
-
-  return applyOverrides(endpointConfig, config.overrides);
-}
-
-/**
- * Generate endpoint parameter for API testing
- */
-function createEndpointParameterFactory(
-  config: Required<ApiDocsFactoryOptions>
-): EndpointParameter {
-  return {
-    name: config.useRealisticData ? faker.lorem.word() : 'id',
-    type: faker.helpers.arrayElement(['query', 'path', 'header', 'body']),
-    dataType: faker.helpers.arrayElement(['string', 'integer', 'number', 'boolean', 'array', 'object']),
-    required: faker.datatype.boolean({ probability: 0.5 }),
-    description: config.useRealisticData ? faker.lorem.sentence() : 'Test parameter',
-    example: 'test_value',
-  };
-}
-
-/**
- * Generate authentication configuration for security testing
- */
-function createAuthenticationConfigFactory(
-  config: Required<ApiDocsFactoryOptions>
-): AuthenticationConfig {
-  return {
-    required: faker.datatype.boolean({ probability: 0.8 }),
-    methods: faker.helpers.arrayElements(['api_key', 'basic', 'bearer', 'oauth2', 'session'], 
-                                       { min: 1, max: 3 }),
-    roles: config.useRealisticData ? 
-      faker.helpers.arrayElements(['admin', 'user', 'viewer'], { min: 1, max: 2 }) :
-      ['user'],
-    permissions: config.useRealisticData ?
-      faker.helpers.arrayElements(['read', 'write', 'delete'], { min: 1, max: 3 }) :
-      ['read'],
-    customHeaders: config.includeAdvancedSecurity ? {
-      'X-API-Version': '2.0',
-      'X-Client-Type': 'web',
-    } : undefined,
-  };
-}
-
-/**
- * Generate validation configuration for data integrity testing
- */
-function createValidationConfigFactory(
-  config: Required<ApiDocsFactoryOptions>
-): ValidationConfig {
-  return {
-    validateRequest: faker.datatype.boolean({ probability: 0.9 }),
-    validateResponse: faker.datatype.boolean({ probability: 0.8 }),
-    schemas: config.includeValidationSchemas ? {
-      request: {
-        type: 'object',
-        properties: {
-          name: { type: 'string', minLength: 1, maxLength: 255 },
-          email: { type: 'string', format: 'email' },
-        },
-        required: ['name'],
-      },
-      response: {
-        type: 'object',
-        properties: {
-          success: { type: 'boolean' },
-          data: { type: 'object' },
-        },
-        required: ['success'],
-      },
-    } : {},
-    strict: faker.datatype.boolean({ probability: 0.7 }),
-  };
-}
-
-/**
- * Generate OpenAPI preview for documentation testing
- */
-export function createOpenAPIPreviewFactory(
-  options: Partial<ApiDocsFactoryOptions> = {}
-): OpenAPIPreview {
-  const config = { ...DEFAULT_API_DOCS_OPTIONS, ...options };
-  initializeFaker(config.seed);
-
-  const preview: OpenAPIPreview = {
-    spec: createOpenAPIConfigFactory(config),
-    url: config.useRealisticData ? 
-      `${faker.internet.url()}/docs` :
-      'https://api.example.com/docs',
-    downloadUrl: config.useRealisticData ?
-      `${faker.internet.url()}/openapi.json` :
-      'https://api.example.com/openapi.json',
-    lastGenerated: faker.date.recent({ hours: 1 }).toISOString(),
-    errors: faker.datatype.boolean({ probability: 0.2 }) ? [
-      'Schema validation failed for endpoint /users',
-      'Missing required parameter in POST /users endpoint',
-    ] : undefined,
-    warnings: faker.datatype.boolean({ probability: 0.3 }) ? [
-      'Deprecated endpoint /legacy/users should be updated',
-      'Missing description for parameter "limit"',
-    ] : undefined,
-  };
-
-  return applyOverrides(preview, config.overrides);
-}
-
-// ============================================================================
-// API GENERATION WORKFLOW FACTORIES
-// ============================================================================
-
-/**
- * Generate API generation workflow for testing wizard components
- */
-export function createAPIGenerationWorkflowFactory(
-  options: Partial<ApiDocsFactoryOptions> = {}
-): APIGenerationWorkflow {
-  const config = { ...DEFAULT_API_DOCS_OPTIONS, ...options };
-  initializeFaker(config.seed);
-
-  const workflow: APIGenerationWorkflow = {
-    serviceId: faker.number.int({ min: 1, max: 100 }),
-    serviceName: config.useRealisticData ?
-      faker.company.name().toLowerCase().replace(/[^a-z0-9]/g, '_') :
-      'test_service',
-    currentStep: faker.number.int({ min: 0, max: 4 }),
-    steps: [
-      {
+export class APIGenerationFactory {
+  private config: Required<FactoryConfig>
+  
+  constructor(config: FactoryConfig = {}) {
+    this.config = { ...DEFAULT_FACTORY_CONFIG, ...config }
+  }
+  
+  /**
+   * Creates generation step configuration for wizard testing
+   */
+  createGenerationStep(stepId: string, overrides: Partial<GenerationStep> = {}): GenerationStep {
+    const steps: Record<string, GenerationStep> = {
+      'service-selection': {
         id: 'service-selection',
-        title: 'Select Service',
-        description: 'Choose the database service for API generation',
+        name: 'serviceSelection',
+        title: 'Select Database Service',
+        description: 'Choose the database service to generate APIs for',
+        order: 1,
+        required: true,
+        completed: false,
+        valid: false,
+        errors: [],
+        data: {},
         component: 'ServiceSelectionStep',
-        completed: true,
-        required: true,
-        data: { serviceId: faker.number.int({ min: 1, max: 100 }) },
-      },
-      {
-        id: 'table-selection',
-        title: 'Select Tables',
-        description: 'Choose which tables to include in the API',
-        component: 'TableSelectionStep',
-        completed: faker.datatype.boolean({ probability: 0.8 }),
-        required: true,
-        data: { 
-          selectedTables: config.useRealisticData ?
-            faker.helpers.arrayElements(['users', 'orders', 'products', 'categories'], 
-                                      { min: 1, max: 4 }) :
-            ['users', 'orders']
+        navigation: {
+          next: 'schema-discovery',
+          canSkip: false,
+          canGoBack: false
         },
+        config: {
+          defaultValues: {
+            serviceId: null
+          },
+          dependencies: []
+        },
+        progress: {
+          current: 1,
+          total: 5,
+          percentage: 20
+        }
       },
-      {
-        id: 'endpoint-configuration',
-        title: 'Configure Endpoints',
-        description: 'Set up API endpoint parameters and security',
-        component: 'EndpointConfigurationStep',
-        completed: faker.datatype.boolean({ probability: 0.6 }),
+      'schema-discovery': {
+        id: 'schema-discovery',
+        name: 'schemaDiscovery',
+        title: 'Discover Database Schema',
+        description: 'Analyze database structure and select tables for API generation',
+        order: 2,
         required: true,
-        data: { endpoints: [] },
+        completed: false,
+        valid: false,
+        errors: [],
+        data: {},
+        component: 'SchemaDiscoveryStep',
+        navigation: {
+          previous: 'service-selection',
+          next: 'endpoint-configuration',
+          canSkip: false,
+          canGoBack: true
+        },
+        config: {
+          defaultValues: {
+            selectedTables: [],
+            includeViews: false,
+            includeRelationships: true
+          },
+          dependencies: ['serviceId']
+        },
+        progress: {
+          current: 2,
+          total: 5,
+          percentage: 40
+        }
       },
-      {
+      'endpoint-configuration': {
+        id: 'endpoint-configuration',
+        name: 'endpointConfiguration',
+        title: 'Configure API Endpoints',
+        description: 'Customize endpoint behavior and parameters',
+        order: 3,
+        required: true,
+        completed: false,
+        valid: false,
+        errors: [],
+        data: {},
+        component: 'EndpointConfigurationStep',
+        navigation: {
+          previous: 'schema-discovery',
+          next: 'security-configuration',
+          canSkip: false,
+          canGoBack: true
+        },
+        config: {
+          defaultValues: {
+            enableCaching: true,
+            enablePagination: true,
+            defaultLimit: 25,
+            maxLimit: 1000
+          },
+          dependencies: ['selectedTables']
+        },
+        progress: {
+          current: 3,
+          total: 5,
+          percentage: 60
+        }
+      },
+      'security-configuration': {
         id: 'security-configuration',
+        name: 'securityConfiguration',
         title: 'Security Settings',
         description: 'Configure authentication and authorization',
-        component: 'SecurityConfigurationStep',
-        completed: faker.datatype.boolean({ probability: 0.4 }),
+        order: 4,
         required: false,
-        data: { security: {} },
+        completed: false,
+        valid: true,
+        errors: [],
+        data: {},
+        component: 'SecurityConfigurationStep',
+        navigation: {
+          previous: 'endpoint-configuration',
+          next: 'review-generate',
+          canSkip: true,
+          canGoBack: true
+        },
+        config: {
+          defaultValues: {
+            requireAuthentication: true,
+            defaultRole: 'api_user',
+            enableRateLimit: false
+          },
+          dependencies: []
+        },
+        progress: {
+          current: 4,
+          total: 5,
+          percentage: 80
+        }
+      },
+      'review-generate': {
+        id: 'review-generate',
+        name: 'reviewGenerate',
+        title: 'Review & Generate',
+        description: 'Review configuration and generate API endpoints',
+        order: 5,
+        required: true,
+        completed: false,
+        valid: false,
+        errors: [],
+        data: {},
+        component: 'ReviewGenerateStep',
+        navigation: {
+          previous: 'security-configuration',
+          canSkip: false,
+          canGoBack: true
+        },
+        config: {
+          defaultValues: {},
+          dependencies: ['serviceId', 'selectedTables']
+        },
+        progress: {
+          current: 5,
+          total: 5,
+          percentage: 100
+        }
+      }
+    }
+    
+    const step = steps[stepId] || steps['service-selection']
+    return { ...step, ...overrides }
+  }
+  
+  /**
+   * Creates wizard state for testing state management
+   */
+  createWizardState(overrides: Partial<WizardState> = {}): WizardState {
+    const steps = [
+      'service-selection',
+      'schema-discovery', 
+      'endpoint-configuration',
+      'security-configuration',
+      'review-generate'
+    ]
+    
+    const stepConfigs = steps.reduce((acc, stepId) => {
+      acc[stepId] = this.createGenerationStep(stepId)
+      return acc
+    }, {} as Record<string, GenerationStep>)
+    
+    const baseState: WizardState = {
+      currentStep: 'service-selection',
+      steps: stepConfigs,
+      stepOrder: steps,
+      status: 'idle',
+      progress: {
+        current: 1,
+        total: 5,
+        percentage: 20,
+        completedSteps: []
+      },
+      data: {
+        serviceId: null,
+        selectedTables: [],
+        endpointConfig: {},
+        securityConfig: {},
+        generationOptions: {}
+      },
+      validation: {
+        valid: false,
+        errors: {},
+        touched: {}
+      },
+      navigation: {
+        canGoNext: false,
+        canGoPrevious: false,
+        canFinish: false,
+        canCancel: true
+      },
+      react: {
+        actions: {
+          setCurrentStep: () => {},
+          updateStepData: () => {},
+          validateStep: async () => true,
+          nextStep: () => {},
+          previousStep: () => {},
+          reset: () => {}
+        },
+        cacheKeys: ['generation-wizard'],
+        optimistic: true
+      }
+    }
+    
+    return { ...baseState, ...overrides }
+  }
+  
+  /**
+   * Creates generation progress for testing progress tracking
+   */
+  createGenerationProgress(overrides: Partial<GenerationProgress> = {}): GenerationProgress {
+    const baseProgress: GenerationProgress = {
+      id: 'gen_123456',
+      serviceId: 1,
+      phase: 'analyzing',
+      progress: 45,
+      operation: 'Discovering database schema',
+      message: 'Analyzing table relationships...',
+      startedAt: new Date(Date.now() - 30000).toISOString(), // 30 seconds ago
+      metrics: {
+        duration: 30000,
+        endpointsGenerated: 0,
+        specSize: 0,
+        validationTime: 0
+      }
+    }
+    
+    return { ...baseProgress, ...overrides }
+  }
+  
+  /**
+   * Creates generation result for testing completion scenarios
+   */
+  createGenerationResult(overrides: Partial<GenerationResult> = {}): GenerationResult {
+    const serviceFactory = new ServiceConfigurationFactory(this.config)
+    const openApiFactory = new OpenAPISpecificationFactory(this.config)
+    
+    const baseResult: GenerationResult = {
+      id: 'result_123456',
+      serviceId: 1,
+      status: 'success',
+      message: 'API generation completed successfully',
+      service: serviceFactory.create(),
+      openapi: openApiFactory.create(),
+      endpoints: this.createEndpointConfigs(),
+      metadata: {
+        generatedAt: new Date().toISOString(),
+        generatedBy: 'admin@example.com',
+        version: '1.0.0',
+        source: 'DreamFactory Admin Interface',
+        settings: {
+          includeViews: false,
+          enableCaching: true,
+          enablePagination: true
+        }
+      },
+      validation: {
+        valid: true,
+        errors: [],
+        warnings: ['Consider adding rate limiting for production use'],
+        suggestions: ['Enable caching for better performance']
+      },
+      performance: {
+        totalTime: 4500, // 4.5 seconds
+        phases: {
+          discovery: 1200,
+          generation: 2800,
+          validation: 500
+        },
+        resourceUsage: {
+          memory: 45, // MB
+          cpu: 15 // %
+        }
+      }
+    }
+    
+    return { ...baseResult, ...overrides }
+  }
+  
+  /**
+   * Creates endpoint configurations for testing
+   */
+  createEndpointConfigs(): EndpointConfig[] {
+    return [
+      {
+        path: '/users',
+        method: 'GET',
+        description: 'Retrieve all users with pagination',
+        operationId: 'getUsers',
+        tags: ['users'],
+        queryParameters: [
+          {
+            name: 'limit',
+            type: 'integer',
+            required: false,
+            description: 'Number of items to return',
+            default: 25
+          },
+          {
+            name: 'offset',
+            type: 'integer',
+            required: false,
+            description: 'Number of items to skip',
+            default: 0
+          }
+        ],
+        responses: {
+          '200': {
+            description: 'Successful operation',
+            contentType: 'application/json'
+          }
+        },
+        security: [
+          {
+            type: 'apiKey',
+            name: 'X-DreamFactory-API-Key',
+            in: 'header'
+          }
+        ],
+        caching: {
+          enabled: true,
+          ttl: 300,
+          varyBy: ['limit', 'offset']
+        }
       },
       {
-        id: 'documentation-generation',
-        title: 'Generate Documentation',
-        description: 'Create OpenAPI specification and documentation',
-        component: 'DocumentationGenerationStep',
-        completed: false,
-        required: true,
-        data: { documentation: {} },
+        path: '/users',
+        method: 'POST',
+        description: 'Create a new user',
+        operationId: 'createUser',
+        tags: ['users'],
+        requestBody: {
+          required: true,
+          contentType: 'application/json',
+          schema: {
+            type: 'object',
+            required: ['email', 'first_name', 'last_name'],
+            properties: {
+              email: { type: 'string', format: 'email' },
+              first_name: { type: 'string' },
+              last_name: { type: 'string' }
+            }
+          }
+        },
+        responses: {
+          '201': {
+            description: 'User created successfully'
+          },
+          '422': {
+            description: 'Validation error'
+          }
+        }
+      }
+    ]
+  }
+  
+  /**
+   * Creates deployment configuration for testing
+   */
+  createDeploymentConfig(overrides: Partial<ServiceDeploymentConfig> = {}): ServiceDeploymentConfig {
+    const baseConfig: ServiceDeploymentConfig = {
+      target: 'serverless',
+      environment: 'development',
+      resources: {
+        memory: '512MB',
+        timeout: '30s',
+        concurrency: 100,
+        runtime: 'nodejs20.x'
       },
-    ],
-    configuration: {
-      selectedTables: config.useRealisticData ?
-        faker.helpers.arrayElements(['users', 'orders', 'products'], { min: 1, max: 3 }) :
-        ['users'],
-      endpoints: [],
+      envVars: {
+        NODE_ENV: 'development',
+        DATABASE_URL: 'mysql://localhost:3306/test',
+        API_BASE_URL: 'https://api.example.com'
+      },
+      scaling: {
+        minInstances: 0,
+        maxInstances: 10,
+        targetCPU: 70,
+        targetMemory: 80
+      },
+      healthCheck: {
+        path: '/health',
+        method: 'GET',
+        timeout: 5,
+        interval: 30,
+        threshold: 3
+      },
+      monitoring: {
+        metrics: true,
+        logs: true,
+        traces: true,
+        alerts: [
+          {
+            type: 'error_rate',
+            threshold: 5,
+            action: 'email'
+          }
+        ]
+      },
+      nextjs: {
+        apiRoute: {
+          path: '/api/v2/mysql_customers',
+          dynamic: true,
+          middleware: ['auth', 'cors']
+        },
+        edge: {
+          regions: ['us-east-1', 'eu-west-1'],
+          runtime: 'edge'
+        },
+        build: {
+          outputStandalone: true,
+          experimental: {
+            serverComponentsExternalPackages: ['mysql2']
+          }
+        }
+      },
       security: {
-        authenticationRequired: true,
-        defaultRoles: ['user'],
-        endpointPermissions: [],
-        rateLimiting: { enabled: false, default: { enabled: false } },
         cors: {
-          enabled: true,
-          origins: ['*'],
+          origins: ['https://app.example.com'],
           methods: ['GET', 'POST', 'PUT', 'DELETE'],
           headers: ['Content-Type', 'Authorization'],
-          credentials: false,
+          credentials: true
         },
-        encryption: { enabled: false, algorithm: 'AES-256' },
+        rateLimit: {
+          requests: 100,
+          period: 'minute',
+          burst: 20
+        },
+        authentication: {
+          required: true,
+          methods: ['apiKey', 'jwt']
+        }
+      }
+    }
+    
+    return { ...baseConfig, ...overrides }
+  }
+  
+  /**
+   * Creates deployment status for testing deployment tracking
+   */
+  createDeploymentStatus(overrides: Partial<DeploymentStatus> = {}): DeploymentStatus {
+    const baseStatus: DeploymentStatus = {
+      id: 'deploy_123456',
+      serviceId: 1,
+      status: 'deployed',
+      message: 'Service deployed successfully',
+      deployedAt: new Date().toISOString(),
+      url: 'https://api.example.com/v2/mysql_customers',
+      health: 'healthy',
+      metrics: {
+        buildTime: 120000, // 2 minutes
+        deployTime: 45000, // 45 seconds
+        memoryUsage: 256, // MB
+        cpuUsage: 15, // %
+        requestCount: 1250,
+        errorRate: 0.2 // %
       },
-      documentation: {
-        generateOpenAPI: true,
-        includeExamples: true,
-        theme: 'default',
-        customization: {},
+      rollback: {
+        available: true,
+        previousVersion: '1.0.0',
+        reason: 'Performance degradation detected'
+      },
+      logs: {
+        build: [
+          'Building Next.js application...',
+          'Compiling TypeScript...',
+          'Optimizing bundle...',
+          'Build completed successfully'
+        ],
+        runtime: [
+          'Service started on port 3000',
+          'Database connection established',
+          'Health check endpoint responding'
+        ],
+        errors: []
+      }
+    }
+    
+    return { ...baseStatus, ...overrides }
+  }
+}
+
+// =================================================================================================
+// USER INTERACTION FACTORIES
+// =================================================================================================
+
+/**
+ * User interaction scenario factory for testing form submissions and workflows
+ * Creates realistic user interaction patterns for comprehensive testing
+ */
+export class UserInteractionFactory {
+  private config: Required<FactoryConfig>
+  
+  constructor(config: FactoryConfig = {}) {
+    this.config = { ...DEFAULT_FACTORY_CONFIG, ...config }
+  }
+  
+  /**
+   * Creates form interaction scenario for database connection testing
+   */
+  createDatabaseConnectionInteraction(): TestScenario {
+    return {
+      name: 'Database Connection Form Interaction',
+      props: {
+        serviceType: 'mysql',
+        mode: 'create'
+      },
+      setup: async () => {
+        // Setup mock API responses
+      },
+      expectations: {
+        render: true,
+        accessibility: true,
+        performance: true,
+        interactions: true
+      },
+      mocks: {},
+      queries: {
+        serviceTypes: {
+          data: [
+            {
+              name: 'mysql',
+              label: 'MySQL',
+              group: 'database'
+            }
+          ]
+        }
+      }
+    }
+  }
+  
+  /**
+   * Creates API generation workflow interaction scenario
+   */
+  createAPIGenerationInteraction(): TestScenario {
+    return {
+      name: 'API Generation Wizard Interaction',
+      props: {
+        serviceId: 1,
+        initialStep: 'service-selection'
+      },
+      setup: async () => {
+        // Setup wizard state and mocks
+      },
+      expectations: {
+        render: true,
+        accessibility: true,
+        performance: true,
+        interactions: true
+      },
+      mocks: {},
+      queries: {
+        wizardState: {
+          data: new APIGenerationFactory(this.config).createWizardState()
+        }
+      }
+    }
+  }
+  
+  /**
+   * Creates form validation interaction scenario
+   */
+  createFormValidationInteraction(): TestScenario {
+    return {
+      name: 'Form Validation Interaction',
+      props: {
+        validationRules: {
+          host: { required: true, pattern: /^[a-zA-Z0-9.-]+$/ },
+          port: { required: true, min: 1, max: 65535 },
+          database: { required: true, minLength: 1 }
+        }
+      },
+      expectations: {
+        render: true,
+        accessibility: true,
+        performance: true,
+        interactions: true
+      },
+      mocks: {},
+      queries: {}
+    }
+  }
+  
+  /**
+   * Creates error handling interaction scenario
+   */
+  createErrorHandlingInteraction(): TestScenario {
+    return {
+      name: 'Error Handling Interaction',
+      props: {
+        errorType: 'validation',
+        errorMessage: 'Connection failed: Invalid credentials'
+      },
+      expectations: {
+        render: true,
+        accessibility: true,
+        performance: true,
+        interactions: true
+      },
+      mocks: {},
+      queries: {}
+    }
+  }
+  
+  /**
+   * Creates loading state interaction scenario
+   */
+  createLoadingStateInteraction(): TestScenario {
+    return {
+      name: 'Loading State Interaction',
+      props: {
+        isLoading: true,
+        loadingMessage: 'Testing database connection...'
+      },
+      expectations: {
+        render: true,
+        accessibility: true,
+        performance: true,
+        interactions: false
+      },
+      mocks: {},
+      queries: {}
+    }
+  }
+}
+
+// =================================================================================================
+// ERROR SCENARIO FACTORIES
+// =================================================================================================
+
+/**
+ * Error scenario factory for comprehensive error handling testing
+ * Creates various error conditions for robust testing coverage
+ */
+export class ErrorScenarioFactory {
+  private config: Required<FactoryConfig>
+  
+  constructor(config: FactoryConfig = {}) {
+    this.config = { ...DEFAULT_FACTORY_CONFIG, ...config }
+  }
+  
+  /**
+   * Creates service error scenarios
+   */
+  createServiceError(category: ServiceError['category'] = 'configuration'): ServiceError {
+    const errors: Record<ServiceError['category'], ServiceError> = {
+      configuration: {
+        code: 'INVALID_CONFIGURATION',
+        message: 'Service configuration is invalid',
+        status: 400,
+        category: 'configuration',
+        context: {
+          serviceId: 1,
+          serviceName: 'mysql_customers',
+          serviceType: 'mysql',
+          operation: 'validate_config'
+        },
+        suggestions: [
+          'Check database connection parameters',
+          'Verify username and password',
+          'Ensure database server is running'
+        ],
+        documentation: {
+          title: 'Database Configuration Guide',
+          url: 'https://docs.dreamfactory.com/database-config'
+        },
+        timestamp: new Date().toISOString(),
+        requestId: 'req_123456'
+      },
+      connection: {
+        code: 'CONNECTION_FAILED',
+        message: 'Failed to connect to database server',
+        status: 503,
+        category: 'connection',
+        context: {
+          serviceId: 1,
+          serviceName: 'mysql_customers',
+          serviceType: 'mysql',
+          operation: 'test_connection'
+        },
+        suggestions: [
+          'Check network connectivity',
+          'Verify server is running',
+          'Check firewall settings'
+        ],
+        documentation: {
+          title: 'Connection Troubleshooting',
+          url: 'https://docs.dreamfactory.com/connection-troubleshooting'
+        },
+        timestamp: new Date().toISOString(),
+        requestId: 'req_123457'
+      },
+      validation: {
+        code: 'VALIDATION_ERROR',
+        message: 'Input validation failed',
+        status: 422,
+        category: 'validation',
+        context: {
+          serviceId: 1,
+          serviceName: 'mysql_customers',
+          serviceType: 'mysql',
+          operation: 'create_service'
+        },
+        suggestions: [
+          'Review required fields',
+          'Check data format requirements',
+          'Ensure all constraints are met'
+        ],
+        documentation: {
+          title: 'Validation Requirements',
+          url: 'https://docs.dreamfactory.com/validation'
+        },
+        timestamp: new Date().toISOString(),
+        requestId: 'req_123458'
       },
       deployment: {
-        environment: 'development',
-        serverless: false,
-        scaling: {
-          autoScale: false,
-          minInstances: 1,
-          maxInstances: 5,
-          targetCPU: 80,
-          targetMemory: 80,
-        },
-        monitoring: {
-          enabled: true,
-          metrics: ['requests', 'errors', 'latency'],
-          alerts: [],
-          logging: {
-            level: 'info',
-            format: 'json',
-            destinations: [],
-          },
-        },
-      },
-    },
-    status: faker.helpers.arrayElement(['draft', 'validating', 'generating', 'completed', 'error']),
-    progress: faker.number.int({ min: 0, max: 100 }),
-    errors: faker.datatype.boolean({ probability: 0.2 }) ? [
-      'Table "users" not found in database',
-      'Invalid endpoint configuration for table "orders"',
-    ] : undefined,
-    result: faker.datatype.boolean({ probability: 0.3 }) ? 
-      createAPIGenerationResultFactory(config) : undefined,
-  };
-
-  return applyOverrides(workflow, config.overrides);
-}
-
-/**
- * Generate API generation result for completion testing
- */
-export function createAPIGenerationResultFactory(
-  options: Partial<ApiDocsFactoryOptions> = {}
-): APIGenerationResult {
-  const config = { ...DEFAULT_API_DOCS_OPTIONS, ...options };
-  initializeFaker(config.seed);
-
-  const result: APIGenerationResult = {
-    success: faker.datatype.boolean({ probability: 0.9 }),
-    endpointsGenerated: faker.number.int({ min: 5, max: 50 }),
-    openApiSpec: createOpenAPIPreviewFactory(config),
-    deploymentUrl: config.useRealisticData ?
-      `${faker.internet.url()}/api/v2/database` :
-      'https://api.example.com/v2/database',
-    documentation: {
-      url: config.useRealisticData ?
-        `${faker.internet.url()}/docs` :
-        'https://api.example.com/docs',
-      downloadUrl: config.useRealisticData ?
-        `${faker.internet.url()}/openapi.json` :
-        'https://api.example.com/openapi.json',
-    },
-    errors: faker.datatype.boolean({ probability: 0.1 }) ? [
-      'Failed to generate endpoint for table "invalid_table"',
-    ] : undefined,
-    warnings: faker.datatype.boolean({ probability: 0.3 }) ? [
-      'Table "users" has no primary key defined',
-      'Large table "transactions" may impact performance',
-    ] : undefined,
-    metrics: {
-      generationTime: faker.number.int({ min: 1000, max: 30000 }),
-      endpoints: Array.from({ length: config.endpointCount }, () => ({
-        endpoint: `/${faker.lorem.word()}`,
-        method: faker.helpers.arrayElement(['GET', 'POST', 'PUT', 'DELETE']) as HTTPMethod,
-        responseTime: faker.number.int({ min: 50, max: 500 }),
-        complexity: faker.helpers.arrayElement(['low', 'medium', 'high']),
-        dependencies: faker.helpers.arrayElements(['database', 'cache', 'auth'], { min: 1, max: 3 }),
-      })),
-    },
-  };
-
-  return applyOverrides(result, config.overrides);
-}
-
-// ============================================================================
-// USER INTERACTION FACTORIES
-// ============================================================================
-
-/**
- * Generate form submission data for user interaction testing
- */
-export function createFormSubmissionFactory<T = Record<string, any>>(
-  formType: 'database-connection' | 'api-generation' | 'user-management' | 'security-config',
-  options: Partial<UserInteractionFactoryOptions> = {}
-): T {
-  const config = { ...DEFAULT_USER_INTERACTION_OPTIONS, ...options };
-  initializeFaker(config.seed);
-
-  let formData: Record<string, any> = {};
-
-  switch (formType) {
-    case 'database-connection':
-      formData = {
-        name: config.useRealisticData ? 
-          faker.company.name().toLowerCase().replace(/[^a-z0-9]/g, '_') :
-          'test_connection',
-        label: config.useRealisticData ? 
-          `${faker.company.name()} Database` :
-          'Test Database',
-        description: config.useRealisticData ?
-          faker.lorem.sentence() :
-          'Test database connection',
-        type: faker.helpers.arrayElement(['mysql', 'postgresql', 'mongodb']),
-        host: config.useRealisticData ? faker.internet.domainName() : 'localhost',
-        port: config.useRealisticData ? faker.internet.port() : 3306,
-        database: config.useRealisticData ? faker.database.name() : 'test_db',
-        username: config.useRealisticData ? faker.internet.userName() : 'testuser',
-        password: config.useRealisticData ? faker.internet.password() : 'testpass',
-        isActive: true,
-      };
-      break;
-
-    case 'api-generation':
-      formData = {
-        serviceName: config.useRealisticData ?
-          faker.company.name().toLowerCase().replace(/[^a-z0-9]/g, '_') :
-          'test_service',
-        selectedTables: config.useRealisticData ?
-          faker.helpers.arrayElements(['users', 'orders', 'products', 'categories'], 
-                                    { min: 1, max: 4 }) :
-          ['users', 'orders'],
-        generateOpenAPI: true,
-        includeExamples: config.includeExamples,
-        securityEnabled: faker.datatype.boolean({ probability: 0.8 }),
-        cachingEnabled: faker.datatype.boolean({ probability: 0.6 }),
-        rateLimitingEnabled: faker.datatype.boolean({ probability: 0.4 }),
-      };
-      break;
-
-    case 'user-management':
-      formData = {
-        firstName: config.useRealisticData ? faker.person.firstName() : 'Test',
-        lastName: config.useRealisticData ? faker.person.lastName() : 'User',
-        email: config.useRealisticData ? faker.internet.email() : 'test@example.com',
-        username: config.useRealisticData ? faker.internet.userName() : 'testuser',
-        password: config.useRealisticData ? faker.internet.password() : 'testpass123',
-        confirmPassword: config.useRealisticData ? faker.internet.password() : 'testpass123',
-        isActive: true,
-        roleId: faker.number.int({ min: 1, max: 10 }),
-        phone: config.useRealisticData ? faker.phone.number() : '+1234567890',
-      };
-      break;
-
-    case 'security-config':
-      formData = {
-        authenticationRequired: faker.datatype.boolean({ probability: 0.9 }),
-        allowedMethods: faker.helpers.arrayElements(['GET', 'POST', 'PUT', 'DELETE'], 
-                                                  { min: 1, max: 4 }),
-        rateLimitEnabled: faker.datatype.boolean({ probability: 0.6 }),
-        maxRequestsPerMinute: faker.number.int({ min: 60, max: 1000 }),
-        corsEnabled: faker.datatype.boolean({ probability: 0.8 }),
-        allowedOrigins: config.useRealisticData ? 
-          [faker.internet.url(), faker.internet.url()] :
-          ['https://example.com'],
-        ipWhitelistEnabled: faker.datatype.boolean({ probability: 0.3 }),
-        allowedIpAddresses: config.useRealisticData ?
-          [faker.internet.ip(), faker.internet.ip()] :
-          ['192.168.1.1'],
-      };
-      break;
-  }
-
-  // Add validation errors if requested
-  if (config.includeErrors && config.validationState === 'invalid') {
-    formData._errors = {
-      name: config.interactionType === 'create' ? 'Name is required' : undefined,
-      email: 'Invalid email format',
-      password: 'Password must be at least 8 characters',
-    };
-  }
-
-  // Add optimistic update metadata
-  if (config.includeOptimisticUpdates) {
-    formData._optimistic = {
-      id: generateId('temp'),
-      timestamp: new Date().toISOString(),
-      type: config.interactionType,
-    };
-  }
-
-  return applyOverrides(formData, config.overrides) as T;
-}
-
-/**
- * Generate user interaction event for testing user workflows
- */
-export function createUserInteractionEventFactory(
-  eventType: 'click' | 'input' | 'submit' | 'navigate' | 'error',
-  options: Partial<UserInteractionFactoryOptions> = {}
-): any {
-  const config = { ...DEFAULT_USER_INTERACTION_OPTIONS, ...options };
-  initializeFaker(config.seed);
-
-  const baseEvent = {
-    id: generateId('event'),
-    type: eventType,
-    timestamp: new Date().toISOString(),
-    userId: faker.number.int({ min: 1, max: 1000 }),
-    sessionId: generateId('session'),
-  };
-
-  switch (eventType) {
-    case 'click':
-      return {
-        ...baseEvent,
-        target: {
-          element: faker.helpers.arrayElement(['button', 'link', 'checkbox', 'radio']),
-          text: config.useRealisticData ? faker.lorem.words(2) : 'Test Button',
-          selector: config.useRealisticData ? 
-            `#${faker.lorem.word()}-${faker.string.alphanumeric(4)}` :
-            '#test-button',
-        },
-        coordinates: {
-          x: faker.number.int({ min: 0, max: 1920 }),
-          y: faker.number.int({ min: 0, max: 1080 }),
-        },
-      };
-
-    case 'input':
-      return {
-        ...baseEvent,
-        field: {
-          name: config.useRealisticData ? faker.lorem.word() : 'testField',
-          type: faker.helpers.arrayElement(['text', 'email', 'password', 'number']),
-          value: config.useRealisticData ? faker.lorem.words(3) : 'test value',
-          valid: config.validationState === 'valid',
-        },
-        validation: config.validationState === 'invalid' ? {
-          errors: ['Field is required', 'Invalid format'],
-        } : undefined,
-      };
-
-    case 'submit':
-      return {
-        ...baseEvent,
-        form: {
-          name: config.useRealisticData ? faker.lorem.word() : 'testForm',
-          data: createFormSubmissionFactory('database-connection', config),
-          valid: config.validationState === 'valid',
-          method: faker.helpers.arrayElement(['POST', 'PUT', 'PATCH']),
-        },
-        result: config.includeErrors ? {
-          success: false,
-          errors: ['Validation failed', 'Network error'],
-        } : {
-          success: true,
-          data: { id: faker.number.int({ min: 1, max: 1000 }) },
-        },
-      };
-
-    case 'navigate':
-      return {
-        ...baseEvent,
-        navigation: {
-          from: config.useRealisticData ? `/${faker.lorem.word()}` : '/test',
-          to: config.useRealisticData ? `/${faker.lorem.word()}` : '/new-test',
-          method: faker.helpers.arrayElement(['push', 'replace', 'back']),
-          trigger: faker.helpers.arrayElement(['click', 'programmatic', 'browser']),
-        },
-      };
-
-    case 'error':
-      return {
-        ...baseEvent,
-        error: {
-          type: faker.helpers.arrayElement(['validation', 'network', 'authentication', 'authorization']),
-          message: config.useRealisticData ? 
-            faker.lorem.sentence() :
-            'Test error message',
-          code: faker.helpers.arrayElement([400, 401, 403, 404, 500]),
-          stack: config.includeDebugInfo ? faker.lorem.paragraphs(3) : undefined,
-        },
+        code: 'DEPLOYMENT_FAILED',
+        message: 'Service deployment failed',
+        status: 500,
+        category: 'deployment',
         context: {
-          component: config.useRealisticData ? faker.lorem.word() : 'TestComponent',
-          props: { testProp: 'testValue' },
-          state: { loading: false, error: true },
+          serviceId: 1,
+          serviceName: 'mysql_customers',
+          serviceType: 'mysql',
+          operation: 'deploy_service'
         },
-      };
-
-    default:
-      return baseEvent;
-  }
-}
-
-// ============================================================================
-// REACT QUERY AND SWR MOCK DATA FACTORIES
-// ============================================================================
-
-/**
- * Generate React Query cache data for hook testing
- */
-export function createReactQueryCacheFactory(
-  queryKey: string[],
-  options: Partial<FactoryOptions> = {}
-): any {
-  const config = { ...DEFAULT_FACTORY_OPTIONS, ...options };
-  initializeFaker(config.seed);
-
-  return {
-    queryKey,
-    queryHash: JSON.stringify(queryKey),
-    data: config.overrides.data || createDatabaseServiceFactory(config),
-    dataUpdatedAt: Date.now(),
-    error: config.overrides.error || null,
-    errorUpdatedAt: config.overrides.error ? Date.now() : 0,
-    fetchFailureCount: 0,
-    fetchFailureReason: null,
-    fetchMeta: null,
-    isInvalidated: false,
-    status: config.overrides.error ? 'error' : 'success',
-    fetchStatus: 'idle',
-  };
-}
-
-/**
- * Generate SWR cache data for hook testing
- */
-export function createSWRCacheFactory(
-  key: string,
-  options: Partial<FactoryOptions> = {}
-): any {
-  const config = { ...DEFAULT_FACTORY_OPTIONS, ...options };
-  initializeFaker(config.seed);
-
-  return {
-    data: config.overrides.data || createDatabaseServiceFactory(config),
-    error: config.overrides.error || undefined,
-    isLoading: config.overrides.isLoading || false,
-    isValidating: config.overrides.isValidating || false,
-    mutate: () => Promise.resolve(),
-  };
-}
-
-/**
- * Generate MSW response data for API mocking
- */
-export function createMSWResponseFactory(
-  responseType: 'success' | 'error' | 'loading',
-  options: Partial<FactoryOptions> = {}
-): any {
-  const config = { ...DEFAULT_FACTORY_OPTIONS, ...options };
-  initializeFaker(config.seed);
-
-  switch (responseType) {
-    case 'success':
-      return {
-        status: 200,
-        data: config.overrides.data || createDatabaseServiceFactory(config),
-        headers: {
-          'content-type': 'application/json',
-          'x-request-id': generateId('req'),
+        suggestions: [
+          'Check deployment logs',
+          'Verify resource availability',
+          'Review deployment configuration'
+        ],
+        documentation: {
+          title: 'Deployment Guide',
+          url: 'https://docs.dreamfactory.com/deployment'
         },
-      };
-
-    case 'error':
-      return {
-        status: config.overrides.status || 400,
-        error: {
-          code: config.overrides.code || 'VALIDATION_ERROR',
-          message: config.overrides.message || 'Validation failed',
-          details: config.includeDebugInfo ? faker.lorem.paragraph() : undefined,
+        timestamp: new Date().toISOString(),
+        requestId: 'req_123459'
+      },
+      generation: {
+        code: 'GENERATION_FAILED',
+        message: 'API generation failed',
+        status: 500,
+        category: 'generation',
+        context: {
+          serviceId: 1,
+          serviceName: 'mysql_customers',
+          serviceType: 'mysql',
+          operation: 'generate_api'
         },
-        headers: {
-          'content-type': 'application/json',
-          'x-request-id': generateId('req'),
+        suggestions: [
+          'Check schema structure',
+          'Verify table permissions',
+          'Review generation settings'
+        ],
+        documentation: {
+          title: 'API Generation Guide',
+          url: 'https://docs.dreamfactory.com/api-generation'
         },
-      };
-
-    case 'loading':
-      return {
-        status: 'pending',
-        delay: faker.number.int({ min: 100, max: 2000 }),
-      };
-
-    default:
-      return {};
-  }
-}
-
-// ============================================================================
-// BATCH FACTORY FUNCTIONS
-// ============================================================================
-
-/**
- * Generate multiple services for list testing
- */
-export function createServiceListFactory(
-  count: number,
-  options: Partial<DatabaseFactoryOptions> = {}
-): ServiceRow[] {
-  const config = { ...DEFAULT_DATABASE_OPTIONS, ...options };
-  
-  return Array.from({ length: count }, (_, index) => 
-    createServiceRowFactory({ 
-      ...config, 
-      seed: config.seed + index,
-      overrides: { id: index + 1, ...config.overrides }
-    })
-  );
-}
-
-/**
- * Generate multiple API endpoints for testing
- */
-export function createAPIEndpointListFactory(
-  count: number,
-  options: Partial<ApiDocsFactoryOptions> = {}
-): APIEndpointConfig[] {
-  const config = { ...DEFAULT_API_DOCS_OPTIONS, ...options };
-  
-  return Array.from({ length: count }, (_, index) => 
-    createAPIEndpointConfigFactory({
-      ...config,
-      seed: config.seed + index,
-      overrides: { ...config.overrides }
-    })
-  );
-}
-
-/**
- * Generate multiple user interactions for workflow testing
- */
-export function createUserInteractionListFactory(
-  count: number,
-  eventType: 'click' | 'input' | 'submit' | 'navigate' | 'error',
-  options: Partial<UserInteractionFactoryOptions> = {}
-): any[] {
-  const config = { ...DEFAULT_USER_INTERACTION_OPTIONS, ...options };
-  
-  return Array.from({ length: count }, (_, index) => 
-    createUserInteractionEventFactory(eventType, {
-      ...config,
-      seed: config.seed + index,
-      overrides: { ...config.overrides }
-    })
-  );
-}
-
-// ============================================================================
-// FACTORY PRESETS FOR COMMON TESTING SCENARIOS
-// ============================================================================
-
-/**
- * Preset: Database connection testing scenario
- */
-export const DATABASE_CONNECTION_PRESET = {
-  mysql: () => createDatabaseServiceFactory({ databaseType: 'mysql', includeSSL: false }),
-  postgresql: () => createDatabaseServiceFactory({ databaseType: 'postgresql', includeSSL: true }),
-  mongodb: () => createDatabaseServiceFactory({ databaseType: 'mongodb', includePooling: true }),
-  withErrors: () => createDatabaseServiceFactory({ 
-    overrides: { isActive: false },
-    includeErrors: true 
-  }),
-  largeSchema: () => createDatabaseServiceFactory({ schemaSize: 'xlarge' }),
-};
-
-/**
- * Preset: API documentation testing scenario
- */
-export const API_DOCUMENTATION_PRESET = {
-  basic: () => createOpenAPIConfigFactory({ includeAdvancedSecurity: false }),
-  advanced: () => createOpenAPIConfigFactory({ 
-    includeAdvancedSecurity: true,
-    endpointCount: 10,
-    includeValidationSchemas: true 
-  }),
-  withErrors: () => createOpenAPIPreviewFactory({
-    overrides: {
-      errors: ['Invalid schema definition', 'Missing required fields'],
-      warnings: ['Deprecated endpoint detected']
+        timestamp: new Date().toISOString(),
+        requestId: 'req_123460'
+      }
     }
-  }),
-};
+    
+    return errors[category]
+  }
+  
+  /**
+   * Creates validation error scenarios
+   */
+  createValidationError(field: string = 'host'): ServiceValidationError {
+    const errors: Record<string, ServiceValidationError> = {
+      host: {
+        field: 'host',
+        message: 'Host is required and must be a valid hostname or IP address',
+        code: 'INVALID_HOST',
+        value: '',
+        rule: 'required|hostname',
+        suggestion: 'Enter a valid hostname like "localhost" or IP address like "192.168.1.1"'
+      },
+      port: {
+        field: 'port',
+        message: 'Port must be between 1 and 65535',
+        code: 'INVALID_PORT',
+        value: 70000,
+        rule: 'integer|min:1|max:65535',
+        suggestion: 'Enter a valid port number between 1 and 65535'
+      },
+      database: {
+        field: 'database',
+        message: 'Database name is required',
+        code: 'MISSING_DATABASE',
+        value: '',
+        rule: 'required|string|min:1',
+        suggestion: 'Enter the name of the database you want to connect to'
+      },
+      username: {
+        field: 'username',
+        message: 'Username is required',
+        code: 'MISSING_USERNAME',
+        value: '',
+        rule: 'required|string|min:1',
+        suggestion: 'Enter a valid database username'
+      },
+      password: {
+        field: 'password',
+        message: 'Password is required',
+        code: 'MISSING_PASSWORD',
+        value: '',
+        rule: 'required|string|min:1',
+        suggestion: 'Enter the password for the database user'
+      }
+    }
+    
+    return errors[field] || errors.host
+  }
+  
+  /**
+   * Creates generation error scenarios
+   */
+  createGenerationError(phase: GenerationError['phase'] = 'generation'): GenerationError {
+    const baseError = this.createServiceError('generation') as GenerationError
+    
+    const phaseErrors: Record<GenerationError['phase'], Partial<GenerationError>> = {
+      initialization: {
+        phase: 'initialization',
+        message: 'Failed to initialize API generation process',
+        details: {
+          source: 'GenerationOrchestrator',
+          expected: 'Valid service configuration',
+          actual: 'Missing service ID'
+        }
+      },
+      analysis: {
+        phase: 'analysis',
+        message: 'Schema analysis failed',
+        details: {
+          source: 'SchemaAnalyzer',
+          line: 1,
+          column: 1,
+          expected: 'Readable database schema',
+          actual: 'Permission denied'
+        }
+      },
+      generation: {
+        phase: 'generation',
+        message: 'API endpoint generation failed',
+        details: {
+          source: 'EndpointGenerator',
+          expected: 'Valid table metadata',
+          actual: 'Corrupted schema data'
+        }
+      },
+      validation: {
+        phase: 'validation',
+        message: 'Generated API validation failed',
+        details: {
+          source: 'OpenAPIValidator',
+          line: 45,
+          column: 12,
+          expected: 'Valid OpenAPI specification',
+          actual: 'Invalid schema reference'
+        }
+      },
+      deployment: {
+        phase: 'deployment',
+        message: 'API deployment failed',
+        details: {
+          source: 'DeploymentManager',
+          expected: 'Successful deployment',
+          actual: 'Resource limit exceeded'
+        }
+      }
+    }
+    
+    return {
+      ...baseError,
+      ...phaseErrors[phase],
+      recovery: {
+        canRetry: phase !== 'deployment',
+        canModify: true,
+        autoRecover: phase === 'validation'
+      }
+    }
+  }
+  
+  /**
+   * Creates network error scenarios for testing
+   */
+  createNetworkErrors(): Record<string, any> {
+    return {
+      timeout: {
+        code: 'NETWORK_TIMEOUT',
+        message: 'Request timed out',
+        status: 408,
+        cause: 'Network timeout after 30 seconds'
+      },
+      connectionRefused: {
+        code: 'CONNECTION_REFUSED',
+        message: 'Connection refused',
+        status: 503,
+        cause: 'Unable to connect to database server'
+      },
+      unauthorizedAccess: {
+        code: 'UNAUTHORIZED_ACCESS',
+        message: 'Access denied',
+        status: 401,
+        cause: 'Invalid authentication credentials'
+      },
+      serverUnavailable: {
+        code: 'SERVER_UNAVAILABLE',
+        message: 'Server temporarily unavailable',
+        status: 503,
+        cause: 'Database server is down for maintenance'
+      }
+    }
+  }
+}
+
+// =================================================================================================
+// MSW HANDLER FACTORIES
+// =================================================================================================
 
 /**
- * Preset: User interaction testing scenario
+ * MSW handler factory for API mocking during testing
+ * Creates realistic API response handlers for comprehensive testing scenarios
  */
-export const USER_INTERACTION_PRESET = {
-  validForm: () => createFormSubmissionFactory('database-connection', { 
-    validationState: 'valid' 
-  }),
-  invalidForm: () => createFormSubmissionFactory('database-connection', { 
-    validationState: 'invalid',
-    includeErrors: true 
-  }),
-  optimisticUpdate: () => createFormSubmissionFactory('api-generation', { 
-    includeOptimisticUpdates: true 
-  }),
-};
+export class MSWHandlerFactory {
+  private config: Required<FactoryConfig>
+  private serviceFactory: ServiceConfigurationFactory
+  private openApiFactory: OpenAPISpecificationFactory
+  private errorFactory: ErrorScenarioFactory
+  
+  constructor(config: FactoryConfig = {}) {
+    this.config = { ...DEFAULT_FACTORY_CONFIG, ...config }
+    this.serviceFactory = new ServiceConfigurationFactory(config)
+    this.openApiFactory = new OpenAPISpecificationFactory(config)
+    this.errorFactory = new ErrorScenarioFactory(config)
+  }
+  
+  /**
+   * Creates API mock generators for consistent response patterns
+   */
+  createApiMockGenerators(): ApiMockGenerators {
+    return {
+      successResponse: <T>(data: T, meta?: Record<string, unknown>): ApiResponse<T> => ({
+        resource: Array.isArray(data) ? data : [data],
+        meta: {
+          count: Array.isArray(data) ? data.length : 1,
+          ...meta
+        }
+      }),
+      
+      errorResponse: (error: Partial<ApiError>): ApiError => ({
+        code: 'GENERIC_ERROR',
+        message: 'An error occurred',
+        status: 500,
+        timestamp: new Date().toISOString(),
+        requestId: `req_${Date.now()}`,
+        ...error
+      }),
+      
+      listResponse: <T>(items: T[], total?: number, offset?: number): ApiResponse<T[]> => ({
+        resource: items,
+        meta: {
+          count: items.length,
+          offset: offset || 0,
+          limit: items.length,
+          total: total || items.length
+        }
+      }),
+      
+      paginatedResponse: <T>(
+        items: T[],
+        page: number,
+        limit: number,
+        total: number
+      ): ApiResponse<T[]> => ({
+        resource: items,
+        meta: {
+          count: items.length,
+          offset: (page - 1) * limit,
+          limit,
+          total
+        }
+      }),
+      
+      validationErrorResponse: (field: string, message: string): ApiError => ({
+        code: 'VALIDATION_ERROR',
+        message: 'Validation failed',
+        status: 422,
+        details: {
+          validation_errors: [{ field, message }]
+        },
+        timestamp: new Date().toISOString(),
+        requestId: `req_${Date.now()}`
+      }),
+      
+      authErrorResponse: (type: 'unauthorized' | 'forbidden'): ApiError => {
+        const errors = {
+          unauthorized: {
+            code: 'UNAUTHORIZED',
+            message: 'Authentication required',
+            status: 401
+          },
+          forbidden: {
+            code: 'FORBIDDEN',
+            message: 'Insufficient permissions',
+            status: 403
+          }
+        }
+        
+        return {
+          ...errors[type],
+          timestamp: new Date().toISOString(),
+          requestId: `req_${Date.now()}`
+        }
+      },
+      
+      serverErrorResponse: (message?: string): ApiError => ({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: message || 'Internal server error',
+        status: 500,
+        timestamp: new Date().toISOString(),
+        requestId: `req_${Date.now()}`
+      })
+    }
+  }
+  
+  /**
+   * Creates service API handlers for testing
+   */
+  createServiceHandlers(): MSWHandler[] {
+    // Note: This would typically use the actual MSW rest object
+    // For type safety, we're returning a mock structure
+    const handlers: any[] = [
+      // GET /api/v2/system/service
+      {
+        method: 'GET',
+        path: '/api/v2/system/service',
+        resolver: () => {
+          const services = this.serviceFactory.createMany(5)
+          return {
+            json: this.createApiMockGenerators().listResponse(services)
+          }
+        }
+      },
+      
+      // POST /api/v2/system/service
+      {
+        method: 'POST',
+        path: '/api/v2/system/service',
+        resolver: (req: any) => {
+          const service = this.serviceFactory.create(req.body)
+          return {
+            status: 201,
+            json: this.createApiMockGenerators().successResponse(service)
+          }
+        }
+      },
+      
+      // GET /api/v2/system/service/:id
+      {
+        method: 'GET',
+        path: '/api/v2/system/service/:id',
+        resolver: (req: any) => {
+          const service = this.serviceFactory.create({ id: parseInt(req.params.id) })
+          return {
+            json: this.createApiMockGenerators().successResponse(service)
+          }
+        }
+      },
+      
+      // PUT /api/v2/system/service/:id
+      {
+        method: 'PUT',
+        path: '/api/v2/system/service/:id',
+        resolver: (req: any) => {
+          const service = this.serviceFactory.create({
+            id: parseInt(req.params.id),
+            ...req.body
+          })
+          return {
+            json: this.createApiMockGenerators().successResponse(service)
+          }
+        }
+      },
+      
+      // DELETE /api/v2/system/service/:id
+      {
+        method: 'DELETE',
+        path: '/api/v2/system/service/:id',
+        resolver: () => {
+          return {
+            status: 204
+          }
+        }
+      },
+      
+      // POST /api/v2/system/service/:id/_test
+      {
+        method: 'POST',
+        path: '/api/v2/system/service/:id/_test',
+        resolver: () => {
+          return {
+            json: this.createApiMockGenerators().successResponse({
+              success: true,
+              message: 'Connection test successful',
+              responseTime: 45
+            })
+          }
+        }
+      },
+      
+      // GET /api/v2/:service/_schema
+      {
+        method: 'GET',
+        path: '/api/v2/:service/_schema',
+        resolver: () => {
+          const openapi = this.openApiFactory.create()
+          return {
+            json: this.createApiMockGenerators().successResponse(openapi)
+          }
+        }
+      }
+    ]
+    
+    return handlers as MSWHandler[]
+  }
+  
+  /**
+   * Creates error scenario handlers for testing error conditions
+   */
+  createErrorHandlers(): MSWHandler[] {
+    const handlers: any[] = [
+      // Connection timeout
+      {
+        method: 'POST',
+        path: '/api/v2/system/service/timeout/_test',
+        resolver: () => {
+          return {
+            status: 408,
+            json: this.errorFactory.createNetworkErrors().timeout
+          }
+        }
+      },
+      
+      // Validation error
+      {
+        method: 'POST',
+        path: '/api/v2/system/service/invalid',
+        resolver: () => {
+          return {
+            status: 422,
+            json: this.createApiMockGenerators().validationErrorResponse('host', 'Host is required')
+          }
+        }
+      },
+      
+      // Server error
+      {
+        method: 'GET',
+        path: '/api/v2/system/service/error',
+        resolver: () => {
+          return {
+            status: 500,
+            json: this.createApiMockGenerators().serverErrorResponse()
+          }
+        }
+      }
+    ]
+    
+    return handlers as MSWHandler[]
+  }
+  
+  /**
+   * Creates performance testing handlers with delays
+   */
+  createPerformanceHandlers(): MSWHandler[] {
+    const handlers: any[] = [
+      // Slow response simulation
+      {
+        method: 'GET',
+        path: '/api/v2/system/service/slow',
+        resolver: async () => {
+          await new Promise(resolve => setTimeout(resolve, 2000)) // 2 second delay
+          return {
+            json: this.createApiMockGenerators().successResponse({ slow: true })
+          }
+        }
+      },
+      
+      // Large dataset simulation
+      {
+        method: 'GET',
+        path: '/api/v2/system/service/large',
+        resolver: () => {
+          const services = this.serviceFactory.createMany(1000)
+          return {
+            json: this.createApiMockGenerators().listResponse(services)
+          }
+        }
+      }
+    ]
+    
+    return handlers as MSWHandler[]
+  }
+}
 
-// ============================================================================
-// EXPORTS
-// ============================================================================
+// =================================================================================================
+// PERFORMANCE TESTING FACTORIES
+// =================================================================================================
 
+/**
+ * Performance testing data factory for build time optimization testing
+ * Creates metrics and benchmarks for performance validation
+ */
+export class PerformanceTestingFactory {
+  private config: Required<FactoryConfig>
+  
+  constructor(config: FactoryConfig = {}) {
+    this.config = { ...DEFAULT_FACTORY_CONFIG, ...config }
+  }
+  
+  /**
+   * Creates performance metrics for component testing
+   */
+  createPerformanceMetrics(overrides: Partial<PerformanceMetrics> = {}): PerformanceMetrics {
+    const baseMetrics: PerformanceMetrics = {
+      renderTime: 45, // milliseconds
+      mountTime: 120,
+      updateTime: 25,
+      unmountTime: 15,
+      memoryUsage: 12.5, // MB
+      bundleSize: 145000, // bytes
+      cacheHitRate: 85 // percentage
+    }
+    
+    return { ...baseMetrics, ...overrides }
+  }
+  
+  /**
+   * Creates performance benchmark data for comparison
+   */
+  createPerformanceBenchmarks(): Record<string, PerformanceMetrics> {
+    return {
+      baseline: this.createPerformanceMetrics(),
+      optimized: this.createPerformanceMetrics({
+        renderTime: 32,
+        mountTime: 95,
+        updateTime: 18,
+        bundleSize: 125000,
+        cacheHitRate: 92
+      }),
+      regression: this.createPerformanceMetrics({
+        renderTime: 78,
+        mountTime: 180,
+        updateTime: 45,
+        bundleSize: 185000,
+        cacheHitRate: 65
+      })
+    }
+  }
+  
+  /**
+   * Creates large dataset for virtual scrolling performance testing
+   */
+  createLargeDataset(size: number = 1000): any[] {
+    return Array.from({ length: size }, (_, index) => ({
+      id: index + 1,
+      name: `Item ${index + 1}`,
+      description: `Description for item ${index + 1}`,
+      value: Math.random() * 1000,
+      timestamp: new Date(Date.now() - Math.random() * 86400000).toISOString()
+    }))
+  }
+  
+  /**
+   * Creates performance test scenarios
+   */
+  createPerformanceScenarios(): TestScenario[] {
+    return [
+      {
+        name: 'Component Render Performance',
+        props: {
+          data: this.createLargeDataset(100)
+        },
+        expectations: {
+          render: true,
+          accessibility: false,
+          performance: true,
+          interactions: false
+        },
+        mocks: {},
+        queries: {}
+      },
+      {
+        name: 'Virtual Scrolling Performance',
+        props: {
+          data: this.createLargeDataset(1000),
+          virtualized: true
+        },
+        expectations: {
+          render: true,
+          accessibility: false,
+          performance: true,
+          interactions: true
+        },
+        mocks: {},
+        queries: {}
+      },
+      {
+        name: 'Form Validation Performance',
+        props: {
+          validationMode: 'onChange',
+          debounceMs: 100
+        },
+        expectations: {
+          render: true,
+          accessibility: false,
+          performance: true,
+          interactions: true
+        },
+        mocks: {},
+        queries: {}
+      }
+    ]
+  }
+}
+
+// =================================================================================================
+// ACCESSIBILITY TESTING FACTORIES
+// =================================================================================================
+
+/**
+ * Accessibility testing factory for WCAG 2.1 AA compliance testing
+ * Creates test data and scenarios for comprehensive accessibility validation
+ */
+export class AccessibilityTestingFactory {
+  private config: Required<FactoryConfig>
+  
+  constructor(config: FactoryConfig = {}) {
+    this.config = { ...DEFAULT_FACTORY_CONFIG, ...config }
+  }
+  
+  /**
+   * Creates accessibility test configuration
+   */
+  createAccessibilityConfig(overrides: Partial<AccessibilityTestConfig> = {}): AccessibilityTestConfig {
+    const baseConfig: AccessibilityTestConfig = {
+      rules: {
+        'color-contrast': true,
+        'keyboard-navigation': true,
+        'screen-reader': true,
+        'focus-management': true,
+        'aria-labels': true,
+        'form-labels': true
+      },
+      exclude: [
+        'third-party-widget',
+        'legacy-component'
+      ],
+      include: [
+        'form',
+        'button',
+        'input',
+        'table',
+        'navigation'
+      ],
+      level: 'AA',
+      tags: ['wcag2a', 'wcag2aa', 'section508']
+    }
+    
+    return { ...baseConfig, ...overrides }
+  }
+  
+  /**
+   * Creates accessibility test scenarios
+   */
+  createAccessibilityScenarios(): TestScenario[] {
+    return [
+      {
+        name: 'Form Accessibility',
+        props: {
+          formType: 'database-connection',
+          includeLabels: true,
+          includeErrorMessages: true
+        },
+        expectations: {
+          render: true,
+          accessibility: true,
+          performance: false,
+          interactions: true
+        },
+        mocks: {},
+        queries: {}
+      },
+      {
+        name: 'Navigation Accessibility',
+        props: {
+          navigationType: 'breadcrumb',
+          includeSkipLinks: true
+        },
+        expectations: {
+          render: true,
+          accessibility: true,
+          performance: false,
+          interactions: true
+        },
+        mocks: {},
+        queries: {}
+      },
+      {
+        name: 'Table Accessibility',
+        props: {
+          tableType: 'service-list',
+          includeSortHeaders: true,
+          includeRowHeaders: true
+        },
+        expectations: {
+          render: true,
+          accessibility: true,
+          performance: false,
+          interactions: true
+        },
+        mocks: {},
+        queries: {}
+      }
+    ]
+  }
+  
+  /**
+   * Creates keyboard navigation test data
+   */
+  createKeyboardNavigationTests(): Record<string, string[]> {
+    return {
+      tabOrder: ['Tab', 'Tab', 'Tab', 'Tab'],
+      escapeAction: ['Escape'],
+      enterAction: ['Enter'],
+      arrowNavigation: ['ArrowDown', 'ArrowDown', 'ArrowUp'],
+      homeEnd: ['Home', 'End'],
+      pageNavigation: ['PageDown', 'PageUp']
+    }
+  }
+}
+
+// =================================================================================================
+// COMPREHENSIVE FACTORY AGGREGATOR
+// =================================================================================================
+
+/**
+ * Comprehensive factory aggregator providing all testing utilities
+ * Serves as the main entry point for test data generation
+ */
+export class APIDocsTestDataFactory {
+  private config: Required<FactoryConfig>
+  
+  public readonly openapi: OpenAPISpecificationFactory
+  public readonly service: ServiceConfigurationFactory
+  public readonly generation: APIGenerationFactory
+  public readonly interaction: UserInteractionFactory
+  public readonly error: ErrorScenarioFactory
+  public readonly msw: MSWHandlerFactory
+  public readonly performance: PerformanceTestingFactory
+  public readonly accessibility: AccessibilityTestingFactory
+  
+  constructor(config: FactoryConfig = {}) {
+    this.config = { ...DEFAULT_FACTORY_CONFIG, ...config }
+    
+    // Initialize all factory instances
+    this.openapi = new OpenAPISpecificationFactory(config)
+    this.service = new ServiceConfigurationFactory(config)
+    this.generation = new APIGenerationFactory(config)
+    this.interaction = new UserInteractionFactory(config)
+    this.error = new ErrorScenarioFactory(config)
+    this.msw = new MSWHandlerFactory(config)
+    this.performance = new PerformanceTestingFactory(config)
+    this.accessibility = new AccessibilityTestingFactory(config)
+  }
+  
+  /**
+   * Creates comprehensive test suite data for API documentation component
+   */
+  createTestSuite(): {
+    openapi: OpenAPISpec[]
+    services: Service[]
+    scenarios: TestScenario[]
+    errors: ServiceError[]
+    handlers: MSWHandler[]
+    performance: PerformanceMetrics
+    accessibility: AccessibilityTestConfig
+  } {
+    return {
+      openapi: this.openapi.createMany(3),
+      services: this.service.createMany(5),
+      scenarios: [
+        ...this.interaction.createDatabaseConnectionInteraction() ? [this.interaction.createDatabaseConnectionInteraction()] : [],
+        ...this.interaction.createAPIGenerationInteraction() ? [this.interaction.createAPIGenerationInteraction()] : [],
+        ...this.performance.createPerformanceScenarios(),
+        ...this.accessibility.createAccessibilityScenarios()
+      ],
+      errors: [
+        this.error.createServiceError('configuration'),
+        this.error.createServiceError('validation'),
+        this.error.createServiceError('generation')
+      ],
+      handlers: [
+        ...this.msw.createServiceHandlers(),
+        ...this.msw.createErrorHandlers(),
+        ...this.msw.createPerformanceHandlers()
+      ],
+      performance: this.performance.createPerformanceMetrics(),
+      accessibility: this.accessibility.createAccessibilityConfig()
+    }
+  }
+  
+  /**
+   * Resets all factories to initial state for test isolation
+   */
+  reset(): void {
+    // Reset any cached state or counters in factories
+    // Implementation would depend on specific caching mechanisms
+  }
+  
+  /**
+   * Updates factory configuration at runtime
+   */
+  updateConfig(config: Partial<FactoryConfig>): void {
+    Object.assign(this.config, config)
+  }
+}
+
+// =================================================================================================
+// DEFAULT EXPORT AND UTILITY FUNCTIONS
+// =================================================================================================
+
+/**
+ * Default factory instance for convenient usage
+ */
+export const apiDocsTestDataFactory = new APIDocsTestDataFactory()
+
+/**
+ * Utility function to create factory with custom configuration
+ */
+export function createTestDataFactory(config: FactoryConfig = {}): APIDocsTestDataFactory {
+  return new APIDocsTestDataFactory(config)
+}
+
+/**
+ * Utility function to generate mock MSW handlers for common scenarios
+ */
+export function createMockHandlers(scenarios: string[] = ['success', 'error']): MSWHandler[] {
+  const factory = new MSWHandlerFactory()
+  const handlers: MSWHandler[] = []
+  
+  scenarios.forEach(scenario => {
+    switch (scenario) {
+      case 'success':
+        handlers.push(...factory.createServiceHandlers())
+        break
+      case 'error':
+        handlers.push(...factory.createErrorHandlers())
+        break
+      case 'performance':
+        handlers.push(...factory.createPerformanceHandlers())
+        break
+    }
+  })
+  
+  return handlers
+}
+
+/**
+ * Utility function to create React Query test utilities
+ */
+export function createQueryTestData(): {
+  queryKey: string[]
+  queryData: Service[]
+  mutationData: Partial<Service>
+  errorData: ServiceError
+} {
+  const factory = new APIDocsTestDataFactory()
+  
+  return {
+    queryKey: ['services'],
+    queryData: factory.service.createMany(3),
+    mutationData: { name: 'test_service', type: 'mysql' },
+    errorData: factory.error.createServiceError('validation')
+  }
+}
+
+/**
+ * Export all factory classes for direct usage
+ */
 export {
-  // Core factory functions
-  createDatabaseServiceFactory,
-  createServiceRowFactory,
-  createServiceTypeDefinitionFactory,
-  createServiceHealthStatusFactory,
-  createServiceMetricsFactory,
-  createServiceTestResultFactory,
-  
-  // API documentation factories
-  createOpenAPIConfigFactory,
-  createAPIEndpointConfigFactory,
-  createOpenAPIPreviewFactory,
-  createAPIGenerationWorkflowFactory,
-  createAPIGenerationResultFactory,
-  
-  // User interaction factories
-  createFormSubmissionFactory,
-  createUserInteractionEventFactory,
-  
-  // React Query/SWR factories
-  createReactQueryCacheFactory,
-  createSWRCacheFactory,
-  createMSWResponseFactory,
-  
-  // Batch factories
-  createServiceListFactory,
-  createAPIEndpointListFactory,
-  createUserInteractionListFactory,
-  
-  // Presets
-  DATABASE_CONNECTION_PRESET,
-  API_DOCUMENTATION_PRESET,
-  USER_INTERACTION_PRESET,
-  
-  // Utility functions
-  generateId,
-  generateConnectionString,
-};
+  OpenAPISpecificationFactory,
+  ServiceConfigurationFactory,
+  APIGenerationFactory,
+  UserInteractionFactory,
+  ErrorScenarioFactory,
+  MSWHandlerFactory,
+  PerformanceTestingFactory,
+  AccessibilityTestingFactory
+}
 
 /**
- * Default export: Factory collection for convenient importing
+ * Export default factory configuration
  */
-export default {
-  database: DATABASE_CONNECTION_PRESET,
-  apiDocs: API_DOCUMENTATION_PRESET,
-  userInteraction: USER_INTERACTION_PRESET,
-  services: {
-    create: createDatabaseServiceFactory,
-    createRow: createServiceRowFactory,
-    createList: createServiceListFactory,
-    createHealthStatus: createServiceHealthStatusFactory,
-    createMetrics: createServiceMetricsFactory,
-    createTestResult: createServiceTestResultFactory,
-  },
-  api: {
-    createConfig: createOpenAPIConfigFactory,
-    createEndpoint: createAPIEndpointConfigFactory,
-    createPreview: createOpenAPIPreviewFactory,
-    createWorkflow: createAPIGenerationWorkflowFactory,
-    createResult: createAPIGenerationResultFactory,
-  },
-  hooks: {
-    createReactQueryCache: createReactQueryCacheFactory,
-    createSWRCache: createSWRCacheFactory,
-    createMSWResponse: createMSWResponseFactory,
-  },
-  forms: {
-    createSubmission: createFormSubmissionFactory,
-    createInteraction: createUserInteractionEventFactory,
-  },
-  utils: {
-    generateId,
-    generateConnectionString,
-  },
-};
+export { DEFAULT_FACTORY_CONFIG }
+
+/**
+ * @example
+ * // Basic usage
+ * import { apiDocsTestDataFactory } from './test-data-factories'
+ * 
+ * // Create OpenAPI specification for testing
+ * const openapi = apiDocsTestDataFactory.openapi.create()
+ * 
+ * // Create service configuration
+ * const service = apiDocsTestDataFactory.service.create({
+ *   name: 'test_db',
+ *   type: 'postgresql'
+ * })
+ * 
+ * // Create test scenarios
+ * const scenarios = apiDocsTestDataFactory.createTestSuite()
+ * 
+ * // Custom factory with different configuration
+ * const customFactory = createTestDataFactory({
+ *   realistic: false,
+ *   seed: 54321
+ * })
+ * 
+ * // MSW handlers for API mocking
+ * const handlers = createMockHandlers(['success', 'error'])
+ * 
+ * // React Query test data
+ * const queryTestData = createQueryTestData()
+ */
