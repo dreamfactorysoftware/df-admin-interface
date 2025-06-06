@@ -1,642 +1,541 @@
+/**
+ * Email Template Data Table Component
+ * 
+ * Comprehensive data table for email template management with React Query caching,
+ * sorting, filtering, pagination, and row actions. Implements WCAG 2.1 AA compliance
+ * and performance optimizations for large datasets.
+ * 
+ * Features:
+ * - React Query intelligent caching with 2-minute stale time
+ * - Zustand store integration for table state management
+ * - Row actions: view, edit, delete, duplicate
+ * - Responsive design with Tailwind CSS
+ * - Bulk operations with selection management
+ * - Comprehensive accessibility support
+ * - Performance optimization with virtual scrolling capability
+ */
+
 'use client';
 
-import React, { useState, useMemo, useCallback } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { 
-  TrashIcon, 
-  PencilIcon, 
-  EyeIcon, 
-  DocumentDuplicateIcon,
-  ChevronUpDownIcon,
-  ChevronUpIcon,
-  ChevronDownIcon,
-  MagnifyingGlassIcon,
-  AdjustmentsHorizontalIcon
-} from '@heroicons/react/24/outline';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useDebounce } from '@/hooks/use-debounce';
-import { useNotifications } from '@/hooks/use-notifications';
-import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
+import { 
+  EyeIcon, 
+  PencilIcon, 
+  TrashIcon, 
+  DocumentDuplicateIcon,
+  PlusIcon,
+  FunnelIcon,
+  ArrowDownTrayIcon,
+  ExclamationTriangleIcon,
+} from '@heroicons/react/24/outline';
+import { Menu, Transition } from '@headlessui/react';
+import { Fragment } from 'react';
+import { DataTable, DataTableColumn, SortConfig, PaginationConfig } from '@/components/ui/data-table';
+import { Button } from '@/components/ui/button';
+import { useEmailTemplates } from '@/hooks/use-email-templates';
+import { EmailTemplate, EmailTemplateRow, EMAIL_TEMPLATE_CONSTANTS } from '@/types/email-templates';
+import { cn } from '@/lib/utils';
 
-// Types for email templates
-interface EmailTemplate {
-  id: string;
-  name: string;
-  to: string;
-  from: string;
-  subject: string;
-  body_text?: string;
-  body_html?: string;
-  defaults?: string;
-  description?: string;
-  created_date: string;
-  last_modified_date: string;
-  created_by_id?: string;
-  last_modified_by_id?: string;
+// Action menu component for row actions
+interface ActionMenuProps {
+  template: EmailTemplate;
+  onView: (template: EmailTemplate) => void;
+  onEdit: (template: EmailTemplate) => void;
+  onDelete: (template: EmailTemplate) => void;
+  onDuplicate: (template: EmailTemplate) => void;
+  disabled?: boolean;
 }
 
-interface ApiResponse<T> {
-  resource: T[];
-  meta?: {
-    count: number;
-    offset: number;
-    limit: number;
-  };
-}
+const ActionMenu: React.FC<ActionMenuProps> = ({
+  template,
+  onView,
+  onEdit,
+  onDelete,
+  onDuplicate,
+  disabled = false,
+}) => {
+  return (
+    <Menu as="div" className="relative inline-block text-left">
+      <Menu.Button
+        disabled={disabled}
+        className={cn(
+          'inline-flex items-center justify-center w-8 h-8 rounded-md',
+          'text-gray-400 hover:text-gray-600 hover:bg-gray-100',
+          'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
+          'disabled:opacity-50 disabled:cursor-not-allowed',
+          'transition-colors duration-200'
+        )}
+        aria-label={`Actions for ${template.name}`}
+      >
+        <svg
+          className="w-4 h-4"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M12 6v.01M12 12v.01M12 18v.01"
+          />
+        </svg>
+      </Menu.Button>
 
-interface TableFilters {
-  search: string;
-  sortBy: string;
-  sortOrder: 'asc' | 'desc';
-  limit: number;
-  offset: number;
-}
-
-interface TableColumn {
-  key: keyof EmailTemplate | 'actions';
-  label: string;
-  sortable?: boolean;
-  width?: string;
-  className?: string;
-}
-
-interface EmailTemplateTableProps {
-  className?: string;
-  onTemplateEdit?: (template: EmailTemplate) => void;
-  onTemplateView?: (template: EmailTemplate) => void;
-  onTemplateDuplicate?: (template: EmailTemplate) => void;
-  onTemplateDelete?: (template: EmailTemplate) => void;
-}
-
-// Mock API client - will be replaced by actual implementation
-const emailTemplatesApi = {
-  getEmailTemplates: async (filters: TableFilters): Promise<ApiResponse<EmailTemplate>> => {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    // Mock data for development
-    const mockTemplates: EmailTemplate[] = [
-      {
-        id: '1',
-        name: 'Welcome Email',
-        to: '{email}',
-        from: 'noreply@dreamfactory.com',
-        subject: 'Welcome to DreamFactory',
-        body_text: 'Welcome to our platform!',
-        body_html: '<h1>Welcome to our platform!</h1>',
-        description: 'Welcome email for new users',
-        created_date: new Date().toISOString(),
-        last_modified_date: new Date().toISOString(),
-      },
-      {
-        id: '2',
-        name: 'Password Reset',
-        to: '{email}',
-        from: 'noreply@dreamfactory.com',
-        subject: 'Password Reset Request',
-        body_text: 'Click to reset your password',
-        body_html: '<p>Click to reset your password</p>',
-        description: 'Password reset email template',
-        created_date: new Date().toISOString(),
-        last_modified_date: new Date().toISOString(),
-      },
-    ];
-
-    // Apply search filter
-    let filtered = mockTemplates;
-    if (filters.search) {
-      const searchLower = filters.search.toLowerCase();
-      filtered = mockTemplates.filter(template => 
-        template.name.toLowerCase().includes(searchLower) ||
-        template.subject.toLowerCase().includes(searchLower) ||
-        (template.description && template.description.toLowerCase().includes(searchLower))
-      );
-    }
-
-    // Apply sorting
-    if (filters.sortBy) {
-      filtered.sort((a, b) => {
-        const aValue = a[filters.sortBy as keyof EmailTemplate] || '';
-        const bValue = b[filters.sortBy as keyof EmailTemplate] || '';
-        const comparison = aValue.toString().localeCompare(bValue.toString());
-        return filters.sortOrder === 'desc' ? -comparison : comparison;
-      });
-    }
-
-    // Apply pagination
-    const total = filtered.length;
-    const paginatedTemplates = filtered.slice(filters.offset, filters.offset + filters.limit);
-
-    return {
-      resource: paginatedTemplates,
-      meta: {
-        count: total,
-        offset: filters.offset,
-        limit: filters.limit,
-      },
-    };
-  },
-
-  deleteEmailTemplate: async (id: string): Promise<void> => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    // Mock delete operation
-  },
-
-  duplicateEmailTemplate: async (template: EmailTemplate): Promise<EmailTemplate> => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    // Mock duplicate operation
-    return {
-      ...template,
-      id: Date.now().toString(),
-      name: `${template.name} (Copy)`,
-      created_date: new Date().toISOString(),
-      last_modified_date: new Date().toISOString(),
-    };
-  },
+      <Transition
+        as={Fragment}
+        enter="transition ease-out duration-100"
+        enterFrom="transform opacity-0 scale-95"
+        enterTo="transform opacity-100 scale-100"
+        leave="transition ease-in duration-75"
+        leaveFrom="transform opacity-100 scale-100"
+        leaveTo="transform opacity-0 scale-95"
+      >
+        <Menu.Items className="absolute right-0 z-10 mt-2 w-48 origin-top-right bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+          <div className="py-1">
+            <Menu.Item>
+              {({ active }) => (
+                <button
+                  onClick={() => onView(template)}
+                  className={cn(
+                    'flex items-center w-full px-4 py-2 text-sm text-left',
+                    active ? 'bg-gray-100 text-gray-900' : 'text-gray-700',
+                    'hover:bg-gray-100 hover:text-gray-900'
+                  )}
+                >
+                  <EyeIcon className="w-4 h-4 mr-3" aria-hidden="true" />
+                  View Details
+                </button>
+              )}
+            </Menu.Item>
+            
+            <Menu.Item>
+              {({ active }) => (
+                <button
+                  onClick={() => onEdit(template)}
+                  className={cn(
+                    'flex items-center w-full px-4 py-2 text-sm text-left',
+                    active ? 'bg-gray-100 text-gray-900' : 'text-gray-700',
+                    'hover:bg-gray-100 hover:text-gray-900'
+                  )}
+                >
+                  <PencilIcon className="w-4 h-4 mr-3" aria-hidden="true" />
+                  Edit Template
+                </button>
+              )}
+            </Menu.Item>
+            
+            <Menu.Item>
+              {({ active }) => (
+                <button
+                  onClick={() => onDuplicate(template)}
+                  className={cn(
+                    'flex items-center w-full px-4 py-2 text-sm text-left',
+                    active ? 'bg-gray-100 text-gray-900' : 'text-gray-700',
+                    'hover:bg-gray-100 hover:text-gray-900'
+                  )}
+                >
+                  <DocumentDuplicateIcon className="w-4 h-4 mr-3" aria-hidden="true" />
+                  Duplicate Template
+                </button>
+              )}
+            </Menu.Item>
+            
+            <hr className="my-1 border-gray-200" />
+            
+            <Menu.Item>
+              {({ active }) => (
+                <button
+                  onClick={() => onDelete(template)}
+                  className={cn(
+                    'flex items-center w-full px-4 py-2 text-sm text-left',
+                    active ? 'bg-red-50 text-red-700' : 'text-red-600',
+                    'hover:bg-red-50 hover:text-red-700'
+                  )}
+                >
+                  <TrashIcon className="w-4 h-4 mr-3" aria-hidden="true" />
+                  Delete Template
+                </button>
+              )}
+            </Menu.Item>
+          </div>
+        </Menu.Items>
+      </Transition>
+    </Menu>
+  );
 };
 
-// Table columns configuration
-const COLUMNS: TableColumn[] = [
-  { key: 'name', label: 'Name', sortable: true, width: 'w-1/4' },
-  { key: 'subject', label: 'Subject', sortable: true, width: 'w-1/3' },
-  { key: 'to', label: 'To', sortable: true, width: 'w-1/6' },
-  { key: 'from', label: 'From', sortable: true, width: 'w-1/6' },
-  { key: 'last_modified_date', label: 'Last Modified', sortable: true, width: 'w-1/6' },
-  { key: 'actions', label: 'Actions', sortable: false, width: 'w-32' },
-];
+// Confirmation dialog for delete operations
+interface ConfirmDeleteDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  templateName: string;
+  isDeleting: boolean;
+}
 
-// Constants
-const DEFAULT_PAGE_SIZE = 25;
-const CACHE_TIME = 5 * 60 * 1000; // 5 minutes
-const STALE_TIME = 2 * 60 * 1000; // 2 minutes
-
-export default function EmailTemplateTable({
-  className = '',
-  onTemplateEdit,
-  onTemplateView,
-  onTemplateDuplicate,
-  onTemplateDelete,
-}: EmailTemplateTableProps) {
-  const router = useRouter();
-  const queryClient = useQueryClient();
-  const { showNotification } = useNotifications();
-  const { showConfirmDialog } = useConfirmDialog();
-
-  // Table state
-  const [filters, setFilters] = useState<TableFilters>({
-    search: '',
-    sortBy: 'name',
-    sortOrder: 'asc',
-    limit: DEFAULT_PAGE_SIZE,
-    offset: 0,
-  });
-
-  // Debounced search for performance
-  const debouncedSearch = useDebounce(filters.search, 300);
-
-  // Memoized query key for React Query caching
-  const queryKey = useMemo(() => [
-    'email-templates',
-    {
-      search: debouncedSearch,
-      sortBy: filters.sortBy,
-      sortOrder: filters.sortOrder,
-      limit: filters.limit,
-      offset: filters.offset,
-    },
-  ], [debouncedSearch, filters.sortBy, filters.sortOrder, filters.limit, filters.offset]);
-
-  // React Query for data fetching with intelligent caching
-  const {
-    data,
-    isLoading,
-    isError,
-    error,
-    refetch,
-  } = useQuery({
-    queryKey,
-    queryFn: () => emailTemplatesApi.getEmailTemplates({
-      ...filters,
-      search: debouncedSearch,
-    }),
-    staleTime: STALE_TIME,
-    gcTime: CACHE_TIME,
-    refetchOnWindowFocus: false,
-    refetchOnMount: 'always',
-  });
-
-  // Delete mutation
-  const deleteMutation = useMutation({
-    mutationFn: emailTemplatesApi.deleteEmailTemplate,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['email-templates'] });
-      showNotification({
-        type: 'success',
-        title: 'Success',
-        message: 'Email template deleted successfully',
-      });
-    },
-    onError: (error: Error) => {
-      showNotification({
-        type: 'error',
-        title: 'Error',
-        message: `Failed to delete email template: ${error.message}`,
-      });
-    },
-  });
-
-  // Duplicate mutation
-  const duplicateMutation = useMutation({
-    mutationFn: emailTemplatesApi.duplicateEmailTemplate,
-    onSuccess: (duplicatedTemplate) => {
-      queryClient.invalidateQueries({ queryKey: ['email-templates'] });
-      showNotification({
-        type: 'success',
-        title: 'Success',
-        message: 'Email template duplicated successfully',
-      });
-      
-      if (onTemplateDuplicate) {
-        onTemplateDuplicate(duplicatedTemplate);
-      }
-    },
-    onError: (error: Error) => {
-      showNotification({
-        type: 'error',
-        title: 'Error',
-        message: `Failed to duplicate email template: ${error.message}`,
-      });
-    },
-  });
-
-  // Event handlers
-  const handleSearchChange = useCallback((value: string) => {
-    setFilters(prev => ({
-      ...prev,
-      search: value,
-      offset: 0, // Reset to first page when searching
-    }));
-  }, []);
-
-  const handleSort = useCallback((column: string) => {
-    setFilters(prev => ({
-      ...prev,
-      sortBy: column,
-      sortOrder: prev.sortBy === column && prev.sortOrder === 'asc' ? 'desc' : 'asc',
-      offset: 0, // Reset to first page when sorting
-    }));
-  }, []);
-
-  const handlePageSizeChange = useCallback((newPageSize: number) => {
-    setFilters(prev => ({
-      ...prev,
-      limit: newPageSize,
-      offset: 0, // Reset to first page when changing page size
-    }));
-  }, []);
-
-  const handlePageChange = useCallback((newOffset: number) => {
-    setFilters(prev => ({
-      ...prev,
-      offset: newOffset,
-    }));
-  }, []);
-
-  const handleView = useCallback((template: EmailTemplate) => {
-    if (onTemplateView) {
-      onTemplateView(template);
-    } else {
-      router.push(`/system-settings/email-templates/${template.id}`);
-    }
-  }, [onTemplateView, router]);
-
-  const handleEdit = useCallback((template: EmailTemplate) => {
-    if (onTemplateEdit) {
-      onTemplateEdit(template);
-    } else {
-      router.push(`/system-settings/email-templates/${template.id}/edit`);
-    }
-  }, [onTemplateEdit, router]);
-
-  const handleDuplicate = useCallback((template: EmailTemplate) => {
-    duplicateMutation.mutate(template);
-  }, [duplicateMutation]);
-
-  const handleDelete = useCallback(async (template: EmailTemplate) => {
-    const confirmed = await showConfirmDialog({
-      title: 'Delete Email Template',
-      message: `Are you sure you want to delete the email template "${template.name}"? This action cannot be undone.`,
-      confirmText: 'Delete',
-      cancelText: 'Cancel',
-      variant: 'destructive',
-    });
-
-    if (confirmed) {
-      deleteMutation.mutate(template.id);
-    }
-  }, [deleteMutation, showConfirmDialog]);
-
-  // Render sort icon
-  const renderSortIcon = (column: string) => {
-    if (filters.sortBy !== column) {
-      return <ChevronUpDownIcon className="h-4 w-4 text-gray-400" />;
-    }
-    return filters.sortOrder === 'asc' 
-      ? <ChevronUpIcon className="h-4 w-4 text-primary-600" />
-      : <ChevronDownIcon className="h-4 w-4 text-primary-600" />;
-  };
-
-  // Format date for display
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
-  // Calculate pagination values
-  const totalItems = data?.meta?.count || 0;
-  const currentPage = Math.floor(filters.offset / filters.limit) + 1;
-  const totalPages = Math.ceil(totalItems / filters.limit);
-  const startItem = filters.offset + 1;
-  const endItem = Math.min(filters.offset + filters.limit, totalItems);
+const ConfirmDeleteDialog: React.FC<ConfirmDeleteDialogProps> = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  templateName,
+  isDeleting,
+}) => {
+  if (!isOpen) return null;
 
   return (
-    <div className={`bg-white dark:bg-gray-800 shadow-sm rounded-lg border border-gray-200 dark:border-gray-700 ${className}`}>
-      {/* Header with search and filters */}
-      <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-        <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-          <div className="flex-1 max-w-md">
-            <div className="relative">
-              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search email templates..."
-                value={filters.search}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm 
-                         focus:ring-2 focus:ring-primary-500 focus:border-primary-500 
-                         dark:bg-gray-700 dark:text-white dark:placeholder-gray-400
-                         text-sm transition-colors duration-200"
-                aria-label="Search email templates"
-              />
-            </div>
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <div className="flex min-h-screen items-center justify-center p-4">
+        {/* Backdrop */}
+        <div
+          className="fixed inset-0 bg-black bg-opacity-25 transition-opacity"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+        
+        {/* Dialog */}
+        <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+          <div className="flex items-center mb-4">
+            <ExclamationTriangleIcon className="w-6 h-6 text-red-600 mr-3" />
+            <h3 className="text-lg font-medium text-gray-900">
+              Confirm Delete
+            </h3>
           </div>
           
-          <div className="flex items-center gap-3">
-            <select
-              value={filters.limit}
-              onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-              className="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm
-                       bg-white dark:bg-gray-700 text-gray-900 dark:text-white
-                       focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              aria-label="Items per page"
+          <p className="text-sm text-gray-600 mb-6">
+            Are you sure you want to delete the email template "{templateName}"? 
+            This action cannot be undone.
+          </p>
+          
+          <div className="flex justify-end space-x-3">
+            <Button
+              variant="outline"
+              onClick={onClose}
+              disabled={isDeleting}
             >
-              <option value={10}>10 per page</option>
-              <option value={25}>25 per page</option>
-              <option value={50}>50 per page</option>
-              <option value={100}>100 per page</option>
-            </select>
-            
-            <button
-              onClick={() => refetch()}
-              disabled={isLoading}
-              className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 
-                       shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 dark:text-gray-200
-                       bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 
-                       focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500
-                       disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-              aria-label="Refresh table"
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={onConfirm}
+              disabled={isDeleting}
             >
-              <AdjustmentsHorizontalIcon className="h-4 w-4" />
-            </button>
+              {isDeleting ? 'Deleting...' : 'Delete Template'}
+            </Button>
           </div>
         </div>
       </div>
+    </div>
+  );
+};
 
-      {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          {/* Table header */}
-          <thead className="bg-gray-50 dark:bg-gray-900">
-            <tr>
-              {COLUMNS.map((column) => (
-                <th
-                  key={column.key}
-                  scope="col"
-                  className={`px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${column.width || ''}`}
-                >
-                  {column.sortable ? (
-                    <button
-                      onClick={() => handleSort(column.key as string)}
-                      className="flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-300 
-                               focus:outline-none focus:text-gray-700 dark:focus:text-gray-300"
-                      aria-label={`Sort by ${column.label}`}
-                    >
-                      {column.label}
-                      {renderSortIcon(column.key as string)}
-                    </button>
-                  ) : (
-                    column.label
-                  )}
-                </th>
-              ))}
-            </tr>
-          </thead>
+// Main email template table component
+export interface EmailTemplateTableProps {
+  className?: string;
+  onCreateNew?: () => void;
+  showCreateButton?: boolean;
+}
 
-          {/* Table body */}
-          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-            {isLoading ? (
-              <tr>
-                <td colSpan={COLUMNS.length} className="px-6 py-8 text-center">
-                  <div className="flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600"></div>
-                    <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">Loading...</span>
-                  </div>
-                </td>
-              </tr>
-            ) : isError ? (
-              <tr>
-                <td colSpan={COLUMNS.length} className="px-6 py-8 text-center">
-                  <div className="text-red-600 dark:text-red-400">
-                    <p className="text-sm font-medium">Error loading email templates</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      {error instanceof Error ? error.message : 'An unexpected error occurred'}
-                    </p>
-                    <button
-                      onClick={() => refetch()}
-                      className="mt-2 text-xs text-primary-600 hover:text-primary-500 underline"
-                    >
-                      Try again
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ) : !data?.resource?.length ? (
-              <tr>
-                <td colSpan={COLUMNS.length} className="px-6 py-8 text-center">
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {filters.search ? 'No email templates match your search.' : 'No email templates found.'}
-                  </p>
-                </td>
-              </tr>
-            ) : (
-              data.resource.map((template) => (
-                <tr
-                  key={template.id}
-                  className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150"
-                >
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">
-                      {template.name}
-                    </div>
-                    {template.description && (
-                      <div className="text-sm text-gray-500 dark:text-gray-400">
-                        {template.description}
-                      </div>
-                    )}
-                  </td>
-                  
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900 dark:text-white">
-                      {template.subject}
-                    </div>
-                  </td>
-                  
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500 dark:text-gray-400 font-mono">
-                      {template.to}
-                    </div>
-                  </td>
-                  
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500 dark:text-gray-400 font-mono">
-                      {template.from}
-                    </div>
-                  </td>
-                  
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500 dark:text-gray-400">
-                      {formatDate(template.last_modified_date)}
-                    </div>
-                  </td>
-                  
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleView(template)}
-                        className="inline-flex items-center p-1.5 border border-transparent rounded-md
-                                 text-gray-400 hover:text-primary-600 hover:bg-primary-50 
-                                 dark:hover:text-primary-400 dark:hover:bg-primary-900/20
-                                 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500
-                                 transition-colors duration-200"
-                        aria-label={`View ${template.name}`}
-                        title="View template"
-                      >
-                        <EyeIcon className="h-4 w-4" />
-                      </button>
-                      
-                      <button
-                        onClick={() => handleEdit(template)}
-                        className="inline-flex items-center p-1.5 border border-transparent rounded-md
-                                 text-gray-400 hover:text-blue-600 hover:bg-blue-50
-                                 dark:hover:text-blue-400 dark:hover:bg-blue-900/20
-                                 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500
-                                 transition-colors duration-200"
-                        aria-label={`Edit ${template.name}`}
-                        title="Edit template"
-                      >
-                        <PencilIcon className="h-4 w-4" />
-                      </button>
-                      
-                      <button
-                        onClick={() => handleDuplicate(template)}
-                        disabled={duplicateMutation.isPending}
-                        className="inline-flex items-center p-1.5 border border-transparent rounded-md
-                                 text-gray-400 hover:text-green-600 hover:bg-green-50
-                                 dark:hover:text-green-400 dark:hover:bg-green-900/20
-                                 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500
-                                 disabled:opacity-50 disabled:cursor-not-allowed
-                                 transition-colors duration-200"
-                        aria-label={`Duplicate ${template.name}`}
-                        title="Duplicate template"
-                      >
-                        <DocumentDuplicateIcon className="h-4 w-4" />
-                      </button>
-                      
-                      <button
-                        onClick={() => handleDelete(template)}
-                        disabled={deleteMutation.isPending}
-                        className="inline-flex items-center p-1.5 border border-transparent rounded-md
-                                 text-gray-400 hover:text-red-600 hover:bg-red-50
-                                 dark:hover:text-red-400 dark:hover:bg-red-900/20
-                                 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500
-                                 disabled:opacity-50 disabled:cursor-not-allowed
-                                 transition-colors duration-200"
-                        aria-label={`Delete ${template.name}`}
-                        title="Delete template"
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+export const EmailTemplateTable: React.FC<EmailTemplateTableProps> = ({
+  className,
+  onCreateNew,
+  showCreateButton = true,
+}) => {
+  const router = useRouter();
+  const [selectedRows, setSelectedRows] = useState<Set<string | number>>(new Set());
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{
+    isOpen: boolean;
+    template?: EmailTemplate;
+  }>({ isOpen: false });
 
-      {/* Pagination */}
-      {data?.resource?.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 px-6 py-3 border-t border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-gray-700 dark:text-gray-300">
-              Showing <span className="font-medium">{startItem}</span> to{' '}
-              <span className="font-medium">{endItem}</span> of{' '}
-              <span className="font-medium">{totalItems}</span> results
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => handlePageChange(Math.max(0, filters.offset - filters.limit))}
-                disabled={filters.offset === 0}
-                className="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 
-                         text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 
-                         bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600
-                         focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500
-                         disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-                aria-label="Previous page"
-              >
-                Previous
-              </button>
-              
-              <span className="text-sm text-gray-700 dark:text-gray-300">
-                Page {currentPage} of {totalPages}
-              </span>
-              
-              <button
-                onClick={() => handlePageChange(filters.offset + filters.limit)}
-                disabled={filters.offset + filters.limit >= totalItems}
-                className="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 
-                         text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 
-                         bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600
-                         focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500
-                         disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-                aria-label="Next page"
-              >
-                Next
-              </button>
-            </div>
-          </div>
+  // Email templates hook with React Query and Zustand integration
+  const {
+    emailTemplates,
+    totalCount,
+    isLoading,
+    isFetching,
+    isError,
+    error,
+    isDeleting,
+    isBulkDeleting,
+    deleteEmailTemplate,
+    bulkDeleteEmailTemplates,
+    currentPage,
+    pageSize,
+    searchQuery,
+    sortBy,
+    sortOrder,
+    setCurrentPage,
+    setPageSize,
+    setSearchQuery,
+    setSorting,
+    setSelectedTemplate,
+    prefetchTemplate,
+    refresh,
+  } = useEmailTemplates();
+
+  // Column definitions for the data table
+  const columns = useMemo<DataTableColumn<EmailTemplate>[]>(() => [
+    {
+      key: 'name',
+      header: 'Template Name',
+      sortable: true,
+      searchable: true,
+      render: (value, row) => (
+        <div className="flex flex-col">
+          <button
+            onClick={() => handleView(row)}
+            className="text-left font-medium text-primary-600 hover:text-primary-700 focus:outline-none focus:underline"
+          >
+            {value}
+          </button>
+          {row.description && (
+            <span className="text-sm text-gray-500 mt-1">
+              {row.description.length > 60 
+                ? `${row.description.substring(0, 60)}...` 
+                : row.description
+              }
+            </span>
+          )}
         </div>
+      ),
+    },
+    {
+      key: 'subject',
+      header: 'Subject',
+      sortable: true,
+      render: (value) => (
+        <span className="text-sm text-gray-900">
+          {value || '(No subject)'}
+        </span>
+      ),
+    },
+    {
+      key: 'createdDate',
+      header: 'Created',
+      sortable: true,
+      align: 'center',
+      render: (value) => (
+        <span className="text-sm text-gray-600">
+          {new Date(value).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+          })}
+        </span>
+      ),
+    },
+    {
+      key: 'lastModifiedDate',
+      header: 'Modified',
+      sortable: true,
+      align: 'center',
+      render: (value) => (
+        <span className="text-sm text-gray-600">
+          {new Date(value).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+          })}
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      align: 'right',
+      render: (_, row) => (
+        <ActionMenu
+          template={row}
+          onView={handleView}
+          onEdit={handleEdit}
+          onDelete={(template) => setDeleteConfirmation({ isOpen: true, template })}
+          onDuplicate={handleDuplicate}
+          disabled={isDeleting || isBulkDeleting}
+        />
+      ),
+    },
+  ], [isDeleting, isBulkDeleting]);
+
+  // Pagination configuration
+  const paginationConfig = useMemo<PaginationConfig>(() => ({
+    page: currentPage,
+    pageSize,
+    total: totalCount,
+    pageSizeOptions: [10, 25, 50, 100],
+  }), [currentPage, pageSize, totalCount]);
+
+  // Sort configuration
+  const sortConfig = useMemo<SortConfig>(() => ({
+    key: sortBy,
+    direction: sortOrder,
+  }), [sortBy, sortOrder]);
+
+  // Row action handlers
+  const handleView = useCallback((template: EmailTemplate) => {
+    setSelectedTemplate(template);
+    router.push(`/system-settings/email-templates/${template.id}`);
+  }, [router, setSelectedTemplate]);
+
+  const handleEdit = useCallback((template: EmailTemplate) => {
+    setSelectedTemplate(template);
+    router.push(`/system-settings/email-templates/${template.id}/edit`);
+  }, [router, setSelectedTemplate]);
+
+  const handleDuplicate = useCallback((template: EmailTemplate) => {
+    setSelectedTemplate(template);
+    router.push(`/system-settings/email-templates/create?duplicate=${template.id}`);
+  }, [router, setSelectedTemplate]);
+
+  const handleDelete = useCallback(() => {
+    if (!deleteConfirmation.template) return;
+    
+    deleteEmailTemplate(deleteConfirmation.template.id);
+    setDeleteConfirmation({ isOpen: false });
+  }, [deleteConfirmation.template, deleteEmailTemplate]);
+
+  // Bulk operations
+  const handleBulkDelete = useCallback(() => {
+    const selectedIds = Array.from(selectedRows).map(id => Number(id));
+    if (selectedIds.length === 0) return;
+    
+    bulkDeleteEmailTemplates(selectedIds);
+    setSelectedRows(new Set());
+  }, [selectedRows, bulkDeleteEmailTemplates]);
+
+  // Row selection handlers
+  const handleSelectionChange = useCallback((newSelection: Set<string | number>) => {
+    setSelectedRows(newSelection);
+  }, []);
+
+  const getRowId = useCallback((row: EmailTemplate) => row.id, []);
+
+  // Table event handlers
+  const handlePageChange = useCallback((page: number) => {
+    setCurrentPage(page);
+  }, [setCurrentPage]);
+
+  const handlePageSizeChange = useCallback((size: number) => {
+    setPageSize(size);
+  }, [setPageSize]);
+
+  const handleSortChange = useCallback((sortConfig: SortConfig) => {
+    setSorting(sortConfig.key as any, sortConfig.direction);
+  }, [setSorting]);
+
+  const handleSearchChange = useCallback((query: string) => {
+    setSearchQuery(query);
+  }, [setSearchQuery]);
+
+  // Row hover handler for prefetching
+  const handleRowHover = useCallback((template: EmailTemplate) => {
+    prefetchTemplate(template.id);
+  }, [prefetchTemplate]);
+
+  // Determine row class names for accessibility and interaction states
+  const getRowClassName = useCallback((row: EmailTemplate, index: number) => {
+    return cn(
+      'transition-colors duration-150',
+      selectedRows.has(row.id) && 'bg-primary-50',
+      'hover:bg-gray-50 focus-within:bg-gray-50'
+    );
+  }, [selectedRows]);
+
+  // Error message formatting
+  const errorMessage = error ? 
+    `Failed to load email templates: ${error instanceof Error ? error.message : 'Unknown error'}` : 
+    null;
+
+  // Table actions component
+  const tableActions = (
+    <div className="flex items-center space-x-2">
+      {/* Bulk actions */}
+      {selectedRows.size > 0 && (
+        <>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={handleBulkDelete}
+            disabled={isBulkDeleting}
+            className="flex items-center"
+          >
+            <TrashIcon className="w-4 h-4 mr-2" />
+            {isBulkDeleting 
+              ? `Deleting ${selectedRows.size}...` 
+              : `Delete ${selectedRows.size} Selected`
+            }
+          </Button>
+          <div className="w-px h-6 bg-gray-300" />
+        </>
+      )}
+      
+      {/* Refresh button */}
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={refresh}
+        disabled={isFetching}
+        className="flex items-center"
+      >
+        <ArrowDownTrayIcon className="w-4 h-4 mr-2" />
+        {isFetching ? 'Refreshing...' : 'Refresh'}
+      </Button>
+      
+      {/* Create new button */}
+      {showCreateButton && (
+        <Button
+          onClick={onCreateNew || (() => router.push('/system-settings/email-templates/create'))}
+          size="sm"
+          className="flex items-center"
+        >
+          <PlusIcon className="w-4 h-4 mr-2" />
+          Create Template
+        </Button>
       )}
     </div>
   );
-}
 
-// Export additional types for external use
-export type { EmailTemplate, EmailTemplateTableProps };
+  return (
+    <div className={cn('space-y-4', className)}>
+      {/* Table container with comprehensive functionality */}
+      <DataTable
+        data={emailTemplates}
+        columns={columns}
+        loading={isLoading}
+        error={errorMessage}
+        pagination={paginationConfig}
+        onPageChange={handlePageChange}
+        onPageSizeChange={handlePageSizeChange}
+        sortConfig={sortConfig}
+        onSortChange={handleSortChange}
+        searchQuery={searchQuery}
+        onSearchChange={handleSearchChange}
+        searchPlaceholder="Search email templates by name or description..."
+        emptyMessage="No email templates found. Create your first template to get started."
+        actions={tableActions}
+        selectedRows={selectedRows}
+        onSelectionChange={handleSelectionChange}
+        getRowId={getRowId}
+        rowClassName={getRowClassName}
+        onRowClick={handleView}
+        showSearch={true}
+        showPagination={true}
+        stickyHeader={true}
+        className="bg-white border border-gray-200 rounded-lg shadow-sm"
+      />
+
+      {/* Delete confirmation dialog */}
+      <ConfirmDeleteDialog
+        isOpen={deleteConfirmation.isOpen}
+        onClose={() => setDeleteConfirmation({ isOpen: false })}
+        onConfirm={handleDelete}
+        templateName={deleteConfirmation.template?.name || ''}
+        isDeleting={isDeleting}
+      />
+    </div>
+  );
+};
+
+export default EmailTemplateTable;
