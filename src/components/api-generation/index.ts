@@ -1,213 +1,273 @@
 /**
- * API Generation Components Export Barrel
+ * @fileoverview API Generation Module - Central Export Barrel
  * 
- * Central export file providing clean imports and public API surface for all
- * API generation components in the React/Next.js DreamFactory Admin Interface.
+ * Comprehensive export file for all API generation components, hooks, types, and utilities
+ * implementing F-003: REST API Endpoint Generation feature per Section 2.1 Feature Catalog.
  * 
- * Supports F-003: REST API Endpoint Generation per Section 2.1 Feature Catalog
- * with React Hook Form-powered configuration interfaces, real-time OpenAPI
- * specification preview using Next.js serverless functions, and intelligent
- * caching via React Query for optimal configuration management.
+ * This module replaces Angular adf-api-docs components with React 19/Next.js 15.1 architecture,
+ * providing clean imports and public API surface for:
+ * - Generation Wizard workflow for guided API creation
+ * - Endpoint Configuration for HTTP method and parameter setup
+ * - OpenAPI Preview with interactive documentation
+ * - Security Configuration for RBAC and API key management
+ * - Type-safe interfaces and utility functions
  * 
- * @fileoverview Export barrel for API generation component ecosystem
+ * Supports React/Next.js Integration Requirements for modular component architecture
+ * with tree-shaking friendly exports optimized for Turbopack build performance per
+ * Section 0.1.1 technical scope.
+ * 
+ * @see Technical Specification Section 2.1 Feature Catalog F-003
+ * @see React/Next.js Integration Requirements for modular component architecture
+ * @see Section 0.2.1 - React/Next.js module organization patterns
+ * 
+ * @module APIGeneration
  * @version 1.0.0
- * @since React 19.0.0, Next.js 15.1.0
  */
 
 // =============================================================================
-// CORE GENERATION COMPONENTS
+// GENERATION WIZARD COMPONENTS
 // =============================================================================
 
 /**
- * Main API Generation Wizard Component
+ * Complete API generation wizard providing guided workflow for database table
+ * selection, endpoint configuration, security setup, and OpenAPI generation.
  * 
- * React Hook Form-powered multi-step wizard for configuring REST API endpoints
- * with real-time validation under 100ms response time. Supports comprehensive
- * endpoint configuration workflows including HTTP method selection, parameter
- * configuration, and security rules assignment.
- */
-export { default as GenerationWizard } from './generation-wizard';
-export type { GenerationWizardProps, GenerationStep, WizardStepProps } from './generation-wizard';
-
-/**
- * Endpoint Configuration Component
+ * Replaces Angular reactive forms with React Hook Form + Zod validation,
+ * implementing multi-step wizard with progress tracking and state persistence.
  * 
- * Detailed endpoint parameter configuration interface with support for query
- * parameters, filters, pagination, and custom endpoint behavior configuration.
- * Integrates with React Query for intelligent configuration caching.
- */
-export { default as EndpointConfiguration } from './endpoint-configuration';
-export type { 
-  EndpointConfigurationProps, 
-  EndpointConfig, 
-  HttpMethod, 
-  ParameterConfig,
-  FilterConfig,
-  PaginationConfig
-} from './endpoint-configuration';
-
-/**
- * OpenAPI Preview Component
+ * Features:
+ * - Multi-step wizard navigation with validation
+ * - React Query-powered schema discovery
+ * - Real-time configuration preview
+ * - Zustand state management integration
+ * - TanStack Virtual for large table lists
  * 
- * Real-time OpenAPI specification preview using Next.js API Routes at
- * `/api/preview/{serviceName}/{endpoint}` for server-side endpoint validation
- * and structure visualization. Supports interactive documentation and testing.
- */
-export { default as OpenAPIPreview } from './openapi-preview';
-export type { 
-  OpenAPIPreviewProps, 
-  OpenAPISpec, 
-  ApiEndpoint, 
-  EndpointPreview,
-  SpecGenerationOptions
-} from './openapi-preview';
-
-/**
- * Security Configuration Component
- * 
- * Role-based access controls, API key management, and endpoint-level security
- * rules configuration. Integrates with Next.js middleware for request
- * interception and token validation with secure session handling.
- */
-export { default as SecurityConfiguration } from './security-configuration';
-export type { 
-  SecurityConfigurationProps, 
-  SecurityRule, 
-  AccessLevel, 
-  ApiKeyConfig,
-  RolePermission,
-  EndpointSecurity
-} from './security-configuration';
-
-// =============================================================================
-// GENERATION WIZARD SUB-COMPONENTS
-// =============================================================================
-
-/**
- * Generation Wizard Step Components
- * 
- * Individual step components for the multi-step API generation workflow,
- * supporting database table selection, endpoint configuration, security
- * setup, and final review steps.
- */
-export { 
-  TableSelectionStep,
-  EndpointConfigStep,
-  SecurityConfigStep,
-  ReviewStep,
-  type StepComponentProps
-} from './generation-wizard';
-
-// =============================================================================
-// ENDPOINT CONFIGURATION SUB-COMPONENTS
-// =============================================================================
-
-/**
- * Endpoint Configuration Sub-Components
- * 
- * Specialized components for different aspects of endpoint configuration
- * including HTTP method selection, parameter management, and filter setup.
+ * @see Section 4.4.3.2 - API generation workflow implementation
  */
 export {
-  HttpMethodSelector,
-  ParameterManager,
-  FilterBuilder,
-  PaginationSetup,
-  type HttpMethodSelectorProps,
-  type ParameterManagerProps,
-  type FilterBuilderProps,
-  type PaginationSetupProps
-} from './endpoint-configuration';
-
-// =============================================================================
-// OPENAPI PREVIEW SUB-COMPONENTS
-// =============================================================================
-
-/**
- * OpenAPI Preview Sub-Components
- * 
- * Components for displaying and interacting with OpenAPI specifications
- * including specification viewer, endpoint testing interface, and documentation
- * generation controls.
- */
-export {
-  SpecificationViewer,
-  EndpointTester,
-  DocumentationGenerator,
-  type SpecificationViewerProps,
-  type EndpointTesterProps,
-  type DocumentationGeneratorProps
-} from './openapi-preview';
-
-// =============================================================================
-// SECURITY CONFIGURATION SUB-COMPONENTS
-// =============================================================================
-
-/**
- * Security Configuration Sub-Components
- * 
- * Components for managing different aspects of API security including
- * role management, API key configuration, and access control rules.
- */
-export {
-  RoleManager,
-  ApiKeyManager,
-  AccessControlBuilder,
-  type RoleManagerProps,
-  type ApiKeyManagerProps,
-  type AccessControlBuilderProps
-} from './security-configuration';
-
-// =============================================================================
-// SHARED HOOKS AND UTILITIES
-// =============================================================================
-
-/**
- * API Generation Hooks
- * 
- * Custom React hooks for API generation workflows using SWR/React Query
- * for intelligent caching and synchronization with backend services.
- * Provides hooks for generation status, configuration management, and
- * real-time preview updates.
- */
-export {
-  useApiGeneration,
-  useEndpointConfiguration,
+  // Primary wizard components
+  GenerationWizard,
+  WizardLayout,
+  WizardProvider,
+  
+  // Individual wizard steps
+  TableSelection,
+  EndpointConfiguration as WizardEndpointConfiguration,
+  GenerationPreview,
+  GenerationProgress,
+  
+  // Wizard navigation and state hooks
+  useWizard,
+  useWizardNavigation,
   useOpenAPIPreview,
-  useSecurityConfiguration,
-  useGenerationWizard,
-  type UseApiGenerationOptions,
-  type UseEndpointConfigurationOptions,
-  type UseOpenAPIPreviewOptions,
-  type UseSecurityConfigurationOptions,
-  type UseGenerationWizardOptions
+  
+  // Wizard type definitions
+  type WizardState,
+  type WizardActions,
+  type WizardStep,
+  type WizardLayoutProps,
+  type TableSelectionProps,
+  type GenerationPreviewProps,
+  type GenerationProgressProps,
+  
+  // Wizard configuration constants
+  WIZARD_STEPS,
+  WIZARD_STEP_CONFIG,
+  HTTP_METHODS,
+  DEFAULT_ENDPOINT_CONFIG,
+  VALIDATION_RULES,
+  REACT_QUERY_CONFIG,
+  
+  // Test utilities for wizard components
+  TestUtilities as WizardTestUtilities
 } from './generation-wizard';
 
+// =============================================================================
+// ENDPOINT CONFIGURATION COMPONENTS
+// =============================================================================
+
+/**
+ * Comprehensive endpoint configuration components for HTTP method selection,
+ * parameter building, query configuration, and security rules.
+ * 
+ * Replaces Angular Material components with Tailwind CSS + Headless UI,
+ * implementing real-time validation and preview capabilities.
+ * 
+ * Features:
+ * - HTTP method selection with conditional options
+ * - Dynamic parameter builder with drag-and-drop
+ * - Query configuration with filtering and pagination
+ * - Security rules configuration
+ * - Real-time validation with Zod schemas
+ * 
+ * @see React/Next.js Integration Requirements for forms and validation
+ */
 export {
-  useEndpointValidation,
-  useParameterConfig,
-  useFilterValidation,
-  type UseEndpointValidationOptions,
-  type UseParameterConfigOptions,
-  type UseFilterValidationOptions
+  // Main endpoint configuration form
+  EndpointConfigForm,
+  
+  // HTTP method and parameter configuration
+  HttpMethodSelector,
+  ParameterBuilder,
+  QueryConfiguration,
+  
+  // Security and validation configuration
+  SecurityConfiguration as EndpointSecurityConfiguration,
+  ValidationRules,
+  
+  // Preview and testing components
+  PreviewPanel,
+  
+  // Endpoint configuration types
+  type EndpointConfigFormProps,
+  type HttpMethodSelectorProps,
+  type ParameterBuilderProps,
+  type QueryConfigurationProps,
+  type ValidationRulesProps,
+  type PreviewPanelProps,
+  
+  // Configuration data types
+  type EndpointConfiguration,
+  type MethodConfiguration,
+  type EndpointParameter,
+  type QueryConfig,
+  type ValidationConfig,
+  type SecurityConfig,
+  
+  // Utility types
+  type HTTPMethod,
+  type ParameterType,
+  type FilterOperator,
+  type ValidationRule,
+  
+  // Configuration schemas for validation
+  endpointConfigSchema,
+  parameterSchema,
+  queryConfigSchema,
+  validationConfigSchema,
+  securityConfigSchema
 } from './endpoint-configuration';
 
+// =============================================================================
+// OPENAPI PREVIEW COMPONENTS
+// =============================================================================
+
+/**
+ * Interactive OpenAPI documentation and testing components using @swagger-ui/react
+ * with enhanced testing capabilities and API key management.
+ * 
+ * Replaces Angular SwaggerUI integration with React components,
+ * implementing F-006: API Documentation and Testing requirements.
+ * 
+ * Features:
+ * - Interactive SwaggerUI documentation viewer
+ * - API documentation service listing
+ * - API key selection and management
+ * - Real-time specification generation
+ * - Clipboard utilities for API keys
+ * 
+ * @see Section 2.1 Feature Catalog F-006
+ */
 export {
-  useSpecGeneration,
-  useEndpointPreview,
-  useDocumentationExport,
-  type UseSpecGenerationOptions,
-  type UseEndpointPreviewOptions,
-  type UseDocumentationExportOptions
+  // Primary OpenAPI components
+  OpenAPIViewer,
+  ApiDocsList,
+  ApiKeySelector,
+  
+  // OpenAPI configuration and utilities
+  SWAGGER_UI_CONFIG,
+  DEFAULT_SWAGGER_THEME,
+  PREVIEW_SETTINGS,
+  
+  // OpenAPI types and interfaces
+  type OpenAPIViewerProps,
+  type ApiDocsListProps,
+  type ApiKeySelectorProps,
+  type OpenAPISpecification,
+  type APIDocumentationInfo,
+  type APIKeyInfo,
+  type SwaggerUIConfig,
+  
+  // Validation schemas
+  openAPISpecificationSchema,
+  apiDocumentationInfoSchema,
+  apiKeyInfoSchema,
+  
+  // Re-exported hooks for convenience
+  useAPIKeys,
+  useApiDocs,
+  useClipboard,
+  useServices,
+  
+  // Test utilities
+  TestUtilities as OpenAPITestUtilities
 } from './openapi-preview';
 
+// =============================================================================
+// SECURITY CONFIGURATION COMPONENTS
+// =============================================================================
+
+/**
+ * Comprehensive API security configuration components implementing
+ * role-based access control, API key management, and endpoint-level permissions.
+ * 
+ * Replaces Angular guards with Next.js middleware patterns,
+ * implementing F-004: API Security Configuration requirements.
+ * 
+ * Features:
+ * - Role-based access control configuration
+ * - API key administration and management
+ * - Endpoint-level security rules
+ * - Security policy configuration
+ * - Real-time permission validation
+ * 
+ * @see Section 4.5 - Security and Authentication Flows
+ * @see Section 2.1 Feature Catalog F-004
+ */
 export {
-  useRoleManagement,
-  useApiKeyManagement,
-  useAccessControl,
-  type UseRoleManagementOptions,
-  type UseApiKeyManagementOptions,
-  type UseAccessControlOptions
+  // Primary security components
+  SecurityConfigForm,
+  ApiKeyManager,
+  RoleBasedAccessControl,
+  EndpointPermissions,
+  
+  // Security context and providers
+  SecurityConfigProvider,
+  useSecurityConfig,
+  withSecurityContext,
+  
+  // Security management hooks
+  useApiKeys as useSecurityApiKeys,
+  
+  // Security utility functions
+  calculateVerbMask,
+  getMethodsFromVerbMask,
+  hasMethod,
+  toggleMethod,
+  hasRequestorType,
+  toggleRequestorType,
+  validatePermissions,
+  validateEndpointRule,
+  buildFilterExpression,
+  mergeSecurityConfigs,
+  
+  // Security type definitions
+  type SecurityConfiguration,
+  type SecurityConfigFormData,
+  type Role,
+  type RolePermission,
+  type ApiKeyInfo as SecurityApiKeyInfo,
+  type EndpointPermission,
+  type EndpointRule,
+  type VerbMask,
+  type RequestorMask,
+  type SecurityPolicy,
+  
+  // Security constants
+  HTTP_VERBS,
+  REQUESTOR_TYPES,
+  DEFAULT_SECURITY_CONFIG,
+  SECURITY_MODULE_INFO
 } from './security-configuration';
 
 // =============================================================================
@@ -215,223 +275,345 @@ export {
 // =============================================================================
 
 /**
- * Core API Generation Types
+ * Comprehensive type definitions for API generation functionality,
+ * providing type safety across all components and workflows.
  * 
- * Comprehensive type definitions for API generation workflows, endpoint
- * configurations, security rules, and OpenAPI specifications. Supports
- * TypeScript 5.8+ strict type safety throughout the component ecosystem.
+ * Supports TypeScript 5.8+ with strict type checking and React 19 patterns.
  */
 export type {
-  // Core Generation Types
-  ApiGenerationConfig,
-  GenerationProgress,
-  GenerationResult,
-  GenerationError,
+  // Core API generation types
+  APIGenerationConfig,
+  APIGenerationResult,
+  APIGenerationStatus,
+  GenerationStatistics,
   
-  // Database and Schema Types
-  DatabaseService,
-  TableMetadata,
-  FieldMetadata,
-  RelationshipMetadata,
+  // Database schema types
+  DatabaseTable,
+  DatabaseField,
+  DatabaseRelation,
+  FieldType,
+  ReferentialAction,
   
-  // Endpoint Types
-  RestEndpoint,
-  EndpointMethod,
-  EndpointParameter,
-  EndpointFilter,
-  EndpointPagination,
+  // HTTP and API types
+  HTTPMethod,
+  HTTPStatus,
+  ContentType,
+  HeaderConfig,
   
-  // Security Types
-  SecurityPolicy,
-  UserRole,
-  Permission,
-  ApiKey,
-  AccessRule,
+  // OpenAPI specification types
+  OpenAPISpec,
+  APIInfo,
+  APIContact,
+  APILicense,
+  APIServer,
+  PathItem,
+  Operation,
+  Parameter,
+  RequestBody,
+  Response,
+  Schema,
+  APIComponents,
+  SecurityScheme,
   
-  // OpenAPI Types
-  OpenApiDocument,
-  ApiPath,
-  ApiOperation,
-  ApiSchema,
-  ApiResponse,
+  // Form and validation types
+  FormValidationError,
+  ValidationResult,
+  FieldValidation,
   
-  // Configuration Types
-  GenerationSettings,
-  PreviewSettings,
-  ExportSettings,
-  ValidationSettings,
+  // React component prop types
+  BaseComponentProps,
+  FormComponentProps,
+  ConfigurationProps,
+  PreviewProps,
   
-  // Error and Status Types
-  ValidationError,
+  // State management types
+  APIGenerationState,
+  ConfigurationState,
+  PreviewState,
+  SecurityState,
+  
+  // Error and status types
+  APIError,
   ConfigurationError,
-  GenerationStatus,
-  PreviewStatus
-} from '../../../types/api-generation';
+  ValidationError,
+  GenerationError
+} from '../types/api-generation';
 
 // =============================================================================
-// UTILITIES AND HELPERS
+// UTILITY FUNCTIONS AND HELPERS
 // =============================================================================
 
 /**
- * API Generation Utilities
- * 
- * Helper functions for API generation workflows including validation,
- * transformation, and formatting utilities. Optimized for Turbopack
- * tree-shaking and build performance.
+ * Utility functions for API generation, configuration management,
+ * and data transformation supporting the component ecosystem.
  */
 export {
+  // Configuration utilities
+  validateAPIConfiguration,
+  mergeConfigurations,
+  normalizeConfiguration,
+  
+  // OpenAPI utilities
+  generateOpenAPISpec,
+  validateOpenAPISpec,
+  transformSchemaToOpenAPI,
+  
+  // HTTP utilities
+  buildEndpointURL,
+  formatHTTPMethod,
+  validateHTTPResponse,
+  
+  // Form utilities
+  createFormSchema,
+  validateFormData,
+  transformFormValues,
+  
+  // Data transformation utilities
+  mapDatabaseToAPI,
+  transformTableToEndpoint,
+  generateParameterDefinitions,
+  
+  // Validation utilities
   validateEndpointConfiguration,
-  generateOpenApiSpec,
-  formatSecurityRules,
-  transformDatabaseSchema,
-  validateApiConfiguration,
-  generateEndpointCode,
-  exportDocumentation,
-  type ValidationResult,
-  type TransformationOptions,
-  type ExportOptions
+  validateSecurityConfiguration,
+  validateParameterConfiguration,
+  
+  // Helper functions
+  formatAPIDocumentation,
+  generateAPIKey,
+  calculatePermissions,
+  buildFilterQuery
+} from '../lib/api-generation-utils';
+
+// =============================================================================
+// CONFIGURATION CONSTANTS
+// =============================================================================
+
+/**
+ * Configuration constants and default values for API generation components.
+ * Optimized for Turbopack tree-shaking and consistent behavior across components.
+ */
+export const API_GENERATION_CONFIG = {
+  // Performance thresholds per React/Next.js Integration Requirements
+  VALIDATION_TIMEOUT: 100, // milliseconds - Real-time validation under 100ms
+  PREVIEW_TIMEOUT: 2000, // milliseconds - API responses under 2 seconds
+  CACHE_TTL: 300000, // milliseconds - 5 minutes cache for React Query
+  
+  // API generation limits
+  MAX_PARAMETERS: 50,
+  MAX_TABLES_PER_GENERATION: 100,
+  MAX_FIELDS_PER_TABLE: 200,
+  
+  // HTTP method configuration
+  SUPPORTED_METHODS: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const,
+  DEFAULT_METHODS: ['GET', 'POST', 'PUT', 'DELETE'] as const,
+  
+  // Security defaults
+  DEFAULT_AUTH_METHODS: ['API_KEY', 'SESSION_TOKEN'] as const,
+  DEFAULT_PERMISSIONS: {
+    GET: ['read'],
+    POST: ['create'],
+    PUT: ['update'],
+    PATCH: ['update'],
+    DELETE: ['delete']
+  } as const,
+  
+  // OpenAPI configuration
+  OPENAPI_VERSION: '3.0.3',
+  DEFAULT_API_VERSION: '1.0.0',
+  
+  // UI configuration
+  WIZARD_STEPS_COUNT: 4,
+  ITEMS_PER_PAGE: 25,
+  VIRTUAL_SCROLL_THRESHOLD: 1000
+} as const;
+
+/**
+ * Error messages and validation constants for consistent user feedback.
+ */
+export const API_GENERATION_MESSAGES = {
+  VALIDATION: {
+    REQUIRED_FIELD: 'This field is required',
+    INVALID_HTTP_METHOD: 'Invalid HTTP method selected',
+    INVALID_PARAMETER_TYPE: 'Invalid parameter type',
+    DUPLICATE_PARAMETER: 'Parameter name already exists',
+    INVALID_SECURITY_CONFIG: 'Invalid security configuration'
+  },
+  GENERATION: {
+    SUCCESS: 'API generation completed successfully',
+    FAILED: 'API generation failed',
+    IN_PROGRESS: 'Generating API endpoints...',
+    VALIDATING: 'Validating configuration...'
+  },
+  PREVIEW: {
+    LOADING: 'Loading preview...',
+    ERROR: 'Failed to generate preview',
+    NO_DATA: 'No data available for preview'
+  }
+} as const;
+
+// =============================================================================
+// REACT QUERY CONFIGURATION
+// =============================================================================
+
+/**
+ * React Query configuration optimized for API generation workflows
+ * with intelligent caching and synchronization per integration requirements.
+ */
+export const API_GENERATION_QUERY_CONFIG = {
+  // Query keys for consistent cache management
+  QUERY_KEYS: {
+    WIZARD_STATE: ['api-generation', 'wizard'] as const,
+    SCHEMA_DISCOVERY: ['api-generation', 'schema'] as const,
+    ENDPOINT_CONFIG: ['api-generation', 'endpoints'] as const,
+    OPENAPI_PREVIEW: ['api-generation', 'openapi'] as const,
+    SECURITY_CONFIG: ['api-generation', 'security'] as const,
+    API_KEYS: ['api-generation', 'api-keys'] as const,
+    SERVICES: ['api-generation', 'services'] as const
+  },
+  
+  // Cache configuration for optimal performance
+  CACHE_CONFIG: {
+    staleTime: 300000, // 5 minutes
+    cacheTime: 600000, // 10 minutes
+    refetchOnWindowFocus: false,
+    refetchOnMount: true,
+    retry: 2,
+    retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 30000)
+  },
+  
+  // Mutation configuration for data modifications
+  MUTATION_CONFIG: {
+    retry: 1,
+    retryDelay: 1000,
+    onError: (error: Error) => {
+      console.error('API Generation mutation error:', error);
+    }
+  }
+} as const;
+
+// =============================================================================
+// MODULE METADATA AND FEATURE FLAGS
+// =============================================================================
+
+/**
+ * Module metadata for debugging, monitoring, and feature management.
+ */
+export const API_GENERATION_MODULE_INFO = {
+  version: '1.0.0',
+  framework: 'React 19 + Next.js 15.1',
+  replaces: 'Angular adf-api-docs components',
+  features: [
+    'Generation Wizard workflow',
+    'Endpoint Configuration',
+    'OpenAPI Preview and Documentation',
+    'Security Configuration',
+    'Real-time validation',
+    'Interactive testing'
+  ],
+  requirements: ['F-003', 'F-004', 'F-006'],
+  performance: {
+    validationTimeout: '< 100ms',
+    previewGeneration: '< 2s',
+    cacheHitResponse: '< 50ms'
+  },
+  dependencies: {
+    react: '^19.0.0',
+    nextjs: '^15.1.0',
+    reactHookForm: '^7.52.0',
+    reactQuery: '^5.0.0',
+    tailwindcss: '^4.1.0',
+    zod: '^3.23.0'
+  },
+  lastUpdated: new Date().toISOString()
+} as const;
+
+/**
+ * Feature flags for conditional functionality and A/B testing.
+ */
+export const API_GENERATION_FEATURE_FLAGS = {
+  // Core features
+  ENABLE_GENERATION_WIZARD: true,
+  ENABLE_ENDPOINT_CONFIGURATION: true,
+  ENABLE_OPENAPI_PREVIEW: true,
+  ENABLE_SECURITY_CONFIGURATION: true,
+  
+  // Advanced features
+  ENABLE_REAL_TIME_PREVIEW: true,
+  ENABLE_BATCH_GENERATION: true,
+  ENABLE_ADVANCED_VALIDATION: true,
+  ENABLE_INTERACTIVE_TESTING: true,
+  
+  // Performance optimizations
+  ENABLE_VIRTUAL_SCROLLING: true,
+  ENABLE_INTELLIGENT_CACHING: true,
+  ENABLE_BACKGROUND_SYNC: true,
+  
+  // Experimental features
+  ENABLE_AI_SUGGESTIONS: false,
+  ENABLE_COLLABORATIVE_EDITING: false,
+  ENABLE_ADVANCED_ANALYTICS: false
+} as const;
+
+// =============================================================================
+// MAIN EXPORT ALIASES
+// =============================================================================
+
+/**
+ * Main component aliases for convenient imports throughout the application.
+ * Provides both specific and general-purpose exports for different use cases.
+ */
+
+// Primary workflow component
+export { GenerationWizard as APIGenerationWizard } from './generation-wizard';
+
+// Configuration components
+export { EndpointConfigForm as APIEndpointConfiguration } from './endpoint-configuration';
+export { OpenAPIViewer as APIDocumentation } from './openapi-preview';
+export { SecurityConfigForm as APISecurityConfiguration } from './security-configuration';
+
+/**
+ * Default export providing the complete API generation experience.
+ * Useful for single-component imports and simplified integration.
+ */
+export { GenerationWizard as default } from './generation-wizard';
+
+// =============================================================================
+// TYPE EXPORTS FOR EXTERNAL CONSUMPTION
+// =============================================================================
+
+/**
+ * Re-export commonly used types for external consumers without requiring
+ * deep imports from individual modules.
+ */
+export type {
+  // Main component prop types
+  GenerationWizardProps,
+  EndpointConfigFormProps as APIEndpointConfigurationProps,
+  OpenAPIViewerProps as APIDocumentationProps,
+  SecurityConfigFormProps as APISecurityConfigurationProps,
+  
+  // Configuration types
+  EndpointConfiguration as APIEndpointConfig,
+  SecurityConfiguration as APISecurityConfig,
+  OpenAPISpecification as APISpecification,
+  
+  // State management types
+  WizardState as APIGenerationWizardState,
+  SecurityState as APISecurityState
 } from './generation-wizard';
 
-export {
-  validateParameters,
-  buildFilterQuery,
-  formatPaginationConfig,
-  type ParameterValidationResult,
-  type FilterQueryOptions,
-  type PaginationFormatOptions
-} from './endpoint-configuration';
-
-export {
-  generatePreviewUrl,
-  formatSpecification,
-  validateOpenApiSpec,
-  type PreviewUrlOptions,
-  type SpecificationFormatOptions,
-  type SpecValidationResult
-} from './openapi-preview';
-
-export {
-  validateSecurityRules,
-  generateApiKey,
-  formatPermissions,
-  type SecurityValidationResult,
-  type ApiKeyGenerationOptions,
-  type PermissionFormatOptions
-} from './security-configuration';
-
-// =============================================================================
-// CONSTANTS AND CONFIGURATION
-// =============================================================================
+/**
+ * Module version for compatibility tracking and debugging
+ */
+export const MODULE_VERSION = '1.0.0';
 
 /**
- * API Generation Constants
- * 
- * Configuration constants for API generation workflows including default
- * settings, validation rules, and performance parameters. Configured for
- * React/Next.js Integration Requirements and Turbopack optimization.
+ * Compatibility information for version management
  */
-export {
-  DEFAULT_GENERATION_CONFIG,
-  SUPPORTED_HTTP_METHODS,
-  DEFAULT_SECURITY_RULES,
-  OPENAPI_SPEC_VERSION,
-  VALIDATION_TIMEOUTS,
-  PREVIEW_UPDATE_INTERVALS,
-  CACHE_CONFIGURATION
-} from './generation-wizard';
-
-export {
-  DEFAULT_ENDPOINT_CONFIG,
-  PARAMETER_TYPES,
-  FILTER_OPERATORS,
-  PAGINATION_DEFAULTS
-} from './endpoint-configuration';
-
-export {
-  PREVIEW_MODES,
-  EXPORT_FORMATS,
-  DOCUMENTATION_TEMPLATES
-} from './openapi-preview';
-
-export {
-  SECURITY_LEVELS,
-  DEFAULT_PERMISSIONS,
-  API_KEY_FORMATS
-} from './security-configuration';
-
-// =============================================================================
-// EXPORT ORGANIZATION FOR TREE-SHAKING
-// =============================================================================
-
-/**
- * Named Export Groups for Optimized Imports
- * 
- * Organized exports for tree-shaking optimization with Turbopack build
- * system. Enables selective importing of component groups for enhanced
- * bundle size optimization and development build performance.
- */
-
-// Core Components Group
-export const CoreComponents = {
-  GenerationWizard,
-  EndpointConfiguration,
-  OpenAPIPreview,
-  SecurityConfiguration
+export const COMPATIBILITY = {
+  react: '^19.0.0',
+  nextjs: '^15.1.0',
+  node: '^20.0.0',
+  typescript: '^5.8.0'
 } as const;
-
-// Hook Groups for Selective Importing
-export const GenerationHooks = {
-  useApiGeneration,
-  useEndpointConfiguration,
-  useOpenAPIPreview,
-  useSecurityConfiguration,
-  useGenerationWizard
-} as const;
-
-export const ValidationHooks = {
-  useEndpointValidation,
-  useParameterConfig,
-  useFilterValidation
-} as const;
-
-export const PreviewHooks = {
-  useSpecGeneration,
-  useEndpointPreview,
-  useDocumentationExport
-} as const;
-
-export const SecurityHooks = {
-  useRoleManagement,
-  useApiKeyManagement,
-  useAccessControl
-} as const;
-
-// Utility Groups for Selective Importing
-export const ValidationUtils = {
-  validateEndpointConfiguration,
-  validateParameters,
-  validateSecurityRules,
-  validateOpenApiSpec
-} as const;
-
-export const GenerationUtils = {
-  generateOpenApiSpec,
-  generateEndpointCode,
-  generatePreviewUrl,
-  generateApiKey
-} as const;
-
-export const FormattingUtils = {
-  formatSecurityRules,
-  formatPaginationConfig,
-  formatSpecification,
-  formatPermissions
-} as const;
-
-/**
- * Default Export - Main API Generation Interface
- * 
- * Primary interface combining all core API generation functionality
- * for simplified importing and usage in application components.
- */
-export { GenerationWizard as default };
