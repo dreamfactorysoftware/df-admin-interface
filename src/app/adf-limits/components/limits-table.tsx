@@ -1,563 +1,255 @@
+"use client";
+
 /**
- * Limits Table Component for React/Next.js Admin Interface
+ * Limits Table Component for DreamFactory Admin Interface
  * 
- * High-performance React table component for displaying and managing API rate limits.
- * Replaces the Angular df-manage-limits-table component with modern React patterns.
+ * Implements a comprehensive React table component for displaying and managing API rate limits,
+ * replacing the Angular df-manage-limits-table component. Features Headless UI table with 
+ * Tailwind CSS styling, TanStack React Query for intelligent data caching, and comprehensive 
+ * sorting, filtering, and pagination capabilities with accessibility features.
  * 
- * Features:
- * - TanStack React Query for intelligent caching (<50ms cache hits)
- * - Tailwind CSS 4.1+ with consistent theming
+ * Key Features:
  * - WCAG 2.1 AA compliance through Headless UI table primitives
- * - Performance optimization using TanStack Virtual for large datasets
- * - React Query mutations for optimistic updates and error handling
+ * - TanStack React Query for intelligent caching with cache hit responses under 50ms
+ * - Performance optimization for large datasets using TanStack Virtual
  * - Comprehensive sorting, filtering, and pagination capabilities
- * - Real-time data refresh with cache invalidation
- * - Responsive design with mobile-first approach
+ * - Optimistic updates and error handling with React Query mutations
+ * - Responsive design with Tailwind CSS 4.1+ utility classes
+ * - Screen reader support and keyboard navigation
+ * - Loading states and error boundaries integration
  * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
- * @since 2024-12-19
+ * @fileoverview React limits table component
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-'use client'
-
-import React, { useState, useMemo, useCallback, useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import React, { useMemo, useState, useCallback, useRef, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { 
-  useQuery, 
-  useMutation, 
-  useQueryClient,
-  useInfiniteQuery,
-} from '@tanstack/react-query'
-import { useVirtualizer } from '@tanstack/react-virtual'
-import {
-  flexRender,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
-  getSortedRowModel,
-  useReactTable,
-  type ColumnDef,
-  type SortingState,
-  type ColumnFiltersState,
-  type VisibilityState,
-  type RowSelectionState,
-} from '@tanstack/react-table'
-import { 
-  ChevronUpIcon,
-  ChevronDownIcon,
-  ArrowPathIcon,
-  TrashIcon,
-  EllipsisHorizontalIcon,
-  AdjustmentsHorizontalIcon,
+  ChevronUpIcon, 
+  ChevronDownIcon, 
   MagnifyingGlassIcon,
   FunnelIcon,
-  XMarkIcon,
-} from '@heroicons/react/24/outline'
-import { clsx } from 'clsx'
-import { toast } from 'sonner'
-
-// Internal imports
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Dialog } from '@/components/ui/dialog'
+  ArrowPathIcon,
+  EllipsisVerticalIcon,
+  PencilIcon,
+  TrashIcon,
+  PlayIcon,
+  PauseIcon,
+  ExclamationTriangleIcon,
+  InformationCircleIcon,
+  CheckCircleIcon
+} from "@heroicons/react/24/outline";
 import { 
-  LimitTableRowData,
-  LimitType,
-  LimitCounter,
-  LIMITS_QUERY_KEYS,
-  type ApiRequestOptions,
-  type ApiListResponse,
-  type ApiErrorResponse,
-} from '@/app/adf-limits/types'
-import { useLimits } from '@/hooks/use-limits'
-import { apiClient } from '@/lib/api-client'
-import type { ApiListResponse as BaseApiListResponse } from '@/types/api'
+  ArrowTopRightOnSquareIcon,
+  UserIcon,
+  ServerIcon,
+  ShieldCheckIcon
+} from "@heroicons/react/24/solid";
 
-// =============================================================================
-// TYPES AND INTERFACES
-// =============================================================================
+import { cn } from "@/lib/utils";
+import { Button, IconButton } from "@/components/ui/button";
+import { 
+  LimitTableRowData, 
+  LimitConfiguration,
+  LimitType,
+  LimitUsageStats,
+  type LimitListTableProps,
+  isUserLimit,
+  isServiceLimit,
+  isRoleLimit,
+  formatRateString
+} from "../types";
+import { useDebounce } from "@/hooks/use-debounce";
+import { useAuth } from "@/hooks/use-auth";
+import { useNotifications } from "@/hooks/use-notifications";
+import { useLogger } from "@/hooks/use-logger";
+import { apiGet, apiDelete, apiPatch } from "@/lib/api-client";
+import type { ApiListResponse, ApiErrorResponse, PaginationMeta } from "@/types/api";
+
+// ============================================================================
+// Constants and Configuration
+// ============================================================================
 
 /**
- * Table column configuration for limits display
+ * Table configuration constants
  */
-interface LimitsTableColumn {
-  /** Column identifier */
-  id: keyof LimitTableRowData | 'actions' | 'select'
-  /** Display header text */
-  header: string
-  /** Column is sortable */
-  sortable?: boolean
-  /** Column is filterable */
-  filterable?: boolean
-  /** Column width specification */
-  width?: string | number
-  /** Column minimum width */
-  minWidth?: string | number
-  /** Column alignment */
-  align?: 'left' | 'center' | 'right'
-  /** Column is hidden by default */
-  hidden?: boolean
-  /** Column priority for responsive hiding */
-  priority?: number
-  /** Enable column resizing */
-  enableResizing?: boolean
+const TABLE_CONFIG = {
+  DEFAULT_PAGE_SIZE: 25,
+  CACHE_TIME: 10 * 60 * 1000, // 10 minutes
+  STALE_TIME: 5 * 60 * 1000,  // 5 minutes
+  VIRTUAL_OVERSCAN: 5,
+  ROW_HEIGHT: 64,
+  HEADER_HEIGHT: 56,
+  SEARCH_DEBOUNCE_MS: 300,
+  LOADING_DEBOUNCE_MS: 150,
+} as const;
+
+/**
+ * Sorting configuration
+ */
+type SortField = keyof LimitTableRowData;
+type SortDirection = 'asc' | 'desc';
+
+interface SortConfig {
+  field: SortField;
+  direction: SortDirection;
 }
 
 /**
- * Table filter configuration
+ * Filter configuration
  */
 interface FilterConfig {
-  /** Filter column */
-  column: keyof LimitTableRowData
-  /** Filter value */
-  value: string
-  /** Filter operator */
-  operator: 'equals' | 'contains' | 'starts_with' | 'ends_with'
+  search: string;
+  limitType?: LimitType;
+  active?: boolean;
+  scope?: 'user' | 'service' | 'role' | 'global';
 }
 
 /**
- * Props for LimitsTable component
+ * API endpoints for limits management
  */
-interface LimitsTableProps {
-  /** Initial query parameters for data fetching */
-  initialParams?: ApiRequestOptions
-  /** Enable selection functionality */
-  selectable?: boolean
-  /** Enable pagination controls */
-  paginated?: boolean
-  /** Items per page (default: 25) */
-  pageSize?: number
-  /** Enable filtering controls */
-  filterable?: boolean
-  /** Enable sorting controls */
-  sortable?: boolean
-  /** Enable column visibility controls */
-  columnVisibility?: boolean
-  /** Enable virtualization for large datasets */
-  virtualized?: boolean
-  /** Custom column configuration */
-  columns?: LimitsTableColumn[]
-  /** Selection change handler */
-  onSelectionChange?: (selectedIds: number[]) => void
-  /** Row click handler */
-  onRowClick?: (limit: LimitTableRowData) => void
-  /** Bulk action handlers */
-  onBulkAction?: (action: string, selectedIds: number[]) => void
-  /** Loading state override */
-  loading?: boolean
-  /** Error state override */
-  error?: ApiErrorResponse | null
-  /** Custom CSS classes */
-  className?: string
-  /** Component test ID for testing */
-  'data-testid'?: string
-}
+const LIMITS_ENDPOINTS = {
+  LIST: '/system/api/v2/limit',
+  DETAIL: (id: number) => `/system/api/v2/limit/${id}`,
+  USAGE: (id: number) => `/system/api/v2/limit/${id}/usage`,
+  TOGGLE: (id: number) => `/system/api/v2/limit/${id}/toggle`,
+} as const;
+
+// ============================================================================
+// Hooks and Data Fetching
+// ============================================================================
 
 /**
- * Bulk action configuration
+ * Custom hook for limits data fetching with React Query
  */
-interface BulkAction {
-  /** Action identifier */
-  id: string
-  /** Display label */
-  label: string
-  /** Action icon component */
-  icon?: React.ComponentType<{ className?: string }>
-  /** Action handler */
-  handler: (selectedIds: number[]) => void | Promise<void>
-  /** Requires confirmation dialog */
-  requiresConfirmation?: boolean
-  /** Confirmation message */
-  confirmationMessage?: string
-  /** Action is destructive (red styling) */
-  destructive?: boolean
-  /** Action is disabled */
-  disabled?: boolean
-  /** Minimum selection count required */
-  minSelection?: number
-  /** Maximum selection count allowed */
-  maxSelection?: number
-}
-
-// =============================================================================
-// DEFAULT CONFIGURATION
-// =============================================================================
-
-/**
- * Default column configuration for limits table
- */
-const DEFAULT_COLUMNS: LimitsTableColumn[] = [
-  {
-    id: 'select',
-    header: '',
-    width: 48,
-    priority: 10,
-    enableResizing: false,
-  },
-  {
-    id: 'active',
-    header: 'Status',
-    sortable: true,
-    filterable: true,
-    width: 120,
-    align: 'center',
-    priority: 8,
-  },
-  {
-    id: 'name',
-    header: 'Name',
-    sortable: true,
-    filterable: true,
-    minWidth: 200,
-    priority: 10,
-  },
-  {
-    id: 'limitType',
-    header: 'Type',
-    sortable: true,
-    filterable: true,
-    width: 150,
-    priority: 7,
-  },
-  {
-    id: 'limitRate',
-    header: 'Rate',
-    sortable: true,
-    width: 120,
-    priority: 6,
-  },
-  {
-    id: 'limitCounter',
-    header: 'Counter',
-    sortable: true,
-    width: 120,
-    priority: 5,
-  },
-  {
-    id: 'user',
-    header: 'User',
-    sortable: true,
-    filterable: true,
-    width: 100,
-    priority: 3,
-    hidden: true,
-  },
-  {
-    id: 'service',
-    header: 'Service',
-    sortable: true,
-    filterable: true,
-    width: 100,
-    priority: 4,
-  },
-  {
-    id: 'role',
-    header: 'Role',
-    sortable: true,
-    filterable: true,
-    width: 100,
-    priority: 2,
-    hidden: true,
-  },
-  {
-    id: 'actions',
-    header: 'Actions',
-    width: 120,
-    align: 'center',
-    priority: 9,
-    enableResizing: false,
-  },
-]
-
-/**
- * Default bulk actions for selected items
- */
-const DEFAULT_BULK_ACTIONS: BulkAction[] = [
-  {
-    id: 'activate',
-    label: 'Activate Selected',
-    handler: async (selectedIds: number[]) => {
-      // Implementation will be handled by the component
-    },
-    minSelection: 1,
-  },
-  {
-    id: 'deactivate',
-    label: 'Deactivate Selected',
-    handler: async (selectedIds: number[]) => {
-      // Implementation will be handled by the component
-    },
-    minSelection: 1,
-  },
-  {
-    id: 'delete',
-    label: 'Delete Selected',
-    icon: TrashIcon,
-    handler: async (selectedIds: number[]) => {
-      // Implementation will be handled by the component
-    },
-    requiresConfirmation: true,
-    confirmationMessage: 'Are you sure you want to delete the selected limits? This action cannot be undone.',
-    destructive: true,
-    minSelection: 1,
-  },
-]
-
-// =============================================================================
-// UTILITY FUNCTIONS
-// =============================================================================
-
-/**
- * Generate query key for limits list with parameters
- */
-const getLimitsQueryKey = (params: ApiRequestOptions = {}) => {
-  return LIMITS_QUERY_KEYS.list(params)
-}
-
-/**
- * Format limit rate for display
- */
-const formatLimitRate = (rate: string): string => {
-  if (!rate) return '-'
+function useLimitsData(
+  pagination: { offset: number; limit: number },
+  sort: SortConfig,
+  filters: FilterConfig
+) {
+  const { user } = useAuth();
+  const { addNotification } = useNotifications();
   
-  // Handle rate format like "100/minute" or "1000/hour"
-  const parts = rate.split('/')
-  if (parts.length === 2) {
-    const [number, period] = parts
-    return `${parseInt(number, 10).toLocaleString()}/${period}`
-  }
-  
-  return rate
-}
+  // Build query parameters
+  const queryParams = useMemo(() => {
+    const params: Record<string, any> = {
+      limit: pagination.limit,
+      offset: pagination.offset,
+      sort: `${sort.direction === 'desc' ? '-' : ''}${sort.field}`,
+      include_count: true,
+    };
 
-/**
- * Format limit counter for display
- */
-const formatLimitCounter = (counter: string): string => {
-  if (!counter) return '-'
-  
-  // Handle counter format like "5/100" for usage/max
-  const parts = counter.split('/')
-  if (parts.length === 2) {
-    const [current, max] = parts
-    return `${parseInt(current, 10).toLocaleString()}/${parseInt(max, 10).toLocaleString()}`
-  }
-  
-  return counter
-}
-
-/**
- * Get status badge variant based on limit state
- */
-const getStatusBadgeVariant = (active: boolean, counter?: string) => {
-  if (!active) return 'secondary'
-  
-  // Check if approaching limit (if counter available)
-  if (counter) {
-    const parts = counter.split('/')
-    if (parts.length === 2) {
-      const current = parseInt(parts[0], 10)
-      const max = parseInt(parts[1], 10)
-      const percentage = (current / max) * 100
-      
-      if (percentage >= 90) return 'destructive'
-      if (percentage >= 70) return 'warning'
+    // Apply filters
+    const filterConditions: string[] = [];
+    
+    if (filters.search) {
+      filterConditions.push(`name contains "${filters.search}"`);
     }
-  }
-  
-  return 'success'
-}
-
-// =============================================================================
-// MAIN COMPONENT
-// =============================================================================
-
-/**
- * LimitsTable Component
- * 
- * Comprehensive table component for managing API rate limits with modern React patterns.
- * Includes sorting, filtering, pagination, selection, and performance optimizations.
- */
-export function LimitsTable({
-  initialParams = {},
-  selectable = true,
-  paginated = true,
-  pageSize = 25,
-  filterable = true,
-  sortable = true,
-  columnVisibility = true,
-  virtualized = false,
-  columns = DEFAULT_COLUMNS,
-  onSelectionChange,
-  onRowClick,
-  onBulkAction,
-  loading: externalLoading,
-  error: externalError,
-  className,
-  'data-testid': testId = 'limits-table',
-}: LimitsTableProps) {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const queryClient = useQueryClient()
-
-  // =============================================================================
-  // STATE MANAGEMENT
-  // =============================================================================
-
-  // Table state
-  const [sorting, setSorting] = useState<SortingState>([])
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
-  const [columnVisibilityState, setColumnVisibilityState] = useState<VisibilityState>(
-    () => {
-      const hiddenColumns = columns
-        .filter(col => col.hidden)
-        .reduce((acc, col) => ({ ...acc, [col.id]: false }), {})
-      return hiddenColumns
+    
+    if (filters.limitType) {
+      filterConditions.push(`limitType="${filters.limitType}"`);
     }
-  )
-  const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
-  const [globalFilter, setGlobalFilter] = useState('')
-
-  // UI state
-  const [showColumnFilters, setShowColumnFilters] = useState(false)
-  const [showBulkActions, setShowBulkActions] = useState(false)
-  const [confirmDialog, setConfirmDialog] = useState<{
-    open: boolean
-    title: string
-    message: string
-    action: () => void
-  }>({
-    open: false,
-    title: '',
-    message: '',
-    action: () => {},
-  })
-
-  // Pagination state
-  const [pagination, setPagination] = useState({
-    pageIndex: 0,
-    pageSize,
-  })
-
-  // Performance tracking
-  const [performanceMetrics, setPerformanceMetrics] = useState({
-    queryTime: 0,
-    cacheHitRate: 0,
-    lastFetchTime: new Date(),
-  })
-
-  // =============================================================================
-  // DATA FETCHING WITH REACT QUERY
-  // =============================================================================
-
-  // Build query parameters from table state
-  const queryParams = useMemo((): ApiRequestOptions => {
-    const params: ApiRequestOptions = {
-      ...initialParams,
-      limit: pagination.pageSize,
-      offset: pagination.pageIndex * pagination.pageSize,
+    
+    if (filters.active !== undefined) {
+      filterConditions.push(`active=${filters.active}`);
+    }
+    
+    if (filters.scope) {
+      switch (filters.scope) {
+        case 'user':
+          filterConditions.push('user is not null');
+          break;
+        case 'service':
+          filterConditions.push('service is not null');
+          break;
+        case 'role':
+          filterConditions.push('role is not null');
+          break;
+        case 'global':
+          filterConditions.push('user is null and service is null and role is null');
+          break;
+      }
+    }
+    
+    if (filterConditions.length > 0) {
+      params.filter = filterConditions.join(' and ');
     }
 
-    // Add sorting
-    if (sorting.length > 0) {
-      const sortField = sorting[0].id
-      const sortDirection = sorting[0].desc ? 'desc' : 'asc'
-      params.sort = `${sortField} ${sortDirection}`
-    }
+    return params;
+  }, [pagination, sort, filters]);
 
-    // Add global search
-    if (globalFilter) {
-      params.search = globalFilter
-    }
-
-    // Add column filters
-    if (columnFilters.length > 0) {
-      const filters = columnFilters.map(filter => 
-        `${filter.id} eq "${filter.value}"`
-      ).join(' and ')
-      params.filter = filters
-    }
-
-    return params
-  }, [initialParams, pagination, sorting, globalFilter, columnFilters])
-
-  // Main data query with performance tracking
-  const {
-    data: limitsData,
-    isLoading,
-    isError,
-    error,
-    refetch,
-    isFetching,
-    dataUpdatedAt,
-  } = useQuery({
-    queryKey: getLimitsQueryKey(queryParams),
-    queryFn: async () => {
-      const startTime = performance.now()
-      
+  // Query configuration
+  const query = useQuery({
+    queryKey: ['limits', 'list', queryParams],
+    queryFn: async (): Promise<ApiListResponse<LimitTableRowData>> => {
       try {
-        const response = await apiClient.get<ApiListResponse<LimitTableRowData>>(
-          '/limits',
-          {
-            params: queryParams,
-            headers: {
-              'Cache-Control': 'max-age=300', // 5 minutes cache
-            },
+        const response = await apiGet<ApiListResponse<LimitTableRowData>>(
+          LIMITS_ENDPOINTS.LIST,
+          { 
+            ...queryParams,
+            snackbarError: 'Failed to load limits data',
+            showSpinner: true,
           }
-        )
-
-        // Update performance metrics
-        const queryTime = performance.now() - startTime
-        setPerformanceMetrics(prev => ({
-          ...prev,
-          queryTime,
-          lastFetchTime: new Date(),
-        }))
-
-        return response
-      } catch (err) {
-        const queryTime = performance.now() - startTime
-        setPerformanceMetrics(prev => ({
-          ...prev,
-          queryTime,
-          lastFetchTime: new Date(),
-        }))
-        throw err
+        );
+        
+        return response;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error occurred';
+        addNotification({
+          type: 'error',
+          title: 'Data Loading Error',
+          message: `Failed to load limits: ${message}`,
+          duration: 5000,
+        });
+        throw error;
       }
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 15 * 60 * 1000, // 15 minutes
-    keepPreviousData: true,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: true,
-    retry: 3,
+    staleTime: TABLE_CONFIG.STALE_TIME,
+    gcTime: TABLE_CONFIG.CACHE_TIME,
+    enabled: !!user, // Only fetch when user is authenticated
+    retry: (failureCount, error) => {
+      // Don't retry on authentication errors
+      if (error instanceof Error && error.message.includes('401')) {
+        return false;
+      }
+      return failureCount < 3;
+    },
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-  })
+  });
 
-  // =============================================================================
-  // MUTATIONS FOR CRUD OPERATIONS
-  // =============================================================================
+  return query;
+}
 
-  // Delete limit mutation with optimistic updates
-  const deleteLimitMutation = useMutation({
-    mutationFn: async (limitId: number) => {
-      return apiClient.delete(`/limits/${limitId}`)
+/**
+ * Custom hook for limits mutations (delete, toggle active)
+ */
+function useLimitsMutations() {
+  const queryClient = useQueryClient();
+  const { addNotification } = useNotifications();
+  const { logger } = useLogger();
+
+  // Delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (limitId: number): Promise<void> => {
+      await apiDelete(LIMITS_ENDPOINTS.DETAIL(limitId), {
+        snackbarSuccess: 'Limit deleted successfully',
+        snackbarError: 'Failed to delete limit',
+      });
     },
     onMutate: async (limitId) => {
-      // Cancel outgoing refetches
-      await queryClient.cancelQueries({ 
-        queryKey: LIMITS_QUERY_KEYS.lists() 
-      })
-
-      // Snapshot previous value
-      const previousData = queryClient.getQueryData(getLimitsQueryKey(queryParams))
-
-      // Optimistically remove from cache
-      queryClient.setQueryData(
-        getLimitsQueryKey(queryParams),
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['limits', 'list'] });
+      
+      // Snapshot the previous value
+      const previousData = queryClient.getQueriesData({ queryKey: ['limits', 'list'] });
+      
+      // Optimistically update cache
+      queryClient.setQueriesData(
+        { queryKey: ['limits', 'list'] },
         (old: ApiListResponse<LimitTableRowData> | undefined) => {
-          if (!old) return old
+          if (!old) return old;
           
           return {
             ...old,
@@ -565,838 +257,917 @@ export function LimitsTable({
             meta: {
               ...old.meta,
               count: old.meta.count - 1,
-              total: (old.meta.total || 0) - 1,
             },
-          }
+          };
         }
-      )
-
-      return { previousData }
+      );
+      
+      return { previousData };
     },
-    onError: (err, limitId, context) => {
-      // Rollback on error
+    onError: (error, limitId, context) => {
+      // Rollback optimistic update
       if (context?.previousData) {
-        queryClient.setQueryData(
-          getLimitsQueryKey(queryParams),
-          context.previousData
-        )
+        context.previousData.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
       }
       
-      toast.error('Failed to delete limit. Please try again.')
-      console.error('Delete limit error:', err)
+      logger.error('Failed to delete limit', { limitId, error });
+      
+      addNotification({
+        type: 'error',
+        title: 'Delete Failed',
+        message: 'Failed to delete the limit. Please try again.',
+        duration: 5000,
+      });
     },
-    onSuccess: () => {
-      toast.success('Limit deleted successfully')
+    onSuccess: (_, limitId) => {
+      logger.info('Limit deleted successfully', { limitId });
+      
+      addNotification({
+        type: 'success',
+        title: 'Limit Deleted',
+        message: 'The limit has been successfully deleted.',
+        duration: 3000,
+      });
     },
     onSettled: () => {
-      // Always refetch after mutation settles
-      queryClient.invalidateQueries({ 
-        queryKey: LIMITS_QUERY_KEYS.lists() 
-      })
+      // Always refetch after error or success
+      queryClient.invalidateQueries({ queryKey: ['limits', 'list'] });
     },
-  })
+  });
 
-  // Bulk status update mutation
-  const bulkStatusMutation = useMutation({
-    mutationFn: async ({ ids, active }: { ids: number[]; active: boolean }) => {
-      return Promise.all(
-        ids.map(id => 
-          apiClient.patch(`/limits/${id}`, { active })
-        )
-      )
+  // Toggle active mutation
+  const toggleActiveMutation = useMutation({
+    mutationFn: async ({ 
+      limitId, 
+      active 
+    }: { 
+      limitId: number; 
+      active: boolean 
+    }): Promise<LimitTableRowData> => {
+      return apiPatch<LimitTableRowData>(
+        LIMITS_ENDPOINTS.DETAIL(limitId),
+        { active },
+        {
+          snackbarSuccess: `Limit ${active ? 'activated' : 'deactivated'} successfully`,
+          snackbarError: `Failed to ${active ? 'activate' : 'deactivate'} limit`,
+        }
+      );
     },
-    onMutate: async ({ ids, active }) => {
-      await queryClient.cancelQueries({ 
-        queryKey: LIMITS_QUERY_KEYS.lists() 
-      })
-
-      const previousData = queryClient.getQueryData(getLimitsQueryKey(queryParams))
-
-      // Optimistically update status
-      queryClient.setQueryData(
-        getLimitsQueryKey(queryParams),
+    onMutate: async ({ limitId, active }) => {
+      await queryClient.cancelQueries({ queryKey: ['limits', 'list'] });
+      
+      const previousData = queryClient.getQueriesData({ queryKey: ['limits', 'list'] });
+      
+      // Optimistically update
+      queryClient.setQueriesData(
+        { queryKey: ['limits', 'list'] },
         (old: ApiListResponse<LimitTableRowData> | undefined) => {
-          if (!old) return old
+          if (!old) return old;
           
           return {
             ...old,
             resource: old.resource.map(limit => 
-              ids.includes(limit.id) 
-                ? { ...limit, active }
-                : limit
+              limit.id === limitId ? { ...limit, active } : limit
             ),
-          }
+          };
         }
-      )
-
-      return { previousData }
+      );
+      
+      return { previousData };
     },
-    onError: (err, variables, context) => {
+    onError: (error, { limitId, active }, context) => {
       if (context?.previousData) {
-        queryClient.setQueryData(
-          getLimitsQueryKey(queryParams),
-          context.previousData
-        )
+        context.previousData.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
       }
       
-      const action = variables.active ? 'activate' : 'deactivate'
-      toast.error(`Failed to ${action} limits. Please try again.`)
-      console.error('Bulk status update error:', err)
+      logger.error(`Failed to ${active ? 'activate' : 'deactivate'} limit`, { 
+        limitId, 
+        active, 
+        error 
+      });
     },
-    onSuccess: (data, variables) => {
-      const action = variables.active ? 'activated' : 'deactivated'
-      const count = variables.ids.length
-      toast.success(`${count} limit${count > 1 ? 's' : ''} ${action} successfully`)
+    onSuccess: (_, { limitId, active }) => {
+      logger.info(`Limit ${active ? 'activated' : 'deactivated'} successfully`, { 
+        limitId, 
+        active 
+      });
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ 
-        queryKey: LIMITS_QUERY_KEYS.lists() 
-      })
+      queryClient.invalidateQueries({ queryKey: ['limits', 'list'] });
     },
-  })
+  });
 
-  // Refresh individual limit cache
-  const refreshLimitMutation = useMutation({
-    mutationFn: async (limitId: number) => {
-      // Clear specific limit cache and refetch
-      await queryClient.invalidateQueries({
-        queryKey: LIMITS_QUERY_KEYS.detail(limitId)
-      })
-      
-      return apiClient.post(`/limits/${limitId}/refresh-cache`)
-    },
-    onSuccess: () => {
-      toast.success('Limit cache refreshed successfully')
-      // Invalidate list to get updated counter values
-      queryClient.invalidateQueries({ 
-        queryKey: LIMITS_QUERY_KEYS.lists() 
-      })
-    },
-    onError: (err) => {
-      toast.error('Failed to refresh limit cache. Please try again.')
-      console.error('Refresh cache error:', err)
-    },
-  })
+  return {
+    deleteMutation,
+    toggleActiveMutation,
+  };
+}
 
-  // =============================================================================
-  // TABLE CONFIGURATION
-  // =============================================================================
+// ============================================================================
+// Table Components
+// ============================================================================
 
-  // Configure table columns based on props and responsive design
-  const tableColumns = useMemo((): ColumnDef<LimitTableRowData>[] => {
-    const cols: ColumnDef<LimitTableRowData>[] = []
+/**
+ * Table header component with sorting capabilities
+ */
+interface TableHeaderProps {
+  field: SortField;
+  label: string;
+  sortable?: boolean;
+  currentSort: SortConfig;
+  onSortChange: (field: SortField) => void;
+  className?: string;
+}
 
-    columns.forEach((colConfig) => {
-      const baseColumn = {
-        id: colConfig.id,
-        enableSorting: sortable && colConfig.sortable,
-        enableColumnFilter: filterable && colConfig.filterable,
-        size: colConfig.width as number,
-        minSize: colConfig.minWidth as number,
-        enableResizing: colConfig.enableResizing !== false,
-      }
+const TableHeader: React.FC<TableHeaderProps> = ({
+  field,
+  label,
+  sortable = true,
+  currentSort,
+  onSortChange,
+  className,
+}) => {
+  const isSorted = currentSort.field === field;
+  const direction = isSorted ? currentSort.direction : undefined;
 
-      switch (colConfig.id) {
-        case 'select':
-          if (selectable) {
-            cols.push({
-              ...baseColumn,
-              header: ({ table }) => (
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                  checked={table.getIsAllPageRowsSelected()}
-                  onChange={table.getToggleAllPageRowsSelectedHandler()}
-                  aria-label="Select all rows"
-                />
-              ),
-              cell: ({ row }) => (
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                  checked={row.getIsSelected()}
-                  onChange={row.getToggleSelectedHandler()}
-                  aria-label={`Select row ${row.index + 1}`}
-                />
-              ),
-              enableSorting: false,
-              enableColumnFilter: false,
-            })
-          }
-          break
-
-        case 'active':
-          cols.push({
-            ...baseColumn,
-            header: 'Status',
-            accessorKey: 'active',
-            cell: ({ row }) => {
-              const active = row.getValue('active') as boolean
-              const counter = row.getValue('limitCounter') as string
-              const variant = getStatusBadgeVariant(active, counter)
-              
-              return (
-                <Badge 
-                  variant={variant}
-                  className="font-medium"
-                >
-                  {active ? 'Active' : 'Inactive'}
-                </Badge>
-              )
-            },
-          })
-          break
-
-        case 'name':
-          cols.push({
-            ...baseColumn,
-            header: 'Name',
-            accessorKey: 'name',
-            cell: ({ row }) => {
-              const name = row.getValue('name') as string
-              return (
-                <button
-                  className="text-left font-medium text-primary-600 hover:text-primary-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 rounded"
-                  onClick={() => onRowClick?.(row.original)}
-                  title={`Edit ${name}`}
-                >
-                  {name}
-                </button>
-              )
-            },
-          })
-          break
-
-        case 'limitType':
-          cols.push({
-            ...baseColumn,
-            header: 'Type',
-            accessorKey: 'limitType',
-            cell: ({ row }) => {
-              const type = row.getValue('limitType') as LimitType
-              return (
-                <Badge variant="outline" className="capitalize">
-                  {type.replace('_', ' ')}
-                </Badge>
-              )
-            },
-          })
-          break
-
-        case 'limitRate':
-          cols.push({
-            ...baseColumn,
-            header: 'Rate',
-            accessorKey: 'limitRate',
-            cell: ({ row }) => {
-              const rate = row.getValue('limitRate') as string
-              return (
-                <span className="font-mono text-sm">
-                  {formatLimitRate(rate)}
-                </span>
-              )
-            },
-          })
-          break
-
-        case 'limitCounter':
-          cols.push({
-            ...baseColumn,
-            header: 'Usage',
-            accessorKey: 'limitCounter',
-            cell: ({ row }) => {
-              const counter = row.getValue('limitCounter') as string
-              const active = row.getValue('active') as boolean
-              
-              if (!active || !counter) {
-                return <span className="text-gray-400">-</span>
-              }
-              
-              return (
-                <span className="font-mono text-sm">
-                  {formatLimitCounter(counter)}
-                </span>
-              )
-            },
-          })
-          break
-
-        case 'user':
-          cols.push({
-            ...baseColumn,
-            header: 'User',
-            accessorKey: 'user',
-            cell: ({ row }) => {
-              const userId = row.getValue('user') as number | null
-              return userId ? (
-                <span className="text-sm text-gray-600">
-                  User {userId}
-                </span>
-              ) : (
-                <span className="text-gray-400">-</span>
-              )
-            },
-          })
-          break
-
-        case 'service':
-          cols.push({
-            ...baseColumn,
-            header: 'Service',
-            accessorKey: 'service',
-            cell: ({ row }) => {
-              const serviceId = row.getValue('service') as number | null
-              return serviceId ? (
-                <span className="text-sm text-gray-600">
-                  Service {serviceId}
-                </span>
-              ) : (
-                <span className="text-gray-400">-</span>
-              )
-            },
-          })
-          break
-
-        case 'role':
-          cols.push({
-            ...baseColumn,
-            header: 'Role',
-            accessorKey: 'role',
-            cell: ({ row }) => {
-              const roleId = row.getValue('role') as number | null
-              return roleId ? (
-                <span className="text-sm text-gray-600">
-                  Role {roleId}
-                </span>
-              ) : (
-                <span className="text-gray-400">-</span>
-              )
-            },
-          })
-          break
-
-        case 'actions':
-          cols.push({
-            ...baseColumn,
-            header: 'Actions',
-            cell: ({ row }) => (
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => refreshLimitMutation.mutate(row.original.id)}
-                  disabled={refreshLimitMutation.isLoading}
-                  title="Refresh cache"
-                  className="h-8 w-8 p-0"
-                >
-                  <ArrowPathIcon 
-                    className={clsx(
-                      'h-4 w-4',
-                      refreshLimitMutation.isLoading && 'animate-spin'
-                    )} 
-                  />
-                  <span className="sr-only">Refresh cache</span>
-                </Button>
-                
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleDeleteSingle(row.original)}
-                  disabled={deleteLimitMutation.isLoading}
-                  title="Delete limit"
-                  className="h-8 w-8 p-0 text-red-600 hover:text-red-800"
-                >
-                  <TrashIcon className="h-4 w-4" />
-                  <span className="sr-only">Delete limit</span>
-                </Button>
-              </div>
-            ),
-            enableSorting: false,
-            enableColumnFilter: false,
-          })
-          break
-
-        default:
-          // Handle custom columns
-          cols.push({
-            ...baseColumn,
-            header: colConfig.header,
-            accessorKey: colConfig.id as keyof LimitTableRowData,
-          })
-      }
-    })
-
-    return cols
-  }, [
-    columns,
-    selectable,
-    sortable,
-    filterable,
-    onRowClick,
-    refreshLimitMutation,
-    deleteLimitMutation,
-  ])
-
-  // Initialize React Table
-  const table = useReactTable({
-    data: limitsData?.resource || [],
-    columns: tableColumns,
-    pageCount: Math.ceil((limitsData?.meta.total || 0) / pagination.pageSize),
-    state: {
-      sorting,
-      columnFilters,
-      columnVisibility: columnVisibilityState,
-      rowSelection,
-      globalFilter,
-      pagination,
-    },
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
-    onColumnVisibilityChange: setColumnVisibilityState,
-    onRowSelectionChange: setRowSelection,
-    onGlobalFilterChange: setGlobalFilter,
-    onPaginationChange: setPagination,
-    getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    manualPagination: true,
-    manualSorting: true,
-    manualFiltering: true,
-    enableRowSelection: selectable,
-    enableColumnResizing: true,
-    columnResizeMode: 'onChange',
-  })
-
-  // =============================================================================
-  // EVENT HANDLERS
-  // =============================================================================
-
-  // Handle single row deletion
-  const handleDeleteSingle = useCallback((limit: LimitTableRowData) => {
-    setConfirmDialog({
-      open: true,
-      title: 'Delete Limit',
-      message: `Are you sure you want to delete the limit "${limit.name}"? This action cannot be undone.`,
-      action: () => {
-        deleteLimitMutation.mutate(limit.id)
-        setConfirmDialog(prev => ({ ...prev, open: false }))
-      },
-    })
-  }, [deleteLimitMutation])
-
-  // Handle bulk actions
-  const handleBulkAction = useCallback((action: string) => {
-    const selectedIds = Object.keys(rowSelection)
-      .filter(key => rowSelection[key])
-      .map(key => parseInt(key, 10))
-    
-    if (selectedIds.length === 0) {
-      toast.error('Please select at least one item')
-      return
+  const handleSort = useCallback(() => {
+    if (sortable) {
+      onSortChange(field);
     }
+  }, [field, sortable, onSortChange]);
 
-    switch (action) {
-      case 'activate':
-        bulkStatusMutation.mutate({ ids: selectedIds, active: true })
-        setRowSelection({})
-        break
-      
-      case 'deactivate':
-        bulkStatusMutation.mutate({ ids: selectedIds, active: false })
-        setRowSelection({})
-        break
-      
-      case 'delete':
-        setConfirmDialog({
-          open: true,
-          title: 'Delete Selected Limits',
-          message: `Are you sure you want to delete ${selectedIds.length} selected limit${selectedIds.length > 1 ? 's' : ''}? This action cannot be undone.`,
-          action: () => {
-            Promise.all(
-              selectedIds.map(id => deleteLimitMutation.mutateAsync(id))
-            ).then(() => {
-              setRowSelection({})
-              toast.success(`${selectedIds.length} limit${selectedIds.length > 1 ? 's' : ''} deleted successfully`)
-            }).catch(() => {
-              toast.error('Some limits could not be deleted')
-            })
-            setConfirmDialog(prev => ({ ...prev, open: false }))
-          },
-        })
-        break
-      
-      default:
-        onBulkAction?.(action, selectedIds)
+  const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
+    if (sortable && (event.key === 'Enter' || event.key === ' ')) {
+      event.preventDefault();
+      handleSort();
     }
-  }, [rowSelection, bulkStatusMutation, deleteLimitMutation, onBulkAction])
-
-  // Handle table refresh
-  const handleRefresh = useCallback(() => {
-    refetch()
-    toast.success('Table refreshed')
-  }, [refetch])
-
-  // Handle search
-  const handleSearch = useCallback((value: string) => {
-    setGlobalFilter(value)
-    setPagination(prev => ({ ...prev, pageIndex: 0 }))
-  }, [])
-
-  // =============================================================================
-  // VIRTUAL SCROLLING SETUP (for large datasets)
-  // =============================================================================
-
-  const parentRef = React.useRef<HTMLDivElement>(null)
-  
-  const virtualizer = useVirtualizer({
-    count: table.getRowModel().rows.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => 60,
-    enabled: virtualized,
-  })
-
-  // =============================================================================
-  // EFFECTS
-  // =============================================================================
-
-  // Update selection change callback
-  useEffect(() => {
-    const selectedIds = Object.keys(rowSelection)
-      .filter(key => rowSelection[key])
-      .map(key => {
-        const row = table.getRowModel().rows[parseInt(key, 10)]
-        return row?.original.id
-      })
-      .filter(id => id !== undefined) as number[]
-    
-    onSelectionChange?.(selectedIds)
-  }, [rowSelection, table, onSelectionChange])
-
-  // Update bulk actions visibility
-  useEffect(() => {
-    const hasSelection = Object.values(rowSelection).some(Boolean)
-    setShowBulkActions(hasSelection)
-  }, [rowSelection])
-
-  // =============================================================================
-  // LOADING AND ERROR STATES
-  // =============================================================================
-
-  const isTableLoading = externalLoading || isLoading
-  const tableError = externalError || (isError ? error : null)
-
-  if (tableError) {
-    return (
-      <div 
-        className="flex flex-col items-center justify-center py-12"
-        data-testid={`${testId}-error`}
-      >
-        <div className="text-center">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-            Failed to load limits
-          </h3>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
-            {tableError.error?.message || 'An unexpected error occurred'}
-          </p>
-          <Button onClick={handleRefresh} variant="outline">
-            <ArrowPathIcon className="h-4 w-4 mr-2" />
-            Try Again
-          </Button>
-        </div>
-      </div>
-    )
-  }
-
-  // =============================================================================
-  // RENDER COMPONENT
-  // =============================================================================
+  }, [sortable, handleSort]);
 
   return (
-    <div 
-      className={clsx(
-        'space-y-4',
+    <th 
+      className={cn(
+        "px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider",
+        "border-b border-gray-200 bg-gray-50",
+        sortable && [
+          "cursor-pointer select-none",
+          "hover:bg-gray-100 transition-colors duration-150",
+          "focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500",
+        ],
+        isSorted && "bg-blue-50 text-blue-700",
         className
       )}
-      data-testid={testId}
+      onClick={sortable ? handleSort : undefined}
+      onKeyDown={sortable ? handleKeyDown : undefined}
+      tabIndex={sortable ? 0 : undefined}
+      role={sortable ? "button" : undefined}
+      aria-sort={
+        isSorted 
+          ? direction === 'asc' 
+            ? 'ascending' 
+            : 'descending'
+          : sortable 
+            ? 'none' 
+            : undefined
+      }
+      aria-label={
+        sortable 
+          ? `Sort by ${label} ${
+              isSorted 
+                ? direction === 'asc' 
+                  ? '(currently ascending, click for descending)' 
+                  : '(currently descending, click for ascending)'
+                : '(not sorted, click to sort ascending)'
+            }`
+          : undefined
+      }
     >
-      {/* Table Header with Controls */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        {/* Search and Filters */}
-        <div className="flex flex-1 items-center gap-2">
-          {/* Global Search */}
-          {filterable && (
-            <div className="relative flex-1 max-w-sm">
-              <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search limits..."
-                value={globalFilter}
-                onChange={(e) => handleSearch(e.target.value)}
-                className="pl-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder-gray-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500"
-              />
-            </div>
-          )}
-
-          {/* Column Filters Toggle */}
-          {filterable && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowColumnFilters(!showColumnFilters)}
-              className={clsx(
-                showColumnFilters && 'bg-primary-50 border-primary-200 dark:bg-primary-900/20'
+      <div className="flex items-center space-x-1">
+        <span>{label}</span>
+        {sortable && (
+          <span className="flex flex-col">
+            <ChevronUpIcon 
+              className={cn(
+                "h-3 w-3 -mb-1",
+                isSorted && direction === 'asc' 
+                  ? "text-blue-600" 
+                  : "text-gray-400"
               )}
-            >
-              <FunnelIcon className="h-4 w-4 mr-2" />
-              Filters
-            </Button>
+              aria-hidden="true"
+            />
+            <ChevronDownIcon 
+              className={cn(
+                "h-3 w-3",
+                isSorted && direction === 'desc' 
+                  ? "text-blue-600" 
+                  : "text-gray-400"
+              )}
+              aria-hidden="true"
+            />
+          </span>
+        )}
+      </div>
+    </th>
+  );
+};
+
+/**
+ * Limit scope badge component
+ */
+const LimitScopeBadge: React.FC<{ limit: LimitTableRowData }> = ({ limit }) => {
+  const scope = useMemo(() => {
+    if (isUserLimit(limit)) return { type: 'user', icon: UserIcon, color: 'blue' };
+    if (isServiceLimit(limit)) return { type: 'service', icon: ServerIcon, color: 'green' };
+    if (isRoleLimit(limit)) return { type: 'role', icon: ShieldCheckIcon, color: 'purple' };
+    return { type: 'global', icon: null, color: 'gray' };
+  }, [limit]);
+
+  const Icon = scope.icon;
+
+  return (
+    <span 
+      className={cn(
+        "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
+        scope.color === 'blue' && "bg-blue-100 text-blue-800",
+        scope.color === 'green' && "bg-green-100 text-green-800",
+        scope.color === 'purple' && "bg-purple-100 text-purple-800",
+        scope.color === 'gray' && "bg-gray-100 text-gray-800",
+      )}
+      aria-label={`Limit scope: ${scope.type}`}
+    >
+      {Icon && <Icon className="h-3 w-3 mr-1" aria-hidden="true" />}
+      {scope.type.charAt(0).toUpperCase() + scope.type.slice(1)}
+    </span>
+  );
+};
+
+/**
+ * Limit status badge component
+ */
+const LimitStatusBadge: React.FC<{ 
+  active: boolean; 
+  usage?: LimitUsageStats;
+}> = ({ active, usage }) => {
+  const status = useMemo(() => {
+    if (!active) {
+      return { 
+        label: 'Inactive', 
+        color: 'gray', 
+        icon: PauseIcon,
+        description: 'This limit is currently disabled'
+      };
+    }
+    
+    if (usage) {
+      const percentage = usage.usagePercentage;
+      if (percentage >= 90) {
+        return { 
+          label: 'Critical', 
+          color: 'red', 
+          icon: ExclamationTriangleIcon,
+          description: `${percentage.toFixed(1)}% of limit used`
+        };
+      } else if (percentage >= 75) {
+        return { 
+          label: 'Warning', 
+          color: 'yellow', 
+          icon: InformationCircleIcon,
+          description: `${percentage.toFixed(1)}% of limit used`
+        };
+      } else {
+        return { 
+          label: 'Active', 
+          color: 'green', 
+          icon: CheckCircleIcon,
+          description: `${percentage.toFixed(1)}% of limit used`
+        };
+      }
+    }
+    
+    return { 
+      label: 'Active', 
+      color: 'green', 
+      icon: PlayIcon,
+      description: 'This limit is currently active'
+    };
+  }, [active, usage]);
+
+  const Icon = status.icon;
+
+  return (
+    <span 
+      className={cn(
+        "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
+        status.color === 'green' && "bg-green-100 text-green-800",
+        status.color === 'yellow' && "bg-yellow-100 text-yellow-800",
+        status.color === 'red' && "bg-red-100 text-red-800",
+        status.color === 'gray' && "bg-gray-100 text-gray-800",
+      )}
+      title={status.description}
+      aria-label={status.description}
+    >
+      <Icon className="h-3 w-3 mr-1" aria-hidden="true" />
+      {status.label}
+    </span>
+  );
+};
+
+/**
+ * Action menu component for table rows
+ */
+const LimitActionMenu: React.FC<{
+  limit: LimitTableRowData;
+  onEdit: (limit: LimitTableRowData) => void;
+  onDelete: (limit: LimitTableRowData) => void;
+  onToggleActive: (limit: LimitTableRowData) => void;
+  disabled?: boolean;
+}> = ({ limit, onEdit, onDelete, onToggleActive, disabled = false }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isOpen]);
+
+  const handleEdit = useCallback(() => {
+    onEdit(limit);
+    setIsOpen(false);
+  }, [limit, onEdit]);
+
+  const handleDelete = useCallback(() => {
+    onDelete(limit);
+    setIsOpen(false);
+  }, [limit, onDelete]);
+
+  const handleToggleActive = useCallback(() => {
+    onToggleActive(limit);
+    setIsOpen(false);
+  }, [limit, onToggleActive]);
+
+  return (
+    <div className="relative" ref={menuRef}>
+      <IconButton
+        icon={<EllipsisVerticalIcon className="h-5 w-5" />}
+        ariaLabel={`Actions for limit ${limit.name}`}
+        variant="ghost"
+        size="sm"
+        onClick={() => setIsOpen(!isOpen)}
+        disabled={disabled}
+        className="text-gray-400 hover:text-gray-600"
+      />
+      
+      {isOpen && (
+        <div 
+          className={cn(
+            "absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg z-10",
+            "border border-gray-200 divide-y divide-gray-100",
+            "focus:outline-none"
           )}
+          role="menu"
+          aria-orientation="vertical"
+          aria-labelledby="options-menu"
+        >
+          <div className="py-1" role="none">
+            <button
+              className={cn(
+                "group flex items-center w-full px-4 py-2 text-sm text-gray-700",
+                "hover:bg-gray-100 hover:text-gray-900",
+                "focus:outline-none focus:bg-gray-100 focus:text-gray-900"
+              )}
+              role="menuitem"
+              onClick={handleEdit}
+            >
+              <PencilIcon className="mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500" />
+              Edit Limit
+            </button>
+            
+            <button
+              className={cn(
+                "group flex items-center w-full px-4 py-2 text-sm text-gray-700",
+                "hover:bg-gray-100 hover:text-gray-900",
+                "focus:outline-none focus:bg-gray-100 focus:text-gray-900"
+              )}
+              role="menuitem"
+              onClick={handleToggleActive}
+            >
+              {limit.active ? (
+                <>
+                  <PauseIcon className="mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500" />
+                  Deactivate
+                </>
+              ) : (
+                <>
+                  <PlayIcon className="mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500" />
+                  Activate
+                </>
+              )}
+            </button>
+          </div>
+          
+          <div className="py-1" role="none">
+            <button
+              className={cn(
+                "group flex items-center w-full px-4 py-2 text-sm text-red-700",
+                "hover:bg-red-50 hover:text-red-900",
+                "focus:outline-none focus:bg-red-50 focus:text-red-900"
+              )}
+              role="menuitem"
+              onClick={handleDelete}
+            >
+              <TrashIcon className="mr-3 h-4 w-4 text-red-400 group-hover:text-red-500" />
+              Delete Limit
+            </button>
+          </div>
         </div>
+      )}
+    </div>
+  );
+};
 
-        {/* Table Actions */}
-        <div className="flex items-center gap-2">
-          {/* Bulk Actions */}
-          {selectable && showBulkActions && (
-            <div className="flex items-center gap-2 mr-4 p-2 bg-primary-50 dark:bg-primary-900/20 rounded-lg">
-              <span className="text-sm font-medium text-primary-700 dark:text-primary-300">
-                {Object.values(rowSelection).filter(Boolean).length} selected
-              </span>
-              
-              {DEFAULT_BULK_ACTIONS.map((action) => (
-                <Button
-                  key={action.id}
-                  size="sm"
-                  variant={action.destructive ? "destructive" : "outline"}
-                  onClick={() => handleBulkAction(action.id)}
-                  disabled={bulkStatusMutation.isLoading || deleteLimitMutation.isLoading}
-                >
-                  {action.icon && <action.icon className="h-4 w-4 mr-1" />}
-                  {action.label}
-                </Button>
-              ))}
+/**
+ * Filter controls component
+ */
+const FilterControls: React.FC<{
+  filters: FilterConfig;
+  onFiltersChange: (filters: FilterConfig) => void;
+  onRefresh: () => void;
+  loading?: boolean;
+}> = ({ filters, onFiltersChange, onRefresh, loading = false }) => {
+  const [showFilters, setShowFilters] = useState(false);
+  
+  const debouncedSearch = useDebounce(filters.search, TABLE_CONFIG.SEARCH_DEBOUNCE_MS);
+
+  // Update search filter when debounced value changes
+  useEffect(() => {
+    if (debouncedSearch !== filters.search) {
+      onFiltersChange({ ...filters, search: debouncedSearch });
+    }
+  }, [debouncedSearch, filters, onFiltersChange]);
+
+  const handleSearchChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    onFiltersChange({ ...filters, search: event.target.value });
+  }, [filters, onFiltersChange]);
+
+  const handleLimitTypeChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = event.target.value as LimitType | '';
+    onFiltersChange({ 
+      ...filters, 
+      limitType: value || undefined 
+    });
+  }, [filters, onFiltersChange]);
+
+  const handleActiveChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = event.target.value;
+    onFiltersChange({ 
+      ...filters, 
+      active: value === '' ? undefined : value === 'true' 
+    });
+  }, [filters, onFiltersChange]);
+
+  const handleScopeChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = event.target.value as FilterConfig['scope'] | '';
+    onFiltersChange({ 
+      ...filters, 
+      scope: value || undefined 
+    });
+  }, [filters, onFiltersChange]);
+
+  const clearFilters = useCallback(() => {
+    onFiltersChange({ search: '', limitType: undefined, active: undefined, scope: undefined });
+  }, [onFiltersChange]);
+
+  const hasActiveFilters = useMemo(() => {
+    return !!(filters.search || filters.limitType || filters.active !== undefined || filters.scope);
+  }, [filters]);
+
+  return (
+    <div className="bg-white px-6 py-4 border-b border-gray-200">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          {/* Search Input */}
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
             </div>
-          )}
+            <input
+              type="text"
+              placeholder="Search limits..."
+              value={filters.search}
+              onChange={handleSearchChange}
+              className={cn(
+                "block w-64 pl-10 pr-3 py-2 border border-gray-300 rounded-md",
+                "placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500",
+                "sm:text-sm"
+              )}
+              aria-label="Search limits by name"
+            />
+          </div>
 
-          {/* Column Visibility */}
-          {columnVisibility && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                // Toggle column visibility dialog
-              }}
-            >
-              <AdjustmentsHorizontalIcon className="h-4 w-4 mr-2" />
-              Columns
-            </Button>
-          )}
-
-          {/* Refresh Button */}
+          {/* Filter Toggle */}
           <Button
             variant="outline"
             size="sm"
-            onClick={handleRefresh}
-            disabled={isFetching}
+            onClick={() => setShowFilters(!showFilters)}
+            icon={<FunnelIcon className="h-4 w-4" />}
+            className={hasActiveFilters ? "border-blue-500 text-blue-600" : ""}
+            ariaLabel={`${showFilters ? 'Hide' : 'Show'} advanced filters`}
           >
-            <ArrowPathIcon 
-              className={clsx(
-                'h-4 w-4 mr-2',
-                isFetching && 'animate-spin'
-              )} 
-            />
-            Refresh
+            Filters
+            {hasActiveFilters && (
+              <span className="ml-1 bg-blue-100 text-blue-600 text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                !
+              </span>
+            )}
           </Button>
         </div>
+
+        {/* Refresh Button */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onRefresh}
+          loading={loading}
+          icon={<ArrowPathIcon className="h-4 w-4" />}
+          ariaLabel="Refresh limits data"
+        >
+          Refresh
+        </Button>
       </div>
 
-      {/* Column Filters Row */}
-      {filterable && showColumnFilters && (
-        <div className="grid grid-cols-1 gap-2 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg sm:grid-cols-2 lg:grid-cols-4">
-          {table.getAllColumns()
-            .filter(column => column.getCanFilter())
-            .map(column => (
-              <div key={column.id} className="space-y-1">
-                <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                  {column.columnDef.header as string}
-                </label>
-                <input
-                  type="text"
-                  placeholder={`Filter ${column.columnDef.header}...`}
-                  value={(column.getFilterValue() as string) ?? ''}
-                  onChange={(e) => column.setFilterValue(e.target.value)}
-                  className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                />
-              </div>
-            ))}
-          
+      {/* Advanced Filters */}
+      {showFilters && (
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-4">
+          <div>
+            <label htmlFor="limitType" className="block text-sm font-medium text-gray-700">
+              Limit Type
+            </label>
+            <select
+              id="limitType"
+              value={filters.limitType || ''}
+              onChange={handleLimitTypeChange}
+              className={cn(
+                "mt-1 block w-full pl-3 pr-10 py-2 text-base border border-gray-300",
+                "focus:outline-none focus:ring-blue-500 focus:border-blue-500",
+                "sm:text-sm rounded-md"
+              )}
+            >
+              <option value="">All Types</option>
+              <option value="api.calls_per_period">API Calls per Period</option>
+              <option value="api.calls_per_minute">API Calls per Minute</option>
+              <option value="api.calls_per_hour">API Calls per Hour</option>
+              <option value="api.calls_per_day">API Calls per Day</option>
+              <option value="db.calls_per_period">DB Calls per Period</option>
+              <option value="service.calls_per_period">Service Calls per Period</option>
+              <option value="user.calls_per_period">User Calls per Period</option>
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="active" className="block text-sm font-medium text-gray-700">
+              Status
+            </label>
+            <select
+              id="active"
+              value={filters.active === undefined ? '' : filters.active.toString()}
+              onChange={handleActiveChange}
+              className={cn(
+                "mt-1 block w-full pl-3 pr-10 py-2 text-base border border-gray-300",
+                "focus:outline-none focus:ring-blue-500 focus:border-blue-500",
+                "sm:text-sm rounded-md"
+              )}
+            >
+              <option value="">All Statuses</option>
+              <option value="true">Active</option>
+              <option value="false">Inactive</option>
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="scope" className="block text-sm font-medium text-gray-700">
+              Scope
+            </label>
+            <select
+              id="scope"
+              value={filters.scope || ''}
+              onChange={handleScopeChange}
+              className={cn(
+                "mt-1 block w-full pl-3 pr-10 py-2 text-base border border-gray-300",
+                "focus:outline-none focus:ring-blue-500 focus:border-blue-500",
+                "sm:text-sm rounded-md"
+              )}
+            >
+              <option value="">All Scopes</option>
+              <option value="global">Global</option>
+              <option value="user">User-specific</option>
+              <option value="service">Service-specific</option>
+              <option value="role">Role-specific</option>
+            </select>
+          </div>
+
           <div className="flex items-end">
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
-              onClick={() => {
-                setColumnFilters([])
-                setGlobalFilter('')
-              }}
+              onClick={clearFilters}
+              disabled={!hasActiveFilters}
+              className="w-full"
             >
-              <XMarkIcon className="h-4 w-4 mr-1" />
-              Clear
+              Clear Filters
             </Button>
           </div>
         </div>
       )}
+    </div>
+  );
+};
 
-      {/* Table Container */}
-      <div className="relative overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
-        {isTableLoading && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/80 dark:bg-gray-900/80">
-            <div className="flex items-center gap-2">
-              <ArrowPathIcon className="h-5 w-5 animate-spin text-primary-600" />
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Loading limits...
-              </span>
-            </div>
+// ============================================================================
+// Main Component
+// ============================================================================
+
+/**
+ * Comprehensive limits table component
+ */
+export const LimitsTable: React.FC<LimitListTableProps> = ({
+  className,
+  ...props
+}) => {
+  // State management
+  const [pagination, setPagination] = useState({
+    offset: 0,
+    limit: TABLE_CONFIG.DEFAULT_PAGE_SIZE,
+  });
+  
+  const [sort, setSort] = useState<SortConfig>({
+    field: 'name',
+    direction: 'asc',
+  });
+  
+  const [filters, setFilters] = useState<FilterConfig>({
+    search: '',
+    limitType: undefined,
+    active: undefined,
+    scope: undefined,
+  });
+
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+
+  // Hooks
+  const queryClient = useQueryClient();
+  const { data, isLoading, error, refetch } = useLimitsData(pagination, sort, filters);
+  const { deleteMutation, toggleActiveMutation } = useLimitsMutations();
+  const { addNotification } = useNotifications();
+  const { logger } = useLogger();
+
+  // Virtual scrolling setup
+  const parentRef = useRef<HTMLDivElement>(null);
+  const virtualizer = useVirtualizer({
+    count: data?.resource.length ?? 0,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => TABLE_CONFIG.ROW_HEIGHT,
+    overscan: TABLE_CONFIG.VIRTUAL_OVERSCAN,
+  });
+
+  // Event handlers
+  const handleSortChange = useCallback((field: SortField) => {
+    setSort(current => ({
+      field,
+      direction: current.field === field && current.direction === 'asc' ? 'desc' : 'asc',
+    }));
+    setPagination(current => ({ ...current, offset: 0 })); // Reset to first page
+  }, []);
+
+  const handleFiltersChange = useCallback((newFilters: FilterConfig) => {
+    setFilters(newFilters);
+    setPagination(current => ({ ...current, offset: 0 })); // Reset to first page
+  }, []);
+
+  const handleRefresh = useCallback(() => {
+    logger.info('Refreshing limits table data');
+    refetch();
+  }, [refetch, logger]);
+
+  const handleEdit = useCallback((limit: LimitTableRowData) => {
+    logger.info('Edit limit requested', { limitId: limit.id, limitName: limit.name });
+    // Navigate to edit page - implementation depends on routing setup
+    addNotification({
+      type: 'info',
+      title: 'Edit Limit',
+      message: `Editing limit: ${limit.name}`,
+      duration: 3000,
+    });
+  }, [logger, addNotification]);
+
+  const handleDelete = useCallback((limit: LimitTableRowData) => {
+    logger.info('Delete limit requested', { limitId: limit.id, limitName: limit.name });
+    
+    if (window.confirm(`Are you sure you want to delete the limit "${limit.name}"? This action cannot be undone.`)) {
+      deleteMutation.mutate(limit.id);
+    }
+  }, [logger, deleteMutation]);
+
+  const handleToggleActive = useCallback((limit: LimitTableRowData) => {
+    const newActiveState = !limit.active;
+    logger.info('Toggle limit active state requested', { 
+      limitId: limit.id, 
+      limitName: limit.name,
+      newActiveState 
+    });
+    
+    toggleActiveMutation.mutate({ 
+      limitId: limit.id, 
+      active: newActiveState 
+    });
+  }, [logger, toggleActiveMutation]);
+
+  const handlePageChange = useCallback((newOffset: number) => {
+    setPagination(current => ({ ...current, offset: newOffset }));
+  }, []);
+
+  const handlePageSizeChange = useCallback((newLimit: number) => {
+    setPagination({ offset: 0, limit: newLimit });
+  }, []);
+
+  // Loading and error states
+  if (error) {
+    return (
+      <div className="bg-white shadow rounded-lg p-6">
+        <div className="text-center">
+          <ExclamationTriangleIcon className="mx-auto h-12 w-12 text-red-400" />
+          <h3 className="mt-2 text-sm font-medium text-gray-900">Error Loading Limits</h3>
+          <p className="mt-1 text-sm text-gray-500">
+            Unable to load the limits data. Please try again.
+          </p>
+          <div className="mt-6">
+            <Button onClick={handleRefresh} variant="primary">
+              Try Again
+            </Button>
           </div>
-        )}
+        </div>
+      </div>
+    );
+  }
 
-        {/* Table */}
-        <div 
+  const limits = data?.resource ?? [];
+  const meta = data?.meta;
+
+  return (
+    <div className={cn("bg-white shadow rounded-lg overflow-hidden", className)}>
+      {/* Filter Controls */}
+      <FilterControls
+        filters={filters}
+        onFiltersChange={handleFiltersChange}
+        onRefresh={handleRefresh}
+        loading={isLoading}
+      />
+
+      {/* Table */}
+      <div className="overflow-hidden">
+        <div
           ref={parentRef}
-          className={clsx(
-            'overflow-auto',
-            virtualized && 'h-[600px]'
-          )}
+          className="overflow-auto"
+          style={{ height: '600px' }}
+          role="table"
+          aria-label="Limits table"
+          aria-rowcount={limits.length}
+          aria-busy={isLoading}
         >
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            {/* Table Header */}
-            <thead className="bg-gray-50 dark:bg-gray-800">
-              {table.getHeaderGroups().map(headerGroup => (
-                <tr key={headerGroup.id}>
-                  {headerGroup.headers.map(header => (
-                    <th
-                      key={header.id}
-                      className={clsx(
-                        'px-6 py-3 text-left text-xs font-medium uppercase tracking-wider',
-                        'text-gray-500 dark:text-gray-400',
-                        header.column.getCanSort() && 'cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-700',
-                        columns.find(col => col.id === header.id)?.align === 'center' && 'text-center',
-                        columns.find(col => col.id === header.id)?.align === 'right' && 'text-right'
-                      )}
-                      style={{
-                        width: header.getSize() !== 150 ? header.getSize() : undefined,
-                      }}
-                      onClick={header.column.getToggleSortingHandler()}
-                    >
-                      <div className="flex items-center gap-2">
-                        {flexRender(header.column.columnDef.header, header.getContext())}
-                        
-                        {header.column.getCanSort() && (
-                          <div className="flex flex-col">
-                            <ChevronUpIcon 
-                              className={clsx(
-                                'h-3 w-3',
-                                header.column.getIsSorted() === 'asc' 
-                                  ? 'text-primary-600' 
-                                  : 'text-gray-400'
-                              )} 
-                            />
-                            <ChevronDownIcon 
-                              className={clsx(
-                                'h-3 w-3 -mt-1',
-                                header.column.getIsSorted() === 'desc' 
-                                  ? 'text-primary-600' 
-                                  : 'text-gray-400'
-                              )} 
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </th>
-                  ))}
-                </tr>
-              ))}
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50 sticky top-0 z-10">
+              <tr role="row">
+                <TableHeader
+                  field="name"
+                  label="Name"
+                  currentSort={sort}
+                  onSortChange={handleSortChange}
+                />
+                <TableHeader
+                  field="limitType"
+                  label="Type"
+                  currentSort={sort}
+                  onSortChange={handleSortChange}
+                />
+                <TableHeader
+                  field="limitRate"
+                  label="Rate"
+                  currentSort={sort}
+                  onSortChange={handleSortChange}
+                />
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200 bg-gray-50">
+                  Scope
+                </th>
+                <TableHeader
+                  field="active"
+                  label="Status"
+                  currentSort={sort}
+                  onSortChange={handleSortChange}
+                />
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200 bg-gray-50">
+                  Actions
+                </th>
+              </tr>
             </thead>
-
-            {/* Table Body */}
-            <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900">
-              {virtualized ? (
-                // Virtualized rows for large datasets
-                virtualizer.getVirtualItems().map(virtualItem => {
-                  const row = table.getRowModel().rows[virtualItem.index]
-                  if (!row) return null
-                  
-                  return (
-                    <tr
-                      key={row.id}
-                      data-index={virtualItem.index}
-                      ref={virtualizer.measureElement}
-                      className={clsx(
-                        'hover:bg-gray-50 dark:hover:bg-gray-800',
-                        row.getIsSelected() && 'bg-primary-50 dark:bg-primary-900/20'
-                      )}
-                      style={{
-                        height: virtualItem.size,
-                        transform: `translateY(${virtualItem.start}px)`,
-                      }}
-                    >
-                      {row.getVisibleCells().map(cell => (
-                        <td
-                          key={cell.id}
-                          className="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-white"
-                        >
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </td>
-                      ))}
-                    </tr>
-                  )
-                })
-              ) : (
-                // Standard rows
-                table.getRowModel().rows.map(row => (
-                  <tr
-                    key={row.id}
-                    className={clsx(
-                      'hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors',
-                      row.getIsSelected() && 'bg-primary-50 dark:bg-primary-900/20'
-                    )}
-                  >
-                    {row.getVisibleCells().map(cell => (
-                      <td
-                        key={cell.id}
-                        className={clsx(
-                          'whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-white',
-                          columns.find(col => col.id === cell.column.id)?.align === 'center' && 'text-center',
-                          columns.find(col => col.id === cell.column.id)?.align === 'right' && 'text-right'
-                        )}
-                      >
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </td>
-                    ))}
-                  </tr>
-                ))
-              )}
-              
-              {/* Empty State */}
-              {table.getRowModel().rows.length === 0 && !isTableLoading && (
+            <tbody 
+              className="bg-white divide-y divide-gray-200"
+              style={{ height: `${virtualizer.getTotalSize()}px` }}
+            >
+              {isLoading ? (
                 <tr>
-                  <td 
-                    colSpan={table.getAllColumns().length}
-                    className="px-6 py-12 text-center"
-                  >
+                  <td colSpan={6} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center">
-                      <FunnelIcon className="h-12 w-12 text-gray-400 mb-4" />
-                      <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                        No limits found
-                      </h3>
-                      <p className="text-gray-600 dark:text-gray-400">
-                        {globalFilter || columnFilters.length > 0
-                          ? 'Try adjusting your search or filters'
-                          : 'Get started by creating your first rate limit'
-                        }
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                      <p className="mt-2 text-sm text-gray-500">Loading limits...</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : limits.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center">
+                    <div className="flex flex-col items-center">
+                      <InformationCircleIcon className="h-12 w-12 text-gray-400" />
+                      <h3 className="mt-2 text-sm font-medium text-gray-900">No limits found</h3>
+                      <p className="mt-1 text-sm text-gray-500">
+                        {filters.search || filters.limitType || filters.active !== undefined || filters.scope
+                          ? "No limits match your current filters."
+                          : "Get started by creating your first limit."}
                       </p>
                     </div>
                   </td>
                 </tr>
+              ) : (
+                virtualizer.getVirtualItems().map((virtualRow) => {
+                  const limit = limits[virtualRow.index];
+                  if (!limit) return null;
+
+                  return (
+                    <tr
+                      key={limit.id}
+                      style={{
+                        height: `${virtualRow.size}px`,
+                        transform: `translateY(${virtualRow.start}px)`,
+                      }}
+                      className="hover:bg-gray-50 transition-colors duration-150"
+                      role="row"
+                      aria-rowindex={virtualRow.index + 2} // +2 for header row
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {limit.name}
+                          </div>
+                          {limit.description && (
+                            <div className="text-sm text-gray-500 truncate max-w-xs">
+                              {limit.description}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm text-gray-900">
+                          {limit.limitType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        </span>
+                      </td>
+                      
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm font-mono text-gray-900">
+                          {limit.limitRate}
+                        </span>
+                      </td>
+                      
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <LimitScopeBadge limit={limit} />
+                      </td>
+                      
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <LimitStatusBadge active={limit.active} />
+                      </td>
+                      
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <LimitActionMenu
+                          limit={limit}
+                          onEdit={handleEdit}
+                          onDelete={handleDelete}
+                          onToggleActive={handleToggleActive}
+                          disabled={deleteMutation.isPending || toggleActiveMutation.isPending}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -1404,118 +1175,79 @@ export function LimitsTable({
       </div>
 
       {/* Pagination */}
-      {paginated && limitsData && (
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          {/* Results Info */}
-          <div className="text-sm text-gray-700 dark:text-gray-300">
-            Showing{' '}
-            <span className="font-medium">
-              {pagination.pageIndex * pagination.pageSize + 1}
-            </span>{' '}
-            to{' '}
-            <span className="font-medium">
-              {Math.min(
-                (pagination.pageIndex + 1) * pagination.pageSize,
-                limitsData.meta.total || 0
-              )}
-            </span>{' '}
-            of{' '}
-            <span className="font-medium">
-              {limitsData.meta.total || 0}
-            </span>{' '}
-            results
-          </div>
-
-          {/* Pagination Controls */}
-          <div className="flex items-center gap-2">
+      {meta && meta.count > 0 && (
+        <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+          <div className="flex-1 flex justify-between sm:hidden">
             <Button
               variant="outline"
               size="sm"
-              onClick={() => table.previousPage()}
-              disabled={!table.getCanPreviousPage()}
+              onClick={() => handlePageChange(Math.max(0, pagination.offset - pagination.limit))}
+              disabled={pagination.offset === 0}
             >
               Previous
             </Button>
-            
-            <div className="flex items-center gap-1">
-              {Array.from(
-                { length: Math.min(5, table.getPageCount()) },
-                (_, i) => {
-                  const pageNumber = pagination.pageIndex >= 3 
-                    ? pagination.pageIndex - 2 + i
-                    : i
-                  
-                  if (pageNumber >= table.getPageCount()) return null
-                  
-                  return (
-                    <Button
-                      key={pageNumber}
-                      variant={pageNumber === pagination.pageIndex ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => table.setPageIndex(pageNumber)}
-                      className="w-8 h-8 p-0"
-                    >
-                      {pageNumber + 1}
-                    </Button>
-                  )
-                }
-              )}
-            </div>
-            
             <Button
               variant="outline"
               size="sm"
-              onClick={() => table.nextPage()}
-              disabled={!table.getCanNextPage()}
+              onClick={() => handlePageChange(pagination.offset + pagination.limit)}
+              disabled={pagination.offset + pagination.limit >= meta.count}
             >
               Next
             </Button>
           </div>
+          
+          <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm text-gray-700">
+                Showing{' '}
+                <span className="font-medium">
+                  {pagination.offset + 1}
+                </span>{' '}
+                to{' '}
+                <span className="font-medium">
+                  {Math.min(pagination.offset + pagination.limit, meta.count)}
+                </span>{' '}
+                of{' '}
+                <span className="font-medium">{meta.count}</span> results
+              </p>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <select
+                value={pagination.limit}
+                onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                className="text-sm border border-gray-300 rounded px-2 py-1"
+                aria-label="Rows per page"
+              >
+                <option value={10}>10 per page</option>
+                <option value={25}>25 per page</option>
+                <option value={50}>50 per page</option>
+                <option value={100}>100 per page</option>
+              </select>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(Math.max(0, pagination.offset - pagination.limit))}
+                disabled={pagination.offset === 0}
+              >
+                Previous
+              </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(pagination.offset + pagination.limit)}
+                disabled={pagination.offset + pagination.limit >= meta.count}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
         </div>
       )}
-
-      {/* Performance Metrics (Development) */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="text-xs text-gray-500 dark:text-gray-400 p-2 bg-gray-50 dark:bg-gray-800 rounded">
-          Query time: {performanceMetrics.queryTime.toFixed(2)}ms | 
-          Last fetch: {performanceMetrics.lastFetchTime.toLocaleTimeString()} |
-          Data updated: {new Date(dataUpdatedAt).toLocaleTimeString()}
-        </div>
-      )}
-
-      {/* Confirmation Dialog */}
-      <Dialog
-        open={confirmDialog.open}
-        onClose={() => setConfirmDialog(prev => ({ ...prev, open: false }))}
-        title={confirmDialog.title}
-        className="max-w-md"
-      >
-        <p className="text-gray-600 dark:text-gray-400 mb-6">
-          {confirmDialog.message}
-        </p>
-        
-        <div className="flex justify-end gap-3">
-          <Button
-            variant="outline"
-            onClick={() => setConfirmDialog(prev => ({ ...prev, open: false }))}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="destructive"
-            onClick={confirmDialog.action}
-          >
-            Delete
-          </Button>
-        </div>
-      </Dialog>
     </div>
-  )
-}
+  );
+};
 
-// =============================================================================
-// EXPORTS
-// =============================================================================
-
-export default LimitsTable
-export type { LimitsTableProps, LimitsTableColumn, FilterConfig }
+export default LimitsTable;
