@@ -1,39 +1,88 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { useParams } from 'next/navigation';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import { useForm, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import useSWR from 'swr';
+import { z } from 'zod';
+import { toast } from 'sonner';
 
-// Import UI Components (create interfaces for type safety)
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+// UI Components
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { Separator } from '@/components/ui/separator';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 
-// Import Feature Components
+// Feature Components
 import { ScriptEditor } from '@/components/event-scripts/script-editor';
 import { LinkService } from '@/components/event-scripts/link-service';
 
-// Import Hooks and API Client
-import { useEventScripts } from '@/hooks/use-event-scripts';
+// Hooks and Services
+import { useEventScript, useEventScripts } from '@/hooks/use-event-scripts';
 import { useStorageServices } from '@/hooks/use-storage-services';
 import { apiClient } from '@/lib/api-client';
 
-// Import Types and Validation
-import { ScriptObject, ScriptEvent, ScriptEventResponse, AceEditorMode } from '@/types/scripts';
-import { Service } from '@/types/services';
-import { scriptSchema } from '@/lib/validations/script-schema';
+// Types
+interface ScriptObject {
+  name: string;
+  type: string;
+  content: string;
+  isActive: boolean;
+  allowEventModification: boolean;
+  storageServiceId?: number;
+  scmRepository?: string;
+  scmReference?: string;
+  storagePath?: string;
+  config?: any;
+  createdById?: number;
+  createdDate?: string;
+  lastModifiedById?: number;
+  lastModifiedDate?: string;
+}
 
-// Import Utilities
-import { groupEvents } from '@/lib/data-transform/event-scripts';
-import { camelToSnakeString } from '@/lib/utils/case';
+interface Service {
+  id: number;
+  name: string;
+  label: string;
+  type: string;
+  description?: string;
+  isActive: boolean;
+}
 
-// Script Types Configuration (replaces SCRIPT_TYPES constant)
+enum AceEditorMode {
+  JSON = 'json',
+  YAML = 'yaml',
+  TEXT = 'text',
+  NODEJS = 'nodejs',
+  PHP = 'php',
+  PYTHON = 'python',
+  PYTHON3 = 'python3',
+  JAVASCRIPT = 'javascript',
+}
+
+// Script validation schema
+const scriptSchema = z.object({
+  name: z.string().min(1, 'Script name is required'),
+  type: z.enum(['nodejs', 'php', 'python', 'python3'], {
+    required_error: 'Script type is required',
+  }),
+  content: z.string().optional(),
+  isActive: z.boolean().default(false),
+  allowEventModification: z.boolean().default(false),
+  storageServiceId: z.number().optional(),
+  storagePath: z.string().optional(),
+});
+
+type ScriptFormData = z.infer<typeof scriptSchema>;
+
+// Script types configuration
 const SCRIPT_TYPES = [
   {
     label: 'Node.js',
@@ -57,420 +106,276 @@ const SCRIPT_TYPES = [
   },
 ] as const;
 
-// Form Schema using Zod for validation
-const editScriptSchema = scriptSchema.extend({
-  name: z.string().min(1, 'Script name is required'),
-  type: z.nativeEnum(AceEditorMode),
-  content: z.string().optional(),
-  storageServiceId: z.union([z.number(), z.null()]).optional(),
-  storagePath: z.string().optional(),
-  isActive: z.boolean().default(false),
-  allow_event_modification: z.boolean().default(false),
-});
-
-type EditScriptFormData = z.infer<typeof editScriptSchema>;
-
-interface EventScriptPageProps {
-  params: {
-    name: string;
-  };
+// Loading skeleton component
+function ScriptFormSkeleton() {
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-6 w-48" />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Skeleton className="h-10 w-full" />
+          <div className="grid grid-cols-2 gap-4">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+          <div className="flex items-center space-x-2">
+            <Skeleton className="h-6 w-6" />
+            <Skeleton className="h-4 w-20" />
+          </div>
+          <div className="flex items-center space-x-2">
+            <Skeleton className="h-6 w-6" />
+            <Skeleton className="h-4 w-32" />
+          </div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-6 w-36" />
+        </CardHeader>
+        <CardContent>
+          <Skeleton className="h-64 w-full" />
+        </CardContent>
+      </Card>
+    </div>
+  );
 }
 
-/**
- * Next.js dynamic route page component for editing individual event scripts.
- * Implements React Hook Form with Zod validation, SWR data fetching, and comprehensive
- * script editing workflow. Replaces Angular DfScriptDetailsComponent edit functionality
- * with React 19 server components and modern patterns.
- * 
- * @param props - Page props containing dynamic route parameters
- * @returns JSX element for the script editing page
- */
-export default function EventScriptEditPage({ params }: EventScriptPageProps) {
+// Error display component
+interface ScriptErrorProps {
+  error: Error;
+  onRetry: () => void;
+}
+
+function ScriptError({ error, onRetry }: ScriptErrorProps) {
+  return (
+    <Alert variant="destructive">
+      <AlertDescription className="flex items-center justify-between">
+        <span>Failed to load script: {error.message}</span>
+        <Button variant="outline" size="sm" onClick={onRetry}>
+          Retry
+        </Button>
+      </AlertDescription>
+    </Alert>
+  );
+}
+
+// Main page component
+export default function ScriptEditPage() {
+  const params = useParams();
   const router = useRouter();
-  const { name: scriptName } = params;
-  
-  // Decode script name from URL (handles URL encoding)
-  const decodedScriptName = useMemo(() => decodeURIComponent(scriptName), [scriptName]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
-  // State for script selection workflow (create mode)
-  const [selectedServiceItem, setSelectedServiceItem] = useState<string>('');
-  const [selectedEventItem, setSelectedEventItem] = useState<string>('');
-  const [selectedRouteItem, setSelectedRouteItem] = useState<string>('');
-  const [selectTable, setSelectTable] = useState<string>('');
-  const [tableProcedureFlag, setTableProcedureFlag] = useState<string>('');
-  const [completeScriptName, setCompleteScriptName] = useState<string>('');
-  const [ungroupedEventItems, setUngroupedEventItems] = useState<string[]>([]);
-  const [ungroupedRouteOptions, setUngroupedRouteOptions] = useState<string[]>([]);
-  const [tableOptions, setTableOptions] = useState<string[]>([]);
-  const [ungroupedEventOptions, setUngroupedEventOptions] = useState<any>({});
-  const [scriptEvents, setScriptEvents] = useState<ScriptEvent[]>([]);
-  const [unGroupedEvents, setUnGroupedEvents] = useState<ScriptEventResponse>({});
-  const [storageServices, setStorageServices] = useState<Service[]>([]);
-  const [storeServiceArray, setStoreServiceArray] = useState<string[]>([]);
+  // Ensure script name is properly decoded
+  const scriptName = useMemo(() => {
+    if (typeof params.name === 'string') {
+      return decodeURIComponent(params.name);
+    }
+    return '';
+  }, [params.name]);
 
-  // Data fetching hooks
-  const { data: scriptDetails, error: scriptError, mutate: mutateScript } = useSWR(
-    decodedScriptName ? `/api/v2/script/${encodeURIComponent(decodedScriptName)}` : null,
+  // Data fetching with SWR
+  const {
+    data: script,
+    error: scriptError,
+    isLoading: isLoadingScript,
+    mutate: mutateScript,
+  } = useSWR(
+    scriptName ? `/api/v2/system/event/${scriptName}` : null,
     apiClient.get,
     {
-      onErrorRetry: (error, key, config, revalidate, { retryCount }) => {
-        // Don't retry on 404 - script doesn't exist yet
-        if (error?.status === 404) return;
-        if (retryCount >= 3) return;
-        setTimeout(() => revalidate({ retryCount }), 1000 * Math.pow(2, retryCount));
-      },
+      errorRetryCount: 3,
+      errorRetryInterval: 1000,
+      revalidateOnFocus: false,
+      dedupingInterval: 5000,
     }
   );
 
-  const { data: eventScriptsData } = useSWR('/api/v2/script/event', apiClient.get);
-  const { storageServices: storageServicesData } = useStorageServices();
+  const {
+    data: storageServices,
+    error: servicesError,
+    isLoading: isLoadingServices,
+  } = useSWR('/api/v2/system/service?group=File', apiClient.get, {
+    revalidateOnFocus: false,
+    dedupingInterval: 30000,
+  });
 
-  // Initialize React Hook Form with Zod validation
-  const form = useForm<EditScriptFormData>({
-    resolver: zodResolver(editScriptSchema),
+  // Form setup with React Hook Form and Zod validation
+  const form = useForm<ScriptFormData>({
+    resolver: zodResolver(scriptSchema),
     defaultValues: {
       name: '',
-      type: AceEditorMode.NODEJS,
+      type: 'nodejs',
       content: '',
-      storageServiceId: null,
-      storagePath: '',
       isActive: false,
-      allow_event_modification: false,
+      allowEventModification: false,
+      storageServiceId: undefined,
+      storagePath: '',
     },
     mode: 'onChange', // Real-time validation under 100ms
   });
 
-  const { handleSubmit, formState: { isSubmitting, errors }, watch, setValue, reset } = form;
-
-  // Watch form values for reactive updates
-  const watchedType = watch('type');
-  const watchedContent = watch('content');
-  const watchedStorageServiceId = watch('storageServiceId');
-  const watchedStoragePath = watch('storagePath');
-
-  // Determine if we're in edit mode (script exists) or create mode
-  const isEditMode = !!(scriptDetails && !scriptError);
-
-  // Effect to populate form when script data is loaded (edit mode)
+  // Handle client-side mounting
   useEffect(() => {
-    if (scriptDetails && isEditMode) {
-      // Transform data from snake_case to camelCase for form
-      const editData = Object.keys(scriptDetails).reduce(
-        (acc, cur) => ({
-          ...acc,
-          [camelToSnakeString(cur)]: scriptDetails[cur],
-        }),
-        {}
-      );
+    setMounted(true);
+  }, []);
 
-      // Ensure isActive is properly set
-      const formData = {
-        ...editData,
-        name: scriptDetails.name,
-        isActive: scriptDetails.isActive || false,
-        allow_event_modification: scriptDetails.allowEventModification || false,
+  // Pre-populate form with script data when loaded
+  useEffect(() => {
+    if (script && mounted) {
+      const formData: ScriptFormData = {
+        name: script.name || scriptName,
+        type: script.type || 'nodejs',
+        content: script.content || '',
+        isActive: script.isActive || false,
+        allowEventModification: script.allowEventModification || false,
+        storageServiceId: script.storageServiceId,
+        storagePath: script.storagePath || '',
       };
 
-      reset(formData);
-      setCompleteScriptName(scriptDetails.name);
+      form.reset(formData);
     }
-  }, [scriptDetails, isEditMode, reset]);
+  }, [script, form, scriptName, mounted]);
 
-  // Effect to initialize event scripts data for create mode
-  useEffect(() => {
-    if (eventScriptsData && !isEditMode) {
-      setScriptEvents(groupEvents(eventScriptsData));
-      setUnGroupedEvents(eventScriptsData);
-    }
-  }, [eventScriptsData, isEditMode]);
+  // Handle form submission
+  const onSubmit = async (data: ScriptFormData) => {
+    setIsSubmitting(true);
+    try {
+      // Prepare script data for update (PATCH/PUT operation)
+      const scriptData = {
+        ...data,
+        name: scriptName, // Ensure name remains the original (read-only)
+        storageServiceId: data.storageServiceId || null,
+        storagePath: data.storageServiceId ? data.storagePath : null,
+      };
 
-  // Effect to initialize storage services data
-  useEffect(() => {
-    if (storageServicesData) {
-      setStorageServices(storageServicesData);
-      setStoreServiceArray(storageServicesData.map(service => service.name));
-    }
-  }, [storageServicesData]);
+      // Update script using PUT request
+      await apiClient.put(`/api/v2/system/event/${scriptName}`, scriptData);
 
-  // Event handlers for script creation workflow
-  const handleSelectedServiceItemEvent = () => {
-    setUngroupedEventItems([]);
-    setUngroupedRouteOptions([]);
-    setSelectedRouteItem('');
-    
-    let serviceType = selectedServiceItem;
-    if (serviceType === 'api_docs') {
-      serviceType = 'apiDocs';
-    }
-    
-    const eventOptions = unGroupedEvents[serviceType];
-    setUngroupedEventOptions(eventOptions);
-    
-    if (eventOptions) {
-      setUngroupedEventItems(Object.keys(eventOptions));
-    }
-  };
+      // Revalidate the script data
+      mutateScript();
 
-  const handleSelectedEventItemEvent = () => {
-    const eventOptions = ungroupedEventOptions[selectedEventItem];
-    if (!eventOptions) return;
-
-    setUngroupedRouteOptions([...eventOptions.endpoints]);
-    
-    const data = eventOptions.parameter;
-    if (data && typeof data === 'object' && Object.keys(data).length > 0) {
-      const paramKey = Object.keys(data)[0];
+      toast.success('Script updated successfully');
       
-      if (paramKey === 'tableName') {
-        setTableProcedureFlag('table');
-        setTableOptions([...data.tableName]);
-      } else if (paramKey === 'procedureName') {
-        setTableProcedureFlag('procedure');
-        setTableOptions([...data.procedureName]);
-      } else if (paramKey === 'functionName') {
-        setTableProcedureFlag('function');
-        setTableOptions([...data.functionName]);
-      }
+      // Navigate back to scripts list
+      router.push('/adf-event-scripts');
+    } catch (error) {
+      console.error('Failed to update script:', error);
+      toast.error(
+        error instanceof Error 
+          ? error.message 
+          : 'Failed to update script. Please try again.'
+      );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleSelectedTable = () => {
-    const newScriptName = selectedRouteItem.replace('{table_name}', selectTable);
-    setCompleteScriptName(newScriptName);
-  };
-
-  const handleSelectedRoute = () => {
-    let newScriptName = selectedRouteItem;
-    if (selectTable) {
-      newScriptName = newScriptName.replace('{table_name}', selectTable);
-    }
-    setCompleteScriptName(newScriptName);
-  };
-
-  // Navigation handler
+  // Handle navigation back
   const handleGoBack = () => {
     router.push('/adf-event-scripts');
   };
 
-  // Form submission handler
-  const onSubmit = async (data: EditScriptFormData) => {
-    try {
-      const scriptItem = {
-        ...data,
-        storageServiceId: 
-          data.storageServiceId && typeof data.storageServiceId === 'object' && 'type' in data.storageServiceId
-            ? (data.storageServiceId as any).type === 'local_file' 
-              ? (data.storageServiceId as any).id 
-              : null
-            : data.storageServiceId,
-        storage_path:
-          data.storageServiceId && typeof data.storageServiceId === 'object' && 'type' in data.storageServiceId
-            ? (data.storageServiceId as any).type === 'local_file'
-              ? data.storagePath
-              : null
-            : data.storagePath,
-        name: isEditMode ? decodedScriptName : (completeScriptName || selectedRouteItem),
-      };
-
-      if (isEditMode) {
-        // Update existing script (PATCH/PUT operation for edit mode)
-        await apiClient.put(`/api/v2/script/${encodeURIComponent(decodedScriptName)}`, scriptItem);
-        await mutateScript(); // Revalidate cache
-      } else {
-        // Create new script
-        await apiClient.post('/api/v2/script', scriptItem, {
-          params: { name: scriptItem.name },
-        });
-      }
-
-      // Navigate back to scripts list
-      handleGoBack();
-    } catch (error) {
-      console.error('Error saving script:', error);
-      // Error handling will be managed by global error handler
-    }
-  };
-
-  // Loading states
-  if (!isEditMode && !eventScriptsData) {
+  // Loading state
+  if (!mounted || isLoadingScript || isLoadingServices) {
     return (
-      <div className="flex items-center justify-center min-h-96">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+      <div className="container mx-auto px-4 py-6 max-w-4xl">
+        <div className="mb-6">
+          <Skeleton className="h-8 w-64 mb-2" />
+          <Skeleton className="h-4 w-96" />
+        </div>
+        <ScriptFormSkeleton />
+      </div>
+    );
+  }
+
+  // Error state
+  if (scriptError) {
+    return (
+      <div className="container mx-auto px-4 py-6 max-w-4xl">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+            Edit Script
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            Edit event script configuration and content
+          </p>
+        </div>
+        <ScriptError 
+          error={scriptError} 
+          onRetry={() => mutateScript()} 
+        />
       </div>
     );
   }
 
   return (
     <div className="container mx-auto px-4 py-6 max-w-4xl">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
-            {isEditMode ? 'Edit Event Script' : 'Create Event Script'}
-          </h1>
-          {isEditMode && (
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Editing script: {decodedScriptName}
+      {/* Page header */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+              Edit Script
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400">
+              Edit event script configuration and content
             </p>
-          )}
+          </div>
+          <Badge variant="secondary" className="text-sm">
+            {scriptName}
+          </Badge>
         </div>
+      </div>
 
-        <FormProvider {...form}>
-          <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-6">
-            {/* Create Mode Fields - Service Selection Workflow */}
-            {!isEditMode && (
-              <>
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Service</FormLabel>
-                      <FormControl>
-                        <Select 
-                          value={selectedServiceItem} 
-                          onValueChange={(value) => {
-                            setSelectedServiceItem(value);
-                            setTimeout(handleSelectedServiceItemEvent, 0);
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a service" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {storeServiceArray.map((service) => (
-                              <SelectItem key={service} value={service}>
-                                {service}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {ungroupedEventItems.length > 0 && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormItem>
-                      <FormLabel>Script Type</FormLabel>
-                      <FormControl>
-                        <Select 
-                          value={selectedEventItem} 
-                          onValueChange={(value) => {
-                            setSelectedEventItem(value);
-                            setTimeout(handleSelectedEventItemEvent, 0);
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select script type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {ungroupedEventItems.map((item) => (
-                              <SelectItem key={item} value={item}>
-                                {item}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </FormControl>
-                    </FormItem>
-
-                    <FormItem>
-                      <FormLabel>Script Method</FormLabel>
-                      <FormControl>
-                        <Select 
-                          value={selectedRouteItem} 
-                          onValueChange={(value) => {
-                            setSelectedRouteItem(value);
-                            setTimeout(handleSelectedRoute, 0);
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select script method" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {ungroupedRouteOptions.map((item) => (
-                              <SelectItem key={item} value={item}>
-                                {item}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </FormControl>
-                    </FormItem>
-                  </div>
-                )}
-
-                {tableOptions.length > 0 && (
-                  <FormItem>
-                    <FormLabel>
-                      {tableProcedureFlag === 'table' ? 'Table Name' : 'Name'}
-                    </FormLabel>
-                    <FormControl>
-                      <Select 
-                        value={selectTable} 
-                        onValueChange={(value) => {
-                          setSelectTable(value);
-                          setTimeout(handleSelectedTable, 0);
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder={`Select ${tableProcedureFlag === 'table' ? 'table' : 'name'}`} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {tableOptions.map((item) => (
-                            <SelectItem key={item} value={item}>
-                              {item}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FormControl>
-                  </FormItem>
-                )}
-
-                {completeScriptName && (
+      <FormProvider {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          {/* Script Configuration */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Script Configuration</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Script Name (Read-only in edit mode) */}
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
                   <FormItem>
                     <FormLabel>Script Name</FormLabel>
                     <FormControl>
-                      <Input 
-                        value={completeScriptName} 
-                        disabled
-                        className="bg-gray-50 dark:bg-gray-700"
+                      <Input
+                        {...field}
+                        value={scriptName}
+                        disabled={true}
+                        className="bg-gray-50 dark:bg-gray-800"
+                        aria-label="Script name (read-only)"
                       />
                     </FormControl>
+                    <FormMessage />
                   </FormItem>
                 )}
-              </>
-            )}
+              />
 
-            {/* Edit Mode - Script Name Field (Read-only) */}
-            {isEditMode && (
-              <FormItem>
-                <FormLabel>Script Name</FormLabel>
-                <FormControl>
-                  <Input 
-                    value={decodedScriptName} 
-                    disabled
-                    className="bg-gray-50 dark:bg-gray-700"
-                  />
-                </FormControl>
-              </FormItem>
-            )}
-
-            {/* Script Type Selection */}
-            <FormField
-              control={form.control}
-              name="type"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Script Type</FormLabel>
-                  <FormControl>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select script type" />
-                      </SelectTrigger>
+              {/* Script Type */}
+              <FormField
+                control={form.control}
+                name="type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Script Type</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                      aria-label="Select script type"
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select script type" />
+                        </SelectTrigger>
+                      </FormControl>
                       <SelectContent>
                         {SCRIPT_TYPES.map((type) => (
                           <SelectItem key={type.value} value={type.value}>
@@ -479,108 +384,145 @@ export default function EventScriptEditPage({ params }: EventScriptPageProps) {
                         ))}
                       </SelectContent>
                     </Select>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Script Toggles */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="isActive"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base">Active</FormLabel>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">
-                        Enable this script
-                      </div>
-                    </div>
-                    <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        aria-label="Active script"
-                      />
-                    </FormControl>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="allow_event_modification"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base">Event Modification</FormLabel>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">
-                        Allow event modification
+              {/* Toggle switches */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="isActive"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="space-y-0.5">
+                        <FormLabel className="text-sm font-medium">
+                          Active
+                        </FormLabel>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                          Enable or disable this script
+                        </p>
                       </div>
-                    </div>
-                    <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        aria-label="Allow event modification"
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          aria-label="Toggle script active status"
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="allowEventModification"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="space-y-0.5">
+                        <FormLabel className="text-sm font-medium">
+                          Allow Event Modification
+                        </FormLabel>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                          Allow script to modify event data
+                        </p>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          aria-label="Toggle event modification permission"
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Storage Service Configuration */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Storage Configuration</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <LinkService
+                formControl={form.control}
+                storageServices={storageServices?.resource || []}
+                cache={scriptName}
+                aria-label="Configure storage service settings"
               />
-            </div>
+            </CardContent>
+          </Card>
 
-            {/* Storage Service Configuration */}
-            <LinkService
-              cache={isEditMode ? decodedScriptName : completeScriptName}
-              storageServiceId={selectedServiceItem}
-              storagePath={form.register('storagePath')}
-              content={form.register('content')}
-            />
+          <Separator />
 
-            {/* Script Editor */}
-            <div className="space-y-2">
-              <FormLabel>Script Content</FormLabel>
+          {/* Script Editor */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Script Content</CardTitle>
+            </CardHeader>
+            <CardContent>
               <ScriptEditor
-                cache={isEditMode ? decodedScriptName : completeScriptName}
-                type={form.register('type')}
-                storageServiceId={form.register('storageServiceId')}
-                storagePath={form.register('storagePath')}
-                content={form.register('content')}
+                formControl={form.control}
+                cache={scriptName}
+                storageServices={storageServices?.resource || []}
+                aria-label="Edit script content"
+                className="min-h-[400px]"
               />
-            </div>
+            </CardContent>
+          </Card>
 
-            {/* Action Buttons */}
-            <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200 dark:border-gray-700">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleGoBack}
-                disabled={isSubmitting}
-                className="px-6"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={isSubmitting || (isEditMode ? false : !completeScriptName)}
-                className="px-6"
-              >
-                {isSubmitting ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Saving...
-                  </>
-                ) : (
-                  'Save Script'
-                )}
-              </Button>
-            </div>
-          </form>
-        </FormProvider>
-      </div>
+          {/* Action Buttons */}
+          <div className="flex items-center justify-end space-x-4 pt-6 border-t">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={handleGoBack}
+              disabled={isSubmitting}
+              aria-label="Cancel editing and go back"
+            >
+              Cancel
+            </Button>
+            <Button 
+              type="submit" 
+              disabled={isSubmitting || !form.formState.isValid}
+              aria-label="Save script changes"
+              className="min-w-[100px]"
+            >
+              {isSubmitting ? (
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Saving...</span>
+                </div>
+              ) : (
+                'Save Script'
+              )}
+            </Button>
+          </div>
+        </form>
+      </FormProvider>
+
+      {/* Development info (hidden in production) */}
+      {process.env.NODE_ENV === 'development' && (
+        <Card className="mt-8 border-dashed">
+          <CardHeader>
+            <CardTitle className="text-sm text-gray-500">
+              Development Info
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-xs text-gray-500 space-y-2">
+            <p>Script Name: {scriptName}</p>
+            <p>Form Valid: {form.formState.isValid ? 'Yes' : 'No'}</p>
+            <p>Form Dirty: {form.formState.isDirty ? 'Yes' : 'No'}</p>
+            <p>
+              Errors: {Object.keys(form.formState.errors).length || 'None'}
+            </p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
