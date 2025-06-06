@@ -1,609 +1,1095 @@
 /**
- * Database Service List Component Types
+ * Database Service List Types
  * 
- * TypeScript interface definitions and type exports specific to database service list
- * components. Defines type-safe contracts for service list operations, table props,
- * filter configurations, and component state management. Provides Zod schema validators
- * for service list filtering and sorting parameters.
+ * TypeScript interface definitions and type exports specific to database service 
+ * list components. Defines type-safe contracts for service list operations, table 
+ * props, filter configurations, and component state management. Provides Zod 
+ * schema validators for service list filtering and sorting parameters.
  * 
- * @fileoverview Comprehensive types for database service list management in React/Next.js
+ * @fileoverview Service list component types for React/Next.js application
  * @version 1.0.0
- * @since 2024-01-01
+ * @since React 19.0.0, Next.js 15.1+, TypeScript 5.8+
  */
 
 import { z } from 'zod';
-import { ReactNode, ComponentType, RefObject } from 'react';
-import type { 
-  UseQueryOptions, 
-  UseMutationOptions, 
-  QueryKey,
-  UseQueryResult,
-  UseMutationResult
-} from '@tanstack/react-query';
-import type { 
-  VirtualizerOptions,
-  Virtualizer,
-  VirtualItem
-} from '@tanstack/react-virtual';
-import type { 
+import type { ReactNode, ComponentType, MouseEvent, KeyboardEvent } from 'react';
+import type { UseFormReturn, FieldError } from 'react-hook-form';
+import type { SWRResponse } from 'swr';
+import type { UseMutationResult, UseQueryResult } from '@tanstack/react-query';
+import type { VirtualItem, Virtualizer } from '@tanstack/react-virtual';
+
+// Re-export and extend core database service types
+export type {
   DatabaseService,
   DatabaseDriver,
   ServiceStatus,
-  ServiceTier,
-  ConnectionTestResult,
-  DatabaseConnectionInput,
+  DatabaseConnectionFormData,
+  ServiceQueryParams,
   GenericListResponse,
   ApiErrorResponse,
-  BaseComponentProps
+  ResponseMetadata,
+  ConnectionTestResult,
+  DatabaseServiceSWRConfig,
+  DatabaseServiceListResponse,
+  DatabaseServiceMutationResult,
+  CreateServiceMutationVariables,
+  UpdateServiceMutationVariables,
+  DeleteServiceMutationVariables,
+  TestConnectionMutationVariables,
+  BulkAction,
+  ColumnConfig,
+  BaseComponentProps,
+} from '../types';
+
+export {
+  DatabaseConnectionSchema,
+  ConnectionTestSchema,
+  ServiceQuerySchema,
+  DatabaseServiceQueryKeys,
+  DATABASE_TYPE_LABELS,
+  SERVICE_STATUS_LABELS,
+  SERVICE_STATUS_COLORS,
+  isDatabaseDriver,
+  isServiceStatus,
+  getDefaultPort,
+  formatServiceStatus,
+  getServiceStatusColor,
 } from '../types';
 
 // =============================================================================
-// SERVICE LIST TABLE TYPES
+// ZOD SCHEMA VALIDATORS FOR SERVICE LIST FILTERING AND SORTING
 // =============================================================================
 
 /**
- * Service list table component props
- * Extends BaseComponentProps with service-specific functionality
+ * Service list filter schema with comprehensive validation
+ * Supports filtering by service properties, search terms, and advanced filters
  */
-export interface ServiceListTableProps extends BaseComponentProps {
-  services: DatabaseService[];
-  loading?: boolean;
-  error?: Error | null;
-  onServiceSelect?: (service: DatabaseService) => void;
-  onServiceEdit?: (service: DatabaseService) => void;
-  onServiceDelete?: (service: DatabaseService) => void;
-  onServiceDuplicate?: (service: DatabaseService) => void;
-  onServiceTest?: (service: DatabaseService) => void;
-  onServiceToggle?: (service: DatabaseService, active: boolean) => void;
-  onBulkActions?: (action: BulkActionType, services: DatabaseService[]) => void;
-  selection?: TableSelectionConfig;
-  pagination?: PaginationConfig;
-  sorting?: SortingConfig;
-  filtering?: FilteringConfig;
-  virtualization?: VirtualizationConfig;
-  paywall?: PaywallConfig;
-  accessibility?: AccessibilityConfig;
-}
+export const ServiceListFilterSchema = z.object({
+  // Text search
+  search: z.string()
+    .max(255, 'Search term must be 255 characters or less')
+    .optional(),
+  
+  // Service type filter
+  type: z.enum(['mysql', 'postgresql', 'sqlserver', 'oracle', 'mongodb', 'snowflake', 'sqlite'])
+    .optional(),
+  
+  // Service status filter
+  status: z.enum(['active', 'inactive', 'testing', 'error', 'configuring'])
+    .optional(),
+  
+  // Date range filters
+  createdAfter: z.string()
+    .datetime({ message: 'Invalid created after date format' })
+    .optional(),
+  
+  createdBefore: z.string()
+    .datetime({ message: 'Invalid created before date format' })
+    .optional(),
+  
+  modifiedAfter: z.string()
+    .datetime({ message: 'Invalid modified after date format' })
+    .optional(),
+  
+  modifiedBefore: z.string()
+    .datetime({ message: 'Invalid modified before date format' })
+    .optional(),
+  
+  // Advanced filters
+  isActive: z.boolean().optional(),
+  hasConnectionIssues: z.boolean().optional(),
+  needsAttention: z.boolean().optional(),
+  
+  // Host/connection filters
+  hostPattern: z.string()
+    .max(255, 'Host pattern must be 255 characters or less')
+    .optional(),
+  
+  databasePattern: z.string()
+    .max(255, 'Database pattern must be 255 characters or less')
+    .optional(),
+  
+  // User filters (for admin views)
+  createdBy: z.number().int().positive().optional(),
+  modifiedBy: z.number().int().positive().optional(),
+  
+  // Performance filters
+  lastTestPassed: z.boolean().optional(),
+  lastTestDuration: z.object({
+    min: z.number().min(0).optional(),
+    max: z.number().min(0).optional(),
+  }).optional(),
+  
+  // Tag-based filtering (if tags are implemented)
+  tags: z.array(z.string().max(50)).optional(),
+});
 
 /**
- * Service list container component props
- * Orchestrates all service list functionality
+ * Service list sorting schema with validation
  */
-export interface ServiceListContainerProps extends BaseComponentProps {
-  initialFilters?: ServiceListFilters;
-  initialSort?: ServiceListSort;
-  pageSize?: number;
-  enableVirtualization?: boolean;
-  enableBulkActions?: boolean;
-  enablePaywall?: boolean;
-  onServiceCreated?: (service: DatabaseService) => void;
-  onServiceUpdated?: (service: DatabaseService) => void;
-  onServiceDeleted?: (serviceId: number) => void;
-  onError?: (error: ApiErrorResponse) => void;
-  refreshInterval?: number;
-  autoRefresh?: boolean;
-}
+export const ServiceListSortSchema = z.object({
+  field: z.enum([
+    'name',
+    'label', 
+    'type',
+    'host',
+    'database',
+    'status',
+    'is_active',
+    'created_date',
+    'last_modified_date',
+    'last_test_date',
+    'last_test_duration',
+    'connection_count',
+  ], {
+    required_error: 'Sort field is required',
+    invalid_type_error: 'Invalid sort field',
+  }),
+  
+  direction: z.enum(['asc', 'desc'], {
+    required_error: 'Sort direction is required',
+    invalid_type_error: 'Sort direction must be asc or desc',
+  }),
+  
+  // Secondary sort for ties
+  secondaryField: z.enum([
+    'name',
+    'type',
+    'created_date',
+    'last_modified_date',
+  ]).optional(),
+  
+  secondaryDirection: z.enum(['asc', 'desc']).optional(),
+});
 
 /**
- * Service list item component props
- * Individual service row representation
+ * Service list pagination schema
  */
-export interface ServiceListItemProps extends BaseComponentProps {
-  service: DatabaseService;
-  index: number;
-  isSelected?: boolean;
-  isExpanded?: boolean;
-  onSelect?: (service: DatabaseService) => void;
-  onEdit?: (service: DatabaseService) => void;
-  onDelete?: (service: DatabaseService) => void;
-  onDuplicate?: (service: DatabaseService) => void;
-  onTest?: (service: DatabaseService) => void;
-  onToggle?: (service: DatabaseService, active: boolean) => void;
-  onExpand?: (service: DatabaseService, expanded: boolean) => void;
-  actions?: ServiceActionConfig[];
-  showDetails?: boolean;
-  compact?: boolean;
-}
+export const ServiceListPaginationSchema = z.object({
+  page: z.number()
+    .int('Page must be an integer')
+    .min(1, 'Page must be at least 1')
+    .max(10000, 'Page cannot exceed 10,000'),
+  
+  limit: z.number()
+    .int('Limit must be an integer')
+    .min(1, 'Limit must be at least 1')
+    .max(100, 'Limit cannot exceed 100'),
+  
+  offset: z.number()
+    .int('Offset must be an integer')
+    .min(0, 'Offset cannot be negative')
+    .optional(),
+});
+
+/**
+ * Complete service list query schema combining filters, sorting, and pagination
+ */
+export const ServiceListQuerySchema = z.object({
+  // Pagination
+  pagination: ServiceListPaginationSchema,
+  
+  // Filtering
+  filters: ServiceListFilterSchema.optional(),
+  
+  // Sorting
+  sort: ServiceListSortSchema.optional(),
+  
+  // View options
+  includeInactive: z.boolean().default(false),
+  includeDeleted: z.boolean().default(false),
+  includeSystemServices: z.boolean().default(true),
+  
+  // Performance options
+  includeConnectionStatus: z.boolean().default(true),
+  includeLastTestResult: z.boolean().default(false),
+  includeSchemaMetadata: z.boolean().default(false),
+  
+  // Cache control
+  skipCache: z.boolean().default(false),
+  maxAge: z.number().int().min(0).max(3600).optional(), // Max cache age in seconds
+});
+
+/**
+ * Bulk action schema for service operations
+ */
+export const ServiceBulkActionSchema = z.object({
+  action: z.enum([
+    'activate',
+    'deactivate',
+    'test-connection',
+    'refresh-schema',
+    'export-config',
+    'delete',
+    'duplicate',
+    'add-tags',
+    'remove-tags',
+    'update-config',
+  ], {
+    required_error: 'Bulk action is required',
+    invalid_type_error: 'Invalid bulk action type',
+  }),
+  
+  serviceIds: z.array(z.number().int().positive())
+    .min(1, 'At least one service must be selected')
+    .max(100, 'Cannot perform bulk action on more than 100 services'),
+  
+  // Action-specific parameters
+  parameters: z.record(z.any()).optional(),
+  
+  // Confirmation
+  confirmed: z.boolean().default(false),
+  
+  // Batch processing options
+  batchSize: z.number().int().min(1).max(10).default(5),
+  continueOnError: z.boolean().default(false),
+});
+
+/**
+ * Service list view configuration schema
+ */
+export const ServiceListViewConfigSchema = z.object({
+  // Column configuration
+  visibleColumns: z.array(z.string()).default([
+    'name', 'type', 'host', 'database', 'status', 'actions'
+  ]),
+  
+  columnWidths: z.record(z.string(), z.number().min(50).max(800)).optional(),
+  columnOrder: z.array(z.string()).optional(),
+  
+  // Display options
+  density: z.enum(['compact', 'normal', 'comfortable']).default('normal'),
+  showRowNumbers: z.boolean().default(false),
+  showRowSelection: z.boolean().default(true),
+  showColumnHeaders: z.boolean().default(true),
+  
+  // Virtualization
+  enableVirtualization: z.boolean().default(false),
+  virtualItemHeight: z.number().min(40).max(200).default(60),
+  virtualOverscan: z.number().min(1).max(20).default(5),
+  
+  // Grouping
+  groupBy: z.enum(['type', 'status', 'host', 'created_date', 'none']).default('none'),
+  expandedGroups: z.array(z.string()).default([]),
+  
+  // Refresh settings
+  autoRefresh: z.boolean().default(false),
+  refreshInterval: z.number().min(5000).max(300000).default(30000), // 30 seconds default
+});
+
+/**
+ * Inferred types from Zod schemas
+ */
+export type ServiceListFilterData = z.infer<typeof ServiceListFilterSchema>;
+export type ServiceListSortData = z.infer<typeof ServiceListSortSchema>;
+export type ServiceListPaginationData = z.infer<typeof ServiceListPaginationSchema>;
+export type ServiceListQueryData = z.infer<typeof ServiceListQuerySchema>;
+export type ServiceBulkActionData = z.infer<typeof ServiceBulkActionSchema>;
+export type ServiceListViewConfigData = z.infer<typeof ServiceListViewConfigSchema>;
 
 // =============================================================================
-// TABLE CONFIGURATION TYPES
+// SERVICE LIST TABLE COMPONENT TYPES
 // =============================================================================
 
 /**
- * Column definition for service list table
- * TanStack Table compatible column configuration
+ * Service list table column definition
  */
 export interface ServiceListColumn {
-  key: keyof DatabaseService | 'actions' | 'selection';
+  /** Column identifier */
+  id: string;
+  
+  /** Column header label */
   header: string;
-  accessorKey?: keyof DatabaseService;
-  cell?: (props: ServiceListCellProps) => ReactNode;
+  
+  /** Column description for tooltips */
+  description?: string;
+  
+  /** Data accessor key or function */
+  accessor: keyof DatabaseService | ((service: DatabaseService) => any);
+  
+  /** Custom cell renderer */
+  cell?: (value: any, service: DatabaseService, index: number) => ReactNode;
+  
+  /** Column width (CSS value) */
+  width?: string;
+  
+  /** Minimum column width */
+  minWidth?: number;
+  
+  /** Maximum column width */
+  maxWidth?: number;
+  
+  /** Column is sortable */
   sortable?: boolean;
+  
+  /** Column is filterable */
   filterable?: boolean;
-  searchable?: boolean;
-  width?: string | number;
-  minWidth?: string | number;
-  maxWidth?: string | number;
-  sticky?: 'left' | 'right' | false;
-  align?: 'left' | 'center' | 'right';
-  visible?: boolean;
+  
+  /** Column is resizable */
   resizable?: boolean;
-  priority?: number; // For responsive hiding
+  
+  /** Column is sticky */
+  sticky?: 'left' | 'right';
+  
+  /** Column alignment */
+  align?: 'left' | 'center' | 'right';
+  
+  /** Column is hidden by default */
+  hidden?: boolean;
+  
+  /** Column cannot be hidden */
+  required?: boolean;
+  
+  /** Column display order */
+  order?: number;
+  
+  /** Column group (for multi-level headers) */
+  group?: string;
+  
+  /** Custom header renderer */
+  headerRenderer?: (column: ServiceListColumn) => ReactNode;
+  
+  /** Column-specific CSS classes */
   className?: string;
+  
+  /** Column-specific header CSS classes */
   headerClassName?: string;
+  
+  /** Column-specific cell CSS classes */
   cellClassName?: string;
 }
 
 /**
- * Cell props for custom cell renderers
+ * Service list table row selection configuration
  */
-export interface ServiceListCellProps {
-  value: any;
-  row: DatabaseService;
-  column: ServiceListColumn;
-  index: number;
-  isSelected: boolean;
+export interface ServiceListRowSelection {
+  /** Selection mode */
+  mode: 'none' | 'single' | 'multiple';
+  
+  /** Currently selected service IDs */
+  selectedIds: number[];
+  
+  /** Selection change callback */
+  onSelectionChange: (selectedIds: number[]) => void;
+  
+  /** Row selection disabled predicate */
+  isRowSelectable?: (service: DatabaseService) => boolean;
+  
+  /** Select all checkbox in header */
+  showSelectAll?: boolean;
+  
+  /** Select all state */
+  selectAllState?: 'none' | 'some' | 'all';
+  
+  /** Select all callback */
+  onSelectAll?: (selectAll: boolean) => void;
+  
+  /** Selection limit */
+  maxSelection?: number;
+  
+  /** Selection validation */
+  validateSelection?: (selectedIds: number[]) => string | null;
 }
 
 /**
- * Table selection configuration
+ * Service list table action configuration
  */
-export interface TableSelectionConfig {
-  enabled: boolean;
-  multiple?: boolean;
-  selectedIds: Set<number>;
-  onSelectionChange: (selectedIds: Set<number>) => void;
-  selectableRowIds?: Set<number>;
-  disabledRowIds?: Set<number>;
-  onSelectAll?: (selected: boolean) => void;
-  onSelectPage?: (selected: boolean) => void;
-}
-
-/**
- * Pagination configuration for service list
- */
-export interface PaginationConfig {
-  currentPage: number;
-  pageSize: number;
-  totalItems: number;
-  totalPages: number;
-  onPageChange: (page: number) => void;
-  onPageSizeChange: (pageSize: number) => void;
-  showPageSizeSelector?: boolean;
-  showPageInfo?: boolean;
-  showFirstLast?: boolean;
-  showPrevNext?: boolean;
-  pageSizeOptions?: number[];
-  maxVisiblePages?: number;
-  disabled?: boolean;
-}
-
-/**
- * Sorting configuration for service list
- */
-export interface SortingConfig {
-  sortBy?: keyof DatabaseService;
-  sortDirection?: 'asc' | 'desc';
-  onSortChange: (sortBy: keyof DatabaseService, direction: 'asc' | 'desc') => void;
-  multiSort?: boolean;
-  sortState?: SortingState[];
-  defaultSort?: ServiceListSort;
-}
-
-/**
- * Individual sorting state
- */
-export interface SortingState {
-  field: keyof DatabaseService;
-  direction: 'asc' | 'desc';
-  priority: number;
-}
-
-/**
- * Filtering configuration for service list
- */
-export interface FilteringConfig {
-  filters: ServiceListFilters;
-  onFiltersChange: (filters: ServiceListFilters) => void;
-  quickFilters?: QuickFilter[];
-  advancedFilters?: AdvancedFilter[];
-  searchFields?: (keyof DatabaseService)[];
-  onSearchChange?: (search: string) => void;
-  onQuickFilterChange?: (filterId: string, enabled: boolean) => void;
-  clearable?: boolean;
-  collapsible?: boolean;
-  defaultExpanded?: boolean;
-}
-
-// =============================================================================
-// FILTER AND SEARCH TYPES
-// =============================================================================
-
-/**
- * Service list filters interface
- * Comprehensive filtering options for database services
- */
-export interface ServiceListFilters {
-  search?: string;
-  type?: DatabaseDriver[];
-  status?: ServiceStatus[];
-  tier?: ServiceTier[];
-  isActive?: boolean;
-  hasErrors?: boolean;
-  createdDateRange?: DateRange;
-  lastModifiedDateRange?: DateRange;
-  tags?: string[];
-  customFilters?: Record<string, any>;
-}
-
-/**
- * Service list sorting options
- */
-export interface ServiceListSort {
-  field: keyof DatabaseService;
-  direction: 'asc' | 'desc';
-}
-
-/**
- * Date range filter
- */
-export interface DateRange {
-  start: Date | string;
-  end: Date | string;
-}
-
-/**
- * Quick filter definition
- */
-export interface QuickFilter {
+export interface ServiceListAction {
+  /** Action identifier */
   id: string;
+  
+  /** Action label */
   label: string;
-  description?: string;
+  
+  /** Action icon component */
   icon?: ComponentType<{ className?: string }>;
-  filter: Partial<ServiceListFilters>;
-  count?: number;
-  enabled?: boolean;
-  shortcut?: string;
-}
-
-/**
- * Advanced filter definition
- */
-export interface AdvancedFilter {
-  id: string;
-  field: keyof DatabaseService;
-  operator: FilterOperator;
-  label: string;
-  type: FilterFieldType;
-  options?: FilterOption[];
-  validation?: z.ZodSchema;
-  placeholder?: string;
-  description?: string;
-}
-
-/**
- * Filter operator types
- */
-export type FilterOperator = 
-  | 'equals'
-  | 'notEquals'
-  | 'contains'
-  | 'notContains'
-  | 'startsWith'
-  | 'endsWith'
-  | 'in'
-  | 'notIn'
-  | 'greaterThan'
-  | 'lessThan'
-  | 'greaterThanOrEqual'
-  | 'lessThanOrEqual'
-  | 'between'
-  | 'isEmpty'
-  | 'isNotEmpty'
-  | 'isNull'
-  | 'isNotNull';
-
-/**
- * Filter field types
- */
-export type FilterFieldType = 
-  | 'text'
-  | 'select'
-  | 'multiselect'
-  | 'date'
-  | 'daterange'
-  | 'number'
-  | 'boolean'
-  | 'tags';
-
-/**
- * Filter option for select filters
- */
-export interface FilterOption {
-  value: string | number | boolean;
-  label: string;
-  description?: string;
-  icon?: ComponentType<{ className?: string }>;
-  count?: number;
-  disabled?: boolean;
-}
-
-// =============================================================================
-// VIRTUALIZATION TYPES
-// =============================================================================
-
-/**
- * Virtualization configuration for large service lists
- * Optimized for 1000+ services per F-002-RQ-002 requirement
- */
-export interface VirtualizationConfig {
-  enabled: boolean;
-  overscan?: number;
-  estimateSize?: number;
-  measureElement?: (element: Element) => number;
-  scrollMargin?: number;
-  scrollToAlignment?: 'start' | 'center' | 'end' | 'auto';
-  initialOffset?: number;
-  lanes?: number;
-  horizontal?: boolean;
-  getScrollElement?: () => Element | Window | null;
-  debug?: boolean;
-}
-
-/**
- * Virtual list item props
- */
-export interface VirtualListItemProps {
-  virtualItem: VirtualItem;
-  service: DatabaseService;
-  index: number;
-  measureElement?: (element: Element) => void;
-}
-
-/**
- * Virtual list ref interface
- */
-export interface VirtualListRef {
-  scrollToIndex: (index: number, options?: { align?: 'start' | 'center' | 'end' | 'auto' }) => void;
-  scrollToOffset: (offset: number) => void;
-  scrollBy: (delta: number) => void;
-  getVirtualItems: () => VirtualItem[];
-  getTotalSize: () => number;
-  measure: () => void;
-}
-
-// =============================================================================
-// ACTION AND INTERACTION TYPES
-// =============================================================================
-
-/**
- * Bulk action types for service list
- */
-export type BulkActionType = 
-  | 'activate'
-  | 'deactivate'
-  | 'delete'
-  | 'duplicate'
-  | 'test'
-  | 'export'
-  | 'tag'
-  | 'move'
-  | 'archive';
-
-/**
- * Bulk action configuration
- */
-export interface BulkActionConfig {
-  type: BulkActionType;
-  label: string;
-  description?: string;
-  icon?: ComponentType<{ className?: string }>;
-  dangerous?: boolean;
-  requiresConfirmation?: boolean;
-  confirmationMessage?: string;
-  disabled?: boolean;
-  hidden?: boolean;
-  shortcut?: string;
-}
-
-/**
- * Service action configuration
- */
-export interface ServiceActionConfig {
-  id: string;
-  label: string;
-  description?: string;
-  icon?: ComponentType<{ className?: string }>;
-  action: (service: DatabaseService) => void | Promise<void>;
-  dangerous?: boolean;
-  requiresConfirmation?: boolean;
-  confirmationMessage?: string;
+  
+  /** Action callback */
+  onClick: (service: DatabaseService, event: MouseEvent) => void;
+  
+  /** Action is disabled predicate */
   disabled?: (service: DatabaseService) => boolean;
-  hidden?: (service: DatabaseService) => boolean;
+  
+  /** Disabled reason tooltip */
+  disabledReason?: (service: DatabaseService) => string;
+  
+  /** Action variant */
+  variant?: 'default' | 'primary' | 'secondary' | 'destructive' | 'ghost';
+  
+  /** Action size */
+  size?: 'sm' | 'md' | 'lg';
+  
+  /** Action requires confirmation */
+  requiresConfirmation?: boolean;
+  
+  /** Confirmation message */
+  confirmationMessage?: (service: DatabaseService) => string;
+  
+  /** Action is loading */
+  loading?: (service: DatabaseService) => boolean;
+  
+  /** Action order */
+  order?: number;
+  
+  /** Action group */
+  group?: string;
+  
+  /** Action visibility */
+  visible?: (service: DatabaseService) => boolean;
+  
+  /** Keyboard shortcut */
   shortcut?: string;
-  priority?: number;
 }
 
 /**
- * Context menu item for service list
+ * Service list table props interface
  */
-export interface ContextMenuItem {
-  id: string;
-  label: string;
-  icon?: ComponentType<{ className?: string }>;
-  action: (service: DatabaseService) => void | Promise<void>;
-  separator?: boolean;
-  disabled?: boolean;
-  dangerous?: boolean;
-  shortcut?: string;
-  submenu?: ContextMenuItem[];
-}
-
-// =============================================================================
-// STATE MANAGEMENT TYPES
-// =============================================================================
-
-/**
- * Service list state interface
- * Zustand store state for service list management
- */
-export interface ServiceListState {
+export interface ServiceListTableProps extends BaseComponentProps {
+  /** Service data array */
   services: DatabaseService[];
-  filteredServices: DatabaseService[];
-  selectedServices: Set<number>;
-  filters: ServiceListFilters;
-  sorting: ServiceListSort;
+  
+  /** Loading state */
+  loading?: boolean;
+  
+  /** Error message */
+  error?: string | null;
+  
+  /** Empty state message */
+  emptyMessage?: string;
+  
+  /** Custom empty state component */
+  emptyState?: ComponentType;
+  
+  /** Column configuration */
+  columns: ServiceListColumn[];
+  
+  /** Row selection configuration */
+  selection?: ServiceListRowSelection;
+  
+  /** Row actions configuration */
+  actions?: ServiceListAction[];
+  
+  /** Bulk actions configuration */
+  bulkActions?: BulkAction[];
+  
+  /** Row click handler */
+  onRowClick?: (service: DatabaseService, event: MouseEvent) => void;
+  
+  /** Row double click handler */
+  onRowDoubleClick?: (service: DatabaseService, event: MouseEvent) => void;
+  
+  /** Row context menu handler */
+  onRowContextMenu?: (service: DatabaseService, event: MouseEvent) => void;
+  
+  /** Row hover handler */
+  onRowHover?: (service: DatabaseService | null, event: MouseEvent) => void;
+  
+  /** Keyboard navigation handler */
+  onKeyDown?: (event: KeyboardEvent) => void;
+  
+  /** Sort configuration */
+  sort?: ServiceListSortData;
+  
+  /** Sort change handler */
+  onSortChange?: (sort: ServiceListSortData) => void;
+  
+  /** Filter configuration */
+  filters?: ServiceListFilterData;
+  
+  /** Filter change handler */
+  onFilterChange?: (filters: ServiceListFilterData) => void;
+  
+  /** Pagination configuration */
+  pagination?: ServiceListPaginationData & {
+    total: number;
+    totalPages: number;
+  };
+  
+  /** Pagination change handler */
+  onPaginationChange?: (pagination: ServiceListPaginationData) => void;
+  
+  /** View configuration */
+  viewConfig?: ServiceListViewConfigData;
+  
+  /** View configuration change handler */
+  onViewConfigChange?: (config: ServiceListViewConfigData) => void;
+  
+  /** Virtualization configuration */
+  virtualization?: {
+    enabled: boolean;
+    itemHeight: number;
+    overscan?: number;
+    scrollElement?: HTMLElement;
+  };
+  
+  /** Custom row renderer */
+  rowRenderer?: (service: DatabaseService, index: number, style?: React.CSSProperties) => ReactNode;
+  
+  /** Custom loading overlay */
+  loadingOverlay?: ComponentType;
+  
+  /** Custom error overlay */
+  errorOverlay?: ComponentType<{ error: string }>;
+  
+  /** Table density */
+  density?: 'compact' | 'normal' | 'comfortable';
+  
+  /** Show table borders */
+  bordered?: boolean;
+  
+  /** Show row striping */
+  striped?: boolean;
+  
+  /** Show hover effects */
+  hoverable?: boolean;
+  
+  /** Table is focusable */
+  focusable?: boolean;
+  
+  /** Auto-focus table on mount */
+  autoFocus?: boolean;
+  
+  /** ARIA label for table */
+  ariaLabel?: string;
+  
+  /** ARIA description for table */
+  ariaDescription?: string;
+  
+  /** Test ID for table */
+  testId?: string;
+}
+
+/**
+ * Service list container props interface
+ */
+export interface ServiceListContainerProps extends BaseComponentProps {
+  /** Initial query parameters */
+  initialQuery?: Partial<ServiceListQueryData>;
+  
+  /** Enable search functionality */
+  enableSearch?: boolean;
+  
+  /** Enable filtering */
+  enableFiltering?: boolean;
+  
+  /** Enable sorting */
+  enableSorting?: boolean;
+  
+  /** Enable pagination */
+  enablePagination?: boolean;
+  
+  /** Enable column configuration */
+  enableColumnConfig?: boolean;
+  
+  /** Enable bulk actions */
+  enableBulkActions?: boolean;
+  
+  /** Enable export functionality */
+  enableExport?: boolean;
+  
+  /** Enable import functionality */
+  enableImport?: boolean;
+  
+  /** Enable auto-refresh */
+  enableAutoRefresh?: boolean;
+  
+  /** Auto-refresh interval in milliseconds */
+  autoRefreshInterval?: number;
+  
+  /** Service creation callback */
+  onCreateService?: () => void;
+  
+  /** Service edit callback */
+  onEditService?: (service: DatabaseService) => void;
+  
+  /** Service delete callback */
+  onDeleteService?: (service: DatabaseService) => void;
+  
+  /** Service duplicate callback */
+  onDuplicateService?: (service: DatabaseService) => void;
+  
+  /** Service test connection callback */
+  onTestConnection?: (service: DatabaseService) => void;
+  
+  /** Service export callback */
+  onExportServices?: (services: DatabaseService[]) => void;
+  
+  /** Service import callback */
+  onImportServices?: (file: File) => void;
+  
+  /** Bulk action callback */
+  onBulkAction?: (action: ServiceBulkActionData) => Promise<void>;
+  
+  /** Query change callback */
+  onQueryChange?: (query: ServiceListQueryData) => void;
+  
+  /** Selection change callback */
+  onSelectionChange?: (selectedIds: number[]) => void;
+  
+  /** View state change callback */
+  onViewStateChange?: (state: ServiceListViewState) => void;
+  
+  /** Error handler */
+  onError?: (error: Error) => void;
+  
+  /** Custom toolbar component */
+  toolbar?: ComponentType<ServiceListToolbarProps>;
+  
+  /** Custom filter panel component */
+  filterPanel?: ComponentType<ServiceListFilterPanelProps>;
+  
+  /** Show toolbar */
+  showToolbar?: boolean;
+  
+  /** Show filter panel */
+  showFilterPanel?: boolean;
+  
+  /** Show footer */
+  showFooter?: boolean;
+  
+  /** Container layout */
+  layout?: 'default' | 'compact' | 'full-width';
+  
+  /** Container height */
+  height?: string | number;
+  
+  /** Enable full-screen mode */
+  enableFullScreen?: boolean;
+  
+  /** Paywall configuration */
+  paywall?: PaywallConfig;
+}
+
+// =============================================================================
+// TANSTACK VIRTUAL TABLE TYPES
+// =============================================================================
+
+/**
+ * Virtual table item data
+ */
+export interface VirtualServiceItem {
+  /** Service data */
+  service: DatabaseService;
+  
+  /** Virtual item index */
+  index: number;
+  
+  /** Virtual item size */
+  size: number;
+  
+  /** Virtual item start position */
+  start: number;
+  
+  /** Virtual item end position */
+  end: number;
+  
+  /** Item is visible in viewport */
+  isVisible: boolean;
+  
+  /** Item measurement key */
+  key: string | number;
+}
+
+/**
+ * Virtual table configuration
+ */
+export interface VirtualTableConfig {
+  /** Enable virtualization */
+  enabled: boolean;
+  
+  /** Item height (fixed) or estimator function */
+  itemHeight: number | ((index: number, service: DatabaseService) => number);
+  
+  /** Overscan count */
+  overscan?: number;
+  
+  /** Scroll element */
+  scrollElement?: HTMLElement | (() => HTMLElement);
+  
+  /** Initial scroll offset */
+  initialOffset?: number;
+  
+  /** Scroll to index on mount */
+  initialIndex?: number;
+  
+  /** Horizontal scrolling */
+  horizontal?: boolean;
+  
+  /** Virtual item measure function */
+  measureElement?: (element: HTMLElement) => void;
+  
+  /** Scroll margin */
+  scrollMargin?: number;
+  
+  /** Gap between items */
+  gap?: number;
+  
+  /** Enable smooth scrolling */
+  smoothScrolling?: boolean;
+  
+  /** Scroll behavior */
+  scrollBehavior?: 'auto' | 'smooth';
+  
+  /** Range extractor function */
+  rangeExtractor?: (range: { startIndex: number; endIndex: number }) => number[];
+}
+
+/**
+ * Virtual table state
+ */
+export interface VirtualTableState {
+  /** Virtualizer instance */
+  virtualizer: Virtualizer<HTMLElement, Element>;
+  
+  /** Virtual items */
+  virtualItems: VirtualItem[];
+  
+  /** Total size */
+  totalSize: number;
+  
+  /** Scroll offset */
+  scrollOffset: number;
+  
+  /** Is scrolling */
+  isScrolling: boolean;
+  
+  /** Visible range */
+  visibleRange: { start: number; end: number };
+  
+  /** Scroll to index function */
+  scrollToIndex: (index: number, options?: { align?: 'start' | 'center' | 'end' | 'auto' }) => void;
+  
+  /** Scroll to offset function */
+  scrollToOffset: (offset: number, options?: { align?: 'start' | 'center' | 'end' | 'auto' }) => void;
+  
+  /** Measure element function */
+  measureElement: (element: HTMLElement) => void;
+  
+  /** Get item by index */
+  getItemByIndex: (index: number) => VirtualItem | undefined;
+}
+
+/**
+ * Virtual row props
+ */
+export interface VirtualRowProps {
+  /** Virtual item */
+  virtualItem: VirtualItem;
+  
+  /** Service data */
+  service: DatabaseService;
+  
+  /** Row index */
+  index: number;
+  
+  /** Row is selected */
+  isSelected: boolean;
+  
+  /** Row is hovered */
+  isHovered: boolean;
+  
+  /** Row is focused */
+  isFocused: boolean;
+  
+  /** Row style from virtualizer */
+  style: React.CSSProperties;
+  
+  /** Measure element callback */
+  measureElement: (element: HTMLElement) => void;
+  
+  /** Row selection callback */
+  onSelect: (selected: boolean) => void;
+  
+  /** Row click callback */
+  onClick: (event: MouseEvent) => void;
+  
+  /** Row hover callback */
+  onHover: (hovered: boolean) => void;
+  
+  /** Row focus callback */
+  onFocus: (focused: boolean) => void;
+}
+
+// =============================================================================
+// REACT QUERY AND SWR INTEGRATION TYPES
+// =============================================================================
+
+/**
+ * Service list query result
+ */
+export interface UseServiceListQueryResult extends UseQueryResult<GenericListResponse<DatabaseService>, Error> {
+  /** Services array */
+  services: DatabaseService[];
+  
+  /** Pagination metadata */
   pagination: {
     currentPage: number;
-    pageSize: number;
+    totalPages: number;
     totalItems: number;
+    pageSize: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
   };
-  virtualization: {
-    enabled: boolean;
-    scrollOffset: number;
-    visibleRange: [number, number];
-  };
-  ui: {
-    loading: boolean;
-    error: ApiErrorResponse | null;
-    refreshing: boolean;
-    bulkActionInProgress: boolean;
-    selectedBulkAction: BulkActionType | null;
-  };
-  preferences: {
-    defaultPageSize: number;
-    defaultSort: ServiceListSort;
-    defaultFilters: ServiceListFilters;
-    columnVisibility: Record<string, boolean>;
-    columnOrder: string[];
-    columnWidths: Record<string, number>;
-    compactMode: boolean;
-    autoRefresh: boolean;
-    refreshInterval: number;
-  };
-}
-
-/**
- * Service list actions interface
- * Zustand store actions for service list management
- */
-export interface ServiceListActions {
-  // Data management
-  setServices: (services: DatabaseService[]) => void;
-  addService: (service: DatabaseService) => void;
-  updateService: (id: number, service: Partial<DatabaseService>) => void;
-  removeService: (id: number) => void;
-  refreshServices: () => Promise<void>;
   
-  // Selection management
-  setSelectedServices: (selectedIds: Set<number>) => void;
-  selectService: (id: number) => void;
-  deselectService: (id: number) => void;
-  selectAll: () => void;
-  deselectAll: () => void;
-  selectFiltered: () => void;
-  
-  // Filtering and sorting
-  setFilters: (filters: ServiceListFilters) => void;
-  updateFilter: (key: keyof ServiceListFilters, value: any) => void;
-  clearFilters: () => void;
-  setSorting: (sorting: ServiceListSort) => void;
-  
-  // Pagination
-  setCurrentPage: (page: number) => void;
-  setPageSize: (pageSize: number) => void;
-  goToPage: (page: number) => void;
-  nextPage: () => void;
-  previousPage: () => void;
-  
-  // Virtualization
-  setVirtualization: (enabled: boolean) => void;
-  updateScrollOffset: (offset: number) => void;
-  updateVisibleRange: (range: [number, number]) => void;
-  
-  // UI state
-  setLoading: (loading: boolean) => void;
-  setError: (error: ApiErrorResponse | null) => void;
-  setRefreshing: (refreshing: boolean) => void;
-  setBulkActionInProgress: (inProgress: boolean) => void;
-  setSelectedBulkAction: (action: BulkActionType | null) => void;
-  
-  // Bulk actions
-  executeBulkAction: (action: BulkActionType, serviceIds: number[]) => Promise<void>;
-  
-  // Preferences
-  updatePreferences: (preferences: Partial<ServiceListState['preferences']>) => void;
-  resetPreferences: () => void;
-  
-  // Utility actions
-  applyFiltersAndSort: () => void;
-  resetState: () => void;
-}
-
-/**
- * Complete service list context type
- */
-export type ServiceListContextType = ServiceListState & ServiceListActions;
-
-// =============================================================================
-// REACT QUERY INTEGRATION TYPES
-// =============================================================================
-
-/**
- * Service list query options
- */
-export interface ServiceListQueryOptions extends Omit<UseQueryOptions<GenericListResponse<DatabaseService>>, 'queryKey' | 'queryFn'> {
-  filters?: ServiceListFilters;
-  sorting?: ServiceListSort;
-  pagination?: { page: number; pageSize: number };
-  refreshInterval?: number;
-}
-
-/**
- * Service list mutation options
- */
-export interface ServiceListMutationOptions<TData, TVariables> 
-  extends Omit<UseMutationOptions<TData, ApiErrorResponse, TVariables>, 'mutationFn'> {
-  onSuccess?: (data: TData, variables: TVariables) => void;
-  onError?: (error: ApiErrorResponse, variables: TVariables) => void;
-  onSettled?: (data: TData | undefined, error: ApiErrorResponse | null, variables: TVariables) => void;
-}
-
-/**
- * Service list hook return type
- */
-export interface UseServiceListReturn {
-  // Data
-  services: DatabaseService[];
-  filteredServices: DatabaseService[];
-  totalCount: number;
-  
-  // Query state
-  isLoading: boolean;
-  isError: boolean;
-  isFetching: boolean;
-  isRefetching: boolean;
-  error: ApiErrorResponse | null;
-  
-  // Actions
-  refetch: () => Promise<UseQueryResult<GenericListResponse<DatabaseService>>>;
+  /** Refresh services */
   refresh: () => Promise<void>;
   
-  // Mutations
-  createService: UseMutationResult<DatabaseService, ApiErrorResponse, DatabaseConnectionInput>;
-  updateService: UseMutationResult<DatabaseService, ApiErrorResponse, { id: number; data: Partial<DatabaseConnectionInput> }>;
-  deleteService: UseMutationResult<void, ApiErrorResponse, number>;
-  deleteServices: UseMutationResult<void, ApiErrorResponse, number[]>;
-  testConnection: UseMutationResult<ConnectionTestResult, ApiErrorResponse, { id: number; config?: any }>;
-  toggleService: UseMutationResult<DatabaseService, ApiErrorResponse, { id: number; active: boolean }>;
-  duplicateService: UseMutationResult<DatabaseService, ApiErrorResponse, number>;
+  /** Invalidate query */
+  invalidate: () => Promise<void>;
   
-  // Query keys for cache management
-  queryKeys: {
-    list: QueryKey;
-    detail: (id: number) => QueryKey;
-    connectionTest: (id: number) => QueryKey;
+  /** Prefetch next page */
+  prefetchNextPage: () => Promise<void>;
+  
+  /** Prefetch previous page */
+  prefetchPreviousPage: () => Promise<void>;
+}
+
+/**
+ * Service list SWR result
+ */
+export interface UseServiceListSWRResult extends SWRResponse<GenericListResponse<DatabaseService>, Error> {
+  /** Services array */
+  services: DatabaseService[];
+  
+  /** Pagination metadata */
+  pagination: {
+    currentPage: number;
+    totalPages: number;
+    totalItems: number;
+    pageSize: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
   };
+  
+  /** Refresh services */
+  refresh: () => Promise<GenericListResponse<DatabaseService> | undefined>;
+  
+  /** Mutate with optimistic updates */
+  mutateOptimistic: (updater: (data: GenericListResponse<DatabaseService>) => GenericListResponse<DatabaseService>) => Promise<GenericListResponse<DatabaseService> | undefined>;
+  
+  /** Add service optimistically */
+  addServiceOptimistic: (service: DatabaseService) => void;
+  
+  /** Update service optimistically */
+  updateServiceOptimistic: (id: number, updates: Partial<DatabaseService>) => void;
+  
+  /** Remove service optimistically */
+  removeServiceOptimistic: (id: number) => void;
+}
+
+/**
+ * Service list mutations interface
+ */
+export interface ServiceListMutations {
+  /** Create service mutation */
+  createService: UseMutationResult<DatabaseService, Error, CreateServiceMutationVariables>;
+  
+  /** Update service mutation */
+  updateService: UseMutationResult<DatabaseService, Error, UpdateServiceMutationVariables>;
+  
+  /** Delete service mutation */
+  deleteService: UseMutationResult<void, Error, DeleteServiceMutationVariables>;
+  
+  /** Test connection mutation */
+  testConnection: UseMutationResult<ConnectionTestResult, Error, TestConnectionMutationVariables>;
+  
+  /** Bulk action mutation */
+  bulkAction: UseMutationResult<ServiceBulkActionResult, Error, ServiceBulkActionData>;
+  
+  /** Export services mutation */
+  exportServices: UseMutationResult<Blob, Error, { serviceIds: number[]; format: 'json' | 'csv' | 'xlsx' }>;
+  
+  /** Import services mutation */
+  importServices: UseMutationResult<ServiceImportResult, Error, { file: File; options?: ServiceImportOptions }>;
+}
+
+/**
+ * Bulk action result
+ */
+export interface ServiceBulkActionResult {
+  /** Action that was performed */
+  action: string;
+  
+  /** Total services processed */
+  total: number;
+  
+  /** Successfully processed services */
+  successful: number;
+  
+  /** Failed services */
+  failed: number;
+  
+  /** Error details for failed services */
+  errors: { serviceId: number; error: string }[];
+  
+  /** Result details */
+  details: { serviceId: number; result: any }[];
+  
+  /** Action duration */
+  duration: number;
+}
+
+/**
+ * Service import result
+ */
+export interface ServiceImportResult {
+  /** Total services in import file */
+  total: number;
+  
+  /** Successfully imported services */
+  imported: number;
+  
+  /** Skipped services (duplicates) */
+  skipped: number;
+  
+  /** Failed imports */
+  failed: number;
+  
+  /** Import errors */
+  errors: { row: number; error: string }[];
+  
+  /** Imported service details */
+  services: DatabaseService[];
+}
+
+/**
+ * Service import options
+ */
+export interface ServiceImportOptions {
+  /** Skip duplicate services */
+  skipDuplicates?: boolean;
+  
+  /** Update existing services */
+  updateExisting?: boolean;
+  
+  /** Validate connections on import */
+  validateConnections?: boolean;
+  
+  /** Import batch size */
+  batchSize?: number;
+  
+  /** Dry run mode */
+  dryRun?: boolean;
+}
+
+// =============================================================================
+// ZUSTAND STORE STATE MANAGEMENT TYPES
+// =============================================================================
+
+/**
+ * Service list view state
+ */
+export interface ServiceListViewState {
+  /** Current query parameters */
+  query: ServiceListQueryData;
+  
+  /** Selected service IDs */
+  selectedIds: number[];
+  
+  /** View configuration */
+  viewConfig: ServiceListViewConfigData;
+  
+  /** Filter panel visibility */
+  showFilterPanel: boolean;
+  
+  /** Column configuration panel visibility */
+  showColumnConfig: boolean;
+  
+  /** Bulk actions panel visibility */
+  showBulkActions: boolean;
+  
+  /** Full-screen mode */
+  fullScreen: boolean;
+  
+  /** Last refresh timestamp */
+  lastRefresh: number | null;
+  
+  /** Auto-refresh enabled */
+  autoRefresh: boolean;
+  
+  /** Error state */
+  error: string | null;
+  
+  /** Loading state */
+  loading: boolean;
+}
+
+/**
+ * Service list actions
+ */
+export interface ServiceListActions {
+  /** Update query parameters */
+  updateQuery: (query: Partial<ServiceListQueryData>) => void;
+  
+  /** Set selected service IDs */
+  setSelectedIds: (ids: number[]) => void;
+  
+  /** Toggle service selection */
+  toggleSelection: (id: number) => void;
+  
+  /** Select all services */
+  selectAll: (services: DatabaseService[]) => void;
+  
+  /** Clear selection */
+  clearSelection: () => void;
+  
+  /** Update view configuration */
+  updateViewConfig: (config: Partial<ServiceListViewConfigData>) => void;
+  
+  /** Toggle filter panel */
+  toggleFilterPanel: () => void;
+  
+  /** Toggle column configuration */
+  toggleColumnConfig: () => void;
+  
+  /** Toggle bulk actions */
+  toggleBulkActions: () => void;
+  
+  /** Toggle full-screen mode */
+  toggleFullScreen: () => void;
+  
+  /** Set auto-refresh */
+  setAutoRefresh: (enabled: boolean) => void;
+  
+  /** Set error state */
+  setError: (error: string | null) => void;
+  
+  /** Set loading state */
+  setLoading: (loading: boolean) => void;
+  
+  /** Reset to initial state */
+  reset: () => void;
+  
+  /** Update last refresh timestamp */
+  updateLastRefresh: () => void;
+}
+
+/**
+ * Complete service list store type
+ */
+export type ServiceListStore = ServiceListViewState & ServiceListActions;
+
+/**
+ * Store hook options
+ */
+export interface UseServiceListStoreOptions {
+  /** Store persistence key */
+  persistKey?: string;
+  
+  /** Enable state persistence */
+  persist?: boolean;
+  
+  /** Persist whitelist */
+  persistWhitelist?: (keyof ServiceListViewState)[];
+  
+  /** Persist blacklist */
+  persistBlacklist?: (keyof ServiceListViewState)[];
+  
+  /** Initial state override */
+  initialState?: Partial<ServiceListViewState>;
+  
+  /** State change callback */
+  onStateChange?: (state: ServiceListViewState) => void;
 }
 
 // =============================================================================
@@ -611,338 +1097,351 @@ export interface UseServiceListReturn {
 // =============================================================================
 
 /**
- * Paywall configuration for service list
+ * Paywall configuration for service list features
  */
 export interface PaywallConfig {
+  /** Feature is behind paywall */
   enabled: boolean;
-  tier: ServiceTier;
+  
+  /** Required subscription tier */
+  requiredTier: 'basic' | 'professional' | 'enterprise';
+  
+  /** Feature limit for current tier */
+  limit?: number;
+  
+  /** Current usage count */
+  usage?: number;
+  
+  /** Paywall message */
+  message?: string;
+  
+  /** Upgrade URL */
+  upgradeUrl?: string;
+  
+  /** Custom paywall component */
+  customComponent?: ComponentType<PaywallProps>;
+  
+  /** Allow limited functionality */
+  allowLimited?: boolean;
+  
+  /** Limited functionality message */
+  limitedMessage?: string;
+}
+
+/**
+ * Paywall props interface
+ */
+export interface PaywallProps {
+  /** Required tier */
+  requiredTier: string;
+  
+  /** Feature name */
+  feature: string;
+  
+  /** Custom message */
+  message?: string;
+  
+  /** Upgrade URL */
+  upgradeUrl?: string;
+  
+  /** Paywall action callback */
+  onAction?: (action: 'upgrade' | 'dismiss') => void;
+  
+  /** Show upgrade button */
+  showUpgrade?: boolean;
+  
+  /** Show dismiss button */
+  showDismiss?: boolean;
+}
+
+/**
+ * Access control configuration
+ */
+export interface ServiceListAccessControl {
+  /** User can view services */
+  canView: boolean;
+  
+  /** User can create services */
+  canCreate: boolean;
+  
+  /** User can edit services */
+  canEdit: boolean;
+  
+  /** User can delete services */
+  canDelete: boolean;
+  
+  /** User can test connections */
+  canTestConnection: boolean;
+  
+  /** User can perform bulk actions */
+  canBulkAction: boolean;
+  
+  /** User can export services */
+  canExport: boolean;
+  
+  /** User can import services */
+  canImport: boolean;
+  
+  /** User can configure views */
+  canConfigureView: boolean;
+  
+  /** Restricted service types */
+  restrictedTypes?: DatabaseDriver[];
+  
+  /** Maximum services allowed */
   maxServices?: number;
-  featureRestrictions?: FeatureRestriction[];
-  upgradePrompts?: UpgradePrompt[];
-  gracePeriod?: number; // Days
-  onUpgradeRequired?: (restriction: FeatureRestriction) => void;
-}
-
-/**
- * Feature restriction definition
- */
-export interface FeatureRestriction {
-  feature: PaywallFeature;
-  requiredTier: ServiceTier;
-  message: string;
-  learnMoreUrl?: string;
-  allowTrial?: boolean;
-  trialDuration?: number; // Days
-}
-
-/**
- * Paywall feature types
- */
-export type PaywallFeature = 
-  | 'unlimited_services'
-  | 'advanced_databases'
-  | 'bulk_operations'
-  | 'export_services'
-  | 'api_analytics'
-  | 'priority_support'
-  | 'custom_branding'
-  | 'sso_integration';
-
-/**
- * Upgrade prompt configuration
- */
-export interface UpgradePrompt {
-  id: string;
-  trigger: PaywallTrigger;
-  title: string;
-  description: string;
-  features: string[];
-  ctaText: string;
-  ctaUrl: string;
-  dismissible?: boolean;
-  frequency?: PromptFrequency;
-}
-
-/**
- * Paywall trigger types
- */
-export type PaywallTrigger = 
-  | 'service_limit_reached'
-  | 'premium_feature_access'
-  | 'bulk_action_attempt'
-  | 'export_attempt'
-  | 'daily_limit_reached';
-
-/**
- * Prompt frequency options
- */
-export type PromptFrequency = 
-  | 'once'
-  | 'daily'
-  | 'weekly'
-  | 'monthly'
-  | 'per_session';
-
-// =============================================================================
-// ACCESSIBILITY TYPES
-// =============================================================================
-
-/**
- * Accessibility configuration for service list
- */
-export interface AccessibilityConfig {
-  announcements?: boolean;
-  keyboardNavigation?: boolean;
-  screenReaderSupport?: boolean;
-  highContrast?: boolean;
-  reducedMotion?: boolean;
-  focusManagement?: FocusManagementConfig;
-  ariaLabels?: AriaLabelsConfig;
-}
-
-/**
- * Focus management configuration
- */
-export interface FocusManagementConfig {
-  autoFocus?: boolean;
-  focusOnLoad?: boolean;
-  focusOnUpdate?: boolean;
-  focusOnError?: boolean;
-  trapFocus?: boolean;
-  restoreFocus?: boolean;
-}
-
-/**
- * ARIA labels configuration
- */
-export interface AriaLabelsConfig {
-  table?: string;
-  sortButton?: (column: string, direction: 'asc' | 'desc') => string;
-  filterButton?: string;
-  bulkActions?: string;
-  pagination?: string;
-  searchInput?: string;
-  rowSelection?: (serviceName: string, selected: boolean) => string;
-  actionButton?: (action: string, serviceName: string) => string;
+  
+  /** Feature restrictions */
+  restrictions: Record<string, boolean>;
 }
 
 // =============================================================================
-// ZOD VALIDATION SCHEMAS
+// ADDITIONAL COMPONENT PROP INTERFACES
 // =============================================================================
 
 /**
- * Zod schema for service list filters
- * Real-time validation for filter forms per React/Next.js integration requirements
+ * Service list toolbar props
  */
-export const ServiceListFiltersSchema = z.object({
-  search: z.string()
-    .max(255, 'Search term must be less than 255 characters')
-    .optional(),
+export interface ServiceListToolbarProps {
+  /** Selected service count */
+  selectedCount: number;
   
-  type: z.array(z.enum([
-    'mysql', 'pgsql', 'sqlite', 'mongodb', 'oracle', 'sqlsrv', 'snowflake',
-    'ibmdb2', 'informix', 'sqlanywhere', 'memsql', 'salesforce_db', 'hana',
-    'apache_hive', 'databricks', 'dremio'
-  ])).optional(),
+  /** Total service count */
+  totalCount: number;
   
-  status: z.array(z.enum([
-    'active', 'inactive', 'testing', 'error', 'configuring', 'pending'
-  ])).optional(),
+  /** Loading state */
+  loading: boolean;
   
-  tier: z.array(z.enum(['core', 'silver', 'gold'])).optional(),
+  /** Search value */
+  searchValue: string;
   
-  isActive: z.boolean().optional(),
+  /** Search change handler */
+  onSearchChange: (value: string) => void;
   
-  hasErrors: z.boolean().optional(),
+  /** Filter toggle handler */
+  onToggleFilters: () => void;
   
-  createdDateRange: z.object({
-    start: z.coerce.date(),
-    end: z.coerce.date()
-  }).refine(
-    data => data.start <= data.end,
-    { message: 'Start date must be before end date' }
-  ).optional(),
+  /** Column config toggle handler */
+  onToggleColumnConfig: () => void;
   
-  lastModifiedDateRange: z.object({
-    start: z.coerce.date(),
-    end: z.coerce.date()
-  }).refine(
-    data => data.start <= data.end,
-    { message: 'Start date must be before end date' }
-  ).optional(),
+  /** Bulk actions toggle handler */
+  onToggleBulkActions: () => void;
   
-  tags: z.array(z.string().min(1).max(50)).optional(),
+  /** Create service handler */
+  onCreateService: () => void;
   
-  customFilters: z.record(z.any()).optional()
-});
+  /** Refresh handler */
+  onRefresh: () => void;
+  
+  /** Export handler */
+  onExport: () => void;
+  
+  /** Import handler */
+  onImport: () => void;
+  
+  /** View mode change handler */
+  onViewModeChange: (mode: 'table' | 'grid' | 'list') => void;
+  
+  /** Current view mode */
+  viewMode: 'table' | 'grid' | 'list';
+  
+  /** Access control */
+  accessControl: ServiceListAccessControl;
+  
+  /** Paywall configuration */
+  paywall?: PaywallConfig;
+}
 
 /**
- * Zod schema for service list sorting
+ * Service list filter panel props
  */
-export const ServiceListSortSchema = z.object({
-  field: z.enum([
-    'id', 'name', 'label', 'description', 'type', 'is_active',
-    'created_date', 'last_modified_date', 'created_by_id', 'last_modified_by_id'
-  ]),
-  direction: z.enum(['asc', 'desc'])
-});
-
-/**
- * Zod schema for pagination parameters
- */
-export const PaginationParamsSchema = z.object({
-  page: z.number()
-    .int('Page must be an integer')
-    .min(1, 'Page must be at least 1')
-    .max(10000, 'Page must be less than 10,000'),
+export interface ServiceListFilterPanelProps {
+  /** Current filters */
+  filters: ServiceListFilterData;
   
-  pageSize: z.number()
-    .int('Page size must be an integer')
-    .min(1, 'Page size must be at least 1')
-    .max(1000, 'Page size must be less than 1,000'),
+  /** Filter change handler */
+  onFiltersChange: (filters: ServiceListFilterData) => void;
   
-  offset: z.number()
-    .int('Offset must be an integer')
-    .min(0, 'Offset must be non-negative')
-    .optional(),
+  /** Clear filters handler */
+  onClearFilters: () => void;
   
-  limit: z.number()
-    .int('Limit must be an integer')
-    .min(1, 'Limit must be at least 1')
-    .max(1000, 'Limit must be less than 1,000')
-    .optional()
-});
-
-/**
- * Zod schema for bulk action parameters
- */
-export const BulkActionSchema = z.object({
-  action: z.enum([
-    'activate', 'deactivate', 'delete', 'duplicate', 'test', 'export', 'tag', 'move', 'archive'
-  ]),
-  serviceIds: z.array(z.number().int().positive())
-    .min(1, 'At least one service must be selected')
-    .max(100, 'Cannot perform bulk action on more than 100 services'),
-  parameters: z.record(z.any()).optional()
-});
-
-/**
- * Zod schema for service list query parameters
- */
-export const ServiceListQueryParamsSchema = z.object({
-  filters: ServiceListFiltersSchema.optional(),
-  sorting: ServiceListSortSchema.optional(),
-  pagination: PaginationParamsSchema.optional(),
-  include: z.array(z.string()).optional(),
-  fields: z.array(z.string()).optional()
-});
+  /** Available filter options */
+  filterOptions: {
+    types: { value: DatabaseDriver; label: string }[];
+    statuses: { value: ServiceStatus; label: string }[];
+    users: { value: number; label: string }[];
+  };
+  
+  /** Panel is visible */
+  visible: boolean;
+  
+  /** Panel close handler */
+  onClose: () => void;
+  
+  /** Apply filters handler */
+  onApply: () => void;
+  
+  /** Reset filters handler */
+  onReset: () => void;
+  
+  /** Enable advanced filters */
+  enableAdvanced?: boolean;
+  
+  /** Show filter shortcuts */
+  showShortcuts?: boolean;
+  
+  /** Custom filter components */
+  customFilters?: Record<string, ComponentType<any>>;
+}
 
 // =============================================================================
-// INFERRED TYPES FROM ZOD SCHEMAS
+// UTILITY TYPES AND CONSTANTS
 // =============================================================================
 
 /**
- * Inferred types from Zod schemas for TypeScript integration
+ * Service list sort fields
  */
-export type ServiceListFiltersInput = z.infer<typeof ServiceListFiltersSchema>;
-export type ServiceListSortInput = z.infer<typeof ServiceListSortSchema>;
-export type PaginationParamsInput = z.infer<typeof PaginationParamsSchema>;
-export type BulkActionInput = z.infer<typeof BulkActionSchema>;
-export type ServiceListQueryParamsInput = z.infer<typeof ServiceListQueryParamsSchema>;
-
-// =============================================================================
-// QUERY KEYS FOR REACT QUERY
-// =============================================================================
+export const SERVICE_LIST_SORT_FIELDS = [
+  'name',
+  'label',
+  'type',
+  'host',
+  'database',
+  'status',
+  'is_active',
+  'created_date',
+  'last_modified_date',
+  'last_test_date',
+  'last_test_duration',
+  'connection_count',
+] as const;
 
 /**
- * Query keys for service list React Query cache management
+ * Service list default columns
  */
-export const ServiceListQueryKeys = {
-  all: ['service-list'] as const,
-  lists: () => [...ServiceListQueryKeys.all, 'list'] as const,
-  list: (params?: ServiceListQueryParamsInput) => [...ServiceListQueryKeys.lists(), params] as const,
-  filtered: (filters: ServiceListFilters) => [...ServiceListQueryKeys.lists(), 'filtered', filters] as const,
-  sorted: (sort: ServiceListSort) => [...ServiceListQueryKeys.lists(), 'sorted', sort] as const,
-  paginated: (pagination: PaginationParamsInput) => [...ServiceListQueryKeys.lists(), 'paginated', pagination] as const,
-  count: (filters?: ServiceListFilters) => [...ServiceListQueryKeys.all, 'count', filters] as const,
-  preferences: () => [...ServiceListQueryKeys.all, 'preferences'] as const,
-  bulkAction: (action: BulkActionType) => [...ServiceListQueryKeys.all, 'bulk-action', action] as const,
-} as const;
+export const SERVICE_LIST_DEFAULT_COLUMNS = [
+  'name',
+  'type',
+  'host',
+  'database',
+  'status',
+  'actions',
+] as const;
 
-// =============================================================================
-// EXPORTS
-// =============================================================================
+/**
+ * Service list bulk actions
+ */
+export const SERVICE_LIST_BULK_ACTIONS = [
+  'activate',
+  'deactivate',
+  'test-connection',
+  'refresh-schema',
+  'export-config',
+  'delete',
+  'duplicate',
+  'add-tags',
+  'remove-tags',
+  'update-config',
+] as const;
 
-// Re-export commonly used types for convenience
-export type {
-  // Component props
-  ServiceListTableProps,
-  ServiceListContainerProps,
-  ServiceListItemProps,
-  
-  // Table configuration
-  ServiceListColumn,
-  ServiceListCellProps,
-  TableSelectionConfig,
-  PaginationConfig,
-  SortingConfig,
-  FilteringConfig,
-  
-  // Filtering and sorting
-  ServiceListFilters,
-  ServiceListSort,
-  QuickFilter,
-  AdvancedFilter,
-  DateRange,
-  
-  // Virtualization
-  VirtualizationConfig,
-  VirtualListItemProps,
-  VirtualListRef,
-  
-  // Actions
-  BulkActionType,
-  BulkActionConfig,
-  ServiceActionConfig,
-  ContextMenuItem,
-  
-  // State management
-  ServiceListState,
-  ServiceListActions,
-  ServiceListContextType,
-  
-  // React Query integration
-  ServiceListQueryOptions,
-  ServiceListMutationOptions,
-  UseServiceListReturn,
-  
-  // Paywall and access control
-  PaywallConfig,
-  FeatureRestriction,
-  PaywallFeature,
-  UpgradePrompt,
-  
-  // Accessibility
-  AccessibilityConfig,
-  FocusManagementConfig,
-  AriaLabelsConfig,
+/**
+ * Default pagination settings
+ */
+export const DEFAULT_PAGINATION: ServiceListPaginationData = {
+  page: 1,
+  limit: 20,
 };
 
-// Export validation schemas
-export {
-  ServiceListFiltersSchema,
-  ServiceListSortSchema,
-  PaginationParamsSchema,
-  BulkActionSchema,
-  ServiceListQueryParamsSchema,
-  ServiceListQueryKeys,
+/**
+ * Default sort settings
+ */
+export const DEFAULT_SORT: ServiceListSortData = {
+  field: 'name',
+  direction: 'asc',
 };
 
-// Export inferred types
-export type {
-  ServiceListFiltersInput,
-  ServiceListSortInput,
-  PaginationParamsInput,
-  BulkActionInput,
-  ServiceListQueryParamsInput,
+/**
+ * Default view configuration
+ */
+export const DEFAULT_VIEW_CONFIG: ServiceListViewConfigData = {
+  visibleColumns: ['name', 'type', 'host', 'database', 'status', 'actions'],
+  density: 'normal',
+  showRowNumbers: false,
+  showRowSelection: true,
+  showColumnHeaders: true,
+  enableVirtualization: false,
+  virtualItemHeight: 60,
+  virtualOverscan: 5,
+  groupBy: 'none',
+  expandedGroups: [],
+  autoRefresh: false,
+  refreshInterval: 30000,
 };
+
+/**
+ * Type guard to check if value is a valid sort field
+ */
+export function isValidSortField(value: unknown): value is typeof SERVICE_LIST_SORT_FIELDS[number] {
+  return typeof value === 'string' && SERVICE_LIST_SORT_FIELDS.includes(value as any);
+}
+
+/**
+ * Type guard to check if value is a valid bulk action
+ */
+export function isValidBulkAction(value: unknown): value is typeof SERVICE_LIST_BULK_ACTIONS[number] {
+  return typeof value === 'string' && SERVICE_LIST_BULK_ACTIONS.includes(value as any);
+}
+
+/**
+ * Utility to create default query
+ */
+export function createDefaultQuery(): ServiceListQueryData {
+  return {
+    pagination: DEFAULT_PAGINATION,
+    sort: DEFAULT_SORT,
+    includeInactive: false,
+    includeDeleted: false,
+    includeSystemServices: true,
+    includeConnectionStatus: true,
+    includeLastTestResult: false,
+    includeSchemaMetadata: false,
+    skipCache: false,
+  };
+}
+
+/**
+ * Utility to validate service list query
+ */
+export function validateServiceListQuery(query: unknown): ServiceListQueryData | null {
+  try {
+    return ServiceListQuerySchema.parse(query);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Utility to create service list store initial state
+ */
+export function createInitialViewState(): ServiceListViewState {
+  return {
+    query: createDefaultQuery(),
+    selectedIds: [],
+    viewConfig: DEFAULT_VIEW_CONFIG,
+    showFilterPanel: false,
+    showColumnConfig: false,
+    showBulkActions: false,
+    fullScreen: false,
+    lastRefresh: null,
+    autoRefresh: false,
+    error: null,
+    loading: false,
+  };
+}
+
+/**
+ * Export type utilities for external use
+ */
+export type ServiceListSortField = typeof SERVICE_LIST_SORT_FIELDS[number];
+export type ServiceListColumnId = typeof SERVICE_LIST_DEFAULT_COLUMNS[number];
+export type ServiceListBulkActionType = typeof SERVICE_LIST_BULK_ACTIONS[number];
