@@ -1,316 +1,322 @@
 /**
  * Custom React hook for responsive breakpoint detection and screen size state management.
- * Replaces Angular DfBreakpointService with React patterns using window.matchMedia and resize listeners.
+ * Replaces Angular DfBreakpointService with React patterns using window.matchMedia
+ * and integrates with Tailwind CSS breakpoint system for consistent responsive design.
  * 
  * Features:
- * - Real-time breakpoint detection using window.matchMedia
- * - Window resize event handling with proper cleanup
- * - Integration with Tailwind CSS breakpoint system
- * - Cross-component state sharing via Zustand store
- * - Memory leak prevention through event listener cleanup
- * 
- * @example
- * ```tsx
- * function ResponsiveComponent() {
- *   const { isSmallScreen, isMobile, activeBreakpoint } = useBreakpoint();
- *   
- *   return (
- *     <div>
- *       {isSmallScreen ? 'Mobile Layout' : 'Desktop Layout'}
- *       <p>Current breakpoint: {activeBreakpoint}</p>
- *     </div>
- *   );
- * }
- * ```
+ * - Accurate breakpoint detection using window.matchMedia API
+ * - Real-time viewport dimension tracking with window resize listeners
+ * - Cross-component state sharing through Zustand store integration
+ * - Utility functions for common responsive design patterns
+ * - Memory leak prevention with proper event listener cleanup
+ * - Server-side rendering compatibility with safe window access
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useBreakpointStore } from '@/stores/app-store';
 import type { 
   BreakpointState, 
   UseBreakpointReturn, 
   TailwindBreakpoint, 
-  ScreenSize,
+  ScreenSize, 
   BreakpointConfig 
 } from '@/types/layout';
 
 /**
- * Tailwind CSS breakpoint configuration.
- * Maps breakpoint names to their corresponding media query strings.
- * These match the default Tailwind CSS responsive design breakpoints.
+ * Tailwind CSS breakpoint configuration mapping to media queries.
+ * Matches default Tailwind CSS responsive prefixes with exact pixel values.
  */
 const BREAKPOINT_CONFIG: BreakpointConfig = {
-  xs: '(max-width: 639px)',        // 0px to 639px
-  sm: '(min-width: 640px)',        // 640px and up
-  md: '(min-width: 768px)',        // 768px and up
-  lg: '(min-width: 1024px)',       // 1024px and up
-  xl: '(min-width: 1280px)',       // 1280px and up
-  '2xl': '(min-width: 1536px)',    // 1536px and up
-} as const;
+  xs: '(max-width: 639px)',     // < 640px (mobile)
+  sm: '(min-width: 640px)',     // >= 640px (small tablet)
+  md: '(min-width: 768px)',     // >= 768px (tablet)
+  lg: '(min-width: 1024px)',    // >= 1024px (desktop)
+  xl: '(min-width: 1280px)',    // >= 1280px (large desktop)
+  '2xl': '(min-width: 1536px)', // >= 1536px (wide screen)
+};
 
 /**
- * Breakpoint order for determining the active (highest matching) breakpoint.
- * Ordered from smallest to largest for proper precedence.
+ * Breakpoint order for determining the highest active breakpoint.
+ * Used to identify the current active breakpoint when multiple may match.
  */
 const BREAKPOINT_ORDER: TailwindBreakpoint[] = ['xs', 'sm', 'md', 'lg', 'xl', '2xl'];
 
 /**
- * Maps breakpoints to screen size categories for simplified responsive logic.
+ * Determines the screen size category based on the active breakpoint.
+ * Provides simplified responsive logic for layout components.
+ * 
+ * @param activeBreakpoint - Current active breakpoint
+ * @returns Screen size category for responsive behavior
  */
-const BREAKPOINT_TO_SCREEN_SIZE: Record<TailwindBreakpoint, ScreenSize> = {
-  xs: 'mobile',
-  sm: 'tablet',
-  md: 'tablet',
-  lg: 'desktop',
-  xl: 'desktop',
-  '2xl': 'wide',
-};
+function getScreenSize(activeBreakpoint: TailwindBreakpoint): ScreenSize {
+  switch (activeBreakpoint) {
+    case 'xs':
+      return 'mobile';
+    case 'sm':
+    case 'md':
+      return 'tablet';
+    case 'lg':
+    case 'xl':
+      return 'desktop';
+    case '2xl':
+      return 'wide';
+    default:
+      return 'mobile';
+  }
+}
 
 /**
- * Gets the current viewport dimensions.
- * Safely handles server-side rendering where window is not available.
+ * Determines the highest active breakpoint from current media query matches.
+ * Uses the breakpoint order to find the most specific matching breakpoint.
+ * 
+ * @param matches - Object containing boolean flags for each breakpoint
+ * @returns The highest active breakpoint
  */
-const getViewportSize = (): { width: number; height: number } => {
-  if (typeof window === 'undefined') {
-    return { width: 1920, height: 1080 }; // Default SSR dimensions
-  }
-  
-  return {
-    width: window.innerWidth,
-    height: window.innerHeight,
-  };
-};
-
-/**
- * Determines which breakpoints are currently active based on media queries.
- * Uses window.matchMedia for accurate, native browser media query matching.
- */
-const getActiveBreakpoints = (): Record<TailwindBreakpoint, boolean> => {
-  if (typeof window === 'undefined') {
-    // Default SSR state - assume desktop
-    return {
-      xs: false,
-      sm: true,
-      md: true,
-      lg: true,
-      xl: true,
-      '2xl': false,
-    };
-  }
-
-  const breakpoints: Record<TailwindBreakpoint, boolean> = {} as Record<TailwindBreakpoint, boolean>;
-  
-  for (const [breakpoint, query] of Object.entries(BREAKPOINT_CONFIG)) {
-    try {
-      breakpoints[breakpoint as TailwindBreakpoint] = window.matchMedia(query).matches;
-    } catch (error) {
-      // Fallback for environments where matchMedia is not supported
-      console.warn(`Failed to evaluate media query for ${breakpoint}:`, error);
-      breakpoints[breakpoint as TailwindBreakpoint] = false;
-    }
-  }
-  
-  return breakpoints;
-};
-
-/**
- * Determines the highest active breakpoint.
- * Returns the largest breakpoint that is currently matching.
- */
-const getActiveBreakpoint = (breakpoints: Record<TailwindBreakpoint, boolean>): TailwindBreakpoint => {
-  // Find the highest active breakpoint by iterating in reverse order
+function getActiveBreakpoint(matches: Record<TailwindBreakpoint, boolean>): TailwindBreakpoint {
+  // Find the highest breakpoint that matches (iterate in reverse order)
   for (let i = BREAKPOINT_ORDER.length - 1; i >= 0; i--) {
     const breakpoint = BREAKPOINT_ORDER[i];
-    if (breakpoints[breakpoint]) {
+    if (matches[breakpoint]) {
       return breakpoint;
     }
   }
   
-  // Fallback to xs if no breakpoints match (should not happen in normal circumstances)
+  // Fallback to xs if no breakpoints match
   return 'xs';
-};
+}
 
 /**
- * Creates a complete breakpoint state object from current viewport conditions.
+ * Creates convenience flags for common responsive design patterns.
+ * Provides boolean flags for simplified conditional rendering and styling.
+ * 
+ * @param activeBreakpoint - Current active breakpoint
+ * @param screenSize - Current screen size category
+ * @returns Object with convenience boolean flags
  */
-const createBreakpointState = (): BreakpointState => {
-  const { width, height } = getViewportSize();
-  const breakpoints = getActiveBreakpoints();
-  const activeBreakpoint = getActiveBreakpoint(breakpoints);
-  const screenSize = BREAKPOINT_TO_SCREEN_SIZE[activeBreakpoint];
-  
+function getConvenienceFlags(activeBreakpoint: TailwindBreakpoint, screenSize: ScreenSize) {
   return {
-    activeBreakpoint,
-    screenSize,
-    width,
-    height,
-    breakpoints,
     isMobile: screenSize === 'mobile',
     isTablet: screenSize === 'tablet',
-    isDesktop: screenSize === 'desktop',
-    isSmallScreen: breakpoints.xs || breakpoints.sm, // Equivalent to Angular's isSmallScreen
-    isLargeScreen: breakpoints.lg || breakpoints.xl || breakpoints['2xl'],
+    isDesktop: screenSize === 'desktop' || screenSize === 'wide',
+    isSmallScreen: activeBreakpoint === 'xs' || activeBreakpoint === 'sm',
+    isLargeScreen: activeBreakpoint === 'lg' || activeBreakpoint === 'xl' || activeBreakpoint === '2xl',
   };
-};
+}
 
 /**
- * Custom React hook for responsive breakpoint detection and management.
+ * Custom React hook for responsive breakpoint detection and screen size management.
+ * Provides real-time breakpoint state and utility functions for responsive design.
  * 
- * Provides real-time responsive state updates and utility functions for
- * component layout decisions. Integrates with the global app store to
- * share breakpoint state across components.
+ * @returns Complete breakpoint state with utility functions
  * 
- * @returns {UseBreakpointReturn} Current breakpoint state and utility functions
+ * @example
+ * ```tsx
+ * function ResponsiveComponent() {
+ *   const { isSmallScreen, activeBreakpoint, isMinBreakpoint } = useBreakpoint();
+ *   
+ *   return (
+ *     <div className={`${isSmallScreen ? 'p-4' : 'p-8'}`}>
+ *       {isMinBreakpoint('lg') ? (
+ *         <DesktopLayout />
+ *       ) : (
+ *         <MobileLayout />
+ *       )}
+ *     </div>
+ *   );
+ * }
+ * ```
  */
-export const useBreakpoint = (): UseBreakpointReturn => {
-  // Get breakpoint state management from global store
-  const { setBreakpoint } = useBreakpointStore();
+export function useBreakpoint(): UseBreakpointReturn {
+  // Get breakpoint state from Zustand store for cross-component sharing
+  const { breakpoint, setBreakpoint } = useBreakpointStore();
   
-  // Local state for immediate updates (before store sync)
-  const [breakpointState, setBreakpointState] = useState<BreakpointState>(() => 
-    createBreakpointState()
-  );
+  // Local state for immediate updates before store synchronization
+  const [localBreakpoint, setLocalBreakpoint] = useState<BreakpointState | null>(null);
   
-  /**
-   * Handles viewport changes and updates breakpoint state.
-   * Debounced to prevent excessive updates during window resizing.
-   */
-  const handleViewportChange = useCallback(() => {
-    const newState = createBreakpointState();
-    setBreakpointState(newState);
-    setBreakpoint(newState);
-  }, [setBreakpoint]);
-  
-  /**
-   * Effect to set up event listeners and initialize breakpoint state.
-   * Manages window resize and media query change events.
-   */
+  // Initialize breakpoint state on mount and handle window resize events
   useEffect(() => {
-    // Initialize state on mount
-    handleViewportChange();
-    
-    // Set up window resize listener
-    const handleResize = () => {
-      handleViewportChange();
-    };
-    
-    // Set up media query listeners for more precise breakpoint detection
-    const mediaQueryListeners: (() => void)[] = [];
-    
-    if (typeof window !== 'undefined') {
-      Object.entries(BREAKPOINT_CONFIG).forEach(([breakpoint, query]) => {
-        try {
-          const mediaQueryList = window.matchMedia(query);
-          const listener = () => handleViewportChange();
-          
-          // Use addEventListener if available (modern browsers)
-          if (mediaQueryList.addEventListener) {
-            mediaQueryList.addEventListener('change', listener);
-            mediaQueryListeners.push(() => 
-              mediaQueryList.removeEventListener('change', listener)
-            );
-          } else {
-            // Fallback for older browsers
-            mediaQueryList.addListener(listener);
-            mediaQueryListeners.push(() => 
-              mediaQueryList.removeListener(listener)
-            );
-          }
-        } catch (error) {
-          console.warn(`Failed to set up media query listener for ${breakpoint}:`, error);
-        }
-      });
-      
-      // Add window resize listener as backup
-      window.addEventListener('resize', handleResize, { passive: true });
+    // Early return if running on server (SSR compatibility)
+    if (typeof window === 'undefined') {
+      return;
     }
     
-    // Cleanup function to prevent memory leaks
-    return () => {
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('resize', handleResize);
-      }
+    /**
+     * Creates the current breakpoint state from window dimensions and media queries.
+     * Calculates all breakpoint matches and determines active breakpoint.
+     */
+    function createBreakpointState(): BreakpointState {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
       
-      // Clean up all media query listeners
-      mediaQueryListeners.forEach(cleanup => cleanup());
+      // Check each breakpoint media query
+      const matches: Record<TailwindBreakpoint, boolean> = {
+        xs: window.matchMedia(BREAKPOINT_CONFIG.xs).matches,
+        sm: window.matchMedia(BREAKPOINT_CONFIG.sm).matches,
+        md: window.matchMedia(BREAKPOINT_CONFIG.md).matches,
+        lg: window.matchMedia(BREAKPOINT_CONFIG.lg).matches,
+        xl: window.matchMedia(BREAKPOINT_CONFIG.xl).matches,
+        '2xl': window.matchMedia(BREAKPOINT_CONFIG['2xl']).matches,
+      };
+      
+      const activeBreakpoint = getActiveBreakpoint(matches);
+      const screenSize = getScreenSize(activeBreakpoint);
+      const convenienceFlags = getConvenienceFlags(activeBreakpoint, screenSize);
+      
+      return {
+        activeBreakpoint,
+        screenSize,
+        width,
+        height,
+        breakpoints: matches,
+        ...convenienceFlags,
+      };
+    }
+    
+    /**
+     * Handles window resize events with throttling for performance.
+     * Updates both local state and store state with new breakpoint information.
+     */
+    function handleResize() {
+      const newBreakpointState = createBreakpointState();
+      
+      // Update local state immediately for responsive UI updates
+      setLocalBreakpoint(newBreakpointState);
+      
+      // Update store state for cross-component access
+      setBreakpoint(newBreakpointState);
+    }
+    
+    // Initialize breakpoint state on mount
+    handleResize();
+    
+    // Set up resize event listener with passive option for better performance
+    window.addEventListener('resize', handleResize, { passive: true });
+    
+    // Cleanup event listener on unmount to prevent memory leaks
+    return () => {
+      window.removeEventListener('resize', handleResize);
     };
-  }, [handleViewportChange]);
+  }, [setBreakpoint]);
   
-  /**
-   * Utility function to check if a specific breakpoint is currently active.
-   */
-  const isBreakpoint = useCallback((breakpoint: TailwindBreakpoint): boolean => {
-    return breakpointState.breakpoints[breakpoint];
-  }, [breakpointState.breakpoints]);
+  // Use local state if available, fallback to store state
+  const currentBreakpoint = localBreakpoint || breakpoint;
   
-  /**
-   * Utility function to check if current screen is at least the specified breakpoint.
-   * Useful for "mobile-first" responsive design patterns.
-   */
-  const isMinBreakpoint = useCallback((breakpoint: TailwindBreakpoint): boolean => {
-    const breakpointIndex = BREAKPOINT_ORDER.indexOf(breakpoint);
-    const activeIndex = BREAKPOINT_ORDER.indexOf(breakpointState.activeBreakpoint);
-    return activeIndex >= breakpointIndex;
-  }, [breakpointState.activeBreakpoint]);
+  // Return default state if no breakpoint data is available (SSR or initial render)
+  if (!currentBreakpoint) {
+    return {
+      activeBreakpoint: 'lg' as TailwindBreakpoint, // Default to desktop for SSR
+      screenSize: 'desktop' as ScreenSize,
+      width: 1280, // Default desktop width
+      height: 720, // Default desktop height
+      breakpoints: {
+        xs: false,
+        sm: false,
+        md: false,
+        lg: true, // Default to large screen
+        xl: false,
+        '2xl': false,
+      },
+      isMobile: false,
+      isTablet: false,
+      isDesktop: true,
+      isSmallScreen: false,
+      isLargeScreen: true,
+      
+      // Utility functions with safe defaults
+      isBreakpoint: (breakpoint: TailwindBreakpoint) => breakpoint === 'lg',
+      isMinBreakpoint: (breakpoint: TailwindBreakpoint) => {
+        const order = ['xs', 'sm', 'md', 'lg', 'xl', '2xl'];
+        const currentIndex = order.indexOf('lg');
+        const targetIndex = order.indexOf(breakpoint);
+        return currentIndex >= targetIndex;
+      },
+      isMaxBreakpoint: (breakpoint: TailwindBreakpoint) => {
+        const order = ['xs', 'sm', 'md', 'lg', 'xl', '2xl'];
+        const currentIndex = order.indexOf('lg');
+        const targetIndex = order.indexOf(breakpoint);
+        return currentIndex <= targetIndex;
+      },
+    };
+  }
   
-  /**
-   * Utility function to check if current screen is at most the specified breakpoint.
-   * Useful for "desktop-first" responsive design patterns.
-   */
-  const isMaxBreakpoint = useCallback((breakpoint: TailwindBreakpoint): boolean => {
-    const breakpointIndex = BREAKPOINT_ORDER.indexOf(breakpoint);
-    const activeIndex = BREAKPOINT_ORDER.indexOf(breakpointState.activeBreakpoint);
-    return activeIndex <= breakpointIndex;
-  }, [breakpointState.activeBreakpoint]);
-  
-  return {
-    ...breakpointState,
-    isBreakpoint,
-    isMinBreakpoint,
-    isMaxBreakpoint,
+  // Utility functions for breakpoint checking
+  const utilities = {
+    /**
+     * Check if a specific breakpoint is currently active.
+     * 
+     * @param breakpoint - Breakpoint to check
+     * @returns True if the specified breakpoint is active
+     */
+    isBreakpoint: (breakpoint: TailwindBreakpoint): boolean => {
+      return currentBreakpoint.activeBreakpoint === breakpoint;
+    },
+    
+    /**
+     * Check if current screen is at least the specified breakpoint.
+     * Useful for "mobile-first" responsive design patterns.
+     * 
+     * @param breakpoint - Minimum breakpoint to check
+     * @returns True if current screen is at or above the specified breakpoint
+     */
+    isMinBreakpoint: (breakpoint: TailwindBreakpoint): boolean => {
+      const currentIndex = BREAKPOINT_ORDER.indexOf(currentBreakpoint.activeBreakpoint);
+      const targetIndex = BREAKPOINT_ORDER.indexOf(breakpoint);
+      return currentIndex >= targetIndex;
+    },
+    
+    /**
+     * Check if current screen is at most the specified breakpoint.
+     * Useful for "desktop-first" responsive design patterns.
+     * 
+     * @param breakpoint - Maximum breakpoint to check
+     * @returns True if current screen is at or below the specified breakpoint
+     */
+    isMaxBreakpoint: (breakpoint: TailwindBreakpoint): boolean => {
+      const currentIndex = BREAKPOINT_ORDER.indexOf(currentBreakpoint.activeBreakpoint);
+      const targetIndex = BREAKPOINT_ORDER.indexOf(breakpoint);
+      return currentIndex <= targetIndex;
+    },
   };
-};
+  
+  // Return complete breakpoint state with utility functions
+  return {
+    ...currentBreakpoint,
+    ...utilities,
+  };
+}
 
 /**
- * Hook variant that only provides the current breakpoint state without utility functions.
- * Useful when you only need the state and not the helper methods.
+ * Lightweight hook for accessing only the current active breakpoint.
+ * Optimized for components that only need the breakpoint name.
  * 
- * @returns {BreakpointState} Current breakpoint state
+ * @returns Current active breakpoint name
  */
-export const useBreakpointState = (): BreakpointState => {
-  const { isBreakpoint, isMinBreakpoint, isMaxBreakpoint, ...state } = useBreakpoint();
-  return state;
-};
-
-/**
- * Hook that provides only the isSmallScreen state for Angular service compatibility.
- * Directly replaces the Angular DfBreakpointService.isSmallScreen observable.
- * 
- * @returns {boolean} True if current screen is xs or sm breakpoint
- */
-export const useIsSmallScreen = (): boolean => {
-  const { isSmallScreen } = useBreakpoint();
-  return isSmallScreen;
-};
-
-/**
- * Hook that provides only the active breakpoint name.
- * Useful for components that need to render differently based on the current breakpoint.
- * 
- * @returns {TailwindBreakpoint} Current active breakpoint
- */
-export const useActiveBreakpoint = (): TailwindBreakpoint => {
+export function useActiveBreakpoint(): TailwindBreakpoint {
   const { activeBreakpoint } = useBreakpoint();
   return activeBreakpoint;
-};
+}
 
 /**
- * Hook that provides only the screen size category.
- * Useful for high-level layout decisions based on device type.
+ * Hook for accessing only screen size convenience flags.
+ * Optimized for components that need simple mobile/desktop detection.
  * 
- * @returns {ScreenSize} Current screen size category
+ * @returns Object with boolean flags for screen size categories
  */
-export const useScreenSize = (): ScreenSize => {
-  const { screenSize } = useBreakpoint();
-  return screenSize;
-};
+export function useScreenSize() {
+  const { isMobile, isTablet, isDesktop, isSmallScreen, isLargeScreen } = useBreakpoint();
+  return { isMobile, isTablet, isDesktop, isSmallScreen, isLargeScreen };
+}
+
+/**
+ * Hook that returns true when the screen is considered "small" (mobile/tablet).
+ * Replaces Angular DfBreakpointService.isSmallScreen observable pattern.
+ * 
+ * @returns True if screen is small (xs or sm breakpoint)
+ */
+export function useIsSmallScreen(): boolean {
+  const { isSmallScreen } = useBreakpoint();
+  return isSmallScreen;
+}
+
+// Export breakpoint configuration for testing and external usage
+export { BREAKPOINT_CONFIG, BREAKPOINT_ORDER };
