@@ -1,328 +1,313 @@
 /**
- * React Query-based App Data Fetching Hook
+ * React Query-based custom hook for fetching individual AppType data.
  * 
- * Custom hook for fetching individual AppType data with intelligent caching
- * and related data loading. Replaces the Angular edit-app.resolver.ts by
- * implementing React Query useQuery with TTL configuration and specialized
- * parameter handling for app ID extraction and role relationship loading.
+ * Replaces the Angular edit-app.resolver.ts by implementing React Query useQuery
+ * with intelligent caching and related data loading. Provides TTL configuration
+ * with staleTime: 300s and cacheTime: 900s for optimal performance and data
+ * freshness while maintaining DreamFactory API compatibility.
  * 
- * Features:
- * - Type-safe AppType return with role relationship loading
- * - Intelligent caching with TTL configuration (staleTime: 300s, cacheTime: 900s)
- * - Automatic background revalidation for real-time updates
- * - Comprehensive field selection patterns maintaining backend compatibility
- * - Cache hit responses under 50ms per React/Next.js Integration Requirements
- * - Error handling with React Error Boundary integration
+ * This hook transforms Angular ResolveFn patterns to React Query-powered 
+ * data fetching with automatic background revalidation and cache responses
+ * under 50ms per React/Next.js Integration Requirements.
  * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
+ * @fileoverview Individual app data fetching hook for edit workflows
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-'use client'
+import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { apiGet, API_ENDPOINTS } from '../../../lib/api-client';
+import type { AppType, AppResourceResponse } from '../../../types/apps';
+import type { GenericErrorResponse } from '../../../types/generic-http';
 
-import { useQuery, UseQueryOptions } from '@tanstack/react-query'
-import { apiClient } from '../../../lib/api-client'
-import type { AppType } from '../../../types/apps'
-import type { GenericListResponse } from '../../../types/generic-http'
+// ============================================================================
+// Types and Interfaces
+// ============================================================================
 
 /**
- * Parameters for individual app data fetching
+ * Hook parameters for app data fetching
  */
-export interface UseAppParams {
-  /** App ID for fetching specific app data */
-  id: string | number
-  /** Additional query parameters for backend API compatibility */
-  related?: string
-  /** Specific fields to retrieve from the API */
-  fields?: string
-  /** Enable/disable the query execution */
-  enabled?: boolean
+export interface UseAppOptions {
+  /** Application ID to fetch */
+  id: number | string;
+  /** Enable/disable the query */
+  enabled?: boolean;
+  /** Custom stale time override (default: 300s) */
+  staleTime?: number;
+  /** Custom cache time override (default: 900s) */
+  cacheTime?: number;
 }
 
 /**
- * App query configuration with intelligent caching
+ * App query key factory for React Query caching
+ * Supports intelligent cache invalidation and background synchronization
  */
-export interface UseAppOptions extends Omit<UseAppParams, 'id'> {
-  /** Additional React Query options */
-  queryOptions?: Omit<UseQueryOptions<AppType>, 'queryKey' | 'queryFn'>
-}
+export type AppDetailQueryKey = ['apps', 'detail', number | string];
 
 /**
- * Query key factory for individual app data fetching
- * Ensures proper cache invalidation and deduplication with related data
+ * Hook return type with enhanced error handling
  */
-export const appQueryKeys = {
-  all: ['apps'] as const,
-  details: () => [...appQueryKeys.all, 'detail'] as const,
-  detail: (id: string | number, params: Omit<UseAppParams, 'id'>) => 
-    [...appQueryKeys.details(), id, params] as const,
+export interface UseAppResult extends UseQueryResult<AppType, Error> {
+  /** App data if successfully loaded */
+  app?: AppType;
+  /** Whether the app is currently being fetched */
+  isLoading: boolean;
+  /** Whether there was an error fetching the app */
+  isError: boolean;
+  /** Error object if the query failed */
+  error: Error | null;
+  /** Whether the app data is stale and being refetched in background */
+  isRefetching: boolean;
 }
 
+// ============================================================================
+// Query Key Factory
+// ============================================================================
+
 /**
- * Default query parameters maintaining Angular resolver compatibility
- * Preserves role relationship loading and comprehensive field selection
+ * Creates a standardized query key for app detail caching
+ * 
+ * @param id - Application ID for cache key generation
+ * @returns Typed query key for React Query cache management
  */
-const DEFAULT_PARAMS: Required<Omit<UseAppParams, 'id' | 'enabled'>> = {
-  related: 'role_by_role_id',
-  fields: '*',
+export function createAppQueryKey(id: number | string): AppDetailQueryKey {
+  return ['apps', 'detail', id];
 }
 
+// ============================================================================
+// API Fetcher Function
+// ============================================================================
+
 /**
- * Individual app data fetcher function
- * Builds query parameters and executes API request for single app
+ * Fetches individual app data from DreamFactory API with related role information.
+ * 
+ * Maintains existing DreamFactory API compatibility by including:
+ * - related: 'role_by_role_id' for role relationship loading
+ * - fields: '*' for comprehensive field selection
+ * 
+ * @param id - Application ID to fetch
+ * @returns Promise resolving to AppType data
+ * @throws Error with DreamFactory API error details
  */
-const fetchApp = async (params: UseAppParams): Promise<AppType> => {
-  const { id, ...queryParams } = params
-  const urlParams = new URLSearchParams()
-
-  // Build query parameters for backend API compatibility
-  urlParams.append('related', queryParams.related || DEFAULT_PARAMS.related)
-  urlParams.append('fields', queryParams.fields || DEFAULT_PARAMS.fields)
-
-  const response = await apiClient.get(`/apps/${id}?${urlParams.toString()}`)
-  
-  // Handle both direct resource and wrapped response formats
-  if (response && typeof response === 'object') {
-    // If response has 'resource' property, extract the app data
-    if ('resource' in response && Array.isArray(response.resource) && response.resource.length > 0) {
-      return response.resource[0] as AppType
+async function fetchAppById(id: number | string): Promise<AppType> {
+  try {
+    // Construct API endpoint with app ID
+    const endpoint = `${API_ENDPOINTS.SYSTEM_APP}/${id}`;
+    
+    // Fetch app data with related role information and all fields
+    // Maintains Angular resolver compatibility with same parameters
+    const response = await apiGet<AppResourceResponse>(endpoint, {
+      related: 'role_by_role_id',
+      fields: '*',
+      includeCacheControl: true,
+    });
+    
+    // Extract app data from DreamFactory response format
+    if (!response || typeof response !== 'object') {
+      throw new Error('Invalid response format from API');
     }
-    // If response is the app object directly
-    if ('id' in response) {
-      return response as AppType
+    
+    // Handle both direct app object and wrapped response formats
+    const appData = 'resource' in response ? response.resource : response;
+    
+    if (!appData || typeof appData !== 'object') {
+      throw new Error('No app data found in response');
     }
+    
+    return appData as AppType;
+  } catch (error) {
+    // Enhanced error handling with DreamFactory API error format support
+    if (error instanceof Error) {
+      let errorMessage = error.message;
+      
+      try {
+        // Parse DreamFactory API error format
+        const apiError = JSON.parse(error.message) as GenericErrorResponse;
+        if (apiError.error) {
+          errorMessage = apiError.error.message || errorMessage;
+        }
+      } catch {
+        // Use original error message if not valid JSON
+      }
+      
+      throw new Error(`Failed to fetch app: ${errorMessage}`);
+    }
+    
+    throw new Error('An unexpected error occurred while fetching app data');
   }
-  
-  throw new Error('Invalid app data received from API')
 }
 
+// ============================================================================
+// React Query Hook
+// ============================================================================
+
 /**
- * React Query-based custom hook for individual app data management
+ * React Query-based hook for fetching individual app data with intelligent caching.
  * 
- * Provides intelligent caching, background synchronization, and type-safe
- * AppType return through TanStack React Query 5.79.2 with specialized
- * parameter handling for app ID extraction and role relationship loading.
+ * Replaces Angular edit-app.resolver.ts with React Query-powered data fetching
+ * that provides automatic background revalidation, cache responses under 50ms,
+ * and optimistic UI updates for enhanced user experience.
  * 
- * @param id - App ID for fetching specific app data
- * @param options - Additional configuration options for query customization
- * @returns React Query result with app data, loading state, and error handling
+ * Key Features:
+ * - TTL configuration with staleTime: 300s, cacheTime: 900s
+ * - Automatic background revalidation for data freshness
+ * - Intelligent error handling with DreamFactory API compatibility
+ * - Type-safe AppType return type with role relationship data
+ * - Cache hit responses under 50ms per performance requirements
+ * 
+ * @param options - Hook configuration options including app ID and cache settings
+ * @returns Query result with app data, loading states, and error handling
  * 
  * @example
- * ```typescript
- * // Basic usage with app ID
- * const { data: app, isLoading, error } = useApp('123')
+ * ```tsx
+ * function EditAppPage({ params }: { params: { id: string } }) {
+ *   const { app, isLoading, isError, error } = useApp({
+ *     id: params.id,
+ *     enabled: !!params.id
+ *   });
  * 
- * // With custom fields selection
- * const { data: app, isLoading } = useApp('456', {
- *   fields: 'id,name,description,roleByRoleId.*'
- * })
+ *   if (isLoading) return <LoadingSpinner />;
+ *   if (isError) return <ErrorMessage error={error} />;
+ *   if (!app) return <NotFound />;
  * 
- * // With disabled query execution (conditional loading)
- * const { data: app, isLoading } = useApp(appId, {
- *   enabled: !!appId && appId !== 'new'
- * })
- * 
- * // With custom query options
- * const { data: app, refetch } = useApp('789', {
- *   queryOptions: {
- *     refetchOnWindowFocus: false,
- *     retry: 3
- *   }
- * })
+ *   return <AppEditForm app={app} />;
+ * }
  * ```
  */
-export function useApp(
-  id: string | number,
-  options: UseAppOptions = {}
-): ReturnType<typeof useQuery<AppType, Error>> {
-  const {
-    related,
-    fields,
-    enabled,
-    queryOptions = {},
-  } = options
+export function useApp(options: UseAppOptions): UseAppResult {
+  const { 
+    id, 
+    enabled = true, 
+    staleTime = 5 * 60 * 1000, // 300 seconds (5 minutes)
+    cacheTime = 15 * 60 * 1000 // 900 seconds (15 minutes)
+  } = options;
 
-  // Merge parameters with defaults
-  const queryParams: UseAppParams = {
-    id,
-    related: related || DEFAULT_PARAMS.related,
-    fields: fields || DEFAULT_PARAMS.fields,
-    enabled,
-  }
+  // Validate app ID parameter
+  const isValidId = id !== undefined && id !== null && id !== '';
+  const queryEnabled = enabled && isValidId;
 
-  return useQuery({
-    // Query key for intelligent caching and deduplication
-    queryKey: appQueryKeys.detail(id, {
-      related: queryParams.related,
-      fields: queryParams.fields,
-    }),
+  // React Query implementation with TanStack React Query 5.79.2
+  const query = useQuery({
+    // Query key for cache management and invalidation
+    queryKey: createAppQueryKey(id),
     
-    // Query function with parameter building
-    queryFn: () => fetchApp(queryParams),
+    // Fetcher function with DreamFactory API integration
+    queryFn: () => fetchAppById(id),
     
-    // Intelligent caching configuration per React/Next.js Integration Requirements
-    staleTime: 5 * 60 * 1000, // 300 seconds (5 minutes) - data considered fresh
-    gcTime: 15 * 60 * 1000, // 900 seconds (15 minutes) - cache retention time
+    // Enable query only when ID is valid and enabled is true
+    enabled: queryEnabled,
     
-    // Background synchronization for real-time updates
-    refetchOnWindowFocus: true,
-    refetchOnReconnect: true,
-    refetchOnMount: 'always',
+    // TTL configuration for intelligent caching
+    staleTime, // Data considered fresh for 5 minutes
+    cacheTime, // Cache kept for 15 minutes after component unmount
     
-    // Enable/disable query execution
-    enabled: queryParams.enabled !== false && !!id && id !== 'new',
+    // Background refetching configuration
+    refetchOnWindowFocus: true, // Refetch when window regains focus
+    refetchOnReconnect: true,   // Refetch when network reconnects
+    refetchOnMount: 'always',   // Always check for updates on mount
     
-    // Error handling and retry configuration
+    // Retry configuration for enhanced reliability
     retry: (failureCount, error) => {
       // Don't retry on 404 errors (app not found)
-      if (error && typeof error === 'object' && 'status' in error && error.status === 404) {
-        return false
+      if (error.message.includes('404') || error.message.includes('not found')) {
+        return false;
       }
-      // Retry up to 3 times for other errors
-      return failureCount < 3
+      // Retry up to 3 times for other errors with exponential backoff
+      return failureCount < 3;
     },
-    
-    // Retry delay with exponential backoff
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     
-    // Additional query options
-    ...queryOptions,
-  })
+    // Error handling configuration
+    throwOnError: false, // Handle errors through error state instead of throwing
+    
+    // Select function for data transformation if needed
+    select: (data: AppType) => {
+      // Ensure role relationship data is properly structured
+      if (data.roleByRoleId) {
+        return {
+          ...data,
+          roleByRoleId: {
+            ...data.roleByRoleId,
+            // Ensure boolean conversion for isActive field
+            isActive: Boolean(data.roleByRoleId.isActive),
+          }
+        };
+      }
+      return data;
+    },
+  });
+
+  // Enhanced return object with convenience properties
+  return {
+    ...query,
+    app: query.data,
+    isLoading: query.isLoading,
+    isError: query.isError,
+    error: query.error,
+    isRefetching: query.isFetching && !query.isLoading,
+  };
 }
 
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
 /**
- * Prefetch function for individual app data
- * Useful for preloading app data before navigation or user interaction
+ * Prefetch app data for performance optimization.
  * 
- * @param queryClient - TanStack Query client instance
- * @param id - App ID for prefetching
- * @param options - Additional configuration options
+ * Useful for prefetching app data when user hovers over edit links
+ * or when navigating to app detail pages for improved perceived performance.
  * 
- * @example
- * ```typescript
- * import { useQueryClient } from '@tanstack/react-query'
- * 
- * const queryClient = useQueryClient()
- * 
- * // Prefetch app data before navigation
- * await prefetchApp(queryClient, '123')
- * 
- * // Prefetch with custom fields
- * await prefetchApp(queryClient, '456', {
- *   fields: 'id,name,description'
- * })
- * ```
+ * @param queryClient - React Query client instance
+ * @param id - Application ID to prefetch
+ * @param options - Optional cache configuration
  */
 export async function prefetchApp(
-  queryClient: any,
-  id: string | number,
-  options: UseAppOptions = {}
+  queryClient: any, // QueryClient type from @tanstack/react-query
+  id: number | string,
+  options: Partial<UseAppOptions> = {}
 ): Promise<void> {
-  const queryParams: UseAppParams = {
-    id,
-    related: options.related || DEFAULT_PARAMS.related,
-    fields: options.fields || DEFAULT_PARAMS.fields,
-  }
+  const {
+    staleTime = 5 * 60 * 1000,
+    cacheTime = 15 * 60 * 1000
+  } = options;
 
   await queryClient.prefetchQuery({
-    queryKey: appQueryKeys.detail(id, {
-      related: queryParams.related,
-      fields: queryParams.fields,
-    }),
-    queryFn: () => fetchApp(queryParams),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  })
+    queryKey: createAppQueryKey(id),
+    queryFn: () => fetchAppById(id),
+    staleTime,
+    cacheTime,
+  });
 }
 
 /**
- * Invalidate individual app cache
- * Useful for triggering data refetch after mutations or updates
+ * Invalidate app cache for real-time updates.
  * 
- * @param queryClient - TanStack Query client instance
- * @param id - Optional app ID for specific cache invalidation
+ * Call this function after successful app mutations to ensure
+ * the UI reflects the latest data immediately.
  * 
- * @example
- * ```typescript
- * // Invalidate specific app cache after update
- * await invalidateAppCache(queryClient, '123')
- * 
- * // Invalidate all app detail caches
- * await invalidateAppCache(queryClient)
- * ```
+ * @param queryClient - React Query client instance
+ * @param id - Application ID to invalidate (optional, invalidates all if not provided)
  */
 export async function invalidateAppCache(
-  queryClient: any,
-  id?: string | number
+  queryClient: any, // QueryClient type from @tanstack/react-query
+  id?: number | string
 ): Promise<void> {
   if (id) {
-    // Invalidate specific app detail cache
+    // Invalidate specific app cache
     await queryClient.invalidateQueries({
-      queryKey: appQueryKeys.detail(id, {}),
-      exact: false
-    })
+      queryKey: createAppQueryKey(id),
+    });
   } else {
-    // Invalidate all app detail caches
+    // Invalidate all app-related caches
     await queryClient.invalidateQueries({
-      queryKey: appQueryKeys.details(),
-    })
+      queryKey: ['apps'],
+    });
   }
 }
 
-/**
- * Remove individual app from cache
- * Useful for immediate cache cleanup after app deletion
- * 
- * @param queryClient - TanStack Query client instance
- * @param id - App ID for cache removal
- * 
- * @example
- * ```typescript
- * // Remove app from cache after deletion
- * removeAppFromCache(queryClient, '123')
- * ```
- */
-export function removeAppFromCache(
-  queryClient: any,
-  id: string | number
-): void {
-  queryClient.removeQueries({
-    queryKey: appQueryKeys.detail(id, {}),
-    exact: false
-  })
-}
+// ============================================================================
+// Default Export
+// ============================================================================
 
-/**
- * Update app data in cache (optimistic updates)
- * Useful for immediate UI updates before server confirmation
- * 
- * @param queryClient - TanStack Query client instance
- * @param id - App ID for cache update
- * @param updater - Function to update app data or new app data
- * 
- * @example
- * ```typescript
- * // Optimistic update with function
- * updateAppInCache(queryClient, '123', (oldApp) => ({
- *   ...oldApp,
- *   name: 'Updated App Name'
- * }))
- * 
- * // Direct update with new data
- * updateAppInCache(queryClient, '123', updatedAppData)
- * ```
- */
-export function updateAppInCache(
-  queryClient: any,
-  id: string | number,
-  updater: AppType | ((old: AppType | undefined) => AppType | undefined)
-): void {
-  queryClient.setQueriesData(
-    {
-      queryKey: appQueryKeys.detail(id, {}),
-      exact: false
-    },
-    updater
-  )
-}
-
-export default useApp
+export default useApp;
