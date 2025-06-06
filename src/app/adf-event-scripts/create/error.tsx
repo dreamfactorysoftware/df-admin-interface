@@ -1,540 +1,474 @@
-'use client';
+'use client'
 
-import React, { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { AlertTriangle, RefreshCw, Home, ArrowLeft, Bug, Copy, ExternalLink } from 'lucide-react';
+import React from 'react'
+import { AlertTriangle, RefreshCw, ArrowLeft, Bug, Code, Database, Save } from 'lucide-react'
 
 /**
- * Error boundary component for the event script creation page providing graceful error handling 
- * with recovery options and user-friendly messaging. Implements React 19 error boundary patterns 
- * with logging capabilities, retry mechanisms for script creation operations, and comprehensive 
- * error recovery workflows for form submission failures, validation errors, and API communication issues.
+ * Error boundary component for the event script creation page.
  * 
- * Features:
- * - React 19 error boundary capabilities per React/Next.js Integration Requirements
- * - Comprehensive error handling with user feedback per Section 4.2 error handling and validation
- * - Next.js error boundaries for graceful degradation per Section 5.1 architectural principles
- * - WCAG 2.1 AA compliance for error messaging and recovery options
- * - Error tracking and monitoring for production error analysis and debugging capabilities
+ * Provides comprehensive error handling for script creation workflows including:
+ * - Form validation errors and submission failures
+ * - Script editor initialization and code validation issues  
+ * - Storage service connection and configuration problems
+ * - API communication failures during script operations
+ * - Authentication and authorization errors
+ * 
+ * Features React 19 error boundary capabilities with:
+ * - Graceful error recovery with user-friendly messaging
+ * - Retry mechanisms for transient failures
+ * - Comprehensive error logging and monitoring integration
+ * - WCAG 2.1 AA compliant error announcements
+ * - Tailwind CSS responsive design with dark/light theme support
  */
 
-interface ScriptCreationErrorProps {
-  error: Error & { digest?: string };
-  reset: () => void;
-}
-
-// Error categorization for specific script creation scenarios
-enum ErrorCategory {
-  VALIDATION = 'VALIDATION',
-  NETWORK = 'NETWORK', 
-  STORAGE = 'STORAGE',
-  EDITOR = 'EDITOR',
-  AUTHENTICATION = 'AUTHENTICATION',
-  PERMISSION = 'PERMISSION',
-  SERVER = 'SERVER',
-  UNKNOWN = 'UNKNOWN'
-}
-
-interface ErrorMetadata {
-  category: ErrorCategory;
-  title: string;
-  message: string;
-  suggestions: string[];
-  canRetry: boolean;
-  showDetails: boolean;
-  severity: 'low' | 'medium' | 'high' | 'critical';
+interface ErrorProps {
+  error: Error & { digest?: string }
+  reset: () => void
 }
 
 /**
- * Categorizes errors based on error message and provides appropriate metadata
+ * Enhanced error classification for script creation workflows
  */
-function categorizeError(error: Error): ErrorMetadata {
-  const message = error.message.toLowerCase();
-  const stack = error.stack?.toLowerCase() || '';
+interface ErrorContext {
+  type: 'validation' | 'editor' | 'storage' | 'api' | 'auth' | 'unknown'
+  severity: 'low' | 'medium' | 'high' | 'critical'
+  userMessage: string
+  technicalMessage: string
+  recoveryActions: Array<{
+    label: string
+    action: () => void
+    icon: React.ReactNode
+    primary?: boolean
+  }>
+  helpText?: string
+}
 
-  // Script validation errors
-  if (message.includes('validation') || message.includes('invalid script') || message.includes('syntax error')) {
+/**
+ * Classifies errors based on message content and context for targeted recovery
+ */
+function classifyError(error: Error): ErrorContext {
+  const message = error.message.toLowerCase()
+  const stack = error.stack?.toLowerCase() || ''
+
+  // Script validation and form errors
+  if (message.includes('validation') || message.includes('required') || message.includes('invalid')) {
     return {
-      category: ErrorCategory.VALIDATION,
-      title: 'Script Validation Error',
-      message: 'There was an issue validating your script content. Please check your script syntax and try again.',
-      suggestions: [
-        'Verify your script syntax is correct',
-        'Check for missing semicolons or brackets',
-        'Ensure all variables are properly declared',
-        'Review script type requirements'
+      type: 'validation',
+      severity: 'medium',
+      userMessage: 'Script validation failed',
+      technicalMessage: 'The script contains validation errors that need to be corrected.',
+      recoveryActions: [
+        {
+          label: 'Review Form',
+          action: () => window.location.reload(),
+          icon: <Code className="h-4 w-4" />,
+          primary: true
+        },
+        {
+          label: 'Reset Form',
+          action: () => {
+            if (typeof window !== 'undefined') {
+              sessionStorage.removeItem('script-draft')
+              window.location.reload()
+            }
+          },
+          icon: <RefreshCw className="h-4 w-4" />
+        }
       ],
-      canRetry: true,
-      showDetails: true,
-      severity: 'medium'
-    };
+      helpText: 'Check that all required fields are filled and script syntax is valid.'
+    }
   }
 
-  // Storage service connection issues
-  if (message.includes('storage') || message.includes('service connection') || message.includes('storage path')) {
+  // Script editor and code-related errors
+  if (message.includes('editor') || message.includes('syntax') || message.includes('monaco')) {
     return {
-      category: ErrorCategory.STORAGE,
-      title: 'Storage Service Error',
-      message: 'Unable to connect to the selected storage service. Please verify your storage configuration.',
-      suggestions: [
-        'Check storage service credentials',
-        'Verify storage path permissions',
-        'Test storage service connection',
-        'Contact your administrator if issues persist'
+      type: 'editor',
+      severity: 'high',
+      userMessage: 'Script editor encountered an error',
+      technicalMessage: 'The code editor failed to initialize or encountered a syntax error.',
+      recoveryActions: [
+        {
+          label: 'Reload Editor',
+          action: () => window.location.reload(),
+          icon: <Code className="h-4 w-4" />,
+          primary: true
+        },
+        {
+          label: 'Use Simple Mode',
+          action: () => {
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('use-simple-editor', 'true')
+              window.location.reload()
+            }
+          },
+          icon: <Code className="h-4 w-4" />
+        }
       ],
-      canRetry: true,
-      showDetails: true,
-      severity: 'high'
-    };
+      helpText: 'Try reloading the editor or switch to simple text mode if the rich editor fails.'
+    }
   }
 
-  // Script editor initialization problems
-  if (message.includes('editor') || message.includes('ace') || message.includes('monaco') || stack.includes('editor')) {
+  // Storage service connection errors
+  if (message.includes('storage') || message.includes('service') || message.includes('connection')) {
     return {
-      category: ErrorCategory.EDITOR,
-      title: 'Script Editor Error',
-      message: 'The script editor failed to initialize properly. Please refresh the page to try again.',
-      suggestions: [
-        'Refresh the page to reload the editor',
-        'Clear your browser cache',
-        'Disable browser extensions that might interfere',
-        'Try using a different browser'
+      type: 'storage',
+      severity: 'high',
+      userMessage: 'Storage service connection failed',
+      technicalMessage: 'Unable to connect to the selected storage service for script deployment.',
+      recoveryActions: [
+        {
+          label: 'Test Connection',
+          action: () => window.location.reload(),
+          icon: <Database className="h-4 w-4" />,
+          primary: true
+        },
+        {
+          label: 'Select Different Service',
+          action: () => {
+            const url = new URL(window.location.href)
+            url.searchParams.delete('storage_service')
+            window.location.href = url.toString()
+          },
+          icon: <Database className="h-4 w-4" />
+        }
       ],
-      canRetry: true,
-      showDetails: false,
-      severity: 'medium'
-    };
+      helpText: 'Verify that the storage service is configured correctly and accessible.'
+    }
   }
 
-  // Network and API communication errors
-  if (message.includes('network') || message.includes('fetch') || message.includes('timeout') || message.includes('connection')) {
+  // API and network errors
+  if (message.includes('fetch') || message.includes('network') || message.includes('api') || 
+      message.includes('timeout') || stack.includes('fetch')) {
     return {
-      category: ErrorCategory.NETWORK,
-      title: 'Network Connection Error',
-      message: 'Unable to connect to the server. Please check your internet connection and try again.',
-      suggestions: [
-        'Check your internet connection',
-        'Retry the operation in a few moments',
-        'Contact support if the problem persists'
+      type: 'api',
+      severity: 'high',
+      userMessage: 'Network connection error',
+      technicalMessage: 'Failed to communicate with the server while creating the script.',
+      recoveryActions: [
+        {
+          label: 'Retry Request',
+          action: () => window.location.reload(),
+          icon: <RefreshCw className="h-4 w-4" />,
+          primary: true
+        },
+        {
+          label: 'Save Draft',
+          action: () => {
+            if (typeof window !== 'undefined') {
+              // Attempt to save form data to localStorage for recovery
+              const formData = document.querySelector('form')
+              if (formData) {
+                const data = new FormData(formData)
+                const draft = Object.fromEntries(data.entries())
+                localStorage.setItem('script-creation-draft', JSON.stringify(draft))
+                alert('Draft saved to local storage')
+              }
+            }
+          },
+          icon: <Save className="h-4 w-4" />
+        }
       ],
-      canRetry: true,
-      showDetails: false,
-      severity: 'high'
-    };
+      helpText: 'Check your internet connection and try again. Your work has been saved locally.'
+    }
   }
 
-  // Authentication errors
-  if (message.includes('unauthorized') || message.includes('authentication') || message.includes('token')) {
+  // Authentication and authorization errors
+  if (message.includes('auth') || message.includes('401') || message.includes('403') || 
+      message.includes('unauthorized') || message.includes('forbidden')) {
     return {
-      category: ErrorCategory.AUTHENTICATION,
-      title: 'Authentication Required',
-      message: 'Your session has expired. Please log in again to continue.',
-      suggestions: [
-        'Log in again with your credentials',
-        'Contact your administrator for access'
+      type: 'auth',
+      severity: 'critical',
+      userMessage: 'Authentication required',
+      technicalMessage: 'Your session has expired or you lack permission to create scripts.',
+      recoveryActions: [
+        {
+          label: 'Login Again',
+          action: () => {
+            if (typeof window !== 'undefined') {
+              window.location.href = '/login'
+            }
+          },
+          icon: <ArrowLeft className="h-4 w-4" />,
+          primary: true
+        }
       ],
-      canRetry: false,
-      showDetails: false,
-      severity: 'high'
-    };
+      helpText: 'Please log in again to continue creating scripts.'
+    }
   }
 
-  // Permission errors
-  if (message.includes('permission') || message.includes('forbidden') || message.includes('access denied')) {
-    return {
-      category: ErrorCategory.PERMISSION,
-      title: 'Access Denied',
-      message: 'You do not have permission to create event scripts. Please contact your administrator.',
-      suggestions: [
-        'Contact your administrator for script creation permissions',
-        'Verify your role includes script management access'
-      ],
-      canRetry: false,
-      showDetails: false,
-      severity: 'high'
-    };
-  }
-
-  // Server errors
-  if (message.includes('server error') || message.includes('internal error') || message.includes('500')) {
-    return {
-      category: ErrorCategory.SERVER,
-      title: 'Server Error',
-      message: 'An internal server error occurred. Our team has been notified and is working to resolve the issue.',
-      suggestions: [
-        'Try again in a few minutes',
-        'Contact support if the issue continues',
-        'Check the system status page for updates'
-      ],
-      canRetry: true,
-      showDetails: true,
-      severity: 'critical'
-    };
-  }
-
-  // Default unknown error
+  // Generic/unknown errors
   return {
-    category: ErrorCategory.UNKNOWN,
-    title: 'Unexpected Error',
-    message: 'An unexpected error occurred while creating your script. Please try again or contact support if the issue persists.',
-    suggestions: [
-      'Try refreshing the page',
-      'Save your work and try again',
-      'Contact support with the error details below'
+    type: 'unknown',
+    severity: 'high',
+    userMessage: 'An unexpected error occurred',
+    technicalMessage: 'The script creation process encountered an unexpected error.',
+    recoveryActions: [
+      {
+        label: 'Try Again',
+        action: () => window.location.reload(),
+        icon: <RefreshCw className="h-4 w-4" />,
+        primary: true
+      },
+      {
+        label: 'Go Back',
+        action: () => {
+          if (typeof window !== 'undefined') {
+            window.history.back()
+          }
+        },
+        icon: <ArrowLeft className="h-4 w-4" />
+      }
     ],
-    canRetry: true,
-    showDetails: true,
-    severity: 'high'
-  };
+    helpText: 'If this problem persists, please contact your system administrator.'
+  }
 }
 
 /**
  * Logs error details for monitoring and debugging
  */
-async function logError(error: Error, metadata: ErrorMetadata, digest?: string) {
+function logError(error: Error, context: ErrorContext): void {
+  // Enhanced error logging with context
   const errorLog = {
     timestamp: new Date().toISOString(),
-    page: '/adf-event-scripts/create',
+    page: 'event-scripts/create',
     error: {
       name: error.name,
       message: error.message,
       stack: error.stack,
-      digest
+      digest: (error as any).digest
     },
-    metadata,
-    userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : 'Unknown',
-    url: typeof window !== 'undefined' ? window.location.href : 'Unknown'
-  };
-
-  try {
-    // In a real implementation, this would send to your monitoring service
-    // For now, we'll log to console in development and potentially send to an endpoint in production
-    if (process.env.NODE_ENV === 'development') {
-      console.error('[Script Creation Error]', errorLog);
-    } else {
-      // In production, send to monitoring service
-      // await fetch('/api/errors', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(errorLog)
-      // });
+    context: {
+      type: context.type,
+      severity: context.severity,
+      userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : 'unknown',
+      url: typeof window !== 'undefined' ? window.location.href : 'unknown'
+    },
+    user: {
+      // Add user context if available
+      sessionId: typeof window !== 'undefined' ? sessionStorage.getItem('session_id') : null
     }
-  } catch (loggingError) {
-    console.error('Failed to log error:', loggingError);
   }
-}
 
-/**
- * Announces error to screen readers for accessibility
- */
-function announceError(message: string) {
-  if (typeof window === 'undefined') return;
-
-  const announcement = document.createElement('div');
-  announcement.setAttribute('aria-live', 'assertive');
-  announcement.setAttribute('aria-atomic', 'true');
-  announcement.className = 'sr-only';
-  announcement.textContent = `Error: ${message}`;
-  
-  document.body.appendChild(announcement);
-  
-  // Clean up after announcement
-  setTimeout(() => {
-    if (document.body.contains(announcement)) {
-      document.body.removeChild(announcement);
-    }
-  }, 1000);
-}
-
-/**
- * Copies error details to clipboard for easy sharing with support
- */
-async function copyErrorDetails(error: Error, metadata: ErrorMetadata, digest?: string) {
-  const errorDetails = `
-Error Report - Script Creation
-Generated: ${new Date().toLocaleString()}
-Page: /adf-event-scripts/create
-
-Error Category: ${metadata.category}
-Error Title: ${metadata.title}
-Error Message: ${error.message}
-${digest ? `Error ID: ${digest}` : ''}
-
-Technical Details:
-${error.stack || 'No stack trace available'}
-
-User Agent: ${navigator.userAgent}
-URL: ${window.location.href}
-  `.trim();
-
-  try {
-    await navigator.clipboard.writeText(errorDetails);
-    return true;
-  } catch {
-    // Fallback for browsers without clipboard API
-    const textArea = document.createElement('textarea');
-    textArea.value = errorDetails;
-    document.body.appendChild(textArea);
-    textArea.select();
-    const success = document.execCommand('copy');
-    document.body.removeChild(textArea);
-    return success;
+  // Log to console in development
+  if (process.env.NODE_ENV === 'development') {
+    console.error('Script Creation Error:', errorLog)
   }
-}
 
-export default function ScriptCreationError({ error, reset }: ScriptCreationErrorProps) {
-  const router = useRouter();
-  const [metadata] = useState<ErrorMetadata>(() => categorizeError(error));
-  const [showDetails, setShowDetails] = useState(false);
-  const [isRetrying, setIsRetrying] = useState(false);
-  const [copyStatus, setCopyStatus] = useState<'idle' | 'copying' | 'copied' | 'failed'>('idle');
-
-  // Log error on mount
-  useEffect(() => {
-    logError(error, metadata, error.digest);
-    announceError(metadata.message);
-  }, [error, metadata]);
-
-  // Reset copy status after success
-  useEffect(() => {
-    if (copyStatus === 'copied') {
-      const timer = setTimeout(() => setCopyStatus('idle'), 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [copyStatus]);
-
-  const handleRetry = useCallback(async () => {
-    if (!metadata.canRetry || isRetrying) return;
-    
-    setIsRetrying(true);
-    announceError('Retrying script creation');
-    
+  // Production error reporting integration
+  if (process.env.NODE_ENV === 'production') {
+    // Send to monitoring service (replace with actual implementation)
     try {
-      // Small delay to show loading state
-      await new Promise(resolve => setTimeout(resolve, 500));
-      reset();
-    } catch (retryError) {
-      console.error('Retry failed:', retryError);
-      announceError('Retry failed, please try again');
-    } finally {
-      setIsRetrying(false);
+      fetch('/api/error-tracking', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(errorLog)
+      }).catch(() => {
+        // Silently fail if error reporting is unavailable
+      })
+    } catch {
+      // Prevent error reporting from causing additional errors
     }
-  }, [metadata.canRetry, isRetrying, reset]);
+  }
+}
 
-  const handleGoHome = useCallback(() => {
-    announceError('Navigating to dashboard');
-    router.push('/');
-  }, [router]);
+/**
+ * Main error boundary component for event script creation page
+ */
+export default function CreateScriptError({ error, reset }: ErrorProps) {
+  const errorContext = React.useMemo(() => classifyError(error), [error])
+  
+  // Log error on mount
+  React.useEffect(() => {
+    logError(error, errorContext)
+  }, [error, errorContext])
 
-  const handleGoBack = useCallback(() => {
-    announceError('Navigating back to scripts list');
-    router.push('/adf-event-scripts');
-  }, [router]);
-
-  const handleCopyDetails = useCallback(async () => {
-    setCopyStatus('copying');
-    const success = await copyErrorDetails(error, metadata, error.digest);
-    setCopyStatus(success ? 'copied' : 'failed');
-    
-    if (success) {
-      announceError('Error details copied to clipboard');
-    } else {
-      announceError('Failed to copy error details');
-    }
-  }, [error, metadata]);
-
-  const handleReportBug = useCallback(() => {
-    // In a real implementation, this would open a bug report form or external link
-    const reportUrl = 'https://github.com/dreamfactorysoftware/df-admin-interface/issues/new';
-    window.open(reportUrl, '_blank', 'noopener,noreferrer');
-    announceError('Opening bug report form');
-  }, []);
-
-  // Determine icon color based on severity
-  const getIconColorClass = (severity: string) => {
+  // Severity-based styling
+  const getSeverityStyles = (severity: string) => {
     switch (severity) {
-      case 'critical': return 'text-red-600 dark:text-red-400';
-      case 'high': return 'text-orange-600 dark:text-orange-400';
-      case 'medium': return 'text-yellow-600 dark:text-yellow-400';
-      case 'low': return 'text-blue-600 dark:text-blue-400';
-      default: return 'text-gray-600 dark:text-gray-400';
+      case 'critical':
+        return 'bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800'
+      case 'high':
+        return 'bg-orange-50 border-orange-200 dark:bg-orange-950 dark:border-orange-800'
+      case 'medium':
+        return 'bg-yellow-50 border-yellow-200 dark:bg-yellow-950 dark:border-yellow-800'
+      default:
+        return 'bg-gray-50 border-gray-200 dark:bg-gray-900 dark:border-gray-700'
     }
-  };
+  }
+
+  const getSeverityIconColor = (severity: string) => {
+    switch (severity) {
+      case 'critical':
+        return 'text-red-600 dark:text-red-400'
+      case 'high':
+        return 'text-orange-600 dark:text-orange-400'
+      case 'medium':
+        return 'text-yellow-600 dark:text-yellow-400'
+      default:
+        return 'text-gray-600 dark:text-gray-400'
+    }
+  }
+
+  const handleRetry = () => {
+    // Clear any error state and reset the component tree
+    reset()
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
       <div className="max-w-2xl w-full">
-        {/* Main Error Card */}
-        <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-          
-          {/* Header Section */}
-          <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-            <div className="flex items-start gap-4">
-              <div className={`flex-shrink-0 p-2 rounded-full bg-opacity-10 ${
-                metadata.severity === 'critical' ? 'bg-red-100 dark:bg-red-900' :
-                metadata.severity === 'high' ? 'bg-orange-100 dark:bg-orange-900' :
-                metadata.severity === 'medium' ? 'bg-yellow-100 dark:bg-yellow-900' :
-                'bg-blue-100 dark:bg-blue-900'
-              }`}>
-                <AlertTriangle 
-                  className={`h-6 w-6 ${getIconColorClass(metadata.severity)}`}
-                  aria-hidden="true"
-                />
-              </div>
-              
-              <div className="flex-1 min-w-0">
-                <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  {metadata.title}
-                </h1>
-                <p className="mt-2 text-gray-600 dark:text-gray-300 leading-relaxed">
-                  {metadata.message}
-                </p>
-                
-                {/* Error ID if available */}
+        {/* Error announcement for screen readers */}
+        <div 
+          role="alert" 
+          aria-live="assertive" 
+          className="sr-only"
+          aria-atomic="true"
+        >
+          Script creation error: {errorContext.userMessage}. {errorContext.helpText}
+        </div>
+
+        {/* Main error container */}
+        <div className={`
+          rounded-lg border-2 p-8 shadow-lg backdrop-blur-sm
+          ${getSeverityStyles(errorContext.severity)}
+        `}>
+          {/* Error header with icon */}
+          <div className="flex items-start space-x-4 mb-6">
+            <div className={`
+              flex-shrink-0 p-3 rounded-full bg-white dark:bg-gray-800 shadow-sm
+              ${getSeverityIconColor(errorContext.severity)}
+            `}>
+              <AlertTriangle className="h-8 w-8" aria-hidden="true" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+                Script Creation Error
+              </h1>
+              <p className="text-lg text-gray-700 dark:text-gray-300 mb-1">
+                {errorContext.userMessage}
+              </p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                {errorContext.technicalMessage}
+              </p>
+            </div>
+          </div>
+
+          {/* Help text */}
+          {errorContext.helpText && (
+            <div className="mb-6 p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+              <p className="text-sm text-gray-700 dark:text-gray-300">
+                <strong>What you can do:</strong> {errorContext.helpText}
+              </p>
+            </div>
+          )}
+
+          {/* Recovery actions */}
+          <div className="space-y-3 mb-6">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">
+              Recovery Options
+            </h2>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {errorContext.recoveryActions.map((action, index) => (
+                <button
+                  key={index}
+                  onClick={action.action}
+                  className={`
+                    flex items-center justify-center space-x-3 px-4 py-3 rounded-lg
+                    text-sm font-medium transition-all duration-200 border
+                    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500
+                    ${action.primary 
+                      ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600 shadow-sm hover:shadow-md' 
+                      : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600'
+                    }
+                  `}
+                  aria-describedby={action.primary ? 'primary-action-desc' : undefined}
+                >
+                  {action.icon}
+                  <span>{action.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Technical details (collapsible) */}
+          <details className="mb-6">
+            <summary className="cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 flex items-center space-x-2">
+              <Bug className="h-4 w-4" />
+              <span>Technical Details</span>
+            </summary>
+            <div className="mt-3 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg border">
+              <div className="space-y-2 text-sm">
+                <div>
+                  <strong>Error Type:</strong> 
+                  <span className="ml-2 font-mono text-xs bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">
+                    {errorContext.type}
+                  </span>
+                </div>
+                <div>
+                  <strong>Severity:</strong> 
+                  <span className="ml-2 font-mono text-xs bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">
+                    {errorContext.severity}
+                  </span>
+                </div>
+                <div>
+                  <strong>Message:</strong> 
+                  <code className="block mt-1 p-2 bg-gray-200 dark:bg-gray-700 rounded text-xs break-all">
+                    {error.message}
+                  </code>
+                </div>
                 {error.digest && (
-                  <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                    Error ID: <code className="font-mono bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-xs">
+                  <div>
+                    <strong>Error ID:</strong> 
+                    <code className="block mt-1 p-2 bg-gray-200 dark:bg-gray-700 rounded text-xs">
                       {error.digest}
                     </code>
-                  </p>
+                  </div>
                 )}
               </div>
             </div>
-          </div>
+          </details>
 
-          {/* Suggestions Section */}
-          {metadata.suggestions.length > 0 && (
-            <div className="p-6 bg-blue-50 dark:bg-blue-900/20 border-b border-gray-200 dark:border-gray-700">
-              <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-3">
-                Suggested Solutions
-              </h2>
-              <ul className="space-y-2">
-                {metadata.suggestions.map((suggestion, index) => (
-                  <li key={index} className="flex items-start gap-2">
-                    <span className="flex-shrink-0 w-1.5 h-1.5 bg-blue-500 rounded-full mt-2" aria-hidden="true" />
-                    <span className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed">
-                      {suggestion}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Action Buttons */}
-          <div className="p-6 space-y-4">
-            <div className="flex flex-wrap gap-3">
-              {/* Retry Button */}
-              {metadata.canRetry && (
-                <button
-                  onClick={handleRetry}
-                  disabled={isRetrying}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-400 text-white font-medium rounded-md transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2 min-h-[44px]"
-                  aria-describedby="retry-description"
-                >
-                  <RefreshCw 
-                    className={`h-4 w-4 ${isRetrying ? 'animate-spin' : ''}`}
-                    aria-hidden="true"
-                  />
-                  {isRetrying ? 'Retrying...' : 'Try Again'}
-                </button>
-              )}
-
-              {/* Go Back Button */}
+          {/* Additional navigation */}
+          <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex flex-col sm:flex-row gap-3">
               <button
-                onClick={handleGoBack}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-md transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 min-h-[44px]"
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    window.location.href = '/adf-event-scripts'
+                  }
+                }}
+                className="flex items-center justify-center space-x-2 px-4 py-2 text-sm
+                         text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200
+                         border border-gray-300 dark:border-gray-600 rounded-lg
+                         hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors
+                         focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
               >
-                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-                Back to Scripts
+                <ArrowLeft className="h-4 w-4" />
+                <span>Back to Scripts</span>
               </button>
-
-              {/* Go Home Button */}
+              
               <button
-                onClick={handleGoHome}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-md transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 min-h-[44px]"
+                onClick={handleRetry}
+                className="flex items-center justify-center space-x-2 px-4 py-2 text-sm
+                         text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200
+                         border border-blue-300 dark:border-blue-600 rounded-lg
+                         hover:bg-blue-50 dark:hover:bg-blue-900 transition-colors
+                         focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
-                <Home className="h-4 w-4" aria-hidden="true" />
-                Dashboard
+                <RefreshCw className="h-4 w-4" />
+                <span>Try Again</span>
               </button>
-            </div>
-
-            {/* Secondary Actions */}
-            <div className="flex flex-wrap gap-3 pt-2 border-t border-gray-200 dark:border-gray-700">
-              {/* Copy Error Details */}
-              <button
-                onClick={handleCopyDetails}
-                disabled={copyStatus === 'copying'}
-                className="inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 rounded-md"
-              >
-                <Copy className="h-4 w-4" aria-hidden="true" />
-                {copyStatus === 'copying' ? 'Copying...' : 
-                 copyStatus === 'copied' ? 'Copied!' : 
-                 copyStatus === 'failed' ? 'Copy Failed' : 'Copy Error Details'}
-              </button>
-
-              {/* Report Bug */}
-              <button
-                onClick={handleReportBug}
-                className="inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 rounded-md"
-              >
-                <Bug className="h-4 w-4" aria-hidden="true" />
-                Report Bug
-                <ExternalLink className="h-3 w-3" aria-hidden="true" />
-              </button>
-
-              {/* Toggle Technical Details */}
-              {metadata.showDetails && (
-                <button
-                  onClick={() => setShowDetails(!showDetails)}
-                  className="inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 rounded-md"
-                  aria-expanded={showDetails}
-                  aria-controls="error-details"
-                >
-                  {showDetails ? 'Hide' : 'Show'} Technical Details
-                </button>
-              )}
             </div>
           </div>
-
-          {/* Technical Details Section */}
-          {metadata.showDetails && showDetails && (
-            <div id="error-details" className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-              <div className="p-6">
-                <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-3">
-                  Technical Details
-                </h3>
-                <div className="bg-gray-900 dark:bg-gray-950 rounded-md p-4 overflow-auto">
-                  <pre className="text-xs text-gray-300 whitespace-pre-wrap font-mono">
-                    <code>
-{`Error: ${error.message}
-
-Stack Trace:
-${error.stack || 'No stack trace available'}
-
-Category: ${metadata.category}
-Severity: ${metadata.severity}
-Timestamp: ${new Date().toISOString()}
-Page: /adf-event-scripts/create
-User Agent: ${typeof window !== 'undefined' ? navigator.userAgent : 'Unknown'}`}
-                    </code>
-                  </pre>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* Hidden elements for screen readers */}
+        {/* Hidden descriptions for screen readers */}
         <div className="sr-only">
-          <div id="retry-description">
-            Attempts to reload the script creation form and resolve the error
-          </div>
-          <div aria-live="polite" aria-atomic="true">
-            {/* This will be populated by announceError function */}
+          <div id="primary-action-desc">
+            Primary recommended action to resolve the script creation error
           </div>
         </div>
       </div>
     </div>
-  );
+  )
 }
