@@ -1,208 +1,246 @@
-/**
- * Loading UI component for email templates section that displays skeleton states and loading indicators
- * while email template data is being fetched. Implements Tailwind CSS animations and responsive design
- * patterns following Next.js app router loading.tsx convention.
- * 
- * This component provides loading feedback for slow network conditions and ensures WCAG 2.1 AA
- * compliance through proper accessibility attributes and animations.
- */
+import React from 'react';
 
-export default function Loading() {
+/**
+ * Loading UI component for email templates section that displays skeleton states 
+ * and loading indicators while email template data is being fetched.
+ * 
+ * Implements Tailwind CSS animations and responsive design patterns following 
+ * Next.js app router loading.tsx convention. Provides skeleton states that match 
+ * the email template table layout with proper accessibility support.
+ * 
+ * Features:
+ * - Skeleton states for top action bar (create/refresh buttons, search input)
+ * - Skeleton states for table header and rows matching email template structure
+ * - WCAG 2.1 AA compliant animations with reduced motion support
+ * - SSR-compatible loading states
+ * - Responsive design for different screen sizes
+ * - Accessible loading announcements for screen readers
+ */
+export default function EmailTemplatesLoading() {
   return (
-    <div className="w-full h-full min-h-screen bg-background" role="status" aria-label="Loading email templates">
-      {/* Page Header Skeleton */}
-      <div className="border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center px-4">
-          {/* Breadcrumb skeleton */}
-          <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-            <div className="h-4 w-20 bg-muted animate-pulse rounded"></div>
-            <div className="h-4 w-1 bg-muted/50"></div>
-            <div className="h-4 w-28 bg-muted animate-pulse rounded"></div>
-            <div className="h-4 w-1 bg-muted/50"></div>
-            <div className="h-4 w-32 bg-muted animate-pulse rounded"></div>
-          </div>
-          <div className="ml-auto">
-            {/* Action button skeleton */}
-            <div className="h-9 w-24 bg-primary/20 animate-pulse rounded-md"></div>
-          </div>
+    <div 
+      className="email-templates-loading w-full max-w-7xl mx-auto p-4 sm:p-6 lg:p-8"
+      role="status"
+      aria-label="Loading email templates"
+      aria-live="polite"
+    >
+      {/* Screen reader announcement */}
+      <div className="sr-only">
+        Loading email templates, please wait...
+      </div>
+
+      {/* Top Action Bar Skeleton */}
+      <div className="top-action-bar-skeleton mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
+        {/* Action buttons skeleton */}
+        <div className="flex items-center gap-3">
+          {/* Create button skeleton */}
+          <div 
+            className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse"
+            aria-hidden="true"
+          />
+          
+          {/* Refresh button skeleton */}
+          <div 
+            className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse"
+            aria-hidden="true"
+          />
+          
+          {/* Additional action buttons placeholder */}
+          <div 
+            className="w-8 h-8 bg-gray-100 dark:bg-gray-800 rounded animate-pulse"
+            aria-hidden="true"
+          />
+        </div>
+
+        {/* Search input skeleton */}
+        <div className="w-full sm:w-80">
+          <div 
+            className="h-14 bg-gray-200 dark:bg-gray-700 rounded-md animate-pulse border border-gray-300 dark:border-gray-600"
+            aria-hidden="true"
+          />
         </div>
       </div>
 
-      {/* Main Content Area */}
-      <div className="container py-6 px-4">
-        {/* Page Title and Description */}
-        <div className="mb-6">
-          <div className="h-8 w-48 bg-muted animate-pulse rounded-md mb-2"></div>
-          <div className="h-4 w-96 bg-muted/60 animate-pulse rounded"></div>
-        </div>
-
-        {/* Filter and Search Controls */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-4">
-            {/* Search input skeleton */}
-            <div className="relative">
-              <div className="h-10 w-72 bg-muted animate-pulse rounded-md"></div>
+      {/* Table Container Skeleton */}
+      <div className="table-container bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
+        {/* Table Header Skeleton */}
+        <div className="table-header border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+          <div className="grid grid-cols-12 gap-4 p-4">
+            {/* Name column header */}
+            <div className="col-span-4">
+              <div 
+                className="h-5 bg-gray-300 dark:bg-gray-600 rounded animate-pulse"
+                aria-hidden="true"
+              />
             </div>
-            {/* Filter dropdown skeleton */}
-            <div className="h-10 w-32 bg-muted animate-pulse rounded-md"></div>
-          </div>
-          <div className="flex items-center space-x-2">
-            {/* Bulk actions skeleton */}
-            <div className="h-9 w-20 bg-muted animate-pulse rounded-md"></div>
-            <div className="h-9 w-28 bg-primary/20 animate-pulse rounded-md"></div>
-          </div>
-        </div>
-
-        {/* Email Templates Table Skeleton */}
-        <div className="rounded-md border border-border bg-card">
-          {/* Table Header */}
-          <div className="border-b border-border bg-muted/50 px-6 py-4">
-            <div className="grid grid-cols-12 gap-4 items-center">
-              {/* Checkbox column */}
-              <div className="col-span-1">
-                <div className="h-4 w-4 bg-muted animate-pulse rounded"></div>
-              </div>
-              {/* Name column */}
-              <div className="col-span-3">
-                <div className="h-4 w-16 bg-muted animate-pulse rounded"></div>
-              </div>
-              {/* Subject column */}
-              <div className="col-span-3">
-                <div className="h-4 w-20 bg-muted animate-pulse rounded"></div>
-              </div>
-              {/* Type column */}
-              <div className="col-span-2">
-                <div className="h-4 w-12 bg-muted animate-pulse rounded"></div>
-              </div>
-              {/* Status column */}
-              <div className="col-span-2">
-                <div className="h-4 w-16 bg-muted animate-pulse rounded"></div>
-              </div>
-              {/* Actions column */}
-              <div className="col-span-1">
-                <div className="h-4 w-12 bg-muted animate-pulse rounded"></div>
-              </div>
+            
+            {/* Description column header */}
+            <div className="col-span-6">
+              <div 
+                className="h-5 bg-gray-300 dark:bg-gray-600 rounded animate-pulse"
+                aria-hidden="true"
+              />
+            </div>
+            
+            {/* Actions column header */}
+            <div className="col-span-2">
+              <div 
+                className="h-5 bg-gray-300 dark:bg-gray-600 rounded animate-pulse"
+                aria-hidden="true"
+              />
             </div>
           </div>
+        </div>
 
-          {/* Table Body - Multiple rows */}
-          {Array.from({ length: 8 }).map((_, index) => (
+        {/* Table Rows Skeleton */}
+        <div className="table-body">
+          {/* Generate 8 skeleton rows for typical loading state */}
+          {Array.from({ length: 8 }, (_, index) => (
             <div 
-              key={index}
-              className="border-b border-border last:border-b-0 px-6 py-4 hover:bg-muted/50 transition-colors"
+              key={`skeleton-row-${index}`}
+              className={`grid grid-cols-12 gap-4 p-4 border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 ${
+                index % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50/50 dark:bg-gray-900/50'
+              }`}
+              aria-hidden="true"
             >
-              <div className="grid grid-cols-12 gap-4 items-center">
-                {/* Checkbox */}
-                <div className="col-span-1">
-                  <div className="h-4 w-4 bg-muted animate-pulse rounded border"></div>
+              {/* Name cell skeleton */}
+              <div className="col-span-4 flex items-center">
+                <div className="space-y-2 w-full">
+                  <div 
+                    className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"
+                    style={{ 
+                      width: `${Math.floor(Math.random() * 40) + 60}%`,
+                      animationDelay: `${index * 100}ms` 
+                    }}
+                  />
                 </div>
-                {/* Name */}
-                <div className="col-span-3">
-                  <div className="space-y-1">
-                    <div className="h-4 w-full bg-muted animate-pulse rounded" style={{ animationDelay: `${index * 0.1}s` }}></div>
-                    <div className="h-3 w-3/4 bg-muted/60 animate-pulse rounded" style={{ animationDelay: `${index * 0.1 + 0.05}s` }}></div>
-                  </div>
+              </div>
+
+              {/* Description cell skeleton */}
+              <div className="col-span-6 flex items-center">
+                <div className="space-y-2 w-full">
+                  <div 
+                    className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"
+                    style={{ 
+                      width: `${Math.floor(Math.random() * 50) + 50}%`,
+                      animationDelay: `${index * 150}ms` 
+                    }}
+                  />
+                  {/* Longer descriptions for some rows */}
+                  {index % 3 === 0 && (
+                    <div 
+                      className="h-3 bg-gray-100 dark:bg-gray-800 rounded animate-pulse"
+                      style={{ 
+                        width: `${Math.floor(Math.random() * 30) + 30}%`,
+                        animationDelay: `${index * 200}ms` 
+                      }}
+                    />
+                  )}
                 </div>
-                {/* Subject */}
-                <div className="col-span-3">
-                  <div className="h-4 w-5/6 bg-muted animate-pulse rounded" style={{ animationDelay: `${index * 0.1 + 0.02}s` }}></div>
-                </div>
-                {/* Type */}
-                <div className="col-span-2">
-                  <div className="h-6 w-16 bg-primary/20 animate-pulse rounded-full" style={{ animationDelay: `${index * 0.1 + 0.03}s` }}></div>
-                </div>
-                {/* Status */}
-                <div className="col-span-2">
-                  <div className="flex items-center space-x-2">
-                    <div className="h-3 w-3 bg-green-500/50 animate-pulse rounded-full" style={{ animationDelay: `${index * 0.1 + 0.04}s` }}></div>
-                    <div className="h-4 w-12 bg-muted animate-pulse rounded" style={{ animationDelay: `${index * 0.1 + 0.04}s` }}></div>
-                  </div>
-                </div>
-                {/* Actions */}
-                <div className="col-span-1">
-                  <div className="flex items-center space-x-1">
-                    <div className="h-8 w-8 bg-muted animate-pulse rounded" style={{ animationDelay: `${index * 0.1 + 0.05}s` }}></div>
-                    <div className="h-8 w-8 bg-muted animate-pulse rounded" style={{ animationDelay: `${index * 0.1 + 0.06}s` }}></div>
-                  </div>
+              </div>
+
+              {/* Actions cell skeleton */}
+              <div className="col-span-2 flex items-center justify-end">
+                <div className="flex items-center gap-2">
+                  {/* Edit button skeleton */}
+                  <div 
+                    className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"
+                    style={{ animationDelay: `${index * 50}ms` }}
+                  />
+                  
+                  {/* Delete button skeleton */}
+                  <div 
+                    className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"
+                    style={{ animationDelay: `${index * 75}ms` }}
+                  />
+                  
+                  {/* More actions menu skeleton */}
+                  <div 
+                    className="w-6 h-6 bg-gray-100 dark:bg-gray-800 rounded animate-pulse"
+                    style={{ animationDelay: `${index * 25}ms` }}
+                  />
                 </div>
               </div>
             </div>
           ))}
         </div>
 
-        {/* Pagination Skeleton */}
-        <div className="flex items-center justify-between mt-6">
-          <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-            <div className="h-4 w-32 bg-muted animate-pulse rounded"></div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="h-9 w-20 bg-muted animate-pulse rounded-md"></div>
-            <div className="flex items-center space-x-1">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="h-9 w-9 bg-muted animate-pulse rounded-md"></div>
-              ))}
+        {/* Table Footer/Pagination Skeleton */}
+        <div className="table-footer border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            {/* Rows per page selector skeleton */}
+            <div className="flex items-center gap-2">
+              <div 
+                className="h-4 w-20 bg-gray-300 dark:bg-gray-600 rounded animate-pulse"
+                aria-hidden="true"
+              />
+              <div 
+                className="h-8 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"
+                aria-hidden="true"
+              />
             </div>
-            <div className="h-9 w-20 bg-muted animate-pulse rounded-md"></div>
+
+            {/* Page info skeleton */}
+            <div className="flex items-center gap-4">
+              <div 
+                className="h-4 w-32 bg-gray-300 dark:bg-gray-600 rounded animate-pulse"
+                aria-hidden="true"
+              />
+              
+              {/* Pagination controls skeleton */}
+              <div className="flex items-center gap-1">
+                <div 
+                  className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"
+                  aria-hidden="true"
+                />
+                <div 
+                  className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"
+                  aria-hidden="true"
+                />
+                <div 
+                  className="w-8 h-8 bg-gray-100 dark:bg-gray-800 rounded animate-pulse"
+                  aria-hidden="true"
+                />
+                <div 
+                  className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"
+                  aria-hidden="true"
+                />
+                <div 
+                  className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"
+                  aria-hidden="true"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Loading Spinner Overlay for Slow Connections */}
-      <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center pointer-events-none opacity-0 animate-fade-in animation-delay-[2s]">
-        <div className="flex flex-col items-center space-y-4 bg-card p-6 rounded-lg border shadow-lg">
-          <div className="relative">
-            {/* Spinner */}
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-primary"></div>
-            {/* Pulse effect */}
-            <div className="absolute inset-0 h-8 w-8 animate-ping rounded-full border border-primary/25"></div>
-          </div>
-          <div className="text-center">
-            <p className="text-sm font-medium text-foreground">Loading email templates...</p>
-            <p className="text-xs text-muted-foreground mt-1">This is taking longer than usual</p>
-          </div>
+      {/* Loading indicator for slow network conditions */}
+      <div className="loading-indicator mt-6 flex items-center justify-center">
+        <div className="flex items-center gap-3 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+          {/* Spinning indicator */}
+          <div 
+            className="w-5 h-5 border-2 border-blue-200 dark:border-blue-700 border-t-blue-500 dark:border-t-blue-400 rounded-full animate-spin"
+            aria-hidden="true"
+          />
+          
+          {/* Loading text */}
+          <span className="text-sm text-blue-700 dark:text-blue-300 font-medium">
+            Loading email templates...
+          </span>
         </div>
       </div>
 
-      {/* Screen Reader Announcements */}
-      <div className="sr-only" aria-live="polite" aria-atomic="true">
-        Loading email template data. Please wait while we fetch the latest information.
-      </div>
-      
+      {/* Accessibility styles for reduced motion */}
       <style jsx>{`
-        @keyframes fade-in {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        
-        .animate-fade-in {
-          animation: fade-in 0.5s ease-in-out forwards;
-        }
-        
-        .animation-delay-\\[2s\\] {
-          animation-delay: 2s;
-        }
-        
-        /* Enhanced pulse animation for accessibility */
-        @keyframes pulse {
-          0%, 100% {
-            opacity: 1;
-          }
-          50% {
-            opacity: 0.4;
-          }
-        }
-        
-        .animate-pulse {
-          animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-        
-        /* Respect prefers-reduced-motion */
         @media (prefers-reduced-motion: reduce) {
-          .animate-pulse,
-          .animate-spin,
-          .animate-ping,
-          .animate-fade-in {
-            animation: none;
+          .email-templates-loading .animate-pulse,
+          .email-templates-loading .animate-spin {
+            animation: none !important;
+          }
+          
+          .email-templates-loading .animate-pulse {
+            opacity: 0.7;
           }
         }
       `}</style>
