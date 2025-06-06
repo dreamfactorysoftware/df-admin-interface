@@ -1,540 +1,895 @@
 /**
  * Database Service List Table Component
  * 
- * React table component for displaying and managing database services in a paginated,
- * filterable table format. Implements service listing functionality using React Query
- * for data fetching, Headless UI for accessible table components, and Tailwind CSS
- * for styling. Provides CRUD operations including delete functionality with optimistic
+ * React table component for displaying and managing database services in a paginated, 
+ * filterable table format. Implements service listing functionality using React Query 
+ * for data fetching, Headless UI for accessible table components, and Tailwind CSS 
+ * for styling. Provides CRUD operations including delete functionality with optimistic 
  * updates and handles large datasets with virtual scrolling.
  * 
- * Migrated from Angular DfManageServicesTableComponent to React functional component
- * with modern patterns and enhanced performance optimizations.
+ * Key Features:
+ * - React 19 stable features with TypeScript 5.8+ per Section 7.1.1
+ * - SWR/React Query for intelligent caching and synchronization 
+ * - TanStack Virtual for virtualization and progressive loading patterns optimized for 1000+ services
+ * - React Hook Form for configuration workflows with real-time validation under 100ms
+ * - Tailwind CSS 4.1+ with consistent theme injection across components
+ * - Headless UI 2.0+ for accessible, unstyled components
+ * - Database service CRUD operations maintaining existing API compatibility per F-001 requirements
+ * - Optimistic updates for delete operations using React Query mutations
+ * - Comprehensive error handling and accessibility compliance
  * 
- * @fileoverview Service list table with comprehensive CRUD operations and accessibility
+ * @fileoverview Service list table component migrated from Angular to React/Next.js
  * @version 1.0.0
- * @since 2024-01-01
+ * @since React 19.0.0, Next.js 15.1+, TypeScript 5.8+
  */
 
 'use client';
 
-import React, {
-  useState,
-  useCallback,
-  useMemo,
-  useEffect,
-  useRef,
-  useTransition,
-  forwardRef,
-  useImperativeHandle,
-  ComponentPropsWithoutRef
-} from 'react';
-import { useVirtualizer, type VirtualItem } from '@tanstack/react-virtual';
-import {
+import React, { useMemo, useCallback, useState, useRef, useEffect } from 'react';
+import { useVirtualizer, type Virtualizer } from '@tanstack/react-virtual';
+import { 
+  Menu,
+  MenuButton,
+  MenuItem,
+  MenuItems,
+  Transition,
+  Checkbox,
+  Button,
+  Dialog,
+  DialogPanel,
+  DialogTitle,
+  Description
+} from '@headlessui/react';
+import { 
+  EllipsisVerticalIcon,
+  PlayIcon,
+  PencilIcon,
+  TrashIcon,
+  DocumentDuplicateIcon,
+  ExclamationTriangleIcon,
+  CheckIcon,
+  XMarkIcon,
+  ChevronUpDownIcon,
   ChevronUpIcon,
   ChevronDownIcon,
   MagnifyingGlassIcon,
-  PlusIcon,
-  TrashIcon,
-  PencilIcon,
-  EyeIcon,
-  ArrowPathIcon,
-  Cog6ToothIcon,
-  ServerIcon,
-  CheckCircleIcon,
-  ExclamationTriangleIcon,
-  XCircleIcon,
-  ClockIcon,
-  EllipsisHorizontalIcon,
-  DocumentDuplicateIcon,
-  PlayIcon,
-  StopIcon
+  FunnelIcon,
+  Square3Stack3DIcon,
+  TableCellsIcon,
+  ArrowPathIcon
 } from '@heroicons/react/24/outline';
-import { 
-  CheckCircleIcon as CheckCircleIconSolid,
-  XCircleIcon as XCircleIconSolid 
-} from '@heroicons/react/24/solid';
-import { cn } from '@/lib/utils';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { cn } from '../../../lib/utils';
 
-// Import types and hooks (these will be available when dependency files are created)
-import type {
+// Type imports from dependencies
+import type { 
   DatabaseService,
+  ServiceListTableProps,
+  ServiceListColumn,
+  ServiceListFilterData,
+  ServiceListSortData,
+  ServiceListPaginationData,
+  ServiceListRowSelection,
+  ServiceListAction,
   DatabaseDriver,
   ServiceStatus,
+  BulkAction,
   ConnectionTestResult,
-  ServiceListFilters,
-  ServiceListSort,
-  ServiceListTableProps,
-  ServiceListCellProps,
-  ServiceListColumn,
-  TableSelectionConfig,
-  PaginationConfig,
-  SortingConfig,
-  FilteringConfig,
-  VirtualizationConfig,
-  BulkActionType,
-  ServiceActionConfig
+  VirtualTableConfig,
+  VirtualServiceItem
 } from './service-list-types';
-import {
-  useServiceListComplete,
+
+import { 
+  SERVICE_STATUS_LABELS,
+  SERVICE_STATUS_COLORS,
+  DATABASE_TYPE_LABELS,
+  ServiceListFilterSchema,
+  ServiceListSortSchema,
+  isValidSortField,
+  formatServiceStatus,
+  getServiceStatusColor
+} from './service-list-types';
+
+// Hook imports
+import { 
+  useServiceList,
+  useServiceListFilters,
+  useServiceListSelection,
   useServiceListVirtualization,
+  useServiceListMutations,
   useServiceConnectionStatus
 } from './service-list-hooks';
-import { DATABASE_TYPES, DATABASE_SERVICE_UI_CONFIG } from '../constants';
+
+import { useServiceListStore } from './service-list-hooks';
+
+// Constants imports
+import { 
+  DATABASE_DRIVERS,
+  COMPONENT_CONFIG,
+  VALIDATION_RULES
+} from '../constants';
 
 // =============================================================================
-// COMPONENT INTERFACES
+// FILTER FORM SCHEMA AND TYPES
 // =============================================================================
 
 /**
- * Service list table component props with comprehensive configuration options
+ * Filter form schema for table controls
  */
-interface ServiceListTableComponentProps extends ComponentPropsWithoutRef<'div'> {
-  services?: DatabaseService[];
-  loading?: boolean;
-  error?: Error | null;
-  onServiceSelect?: (service: DatabaseService) => void;
-  onServiceEdit?: (service: DatabaseService) => void;
-  onServiceDelete?: (service: DatabaseService) => void;
-  onServiceDuplicate?: (service: DatabaseService) => void;
-  onServiceTest?: (service: DatabaseService) => void;
-  onServiceToggle?: (service: DatabaseService, active: boolean) => void;
-  onBulkActions?: (action: BulkActionType, services: DatabaseService[]) => void;
-  onRefresh?: () => void;
-  selection?: Partial<TableSelectionConfig>;
-  pagination?: Partial<PaginationConfig>;
-  sorting?: Partial<SortingConfig>;
-  filtering?: Partial<FilteringConfig>;
-  virtualization?: Partial<VirtualizationConfig>;
-  enableVirtualization?: boolean;
-  enableBulkActions?: boolean;
-  enableContextMenu?: boolean;
-  compactMode?: boolean;
-  showConnectionStatus?: boolean;
-  refreshInterval?: number;
-  autoRefresh?: boolean;
-  'data-testid'?: string;
-}
+const FilterFormSchema = z.object({
+  search: z.string().optional(),
+  type: z.array(z.enum(['mysql', 'postgresql', 'sqlserver', 'oracle', 'mongodb', 'snowflake', 'sqlite'])).optional(),
+  status: z.array(z.enum(['active', 'inactive'])).optional(),
+  showInactive: z.boolean().default(false),
+});
+
+type FilterFormData = z.infer<typeof FilterFormSchema>;
+
+// =============================================================================
+// COLUMN DEFINITIONS
+// =============================================================================
 
 /**
- * Service list table ref interface for imperative control
+ * Default column configuration for service list table
  */
-interface ServiceListTableRef {
-  refresh: () => void;
-  clearSelection: () => void;
-  selectAll: () => void;
-  getSelectedServices: () => DatabaseService[];
-  scrollToService: (serviceId: number) => void;
-  focusSearch: () => void;
-}
+const DEFAULT_COLUMNS: ServiceListColumn[] = [
+  {
+    id: 'selection',
+    header: '',
+    accessor: 'id',
+    width: '48px',
+    minWidth: 48,
+    maxWidth: 48,
+    sortable: false,
+    filterable: false,
+    resizable: false,
+    sticky: 'left',
+    required: true,
+    className: 'w-12 text-center',
+  },
+  {
+    id: 'name',
+    header: 'Service Name',
+    accessor: 'name',
+    width: '200px',
+    minWidth: 150,
+    sortable: true,
+    filterable: true,
+    className: 'font-medium text-gray-900 dark:text-gray-100',
+  },
+  {
+    id: 'type',
+    header: 'Type',
+    accessor: 'type',
+    width: '120px',
+    minWidth: 100,
+    sortable: true,
+    filterable: true,
+    className: 'text-gray-700 dark:text-gray-300',
+  },
+  {
+    id: 'label',
+    header: 'Display Label',
+    accessor: 'label',
+    width: '180px',
+    minWidth: 120,
+    sortable: true,
+    filterable: false,
+    className: 'text-gray-700 dark:text-gray-300',
+  },
+  {
+    id: 'status',
+    header: 'Status',
+    accessor: 'is_active',
+    width: '100px',
+    minWidth: 80,
+    sortable: true,
+    filterable: true,
+    align: 'center',
+    className: 'text-center',
+  },
+  {
+    id: 'connection_status',
+    header: 'Connection',
+    accessor: (service) => service.id,
+    width: '120px',
+    minWidth: 100,
+    sortable: false,
+    filterable: false,
+    align: 'center',
+    className: 'text-center',
+  },
+  {
+    id: 'created_date',
+    header: 'Created',
+    accessor: 'created_date',
+    width: '140px',
+    minWidth: 120,
+    sortable: true,
+    filterable: false,
+    className: 'text-gray-600 dark:text-gray-400',
+  },
+  {
+    id: 'last_modified_date',
+    header: 'Modified',
+    accessor: 'last_modified_date',
+    width: '140px',
+    minWidth: 120,
+    sortable: true,
+    filterable: false,
+    className: 'text-gray-600 dark:text-gray-400',
+  },
+  {
+    id: 'actions',
+    header: 'Actions',
+    accessor: 'id',
+    width: '120px',
+    minWidth: 100,
+    maxWidth: 120,
+    sortable: false,
+    filterable: false,
+    resizable: false,
+    sticky: 'right',
+    required: true,
+    align: 'center',
+    className: 'text-center',
+  },
+];
+
+// =============================================================================
+// BULK ACTIONS CONFIGURATION
+// =============================================================================
 
 /**
- * Service row action dropdown props
+ * Available bulk actions for selected services
  */
-interface ServiceActionsDropdownProps {
+const BULK_ACTIONS: BulkAction[] = [
+  {
+    id: 'activate',
+    label: 'Activate Services',
+    icon: CheckIcon,
+    variant: 'default',
+    requiresConfirmation: true,
+    confirmationMessage: 'Are you sure you want to activate the selected services?',
+  },
+  {
+    id: 'deactivate',
+    label: 'Deactivate Services',
+    icon: XMarkIcon,
+    variant: 'warning',
+    requiresConfirmation: true,
+    confirmationMessage: 'Are you sure you want to deactivate the selected services?',
+  },
+  {
+    id: 'test-connection',
+    label: 'Test Connections',
+    icon: PlayIcon,
+    variant: 'default',
+    requiresConfirmation: false,
+  },
+  {
+    id: 'delete',
+    label: 'Delete Services',
+    icon: TrashIcon,
+    variant: 'destructive',
+    requiresConfirmation: true,
+    confirmationMessage: 'Are you sure you want to delete the selected services? This action cannot be undone.',
+  },
+];
+
+// =============================================================================
+// COMPONENT SUBCOMPONENTS
+// =============================================================================
+
+/**
+ * Service Status Badge Component
+ */
+interface ServiceStatusBadgeProps {
   service: DatabaseService;
-  onEdit?: (service: DatabaseService) => void;
-  onDelete?: (service: DatabaseService) => void;
-  onDuplicate?: (service: DatabaseService) => void;
-  onTest?: (service: DatabaseService) => void;
-  onToggle?: (service: DatabaseService, active: boolean) => void;
   className?: string;
-  'data-testid'?: string;
 }
 
-/**
- * Connection status indicator props
- */
-interface ConnectionStatusIndicatorProps {
-  service: DatabaseService;
-  showDetails?: boolean;
-  size?: 'sm' | 'md' | 'lg';
-  className?: string;
-  'data-testid'?: string;
-}
+const ServiceStatusBadge: React.FC<ServiceStatusBadgeProps> = ({ service, className }) => {
+  const status: ServiceStatus = service.is_active ? 'active' : 'inactive';
+  const statusColor = getServiceStatusColor(status);
+  const statusLabel = formatServiceStatus(status);
 
-// =============================================================================
-// UTILITY FUNCTIONS
-// =============================================================================
-
-/**
- * Format date for display in table cells
- */
-const formatDate = (dateString: string): string => {
-  try {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  } catch {
-    return 'Invalid Date';
-  }
+  return (
+    <span 
+      className={cn(
+        'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
+        statusColor === 'green' && 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100',
+        statusColor === 'gray' && 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100',
+        statusColor === 'red' && 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100',
+        statusColor === 'yellow' && 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100',
+        statusColor === 'blue' && 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100',
+        className
+      )}
+      title={`Service is ${statusLabel.toLowerCase()}`}
+    >
+      {statusLabel}
+    </span>
+  );
 };
-
-/**
- * Get database type display information
- */
-const getDatabaseTypeInfo = (type: DatabaseDriver) => {
-  return DATABASE_TYPES[type] || {
-    label: type.toUpperCase(),
-    group: 'Database',
-    tier: 'core'
-  };
-};
-
-/**
- * Get service status display information
- */
-const getServiceStatusInfo = (status: ServiceStatus) => {
-  const statusConfig = {
-    active: {
-      label: 'Active',
-      color: 'text-green-600 dark:text-green-400',
-      bgColor: 'bg-green-50 dark:bg-green-900/20',
-      borderColor: 'border-green-200 dark:border-green-800',
-      icon: CheckCircleIconSolid
-    },
-    inactive: {
-      label: 'Inactive',
-      color: 'text-gray-600 dark:text-gray-400',
-      bgColor: 'bg-gray-50 dark:bg-gray-900/20',
-      borderColor: 'border-gray-200 dark:border-gray-800',
-      icon: StopIcon
-    },
-    testing: {
-      label: 'Testing',
-      color: 'text-blue-600 dark:text-blue-400',
-      bgColor: 'bg-blue-50 dark:bg-blue-900/20',
-      borderColor: 'border-blue-200 dark:border-blue-800',
-      icon: ArrowPathIcon
-    },
-    error: {
-      label: 'Error',
-      color: 'text-red-600 dark:text-red-400',
-      bgColor: 'bg-red-50 dark:bg-red-900/20',
-      borderColor: 'border-red-200 dark:border-red-800',
-      icon: XCircleIconSolid
-    },
-    configuring: {
-      label: 'Configuring',
-      color: 'text-yellow-600 dark:text-yellow-400',
-      bgColor: 'bg-yellow-50 dark:bg-yellow-900/20',
-      borderColor: 'border-yellow-200 dark:border-yellow-800',
-      icon: Cog6ToothIcon
-    },
-    pending: {
-      label: 'Pending',
-      color: 'text-orange-600 dark:text-orange-400',
-      bgColor: 'bg-orange-50 dark:bg-orange-900/20',
-      borderColor: 'border-orange-200 dark:border-orange-800',
-      icon: ClockIcon
-    }
-  };
-
-  return statusConfig[status] || statusConfig.inactive;
-};
-
-// =============================================================================
-// SUB-COMPONENTS
-// =============================================================================
 
 /**
  * Connection Status Indicator Component
  */
-const ConnectionStatusIndicator: React.FC<ConnectionStatusIndicatorProps> = ({
-  service,
-  showDetails = false,
-  size = 'md',
-  className,
-  'data-testid': testId
-}) => {
-  const { result, status, isLoading, test } = useServiceConnectionStatus(
-    service.id,
-    service.config as any
-  );
+interface ConnectionStatusIndicatorProps {
+  serviceId: number;
+  className?: string;
+}
 
-  const sizeClasses = {
-    sm: 'h-3 w-3',
-    md: 'h-4 w-4',
-    lg: 'h-5 w-5'
-  };
+const ConnectionStatusIndicator: React.FC<ConnectionStatusIndicatorProps> = ({ serviceId, className }) => {
+  const { connectionStatus, isLoading, error, testConnection } = useServiceConnectionStatus(serviceId);
 
-  const textSizeClasses = {
-    sm: 'text-xs',
-    md: 'text-sm',
-    lg: 'text-base'
-  };
+  const getStatusIcon = () => {
+    if (isLoading) {
+      return (
+        <div className="inline-flex items-center">
+          <ArrowPathIcon className="h-4 w-4 animate-spin text-blue-500" />
+          <span className="sr-only">Testing connection...</span>
+        </div>
+      );
+    }
 
-  const iconSize = sizeClasses[size];
-  const textSize = textSizeClasses[size];
+    if (error || !connectionStatus) {
+      return (
+        <div className="inline-flex items-center">
+          <ExclamationTriangleIcon className="h-4 w-4 text-red-500" />
+          <span className="sr-only">Connection failed</span>
+        </div>
+      );
+    }
 
-  if (isLoading) {
+    if (connectionStatus.success) {
+      return (
+        <div className="inline-flex items-center">
+          <CheckIcon className="h-4 w-4 text-green-500" />
+          <span className="sr-only">Connection successful</span>
+        </div>
+      );
+    }
+
     return (
-      <div
-        className={cn('flex items-center space-x-2', className)}
-        data-testid={testId}
-        title="Testing connection..."
-      >
-        <ArrowPathIcon className={cn(iconSize, 'animate-spin text-blue-500')} />
-        {showDetails && (
-          <span className={cn(textSize, 'text-blue-600 dark:text-blue-400')}>
-            Testing...
-          </span>
-        )}
+      <div className="inline-flex items-center">
+        <XMarkIcon className="h-4 w-4 text-red-500" />
+        <span className="sr-only">Connection failed</span>
       </div>
     );
-  }
-
-  if (!result) {
-    return (
-      <div
-        className={cn('flex items-center space-x-2', className)}
-        data-testid={testId}
-        title="Connection status unknown"
-      >
-        <div className={cn(iconSize, 'rounded-full bg-gray-400')} />
-        {showDetails && (
-          <span className={cn(textSize, 'text-gray-600 dark:text-gray-400')}>
-            Unknown
-          </span>
-        )}
-      </div>
-    );
-  }
-
-  const statusIcon = result.success ? (
-    <CheckCircleIconSolid className={cn(iconSize, 'text-green-500')} />
-  ) : (
-    <XCircleIconSolid className={cn(iconSize, 'text-red-500')} />
-  );
-
-  const statusText = result.success ? 'Connected' : 'Connection Failed';
-  const statusColor = result.success
-    ? 'text-green-600 dark:text-green-400'
-    : 'text-red-600 dark:text-red-400';
+  };
 
   return (
-    <div
-      className={cn('flex items-center space-x-2', className)}
-      data-testid={testId}
-      title={`${statusText}: ${result.message}`}
-    >
-      {statusIcon}
-      {showDetails && (
-        <div className={textSize}>
-          <div className={cn('font-medium', statusColor)}>
-            {statusText}
-          </div>
-          {result.testDuration && (
-            <div className="text-xs text-gray-500">
-              {result.testDuration}ms
-            </div>
-          )}
-        </div>
+    <button
+      onClick={() => testConnection()}
+      disabled={isLoading}
+      className={cn(
+        'inline-flex items-center justify-center w-8 h-8 rounded-full transition-colors',
+        'hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500',
+        'disabled:opacity-50 disabled:cursor-not-allowed',
+        className
       )}
-    </div>
+      title={`Test connection for service ${serviceId}`}
+    >
+      {getStatusIcon()}
+    </button>
   );
 };
 
 /**
- * Service Actions Dropdown Component
+ * Service Actions Menu Component
  */
-const ServiceActionsDropdown: React.FC<ServiceActionsDropdownProps> = ({
+interface ServiceActionsMenuProps {
+  service: DatabaseService;
+  onEdit: (service: DatabaseService) => void;
+  onDelete: (service: DatabaseService) => void;
+  onDuplicate: (service: DatabaseService) => void;
+  onTestConnection: (service: DatabaseService) => void;
+  disabled?: boolean;
+}
+
+const ServiceActionsMenu: React.FC<ServiceActionsMenuProps> = ({
   service,
   onEdit,
   onDelete,
   onDuplicate,
-  onTest,
-  onToggle,
-  className,
-  'data-testid': testId
+  onTestConnection,
+  disabled = false
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [isOpen]);
-
-  const actions: ServiceActionConfig[] = [
+  const actions: ServiceListAction[] = [
+    {
+      id: 'test',
+      label: 'Test Connection',
+      icon: PlayIcon,
+      onClick: () => onTestConnection(service),
+      variant: 'default',
+    },
     {
       id: 'edit',
-      label: 'Edit Configuration',
+      label: 'Edit Service',
       icon: PencilIcon,
-      action: () => onEdit?.(service),
-      disabled: () => !service.mutable,
-      priority: 1
+      onClick: () => onEdit(service),
+      variant: 'default',
     },
     {
       id: 'duplicate',
       label: 'Duplicate Service',
       icon: DocumentDuplicateIcon,
-      action: () => onDuplicate?.(service),
-      priority: 2
-    },
-    {
-      id: 'test',
-      label: 'Test Connection',
-      icon: PlayIcon,
-      action: () => onTest?.(service),
-      priority: 3
-    },
-    {
-      id: 'toggle',
-      label: service.is_active ? 'Deactivate' : 'Activate',
-      icon: service.is_active ? StopIcon : PlayIcon,
-      action: () => onToggle?.(service, !service.is_active),
-      disabled: () => !service.mutable,
-      priority: 4
+      onClick: () => onDuplicate(service),
+      variant: 'default',
     },
     {
       id: 'delete',
       label: 'Delete Service',
       icon: TrashIcon,
-      action: () => onDelete?.(service),
-      dangerous: true,
-      disabled: () => !service.deletable,
-      priority: 5
-    }
+      onClick: () => onDelete(service),
+      variant: 'destructive',
+      requiresConfirmation: true,
+    },
   ];
 
-  const availableActions = actions.filter(action => 
-    !action.disabled?.(service) && !action.hidden?.(service)
-  );
-
   return (
-    <div ref={dropdownRef} className={cn('relative', className)} data-testid={testId}>
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setIsOpen(!isOpen);
-        }}
-        className="flex items-center justify-center w-8 h-8 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
-        aria-label={`Actions for ${service.label || service.name}`}
-        aria-haspopup="true"
-        aria-expanded={isOpen}
-        data-testid={`${testId}-trigger`}
+    <Menu as="div" className="relative inline-block text-left">
+      <MenuButton
+        disabled={disabled}
+        className={cn(
+          'inline-flex items-center justify-center w-8 h-8 rounded-full transition-colors',
+          'hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500',
+          'disabled:opacity-50 disabled:cursor-not-allowed'
+        )}
+        title={`Actions for ${service.name}`}
       >
-        <EllipsisHorizontalIcon className="h-5 w-5" />
-      </button>
+        <EllipsisVerticalIcon className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+        <span className="sr-only">Service actions</span>
+      </MenuButton>
 
-      {isOpen && (
-        <div
-          className="absolute right-0 top-9 z-20 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 py-1"
-          role="menu"
-          aria-orientation="vertical"
-          data-testid={`${testId}-menu`}
-        >
-          {availableActions.map((action, index) => {
-            const Icon = action.icon;
-            return (
-              <button
-                key={action.id}
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsOpen(false);
-                  action.action(service);
-                }}
-                className={cn(
-                  'flex items-center w-full px-4 py-2 text-sm text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors',
-                  action.dangerous
-                    ? 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20'
-                    : 'text-gray-700 dark:text-gray-300'
-                )}
-                role="menuitem"
-                tabIndex={0}
-                data-testid={`${testId}-action-${action.id}`}
-                aria-label={action.description || action.label}
-              >
-                <Icon className="h-4 w-4 mr-3 flex-shrink-0" />
-                <span className="truncate">{action.label}</span>
-                {action.shortcut && (
-                  <span className="ml-auto text-xs text-gray-400">
-                    {action.shortcut}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
+      <Transition
+        enter="transition ease-out duration-100"
+        enterFrom="transform opacity-0 scale-95"
+        enterTo="transform opacity-100 scale-100"
+        leave="transition ease-in duration-75"
+        leaveFrom="transform opacity-100 scale-100"
+        leaveTo="transform opacity-0 scale-95"
+      >
+        <MenuItems className="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white dark:bg-gray-900 py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+          {actions.map((action) => (
+            <MenuItem key={action.id}>
+              {({ focus }) => (
+                <button
+                  onClick={action.onClick}
+                  className={cn(
+                    'group flex items-center px-4 py-2 text-sm w-full text-left transition-colors',
+                    focus 
+                      ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100' 
+                      : 'text-gray-700 dark:text-gray-300',
+                    action.variant === 'destructive' 
+                      ? 'text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300'
+                      : ''
+                  )}
+                >
+                  {action.icon && (
+                    <action.icon 
+                      className={cn(
+                        'mr-3 h-4 w-4',
+                        action.variant === 'destructive' 
+                          ? 'text-red-500 dark:text-red-400' 
+                          : 'text-gray-500 dark:text-gray-400'
+                      )} 
+                    />
+                  )}
+                  {action.label}
+                </button>
+              )}
+            </MenuItem>
+          ))}
+        </MenuItems>
+      </Transition>
+    </Menu>
   );
 };
 
 /**
- * Service Status Badge Component
+ * Table Header Component
  */
-const ServiceStatusBadge: React.FC<{
-  service: DatabaseService;
+interface TableHeaderProps {
+  columns: ServiceListColumn[];
+  sort?: ServiceListSortData;
+  onSortChange?: (sort: ServiceListSortData) => void;
+  selection?: ServiceListRowSelection;
   className?: string;
-  'data-testid'?: string;
-}> = ({ service, className, 'data-testid': testId }) => {
-  const status = service.status || (service.is_active ? 'active' : 'inactive');
-  const statusInfo = getServiceStatusInfo(status);
-  const Icon = statusInfo.icon;
+}
 
-  return (
-    <div
-      className={cn(
-        'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border',
-        statusInfo.color,
-        statusInfo.bgColor,
-        statusInfo.borderColor,
-        className
-      )}
-      data-testid={testId}
-      title={`Service status: ${statusInfo.label}`}
-    >
-      <Icon className="h-3 w-3 mr-1.5" />
-      {statusInfo.label}
-    </div>
-  );
-};
+const TableHeader: React.FC<TableHeaderProps> = ({
+  columns,
+  sort,
+  onSortChange,
+  selection,
+  className
+}) => {
+  const handleSort = useCallback((columnId: string) => {
+    if (!onSortChange || !isValidSortField(columnId)) return;
 
-/**
- * Database Type Badge Component
- */
-const DatabaseTypeBadge: React.FC<{
-  type: DatabaseDriver;
-  className?: string;
-  'data-testid'?: string;
-}> = ({ type, className, 'data-testid': testId }) => {
-  const typeInfo = getDatabaseTypeInfo(type);
-  
-  const tierColors = {
-    core: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800',
-    silver: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-800',
-    gold: 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800'
+    const newSort: ServiceListSortData = {
+      field: columnId as any,
+      direction: sort?.field === columnId && sort.direction === 'asc' ? 'desc' : 'asc'
+    };
+
+    onSortChange(newSort);
+  }, [sort, onSortChange]);
+
+  const getSortIcon = (columnId: string) => {
+    if (sort?.field !== columnId) {
+      return <ChevronUpDownIcon className="h-4 w-4 text-gray-400" />;
+    }
+    return sort.direction === 'asc' 
+      ? <ChevronUpIcon className="h-4 w-4 text-primary-600" />
+      : <ChevronDownIcon className="h-4 w-4 text-primary-600" />;
   };
 
   return (
-    <div
+    <thead className={cn('bg-gray-50 dark:bg-gray-800', className)}>
+      <tr>
+        {columns.map((column) => (
+          <th
+            key={column.id}
+            scope="col"
+            className={cn(
+              'px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider',
+              column.align === 'center' && 'text-center',
+              column.align === 'right' && 'text-right',
+              column.sticky === 'left' && 'sticky left-0 z-10 bg-gray-50 dark:bg-gray-800',
+              column.sticky === 'right' && 'sticky right-0 z-10 bg-gray-50 dark:bg-gray-800',
+              column.headerClassName
+            )}
+            style={{ width: column.width, minWidth: column.minWidth, maxWidth: column.maxWidth }}
+          >
+            {column.id === 'selection' && selection?.mode === 'multiple' ? (
+              <Checkbox
+                checked={selection.selectAllState === 'all'}
+                indeterminate={selection.selectAllState === 'some'}
+                onChange={(checked) => selection.onSelectAll?.(checked)}
+                className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700"
+              />
+            ) : column.sortable ? (
+              <button
+                onClick={() => handleSort(column.id)}
+                className="group inline-flex items-center space-x-1 hover:text-gray-700 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded"
+              >
+                <span>{column.header}</span>
+                {getSortIcon(column.id)}
+              </button>
+            ) : (
+              <span>{column.header}</span>
+            )}
+          </th>
+        ))}
+      </tr>
+    </thead>
+  );
+};
+
+/**
+ * Table Row Component
+ */
+interface TableRowProps {
+  service: DatabaseService;
+  columns: ServiceListColumn[];
+  index: number;
+  selected?: boolean;
+  onSelectionChange?: (selected: boolean) => void;
+  onRowClick?: (service: DatabaseService) => void;
+  onEdit: (service: DatabaseService) => void;
+  onDelete: (service: DatabaseService) => void;
+  onDuplicate: (service: DatabaseService) => void;
+  onTestConnection: (service: DatabaseService) => void;
+  style?: React.CSSProperties;
+  className?: string;
+}
+
+const TableRow: React.FC<TableRowProps> = ({
+  service,
+  columns,
+  index,
+  selected = false,
+  onSelectionChange,
+  onRowClick,
+  onEdit,
+  onDelete,
+  onDuplicate,
+  onTestConnection,
+  style,
+  className
+}) => {
+  const formatDate = useCallback((dateString?: string) => {
+    if (!dateString) return '—';
+    return new Date(dateString).toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  }, []);
+
+  const formatDatabaseType = useCallback((type: DatabaseDriver) => {
+    return DATABASE_TYPE_LABELS[type] || type;
+  }, []);
+
+  const getCellContent = useCallback((column: ServiceListColumn, service: DatabaseService) => {
+    switch (column.id) {
+      case 'selection':
+        return (
+          <Checkbox
+            checked={selected}
+            onChange={onSelectionChange}
+            className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700"
+            aria-label={`Select ${service.name}`}
+          />
+        );
+
+      case 'name':
+        return (
+          <div>
+            <div className="font-medium text-gray-900 dark:text-gray-100">{service.name}</div>
+            {service.description && (
+              <div className="text-sm text-gray-500 dark:text-gray-400 truncate max-w-xs" title={service.description}>
+                {service.description}
+              </div>
+            )}
+          </div>
+        );
+
+      case 'type':
+        return (
+          <span className="inline-flex items-center rounded-md bg-primary-50 dark:bg-primary-900 px-2 py-1 text-xs font-medium text-primary-700 dark:text-primary-300">
+            {formatDatabaseType(service.type)}
+          </span>
+        );
+
+      case 'label':
+        return service.label || service.name;
+
+      case 'status':
+        return <ServiceStatusBadge service={service} />;
+
+      case 'connection_status':
+        return <ConnectionStatusIndicator serviceId={service.id} />;
+
+      case 'created_date':
+        return formatDate(service.created_date);
+
+      case 'last_modified_date':
+        return formatDate(service.last_modified_date);
+
+      case 'actions':
+        return (
+          <ServiceActionsMenu
+            service={service}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            onDuplicate={onDuplicate}
+            onTestConnection={onTestConnection}
+          />
+        );
+
+      default:
+        if (column.cell) {
+          const value = typeof column.accessor === 'function'
+            ? column.accessor(service)
+            : service[column.accessor as keyof DatabaseService];
+          return column.cell(value, service, index);
+        }
+
+        const value = typeof column.accessor === 'function'
+          ? column.accessor(service)
+          : service[column.accessor as keyof DatabaseService];
+
+        return String(value || '—');
+    }
+  }, [selected, onSelectionChange, formatDate, formatDatabaseType, onEdit, onDelete, onDuplicate, onTestConnection, index]);
+
+  return (
+    <tr
+      style={style}
       className={cn(
-        'inline-flex items-center px-2 py-1 rounded text-xs font-medium border',
-        tierColors[typeInfo.tier],
+        'hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer',
+        selected && 'bg-primary-50 dark:bg-primary-900/20',
         className
       )}
-      data-testid={testId}
-      title={`${typeInfo.label} (${typeInfo.tier} tier)`}
+      onClick={() => onRowClick?.(service)}
     >
-      <ServerIcon className="h-3 w-3 mr-1" />
-      {typeInfo.label}
+      {columns.map((column) => (
+        <td
+          key={column.id}
+          className={cn(
+            'px-6 py-4 whitespace-nowrap',
+            column.align === 'center' && 'text-center',
+            column.align === 'right' && 'text-right',
+            column.sticky === 'left' && 'sticky left-0 z-10 bg-white dark:bg-gray-900',
+            column.sticky === 'right' && 'sticky right-0 z-10 bg-white dark:bg-gray-900',
+            selected && column.sticky && 'bg-primary-50 dark:bg-primary-900/20',
+            column.cellClassName,
+            column.className
+          )}
+        >
+          {getCellContent(column, service)}
+        </td>
+      ))}
+    </tr>
+  );
+};
+
+/**
+ * Empty State Component
+ */
+interface EmptyStateProps {
+  message?: string;
+  hasFilters?: boolean;
+  onClearFilters?: () => void;
+  onCreateService?: () => void;
+  className?: string;
+}
+
+const EmptyState: React.FC<EmptyStateProps> = ({
+  message,
+  hasFilters = false,
+  onClearFilters,
+  onCreateService,
+  className
+}) => {
+  return (
+    <div className={cn('text-center py-12', className)}>
+      <Square3Stack3DIcon className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500" />
+      <h3 className="mt-4 text-sm font-medium text-gray-900 dark:text-gray-100">
+        {message || (hasFilters ? 'No services match your filters' : 'No database services')}
+      </h3>
+      <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+        {hasFilters 
+          ? 'Try adjusting your search criteria or filters.'
+          : 'Get started by creating your first database service connection.'
+        }
+      </p>
+      <div className="mt-6 flex justify-center space-x-3">
+        {hasFilters && onClearFilters && (
+          <Button
+            onClick={onClearFilters}
+            variant="outline"
+            size="sm"
+          >
+            Clear filters
+          </Button>
+        )}
+        {onCreateService && (
+          <Button
+            onClick={onCreateService}
+            variant="primary"
+            size="sm"
+          >
+            Create service
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Loading State Component
+ */
+interface LoadingStateProps {
+  message?: string;
+  className?: string;
+}
+
+const LoadingState: React.FC<LoadingStateProps> = ({ 
+  message = 'Loading services...',
+  className
+}) => {
+  return (
+    <div className={cn('text-center py-12', className)}>
+      <ArrowPathIcon className="mx-auto h-8 w-8 text-primary-600 animate-spin" />
+      <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">{message}</p>
+    </div>
+  );
+};
+
+/**
+ * Filter Controls Component
+ */
+interface FilterControlsProps {
+  filters: ServiceListFilterData;
+  onFiltersChange: (filters: ServiceListFilterData) => void;
+  onClearFilters: () => void;
+  className?: string;
+}
+
+const FilterControls: React.FC<FilterControlsProps> = ({
+  filters,
+  onFiltersChange,
+  onClearFilters,
+  className
+}) => {
+  const { control, watch, setValue } = useForm<FilterFormData>({
+    resolver: zodResolver(FilterFormSchema),
+    defaultValues: {
+      search: filters.search || '',
+      type: [],
+      status: [],
+      showInactive: false,
+    },
+  });
+
+  const watchedValues = watch();
+
+  // Update filters when form values change
+  useEffect(() => {
+    const newFilters: ServiceListFilterData = {
+      search: watchedValues.search || undefined,
+      type: watchedValues.type?.length ? watchedValues.type : undefined,
+      status: watchedValues.status?.length ? watchedValues.status : undefined,
+    };
+    onFiltersChange(newFilters);
+  }, [watchedValues, onFiltersChange]);
+
+  const hasActiveFilters = !!(filters.search || filters.type?.length || filters.status?.length);
+
+  return (
+    <div className={cn('space-y-4', className)}>
+      {/* Search Input */}
+      <div className="relative">
+        <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+        <Controller
+          name="search"
+          control={control}
+          render={({ field }) => (
+            <input
+              {...field}
+              type="text"
+              placeholder="Search services..."
+              className="block w-full rounded-md border-gray-300 dark:border-gray-600 pl-10 pr-3 py-2 text-sm placeholder-gray-400 dark:placeholder-gray-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:border-primary-500 focus:ring-primary-500"
+            />
+          )}
+        />
+      </div>
+
+      {/* Filter Toggles */}
+      <div className="flex flex-wrap gap-3">
+        <Controller
+          name="showInactive"
+          control={control}
+          render={({ field }) => (
+            <label className="inline-flex items-center">
+              <Checkbox
+                checked={field.value}
+                onChange={field.onChange}
+                className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+              />
+              <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
+                Show inactive services
+              </span>
+            </label>
+          )}
+        />
+      </div>
+
+      {/* Clear Filters */}
+      {hasActiveFilters && (
+        <div className="flex justify-end">
+          <Button
+            onClick={() => {
+              setValue('search', '');
+              setValue('type', []);
+              setValue('status', []);
+              setValue('showInactive', false);
+              onClearFilters();
+            }}
+            variant="outline"
+            size="sm"
+          >
+            Clear all filters
+          </Button>
+        </div>
+      )}
     </div>
   );
 };
@@ -544,716 +899,648 @@ const DatabaseTypeBadge: React.FC<{
 // =============================================================================
 
 /**
- * Database Service List Table Component
+ * Service List Table Component
  * 
- * Comprehensive table component for managing database services with modern React patterns,
- * accessibility support, virtual scrolling for performance, and full CRUD operations.
+ * Main table component for displaying and managing database services.
+ * Implements pagination, filtering, sorting, virtual scrolling, and CRUD operations.
  */
-export const ServiceListTable = forwardRef<ServiceListTableRef, ServiceListTableComponentProps>(
-  ({
-    services: externalServices,
-    loading: externalLoading,
-    error: externalError,
-    onServiceSelect,
-    onServiceEdit,
-    onServiceDelete,
-    onServiceDuplicate,
-    onServiceTest,
-    onServiceToggle,
-    onBulkActions,
-    onRefresh,
-    selection,
-    pagination,
-    sorting,
-    filtering,
-    virtualization,
-    enableVirtualization = true,
-    enableBulkActions = true,
-    enableContextMenu = true,
-    compactMode = false,
-    showConnectionStatus = true,
-    refreshInterval = 30000,
-    autoRefresh = false,
-    className,
-    'data-testid': testId,
-    ...props
-  }, ref) => {
-    // Refs and state
-    const containerRef = useRef<HTMLDivElement>(null);
-    const searchInputRef = useRef<HTMLInputElement>(null);
-    const [isPending, startTransition] = useTransition();
-    const [searchTerm, setSearchTerm] = useState('');
-    const [sortField, setSortField] = useState<keyof DatabaseService>('name');
-    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+export const ServiceListTable: React.FC<ServiceListTableProps> = ({
+  services = [],
+  loading = false,
+  error = null,
+  emptyMessage,
+  emptyState: EmptyStateComponent,
+  columns = DEFAULT_COLUMNS,
+  selection,
+  actions,
+  bulkActions = BULK_ACTIONS,
+  onRowClick,
+  onRowDoubleClick,
+  onRowContextMenu,
+  onRowHover,
+  onKeyDown,
+  sort,
+  onSortChange,
+  filters,
+  onFilterChange,
+  pagination,
+  onPaginationChange,
+  viewConfig,
+  onViewConfigChange,
+  virtualization,
+  rowRenderer,
+  loadingOverlay: LoadingOverlayComponent,
+  errorOverlay: ErrorOverlayComponent,
+  density = 'normal',
+  bordered = true,
+  striped = true,
+  hoverable = true,
+  focusable = true,
+  autoFocus = false,
+  ariaLabel = 'Database Services Table',
+  ariaDescription = 'Table displaying database service connections with filtering and sorting capabilities',
+  testId = 'service-list-table',
+  className,
+  'data-testid': dataTestId,
+  ...props
+}) => {
+  // Local state
+  const [showFilters, setShowFilters] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteService, setDeleteService] = useState<DatabaseService | null>(null);
+  const [bulkActionDialog, setBulkActionDialog] = useState<{
+    action: BulkAction;
+    services: DatabaseService[];
+  } | null>(null);
 
-    // Use the compound hook for complete service list functionality
-    const {
-      services,
-      loading,
-      error,
-      refetch,
-      refresh,
-      mutations,
-      selection: selectionState,
-      filters,
-      updateFilters,
-      setSearch,
-      setSorting,
-      export: exportHook,
-      virtualization: virtualizationHook
-    } = useServiceListComplete({
-      enabled: true,
-      enableVirtualization: enableVirtualization && services && services.length > 50,
-      containerRef
-    });
+  // Table container ref for virtualization
+  const tableContainerRef = useRef<HTMLDivElement>(null);
 
-    // Use external data if provided, otherwise use hook data
-    const displayServices = externalServices || services;
-    const isLoading = externalLoading !== undefined ? externalLoading : loading;
-    const displayError = externalError !== undefined ? externalError : error;
+  // Hooks
+  const { 
+    services: hookServices,
+    isLoading: hookLoading,
+    error: hookError,
+    deleteService: deleteServiceMutation,
+    deleteServices: deleteServicesMutation,
+    testConnection: testConnectionMutation,
+    toggleService: toggleServiceMutation,
+    duplicateService: duplicateServiceMutation,
+    refresh
+  } = useServiceList();
 
-    // Column definitions for the table
-    const columns: ServiceListColumn[] = useMemo(() => [
-      {
-        key: 'selection',
-        header: '',
-        width: '48px',
-        sticky: 'left',
-        cell: ({ row, index }: ServiceListCellProps) => (
-          <div className="flex items-center justify-center">
-            <input
-              type="checkbox"
-              checked={selectionState.isSelected(row.id)}
-              onChange={() => selectionState.toggleSelection(row.id)}
-              className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-              aria-label={`Select ${row.label || row.name}`}
-              data-testid={`service-${row.id}-checkbox`}
-            />
-          </div>
-        ),
-        visible: enableBulkActions
-      },
-      {
-        key: 'name',
-        header: 'Service Name',
-        accessorKey: 'name',
-        sortable: true,
-        searchable: true,
-        minWidth: '200px',
-        cell: ({ row }: ServiceListCellProps) => (
-          <div className="flex flex-col">
-            <div className="font-medium text-gray-900 dark:text-gray-100">
-              {row.label || row.name}
-            </div>
-            {row.label && row.label !== row.name && (
-              <div className="text-sm text-gray-500 dark:text-gray-400 font-mono">
-                {row.name}
-              </div>
-            )}
-          </div>
-        )
-      },
-      {
-        key: 'type',
-        header: 'Database Type',
-        accessorKey: 'type',
-        sortable: true,
-        filterable: true,
-        width: '150px',
-        cell: ({ row }: ServiceListCellProps) => (
-          <DatabaseTypeBadge 
-            type={row.type}
-            data-testid={`service-${row.id}-type-badge`}
-          />
-        )
-      },
-      {
-        key: 'status',
-        header: 'Status',
-        width: '120px',
-        sortable: true,
-        filterable: true,
-        cell: ({ row }: ServiceListCellProps) => (
-          <ServiceStatusBadge 
-            service={row}
-            data-testid={`service-${row.id}-status-badge`}
-          />
-        )
-      },
-      {
-        key: 'connection',
-        header: 'Connection',
-        width: '120px',
-        cell: ({ row }: ServiceListCellProps) => (
-          <ConnectionStatusIndicator
-            service={row}
-            showDetails={!compactMode}
-            size={compactMode ? 'sm' : 'md'}
-            data-testid={`service-${row.id}-connection-status`}
-          />
-        ),
-        visible: showConnectionStatus
-      },
-      {
-        key: 'description',
-        header: 'Description',
-        accessorKey: 'description',
-        searchable: true,
-        cell: ({ row }: ServiceListCellProps) => (
-          <div className="max-w-xs truncate text-gray-600 dark:text-gray-400">
-            {row.description || '—'}
-          </div>
-        ),
-        visible: !compactMode
-      },
-      {
-        key: 'created_date',
-        header: 'Created',
-        accessorKey: 'created_date',
-        sortable: true,
-        width: '140px',
-        cell: ({ row }: ServiceListCellProps) => (
-          <div className="text-sm text-gray-600 dark:text-gray-400">
-            {formatDate(row.created_date)}
-          </div>
-        ),
-        visible: !compactMode
-      },
-      {
-        key: 'last_modified_date',
-        header: 'Modified',
-        accessorKey: 'last_modified_date',
-        sortable: true,
-        width: '140px',
-        cell: ({ row }: ServiceListCellProps) => (
-          <div className="text-sm text-gray-600 dark:text-gray-400">
-            {formatDate(row.last_modified_date)}
-          </div>
-        ),
-        visible: !compactMode
-      },
-      {
-        key: 'actions',
-        header: '',
-        width: '60px',
-        sticky: 'right',
-        cell: ({ row }: ServiceListCellProps) => (
-          <ServiceActionsDropdown
-            service={row}
-            onEdit={onServiceEdit}
-            onDelete={onServiceDelete}
-            onDuplicate={onServiceDuplicate}
-            onTest={onServiceTest}
-            onToggle={onServiceToggle}
-            data-testid={`service-${row.id}-actions`}
-          />
-        )
-      }
-    ].filter(column => column.visible !== false), [
-      enableBulkActions,
-      showConnectionStatus,
-      compactMode,
-      selectionState,
-      onServiceEdit,
-      onServiceDelete,
-      onServiceDuplicate,
-      onServiceTest,
-      onServiceToggle
-    ]);
+  const {
+    filters: storeFilters,
+    setFilters,
+    clearFilters,
+    setSearch,
+    setSorting
+  } = useServiceListFilters();
 
-    // Filter services based on search term
-    const filteredServices = useMemo(() => {
-      if (!searchTerm.trim()) return displayServices;
-      
-      const term = searchTerm.toLowerCase();
-      return displayServices.filter(service => 
-        service.name.toLowerCase().includes(term) ||
-        service.label?.toLowerCase().includes(term) ||
-        service.description?.toLowerCase().includes(term) ||
-        service.type.toLowerCase().includes(term)
-      );
-    }, [displayServices, searchTerm]);
+  const {
+    selectedServices,
+    selectedCount,
+    selectedServiceObjects,
+    isSelected,
+    isAllSelected,
+    isIndeterminate,
+    toggleSelection,
+    toggleSelectAll,
+    selectAll,
+    deselectAll
+  } = useServiceListSelection();
 
-    // Sort services
-    const sortedServices = useMemo(() => {
-      const sorted = [...filteredServices];
-      sorted.sort((a, b) => {
-        const aValue = a[sortField] as any;
-        const bValue = b[sortField] as any;
-        
-        if (aValue === bValue) return 0;
-        
-        const comparison = aValue < bValue ? -1 : 1;
-        return sortDirection === 'asc' ? comparison : -comparison;
+  const {
+    bulkAction: bulkActionMutation,
+    isBulkActionInProgress
+  } = useServiceListMutations();
+
+  // Use provided data or hook data
+  const displayServices = services.length > 0 ? services : hookServices;
+  const isDataLoading = loading || hookLoading;
+  const dataError = error || hookError;
+
+  // Virtual scrolling setup
+  const enableVirtualization = virtualization?.enabled || displayServices.length > COMPONENT_CONFIG.serviceList.virtualScrollThreshold;
+  
+  const virtualizer = useVirtualizer({
+    count: displayServices.length,
+    getScrollElement: () => tableContainerRef.current,
+    estimateSize: () => virtualization?.itemHeight || COMPONENT_CONFIG.serviceList.virtualScrolling.itemHeight,
+    overscan: virtualization?.overscan || COMPONENT_CONFIG.serviceList.virtualScrolling.threshold,
+  });
+
+  // Selection configuration
+  const selectionConfig: ServiceListRowSelection = selection || {
+    mode: 'multiple',
+    selectedIds: Array.from(selectedServices),
+    onSelectionChange: (selectedIds: number[]) => {
+      // Update selection in store
+    },
+    showSelectAll: true,
+    selectAllState: isAllSelected ? 'all' : (isIndeterminate ? 'some' : 'none'),
+    onSelectAll: toggleSelectAll,
+    maxSelection: 100,
+  };
+
+  // Action handlers
+  const handleEdit = useCallback((service: DatabaseService) => {
+    // Navigate to edit page or open edit modal
+    console.log('Edit service:', service);
+  }, []);
+
+  const handleDelete = useCallback((service: DatabaseService) => {
+    setDeleteService(service);
+  }, []);
+
+  const handleDuplicate = useCallback(async (service: DatabaseService) => {
+    try {
+      await duplicateServiceMutation.mutateAsync(service.id);
+    } catch (error) {
+      console.error('Failed to duplicate service:', error);
+    }
+  }, [duplicateServiceMutation]);
+
+  const handleTestConnection = useCallback(async (service: DatabaseService) => {
+    try {
+      await testConnectionMutation.mutateAsync({ id: service.id });
+    } catch (error) {
+      console.error('Connection test failed:', error);
+    }
+  }, [testConnectionMutation]);
+
+  const handleBulkAction = useCallback(async (action: BulkAction) => {
+    if (selectedServiceObjects.length === 0) return;
+
+    if (action.requiresConfirmation) {
+      setBulkActionDialog({ action, services: selectedServiceObjects });
+      return;
+    }
+
+    try {
+      await bulkActionMutation.mutateAsync({
+        action: action.id as any,
+        serviceIds: Array.from(selectedServices),
+        parameters: {},
+        confirmed: true,
       });
-      return sorted;
-    }, [filteredServices, sortField, sortDirection]);
+      deselectAll();
+    } catch (error) {
+      console.error('Bulk action failed:', error);
+    }
+  }, [selectedServiceObjects, selectedServices, bulkActionMutation, deselectAll]);
 
-    // Virtual scrolling setup for large datasets
-    const virtualizer = useVirtualizer({
-      count: sortedServices.length,
-      getScrollElement: () => containerRef.current,
-      estimateSize: () => (compactMode ? 48 : 64),
-      overscan: 10
-    });
+  const handleConfirmDelete = useCallback(async () => {
+    if (!deleteService) return;
 
-    const virtualItems = enableVirtualization && sortedServices.length > 50 
-      ? virtualizer.getVirtualItems()
-      : null;
+    setIsDeleting(true);
+    try {
+      await deleteServiceMutation.mutateAsync({ id: deleteService.id });
+      setDeleteService(null);
+    } catch (error) {
+      console.error('Failed to delete service:', error);
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [deleteService, deleteServiceMutation]);
 
-    // Event handlers
-    const handleSort = useCallback((field: keyof DatabaseService) => {
-      startTransition(() => {
-        if (sortField === field) {
-          setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-        } else {
-          setSortField(field);
-          setSortDirection('asc');
-        }
-        setSorting({ field, direction: sortDirection === 'asc' ? 'desc' : 'asc' });
+  const handleConfirmBulkAction = useCallback(async () => {
+    if (!bulkActionDialog) return;
+
+    try {
+      await bulkActionMutation.mutateAsync({
+        action: bulkActionDialog.action.id as any,
+        serviceIds: bulkActionDialog.services.map(s => s.id),
+        parameters: {},
+        confirmed: true,
       });
-    }, [sortField, sortDirection, setSorting]);
+      setBulkActionDialog(null);
+      deselectAll();
+    } catch (error) {
+      console.error('Bulk action failed:', error);
+    }
+  }, [bulkActionDialog, bulkActionMutation, deselectAll]);
 
-    const handleSearch = useCallback((value: string) => {
-      startTransition(() => {
-        setSearchTerm(value);
-        setSearch(value);
-      });
-    }, [setSearch]);
+  // Filter handlers
+  const handleFiltersChange = useCallback((newFilters: ServiceListFilterData) => {
+    setFilters(newFilters);
+    if (onFilterChange) {
+      onFilterChange(newFilters);
+    }
+  }, [setFilters, onFilterChange]);
 
-    const handleRowClick = useCallback((service: DatabaseService) => {
-      onServiceSelect?.(service);
-    }, [onServiceSelect]);
+  const handleClearFilters = useCallback(() => {
+    clearFilters();
+    if (onFilterChange) {
+      onFilterChange({});
+    }
+  }, [clearFilters, onFilterChange]);
 
-    const handleRowKeyDown = useCallback((
-      event: React.KeyboardEvent,
-      service: DatabaseService,
-      index: number
-    ) => {
+  // Sort handlers
+  const handleSortChange = useCallback((newSort: ServiceListSortData) => {
+    setSorting(newSort);
+    if (onSortChange) {
+      onSortChange(newSort);
+    }
+  }, [setSorting, onSortChange]);
+
+  // Keyboard navigation
+  const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
+    if (onKeyDown) {
+      onKeyDown(event);
+    }
+
+    // Add keyboard shortcuts
+    if (event.ctrlKey || event.metaKey) {
       switch (event.key) {
-        case 'Enter':
-        case ' ':
+        case 'a':
           event.preventDefault();
-          onServiceSelect?.(service);
+          selectAll(displayServices);
           break;
-        case 'ArrowDown':
+        case 'f':
           event.preventDefault();
-          if (index < sortedServices.length - 1) {
-            const nextRow = containerRef.current?.querySelector(
-              `[data-row-index="${index + 1}"]`
-            ) as HTMLElement;
-            nextRow?.focus();
-          }
+          setShowFilters(!showFilters);
           break;
-        case 'ArrowUp':
+        case 'r':
           event.preventDefault();
-          if (index > 0) {
-            const prevRow = containerRef.current?.querySelector(
-              `[data-row-index="${index - 1}"]`
-            ) as HTMLElement;
-            prevRow?.focus();
-          }
+          refresh();
           break;
       }
-    }, [onServiceSelect, sortedServices.length]);
-
-    // Imperative handle for parent component control
-    useImperativeHandle(ref, () => ({
-      refresh: () => {
-        refresh();
-        onRefresh?.();
-      },
-      clearSelection: () => {
-        selectionState.selectNone();
-      },
-      selectAll: () => {
-        selectionState.selectAll();
-      },
-      getSelectedServices: () => {
-        return selectionState.selectedServices;
-      },
-      scrollToService: (serviceId: number) => {
-        const index = sortedServices.findIndex(s => s.id === serviceId);
-        if (index >= 0 && virtualizer) {
-          virtualizer.scrollToIndex(index);
-        }
-      },
-      focusSearch: () => {
-        searchInputRef.current?.focus();
-      }
-    }), [refresh, onRefresh, selectionState, sortedServices, virtualizer]);
-
-    // Auto-refresh setup
-    useEffect(() => {
-      if (!autoRefresh || !refreshInterval) return;
-
-      const interval = setInterval(() => {
-        refresh();
-      }, refreshInterval);
-
-      return () => clearInterval(interval);
-    }, [autoRefresh, refreshInterval, refresh]);
-
-    // Render loading state
-    if (isLoading && sortedServices.length === 0) {
-      return (
-        <div 
-          className={cn('flex flex-col items-center justify-center p-12 space-y-4', className)}
-          data-testid={`${testId}-loading`}
-          {...props}
-        >
-          <ArrowPathIcon className="h-8 w-8 animate-spin text-gray-400" />
-          <div className="text-sm text-gray-500 dark:text-gray-400">
-            Loading database services...
-          </div>
-        </div>
-      );
     }
 
-    // Render error state
-    if (displayError && sortedServices.length === 0) {
-      return (
-        <div 
-          className={cn('flex flex-col items-center justify-center p-12 space-y-4', className)}
-          data-testid={`${testId}-error`}
-          {...props}
-        >
-          <ExclamationTriangleIcon className="h-8 w-8 text-red-500" />
-          <div className="text-center">
-            <div className="text-sm font-medium text-red-600 dark:text-red-400 mb-1">
-              Failed to load services
-            </div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">
-              {displayError.message}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              refresh();
-              onRefresh?.();
-            }}
-            className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-          >
-            <ArrowPathIcon className="h-4 w-4 mr-1.5" />
-            Retry
-          </button>
-        </div>
-      );
+    if (event.key === 'Escape') {
+      deselectAll();
+      setShowFilters(false);
     }
+  }, [onKeyDown, selectAll, displayServices, showFilters, refresh, deselectAll]);
 
-    // Render empty state
-    if (sortedServices.length === 0) {
-      return (
-        <div 
-          className={cn('flex flex-col items-center justify-center p-12 space-y-4', className)}
-          data-testid={`${testId}-empty`}
-          {...props}
-        >
-          <ServerIcon className="h-12 w-12 text-gray-400" />
-          <div className="text-center">
-            <div className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
-              {searchTerm ? 'No services found' : 'No database services'}
+  // Auto-focus table on mount
+  useEffect(() => {
+    if (autoFocus && tableContainerRef.current) {
+      tableContainerRef.current.focus();
+    }
+  }, [autoFocus]);
+
+  // Loading state
+  if (isDataLoading && displayServices.length === 0) {
+    return LoadingOverlayComponent ? <LoadingOverlayComponent /> : <LoadingState />;
+  }
+
+  // Error state
+  if (dataError && displayServices.length === 0) {
+    return ErrorOverlayComponent ? 
+      <ErrorOverlayComponent error={dataError.message} /> : 
+      <div className="text-center py-12">
+        <ExclamationTriangleIcon className="mx-auto h-12 w-12 text-red-500" />
+        <p className="mt-4 text-sm text-red-600">{dataError.message}</p>
+        <Button onClick={refresh} variant="outline" size="sm" className="mt-4">
+          Try again
+        </Button>
+      </div>;
+  }
+
+  // Empty state
+  if (displayServices.length === 0) {
+    const hasActiveFilters = !!(storeFilters.search || storeFilters.type?.length || storeFilters.status?.length);
+    
+    return EmptyStateComponent ? 
+      <EmptyStateComponent /> : 
+      <EmptyState 
+        message={emptyMessage}
+        hasFilters={hasActiveFilters}
+        onClearFilters={handleClearFilters}
+      />;
+  }
+
+  return (
+    <div className={cn('flex flex-col space-y-4', className)} data-testid={dataTestId || testId} {...props}>
+      {/* Toolbar */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          {/* Selected count */}
+          {selectedCount > 0 && (
+            <span className="text-sm text-gray-700 dark:text-gray-300">
+              {selectedCount} selected
+            </span>
+          )}
+
+          {/* Bulk actions */}
+          {selectedCount > 0 && (
+            <div className="flex items-center space-x-2">
+              {bulkActions.map((action) => (
+                <Button
+                  key={action.id}
+                  onClick={() => handleBulkAction(action)}
+                  disabled={isBulkActionInProgress}
+                  variant={action.variant}
+                  size="sm"
+                >
+                  {action.icon && <action.icon className="h-4 w-4 mr-2" />}
+                  {action.label}
+                </Button>
+              ))}
             </div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">
-              {searchTerm 
-                ? `No services match "${searchTerm}"`
-                : 'Get started by creating your first database service'
-              }
-            </div>
-          </div>
-          {!searchTerm && (
-            <button
-              type="button"
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-              onClick={() => {
-                // Navigate to create service page
-                window.location.href = '/api-connections/database/create';
-              }}
-            >
-              <PlusIcon className="h-4 w-4 mr-1.5" />
-              Create Database Service
-            </button>
           )}
         </div>
-      );
-    }
 
-    // Main table render
-    return (
-      <div 
-        className={cn('flex flex-col h-full bg-white dark:bg-gray-900', className)}
-        data-testid={testId}
-        {...props}
-      >
-        {/* Header with search and actions */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center space-x-4">
-            <div className="relative">
-              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                ref={searchInputRef}
-                type="text"
-                placeholder="Search services..."
-                value={searchTerm}
-                onChange={(e) => handleSearch(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-primary-500 focus:border-transparent w-64"
-                data-testid={`${testId}-search-input`}
-                aria-label="Search database services"
-              />
-            </div>
-            
-            {searchTerm && (
-              <div className="text-sm text-gray-500 dark:text-gray-400">
-                {sortedServices.length} of {displayServices.length} services
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center space-x-2">
-            {enableBulkActions && selectionState.selectedCount > 0 && (
-              <div className="flex items-center space-x-2 mr-4">
-                <span className="text-sm text-gray-600 dark:text-gray-400">
-                  {selectionState.selectedCount} selected
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const selectedServices = selectionState.selectedServices;
-                    onBulkActions?.('delete', selectedServices);
-                  }}
-                  className="inline-flex items-center px-2 py-1 border border-red-300 dark:border-red-600 text-xs font-medium rounded text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                  data-testid={`${testId}-bulk-delete`}
-                >
-                  <TrashIcon className="h-3 w-3 mr-1" />
-                  Delete Selected
-                </button>
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={() => {
-                refresh();
-                onRefresh?.();
-              }}
-              disabled={isLoading}
-              className="inline-flex items-center p-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50"
-              data-testid={`${testId}-refresh-button`}
-              aria-label="Refresh service list"
-            >
-              <ArrowPathIcon className={cn('h-4 w-4', isLoading && 'animate-spin')} />
-            </button>
-          </div>
-        </div>
-
-        {/* Table container */}
-        <div 
-          ref={containerRef}
-          className="flex-1 overflow-auto"
-          style={{ height: enableVirtualization ? '100%' : 'auto' }}
-          data-testid={`${testId}-table-container`}
-        >
-          <table
-            className="w-full border-collapse"
-            role="table"
-            aria-label="Database services table"
-            aria-rowcount={sortedServices.length + 1}
+        <div className="flex items-center space-x-2">
+          {/* Filter toggle */}
+          <Button
+            onClick={() => setShowFilters(!showFilters)}
+            variant="outline"
+            size="sm"
+            className={showFilters ? 'bg-primary-50 dark:bg-primary-900/20' : ''}
           >
-            {/* Table header */}
-            <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10">
-              <tr role="row" aria-rowindex={1}>
-                {columns.map((column, columnIndex) => (
-                  <th
-                    key={column.key as string}
-                    role="columnheader"
-                    scope="col"
-                    aria-colindex={columnIndex + 1}
-                    aria-sort={
-                      column.sortable && sortField === column.accessorKey
-                        ? sortDirection
-                        : column.sortable ? 'none' : undefined
-                    }
-                    className={cn(
-                      'text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider border-b border-gray-200 dark:border-gray-700',
-                      column.sortable && 'cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700',
-                      column.sticky === 'left' && 'sticky left-0 bg-gray-50 dark:bg-gray-800 z-20',
-                      column.sticky === 'right' && 'sticky right-0 bg-gray-50 dark:bg-gray-800 z-20',
-                      compactMode ? 'px-2 py-2' : 'px-4 py-3'
-                    )}
-                    style={{
-                      width: column.width,
-                      minWidth: column.minWidth,
-                      maxWidth: column.maxWidth
-                    }}
-                    onClick={() => {
-                      if (column.sortable && column.accessorKey) {
-                        handleSort(column.accessorKey);
-                      }
-                    }}
-                    onKeyDown={(e) => {
-                      if (column.sortable && column.accessorKey && (e.key === 'Enter' || e.key === ' ')) {
-                        e.preventDefault();
-                        handleSort(column.accessorKey);
-                      }
-                    }}
-                    tabIndex={column.sortable ? 0 : undefined}
-                    data-testid={`${testId}-header-${column.key}`}
-                  >
-                    <div className="flex items-center space-x-1">
-                      <span>{column.header}</span>
-                      {column.sortable && column.accessorKey === sortField && (
-                        <span className="ml-2">
-                          {sortDirection === 'asc' ? (
-                            <ChevronUpIcon className="h-3 w-3" />
-                          ) : (
-                            <ChevronDownIcon className="h-3 w-3" />
-                          )}
-                        </span>
-                      )}
-                    </div>
-                  </th>
-                ))}
-              </tr>
-            </thead>
+            <FunnelIcon className="h-4 w-4" />
+            Filters
+          </Button>
 
-            {/* Table body */}
-            <tbody
-              className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700"
-              style={virtualItems ? {
-                height: `${virtualizer.getTotalSize()}px`,
-                position: 'relative'
-              } : undefined}
+          {/* Refresh */}
+          <Button
+            onClick={refresh}
+            variant="outline"
+            size="sm"
+            disabled={isDataLoading}
+          >
+            <ArrowPathIcon className={cn('h-4 w-4', isDataLoading && 'animate-spin')} />
+            Refresh
+          </Button>
+
+          {/* View toggle */}
+          <div className="flex items-center rounded-md border border-gray-300 dark:border-gray-600">
+            <Button
+              variant="ghost"
+              size="sm"
+              className={!enableVirtualization ? 'bg-primary-50 dark:bg-primary-900/20' : ''}
             >
-              {(virtualItems || sortedServices.map((service, index) => ({ service, index }))).map((item) => {
-                const { service, index } = virtualItems ? {
-                  service: sortedServices[item.index],
-                  index: item.index
-                } : item as { service: DatabaseService; index: number };
+              <TableCellsIcon className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={enableVirtualization ? 'bg-primary-50 dark:bg-primary-900/20' : ''}
+            >
+              <Square3Stack3DIcon className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </div>
 
-                return (
-                  <tr
-                    key={service.id}
-                    role="row"
-                    aria-rowindex={index + 2}
-                    aria-selected={selectionState.isSelected(service.id)}
-                    data-row-index={index}
-                    className={cn(
-                      'hover:bg-gray-50 dark:hover:bg-gray-800 focus-within:bg-primary-50 dark:focus-within:bg-primary-900/20 cursor-pointer transition-colors',
-                      selectionState.isSelected(service.id) && 'bg-primary-50 dark:bg-primary-900/20'
-                    )}
-                    style={virtualItems ? {
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
+      {/* Filters */}
+      {showFilters && (
+        <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50 dark:bg-gray-800">
+          <FilterControls
+            filters={storeFilters}
+            onFiltersChange={handleFiltersChange}
+            onClearFilters={handleClearFilters}
+          />
+        </div>
+      )}
+
+      {/* Table */}
+      <div className="flex flex-col">
+        <div className="-my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+          <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
+            <div 
+              ref={tableContainerRef}
+              className={cn(
+                'overflow-hidden shadow ring-1 ring-black ring-opacity-5',
+                bordered && 'border border-gray-200 dark:border-gray-700',
+                'sm:rounded-lg'
+              )}
+              tabIndex={focusable ? 0 : undefined}
+              onKeyDown={handleKeyDown}
+              role="table"
+              aria-label={ariaLabel}
+              aria-description={ariaDescription}
+            >
+              {enableVirtualization ? (
+                /* Virtual Table */
+                <div
+                  style={{
+                    height: Math.min(600, virtualizer.getTotalSize()),
+                    overflow: 'auto',
+                  }}
+                >
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <TableHeader
+                      columns={columns}
+                      sort={sort || { field: 'name', direction: 'asc' }}
+                      onSortChange={handleSortChange}
+                      selection={selectionConfig}
+                    />
+                  </table>
+                  
+                  <div
+                    style={{
+                      height: virtualizer.getTotalSize(),
                       width: '100%',
-                      height: `${item.size}px`,
-                      transform: `translateY(${item.start}px)`
-                    } : undefined}
-                    onClick={() => handleRowClick(service)}
-                    onKeyDown={(e) => handleRowKeyDown(e, service, index)}
-                    tabIndex={0}
-                    data-testid={`${testId}-row-${service.id}`}
+                      position: 'relative',
+                    }}
                   >
-                    {columns.map((column, columnIndex) => (
-                      <td
-                        key={`${service.id}-${column.key}`}
-                        role="gridcell"
-                        aria-colindex={columnIndex + 1}
-                        className={cn(
-                          'border-b border-gray-200 dark:border-gray-700 text-sm text-gray-900 dark:text-gray-100',
-                          column.sticky === 'left' && 'sticky left-0 bg-white dark:bg-gray-900 z-10',
-                          column.sticky === 'right' && 'sticky right-0 bg-white dark:bg-gray-900 z-10',
-                          compactMode ? 'px-2 py-2' : 'px-4 py-3',
-                          column.cellClassName
-                        )}
-                        style={{
-                          width: column.width,
-                          minWidth: column.minWidth,
-                          maxWidth: column.maxWidth
-                        }}
-                        data-testid={`${testId}-cell-${service.id}-${column.key}`}
-                      >
-                        {column.cell ? 
-                          column.cell({
-                            value: column.accessorKey ? service[column.accessorKey] : undefined,
-                            row: service,
-                            column,
-                            index,
-                            isSelected: selectionState.isSelected(service.id)
-                          }) :
-                          column.accessorKey ? String(service[column.accessorKey] || '') : ''
-                        }
-                      </td>
-                    ))}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                    {virtualizer.getVirtualItems().map((virtualItem) => {
+                      const service = displayServices[virtualItem.index];
+                      if (!service) return null;
 
-        {/* Footer with pagination and stats */}
-        <div className="flex items-center justify-between p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
-          <div className="text-sm text-gray-500 dark:text-gray-400">
-            Showing {sortedServices.length} of {displayServices.length} services
-            {selectionState.selectedCount > 0 && (
-              <span className="ml-2">
-                • {selectionState.selectedCount} selected
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center space-x-2">
-            {enableBulkActions && (
-              <div className="flex items-center space-x-2">
-                <label className="flex items-center text-sm text-gray-600 dark:text-gray-400">
-                  <input
-                    type="checkbox"
-                    checked={selectionState.isAllSelected}
-                    ref={(input) => {
-                      if (input) {
-                        input.indeterminate = selectionState.isPartialSelected;
-                      }
-                    }}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        selectionState.selectAll();
-                      } else {
-                        selectionState.selectNone();
-                      }
-                    }}
-                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded mr-2"
-                    data-testid={`${testId}-select-all-checkbox`}
+                      return (
+                        <div
+                          key={virtualItem.key}
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            height: virtualItem.size,
+                            transform: `translateY(${virtualItem.start}px)`,
+                          }}
+                        >
+                          <table className="min-w-full">
+                            <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                              <TableRow
+                                service={service}
+                                columns={columns}
+                                index={virtualItem.index}
+                                selected={isSelected(service.id)}
+                                onSelectionChange={(selected) => {
+                                  toggleSelection(service.id);
+                                }}
+                                onRowClick={onRowClick}
+                                onEdit={handleEdit}
+                                onDelete={handleDelete}
+                                onDuplicate={handleDuplicate}
+                                onTestConnection={handleTestConnection}
+                                className={cn(
+                                  striped && virtualItem.index % 2 === 0 && 'bg-gray-50 dark:bg-gray-800',
+                                  hoverable && 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                                )}
+                              />
+                            </tbody>
+                          </table>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                /* Regular Table */
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  <TableHeader
+                    columns={columns}
+                    sort={sort || { field: 'name', direction: 'asc' }}
+                    onSortChange={handleSortChange}
+                    selection={selectionConfig}
                   />
-                  Select all
-                </label>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Loading overlay */}
-        {isLoading && sortedServices.length > 0 && (
-          <div className="absolute inset-0 bg-white/50 dark:bg-gray-900/50 flex items-center justify-center z-30">
-            <div className="flex items-center space-x-2 bg-white dark:bg-gray-800 px-4 py-2 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
-              <ArrowPathIcon className="h-4 w-4 animate-spin text-primary-600" />
-              <span className="text-sm text-gray-700 dark:text-gray-300">
-                Refreshing services...
-              </span>
+                  <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                    {displayServices.map((service, index) => (
+                      <TableRow
+                        key={service.id}
+                        service={service}
+                        columns={columns}
+                        index={index}
+                        selected={isSelected(service.id)}
+                        onSelectionChange={(selected) => {
+                          toggleSelection(service.id);
+                        }}
+                        onRowClick={onRowClick}
+                        onEdit={handleEdit}
+                        onDelete={handleDelete}
+                        onDuplicate={handleDuplicate}
+                        onTestConnection={handleTestConnection}
+                        className={cn(
+                          striped && index % 2 === 0 && 'bg-gray-50 dark:bg-gray-800',
+                          hoverable && 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                        )}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
-        )}
+        </div>
       </div>
-    );
-  }
-);
 
-ServiceListTable.displayName = 'ServiceListTable';
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deleteService} onClose={() => setDeleteService(null)}>
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+            <Transition
+              show={!!deleteService}
+              enter="ease-out duration-300"
+              enterFrom="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+              enterTo="opacity-100 translate-y-0 sm:scale-100"
+              leave="ease-in duration-200"
+              leaveFrom="opacity-100 translate-y-0 sm:scale-100"
+              leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+            >
+              <DialogPanel className="relative transform overflow-hidden rounded-lg bg-white dark:bg-gray-900 px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6">
+                <div className="sm:flex sm:items-start">
+                  <div className="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100 dark:bg-red-900 sm:mx-0 sm:h-10 sm:w-10">
+                    <ExclamationTriangleIcon className="h-6 w-6 text-red-600 dark:text-red-400" />
+                  </div>
+                  <div className="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left">
+                    <DialogTitle className="text-base font-semibold leading-6 text-gray-900 dark:text-gray-100">
+                      Delete Service
+                    </DialogTitle>
+                    <div className="mt-2">
+                      <Description className="text-sm text-gray-500 dark:text-gray-400">
+                        Are you sure you want to delete "{deleteService?.name}"? This action cannot be undone.
+                      </Description>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
+                  <Button
+                    onClick={handleConfirmDelete}
+                    disabled={isDeleting}
+                    variant="destructive"
+                    className="w-full sm:ml-3 sm:w-auto"
+                  >
+                    {isDeleting ? 'Deleting...' : 'Delete'}
+                  </Button>
+                  <Button
+                    onClick={() => setDeleteService(null)}
+                    variant="outline"
+                    className="mt-3 w-full sm:mt-0 sm:w-auto"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </DialogPanel>
+            </Transition>
+          </div>
+        </div>
+      </Dialog>
 
-// =============================================================================
-// EXPORTS
-// =============================================================================
+      {/* Bulk Action Confirmation Dialog */}
+      <Dialog open={!!bulkActionDialog} onClose={() => setBulkActionDialog(null)}>
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+            <Transition
+              show={!!bulkActionDialog}
+              enter="ease-out duration-300"
+              enterFrom="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+              enterTo="opacity-100 translate-y-0 sm:scale-100"
+              leave="ease-in duration-200"
+              leaveFrom="opacity-100 translate-y-0 sm:scale-100"
+              leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+            >
+              <DialogPanel className="relative transform overflow-hidden rounded-lg bg-white dark:bg-gray-900 px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6">
+                <div className="sm:flex sm:items-start">
+                  <div className={cn(
+                    "mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full sm:mx-0 sm:h-10 sm:w-10",
+                    bulkActionDialog?.action.variant === 'destructive' 
+                      ? 'bg-red-100 dark:bg-red-900'
+                      : 'bg-yellow-100 dark:bg-yellow-900'
+                  )}>
+                    <ExclamationTriangleIcon className={cn(
+                      "h-6 w-6",
+                      bulkActionDialog?.action.variant === 'destructive'
+                        ? 'text-red-600 dark:text-red-400'
+                        : 'text-yellow-600 dark:text-yellow-400'
+                    )} />
+                  </div>
+                  <div className="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left">
+                    <DialogTitle className="text-base font-semibold leading-6 text-gray-900 dark:text-gray-100">
+                      {bulkActionDialog?.action.label}
+                    </DialogTitle>
+                    <div className="mt-2">
+                      <Description className="text-sm text-gray-500 dark:text-gray-400">
+                        {bulkActionDialog?.action.confirmationMessage || 
+                         `Are you sure you want to ${bulkActionDialog?.action.label.toLowerCase()} ${bulkActionDialog?.services.length} service(s)?`}
+                      </Description>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
+                  <Button
+                    onClick={handleConfirmBulkAction}
+                    disabled={isBulkActionInProgress}
+                    variant={bulkActionDialog?.action.variant || 'default'}
+                    className="w-full sm:ml-3 sm:w-auto"
+                  >
+                    {isBulkActionInProgress ? 'Processing...' : 'Confirm'}
+                  </Button>
+                  <Button
+                    onClick={() => setBulkActionDialog(null)}
+                    variant="outline"
+                    className="mt-3 w-full sm:mt-0 sm:w-auto"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </DialogPanel>
+            </Transition>
+          </div>
+        </div>
+      </Dialog>
+    </div>
+  );
+};
 
+// Default export
 export default ServiceListTable;
-export type { ServiceListTableComponentProps, ServiceListTableRef };
+
+// Additional exports for external usage
+export type {
+  ServiceListTableProps,
+  ServiceListColumn,
+  ServiceListRowSelection,
+  ServiceListAction,
+  ServiceListFilterData,
+  ServiceListSortData,
+  ServiceListPaginationData,
+};
+
+export {
+  DEFAULT_COLUMNS,
+  BULK_ACTIONS,
+  ServiceStatusBadge,
+  ConnectionStatusIndicator,
+  ServiceActionsMenu,
+  TableHeader,
+  TableRow,
+  EmptyState,
+  LoadingState,
+  FilterControls,
+};
