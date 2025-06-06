@@ -1,28 +1,37 @@
 /**
  * Connection Test Button Component
  * 
- * React component that renders a connection test button with loading states, success/error feedback,
- * and integration with the connection testing hook. Provides immediate visual feedback during 
- * connection testing and displays appropriate icons and messages based on test results.
+ * React component that renders a connection test button with loading states, success/error 
+ * feedback, and integration with the connection testing hook. Provides immediate visual 
+ * feedback during connection testing and displays appropriate icons and messages based on 
+ * test results. Optimized for React 19 patterns with TypeScript 5.8+ and Tailwind CSS 4.1+.
  * 
- * Features:
- * - Real-time connection testing with SWR caching
- * - Loading states with spinner animations
- * - Success/error feedback with appropriate icons and colors
- * - Accessible button interactions with keyboard navigation
- * - Integration with React Hook Form for validation
- * - Tailwind CSS styling with consistent theme support
- * 
- * @fileoverview Connection test button with React 19/Next.js 15.1 optimization
+ * @fileoverview Database connection test button with real-time feedback
  * @version 1.0.0
- * @since 2024-01-01
+ * @since React 19.0.0, Next.js 15.1+, TypeScript 5.8+
  */
 
-'use client';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useFormContext, type FieldPath } from 'react-hook-form';
+import { 
+  CheckCircleIcon, 
+  ExclamationCircleIcon,
+  ArrowPathIcon,
+  XMarkIcon,
+  ClockIcon,
+  WifiIcon,
+  SignalIcon
+} from '@heroicons/react/24/outline';
+import { CheckCircleIcon as CheckCircleIconSolid } from '@heroicons/react/24/solid';
 
-import React, { useCallback, forwardRef } from 'react';
-import { cva, type VariantProps } from 'class-variance-authority';
-import type { DatabaseConfig, ConnectionTestResult, ConnectionTestStatus } from '../types';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import { useConnectionTest } from './use-connection-test';
+import type { 
+  DatabaseConnectionFormData, 
+  ConnectionTestResult, 
+  BaseComponentProps 
+} from '../types';
 
 // =============================================================================
 // TYPES AND INTERFACES
@@ -30,316 +39,233 @@ import type { DatabaseConfig, ConnectionTestResult, ConnectionTestStatus } from 
 
 /**
  * Connection test button component props
- * Following React 19 patterns with TypeScript 5.8+ type safety
  */
-export interface ConnectionTestButtonProps {
-  /** Database configuration to test */
-  config: DatabaseConfig;
-  /** Current connection test status */
-  status?: ConnectionTestStatus;
-  /** Latest connection test result */
-  result?: ConnectionTestResult | null;
-  /** Whether the button is currently loading/testing */
-  loading?: boolean;
-  /** Whether the button should be disabled */
-  disabled?: boolean;
+export interface ConnectionTestButtonProps extends BaseComponentProps {
+  /** Form field path to watch for configuration changes */
+  configPath?: FieldPath<DatabaseConnectionFormData>;
+  
+  /** Connection configuration to test (overrides form data) */
+  config?: Partial<DatabaseConnectionFormData>;
+  
   /** Button size variant */
-  size?: 'sm' | 'md' | 'lg';
-  /** Button style variant */
-  variant?: 'primary' | 'secondary' | 'outline';
-  /** Custom CSS classes */
-  className?: string;
-  /** Test ID for automated testing */
-  'data-testid'?: string;
-  /** Callback function when connection test is initiated */
-  onTest?: (config: DatabaseConfig) => void | Promise<void>;
-  /** Callback function when test completes successfully */
-  onSuccess?: (result: ConnectionTestResult) => void;
-  /** Callback function when test fails */
-  onError?: (error: Error) => void;
-  /** Show detailed status text alongside icon */
-  showStatusText?: boolean;
-  /** Automatically test when config changes */
-  autoTest?: boolean;
+  size?: 'sm' | 'default' | 'lg';
+  
+  /** Button layout variant */
+  variant?: 'default' | 'outline' | 'secondary';
+  
+  /** Custom button text for idle state */
+  idleText?: string;
+  
+  /** Custom button text for testing state */
+  testingText?: string;
+  
+  /** Custom button text for success state */
+  successText?: string;
+  
+  /** Custom button text for error state */
+  errorText?: string;
+  
+  /** Auto-hide success state after delay (ms) */
+  autoHideSuccess?: number;
+  
+  /** Auto-hide error state after delay (ms) */
+  autoHideError?: number;
+  
+  /** Enable retry functionality */
+  enableRetry?: boolean;
+  
+  /** Maximum retry attempts */
+  maxRetries?: number;
+  
+  /** Show test duration */
+  showDuration?: boolean;
+  
+  /** Show retry count */
+  showRetryCount?: boolean;
+  
+  /** Disable button */
+  disabled?: boolean;
+  
+  /** Custom disabled tooltip */
+  disabledTooltip?: string;
+  
+  /** Connection test success callback */
+  onTestSuccess?: (result: ConnectionTestResult) => void;
+  
+  /** Connection test error callback */
+  onTestError?: (error: string, result?: ConnectionTestResult) => void;
+  
+  /** Connection test start callback */
+  onTestStart?: () => void;
+  
+  /** Connection test complete callback */
+  onTestComplete?: (result: ConnectionTestResult) => void;
+  
+  /** Connection test cancel callback */
+  onTestCancel?: () => void;
+  
+  /** Enable real-time form validation on change */
+  enableRealTimeValidation?: boolean;
+  
+  /** Validation debounce delay in milliseconds */
+  validationDebounce?: number;
+  
+  /** Test timeout in milliseconds */
+  timeout?: number;
+  
+  /** Enable cancellation during test */
+  enableCancellation?: boolean;
+  
+  /** Hide button text (icon only) */
+  iconOnly?: boolean;
+  
+  /** Custom loading icon */
+  loadingIcon?: React.ComponentType<{ className?: string }>;
+  
+  /** Custom success icon */
+  successIcon?: React.ComponentType<{ className?: string }>;
+  
+  /** Custom error icon */
+  errorIcon?: React.ComponentType<{ className?: string }>;
+  
+  /** Custom idle icon */
+  idleIcon?: React.ComponentType<{ className?: string }>;
+}
+
+/**
+ * Connection test state for UI display
+ */
+interface ConnectionTestState {
+  /** Current status */
+  status: 'idle' | 'testing' | 'success' | 'error' | 'cancelled';
+  
+  /** Display message */
+  message: string;
+  
+  /** Icon component */
+  icon: React.ComponentType<{ className?: string }>;
+  
+  /** Button variant */
+  variant: 'default' | 'outline' | 'secondary';
+  
+  /** Button color classes */
+  colorClasses: string;
+  
+  /** Show spinner */
+  showSpinner: boolean;
+  
+  /** Allow click */
+  clickable: boolean;
 }
 
 // =============================================================================
-// STYLE VARIANTS
+// UTILITY FUNCTIONS
 // =============================================================================
 
 /**
- * Connection test button style variants using class-variance-authority
- * Implements WCAG 2.1 AA compliant colors with proper contrast ratios
+ * Formats test duration for display
  */
-const connectionTestButtonVariants = cva(
-  // Base styles for all variants
-  [
-    // Layout and sizing
-    'inline-flex items-center justify-center gap-2 rounded-md font-medium transition-all duration-200',
-    // Typography
-    'text-sm leading-5 font-medium',
-    // Focus states for accessibility
-    'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
-    // Disabled states
-    'disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none',
-    // Interactive states
-    'hover:shadow-sm active:scale-[0.98]',
-    // Minimum touch target for accessibility (44x44px)
-    'min-h-[44px] min-w-[44px]'
-  ],
-  {
-    variants: {
-      variant: {
-        primary: [
-          // Primary colors with 4.5:1 contrast ratio
-          'bg-primary-600 text-white border border-primary-600',
-          'hover:bg-primary-700 hover:border-primary-700',
-          'focus-visible:ring-primary-500',
-          'active:bg-primary-800 active:border-primary-800'
-        ],
-        secondary: [
-          // Secondary colors with proper contrast
-          'bg-slate-100 text-slate-900 border border-slate-300',
-          'hover:bg-slate-200 hover:border-slate-400',
-          'focus-visible:ring-slate-500',
-          'active:bg-slate-300 active:border-slate-500',
-          'dark:bg-slate-800 dark:text-slate-100 dark:border-slate-600',
-          'dark:hover:bg-slate-700 dark:hover:border-slate-500'
-        ],
-        outline: [
-          // Outline variant with border emphasis
-          'bg-transparent text-primary-700 border border-primary-300',
-          'hover:bg-primary-50 hover:border-primary-400',
-          'focus-visible:ring-primary-500',
-          'active:bg-primary-100 active:border-primary-500',
-          'dark:text-primary-400 dark:border-primary-600',
-          'dark:hover:bg-primary-950 dark:hover:border-primary-500'
-        ]
-      },
-      size: {
-        sm: [
-          'px-3 py-1.5 text-xs leading-4 gap-1.5',
-          'min-h-[36px] min-w-[36px]' // Reduced for small variant but still accessible
-        ],
-        md: [
-          'px-4 py-2 text-sm leading-5 gap-2',
-          'min-h-[44px] min-w-[44px]' // Standard accessible size
-        ],
-        lg: [
-          'px-6 py-3 text-base leading-6 gap-2.5',
-          'min-h-[48px] min-w-[48px]' // Larger for prominent actions
-        ]
-      },
-      status: {
-        idle: '',
-        testing: [
-          'cursor-wait',
-          'animate-pulse'
-        ],
-        success: [
-          'bg-success-600 text-white border-success-600',
-          'hover:bg-success-700 hover:border-success-700',
-          'focus-visible:ring-success-500'
-        ],
-        error: [
-          'bg-error-600 text-white border-error-600',
-          'hover:bg-error-700 hover:border-error-700',
-          'focus-visible:ring-error-500'
-        ]
-      }
-    },
-    compoundVariants: [
-      // Status overrides for specific combinations
-      {
-        status: 'testing',
-        variant: 'primary',
-        className: 'bg-warning-500 border-warning-500 text-white'
-      },
-      {
-        status: 'testing',
-        variant: 'secondary',
-        className: 'bg-warning-100 border-warning-300 text-warning-800'
-      },
-      {
-        status: 'testing',
-        variant: 'outline',
-        className: 'border-warning-400 text-warning-700 bg-warning-50'
-      }
-    ],
-    defaultVariants: {
-      variant: 'primary',
-      size: 'md',
-      status: 'idle'
-    }
+const formatTestDuration = (duration: number | null): string => {
+  if (!duration) return '';
+  
+  if (duration < 1000) {
+    return `${duration}ms`;
+  } else if (duration < 60000) {
+    return `${(duration / 1000).toFixed(1)}s`;
+  } else {
+    const minutes = Math.floor(duration / 60000);
+    const seconds = ((duration % 60000) / 1000).toFixed(0);
+    return `${minutes}m ${seconds}s`;
   }
-);
-
-// =============================================================================
-// ICON COMPONENTS
-// =============================================================================
+};
 
 /**
- * Spinner icon for loading states
+ * Validates if connection config is complete enough for testing
  */
-const SpinnerIcon: React.FC<{ className?: string }> = ({ className = '' }) => (
-  <svg 
-    className={`animate-spin ${className}`} 
-    fill="none" 
-    viewBox="0 0 24 24"
-    aria-hidden="true"
-  >
-    <circle 
-      className="opacity-25" 
-      cx="12" 
-      cy="12" 
-      r="10" 
-      stroke="currentColor" 
-      strokeWidth="4"
-    />
-    <path 
-      className="opacity-75" 
-      fill="currentColor" 
-      d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-    />
-  </svg>
-);
+const isConfigValidForTesting = (config: Partial<DatabaseConnectionFormData>): boolean => {
+  if (!config.type || !config.host || !config.database) {
+    return false;
+  }
+  
+  // SQLite doesn't require username/password
+  if (config.type === 'sqlite') {
+    return true;
+  }
+  
+  return !!(config.username && config.password);
+};
 
 /**
- * Check icon for success states
+ * Gets connection test state configuration
  */
-const CheckIcon: React.FC<{ className?: string }> = ({ className = '' }) => (
-  <svg 
-    className={className} 
-    fill="none" 
-    viewBox="0 0 24 24" 
-    strokeWidth={2} 
-    stroke="currentColor"
-    aria-hidden="true"
-  >
-    <path 
-      strokeLinecap="round" 
-      strokeLinejoin="round" 
-      d="M5 13l4 4L19 7" 
-    />
-  </svg>
-);
-
-/**
- * X icon for error states
- */
-const XIcon: React.FC<{ className?: string }> = ({ className = '' }) => (
-  <svg 
-    className={className} 
-    fill="none" 
-    viewBox="0 0 24 24" 
-    strokeWidth={2} 
-    stroke="currentColor"
-    aria-hidden="true"
-  >
-    <path 
-      strokeLinecap="round" 
-      strokeLinejoin="round" 
-      d="M6 18L18 6M6 6l12 12" 
-    />
-  </svg>
-);
-
-/**
- * Cable icon for connection testing
- */
-const CableIcon: React.FC<{ className?: string }> = ({ className = '' }) => (
-  <svg 
-    className={className} 
-    fill="none" 
-    viewBox="0 0 24 24" 
-    strokeWidth={2} 
-    stroke="currentColor"
-    aria-hidden="true"
-  >
-    <path 
-      strokeLinecap="round" 
-      strokeLinejoin="round" 
-      d="M8.5 14.5A2.5 2.5 0 0011 12c0-1.38-.5-2-1.5-2s-1.5.62-1.5 2a2.5 2.5 0 002.5 2.5z" 
-    />
-    <path 
-      strokeLinecap="round" 
-      strokeLinejoin="round" 
-      d="M12 7V5a2 2 0 00-2-2H6a2 2 0 00-2 2v14a2 2 0 002 2h4a2 2 0 002-2v-2M16 7v10M20 7v10" 
-    />
-  </svg>
-);
-
-// =============================================================================
-// HOOK INTEGRATION
-// =============================================================================
-
-/**
- * Mock connection test hook for integration
- * In real implementation, this would import from use-connection-test.ts
- */
-const useConnectionTest = (config: DatabaseConfig) => {
-  const [isLoading, setIsLoading] = React.useState(false);
-  const [result, setResult] = React.useState<ConnectionTestResult | null>(null);
-  const [error, setError] = React.useState<Error | null>(null);
-
-  const test = useCallback(async (testConfig: DatabaseConfig): Promise<ConnectionTestResult> => {
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      // Simulate API call with realistic timing
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Mock result based on configuration completeness
-      const hasRequiredFields = testConfig.host && testConfig.database && testConfig.username;
-      const success = hasRequiredFields && Math.random() > 0.3; // 70% success rate for demo
-      
-      const testResult: ConnectionTestResult = {
-        success,
-        message: success 
-          ? `Successfully connected to ${testConfig.driver} database` 
-          : 'Connection failed - please check your credentials',
-        details: success 
-          ? `Connected to ${testConfig.host}:${testConfig.port || 'default'}`
-          : 'Authentication failed or database unreachable',
-        testDuration: 1800 + Math.random() * 400, // 1.8-2.2 seconds
-        timestamp: new Date().toISOString(),
-        errorCode: success ? undefined : 'AUTH_FAILED',
-        metadata: success ? {
-          serverVersion: '8.0.32',
-          databaseVersion: testConfig.driver + ' 8.0',
-          schema: testConfig.database,
-          tableCount: Math.floor(Math.random() * 50) + 10,
-          features: ['transactions', 'foreign_keys'],
-          charset: 'utf8mb4',
-          timezone: 'UTC'
-        } : undefined
+const getConnectionTestState = (
+  status: 'idle' | 'testing' | 'success' | 'error',
+  result: ConnectionTestResult | null,
+  error: any,
+  retryCount: number,
+  maxRetries: number,
+  props: ConnectionTestButtonProps
+): ConnectionTestState => {
+  const {
+    idleText = 'Test Connection',
+    testingText = 'Testing...',
+    successText = 'Connected',
+    errorText = 'Test Failed',
+    enableRetry = true,
+    showRetryCount = false
+  } = props;
+  
+  switch (status) {
+    case 'testing':
+      return {
+        status: 'testing',
+        message: testingText,
+        icon: props.loadingIcon || ArrowPathIcon,
+        variant: 'outline',
+        colorClasses: 'border-blue-300 text-blue-700 hover:bg-blue-50 focus:ring-blue-500',
+        showSpinner: true,
+        clickable: false
       };
       
-      setResult(testResult);
-      return testResult;
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error('Connection test failed');
-      setError(error);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  const reset = useCallback(() => {
-    setResult(null);
-    setError(null);
-    setIsLoading(false);
-  }, []);
-
-  return {
-    test,
-    result,
-    isLoading,
-    error,
-    reset
-  };
+    case 'success':
+      return {
+        status: 'success',
+        message: result?.testDuration ? 
+          `${successText} (${formatTestDuration(result.testDuration)})` : 
+          successText,
+        icon: props.successIcon || CheckCircleIconSolid,
+        variant: 'outline',
+        colorClasses: 'border-green-300 text-green-700 hover:bg-green-50 focus:ring-green-500',
+        showSpinner: false,
+        clickable: true
+      };
+      
+    case 'error':
+      const errorMessage = error?.error?.message || result?.message || 'Connection failed';
+      const retryText = enableRetry && retryCount > 0 && showRetryCount ? 
+        ` (Retry ${retryCount}/${maxRetries})` : '';
+      
+      return {
+        status: 'error',
+        message: `${errorText}${retryText}`,
+        icon: props.errorIcon || ExclamationCircleIcon,
+        variant: 'outline',
+        colorClasses: 'border-red-300 text-red-700 hover:bg-red-50 focus:ring-red-500',
+        showSpinner: false,
+        clickable: enableRetry
+      };
+      
+    default: // idle
+      return {
+        status: 'idle',
+        message: idleText,
+        icon: props.idleIcon || WifiIcon,
+        variant: 'default',
+        colorClasses: '',
+        showSpinner: false,
+        clickable: true
+      };
+  }
 };
 
 // =============================================================================
@@ -349,177 +275,346 @@ const useConnectionTest = (config: DatabaseConfig) => {
 /**
  * Connection Test Button Component
  * 
- * Provides a comprehensive connection testing interface with visual feedback,
- * accessibility support, and integration with React Hook Form validation.
+ * Renders a button for testing database connections with real-time feedback,
+ * loading states, and comprehensive error handling. Integrates with React Hook Form
+ * for automatic form validation and provides immediate visual feedback during
+ * connection testing.
+ * 
+ * @param props - Connection test button props
+ * @returns JSX element
  */
-export const ConnectionTestButton = forwardRef<
-  HTMLButtonElement,
-  ConnectionTestButtonProps & VariantProps<typeof connectionTestButtonVariants>
->(({
-  config,
-  status = 'idle',
-  result: externalResult,
-  loading: externalLoading,
-  disabled = false,
-  size = 'md',
-  variant = 'primary',
-  className,
-  'data-testid': testId,
-  onTest,
-  onSuccess,
-  onError,
-  showStatusText = true,
-  autoTest = false,
-  ...props
-}, ref) => {
-  // Integration with connection test hook
-  const { test, result: hookResult, isLoading: hookLoading, error, reset } = useConnectionTest(config);
+export const ConnectionTestButton: React.FC<ConnectionTestButtonProps> = (props) => {
+  const {
+    configPath,
+    config,
+    size = 'default',
+    variant: propVariant,
+    autoHideSuccess = 3000,
+    autoHideError = 0, // Don't auto-hide errors
+    enableRetry = true,
+    maxRetries = 3,
+    showDuration = true,
+    showRetryCount = false,
+    disabled = false,
+    disabledTooltip,
+    onTestSuccess,
+    onTestError,
+    onTestStart,
+    onTestComplete,
+    onTestCancel,
+    enableRealTimeValidation = false,
+    validationDebounce = 500,
+    timeout = 10000,
+    enableCancellation = true,
+    iconOnly = false,
+    className,
+    'data-testid': dataTestId = 'connection-test-button',
+    'aria-label': ariaLabel,
+    'aria-describedby': ariaDescribedby,
+    ...restProps
+  } = props;
   
-  // Use external props if provided, otherwise use hook state
-  const isLoading = externalLoading ?? hookLoading;
-  const result = externalResult ?? hookResult;
+  // Form integration
+  const formContext = useFormContext<DatabaseConnectionFormData>();
+  const { watch, formState: { errors } } = formContext || {};
   
-  // Determine current status based on state
-  const currentStatus: ConnectionTestStatus = React.useMemo(() => {
-    if (isLoading) return 'testing';
-    if (result?.success) return 'success';
-    if (result && !result.success) return 'error';
-    return status;
-  }, [isLoading, result, status]);
-
-  // Handle button click
-  const handleClick = useCallback(async () => {
-    if (isLoading || disabled) return;
-
-    try {
-      // Reset previous results
-      reset();
-      
-      // Call external handler if provided
-      if (onTest) {
-        await onTest(config);
-      } else {
-        // Use hook's test function
-        const testResult = await test(config);
-        if (testResult.success && onSuccess) {
-          onSuccess(testResult);
-        }
-      }
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error('Connection test failed');
-      if (onError) {
-        onError(error);
-      }
+  // Watch form data if configPath is provided
+  const watchedConfig = watch ? watch(configPath as any) : null;
+  
+  // Determine active configuration
+  const activeConfig = config || watchedConfig || {};
+  
+  // Connection test hook
+  const {
+    testConnection,
+    result,
+    isLoading,
+    error,
+    status,
+    retry,
+    cancel,
+    testDuration,
+    retryCount
+  } = useConnectionTest({
+    enableRetry,
+    maxRetries,
+    timeout,
+    onSuccess: (result) => {
+      onTestSuccess?.(result);
+      onTestComplete?.(result);
+    },
+    onError: (error) => {
+      const errorMessage = error.error?.message || 'Connection test failed';
+      onTestError?.(errorMessage, result || undefined);
+      onTestComplete?.(result || {
+        success: false,
+        message: errorMessage,
+        testDuration: testDuration || 0,
+        timestamp: new Date().toISOString()
+      });
     }
-  }, [config, isLoading, disabled, onTest, onSuccess, onError, test, reset]);
-
-  // Auto-test functionality
-  React.useEffect(() => {
-    if (autoTest && config.host && config.database && !isLoading) {
-      const timeoutId = setTimeout(() => {
-        handleClick();
-      }, 500); // Debounce auto-testing
-
-      return () => clearTimeout(timeoutId);
+  });
+  
+  // Local state for UI feedback
+  const [displayState, setDisplayState] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+  const [autoHideTimer, setAutoHideTimer] = useState<NodeJS.Timeout | null>(null);
+  
+  // Update display state based on hook status
+  useEffect(() => {
+    if (status === 'testing') {
+      setDisplayState('testing');
+      // Clear any existing timer
+      if (autoHideTimer) {
+        clearTimeout(autoHideTimer);
+        setAutoHideTimer(null);
+      }
+    } else if (status === 'success') {
+      setDisplayState('success');
+      // Auto-hide success state if configured
+      if (autoHideSuccess > 0) {
+        const timer = setTimeout(() => {
+          setDisplayState('idle');
+          setAutoHideTimer(null);
+        }, autoHideSuccess);
+        setAutoHideTimer(timer);
+      }
+    } else if (status === 'error') {
+      setDisplayState('error');
+      // Auto-hide error state if configured
+      if (autoHideError > 0) {
+        const timer = setTimeout(() => {
+          setDisplayState('idle');
+          setAutoHideTimer(null);
+        }, autoHideError);
+        setAutoHideTimer(timer);
+      }
+    } else {
+      setDisplayState('idle');
     }
-  }, [autoTest, config.host, config.database, config.username, isLoading, handleClick]);
-
-  // Determine button content
-  const getButtonContent = () => {
-    const iconSize = size === 'sm' ? 'w-4 h-4' : size === 'lg' ? 'w-6 h-6' : 'w-5 h-5';
     
-    switch (currentStatus) {
-      case 'testing':
-        return (
-          <>
-            <SpinnerIcon className={iconSize} />
-            {showStatusText && 'Testing...'}
-          </>
-        );
-      
-      case 'success':
-        return (
-          <>
-            <CheckIcon className={iconSize} />
-            {showStatusText && 'Connected'}
-          </>
-        );
-      
-      case 'error':
-        return (
-          <>
-            <XIcon className={iconSize} />
-            {showStatusText && 'Failed'}
-          </>
-        );
-      
-      default:
-        return (
-          <>
-            <CableIcon className={iconSize} />
-            {showStatusText && 'Test Connection'}
-          </>
-        );
-    }
-  };
-
-  // Determine ARIA label for accessibility
-  const getAriaLabel = () => {
-    switch (currentStatus) {
-      case 'testing':
-        return 'Testing database connection...';
-      case 'success':
-        return `Connection successful: ${result?.message || 'Database connection established'}`;
-      case 'error':
-        return `Connection failed: ${result?.message || error?.message || 'Unknown error'}`;
-      default:
-        return 'Test database connection';
-    }
-  };
-
-  // Check if button should be disabled
-  const isDisabled = disabled || isLoading || !config.host || !config.database;
-
-  return (
-    <button
-      ref={ref}
-      type="button"
-      className={connectionTestButtonVariants({
-        variant,
-        size,
-        status: currentStatus,
-        className
-      })}
-      disabled={isDisabled}
-      onClick={handleClick}
-      aria-label={getAriaLabel()}
-      aria-live="polite"
-      aria-busy={isLoading}
-      data-testid={testId || 'connection-test-button'}
-      title={result?.message || getAriaLabel()}
-      {...props}
-    >
-      {getButtonContent()}
-    </button>
+    return () => {
+      if (autoHideTimer) {
+        clearTimeout(autoHideTimer);
+      }
+    };
+  }, [status, autoHideSuccess, autoHideError]);
+  
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (autoHideTimer) {
+        clearTimeout(autoHideTimer);
+      }
+    };
+  }, []);
+  
+  // Check if config is valid for testing
+  const isConfigValid = isConfigValidForTesting(activeConfig);
+  const isFormInvalid = formContext && Object.keys(errors).length > 0;
+  const isButtonDisabled = disabled || !isConfigValid || isFormInvalid;
+  
+  // Get current test state configuration
+  const testState = getConnectionTestState(
+    displayState,
+    result,
+    error,
+    retryCount,
+    maxRetries,
+    props
   );
-});
+  
+  // Handle test button click
+  const handleTestClick = useCallback(async () => {
+    if (isButtonDisabled || !testState.clickable) {
+      return;
+    }
+    
+    // If currently testing and cancellation is enabled, cancel the test
+    if (displayState === 'testing' && enableCancellation) {
+      cancel();
+      onTestCancel?.();
+      return;
+    }
+    
+    // If in error state with retry enabled, retry the test
+    if (displayState === 'error' && enableRetry) {
+      try {
+        onTestStart?.();
+        await retry();
+      } catch (error) {
+        // Error handled by hook callbacks
+      }
+      return;
+    }
+    
+    // Start new test
+    try {
+      onTestStart?.();
+      await testConnection(activeConfig as DatabaseConnectionFormData);
+    } catch (error) {
+      // Error handled by hook callbacks
+    }
+  }, [
+    isButtonDisabled,
+    testState.clickable,
+    displayState,
+    enableCancellation,
+    enableRetry,
+    cancel,
+    onTestCancel,
+    retry,
+    onTestStart,
+    testConnection,
+    activeConfig
+  ]);
+  
+  // Determine button variant
+  const buttonVariant = propVariant || testState.variant;
+  
+  // Build button classes
+  const buttonClasses = cn(
+    // Base classes
+    'relative transition-all duration-200',
+    // State-specific classes
+    testState.colorClasses,
+    // Custom classes
+    className
+  );
+  
+  // Render button icon
+  const renderIcon = () => {
+    const IconComponent = testState.icon;
+    const iconClasses = cn(
+      'flex-shrink-0 transition-transform duration-200',
+      {
+        'w-4 h-4': size === 'sm',
+        'w-5 h-5': size === 'default',
+        'w-6 h-6': size === 'lg',
+        'animate-spin': testState.showSpinner,
+        'mr-2': !iconOnly
+      }
+    );
+    
+    return <IconComponent className={iconClasses} />;
+  };
+  
+  // Render button content
+  const renderButtonContent = () => {
+    return (
+      <div className="flex items-center justify-center">
+        {renderIcon()}
+        {!iconOnly && (
+          <span className="font-medium">
+            {testState.message}
+          </span>
+        )}
+        {/* Show cancellation option during testing */}
+        {displayState === 'testing' && enableCancellation && (
+          <XMarkIcon className="w-4 h-4 ml-2 opacity-70 hover:opacity-100 transition-opacity" />
+        )}
+      </div>
+    );
+  };
+  
+  // Render disabled tooltip if needed
+  const getDisabledTooltip = () => {
+    if (disabled && disabledTooltip) {
+      return disabledTooltip;
+    }
+    
+    if (!isConfigValid) {
+      return 'Please fill in required connection details';
+    }
+    
+    if (isFormInvalid) {
+      return 'Please fix form validation errors';
+    }
+    
+    return undefined;
+  };
+  
+  const tooltipText = getDisabledTooltip();
+  
+  return (
+    <div className="relative">
+      <Button
+        type="button"
+        variant={buttonVariant}
+        size={size}
+        disabled={isButtonDisabled}
+        onClick={handleTestClick}
+        className={buttonClasses}
+        data-testid={dataTestId}
+        aria-label={ariaLabel || `${testState.message}${tooltipText ? ` - ${tooltipText}` : ''}`}
+        aria-describedby={ariaDescribedby}
+        title={tooltipText}
+        {...restProps}
+      >
+        {renderButtonContent()}
+      </Button>
+      
+      {/* Connection status indicator */}
+      {(displayState === 'success' || displayState === 'error') && (
+        <div className="absolute -top-1 -right-1">
+          <div className={cn(
+            'w-3 h-3 rounded-full border-2 border-white',
+            {
+              'bg-green-500': displayState === 'success',
+              'bg-red-500': displayState === 'error'
+            }
+          )} />
+        </div>
+      )}
+      
+      {/* Test duration display */}
+      {showDuration && testDuration && displayState === 'success' && (
+        <div className="absolute -bottom-6 left-0 right-0 text-center">
+          <span className="inline-flex items-center text-xs text-gray-500 bg-white px-2 py-1 rounded shadow">
+            <ClockIcon className="w-3 h-3 mr-1" />
+            {formatTestDuration(testDuration)}
+          </span>
+        </div>
+      )}
+      
+      {/* Retry count display */}
+      {showRetryCount && retryCount > 0 && displayState === 'error' && (
+        <div className="absolute -bottom-6 right-0">
+          <span className="inline-flex items-center text-xs text-red-600 bg-red-50 px-2 py-1 rounded">
+            {retryCount}/{maxRetries}
+          </span>
+        </div>
+      )}
+      
+      {/* Connection strength indicator for successful connections */}
+      {displayState === 'success' && result?.metadata?.responseTime && (
+        <div className="absolute -top-8 left-1/2 transform -translate-x-1/2">
+          <div className="flex items-center space-x-1 bg-green-50 px-2 py-1 rounded text-xs text-green-700">
+            <SignalIcon className="w-3 h-3" />
+            <span>{result.metadata.responseTime}ms</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
-// Set display name for debugging
+// =============================================================================
+// DISPLAY NAME AND EXPORTS
+// =============================================================================
+
 ConnectionTestButton.displayName = 'ConnectionTestButton';
-
-// =============================================================================
-// EXPORTS
-// =============================================================================
 
 export default ConnectionTestButton;
 
 // Export types for external use
 export type {
   ConnectionTestButtonProps,
-  VariantProps
+  ConnectionTestState
 };
 
-// Export style variants for customization
+// Export utility functions
 export {
-  connectionTestButtonVariants
+  formatTestDuration,
+  isConfigValidForTesting,
+  getConnectionTestState
 };
