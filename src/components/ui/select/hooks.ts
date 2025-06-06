@@ -1,1060 +1,1145 @@
 /**
- * Custom React hooks for select component logic including useSelect for basic selection,
- * useAutocomplete for search functionality, and useMultiSelect for multiple selection state management.
- * Provides reusable logic for option filtering, value transformation, and async loading.
+ * Select Component Custom React Hooks
  * 
- * @fileoverview Replaces Angular select patterns with React hooks that integrate with
- * React Hook Form, SWR/React Query caching, and Next.js middleware for comprehensive
- * select component functionality throughout the DreamFactory Admin Interface.
+ * Comprehensive collection of React 19 hooks for select component logic including
+ * single/multi-selection, autocomplete functionality, keyboard navigation, and 
+ * HTTP verb bitmask transformations. Replaces Angular reactive forms patterns
+ * with React Hook Form integration and modern React patterns.
+ * 
+ * @fileoverview Select component hooks for DreamFactory Admin Interface
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useFormContext, type FieldValues, type Path } from 'react-hook-form';
-import { cn } from '../../../lib/utils';
-
-// ============================================================================
-// TYPE DEFINITIONS
-// ============================================================================
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useFormContext, type FieldPath, type FieldValues, type UseFormRegister } from 'react-hook-form';
+import { useDebouncedValue, useDebouncedCallback } from '../../hooks/use-debounce';
+import { cn } from '../../lib/utils';
+import type {
+  SelectValue,
+  SelectOption,
+  OptionGroup,
+  SelectProps,
+  AutocompleteProps,
+  MultiSelectProps,
+  AdvancedSelectProps,
+  BitmaskValue,
+  ValueTransform,
+  SelectLoadingState,
+  SelectErrorState,
+} from './types';
 
 /**
- * Base option interface for all select variants
+ * Hook return type for basic select functionality
  */
-export interface SelectOption<T = any> {
-  /** Unique value for the option */
-  value: T;
-  /** Display label for the option */
-  label: string;
-  /** Optional description for additional context */
-  description?: string;
-  /** Optional icon component or icon name */
-  icon?: React.ComponentType<any> | string;
-  /** Whether the option is disabled */
-  disabled?: boolean;
-  /** Optional group identifier for grouped options */
-  group?: string;
-  /** Additional data for the option */
-  data?: Record<string, any>;
-}
-
-/**
- * Group configuration for organizing options
- */
-export interface SelectGroup {
-  /** Group identifier */
-  id: string;
-  /** Group display label */
-  label: string;
-  /** Whether the group is collapsible */
-  collapsible?: boolean;
-  /** Whether the group is initially collapsed */
-  defaultCollapsed?: boolean;
-}
-
-/**
- * Base select state interface
- */
-interface SelectState<T = any> {
-  selectedValue: T | T[] | undefined;
-  isValid: boolean;
-  isDirty: boolean;
-  isTouched: boolean;
-  error?: string;
-  isLoading?: boolean;
-}
-
-/**
- * Base select actions interface
- */
-interface SelectActions<T = any> {
-  setValue: (value: T | T[] | undefined) => void;
+export interface UseSelectReturn<T = SelectValue> {
+  /** Current selected value */
+  selectedValue: T | undefined;
+  /** Selected option object with metadata */
+  selectedOption: SelectOption<T> | undefined;
+  /** Handle value selection */
+  handleSelect: (value: T, option?: SelectOption<T>) => void;
+  /** Clear current selection */
   clearSelection: () => void;
-  markAsTouched: () => void;
-  validate: () => boolean;
+  /** Whether component is open/focused */
+  isOpen: boolean;
+  /** Set open state */
+  setIsOpen: (open: boolean) => void;
+  /** Validation error state */
+  error: string | undefined;
+  /** Whether field is required */
+  isRequired: boolean;
+  /** Field registration for React Hook Form */
+  register: any;
 }
 
 /**
- * Autocomplete specific state
+ * Hook return type for autocomplete functionality
  */
-interface AutocompleteState<T = any> extends SelectState<T> {
-  searchTerm: string;
-  isSearching: boolean;
+export interface UseAutocompleteReturn<T = SelectValue> extends UseSelectReturn<T> {
+  /** Current search query */
+  searchQuery: string;
+  /** Set search query */
+  setSearchQuery: (query: string) => void;
+  /** Debounced search query */
+  debouncedSearchQuery: string;
+  /** Filtered options based on search */
   filteredOptions: SelectOption<T>[];
-  hasMore?: boolean;
+  /** Search loading state */
+  isSearching: boolean;
+  /** Recent selections for quick access */
+  recentSelections: SelectOption<T>[];
+  /** Handle search input change */
+  handleSearchChange: (query: string) => void;
+  /** Create new option from search input */
+  handleCreateOption: () => Promise<void>;
+  /** Whether current search can create new option */
+  canCreateOption: boolean;
 }
 
 /**
- * Autocomplete specific actions
+ * Hook return type for multi-select functionality
  */
-interface AutocompleteActions<T = any> extends SelectActions<T> {
-  setSearchTerm: (term: string) => void;
-  loadMore: () => void;
-  refresh: () => void;
-}
-
-/**
- * Multi-select specific state
- */
-interface MultiSelectState<T = any> extends SelectState<T[]> {
-  selectedCount: number;
-  maxReached: boolean;
-}
-
-/**
- * Multi-select specific actions
- */
-interface MultiSelectActions<T = any> extends SelectActions<T[]> {
-  addValue: (value: T) => void;
+export interface UseMultiSelectReturn<T = SelectValue> extends Omit<UseSelectReturn<T>, 'selectedValue' | 'selectedOption'> {
+  /** Array of selected values */
+  selectedValues: T[];
+  /** Array of selected option objects */
+  selectedOptions: SelectOption<T>[];
+  /** Handle multiple value selection */
+  handleMultiSelect: (value: T, option?: SelectOption<T>) => void;
+  /** Remove specific value from selection */
   removeValue: (value: T) => void;
-  toggleValue: (value: T) => void;
+  /** Select all available options */
   selectAll: () => void;
-  deselectAll: () => void;
-  invertSelection: () => void;
+  /** Clear all selections */
+  clearAll: () => void;
+  /** Whether all options are selected */
+  isAllSelected: boolean;
+  /** Number of selected items */
+  selectionCount: number;
+  /** Whether max selections reached */
+  isMaxReached: boolean;
 }
 
 /**
- * Keyboard navigation state
+ * Hook return type for option management
  */
-interface KeyboardNavigation {
-  focusedIndex: number;
-  setFocusedIndex: (index: number) => void;
+export interface UseSelectOptionsReturn<T = SelectValue> {
+  /** Normalized flat options array */
+  flatOptions: SelectOption<T>[];
+  /** Grouped options if grouping is enabled */
+  groupedOptions: OptionGroup<T>[];
+  /** Find option by value */
+  findOption: (value: T) => SelectOption<T> | undefined;
+  /** Get display label for value */
+  getDisplayLabel: (value: T) => string;
+  /** Filter options by search query */
+  filterOptions: (query: string) => SelectOption<T>[];
+  /** Whether options contain groups */
+  hasGroups: boolean;
+}
+
+/**
+ * Hook return type for keyboard navigation
+ */
+export interface UseSelectKeyboardReturn {
+  /** Currently highlighted option index */
+  highlightedIndex: number;
+  /** Set highlighted index */
+  setHighlightedIndex: (index: number) => void;
+  /** Move highlight up */
+  moveHighlightUp: () => void;
+  /** Move highlight down */
+  moveHighlightDown: () => void;
+  /** Select highlighted option */
+  selectHighlighted: () => void;
+  /** Reset highlight to first option */
+  resetHighlight: () => void;
+  /** Keyboard event handler */
   handleKeyDown: (event: React.KeyboardEvent) => void;
-  moveFocus: (direction: 'up' | 'down' | 'home' | 'end') => void;
 }
 
 /**
- * Validation options
+ * Hook return type for validation integration
  */
-interface ValidationOptions {
-  required?: boolean;
-  customValidator?: (value: any) => { isValid: boolean; error?: string };
+export interface UseSelectValidationReturn {
+  /** Current validation error */
+  error: string | undefined;
+  /** Whether field is valid */
+  isValid: boolean;
+  /** Whether field is required */
+  isRequired: boolean;
+  /** Validate current value */
+  validate: (value: any) => string | undefined;
+  /** Clear validation error */
+  clearError: () => void;
+  /** Field registration for forms */
+  register: any;
 }
 
 /**
- * Async loading configuration
- */
-interface AsyncLoadingConfig<T = any> {
-  loadOptions: (searchTerm: string, page?: number) => Promise<{ options: SelectOption<T>[]; hasMore?: boolean; total?: number }>;
-  pageSize?: number;
-  searchDebounceMs?: number;
-  cacheResults?: boolean;
-}
-
-/**
- * HTTP verb types and configurations for verb picker integration
- */
-export type HttpVerb = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-export type VerbValue = string | number | HttpVerb | HttpVerb[];
-
-export const HTTP_VERB_BITMASKS: Record<HttpVerb, number> = {
-  GET: 1,
-  POST: 2,
-  PUT: 4,
-  PATCH: 8,
-  DELETE: 16,
-} as const;
-
-// ============================================================================
-// UTILITY FUNCTIONS
-// ============================================================================
-
-/**
- * Simple debounce implementation for select functionality
- */
-function useDebounce<T>(value: T, delay: number): T {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, delay]);
-
-  return debouncedValue;
-}
-
-/**
- * Normalize option to ensure consistent structure
- */
-function normalizeOption<T>(option: T | SelectOption<T>): SelectOption<T> {
-  if (typeof option === 'object' && option !== null && 'value' in option && 'label' in option) {
-    return option as SelectOption<T>;
-  }
-
-  return {
-    value: option as T,
-    label: String(option),
-  };
-}
-
-/**
- * Filter options based on search term
- */
-function filterOptions<T>(options: SelectOption<T>[], searchTerm: string): SelectOption<T>[] {
-  if (!searchTerm.trim()) {
-    return options;
-  }
-
-  const term = searchTerm.toLowerCase();
-  return options.filter(option => 
-    option.label.toLowerCase().includes(term) ||
-    option.description?.toLowerCase().includes(term) ||
-    option.value?.toString().toLowerCase().includes(term)
-  );
-}
-
-/**
- * Group options by their group property
- */
-function groupOptions<T>(options: SelectOption<T>[]): Record<string, SelectOption<T>[]> {
-  return options.reduce((groups, option) => {
-    const groupKey = option.group || 'default';
-    if (!groups[groupKey]) {
-      groups[groupKey] = [];
-    }
-    groups[groupKey].push(option);
-    return groups;
-  }, {} as Record<string, SelectOption<T>[]>);
-}
-
-/**
- * Convert HTTP verbs array to bitmask
- */
-function convertVerbsToBitmask(verbs: HttpVerb[]): number {
-  return verbs.reduce((mask, verb) => mask | HTTP_VERB_BITMASKS[verb], 0);
-}
-
-/**
- * Convert bitmask to HTTP verbs array
- */
-function convertBitmaskToVerbs(bitmask: number): HttpVerb[] {
-  return Object.entries(HTTP_VERB_BITMASKS)
-    .filter(([_, value]) => (bitmask & value) === value)
-    .map(([verb]) => verb as HttpVerb);
-}
-
-/**
- * Validate selection based on requirements
- */
-function validateSelection(value: any, required: boolean = false): { isValid: boolean; error?: string } {
-  if (required && (value === undefined || value === null || value === '')) {
-    return { isValid: false, error: 'Selection is required' };
-  }
-
-  if (Array.isArray(value) && required && value.length === 0) {
-    return { isValid: false, error: 'At least one selection is required' };
-  }
-
-  return { isValid: true };
-}
-
-// ============================================================================
-// CORE HOOKS
-// ============================================================================
-
-/**
- * Core single select hook for basic selection state management
- * Provides value management, validation, and reactive updates.
+ * Hook for basic single selection state management and value transformation
  * 
- * @param initialValue - Initial selected value
- * @param options - Validation and configuration options
- * @returns Select state and actions
+ * @param props - Select component props
+ * @returns Select state and handlers
+ * 
+ * @example
+ * ```tsx
+ * const {
+ *   selectedValue,
+ *   handleSelect,
+ *   clearSelection,
+ *   isOpen,
+ *   setIsOpen
+ * } = useSelect({
+ *   value: selectedDb,
+ *   onChange: setSelectedDb,
+ *   options: databaseOptions
+ * });
+ * ```
  */
-export function useSelect<T = any>(
-  initialValue: T | undefined = undefined,
-  options: ValidationOptions = {}
-): SelectState<T> & SelectActions<T> {
-  const [selectedValue, setSelectedValue] = useState<T | undefined>(initialValue);
-  const [isDirty, setIsDirty] = useState(false);
-  const [isTouched, setIsTouched] = useState(false);
+export function useSelect<T = SelectValue, TFieldValues extends FieldValues = FieldValues>(
+  props: SelectProps<T, TFieldValues>
+): UseSelectReturn<T> {
+  const {
+    value,
+    defaultValue,
+    onChange,
+    options = [],
+    name,
+    rules,
+    disabled = false,
+    valueTransform,
+  } = props;
+
+  const formContext = useFormContext<TFieldValues>();
+  const [internalValue, setInternalValue] = useState<T | undefined>(value ?? defaultValue);
+  const [isOpen, setIsOpen] = useState(false);
   const [error, setError] = useState<string | undefined>();
 
-  // Memoized validation result
-  const validationResult = useMemo(() => {
-    const baseValidation = validateSelection(selectedValue, options.required);
+  const isControlled = value !== undefined;
+  const currentValue = isControlled ? value : internalValue;
+
+  // Get options handling
+  const { flatOptions, findOption, getDisplayLabel } = useSelectOptions(options);
+
+  // Find current selected option
+  const selectedOption = useMemo(() => {
+    return currentValue !== undefined ? findOption(currentValue) : undefined;
+  }, [currentValue, findOption]);
+
+  // Value transformation
+  const transformValue = useCallback((rawValue: T): T => {
+    if (valueTransform?.toFormValue) {
+      return valueTransform.toFormValue(rawValue);
+    }
+    return rawValue;
+  }, [valueTransform]);
+
+  const handleSelect = useCallback((selectedValue: T, option?: SelectOption<T>) => {
+    const transformedValue = transformValue(selectedValue);
     
-    if (!baseValidation.isValid) {
-      return baseValidation;
+    if (!isControlled) {
+      setInternalValue(transformedValue);
     }
-
-    // Run custom validation if provided
-    if (options.customValidator) {
-      return options.customValidator(selectedValue);
-    }
-
-    return baseValidation;
-  }, [selectedValue, options.required, options.customValidator]);
-
-  const isValid = validationResult.isValid;
-
-  // Update error state when validation changes
-  useEffect(() => {
-    setError(validationResult.error);
-  }, [validationResult.error]);
-
-  // Action handlers
-  const setValue = useCallback((value: T | undefined) => {
-    setSelectedValue(value);
-    setIsDirty(true);
-  }, []);
+    
+    onChange?.(transformedValue, option);
+    setIsOpen(false);
+    setError(undefined);
+  }, [onChange, isControlled, transformValue]);
 
   const clearSelection = useCallback(() => {
-    setValue(undefined);
-  }, [setValue]);
-
-  const markAsTouched = useCallback(() => {
-    setIsTouched(true);
-  }, []);
-
-  const validate = useCallback(() => {
-    markAsTouched();
-    return isValid;
-  }, [isValid, markAsTouched]);
-
-  return {
-    selectedValue,
-    isValid,
-    isDirty,
-    isTouched,
-    error,
-    setValue,
-    clearSelection,
-    markAsTouched,
-    validate,
-  };
-}
-
-/**
- * Autocomplete hook with debounced search, async loading, and option filtering
- * Provides search functionality with performance optimization and async data loading.
- * 
- * @param options - Available options for selection
- * @param config - Async loading and search configuration
- * @param validationOptions - Validation configuration
- * @returns Autocomplete state and actions
- */
-export function useAutocomplete<T = any>(
-  options: SelectOption<T>[] = [],
-  config: Partial<AsyncLoadingConfig<T>> = {},
-  validationOptions: ValidationOptions = {}
-): AutocompleteState<T> & AutocompleteActions<T> {
-  const {
-    loadOptions,
-    pageSize = 50,
-    searchDebounceMs = 300,
-    cacheResults = true
-  } = config;
-
-  // Base select functionality
-  const baseSelect = useSelect<T>(undefined, validationOptions);
-
-  // Search state
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
-  const [asyncOptions, setAsyncOptions] = useState<SelectOption<T>[]>([]);
-  const [hasMore, setHasMore] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [cache, setCache] = useState<Map<string, { options: SelectOption<T>[]; hasMore: boolean }>>(new Map());
-
-  // Debounced search term
-  const debouncedSearchTerm = useDebounce(searchTerm, searchDebounceMs);
-
-  // Combined options (static + async)
-  const allOptions = useMemo(() => {
-    return [...options, ...asyncOptions];
-  }, [options, asyncOptions]);
-
-  // Filtered options based on search
-  const filteredOptions = useMemo(() => {
-    if (!debouncedSearchTerm && !loadOptions) {
-      return allOptions;
+    const clearedValue = undefined as T | undefined;
+    
+    if (!isControlled) {
+      setInternalValue(clearedValue);
     }
+    
+    onChange?.(clearedValue as T);
+    setError(undefined);
+  }, [onChange, isControlled]);
 
-    return filterOptions(allOptions, debouncedSearchTerm);
-  }, [allOptions, debouncedSearchTerm, loadOptions]);
-
-  // Async search effect
-  useEffect(() => {
-    if (!loadOptions || !debouncedSearchTerm) {
-      setAsyncOptions([]);
-      setIsSearching(false);
-      return;
-    }
-
-    // Check cache first
-    const cacheKey = `${debouncedSearchTerm}-1`;
-    if (cacheResults && cache.has(cacheKey)) {
-      const cached = cache.get(cacheKey)!;
-      setAsyncOptions(cached.options);
-      setHasMore(cached.hasMore);
-      setCurrentPage(1);
-      return;
-    }
-
-    setIsSearching(true);
-    setCurrentPage(1);
-
-    loadOptions(debouncedSearchTerm, 1)
-      .then(result => {
-        setAsyncOptions(result.options);
-        setHasMore(result.hasMore || false);
-
-        // Cache results
-        if (cacheResults) {
-          setCache(prev => new Map(prev).set(cacheKey, {
-            options: result.options,
-            hasMore: result.hasMore || false
-          }));
-        }
-      })
-      .catch(error => {
-        console.error('Failed to load options:', error);
-        setAsyncOptions([]);
-        setHasMore(false);
-      })
-      .finally(() => {
-        setIsSearching(false);
+  // Form integration
+  const register = useMemo(() => {
+    if (formContext && name) {
+      return formContext.register(name as FieldPath<TFieldValues>, {
+        ...rules,
+        disabled,
+        value: currentValue,
       });
-  }, [debouncedSearchTerm, loadOptions, cacheResults, cache]);
-
-  // Load more functionality
-  const loadMore = useCallback(async () => {
-    if (!loadOptions || !hasMore || isSearching) {
-      return;
     }
+    return {};
+  }, [formContext, name, rules, disabled, currentValue]);
 
-    const nextPage = currentPage + 1;
-    const cacheKey = `${debouncedSearchTerm}-${nextPage}`;
+  // Validation
+  const isRequired = Boolean(rules?.required);
 
-    // Check cache first
-    if (cacheResults && cache.has(cacheKey)) {
-      const cached = cache.get(cacheKey)!;
-      setAsyncOptions(prev => [...prev, ...cached.options]);
-      setHasMore(cached.hasMore);
-      setCurrentPage(nextPage);
-      return;
-    }
-
-    setIsSearching(true);
-
-    try {
-      const result = await loadOptions(debouncedSearchTerm, nextPage);
-      setAsyncOptions(prev => [...prev, ...result.options]);
-      setHasMore(result.hasMore || false);
-      setCurrentPage(nextPage);
-
-      // Cache results
-      if (cacheResults) {
-        setCache(prev => new Map(prev).set(cacheKey, {
-          options: result.options,
-          hasMore: result.hasMore || false
-        }));
-      }
-    } catch (error) {
-      console.error('Failed to load more options:', error);
-    } finally {
-      setIsSearching(false);
-    }
-  }, [loadOptions, hasMore, isSearching, currentPage, debouncedSearchTerm, cacheResults, cache]);
-
-  // Refresh functionality
-  const refresh = useCallback(() => {
-    setCache(new Map());
-    setAsyncOptions([]);
-    setCurrentPage(1);
-    setHasMore(false);
-    
-    // Trigger reload if we have a search term
-    if (debouncedSearchTerm && loadOptions) {
-      setIsSearching(true);
-      loadOptions(debouncedSearchTerm, 1)
-        .then(result => {
-          setAsyncOptions(result.options);
-          setHasMore(result.hasMore || false);
-        })
-        .catch(error => {
-          console.error('Failed to refresh options:', error);
-        })
-        .finally(() => {
-          setIsSearching(false);
-        });
-    }
-  }, [debouncedSearchTerm, loadOptions]);
-
-  return {
-    ...baseSelect,
-    searchTerm,
-    isSearching,
-    filteredOptions,
-    hasMore,
-    setSearchTerm,
-    loadMore,
-    refresh,
-  };
-}
-
-/**
- * Multi-select hook for multiple selection logic, chip management, and batch operations
- * Provides comprehensive multiple selection functionality with limits and batch operations.
- * 
- * @param initialValues - Initial selected values array
- * @param maxSelections - Maximum number of selections allowed
- * @param validationOptions - Validation configuration
- * @returns Multi-select state and actions
- */
-export function useMultiSelect<T = any>(
-  initialValues: T[] = [],
-  maxSelections?: number,
-  validationOptions: ValidationOptions = {}
-): MultiSelectState<T> & MultiSelectActions<T> {
-  // Base select functionality with array type
-  const baseSelect = useSelect<T[]>(initialValues, validationOptions);
-  const selectedValues = baseSelect.selectedValue || [];
-
-  // Derived state
-  const selectedCount = selectedValues.length;
-  const maxReached = maxSelections ? selectedCount >= maxSelections : false;
-
-  // Enhanced setValue to work with arrays
-  const setValue = useCallback((values: T[] | undefined) => {
-    const normalizedValues = values || [];
-    
-    // Enforce max selections
-    if (maxSelections && normalizedValues.length > maxSelections) {
-      return;
-    }
-    
-    baseSelect.setValue(normalizedValues);
-  }, [baseSelect, maxSelections]);
-
-  // Add single value
-  const addValue = useCallback((value: T) => {
-    if (selectedValues.includes(value)) {
-      return; // Already selected
-    }
-    
-    if (maxSelections && selectedCount >= maxSelections) {
-      return; // Max reached
-    }
-    
-    setValue([...selectedValues, value]);
-  }, [selectedValues, selectedCount, maxSelections, setValue]);
-
-  // Remove single value
-  const removeValue = useCallback((value: T) => {
-    setValue(selectedValues.filter(v => v !== value));
-  }, [selectedValues, setValue]);
-
-  // Toggle single value
-  const toggleValue = useCallback((value: T) => {
-    if (selectedValues.includes(value)) {
-      removeValue(value);
-    } else {
-      addValue(value);
-    }
-  }, [selectedValues, addValue, removeValue]);
-
-  // Batch operations
-  const selectAll = useCallback((availableValues: T[]) => {
-    const valuesToSelect = maxSelections 
-      ? availableValues.slice(0, maxSelections)
-      : availableValues;
-    setValue(valuesToSelect);
-  }, [maxSelections, setValue]);
-
-  const deselectAll = useCallback(() => {
-    setValue([]);
-  }, [setValue]);
-
-  const invertSelection = useCallback((availableValues: T[]) => {
-    const unselected = availableValues.filter(value => !selectedValues.includes(value));
-    const newSelection = maxSelections 
-      ? unselected.slice(0, maxSelections)
-      : unselected;
-    setValue(newSelection);
-  }, [selectedValues, maxSelections, setValue]);
-
-  // Clear selection override
-  const clearSelection = useCallback(() => {
-    setValue([]);
-  }, [setValue]);
-
-  return {
-    ...baseSelect,
-    selectedValue: selectedValues,
-    selectedCount,
-    maxReached,
-    setValue,
-    addValue,
-    removeValue,
-    toggleValue,
-    selectAll,
-    deselectAll,
-    invertSelection,
-    clearSelection,
-  };
-}
-
-/**
- * Select options hook for option normalization and group processing
- * Provides utilities for organizing and managing select options with grouping support.
- * 
- * @param rawOptions - Raw option data to normalize
- * @param groups - Group configuration for organizing options
- * @returns Normalized options and group management utilities
- */
-export function useSelectOptions<T = any>(
-  rawOptions: (T | SelectOption<T>)[] = [],
-  groups: SelectGroup[] = []
-): {
-  options: SelectOption<T>[];
-  groupedOptions: Record<string, SelectOption<T>[]>;
-  getOptionByValue: (value: T) => SelectOption<T> | undefined;
-  getOptionsByGroup: (groupId: string) => SelectOption<T>[];
-  hasGroups: boolean;
-  totalOptions: number;
-} {
-  // Normalize all options
-  const options = useMemo(() => {
-    return rawOptions.map(normalizeOption);
-  }, [rawOptions]);
-
-  // Group options
-  const groupedOptions = useMemo(() => {
-    return groupOptions(options);
-  }, [options]);
-
-  // Utility functions
-  const getOptionByValue = useCallback((value: T) => {
-    return options.find(option => option.value === value);
-  }, [options]);
-
-  const getOptionsByGroup = useCallback((groupId: string) => {
-    return groupedOptions[groupId] || [];
-  }, [groupedOptions]);
-
-  const hasGroups = Object.keys(groupedOptions).length > 1 || 
-    (Object.keys(groupedOptions).length === 1 && !groupedOptions.default);
-
-  return {
-    options,
-    groupedOptions,
-    getOptionByValue,
-    getOptionsByGroup,
-    hasGroups,
-    totalOptions: options.length,
-  };
-}
-
-/**
- * Keyboard navigation hook for consistent keyboard interactions across select variants
- * Provides arrow key navigation, enter/escape handling, and focus management.
- * 
- * @param options - Available options for navigation
- * @param onSelection - Callback when an option is selected
- * @param onEscape - Callback when escape is pressed
- * @returns Keyboard navigation state and handlers
- */
-export function useSelectKeyboard<T = any>(
-  options: SelectOption<T>[],
-  onSelection?: (value: T) => void,
-  onEscape?: () => void
-): KeyboardNavigation {
-  const [focusedIndex, setFocusedIndex] = useState(0);
-
-  // Clamp focused index to valid range
-  const clampedFocusedIndex = useMemo(() => {
-    return Math.max(0, Math.min(focusedIndex, options.length - 1));
-  }, [focusedIndex, options.length]);
-
-  // Update focused index with clamping
-  const updateFocusedIndex = useCallback((newIndex: number) => {
-    const clampedIndex = Math.max(0, Math.min(newIndex, options.length - 1));
-    setFocusedIndex(clampedIndex);
-  }, [options.length]);
-
-  // Movement functions
-  const moveFocus = useCallback((direction: 'up' | 'down' | 'home' | 'end') => {
-    switch (direction) {
-      case 'up':
-        updateFocusedIndex(clampedFocusedIndex - 1);
-        break;
-      case 'down':
-        updateFocusedIndex(clampedFocusedIndex + 1);
-        break;
-      case 'home':
-        updateFocusedIndex(0);
-        break;
-      case 'end':
-        updateFocusedIndex(options.length - 1);
-        break;
-    }
-  }, [clampedFocusedIndex, updateFocusedIndex, options.length]);
-
-  // Keyboard event handler
-  const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
-    switch (event.key) {
-      case 'ArrowUp':
-        event.preventDefault();
-        moveFocus('up');
-        break;
-      case 'ArrowDown':
-        event.preventDefault();
-        moveFocus('down');
-        break;
-      case 'Home':
-        event.preventDefault();
-        moveFocus('home');
-        break;
-      case 'End':
-        event.preventDefault();
-        moveFocus('end');
-        break;
-      case 'Enter':
-      case ' ':
-        event.preventDefault();
-        if (options[clampedFocusedIndex] && onSelection) {
-          onSelection(options[clampedFocusedIndex].value);
-        }
-        break;
-      case 'Escape':
-        event.preventDefault();
-        if (onEscape) {
-          onEscape();
-        }
-        break;
-    }
-  }, [moveFocus, clampedFocusedIndex, options, onSelection, onEscape]);
-
-  // Reset focus when options change
   useEffect(() => {
-    if (options.length > 0 && clampedFocusedIndex >= options.length) {
-      setFocusedIndex(options.length - 1);
+    if (formContext && name) {
+      const fieldError = formContext.formState.errors[name as FieldPath<TFieldValues>];
+      setError(fieldError?.message as string);
     }
-  }, [options.length, clampedFocusedIndex]);
+  }, [formContext, name]);
 
   return {
-    focusedIndex: clampedFocusedIndex,
-    setFocusedIndex: updateFocusedIndex,
-    handleKeyDown,
-    moveFocus,
+    selectedValue: currentValue,
+    selectedOption,
+    handleSelect,
+    clearSelection,
+    isOpen,
+    setIsOpen,
+    error,
+    isRequired,
+    register,
   };
 }
 
 /**
- * Form integration hook for React Hook Form validation and error handling
- * Provides seamless integration with React Hook Form including validation and state sync.
+ * Hook for autocomplete functionality with debounced search and async loading
  * 
- * @param name - Form field name
- * @param validationOptions - Validation configuration
- * @returns Form integration state and handlers
- */
-export function useSelectValidation<T extends FieldValues>(
-  name: Path<T>,
-  validationOptions: ValidationOptions = {}
-) {
-  const formContext = useFormContext<T>();
-  const hasFormContext = !!formContext;
-
-  // Form field registration
-  const formField = hasFormContext ? formContext.register(name, {
-    required: validationOptions.required ? 'Selection is required' : false,
-    validate: (value) => {
-      const validation = validateSelection(value, validationOptions.required);
-      if (!validation.isValid) {
-        return validation.error;
-      }
-
-      // Run custom validation if provided
-      if (validationOptions.customValidator) {
-        const customResult = validationOptions.customValidator(value);
-        if (!customResult.isValid) {
-          return customResult.error;
-        }
-      }
-
-      return true;
-    }
-  }) : null;
-
-  const fieldState = hasFormContext ? formContext.getFieldState(name) : null;
-  const fieldValue = hasFormContext ? formContext.getValues(name) : undefined;
-
-  // Form action handlers
-  const setValue = useCallback((value: any) => {
-    if (hasFormContext) {
-      formContext.setValue(name, value, { shouldValidate: true, shouldDirty: true });
-    }
-  }, [hasFormContext, formContext, name]);
-
-  const trigger = useCallback(() => {
-    if (hasFormContext) {
-      return formContext.trigger(name);
-    }
-    return Promise.resolve(true);
-  }, [hasFormContext, formContext, name]);
-
-  const clearErrors = useCallback(() => {
-    if (hasFormContext) {
-      formContext.clearErrors(name);
-    }
-  }, [hasFormContext, formContext, name]);
-
-  return {
-    ...formField,
-    value: fieldValue,
-    error: fieldState?.error?.message,
-    isDirty: fieldState?.isDirty || false,
-    isTouched: fieldState?.isTouched || false,
-    isValid: !fieldState?.error,
-    setValue,
-    trigger,
-    clearErrors,
-    hasFormContext,
-  };
-}
-
-/**
- * HTTP verb transformation hook for bitmask conversions from Angular df-verb-picker
- * Handles conversion between different verb formats with comprehensive bitmask operations.
+ * @param props - Autocomplete component props
+ * @returns Autocomplete state and handlers
  * 
- * @param value - Current verb value
- * @param mode - Transformation mode ('verb', 'verb_multiple', 'number')
- * @returns Verb transformation utilities and state
+ * @example
+ * ```tsx
+ * const {
+ *   searchQuery,
+ *   setSearchQuery,
+ *   filteredOptions,
+ *   handleCreateOption,
+ *   canCreateOption
+ * } = useAutocomplete({
+ *   options: databaseTables,
+ *   onSearch: handleTableSearch,
+ *   allowCustomValue: true,
+ *   searchDebounce: 300
+ * });
+ * ```
  */
-export function useVerbTransform(
-  value: VerbValue | undefined,
-  mode: 'verb' | 'verb_multiple' | 'number' = 'verb'
-): {
-  transformedValue: VerbValue | undefined;
-  toBitmask: (verbs: HttpVerb[]) => number;
-  fromBitmask: (bitmask: number) => HttpVerb[];
-  getVerbBitmask: (verb: HttpVerb) => number;
-  isVerbInBitmask: (bitmask: number, verb: HttpVerb) => boolean;
-  selectedVerbs: HttpVerb[];
-  originalValue: VerbValue | undefined;
-  hasChanged: boolean;
-} {
-  // Transform value based on mode
-  const transformedValue = useMemo(() => {
-    if (value === undefined || value === null) {
-      return undefined;
+export function useAutocomplete<T = SelectValue, TFieldValues extends FieldValues = FieldValues>(
+  props: AutocompleteProps<T, TFieldValues>
+): UseAutocompleteReturn<T> {
+  const {
+    searchQuery: controlledSearchQuery,
+    searchDebounce = 300,
+    minSearchLength = 2,
+    onSearch,
+    asyncOptions,
+    allowCustomValue = false,
+    onCreateOption,
+    filterOptions: customFilterOptions,
+    showRecentSelections = false,
+    maxRecentSelections = 5,
+    options = [],
+  } = props;
+
+  const baseSelect = useSelect(props);
+  const [internalSearchQuery, setInternalSearchQuery] = useState(controlledSearchQuery || '');
+  const [isSearching, setIsSearching] = useState(false);
+  const [recentSelections, setRecentSelections] = useState<SelectOption<T>[]>([]);
+  const isSearchControlled = controlledSearchQuery !== undefined;
+
+  const currentSearchQuery = isSearchControlled ? controlledSearchQuery : internalSearchQuery;
+
+  // Debounced search query for API calls
+  const { debouncedValue: debouncedSearchQuery, isPending } = useDebouncedValue(
+    currentSearchQuery,
+    { delay: searchDebounce }
+  );
+
+  // Get options handling
+  const { flatOptions, filterOptions: defaultFilterOptions } = useSelectOptions(options);
+
+  // Handle search input changes
+  const handleSearchChange = useCallback((query: string) => {
+    if (!isSearchControlled) {
+      setInternalSearchQuery(query);
+    }
+  }, [isSearchControlled]);
+
+  // Debounced search handler
+  const debouncedSearch = useDebouncedCallback(
+    async (query: string) => {
+      if (query.length >= minSearchLength) {
+        setIsSearching(true);
+        try {
+          if (asyncOptions) {
+            await asyncOptions(query);
+          } else if (onSearch) {
+            await onSearch(query);
+          }
+        } catch (error) {
+          console.error('Search error:', error);
+        } finally {
+          setIsSearching(false);
+        }
+      } else {
+        setIsSearching(false);
+      }
+    },
+    { delay: searchDebounce, trailing: true }
+  );
+
+  // Trigger search when debounced query changes
+  useEffect(() => {
+    if (debouncedSearchQuery !== currentSearchQuery) {
+      debouncedSearch(debouncedSearchQuery);
+    }
+  }, [debouncedSearchQuery, currentSearchQuery, debouncedSearch]);
+
+  // Filter options based on search query
+  const filteredOptions = useMemo(() => {
+    if (!currentSearchQuery) {
+      return showRecentSelections ? recentSelections : flatOptions;
     }
 
-    switch (mode) {
-      case 'verb':
-        // Single verb mode - return first verb as string
-        if (Array.isArray(value)) {
-          return value[0] || undefined;
-        }
-        if (typeof value === 'number') {
-          const verbs = convertBitmaskToVerbs(value);
-          return verbs[0] || undefined;
-        }
-        return value;
-
-      case 'verb_multiple':
-        // Multiple verb mode - return array
-        if (Array.isArray(value)) {
-          return value;
-        }
-        if (typeof value === 'number') {
-          return convertBitmaskToVerbs(value);
-        }
-        if (typeof value === 'string') {
-          return [value as HttpVerb];
-        }
-        return [];
-
-      case 'number':
-        // Bitmask mode - return number
-        if (typeof value === 'number') {
-          return value;
-        }
-        if (Array.isArray(value)) {
-          return convertVerbsToBitmask(value as HttpVerb[]);
-        }
-        if (typeof value === 'string') {
-          return HTTP_VERB_BITMASKS[value as HttpVerb] || 0;
-        }
-        return 0;
-
-      default:
-        return value;
-    }
-  }, [value, mode]);
-
-  // Get selected verbs array
-  const selectedVerbs = useMemo(() => {
-    if (value === undefined || value === null) {
+    if (currentSearchQuery.length < minSearchLength) {
       return [];
     }
 
-    if (Array.isArray(value)) {
-      return value as HttpVerb[];
+    const filterFn = customFilterOptions || defaultFilterOptions;
+    return filterFn(currentSearchQuery);
+  }, [
+    currentSearchQuery,
+    minSearchLength,
+    flatOptions,
+    showRecentSelections,
+    recentSelections,
+    customFilterOptions,
+    defaultFilterOptions,
+  ]);
+
+  // Check if current search can create new option
+  const canCreateOption = useMemo(() => {
+    if (!allowCustomValue || !currentSearchQuery) return false;
+    
+    const exists = flatOptions.some(option => 
+      option.label.toLowerCase() === currentSearchQuery.toLowerCase() ||
+      String(option.value).toLowerCase() === currentSearchQuery.toLowerCase()
+    );
+    
+    return !exists && currentSearchQuery.length >= minSearchLength;
+  }, [allowCustomValue, currentSearchQuery, flatOptions, minSearchLength]);
+
+  // Handle creating new option from search
+  const handleCreateOption = useCallback(async () => {
+    if (!canCreateOption || !onCreateOption) return;
+
+    try {
+      const newOption = await onCreateOption(currentSearchQuery);
+      baseSelect.handleSelect(newOption.value, newOption);
+      setInternalSearchQuery('');
+    } catch (error) {
+      console.error('Failed to create option:', error);
     }
-    if (typeof value === 'number') {
-      return convertBitmaskToVerbs(value);
+  }, [canCreateOption, onCreateOption, currentSearchQuery, baseSelect]);
+
+  // Enhanced selection handler to track recent selections
+  const handleSelect = useCallback((value: T, option?: SelectOption<T>) => {
+    baseSelect.handleSelect(value, option);
+    
+    if (option && showRecentSelections) {
+      setRecentSelections(prev => {
+        const filtered = prev.filter(item => item.value !== value);
+        return [option, ...filtered].slice(0, maxRecentSelections);
+      });
     }
-    if (typeof value === 'string') {
-      return [value as HttpVerb];
-    }
-
-    return [];
-  }, [value]);
-
-  // Utility functions
-  const toBitmask = useCallback((verbs: HttpVerb[]) => {
-    return convertVerbsToBitmask(verbs);
-  }, []);
-
-  const fromBitmask = useCallback((bitmask: number) => {
-    return convertBitmaskToVerbs(bitmask);
-  }, []);
-
-  const getVerbBitmask = useCallback((verb: HttpVerb) => {
-    return HTTP_VERB_BITMASKS[verb] || 0;
-  }, []);
-
-  const isVerbInBitmask = useCallback((bitmask: number, verb: HttpVerb) => {
-    const verbValue = HTTP_VERB_BITMASKS[verb];
-    return verbValue ? (bitmask & verbValue) === verbValue : false;
-  }, []);
+    
+    setInternalSearchQuery('');
+  }, [baseSelect, showRecentSelections, maxRecentSelections]);
 
   return {
-    transformedValue,
-    toBitmask,
-    fromBitmask,
-    getVerbBitmask,
-    isVerbInBitmask,
-    selectedVerbs,
-    originalValue: value,
-    hasChanged: transformedValue !== value,
+    ...baseSelect,
+    handleSelect,
+    searchQuery: currentSearchQuery,
+    setSearchQuery: handleSearchChange,
+    debouncedSearchQuery,
+    filteredOptions,
+    isSearching: isSearching || isPending,
+    recentSelections,
+    handleSearchChange,
+    handleCreateOption,
+    canCreateOption,
   };
 }
-
-// ============================================================================
-// COMPOSITE HOOKS
-// ============================================================================
 
 /**
- * Complete select hook that combines all select functionality
- * Provides a comprehensive interface for components that need full select capabilities.
+ * Hook for multiple selection logic with chip management and batch operations
  * 
- * @param options - Available options for selection
- * @param config - Configuration including async loading and validation
- * @returns Complete select functionality
+ * @param props - Multi-select component props
+ * @returns Multi-select state and handlers
+ * 
+ * @example
+ * ```tsx
+ * const {
+ *   selectedValues,
+ *   selectedOptions,
+ *   handleMultiSelect,
+ *   removeValue,
+ *   selectAll,
+ *   isMaxReached
+ * } = useMultiSelect({
+ *   value: selectedTables,
+ *   onChange: setSelectedTables,
+ *   options: availableTables,
+ *   maxSelections: 10
+ * });
+ * ```
  */
-export function useCompleteSelect<T = any>(
-  options: (T | SelectOption<T>)[] = [],
-  config: {
-    mode?: 'single' | 'multiple' | 'autocomplete';
-    initialValue?: T | T[];
-    maxSelections?: number;
-    async?: Partial<AsyncLoadingConfig<T>>;
-    validation?: ValidationOptions;
-    groups?: SelectGroup[];
-    formField?: string;
-  } = {}
-) {
+export function useMultiSelect<T = SelectValue, TFieldValues extends FieldValues = FieldValues>(
+  props: MultiSelectProps<T, TFieldValues>
+): UseMultiSelectReturn<T> {
   const {
-    mode = 'single',
-    initialValue,
+    value,
+    defaultValue = [],
+    onChange,
+    options = [],
     maxSelections,
-    async: asyncConfig,
-    validation = {},
-    groups = [],
-    formField,
-  } = config;
+    minSelections = 0,
+    orderSelected = 'selection',
+    closeOnSelect = false,
+  } = props;
 
-  // Normalize options
-  const optionsData = useSelectOptions(options, groups);
+  const baseSelect = useSelect({ ...props, value: undefined });
+  const [internalValues, setInternalValues] = useState<T[]>(value ?? defaultValue);
 
-  // Select mode specific functionality
-  const singleSelect = useSelect(
-    mode === 'single' ? initialValue as T : undefined,
-    validation
-  );
+  const isControlled = value !== undefined;
+  const currentValues = isControlled ? value : internalValues;
 
-  const multiSelect = useMultiSelect(
-    mode === 'multiple' ? (initialValue as T[] || []) : [],
-    maxSelections,
-    validation
-  );
+  // Get options handling
+  const { flatOptions, findOption } = useSelectOptions(options);
 
-  const autocompleteSelect = useAutocomplete(
-    optionsData.options,
-    asyncConfig || {},
-    validation
-  );
-
-  // Form integration if field name provided
-  const formIntegration = formField ? useSelectValidation(formField as any, validation) : null;
-
-  // Keyboard navigation
-  const keyboard = useSelectKeyboard(
-    mode === 'autocomplete' ? autocompleteSelect.filteredOptions : optionsData.options,
-    (value: T) => {
-      if (formIntegration) {
-        if (mode === 'multiple') {
-          const currentValues = Array.isArray(formIntegration.value) ? formIntegration.value : [];
-          if (!currentValues.includes(value)) {
-            formIntegration.setValue([...currentValues, value]);
-          }
-        } else {
-          formIntegration.setValue(value);
-        }
-      } else {
-        switch (mode) {
-          case 'single':
-            singleSelect.setValue(value);
-            break;
-          case 'multiple':
-            multiSelect.addValue(value);
-            break;
-          case 'autocomplete':
-            autocompleteSelect.setValue(value);
-            break;
-        }
-      }
+  // Get selected options with metadata
+  const selectedOptions = useMemo(() => {
+    const options = currentValues.map(val => findOption(val)).filter(Boolean) as SelectOption<T>[];
+    
+    switch (orderSelected) {
+      case 'alphabetical':
+        return options.sort((a, b) => a.label.localeCompare(b.label));
+      case 'original':
+        return options.sort((a, b) => {
+          const aIndex = flatOptions.findIndex(opt => opt.value === a.value);
+          const bIndex = flatOptions.findIndex(opt => opt.value === b.value);
+          return aIndex - bIndex;
+        });
+      default: // 'selection' order
+        return options;
     }
-  );
+  }, [currentValues, findOption, orderSelected, flatOptions]);
 
-  // Select appropriate hook based on mode
-  const currentSelect = mode === 'single' ? singleSelect : 
-                      mode === 'multiple' ? multiSelect : 
-                      autocompleteSelect;
+  // Selection constraints
+  const selectionCount = currentValues.length;
+  const isMaxReached = maxSelections ? selectionCount >= maxSelections : false;
+  const isAllSelected = flatOptions.length > 0 && currentValues.length === flatOptions.length;
+
+  // Handle multi-selection
+  const handleMultiSelect = useCallback((selectedValue: T, option?: SelectOption<T>) => {
+    if (isMaxReached && !currentValues.includes(selectedValue)) {
+      return;
+    }
+
+    const newValues = currentValues.includes(selectedValue)
+      ? currentValues.filter(val => val !== selectedValue)
+      : [...currentValues, selectedValue];
+
+    if (!isControlled) {
+      setInternalValues(newValues);
+    }
+
+    onChange?.(newValues, newValues.map(val => findOption(val)).filter(Boolean) as SelectOption<T>[]);
+    
+    if (!closeOnSelect) {
+      baseSelect.setIsOpen(true);
+    }
+  }, [currentValues, isMaxReached, isControlled, onChange, findOption, closeOnSelect, baseSelect]);
+
+  // Remove specific value
+  const removeValue = useCallback((valueToRemove: T) => {
+    const newValues = currentValues.filter(val => val !== valueToRemove);
+    
+    if (!isControlled) {
+      setInternalValues(newValues);
+    }
+    
+    onChange?.(newValues, newValues.map(val => findOption(val)).filter(Boolean) as SelectOption<T>[]);
+  }, [currentValues, isControlled, onChange, findOption]);
+
+  // Select all options
+  const selectAll = useCallback(() => {
+    const allValues = flatOptions.slice(0, maxSelections).map(opt => opt.value);
+    
+    if (!isControlled) {
+      setInternalValues(allValues);
+    }
+    
+    onChange?.(allValues, flatOptions.slice(0, maxSelections));
+  }, [flatOptions, maxSelections, isControlled, onChange]);
+
+  // Clear all selections
+  const clearAll = useCallback(() => {
+    const emptyValues: T[] = [];
+    
+    if (!isControlled) {
+      setInternalValues(emptyValues);
+    }
+    
+    onChange?.(emptyValues, []);
+  }, [isControlled, onChange]);
 
   return {
-    // Current state
-    mode,
-    value: formIntegration ? formIntegration.value : currentSelect.selectedValue,
-    isValid: formIntegration ? formIntegration.isValid : currentSelect.isValid,
-    error: formIntegration ? formIntegration.error : currentSelect.error,
-    isDirty: formIntegration ? formIntegration.isDirty : currentSelect.isDirty,
-    isTouched: formIntegration ? formIntegration.isTouched : currentSelect.isTouched,
-
-    // Options data
-    ...optionsData,
-
-    // Mode-specific functionality
-    single: mode === 'single' ? singleSelect : null,
-    multi: mode === 'multiple' ? multiSelect : null,
-    autocomplete: mode === 'autocomplete' ? autocompleteSelect : null,
-
-    // Keyboard support
-    keyboard,
-
-    // Form integration
-    hasFormContext: !!formIntegration,
-    formField: formIntegration,
-
-    // Generic actions
-    setValue: formIntegration ? formIntegration.setValue : currentSelect.setValue,
-    clearSelection: currentSelect.clearSelection,
-    validate: formIntegration ? formIntegration.trigger : () => Promise.resolve(currentSelect.validate()),
+    ...baseSelect,
+    selectedValues: currentValues,
+    selectedOptions,
+    handleSelect: handleMultiSelect,
+    handleMultiSelect,
+    removeValue,
+    selectAll,
+    clearAll: clearAll,
+    isAllSelected,
+    selectionCount,
+    isMaxReached,
   };
 }
+
+/**
+ * Hook for option normalization and group processing
+ * 
+ * @param options - Raw options array or grouped options
+ * @returns Normalized options with utility functions
+ * 
+ * @example
+ * ```tsx
+ * const {
+ *   flatOptions,
+ *   groupedOptions,
+ *   findOption,
+ *   getDisplayLabel
+ * } = useSelectOptions(databaseConnections);
+ * ```
+ */
+export function useSelectOptions<T = SelectValue>(
+  options: SelectOption<T>[] | OptionGroup<T>[]
+): UseSelectOptionsReturn<T> {
+  // Determine if options are grouped
+  const hasGroups = options.length > 0 && 'options' in options[0];
+
+  // Create flat options array
+  const flatOptions = useMemo(() => {
+    if (hasGroups) {
+      return (options as OptionGroup<T>[]).flatMap(group => group.options);
+    }
+    return options as SelectOption<T>[];
+  }, [options, hasGroups]);
+
+  // Create grouped options array
+  const groupedOptions = useMemo(() => {
+    if (hasGroups) {
+      return options as OptionGroup<T>[];
+    }
+    return [];
+  }, [options, hasGroups]);
+
+  // Find option by value
+  const findOption = useCallback((value: T): SelectOption<T> | undefined => {
+    return flatOptions.find(option => option.value === value);
+  }, [flatOptions]);
+
+  // Get display label for value
+  const getDisplayLabel = useCallback((value: T): string => {
+    const option = findOption(value);
+    return option?.label || String(value);
+  }, [findOption]);
+
+  // Filter options by search query
+  const filterOptions = useCallback((query: string): SelectOption<T>[] => {
+    if (!query) return flatOptions;
+
+    const searchTerm = query.toLowerCase();
+    return flatOptions.filter(option => {
+      const labelMatch = option.label.toLowerCase().includes(searchTerm);
+      const valueMatch = String(option.value).toLowerCase().includes(searchTerm);
+      const keywordMatch = option.searchKeywords?.some(keyword => 
+        keyword.toLowerCase().includes(searchTerm)
+      );
+      
+      return labelMatch || valueMatch || keywordMatch;
+    });
+  }, [flatOptions]);
+
+  return {
+    flatOptions,
+    groupedOptions,
+    findOption,
+    getDisplayLabel,
+    filterOptions,
+    hasGroups,
+  };
+}
+
+/**
+ * Hook for consistent keyboard navigation across select variants
+ * 
+ * @param options - Available options for navigation
+ * @param onSelect - Selection handler
+ * @param isOpen - Whether dropdown is open
+ * @returns Keyboard navigation state and handlers
+ * 
+ * @example
+ * ```tsx
+ * const {
+ *   highlightedIndex,
+ *   handleKeyDown,
+ *   selectHighlighted
+ * } = useSelectKeyboard(
+ *   filteredOptions,
+ *   handleSelect,
+ *   isOpen
+ * );
+ * ```
+ */
+export function useSelectKeyboard<T = SelectValue>(
+  options: SelectOption<T>[],
+  onSelect: (value: T, option?: SelectOption<T>) => void,
+  isOpen: boolean,
+  onToggleOpen?: (open: boolean) => void
+): UseSelectKeyboardReturn {
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+
+  // Reset highlight when options change or dropdown closes
+  useEffect(() => {
+    if (!isOpen || options.length === 0) {
+      setHighlightedIndex(-1);
+    } else if (highlightedIndex >= options.length) {
+      setHighlightedIndex(options.length - 1);
+    }
+  }, [isOpen, options, highlightedIndex]);
+
+  const moveHighlightUp = useCallback(() => {
+    setHighlightedIndex(prev => {
+      if (prev <= 0) return options.length - 1;
+      return prev - 1;
+    });
+  }, [options.length]);
+
+  const moveHighlightDown = useCallback(() => {
+    setHighlightedIndex(prev => {
+      if (prev >= options.length - 1) return 0;
+      return prev + 1;
+    });
+  }, [options.length]);
+
+  const selectHighlighted = useCallback(() => {
+    if (highlightedIndex >= 0 && highlightedIndex < options.length) {
+      const option = options[highlightedIndex];
+      onSelect(option.value, option);
+    }
+  }, [highlightedIndex, options, onSelect]);
+
+  const resetHighlight = useCallback(() => {
+    setHighlightedIndex(0);
+  }, []);
+
+  const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
+    switch (event.key) {
+      case 'ArrowDown':
+        event.preventDefault();
+        if (!isOpen) {
+          onToggleOpen?.(true);
+          resetHighlight();
+        } else {
+          moveHighlightDown();
+        }
+        break;
+      
+      case 'ArrowUp':
+        event.preventDefault();
+        if (!isOpen) {
+          onToggleOpen?.(true);
+          resetHighlight();
+        } else {
+          moveHighlightUp();
+        }
+        break;
+      
+      case 'Enter':
+        event.preventDefault();
+        if (isOpen && highlightedIndex >= 0) {
+          selectHighlighted();
+        } else {
+          onToggleOpen?.(!isOpen);
+        }
+        break;
+      
+      case 'Escape':
+        event.preventDefault();
+        if (isOpen) {
+          onToggleOpen?.(false);
+        }
+        break;
+      
+      case 'Tab':
+        if (isOpen) {
+          onToggleOpen?.(false);
+        }
+        break;
+    }
+  }, [isOpen, highlightedIndex, moveHighlightUp, moveHighlightDown, selectHighlighted, resetHighlight, onToggleOpen]);
+
+  return {
+    highlightedIndex,
+    setHighlightedIndex,
+    moveHighlightUp,
+    moveHighlightDown,
+    selectHighlighted,
+    resetHighlight,
+    handleKeyDown,
+  };
+}
+
+/**
+ * Hook for form integration and error handling with React Hook Form
+ * 
+ * @param name - Field name for form registration
+ * @param rules - Validation rules
+ * @param customValidation - Custom validation function
+ * @returns Validation state and handlers
+ * 
+ * @example
+ * ```tsx
+ * const {
+ *   error,
+ *   isValid,
+ *   validate,
+ *   register
+ * } = useSelectValidation('databaseType', {
+ *   required: 'Database type is required'
+ * });
+ * ```
+ */
+export function useSelectValidation<TFieldValues extends FieldValues = FieldValues>(
+  name?: FieldPath<TFieldValues>,
+  rules?: any,
+  customValidation?: (value: any) => string | undefined
+): UseSelectValidationReturn {
+  const formContext = useFormContext<TFieldValues>();
+  const [error, setError] = useState<string | undefined>();
+
+  const isRequired = Boolean(rules?.required);
+
+  // Get validation error from form context
+  useEffect(() => {
+    if (formContext && name) {
+      const fieldError = formContext.formState.errors[name];
+      setError(fieldError?.message as string);
+    }
+  }, [formContext, name]);
+
+  // Validation function
+  const validate = useCallback((value: any): string | undefined => {
+    // Check required validation
+    if (isRequired && (value === undefined || value === null || value === '')) {
+      const requiredMessage = typeof rules?.required === 'string' 
+        ? rules.required 
+        : 'This field is required';
+      return requiredMessage;
+    }
+
+    // Run custom validation
+    if (customValidation) {
+      return customValidation(value);
+    }
+
+    return undefined;
+  }, [isRequired, rules, customValidation]);
+
+  const clearError = useCallback(() => {
+    setError(undefined);
+  }, []);
+
+  // Form registration
+  const register = useMemo(() => {
+    if (formContext && name) {
+      return formContext.register(name, {
+        ...rules,
+        validate: validate,
+      });
+    }
+    return {};
+  }, [formContext, name, rules, validate]);
+
+  const isValid = !error;
+
+  return {
+    error,
+    isValid,
+    isRequired,
+    validate,
+    clearError,
+    register,
+  };
+}
+
+/**
+ * Hook for HTTP verb bitmask conversions from Angular df-verb-picker component
+ * Transforms verb selections between bitmask integer and array representations
+ * 
+ * @param value - Current bitmask value or verb array
+ * @param onChange - Change handler for transformed value
+ * @returns Verb transformation utilities
+ * 
+ * @example
+ * ```tsx
+ * const {
+ *   selectedVerbs,
+ *   bitmaskValue,
+ *   toggleVerb,
+ *   selectAllVerbs,
+ *   getVerbLabels
+ * } = useVerbTransform(selectedVerbBitmask, onChange);
+ * ```
+ */
+export function useVerbTransform(
+  value: number | string[] | undefined,
+  onChange?: (value: number) => void
+) {
+  // HTTP verb definitions with bitmask values
+  const HTTP_VERBS = useMemo(() => ({
+    GET: 1,      // 2^0
+    POST: 2,     // 2^1
+    PUT: 4,      // 2^2
+    PATCH: 8,    // 2^3
+    DELETE: 16,  // 2^4
+    HEAD: 32,    // 2^5
+    OPTIONS: 64, // 2^6
+  }), []);
+
+  const VERB_LABELS = useMemo(() => ({
+    1: 'GET',
+    2: 'POST',
+    4: 'PUT',
+    8: 'PATCH',
+    16: 'DELETE',
+    32: 'HEAD',
+    64: 'OPTIONS',
+  }), []);
+
+  // Convert bitmask to verb array
+  const bitmaskToVerbs = useCallback((bitmask: number): string[] => {
+    const verbs: string[] = [];
+    Object.entries(HTTP_VERBS).forEach(([verb, bit]) => {
+      if ((bitmask & bit) === bit) {
+        verbs.push(verb);
+      }
+    });
+    return verbs;
+  }, [HTTP_VERBS]);
+
+  // Convert verb array to bitmask
+  const verbsToBitmask = useCallback((verbs: string[]): number => {
+    return verbs.reduce((bitmask, verb) => {
+      const bit = HTTP_VERBS[verb as keyof typeof HTTP_VERBS];
+      return bit ? bitmask | bit : bitmask;
+    }, 0);
+  }, [HTTP_VERBS]);
+
+  // Current state calculation
+  const bitmaskValue = useMemo(() => {
+    if (typeof value === 'number') {
+      return value;
+    } else if (Array.isArray(value)) {
+      return verbsToBitmask(value);
+    }
+    return 0;
+  }, [value, verbsToBitmask]);
+
+  const selectedVerbs = useMemo(() => {
+    return bitmaskToVerbs(bitmaskValue);
+  }, [bitmaskValue, bitmaskToVerbs]);
+
+  // Toggle individual verb
+  const toggleVerb = useCallback((verb: string) => {
+    const bit = HTTP_VERBS[verb as keyof typeof HTTP_VERBS];
+    if (!bit) return;
+
+    const newBitmask = bitmaskValue ^ bit; // XOR to toggle
+    onChange?.(newBitmask);
+  }, [bitmaskValue, HTTP_VERBS, onChange]);
+
+  // Select all verbs
+  const selectAllVerbs = useCallback(() => {
+    const allVerbsBitmask = Object.values(HTTP_VERBS).reduce((acc, bit) => acc | bit, 0);
+    onChange?.(allVerbsBitmask);
+  }, [HTTP_VERBS, onChange]);
+
+  // Clear all verbs
+  const clearAllVerbs = useCallback(() => {
+    onChange?.(0);
+  }, [onChange]);
+
+  // Check if specific verb is selected
+  const isVerbSelected = useCallback((verb: string): boolean => {
+    const bit = HTTP_VERBS[verb as keyof typeof HTTP_VERBS];
+    return bit ? (bitmaskValue & bit) === bit : false;
+  }, [bitmaskValue, HTTP_VERBS]);
+
+  // Get human-readable labels for selected verbs
+  const getVerbLabels = useCallback((): string[] => {
+    return selectedVerbs;
+  }, [selectedVerbs]);
+
+  // Get all available verbs
+  const getAllVerbs = useCallback((): string[] => {
+    return Object.keys(HTTP_VERBS);
+  }, [HTTP_VERBS]);
+
+  // Validate bitmask value
+  const isValidBitmask = useCallback((bitmask: number): boolean => {
+    const maxBitmask = Object.values(HTTP_VERBS).reduce((acc, bit) => acc | bit, 0);
+    return bitmask >= 0 && bitmask <= maxBitmask;
+  }, [HTTP_VERBS]);
+
+  return {
+    selectedVerbs,
+    bitmaskValue,
+    toggleVerb,
+    selectAllVerbs,
+    clearAllVerbs,
+    isVerbSelected,
+    getVerbLabels,
+    getAllVerbs,
+    isValidBitmask,
+    verbOptions: useMemo(() => 
+      Object.keys(HTTP_VERBS).map(verb => ({
+        value: verb,
+        label: verb,
+        disabled: false,
+      })), [HTTP_VERBS]
+    ),
+  };
+}
+
+/**
+ * Advanced hook for complex select scenarios with bitmask operations and hierarchical data
+ * 
+ * @param props - Advanced select component props
+ * @returns Advanced select state and handlers
+ * 
+ * @example
+ * ```tsx
+ * const {
+ *   selectedValue,
+ *   handleBitmaskToggle,
+ *   hierarchicalOptions,
+ *   validateSelection
+ * } = useAdvancedSelect({
+ *   value: permissions,
+ *   bitmaskMode: true,
+ *   hierarchical: true,
+ *   options: permissionOptions
+ * });
+ * ```
+ */
+export function useAdvancedSelect<T = SelectValue, TFieldValues extends FieldValues = FieldValues>(
+  props: AdvancedSelectProps<T, TFieldValues>
+): UseSelectReturn<T> & {
+  handleBitmaskToggle: (bit: number) => void;
+  bitmaskValue: BitmaskValue | undefined;
+  hierarchicalSelection: Map<string, boolean>;
+  validateSelection: () => string | undefined;
+} {
+  const {
+    bitmaskMode = false,
+    bitmaskConfig,
+    hierarchical = false,
+    hierarchy,
+    customValidation,
+  } = props;
+
+  const baseSelect = useSelect(props);
+
+  // Bitmask operations
+  const bitmaskValue = useMemo((): BitmaskValue | undefined => {
+    if (!bitmaskMode || !bitmaskConfig || typeof baseSelect.selectedValue !== 'number') {
+      return undefined;
+    }
+
+    const value = baseSelect.selectedValue as number;
+    const selectedBits: number[] = [];
+    
+    Object.keys(bitmaskConfig.bitLabels).forEach(bitStr => {
+      const bit = parseInt(bitStr);
+      if ((value & (1 << bit)) !== 0) {
+        selectedBits.push(bit);
+      }
+    });
+
+    return {
+      value,
+      selectedBits,
+      labels: bitmaskConfig.bitLabels,
+    };
+  }, [bitmaskMode, bitmaskConfig, baseSelect.selectedValue]);
+
+  const handleBitmaskToggle = useCallback((bit: number) => {
+    if (!bitmaskMode || typeof baseSelect.selectedValue !== 'number') return;
+
+    const currentValue = baseSelect.selectedValue as number;
+    const newValue = currentValue ^ (1 << bit); // XOR to toggle bit
+    baseSelect.handleSelect(newValue as T);
+  }, [bitmaskMode, baseSelect]);
+
+  // Hierarchical selection state
+  const [hierarchicalSelection, setHierarchicalSelection] = useState<Map<string, boolean>>(new Map());
+
+  // Custom validation
+  const validateSelection = useCallback((): string | undefined => {
+    if (customValidation?.validate) {
+      const result = customValidation.validate(baseSelect.selectedValue);
+      return typeof result === 'string' ? result : undefined;
+    }
+    return undefined;
+  }, [customValidation, baseSelect.selectedValue]);
+
+  return {
+    ...baseSelect,
+    handleBitmaskToggle,
+    bitmaskValue,
+    hierarchicalSelection,
+    validateSelection,
+  };
+}
+
+/**
+ * Utility hook for managing select loading and error states
+ * 
+ * @param initialLoading - Initial loading state
+ * @returns Loading and error state management
+ */
+export function useSelectState(initialLoading = false) {
+  const [loadingState, setLoadingState] = useState<SelectLoadingState>({
+    isLoading: initialLoading,
+    type: 'initial',
+  });
+  const [errorState, setErrorState] = useState<SelectErrorState | undefined>();
+
+  const setLoading = useCallback((loading: boolean, type: SelectLoadingState['type'] = 'initial', message?: string) => {
+    setLoadingState({
+      isLoading: loading,
+      type,
+      message,
+    });
+  }, []);
+
+  const setError = useCallback((error: string | SelectErrorState) => {
+    if (typeof error === 'string') {
+      setErrorState({ message: error, type: 'validation' });
+    } else {
+      setErrorState(error);
+    }
+  }, []);
+
+  const clearError = useCallback(() => {
+    setErrorState(undefined);
+  }, []);
+
+  return {
+    loadingState,
+    errorState,
+    setLoading,
+    setError,
+    clearError,
+  };
+}
+
+// Export all hooks for easy consumption
+export {
+  useSelect,
+  useAutocomplete,
+  useMultiSelect,
+  useSelectOptions,
+  useSelectKeyboard,
+  useSelectValidation,
+  useVerbTransform,
+  useAdvancedSelect,
+  useSelectState,
+};
