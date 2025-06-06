@@ -1,162 +1,233 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "_metadata": {
-    "version": "1.0.0",
-    "locale": "en",
-    "direction": "ltr",
-    "lastModified": "2024-01-01T00:00:00.000Z",
-    "framework": "Next.js 15.1 + React 19",
-    "ssrOptimized": true
-  },
-  "scriptName": "Script Name",
-  "scriptMethod": "Script Method",
-  "scriptType": "Script Type",
-  "scriptLocation": "Script Location",
-  "tableName": "Table Name",
-  "active": "Active",
-  "importScriptFile": "Import a script file",
-  "fromDesktop": "From Desktop",
-  "fromGitHub": "From GitHub",
-  "selectFile": "Select File",
-  "linkToService": "Link to a service",
-  "service": "Service",
-  "repository": "Repository",
-  "branch": "Branch/Tag",
-  "path": "Path",
-  "viewLatest": "View Latest",
-  "deleteCache": "Delete Cache",
-  "runtimes": {
-    "javascript": "JavaScript",
+  "title": "Script Management",
+  "subtitle": "Manage server-side scripts for custom business logic",
+  "types": {
     "php": "PHP",
+    "javascript": "JavaScript",
     "python": "Python",
-    "python3": "Python3",
+    "python3": "Python 3",
     "nodejs": "Node.js"
   },
-  "form": {
-    "validation": {
-      "scriptName": {
-        "required": "Script name is required",
-        "minLength": "Script name must be at least 2 characters",
-        "maxLength": "Script name must be less than 50 characters",
-        "pattern": "Script name can only contain letters, numbers, underscores, and hyphens"
-      },
-      "scriptType": {
-        "required": "Please select a script type"
-      },
-      "scriptMethod": {
-        "required": "Script method is required"
-      },
-      "repository": {
-        "required": "Repository URL is required",
-        "url": "Please enter a valid repository URL"
-      },
-      "branch": {
-        "required": "Branch or tag is required"
-      },
-      "path": {
-        "required": "Script path is required"
-      },
-      "file": {
-        "required": "Please select a script file",
-        "fileType": "Only .js, .php, .py, and .txt files are allowed"
-      }
-    },
-    "labels": {
-      "scriptName": "Script Name",
-      "scriptType": "Runtime Type", 
-      "scriptMethod": "Method",
-      "repository": "GitHub Repository",
-      "branch": "Branch/Tag",
-      "path": "File Path",
-      "active": "Active Script"
-    },
-    "placeholders": {
-      "scriptName": "Enter script name",
-      "repository": "https://github.com/username/repository",
-      "branch": "main",
-      "path": "path/to/script.js"
+  "labels": {
+    "name": "Script Name",
+    "type": "Script Type",
+    "language": "Script Language",
+    "description": "Description",
+    "content": "Script Content",
+    "active": "Active",
+    "storage": "Storage Type",
+    "github": "GitHub Repository",
+    "local": "Local Storage",
+    "scriptMethod": "Script Method",
+    "scriptLocation": "Script Location",
+    "tableName": "Table Name",
+    "service": "Service",
+    "repository": "Repository",
+    "branch": "Branch/Tag",
+    "path": "Path"
+  },
+  "placeholders": {
+    "enterScriptName": "Enter script name",
+    "enterDescription": "Enter script description",
+    "selectLanguage": "Select programming language",
+    "selectStorage": "Select storage type",
+    "enterRepository": "Enter repository URL",
+    "enterBranch": "Enter branch or tag",
+    "enterPath": "Enter file path"
+  },
+  "editor": {
+    "loading": "Loading script content...",
+    "saving": "Saving script...",
+    "saved": "Script saved successfully",
+    "error": "Error loading script",
+    "syntax": "Syntax error detected",
+    "fullscreen": "Enter fullscreen mode",
+    "exitFullscreen": "Exit fullscreen mode",
+    "lineNumbers": "Show line numbers",
+    "wordWrap": "Enable word wrap",
+    "themes": {
+      "dark": "Dark theme",
+      "light": "Light theme",
+      "auto": "Auto theme"
     }
   },
-  "notifications": {
-    "success": {
-      "create": "Script successfully created",
-      "update": "Script successfully updated", 
-      "delete": "Script successfully deleted",
-      "fetchScript": "Script file successfully fetched",
-      "fetchCache": "Successfully pulled the latest script from source",
-      "deleteCache": "Successfully cleared script from cache"
-    },
-    "error": {
-      "create": "Failed to create script",
-      "update": "Failed to update script",
-      "delete": "Failed to delete script",
-      "fetchScript": "Failed to fetch script file",
-      "fetchCache": "Failed to pull latest script from source",
-      "deleteCache": "Failed to clear script cache",
-      "networkError": "Network error occurred while processing script",
-      "serverError": "Server error occurred while processing script"
-    }
-  },
-  "errors": {
-    "githubImport": "Error: Invalid file format. Only js, php, py, txt file format(s) allowed",
-    "fileUpload": "Error uploading file. Please try again.",
-    "connectionFailed": "Failed to connect to GitHub repository",
-    "invalidRepository": "Invalid repository URL or access denied",
-    "fileNotFound": "Script file not found in repository",
-    "unsupportedRuntime": "Unsupported script runtime type"
-  },
-  "errorBoundary": {
-    "title": "Script Management Error",
-    "description": "An error occurred in the script management component. Please refresh the page or contact support if the problem persists.",
-    "action": "Reload Component",
-    "fallback": "Unable to load script management interface"
-  },
-  "toast": {
-    "success": {
-      "title": "Success",
-      "createMessage": "Script has been created successfully",
-      "updateMessage": "Script has been updated successfully",
-      "deleteMessage": "Script has been deleted successfully",
-      "cacheRefreshMessage": "Script cache has been refreshed",
-      "cacheClearMessage": "Script cache has been cleared"
-    },
-    "error": {
-      "title": "Error",
-      "genericMessage": "An error occurred while processing the script",
-      "validationMessage": "Please correct the form errors and try again",
-      "networkMessage": "Network error - please check your connection",
-      "serverMessage": "Server error - please try again later"
-    },
-    "loading": {
-      "title": "Processing",
-      "createMessage": "Creating script...",
-      "updateMessage": "Updating script...",
-      "deleteMessage": "Deleting script...",
-      "fetchMessage": "Fetching script..."
+  "github": {
+    "repository": "Repository URL",
+    "branch": "Branch/Tag",
+    "path": "File Path",
+    "token": "Access Token",
+    "sync": "Sync from GitHub",
+    "lastSync": "Last synchronized",
+    "syncStatus": {
+      "syncing": "Synchronizing...",
+      "success": "Sync completed",
+      "error": "Sync failed",
+      "never": "Never synchronized"
     }
   },
   "actions": {
     "create": "Create Script",
-    "update": "Update Script", 
+    "edit": "Edit Script",
     "delete": "Delete Script",
+    "duplicate": "Duplicate Script",
+    "test": "Test Script",
     "save": "Save Script",
     "cancel": "Cancel",
+    "import": "Import Script",
+    "export": "Export Script",
+    "refresh": "Refresh",
     "viewLatest": "View Latest",
-    "refreshCache": "Refresh Cache",
-    "clearCache": "Clear Cache",
-    "uploadFile": "Upload File",
-    "selectFromGitHub": "Select from GitHub"
+    "deleteCache": "Clear Cache",
+    "linkToService": "Link to Service"
   },
-  "states": {
-    "loading": "Loading scripts...",
-    "empty": "No scripts found",
-    "error": "Failed to load scripts"
+  "import": {
+    "title": "Import Script",
+    "fromDesktop": "From Desktop",
+    "fromGitHub": "From GitHub",
+    "selectFile": "Select File",
+    "dragDrop": "Drag and drop files here or click to browse",
+    "allowedFormats": "Allowed formats: .js, .php, .py, .txt",
+    "maxSize": "Maximum file size: 10MB"
   },
-  "accessibility": {
-    "scriptNameInput": "Enter the name for your script",
-    "scriptTypeSelect": "Select the runtime type for your script",
-    "repositoryInput": "Enter GitHub repository URL",
-    "fileUploadButton": "Click to upload script file from your device",
-    "deleteScriptButton": "Delete this script permanently"
+  "validation": {
+    "required": "This field is required",
+    "email": "Please enter a valid email address",
+    "minLength": "Must be at least {{min}} characters",
+    "maxLength": "Must be no more than {{max}} characters",
+    "pattern": "Invalid format",
+    "numeric": "Must be a valid number",
+    "url": "Must be a valid URL",
+    "custom": "Invalid value",
+    "scriptName": {
+      "required": "Script name is required",
+      "minLength": "Script name must be at least 2 characters",
+      "maxLength": "Script name must be less than 100 characters",
+      "pattern": "Script name can only contain letters, numbers, hyphens, and underscores"
+    },
+    "scriptType": {
+      "required": "Please select a script type"
+    },
+    "content": {
+      "required": "Script content cannot be empty",
+      "syntax": "Script contains syntax errors"
+    },
+    "github": {
+      "repository": "Please enter a valid GitHub repository URL",
+      "branch": "Branch name is required",
+      "path": "File path is required",
+      "token": "Access token is required for private repositories"
+    }
+  },
+  "messages": {
+    "create": {
+      "success": "Script successfully created",
+      "error": "Failed to create script",
+      "pending": "Creating script..."
+    },
+    "update": {
+      "success": "Script successfully updated",
+      "error": "Failed to update script",
+      "pending": "Updating script..."
+    },
+    "delete": {
+      "success": "Script successfully deleted",
+      "error": "Failed to delete script",
+      "pending": "Deleting script...",
+      "confirm": "Are you sure you want to delete this script?"
+    },
+    "fetch": {
+      "error": "Failed to load script",
+      "pending": "Loading script...",
+      "empty": "No scripts found"
+    },
+    "import": {
+      "success": "Script file successfully imported",
+      "error": "Failed to import script file",
+      "pending": "Importing script..."
+    },
+    "sync": {
+      "success": "Successfully pulled the latest script from source",
+      "error": "Failed to sync script from repository",
+      "pending": "Synchronizing script..."
+    },
+    "cache": {
+      "success": "Successfully cleared script from cache",
+      "error": "Failed to clear script cache",
+      "pending": "Clearing cache..."
+    },
+    "test": {
+      "success": "Script executed successfully",
+      "error": "Script execution failed",
+      "pending": "Testing script..."
+    }
+  },
+  "dialogs": {
+    "delete": {
+      "title": "Delete Script",
+      "message": "Are you sure you want to delete \"{{name}}\"?",
+      "warning": "This action cannot be undone. All associated data will be permanently removed.",
+      "confirm": "Delete Script",
+      "cancel": "Cancel"
+    },
+    "unsavedChanges": {
+      "title": "Unsaved Changes",
+      "message": "You have unsaved changes. Do you want to save them before leaving?",
+      "save": "Save Changes",
+      "discard": "Discard Changes",
+      "cancel": "Cancel"
+    },
+    "syntax": {
+      "title": "Syntax Error",
+      "message": "The script contains syntax errors that may prevent it from executing correctly.",
+      "saveAnyway": "Save Anyway",
+      "fixErrors": "Fix Errors",
+      "cancel": "Cancel"
+    }
+  },
+  "status": {
+    "active": "Active",
+    "inactive": "Inactive",
+    "draft": "Draft",
+    "error": "Error",
+    "syncing": "Syncing",
+    "cached": "Cached"
+  },
+  "filters": {
+    "all": "All Scripts",
+    "active": "Active Scripts",
+    "inactive": "Inactive Scripts",
+    "byType": "Filter by Type",
+    "byStatus": "Filter by Status"
+  },
+  "search": {
+    "placeholder": "Search scripts by name or description...",
+    "noResults": "No scripts found matching your search",
+    "resultsCount": "{{count}} script(s) found"
+  },
+  "errors": {
+    "githubImport": "Invalid file format. Only .js, .php, .py, .txt files are allowed",
+    "connectionFailed": "Failed to connect to repository",
+    "invalidFormat": "Invalid script format",
+    "fileNotFound": "Script file not found in repository",
+    "accessDenied": "Access denied. Please check your permissions",
+    "quotaExceeded": "Storage quota exceeded",
+    "networkError": "Network connection error",
+    "serverError": "Server error occurred",
+    "validationFailed": "Script validation failed",
+    "compilationError": "Script compilation error",
+    "executionTimeout": "Script execution timed out",
+    "memoryLimit": "Script exceeded memory limit",
+    "permissionDenied": "Permission denied",
+    "resourceNotFound": "Resource not found",
+    "conflictError": "Conflict with existing script",
+    "rateLimitExceeded": "Rate limit exceeded. Please try again later"
+  },
+  "info": {
+    "empty": "No scripts have been created yet",
+    "emptySearch": "No scripts match your current filters",
+    "createFirst": "Create your first script to get started",
+    "githubIntegration": "Connect to GitHub to sync scripts automatically",
+    "syntaxHighlighting": "Syntax highlighting available for all supported languages",
+    "autoSave": "Changes are automatically saved as you type"
   }
 }
