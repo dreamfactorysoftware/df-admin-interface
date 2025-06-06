@@ -1,962 +1,845 @@
 /**
- * React Query Mutations Hook for Rate Limit CRUD Operations
+ * Limit Mutations Hook for React Query Integration
  * 
- * Custom React hook implementing React Query mutations for limit CRUD operations with optimistic updates
- * and intelligent cache invalidation. Provides create, update, and delete functionality for database limits
- * with comprehensive error handling and automatic cache synchronization following DreamFactory API patterns
- * and performance requirements.
+ * Custom React hook implementing comprehensive React Query mutations for limit CRUD operations
+ * with optimistic updates, intelligent cache invalidation, and automatic error rollback.
+ * Replaces Angular DfBaseCrudService patterns with modern React Query mutation workflows
+ * optimized for DreamFactory API patterns and performance requirements.
  * 
  * Features:
- * - Type-safe mutation operations with payload assembly logic per React/Next.js Integration Requirements
- * - Optimistic updates for immediate UI feedback with automatic rollback on failure
- * - Comprehensive cache invalidation and synchronization per Section 4.3.2 mutation workflows
- * - API responses under 2 seconds per React/Next.js Integration Requirements
- * - Error handling with automatic rollback per Section 4.3.2 error handling patterns
- * - Success/error notifications integration for user feedback per existing Angular snackbar patterns
- * - Intelligent cache management for related queries (limit lists, limit cache)
+ * - Type-safe mutation operations with comprehensive payload assembly
+ * - Optimistic updates for limit creation, modification, and deletion
+ * - Intelligent cache invalidation for related queries (limit lists, limit cache)
+ * - Automatic rollback on mutation failure with error state management
+ * - Success/error notifications integration following existing snackbar patterns
+ * - API response performance under 2 seconds per React/Next.js Integration Requirements
+ * - Comprehensive error handling with Angular catchError/throwError pattern conversion
  * 
- * Replaces Angular DfBaseCrudService create/update methods with React Query mutations per Section 3.2.2
- * state management while maintaining complete functionality and improving performance characteristics.
- * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
- * @since 2024-12-19
- * 
- * @example
- * ```tsx
- * const {
- *   createLimit,
- *   updateLimit,
- *   deleteLimit,
- *   toggleLimitStatus,
- *   isLoading,
- *   error
- * } = useLimitMutations();
- * 
- * // Create new limit with optimistic update
- * await createLimit.mutateAsync({
- *   name: 'API Rate Limit',
- *   limitType: LimitType.SERVICE,
- *   limitRate: '100/minute',
- *   limitCounter: LimitCounter.REQUEST,
- *   service: 1,
- *   active: true
- * });
- * 
- * // Update existing limit
- * await updateLimit.mutateAsync({
- *   id: 1,
- *   name: 'Updated API Rate Limit',
- *   limitRate: '200/minute'
- * });
- * 
- * // Delete limit with confirmation
- * await deleteLimit.mutateAsync(1);
- * 
- * // Toggle limit status
- * await toggleLimitStatus.mutateAsync({
- *   id: 1,
- *   active: false
- * });
- * ```
+ * @fileoverview React Query mutations for limit management operations
+ * @version 1.0.0
+ * @see Technical Specification Section 0 - SUMMARY OF CHANGES
+ * @see Technical Specification Section 4.3.2 - Server State Management
+ * @see Technical Specification Section 3.2.2 - State Management Architecture
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useCallback, useMemo } from 'react'
-import {
-  CreateLimitFormData,
-  EditLimitFormData,
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
+import { apiPost, apiPut, apiDelete } from '@/lib/api-client';
+import { useNotifications } from '@/hooks/use-notifications';
+import type {
   LimitTableRowData,
-  LIMITS_QUERY_KEYS,
-  CreateLimitMutationResult,
-  UpdateLimitMutationResult,
-  DeleteLimitMutationResult,
-  ToggleLimitMutationResult,
-  type LimitsCacheInvalidationFilters
-} from '@/app/adf-limits/types'
-import {
-  ApiCreateResponse,
-  ApiUpdateResponse,
-  ApiDeleteResponse,
-  ApiErrorResponse,
-  ApiListResponse,
-  ApiRequestOptions,
-  type PaginationMeta
-} from '@/types/api'
-import { useNotifications } from '@/hooks/use-notifications'
-import { apiClient } from '@/lib/api-client'
+  LimitConfiguration,
+  CreateLimitMutationVariables,
+  UpdateLimitMutationVariables,
+  DeleteLimitMutationVariables,
+  BulkLimitMutationVariables,
+  CreateLimitMutation,
+  UpdateLimitMutation,
+  DeleteLimitMutation,
+  BulkLimitMutation,
+  LimitMutationOptions,
+} from '@/app/adf-limits/types';
+import type { ApiResourceResponse, ApiErrorResponse } from '@/types/api';
 
-// =============================================================================
-// TYPES AND INTERFACES
-// =============================================================================
+// ============================================================================
+// Constants and Configuration
+// ============================================================================
 
 /**
- * Context data for optimistic updates and rollback operations
+ * API endpoint base for limit operations
+ * Following DreamFactory API v2 patterns
  */
-interface OptimisticContext {
-  previousData?: LimitTableRowData
-  previousList?: LimitTableRowData[]
-  tempId?: string
-  snapshot?: {
-    listCache: Record<string, ApiListResponse<LimitTableRowData>>
-    detailCache: Record<string, LimitTableRowData>
-  }
-}
+const LIMIT_API_BASE = '/api/v2/system/limit';
 
 /**
- * Toggle limit status payload
+ * Query key patterns for cache invalidation
+ * Ensures comprehensive cache synchronization across related queries
  */
-interface ToggleLimitStatusPayload {
-  id: number
-  active: boolean
-}
+const QUERY_KEY_PATTERNS = {
+  LIMIT_LIST: ['limits'] as const,
+  LIMIT_DETAIL: (id: number) => ['limits', id] as const,
+  LIMIT_USAGE: (id: number) => ['limits', id, 'usage'] as const,
+  USER_LIMITS: (userId: number) => ['users', userId, 'limits'] as const,
+  SERVICE_LIMITS: (serviceId: number) => ['services', serviceId, 'limits'] as const,
+  ROLE_LIMITS: (roleId: number) => ['roles', roleId, 'limits'] as const,
+  SYSTEM_STATS: ['system', 'stats'] as const,
+} as const;
 
 /**
- * Mutation performance metrics for monitoring
+ * Default mutation options following React Query best practices
+ * Optimized for DreamFactory API response patterns
  */
-interface MutationMetrics {
-  startTime: number
-  endTime?: number
-  duration?: number
-  operation: 'create' | 'update' | 'delete' | 'toggle'
-  success: boolean
-  errorCode?: string
-}
+const DEFAULT_MUTATION_OPTIONS: Partial<LimitMutationOptions> = {
+  optimisticUpdate: {
+    enabled: true,
+    rollbackOnError: true,
+  },
+  successNotification: {
+    title: 'Success',
+    message: 'Operation completed successfully',
+    duration: 5000, // Match Angular snackbar duration
+  },
+  errorNotification: {
+    title: 'Error',
+    fallbackMessage: 'An unexpected error occurred. Please try again.',
+  },
+} as const;
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
 
 /**
- * Hook return interface with comprehensive mutation operations
+ * Generate unique cache keys for limit-related queries
+ * Ensures proper cache invalidation across related data structures
  */
-interface UseLimitMutationsReturn {
-  // Mutation results with React Query integration
-  createLimit: CreateLimitMutationResult
-  updateLimit: UpdateLimitMutationResult
-  deleteLimit: DeleteLimitMutationResult
-  toggleLimitStatus: ToggleLimitMutationResult
-  
-  // Aggregate loading and error states
-  isLoading: boolean
-  error: ApiErrorResponse | null
-  
-  // Performance and debugging information
-  lastMutation: MutationMetrics | null
-  mutationCount: number
-  
-  // Utility methods for advanced scenarios
-  invalidateQueries: () => Promise<void>
-  resetMutationState: () => void
-}
+const generateCacheKeys = (limit: Partial<LimitTableRowData>): string[] => {
+  const keys: string[] = [
+    JSON.stringify(QUERY_KEY_PATTERNS.LIMIT_LIST),
+    JSON.stringify(QUERY_KEY_PATTERNS.SYSTEM_STATS),
+  ];
 
-// =============================================================================
-// API FUNCTIONS
-// =============================================================================
-
-/**
- * Create a new rate limit via DreamFactory API
- * 
- * @param data - Rate limit creation data
- * @returns Promise resolving to creation response
- */
-async function createLimitApi(data: CreateLimitFormData): Promise<ApiCreateResponse> {
-  const payload = {
-    name: data.name,
-    limit_type: data.limitType,
-    limit_rate: data.limitRate,
-    limit_counter: data.limitCounter,
-    user_id: data.user || null,
-    service_id: data.service || null,
-    role_id: data.role || null,
-    active: data.active ?? true,
-    metadata: data.metadata || null
+  if (limit.id) {
+    keys.push(JSON.stringify(QUERY_KEY_PATTERNS.LIMIT_DETAIL(limit.id)));
+    keys.push(JSON.stringify(QUERY_KEY_PATTERNS.LIMIT_USAGE(limit.id)));
   }
 
-  const response = await apiClient.post('/limits', payload)
-  return response
-}
-
-/**
- * Update an existing rate limit via DreamFactory API
- * 
- * @param data - Rate limit update data
- * @returns Promise resolving to update response
- */
-async function updateLimitApi(data: EditLimitFormData): Promise<ApiUpdateResponse> {
-  const { id, ...updateData } = data
-  
-  const payload = {
-    name: updateData.name,
-    limit_type: updateData.limitType,
-    limit_rate: updateData.limitRate,
-    limit_counter: updateData.limitCounter,
-    user_id: updateData.user || null,
-    service_id: updateData.service || null,
-    role_id: updateData.role || null,
-    active: updateData.active ?? true,
-    metadata: updateData.metadata || null
+  if (limit.user) {
+    keys.push(JSON.stringify(QUERY_KEY_PATTERNS.USER_LIMITS(limit.user)));
   }
 
-  const response = await apiClient.put(`/limits/${id}`, payload)
-  return response
-}
-
-/**
- * Delete a rate limit via DreamFactory API
- * 
- * @param id - Rate limit ID to delete
- * @returns Promise resolving to deletion response
- */
-async function deleteLimitApi(id: number): Promise<ApiDeleteResponse> {
-  const response = await apiClient.delete(`/limits/${id}`)
-  return response
-}
-
-/**
- * Toggle rate limit active status via DreamFactory API
- * 
- * @param payload - Toggle status payload
- * @returns Promise resolving to update response
- */
-async function toggleLimitStatusApi(payload: ToggleLimitStatusPayload): Promise<ApiUpdateResponse> {
-  const response = await apiClient.patch(`/limits/${payload.id}`, {
-    active: payload.active
-  })
-  return response
-}
-
-// =============================================================================
-// CACHE MANAGEMENT UTILITIES
-// =============================================================================
-
-/**
- * Generate cache invalidation filters for comprehensive cache management
- * 
- * @param queryClient - React Query client instance
- * @returns Cache invalidation filters
- */
-function createCacheInvalidationFilters(queryClient: ReturnType<typeof useQueryClient>): LimitsCacheInvalidationFilters {
-  return {
-    all: {
-      queryKey: LIMITS_QUERY_KEYS.all,
-      exact: false
-    },
-    lists: {
-      queryKey: LIMITS_QUERY_KEYS.lists(),
-      exact: false
-    },
-    detail: (id: number) => ({
-      queryKey: LIMITS_QUERY_KEYS.detail(id),
-      exact: true
-    }),
-    related: (id: number) => ({
-      queryKey: LIMITS_QUERY_KEYS.related(id),
-      exact: false
-    })
+  if (limit.service) {
+    keys.push(JSON.stringify(QUERY_KEY_PATTERNS.SERVICE_LIMITS(limit.service)));
   }
-}
+
+  if (limit.role) {
+    keys.push(JSON.stringify(QUERY_KEY_PATTERNS.ROLE_LIMITS(limit.role)));
+  }
+
+  return keys;
+};
 
 /**
- * Optimistically update limit list cache with new or updated item
- * 
- * @param queryClient - React Query client instance
- * @param limitData - Limit data to add or update
- * @param operation - Type of operation (create, update, delete)
+ * Transform limit configuration to API payload format
+ * Ensures compatibility with DreamFactory API expectations
  */
-function updateListCacheOptimistically(
-  queryClient: ReturnType<typeof useQueryClient>,
-  limitData: Partial<LimitTableRowData>,
-  operation: 'create' | 'update' | 'delete'
-): void {
-  const listQueryKeys = queryClient.getQueryCache().findAll({
-    queryKey: LIMITS_QUERY_KEYS.lists(),
-    exact: false
-  })
+const transformLimitPayload = (config: LimitConfiguration): Record<string, any> => {
+  const { period, rateValue, options, scope, ...baseConfig } = config;
 
-  listQueryKeys.forEach((query) => {
-    const currentData = query.state.data as ApiListResponse<LimitTableRowData> | undefined
-    if (!currentData) return
+  // Generate rate string from configuration
+  const periodText = period.value === 1 ? period.unit : `${period.value} ${period.unit}s`;
+  const limitRate = `${rateValue} per ${periodText}`;
 
-    let updatedResource: LimitTableRowData[]
+  // Build API payload
+  const payload: Record<string, any> = {
+    ...baseConfig,
+    limit_rate: limitRate,
+    limit_value: rateValue,
+    period_value: period.value,
+    period_unit: period.unit,
+  };
 
-    switch (operation) {
-      case 'create':
-        // Add new item to the beginning of the list
-        const newItem: LimitTableRowData = {
-          id: Date.now(), // Temporary ID for optimistic update
-          name: limitData.name || '',
-          limitType: limitData.limitType!,
-          limitRate: limitData.limitRate || '',
-          limitCounter: limitData.limitCounter!,
-          user: limitData.user || null,
-          service: limitData.service || null,
-          role: limitData.role || null,
-          active: limitData.active ?? true,
-          createdAt: new Date().toISOString(),
-          metadata: limitData.metadata
-        }
-        updatedResource = [newItem, ...currentData.resource]
-        break
+  // Include advanced options if provided
+  if (options) {
+    payload.options = {
+      allow_burst: options.allowBurst,
+      burst_multiplier: options.burstMultiplier,
+      reset_time: options.resetTime,
+      error_message: options.errorMessage,
+      priority: options.priority,
+    };
+  }
 
-      case 'update':
-        updatedResource = currentData.resource.map(item =>
-          item.id === limitData.id
-            ? { ...item, ...limitData, updatedAt: new Date().toISOString() }
-            : item
-        )
-        break
+  // Include scope configuration if provided
+  if (scope) {
+    payload.scope = {
+      endpoints: scope.endpoints,
+      methods: scope.methods,
+      ip_restrictions: scope.ipRestrictions,
+    };
+  }
 
-      case 'delete':
-        updatedResource = currentData.resource.filter(item => item.id !== limitData.id)
-        break
-
-      default:
-        return
-    }
-
-    // Update pagination metadata
-    const updatedMeta: PaginationMeta = {
-      ...currentData.meta,
-      count: updatedResource.length,
-      total: operation === 'create' 
-        ? (currentData.meta.total || 0) + 1
-        : operation === 'delete'
-        ? Math.max((currentData.meta.total || 0) - 1, 0)
-        : currentData.meta.total
-    }
-
-    queryClient.setQueryData(query.queryKey, {
-      resource: updatedResource,
-      meta: updatedMeta
-    })
-  })
-}
+  return payload;
+};
 
 /**
- * Create snapshot of current cache state for rollback purposes
- * 
- * @param queryClient - React Query client instance
- * @param limitId - Optional limit ID for targeted snapshot
- * @returns Cache snapshot
+ * Transform API response to limit table row data
+ * Normalizes DreamFactory API response format for client consumption
  */
-function createCacheSnapshot(
-  queryClient: ReturnType<typeof useQueryClient>,
-  limitId?: number
-): OptimisticContext['snapshot'] {
-  const listQueries = queryClient.getQueryCache().findAll({
-    queryKey: LIMITS_QUERY_KEYS.lists(),
-    exact: false
-  })
+const transformApiResponse = (response: any): LimitTableRowData => {
+  const {
+    id,
+    name,
+    limit_type: limitType,
+    limit_rate: limitRate,
+    limit_counter: limitCounter,
+    user_id: user,
+    service_id: service,
+    role_id: role,
+    active,
+    description,
+    created_date: createdAt,
+    last_modified_date: updatedAt,
+    created_by_id: createdBy,
+    current_usage: currentUsage,
+    period_value,
+    period_unit,
+  } = response;
 
-  const listCache: Record<string, ApiListResponse<LimitTableRowData>> = {}
-  const detailCache: Record<string, LimitTableRowData> = {}
+  const transformedData: LimitTableRowData = {
+    id,
+    name,
+    limitType,
+    limitRate,
+    limitCounter,
+    user: user || null,
+    service: service || null,
+    role: role || null,
+    active: Boolean(active),
+    description,
+    createdAt,
+    updatedAt,
+    createdBy,
+    currentUsage,
+  };
 
-  // Capture list cache
-  listQueries.forEach((query) => {
-    const data = query.state.data as ApiListResponse<LimitTableRowData> | undefined
-    if (data) {
-      listCache[JSON.stringify(query.queryKey)] = data
-    }
-  })
+  // Include period configuration if available
+  if (period_value && period_unit) {
+    transformedData.period = {
+      value: period_value,
+      unit: period_unit,
+    };
+  }
 
-  // Capture detail cache (specific or all)
-  if (limitId) {
-    const detailQuery = queryClient.getQueryCache().find({
-      queryKey: LIMITS_QUERY_KEYS.detail(limitId),
-      exact: true
-    })
-    
-    if (detailQuery?.state.data) {
-      detailCache[limitId.toString()] = detailQuery.state.data as LimitTableRowData
-    }
-  } else {
-    const detailQueries = queryClient.getQueryCache().findAll({
-      queryKey: LIMITS_QUERY_KEYS.details(),
-      exact: false
-    })
+  return transformedData;
+};
 
-    detailQueries.forEach((query) => {
-      const data = query.state.data as LimitTableRowData | undefined
-      if (data && data.id) {
-        detailCache[data.id.toString()] = data
+// ============================================================================
+// Main Hook Implementation
+// ============================================================================
+
+/**
+ * useLimitMutations Hook
+ * 
+ * Provides comprehensive React Query mutations for limit CRUD operations with
+ * optimistic updates, intelligent cache invalidation, and automatic error handling.
+ * Replaces Angular DfBaseCrudService patterns with modern React Query workflows.
+ * 
+ * @param options - Optional configuration for mutation behavior
+ * @returns Object containing mutation functions and state management
+ */
+export function useLimitMutations(
+  options: Partial<LimitMutationOptions> = {}
+) {
+  const queryClient = useQueryClient();
+  const { success, error: showError } = useNotifications();
+
+  // Merge provided options with defaults
+  const mutationOptions = {
+    ...DEFAULT_MUTATION_OPTIONS,
+    ...options,
+  };
+
+  // =========================================================================
+  // Create Limit Mutation
+  // =========================================================================
+
+  /**
+   * Create new limit with optimistic updates and comprehensive error handling
+   * Implements Section 4.3.2 Server State Management optimistic update patterns
+   */
+  const createLimitMutation = useMutation<
+    CreateLimitMutation,
+    ApiErrorResponse,
+    CreateLimitMutationVariables
+  >({
+    mutationFn: async ({ data, testConnection = false }: CreateLimitMutationVariables) => {
+      const payload = transformLimitPayload(data);
+      
+      // Add connection test parameter if requested
+      if (testConnection && data.service) {
+        payload.test_connection = true;
       }
-    })
-  }
 
-  return { listCache, detailCache }
-}
+      return apiPost<CreateLimitMutation>(LIMIT_API_BASE, payload, {
+        snackbarSuccess: mutationOptions.successNotification?.message,
+        snackbarError: mutationOptions.errorNotification?.fallbackMessage,
+      });
+    },
 
-/**
- * Restore cache state from snapshot for rollback operations
- * 
- * @param queryClient - React Query client instance
- * @param snapshot - Cache snapshot to restore
- */
-function restoreCacheFromSnapshot(
-  queryClient: ReturnType<typeof useQueryClient>,
-  snapshot: OptimisticContext['snapshot']
-): void {
-  if (!snapshot) return
+    onMutate: async (variables) => {
+      if (!mutationOptions.optimisticUpdate?.enabled) return;
 
-  // Restore list cache
-  Object.entries(snapshot.listCache).forEach(([queryKeyStr, data]) => {
-    try {
-      const queryKey = JSON.parse(queryKeyStr)
-      queryClient.setQueryData(queryKey, data)
-    } catch (error) {
-      console.warn('Failed to restore list cache entry:', error)
-    }
-  })
+      // Cancel any outgoing refetches to prevent overwriting optimistic update
+      await queryClient.cancelQueries({ queryKey: QUERY_KEY_PATTERNS.LIMIT_LIST });
 
-  // Restore detail cache
-  Object.entries(snapshot.detailCache).forEach(([limitId, data]) => {
-    const id = parseInt(limitId, 10)
-    if (!isNaN(id)) {
-      queryClient.setQueryData(LIMITS_QUERY_KEYS.detail(id), data)
-    }
-  })
-}
+      // Snapshot the previous value for rollback
+      const previousLimits = queryClient.getQueryData(QUERY_KEY_PATTERNS.LIMIT_LIST);
 
-// =============================================================================
-// MAIN HOOK IMPLEMENTATION
-// =============================================================================
-
-/**
- * Custom hook for rate limit mutations with React Query integration
- * 
- * Provides comprehensive CRUD operations for rate limits with optimistic updates,
- * intelligent cache invalidation, error handling, and user feedback integration.
- * Replaces Angular DfBaseCrudService patterns with modern React Query mutations
- * while maintaining full functionality and improving performance characteristics.
- * 
- * @returns Hook interface with mutation operations and state
- */
-export function useLimitMutations(): UseLimitMutationsReturn {
-  const queryClient = useQueryClient()
-  const { success, error: showError } = useNotifications()
-  
-  // Performance and debugging state
-  const [lastMutation, setLastMutation] = useState<MutationMetrics | null>(null)
-  const [mutationCount, setMutationCount] = useState(0)
-
-  // Cache invalidation filters
-  const cacheFilters = useMemo(
-    () => createCacheInvalidationFilters(queryClient),
-    [queryClient]
-  )
-
-  // Utility function to track mutation metrics
-  const trackMutationMetrics = useCallback((
-    operation: MutationMetrics['operation'],
-    success: boolean,
-    startTime: number,
-    errorCode?: string
-  ) => {
-    const endTime = Date.now()
-    const metrics: MutationMetrics = {
-      startTime,
-      endTime,
-      duration: endTime - startTime,
-      operation,
-      success,
-      errorCode
-    }
-    
-    setLastMutation(metrics)
-    setMutationCount(prev => prev + 1)
-    
-    // Log performance metrics for monitoring
-    if (metrics.duration && metrics.duration > 2000) {
-      console.warn(`Slow ${operation} mutation detected:`, metrics)
-    }
-  }, [])
-
-  // =============================================================================
-  // CREATE LIMIT MUTATION
-  // =============================================================================
-
-  const createLimit: CreateLimitMutationResult = useMutation({
-    mutationFn: createLimitApi,
-    
-    onMutate: async (variables: CreateLimitFormData): Promise<OptimisticContext> => {
-      const startTime = Date.now()
-      
-      // Cancel outgoing queries to prevent conflicts
-      await queryClient.cancelQueries({
-        queryKey: LIMITS_QUERY_KEYS.all
-      })
-
-      // Snapshot current cache state
-      const snapshot = createCacheSnapshot(queryClient)
-      
       // Generate temporary ID for optimistic update
-      const tempId = `temp-${Date.now()}`
-      
+      const tempId = Date.now();
+      const optimisticLimit: LimitTableRowData = {
+        id: tempId,
+        name: variables.data.name,
+        limitType: variables.data.limitType,
+        limitRate: `${variables.data.rateValue} per ${variables.data.period.value === 1 ? variables.data.period.unit : `${variables.data.period.value} ${variables.data.period.unit}s`}`,
+        limitCounter: variables.data.limitCounter,
+        user: variables.data.user || null,
+        service: variables.data.service || null,
+        role: variables.data.role || null,
+        active: variables.data.active,
+        description: variables.data.description,
+        createdAt: new Date().toISOString(),
+        period: variables.data.period,
+      };
+
       // Optimistically update the cache
-      updateListCacheOptimistically(queryClient, variables, 'create')
-      
-      return { tempId, snapshot }
+      queryClient.setQueryData(QUERY_KEY_PATTERNS.LIMIT_LIST, (oldData: any) => {
+        if (!oldData?.resource) return oldData;
+        return {
+          ...oldData,
+          resource: [...oldData.resource, optimisticLimit],
+          meta: {
+            ...oldData.meta,
+            count: oldData.meta.count + 1,
+          },
+        };
+      });
+
+      return { previousLimits, optimisticLimit };
     },
 
-    onSuccess: async (
-      data: ApiCreateResponse,
-      variables: CreateLimitFormData,
-      context: OptimisticContext | undefined
-    ) => {
-      const startTime = context?.snapshot ? Date.now() : Date.now()
+    onSuccess: (data, variables, context) => {
+      // Transform and update with real data from server
+      const newLimit = transformApiResponse(data.resource);
       
+      // Update the optimistic entry with real data
+      queryClient.setQueryData(QUERY_KEY_PATTERNS.LIMIT_LIST, (oldData: any) => {
+        if (!oldData?.resource) return oldData;
+        return {
+          ...oldData,
+          resource: oldData.resource.map((limit: LimitTableRowData) =>
+            limit.id === context?.optimisticLimit?.id ? newLimit : limit
+          ),
+        };
+      });
+
+      // Cache the individual limit
+      queryClient.setQueryData(QUERY_KEY_PATTERNS.LIMIT_DETAIL(newLimit.id), {
+        resource: newLimit,
+        timestamp: new Date().toISOString(),
+      });
+
+      // Invalidate related queries for comprehensive synchronization
+      const cacheKeys = generateCacheKeys(newLimit);
+      cacheKeys.forEach(key => {
+        queryClient.invalidateQueries({ queryKey: JSON.parse(key) });
+      });
+
+      // Show success notification
+      if (mutationOptions.successNotification) {
+        success(
+          mutationOptions.successNotification.message,
+          {
+            title: mutationOptions.successNotification.title,
+            duration: mutationOptions.successNotification.duration,
+          }
+        );
+      }
+    },
+
+    onError: (err, variables, context) => {
+      // Rollback optimistic update if enabled
+      if (mutationOptions.optimisticUpdate?.rollbackOnError && context?.previousLimits) {
+        queryClient.setQueryData(QUERY_KEY_PATTERNS.LIMIT_LIST, context.previousLimits);
+      }
+
+      // Parse error message from API response
+      let errorMessage = mutationOptions.errorNotification?.fallbackMessage || 'Failed to create limit';
       try {
-        // Show success notification
-        success(`Rate limit "${variables.name}" created successfully`)
-        
-        // Invalidate and refetch related queries
-        await queryClient.invalidateQueries(cacheFilters.lists)
-        await queryClient.invalidateQueries(cacheFilters.all)
-        
-        // Update detail cache if the new item is being viewed
-        if (data.id) {
-          queryClient.setQueryData(
-            LIMITS_QUERY_KEYS.detail(Number(data.id)),
-            {
-              ...variables,
-              id: Number(data.id),
-              createdAt: new Date().toISOString()
-            } as LimitTableRowData
-          )
+        const errorData = JSON.parse(err.message);
+        if (errorData.error?.message) {
+          errorMessage = errorData.error.message;
         }
-        
-        trackMutationMetrics('create', true, startTime)
-      } catch (error) {
-        console.error('Error in create limit success handler:', error)
-        showError('Failed to update cache after creating limit')
+      } catch {
+        // Use fallback message if parsing fails
       }
-    },
 
-    onError: (
-      error: ApiErrorResponse,
-      variables: CreateLimitFormData,
-      context: OptimisticContext | undefined
-    ) => {
-      const startTime = context?.snapshot ? Date.now() : Date.now()
-      
-      // Rollback optimistic updates
-      if (context?.snapshot) {
-        restoreCacheFromSnapshot(queryClient, context.snapshot)
-      }
-      
       // Show error notification
-      showError(
-        error.error?.message || 'Failed to create rate limit',
-        'Creation Error'
-      )
-      
-      trackMutationMetrics('create', false, startTime, error.error?.code)
+      showError(errorMessage, {
+        title: mutationOptions.errorNotification?.title,
+      });
     },
 
     onSettled: () => {
-      // Ensure cache consistency regardless of outcome
-      queryClient.refetchQueries({
-        queryKey: LIMITS_QUERY_KEYS.lists(),
-        exact: false
-      })
+      // Ensure cache consistency after mutation completes
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY_PATTERNS.LIMIT_LIST });
+    },
+  });
+
+  // =========================================================================
+  // Update Limit Mutation
+  // =========================================================================
+
+  /**
+   * Update existing limit with optimistic updates and rollback capability
+   * Implements Section 4.3.2 mutation workflows with error state management
+   */
+  const updateLimitMutation = useMutation<
+    UpdateLimitMutation,
+    ApiErrorResponse,
+    UpdateLimitMutationVariables
+  >({
+    mutationFn: async ({ id, data, testConnection = false }: UpdateLimitMutationVariables) => {
+      const payload = transformLimitPayload(data as LimitConfiguration);
+      
+      // Add connection test parameter if requested
+      if (testConnection && data.service) {
+        payload.test_connection = true;
+      }
+
+      return apiPut<UpdateLimitMutation>(`${LIMIT_API_BASE}/${id}`, payload, {
+        snackbarSuccess: mutationOptions.successNotification?.message,
+        snackbarError: mutationOptions.errorNotification?.fallbackMessage,
+      });
     },
 
-    retry: 1,
-    useErrorBoundary: false
-  })
+    onMutate: async (variables) => {
+      if (!mutationOptions.optimisticUpdate?.enabled) return;
 
-  // =============================================================================
-  // UPDATE LIMIT MUTATION
-  // =============================================================================
+      const { id, data } = variables;
 
-  const updateLimit: UpdateLimitMutationResult = useMutation({
-    mutationFn: updateLimitApi,
-    
-    onMutate: async (variables: EditLimitFormData): Promise<OptimisticContext> => {
-      const startTime = Date.now()
-      
-      // Cancel outgoing queries
-      await queryClient.cancelQueries({
-        queryKey: LIMITS_QUERY_KEYS.detail(variables.id)
-      })
-      await queryClient.cancelQueries({
-        queryKey: LIMITS_QUERY_KEYS.lists()
-      })
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: QUERY_KEY_PATTERNS.LIMIT_LIST });
+      await queryClient.cancelQueries({ queryKey: QUERY_KEY_PATTERNS.LIMIT_DETAIL(id) });
 
-      // Snapshot current state
-      const previousData = queryClient.getQueryData(
-        LIMITS_QUERY_KEYS.detail(variables.id)
-      ) as LimitTableRowData | undefined
-      
-      const snapshot = createCacheSnapshot(queryClient, variables.id)
-      
-      // Optimistically update detail cache
-      if (previousData) {
-        const optimisticData: LimitTableRowData = {
-          ...previousData,
-          ...variables,
-          updatedAt: new Date().toISOString()
+      // Snapshot previous values
+      const previousLimitsList = queryClient.getQueryData(QUERY_KEY_PATTERNS.LIMIT_LIST);
+      const previousLimitDetail = queryClient.getQueryData(QUERY_KEY_PATTERNS.LIMIT_DETAIL(id));
+
+      // Optimistically update the limit list
+      queryClient.setQueryData(QUERY_KEY_PATTERNS.LIMIT_LIST, (oldData: any) => {
+        if (!oldData?.resource) return oldData;
+        return {
+          ...oldData,
+          resource: oldData.resource.map((limit: LimitTableRowData) =>
+            limit.id === id ? { ...limit, ...data, updatedAt: new Date().toISOString() } : limit
+          ),
+        };
+      });
+
+      // Optimistically update the individual limit
+      queryClient.setQueryData(QUERY_KEY_PATTERNS.LIMIT_DETAIL(id), (oldData: any) => {
+        if (!oldData?.resource) return oldData;
+        return {
+          ...oldData,
+          resource: { ...oldData.resource, ...data, updatedAt: new Date().toISOString() },
+        };
+      });
+
+      return { previousLimitsList, previousLimitDetail };
+    },
+
+    onSuccess: (data, variables, context) => {
+      const updatedLimit = transformApiResponse(data.resource);
+      const { id } = variables;
+
+      // Update caches with real server data
+      queryClient.setQueryData(QUERY_KEY_PATTERNS.LIMIT_LIST, (oldData: any) => {
+        if (!oldData?.resource) return oldData;
+        return {
+          ...oldData,
+          resource: oldData.resource.map((limit: LimitTableRowData) =>
+            limit.id === id ? updatedLimit : limit
+          ),
+        };
+      });
+
+      queryClient.setQueryData(QUERY_KEY_PATTERNS.LIMIT_DETAIL(id), {
+        resource: updatedLimit,
+        timestamp: new Date().toISOString(),
+      });
+
+      // Invalidate related queries
+      const cacheKeys = generateCacheKeys(updatedLimit);
+      cacheKeys.forEach(key => {
+        queryClient.invalidateQueries({ queryKey: JSON.parse(key) });
+      });
+
+      // Show success notification
+      if (mutationOptions.successNotification) {
+        success(
+          'Limit updated successfully',
+          {
+            title: mutationOptions.successNotification.title,
+            duration: mutationOptions.successNotification.duration,
+          }
+        );
+      }
+    },
+
+    onError: (err, variables, context) => {
+      const { id } = variables;
+
+      // Rollback optimistic updates if enabled
+      if (mutationOptions.optimisticUpdate?.rollbackOnError) {
+        if (context?.previousLimitsList) {
+          queryClient.setQueryData(QUERY_KEY_PATTERNS.LIMIT_LIST, context.previousLimitsList);
         }
-        
-        queryClient.setQueryData(
-          LIMITS_QUERY_KEYS.detail(variables.id),
-          optimisticData
-        )
+        if (context?.previousLimitDetail) {
+          queryClient.setQueryData(QUERY_KEY_PATTERNS.LIMIT_DETAIL(id), context.previousLimitDetail);
+        }
       }
-      
-      // Optimistically update list cache
-      updateListCacheOptimistically(queryClient, variables, 'update')
-      
-      return { previousData, snapshot }
-    },
 
-    onSuccess: async (
-      data: ApiUpdateResponse,
-      variables: EditLimitFormData,
-      context: OptimisticContext | undefined
-    ) => {
-      const startTime = Date.now()
-      
+      // Parse and show error message
+      let errorMessage = 'Failed to update limit';
       try {
-        // Show success notification
-        success(`Rate limit "${variables.name}" updated successfully`)
-        
-        // Invalidate related queries for fresh data
-        await queryClient.invalidateQueries(cacheFilters.detail(variables.id))
-        await queryClient.invalidateQueries(cacheFilters.lists)
-        await queryClient.invalidateQueries(cacheFilters.related(variables.id))
-        
-        trackMutationMetrics('update', true, startTime)
-      } catch (error) {
-        console.error('Error in update limit success handler:', error)
-        showError('Failed to update cache after modifying limit')
+        const errorData = JSON.parse(err.message);
+        if (errorData.error?.message) {
+          errorMessage = errorData.error.message;
+        }
+      } catch {
+        // Use fallback message
       }
-    },
 
-    onError: (
-      error: ApiErrorResponse,
-      variables: EditLimitFormData,
-      context: OptimisticContext | undefined
-    ) => {
-      const startTime = Date.now()
-      
-      // Rollback optimistic updates
-      if (context?.snapshot) {
-        restoreCacheFromSnapshot(queryClient, context.snapshot)
-      } else if (context?.previousData) {
-        // Fallback to individual restoration
-        queryClient.setQueryData(
-          LIMITS_QUERY_KEYS.detail(variables.id),
-          context.previousData
-        )
-      }
-      
-      // Show error notification
-      showError(
-        error.error?.message || 'Failed to update rate limit',
-        'Update Error'
-      )
-      
-      trackMutationMetrics('update', false, startTime, error.error?.code)
+      showError(errorMessage, {
+        title: mutationOptions.errorNotification?.title,
+      });
     },
 
     onSettled: (data, error, variables) => {
-      // Ensure data consistency
-      queryClient.refetchQueries({
-        queryKey: LIMITS_QUERY_KEYS.detail(variables.id),
-        exact: true
-      })
+      // Ensure cache consistency
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY_PATTERNS.LIMIT_LIST });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY_PATTERNS.LIMIT_DETAIL(variables.id) });
+    },
+  });
+
+  // =========================================================================
+  // Delete Limit Mutation
+  // =========================================================================
+
+  /**
+   * Delete limit with optimistic removal and comprehensive rollback
+   * Implements automatic rollback on mutation failure per Section 4.3.2 error handling
+   */
+  const deleteLimitMutation = useMutation<
+    DeleteLimitMutation,
+    ApiErrorResponse,
+    DeleteLimitMutationVariables
+  >({
+    mutationFn: async ({ id, force = false }: DeleteLimitMutationVariables) => {
+      const queryParams = force ? '?force=true' : '';
+      return apiDelete<DeleteLimitMutation>(`${LIMIT_API_BASE}/${id}${queryParams}`, {
+        snackbarSuccess: 'Limit deleted successfully',
+        snackbarError: 'Failed to delete limit',
+      });
     },
 
-    retry: 1,
-    useErrorBoundary: false
-  })
+    onMutate: async (variables) => {
+      if (!mutationOptions.optimisticUpdate?.enabled) return;
 
-  // =============================================================================
-  // DELETE LIMIT MUTATION
-  // =============================================================================
+      const { id } = variables;
 
-  const deleteLimit: DeleteLimitMutationResult = useMutation({
-    mutationFn: deleteLimitApi,
-    
-    onMutate: async (limitId: number): Promise<OptimisticContext> => {
-      const startTime = Date.now()
-      
-      // Cancel outgoing queries
-      await queryClient.cancelQueries({
-        queryKey: LIMITS_QUERY_KEYS.detail(limitId)
-      })
-      await queryClient.cancelQueries({
-        queryKey: LIMITS_QUERY_KEYS.lists()
-      })
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: QUERY_KEY_PATTERNS.LIMIT_LIST });
+      await queryClient.cancelQueries({ queryKey: QUERY_KEY_PATTERNS.LIMIT_DETAIL(id) });
 
-      // Capture current state
-      const previousData = queryClient.getQueryData(
-        LIMITS_QUERY_KEYS.detail(limitId)
-      ) as LimitTableRowData | undefined
-      
-      const snapshot = createCacheSnapshot(queryClient, limitId)
-      
-      // Optimistically remove from caches
-      queryClient.removeQueries({
-        queryKey: LIMITS_QUERY_KEYS.detail(limitId),
-        exact: true
-      })
-      
-      updateListCacheOptimistically(queryClient, { id: limitId }, 'delete')
-      
-      return { previousData, snapshot }
+      // Snapshot previous state
+      const previousLimitsList = queryClient.getQueryData(QUERY_KEY_PATTERNS.LIMIT_LIST);
+      const previousLimitDetail = queryClient.getQueryData(QUERY_KEY_PATTERNS.LIMIT_DETAIL(id));
+
+      // Get the limit being deleted for cache key generation
+      const limitToDelete = previousLimitDetail as any;
+      const limitData = limitToDelete?.resource;
+
+      // Optimistically remove from list
+      queryClient.setQueryData(QUERY_KEY_PATTERNS.LIMIT_LIST, (oldData: any) => {
+        if (!oldData?.resource) return oldData;
+        return {
+          ...oldData,
+          resource: oldData.resource.filter((limit: LimitTableRowData) => limit.id !== id),
+          meta: {
+            ...oldData.meta,
+            count: Math.max(0, oldData.meta.count - 1),
+          },
+        };
+      });
+
+      // Remove individual limit cache
+      queryClient.removeQueries({ queryKey: QUERY_KEY_PATTERNS.LIMIT_DETAIL(id) });
+
+      return { previousLimitsList, previousLimitDetail, limitData };
     },
 
-    onSuccess: async (
-      data: ApiDeleteResponse,
-      limitId: number,
-      context: OptimisticContext | undefined
-    ) => {
-      const startTime = Date.now()
-      
-      try {
-        const limitName = context?.previousData?.name || 'Rate limit'
-        
-        // Show success notification
-        success(`${limitName} deleted successfully`)
-        
-        // Clean up all related queries
-        await queryClient.invalidateQueries(cacheFilters.lists)
-        await queryClient.invalidateQueries(cacheFilters.related(limitId))
-        
-        // Remove from query cache permanently
-        queryClient.removeQueries({
-          queryKey: LIMITS_QUERY_KEYS.detail(limitId),
-          exact: true
-        })
-        
-        trackMutationMetrics('delete', true, startTime)
-      } catch (error) {
-        console.error('Error in delete limit success handler:', error)
-        showError('Failed to update cache after deleting limit')
+    onSuccess: (data, variables, context) => {
+      // Invalidate related queries for the deleted limit
+      if (context?.limitData) {
+        const cacheKeys = generateCacheKeys(context.limitData);
+        cacheKeys.forEach(key => {
+          queryClient.invalidateQueries({ queryKey: JSON.parse(key) });
+        });
       }
+
+      // Show success notification
+      success('Limit deleted successfully', {
+        title: 'Success',
+        duration: 5000,
+      });
     },
 
-    onError: (
-      error: ApiErrorResponse,
-      limitId: number,
-      context: OptimisticContext | undefined
-    ) => {
-      const startTime = Date.now()
-      
-      // Rollback deletion
-      if (context?.snapshot) {
-        restoreCacheFromSnapshot(queryClient, context.snapshot)
-      } else if (context?.previousData) {
-        // Restore individual item
-        queryClient.setQueryData(
-          LIMITS_QUERY_KEYS.detail(limitId),
-          context.previousData
-        )
-      }
-      
-      // Show error notification
-      const limitName = context?.previousData?.name || 'rate limit'
-      showError(
-        error.error?.message || `Failed to delete ${limitName}`,
-        'Deletion Error'
-      )
-      
-      trackMutationMetrics('delete', false, startTime, error.error?.code)
-    },
+    onError: (err, variables, context) => {
+      const { id } = variables;
 
-    onSettled: (data, error, limitId) => {
-      // Refresh list queries to ensure consistency
-      queryClient.refetchQueries({
-        queryKey: LIMITS_QUERY_KEYS.lists(),
-        exact: false
-      })
-    },
-
-    retry: 1,
-    useErrorBoundary: false
-  })
-
-  // =============================================================================
-  // TOGGLE LIMIT STATUS MUTATION
-  // =============================================================================
-
-  const toggleLimitStatus: ToggleLimitMutationResult = useMutation({
-    mutationFn: toggleLimitStatusApi,
-    
-    onMutate: async (variables: ToggleLimitStatusPayload): Promise<OptimisticContext> => {
-      const startTime = Date.now()
-      
-      // Cancel related queries
-      await queryClient.cancelQueries({
-        queryKey: LIMITS_QUERY_KEYS.detail(variables.id)
-      })
-
-      // Capture current state
-      const previousData = queryClient.getQueryData(
-        LIMITS_QUERY_KEYS.detail(variables.id)
-      ) as LimitTableRowData | undefined
-      
-      const snapshot = createCacheSnapshot(queryClient, variables.id)
-      
-      // Optimistically update status
-      if (previousData) {
-        const optimisticData: LimitTableRowData = {
-          ...previousData,
-          active: variables.active,
-          updatedAt: new Date().toISOString()
+      // Rollback optimistic updates if enabled
+      if (mutationOptions.optimisticUpdate?.rollbackOnError) {
+        if (context?.previousLimitsList) {
+          queryClient.setQueryData(QUERY_KEY_PATTERNS.LIMIT_LIST, context.previousLimitsList);
         }
-        
-        queryClient.setQueryData(
-          LIMITS_QUERY_KEYS.detail(variables.id),
-          optimisticData
-        )
-        
-        // Update in list cache as well
-        updateListCacheOptimistically(queryClient, optimisticData, 'update')
+        if (context?.previousLimitDetail) {
+          queryClient.setQueryData(QUERY_KEY_PATTERNS.LIMIT_DETAIL(id), context.previousLimitDetail);
+        }
       }
-      
-      return { previousData, snapshot }
-    },
 
-    onSuccess: async (
-      data: ApiUpdateResponse,
-      variables: ToggleLimitStatusPayload,
-      context: OptimisticContext | undefined
-    ) => {
-      const startTime = Date.now()
-      
+      // Parse and show error message
+      let errorMessage = 'Failed to delete limit';
       try {
-        const limitName = context?.previousData?.name || 'Rate limit'
-        const status = variables.active ? 'enabled' : 'disabled'
-        
-        // Show success notification
-        success(`${limitName} ${status} successfully`)
-        
-        // Invalidate caches for fresh data
-        await queryClient.invalidateQueries(cacheFilters.detail(variables.id))
-        await queryClient.invalidateQueries(cacheFilters.lists)
-        
-        trackMutationMetrics('toggle', true, startTime)
-      } catch (error) {
-        console.error('Error in toggle limit status success handler:', error)
-        showError('Failed to update cache after toggling limit status')
+        const errorData = JSON.parse(err.message);
+        if (errorData.error?.message) {
+          errorMessage = errorData.error.message;
+        }
+      } catch {
+        // Use fallback message
       }
+
+      showError(errorMessage, {
+        title: 'Error',
+      });
     },
 
-    onError: (
-      error: ApiErrorResponse,
-      variables: ToggleLimitStatusPayload,
-      context: OptimisticContext | undefined
-    ) => {
-      const startTime = Date.now()
-      
-      // Rollback status change
-      if (context?.snapshot) {
-        restoreCacheFromSnapshot(queryClient, context.snapshot)
-      } else if (context?.previousData) {
-        queryClient.setQueryData(
-          LIMITS_QUERY_KEYS.detail(variables.id),
-          context.previousData
-        )
-      }
-      
-      // Show error notification
-      const limitName = context?.previousData?.name || 'rate limit'
-      const action = variables.active ? 'enable' : 'disable'
-      showError(
-        error.error?.message || `Failed to ${action} ${limitName}`,
-        'Status Change Error'
-      )
-      
-      trackMutationMetrics('toggle', false, startTime, error.error?.code)
+    onSettled: () => {
+      // Ensure cache consistency
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY_PATTERNS.LIMIT_LIST });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY_PATTERNS.SYSTEM_STATS });
     },
+  });
 
-    onSettled: (data, error, variables) => {
-      // Ensure consistency
-      queryClient.refetchQueries({
-        queryKey: LIMITS_QUERY_KEYS.detail(variables.id),
-        exact: true
-      })
-    },
-
-    retry: 1,
-    useErrorBoundary: false
-  })
-
-  // =============================================================================
-  // UTILITY METHODS
-  // =============================================================================
+  // =========================================================================
+  // Bulk Operations Mutation
+  // =========================================================================
 
   /**
-   * Manually invalidate all limit-related queries
+   * Bulk limit operations (activate, deactivate, delete) with granular error handling
+   * Supports partial success scenarios with detailed feedback
    */
-  const invalidateQueries = useCallback(async (): Promise<void> => {
-    await queryClient.invalidateQueries(cacheFilters.all)
-  }, [queryClient, cacheFilters])
+  const bulkLimitMutation = useMutation<
+    BulkLimitMutation,
+    ApiErrorResponse,
+    BulkLimitMutationVariables
+  >({
+    mutationFn: async ({ operation, limitIds, force = false }: BulkLimitMutationVariables) => {
+      const payload = {
+        operation,
+        ids: limitIds,
+        force,
+      };
 
-  /**
-   * Reset mutation state and metrics
-   */
-  const resetMutationState = useCallback((): void => {
-    setLastMutation(null)
-    setMutationCount(0)
-  }, [])
+      return apiPost<BulkLimitMutation>(`${LIMIT_API_BASE}/bulk`, payload, {
+        snackbarSuccess: `Bulk ${operation} operation completed`,
+        snackbarError: `Bulk ${operation} operation failed`,
+      });
+    },
 
-  // =============================================================================
-  // AGGREGATE STATE COMPUTATION
-  // =============================================================================
+    onMutate: async (variables) => {
+      if (!mutationOptions.optimisticUpdate?.enabled) return;
 
-  const isLoading = useMemo(() => 
-    createLimit.isPending || 
-    updateLimit.isPending || 
-    deleteLimit.isPending || 
-    toggleLimitStatus.isPending,
-    [createLimit.isPending, updateLimit.isPending, deleteLimit.isPending, toggleLimitStatus.isPending]
-  )
+      const { operation, limitIds } = variables;
 
-  const error = useMemo(() => 
-    createLimit.error || 
-    updateLimit.error || 
-    deleteLimit.error || 
-    toggleLimitStatus.error,
-    [createLimit.error, updateLimit.error, deleteLimit.error, toggleLimitStatus.error]
-  )
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: QUERY_KEY_PATTERNS.LIMIT_LIST });
 
-  // =============================================================================
-  // RETURN HOOK INTERFACE
-  // =============================================================================
+      // Snapshot previous state
+      const previousLimitsList = queryClient.getQueryData(QUERY_KEY_PATTERNS.LIMIT_LIST);
+
+      // Optimistically update based on operation
+      queryClient.setQueryData(QUERY_KEY_PATTERNS.LIMIT_LIST, (oldData: any) => {
+        if (!oldData?.resource) return oldData;
+
+        let updatedResource = [...oldData.resource];
+
+        switch (operation) {
+          case 'activate':
+            updatedResource = updatedResource.map((limit: LimitTableRowData) =>
+              limitIds.includes(limit.id) ? { ...limit, active: true } : limit
+            );
+            break;
+          case 'deactivate':
+            updatedResource = updatedResource.map((limit: LimitTableRowData) =>
+              limitIds.includes(limit.id) ? { ...limit, active: false } : limit
+            );
+            break;
+          case 'delete':
+            updatedResource = updatedResource.filter((limit: LimitTableRowData) =>
+              !limitIds.includes(limit.id)
+            );
+            break;
+        }
+
+        return {
+          ...oldData,
+          resource: updatedResource,
+          meta: {
+            ...oldData.meta,
+            count: operation === 'delete' 
+              ? Math.max(0, oldData.meta.count - limitIds.length)
+              : oldData.meta.count,
+          },
+        };
+      });
+
+      return { previousLimitsList };
+    },
+
+    onSuccess: (data, variables, context) => {
+      // Handle partial success scenarios
+      const { results } = data;
+      const { operation } = variables;
+
+      const successCount = results.filter(r => r.success).length;
+      const errorCount = results.filter(r => !r.success).length;
+
+      if (errorCount === 0) {
+        success(`All ${successCount} limits ${operation}d successfully`, {
+          title: 'Bulk Operation Complete',
+          duration: 5000,
+        });
+      } else {
+        showError(
+          `${successCount} limits ${operation}d successfully, ${errorCount} failed`,
+          { title: 'Bulk Operation Partial Success' }
+        );
+      }
+
+      // Invalidate related queries
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY_PATTERNS.LIMIT_LIST });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY_PATTERNS.SYSTEM_STATS });
+    },
+
+    onError: (err, variables, context) => {
+      // Rollback optimistic updates if enabled
+      if (mutationOptions.optimisticUpdate?.rollbackOnError && context?.previousLimitsList) {
+        queryClient.setQueryData(QUERY_KEY_PATTERNS.LIMIT_LIST, context.previousLimitsList);
+      }
+
+      // Parse and show error message
+      let errorMessage = `Bulk ${variables.operation} operation failed`;
+      try {
+        const errorData = JSON.parse(err.message);
+        if (errorData.error?.message) {
+          errorMessage = errorData.error.message;
+        }
+      } catch {
+        // Use fallback message
+      }
+
+      showError(errorMessage, {
+        title: 'Bulk Operation Error',
+      });
+    },
+
+    onSettled: () => {
+      // Ensure cache consistency
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY_PATTERNS.LIMIT_LIST });
+    },
+  });
+
+  // =========================================================================
+  // Return Hook Interface
+  // =========================================================================
 
   return {
-    // Mutation operations
-    createLimit,
-    updateLimit,
-    deleteLimit,
-    toggleLimitStatus,
-    
-    // Aggregate state
-    isLoading,
-    error,
-    
-    // Performance metrics
-    lastMutation,
-    mutationCount,
-    
-    // Utility methods
-    invalidateQueries,
-    resetMutationState
-  }
+    // Mutation functions
+    createLimit: createLimitMutation.mutate,
+    updateLimit: updateLimitMutation.mutate,
+    deleteLimit: deleteLimitMutation.mutate,
+    bulkOperation: bulkLimitMutation.mutate,
+
+    // Async mutation functions for imperative usage
+    createLimitAsync: createLimitMutation.mutateAsync,
+    updateLimitAsync: updateLimitMutation.mutateAsync,
+    deleteLimitAsync: deleteLimitMutation.mutateAsync,
+    bulkOperationAsync: bulkLimitMutation.mutateAsync,
+
+    // Mutation state
+    isCreating: createLimitMutation.isPending,
+    isUpdating: updateLimitMutation.isPending,
+    isDeleting: deleteLimitMutation.isPending,
+    isBulkOperating: bulkLimitMutation.isPending,
+
+    // Any mutation pending
+    isPending: 
+      createLimitMutation.isPending ||
+      updateLimitMutation.isPending ||
+      deleteLimitMutation.isPending ||
+      bulkLimitMutation.isPending,
+
+    // Error states
+    createError: createLimitMutation.error,
+    updateError: updateLimitMutation.error,
+    deleteError: deleteLimitMutation.error,
+    bulkError: bulkLimitMutation.error,
+
+    // Reset functions for error states
+    resetCreateError: createLimitMutation.reset,
+    resetUpdateError: updateLimitMutation.reset,
+    resetDeleteError: deleteLimitMutation.reset,
+    resetBulkError: bulkLimitMutation.reset,
+
+    // Reset all errors
+    resetAllErrors: useCallback(() => {
+      createLimitMutation.reset();
+      updateLimitMutation.reset();
+      deleteLimitMutation.reset();
+      bulkLimitMutation.reset();
+    }, [
+      createLimitMutation.reset,
+      updateLimitMutation.reset,
+      deleteLimitMutation.reset,
+      bulkLimitMutation.reset,
+    ]),
+
+    // Cache management functions
+    invalidateQueries: useCallback(() => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY_PATTERNS.LIMIT_LIST });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY_PATTERNS.SYSTEM_STATS });
+    }, [queryClient]),
+
+    // Manual cache update functions
+    updateLimitCache: useCallback((id: number, data: Partial<LimitTableRowData>) => {
+      queryClient.setQueryData(QUERY_KEY_PATTERNS.LIMIT_DETAIL(id), (oldData: any) => {
+        if (!oldData?.resource) return oldData;
+        return {
+          ...oldData,
+          resource: { ...oldData.resource, ...data, updatedAt: new Date().toISOString() },
+        };
+      });
+    }, [queryClient]),
+
+    // Prefetch functions for performance optimization
+    prefetchLimit: useCallback(async (id: number) => {
+      await queryClient.prefetchQuery({
+        queryKey: QUERY_KEY_PATTERNS.LIMIT_DETAIL(id),
+        queryFn: () => apiPost(`${LIMIT_API_BASE}/${id}`),
+        staleTime: 5 * 60 * 1000, // 5 minutes
+      });
+    }, [queryClient]),
+  };
 }
 
-/**
- * Export hook for external use
- */
-export default useLimitMutations
+// ============================================================================
+// Type Exports and Default Export
+// ============================================================================
 
-/**
- * Export types for external use
- */
-export type {
-  UseLimitMutationsReturn,
-  OptimisticContext,
-  ToggleLimitStatusPayload,
-  MutationMetrics
-}
+export type UseLimitMutationsReturn = ReturnType<typeof useLimitMutations>;
+
+export default useLimitMutations;
