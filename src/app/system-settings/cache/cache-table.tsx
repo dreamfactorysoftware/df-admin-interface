@@ -1,18 +1,24 @@
-'use client';
+"use client";
 
-import { useState, useMemo, useCallback } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useVirtualizer } from '@tanstack/react-virtual';
-import { Dialog, Transition } from '@headlessui/react';
-import { 
-  TrashIcon, 
-  ArrowPathIcon,
-  ExclamationTriangleIcon 
-} from '@heroicons/react/24/outline';
-import { Fragment } from 'react';
-import { toast } from 'react-hot-toast';
+import React, { useState, useMemo, useCallback } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { ArrowPathIcon, TrashIcon } from "@heroicons/react/24/outline";
+import { Dialog } from "@headlessui/react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { apiGet, apiDelete } from "@/lib/api-client";
+import type { ApiListResponse } from "@/types/api";
 
-// Types for cache data
+// ============================================================================
+// Types
+// ============================================================================
+
+/**
+ * Cache entry data structure from DreamFactory API
+ */
 interface CacheType {
   name: string;
   label: string;
@@ -20,288 +26,359 @@ interface CacheType {
   type: string;
 }
 
+/**
+ * Table row data structure for display
+ */
 interface CacheRow {
   name: string;
   label: string;
 }
 
+/**
+ * Cache table component props
+ */
 interface CacheTableProps {
-  serviceId?: string;
+  /**
+   * Additional CSS classes for the table container
+   */
   className?: string;
+  /**
+   * Loading state override
+   */
+  isLoading?: boolean;
+  /**
+   * Error state override
+   */
+  error?: Error | null;
 }
 
-interface FlushCacheModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  cacheItem: CacheRow | null;
-  onConfirm: (cacheName: string) => void;
-  isLoading: boolean;
-}
+// ============================================================================
+// Constants
+// ============================================================================
 
-// Mock API client - This would be replaced with the actual API client
-const cacheApi = {
-  getAll: async (params?: { limit?: number; offset?: number; filter?: string }): Promise<{
-    resource: CacheType[];
-    meta: { count: number };
-  }> => {
-    // Simulate API call with realistic delay
-    await new Promise(resolve => setTimeout(resolve, Math.random() * 100 + 50));
-    
-    // Mock data for large datasets to test virtualization
-    const mockData: CacheType[] = Array.from({ length: 1200 }, (_, i) => ({
-      name: `service_${i + 1}`,
-      label: `Service ${i + 1} Cache`,
-      description: `Cache for service ${i + 1}`,
-      type: 'service'
-    }));
+const CACHE_QUERY_KEY = ["system", "cache"] as const;
 
-    const { limit = 50, offset = 0, filter = '' } = params || {};
-    
-    let filteredData = mockData;
-    if (filter) {
-      filteredData = mockData.filter(item => 
-        item.label.toLowerCase().includes(filter.toLowerCase()) ||
-        item.name.toLowerCase().includes(filter.toLowerCase())
-      );
-    }
+// Virtual table settings optimized for 1000+ entries
+const VIRTUAL_TABLE_CONFIG = {
+  itemHeight: 56, // 56px per row for proper touch targets
+  overscan: 5, // Render 5 extra items for smooth scrolling
+  scrollMargin: 8, // Scroll margin for better UX
+} as const;
 
-    const paginatedData = filteredData.slice(offset, offset + limit);
-    
-    return {
-      resource: paginatedData,
-      meta: { count: filteredData.length }
-    };
-  },
-  
-  delete: async (cacheName: string): Promise<void> => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, Math.random() * 200 + 100));
-    
-    // Simulate random failures for testing error handling
-    if (Math.random() < 0.1) {
-      throw new Error('Failed to flush cache');
-    }
-  }
-};
+// ============================================================================
+// Cache Service Hook
+// ============================================================================
 
-// Flush confirmation modal component
-function FlushCacheModal({ isOpen, onClose, cacheItem, onConfirm, isLoading }: FlushCacheModalProps) {
-  const handleConfirm = useCallback(() => {
-    if (cacheItem) {
-      onConfirm(cacheItem.name);
-    }
-  }, [cacheItem, onConfirm]);
-
-  return (
-    <Transition appear show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-50" onClose={onClose}>
-        <Transition.Child
-          as={Fragment}
-          enter="ease-out duration-300"
-          enterFrom="opacity-0"
-          enterTo="opacity-100"
-          leave="ease-in duration-200"
-          leaveFrom="opacity-100"
-          leaveTo="opacity-0"
-        >
-          <div className="fixed inset-0 bg-black bg-opacity-25" />
-        </Transition.Child>
-
-        <div className="fixed inset-0 overflow-y-auto">
-          <div className="flex min-h-full items-center justify-center p-4 text-center">
-            <Transition.Child
-              as={Fragment}
-              enter="ease-out duration-300"
-              enterFrom="opacity-0 scale-95"
-              enterTo="opacity-100 scale-100"
-              leave="ease-in duration-200"
-              leaveFrom="opacity-100 scale-100"
-              leaveTo="opacity-0 scale-95"
-            >
-              <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 p-6 text-left align-middle shadow-xl transition-all">
-                <div className="flex items-center space-x-3 mb-4">
-                  <ExclamationTriangleIcon className="h-6 w-6 text-amber-500" />
-                  <Dialog.Title
-                    as="h3"
-                    className="text-lg font-medium leading-6 text-gray-900 dark:text-white"
-                  >
-                    Flush Cache Confirmation
-                  </Dialog.Title>
-                </div>
-
-                <div className="mt-2">
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Are you sure you want to flush the cache for{' '}
-                    <span className="font-semibold text-gray-900 dark:text-white">
-                      {cacheItem?.label}
-                    </span>
-                    ? This action cannot be undone and may temporarily impact performance.
-                  </p>
-                </div>
-
-                <div className="mt-6 flex justify-end space-x-3">
-                  <button
-                    type="button"
-                    className="inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    onClick={onClose}
-                    disabled={isLoading}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    className="inline-flex justify-center items-center space-x-2 rounded-md border border-transparent bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    onClick={handleConfirm}
-                    disabled={isLoading}
-                  >
-                    {isLoading && (
-                      <ArrowPathIcon className="h-4 w-4 animate-spin" />
-                    )}
-                    <span>Flush Cache</span>
-                  </button>
-                </div>
-              </Dialog.Panel>
-            </Transition.Child>
-          </div>
-        </div>
-      </Dialog>
-    </Transition>
-  );
-}
-
-// Main cache table component
-export default function CacheTable({ serviceId, className }: CacheTableProps) {
-  const [filter, setFilter] = useState('');
-  const [selectedCache, setSelectedCache] = useState<CacheRow | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  
+/**
+ * Custom hook for cache data fetching and operations
+ * Implements React Query patterns with SWR-style revalidation
+ */
+function useCache() {
   const queryClient = useQueryClient();
 
-  // React Query for cache data with optimistic caching
+  // Fetch cache entries with React Query
   const {
     data: cacheData,
     isLoading,
-    isError,
     error,
-    refetch
+    refetch,
   } = useQuery({
-    queryKey: ['cache', { filter }],
-    queryFn: () => cacheApi.getAll({ 
-      limit: 1000, // Load all for virtualization
-      offset: 0, 
-      filter 
-    }),
-    staleTime: 30000, // Cache hit responses under 50ms
-    cacheTime: 300000, // 5 minutes cache time
-    refetchInterval: 60000, // Real-time monitoring with auto-revalidation
+    queryKey: CACHE_QUERY_KEY,
+    queryFn: async (): Promise<CacheType[]> => {
+      const response = await apiGet<ApiListResponse<CacheType>>(
+        "/system/cache",
+        {
+          fields: "*",
+          includeCount: false,
+          // Ensure fast cache hit responses under 50ms requirement
+          snackbarError: "Failed to load cache entries",
+        }
+      );
+      return response.resource || [];
+    },
+    staleTime: 30 * 1000, // 30 seconds stale time for real-time updates
+    gcTime: 5 * 60 * 1000, // 5 minutes garbage collection
+    refetchOnWindowFocus: true, // Auto-refresh on window focus
+    refetchInterval: 60 * 1000, // Auto-refresh every minute for real-time monitoring
     retry: 3,
-    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 
-  // Mutation for cache flush with optimistic updates
-  const flushCacheMutation = useMutation({
-    mutationFn: cacheApi.delete,
-    onMutate: async (cacheName: string) => {
-      // Cancel outgoing refetches
-      await queryClient.cancelQueries({ queryKey: ['cache'] });
-
-      // Snapshot previous value for rollback
-      const previousCache = queryClient.getQueryData(['cache', { filter }]);
-
-      // Optimistically update cache by removing the flushed item
-      queryClient.setQueryData(['cache', { filter }], (old: any) => {
-        if (!old) return old;
-        return {
-          ...old,
-          resource: old.resource.filter((item: CacheType) => item.name !== cacheName)
-        };
+  // Clear cache mutation with optimistic updates
+  const clearCacheMutation = useMutation({
+    mutationFn: async (cacheName: string): Promise<void> => {
+      await apiDelete(`/system/cache/${cacheName}`, {
+        snackbarSuccess: "Cache cleared successfully",
+        snackbarError: "Failed to clear cache",
       });
+    },
+    onMutate: async (cacheName: string) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: CACHE_QUERY_KEY });
 
+      // Snapshot the previous value for rollback
+      const previousCache = queryClient.getQueryData<CacheType[]>(CACHE_QUERY_KEY);
+
+      // Optimistically update cache list (remove cleared cache)
+      queryClient.setQueryData<CacheType[]>(CACHE_QUERY_KEY, (old) =>
+        old ? old.filter((cache) => cache.name !== cacheName) : []
+      );
+
+      // Return context object with snapshot
       return { previousCache };
     },
     onError: (err, cacheName, context) => {
       // Rollback on error
       if (context?.previousCache) {
-        queryClient.setQueryData(['cache', { filter }], context.previousCache);
+        queryClient.setQueryData(CACHE_QUERY_KEY, context.previousCache);
       }
-      toast.error(`Failed to flush cache: ${err.message}`);
+      console.error("Error clearing cache:", err);
+      toast.error(`Failed to clear ${cacheName} cache`);
     },
     onSuccess: (data, cacheName) => {
-      toast.success(`Cache flushed successfully for ${selectedCache?.label}`);
-      // Invalidate and refetch to ensure consistency
-      queryClient.invalidateQueries({ queryKey: ['cache'] });
+      toast.success(`${cacheName} cache cleared successfully`);
     },
     onSettled: () => {
-      setIsModalOpen(false);
-      setSelectedCache(null);
+      // Always refetch after mutation settles
+      queryClient.invalidateQueries({ queryKey: CACHE_QUERY_KEY });
     },
   });
 
-  // Map data for table display
-  const tableData: CacheRow[] = useMemo(() => {
-    if (!cacheData?.resource) return [];
-    return cacheData.resource.map((item: CacheType) => ({
-      name: item.name,
-      label: item.label,
+  return {
+    cacheData,
+    isLoading,
+    error,
+    refetch,
+    clearCache: clearCacheMutation.mutate,
+    isClearingCache: clearCacheMutation.isPending,
+  };
+}
+
+// ============================================================================
+// Cache Clear Confirmation Modal
+// ============================================================================
+
+interface CacheModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  cacheRow: CacheRow | null;
+  onConfirm: () => void;
+  isLoading?: boolean;
+}
+
+/**
+ * Confirmation modal for cache clearing operations
+ * Implements Headless UI Dialog with WCAG 2.1 AA compliance
+ */
+function CacheModal({ isOpen, onClose, cacheRow, onConfirm, isLoading }: CacheModalProps) {
+  if (!cacheRow) return null;
+
+  return (
+    <Dialog open={isOpen} onClose={onClose} className="relative z-50">
+      {/* Backdrop */}
+      <div className="fixed inset-0 bg-black/25" aria-hidden="true" />
+
+      {/* Container */}
+      <div className="fixed inset-0 flex items-center justify-center p-4">
+        <Dialog.Panel className="mx-auto max-w-sm rounded-lg bg-white p-6 shadow-lg dark:bg-gray-800">
+          {/* Title */}
+          <Dialog.Title className="text-lg font-medium leading-6 text-gray-900 dark:text-gray-100">
+            Clear {cacheRow.label} Cache
+          </Dialog.Title>
+
+          {/* Description */}
+          <Dialog.Description className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+            Are you sure you want to clear the cache for {cacheRow.label}? This action cannot be undone.
+          </Dialog.Description>
+
+          {/* Actions */}
+          <div className="mt-4 flex space-x-2">
+            <Button
+              variant="outline"
+              onClick={onClose}
+              disabled={isLoading}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={onConfirm}
+              loading={isLoading}
+              loadingText="Clearing cache..."
+              className="flex-1"
+            >
+              Clear Cache
+            </Button>
+          </div>
+        </Dialog.Panel>
+      </div>
+    </Dialog>
+  );
+}
+
+// ============================================================================
+// Main Cache Table Component
+// ============================================================================
+
+/**
+ * Cache table component for displaying and managing per-service cache entries
+ * 
+ * Features:
+ * - Virtualized table rendering for 1000+ cache entries per Section 5.2 scaling considerations
+ * - Cache hit responses under 50ms per React/Next.js Integration Requirements performance standards
+ * - Real-time cache status monitoring with SWR automatic revalidation per Section 4.3.2
+ * - Responsive table design maintaining WCAG 2.1 AA compliance per accessibility requirements
+ * - Optimistic cache updates with error rollback per Section 4.3.2 mutation workflows
+ * 
+ * @param props - Component props
+ */
+export function CacheTable({ className, isLoading: externalLoading, error: externalError }: CacheTableProps) {
+  const { cacheData, isLoading, error, refetch, clearCache, isClearingCache } = useCache();
+  const [selectedCache, setSelectedCache] = useState<CacheRow | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Use external overrides if provided
+  const finalLoading = externalLoading ?? isLoading;
+  const finalError = externalError ?? error;
+
+  // Transform cache data to table rows
+  const tableRows = useMemo((): CacheRow[] => {
+    if (!cacheData) return [];
+    return cacheData.map((cache) => ({
+      name: cache.name,
+      label: cache.label,
     }));
   }, [cacheData]);
 
-  // Virtualization setup for large datasets
-  const parentRef = useState<HTMLDivElement | null>(null)[0];
-  const rowVirtualizer = useVirtualizer({
-    count: tableData.length,
-    getScrollElement: () => parentRef,
-    estimateSize: () => 64, // Estimated row height
-    overscan: 10, // Render extra items for smooth scrolling
+  // Virtual table setup for large datasets
+  const parentRef = React.useRef<HTMLDivElement>(null);
+  const virtualizer = useVirtualizer({
+    count: tableRows.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => VIRTUAL_TABLE_CONFIG.itemHeight,
+    overscan: VIRTUAL_TABLE_CONFIG.overscan,
   });
 
-  // Event handlers
-  const handleFlushCache = useCallback((cacheItem: CacheRow) => {
-    setSelectedCache(cacheItem);
+  // Handle cache clearing
+  const handleClearCache = useCallback((cache: CacheRow) => {
+    setSelectedCache(cache);
     setIsModalOpen(true);
   }, []);
 
-  const handleConfirmFlush = useCallback((cacheName: string) => {
-    flushCacheMutation.mutate(cacheName);
-  }, [flushCacheMutation]);
+  const handleConfirmClear = useCallback(() => {
+    if (selectedCache) {
+      clearCache(selectedCache.name);
+      setIsModalOpen(false);
+      setSelectedCache(null);
+    }
+  }, [selectedCache, clearCache]);
 
+  const handleModalClose = useCallback(() => {
+    setIsModalOpen(false);
+    setSelectedCache(null);
+  }, []);
+
+  // Handle refresh
   const handleRefresh = useCallback(() => {
     refetch();
-    toast.success('Cache data refreshed');
+    toast.success("Cache list refreshed");
   }, [refetch]);
 
-  // Render loading state
-  if (isLoading) {
+  // Loading state
+  if (finalLoading) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <ArrowPathIcon className="h-8 w-8 animate-spin text-primary-500" />
-        <span className="ml-2 text-gray-600 dark:text-gray-400">Loading cache data...</span>
+      <div className={cn("space-y-4", className)}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+            Per-Service Caches
+          </h3>
+          <div className="h-9 w-9 animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
+        </div>
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+              <div className="h-4 w-32 animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
+              <div className="h-8 w-20 animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
 
-  // Render error state
-  if (isError) {
+  // Error state
+  if (finalError) {
     return (
-      <div className="rounded-md bg-red-50 dark:bg-red-900/20 p-4">
-        <div className="flex">
-          <ExclamationTriangleIcon className="h-5 w-5 text-red-400" />
-          <div className="ml-3">
-            <h3 className="text-sm font-medium text-red-800 dark:text-red-400">
-              Error loading cache data
-            </h3>
-            <div className="mt-2 text-sm text-red-700 dark:text-red-300">
-              {error instanceof Error ? error.message : 'An unknown error occurred'}
-            </div>
-            <div className="mt-4">
-              <button
-                type="button"
-                onClick={handleRefresh}
-                className="bg-red-100 dark:bg-red-800 text-red-800 dark:text-red-200 px-3 py-1 rounded-md text-sm font-medium hover:bg-red-200 dark:hover:bg-red-700 transition-colors"
+      <div className={cn("space-y-4", className)}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+            Per-Service Caches
+          </h3>
+          <IconButton
+            variant="ghost"
+            size="sm"
+            onClick={handleRefresh}
+            aria-label="Refresh cache list"
+          >
+            <ArrowPathIcon className="h-4 w-4" />
+          </IconButton>
+        </div>
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/10">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg
+                className="h-5 w-5 text-red-400"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                aria-hidden="true"
               >
-                Try again
-              </button>
+                <path
+                  fillRule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z"
+                  clipRule="evenodd"
+                />
+              </svg>
             </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800 dark:text-red-200">
+                Error loading cache entries
+              </h3>
+              <div className="mt-2 text-sm text-red-700 dark:text-red-300">
+                {finalError.message || "An unexpected error occurred"}
+              </div>
+              <div className="mt-3">
+                <Button variant="outline" size="sm" onClick={handleRefresh}>
+                  Try again
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Empty state
+  if (!tableRows.length) {
+    return (
+      <div className={cn("space-y-4", className)}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+            Per-Service Caches
+          </h3>
+          <IconButton
+            variant="ghost"
+            size="sm"
+            onClick={handleRefresh}
+            aria-label="Refresh cache list"
+          >
+            <ArrowPathIcon className="h-4 w-4" />
+          </IconButton>
+        </div>
+        <div className="text-center py-8">
+          <div className="text-gray-500 dark:text-gray-400">
+            No cache entries found
           </div>
         </div>
       </div>
@@ -309,135 +386,111 @@ export default function CacheTable({ serviceId, className }: CacheTableProps) {
   }
 
   return (
-    <div className={`bg-white dark:bg-gray-800 shadow rounded-lg ${className || ''}`}>
-      {/* Header with controls */}
-      <div className="px-4 py-5 sm:p-6">
-        <div className="sm:flex sm:items-center sm:justify-between">
-          <div>
-            <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">
-              Per-Service Cache Entries
-            </h3>
-            <p className="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
-              Manage cache entries for individual services. Total entries: {tableData.length}
-            </p>
-          </div>
-          <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
-            <button
-              type="button"
-              onClick={handleRefresh}
-              className="inline-flex items-center justify-center rounded-md border border-transparent bg-primary-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              disabled={isLoading}
-            >
-              <ArrowPathIcon className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
-          </div>
-        </div>
-
-        {/* Filter input */}
-        <div className="mt-6">
-          <label htmlFor="cache-filter" className="sr-only">
-            Filter cache entries
-          </label>
-          <input
-            type="text"
-            name="cache-filter"
-            id="cache-filter"
-            className="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm dark:text-white"
-            placeholder="Filter cache entries..."
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-          />
-        </div>
+    <div className={cn("space-y-4", className)}>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+          Per-Service Caches
+        </h3>
+        <IconButton
+          variant="ghost"
+          size="sm"
+          onClick={handleRefresh}
+          aria-label="Refresh cache list"
+        >
+          <ArrowPathIcon className="h-4 w-4" />
+        </IconButton>
       </div>
 
-      {/* Virtualized table */}
-      <div className="border-t border-gray-200 dark:border-gray-700">
-        {tableData.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="text-gray-500 dark:text-gray-400">
-              {filter ? 'No cache entries match your filter.' : 'No cache entries found.'}
-            </div>
+      {/* Virtual Table Container */}
+      <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden">
+        {/* Table Header */}
+        <div className="grid grid-cols-[1fr_auto] gap-4 px-4 py-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+          <div className="text-left text-sm font-medium text-gray-900 dark:text-gray-100">
+            Service Cache
           </div>
-        ) : (
-          <div className="overflow-hidden">
-            {/* Table header */}
-            <div className="bg-gray-50 dark:bg-gray-900 px-6 py-3 border-b border-gray-200 dark:border-gray-700">
-              <div className="grid grid-cols-12 gap-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                <div className="col-span-8">Service Cache</div>
-                <div className="col-span-4 text-right">Actions</div>
-              </div>
-            </div>
+          <div className="text-right text-sm font-medium text-gray-900 dark:text-gray-100">
+            Actions
+          </div>
+        </div>
 
-            {/* Virtualized rows */}
-            <div
-              ref={parentRef}
-              className="h-96 overflow-auto"
-              style={{ contain: 'strict' }}
-            >
-              <div
-                style={{
-                  height: `${rowVirtualizer.getTotalSize()}px`,
-                  width: '100%',
-                  position: 'relative',
-                }}
-              >
-                {rowVirtualizer.getVirtualItems().map((virtualItem) => {
-                  const cacheItem = tableData[virtualItem.index];
-                  return (
-                    <div
-                      key={virtualItem.key}
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        height: `${virtualItem.size}px`,
-                        transform: `translateY(${virtualItem.start}px)`,
-                      }}
-                      className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+        {/* Virtualized Table Body */}
+        <div
+          ref={parentRef}
+          className="h-96 overflow-auto"
+          style={{
+            contain: "strict",
+          }}
+        >
+          <div
+            style={{
+              height: `${virtualizer.getTotalSize()}px`,
+              width: "100%",
+              position: "relative",
+            }}
+          >
+            {virtualizer.getVirtualItems().map((virtualItem) => {
+              const row = tableRows[virtualItem.index];
+              if (!row) return null;
+
+              return (
+                <div
+                  key={virtualItem.key}
+                  className={cn(
+                    "absolute top-0 left-0 w-full grid grid-cols-[1fr_auto] gap-4 px-4 py-3 border-b border-gray-100 dark:border-gray-700",
+                    "hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                  )}
+                  style={{
+                    height: `${virtualItem.size}px`,
+                    transform: `translateY(${virtualItem.start}px)`,
+                  }}
+                >
+                  {/* Cache Label */}
+                  <div className="flex items-center text-sm text-gray-900 dark:text-gray-100">
+                    {row.label}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center space-x-2">
+                    <IconButton
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleClearCache(row)}
+                      disabled={isClearingCache}
+                      aria-label={`Clear ${row.label} cache`}
+                      className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
                     >
-                      <div className="grid grid-cols-12 gap-4 items-center">
-                        <div className="col-span-8">
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">
-                            {cacheItem.label}
-                          </div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400">
-                            {cacheItem.name}
-                          </div>
-                        </div>
-                        <div className="col-span-4 text-right">
-                          <button
-                            type="button"
-                            onClick={() => handleFlushCache(cacheItem)}
-                            className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 dark:text-red-400 dark:bg-red-900/30 dark:hover:bg-red-900/50 transition-colors"
-                            aria-label={`Flush cache for ${cacheItem.label}`}
-                          >
-                            <TrashIcon className="h-3 w-3 mr-1" />
-                            Flush
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+                      <TrashIcon className="h-4 w-4" />
+                    </IconButton>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        )}
+        </div>
+
+        {/* Table Footer */}
+        <div className="px-4 py-3 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            {tableRows.length} cache entries
+          </div>
+        </div>
       </div>
 
-      {/* Confirmation modal */}
-      <FlushCacheModal
+      {/* Confirmation Modal */}
+      <CacheModal
         isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setSelectedCache(null);
-        }}
-        cacheItem={selectedCache}
-        onConfirm={handleConfirmFlush}
-        isLoading={flushCacheMutation.isLoading}
+        onClose={handleModalClose}
+        cacheRow={selectedCache}
+        onConfirm={handleConfirmClear}
+        isLoading={isClearingCache}
       />
     </div>
   );
 }
+
+// ============================================================================
+// Default Export
+// ============================================================================
+
+export default CacheTable;
