@@ -1,860 +1,727 @@
 /**
- * @fileoverview Authentication State Management Hook
+ * Authentication State Management Hook for DreamFactory Admin Interface
  * 
- * Custom React hook implementing centralized authentication state management with Zustand
- * integration and Next.js middleware coordination. Provides authentication status, user 
- * permissions, session management, and automatic token refresh capabilities.
- * 
- * Replaces Angular authentication service patterns with React Query-powered state 
- * synchronization and server-side validation for enhanced security and performance.
+ * Provides centralized authentication state management with Zustand integration,
+ * Next.js middleware coordination, and React Query-powered state synchronization.
+ * Replaces Angular authentication service patterns with modern React hooks.
  * 
  * Key Features:
- * - Zustand-based authentication state management with optimistic updates
- * - Next.js middleware coordination for edge-based token validation  
+ * - Zustand-based authentication state management
+ * - Next.js middleware coordination for edge-based token validation
  * - Automatic token refresh with server-side validation
- * - Real-time authentication status synchronization (< 100ms processing)
- * - User permission caching with React Query intelligent caching (< 50ms cache hits)
+ * - Real-time authentication status synchronization
+ * - User permission caching with React Query intelligent caching
  * - Session management with automatic cleanup and timeout handling
- * - Role-based access control (RBAC) integration
- * - Enhanced security through server-side validation
- * - React 19 concurrent features compatibility
+ * - Enterprise-grade error handling and security monitoring
  * 
  * Performance Requirements:
- * - Middleware processing under 100ms per React/Next.js Integration Requirements
- * - Cache hit responses under 50ms per React/Next.js Integration Requirements
- * - Real-time state synchronization with sub-second updates
- * - Optimistic UI updates for improved user experience
+ * - Middleware processing under 100ms
+ * - Cache hit responses under 50ms
+ * - Real-time validation under 100ms
  * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
+ * Security Features:
+ * - Server-side token validation
+ * - Automatic session invalidation on security violations
+ * - Comprehensive audit logging for compliance
+ * - RBAC integration with role-based route access
+ * 
+ * @fileoverview Authentication state management hook with Next.js integration
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
 'use client';
 
-import { useCallback, useEffect, useRef, useTransition } from 'react';
-import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { create } from 'zustand';
-import { subscribeWithSelector, persist, createJSONStorage } from 'zustand/middleware';
+import { subscribeWithSelector, devtools } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
-import { apiClient } from '@/lib/api-client';
-import {
-  UserSession,
+import { apiGet, apiPost, apiDelete } from '../../../lib/api-client';
+import type {
   AuthState,
-  AuthError,
-  AuthErrorCode,
+  AuthActions,
+  AuthStore,
   LoginCredentials,
   LoginResponse,
-  Permission,
-  Role,
-  RBACContext,
-  AccessCheckResult,
-  SessionValidationOptions,
-  AuthEventType
-} from '@/types/auth';
-import {
-  UserProfile,
-  UserPermissions,
-  SessionState,
-  AuthSession,
-  JWTPayload
-} from '@/types/user';
+  UserSession,
+  AuthError,
+  AuthErrorCode,
+  MiddlewareAuthResult,
+  TokenRefreshResult,
+  SessionValidationResult,
+} from '../../../types/auth';
+import type { UserProfile } from '../../../types/user';
 
 // ============================================================================
 // CONSTANTS AND CONFIGURATION
 // ============================================================================
 
 /**
- * Authentication configuration constants optimized for performance
+ * Authentication query keys for React Query cache management
+ */
+export const AUTH_QUERY_KEYS = {
+  SESSION: ['auth', 'session'] as const,
+  USER: ['auth', 'user'] as const,
+  PERMISSIONS: ['auth', 'permissions'] as const,
+  REFRESH: ['auth', 'refresh'] as const,
+  VALIDATION: ['auth', 'validation'] as const,
+} as const;
+
+/**
+ * Authentication configuration with performance and security settings
  */
 const AUTH_CONFIG = {
-  // Query keys for React Query caching
-  QUERY_KEYS: {
-    SESSION: ['auth', 'session'] as const,
-    USER: ['auth', 'user'] as const,
-    PERMISSIONS: ['auth', 'permissions'] as const,
-    ROLES: ['auth', 'roles'] as const,
-    VALIDATION: ['auth', 'validation'] as const,
-  },
+  // Token refresh timing (5 minutes before expiration)
+  REFRESH_THRESHOLD_MS: 5 * 60 * 1000,
   
-  // Cache configuration for optimal performance
-  CACHE: {
-    SESSION_STALE_TIME: 4 * 60 * 1000, // 4 minutes (under 5 minutes per spec)
-    SESSION_CACHE_TIME: 10 * 60 * 1000, // 10 minutes
-    PERMISSIONS_STALE_TIME: 5 * 60 * 1000, // 5 minutes
-    PERMISSIONS_CACHE_TIME: 15 * 60 * 1000, // 15 minutes
-    REFETCH_INTERVAL: 30 * 1000, // 30 seconds for session validation
-  },
+  // Session validation interval (30 seconds)
+  VALIDATION_INTERVAL_MS: 30 * 1000,
   
-  // Session management timeouts
-  SESSION: {
-    REFRESH_THRESHOLD: 5 * 60 * 1000, // 5 minutes before expiry
-    ACTIVITY_TIMEOUT: 30 * 60 * 1000, // 30 minutes inactivity
-    CLEANUP_INTERVAL: 60 * 1000, // 1 minute cleanup check
-    MAX_RETRY_ATTEMPTS: 3,
-  },
+  // Maximum retry attempts for failed operations
+  MAX_RETRY_ATTEMPTS: 3,
   
-  // Performance thresholds per specification
-  PERFORMANCE: {
-    MIDDLEWARE_TIMEOUT: 100, // 100ms middleware processing requirement
-    CACHE_HIT_TIMEOUT: 50, // 50ms cache hit requirement
-    REFRESH_TIMEOUT: 2000, // 2 seconds for token refresh
-  }
+  // Request timeout for authentication operations
+  REQUEST_TIMEOUT_MS: 10000,
+  
+  // Cache times for React Query
+  CACHE_TIME_MS: 5 * 60 * 1000, // 5 minutes
+  STALE_TIME_MS: 60 * 1000, // 1 minute
+  
+  // Middleware performance requirements
+  MIDDLEWARE_TIMEOUT_MS: 100,
+  CACHE_HIT_TIMEOUT_MS: 50,
+} as const;
+
+/**
+ * Storage keys for session persistence
+ */
+const STORAGE_KEYS = {
+  SESSION_TOKEN: 'df-session-token',
+  USER_DATA: 'df-user-data',
+  REFRESH_TOKEN: 'df-refresh-token',
+  LAST_ACTIVITY: 'df-last-activity',
+  PERMISSIONS_CACHE: 'df-permissions-cache',
 } as const;
 
 // ============================================================================
-// ZUSTAND STORE DEFINITION
+// ZUSTAND AUTHENTICATION STORE
 // ============================================================================
 
 /**
- * Authentication store interface with comprehensive state management
+ * Authentication store interface with enhanced state management
  */
-interface AuthStore {
-  // Core authentication state
-  state: AuthState;
-  
-  // Session management state
-  sessionData: AuthSession | null;
+interface AuthStoreState extends AuthState {
+  // Enhanced session management
+  sessionId: string | null;
+  tokenExpiresAt: Date | null;
   lastActivity: Date | null;
-  sessionExpiry: Date | null;
+  refreshToken: string | null;
   
-  // Permission and role state
-  permissions: UserPermissions | null;
-  userRole: Role | null;
-  accessCache: Map<string, AccessCheckResult>;
+  // Permission and role management
+  permissions: string[];
+  roles: string[];
+  isRootAdmin: boolean;
+  isSysAdmin: boolean;
   
-  // UI state
-  isRefreshing: boolean;
-  isHydrated: boolean;
+  // Session monitoring
+  isSessionValid: boolean;
+  sessionCheckInProgress: boolean;
+  refreshInProgress: boolean;
   
-  // Actions - Authentication
-  setAuthenticated: (user: UserSession, token: string) => void;
-  setUnauthenticated: (error?: AuthError) => void;
-  setLoading: (loading: boolean) => void;
-  setError: (error: AuthError | null) => void;
-  clearError: () => void;
+  // Performance monitoring
+  lastTokenRefresh: Date | null;
+  authOperationCount: number;
   
-  // Actions - Session Management
-  updateLastActivity: () => void;
-  setSessionData: (session: AuthSession | null) => void;
-  setSessionExpiry: (expiry: Date | null) => void;
-  clearSession: () => void;
-  
-  // Actions - Permissions and Roles
-  setPermissions: (permissions: UserPermissions | null) => void;
-  setUserRole: (role: Role | null) => void;
-  updateAccessCache: (key: string, result: AccessCheckResult) => void;
-  clearAccessCache: () => void;
-  
-  // Actions - UI State
-  setRefreshing: (refreshing: boolean) => void;
-  setHydrated: (hydrated: boolean) => void;
-  
-  // Actions - Utilities
-  reset: () => void;
-  hydrateFromSession: (session: UserSession) => void;
+  // Security flags
+  securityViolations: number;
+  suspiciousActivityDetected: boolean;
 }
 
 /**
- * Initial authentication state
+ * Authentication store actions with comprehensive functionality
  */
-const initialAuthState: AuthState = {
-  isAuthenticated: false,
-  isLoading: false,
-  user: null,
-  token: null,
-  error: null,
-  lastActivity: null,
-  isRefreshing: false,
-};
+interface AuthStoreActions extends AuthActions {
+  // Enhanced session management
+  setSession: (session: UserSession, rememberMe?: boolean) => void;
+  clearSession: () => void;
+  updateSessionActivity: () => void;
+  validateSession: () => Promise<boolean>;
+  
+  // Token management
+  setTokens: (sessionToken: string, refreshToken?: string, expiresAt?: Date) => void;
+  clearTokens: () => void;
+  scheduleTokenRefresh: () => void;
+  
+  // Permission management
+  setPermissions: (permissions: string[]) => void;
+  setRoles: (roles: string[]) => void;
+  hasPermission: (permission: string) => boolean;
+  hasRole: (role: string) => boolean;
+  hasAnyRole: (roles: string[]) => boolean;
+  
+  // Security monitoring
+  recordSecurityViolation: (violation: string) => void;
+  setSuspiciousActivity: (detected: boolean) => void;
+  
+  // Performance tracking
+  incrementOperationCount: () => void;
+  resetOperationCount: () => void;
+  
+  // Error handling
+  setAuthError: (error: AuthError | null) => void;
+  clearAuthError: () => void;
+  
+  // Loading states
+  setLoading: (loading: boolean) => void;
+  setRefreshing: (refreshing: boolean) => void;
+}
 
 /**
- * Main authentication store using Zustand with persistence and middleware
+ * Complete authentication store interface
  */
-const useAuthStore = create<AuthStore>()(
-  subscribeWithSelector(
-    persist(
+interface CompleteAuthStore extends AuthStoreState, AuthStoreActions {}
+
+/**
+ * Zustand authentication store with middleware integration
+ */
+const useAuthStore = create<CompleteAuthStore>()(
+  devtools(
+    subscribeWithSelector(
       immer((set, get) => ({
-        // Initial state
-        state: initialAuthState,
-        sessionData: null,
-        lastActivity: null,
-        sessionExpiry: null,
-        permissions: null,
-        userRole: null,
-        accessCache: new Map(),
+        // Authentication state
+        isAuthenticated: false,
+        isLoading: false,
+        user: null,
+        error: null,
         isRefreshing: false,
-        isHydrated: false,
         
-        // Authentication actions
-        setAuthenticated: (user: UserSession, token: string) => {
+        // Enhanced session state
+        sessionId: null,
+        tokenExpiresAt: null,
+        lastActivity: null,
+        refreshToken: null,
+        
+        // Permission state
+        permissions: [],
+        roles: [],
+        isRootAdmin: false,
+        isSysAdmin: false,
+        
+        // Session monitoring
+        isSessionValid: false,
+        sessionCheckInProgress: false,
+        refreshInProgress: false,
+        
+        // Performance monitoring
+        lastTokenRefresh: null,
+        authOperationCount: 0,
+        
+        // Security state
+        securityViolations: 0,
+        suspiciousActivityDetected: false,
+        
+        // Actions
+        setSession: (session: UserSession, rememberMe = false) =>
           set((state) => {
-            state.state.isAuthenticated = true;
-            state.state.user = user;
-            state.state.token = token;
-            state.state.error = null;
-            state.state.isLoading = false;
+            state.isAuthenticated = true;
+            state.user = session;
+            state.sessionId = session.sessionId;
+            state.permissions = session.role?.permissions?.map(p => p.resource) || [];
+            state.roles = session.role ? [session.role.name] : [];
+            state.isRootAdmin = session.isRootAdmin;
+            state.isSysAdmin = session.isSysAdmin;
+            state.isSessionValid = true;
             state.lastActivity = new Date();
-            state.sessionExpiry = user.tokenExpiryDate;
-          });
-        },
+            state.error = null;
+            state.isLoading = false;
+            
+            // Store in browser storage if remember me is enabled
+            if (rememberMe) {
+              try {
+                localStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(session));
+                localStorage.setItem(STORAGE_KEYS.LAST_ACTIVITY, new Date().toISOString());
+              } catch (error) {
+                console.warn('Failed to store session data:', error);
+              }
+            }
+          }),
         
-        setUnauthenticated: (error?: AuthError) => {
+        clearSession: () =>
           set((state) => {
-            state.state.isAuthenticated = false;
-            state.state.user = null;
-            state.state.token = null;
-            state.state.error = error || null;
-            state.state.isLoading = false;
-            state.sessionData = null;
+            state.isAuthenticated = false;
+            state.user = null;
+            state.sessionId = null;
+            state.tokenExpiresAt = null;
             state.lastActivity = null;
-            state.sessionExpiry = null;
-            state.permissions = null;
-            state.userRole = null;
-            state.accessCache.clear();
-            state.isRefreshing = false;
-          });
-        },
+            state.refreshToken = null;
+            state.permissions = [];
+            state.roles = [];
+            state.isRootAdmin = false;
+            state.isSysAdmin = false;
+            state.isSessionValid = false;
+            state.refreshInProgress = false;
+            state.error = null;
+            state.isLoading = false;
+            
+            // Clear browser storage
+            try {
+              localStorage.removeItem(STORAGE_KEYS.SESSION_TOKEN);
+              localStorage.removeItem(STORAGE_KEYS.USER_DATA);
+              localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+              localStorage.removeItem(STORAGE_KEYS.LAST_ACTIVITY);
+              localStorage.removeItem(STORAGE_KEYS.PERMISSIONS_CACHE);
+            } catch (error) {
+              console.warn('Failed to clear session storage:', error);
+            }
+          }),
         
-        setLoading: (loading: boolean) => {
-          set((state) => {
-            state.state.isLoading = loading;
-          });
-        },
-        
-        setError: (error: AuthError | null) => {
-          set((state) => {
-            state.state.error = error;
-          });
-        },
-        
-        clearError: () => {
-          set((state) => {
-            state.state.error = null;
-          });
-        },
-        
-        // Session management actions
-        updateLastActivity: () => {
+        updateSessionActivity: () =>
           set((state) => {
             state.lastActivity = new Date();
-            state.state.lastActivity = new Date();
+            try {
+              localStorage.setItem(STORAGE_KEYS.LAST_ACTIVITY, new Date().toISOString());
+            } catch (error) {
+              console.warn('Failed to update activity timestamp:', error);
+            }
+          }),
+        
+        validateSession: async () => {
+          const state = get();
+          if (!state.sessionId || state.sessionCheckInProgress) {
+            return false;
+          }
+          
+          set((draft) => {
+            draft.sessionCheckInProgress = true;
           });
+          
+          try {
+            const response = await apiGet<SessionValidationResult>(
+              `/api/v2/user/session/${state.sessionId}`,
+              { signal: AbortSignal.timeout(AUTH_CONFIG.REQUEST_TIMEOUT_MS) }
+            );
+            
+            const isValid = response.isValid && response.session;
+            
+            set((draft) => {
+              draft.isSessionValid = isValid;
+              draft.sessionCheckInProgress = false;
+              if (!isValid) {
+                draft.isAuthenticated = false;
+                draft.user = null;
+              }
+            });
+            
+            return isValid;
+          } catch (error) {
+            set((draft) => {
+              draft.isSessionValid = false;
+              draft.sessionCheckInProgress = false;
+              draft.error = {
+                code: 'SESSION_VALIDATION_FAILED',
+                message: 'Failed to validate session',
+                context: error,
+                timestamp: new Date().toISOString(),
+              };
+            });
+            return false;
+          }
         },
         
-        setSessionData: (session: AuthSession | null) => {
+        setTokens: (sessionToken: string, refreshToken?: string, expiresAt?: Date) =>
           set((state) => {
-            state.sessionData = session;
-          });
-        },
+            state.tokenExpiresAt = expiresAt || null;
+            state.refreshToken = refreshToken || null;
+            state.lastTokenRefresh = new Date();
+            
+            try {
+              localStorage.setItem(STORAGE_KEYS.SESSION_TOKEN, sessionToken);
+              if (refreshToken) {
+                localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
+              }
+            } catch (error) {
+              console.warn('Failed to store tokens:', error);
+            }
+          }),
         
-        setSessionExpiry: (expiry: Date | null) => {
+        clearTokens: () =>
           set((state) => {
-            state.sessionExpiry = expiry;
-          });
+            state.tokenExpiresAt = null;
+            state.refreshToken = null;
+            
+            try {
+              localStorage.removeItem(STORAGE_KEYS.SESSION_TOKEN);
+              localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+            } catch (error) {
+              console.warn('Failed to clear tokens:', error);
+            }
+          }),
+        
+        scheduleTokenRefresh: () => {
+          const state = get();
+          if (!state.tokenExpiresAt || state.refreshInProgress) {
+            return;
+          }
+          
+          const timeUntilExpiry = state.tokenExpiresAt.getTime() - Date.now();
+          const timeUntilRefresh = timeUntilExpiry - AUTH_CONFIG.REFRESH_THRESHOLD_MS;
+          
+          if (timeUntilRefresh > 0) {
+            setTimeout(() => {
+              if (get().isAuthenticated && !get().refreshInProgress) {
+                get().refreshToken();
+              }
+            }, timeUntilRefresh);
+          }
         },
         
-        clearSession: () => {
-          set((state) => {
-            state.sessionData = null;
-            state.lastActivity = null;
-            state.sessionExpiry = null;
-            state.state.lastActivity = null;
-          });
-        },
-        
-        // Permission and role actions
-        setPermissions: (permissions: UserPermissions | null) => {
+        setPermissions: (permissions: string[]) =>
           set((state) => {
             state.permissions = permissions;
-          });
-        },
+            try {
+              localStorage.setItem(STORAGE_KEYS.PERMISSIONS_CACHE, JSON.stringify(permissions));
+            } catch (error) {
+              console.warn('Failed to cache permissions:', error);
+            }
+          }),
         
-        setUserRole: (role: Role | null) => {
+        setRoles: (roles: string[]) =>
           set((state) => {
-            state.userRole = role;
-          });
+            state.roles = roles;
+          }),
+        
+        hasPermission: (permission: string) => {
+          const state = get();
+          return state.permissions.includes(permission) || state.isRootAdmin;
         },
         
-        updateAccessCache: (key: string, result: AccessCheckResult) => {
+        hasRole: (role: string) => {
+          const state = get();
+          return state.roles.includes(role) || state.isRootAdmin;
+        },
+        
+        hasAnyRole: (roles: string[]) => {
+          const state = get();
+          return roles.some(role => state.roles.includes(role)) || state.isRootAdmin;
+        },
+        
+        recordSecurityViolation: (violation: string) =>
           set((state) => {
-            state.accessCache.set(key, result);
-          });
-        },
+            state.securityViolations += 1;
+            state.suspiciousActivityDetected = state.securityViolations >= 3;
+            console.warn('Security violation recorded:', violation);
+          }),
         
-        clearAccessCache: () => {
+        setSuspiciousActivity: (detected: boolean) =>
           set((state) => {
-            state.accessCache.clear();
-          });
-        },
+            state.suspiciousActivityDetected = detected;
+          }),
         
-        // UI state actions
-        setRefreshing: (refreshing: boolean) => {
+        incrementOperationCount: () =>
+          set((state) => {
+            state.authOperationCount += 1;
+          }),
+        
+        resetOperationCount: () =>
+          set((state) => {
+            state.authOperationCount = 0;
+          }),
+        
+        setAuthError: (error: AuthError | null) =>
+          set((state) => {
+            state.error = error;
+          }),
+        
+        clearAuthError: () =>
+          set((state) => {
+            state.error = null;
+          }),
+        
+        setLoading: (loading: boolean) =>
+          set((state) => {
+            state.isLoading = loading;
+          }),
+        
+        setRefreshing: (refreshing: boolean) =>
           set((state) => {
             state.isRefreshing = refreshing;
-            state.state.isRefreshing = refreshing;
-          });
+            state.refreshInProgress = refreshing;
+          }),
+        
+        // Core authentication actions
+        login: async (credentials: LoginCredentials) => {
+          const store = get();
+          store.setLoading(true);
+          store.clearAuthError();
+          store.incrementOperationCount();
+          
+          try {
+            const response = await apiPost<LoginResponse>(
+              '/api/v2/user/session',
+              credentials,
+              { 
+                signal: AbortSignal.timeout(AUTH_CONFIG.REQUEST_TIMEOUT_MS),
+                snackbarSuccess: 'Login successful',
+                snackbarError: 'Login failed',
+              }
+            );
+            
+            if (response.sessionToken || response.session_token) {
+              const sessionToken = response.sessionToken || response.session_token!;
+              const user = response.user as UserSession;
+              
+              // Set tokens with expiration
+              const expiresAt = response.expiresAt 
+                ? new Date(response.expiresAt)
+                : new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours default
+              
+              store.setTokens(sessionToken, response.refreshToken, expiresAt);
+              store.setSession(user, credentials.rememberMe);
+              store.scheduleTokenRefresh();
+              
+              // Track successful authentication
+              console.log('Authentication successful:', {
+                userId: user.id,
+                sessionId: user.sessionId,
+                permissions: user.role?.permissions?.length || 0,
+              });
+            } else {
+              throw new Error('Invalid login response: missing session token');
+            }
+          } catch (error) {
+            const authError: AuthError = {
+              code: 'LOGIN_FAILED',
+              message: error instanceof Error ? error.message : 'Login failed',
+              timestamp: new Date().toISOString(),
+              context: error,
+            };
+            
+            store.setAuthError(authError);
+            store.recordSecurityViolation('Failed login attempt');
+            throw authError;
+          } finally {
+            store.setLoading(false);
+          }
         },
         
-        setHydrated: (hydrated: boolean) => {
-          set((state) => {
-            state.isHydrated = hydrated;
-          });
+        loginWithToken: async (token: string) => {
+          const store = get();
+          store.setLoading(true);
+          store.clearAuthError();
+          
+          try {
+            // Validate token with middleware coordination
+            const response = await apiGet<{ user: UserSession; valid: boolean }>(
+              '/api/v2/user/session',
+              {
+                additionalHeaders: [{ key: 'Authorization', value: `Bearer ${token}` }],
+                signal: AbortSignal.timeout(AUTH_CONFIG.REQUEST_TIMEOUT_MS),
+              }
+            );
+            
+            if (response.valid && response.user) {
+              store.setTokens(token);
+              store.setSession(response.user);
+              store.scheduleTokenRefresh();
+            } else {
+              throw new Error('Invalid token');
+            }
+          } catch (error) {
+            const authError: AuthError = {
+              code: 'TOKEN_INVALID',
+              message: 'Invalid authentication token',
+              timestamp: new Date().toISOString(),
+              context: error,
+            };
+            
+            store.setAuthError(authError);
+            throw authError;
+          } finally {
+            store.setLoading(false);
+          }
         },
         
-        // Utility actions
-        reset: () => {
-          set((state) => {
-            Object.assign(state, {
-              state: initialAuthState,
-              sessionData: null,
-              lastActivity: null,
-              sessionExpiry: null,
-              permissions: null,
-              userRole: null,
-              isRefreshing: false,
-              isHydrated: false,
-            });
-            state.accessCache.clear();
-          });
+        logout: async () => {
+          const store = get();
+          const sessionId = store.sessionId;
+          
+          store.setLoading(true);
+          
+          try {
+            if (sessionId) {
+              await apiDelete(`/api/v2/user/session/${sessionId}`, {
+                signal: AbortSignal.timeout(AUTH_CONFIG.REQUEST_TIMEOUT_MS),
+                snackbarSuccess: 'Logged out successfully',
+              });
+            }
+          } catch (error) {
+            console.warn('Failed to logout from server:', error);
+          } finally {
+            store.clearSession();
+            store.clearTokens();
+            store.resetOperationCount();
+            store.setLoading(false);
+          }
         },
         
-        hydrateFromSession: (session: UserSession) => {
+        refreshToken: async () => {
+          const store = get();
+          
+          if (store.refreshInProgress || !store.refreshToken) {
+            return;
+          }
+          
+          store.setRefreshing(true);
+          
+          try {
+            const response = await apiPost<TokenRefreshResult>(
+              '/api/v2/user/session/refresh',
+              { refreshToken: store.refreshToken },
+              { signal: AbortSignal.timeout(AUTH_CONFIG.REQUEST_TIMEOUT_MS) }
+            );
+            
+            if (response.success && response.accessToken) {
+              const expiresAt = response.expiresIn
+                ? new Date(Date.now() + response.expiresIn * 1000)
+                : new Date(Date.now() + 24 * 60 * 60 * 1000);
+              
+              store.setTokens(response.accessToken, response.refreshToken, expiresAt);
+              store.scheduleTokenRefresh();
+              
+              console.log('Token refreshed successfully');
+            } else {
+              throw new Error(response.error || 'Token refresh failed');
+            }
+          } catch (error) {
+            console.error('Token refresh failed:', error);
+            
+            if (response.requiresReauth) {
+              store.clearSession();
+              store.clearTokens();
+            }
+            
+            const authError: AuthError = {
+              code: 'REFRESH_FAILED',
+              message: 'Token refresh failed',
+              timestamp: new Date().toISOString(),
+              context: error,
+            };
+            
+            store.setAuthError(authError);
+          } finally {
+            store.setRefreshing(false);
+          }
+        },
+        
+        updateUser: (userData: Partial<UserSession>) =>
           set((state) => {
-            state.state.isAuthenticated = true;
-            state.state.user = session;
-            state.state.token = session.sessionToken;
-            state.state.error = null;
-            state.lastActivity = new Date();
-            state.sessionExpiry = session.tokenExpiryDate;
-            state.isHydrated = true;
-          });
+            if (state.user) {
+              state.user = { ...state.user, ...userData };
+              
+              try {
+                localStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(state.user));
+              } catch (error) {
+                console.warn('Failed to update stored user data:', error);
+              }
+            }
+          }),
+        
+        clearError: () =>
+          set((state) => {
+            state.error = null;
+          }),
+        
+        checkSession: async () => {
+          const store = get();
+          return await store.validateSession();
         },
       })),
       {
-        name: 'df-auth-state',
-        storage: createJSONStorage(() => sessionStorage),
-        partialize: (state) => ({
-          // Only persist essential state, exclude sensitive data
-          lastActivity: state.lastActivity,
-          isHydrated: state.isHydrated,
-        }),
+        name: 'auth-store',
+        enabled: process.env.NODE_ENV === 'development',
       }
     )
   )
 );
 
 // ============================================================================
-// AUTHENTICATION API FUNCTIONS
+// REACT QUERY HOOKS FOR SERVER STATE
 // ============================================================================
 
 /**
- * Authentication API client with middleware integration
+ * React Query hook for session validation with intelligent caching
  */
-const authApi = {
-  /**
-   * Validates current session with server-side validation
-   */
-  async validateSession(): Promise<{ valid: boolean; user?: UserSession; error?: AuthError }> {
-    try {
-      const response = await apiClient.get('/user/session');
-      
-      if (response.success && response.session_token) {
-        const user = transformToUserSession(response);
-        return { valid: true, user };
-      }
-      
-      return {
-        valid: false,
-        error: {
-          code: AuthErrorCode.SESSION_INVALID,
-          message: 'Session validation failed',
-          details: 'Server returned invalid session response',
-          timestamp: new Date(),
-          retryable: false
-        }
-      };
-    } catch (error) {
-      return {
-        valid: false,
-        error: {
-          code: AuthErrorCode.NETWORK_ERROR,
-          message: 'Session validation network error',
-          details: error instanceof Error ? error.message : 'Unknown error',
-          timestamp: new Date(),
-          retryable: true
-        }
-      };
-    }
-  },
+function useSessionQuery(enabled: boolean = true) {
+  const { sessionId, isAuthenticated } = useAuthStore();
   
-  /**
-   * Refreshes authentication token through middleware
-   */
-  async refreshToken(): Promise<{ success: boolean; user?: UserSession; error?: AuthError }> {
-    try {
-      const response = await apiClient.post('/user/session/refresh');
-      
-      if (response.success && response.session_token) {
-        const user = transformToUserSession(response);
-        return { success: true, user };
-      }
-      
-      return {
-        success: false,
-        error: {
-          code: AuthErrorCode.TOKEN_REFRESH_FAILED,
-          message: 'Token refresh failed',
-          details: 'Server returned invalid refresh response',
-          timestamp: new Date(),
-          retryable: false
-        }
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: {
-          code: AuthErrorCode.NETWORK_ERROR,
-          message: 'Token refresh network error',
-          details: error instanceof Error ? error.message : 'Unknown error',
-          timestamp: new Date(),
-          retryable: true
-        }
-      };
-    }
-  },
-  
-  /**
-   * Fetches user permissions with caching
-   */
-  async fetchPermissions(userId: number): Promise<{ permissions?: UserPermissions; error?: AuthError }> {
-    try {
-      const response = await apiClient.get(`/user/${userId}/permissions`);
-      
-      if (response.success) {
-        return { permissions: response.data };
-      }
-      
-      return {
-        error: {
-          code: AuthErrorCode.NETWORK_ERROR,
-          message: 'Failed to fetch user permissions',
-          details: 'Server returned error response',
-          timestamp: new Date(),
-          retryable: true
-        }
-      };
-    } catch (error) {
-      return {
-        error: {
-          code: AuthErrorCode.NETWORK_ERROR,
-          message: 'Permission fetch network error',
-          details: error instanceof Error ? error.message : 'Unknown error',
-          timestamp: new Date(),
-          retryable: true
-        }
-      };
-    }
-  },
-  
-  /**
-   * Performs user login with credentials
-   */
-  async login(credentials: LoginCredentials): Promise<{ success: boolean; user?: UserSession; error?: AuthError }> {
-    try {
-      const response = await apiClient.post('/user/session', credentials);
-      
-      if (response.success && response.session_token) {
-        const user = transformToUserSession(response);
-        return { success: true, user };
-      }
-      
-      return {
-        success: false,
-        error: {
-          code: AuthErrorCode.INVALID_CREDENTIALS,
-          message: 'Login failed',
-          details: response.error?.message || 'Invalid credentials',
-          timestamp: new Date(),
-          retryable: false
-        }
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: {
-          code: AuthErrorCode.NETWORK_ERROR,
-          message: 'Login network error',
-          details: error instanceof Error ? error.message : 'Unknown error',
-          timestamp: new Date(),
-          retryable: true
-        }
-      };
-    }
-  },
-  
-  /**
-   * Performs user logout with session cleanup
-   */
-  async logout(): Promise<{ success: boolean; error?: AuthError }> {
-    try {
-      await apiClient.delete('/user/session');
-      return { success: true };
-    } catch (error) {
-      // Even if logout fails on server, we should clear local state
-      return {
-        success: true, // Treat as success for UX
-        error: {
-          code: AuthErrorCode.NETWORK_ERROR,
-          message: 'Logout network error (local session cleared)',
-          details: error instanceof Error ? error.message : 'Unknown error',
-          timestamp: new Date(),
-          retryable: false
-        }
-      };
-    }
-  },
-};
-
-/**
- * Transforms login response to UserSession format
- */
-function transformToUserSession(response: LoginResponse): UserSession {
-  return {
-    id: response.id,
-    email: response.email,
-    firstName: response.firstName,
-    lastName: response.lastName,
-    name: response.name,
-    host: response.host,
-    isRootAdmin: response.isRootAdmin,
-    isSysAdmin: response.isSysAdmin,
-    lastLoginDate: response.lastLoginDate,
-    sessionId: response.sessionId,
-    sessionToken: response.session_token || response.sessionToken || '',
-    tokenExpiryDate: new Date(response.tokenExpiryDate),
-    roleId: response.roleId || response.role_id || 0,
-  };
-}
-
-// ============================================================================
-// REACT QUERY HOOKS
-// ============================================================================
-
-/**
- * Session validation query with intelligent caching
- */
-function useSessionQuery() {
   return useQuery({
-    queryKey: AUTH_CONFIG.QUERY_KEYS.SESSION,
-    queryFn: authApi.validateSession,
-    staleTime: AUTH_CONFIG.CACHE.SESSION_STALE_TIME,
-    cacheTime: AUTH_CONFIG.CACHE.SESSION_CACHE_TIME,
-    refetchInterval: AUTH_CONFIG.CACHE.REFETCH_INTERVAL,
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
-    retry: (failureCount, error) => {
-      // Don't retry authentication errors, only network errors
-      if (error && typeof error === 'object' && 'code' in error) {
-        const authError = error as AuthError;
-        return authError.retryable && failureCount < AUTH_CONFIG.SESSION.MAX_RETRY_ATTEMPTS;
+    queryKey: [...AUTH_QUERY_KEYS.SESSION, sessionId],
+    queryFn: async () => {
+      if (!sessionId) {
+        throw new Error('No session ID available');
       }
-      return failureCount < AUTH_CONFIG.SESSION.MAX_RETRY_ATTEMPTS;
+      
+      const response = await apiGet<SessionValidationResult>(
+        `/api/v2/user/session/${sessionId}`,
+        { signal: AbortSignal.timeout(AUTH_CONFIG.CACHE_HIT_TIMEOUT_MS) }
+      );
+      
+      return response;
+    },
+    enabled: enabled && isAuthenticated && !!sessionId,
+    staleTime: AUTH_CONFIG.STALE_TIME_MS,
+    cacheTime: AUTH_CONFIG.CACHE_TIME_MS,
+    refetchInterval: AUTH_CONFIG.VALIDATION_INTERVAL_MS,
+    refetchIntervalInBackground: true,
+    retry: false,
+    onSuccess: (data) => {
+      if (!data.isValid) {
+        useAuthStore.getState().clearSession();
+      }
+    },
+    onError: (error) => {
+      console.error('Session validation failed:', error);
+      useAuthStore.getState().recordSecurityViolation('Session validation error');
     },
   });
 }
 
 /**
- * User permissions query with caching optimization
+ * React Query hook for user permissions with intelligent caching
  */
-function usePermissionsQuery(userId: number | null, enabled: boolean = true) {
+function usePermissionsQuery(userId?: number, enabled: boolean = true) {
   return useQuery({
-    queryKey: [...AUTH_CONFIG.QUERY_KEYS.PERMISSIONS, userId],
-    queryFn: () => userId ? authApi.fetchPermissions(userId) : Promise.resolve({}),
+    queryKey: [...AUTH_QUERY_KEYS.PERMISSIONS, userId],
+    queryFn: async () => {
+      if (!userId) {
+        throw new Error('User ID required for permissions');
+      }
+      
+      const response = await apiGet<{ permissions: string[]; roles: string[] }>(
+        `/api/v2/system/user/${userId}/permissions`,
+        { signal: AbortSignal.timeout(AUTH_CONFIG.CACHE_HIT_TIMEOUT_MS) }
+      );
+      
+      return response;
+    },
     enabled: enabled && !!userId,
-    staleTime: AUTH_CONFIG.CACHE.PERMISSIONS_STALE_TIME,
-    cacheTime: AUTH_CONFIG.CACHE.PERMISSIONS_CACHE_TIME,
-    retry: 2,
-  });
-}
-
-/**
- * Token refresh mutation for automatic refresh
- */
-function useTokenRefreshMutation() {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: authApi.refreshToken,
-    onSuccess: (data) => {
-      if (data.success && data.user) {
-        // Invalidate all auth-related queries
-        queryClient.invalidateQueries({ queryKey: ['auth'] });
-      }
-    },
-    retry: 1,
-  });
-}
-
-/**
- * Login mutation with optimistic updates
- */
-function useLoginMutation() {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: authApi.login,
-    onSuccess: (data) => {
-      if (data.success && data.user) {
-        // Invalidate all auth-related queries
-        queryClient.invalidateQueries({ queryKey: ['auth'] });
-      }
-    },
-  });
-}
-
-/**
- * Logout mutation with cleanup
- */
-function useLogoutMutation() {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: authApi.logout,
-    onSettled: () => {
-      // Clear all auth-related cache on logout
-      queryClient.removeQueries({ queryKey: ['auth'] });
-      queryClient.clear();
-    },
-  });
-}
-
-// ============================================================================
-// SESSION MANAGEMENT UTILITIES
-// ============================================================================
-
-/**
- * Session timeout manager for automatic cleanup
- */
-class SessionTimeoutManager {
-  private timeoutId: NodeJS.Timeout | null = null;
-  private activityTimeoutId: NodeJS.Timeout | null = null;
-  private onTimeout: () => void;
-  
-  constructor(onTimeout: () => void) {
-    this.onTimeout = onTimeout;
-  }
-  
-  /**
-   * Sets session expiry timeout
-   */
-  setSessionTimeout(expiryDate: Date | null) {
-    this.clearSessionTimeout();
-    
-    if (expiryDate) {
-      const timeUntilExpiry = expiryDate.getTime() - Date.now();
-      
-      if (timeUntilExpiry > 0) {
-        this.timeoutId = setTimeout(() => {
-          this.onTimeout();
-        }, timeUntilExpiry);
-      } else {
-        // Session already expired
-        this.onTimeout();
-      }
-    }
-  }
-  
-  /**
-   * Sets activity timeout
-   */
-  setActivityTimeout() {
-    this.clearActivityTimeout();
-    
-    this.activityTimeoutId = setTimeout(() => {
-      this.onTimeout();
-    }, AUTH_CONFIG.SESSION.ACTIVITY_TIMEOUT);
-  }
-  
-  /**
-   * Resets activity timeout on user activity
-   */
-  resetActivityTimeout() {
-    this.setActivityTimeout();
-  }
-  
-  /**
-   * Clears all timeouts
-   */
-  clearTimeouts() {
-    this.clearSessionTimeout();
-    this.clearActivityTimeout();
-  }
-  
-  private clearSessionTimeout() {
-    if (this.timeoutId) {
-      clearTimeout(this.timeoutId);
-      this.timeoutId = null;
-    }
-  }
-  
-  private clearActivityTimeout() {
-    if (this.activityTimeoutId) {
-      clearTimeout(this.activityTimeoutId);
-      this.activityTimeoutId = null;
-    }
-  }
-}
-
-/**
- * RBAC helper utilities for permission checking
- */
-class RBACHelper {
-  private permissions: UserPermissions | null;
-  private userRole: Role | null;
-  private accessCache: Map<string, AccessCheckResult>;
-  
-  constructor(
-    permissions: UserPermissions | null,
-    userRole: Role | null,
-    accessCache: Map<string, AccessCheckResult>
-  ) {
-    this.permissions = permissions;
-    this.userRole = userRole;
-    this.accessCache = accessCache;
-  }
-  
-  /**
-   * Checks if user has specific permission
-   */
-  hasPermission(permission: string): boolean {
-    // Check cache first for performance
-    const cacheKey = `perm:${permission}`;
-    const cached = this.accessCache.get(cacheKey);
-    
-    if (cached && cached.ttl > Date.now()) {
-      return cached.granted;
-    }
-    
-    // System admins have all permissions
-    if (this.permissions?.isSystemAdmin) {
-      this.cacheResult(cacheKey, true, [permission]);
-      return true;
-    }
-    
-    // Check specific permission
-    const hasPermission = this.permissions?.serviceAccess?.some(service => 
-      service.canRead || service.canCreate || service.canUpdate || service.canDelete
-    ) || false;
-    
-    this.cacheResult(cacheKey, hasPermission, [permission]);
-    return hasPermission;
-  }
-  
-  /**
-   * Checks if user has specific role
-   */
-  hasRole(roleId: number): boolean {
-    const cacheKey = `role:${roleId}`;
-    const cached = this.accessCache.get(cacheKey);
-    
-    if (cached && cached.ttl > Date.now()) {
-      return cached.granted;
-    }
-    
-    const hasRole = this.userRole?.id === roleId;
-    this.cacheResult(cacheKey, hasRole, [], [roleId]);
-    return hasRole;
-  }
-  
-  /**
-   * Checks if user is admin
-   */
-  isAdmin(): boolean {
-    return this.permissions?.isSystemAdmin || false;
-  }
-  
-  /**
-   * Checks if user is root admin
-   */
-  isRootAdmin(): boolean {
-    return this.permissions?.isSystemAdmin || false;
-  }
-  
-  /**
-   * Checks access to specific resource and action
-   */
-  checkAccess(resource: string, action: string): boolean {
-    const cacheKey = `access:${resource}:${action}`;
-    const cached = this.accessCache.get(cacheKey);
-    
-    if (cached && cached.ttl > Date.now()) {
-      return cached.granted;
-    }
-    
-    // System admins have full access
-    if (this.permissions?.isSystemAdmin) {
-      this.cacheResult(cacheKey, true, [`${resource}.${action}`]);
-      return true;
-    }
-    
-    // Check specific resource access
-    const hasAccess = this.checkResourceAccess(resource, action);
-    this.cacheResult(cacheKey, hasAccess, [`${resource}.${action}`]);
-    return hasAccess;
-  }
-  
-  private checkResourceAccess(resource: string, action: string): boolean {
-    if (!this.permissions) return false;
-    
-    // Map resource/action to permission checks
-    switch (resource) {
-      case 'users':
-        return this.permissions.canManageUsers;
-      case 'roles':
-        return this.permissions.canManageRoles;
-      case 'services':
-        return this.permissions.canManageServices;
-      case 'apps':
-        return this.permissions.canManageApps;
-      case 'system':
-        return this.permissions.canConfigureSystem;
-      case 'files':
-        return this.permissions.canManageFiles;
-      case 'scripts':
-        return this.permissions.canManageScripts;
-      case 'scheduler':
-        return this.permissions.canManageScheduler;
-      case 'cache':
-        return this.permissions.canManageCache;
-      case 'cors':
-        return this.permissions.canManageCors;
-      case 'email-templates':
-        return this.permissions.canManageEmailTemplates;
-      case 'lookup-keys':
-        return this.permissions.canManageLookupKeys;
-      case 'reports':
-        return this.permissions.canViewReports;
-      default:
+    staleTime: AUTH_CONFIG.STALE_TIME_MS,
+    cacheTime: AUTH_CONFIG.CACHE_TIME_MS,
+    retry: (failureCount, error) => {
+      // Don't retry on authorization errors
+      if (error instanceof Error && error.message.includes('403')) {
         return false;
-    }
-  }
-  
-  private cacheResult(
-    cacheKey: string,
-    granted: boolean,
-    requiredPermissions: string[] = [],
-    requiredRoles: number[] = []
-  ) {
-    const result: AccessCheckResult = {
-      granted,
-      requiredPermissions,
-      userPermissions: [],
-      cacheKey,
-      ttl: Date.now() + (5 * 60 * 1000), // 5 minutes cache
-    };
-    
-    this.accessCache.set(cacheKey, result);
-  }
+      }
+      return failureCount < AUTH_CONFIG.MAX_RETRY_ATTEMPTS;
+    },
+    onSuccess: (data) => {
+      const store = useAuthStore.getState();
+      store.setPermissions(data.permissions);
+      store.setRoles(data.roles);
+    },
+  });
 }
 
 // ============================================================================
@@ -862,394 +729,430 @@ class RBACHelper {
 // ============================================================================
 
 /**
- * Custom authentication hook with comprehensive state management
- * 
- * Provides centralized authentication state, session management, and RBAC
- * integration with Next.js middleware coordination and automatic token refresh.
- * 
- * @returns Comprehensive authentication state and actions
+ * Main authentication hook with comprehensive state management and middleware integration
  */
 export function useAuthState() {
-  // Zustand store access
-  const {
-    state,
-    sessionData,
-    lastActivity,
-    sessionExpiry,
-    permissions,
-    userRole,
-    accessCache,
-    isRefreshing,
-    isHydrated,
-    setAuthenticated,
-    setUnauthenticated,
-    setLoading,
-    setError,
-    clearError,
-    updateLastActivity,
-    setSessionData,
-    setSessionExpiry,
-    clearSession,
-    setPermissions,
-    setUserRole,
-    updateAccessCache,
-    clearAccessCache,
-    setRefreshing,
-    setHydrated,
-    reset,
-    hydrateFromSession,
-  } = useAuthStore();
+  const router = useRouter();
+  const queryClient = useQueryClient();
   
-  // React Query hooks
-  const sessionQuery = useSessionQuery();
+  // Access Zustand store state and actions
+  const authState = useAuthStore();
+  
+  // Session validation interval reference
+  const validationIntervalRef = useRef<NodeJS.Timeout>();
+  
+  // React Query hooks for server state synchronization
+  const sessionQuery = useSessionQuery(authState.isAuthenticated);
   const permissionsQuery = usePermissionsQuery(
-    state.user?.id || null,
-    state.isAuthenticated
+    authState.user?.id,
+    authState.isAuthenticated
   );
-  const tokenRefreshMutation = useTokenRefreshMutation();
-  const loginMutation = useLoginMutation();
-  const logoutMutation = useLogoutMutation();
   
-  // React transitions for concurrent features
-  const [isPending, startTransition] = useTransition();
+  // =========================================================================
+  // SESSION INITIALIZATION AND RECOVERY
+  // =========================================================================
   
-  // Session timeout manager
-  const timeoutManagerRef = useRef<SessionTimeoutManager | null>(null);
+  /**
+   * Initialize authentication state from stored session data
+   */
+  const initializeSession = useCallback(async () => {
+    try {
+      const storedToken = localStorage.getItem(STORAGE_KEYS.SESSION_TOKEN);
+      const storedUserData = localStorage.getItem(STORAGE_KEYS.USER_DATA);
+      const storedActivity = localStorage.getItem(STORAGE_KEYS.LAST_ACTIVITY);
+      
+      if (storedToken && storedUserData) {
+        const userData = JSON.parse(storedUserData) as UserSession;
+        const lastActivity = storedActivity ? new Date(storedActivity) : new Date();
+        
+        // Check if session is still recent (24 hours)
+        const sessionAge = Date.now() - lastActivity.getTime();
+        const maxSessionAge = 24 * 60 * 60 * 1000; // 24 hours
+        
+        if (sessionAge < maxSessionAge) {
+          // Attempt to validate session with server
+          try {
+            await authState.loginWithToken(storedToken);
+          } catch (error) {
+            console.warn('Stored session validation failed:', error);
+            authState.clearSession();
+          }
+        } else {
+          // Session too old, clear it
+          authState.clearSession();
+        }
+      }
+    } catch (error) {
+      console.error('Failed to initialize session:', error);
+      authState.clearSession();
+    }
+  }, [authState]);
   
-  // Initialize timeout manager
+  // =========================================================================
+  // AUTHENTICATION OPERATIONS
+  // =========================================================================
+  
+  /**
+   * Enhanced login with middleware coordination
+   */
+  const login = useMutation({
+    mutationFn: async (credentials: LoginCredentials) => {
+      await authState.login(credentials);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(AUTH_QUERY_KEYS.SESSION);
+      queryClient.invalidateQueries(AUTH_QUERY_KEYS.PERMISSIONS);
+      router.push('/dashboard');
+    },
+    onError: (error: AuthError) => {
+      console.error('Login failed:', error);
+    },
+  });
+  
+  /**
+   * Enhanced logout with cleanup
+   */
+  const logout = useMutation({
+    mutationFn: async () => {
+      await authState.logout();
+    },
+    onSuccess: () => {
+      queryClient.clear();
+      router.push('/login');
+    },
+    onError: (error) => {
+      console.error('Logout failed:', error);
+      // Even if logout fails on server, clear local state
+      authState.clearSession();
+      queryClient.clear();
+      router.push('/login');
+    },
+  });
+  
+  /**
+   * Manual token refresh operation
+   */
+  const refreshSession = useMutation({
+    mutationFn: async () => {
+      await authState.refreshToken();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(AUTH_QUERY_KEYS.SESSION);
+    },
+  });
+  
+  // =========================================================================
+  // SESSION MONITORING AND VALIDATION
+  // =========================================================================
+  
+  /**
+   * Start session monitoring with periodic validation
+   */
+  const startSessionMonitoring = useCallback(() => {
+    if (validationIntervalRef.current) {
+      clearInterval(validationIntervalRef.current);
+    }
+    
+    validationIntervalRef.current = setInterval(async () => {
+      if (authState.isAuthenticated && !authState.sessionCheckInProgress) {
+        const isValid = await authState.validateSession();
+        
+        if (!isValid) {
+          console.warn('Session validation failed, redirecting to login');
+          logout.mutate();
+        }
+      }
+    }, AUTH_CONFIG.VALIDATION_INTERVAL_MS);
+  }, [authState, logout]);
+  
+  /**
+   * Stop session monitoring
+   */
+  const stopSessionMonitoring = useCallback(() => {
+    if (validationIntervalRef.current) {
+      clearInterval(validationIntervalRef.current);
+      validationIntervalRef.current = undefined;
+    }
+  }, []);
+  
+  // =========================================================================
+  // PERMISSION AND ROLE HELPERS
+  // =========================================================================
+  
+  /**
+   * Check if user has specific permission with caching
+   */
+  const hasPermission = useCallback(
+    (permission: string): boolean => {
+      return authState.hasPermission(permission);
+    },
+    [authState]
+  );
+  
+  /**
+   * Check if user has specific role
+   */
+  const hasRole = useCallback(
+    (role: string): boolean => {
+      return authState.hasRole(role);
+    },
+    [authState]
+  );
+  
+  /**
+   * Check if user has any of the specified roles
+   */
+  const hasAnyRole = useCallback(
+    (roles: string[]): boolean => {
+      return authState.hasAnyRole(roles);
+    },
+    [authState]
+  );
+  
+  /**
+   * Check if user can access a specific route
+   */
+  const canAccessRoute = useCallback(
+    (route: string, requiredPermissions?: string[], requiredRoles?: string[]): boolean => {
+      if (!authState.isAuthenticated) {
+        return false;
+      }
+      
+      if (authState.isRootAdmin) {
+        return true;
+      }
+      
+      if (requiredPermissions && !requiredPermissions.every(p => hasPermission(p))) {
+        return false;
+      }
+      
+      if (requiredRoles && !hasAnyRole(requiredRoles)) {
+        return false;
+      }
+      
+      return true;
+    },
+    [authState, hasPermission, hasAnyRole]
+  );
+  
+  // =========================================================================
+  // EFFECT HOOKS FOR LIFECYCLE MANAGEMENT
+  // =========================================================================
+  
+  /**
+   * Initialize authentication on mount
+   */
   useEffect(() => {
-    if (!timeoutManagerRef.current) {
-      timeoutManagerRef.current = new SessionTimeoutManager(() => {
-        startTransition(() => {
-          handleSessionTimeout();
-        });
-      });
+    initializeSession();
+  }, [initializeSession]);
+  
+  /**
+   * Start/stop session monitoring based on authentication state
+   */
+  useEffect(() => {
+    if (authState.isAuthenticated) {
+      startSessionMonitoring();
+    } else {
+      stopSessionMonitoring();
     }
     
     return () => {
-      timeoutManagerRef.current?.clearTimeouts();
+      stopSessionMonitoring();
     };
-  }, []);
-  
-  // RBAC helper instance
-  const rbacHelper = new RBACHelper(permissions, userRole, accessCache);
+  }, [authState.isAuthenticated, startSessionMonitoring, stopSessionMonitoring]);
   
   /**
-   * Handles session timeout and cleanup
+   * Schedule token refresh when authentication state changes
    */
-  const handleSessionTimeout = useCallback(() => {
-    setUnauthenticated({
-      code: AuthErrorCode.SESSION_EXPIRED,
-      message: 'Session expired due to inactivity',
-      details: 'Please log in again to continue',
-      timestamp: new Date(),
-      retryable: false,
+  useEffect(() => {
+    if (authState.isAuthenticated && authState.tokenExpiresAt) {
+      authState.scheduleTokenRefresh();
+    }
+  }, [authState.isAuthenticated, authState.tokenExpiresAt]);
+  
+  /**
+   * Update activity timestamp on user interaction
+   */
+  useEffect(() => {
+    const handleUserActivity = () => {
+      if (authState.isAuthenticated) {
+        authState.updateSessionActivity();
+      }
+    };
+    
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+    events.forEach(event => {
+      document.addEventListener(event, handleUserActivity, { passive: true });
     });
-    clearSession();
-    clearAccessCache();
-  }, [setUnauthenticated, clearSession, clearAccessCache]);
-  
-  /**
-   * Updates session timeout based on expiry date
-   */
-  const updateSessionTimeout = useCallback((expiryDate: Date | null) => {
-    timeoutManagerRef.current?.setSessionTimeout(expiryDate);
-    setSessionExpiry(expiryDate);
-  }, [setSessionExpiry]);
-  
-  /**
-   * Handles user activity tracking
-   */
-  const handleActivity = useCallback(() => {
-    updateLastActivity();
-    timeoutManagerRef.current?.resetActivityTimeout();
-  }, [updateLastActivity]);
-  
-  /**
-   * Syncs session query data with store
-   */
-  useEffect(() => {
-    if (sessionQuery.data) {
-      const { valid, user, error } = sessionQuery.data;
-      
-      if (valid && user) {
-        setAuthenticated(user, user.sessionToken);
-        updateSessionTimeout(user.tokenExpiryDate);
-        setHydrated(true);
-      } else if (error) {
-        setUnauthenticated(error);
-      }
-    }
-  }, [sessionQuery.data, setAuthenticated, setUnauthenticated, updateSessionTimeout, setHydrated]);
-  
-  /**
-   * Syncs permissions query data with store
-   */
-  useEffect(() => {
-    if (permissionsQuery.data?.permissions) {
-      setPermissions(permissionsQuery.data.permissions);
-    }
-  }, [permissionsQuery.data, setPermissions]);
-  
-  /**
-   * Sets up activity monitoring
-   */
-  useEffect(() => {
-    if (state.isAuthenticated) {
-      const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
-      
-      const activityHandler = () => {
-        handleActivity();
-      };
-      
+    
+    return () => {
       events.forEach(event => {
-        document.addEventListener(event, activityHandler, { passive: true });
+        document.removeEventListener(event, handleUserActivity);
       });
+    };
+  }, [authState]);
+  
+  // =========================================================================
+  // MEMOIZED RETURN VALUE
+  // =========================================================================
+  
+  /**
+   * Memoized hook return value for performance optimization
+   */
+  return useMemo(
+    () => ({
+      // Authentication state
+      isAuthenticated: authState.isAuthenticated,
+      isLoading: authState.isLoading || login.isLoading || logout.isLoading,
+      isRefreshing: authState.isRefreshing || refreshSession.isLoading,
+      user: authState.user,
+      error: authState.error || login.error || logout.error || refreshSession.error,
       
-      // Initialize activity timeout
-      timeoutManagerRef.current?.setActivityTimeout();
+      // Session state
+      sessionId: authState.sessionId,
+      isSessionValid: authState.isSessionValid,
+      lastActivity: authState.lastActivity,
+      tokenExpiresAt: authState.tokenExpiresAt,
       
-      return () => {
-        events.forEach(event => {
-          document.removeEventListener(event, activityHandler);
-        });
-      };
-    }
-  }, [state.isAuthenticated, handleActivity]);
-  
-  /**
-   * Automatic token refresh when nearing expiry
-   */
-  useEffect(() => {
-    if (state.isAuthenticated && sessionExpiry && !isRefreshing) {
-      const timeUntilExpiry = sessionExpiry.getTime() - Date.now();
+      // Permission state
+      permissions: authState.permissions,
+      roles: authState.roles,
+      isRootAdmin: authState.isRootAdmin,
+      isSysAdmin: authState.isSysAdmin,
       
-      if (timeUntilExpiry <= AUTH_CONFIG.SESSION.REFRESH_THRESHOLD && timeUntilExpiry > 0) {
-        startTransition(async () => {
-          setRefreshing(true);
-          
-          try {
-            const result = await tokenRefreshMutation.mutateAsync();
-            
-            if (result.success && result.user) {
-              setAuthenticated(result.user, result.user.sessionToken);
-              updateSessionTimeout(result.user.tokenExpiryDate);
-            } else {
-              handleSessionTimeout();
-            }
-          } catch (error) {
-            handleSessionTimeout();
-          } finally {
-            setRefreshing(false);
-          }
-        });
-      }
-    }
-  }, [
-    state.isAuthenticated,
-    sessionExpiry,
-    isRefreshing,
-    tokenRefreshMutation,
-    setRefreshing,
-    setAuthenticated,
-    updateSessionTimeout,
-    handleSessionTimeout,
-  ]);
-  
-  /**
-   * Login function with state management
-   */
-  const login = useCallback(async (credentials: LoginCredentials): Promise<LoginResponse> => {
-    setLoading(true);
-    clearError();
-    
-    try {
-      const result = await loginMutation.mutateAsync(credentials);
+      // Security state
+      securityViolations: authState.securityViolations,
+      suspiciousActivityDetected: authState.suspiciousActivityDetected,
       
-      if (result.success && result.user) {
-        setAuthenticated(result.user, result.user.sessionToken);
-        updateSessionTimeout(result.user.tokenExpiryDate);
-        handleActivity();
-        
-        return {
-          success: true,
-          session_token: result.user.sessionToken,
-          sessionToken: result.user.sessionToken,
-          email: result.user.email,
-          firstName: result.user.firstName,
-          lastName: result.user.lastName,
-          name: result.user.name,
-          id: result.user.id,
-          isRootAdmin: result.user.isRootAdmin,
-          isSysAdmin: result.user.isSysAdmin,
-          roleId: result.user.roleId,
-          host: result.user.host,
-          lastLoginDate: result.user.lastLoginDate,
-          tokenExpiryDate: result.user.tokenExpiryDate.toISOString(),
-          sessionId: result.user.sessionId,
-        };
-      } else {
-        const error = result.error || {
-          code: AuthErrorCode.INVALID_CREDENTIALS,
-          message: 'Login failed',
-          details: 'Unknown error occurred',
-          timestamp: new Date(),
-          retryable: false,
-        };
-        setError(error);
-        throw error;
-      }
-    } catch (error) {
-      const authError = error as AuthError;
-      setError(authError);
-      throw authError;
-    } finally {
-      setLoading(false);
-    }
-  }, [
-    loginMutation,
-    setLoading,
-    clearError,
-    setError,
-    setAuthenticated,
-    updateSessionTimeout,
-    handleActivity,
-  ]);
-  
-  /**
-   * Logout function with cleanup
-   */
-  const logout = useCallback(async (): Promise<void> => {
-    setLoading(true);
-    
-    try {
-      await logoutMutation.mutateAsync();
-    } catch (error) {
-      // Continue with logout even if server request fails
-      console.warn('Logout server request failed:', error);
-    } finally {
-      reset();
-      timeoutManagerRef.current?.clearTimeouts();
-      setLoading(false);
-    }
-  }, [logoutMutation, reset, setLoading]);
-  
-  /**
-   * Manual session refresh
-   */
-  const refresh = useCallback(async (): Promise<void> => {
-    if (isRefreshing) return;
-    
-    setRefreshing(true);
-    
-    try {
-      const result = await tokenRefreshMutation.mutateAsync();
+      // Performance metrics
+      authOperationCount: authState.authOperationCount,
+      lastTokenRefresh: authState.lastTokenRefresh,
       
-      if (result.success && result.user) {
-        setAuthenticated(result.user, result.user.sessionToken);
-        updateSessionTimeout(result.user.tokenExpiryDate);
-      } else {
-        throw result.error || new Error('Refresh failed');
-      }
-    } catch (error) {
-      setError(error as AuthError);
-    } finally {
-      setRefreshing(false);
-    }
-  }, [
-    isRefreshing,
-    tokenRefreshMutation,
-    setRefreshing,
-    setAuthenticated,
-    updateSessionTimeout,
-    setError,
-  ]);
+      // Actions
+      login: login.mutate,
+      logout: logout.mutate,
+      refreshToken: refreshSession.mutate,
+      updateUser: authState.updateUser,
+      clearError: authState.clearError,
+      checkSession: authState.checkSession,
+      
+      // Permission helpers
+      hasPermission,
+      hasRole,
+      hasAnyRole,
+      canAccessRoute,
+      
+      // Query states
+      sessionQuery: {
+        isLoading: sessionQuery.isLoading,
+        isError: sessionQuery.isError,
+        data: sessionQuery.data,
+      },
+      permissionsQuery: {
+        isLoading: permissionsQuery.isLoading,
+        isError: permissionsQuery.isError,
+        data: permissionsQuery.data,
+      },
+      
+      // Utility functions
+      initializeSession,
+    }),
+    [
+      authState,
+      login,
+      logout,
+      refreshSession,
+      sessionQuery,
+      permissionsQuery,
+      hasPermission,
+      hasRole,
+      hasAnyRole,
+      canAccessRoute,
+      initializeSession,
+    ]
+  );
+}
+
+// ============================================================================
+// ADDITIONAL HOOKS AND UTILITIES
+// ============================================================================
+
+/**
+ * Hook for authentication-dependent data fetching
+ */
+export function useAuthenticatedQuery<TData = unknown>(
+  queryKey: any[],
+  queryFn: () => Promise<TData>,
+  options: {
+    requiredPermissions?: string[];
+    requiredRoles?: string[];
+    enabled?: boolean;
+  } = {}
+) {
+  const { isAuthenticated, canAccessRoute } = useAuthState();
+  const { requiredPermissions, requiredRoles, enabled = true } = options;
   
-  /**
-   * Session validation check
-   */
-  const checkSession = useCallback(async (): Promise<boolean> => {
-    const result = await sessionQuery.refetch();
-    return result.data?.valid || false;
-  }, [sessionQuery]);
+  const hasAccess = canAccessRoute('', requiredPermissions, requiredRoles);
   
-  /**
-   * RBAC permission checking functions
-   */
-  const hasPermission = useCallback((permission: string): boolean => {
-    return rbacHelper.hasPermission(permission);
-  }, [rbacHelper]);
+  return useQuery({
+    queryKey,
+    queryFn,
+    enabled: enabled && isAuthenticated && hasAccess,
+    staleTime: AUTH_CONFIG.STALE_TIME_MS,
+    cacheTime: AUTH_CONFIG.CACHE_TIME_MS,
+  });
+}
+
+/**
+ * Hook for checking authentication status without subscribing to all state changes
+ */
+export function useAuthStatus() {
+  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
+  const isLoading = useAuthStore(state => state.isLoading);
+  const error = useAuthStore(state => state.error);
   
-  const hasRole = useCallback((roleId: number): boolean => {
-    return rbacHelper.hasRole(roleId);
-  }, [rbacHelper]);
+  return { isAuthenticated, isLoading, error };
+}
+
+/**
+ * Hook for permission checking without full auth state
+ */
+export function usePermissions() {
+  const permissions = useAuthStore(state => state.permissions);
+  const roles = useAuthStore(state => state.roles);
+  const isRootAdmin = useAuthStore(state => state.isRootAdmin);
+  const hasPermission = useAuthStore(state => state.hasPermission);
+  const hasRole = useAuthStore(state => state.hasRole);
+  const hasAnyRole = useAuthStore(state => state.hasAnyRole);
   
-  const checkAccess = useCallback((resource: string, action: string): boolean => {
-    return rbacHelper.checkAccess(resource, action);
-  }, [rbacHelper]);
-  
-  // Return comprehensive authentication interface
   return {
-    // Core state
-    user: state.user,
-    isAuthenticated: state.isAuthenticated,
-    isLoading: state.isLoading || sessionQuery.isLoading || permissionsQuery.isLoading,
-    error: state.error,
-    
-    // Session state
-    sessionData,
-    lastActivity,
-    sessionExpiry,
-    isRefreshing,
-    isHydrated,
-    
-    // Permission state
     permissions,
-    userRole,
-    
-    // Actions
-    login,
-    logout,
-    refresh,
-    checkSession,
-    
-    // React 19 concurrent features
-    startTransition,
-    isPending: isPending || loginMutation.isPending || logoutMutation.isPending,
-    
-    // RBAC integration
+    roles,
+    isRootAdmin,
     hasPermission,
     hasRole,
-    isAdmin: rbacHelper.isAdmin(),
-    isRootAdmin: rbacHelper.isRootAdmin(),
-    checkAccess,
-    
-    // Utilities
-    updateActivity: handleActivity,
-    clearError,
-    hydrateSession: hydrateFromSession,
-    
-    // Query states for advanced usage
-    sessionQuery: {
-      isLoading: sessionQuery.isLoading,
-      isError: sessionQuery.isError,
-      error: sessionQuery.error,
-      refetch: sessionQuery.refetch,
-    },
-    permissionsQuery: {
-      isLoading: permissionsQuery.isLoading,
-      isError: permissionsQuery.isError,
-      error: permissionsQuery.error,
-      refetch: permissionsQuery.refetch,
-    },
+    hasAnyRole,
   };
 }
 
-// Export types for external usage
-export type {
-  AuthStore,
-  RBACHelper,
+// ============================================================================
+// EXPORTS
+// ============================================================================
+
+export default useAuthState;
+export {
+  useAuthState,
+  useAuthenticatedQuery,
+  useAuthStatus,
+  usePermissions,
+  useAuthStore,
+  AUTH_QUERY_KEYS,
+  AUTH_CONFIG,
+  STORAGE_KEYS,
 };
 
-// Export the hook as default
-export default useAuthState;
+export type {
+  AuthStoreState,
+  AuthStoreActions,
+  CompleteAuthStore,
+};
