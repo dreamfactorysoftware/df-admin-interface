@@ -1,278 +1,304 @@
 /**
- * @fileoverview IconLink UI Component for DreamFactory Admin Interface
+ * IconLink Component for DreamFactory Admin Interface
  * 
- * React component migrated from Angular DfIconLinkComponent to provide consistent
- * icon-based navigation links with internationalization, accessibility, and 
- * responsive design. Replaces FontAwesome icons with Lucide React for better
- * React ecosystem integration and bundle optimization.
+ * A reusable React component that renders an external link with an icon and translated label.
+ * Replaces the Angular DfIconLinkComponent with React patterns and Tailwind CSS styling.
+ * Provides accessibility features, external link handling, and responsive design.
  * 
  * Key Features:
- * - Lucide React icons with consistent styling
- * - Tailwind CSS utility classes for responsive design
- * - WCAG 2.1 AA accessibility compliance with ARIA labels
- * - TypeScript interfaces for type safety
- * - Hover and focus states with smooth transitions
- * - External link indicators for user experience
+ * - Lucide React icons instead of FontAwesome for smaller bundle size
+ * - Next.js internationalization for translated labels
+ * - Tailwind CSS for consistent styling with theme support
+ * - WCAG 2.1 AA accessibility compliance with proper ARIA attributes
+ * - External link security with rel="noopener noreferrer"
+ * - Hover and focus states for enhanced UX
+ * - TypeScript for type safety and developer experience
  * 
- * Performance Requirements:
- * - Component render time under 10ms
- * - Smooth hover transitions under 200ms
- * - Accessible keyboard navigation support
- * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
+ * @fileoverview Icon-based external link component
+ * @version 1.0.0
+ * @since Next.js 15.1+ / React 19.0.0
  */
 
-import React from 'react';
-import Link from 'next/link';
-import { ExternalLink } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+'use client';
+
+import { type ComponentProps, forwardRef } from 'react';
+import { type LucideIcon, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+// =============================================================================
+// TYPE DEFINITIONS
+// =============================================================================
+
 /**
- * Interface for IconLink component props
- * Maintains compatibility with Angular version while adding React-specific features
+ * Resource link item interface
+ * Matches the structure used in home constants
  */
-export interface IconLinkProps {
-  /** Resource link item containing name, icon, and URL */
-  linkItem: {
-    name: string;
-    icon: LucideIcon;
-    link: string;
-    description?: string;
-    category?: string;
-  };
-  
-  /** Optional custom className for styling overrides */
-  className?: string;
-  
-  /** Size variant for the icon and text */
+export interface ResourceLink {
+  /** Translation key for the resource name */
+  name: string;
+  /** Lucide React icon component */
+  icon: LucideIcon;
+  /** External URL for the resource */
+  link: string;
+}
+
+/**
+ * IconLink component props
+ * Extends anchor element props for additional HTML attributes
+ */
+export interface IconLinkProps extends Omit<ComponentProps<'a'>, 'href' | 'children'> {
+  /** Resource link data with icon, name, and URL */
+  linkItem: ResourceLink;
+  /** Optional variant for different visual styles */
+  variant?: 'default' | 'compact' | 'card';
+  /** Optional size for icon and text scaling */
   size?: 'sm' | 'md' | 'lg';
-  
-  /** Color variant for theming */
-  variant?: 'default' | 'primary' | 'secondary' | 'muted';
-  
   /** Whether to show external link indicator */
   showExternalIcon?: boolean;
-  
-  /** Optional click handler for analytics or custom behavior */
-  onClick?: (linkItem: IconLinkProps['linkItem']) => void;
-  
-  /** Whether to open link in new tab (default: true for external links) */
-  target?: '_blank' | '_self';
-  
-  /** Optional aria-label override for accessibility */
-  ariaLabel?: string;
+  /** Custom CSS class names */
+  className?: string;
+  /** For internationalization - will be replaced with Next.js i18n hook */
+  translateFn?: (key: string) => string;
 }
 
-/**
- * Size configuration mapping
- * Defines consistent sizing across component variants
- */
-const sizeConfig = {
-  sm: {
-    icon: 'h-4 w-4',
-    text: 'text-sm',
-    spacing: 'gap-2',
-    padding: 'px-2 py-1',
-  },
-  md: {
-    icon: 'h-5 w-5',
-    text: 'text-base',
-    spacing: 'gap-3',
-    padding: 'px-3 py-2',
-  },
-  lg: {
-    icon: 'h-6 w-6',
-    text: 'text-lg',
-    spacing: 'gap-4',
-    padding: 'px-4 py-3',
-  },
-} as const;
+// =============================================================================
+// STYLE VARIANTS
+// =============================================================================
 
 /**
- * Color variant configuration
- * Provides consistent theming across the application
+ * Base styles for all variants
  */
-const variantConfig = {
-  default: {
-    link: 'text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white',
-    icon: 'text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200',
-    external: 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300',
-  },
-  primary: {
-    link: 'text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300',
-    icon: 'text-primary-500 hover:text-primary-600 dark:text-primary-400 dark:hover:text-primary-300',
-    external: 'text-primary-400 hover:text-primary-500 dark:text-primary-500 dark:hover:text-primary-400',
-  },
-  secondary: {
-    link: 'text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200',
-    icon: 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300',
-    external: 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300',
-  },
-  muted: {
-    link: 'text-gray-500 hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-300',
-    icon: 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-400',
-    external: 'text-gray-300 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400',
-  },
-} as const;
+const baseStyles = `
+  inline-flex items-center gap-2 
+  text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300
+  transition-colors duration-200 ease-in-out
+  focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 
+  dark:focus:ring-offset-gray-900
+  rounded-md
+`;
 
 /**
- * Utility function to determine if a link is external
- * Checks if the URL starts with http/https or is an absolute URL
+ * Variant-specific styles
  */
-function isExternalLink(url: string): boolean {
-  return url.startsWith('http://') || url.startsWith('https://') || url.startsWith('//');
-}
+const variantStyles = {
+  default: `
+    text-base font-medium
+    hover:underline hover:decoration-2 hover:underline-offset-4
+    px-1 py-1
+  `,
+  compact: `
+    text-sm font-normal
+    px-0.5 py-0.5
+  `,
+  card: `
+    text-base font-semibold
+    p-3 border border-gray-200 dark:border-gray-700 rounded-lg
+    hover:bg-gray-50 dark:hover:bg-gray-800
+    hover:border-primary-300 dark:hover:border-primary-600
+    hover:no-underline
+    shadow-sm hover:shadow-md
+    transition-all duration-200
+  `,
+};
+
+/**
+ * Size-specific styles for icons
+ */
+const iconSizes = {
+  sm: 'h-4 w-4',
+  md: 'h-5 w-5',
+  lg: 'h-6 w-6',
+};
+
+/**
+ * Size-specific styles for text
+ */
+const textSizes = {
+  sm: 'text-sm',
+  md: 'text-base',
+  lg: 'text-lg',
+};
+
+// =============================================================================
+// COMPONENT IMPLEMENTATION
+// =============================================================================
 
 /**
  * IconLink Component
  * 
- * Renders an accessible icon-based link with consistent styling and behavior.
- * Supports both internal Next.js navigation and external links with proper
- * accessibility attributes and visual indicators.
+ * Renders an accessible external link with an icon and translated label.
+ * Supports multiple variants and sizes for different use cases.
  * 
- * Features:
- * - Automatic external link detection and handling
- * - Accessible keyboard navigation with focus management
- * - Smooth hover and focus transitions
- * - Responsive design with size variants
- * - ARIA labels for screen reader support
- * - Optional click tracking for analytics
- * 
- * @param props - Component props including linkItem and styling options
- * @returns JSX element representing the icon link
+ * @param linkItem - Resource link data with icon, name, and URL
+ * @param variant - Visual style variant
+ * @param size - Icon and text size
+ * @param showExternalIcon - Whether to show external link indicator
+ * @param className - Additional CSS classes
+ * @param translateFn - Translation function (temporary until Next.js i18n is set up)
+ * @param ...props - Additional anchor element props
  */
-export function IconLink({
+export const IconLink = forwardRef<HTMLAnchorElement, IconLinkProps>(({
   linkItem,
-  className,
-  size = 'md',
   variant = 'default',
+  size = 'md',
   showExternalIcon = true,
-  onClick,
-  target,
-  ariaLabel,
-}: IconLinkProps): JSX.Element {
-  const { icon: Icon, name, link, description } = linkItem;
-  const sizeStyles = sizeConfig[size];
-  const variantStyles = variantConfig[variant];
-  
-  // Determine if this is an external link
-  const isExternal = isExternalLink(link);
-  const linkTarget = target || (isExternal ? '_blank' : '_self');
-  
-  // Handle click events
-  const handleClick = (event: React.MouseEvent) => {
-    if (onClick) {
-      onClick(linkItem);
-    }
-    
-    // Add analytics tracking for external links
-    if (isExternal && typeof window !== 'undefined') {
-      // Analytics tracking can be added here
-      console.log('External link clicked:', link);
-    }
-  };
-  
-  // Generate accessible label
-  const accessibleLabel = ariaLabel || 
-    description || 
-    `${name}${isExternal ? ' (opens in new tab)' : ''}`;
-  
-  // Common link styles
-  const linkStyles = cn(
-    // Base styles
-    'inline-flex items-center rounded-md font-medium transition-all duration-200',
-    'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
-    'hover:bg-gray-50 dark:hover:bg-gray-800/50',
-    
-    // Size-specific styles
-    sizeStyles.spacing,
-    sizeStyles.padding,
-    
-    // Variant-specific styles
-    variantStyles.link,
-    
-    // Custom className override
+  className,
+  translateFn,
+  ...props
+}, ref) => {
+  // Temporary translation function until Next.js i18n is implemented
+  const translate = translateFn || ((key: string) => {
+    // Basic fallback translations for development
+    const translations: Record<string, string> = {
+      'home.resourceLinks.gettingStartedGuide': 'Getting Started Guide',
+      'home.resourceLinks.writtenTutorials': 'Written Tutorials',
+      'home.resourceLinks.videoTutorials': 'Video Tutorials',
+      'home.resourceLinks.fullDocumentation': 'Full Documentation',
+      'home.resourceLinks.communityForum': 'Community Forum',
+      'home.resourceLinks.bugFeatureRequests': 'Bugs and Feature Requests',
+      'home.resourceLinks.twitter': 'DreamFactory on Twitter',
+      'home.resourceLinks.blog': 'DreamFactory blog',
+      'home.resourceLinks.contactSupport': 'Contact Support',
+    };
+    return translations[key] || key;
+  });
+
+  const IconComponent = linkItem.icon;
+  const linkText = translate(linkItem.name);
+
+  // Construct CSS classes
+  const linkClasses = cn(
+    baseStyles,
+    variantStyles[variant],
     className
   );
-  
-  // Icon styles
-  const iconStyles = cn(
-    'flex-shrink-0 transition-colors duration-200',
-    sizeStyles.icon,
-    variantStyles.icon
+
+  const iconClasses = cn(
+    iconSizes[size],
+    'shrink-0'
   );
-  
-  // Text styles
-  const textStyles = cn(
-    'transition-colors duration-200',
-    sizeStyles.text
+
+  const textClasses = cn(
+    textSizes[size],
+    variant === 'card' ? 'font-semibold' : 'font-medium'
   );
-  
-  // External icon styles
-  const externalIconStyles = cn(
-    'flex-shrink-0 ml-1 transition-colors duration-200',
-    'h-3 w-3', // Always small for external indicator
-    variantStyles.external
-  );
-  
-  // Link content
-  const linkContent = (
-    <>
-      <Icon 
-        className={iconStyles}
+
+  return (
+    <a
+      ref={ref}
+      href={linkItem.link}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={linkClasses}
+      aria-label={`${linkText} (opens in new tab)`}
+      {...props}
+    >
+      {/* Main Icon */}
+      <IconComponent 
+        className={iconClasses}
         aria-hidden="true"
       />
-      <span className={textStyles}>
-        {name}
+      
+      {/* Link Text */}
+      <span className={textClasses}>
+        {linkText}
       </span>
-      {isExternal && showExternalIcon && (
+      
+      {/* External Link Indicator */}
+      {showExternalIcon && (
         <ExternalLink 
-          className={externalIconStyles}
+          className={cn(iconSizes[size === 'lg' ? 'md' : 'sm'], 'shrink-0 opacity-60')}
           aria-hidden="true"
         />
       )}
-    </>
-  );
-  
-  // Render internal link using Next.js Link component
-  if (!isExternal) {
-    return (
-      <Link 
-        href={link}
-        className={linkStyles}
-        onClick={handleClick}
-        aria-label={accessibleLabel}
-        title={description}
-      >
-        {linkContent}
-      </Link>
-    );
-  }
-  
-  // Render external link with security attributes
-  return (
-    <a
-      href={link}
-      target={linkTarget}
-      rel={linkTarget === '_blank' ? 'noopener noreferrer' : undefined}
-      className={linkStyles}
-      onClick={handleClick}
-      aria-label={accessibleLabel}
-      title={description}
-    >
-      {linkContent}
     </a>
+  );
+});
+
+IconLink.displayName = 'IconLink';
+
+// =============================================================================
+// COMPONENT VARIANTS
+// =============================================================================
+
+/**
+ * Compact IconLink variant
+ * Smaller size for secondary navigation or dense layouts
+ */
+export const CompactIconLink = forwardRef<HTMLAnchorElement, Omit<IconLinkProps, 'variant' | 'size'>>(
+  (props, ref) => (
+    <IconLink 
+      ref={ref} 
+      variant="compact" 
+      size="sm" 
+      showExternalIcon={false}
+      {...props} 
+    />
+  )
+);
+
+CompactIconLink.displayName = 'CompactIconLink';
+
+/**
+ * Card IconLink variant
+ * Card-style layout for featured links and landing pages
+ */
+export const CardIconLink = forwardRef<HTMLAnchorElement, Omit<IconLinkProps, 'variant'>>(
+  (props, ref) => (
+    <IconLink 
+      ref={ref} 
+      variant="card" 
+      {...props} 
+    />
+  )
+);
+
+CardIconLink.displayName = 'CardIconLink';
+
+// =============================================================================
+// UTILITY FUNCTIONS
+// =============================================================================
+
+/**
+ * Helper function to validate resource link structure
+ * Useful for runtime validation and development
+ */
+export function isValidResourceLink(item: any): item is ResourceLink {
+  return (
+    typeof item === 'object' &&
+    item !== null &&
+    typeof item.name === 'string' &&
+    typeof item.link === 'string' &&
+    typeof item.icon === 'function'
   );
 }
 
 /**
- * Type exports for external usage
+ * Helper function to extract domain from resource link
+ * Useful for analytics and security validation
  */
-export type { IconLinkProps };
+export function getResourceDomain(link: string): string {
+  try {
+    return new URL(link).hostname;
+  } catch {
+    return '';
+  }
+}
 
 /**
- * Default export for convenience
+ * Helper function to determine if link is secure (HTTPS)
+ * Useful for security validation and mixed content warnings
  */
+export function isSecureLink(link: string): boolean {
+  try {
+    return new URL(link).protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+// =============================================================================
+// DEFAULT EXPORT
+// =============================================================================
+
 export default IconLink;
