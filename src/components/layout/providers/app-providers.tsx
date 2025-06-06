@@ -1,384 +1,714 @@
 /**
- * Root provider component for the DreamFactory Admin Interface application.
+ * App Providers - Root Provider Component for DreamFactory Admin Interface
  * 
- * This component combines all application context providers in the correct hierarchical order,
- * replacing Angular module dependency injection with React context composition. It ensures
- * proper provider dependencies, error boundary protection, and performance optimization
- * through provider memoization patterns compatible with React 19 concurrent features.
+ * This component combines all application context providers in the correct hierarchy order,
+ * replacing Angular module dependency injection with React context composition. Implements
+ * efficient provider composition patterns to avoid provider hell anti-pattern while ensuring
+ * proper dependency relationships and type safety.
  * 
- * Provider Hierarchy (ordered by dependency requirements):
- * 1. ErrorBoundary - Catches errors from all child providers and components
- * 2. QueryProvider - Provides TanStack React Query client for server state management
- * 3. AuthProvider - Provides authentication context (depends on QueryProvider for user data)
- * 4. ThemeProvider - Provides theme context (depends on AuthProvider for user preferences)
- * 5. NotificationProvider - Provides notification context (depends on AuthProvider for user settings)
+ * Key Features:
+ * - React 19 optimized context composition with minimal re-renders
+ * - Correct provider hierarchy ensuring authentication context availability to query provider
+ * - Error boundary integration protecting entire application provider tree
+ * - Type-safe provider composition with proper TypeScript inference
+ * - Performance optimization preventing unnecessary re-renders through provider memoization
+ * - Graceful degradation with error recovery mechanisms
+ * - Development tools integration for debugging and monitoring
+ * 
+ * Provider Hierarchy (outer to inner):
+ * 1. ErrorBoundary - Catches and handles React errors across entire app
+ * 2. ThemeProvider - Provides theme context independent of other providers
+ * 3. AuthProvider - Provides authentication context needed by QueryProvider
+ * 4. QueryProvider - Uses auth context for API authentication headers
+ * 5. NotificationProvider - Provides notifications that may be used by other systems
  * 
  * @version 1.0.0
- * @requires React 19.0.0 with enhanced concurrent features and context optimizations
- * @requires TypeScript 5.8+ with enhanced React 19 support for context typing
- * @requires Next.js 15.1+ for SSR-compatible provider composition patterns
+ * @requires React 19.0.0 for enhanced context composition and concurrent features
+ * @requires Next.js 15.1+ for middleware integration and error handling
+ * @requires TypeScript 5.8+ for enhanced type inference and React 19 support
  */
 
 'use client';
 
-import React, { memo, useMemo, type ReactNode } from 'react';
+import React, { useMemo, useCallback, ReactNode } from 'react';
 import { ErrorBoundary } from './error-boundary';
-import { QueryProvider } from './query-provider';
 import { AuthProvider } from './auth-provider';
 import { ThemeProvider } from './theme-provider';
+import { QueryProvider } from './query-provider';
 import { NotificationProvider } from './notification-provider';
 import type { 
-  AppProvidersConfig, 
   AppProvidersProps,
-  AuthProviderProps,
-  ThemeProviderProps,
-  QueryProviderProps,
-  NotificationProviderProps,
-  ErrorProviderProps,
-  DEFAULT_PROVIDER_CONFIG,
-  PROVIDER_DISPLAY_NAMES 
+  ProviderConfig,
+  ProviderComposition,
+  AppProvidersContextValue 
 } from './provider-types';
 
 // =============================================================================
-// Constants & Configuration
+// Constants and Configuration
 // =============================================================================
 
 /**
- * Default configuration for all providers with performance-optimized settings.
- * These values are derived from the technical specification requirements for
- * cache hit responses under 50ms and real-time validation under 100ms.
+ * Default configuration for all providers
+ * Provides sensible defaults while allowing customization through props
  */
-const DEFAULT_APP_CONFIG: Required<AppProvidersConfig> = {
+const DEFAULT_PROVIDER_CONFIG: ProviderConfig = {
   auth: {
-    refreshInterval: DEFAULT_PROVIDER_CONFIG.auth.refreshInterval,
-    autoRefresh: DEFAULT_PROVIDER_CONFIG.auth.autoRefresh,
+    autoRefresh: true,
+    refreshInterval: 15 * 60 * 1000, // 15 minutes
     debug: process.env.NODE_ENV === 'development',
   },
   theme: {
-    defaultTheme: DEFAULT_PROVIDER_CONFIG.theme.defaultTheme,
-    enableSystemDetection: DEFAULT_PROVIDER_CONFIG.theme.enableSystemDetection,
-    storageKey: DEFAULT_PROVIDER_CONFIG.theme.storageKey,
+    defaultTheme: 'system',
+    enableSystemDetection: true,
     debug: process.env.NODE_ENV === 'development',
   },
   query: {
-    cacheConfig: DEFAULT_PROVIDER_CONFIG.query.cacheConfig,
-    devtools: {
-      enabled: process.env.NODE_ENV === 'development',
-      position: 'bottom-right',
-      initialIsOpen: false,
-      buttonPosition: 'bottom-right',
-    },
+    enableDevtools: process.env.NODE_ENV === 'development',
     debug: process.env.NODE_ENV === 'development',
+    cacheConfig: {
+      defaultStaleTime: 5 * 60 * 1000, // 5 minutes
+      defaultCacheTime: 10 * 60 * 1000, // 10 minutes
+    },
   },
   notification: {
-    maxQueueSize: DEFAULT_PROVIDER_CONFIG.notification.maxQueueSize,
-    position: DEFAULT_PROVIDER_CONFIG.notification.position,
-    persistAcrossRoutes: DEFAULT_PROVIDER_CONFIG.notification.persistAcrossRoutes,
+    maxQueueSize: 10,
+    position: 'top-right',
+    persistAcrossRoutes: true,
     debug: process.env.NODE_ENV === 'development',
   },
-  error: {
-    maxHistoryEntries: DEFAULT_PROVIDER_CONFIG.error.maxHistoryEntries,
-    developmentMode: DEFAULT_PROVIDER_CONFIG.error.developmentMode,
-    reportingConfig: {
-      enabled: process.env.NODE_ENV === 'production',
-      includeUserContext: true,
-      includeStackTrace: true,
-      sampleRate: 1.0,
-      maxErrorsPerSession: 50,
-      ignoredErrors: [
-        'ResizeObserver loop limit exceeded',
-        'Non-Error promise rejection captured',
-        'Loading chunk',
-      ],
-    },
-    debug: process.env.NODE_ENV === 'development',
+  errorBoundary: {
+    enableReporting: process.env.NODE_ENV === 'production',
+    developmentMode: process.env.NODE_ENV === 'development',
+    maxRetries: 3,
+    enableAutoRetry: true,
   },
-  development: {
-    enableDevtools: process.env.NODE_ENV === 'development',
-    enableDebugLogging: process.env.NODE_ENV === 'development',
-    mockApiCalls: process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_MOCK_API === 'true',
-  },
-} as const;
+};
 
 /**
- * Provider order configuration ensuring proper dependency resolution.
- * Lower numbers indicate higher priority (outer providers).
+ * Provider composition order with dependency management
+ * Ensures providers are initialized in correct order based on dependencies
  */
-const PROVIDER_ORDER = {
-  error: 1,      // Must be outermost to catch all errors
-  query: 2,      // Required by auth provider for user data fetching
-  auth: 3,       // Required by theme and notification providers for user preferences
-  theme: 4,      // Required by notification provider for theme-aware styling
-  notification: 5, // Innermost provider
-} as const;
+const PROVIDER_COMPOSITION: ProviderComposition[] = [
+  {
+    name: 'ErrorBoundary',
+    priority: 1, // Highest priority - must wrap everything
+    dependencies: [],
+  },
+  {
+    name: 'ThemeProvider',
+    priority: 2, // Independent provider
+    dependencies: [],
+  },
+  {
+    name: 'AuthProvider',
+    priority: 3, // Needed by QueryProvider
+    dependencies: [],
+  },
+  {
+    name: 'QueryProvider',
+    priority: 4, // Depends on AuthProvider for authentication headers
+    dependencies: ['AuthProvider'],
+  },
+  {
+    name: 'NotificationProvider',
+    priority: 5, // Can use other providers internally
+    dependencies: ['ThemeProvider'],
+  },
+];
 
 // =============================================================================
-// Provider Composition Component
+// App Providers Props Interface
 // =============================================================================
 
 /**
- * Optimized provider composition component that avoids provider hell anti-pattern.
- * Uses React 19's enhanced context optimizations and proper dependency ordering.
+ * Props interface for AppProviders component with comprehensive configuration options
  */
-const ProviderComposition = memo<{
+export interface AppProvidersProps {
+  /** Child components to wrap with all providers */
   children: ReactNode;
-  config: Required<AppProvidersConfig>;
-}>(({ children, config }) => {
-  // Memoize provider configurations to prevent unnecessary re-renders
-  const errorConfig = useMemo<ErrorProviderProps>(() => ({
-    reportingConfig: config.error.reportingConfig,
-    maxHistoryEntries: config.error.maxHistoryEntries,
-    developmentMode: config.error.developmentMode,
-    debug: config.error.debug,
-  }), [config.error]);
+  
+  /** Configuration for individual providers */
+  config?: Partial<ProviderConfig>;
+  
+  /** Whether to enable debug mode for all providers */
+  debug?: boolean;
+  
+  /** Custom error boundary component */
+  errorBoundary?: React.ComponentType<any>;
+  
+  /** Custom error fallback component */
+  errorFallback?: React.ComponentType<any>;
+  
+  /** Provider-specific overrides */
+  providerOverrides?: {
+    auth?: Partial<React.ComponentProps<typeof AuthProvider>>;
+    theme?: Partial<React.ComponentProps<typeof ThemeProvider>>;
+    query?: Partial<React.ComponentProps<typeof QueryProvider>>;
+    notification?: Partial<React.ComponentProps<typeof NotificationProvider>>;
+    errorBoundary?: Partial<React.ComponentProps<typeof ErrorBoundary>>;
+  };
+  
+  /** Environment-specific configuration */
+  environment?: 'development' | 'staging' | 'production';
+  
+  /** Feature flags for conditional provider loading */
+  features?: {
+    enableAuth?: boolean;
+    enableThemes?: boolean;
+    enableNotifications?: boolean;
+    enableErrorReporting?: boolean;
+    enableQueryDevtools?: boolean;
+  };
+  
+  /** Custom provider initialization hooks */
+  onProvidersInitialized?: () => void;
+  onProviderError?: (providerName: string, error: Error) => void;
+}
 
-  const queryConfig = useMemo<QueryProviderProps>(() => ({
-    cacheConfig: config.query.cacheConfig,
-    devtools: config.query.devtools,
-    debug: config.query.debug,
-  }), [config.query]);
+// =============================================================================
+// Provider Composition Utility Functions
+// =============================================================================
 
-  const authConfig = useMemo<AuthProviderProps>(() => ({
-    refreshInterval: config.auth.refreshInterval,
-    autoRefresh: config.auth.autoRefresh,
-    debug: config.auth.debug,
-  }), [config.auth]);
+/**
+ * Merges default configuration with user-provided overrides
+ * Implements deep merge strategy for nested configuration objects
+ */
+function mergeProviderConfig(
+  defaultConfig: ProviderConfig,
+  userConfig?: Partial<ProviderConfig>
+): ProviderConfig {
+  if (!userConfig) return defaultConfig;
+  
+  return {
+    auth: { ...defaultConfig.auth, ...userConfig.auth },
+    theme: { ...defaultConfig.theme, ...userConfig.theme },
+    query: { 
+      ...defaultConfig.query, 
+      ...userConfig.query,
+      cacheConfig: {
+        ...defaultConfig.query.cacheConfig,
+        ...userConfig.query?.cacheConfig,
+      },
+    },
+    notification: { ...defaultConfig.notification, ...userConfig.notification },
+    errorBoundary: { ...defaultConfig.errorBoundary, ...userConfig.errorBoundary },
+  };
+}
 
-  const themeConfig = useMemo<ThemeProviderProps>(() => ({
-    defaultTheme: config.theme.defaultTheme,
-    enableSystemDetection: config.theme.enableSystemDetection,
-    storageKey: config.theme.storageKey,
-    debug: config.theme.debug,
-  }), [config.theme]);
+/**
+ * Validates provider dependencies are met in the composition order
+ * Ensures providers are rendered in correct hierarchy for dependency injection
+ */
+function validateProviderDependencies(composition: ProviderComposition[]): boolean {
+  const availableProviders = new Set<string>();
+  
+  for (const provider of composition.sort((a, b) => a.priority - b.priority)) {
+    // Check if all dependencies are available
+    for (const dependency of provider.dependencies) {
+      if (!availableProviders.has(dependency)) {
+        console.error(
+          `Provider ${provider.name} depends on ${dependency} but it's not available. ` +
+          `Check provider composition order.`
+        );
+        return false;
+      }
+    }
+    
+    availableProviders.add(provider.name);
+  }
+  
+  return true;
+}
 
-  const notificationConfig = useMemo<NotificationProviderProps>(() => ({
-    maxQueueSize: config.notification.maxQueueSize,
-    position: config.notification.position,
-    persistAcrossRoutes: config.notification.persistAcrossRoutes,
-    debug: config.notification.debug,
-  }), [config.notification]);
+/**
+ * Creates provider error handler with context information
+ * Provides detailed error reporting for provider-specific failures
+ */
+function createProviderErrorHandler(
+  providerName: string, 
+  onError?: (providerName: string, error: Error) => void
+) {
+  return (error: Error, errorInfo?: React.ErrorInfo) => {
+    const enhancedError = new Error(
+      `Provider ${providerName} encountered an error: ${error.message}`
+    );
+    enhancedError.stack = error.stack;
+    
+    console.error(`[${providerName}] Provider Error:`, error);
+    
+    if (errorInfo) {
+      console.error(`[${providerName}] Component Stack:`, errorInfo.componentStack);
+    }
+    
+    if (onError) {
+      onError(providerName, enhancedError);
+    }
+  };
+}
+
+// =============================================================================
+// Individual Provider Wrapper Components
+// =============================================================================
+
+/**
+ * Memoized AuthProvider wrapper with error handling
+ */
+const MemoizedAuthProvider = React.memo<{
+  children: ReactNode;
+  config: ProviderConfig['auth'];
+  overrides?: Partial<React.ComponentProps<typeof AuthProvider>>;
+  onError?: (error: Error) => void;
+}>(({ children, config, overrides, onError }) => {
+  const handleError = useCallback(
+    (error: Error, errorInfo: React.ErrorInfo) => {
+      createProviderErrorHandler('AuthProvider', 
+        onError ? (_, err) => onError(err) : undefined
+      )(error, errorInfo);
+    },
+    [onError]
+  );
 
   return (
-    <ErrorBoundary {...errorConfig}>
-      <QueryProvider {...queryConfig}>
-        <AuthProvider {...authConfig}>
-          <ThemeProvider {...themeConfig}>
-            <NotificationProvider {...notificationConfig}>
-              {children}
-            </NotificationProvider>
-          </ThemeProvider>
-        </AuthProvider>
-      </QueryProvider>
+    <AuthProvider
+      autoRefresh={config.autoRefresh}
+      refreshInterval={config.refreshInterval}
+      debug={config.debug}
+      {...overrides}
+    >
+      {children}
+    </AuthProvider>
+  );
+});
+
+MemoizedAuthProvider.displayName = 'MemoizedAuthProvider';
+
+/**
+ * Memoized ThemeProvider wrapper with error handling
+ */
+const MemoizedThemeProvider = React.memo<{
+  children: ReactNode;
+  config: ProviderConfig['theme'];
+  overrides?: Partial<React.ComponentProps<typeof ThemeProvider>>;
+  onError?: (error: Error) => void;
+}>(({ children, config, overrides, onError }) => {
+  return (
+    <ThemeProvider
+      defaultTheme={config.defaultTheme}
+      enableSystemDetection={config.enableSystemDetection}
+      debug={config.debug}
+      {...overrides}
+    >
+      {children}
+    </ThemeProvider>
+  );
+});
+
+MemoizedThemeProvider.displayName = 'MemoizedThemeProvider';
+
+/**
+ * Memoized QueryProvider wrapper with error handling
+ */
+const MemoizedQueryProvider = React.memo<{
+  children: ReactNode;
+  config: ProviderConfig['query'];
+  overrides?: Partial<React.ComponentProps<typeof QueryProvider>>;
+  onError?: (error: Error) => void;
+}>(({ children, config, overrides, onError }) => {
+  return (
+    <QueryProvider
+      cacheConfig={config.cacheConfig}
+      devtools={{ enabled: config.enableDevtools }}
+      debug={config.debug}
+      {...overrides}
+    >
+      {children}
+    </QueryProvider>
+  );
+});
+
+MemoizedQueryProvider.displayName = 'MemoizedQueryProvider';
+
+/**
+ * Memoized NotificationProvider wrapper with error handling
+ */
+const MemoizedNotificationProvider = React.memo<{
+  children: ReactNode;
+  config: ProviderConfig['notification'];
+  overrides?: Partial<React.ComponentProps<typeof NotificationProvider>>;
+  onError?: (error: Error) => void;
+}>(({ children, config, overrides, onError }) => {
+  return (
+    <NotificationProvider
+      maxQueueSize={config.maxQueueSize}
+      position={config.position}
+      persistAcrossRoutes={config.persistAcrossRoutes}
+      debug={config.debug}
+      {...overrides}
+    >
+      {children}
+    </NotificationProvider>
+  );
+});
+
+MemoizedNotificationProvider.displayName = 'MemoizedNotificationProvider';
+
+/**
+ * Memoized ErrorBoundary wrapper with enhanced error handling
+ */
+const MemoizedErrorBoundary = React.memo<{
+  children: ReactNode;
+  config: ProviderConfig['errorBoundary'];
+  overrides?: Partial<React.ComponentProps<typeof ErrorBoundary>>;
+  fallback?: React.ComponentType<any>;
+  onError?: (error: Error) => void;
+}>(({ children, config, overrides, fallback, onError }) => {
+  const handleError = useCallback(
+    (error: Error, errorInfo: React.ErrorInfo) => {
+      createProviderErrorHandler('ErrorBoundary', 
+        onError ? (_, err) => onError(err) : undefined
+      )(error, errorInfo);
+    },
+    [onError]
+  );
+
+  return (
+    <ErrorBoundary
+      boundaryId="app-providers-root"
+      enableReporting={config.enableReporting}
+      developmentMode={config.developmentMode}
+      maxRetries={config.maxRetries}
+      enableAutoRetry={config.enableAutoRetry}
+      fallback={fallback}
+      onError={handleError}
+      {...overrides}
+    >
+      {children}
     </ErrorBoundary>
   );
 });
 
-ProviderComposition.displayName = 'ProviderComposition';
+MemoizedErrorBoundary.displayName = 'MemoizedErrorBoundary';
 
 // =============================================================================
-// Main AppProviders Component
+// Main App Providers Component
 // =============================================================================
 
 /**
- * Root application providers component that combines all context providers
- * in the correct hierarchical order with comprehensive error handling and
- * performance optimizations for React 19 concurrent features.
+ * App Providers - Root provider component that combines all application providers
  * 
- * This component replaces Angular's NgModule providers array and dependency
- * injection system with React's context composition pattern, ensuring:
- * - Proper provider hierarchy for dependency resolution
- * - Error boundary protection for the entire provider tree
- * - Performance optimization through memoization and React 19 optimizations
- * - Type-safe provider composition with TypeScript inference
- * - Development mode debugging and monitoring capabilities
+ * This component implements the provider composition pattern to combine AuthProvider,
+ * ThemeProvider, QueryProvider, NotificationProvider, and ErrorBoundary in the correct
+ * hierarchy order. Provides performance optimizations through memoization and ensures
+ * type safety with comprehensive TypeScript support.
  * 
- * @param props - Component props with children and optional configuration
- * @returns JSX element with all providers composed in correct order
+ * @param props - App providers configuration and children
+ * @returns JSX element with all providers properly composed
  */
-export const AppProviders: React.FC<AppProvidersProps> = memo<AppProvidersProps>(({
+export function AppProviders({
   children,
-  config = {},
-  strictMode = false,
-  enableProfiling = process.env.NODE_ENV === 'development',
-}) => {
-  // Merge provided configuration with defaults, optimizing for performance
-  const mergedConfig = useMemo<Required<AppProvidersConfig>>(() => ({
-    auth: { ...DEFAULT_APP_CONFIG.auth, ...config.auth },
-    theme: { ...DEFAULT_APP_CONFIG.theme, ...config.theme },
-    query: { ...DEFAULT_APP_CONFIG.query, ...config.query },
-    notification: { ...DEFAULT_APP_CONFIG.notification, ...config.notification },
-    error: { 
-      ...DEFAULT_APP_CONFIG.error, 
-      ...config.error,
-      reportingConfig: {
-        ...DEFAULT_APP_CONFIG.error.reportingConfig,
-        ...config.error?.reportingConfig,
-      },
-    },
-    development: { ...DEFAULT_APP_CONFIG.development, ...config.development },
-  }), [config]);
+  config: userConfig,
+  debug = false,
+  errorBoundary: CustomErrorBoundary,
+  errorFallback: CustomErrorFallback,
+  providerOverrides = {},
+  environment = process.env.NODE_ENV as 'development' | 'staging' | 'production',
+  features = {
+    enableAuth: true,
+    enableThemes: true,
+    enableNotifications: true,
+    enableErrorReporting: environment === 'production',
+    enableQueryDevtools: environment === 'development',
+  },
+  onProvidersInitialized,
+  onProviderError,
+}: AppProvidersProps): JSX.Element {
+  // =============================================================================
+  // Configuration and Validation
+  // =============================================================================
 
-  // Log provider initialization in development mode
-  if (mergedConfig.development.enableDebugLogging) {
-    console.group('🔧 AppProviders Initialization');
-    console.log('Provider Order:', PROVIDER_ORDER);
-    console.log('Configuration:', mergedConfig);
-    console.log('Strict Mode:', strictMode);
-    console.log('Profiling:', enableProfiling);
-    console.groupEnd();
-  }
+  // Merge user configuration with defaults
+  const config = useMemo(
+    () => mergeProviderConfig(DEFAULT_PROVIDER_CONFIG, userConfig),
+    [userConfig]
+  );
 
-  // Create provider tree with proper error boundaries and performance optimization
-  const providerTree = useMemo(() => (
-    <ProviderComposition config={mergedConfig}>
-      {children}
-    </ProviderComposition>
-  ), [children, mergedConfig]);
+  // Apply global debug override
+  const finalConfig = useMemo(() => {
+    if (debug) {
+      return {
+        auth: { ...config.auth, debug: true },
+        theme: { ...config.theme, debug: true },
+        query: { ...config.query, debug: true },
+        notification: { ...config.notification, debug: true },
+        errorBoundary: { ...config.errorBoundary, developmentMode: true },
+      };
+    }
+    return config;
+  }, [config, debug]);
 
-  // Wrap in React.StrictMode if enabled for enhanced development debugging
-  if (strictMode) {
-    return (
-      <React.StrictMode>
-        {enableProfiling ? (
-          <React.Profiler
-            id="AppProviders"
-            onRender={(id, phase, actualDuration) => {
-              if (mergedConfig.development.enableDebugLogging) {
-                console.log(`🔍 Profiler [${id}]: ${phase} phase took ${actualDuration}ms`);
-              }
-            }}
-          >
-            {providerTree}
-          </React.Profiler>
-        ) : (
-          providerTree
-        )}
-      </React.StrictMode>
+  // Validate provider dependencies on mount
+  React.useEffect(() => {
+    const isValid = validateProviderDependencies(PROVIDER_COMPOSITION);
+    if (!isValid) {
+      console.error('Provider dependency validation failed. Check provider composition order.');
+    }
+    
+    if (debug) {
+      console.log('AppProviders initialized with configuration:', finalConfig);
+      console.log('Provider composition order:', PROVIDER_COMPOSITION);
+    }
+    
+    if (onProvidersInitialized) {
+      onProvidersInitialized();
+    }
+  }, [finalConfig, debug, onProvidersInitialized]);
+
+  // =============================================================================
+  // Error Handling
+  // =============================================================================
+
+  // Create provider-specific error handlers
+  const authErrorHandler = useCallback(
+    (error: Error) => onProviderError?.('AuthProvider', error),
+    [onProviderError]
+  );
+
+  const themeErrorHandler = useCallback(
+    (error: Error) => onProviderError?.('ThemeProvider', error),
+    [onProviderError]
+  );
+
+  const queryErrorHandler = useCallback(
+    (error: Error) => onProviderError?.('QueryProvider', error),
+    [onProviderError]
+  );
+
+  const notificationErrorHandler = useCallback(
+    (error: Error) => onProviderError?.('NotificationProvider', error),
+    [onProviderError]
+  );
+
+  const errorBoundaryHandler = useCallback(
+    (error: Error) => onProviderError?.('ErrorBoundary', error),
+    [onProviderError]
+  );
+
+  // =============================================================================
+  // Provider Composition with Feature Flags
+  // =============================================================================
+
+  // Build provider tree with conditional rendering based on feature flags
+  const providerTree = useMemo(() => {
+    let tree = children;
+
+    // Wrap with NotificationProvider (innermost, except for error boundary)
+    if (features.enableNotifications) {
+      tree = (
+        <MemoizedNotificationProvider
+          config={finalConfig.notification}
+          overrides={providerOverrides.notification}
+          onError={notificationErrorHandler}
+        >
+          {tree}
+        </MemoizedNotificationProvider>
+      );
+    }
+
+    // Wrap with QueryProvider (needs AuthProvider context)
+    tree = (
+      <MemoizedQueryProvider
+        config={{
+          ...finalConfig.query,
+          enableDevtools: features.enableQueryDevtools && finalConfig.query.enableDevtools,
+        }}
+        overrides={providerOverrides.query}
+        onError={queryErrorHandler}
+      >
+        {tree}
+      </MemoizedQueryProvider>
     );
+
+    // Wrap with AuthProvider (needed by QueryProvider)
+    if (features.enableAuth) {
+      tree = (
+        <MemoizedAuthProvider
+          config={finalConfig.auth}
+          overrides={providerOverrides.auth}
+          onError={authErrorHandler}
+        >
+          {tree}
+        </MemoizedAuthProvider>
+      );
+    }
+
+    // Wrap with ThemeProvider (independent)
+    if (features.enableThemes) {
+      tree = (
+        <MemoizedThemeProvider
+          config={finalConfig.theme}
+          overrides={providerOverrides.theme}
+          onError={themeErrorHandler}
+        >
+          {tree}
+        </MemoizedThemeProvider>
+      );
+    }
+
+    // Wrap with ErrorBoundary (outermost)
+    const ErrorBoundaryComponent = CustomErrorBoundary || MemoizedErrorBoundary;
+    tree = (
+      <ErrorBoundaryComponent
+        config={{
+          ...finalConfig.errorBoundary,
+          enableReporting: features.enableErrorReporting && finalConfig.errorBoundary.enableReporting,
+        }}
+        overrides={providerOverrides.errorBoundary}
+        fallback={CustomErrorFallback}
+        onError={errorBoundaryHandler}
+      >
+        {tree}
+      </ErrorBoundaryComponent>
+    );
+
+    return tree;
+  }, [
+    children,
+    finalConfig,
+    features,
+    providerOverrides,
+    CustomErrorBoundary,
+    CustomErrorFallback,
+    authErrorHandler,
+    themeErrorHandler,
+    queryErrorHandler,
+    notificationErrorHandler,
+    errorBoundaryHandler,
+  ]);
+
+  // =============================================================================
+  // Development Tools and Debugging
+  // =============================================================================
+
+  // Log provider hierarchy in development mode
+  React.useEffect(() => {
+    if (debug && typeof window !== 'undefined') {
+      (window as any).__DREAMFACTORY_PROVIDERS__ = {
+        config: finalConfig,
+        features,
+        composition: PROVIDER_COMPOSITION,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }, [debug, finalConfig, features]);
+
+  return <>{providerTree}</>;
+}
+
+// =============================================================================
+// Higher-Order Component for Provider Composition
+// =============================================================================
+
+/**
+ * Higher-order component that wraps components with AppProviders
+ * Useful for testing and isolated component development
+ */
+export function withProviders<P extends object>(
+  WrappedComponent: React.ComponentType<P>,
+  providersConfig?: Partial<AppProvidersProps>
+): React.ComponentType<P> {
+  const WithProvidersComponent = (props: P) => (
+    <AppProviders {...providersConfig}>
+      <WrappedComponent {...props} />
+    </AppProviders>
+  );
+
+  WithProvidersComponent.displayName = 
+    `withProviders(${WrappedComponent.displayName || WrappedComponent.name})`;
+
+  return WithProvidersComponent;
+}
+
+// =============================================================================
+// Context Hook for Provider Status
+// =============================================================================
+
+/**
+ * Custom hook to access information about provider status and configuration
+ * Useful for debugging and monitoring provider health
+ */
+export function useProviderStatus(): AppProvidersContextValue {
+  const [initializationTime] = React.useState(() => Date.now());
+  const [renderCount, setRenderCount] = React.useState(0);
+
+  React.useEffect(() => {
+    setRenderCount(count => count + 1);
+  });
+
+  return {
+    isInitialized: true,
+    initializationTime,
+    renderCount,
+    composition: PROVIDER_COMPOSITION,
+    debug: process.env.NODE_ENV === 'development',
+  };
+}
+
+// =============================================================================
+// Provider Status Component for Development
+// =============================================================================
+
+/**
+ * Development-only component for visualizing provider status
+ * Renders provider hierarchy and configuration information
+ */
+export const ProviderStatusDebugger: React.FC<{ show?: boolean }> = ({ show = false }) => {
+  const status = useProviderStatus();
+
+  if (!show || process.env.NODE_ENV !== 'development') {
+    return null;
   }
 
-  return enableProfiling ? (
-    <React.Profiler
-      id="AppProviders"
-      onRender={(id, phase, actualDuration) => {
-        if (mergedConfig.development.enableDebugLogging) {
-          console.log(`🔍 Profiler [${id}]: ${phase} phase took ${actualDuration}ms`);
-        }
+  return (
+    <div 
+      style={{
+        position: 'fixed',
+        bottom: '20px',
+        right: '20px',
+        background: 'rgba(0, 0, 0, 0.8)',
+        color: 'white',
+        padding: '10px',
+        borderRadius: '5px',
+        fontSize: '12px',
+        zIndex: 10000,
+        maxWidth: '300px',
       }}
     >
-      {providerTree}
-    </React.Profiler>
-  ) : (
-    providerTree
+      <h4>Provider Status</h4>
+      <p>Initialized: {status.isInitialized ? 'Yes' : 'No'}</p>
+      <p>Render Count: {status.renderCount}</p>
+      <p>Composition: {status.composition.length} providers</p>
+      <details>
+        <summary>Provider Order</summary>
+        <ul>
+          {status.composition.map((provider, index) => (
+            <li key={provider.name}>
+              {index + 1}. {provider.name} (Priority: {provider.priority})
+            </li>
+          ))}
+        </ul>
+      </details>
+    </div>
   );
-});
-
-AppProviders.displayName = PROVIDER_DISPLAY_NAMES.app;
-
-// =============================================================================
-// Development Utilities
-// =============================================================================
-
-/**
- * Development utility hook for inspecting provider configuration.
- * Only available in development mode for debugging purposes.
- */
-export const useAppProvidersDebug = () => {
-  if (process.env.NODE_ENV !== 'development') {
-    throw new Error('useAppProvidersDebug is only available in development mode');
-  }
-
-  return useMemo(() => ({
-    defaultConfig: DEFAULT_APP_CONFIG,
-    providerOrder: PROVIDER_ORDER,
-    displayNames: PROVIDER_DISPLAY_NAMES,
-    isReactStrictMode: typeof window !== 'undefined' && !!document.querySelector('[data-reactroot]'),
-  }), []);
-};
-
-/**
- * Type guard to check if provider configuration is valid.
- * Ensures runtime type safety for provider configuration objects.
- */
-export const isValidProviderConfig = (config: unknown): config is AppProvidersConfig => {
-  if (!config || typeof config !== 'object') {
-    return false;
-  }
-
-  const c = config as Record<string, unknown>;
-  
-  // Check for valid optional configuration objects
-  const validKeys = ['auth', 'theme', 'query', 'notification', 'error', 'development'];
-  const configKeys = Object.keys(c);
-  
-  return configKeys.every(key => validKeys.includes(key));
-};
-
-/**
- * Provider configuration validator for development debugging.
- * Validates provider configuration structure and warns about potential issues.
- */
-export const validateProviderConfig = (config: AppProvidersConfig): void => {
-  if (process.env.NODE_ENV !== 'development') {
-    return;
-  }
-
-  console.group('🔍 Provider Configuration Validation');
-
-  try {
-    // Validate configuration structure
-    if (!isValidProviderConfig(config)) {
-      console.warn('⚠️ Invalid provider configuration structure detected');
-    }
-
-    // Check for potential performance issues
-    if (config.query?.cacheConfig?.defaultStaleTime && config.query.cacheConfig.defaultStaleTime < 30000) {
-      console.warn('⚠️ Short stale time may cause excessive API requests');
-    }
-
-    if (config.notification?.maxQueueSize && config.notification.maxQueueSize > 20) {
-      console.warn('⚠️ Large notification queue size may impact performance');
-    }
-
-    // Validate provider dependencies
-    if (config.auth?.autoRefresh === false && config.auth?.refreshInterval) {
-      console.warn('⚠️ Refresh interval set but auto-refresh is disabled');
-    }
-
-    console.log('✅ Provider configuration validation completed');
-  } catch (error) {
-    console.error('❌ Provider configuration validation failed:', error);
-  } finally {
-    console.groupEnd();
-  }
 };
 
 // =============================================================================
-// Exports
+// Type Exports
+// =============================================================================
+
+export type { AppProvidersProps, ProviderConfig, ProviderComposition };
+
+// =============================================================================
+// Default Export
 // =============================================================================
 
 export default AppProviders;
-
-export type {
-  AppProvidersProps,
-  AppProvidersConfig,
-} from './provider-types';
-
-/**
- * Re-export provider types for convenience
- */
-export type {
-  AuthProviderProps,
-  ThemeProviderProps,
-  QueryProviderProps,
-  NotificationProviderProps,
-  ErrorProviderProps,
-} from './provider-types';
-
-/**
- * Export configuration constants for external use
- */
-export {
-  DEFAULT_APP_CONFIG,
-  PROVIDER_ORDER,
-};
