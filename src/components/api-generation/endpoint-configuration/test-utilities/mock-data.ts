@@ -1,1148 +1,1311 @@
 /**
- * Comprehensive mock data and fixtures for endpoint configuration testing
+ * Comprehensive Mock Data and Fixtures for Endpoint Configuration Testing
  * 
- * This module provides realistic test data for unit tests, integration tests, and MSW handlers
- * with type-safe interfaces derived from the original Angular mock data patterns.
+ * Provides type-safe mock data and factory functions for testing API endpoint configuration
+ * components. Includes OpenAPI specifications, endpoint parameters, HTTP methods, security
+ * schemes, and response configurations for comprehensive test coverage.
  * 
- * Features:
- * - OpenAPI 3.0+ specification mock data for F-003 REST API Endpoint Generation
- * - Endpoint configuration objects for HTTP methods, parameters, and security
- * - Type-safe mock data compatible with Zod schema validators
- * - React Hook Form testing fixtures
- * - MSW-compatible mock responses
- * - 90%+ test coverage support per Section 2.4 Implementation Considerations
+ * @fileoverview Mock data factories for endpoint configuration testing
+ * @version 1.0.0
+ * @since React 19.0.0, Next.js 15.1+, TypeScript 5.8+
  */
 
-// Core endpoint configuration types
-export interface MockEndpointConfiguration {
-  id: string;
-  name: string;
-  description?: string;
-  method: HttpMethod;
-  path: string;
-  parameters: EndpointParameter[];
-  requestBody?: RequestBodyConfiguration;
-  responses: ResponseConfiguration[];
-  security: SecurityConfiguration[];
-  tags: string[];
-  operationId: string;
-  deprecated?: boolean;
-  summary?: string;
-}
+import type { 
+  EndpointConfiguration, 
+  EndpointParameter, 
+  HttpMethod, 
+  SecurityScheme,
+  ApiResponse,
+  ValidationRule,
+  QueryConfiguration,
+  OpenApiSpecification,
+  EndpointConfigForm
+} from '../types';
 
-export interface EndpointParameter {
-  name: string;
-  in: ParameterLocation;
-  required: boolean;
-  schema: ParameterSchema;
-  description?: string;
-  example?: any;
-  style?: ParameterStyle;
-  explode?: boolean;
-}
+// =============================================================================
+// HTTP CONSTANTS AND HEADERS
+// =============================================================================
 
-export interface RequestBodyConfiguration {
-  description?: string;
-  required: boolean;
-  content: Record<string, MediaTypeConfiguration>;
-}
-
-export interface ResponseConfiguration {
-  statusCode: string;
-  description: string;
-  content?: Record<string, MediaTypeConfiguration>;
-  headers?: Record<string, HeaderConfiguration>;
-}
-
-export interface MediaTypeConfiguration {
-  schema: SchemaConfiguration;
-  example?: any;
-  examples?: Record<string, ExampleConfiguration>;
-}
-
-export interface SchemaConfiguration {
-  type: SchemaType;
-  format?: string;
-  properties?: Record<string, SchemaConfiguration>;
-  items?: SchemaConfiguration;
-  required?: string[];
-  enum?: any[];
-  minimum?: number;
-  maximum?: number;
-  pattern?: string;
-  additionalProperties?: boolean | SchemaConfiguration;
-  description?: string;
-  example?: any;
-  nullable?: boolean;
-  readOnly?: boolean;
-  writeOnly?: boolean;
-}
-
-export interface SecurityConfiguration {
-  type: SecurityType;
-  name: string;
-  description?: string;
-  in?: SecurityLocation;
-  scheme?: string;
-  bearerFormat?: string;
-  flows?: OAuthFlowConfiguration;
-  openIdConnectUrl?: string;
-  scopes?: string[];
-}
-
-export interface OAuthFlowConfiguration {
-  authorizationUrl?: string;
-  tokenUrl?: string;
-  refreshUrl?: string;
-  scopes: Record<string, string>;
-}
-
-export interface HeaderConfiguration {
-  description?: string;
-  required?: boolean;
-  schema: SchemaConfiguration;
-  example?: any;
-}
-
-export interface ExampleConfiguration {
-  summary?: string;
-  description?: string;
-  value: any;
-  externalValue?: string;
-}
-
-// Enums for type safety
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS';
-export type ParameterLocation = 'query' | 'header' | 'path' | 'cookie';
-export type ParameterStyle = 'matrix' | 'label' | 'form' | 'simple' | 'spaceDelimited' | 'pipeDelimited' | 'deepObject';
-export type SchemaType = 'string' | 'number' | 'integer' | 'boolean' | 'array' | 'object' | 'null';
-export type SecurityType = 'apiKey' | 'http' | 'oauth2' | 'openIdConnect';
-export type SecurityLocation = 'query' | 'header' | 'cookie';
-
-// Mock HTTP status codes for comprehensive testing
-export const MOCK_HTTP_STATUS_CODES = {
-  SUCCESS: {
-    OK: '200',
-    CREATED: '201',
-    ACCEPTED: '202',
-    NO_CONTENT: '204',
-  },
-  CLIENT_ERROR: {
-    BAD_REQUEST: '400',
-    UNAUTHORIZED: '401',
-    FORBIDDEN: '403',
-    NOT_FOUND: '404',
-    METHOD_NOT_ALLOWED: '405',
-    CONFLICT: '409',
-    UNPROCESSABLE_ENTITY: '422',
-    TOO_MANY_REQUESTS: '429',
-  },
-  SERVER_ERROR: {
-    INTERNAL_SERVER_ERROR: '500',
-    NOT_IMPLEMENTED: '501',
-    BAD_GATEWAY: '502',
-    SERVICE_UNAVAILABLE: '503',
-    GATEWAY_TIMEOUT: '504',
-  },
+/**
+ * Standard HTTP headers for API configuration
+ */
+export const HTTP_HEADERS = {
+  API_KEY: 'X-DreamFactory-API-Key',
+  SESSION_TOKEN: 'X-DreamFactory-Session-Token',
+  CONTENT_TYPE: 'Content-Type',
+  AUTHORIZATION: 'Authorization',
+  ACCEPT: 'Accept',
+  CACHE_CONTROL: 'Cache-Control',
+  CORS_ORIGIN: 'Access-Control-Allow-Origin',
 } as const;
 
-// Mock media types for content negotiation testing
-export const MOCK_MEDIA_TYPES = {
+/**
+ * Standard HTTP status codes for API responses
+ */
+export const HTTP_STATUS_CODES = {
+  OK: 200,
+  CREATED: 201,
+  NO_CONTENT: 204,
+  BAD_REQUEST: 400,
+  UNAUTHORIZED: 401,
+  FORBIDDEN: 403,
+  NOT_FOUND: 404,
+  METHOD_NOT_ALLOWED: 405,
+  CONFLICT: 409,
+  UNPROCESSABLE_ENTITY: 422,
+  INTERNAL_SERVER_ERROR: 500,
+  SERVICE_UNAVAILABLE: 503,
+} as const;
+
+/**
+ * Supported HTTP methods for endpoint configuration
+ */
+export const SUPPORTED_HTTP_METHODS: HttpMethod[] = [
+  'GET',
+  'POST',
+  'PUT',
+  'PATCH',
+  'DELETE'
+];
+
+/**
+ * Standard content types for API requests/responses
+ */
+export const CONTENT_TYPES = {
   JSON: 'application/json',
   XML: 'application/xml',
   FORM_DATA: 'multipart/form-data',
   URL_ENCODED: 'application/x-www-form-urlencoded',
   TEXT_PLAIN: 'text/plain',
   TEXT_HTML: 'text/html',
-  BINARY: 'application/octet-stream',
 } as const;
 
-// Mock schema configurations for various data types
-export const MOCK_SCHEMAS: Record<string, SchemaConfiguration> = {
-  STRING: {
-    type: 'string',
-    description: 'A simple string value',
-    example: 'example string',
-  },
-  EMAIL: {
-    type: 'string',
-    format: 'email',
-    description: 'Email address',
-    pattern: '^[\\w\\.-]+@[\\w\\.-]+\\.[a-zA-Z]{2,}$',
-    example: 'user@example.com',
-  },
-  UUID: {
-    type: 'string',
-    format: 'uuid',
-    description: 'UUID identifier',
-    pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
-    example: '123e4567-e89b-12d3-a456-426614174000',
-  },
-  INTEGER: {
-    type: 'integer',
-    description: 'Integer value',
-    minimum: 0,
-    example: 42,
-  },
-  POSITIVE_INTEGER: {
-    type: 'integer',
-    format: 'int32',
-    description: 'Positive integer value',
-    minimum: 1,
-    example: 123,
-  },
-  NUMBER: {
-    type: 'number',
-    description: 'Numeric value',
-    example: 3.14159,
-  },
-  BOOLEAN: {
-    type: 'boolean',
-    description: 'Boolean value',
-    example: true,
-  },
-  DATE: {
-    type: 'string',
-    format: 'date',
-    description: 'Date in YYYY-MM-DD format',
-    example: '2024-01-15',
-  },
-  DATETIME: {
-    type: 'string',
-    format: 'date-time',
-    description: 'DateTime in ISO 8601 format',
-    example: '2024-01-15T10:30:00Z',
-  },
-  ENUM_STATUS: {
-    type: 'string',
-    enum: ['active', 'inactive', 'pending', 'suspended'],
-    description: 'Status enumeration',
-    example: 'active',
-  },
-  ARRAY_STRINGS: {
-    type: 'array',
-    items: {
-      type: 'string',
-    },
-    description: 'Array of strings',
-    example: ['item1', 'item2', 'item3'],
-  },
-  ARRAY_INTEGERS: {
-    type: 'array',
-    items: {
-      type: 'integer',
-    },
-    description: 'Array of integers',
-    example: [1, 2, 3, 4, 5],
-  },
-  PAGINATION_OBJECT: {
-    type: 'object',
-    properties: {
-      page: {
-        type: 'integer',
-        minimum: 1,
-        description: 'Current page number',
-        example: 1,
-      },
-      limit: {
-        type: 'integer',
-        minimum: 1,
-        maximum: 100,
-        description: 'Number of items per page',
-        example: 20,
-      },
-      total: {
-        type: 'integer',
-        minimum: 0,
-        description: 'Total number of items',
-        example: 150,
-      },
-      totalPages: {
-        type: 'integer',
-        minimum: 0,
-        description: 'Total number of pages',
-        example: 8,
-      },
-    },
-    required: ['page', 'limit', 'total', 'totalPages'],
-    description: 'Pagination information',
-  },
-  ERROR_OBJECT: {
-    type: 'object',
-    properties: {
-      error: {
-        type: 'object',
-        properties: {
-          code: {
-            type: 'integer',
-            description: 'Error code',
-            example: 400,
-          },
-          message: {
-            type: 'string',
-            description: 'Error message',
-            example: 'Bad Request',
-          },
-          details: {
-            type: 'string',
-            description: 'Detailed error description',
-            example: 'The request body is missing required fields',
-          },
-          timestamp: {
-            type: 'string',
-            format: 'date-time',
-            description: 'Error timestamp',
-            example: '2024-01-15T10:30:00Z',
-          },
-        },
-        required: ['code', 'message'],
-      },
-    },
-    required: ['error'],
-    description: 'Standard error response',
-  },
-} as const;
+// =============================================================================
+// SECURITY SCHEME MOCK DATA
+// =============================================================================
 
-// Mock security configurations
-export const MOCK_SECURITY_CONFIGS: Record<string, SecurityConfiguration> = {
-  API_KEY_HEADER: {
-    type: 'apiKey',
-    name: 'X-API-Key',
-    in: 'header',
-    description: 'API key authentication via header',
+/**
+ * Mock security schemes for API authentication testing
+ */
+export const mockSecuritySchemes: Record<string, SecurityScheme> = {
+  BasicAuth: {
+    type: 'http',
+    scheme: 'basic',
+    description: 'HTTP Basic Authentication'
   },
-  API_KEY_QUERY: {
-    type: 'apiKey',
-    name: 'api_key',
-    in: 'query',
-    description: 'API key authentication via query parameter',
-  },
-  BEARER_TOKEN: {
+  BearerAuth: {
     type: 'http',
     scheme: 'bearer',
     bearerFormat: 'JWT',
-    name: 'Authorization',
-    description: 'Bearer token authentication',
+    description: 'JWT Bearer Token Authentication'
   },
-  BASIC_AUTH: {
-    type: 'http',
-    scheme: 'basic',
-    name: 'Authorization',
-    description: 'Basic HTTP authentication',
+  ApiKeyQuery: {
+    type: 'apiKey',
+    in: 'query',
+    name: 'api_key',
+    description: 'API Key passed as query parameter'
   },
-  OAUTH2_AUTH_CODE: {
+  ApiKeyHeader: {
+    type: 'apiKey',
+    in: 'header',
+    name: HTTP_HEADERS.API_KEY,
+    description: 'API Key passed in request header'
+  },
+  SessionTokenQuery: {
+    type: 'apiKey',
+    in: 'query',
+    name: 'session_token',
+    description: 'Session token passed as query parameter'
+  },
+  SessionTokenHeader: {
+    type: 'apiKey',
+    in: 'header',
+    name: HTTP_HEADERS.SESSION_TOKEN,
+    description: 'Session token passed in request header'
+  },
+  OAuth2: {
     type: 'oauth2',
-    name: 'oauth2AuthCode',
-    description: 'OAuth 2.0 Authorization Code Flow',
     flows: {
-      authorizationUrl: 'https://api.example.com/oauth/authorize',
-      tokenUrl: 'https://api.example.com/oauth/token',
-      scopes: {
-        'read': 'Read access to resources',
-        'write': 'Write access to resources',
-        'admin': 'Administrative access',
-      },
+      authorizationCode: {
+        authorizationUrl: 'https://api.example.com/oauth/authorize',
+        tokenUrl: 'https://api.example.com/oauth/token',
+        scopes: {
+          'read': 'Read access to resources',
+          'write': 'Write access to resources',
+          'admin': 'Administrative access'
+        }
+      }
     },
-  },
-  OAUTH2_CLIENT_CREDENTIALS: {
-    type: 'oauth2',
-    name: 'oauth2ClientCredentials',
-    description: 'OAuth 2.0 Client Credentials Flow',
-    flows: {
-      tokenUrl: 'https://api.example.com/oauth/token',
-      scopes: {
-        'api:read': 'Read API access',
-        'api:write': 'Write API access',
-      },
-    },
-  },
-} as const;
+    description: 'OAuth 2.0 Authorization Code Flow'
+  }
+};
 
-// Mock endpoint parameters
-export const MOCK_PARAMETERS: Record<string, EndpointParameter> = {
-  ID_PATH: {
+// =============================================================================
+// ENDPOINT PARAMETER MOCK DATA
+// =============================================================================
+
+/**
+ * Factory function for creating mock endpoint parameters
+ */
+export function createMockParameter(overrides: Partial<EndpointParameter> = {}): EndpointParameter {
+  const defaults: EndpointParameter = {
     name: 'id',
     in: 'path',
     required: true,
-    schema: MOCK_SCHEMAS.UUID,
+    schema: {
+      type: 'integer',
+      format: 'int64'
+    },
+    description: 'Unique identifier for the resource',
+    example: 123
+  };
+
+  return { ...defaults, ...overrides };
+}
+
+/**
+ * Collection of common endpoint parameters for testing
+ */
+export const mockEndpointParameters = {
+  // Path parameters
+  pathId: createMockParameter({
+    name: 'id',
+    in: 'path',
+    required: true,
+    schema: { type: 'integer', format: 'int64' },
     description: 'Resource identifier',
-    example: '123e4567-e89b-12d3-a456-426614174000',
-  },
-  LIMIT_QUERY: {
+    example: 123
+  }),
+  
+  pathServiceName: createMockParameter({
+    name: 'serviceName',
+    in: 'path',
+    required: true,
+    schema: { type: 'string', pattern: '^[a-zA-Z0-9_-]+$' },
+    description: 'Database service name',
+    example: 'mysql_db'
+  }),
+
+  pathTableName: createMockParameter({
+    name: 'tableName',
+    in: 'path',
+    required: true,
+    schema: { type: 'string', pattern: '^[a-zA-Z0-9_-]+$' },
+    description: 'Database table name',
+    example: 'users'
+  }),
+
+  // Query parameters
+  queryLimit: createMockParameter({
     name: 'limit',
     in: 'query',
     required: false,
-    schema: {
-      type: 'integer',
-      minimum: 1,
-      maximum: 100,
-      default: 20,
-    },
-    description: 'Number of items to return',
-    example: 20,
-  },
-  OFFSET_QUERY: {
+    schema: { type: 'integer', minimum: 1, maximum: 1000, default: 25 },
+    description: 'Maximum number of records to return',
+    example: 25
+  }),
+
+  queryOffset: createMockParameter({
     name: 'offset',
     in: 'query',
     required: false,
-    schema: {
-      type: 'integer',
-      minimum: 0,
-      default: 0,
-    },
-    description: 'Number of items to skip',
-    example: 0,
-  },
-  SORT_QUERY: {
-    name: 'sort',
-    in: 'query',
-    required: false,
-    schema: {
-      type: 'string',
-      pattern: '^[a-zA-Z_][a-zA-Z0-9_]*(:asc|:desc)?$',
-    },
-    description: 'Sort field and direction (field:asc or field:desc)',
-    example: 'created_at:desc',
-  },
-  FILTER_QUERY: {
+    schema: { type: 'integer', minimum: 0, default: 0 },
+    description: 'Number of records to skip',
+    example: 0
+  }),
+
+  queryFilter: createMockParameter({
     name: 'filter',
     in: 'query',
     required: false,
-    schema: {
-      type: 'string',
-    },
-    description: 'Filter expression for results',
-    example: 'status=active AND created_at>2024-01-01',
-  },
-  INCLUDE_QUERY: {
-    name: 'include',
+    schema: { type: 'string' },
+    description: 'Filter conditions for the query',
+    example: 'name = "John Doe"'
+  }),
+
+  querySort: createMockParameter({
+    name: 'order',
     in: 'query',
     required: false,
-    schema: {
-      type: 'array',
-      items: {
-        type: 'string',
-      },
+    schema: { type: 'string' },
+    description: 'Sort order for results',
+    example: 'name ASC, created_at DESC'
+  }),
+
+  queryFields: createMockParameter({
+    name: 'fields',
+    in: 'query',
+    required: false,
+    schema: { type: 'string' },
+    description: 'Comma-separated list of fields to return',
+    example: 'id,name,email'
+  }),
+
+  queryFormat: createMockParameter({
+    name: 'format',
+    in: 'query',
+    required: false,
+    schema: { 
+      type: 'string',
+      enum: ['json', 'xml'],
+      default: 'json'
     },
-    style: 'form',
-    explode: false,
-    description: 'Related resources to include',
-    example: ['metadata', 'relationships'],
-  },
-  CONTENT_TYPE_HEADER: {
-    name: 'Content-Type',
+    description: 'Response format',
+    example: 'json'
+  }),
+
+  // Header parameters
+  headerApiKey: createMockParameter({
+    name: HTTP_HEADERS.API_KEY,
     in: 'header',
     required: true,
-    schema: {
-      type: 'string',
-      enum: [
-        MOCK_MEDIA_TYPES.JSON,
-        MOCK_MEDIA_TYPES.XML,
-        MOCK_MEDIA_TYPES.FORM_DATA,
-        MOCK_MEDIA_TYPES.URL_ENCODED,
-      ],
-    },
-    description: 'Content type of the request body',
-    example: MOCK_MEDIA_TYPES.JSON,
-  },
-  ACCEPT_HEADER: {
-    name: 'Accept',
+    schema: { type: 'string', minLength: 32 },
+    description: 'API key for authentication',
+    example: 'your-api-key-here'
+  }),
+
+  headerSessionToken: createMockParameter({
+    name: HTTP_HEADERS.SESSION_TOKEN,
     in: 'header',
     required: false,
-    schema: {
-      type: 'string',
-      enum: [
-        MOCK_MEDIA_TYPES.JSON,
-        MOCK_MEDIA_TYPES.XML,
-        MOCK_MEDIA_TYPES.TEXT_PLAIN,
-      ],
-    },
-    description: 'Acceptable response content types',
-    example: MOCK_MEDIA_TYPES.JSON,
-  },
-} as const;
+    schema: { type: 'string' },
+    description: 'Session token for authentication',
+    example: 'session-token-here'
+  }),
 
-// Mock response configurations
-export const MOCK_RESPONSES: Record<string, ResponseConfiguration> = {
-  SUCCESS_LIST: {
-    statusCode: MOCK_HTTP_STATUS_CODES.SUCCESS.OK,
-    description: 'Successful list response',
+  headerContentType: createMockParameter({
+    name: HTTP_HEADERS.CONTENT_TYPE,
+    in: 'header',
+    required: false,
+    schema: { 
+      type: 'string',
+      enum: [CONTENT_TYPES.JSON, CONTENT_TYPES.XML],
+      default: CONTENT_TYPES.JSON
+    },
+    description: 'Content type of the request body',
+    example: CONTENT_TYPES.JSON
+  })
+};
+
+// =============================================================================
+// API RESPONSE MOCK DATA
+// =============================================================================
+
+/**
+ * Factory function for creating mock API responses
+ */
+export function createMockApiResponse(overrides: Partial<ApiResponse> = {}): ApiResponse {
+  const defaults: ApiResponse = {
+    description: 'Successful response',
     content: {
-      [MOCK_MEDIA_TYPES.JSON]: {
+      [CONTENT_TYPES.JSON]: {
         schema: {
           type: 'object',
           properties: {
-            data: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  id: MOCK_SCHEMAS.UUID,
-                  name: MOCK_SCHEMAS.STRING,
-                  status: MOCK_SCHEMAS.ENUM_STATUS,
-                  created_at: MOCK_SCHEMAS.DATETIME,
-                  updated_at: MOCK_SCHEMAS.DATETIME,
-                },
-                required: ['id', 'name', 'status'],
-              },
-            },
-            meta: MOCK_SCHEMAS.PAGINATION_OBJECT,
-          },
-          required: ['data', 'meta'],
-        },
-        example: {
-          data: [
-            {
-              id: '123e4567-e89b-12d3-a456-426614174000',
-              name: 'Example Item 1',
-              status: 'active',
-              created_at: '2024-01-15T10:30:00Z',
-              updated_at: '2024-01-15T10:30:00Z',
-            },
-            {
-              id: '123e4567-e89b-12d3-a456-426614174001',
-              name: 'Example Item 2',
-              status: 'inactive',
-              created_at: '2024-01-14T15:45:00Z',
-              updated_at: '2024-01-14T15:45:00Z',
-            },
-          ],
-          meta: {
-            page: 1,
-            limit: 20,
-            total: 150,
-            totalPages: 8,
-          },
-        },
-      },
-    },
-  },
-  SUCCESS_ITEM: {
-    statusCode: MOCK_HTTP_STATUS_CODES.SUCCESS.OK,
-    description: 'Successful item response',
+            success: {
+              type: 'boolean',
+              description: 'Indicates if the operation was successful'
+            }
+          }
+        }
+      }
+    }
+  };
+
+  return { ...defaults, ...overrides };
+}
+
+/**
+ * Standard API response templates
+ */
+export const mockApiResponses = {
+  // Success responses
+  success: createMockApiResponse({
+    description: 'Operation completed successfully',
     content: {
-      [MOCK_MEDIA_TYPES.JSON]: {
+      [CONTENT_TYPES.JSON]: {
         schema: {
           type: 'object',
           properties: {
-            data: {
-              type: 'object',
-              properties: {
-                id: MOCK_SCHEMAS.UUID,
-                name: MOCK_SCHEMAS.STRING,
-                description: MOCK_SCHEMAS.STRING,
-                status: MOCK_SCHEMAS.ENUM_STATUS,
-                email: MOCK_SCHEMAS.EMAIL,
-                created_at: MOCK_SCHEMAS.DATETIME,
-                updated_at: MOCK_SCHEMAS.DATETIME,
-                metadata: {
-                  type: 'object',
-                  additionalProperties: true,
-                },
-              },
-              required: ['id', 'name', 'status'],
-            },
-          },
-          required: ['data'],
-        },
-        example: {
-          data: {
-            id: '123e4567-e89b-12d3-a456-426614174000',
-            name: 'Example Item',
-            description: 'This is an example item for testing',
-            status: 'active',
-            email: 'user@example.com',
-            created_at: '2024-01-15T10:30:00Z',
-            updated_at: '2024-01-15T10:30:00Z',
-            metadata: {
-              category: 'test',
-              priority: 'high',
-            },
-          },
-        },
-      },
-    },
-  },
-  SUCCESS_CREATED: {
-    statusCode: MOCK_HTTP_STATUS_CODES.SUCCESS.CREATED,
+            success: { type: 'boolean', example: true }
+          }
+        }
+      }
+    }
+  }),
+
+  created: createMockApiResponse({
     description: 'Resource created successfully',
     content: {
-      [MOCK_MEDIA_TYPES.JSON]: {
+      [CONTENT_TYPES.JSON]: {
         schema: {
           type: 'object',
           properties: {
-            data: {
+            id: { type: 'integer', example: 123 },
+            message: { type: 'string', example: 'Resource created successfully' }
+          }
+        }
+      }
+    }
+  }),
+
+  resourceList: createMockApiResponse({
+    description: 'List of resources',
+    content: {
+      [CONTENT_TYPES.JSON]: {
+        schema: {
+          type: 'object',
+          properties: {
+            resource: {
+              type: 'array',
+              items: { type: 'object' },
+              description: 'Array of resources'
+            },
+            meta: {
               type: 'object',
               properties: {
-                id: MOCK_SCHEMAS.UUID,
-                name: MOCK_SCHEMAS.STRING,
-                status: MOCK_SCHEMAS.ENUM_STATUS,
-                created_at: MOCK_SCHEMAS.DATETIME,
-              },
-              required: ['id', 'name', 'status', 'created_at'],
-            },
-          },
-          required: ['data'],
-        },
-        example: {
-          data: {
-            id: '123e4567-e89b-12d3-a456-426614174000',
-            name: 'New Item',
-            status: 'active',
-            created_at: '2024-01-15T10:30:00Z',
-          },
-        },
-      },
-    },
-  },
-  SUCCESS_NO_CONTENT: {
-    statusCode: MOCK_HTTP_STATUS_CODES.SUCCESS.NO_CONTENT,
-    description: 'Operation completed successfully with no content',
-  },
-  ERROR_BAD_REQUEST: {
-    statusCode: MOCK_HTTP_STATUS_CODES.CLIENT_ERROR.BAD_REQUEST,
+                count: { type: 'integer', description: 'Total count of resources' },
+                limit: { type: 'integer', description: 'Limit applied to the query' },
+                offset: { type: 'integer', description: 'Offset applied to the query' }
+              }
+            }
+          }
+        }
+      }
+    }
+  }),
+
+  // Error responses
+  badRequest: createMockApiResponse({
     description: 'Bad request - validation errors',
     content: {
-      [MOCK_MEDIA_TYPES.JSON]: {
-        schema: MOCK_SCHEMAS.ERROR_OBJECT,
-        example: {
-          error: {
-            code: 400,
-            message: 'Bad Request',
-            details: 'Validation failed for required fields',
-            timestamp: '2024-01-15T10:30:00Z',
-          },
-        },
-      },
-    },
-  },
-  ERROR_UNAUTHORIZED: {
-    statusCode: MOCK_HTTP_STATUS_CODES.CLIENT_ERROR.UNAUTHORIZED,
+      [CONTENT_TYPES.JSON]: {
+        schema: {
+          type: 'object',
+          properties: {
+            error: {
+              type: 'object',
+              properties: {
+                code: { type: 'integer', example: 400 },
+                message: { type: 'string', example: 'Validation failed' },
+                details: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      field: { type: 'string' },
+                      message: { type: 'string' }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }),
+
+  unauthorized: createMockApiResponse({
     description: 'Authentication required',
     content: {
-      [MOCK_MEDIA_TYPES.JSON]: {
-        schema: MOCK_SCHEMAS.ERROR_OBJECT,
-        example: {
-          error: {
-            code: 401,
-            message: 'Unauthorized',
-            details: 'Valid authentication credentials required',
-            timestamp: '2024-01-15T10:30:00Z',
-          },
-        },
-      },
-    },
-  },
-  ERROR_FORBIDDEN: {
-    statusCode: MOCK_HTTP_STATUS_CODES.CLIENT_ERROR.FORBIDDEN,
+      [CONTENT_TYPES.JSON]: {
+        schema: {
+          type: 'object',
+          properties: {
+            error: {
+              type: 'object',
+              properties: {
+                code: { type: 'integer', example: 401 },
+                message: { type: 'string', example: 'Authentication required' }
+              }
+            }
+          }
+        }
+      }
+    }
+  }),
+
+  forbidden: createMockApiResponse({
     description: 'Access forbidden',
     content: {
-      [MOCK_MEDIA_TYPES.JSON]: {
-        schema: MOCK_SCHEMAS.ERROR_OBJECT,
-        example: {
-          error: {
-            code: 403,
-            message: 'Forbidden',
-            details: 'Insufficient permissions to access this resource',
-            timestamp: '2024-01-15T10:30:00Z',
-          },
-        },
-      },
-    },
-  },
-  ERROR_NOT_FOUND: {
-    statusCode: MOCK_HTTP_STATUS_CODES.CLIENT_ERROR.NOT_FOUND,
+      [CONTENT_TYPES.JSON]: {
+        schema: {
+          type: 'object',
+          properties: {
+            error: {
+              type: 'object',
+              properties: {
+                code: { type: 'integer', example: 403 },
+                message: { type: 'string', example: 'Access forbidden' }
+              }
+            }
+          }
+        }
+      }
+    }
+  }),
+
+  notFound: createMockApiResponse({
     description: 'Resource not found',
     content: {
-      [MOCK_MEDIA_TYPES.JSON]: {
-        schema: MOCK_SCHEMAS.ERROR_OBJECT,
-        example: {
-          error: {
-            code: 404,
-            message: 'Not Found',
-            details: 'The requested resource does not exist',
-            timestamp: '2024-01-15T10:30:00Z',
-          },
-        },
-      },
-    },
-  },
-  ERROR_INTERNAL_SERVER: {
-    statusCode: MOCK_HTTP_STATUS_CODES.SERVER_ERROR.INTERNAL_SERVER_ERROR,
+      [CONTENT_TYPES.JSON]: {
+        schema: {
+          type: 'object',
+          properties: {
+            error: {
+              type: 'object',
+              properties: {
+                code: { type: 'integer', example: 404 },
+                message: { type: 'string', example: 'Resource not found' }
+              }
+            }
+          }
+        }
+      }
+    }
+  }),
+
+  internalError: createMockApiResponse({
     description: 'Internal server error',
     content: {
-      [MOCK_MEDIA_TYPES.JSON]: {
-        schema: MOCK_SCHEMAS.ERROR_OBJECT,
-        example: {
-          error: {
-            code: 500,
-            message: 'Internal Server Error',
-            details: 'An unexpected error occurred while processing the request',
-            timestamp: '2024-01-15T10:30:00Z',
-          },
-        },
-      },
-    },
-  },
-} as const;
+      [CONTENT_TYPES.JSON]: {
+        schema: {
+          type: 'object',
+          properties: {
+            error: {
+              type: 'object',
+              properties: {
+                code: { type: 'integer', example: 500 },
+                message: { type: 'string', example: 'Internal server error' }
+              }
+            }
+          }
+        }
+      }
+    }
+  })
+};
 
-// Complete mock endpoint configurations for comprehensive testing
-export const MOCK_ENDPOINT_CONFIGURATIONS: Record<string, MockEndpointConfiguration> = {
-  GET_LIST: {
-    id: 'get-list-endpoint',
-    name: 'Get Items List',
-    description: 'Retrieve a paginated list of items with filtering and sorting',
+// =============================================================================
+// VALIDATION RULES MOCK DATA
+// =============================================================================
+
+/**
+ * Factory function for creating mock validation rules
+ */
+export function createMockValidationRule(overrides: Partial<ValidationRule> = {}): ValidationRule {
+  const defaults: ValidationRule = {
+    field: 'email',
+    operator: 'required',
+    value: true,
+    message: 'This field is required'
+  };
+
+  return { ...defaults, ...overrides };
+}
+
+/**
+ * Common validation rules for testing
+ */
+export const mockValidationRules = {
+  required: createMockValidationRule({
+    field: 'name',
+    operator: 'required',
+    value: true,
+    message: 'Name is required'
+  }),
+
+  minLength: createMockValidationRule({
+    field: 'password',
+    operator: 'min_length',
+    value: 8,
+    message: 'Password must be at least 8 characters'
+  }),
+
+  maxLength: createMockValidationRule({
+    field: 'description',
+    operator: 'max_length',
+    value: 255,
+    message: 'Description cannot exceed 255 characters'
+  }),
+
+  email: createMockValidationRule({
+    field: 'email',
+    operator: 'email',
+    value: true,
+    message: 'Please enter a valid email address'
+  }),
+
+  numeric: createMockValidationRule({
+    field: 'age',
+    operator: 'numeric',
+    value: true,
+    message: 'Age must be a number'
+  }),
+
+  range: createMockValidationRule({
+    field: 'rating',
+    operator: 'between',
+    value: [1, 5],
+    message: 'Rating must be between 1 and 5'
+  }),
+
+  pattern: createMockValidationRule({
+    field: 'phone',
+    operator: 'regex',
+    value: '^\\+?[1-9]\\d{1,14}$',
+    message: 'Please enter a valid phone number'
+  })
+};
+
+// =============================================================================
+// QUERY CONFIGURATION MOCK DATA
+// =============================================================================
+
+/**
+ * Factory function for creating mock query configurations
+ */
+export function createMockQueryConfiguration(overrides: Partial<QueryConfiguration> = {}): QueryConfiguration {
+  const defaults: QueryConfiguration = {
+    pagination: {
+      enabled: true,
+      defaultLimit: 25,
+      maxLimit: 1000
+    },
+    filtering: {
+      enabled: true,
+      allowedOperators: ['=', '!=', '<', '>', '<=', '>=', 'LIKE', 'IN', 'NOT IN']
+    },
+    sorting: {
+      enabled: true,
+      defaultSort: 'id ASC',
+      allowedFields: ['id', 'name', 'created_at', 'updated_at']
+    },
+    fieldSelection: {
+      enabled: true,
+      allowedFields: ['*']
+    }
+  };
+
+  return { ...defaults, ...overrides };
+}
+
+/**
+ * Pre-configured query configurations for different use cases
+ */
+export const mockQueryConfigurations = {
+  standard: createMockQueryConfiguration(),
+
+  readOnly: createMockQueryConfiguration({
+    pagination: {
+      enabled: true,
+      defaultLimit: 50,
+      maxLimit: 500
+    },
+    filtering: {
+      enabled: true,
+      allowedOperators: ['=', 'LIKE', 'IN']
+    },
+    sorting: {
+      enabled: true,
+      defaultSort: 'name ASC',
+      allowedFields: ['name', 'created_at']
+    },
+    fieldSelection: {
+      enabled: false,
+      allowedFields: []
+    }
+  }),
+
+  minimal: createMockQueryConfiguration({
+    pagination: {
+      enabled: true,
+      defaultLimit: 10,
+      maxLimit: 100
+    },
+    filtering: {
+      enabled: false,
+      allowedOperators: []
+    },
+    sorting: {
+      enabled: false,
+      defaultSort: '',
+      allowedFields: []
+    },
+    fieldSelection: {
+      enabled: false,
+      allowedFields: []
+    }
+  }),
+
+  advanced: createMockQueryConfiguration({
+    pagination: {
+      enabled: true,
+      defaultLimit: 100,
+      maxLimit: 5000
+    },
+    filtering: {
+      enabled: true,
+      allowedOperators: ['=', '!=', '<', '>', '<=', '>=', 'LIKE', 'NOT LIKE', 'IN', 'NOT IN', 'IS NULL', 'IS NOT NULL']
+    },
+    sorting: {
+      enabled: true,
+      defaultSort: 'updated_at DESC',
+      allowedFields: ['*']
+    },
+    fieldSelection: {
+      enabled: true,
+      allowedFields: ['*']
+    }
+  })
+};
+
+// =============================================================================
+// ENDPOINT CONFIGURATION MOCK DATA
+// =============================================================================
+
+/**
+ * Factory function for creating mock endpoint configurations
+ */
+export function createMockEndpointConfiguration(overrides: Partial<EndpointConfiguration> = {}): EndpointConfiguration {
+  const defaults: EndpointConfiguration = {
+    path: '/api/v2/users',
     method: 'GET',
-    path: '/api/v2/items',
+    operationId: 'getUsers',
+    summary: 'Get list of users',
+    description: 'Retrieve a paginated list of users with optional filtering and sorting',
+    tags: ['users'],
     parameters: [
-      MOCK_PARAMETERS.LIMIT_QUERY,
-      MOCK_PARAMETERS.OFFSET_QUERY,
-      MOCK_PARAMETERS.SORT_QUERY,
-      MOCK_PARAMETERS.FILTER_QUERY,
-      MOCK_PARAMETERS.INCLUDE_QUERY,
-      MOCK_PARAMETERS.ACCEPT_HEADER,
+      mockEndpointParameters.queryLimit,
+      mockEndpointParameters.queryOffset,
+      mockEndpointParameters.queryFilter,
+      mockEndpointParameters.querySort
     ],
-    responses: [
-      MOCK_RESPONSES.SUCCESS_LIST,
-      MOCK_RESPONSES.ERROR_BAD_REQUEST,
-      MOCK_RESPONSES.ERROR_UNAUTHORIZED,
-      MOCK_RESPONSES.ERROR_FORBIDDEN,
-      MOCK_RESPONSES.ERROR_INTERNAL_SERVER,
-    ],
+    responses: {
+      '200': mockApiResponses.resourceList,
+      '400': mockApiResponses.badRequest,
+      '401': mockApiResponses.unauthorized,
+      '500': mockApiResponses.internalError
+    },
     security: [
-      MOCK_SECURITY_CONFIGS.API_KEY_HEADER,
-      MOCK_SECURITY_CONFIGS.BEARER_TOKEN,
+      { ApiKeyHeader: [] },
+      { SessionTokenHeader: [] }
     ],
-    tags: ['Items', 'List Operations'],
-    operationId: 'getItemsList',
-    summary: 'List all items with pagination',
-  },
-  GET_ITEM: {
-    id: 'get-item-endpoint',
-    name: 'Get Single Item',
-    description: 'Retrieve a specific item by its identifier',
+    queryConfiguration: mockQueryConfigurations.standard,
+    validationRules: [
+      mockValidationRules.required
+    ]
+  };
+
+  return { ...defaults, ...overrides };
+}
+
+/**
+ * Complete endpoint configurations for different HTTP methods
+ */
+export const mockEndpointConfigurations = {
+  // GET endpoints
+  getUsers: createMockEndpointConfiguration(),
+
+  getUserById: createMockEndpointConfiguration({
+    path: '/api/v2/users/{id}',
     method: 'GET',
-    path: '/api/v2/items/{id}',
+    operationId: 'getUserById',
+    summary: 'Get user by ID',
+    description: 'Retrieve a specific user by their unique identifier',
     parameters: [
-      MOCK_PARAMETERS.ID_PATH,
-      MOCK_PARAMETERS.INCLUDE_QUERY,
-      MOCK_PARAMETERS.ACCEPT_HEADER,
+      mockEndpointParameters.pathId,
+      mockEndpointParameters.queryFields
     ],
-    responses: [
-      MOCK_RESPONSES.SUCCESS_ITEM,
-      MOCK_RESPONSES.ERROR_BAD_REQUEST,
-      MOCK_RESPONSES.ERROR_UNAUTHORIZED,
-      MOCK_RESPONSES.ERROR_FORBIDDEN,
-      MOCK_RESPONSES.ERROR_NOT_FOUND,
-      MOCK_RESPONSES.ERROR_INTERNAL_SERVER,
-    ],
-    security: [
-      MOCK_SECURITY_CONFIGS.API_KEY_HEADER,
-      MOCK_SECURITY_CONFIGS.BEARER_TOKEN,
-    ],
-    tags: ['Items', 'Read Operations'],
-    operationId: 'getItemById',
-    summary: 'Get item by ID',
-  },
-  POST_ITEM: {
-    id: 'post-item-endpoint',
-    name: 'Create New Item',
-    description: 'Create a new item with the provided data',
+    responses: {
+      '200': mockApiResponses.success,
+      '404': mockApiResponses.notFound,
+      '401': mockApiResponses.unauthorized,
+      '500': mockApiResponses.internalError
+    }
+  }),
+
+  // POST endpoints
+  createUser: createMockEndpointConfiguration({
+    path: '/api/v2/users',
     method: 'POST',
-    path: '/api/v2/items',
+    operationId: 'createUser',
+    summary: 'Create new user',
+    description: 'Create a new user with the provided data',
     parameters: [
-      MOCK_PARAMETERS.CONTENT_TYPE_HEADER,
-      MOCK_PARAMETERS.ACCEPT_HEADER,
+      mockEndpointParameters.headerContentType
     ],
     requestBody: {
-      description: 'Item data for creation',
       required: true,
       content: {
-        [MOCK_MEDIA_TYPES.JSON]: {
+        [CONTENT_TYPES.JSON]: {
           schema: {
             type: 'object',
+            required: ['name', 'email'],
             properties: {
-              name: MOCK_SCHEMAS.STRING,
-              description: MOCK_SCHEMAS.STRING,
-              status: MOCK_SCHEMAS.ENUM_STATUS,
-              email: MOCK_SCHEMAS.EMAIL,
-              metadata: {
-                type: 'object',
-                additionalProperties: true,
+              name: {
+                type: 'string',
+                minLength: 1,
+                maxLength: 100,
+                example: 'John Doe'
               },
-            },
-            required: ['name', 'status'],
-          },
-          example: {
-            name: 'New Item',
-            description: 'This is a new item',
-            status: 'active',
-            email: 'item@example.com',
-            metadata: {
-              category: 'test',
-              priority: 'medium',
-            },
-          },
-        },
-      },
+              email: {
+                type: 'string',
+                format: 'email',
+                example: 'john.doe@example.com'
+              },
+              password: {
+                type: 'string',
+                minLength: 8,
+                format: 'password',
+                example: 'securePassword123'
+              }
+            }
+          }
+        }
+      }
     },
-    responses: [
-      MOCK_RESPONSES.SUCCESS_CREATED,
-      MOCK_RESPONSES.ERROR_BAD_REQUEST,
-      MOCK_RESPONSES.ERROR_UNAUTHORIZED,
-      MOCK_RESPONSES.ERROR_FORBIDDEN,
-      MOCK_RESPONSES.ERROR_INTERNAL_SERVER,
-    ],
-    security: [
-      MOCK_SECURITY_CONFIGS.API_KEY_HEADER,
-      MOCK_SECURITY_CONFIGS.BEARER_TOKEN,
-    ],
-    tags: ['Items', 'Create Operations'],
-    operationId: 'createItem',
-    summary: 'Create a new item',
-  },
-  PUT_ITEM: {
-    id: 'put-item-endpoint',
-    name: 'Update Item',
-    description: 'Update an existing item with new data',
+    responses: {
+      '201': mockApiResponses.created,
+      '400': mockApiResponses.badRequest,
+      '401': mockApiResponses.unauthorized,
+      '409': {
+        description: 'User already exists',
+        content: {
+          [CONTENT_TYPES.JSON]: {
+            schema: {
+              type: 'object',
+              properties: {
+                error: {
+                  type: 'object',
+                  properties: {
+                    code: { type: 'integer', example: 409 },
+                    message: { type: 'string', example: 'User with this email already exists' }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      '500': mockApiResponses.internalError
+    },
+    validationRules: [
+      mockValidationRules.required,
+      mockValidationRules.email,
+      mockValidationRules.minLength
+    ]
+  }),
+
+  // PUT endpoints
+  updateUser: createMockEndpointConfiguration({
+    path: '/api/v2/users/{id}',
     method: 'PUT',
-    path: '/api/v2/items/{id}',
+    operationId: 'updateUser',
+    summary: 'Update user',
+    description: 'Update an existing user with the provided data',
     parameters: [
-      MOCK_PARAMETERS.ID_PATH,
-      MOCK_PARAMETERS.CONTENT_TYPE_HEADER,
-      MOCK_PARAMETERS.ACCEPT_HEADER,
+      mockEndpointParameters.pathId,
+      mockEndpointParameters.headerContentType
     ],
     requestBody: {
-      description: 'Updated item data',
       required: true,
       content: {
-        [MOCK_MEDIA_TYPES.JSON]: {
+        [CONTENT_TYPES.JSON]: {
           schema: {
             type: 'object',
             properties: {
-              name: MOCK_SCHEMAS.STRING,
-              description: MOCK_SCHEMAS.STRING,
-              status: MOCK_SCHEMAS.ENUM_STATUS,
-              email: MOCK_SCHEMAS.EMAIL,
-              metadata: {
-                type: 'object',
-                additionalProperties: true,
+              name: {
+                type: 'string',
+                minLength: 1,
+                maxLength: 100,
+                example: 'John Smith'
               },
-            },
-            required: ['name', 'status'],
-          },
-          example: {
-            name: 'Updated Item',
-            description: 'This item has been updated',
-            status: 'active',
-            email: 'updated@example.com',
-            metadata: {
-              category: 'updated',
-              priority: 'high',
-            },
-          },
-        },
-      },
+              email: {
+                type: 'string',
+                format: 'email',
+                example: 'john.smith@example.com'
+              }
+            }
+          }
+        }
+      }
     },
-    responses: [
-      MOCK_RESPONSES.SUCCESS_ITEM,
-      MOCK_RESPONSES.ERROR_BAD_REQUEST,
-      MOCK_RESPONSES.ERROR_UNAUTHORIZED,
-      MOCK_RESPONSES.ERROR_FORBIDDEN,
-      MOCK_RESPONSES.ERROR_NOT_FOUND,
-      MOCK_RESPONSES.ERROR_INTERNAL_SERVER,
-    ],
-    security: [
-      MOCK_SECURITY_CONFIGS.API_KEY_HEADER,
-      MOCK_SECURITY_CONFIGS.BEARER_TOKEN,
-    ],
-    tags: ['Items', 'Update Operations'],
-    operationId: 'updateItem',
-    summary: 'Update an existing item',
-  },
-  PATCH_ITEM: {
-    id: 'patch-item-endpoint',
-    name: 'Partial Update Item',
-    description: 'Partially update an existing item',
+    responses: {
+      '200': mockApiResponses.success,
+      '400': mockApiResponses.badRequest,
+      '401': mockApiResponses.unauthorized,
+      '404': mockApiResponses.notFound,
+      '500': mockApiResponses.internalError
+    },
+    validationRules: [
+      mockValidationRules.email,
+      mockValidationRules.maxLength
+    ]
+  }),
+
+  // PATCH endpoints
+  patchUser: createMockEndpointConfiguration({
+    path: '/api/v2/users/{id}',
     method: 'PATCH',
-    path: '/api/v2/items/{id}',
+    operationId: 'patchUser',
+    summary: 'Partially update user',
+    description: 'Partially update specific fields of an existing user',
     parameters: [
-      MOCK_PARAMETERS.ID_PATH,
-      MOCK_PARAMETERS.CONTENT_TYPE_HEADER,
-      MOCK_PARAMETERS.ACCEPT_HEADER,
+      mockEndpointParameters.pathId,
+      mockEndpointParameters.headerContentType
     ],
     requestBody: {
-      description: 'Partial item data for update',
       required: true,
       content: {
-        [MOCK_MEDIA_TYPES.JSON]: {
+        [CONTENT_TYPES.JSON]: {
           schema: {
             type: 'object',
             properties: {
-              name: MOCK_SCHEMAS.STRING,
-              description: MOCK_SCHEMAS.STRING,
-              status: MOCK_SCHEMAS.ENUM_STATUS,
-              email: MOCK_SCHEMAS.EMAIL,
-              metadata: {
-                type: 'object',
-                additionalProperties: true,
+              name: {
+                type: 'string',
+                minLength: 1,
+                maxLength: 100,
+                example: 'Updated Name'
               },
-            },
-            additionalProperties: false,
-          },
-          example: {
-            status: 'inactive',
-            metadata: {
-              priority: 'low',
-            },
-          },
-        },
-      },
+              email: {
+                type: 'string',
+                format: 'email',
+                example: 'updated@example.com'
+              },
+              active: {
+                type: 'boolean',
+                example: true
+              }
+            }
+          }
+        }
+      }
     },
-    responses: [
-      MOCK_RESPONSES.SUCCESS_ITEM,
-      MOCK_RESPONSES.ERROR_BAD_REQUEST,
-      MOCK_RESPONSES.ERROR_UNAUTHORIZED,
-      MOCK_RESPONSES.ERROR_FORBIDDEN,
-      MOCK_RESPONSES.ERROR_NOT_FOUND,
-      MOCK_RESPONSES.ERROR_INTERNAL_SERVER,
-    ],
-    security: [
-      MOCK_SECURITY_CONFIGS.API_KEY_HEADER,
-      MOCK_SECURITY_CONFIGS.BEARER_TOKEN,
-    ],
-    tags: ['Items', 'Update Operations'],
-    operationId: 'patchItem',
-    summary: 'Partially update an item',
-  },
-  DELETE_ITEM: {
-    id: 'delete-item-endpoint',
-    name: 'Delete Item',
-    description: 'Delete an existing item by its identifier',
+    responses: {
+      '200': mockApiResponses.success,
+      '400': mockApiResponses.badRequest,
+      '401': mockApiResponses.unauthorized,
+      '404': mockApiResponses.notFound,
+      '500': mockApiResponses.internalError
+    }
+  }),
+
+  // DELETE endpoints
+  deleteUser: createMockEndpointConfiguration({
+    path: '/api/v2/users/{id}',
     method: 'DELETE',
-    path: '/api/v2/items/{id}',
+    operationId: 'deleteUser',
+    summary: 'Delete user',
+    description: 'Delete a specific user by their unique identifier',
     parameters: [
-      MOCK_PARAMETERS.ID_PATH,
+      mockEndpointParameters.pathId
     ],
-    responses: [
-      MOCK_RESPONSES.SUCCESS_NO_CONTENT,
-      MOCK_RESPONSES.ERROR_BAD_REQUEST,
-      MOCK_RESPONSES.ERROR_UNAUTHORIZED,
-      MOCK_RESPONSES.ERROR_FORBIDDEN,
-      MOCK_RESPONSES.ERROR_NOT_FOUND,
-      MOCK_RESPONSES.ERROR_INTERNAL_SERVER,
-    ],
-    security: [
-      MOCK_SECURITY_CONFIGS.API_KEY_HEADER,
-      MOCK_SECURITY_CONFIGS.BEARER_TOKEN,
-    ],
-    tags: ['Items', 'Delete Operations'],
-    operationId: 'deleteItem',
-    summary: 'Delete an item',
-  },
-} as const;
-
-// OpenAPI 3.0+ specification mock for comprehensive testing
-export const MOCK_OPENAPI_SPECIFICATION = {
-  openapi: '3.0.3',
-  info: {
-    title: 'DreamFactory Generated API',
-    description: 'Automatically generated REST API from database schema',
-    version: '1.0.0',
-    contact: {
-      name: 'API Support',
-      email: 'support@dreamfactory.com',
-      url: 'https://www.dreamfactory.com/support',
-    },
-    license: {
-      name: 'DreamFactory License',
-      url: 'https://www.dreamfactory.com/license',
-    },
-  },
-  servers: [
-    {
-      url: 'https://api.example.com',
-      description: 'Production server',
-    },
-    {
-      url: 'https://staging-api.example.com',
-      description: 'Staging server',
-    },
-    {
-      url: 'http://localhost:8080',
-      description: 'Development server',
-    },
-  ],
-  paths: Object.fromEntries(
-    Object.values(MOCK_ENDPOINT_CONFIGURATIONS).map(endpoint => [
-      endpoint.path,
-      {
-        [endpoint.method.toLowerCase()]: {
-          summary: endpoint.summary,
-          description: endpoint.description,
-          operationId: endpoint.operationId,
-          tags: endpoint.tags,
-          parameters: endpoint.parameters,
-          requestBody: endpoint.requestBody,
-          responses: Object.fromEntries(
-            endpoint.responses.map(response => [
-              response.statusCode,
-              {
-                description: response.description,
-                content: response.content,
-                headers: response.headers,
-              },
-            ])
-          ),
-          security: endpoint.security.map(sec => ({
-            [sec.name]: sec.scopes || [],
-          })),
-          deprecated: endpoint.deprecated || false,
-        },
+    responses: {
+      '204': {
+        description: 'User deleted successfully'
       },
-    ])
-  ),
-  components: {
-    securitySchemes: Object.fromEntries(
-      Object.values(MOCK_SECURITY_CONFIGS).map(security => [
-        security.name,
-        {
-          type: security.type,
-          name: security.name,
-          in: security.in,
-          scheme: security.scheme,
-          bearerFormat: security.bearerFormat,
-          flows: security.flows,
-          openIdConnectUrl: security.openIdConnectUrl,
-          description: security.description,
+      '401': mockApiResponses.unauthorized,
+      '404': mockApiResponses.notFound,
+      '500': mockApiResponses.internalError
+    }
+  })
+};
+
+// =============================================================================
+// OPENAPI SPECIFICATION MOCK DATA
+// =============================================================================
+
+/**
+ * Factory function for creating complete OpenAPI specifications
+ */
+export function createMockOpenApiSpec(overrides: Partial<OpenApiSpecification> = {}): OpenApiSpecification {
+  const defaults: OpenApiSpecification = {
+    openapi: '3.0.3',
+    info: {
+      title: 'DreamFactory API',
+      description: 'Auto-generated REST API for database operations',
+      version: '1.0.0',
+      contact: {
+        name: 'DreamFactory Support',
+        url: 'https://www.dreamfactory.com/support',
+        email: 'support@dreamfactory.com'
+      },
+      license: {
+        name: 'MIT',
+        url: 'https://opensource.org/licenses/MIT'
+      }
+    },
+    servers: [
+      {
+        url: '/api/v2',
+        description: 'DreamFactory API v2'
+      }
+    ],
+    components: {
+      securitySchemes: mockSecuritySchemes,
+      responses: mockApiResponses,
+      schemas: {
+        User: {
+          type: 'object',
+          required: ['id', 'name', 'email'],
+          properties: {
+            id: {
+              type: 'integer',
+              format: 'int64',
+              description: 'Unique identifier',
+              example: 123
+            },
+            name: {
+              type: 'string',
+              minLength: 1,
+              maxLength: 100,
+              description: 'User full name',
+              example: 'John Doe'
+            },
+            email: {
+              type: 'string',
+              format: 'email',
+              description: 'User email address',
+              example: 'john.doe@example.com'
+            },
+            created_at: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Creation timestamp',
+              example: '2024-01-01T00:00:00Z'
+            },
+            updated_at: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Last update timestamp',
+              example: '2024-01-01T00:00:00Z'
+            }
+          }
         },
-      ])
-    ),
-    schemas: MOCK_SCHEMAS,
-    parameters: MOCK_PARAMETERS,
-    responses: MOCK_RESPONSES,
+        Error: {
+          type: 'object',
+          required: ['error'],
+          properties: {
+            error: {
+              type: 'object',
+              required: ['code', 'message'],
+              properties: {
+                code: {
+                  type: 'integer',
+                  description: 'Error code'
+                },
+                message: {
+                  type: 'string',
+                  description: 'Error message'
+                },
+                details: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      field: { type: 'string' },
+                      message: { type: 'string' }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    security: [
+      { ApiKeyHeader: [] },
+      { SessionTokenHeader: [] }
+    ],
+    tags: [
+      {
+        name: 'users',
+        description: 'User management operations'
+      }
+    ],
+    paths: {}
+  };
+
+  return { ...defaults, ...overrides };
+}
+
+/**
+ * Complete OpenAPI specifications for different database services
+ */
+export const mockOpenApiSpecs = {
+  // MySQL database service
+  mysql: createMockOpenApiSpec({
+    info: {
+      title: 'MySQL Database API',
+      description: 'Auto-generated REST API for MySQL database operations',
+      version: '1.0.0'
+    },
+    servers: [
+      {
+        url: '/api/v2/mysql_db',
+        description: 'MySQL Database Service'
+      }
+    ],
+    paths: {
+      '/users': {
+        get: {
+          ...mockEndpointConfigurations.getUsers,
+          tags: ['users']
+        },
+        post: {
+          ...mockEndpointConfigurations.createUser,
+          tags: ['users']
+        }
+      },
+      '/users/{id}': {
+        get: {
+          ...mockEndpointConfigurations.getUserById,
+          tags: ['users']
+        },
+        put: {
+          ...mockEndpointConfigurations.updateUser,
+          tags: ['users']
+        },
+        patch: {
+          ...mockEndpointConfigurations.patchUser,
+          tags: ['users']
+        },
+        delete: {
+          ...mockEndpointConfigurations.deleteUser,
+          tags: ['users']
+        }
+      }
+    }
+  }),
+
+  // PostgreSQL database service
+  postgresql: createMockOpenApiSpec({
+    info: {
+      title: 'PostgreSQL Database API',
+      description: 'Auto-generated REST API for PostgreSQL database operations',
+      version: '1.0.0'
+    },
+    servers: [
+      {
+        url: '/api/v2/postgres_db',
+        description: 'PostgreSQL Database Service'
+      }
+    ]
+  }),
+
+  // MongoDB service
+  mongodb: createMockOpenApiSpec({
+    info: {
+      title: 'MongoDB API',
+      description: 'Auto-generated REST API for MongoDB operations',
+      version: '1.0.0'
+    },
+    servers: [
+      {
+        url: '/api/v2/mongo_db',
+        description: 'MongoDB Service'
+      }
+    ]
+  })
+};
+
+// =============================================================================
+// FORM CONFIGURATION MOCK DATA
+// =============================================================================
+
+/**
+ * Mock endpoint configuration form data for React Hook Form testing
+ */
+export const mockEndpointConfigForm: EndpointConfigForm = {
+  serviceName: 'mysql_db',
+  tableName: 'users',
+  path: '/api/v2/mysql_db/users',
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+  security: {
+    enabled: true,
+    schemes: ['ApiKeyHeader', 'SessionTokenHeader'],
+    requireAuthentication: true
   },
-  tags: [
-    {
-      name: 'Items',
-      description: 'Operations related to item management',
-    },
-    {
-      name: 'List Operations',
-      description: 'Operations for listing resources with pagination',
-    },
-    {
-      name: 'Read Operations',
-      description: 'Operations for reading individual resources',
-    },
-    {
-      name: 'Create Operations',
-      description: 'Operations for creating new resources',
-    },
-    {
-      name: 'Update Operations',
-      description: 'Operations for updating existing resources',
-    },
-    {
-      name: 'Delete Operations',
-      description: 'Operations for deleting resources',
-    },
+  queryConfig: mockQueryConfigurations.standard,
+  validationRules: [
+    mockValidationRules.required,
+    mockValidationRules.email,
+    mockValidationRules.minLength
   ],
-} as const;
+  responseFormats: [CONTENT_TYPES.JSON, CONTENT_TYPES.XML],
+  tags: ['users', 'database'],
+  description: 'User management endpoints for the MySQL database service',
+  generateDocumentation: true,
+  enableTesting: true
+};
 
-// Mock data for React Hook Form testing
-export const MOCK_FORM_DATA = {
-  VALID_ENDPOINT: {
-    name: 'Test Endpoint',
-    description: 'This is a test endpoint',
-    method: 'GET' as HttpMethod,
-    path: '/api/v2/test',
-    parameters: [MOCK_PARAMETERS.LIMIT_QUERY],
-    security: [MOCK_SECURITY_CONFIGS.API_KEY_HEADER],
-    tags: ['Test'],
+// =============================================================================
+// FACTORY FUNCTIONS FOR DYNAMIC TEST DATA
+// =============================================================================
+
+/**
+ * Factory for creating endpoint configurations with random data
+ */
+export function createRandomEndpointConfig(
+  serviceName: string,
+  tableName: string,
+  methods: HttpMethod[] = ['GET']
+): EndpointConfiguration {
+  const config = createMockEndpointConfiguration({
+    path: `/api/v2/${serviceName}/${tableName}`,
+    method: methods[0],
+    operationId: `${methods[0].toLowerCase()}${tableName.charAt(0).toUpperCase() + tableName.slice(1)}`,
+    summary: `${methods[0]} ${tableName}`,
+    description: `${methods[0]} operation for ${tableName} in ${serviceName}`,
+    tags: [tableName, serviceName]
+  });
+
+  return config;
+}
+
+/**
+ * Factory for creating complete OpenAPI specs for testing
+ */
+export function createTestOpenApiSpec(
+  serviceName: string,
+  tables: string[],
+  methods: HttpMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']
+): OpenApiSpecification {
+  const spec = createMockOpenApiSpec({
+    info: {
+      title: `${serviceName} API`,
+      description: `Auto-generated API for ${serviceName} service`,
+      version: '1.0.0'
+    },
+    servers: [
+      {
+        url: `/api/v2/${serviceName}`,
+        description: `${serviceName} Service`
+      }
+    ]
+  });
+
+  // Generate paths for each table and method combination
+  const paths: Record<string, any> = {};
+  
+  tables.forEach(table => {
+    methods.forEach(method => {
+      const pathKey = method === 'POST' ? `/${table}` : `/${table}/{id}`;
+      
+      if (!paths[pathKey]) {
+        paths[pathKey] = {};
+      }
+      
+      paths[pathKey][method.toLowerCase()] = createRandomEndpointConfig(
+        serviceName,
+        table,
+        [method]
+      );
+    });
+  });
+
+  spec.paths = paths;
+  return spec;
+}
+
+/**
+ * Utility function to create MSW-compatible response data
+ */
+export function createMswResponseData(
+  endpointConfig: EndpointConfiguration,
+  statusCode: number = HTTP_STATUS_CODES.OK
+): any {
+  const response = endpointConfig.responses?.[statusCode.toString()];
+  
+  if (!response) {
+    return { success: true };
+  }
+
+  // Extract example data from schema
+  const content = response.content?.[CONTENT_TYPES.JSON];
+  if (content?.schema) {
+    return generateExampleFromSchema(content.schema);
+  }
+
+  return { success: true };
+}
+
+/**
+ * Helper function to generate example data from JSON schema
+ */
+function generateExampleFromSchema(schema: any): any {
+  if (schema.example) {
+    return schema.example;
+  }
+
+  if (schema.type === 'object' && schema.properties) {
+    const result: any = {};
+    for (const [key, prop] of Object.entries(schema.properties as any)) {
+      result[key] = generateExampleFromSchema(prop);
+    }
+    return result;
+  }
+
+  if (schema.type === 'array' && schema.items) {
+    return [generateExampleFromSchema(schema.items)];
+  }
+
+  // Default values for primitive types
+  switch (schema.type) {
+    case 'string':
+      return schema.format === 'email' ? 'test@example.com' : 'string';
+    case 'integer':
+      return 123;
+    case 'number':
+      return 123.45;
+    case 'boolean':
+      return true;
+    default:
+      return null;
+  }
+}
+
+// =============================================================================
+// EXPORT COLLECTIONS
+// =============================================================================
+
+/**
+ * Complete collection of all mock data for easy importing
+ */
+export const mockData = {
+  constants: {
+    HTTP_HEADERS,
+    HTTP_STATUS_CODES,
+    SUPPORTED_HTTP_METHODS,
+    CONTENT_TYPES
   },
-  INVALID_ENDPOINT: {
-    name: '',
-    description: 'This is an invalid endpoint with missing required fields',
-    method: 'INVALID_METHOD' as any,
-    path: 'invalid-path-without-leading-slash',
-    parameters: [],
-    security: [],
-    tags: [],
-  },
-  PARTIAL_ENDPOINT: {
-    name: 'Partial Endpoint',
-    method: 'POST' as HttpMethod,
-    path: '/api/v2/partial',
-  },
-} as const;
+  securitySchemes: mockSecuritySchemes,
+  parameters: mockEndpointParameters,
+  responses: mockApiResponses,
+  validationRules: mockValidationRules,
+  queryConfigurations: mockQueryConfigurations,
+  endpointConfigurations: mockEndpointConfigurations,
+  openApiSpecs: mockOpenApiSpecs,
+  formData: mockEndpointConfigForm
+};
 
-// MSW-compatible mock handlers data
-export const MSW_MOCK_DATA = {
-  endpoints: Object.values(MOCK_ENDPOINT_CONFIGURATIONS),
-  openApiSpec: MOCK_OPENAPI_SPECIFICATION,
-  securityConfigs: Object.values(MOCK_SECURITY_CONFIGS),
-  schemas: MOCK_SCHEMAS,
-  parameters: Object.values(MOCK_PARAMETERS),
-  responses: Object.values(MOCK_RESPONSES),
-} as const;
+/**
+ * Factory functions for dynamic data generation
+ */
+export const factories = {
+  createMockParameter,
+  createMockApiResponse,
+  createMockValidationRule,
+  createMockQueryConfiguration,
+  createMockEndpointConfiguration,
+  createMockOpenApiSpec,
+  createRandomEndpointConfig,
+  createTestOpenApiSpec,
+  createMswResponseData
+};
 
-// Utility functions for test data generation
-export const createMockEndpoint = (
-  overrides: Partial<MockEndpointConfiguration> = {}
-): MockEndpointConfiguration => ({
-  ...MOCK_ENDPOINT_CONFIGURATIONS.GET_LIST,
-  ...overrides,
-  id: overrides.id || `mock-endpoint-${Date.now()}`,
-});
-
-export const createMockParameter = (
-  overrides: Partial<EndpointParameter> = {}
-): EndpointParameter => ({
-  ...MOCK_PARAMETERS.LIMIT_QUERY,
-  ...overrides,
-  name: overrides.name || `mock-param-${Date.now()}`,
-});
-
-export const createMockSchema = (
-  overrides: Partial<SchemaConfiguration> = {}
-): SchemaConfiguration => ({
-  ...MOCK_SCHEMAS.STRING,
-  ...overrides,
-});
-
-export const createMockResponse = (
-  overrides: Partial<ResponseConfiguration> = {}
-): ResponseConfiguration => ({
-  ...MOCK_RESPONSES.SUCCESS_ITEM,
-  ...overrides,
-});
-
-export const createMockSecurity = (
-  overrides: Partial<SecurityConfiguration> = {}
-): SecurityConfiguration => ({
-  ...MOCK_SECURITY_CONFIGS.API_KEY_HEADER,
-  ...overrides,
-  name: overrides.name || `mock-security-${Date.now()}`,
-});
-
-// Export all mock data for comprehensive testing coverage
-export default {
-  configurations: MOCK_ENDPOINT_CONFIGURATIONS,
-  openApiSpec: MOCK_OPENAPI_SPECIFICATION,
-  schemas: MOCK_SCHEMAS,
-  parameters: MOCK_PARAMETERS,
-  responses: MOCK_RESPONSES,
-  security: MOCK_SECURITY_CONFIGS,
-  statusCodes: MOCK_HTTP_STATUS_CODES,
-  mediaTypes: MOCK_MEDIA_TYPES,
-  formData: MOCK_FORM_DATA,
-  mswData: MSW_MOCK_DATA,
-  utilities: {
-    createMockEndpoint,
-    createMockParameter,
-    createMockSchema,
-    createMockResponse,
-    createMockSecurity,
-  },
-} as const;
+// Default export for convenient importing
+export default mockData;
