@@ -1,496 +1,495 @@
+/**
+ * Authentication Layout Component
+ * 
+ * React authentication layout wrapper component providing common structure for
+ * all authentication pages including login, registration, password reset, and
+ * SAML callback. Implements responsive design with centered content areas,
+ * theme support, and consistent styling using Tailwind CSS.
+ * 
+ * Features:
+ * - Responsive layout design supporting mobile, tablet, and desktop screen sizes
+ * - Dark mode theme support with smooth transitions and consistent color schemes
+ * - Centered content area with appropriate padding and spacing for optimal UX
+ * - Consistent branding elements including DreamFactory logo and color schemes
+ * - Error boundary implementation for graceful error handling in auth flows
+ * - Loading state management for authentication operations with user feedback
+ * - WCAG 2.1 AA compliance with proper contrast ratios and accessibility features
+ * - Integration with Next.js app router for consistent page structure
+ * 
+ * Architecture:
+ * - Replaces Angular Material card-based authentication page structure
+ * - Uses Tailwind CSS flexbox utilities instead of Angular Material layout
+ * - Integrates with React context for theme management and error handling
+ * - Provides reusable container patterns for authentication form components
+ * 
+ * @fileoverview Authentication layout wrapper for all auth-related pages
+ * @version 1.0.0
+ * @since React 19.0.0, Next.js 15.1+, TypeScript 5.8+
+ */
+
 'use client';
 
-import React, { Suspense, useEffect, useState } from 'react';
-import { ErrorBoundary } from 'react-error-boundary';
-import { Transition } from '@headlessui/react';
-import Image from 'next/image';
-import Link from 'next/link';
+import React, { Suspense } from 'react';
+import { useTheme } from '../../../hooks/use-theme';
+import type { ThemeMode } from '../../../types/theme';
 
-/**
- * Utility function for merging Tailwind CSS classes
- * Provides basic className concatenation with undefined filtering
- */
-function cn(...classes: (string | undefined | null | false)[]): string {
-  return classes.filter(Boolean).join(' ');
-}
+// ============================================================================
+// COMPONENT INTERFACES
+// ============================================================================
 
-// Type definitions for props and interfaces
 interface AuthLayoutProps {
+  /** Child components to render within the authentication layout */
   children: React.ReactNode;
+  
+  /** Optional title for the authentication page */
   title?: string;
+  
+  /** Optional subtitle or description for the page */
   subtitle?: string;
+  
+  /** Whether to show the DreamFactory logo */
   showLogo?: boolean;
-  showBranding?: boolean;
+  
+  /** Whether to show a theme toggle in the top corner */
+  showThemeToggle?: boolean;
+  
+  /** Maximum width for the content container */
+  maxWidth?: 'sm' | 'md' | 'lg' | 'xl';
+  
+  /** Whether to show the background pattern */
+  showBackgroundPattern?: boolean;
+  
+  /** Additional CSS classes for the container */
   className?: string;
-  loading?: boolean;
+  
+  /** Custom loading message for authentication operations */
+  loadingMessage?: string;
+  
+  /** Whether the layout is in a loading state */
+  isLoading?: boolean;
 }
 
-/**
- * Theme context type definition - matches expected interface from use-theme hook
- */
-interface ThemeContextType {
-  theme: 'light' | 'dark' | 'system';
-  resolvedTheme: 'light' | 'dark';
-  setTheme: (theme: 'light' | 'dark' | 'system') => void;
-  systemTheme: 'light' | 'dark';
-  mounted: boolean;
+interface AuthErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
 }
 
-/**
- * Error boundary fallback component for authentication flows
- * Provides user-friendly error display with recovery options
- */
-function AuthErrorFallback({ 
-  error, 
-  resetErrorBoundary 
-}: { 
-  error: Error; 
-  resetErrorBoundary: () => void;
-}) {
-  useEffect(() => {
-    // Log error to monitoring service in production
-    console.error('Authentication Error:', error);
-  }, [error]);
-
-  return (
-    <div 
-      className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4 sm:px-6 lg:px-8"
-      role="alert"
-      aria-labelledby="auth-error-title"
-      aria-describedby="auth-error-description"
-    >
-      <div className="max-w-md w-full space-y-8">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-6">
-          <div className="flex items-center space-x-3 mb-4">
-            <div className="flex-shrink-0">
-              <svg 
-                className="h-8 w-8 text-red-500" 
-                fill="none" 
-                viewBox="0 0 24 24" 
-                stroke="currentColor"
-                aria-hidden="true"
-              >
-                <path 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  strokeWidth={2} 
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 18.5c-.77.833.192 2.5 1.732 2.5z" 
-                />
-              </svg>
-            </div>
-            <div>
-              <h1 
-                id="auth-error-title"
-                className="text-lg font-semibold text-gray-900 dark:text-white"
-              >
-                Authentication Error
-              </h1>
-            </div>
-          </div>
-          
-          <p 
-            id="auth-error-description"
-            className="text-gray-600 dark:text-gray-400 mb-6 text-sm leading-relaxed"
-          >
-            Something went wrong during authentication. Please try again or contact your administrator if the problem persists.
-          </p>
-          
-          <div className="flex flex-col sm:flex-row gap-3">
-            <button
-              onClick={resetErrorBoundary}
-              className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200 min-h-[44px]"
-              aria-label="Try to recover from authentication error"
-            >
-              <svg 
-                className="h-4 w-4 mr-2" 
-                fill="none" 
-                viewBox="0 0 24 24" 
-                stroke="currentColor"
-                aria-hidden="true"
-              >
-                <path 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  strokeWidth={2} 
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" 
-                />
-              </svg>
-              Try Again
-            </button>
-            
-            <Link
-              href="/login"
-              className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200 min-h-[44px]"
-              aria-label="Return to login page"
-            >
-              <svg 
-                className="h-4 w-4 mr-2" 
-                fill="none" 
-                viewBox="0 0 24 24" 
-                stroke="currentColor"
-                aria-hidden="true"
-              >
-                <path 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  strokeWidth={2} 
-                  d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-3 0V9a1 1 0 00-1-1H9a1 1 0 00-1 1v10M4 21h16" 
-                />
-              </svg>
-              Back to Login
-            </Link>
-          </div>
-          
-          {process.env.NODE_ENV === 'development' && (
-            <details className="mt-6 p-4 bg-gray-100 dark:bg-gray-700 rounded-md">
-              <summary className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer hover:text-gray-900 dark:hover:text-white transition-colors">
-                Error Details (Development)
-              </summary>
-              <pre className="mt-2 text-xs text-gray-600 dark:text-gray-400 overflow-auto whitespace-pre-wrap">
-                {error.message}
-                {error.stack && '\n\n' + error.stack}
-              </pre>
-            </details>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+interface AuthErrorBoundaryProps {
+  children: React.ReactNode;
+  fallback?: React.ComponentType<{ error: Error | null; resetError: () => void }>;
 }
 
-/**
- * Loading component for authentication operations
- * Displays during suspense loading states with branded styling
- */
-function AuthLoadingFallback() {
-  return (
-    <div 
-      className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4 sm:px-6 lg:px-8"
-      role="status"
-      aria-label="Loading authentication page"
-    >
-      <div className="flex flex-col items-center space-y-4">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600" />
-        <p className="text-gray-600 dark:text-gray-400 text-lg font-medium">
-          Loading...
-        </p>
-      </div>
-    </div>
-  );
-}
+// ============================================================================
+// ERROR BOUNDARY COMPONENT
+// ============================================================================
 
 /**
- * DreamFactory logo component with responsive sizing
+ * Authentication Error Boundary Component
+ * 
+ * Provides comprehensive error handling specifically for authentication flows
+ * with graceful degradation and user-friendly error messages. Implements
+ * React error boundary patterns optimized for auth-related error scenarios.
  */
-function DreamFactoryLogo({ className }: { className?: string }) {
-  return (
-    <div className={cn("flex items-center justify-center", className)}>
-      <div className="flex items-center space-x-3">
-        {/* Logo icon placeholder - replace with actual DreamFactory logo */}
-        <div className="h-10 w-10 bg-primary-600 rounded-lg flex items-center justify-center">
-          <svg 
-            className="h-6 w-6 text-white" 
-            fill="none" 
-            viewBox="0 0 24 24" 
-            stroke="currentColor"
-            aria-hidden="true"
-          >
-            <path 
-              strokeLinecap="round" 
-              strokeLinejoin="round" 
-              strokeWidth={2} 
-              d="M13 10V3L4 14h7v7l9-11h-7z" 
-            />
-          </svg>
-        </div>
-        <div className="text-2xl font-bold text-gray-900 dark:text-white">
-          DreamFactory
-        </div>
-      </div>
-    </div>
-  );
-}
+class AuthErrorBoundary extends React.Component<AuthErrorBoundaryProps, AuthErrorBoundaryState> {
+  constructor(props: AuthErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
 
-/**
- * Theme toggle component for authentication pages
- */
-function ThemeToggle() {
-  const [mounted, setMounted] = useState(false);
-  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system');
-  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light');
+  static getDerivedStateFromError(error: Error): AuthErrorBoundaryState {
+    return { hasError: true, error };
+  }
 
-  // Detect system theme preference
-  useEffect(() => {
-    setMounted(true);
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    setResolvedTheme(mediaQuery.matches ? 'dark' : 'light');
-
-    const handleChange = (e: MediaQueryListEvent) => {
-      setResolvedTheme(e.matches ? 'dark' : 'light');
-    };
-
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
-  }, []);
-
-  // Load saved theme preference
-  useEffect(() => {
-    if (mounted) {
-      const stored = localStorage.getItem('df-admin-theme') as 'light' | 'dark' | 'system';
-      if (stored && ['dark', 'light', 'system'].includes(stored)) {
-        setTheme(stored);
-      }
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    // Log authentication errors for monitoring
+    console.error('Authentication Error Boundary caught an error:', error, errorInfo);
+    
+    // In production, integrate with error monitoring service
+    if (process.env.NODE_ENV === 'production') {
+      // Example: Send to monitoring service
+      // errorReporting.captureException(error, { context: 'authentication', ...errorInfo });
     }
-  }, [mounted]);
+  }
 
-  // Apply theme to document
-  useEffect(() => {
-    if (mounted) {
-      const root = document.documentElement;
-      const effectiveTheme = theme === 'system' ? resolvedTheme : theme;
-      
-      root.classList.remove('light', 'dark');
-      root.classList.add(effectiveTheme);
-      
-      // Update meta theme-color for mobile browsers
-      const themeColorMeta = document.querySelector('meta[name="theme-color"]');
-      if (themeColorMeta) {
-        themeColorMeta.setAttribute(
-          'content', 
-          effectiveTheme === 'dark' ? '#111827' : '#ffffff'
-        );
-      }
-    }
-  }, [theme, resolvedTheme, mounted]);
-
-  const toggleTheme = () => {
-    const newTheme = resolvedTheme === 'dark' ? 'light' : 'dark';
-    setTheme(newTheme);
-    localStorage.setItem('df-admin-theme', newTheme);
+  resetError = () => {
+    this.setState({ hasError: false, error: null });
   };
 
+  render() {
+    if (this.state.hasError) {
+      // Use custom fallback component if provided
+      if (this.props.fallback) {
+        const FallbackComponent = this.props.fallback;
+        return <FallbackComponent error={this.state.error} resetError={this.resetError} />;
+      }
+
+      // Default fallback UI for authentication errors
+      return (
+        <div 
+          className="min-h-screen flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-900"
+          role="alert"
+          aria-labelledby="auth-error-title"
+          aria-describedby="auth-error-description"
+        >
+          <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 text-center">
+            {/* Error Icon */}
+            <div className="w-12 h-12 mx-auto mb-4 text-red-500 dark:text-red-400">
+              <svg 
+                className="w-full h-full" 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  strokeWidth={2} 
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" 
+                />
+              </svg>
+            </div>
+            
+            <h1 
+              id="auth-error-title"
+              className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2"
+            >
+              Authentication Error
+            </h1>
+            
+            <p 
+              id="auth-error-description"
+              className="text-gray-600 dark:text-gray-400 mb-4"
+            >
+              An error occurred during authentication. Please try again.
+            </p>
+            
+            <button
+              onClick={this.resetError}
+              className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+// ============================================================================
+// LOADING COMPONENT
+// ============================================================================
+
+/**
+ * Authentication Loading Component
+ * 
+ * Provides loading state UI specifically designed for authentication operations
+ * with accessible loading indicators and customizable messaging.
+ */
+const AuthLoading: React.FC<{ message?: string }> = ({ 
+  message = 'Authenticating...' 
+}) => (
+  <div 
+    className="min-h-screen flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-900"
+    role="status"
+    aria-label={message}
+  >
+    <div className="text-center">
+      {/* Loading Spinner */}
+      <div className="w-8 h-8 mx-auto mb-4">
+        <svg
+          className="animate-spin text-primary-600 dark:text-primary-400"
+          fill="none"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <circle
+            className="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeWidth="4"
+          />
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+          />
+        </svg>
+      </div>
+      
+      <p className="text-gray-600 dark:text-gray-400 text-sm">
+        {message}
+      </p>
+    </div>
+  </div>
+);
+
+// ============================================================================
+// THEME TOGGLE COMPONENT
+// ============================================================================
+
+/**
+ * Theme Toggle Component
+ * 
+ * Compact theme toggle specifically designed for authentication pages,
+ * positioned in the top-right corner for easy access without interfering
+ * with the authentication workflow.
+ */
+const AuthThemeToggle: React.FC = () => {
+  const { resolvedTheme, toggleTheme, mounted } = useTheme();
+
+  // Don't render until mounted to prevent hydration mismatch
   if (!mounted) {
-    return null;
+    return (
+      <div className="w-10 h-10 rounded-lg bg-gray-200 dark:bg-gray-700 animate-pulse" />
+    );
   }
 
   return (
     <button
       onClick={toggleTheme}
-      className="p-2 rounded-md text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200"
-      aria-label={`Switch to ${resolvedTheme === 'dark' ? 'light' : 'dark'} mode`}
+      className="p-2 rounded-lg bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+      aria-label={`Switch to ${resolvedTheme === 'light' ? 'dark' : 'light'} mode`}
+      title={`Switch to ${resolvedTheme === 'light' ? 'dark' : 'light'} mode`}
     >
-      {resolvedTheme === 'dark' ? (
-        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+      {resolvedTheme === 'light' ? (
+        // Moon icon for dark mode
+        <svg
+          className="w-5 h-5 text-gray-600 dark:text-gray-400"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
+          />
         </svg>
       ) : (
-        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+        // Sun icon for light mode
+        <svg
+          className="w-5 h-5 text-gray-600 dark:text-gray-400"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
+          />
         </svg>
       )}
     </button>
   );
-}
+};
+
+// ============================================================================
+// DREAMFACTORY LOGO COMPONENT
+// ============================================================================
 
 /**
- * Skip link component for accessibility
- * Allows keyboard users to skip to main content
+ * DreamFactory Logo Component
+ * 
+ * Renders the DreamFactory logo with consistent branding and responsive sizing.
+ * Supports both light and dark themes with appropriate color schemes.
  */
-function SkipLink() {
-  return (
-    <a
-      href="#auth-content"
-      className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 bg-primary-600 text-white px-4 py-2 rounded-md text-sm font-medium z-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-    >
-      Skip to main content
-    </a>
-  );
-}
+const DreamFactoryLogo: React.FC<{ className?: string }> = ({ className = '' }) => (
+  <div className={`flex items-center justify-center ${className}`}>
+    {/* Logo Container */}
+    <div className="flex items-center space-x-3">
+      {/* Logo Icon */}
+      <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-lg flex items-center justify-center shadow-sm">
+        <svg
+          className="w-6 h-6 text-white"
+          fill="currentColor"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+        </svg>
+      </div>
+      
+      {/* Logo Text */}
+      <div className="hidden sm:block">
+        <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+          DreamFactory
+        </h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400 -mt-1">
+          Admin Interface
+        </p>
+      </div>
+    </div>
+  </div>
+);
+
+// ============================================================================
+// MAIN AUTHENTICATION LAYOUT COMPONENT
+// ============================================================================
 
 /**
  * Authentication Layout Component
  * 
- * React authentication layout wrapper component providing common structure for all 
- * authentication pages including login, registration, password reset, and SAML callback.
+ * Main layout wrapper component for all authentication pages. Provides
+ * consistent structure, theming, error handling, and responsive design
+ * across login, registration, password reset, and SAML callback pages.
  * 
- * Features:
- * - Responsive centered layout optimized for mobile, tablet, and desktop
- * - Dark mode theme support with smooth transitions and system preference detection
- * - Consistent DreamFactory branding with logo and color schemes
- * - Error boundary implementation for graceful error handling in authentication flows
- * - Loading state management for authentication operations with user feedback
- * - WCAG 2.1 AA compliance with proper contrast ratios and accessibility features
- * - Integration with Next.js app router for consistent page structure
- * - Keyboard navigation support with focus management
- * - Mobile-responsive design with touch-friendly interactions
- * - Theme toggle for user preference selection
- * 
- * Replaces Angular Material card-based authentication page structure with modern
- * React patterns using Tailwind CSS utility-first approach for maintainable styling.
+ * @param props - Component properties
+ * @returns Authentication layout with providers and structure
  */
-export function AuthLayout({ 
-  children, 
+export const AuthLayout: React.FC<AuthLayoutProps> = ({
+  children,
   title,
   subtitle,
   showLogo = true,
-  showBranding = true,
-  className,
-  loading = false
-}: AuthLayoutProps) {
-  const [mounted, setMounted] = useState(false);
+  showThemeToggle = true,
+  maxWidth = 'md',
+  showBackgroundPattern = true,
+  className = '',
+  loadingMessage,
+  isLoading = false,
+}) => {
+  const { resolvedTheme, mounted } = useTheme();
 
-  // Prevent hydration mismatch by mounting after client-side hydration
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  // Container max width classes
+  const maxWidthClasses = {
+    sm: 'max-w-sm',
+    md: 'max-w-md',
+    lg: 'max-w-lg',
+    xl: 'max-w-xl',
+  };
 
-  // Handle escape key to close any open dialogs or forms
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        // Allow form components to handle escape key events
-        const activeElement = document.activeElement as HTMLElement;
-        if (activeElement && activeElement.blur) {
-          activeElement.blur();
-        }
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  // Prevent hydration mismatch
-  if (!mounted) {
-    return <AuthLoadingFallback />;
+  // Show loading state if specified
+  if (isLoading) {
+    return <AuthLoading message={loadingMessage} />;
   }
 
   return (
-    <ErrorBoundary
-      FallbackComponent={AuthErrorFallback}
-      onReset={() => {
-        // Clear any error state and refresh if needed
-        window.location.reload();
-      }}
-      onError={(error) => {
-        // Log error to monitoring service
-        console.error('Authentication Layout Error:', error);
-      }}
-    >
-      <div className={cn(
-        "min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300",
-        "flex flex-col justify-center py-12 sm:px-6 lg:px-8",
-        className
-      )}>
-        {/* Skip link for accessibility */}
-        <SkipLink />
-
-        {/* Loading overlay */}
-        <Transition
-          show={loading}
-          enter="transition-opacity duration-300"
-          enterFrom="opacity-0"
-          enterTo="opacity-100"
-          leave="transition-opacity duration-200"
-          leaveFrom="opacity-100"
-          leaveTo="opacity-0"
-        >
+    <AuthErrorBoundary>
+      <div 
+        className={`
+          min-h-screen flex flex-col
+          bg-gray-50 dark:bg-gray-900
+          transition-colors duration-200
+          ${className}
+        `}
+      >
+        {/* Background Pattern */}
+        {showBackgroundPattern && (
           <div 
-            className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center"
-            role="status"
-            aria-label="Processing authentication"
+            className="absolute inset-0 opacity-5 dark:opacity-10"
+            aria-hidden="true"
           >
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-xl max-w-sm w-full mx-4">
-              <div className="flex items-center space-x-3">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600" />
-                <span className="text-gray-900 dark:text-white font-medium">
-                  Processing...
-                </span>
-              </div>
-            </div>
-          </div>
-        </Transition>
-
-        {/* Theme toggle - positioned in top right */}
-        <div className="absolute top-4 right-4 z-10">
-          <ThemeToggle />
-        </div>
-
-        {/* Main authentication content */}
-        <div className="sm:mx-auto sm:w-full sm:max-w-md">
-          {/* Header section with logo and branding */}
-          {showLogo && (
-            <div className="text-center mb-8">
-              <DreamFactoryLogo className="mb-4" />
-              {title && (
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                  {title}
-                </h1>
-              )}
-              {subtitle && (
-                <p className="text-gray-600 dark:text-gray-400 text-base">
-                  {subtitle}
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Authentication form container */}
-          <div className="bg-white dark:bg-gray-800 py-8 px-4 shadow-lg sm:rounded-lg sm:px-10 border border-gray-200 dark:border-gray-700">
-            <main 
-              id="auth-content"
-              className="focus:outline-none"
-              role="main"
-              aria-label="Authentication form"
-              tabIndex={-1}
+            <div className="absolute inset-0 bg-gradient-to-br from-primary-500 to-primary-600" />
+            <svg
+              className="absolute inset-0 w-full h-full"
+              viewBox="0 0 100 100"
+              preserveAspectRatio="none"
             >
-              <Suspense fallback={<AuthLoadingFallback />}>
-                <ErrorBoundary
-                  FallbackComponent={AuthErrorFallback}
-                  onReset={() => {
-                    // Reset form state if needed
-                    window.location.reload();
-                  }}
+              <defs>
+                <pattern
+                  id="auth-bg-pattern"
+                  x="0"
+                  y="0"
+                  width="20"
+                  height="20"
+                  patternUnits="userSpaceOnUse"
+                >
+                  <circle
+                    cx="10"
+                    cy="10"
+                    r="1"
+                    fill="currentColor"
+                    className="text-primary-600 dark:text-primary-400"
+                  />
+                </pattern>
+              </defs>
+              <rect width="100%" height="100%" fill="url(#auth-bg-pattern)" />
+            </svg>
+          </div>
+        )}
+
+        {/* Theme Toggle */}
+        {showThemeToggle && (
+          <div className="absolute top-4 right-4 z-10">
+            <Suspense fallback={<div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />}>
+              <AuthThemeToggle />
+            </Suspense>
+          </div>
+        )}
+
+        {/* Main Content Container */}
+        <div className="flex-1 flex items-center justify-center p-4 relative z-10">
+          <div className={`w-full ${maxWidthClasses[maxWidth]} space-y-6`}>
+            {/* Logo Section */}
+            {showLogo && (
+              <div className="text-center">
+                <DreamFactoryLogo className="mb-4" />
+              </div>
+            )}
+
+            {/* Title and Subtitle */}
+            {(title || subtitle) && (
+              <div className="text-center">
+                {title && (
+                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+                    {title}
+                  </h1>
+                )}
+                {subtitle && (
+                  <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base">
+                    {subtitle}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Main Content Card */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div className="p-6 sm:p-8">
+                <Suspense 
+                  fallback={
+                    <div className="flex items-center justify-center py-8">
+                      <div className="w-6 h-6 animate-spin border-2 border-primary-600 border-t-transparent rounded-full" />
+                    </div>
+                  }
                 >
                   {children}
-                </ErrorBoundary>
-              </Suspense>
-            </main>
-          </div>
+                </Suspense>
+              </div>
+            </div>
 
-          {/* Footer branding */}
-          {showBranding && (
-            <div className="mt-8 text-center">
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Powered by{' '}
-                <Link 
-                  href="https://www.dreamfactory.com" 
-                  className="font-medium text-primary-600 hover:text-primary-500 dark:text-primary-400 dark:hover:text-primary-300 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 rounded-sm"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Visit DreamFactory website (opens in new tab)"
-                >
-                  DreamFactory
-                </Link>
-                {' '}API Platform
-              </p>
-              <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">
-                Version 2024.1 • Build with modern APIs in minutes
+            {/* Footer */}
+            <div className="text-center">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                © {new Date().getFullYear()} DreamFactory Software, Inc. All rights reserved.
               </p>
             </div>
-          )}
+          </div>
         </div>
-
-        {/* Accessibility announcements */}
-        <div 
-          id="auth-announcement-region"
-          aria-live="polite"
-          aria-atomic="true"
-          className="sr-only"
-        />
       </div>
-    </ErrorBoundary>
+    </AuthErrorBoundary>
   );
-}
+};
+
+// ============================================================================
+// COMPONENT EXPORTS
+// ============================================================================
 
 export default AuthLayout;
+
+// Export additional components for standalone use
+export { AuthErrorBoundary, AuthLoading, AuthThemeToggle, DreamFactoryLogo };
+
+// Export types for external usage
+export type { AuthLayoutProps, AuthErrorBoundaryProps };
