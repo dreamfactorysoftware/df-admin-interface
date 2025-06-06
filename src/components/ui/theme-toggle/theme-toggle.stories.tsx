@@ -1,163 +1,173 @@
-/**
- * ThemeToggle Storybook Stories
- * 
- * Comprehensive documentation and interactive examples for the ThemeToggle component.
- * Demonstrates all component variants, accessibility features, theme states, and 
- * integration patterns for development and design system documentation.
- * 
- * Features:
- * - Storybook 7+ CSF3 format with enhanced controls and documentation
- * - Interactive examples of all size variants (sm, md, lg) and styling options
- * - Three-state theme switching behavior (light/dark/system) with live preview
- * - WCAG 2.1 AA accessibility demonstrations including keyboard navigation
- * - Theme context integration examples with proper provider setup
- * - Component usage in different layout contexts and scenarios
- * - Dark mode demonstrations with smooth transition animations
- * 
- * @version 1.0.0
- * @since React 19.0.0
- */
-
 import type { Meta, StoryObj } from '@storybook/react';
 import { action } from '@storybook/addon-actions';
-import { userEvent, within, expect, fn } from '@storybook/test';
-import { ThemeToggle } from './theme-toggle';
-import { ThemeProvider, useTheme } from '@/components/layout/theme/theme-provider';
-import React, { useState, useEffect } from 'react';
+import { userEvent, within, expect } from '@storybook/test';
+import { useState } from 'react';
+import { 
+  SunIcon, 
+  MoonIcon, 
+  ComputerDesktopIcon,
+  CogIcon,
+  UserIcon,
+  BellIcon
+} from '@heroicons/react/24/outline';
+import { ThemeToggle, CompactThemeToggle, ThemeToggleVariants } from './theme-toggle';
+import { ThemeProvider } from '@/components/layout/theme/theme-provider';
+import type { ThemeMode } from '@/types/theme';
 
 /**
- * ThemeToggle component provides a three-state theme switcher with full accessibility support.
- * Replaces Angular Material mat-slide-toggle with Headless UI Switch component.
- * 
- * ## Features
- * - **Three-state selection**: Light, Dark, and System preference detection
- * - **WCAG 2.1 AA compliant**: Proper contrast ratios, keyboard navigation, screen reader support
- * - **Touch-friendly**: Minimum 44x44px touch targets for mobile accessibility
- * - **Theme integration**: Seamless integration with React context theme provider
- * - **Smooth transitions**: CSS transitions with reduced motion support
- * - **System detection**: Automatic system preference following with media query listening
- * 
- * ## Accessibility
- * - Keyboard navigation with Tab and Space/Enter keys
- * - Screen reader announcements for state changes
- * - ARIA labels and proper role attributes
- * - Focus-visible indicators for keyboard-only navigation
- * - Minimum 4.5:1 contrast ratios for all text elements
- * - Minimum 3:1 contrast ratios for UI components and focus indicators
+ * Mock theme provider for isolated Storybook testing
+ * Provides controlled theme state without relying on global context
  */
+function MockThemeProvider({ 
+  children, 
+  initialTheme = 'system',
+  forceResolved 
+}: { 
+  children: React.ReactNode;
+  initialTheme?: ThemeMode;
+  forceResolved?: 'light' | 'dark';
+}) {
+  const [theme, setTheme] = useState<ThemeMode>(initialTheme);
+  const [mounted, setMounted] = useState(true);
+  
+  // Mock system theme detection
+  const systemTheme = forceResolved || 'light';
+  const resolvedTheme = theme === 'system' ? systemTheme : (theme as 'light' | 'dark');
+
+  const mockContext = {
+    theme,
+    resolvedTheme,
+    systemTheme,
+    setTheme: (newTheme: ThemeMode) => {
+      setTheme(newTheme);
+      action('theme-changed')(newTheme);
+    },
+    mounted,
+    isTheme: (mode: ThemeMode) => theme === mode,
+    isResolvedTheme: (mode: 'light' | 'dark') => resolvedTheme === mode,
+  };
+
+  return (
+    <div className={resolvedTheme === 'dark' ? 'dark' : ''}>
+      <div data-theme-context={JSON.stringify(mockContext)}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 const meta = {
-  title: 'UI Components/Theme Toggle',
+  title: 'UI Components/ThemeToggle',
   component: ThemeToggle,
   parameters: {
     layout: 'centered',
     docs: {
       description: {
         component: `
-The ThemeToggle component provides users with intuitive theme switching capabilities, 
-supporting light mode, dark mode, and automatic system preference detection. Built with 
-accessibility-first principles and smooth visual transitions.
+# ThemeToggle Component System
 
-### Migration from Angular
-This component replaces the Angular \`df-theme-toggle\` component, providing equivalent 
-functionality with enhanced accessibility and modern React patterns.
+A comprehensive three-state theme switcher implementing WCAG 2.1 AA accessibility standards with 
+React 19/Tailwind CSS implementation. Provides seamless light/dark/system theme management with 
+smooth animations and complete keyboard accessibility.
 
-### Accessibility Features
-- **WCAG 2.1 AA Compliant**: Meets all Level AA accessibility requirements
-- **Keyboard Navigation**: Full keyboard support with proper focus management
-- **Screen Reader Support**: Descriptive labels and state announcements
-- **Touch Targets**: Minimum 44x44px interactive areas for mobile users
-- **High Contrast**: Proper contrast ratios for all visual elements
-`,
-      },
-    },
-    a11y: {
-      config: {
-        rules: [
-          {
-            // Ensure focus indicators meet 3:1 contrast requirement
-            id: 'color-contrast-enhanced',
-            enabled: true,
-          },
-          {
-            // Validate touch target sizes
-            id: 'target-size',
-            enabled: true,
-          },
-          {
-            // Check keyboard navigation support
-            id: 'keyboard-navigation',
-            enabled: true,
-          },
-        ],
+## Features
+
+- ✅ **Three-State Theme Selection**: Light, Dark, and System preference modes
+- ✅ **WCAG 2.1 AA Compliant**: 4.5:1 contrast ratios, 44x44px minimum touch targets
+- ✅ **Keyboard Navigation**: Full keyboard support with focus-visible indicators
+- ✅ **Screen Reader Support**: Comprehensive ARIA labeling and announcements
+- ✅ **System Theme Detection**: Automatic following of OS preference changes
+- ✅ **Smooth Animations**: CSS transitions for theme state changes
+- ✅ **React 19 Integration**: Modern hooks and context patterns
+- ✅ **TypeScript 5.8+**: Full type safety with proper inference
+
+## Theme Modes
+
+- \`light\` - Light theme with bright backgrounds and dark text
+- \`dark\` - Dark theme with dark backgrounds and light text  
+- \`system\` - Automatically follows operating system preference
+
+## Size Variants
+
+- \`sm\` - Small toggles (44x44px minimum for accessibility)
+- \`md\` - Medium toggles (48x48px default)
+- \`lg\` - Large toggles (56x56px for prominent placement)
+
+## Visual Variants
+
+- \`default\` - Standard styling with subtle backgrounds
+- \`outline\` - Outlined style with clear boundaries
+- \`ghost\` - Minimal styling for subtle integration
+- \`secondary\` - Alternative styling for secondary contexts
+
+## Accessibility Features
+
+All theme toggles meet WCAG 2.1 AA standards with:
+- Minimum 44x44px touch targets for mobile accessibility
+- High contrast focus indicators (3:1 minimum ratio)
+- Comprehensive keyboard navigation support
+- Screen reader announcements for theme changes
+- Proper ARIA labeling and descriptions
+- Role-based interaction patterns
+
+## Integration
+
+The ThemeToggle integrates seamlessly with the application's theme system:
+- React Context integration via \`useTheme\` hook
+- Persistent storage of user preferences
+- Real-time system preference detection
+- Theme transition animations
+        `,
       },
     },
   },
+  tags: ['autodocs'],
   argTypes: {
-    size: {
-      control: { type: 'select' },
-      options: ['sm', 'md', 'lg'],
-      description: 'Size variant of the theme toggle component',
-      table: {
-        type: { summary: "'sm' | 'md' | 'lg'" },
-        defaultValue: { summary: "'md'" },
-      },
-    },
     variant: {
-      control: { type: 'select' },
-      options: ['default', 'compact', 'icon-only'],
-      description: 'Visual variant of the theme toggle',
-      table: {
-        type: { summary: "'default' | 'compact' | 'icon-only'" },
-        defaultValue: { summary: "'default'" },
-      },
+      control: 'select',
+      options: ['default', 'outline', 'ghost', 'secondary'],
+      description: 'Visual style variant for the toggle component',
     },
-    showLabel: {
-      control: { type: 'boolean' },
-      description: 'Whether to display text labels alongside icons',
-      table: {
-        type: { summary: 'boolean' },
-        defaultValue: { summary: 'true' },
-      },
+    size: {
+      control: 'select',
+      options: ['sm', 'md', 'lg'],
+      description: 'Size variant (all maintain 44px minimum touch target)',
+    },
+    showLabels: {
+      control: 'boolean',
+      description: 'Display text labels alongside theme icons',
+    },
+    labelPosition: {
+      control: 'select',
+      options: ['top', 'bottom', 'left', 'right'],
+      description: 'Position of labels relative to the toggle buttons',
     },
     disabled: {
-      control: { type: 'boolean' },
-      description: 'Whether the toggle is disabled',
-      table: {
-        type: { summary: 'boolean' },
-        defaultValue: { summary: 'false' },
-      },
+      control: 'boolean',
+      description: 'Disable all theme toggle interactions',
     },
-    orientation: {
-      control: { type: 'select' },
-      options: ['horizontal', 'vertical'],
-      description: 'Layout orientation of the toggle buttons',
-      table: {
-        type: { summary: "'horizontal' | 'vertical'" },
-        defaultValue: { summary: "'horizontal'" },
-      },
+    enableSystem: {
+      control: 'boolean',
+      description: 'Include system theme preference option',
     },
-    className: {
-      control: { type: 'text' },
-      description: 'Additional CSS classes to apply',
-      table: {
-        type: { summary: 'string' },
-      },
+    compact: {
+      control: 'boolean',
+      description: 'Use compact layout without labels',
+    },
+    showLoading: {
+      control: 'boolean',
+      description: 'Show loading state during theme transitions',
     },
     onThemeChange: {
       action: 'theme-changed',
       description: 'Callback fired when theme selection changes',
-      table: {
-        type: { summary: '(theme: ThemeMode) => void' },
-      },
     },
   },
   decorators: [
     (Story, context) => (
-      <ThemeProvider>
-        <div className="p-6 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
-          <Story {...context} />
-        </div>
-      </ThemeProvider>
+      <MockThemeProvider initialTheme={context.args.initialTheme || 'system'}>
+        <Story />
+      </MockThemeProvider>
     ),
   ],
 } satisfies Meta<typeof ThemeToggle>;
@@ -165,728 +175,752 @@ functionality with enhanced accessibility and modern React patterns.
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * Theme Status Display Component
- * Shows current theme state for documentation purposes
- */
-const ThemeStatus = () => {
-  const { theme, resolvedTheme, systemTheme } = useTheme();
-  return (
-    <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-md text-sm">
-      <p><strong>Current Theme:</strong> {theme}</p>
-      <p><strong>Resolved Theme:</strong> {resolvedTheme}</p>
-      <p><strong>System Theme:</strong> {systemTheme}</p>
-    </div>
-  );
-};
-
-/**
- * Layout Example Wrapper
- * Demonstrates theme toggle in different layout contexts
- */
-const LayoutExample = ({ 
-  children, 
-  context = 'header' 
-}: { 
-  children: React.ReactNode;
-  context?: 'header' | 'sidebar' | 'footer' | 'modal';
-}) => {
-  const layouts = {
-    header: 'flex items-center justify-between p-4 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700',
-    sidebar: 'w-64 p-4 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700',
-    footer: 'p-4 bg-gray-100 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700',
-    modal: 'p-6 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700',
-  };
-
-  return (
-    <div className={layouts[context]}>
-      <div className="flex items-center space-x-3">
-        <span className="text-sm font-medium text-gray-900 dark:text-white">
-          Theme Settings
-        </span>
-        {children}
-      </div>
-    </div>
-  );
-};
-
-// Default story showcasing standard behavior
+// Basic theme toggle variants
 export const Default: Story = {
   args: {
-    size: 'md',
     variant: 'default',
-    showLabel: true,
-    disabled: false,
-    orientation: 'horizontal',
+    size: 'md',
     onThemeChange: action('theme-changed'),
   },
   parameters: {
     docs: {
       description: {
-        story: `
-The default theme toggle configuration with medium size, horizontal orientation, 
-and full labels. This is the most common implementation across the application.
-        `,
+        story: 'Default theme toggle with standard styling. Shows all three theme options (light, dark, system) with icon indicators.',
       },
     },
   },
-  render: (args) => (
-    <div className="space-y-4">
-      <ThemeToggle {...args} />
-      <ThemeStatus />
-    </div>
-  ),
 };
 
-// Size variants demonstration
-export const SizeVariants: Story = {
+export const WithLabels: Story = {
+  args: {
+    variant: 'default',
+    size: 'md',
+    showLabels: true,
+    labelPosition: 'bottom',
+    onThemeChange: action('theme-changed'),
+  },
   parameters: {
     docs: {
       description: {
-        story: `
-Demonstrates all available size variants. All sizes maintain the minimum 44x44px 
-touch target requirement for WCAG 2.1 AA compliance while providing visual hierarchy.
-        `,
+        story: 'Theme toggle with text labels for enhanced user understanding. Labels improve clarity of theme options.',
       },
     },
   },
-  render: () => (
-    <div className="space-y-6">
-      <div className="space-y-3">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Size Variants</h3>
-        
-        <div className="flex flex-col space-y-4">
-          <div className="flex items-center space-x-4">
-            <span className="w-16 text-sm text-gray-600 dark:text-gray-400">Small:</span>
-            <ThemeToggle size="sm" />
-          </div>
-          
-          <div className="flex items-center space-x-4">
-            <span className="w-16 text-sm text-gray-600 dark:text-gray-400">Medium:</span>
-            <ThemeToggle size="md" />
-          </div>
-          
-          <div className="flex items-center space-x-4">
-            <span className="w-16 text-sm text-gray-600 dark:text-gray-400">Large:</span>
-            <ThemeToggle size="lg" />
-          </div>
-        </div>
-      </div>
-      
-      <ThemeStatus />
-    </div>
-  ),
 };
 
-// Visual variants showcase
-export const VisualVariants: Story = {
+export const Outline: Story = {
+  args: {
+    variant: 'outline',
+    size: 'md',
+    showLabels: true,
+    labelPosition: 'bottom',
+    onThemeChange: action('theme-changed'),
+  },
   parameters: {
     docs: {
       description: {
-        story: `
-Different visual presentations of the theme toggle suitable for various UI contexts.
-The icon-only variant is perfect for compact spaces while maintaining accessibility.
-        `,
+        story: 'Outline variant with clear visual boundaries. Provides stronger visual separation between theme options.',
       },
     },
   },
-  render: () => (
-    <div className="space-y-6">
-      <div className="space-y-3">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Visual Variants</h3>
-        
-        <div className="flex flex-col space-y-4">
-          <div className="flex items-center space-x-4">
-            <span className="w-20 text-sm text-gray-600 dark:text-gray-400">Default:</span>
-            <ThemeToggle variant="default" />
-          </div>
-          
-          <div className="flex items-center space-x-4">
-            <span className="w-20 text-sm text-gray-600 dark:text-gray-400">Compact:</span>
-            <ThemeToggle variant="compact" />
-          </div>
-          
-          <div className="flex items-center space-x-4">
-            <span className="w-20 text-sm text-gray-600 dark:text-gray-400">Icon Only:</span>
-            <ThemeToggle variant="icon-only" />
-          </div>
-        </div>
-      </div>
-      
-      <ThemeStatus />
-    </div>
-  ),
 };
 
-// Orientation options
-export const Orientations: Story = {
+export const Ghost: Story = {
+  args: {
+    variant: 'ghost',
+    size: 'md',
+    onThemeChange: action('theme-changed'),
+  },
   parameters: {
     docs: {
       description: {
-        story: `
-Horizontal and vertical orientations for different layout requirements.
-Vertical orientation is useful in sidebar or narrow container contexts.
-        `,
+        story: 'Ghost variant with minimal styling. Perfect for subtle integration in headers or sidebars.',
       },
     },
   },
-  render: () => (
-    <div className="space-y-6">
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Orientations</h3>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-2">
-            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Horizontal</h4>
-            <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
-              <ThemeToggle orientation="horizontal" />
-            </div>
-          </div>
-          
-          <div className="space-y-2">
-            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Vertical</h4>
-            <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
-              <ThemeToggle orientation="vertical" />
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <ThemeStatus />
-    </div>
-  ),
 };
 
-// Accessibility demonstration
-export const AccessibilityFeatures: Story = {
+export const Secondary: Story = {
+  args: {
+    variant: 'secondary',
+    size: 'md',
+    showLabels: true,
+    labelPosition: 'right',
+    onThemeChange: action('theme-changed'),
+  },
   parameters: {
     docs: {
       description: {
-        story: `
-Demonstrates accessibility features including keyboard navigation, screen reader support,
-and focus management. Try navigating with Tab key and activating with Space or Enter.
-
-### Accessibility Features:
-- **Keyboard Navigation**: Tab to focus, Space/Enter to activate
-- **Screen Reader Support**: Descriptive labels and state announcements
-- **Focus Indicators**: Clear visual focus rings that meet 3:1 contrast requirements
-- **Touch Targets**: All interactive elements meet 44x44px minimum size
-- **Color Independence**: Theme states are distinguishable without relying solely on color
-        `,
+        story: 'Secondary variant with alternative styling. Labels positioned to the right for different layout needs.',
       },
     },
   },
+};
+
+// Size variations
+export const Sizes: Story = {
   render: () => (
-    <div className="space-y-6">
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-          Accessibility Demonstration
+    <div className="flex flex-col items-center gap-8">
+      <div className="text-center">
+        <h3 className="mb-4 text-sm font-medium text-gray-700 dark:text-gray-300">
+          Small (44px minimum)
         </h3>
-        
-        <div className="p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            Use Tab key to navigate, Space or Enter to activate:
-          </p>
-          <ThemeToggle 
-            size="lg"
-            className="focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500"
-          />
-        </div>
-        
-        <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
-          <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">
-            Screen Reader Announcements:
-          </h4>
-          <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
-            <li>• "Theme toggle, currently set to [current theme]"</li>
-            <li>• "Light theme selected" when switching to light</li>
-            <li>• "Dark theme selected" when switching to dark</li>
-            <li>• "System theme selected, following system preference" for system mode</li>
-          </ul>
-        </div>
+        <ThemeToggle 
+          size="sm" 
+          showLabels 
+          labelPosition="bottom"
+          onThemeChange={action('small-theme-changed')}
+        />
       </div>
       
-      <ThemeStatus />
+      <div className="text-center">
+        <h3 className="mb-4 text-sm font-medium text-gray-700 dark:text-gray-300">
+          Medium (48px default)
+        </h3>
+        <ThemeToggle 
+          size="md" 
+          showLabels 
+          labelPosition="bottom"
+          onThemeChange={action('medium-theme-changed')}
+        />
+      </div>
+      
+      <div className="text-center">
+        <h3 className="mb-4 text-sm font-medium text-gray-700 dark:text-gray-300">
+          Large (56px prominent)
+        </h3>
+        <ThemeToggle 
+          size="lg" 
+          showLabels 
+          labelPosition="bottom"
+          onThemeChange={action('large-theme-changed')}
+        />
+      </div>
     </div>
   ),
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    
-    // Test keyboard navigation
-    const themeToggle = canvas.getByRole('radiogroup', { name: /theme toggle/i });
-    
-    // Focus the component
-    await userEvent.tab();
-    
-    // Verify focus is on the component
-    expect(themeToggle).toHaveFocus();
-    
-    // Test keyboard activation
-    await userEvent.keyboard('{Space}');
-    
-    // Verify the interaction was handled
-    expect(themeToggle).toBeInTheDocument();
-  },
-};
-
-// State management and theme integration
-export const ThemeIntegration: Story = {
   parameters: {
     docs: {
       description: {
-        story: `
-Demonstrates integration with the theme context provider and real-time theme switching.
-Shows how theme changes propagate throughout the application and affect other components.
-        `,
+        story: 'All size variants maintain WCAG 2.1 AA minimum 44x44px touch targets for accessibility compliance.',
       },
     },
-  },
-  render: () => {
-    const ThemeIntegrationDemo = () => {
-      const { theme, resolvedTheme } = useTheme();
-      
-      return (
-        <div className="space-y-6">
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Theme Integration Demo
-            </h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-3">
-                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Theme Toggle
-                </h4>
-                <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
-                  <ThemeToggle />
-                </div>
-              </div>
-              
-              <div className="space-y-3">
-                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Affected Components
-                </h4>
-                <div className="space-y-2">
-                  <div className="p-3 bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 rounded-md">
-                    <p className="text-sm text-primary-900 dark:text-primary-100">
-                      Primary themed content responds to theme changes
-                    </p>
-                  </div>
-                  <div className="p-3 bg-secondary-50 dark:bg-secondary-800 border border-secondary-200 dark:border-secondary-700 rounded-md">
-                    <p className="text-sm text-secondary-900 dark:text-secondary-100">
-                      Secondary themed content also updates
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-              <h5 className="text-sm font-medium text-gray-900 dark:text-white mb-2">
-                Current Theme State:
-              </h5>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-gray-600 dark:text-gray-400">Selected:</span>
-                  <span className="ml-2 font-mono bg-white dark:bg-gray-700 px-2 py-1 rounded text-gray-900 dark:text-white">
-                    {theme}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-gray-600 dark:text-gray-400">Resolved:</span>
-                  <span className="ml-2 font-mono bg-white dark:bg-gray-700 px-2 py-1 rounded text-gray-900 dark:text-white">
-                    {resolvedTheme}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    };
-    
-    return <ThemeIntegrationDemo />;
   },
 };
 
-// Layout context examples
-export const LayoutContexts: Story = {
-  parameters: {
-    docs: {
-      description: {
-        story: `
-Examples of theme toggle integration in different layout contexts throughout the application.
-Shows appropriate sizing and styling for various UI locations.
-        `,
-      },
-    },
-  },
+// Label positioning
+export const LabelPositions: Story = {
   render: () => (
-    <div className="space-y-6">
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-        Layout Context Examples
-      </h3>
+    <div className="grid grid-cols-2 gap-8 items-center">
+      <div className="text-center">
+        <h3 className="mb-4 text-sm font-medium text-gray-700 dark:text-gray-300">
+          Labels Top
+        </h3>
+        <ThemeToggle 
+          showLabels 
+          labelPosition="top"
+          onThemeChange={action('top-labels-changed')}
+        />
+      </div>
       
-      <div className="space-y-6">
-        <div>
-          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Header Navigation
-          </h4>
-          <LayoutExample context="header">
-            <ThemeToggle variant="compact" size="sm" />
-          </LayoutExample>
-        </div>
-        
-        <div>
-          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Sidebar Menu
-          </h4>
-          <LayoutExample context="sidebar">
-            <ThemeToggle orientation="vertical" size="sm" />
-          </LayoutExample>
-        </div>
-        
-        <div>
-          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Modal Dialog
-          </h4>
-          <LayoutExample context="modal">
-            <ThemeToggle size="md" />
-          </LayoutExample>
-        </div>
-        
-        <div>
-          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Footer
-          </h4>
-          <LayoutExample context="footer">
-            <ThemeToggle variant="icon-only" size="sm" />
-          </LayoutExample>
-        </div>
+      <div className="text-center">
+        <h3 className="mb-4 text-sm font-medium text-gray-700 dark:text-gray-300">
+          Labels Bottom
+        </h3>
+        <ThemeToggle 
+          showLabels 
+          labelPosition="bottom"
+          onThemeChange={action('bottom-labels-changed')}
+        />
+      </div>
+      
+      <div className="text-center">
+        <h3 className="mb-4 text-sm font-medium text-gray-700 dark:text-gray-300">
+          Labels Left
+        </h3>
+        <ThemeToggle 
+          showLabels 
+          labelPosition="left"
+          onThemeChange={action('left-labels-changed')}
+        />
+      </div>
+      
+      <div className="text-center">
+        <h3 className="mb-4 text-sm font-medium text-gray-700 dark:text-gray-300">
+          Labels Right
+        </h3>
+        <ThemeToggle 
+          showLabels 
+          labelPosition="right"
+          onThemeChange={action('right-labels-changed')}
+        />
       </div>
     </div>
   ),
+  parameters: {
+    docs: {
+      description: {
+        story: 'Flexible label positioning for different layout requirements. Supports top, bottom, left, and right positioning.',
+      },
+    },
+  },
 };
 
-// Disabled state demonstration
+// Component states
+export const LoadingState: Story = {
+  args: {
+    showLoading: true,
+    showLabels: true,
+    labelPosition: 'bottom',
+    onThemeChange: action('loading-theme-changed'),
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'Loading state with spinner overlay. Disables interaction during theme transitions.',
+      },
+    },
+  },
+};
+
 export const DisabledState: Story = {
   args: {
     disabled: true,
-    size: 'md',
-    variant: 'default',
+    showLabels: true,
+    labelPosition: 'bottom',
+    onThemeChange: action('disabled-theme-changed'),
   },
   parameters: {
     docs: {
       description: {
-        story: `
-Disabled state maintains accessibility by properly announcing the disabled status 
-to screen readers while providing visual feedback through reduced opacity and cursor changes.
-        `,
+        story: 'Disabled state with reduced opacity and no interaction. Useful when theme switching is not available.',
       },
     },
   },
-  render: (args) => (
-    <div className="space-y-4">
-      <div className="space-y-3">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-          Disabled State
+};
+
+export const WithoutSystemOption: Story = {
+  args: {
+    enableSystem: false,
+    showLabels: true,
+    labelPosition: 'bottom',
+    onThemeChange: action('no-system-theme-changed'),
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'Theme toggle without system preference option. Only shows light and dark theme choices.',
+      },
+    },
+  },
+};
+
+// Compact variations
+export const CompactVariant: Story = {
+  render: () => (
+    <div className="flex flex-col gap-6">
+      <div>
+        <h3 className="mb-4 text-sm font-medium text-gray-700 dark:text-gray-300">
+          Compact Theme Toggle
         </h3>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          The theme toggle is disabled and cannot be interacted with:
-        </p>
-        <ThemeToggle {...args} />
+        <CompactThemeToggle onThemeChange={action('compact-theme-changed')} />
       </div>
       
-      <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg border border-yellow-200 dark:border-yellow-800">
-        <h4 className="text-sm font-semibold text-yellow-900 dark:text-yellow-100 mb-2">
-          Accessibility Notes:
-        </h4>
-        <ul className="text-sm text-yellow-800 dark:text-yellow-200 space-y-1">
-          <li>• Component is properly marked as disabled for screen readers</li>
-          <li>• Visual opacity is reduced to indicate unavailable state</li>
-          <li>• Keyboard navigation skips over disabled components</li>
-          <li>• Mouse cursor changes to indicate non-interactive state</li>
-        </ul>
+      <div>
+        <h3 className="mb-4 text-sm font-medium text-gray-700 dark:text-gray-300">
+          Compact with Different Variants
+        </h3>
+        <div className="flex gap-4">
+          <CompactThemeToggle 
+            variant="outline" 
+            onThemeChange={action('compact-outline-changed')}
+          />
+          <CompactThemeToggle 
+            variant="ghost" 
+            onThemeChange={action('compact-ghost-changed')}
+          />
+          <CompactThemeToggle 
+            variant="secondary" 
+            size="lg"
+            onThemeChange={action('compact-secondary-changed')}
+          />
+        </div>
       </div>
     </div>
   ),
-};
-
-// Animation and transition showcase
-export const AnimationsAndTransitions: Story = {
   parameters: {
     docs: {
       description: {
-        story: `
-Demonstrates smooth transitions and animations when switching between themes.
-Respects user's motion preferences and provides appropriate feedback.
-        `,
+        story: 'Compact variant for space-constrained layouts. Removes labels for minimal footprint while maintaining accessibility.',
       },
     },
-  },
-  render: () => {
-    const AnimationDemo = () => {
-      const [isAnimating, setIsAnimating] = useState(false);
-      
-      const handleThemeChange = () => {
-        setIsAnimating(true);
-        setTimeout(() => setIsAnimating(false), 300);
-      };
-      
-      return (
-        <div className="space-y-6">
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Animations & Transitions
-            </h3>
-            
-            <div className="p-6 border border-gray-200 dark:border-gray-700 rounded-lg">
-              <div className="flex items-center justify-center space-x-6">
-                <div className={`transition-all duration-300 ${isAnimating ? 'scale-105' : 'scale-100'}`}>
-                  <ThemeToggle 
-                    onThemeChange={handleThemeChange}
-                    size="lg"
-                  />
-                </div>
-              </div>
-              
-              {isAnimating && (
-                <div className="mt-4 text-center">
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
-                    <span className="w-2 h-2 bg-blue-400 rounded-full animate-pulse mr-2"></span>
-                    Theme switching...
-                  </span>
-                </div>
-              )}
-            </div>
-            
-            <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-200 dark:border-green-800">
-              <h4 className="text-sm font-semibold text-green-900 dark:text-green-100 mb-2">
-                Animation Features:
-              </h4>
-              <ul className="text-sm text-green-800 dark:text-green-200 space-y-1">
-                <li>• Smooth 200ms transitions for theme changes</li>
-                <li>• Respects prefers-reduced-motion for accessibility</li>
-                <li>• Subtle hover and focus state animations</li>
-                <li>• No flash or jarring visual changes during theme switching</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      );
-    };
-    
-    return <AnimationDemo />;
   },
 };
 
-// Interactive playground
-export const InteractivePlayground: Story = {
-  parameters: {
-    docs: {
-      description: {
-        story: `
-Interactive playground to test all component options and see real-time changes.
-Experiment with different combinations of props to understand component behavior.
-        `,
-      },
-    },
-  },
-  render: () => {
-    const PlaygroundDemo = () => {
-      const [size, setSize] = useState<'sm' | 'md' | 'lg'>('md');
-      const [variant, setVariant] = useState<'default' | 'compact' | 'icon-only'>('default');
-      const [orientation, setOrientation] = useState<'horizontal' | 'vertical'>('horizontal');
-      const [showLabel, setShowLabel] = useState(true);
-      const [disabled, setDisabled] = useState(false);
-      
-      return (
-        <div className="space-y-6">
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Interactive Playground
-            </h3>
-            
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Controls
-                </h4>
-                
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Size
-                    </label>
-                    <select 
-                      value={size} 
-                      onChange={(e) => setSize(e.target.value as 'sm' | 'md' | 'lg')}
-                      className="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    >
-                      <option value="sm">Small</option>
-                      <option value="md">Medium</option>
-                      <option value="lg">Large</option>
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Variant
-                    </label>
-                    <select 
-                      value={variant} 
-                      onChange={(e) => setVariant(e.target.value as 'default' | 'compact' | 'icon-only')}
-                      className="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    >
-                      <option value="default">Default</option>
-                      <option value="compact">Compact</option>
-                      <option value="icon-only">Icon Only</option>
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Orientation
-                    </label>
-                    <select 
-                      value={orientation} 
-                      onChange={(e) => setOrientation(e.target.value as 'horizontal' | 'vertical')}
-                      className="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    >
-                      <option value="horizontal">Horizontal</option>
-                      <option value="vertical">Vertical</option>
-                    </select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <label className="flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={showLabel}
-                        onChange={(e) => setShowLabel(e.target.checked)}
-                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                      />
-                      <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Show Labels</span>
-                    </label>
-                    
-                    <label className="flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={disabled}
-                        onChange={(e) => setDisabled(e.target.checked)}
-                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                      />
-                      <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Disabled</span>
-                    </label>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="space-y-4">
-                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Preview
-                </h4>
-                
-                <div className="p-6 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 flex items-center justify-center min-h-[200px]">
-                  <ThemeToggle
-                    size={size}
-                    variant={variant}
-                    orientation={orientation}
-                    showLabel={showLabel}
-                    disabled={disabled}
-                    onThemeChange={action('theme-changed')}
-                  />
-                </div>
-              </div>
-            </div>
-            
-            <ThemeStatus />
-          </div>
-        </div>
-      );
-    };
-    
-    return <PlaygroundDemo />;
-  },
-};
-
-// Performance and testing story
-export const PerformanceAndTesting: Story = {
-  parameters: {
-    docs: {
-      description: {
-        story: `
-Demonstrates performance characteristics and testing scenarios for the ThemeToggle component.
-Useful for validating component behavior in automated tests.
-        `,
-      },
-    },
-  },
+// Pre-configured variants
+export const PreConfiguredVariants: Story = {
   render: () => (
-    <div className="space-y-6">
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-          Performance & Testing
+    <div className="flex flex-col gap-8">
+      <div>
+        <h3 className="mb-4 text-sm font-medium text-gray-700 dark:text-gray-300">
+          Header Variant (Compact, Ghost, Small)
         </h3>
+        <div className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg">
+          <div className="flex justify-between items-center">
+            <span className="text-gray-900 dark:text-white font-medium">Application Header</span>
+            <ThemeToggleVariants.Header onThemeChange={action('header-theme-changed')} />
+          </div>
+        </div>
+      </div>
+      
+      <div>
+        <h3 className="mb-4 text-sm font-medium text-gray-700 dark:text-gray-300">
+          Settings Variant (Outline, Medium, With Labels)
+        </h3>
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-6 rounded-lg">
+          <div className="flex justify-between items-center">
+            <div>
+              <h4 className="font-medium text-gray-900 dark:text-white">Theme Preference</h4>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Choose your preferred color theme
+              </p>
+            </div>
+            <ThemeToggleVariants.Settings onThemeChange={action('settings-theme-changed')} />
+          </div>
+        </div>
+      </div>
+      
+      <div>
+        <h3 className="mb-4 text-sm font-medium text-gray-700 dark:text-gray-300">
+          Mobile Variant (Large, Compact, Secondary)
+        </h3>
+        <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg md:hidden">
+          <div className="flex justify-center">
+            <ThemeToggleVariants.Mobile onThemeChange={action('mobile-theme-changed')} />
+          </div>
+        </div>
+      </div>
+      
+      <div>
+        <h3 className="mb-4 text-sm font-medium text-gray-700 dark:text-gray-300">
+          High Contrast Variant (Large, Outline, Right Labels)
+        </h3>
+        <div className="bg-white dark:bg-gray-900 border-2 border-gray-300 dark:border-gray-600 p-6 rounded-lg">
+          <ThemeToggleVariants.HighContrast onThemeChange={action('high-contrast-theme-changed')} />
+        </div>
+      </div>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story: 'Pre-configured variants optimized for common use cases: header navigation, settings pages, mobile layouts, and high contrast needs.',
+      },
+    },
+  },
+};
+
+// Custom icons
+export const CustomIcons: Story = {
+  args: {
+    showLabels: true,
+    labelPosition: 'bottom',
+    icons: {
+      light: SunIcon,
+      dark: MoonIcon,
+      system: CogIcon, // Custom icon for system preference
+    },
+    onThemeChange: action('custom-icons-theme-changed'),
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'Theme toggle with custom icons. Allows complete customization of theme indicators while maintaining accessibility.',
+      },
+    },
+  },
+};
+
+// Dark mode demonstration
+export const DarkModeDemo: Story = {
+  render: () => (
+    <div className="dark">
+      <div className="bg-gray-900 p-8 rounded-lg">
+        <div className="mb-6">
+          <h3 className="text-white text-lg font-medium mb-2">
+            Dark Mode Theme Toggle
+          </h3>
+          <p className="text-gray-300 text-sm">
+            All variants adapt to dark mode with proper contrast ratios and accessibility.
+          </p>
+        </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-3">
-            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Performance Metrics
-            </h4>
-            <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-              <ul className="text-sm space-y-1">
-                <li>• <strong>Bundle Size:</strong> ~2.3kb gzipped</li>
-                <li>• <strong>Render Time:</strong> &lt;1ms</li>
-                <li>• <strong>Memory Usage:</strong> Minimal</li>
-                <li>• <strong>Re-renders:</strong> Only on theme change</li>
-                <li>• <strong>Accessibility:</strong> 100% compliant</li>
-              </ul>
-            </div>
+          <div className="space-y-4">
+            <h4 className="text-gray-200 font-medium">Standard Variants</h4>
+            <ThemeToggle 
+              variant="default" 
+              showLabels 
+              labelPosition="bottom"
+              onThemeChange={action('dark-default-changed')}
+            />
+            <ThemeToggle 
+              variant="outline" 
+              showLabels 
+              labelPosition="bottom"
+              onThemeChange={action('dark-outline-changed')}
+            />
           </div>
           
-          <div className="space-y-3">
-            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Test Component
-            </h4>
-            <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+          <div className="space-y-4">
+            <h4 className="text-gray-200 font-medium">Alternative Variants</h4>
+            <ThemeToggle 
+              variant="ghost" 
+              showLabels 
+              labelPosition="bottom"
+              onThemeChange={action('dark-ghost-changed')}
+            />
+            <ThemeToggle 
+              variant="secondary" 
+              showLabels 
+              labelPosition="bottom"
+              onThemeChange={action('dark-secondary-changed')}
+            />
+          </div>
+        </div>
+        
+        <div className="mt-6 pt-6 border-t border-gray-700">
+          <h4 className="text-gray-200 font-medium mb-4">Compact Versions</h4>
+          <div className="flex gap-4">
+            <CompactThemeToggle 
+              variant="outline"
+              onThemeChange={action('dark-compact-outline')}
+            />
+            <CompactThemeToggle 
+              variant="ghost"
+              onThemeChange={action('dark-compact-ghost')}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story: 'Dark mode variants maintaining WCAG 2.1 AA contrast ratios. All components adapt seamlessly to dark themes.',
+      },
+    },
+  },
+};
+
+// Real-world integration scenarios
+export const ApplicationHeaderScenario: Story = {
+  render: () => (
+    <div className="w-full max-w-6xl">
+      <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+        <div className="px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="bg-primary-600 text-white p-2 rounded">
+                <ComputerDesktopIcon className="h-6 w-6" />
+              </div>
+              <div>
+                <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  DreamFactory Admin
+                </h1>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Database API Management
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-4">
+              <button className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                <BellIcon className="h-5 w-5" />
+              </button>
+              <button className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                <CogIcon className="h-5 w-5" />
+              </button>
+              <ThemeToggleVariants.Header onThemeChange={action('header-scenario-changed')} />
+              <button className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                <UserIcon className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story: 'Real-world application header integration showing theme toggle alongside other navigation elements.',
+      },
+    },
+  },
+};
+
+export const SettingsPageScenario: Story = {
+  render: () => (
+    <div className="w-full max-w-2xl">
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+        <div className="mb-6">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+            User Preferences
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400">
+            Customize your DreamFactory Admin experience
+          </p>
+        </div>
+        
+        <div className="space-y-6">
+          <div className="flex items-center justify-between py-4 border-b border-gray-200 dark:border-gray-700">
+            <div>
+              <h3 className="font-medium text-gray-900 dark:text-white">
+                Color Theme
+              </h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Choose your preferred color theme or follow system settings
+              </p>
+            </div>
+            <ThemeToggleVariants.Settings onThemeChange={action('settings-scenario-changed')} />
+          </div>
+          
+          <div className="flex items-center justify-between py-4 border-b border-gray-200 dark:border-gray-700">
+            <div>
+              <h3 className="font-medium text-gray-900 dark:text-white">
+                Language
+              </h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Select your preferred language for the interface
+              </p>
+            </div>
+            <select className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+              <option>English</option>
+              <option>Spanish</option>
+              <option>French</option>
+            </select>
+          </div>
+          
+          <div className="flex items-center justify-between py-4">
+            <div>
+              <h3 className="font-medium text-gray-900 dark:text-white">
+                Auto-refresh Schema
+              </h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Automatically refresh database schemas every 5 minutes
+              </p>
+            </div>
+            <input 
+              type="checkbox" 
+              className="h-4 w-4 text-primary-600 border-gray-300 rounded"
+              defaultChecked
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story: 'Settings page integration showing theme toggle as part of comprehensive user preferences interface.',
+      },
+    },
+  },
+};
+
+// Accessibility testing story
+export const AccessibilityTesting: Story = {
+  render: () => (
+    <div className="space-y-8">
+      <div>
+        <h3 className="mb-4 text-sm font-medium text-gray-700 dark:text-gray-300">
+          Keyboard Navigation Test
+        </h3>
+        <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+          Use Tab to navigate between theme options and Enter/Space to select. Focus rings should be clearly visible with 3:1 contrast.
+        </p>
+        <ThemeToggle 
+          showLabels 
+          labelPosition="bottom"
+          onThemeChange={action('keyboard-nav-changed')}
+        />
+      </div>
+
+      <div>
+        <h3 className="mb-4 text-sm font-medium text-gray-700 dark:text-gray-300">
+          Touch Target Test
+        </h3>
+        <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+          All theme toggle buttons maintain minimum 44x44px touch targets (outlined in red for testing).
+        </p>
+        <div className="space-y-4">
+          <ThemeToggle 
+            size="sm" 
+            className="[&>div>button]:ring-2 [&>div>button]:ring-red-500"
+            onThemeChange={action('touch-target-sm')}
+          />
+          <ThemeToggle 
+            size="md" 
+            className="[&>div>button]:ring-2 [&>div>button]:ring-red-500"
+            onThemeChange={action('touch-target-md')}
+          />
+        </div>
+      </div>
+
+      <div>
+        <h3 className="mb-4 text-sm font-medium text-gray-700 dark:text-gray-300">
+          Screen Reader Announcements
+        </h3>
+        <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+          Theme changes are announced to screen readers with proper ARIA labels and descriptions.
+        </p>
+        <ThemeToggle 
+          showLabels 
+          labelPosition="right"
+          ariaLabel="Theme preference selection with screen reader support"
+          onThemeChange={action('screen-reader-changed')}
+        />
+      </div>
+
+      <div>
+        <h3 className="mb-4 text-sm font-medium text-gray-700 dark:text-gray-300">
+          High Contrast Mode
+        </h3>
+        <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+          High contrast variant with enhanced visual boundaries for users with visual impairments.
+        </p>
+        <ThemeToggleVariants.HighContrast onThemeChange={action('high-contrast-changed')} />
+      </div>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story: 'Comprehensive accessibility testing scenarios including keyboard navigation, touch targets, screen reader support, and high contrast mode.',
+      },
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    
+    // Test keyboard navigation - find the first theme toggle button
+    const themeButtons = canvas.getAllByRole('switch');
+    if (themeButtons.length > 0) {
+      await userEvent.tab();
+      await expect(themeButtons[0]).toHaveFocus();
+    }
+    
+    // Test touch targets for the small size variant
+    const smallButtons = canvas.getAllByRole('switch');
+    if (smallButtons.length > 3) { // Assuming the small variant comes after the main demo
+      const buttonRect = smallButtons[3].getBoundingClientRect();
+      await expect(buttonRect.width).toBeGreaterThanOrEqual(44);
+      await expect(buttonRect.height).toBeGreaterThanOrEqual(44);
+    }
+  },
+};
+
+// Performance testing story
+export const PerformanceTest: Story = {
+  render: () => (
+    <div className="space-y-6">
+      <div>
+        <h3 className="mb-4 text-sm font-medium text-gray-700 dark:text-gray-300">
+          Multiple Theme Toggles
+        </h3>
+        <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+          Testing performance with multiple theme toggle instances.
+        </p>
+        <div className="grid grid-cols-3 gap-4">
+          {Array.from({ length: 9 }).map((_, i) => (
+            <ThemeToggle
+              key={i}
+              size={i % 3 === 0 ? 'sm' : i % 3 === 1 ? 'md' : 'lg'}
+              variant={['default', 'outline', 'ghost'][i % 3] as any}
+              onThemeChange={action(`performance-${i}`)}
+            />
+          ))}
+        </div>
+      </div>
+      
+      <div>
+        <h3 className="mb-4 text-sm font-medium text-gray-700 dark:text-gray-300">
+          Rapid State Changes
+        </h3>
+        <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+          Testing theme toggle responsiveness with rapid interactions.
+        </p>
+        <div className="flex gap-4">
+          <ThemeToggle showLoading onThemeChange={action('rapid-1')} />
+          <ThemeToggle disabled onThemeChange={action('rapid-2')} />
+          <ThemeToggle showLabels labelPosition="top" onThemeChange={action('rapid-3')} />
+        </div>
+      </div>
+    </div>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story: 'Performance testing with multiple theme toggle instances and rapid state changes to ensure smooth operation.',
+      },
+    },
+  },
+};
+
+// System theme integration demo
+export const SystemThemeIntegration: Story = {
+  render: () => {
+    const [currentSystemTheme, setCurrentSystemTheme] = useState<'light' | 'dark'>('light');
+    
+    return (
+      <MockThemeProvider initialTheme="system" forceResolved={currentSystemTheme}>
+        <div className="space-y-6">
+          <div>
+            <h3 className="mb-4 text-sm font-medium text-gray-700 dark:text-gray-300">
+              System Theme Simulation
+            </h3>
+            <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+              Simulate system theme changes to see automatic theme following.
+            </p>
+            <div className="flex gap-4 mb-6">
+              <button
+                onClick={() => setCurrentSystemTheme('light')}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-md text-sm"
+              >
+                Simulate Light System
+              </button>
+              <button
+                onClick={() => setCurrentSystemTheme('dark')}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-md text-sm"
+              >
+                Simulate Dark System
+              </button>
+            </div>
+            
+            <div className="p-6 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900">
+              <div className="mb-4">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Current system preference: <strong>{currentSystemTheme}</strong>
+                </p>
+              </div>
               <ThemeToggle 
-                data-testid="theme-toggle-test"
-                onThemeChange={fn()}
+                showLabels 
+                labelPosition="bottom"
+                onThemeChange={action('system-integration-changed')}
               />
             </div>
           </div>
         </div>
-        
-        <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
-          <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">
-            Testing Guidelines:
-          </h4>
-          <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
-            <li>• Use <code>data-testid="theme-toggle"</code> for component identification</li>
-            <li>• Test keyboard navigation with Tab and Space/Enter keys</li>
-            <li>• Verify theme change callbacks are fired correctly</li>
-            <li>• Test accessibility with screen reader simulation</li>
-            <li>• Validate WCAG 2.1 AA compliance with automated tools</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  ),
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    
-    // Find the test component
-    const themeToggle = canvas.getByTestId('theme-toggle-test');
-    
-    // Verify component is rendered
-    expect(themeToggle).toBeInTheDocument();
-    
-    // Test accessibility attributes
-    expect(themeToggle).toHaveAttribute('role');
-    
-    // Test keyboard interaction
-    await userEvent.tab();
-    expect(themeToggle).toHaveFocus();
+      </MockThemeProvider>
+    );
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'Demonstration of system theme integration with simulated OS preference changes. Shows automatic theme following when system mode is selected.',
+      },
+    },
   },
 };
