@@ -1,531 +1,743 @@
 /**
- * VerbPicker React Component
+ * VerbPicker Component - HTTP Verb Selection with Headless UI
  * 
- * Comprehensive HTTP verb selection component built on Headless UI Listbox with Tailwind CSS styling.
- * Replaces Angular Material mat-select with modern React 19/Next.js 15.1 architecture.
+ * Main React HTTP verb selection component built on Headless UI Listbox with Tailwind CSS styling.
+ * Provides accessible verb selection (GET, POST, PUT, PATCH, DELETE) with single, multiple, and bitmask modes.
+ * Integrates with React Hook Form for validation and includes ARIA labeling, theme support, and tooltip
+ * functionality for WCAG 2.1 AA compliance.
  * 
- * Features:
- * - Accessible verb selection (GET, POST, PUT, PATCH, DELETE) with WCAG 2.1 AA compliance
- * - Three selection modes: 'verb' (single), 'verb_multiple' (array), 'number' (bitmask)
- * - React Hook Form integration with real-time validation under 100ms
- * - Bitmask value transformations (1=GET, 2=POST, 4=PUT, 8=PATCH, 16=DELETE)
- * - Theme support (light/dark) with Tailwind CSS
- * - Tooltip functionality using Headless UI
- * - ARIA labeling and keyboard navigation support
- * 
- * @fileoverview Replaces Angular df-verb-picker with React Hook Form and Headless UI integration
+ * @fileoverview Production-ready HTTP verb picker component with comprehensive accessibility
+ * @version 1.0.0
  */
 
-import React, { forwardRef, useId, useMemo, useCallback } from 'react';
-import { Listbox, Transition } from '@headlessui/react';
-import { ChevronUpDownIcon, CheckIcon, QuestionMarkCircleIcon } from '@heroicons/react/24/outline';
-import { useController, type FieldPath, type FieldValues } from 'react-hook-form';
-
-// Internal component imports
-import {
+import React, { forwardRef, useState, useId, useMemo, Fragment } from 'react';
+import { 
+  Listbox, 
+  Transition,
+  Label as HeadlessLabel,
+  Description as HeadlessDescription 
+} from '@headlessui/react';
+import { ChevronUpDownIcon, CheckIcon, XMarkIcon } from '@heroicons/react/20/solid';
+import { ExclamationCircleIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
+import { cn } from '@/lib/utils';
+import { 
   type VerbPickerProps,
   type HttpVerb,
-  type VerbPickerMode,
-  type VerbPickerAnyValue,
   type VerbOption,
-  type ConfigSchema,
+  type VerbPickerMode,
+  type VerbPickerValue,
+  DEFAULT_VERB_OPTIONS,
+  type VerbColorVariant
 } from './types';
 import { 
-  useCompleteVerbPicker,
+  useVerbPickerComplete,
   useVerbOptions,
-  useThemeMode,
+  useThemeMode 
 } from './hooks';
 import {
-  formatVerbDisplay,
   getSelectedVerbs,
-  validateVerbSelection,
+  isVerbSelected,
+  formatVerbDisplay,
+  convertVerbsToBitmask,
+  convertBitmaskToVerbs,
+  convertVerbToBitmask
 } from './utils';
 
-// Utility function for combining class names
-const cn = (...classes: (string | undefined | null | false)[]): string => {
-  return classes.filter(Boolean).join(' ');
-};
+// ============================================================================
+// THEME CONFIGURATION
+// ============================================================================
 
 /**
- * Tooltip component for schema descriptions
- * Provides accessible tooltips using Headless UI with WCAG compliance
+ * Verb color variants for consistent HTTP method styling
+ * Provides accessible color combinations for light and dark themes
  */
-interface TooltipProps {
-  content: React.ReactNode;
-  children: React.ReactNode;
-  disabled?: boolean;
+const VERB_THEME_CLASSES: Record<VerbColorVariant, {
+  light: { bg: string; text: string; border: string; hover: string; selected: string };
+  dark: { bg: string; text: string; border: string; hover: string; selected: string };
+}> = {
+  get: {
+    light: { 
+      bg: 'bg-blue-50', 
+      text: 'text-blue-700', 
+      border: 'border-blue-200', 
+      hover: 'hover:bg-blue-100', 
+      selected: 'bg-blue-100 border-blue-300' 
+    },
+    dark: { 
+      bg: 'bg-blue-900/20', 
+      text: 'text-blue-300', 
+      border: 'border-blue-700', 
+      hover: 'hover:bg-blue-800/30', 
+      selected: 'bg-blue-800/40 border-blue-600' 
+    }
+  },
+  post: {
+    light: { 
+      bg: 'bg-green-50', 
+      text: 'text-green-700', 
+      border: 'border-green-200', 
+      hover: 'hover:bg-green-100', 
+      selected: 'bg-green-100 border-green-300' 
+    },
+    dark: { 
+      bg: 'bg-green-900/20', 
+      text: 'text-green-300', 
+      border: 'border-green-700', 
+      hover: 'hover:bg-green-800/30', 
+      selected: 'bg-green-800/40 border-green-600' 
+    }
+  },
+  put: {
+    light: { 
+      bg: 'bg-orange-50', 
+      text: 'text-orange-700', 
+      border: 'border-orange-200', 
+      hover: 'hover:bg-orange-100', 
+      selected: 'bg-orange-100 border-orange-300' 
+    },
+    dark: { 
+      bg: 'bg-orange-900/20', 
+      text: 'text-orange-300', 
+      border: 'border-orange-700', 
+      hover: 'hover:bg-orange-800/30', 
+      selected: 'bg-orange-800/40 border-orange-600' 
+    }
+  },
+  patch: {
+    light: { 
+      bg: 'bg-purple-50', 
+      text: 'text-purple-700', 
+      border: 'border-purple-200', 
+      hover: 'hover:bg-purple-100', 
+      selected: 'bg-purple-100 border-purple-300' 
+    },
+    dark: { 
+      bg: 'bg-purple-900/20', 
+      text: 'text-purple-300', 
+      border: 'border-purple-700', 
+      hover: 'hover:bg-purple-800/30', 
+      selected: 'bg-purple-800/40 border-purple-600' 
+    }
+  },
+  delete: {
+    light: { 
+      bg: 'bg-red-50', 
+      text: 'text-red-700', 
+      border: 'border-red-200', 
+      hover: 'hover:bg-red-100', 
+      selected: 'bg-red-100 border-red-300' 
+    },
+    dark: { 
+      bg: 'bg-red-900/20', 
+      text: 'text-red-300', 
+      border: 'border-red-700', 
+      hover: 'hover:bg-red-800/30', 
+      selected: 'bg-red-800/40 border-red-600' 
+    }
+  }
+};
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+/**
+ * Get verb color variant based on HTTP method
+ */
+function getVerbColorVariant(verb: HttpVerb): VerbColorVariant {
+  return verb.toLowerCase() as VerbColorVariant;
 }
 
-const Tooltip: React.FC<TooltipProps> = ({ content, children, disabled = false }) => {
-  const tooltipId = useId();
+/**
+ * Get theme classes for a specific verb
+ */
+function getVerbThemeClasses(verb: HttpVerb, isDark: boolean, state: 'default' | 'hover' | 'selected' = 'default') {
+  const variant = getVerbColorVariant(verb);
+  const theme = isDark ? VERB_THEME_CLASSES[variant].dark : VERB_THEME_CLASSES[variant].light;
   
-  if (disabled || !content) {
-    return <>{children}</>;
+  switch (state) {
+    case 'hover':
+      return `${theme.bg} ${theme.text} ${theme.border} ${theme.hover}`;
+    case 'selected':
+      return `${theme.selected} ${theme.text}`;
+    default:
+      return `${theme.bg} ${theme.text} ${theme.border}`;
   }
-
-  return (
-    <div className="relative group">
-      {children}
-      <div
-        id={tooltipId}
-        role="tooltip"
-        className={cn(
-          "absolute z-50 px-2 py-1 text-xs font-medium text-white",
-          "bg-gray-900 dark:bg-gray-700 rounded-md shadow-lg",
-          "opacity-0 invisible group-hover:opacity-100 group-hover:visible",
-          "transition-all duration-200 ease-in-out",
-          "bottom-full left-1/2 transform -translate-x-1/2 mb-2",
-          "before:content-[''] before:absolute before:top-full before:left-1/2",
-          "before:transform before:-translate-x-1/2 before:border-4",
-          "before:border-transparent before:border-t-gray-900 dark:before:border-t-gray-700",
-          "max-w-xs break-words whitespace-normal"
-        )}
-      >
-        {content}
-      </div>
-    </div>
-  );
-};
+}
 
 /**
- * Verb option display component
- * Renders individual HTTP verb options with proper styling and selection states
+ * Format display value based on mode and selection
  */
-interface VerbOptionItemProps {
+function formatDisplayValue<TMode extends VerbPickerMode>(
+  value: VerbPickerValue<TMode>, 
+  mode: TMode,
+  placeholder: string = 'Select verb(s)...'
+): string {
+  if (value == null) return placeholder;
+  
+  switch (mode) {
+    case 'verb':
+      return typeof value === 'string' ? value : placeholder;
+    case 'verb_multiple':
+      if (Array.isArray(value)) {
+        return value.length === 0 ? placeholder : 
+               value.length === 1 ? value[0] : 
+               `${value.length} verbs selected`;
+      }
+      return placeholder;
+    case 'number':
+      if (typeof value === 'number') {
+        const verbs = convertBitmaskToVerbs(value);
+        return verbs.length === 0 ? placeholder :
+               verbs.length === 1 ? verbs[0] :
+               `${verbs.length} verbs selected`;
+      }
+      return placeholder;
+    default:
+      return placeholder;
+  }
+}
+
+// ============================================================================
+// SUB-COMPONENTS
+// ============================================================================
+
+/**
+ * VerbOption Component - Individual verb option with tooltip
+ */
+interface VerbOptionProps {
   option: VerbOption;
   selected: boolean;
   active: boolean;
   disabled?: boolean;
-  theme: 'light' | 'dark' | 'system';
+  showTooltip?: boolean;
+  isDark: boolean;
+  onSelect: () => void;
 }
 
-const VerbOptionItem: React.FC<VerbOptionItemProps> = ({ 
+const VerbOption = React.memo<VerbOptionProps>(({ 
   option, 
   selected, 
   active, 
   disabled = false,
-  theme 
+  showTooltip = true,
+  isDark,
+  onSelect 
 }) => {
-  return (
-    <li
-      className={cn(
-        "relative cursor-default select-none py-2 pl-3 pr-9",
-        active && !disabled
-          ? "bg-primary-600 text-white"
-          : "text-gray-900 dark:text-gray-100",
-        disabled && "opacity-50 cursor-not-allowed"
-      )}
-      role="option"
-      aria-selected={selected}
-      aria-disabled={disabled}
-    >
-      <div className="flex items-center">
-        <span 
-          className={cn(
-            "block truncate font-medium",
-            selected ? "font-semibold" : "font-normal"
-          )}
-        >
-          {option.label}
-        </span>
-        <span 
-          className={cn(
-            "ml-2 text-xs",
-            active && !disabled
-              ? "text-primary-200"
-              : "text-gray-500 dark:text-gray-400"
-          )}
-        >
-          ({option.altValue})
-        </span>
-      </div>
-      
-      {selected && (
-        <span 
-          className={cn(
-            "absolute inset-y-0 right-0 flex items-center pr-4",
-            active && !disabled ? "text-white" : "text-primary-600"
-          )}
-        >
-          <CheckIcon className="h-5 w-5" aria-hidden="true" />
-        </span>
-      )}
-    </li>
+  const themeClasses = getVerbThemeClasses(
+    option.altValue, 
+    isDark, 
+    selected ? 'selected' : active ? 'hover' : 'default'
   );
-};
+
+  return (
+    <Listbox.Option
+      value={option.altValue}
+      disabled={disabled}
+      className={({ active, selected: isSelected }) =>
+        cn(
+          // Base styles
+          'relative cursor-pointer select-none py-2 pl-3 pr-9 rounded-md transition-colors duration-150',
+          
+          // Theme-aware styling
+          selected || isSelected 
+            ? getVerbThemeClasses(option.altValue, isDark, 'selected')
+            : active 
+            ? getVerbThemeClasses(option.altValue, isDark, 'hover')
+            : getVerbThemeClasses(option.altValue, isDark, 'default'),
+          
+          // Disabled state
+          disabled && 'opacity-50 cursor-not-allowed',
+          
+          // Focus ring for accessibility
+          'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
+          isDark && 'focus:ring-offset-gray-800'
+        )
+      }
+      title={showTooltip && option.description ? option.description : undefined}
+      aria-label={option.ariaLabel || `Select ${option.label} HTTP method`}
+    >
+      {({ selected: isSelected }) => (
+        <>
+          <div className="flex items-center">
+            <span className={cn(
+              'block truncate font-medium text-sm',
+              (selected || isSelected) ? 'font-semibold' : 'font-normal'
+            )}>
+              {option.label}
+            </span>
+            
+            {option.description && showTooltip && (
+              <InformationCircleIcon 
+                className="ml-2 h-4 w-4 opacity-60" 
+                aria-hidden="true"
+              />
+            )}
+          </div>
+          
+          {(selected || isSelected) && (
+            <span className="absolute inset-y-0 right-0 flex items-center pr-3">
+              <CheckIcon 
+                className="h-4 w-4 text-current" 
+                aria-hidden="true" 
+              />
+            </span>
+          )}
+        </>
+      )}
+    </Listbox.Option>
+  );
+});
+
+VerbOption.displayName = 'VerbOption';
 
 /**
- * Main VerbPicker component
- * Comprehensive HTTP verb selection with accessibility, validation, and theme support
+ * SelectedVerbBadge Component - Display badge for selected verbs in multiple mode
+ */
+interface SelectedVerbBadgeProps {
+  verb: HttpVerb;
+  isDark: boolean;
+  onRemove?: () => void;
+  removable?: boolean;
+}
+
+const SelectedVerbBadge = React.memo<SelectedVerbBadgeProps>(({ 
+  verb, 
+  isDark, 
+  onRemove, 
+  removable = false 
+}) => {
+  const themeClasses = getVerbThemeClasses(verb, isDark, 'selected');
+  
+  return (
+    <span className={cn(
+      'inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium border',
+      themeClasses,
+      'transition-colors duration-150'
+    )}>
+      {verb}
+      {removable && onRemove && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onRemove();
+          }}
+          className={cn(
+            'ml-1 inline-flex h-4 w-4 items-center justify-center rounded hover:bg-black/10',
+            'focus:outline-none focus:ring-1 focus:ring-current',
+            isDark && 'hover:bg-white/10'
+          )}
+          aria-label={`Remove ${verb}`}
+        >
+          <XMarkIcon className="h-3 w-3" aria-hidden="true" />
+        </button>
+      )}
+    </span>
+  );
+});
+
+SelectedVerbBadge.displayName = 'SelectedVerbBadge';
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
+
+/**
+ * VerbPicker Component
+ * 
+ * Comprehensive HTTP verb selection component with accessibility, validation, and theme support
  */
 const VerbPicker = forwardRef<
   HTMLButtonElement,
   VerbPickerProps
->(({
-  mode = 'verb',
+>(function VerbPicker({
+  mode = 'verb_multiple',
   schema,
-  size = 'md',
-  theme: themeProp,
-  verbOptions: customVerbOptions,
-  defaultValue,
-  value: controlledValue,
-  onChange: onControlledChange,
-  onFocus,
-  onBlur,
-  allowEmpty = true,
-  maxSelections,
-  minSelections,
-  placeholder,
-  control,
-  name,
-  rules,
-  showTooltip = true,
-  tooltipContent,
-  className,
-  id: providedId,
-  'data-testid': testId,
-  disabled = false,
-  required = false,
-  error: externalError,
-  helperText,
   showLabel = true,
-  ...restProps
-}, ref) => {
-  // Generate unique IDs for accessibility
-  const generatedId = useId();
-  const id = providedId || generatedId;
-  const labelId = `${id}-label`;
-  const descriptionId = `${id}-description`;
-  const errorId = `${id}-error`;
-
-  // Theme management
-  const { theme: globalTheme } = useThemeMode();
-  const effectiveTheme = themeProp || globalTheme;
-
-  // Verb options with internationalization support
-  const { verbOptions } = useVerbOptions({ 
-    includeLabels: true,
-    filterVerbs: customVerbOptions?.map(opt => opt.altValue)
-  });
+  label,
+  description,
+  value,
+  defaultValue,
+  options = DEFAULT_VERB_OPTIONS,
+  onChange,
+  onBlur,
+  onFocus,
+  error,
+  helpText,
+  required = false,
+  disabled = false,
+  readOnly = false,
+  size = 'md',
+  variant = 'outline',
+  orientation = 'vertical',
+  multiple = false,
+  showTooltips = true,
+  theme,
+  transform,
+  bitmaskUtils,
+  className,
+  containerClassName,
+  labelClassName,
+  'data-testid': testId = 'verb-picker',
+  renderOption,
+  'aria-label': ariaLabel,
+  'aria-describedby': ariaDescribedBy,
+  'aria-required': ariaRequired,
+  'aria-invalid': ariaInvalid,
+  ...rest
+}, ref) {
+  // ============================================================================
+  // HOOKS AND STATE
+  // ============================================================================
   
-  const finalVerbOptions = customVerbOptions || verbOptions;
-
-  // React Hook Form integration (when control and name are provided)
-  const {
-    field: controllerField,
-    fieldState: { error: hookFormError, isDirty, isTouched }
-  } = useController({
-    name: name!,
-    control,
-    rules: {
-      required: required ? 'Verb selection is required' : false,
-      validate: (fieldValue) => {
-        const validation = validateVerbSelection(fieldValue, mode, required);
-        if (!validation.isValid) {
-          return validation.error;
-        }
-
-        // Custom validation rules
-        if (mode === 'verb_multiple' && Array.isArray(fieldValue)) {
-          if (maxSelections && fieldValue.length > maxSelections) {
-            return `Maximum ${maxSelections} verbs allowed`;
-          }
-          if (minSelections && fieldValue.length < minSelections) {
-            return `Minimum ${minSelections} verbs required`;
-          }
-        }
-
-        return true;
-      },
-      ...rules
-    },
-    defaultValue: defaultValue as any
-  }) as any;
-
-  // Determine current value and change handler
-  const currentValue = controllerField?.value ?? controlledValue;
-  const handleChange = controllerField?.onChange ?? onControlledChange;
-
-  // Selected verbs for display
-  const selectedVerbs = useMemo(() => {
-    return getSelectedVerbs(currentValue, mode);
-  }, [currentValue, mode]);
-
-  // Error state management
-  const error = externalError || hookFormError?.message;
-  const hasError = Boolean(error);
-
-  // Selection handlers
-  const handleVerbSelect = useCallback((newValue: VerbPickerAnyValue) => {
-    if (disabled) return;
+  const componentId = useId();
+  const labelId = `${componentId}-label`;
+  const descriptionId = `${componentId}-description`;
+  const errorId = `${componentId}-error`;
+  const helpId = `${componentId}-help`;
+  
+  const { isDark } = useThemeMode('system', theme);
+  const [isOpen, setIsOpen] = useState(false);
+  
+  // Normalize the value based on mode
+  const normalizedValue = useMemo(() => {
+    if (value !== undefined) return value;
+    if (defaultValue !== undefined) return defaultValue;
     
-    handleChange?.(newValue);
-    
-    // Mark field as touched for React Hook Form
-    if (controllerField?.onBlur) {
-      controllerField.onBlur();
+    // Return appropriate default for mode
+    switch (mode) {
+      case 'verb':
+        return null;
+      case 'verb_multiple':
+        return [];
+      case 'number':
+        return 0;
+      default:
+        return null;
     }
-  }, [disabled, handleChange, controllerField]);
-
-  const handleSingleVerbSelect = useCallback((verb: HttpVerb) => {
-    const newValue = selectedVerbs.includes(verb) && allowEmpty ? undefined : verb;
-    handleVerbSelect(newValue);
-  }, [selectedVerbs, allowEmpty, handleVerbSelect]);
-
-  const handleMultipleVerbToggle = useCallback((verb: HttpVerb) => {
-    const isSelected = selectedVerbs.includes(verb);
-    let newVerbs: HttpVerb[];
+  }, [value, defaultValue, mode]);
+  
+  // Get currently selected verbs
+  const selectedVerbs = useMemo(() => 
+    getSelectedVerbs(normalizedValue, mode),
+    [normalizedValue, mode]
+  );
+  
+  // Handle selection changes with proper type safety
+  const handleSelectionChange = (newValue: any) => {
+    let transformedValue: any;
     
-    if (isSelected) {
-      newVerbs = selectedVerbs.filter(v => v !== verb);
-    } else {
-      if (maxSelections && selectedVerbs.length >= maxSelections) {
-        return; // Don't add if at max selections
+    switch (mode) {
+      case 'verb':
+        transformedValue = newValue;
+        break;
+      case 'verb_multiple':
+        transformedValue = Array.isArray(newValue) ? newValue : [newValue];
+        break;
+      case 'number':
+        transformedValue = Array.isArray(newValue) 
+          ? convertVerbsToBitmask(newValue)
+          : convertVerbToBitmask(newValue);
+        break;
+      default:
+        transformedValue = newValue;
+    }
+    
+    onChange?.(transformedValue);
+  };
+  
+  // Handle individual verb toggle for multiple mode
+  const handleVerbToggle = (verb: HttpVerb) => {
+    if (disabled || readOnly) return;
+    
+    switch (mode) {
+      case 'verb':
+        handleSelectionChange(verb);
+        break;
+        
+      case 'verb_multiple': {
+        const currentVerbs = Array.isArray(normalizedValue) ? normalizedValue : [];
+        const isSelected = currentVerbs.includes(verb);
+        const newVerbs = isSelected 
+          ? currentVerbs.filter(v => v !== verb)
+          : [...currentVerbs, verb];
+        handleSelectionChange(newVerbs);
+        break;
       }
-      newVerbs = [...selectedVerbs, verb];
-    }
-    
-    const newValue = mode === 'number' 
-      ? newVerbs.reduce((bitmask, v) => {
-          const verbBitmasks = { GET: 1, POST: 2, PUT: 4, PATCH: 8, DELETE: 16 };
-          return bitmask | (verbBitmasks[v] || 0);
-        }, 0)
-      : newVerbs;
-    
-    handleVerbSelect(newValue);
-  }, [selectedVerbs, maxSelections, mode, handleVerbSelect]);
-
-  // Display value formatting
-  const displayValue = useMemo(() => {
-    if (selectedVerbs.length === 0) {
-      return placeholder || 'Select HTTP verb(s)';
-    }
-    return formatVerbDisplay(selectedVerbs, selectedVerbs.length > 2 ? 'long' : 'short');
-  }, [selectedVerbs, placeholder]);
-
-  // Size-based styling
-  const sizeClasses = {
-    sm: {
-      button: 'py-1.5 pl-3 pr-8 text-sm',
-      icon: 'h-4 w-4',
-      option: 'py-1.5 pl-2 pr-8 text-sm'
-    },
-    md: {
-      button: 'py-2 pl-3 pr-10 text-sm',
-      icon: 'h-5 w-5', 
-      option: 'py-2 pl-3 pr-9 text-sm'
-    },
-    lg: {
-      button: 'py-2.5 pl-4 pr-12 text-base',
-      icon: 'h-6 w-6',
-      option: 'py-2.5 pl-4 pr-10 text-base'
+      
+      case 'number': {
+        const currentBitmask = typeof normalizedValue === 'number' ? normalizedValue : 0;
+        const verbBitmask = convertVerbToBitmask(verb);
+        const isSelected = (currentBitmask & verbBitmask) === verbBitmask;
+        const newBitmask = isSelected 
+          ? currentBitmask & ~verbBitmask
+          : currentBitmask | verbBitmask;
+        handleSelectionChange(newBitmask);
+        break;
+      }
     }
   };
-
-  const currentSizeClasses = sizeClasses[size];
-
-  // Button styling based on state and theme
-  const buttonClasses = cn(
-    "relative w-full cursor-default rounded-md border bg-white text-left shadow-sm",
-    "focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500",
-    "disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500",
-    currentSizeClasses.button,
-    hasError
-      ? "border-red-300 focus:border-red-500 focus:ring-red-500"
-      : "border-gray-300 dark:border-gray-600",
-    effectiveTheme === 'dark'
-      ? "bg-gray-800 text-gray-100 border-gray-600"
-      : "bg-white text-gray-900 border-gray-300",
-    disabled && "opacity-50",
-    className
-  );
-
-  // Schema-based tooltip content
-  const tooltipText = useMemo(() => {
-    if (tooltipContent) return tooltipContent;
-    if (schema?.description) return schema.description;
-    return null;
-  }, [tooltipContent, schema?.description]);
-
-  // Label and field information
-  const fieldLabel = schema?.label || schema?.name || name || 'HTTP Verbs';
-
+  
+  // Remove specific verb (for multiple mode badges)
+  const handleVerbRemove = (verb: HttpVerb) => {
+    if (disabled || readOnly) return;
+    
+    switch (mode) {
+      case 'verb_multiple': {
+        const currentVerbs = Array.isArray(normalizedValue) ? normalizedValue : [];
+        const newVerbs = currentVerbs.filter(v => v !== verb);
+        handleSelectionChange(newVerbs);
+        break;
+      }
+      
+      case 'number': {
+        const currentBitmask = typeof normalizedValue === 'number' ? normalizedValue : 0;
+        const verbBitmask = convertVerbToBitmask(verb);
+        const newBitmask = currentBitmask & ~verbBitmask;
+        handleSelectionChange(newBitmask);
+        break;
+      }
+    }
+  };
+  
+  // ============================================================================
+  // COMPUTED VALUES
+  // ============================================================================
+  
+  const displayValue = formatDisplayValue(normalizedValue, mode, 'Select HTTP method(s)...');
+  const hasError = Boolean(error);
+  const hasSelection = selectedVerbs.length > 0;
+  const isMultipleMode = mode === 'verb_multiple' || mode === 'number';
+  
+  // ARIA attributes
+  const ariaDescriptions = [
+    description && descriptionId,
+    helpText && helpId,
+    error && errorId,
+    ariaDescribedBy
+  ].filter(Boolean).join(' ') || undefined;
+  
+  // ============================================================================
+  // RENDER HELPERS
+  // ============================================================================
+  
+  const renderSelectedBadges = () => {
+    if (!isMultipleMode || selectedVerbs.length === 0) return null;
+    
+    return (
+      <div className="flex flex-wrap gap-1 mt-2">
+        {selectedVerbs.map((verb) => (
+          <SelectedVerbBadge
+            key={verb}
+            verb={verb}
+            isDark={isDark}
+            onRemove={() => handleVerbRemove(verb)}
+            removable={!disabled && !readOnly}
+          />
+        ))}
+      </div>
+    );
+  };
+  
+  // ============================================================================
+  // MAIN RENDER
+  // ============================================================================
+  
   return (
-    <div className="w-full" data-testid={testId}>
-      {/* Field Label */}
-      {showLabel && (
-        <div className="flex items-center gap-2 mb-1">
-          <label
-            id={labelId}
-            htmlFor={id}
-            className={cn(
-              "block text-sm font-medium",
-              effectiveTheme === 'dark' ? "text-gray-200" : "text-gray-700",
-              hasError && "text-red-600 dark:text-red-400"
-            )}
-          >
-            {fieldLabel}
-            {required && (
-              <span className="ml-1 text-red-500" aria-label="required">
-                *
-              </span>
-            )}
-          </label>
-          
-          {/* Tooltip */}
-          {showTooltip && tooltipText && (
-            <Tooltip content={tooltipText}>
-              <QuestionMarkCircleIcon 
-                className={cn(
-                  "h-4 w-4 cursor-help",
-                  effectiveTheme === 'dark' ? "text-gray-400" : "text-gray-500"
-                )}
-                aria-label="Field information"
-              />
-            </Tooltip>
-          )}
-        </div>
-      )}
-
-      {/* Main Listbox Component */}
-      <Listbox
-        value={currentValue}
-        onChange={handleVerbSelect}
-        disabled={disabled}
-        multiple={mode === 'verb_multiple'}
-      >
-        {({ open }) => (
-          <div className="relative">
-            <Listbox.Button
-              ref={ref}
-              id={id}
-              className={buttonClasses}
-              aria-labelledby={labelId}
-              aria-describedby={cn(
-                helperText && descriptionId,
-                hasError && errorId
-              )}
-              aria-invalid={hasError}
-              aria-expanded={open}
-              aria-haspopup="listbox"
-              onFocus={onFocus}
-              onBlur={onBlur}
-              {...restProps}
-            >
-              <span className="block truncate">
-                {displayValue}
-              </span>
-              <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                <ChevronUpDownIcon
-                  className={cn(
-                    currentSizeClasses.icon,
-                    effectiveTheme === 'dark' ? "text-gray-400" : "text-gray-400"
-                  )}
-                  aria-hidden="true"
-                />
-              </span>
-            </Listbox.Button>
-
-            {/* Options Dropdown */}
-            <Transition
-              show={open}
-              as={React.Fragment}
-              leave="transition ease-in duration-100"
-              leaveFrom="opacity-100"
-              leaveTo="opacity-0"
-            >
-              <Listbox.Options
-                className={cn(
-                  "absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md",
-                  "bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5",
-                  "focus:outline-none",
-                  effectiveTheme === 'dark'
-                    ? "bg-gray-800 ring-gray-600"
-                    : "bg-white ring-black ring-opacity-5",
-                  currentSizeClasses.option
-                )}
-                role="listbox"
-                aria-labelledby={labelId}
-              >
-                {finalVerbOptions.map((option) => {
-                  const isSelected = selectedVerbs.includes(option.altValue);
-                  
-                  return (
-                    <Listbox.Option
-                      key={option.altValue}
-                      value={mode === 'verb' ? option.altValue : 
-                             mode === 'verb_multiple' ? option.altValue :
-                             option.value}
-                      disabled={disabled}
-                      className={({ active }) => 
-                        mode === 'verb'
-                          ? "" // Headless UI handles styling for single select
-                          : "cursor-pointer" // Custom styling needed for multiple select
-                      }
-                    >
-                      {({ active }) => (
-                        <div
-                          onClick={() => {
-                            if (mode === 'verb') {
-                              handleSingleVerbSelect(option.altValue);
-                            } else {
-                              handleMultipleVerbToggle(option.altValue);
-                            }
-                          }}
-                        >
-                          <VerbOptionItem
-                            option={option}
-                            selected={isSelected}
-                            active={active}
-                            disabled={disabled}
-                            theme={effectiveTheme}
-                          />
-                        </div>
-                      )}
-                    </Listbox.Option>
-                  );
-                })}
-              </Listbox.Options>
-            </Transition>
-          </div>
-        )}
-      </Listbox>
-
-      {/* Helper Text */}
-      {helperText && !hasError && (
-        <p
-          id={descriptionId}
+    <div 
+      className={cn('w-full', containerClassName)}
+      data-testid={testId}
+    >
+      {/* Label */}
+      {showLabel && label && (
+        <HeadlessLabel 
+          as="label"
+          htmlFor={componentId}
           className={cn(
-            "mt-1 text-xs",
-            effectiveTheme === 'dark' ? "text-gray-400" : "text-gray-600"
+            'block text-sm font-medium mb-2',
+            isDark ? 'text-gray-200' : 'text-gray-700',
+            hasError && (isDark ? 'text-red-400' : 'text-red-600'),
+            required && "after:content-['*'] after:ml-1 after:text-red-500",
+            labelClassName
           )}
+          id={labelId}
         >
-          {helperText}
-        </p>
+          {label}
+        </HeadlessLabel>
       )}
-
+      
+      {/* Description */}
+      {description && (
+        <HeadlessDescription
+          className={cn(
+            'text-sm mb-2',
+            isDark ? 'text-gray-400' : 'text-gray-600'
+          )}
+          id={descriptionId}
+        >
+          {description}
+        </HeadlessDescription>
+      )}
+      
+      {/* Main Listbox */}
+      <Listbox
+        value={mode === 'verb_multiple' ? selectedVerbs : selectedVerbs[0] || null}
+        onChange={mode === 'verb_multiple' ? handleSelectionChange : (value) => handleSelectionChange(value)}
+        multiple={mode === 'verb_multiple'}
+        disabled={disabled}
+        by={(a, b) => a === b}
+      >
+        <div className="relative">
+          {/* Trigger Button */}
+          <Listbox.Button
+            ref={ref}
+            className={cn(
+              // Base styles
+              'relative w-full cursor-pointer rounded-lg border py-2 pl-3 pr-10 text-left transition-colors duration-200',
+              'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
+              
+              // Size variants
+              size === 'xs' && 'py-1 px-2 text-xs',
+              size === 'sm' && 'py-1.5 px-2.5 text-sm',
+              size === 'md' && 'py-2 px-3 text-sm',
+              size === 'lg' && 'py-2.5 px-3.5 text-base',
+              size === 'xl' && 'py-3 px-4 text-lg',
+              
+              // Variant styles
+              variant === 'outline' && (
+                isDark 
+                  ? 'border-gray-600 bg-gray-800 text-gray-100 hover:border-gray-500' 
+                  : 'border-gray-300 bg-white text-gray-900 hover:border-gray-400'
+              ),
+              variant === 'filled' && (
+                isDark 
+                  ? 'border-gray-700 bg-gray-700 text-gray-100 hover:bg-gray-600' 
+                  : 'border-gray-200 bg-gray-50 text-gray-900 hover:bg-gray-100'
+              ),
+              
+              // State styles
+              hasError && (
+                isDark 
+                  ? 'border-red-500 focus:ring-red-500' 
+                  : 'border-red-300 focus:ring-red-500'
+              ),
+              disabled && 'opacity-50 cursor-not-allowed',
+              readOnly && 'cursor-default',
+              
+              // Focus ring offset
+              isDark && 'focus:ring-offset-gray-800',
+              
+              className
+            )}
+            aria-label={ariaLabel || label || 'Select HTTP methods'}
+            aria-describedby={ariaDescriptions}
+            aria-required={ariaRequired || required}
+            aria-invalid={ariaInvalid || hasError}
+            aria-expanded={isOpen}
+            aria-haspopup="listbox"
+            id={componentId}
+            onFocus={onFocus}
+            onBlur={onBlur}
+            data-testid={`${testId}-button`}
+          >
+            <span className={cn(
+              'block truncate',
+              !hasSelection && (isDark ? 'text-gray-400' : 'text-gray-500')
+            )}>
+              {displayValue}
+            </span>
+            
+            <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+              <ChevronUpDownIcon
+                className={cn(
+                  'h-5 w-5',
+                  isDark ? 'text-gray-400' : 'text-gray-400'
+                )}
+                aria-hidden="true"
+              />
+            </span>
+          </Listbox.Button>
+          
+          {/* Options Dropdown */}
+          <Transition
+            as={Fragment}
+            show={isOpen}
+            leave="transition ease-in duration-100"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+            beforeEnter={() => setIsOpen(true)}
+            afterLeave={() => setIsOpen(false)}
+          >
+            <Listbox.Options 
+              className={cn(
+                'absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-lg border py-1 shadow-lg',
+                'focus:outline-none',
+                isDark 
+                  ? 'border-gray-600 bg-gray-800' 
+                  : 'border-gray-300 bg-white'
+              )}
+              data-testid={`${testId}-options`}
+            >
+              {options.map((option) => {
+                const isSelected = isVerbSelected(normalizedValue, option.altValue, mode);
+                
+                if (renderOption) {
+                  return (
+                    <Fragment key={option.value}>
+                      {renderOption(option, isSelected)}
+                    </Fragment>
+                  );
+                }
+                
+                return (
+                  <VerbOption
+                    key={option.value}
+                    option={option}
+                    selected={isSelected}
+                    active={false}
+                    disabled={option.disabled}
+                    showTooltip={showTooltips}
+                    isDark={isDark}
+                    onSelect={() => handleVerbToggle(option.altValue)}
+                  />
+                );
+              })}
+            </Listbox.Options>
+          </Transition>
+        </div>
+      </Listbox>
+      
+      {/* Selected Verbs Badges (Multiple Mode) */}
+      {renderSelectedBadges()}
+      
       {/* Error Message */}
-      {hasError && (
-        <p
+      {error && (
+        <div 
+          className={cn(
+            'mt-2 flex items-center gap-1 text-sm',
+            isDark ? 'text-red-400' : 'text-red-600'
+          )}
           id={errorId}
-          className="mt-1 text-xs text-red-600 dark:text-red-400"
           role="alert"
           aria-live="polite"
         >
+          <ExclamationCircleIcon className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
           {error}
-        </p>
+        </div>
       )}
-
-      {/* Selection Summary for Multiple Mode */}
-      {mode !== 'verb' && selectedVerbs.length > 0 && (
-        <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          {selectedVerbs.length} verb{selectedVerbs.length !== 1 ? 's' : ''} selected
-          {mode === 'number' && ` (bitmask: ${
-            selectedVerbs.reduce((bitmask, verb) => {
-              const verbBitmasks = { GET: 1, POST: 2, PUT: 4, PATCH: 8, DELETE: 16 };
-              return bitmask | (verbBitmasks[verb] || 0);
-            }, 0)
-          })`}
+      
+      {/* Help Text */}
+      {helpText && !error && (
+        <div 
+          className={cn(
+            'mt-2 text-sm',
+            isDark ? 'text-gray-400' : 'text-gray-600'
+          )}
+          id={helpId}
+        >
+          {helpText}
         </div>
       )}
     </div>
@@ -534,5 +746,32 @@ const VerbPicker = forwardRef<
 
 VerbPicker.displayName = 'VerbPicker';
 
+// ============================================================================
+// EXPORTS
+// ============================================================================
+
 export default VerbPicker;
-export type { VerbPickerProps, HttpVerb, VerbPickerMode, VerbPickerAnyValue };
+export { VerbPicker };
+export type { VerbPickerProps };
+
+// Export sub-components for advanced usage
+export { VerbOption, SelectedVerbBadge };
+
+// Re-export types and utilities for convenience
+export type { 
+  HttpVerb, 
+  VerbOption as VerbOptionType, 
+  VerbPickerMode,
+  VerbPickerValue,
+  VerbColorVariant
+} from './types';
+
+export {
+  DEFAULT_VERB_OPTIONS,
+  getSelectedVerbs,
+  isVerbSelected,
+  formatVerbDisplay,
+  convertVerbsToBitmask,
+  convertBitmaskToVerbs,
+  convertVerbToBitmask
+} from './utils';
