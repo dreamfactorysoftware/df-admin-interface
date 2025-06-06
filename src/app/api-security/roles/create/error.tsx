@@ -1,539 +1,621 @@
 'use client';
 
 /**
- * Role Creation Error Boundary Component
+ * Error Boundary Component for Role Creation Page
  * 
- * Next.js error boundary component for the role creation page that handles and displays
- * errors in role creation workflows including validation errors, API failures, and form
- * submission issues. Provides user-friendly error messages and recovery actions while
- * maintaining application stability during role creation operations.
+ * Comprehensive error handling for role creation workflows including:
+ * - Validation errors for role configuration and permissions
+ * - API failures during role creation and service access validation
+ * - Authentication and authorization errors per Section 4.5 security flows
+ * - Network connectivity issues with automatic retry mechanisms
+ * - User-friendly error recovery interfaces with accessibility compliance
+ * - Role-specific error scenarios including lookup key validation and service access configuration
  * 
- * Features:
- * - Comprehensive error handling per Section 4.2 error handling requirements
- * - User-friendly error recovery interfaces per Section 7.6 user interactions
- * - Accessibility compliance for error states per WCAG 2.1 AA requirements
- * - Role creation specific error handling per F-005 User and Role Management
- * - Next.js app router error boundary conventions
- * - Tailwind CSS styling with responsive design
- * - Internationalization support for error messages
+ * Implements Next.js 15.1+ app router error boundary conventions with React 19 error handling patterns.
+ * Provides WCAG 2.1 AA compliant error states with comprehensive user recovery options.
  * 
- * Architecture:
- * - React Error Boundary integration with Next.js app router
- * - Mock Service Worker integration for development error testing
- * - Comprehensive error categorization and recovery actions
- * - Performance optimized with React 19 concurrent features
+ * @fileoverview Role creation error boundary with comprehensive error handling
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-import React, { useEffect, useCallback, startTransition } from 'react';
+import { useEffect, useCallback, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertTriangle, RefreshCw, ArrowLeft, Home, Bug, Network, Shield, Eye, EyeOff } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { useErrorHandler } from '@/hooks/use-error-handling';
+import {
+  ErrorType,
+  ErrorSeverity,
+  AppError,
+  RecoveryAction,
+  UserFriendlyErrorMessage,
+} from '@/types/error';
 
-// ============================================================================
-// ERROR TYPES AND INTERFACES
-// ============================================================================
-
-interface RoleCreationError extends Error {
-  code?: string;
-  status?: number;
-  field?: string;
-  details?: Record<string, any>;
-  timestamp?: Date;
-  context?: 'validation' | 'api' | 'network' | 'authorization' | 'service' | 'lookup';
-}
-
-interface ErrorBoundaryProps {
+/**
+ * Props interface for role creation error boundary
+ */
+interface RoleCreateErrorProps {
   error: Error & { digest?: string };
   reset: () => void;
 }
 
-interface ErrorDisplayProps {
-  error: RoleCreationError;
-  onRetry: () => void;
-  onGoBack: () => void;
-  onGoHome: () => void;
-  onToggleDetails: () => void;
-  showDetails: boolean;
-}
-
-// ============================================================================
-// ERROR CATEGORIZATION AND MESSAGES
-// ============================================================================
-
-const ERROR_CATEGORIES = {
-  VALIDATION: {
-    icon: AlertTriangle,
-    color: 'text-yellow-600 dark:text-yellow-400',
-    bgColor: 'bg-yellow-50 dark:bg-yellow-900/20',
-    borderColor: 'border-yellow-200 dark:border-yellow-800',
-    title: 'Validation Error',
-    description: 'There are issues with the role configuration that need to be corrected.',
-    canRetry: true,
-    primaryAction: 'Fix Issues'
-  },
-  API: {
-    icon: AlertTriangle,
-    color: 'text-red-600 dark:text-red-400',
-    bgColor: 'bg-red-50 dark:bg-red-900/20',
-    borderColor: 'border-red-200 dark:border-red-800',
-    title: 'API Error',
-    description: 'The server encountered an error while creating the role.',
-    canRetry: true,
-    primaryAction: 'Try Again'
-  },
-  NETWORK: {
-    icon: Network,
-    color: 'text-blue-600 dark:text-blue-400',
-    bgColor: 'bg-blue-50 dark:bg-blue-900/20',
-    borderColor: 'border-blue-200 dark:border-blue-800',
-    title: 'Network Error',
-    description: 'Unable to connect to the server. Please check your connection.',
-    canRetry: true,
-    primaryAction: 'Retry Connection'
-  },
-  AUTHORIZATION: {
-    icon: Shield,
-    color: 'text-purple-600 dark:text-purple-400',
-    bgColor: 'bg-purple-50 dark:bg-purple-900/20',
-    borderColor: 'border-purple-200 dark:border-purple-800',
-    title: 'Access Denied',
-    description: 'You do not have permission to create roles.',
-    canRetry: false,
-    primaryAction: 'Contact Administrator'
-  },
-  SERVICE: {
-    icon: Bug,
-    color: 'text-orange-600 dark:text-orange-400',
-    bgColor: 'bg-orange-50 dark:bg-orange-900/20',
-    borderColor: 'border-orange-200 dark:border-orange-800',
-    title: 'Service Access Error',
-    description: 'Error configuring service access permissions for the role.',
-    canRetry: true,
-    primaryAction: 'Retry Configuration'
-  },
-  LOOKUP: {
-    icon: AlertTriangle,
-    color: 'text-indigo-600 dark:text-indigo-400',
-    bgColor: 'bg-indigo-50 dark:bg-indigo-900/20',
-    borderColor: 'border-indigo-200 dark:border-indigo-800',
-    title: 'Lookup Key Validation Error',
-    description: 'Invalid or missing lookup key configuration for the role.',
-    canRetry: true,
-    primaryAction: 'Check Configuration'
-  }
+/**
+ * Role-specific error codes and messages
+ */
+const ROLE_ERROR_CODES = {
+  ROLE_NAME_EXISTS: 'ROLE_NAME_EXISTS',
+  INVALID_PERMISSIONS: 'INVALID_PERMISSIONS',
+  SERVICE_ACCESS_DENIED: 'SERVICE_ACCESS_DENIED',
+  LOOKUP_KEY_INVALID: 'LOOKUP_KEY_INVALID',
+  ROLE_CREATION_FAILED: 'ROLE_CREATION_FAILED',
+  PERMISSION_VALIDATION_FAILED: 'PERMISSION_VALIDATION_FAILED',
+  SERVICE_CONFIGURATION_ERROR: 'SERVICE_CONFIGURATION_ERROR',
 } as const;
 
-const getErrorCategory = (error: RoleCreationError): keyof typeof ERROR_CATEGORIES => {
-  // Network errors
-  if (!navigator.onLine || error.message.includes('network') || error.message.includes('fetch')) {
-    return 'NETWORK';
-  }
-  
-  // Authorization errors (403, 401)
-  if (error.status === 401 || error.status === 403 || error.message.includes('unauthorized') || error.message.includes('forbidden')) {
-    return 'AUTHORIZATION';
-  }
-  
-  // Validation errors (400, specific validation contexts)
-  if (error.status === 400 || error.context === 'validation' || error.field) {
-    return 'VALIDATION';
-  }
-  
-  // Service access configuration errors
-  if (error.message.includes('service') || error.message.includes('access') || error.context === 'service') {
-    return 'SERVICE';
-  }
-  
-  // Lookup key validation errors
-  if (error.message.includes('lookup') || error.message.includes('key') || error.context === 'lookup') {
-    return 'LOOKUP';
-  }
-  
-  // Default to API error for server errors (500+)
-  return 'API';
+/**
+ * Role creation specific error messages with internationalization support
+ */
+const getRoleErrorMessage = (errorCode: string, error: Error): UserFriendlyErrorMessage => {
+  const baseMessages: Record<string, UserFriendlyErrorMessage> = {
+    [ROLE_ERROR_CODES.ROLE_NAME_EXISTS]: {
+      title: 'Role Name Already Exists',
+      message: 'A role with this name already exists in the system.',
+      actionableMessage: 'Please choose a different role name and try again.',
+      recoveryOptions: [
+        {
+          type: 'retry',
+          label: 'Try Different Name',
+          primary: true,
+          accessibility: {
+            ariaLabel: 'Try creating role with a different name',
+            keyboardShortcut: 'Enter',
+          },
+        },
+        {
+          type: 'dismiss',
+          label: 'Cancel',
+          primary: false,
+          accessibility: {
+            ariaLabel: 'Cancel role creation',
+            keyboardShortcut: 'Escape',
+          },
+        },
+      ],
+      accessibility: {
+        ariaLabel: 'Error: Role name already exists',
+        role: 'alert',
+        screenReaderText: 'Role creation failed. A role with this name already exists. Please choose a different role name and try again.',
+      },
+    },
+    [ROLE_ERROR_CODES.INVALID_PERMISSIONS]: {
+      title: 'Invalid Permission Configuration',
+      message: 'The selected permissions are invalid or conflicting.',
+      actionableMessage: 'Please review your permission selections and ensure they are valid for the chosen services.',
+      recoveryOptions: [
+        {
+          type: 'retry',
+          label: 'Review Permissions',
+          primary: true,
+          accessibility: {
+            ariaLabel: 'Review and correct permission configuration',
+            keyboardShortcut: 'Enter',
+          },
+        },
+        {
+          type: 'dismiss',
+          label: 'Cancel',
+          primary: false,
+          accessibility: {
+            ariaLabel: 'Cancel role creation',
+            keyboardShortcut: 'Escape',
+          },
+        },
+      ],
+      accessibility: {
+        ariaLabel: 'Error: Invalid permission configuration',
+        role: 'alert',
+        screenReaderText: 'Role creation failed. The selected permissions are invalid or conflicting. Please review your permission selections.',
+      },
+    },
+    [ROLE_ERROR_CODES.SERVICE_ACCESS_DENIED]: {
+      title: 'Service Access Denied',
+      message: 'You do not have permission to configure access for the selected services.',
+      actionableMessage: 'Contact your administrator or select only services you have permission to configure.',
+      recoveryOptions: [
+        {
+          type: 'contact',
+          label: 'Contact Administrator',
+          primary: true,
+          accessibility: {
+            ariaLabel: 'Contact system administrator for service access',
+          },
+        },
+        {
+          type: 'retry',
+          label: 'Try Again',
+          primary: false,
+          accessibility: {
+            ariaLabel: 'Retry role creation with different services',
+            keyboardShortcut: 'Enter',
+          },
+        },
+        {
+          type: 'dismiss',
+          label: 'Cancel',
+          primary: false,
+          accessibility: {
+            ariaLabel: 'Cancel role creation',
+            keyboardShortcut: 'Escape',
+          },
+        },
+      ],
+      accessibility: {
+        ariaLabel: 'Error: Service access denied',
+        role: 'alert',
+        screenReaderText: 'Role creation failed. You do not have permission to configure access for the selected services. Contact your administrator.',
+      },
+    },
+    [ROLE_ERROR_CODES.LOOKUP_KEY_INVALID]: {
+      title: 'Invalid Lookup Key Configuration',
+      message: 'One or more lookup keys are invalid or do not exist in the system.',
+      actionableMessage: 'Please verify the lookup keys and ensure they exist in the system configuration.',
+      recoveryOptions: [
+        {
+          type: 'retry',
+          label: 'Verify Lookup Keys',
+          primary: true,
+          accessibility: {
+            ariaLabel: 'Verify and correct lookup key configuration',
+            keyboardShortcut: 'Enter',
+          },
+        },
+        {
+          type: 'dismiss',
+          label: 'Cancel',
+          primary: false,
+          accessibility: {
+            ariaLabel: 'Cancel role creation',
+            keyboardShortcut: 'Escape',
+          },
+        },
+      ],
+      accessibility: {
+        ariaLabel: 'Error: Invalid lookup key configuration',
+        role: 'alert',
+        screenReaderText: 'Role creation failed. One or more lookup keys are invalid. Please verify the lookup keys exist in the system.',
+      },
+    },
+  };
+
+  return baseMessages[errorCode] || {
+    title: 'Role Creation Error',
+    message: error.message || 'An unexpected error occurred while creating the role.',
+    actionableMessage: 'Please try again or contact support if the problem persists.',
+    recoveryOptions: [
+      {
+        type: 'retry',
+        label: 'Try Again',
+        primary: true,
+        accessibility: {
+          ariaLabel: 'Retry role creation',
+          keyboardShortcut: 'Enter',
+        },
+      },
+      {
+        type: 'contact',
+        label: 'Contact Support',
+        primary: false,
+        accessibility: {
+          ariaLabel: 'Contact technical support',
+        },
+      },
+      {
+        type: 'dismiss',
+        label: 'Cancel',
+        primary: false,
+        accessibility: {
+          ariaLabel: 'Cancel role creation',
+          keyboardShortcut: 'Escape',
+        },
+      },
+    ],
+    accessibility: {
+      ariaLabel: 'Error: Role creation failed',
+      role: 'alert',
+      screenReaderText: 'Role creation failed with an unexpected error. Please try again or contact support.',
+    },
+  };
 };
 
-const getErrorMessage = (error: RoleCreationError): string => {
-  // Check for specific role creation error messages
-  const errorMessage = error.message?.toLowerCase() || '';
+/**
+ * Extract role-specific error information from error object
+ */
+const extractRoleErrorInfo = (error: Error): { code: string; context?: any } => {
+  // Check for API error response format
+  if ('response' in error && error.response && typeof error.response === 'object') {
+    const response = error.response as any;
+    if (response.data?.error?.code) {
+      return {
+        code: response.data.error.code,
+        context: response.data.error.context,
+      };
+    }
+  }
+
+  // Check for specific error patterns in message
+  const message = error.message.toLowerCase();
   
-  if (errorMessage.includes('role name') || errorMessage.includes('name already exists')) {
-    return 'A role with this name already exists. Please choose a different name.';
+  if (message.includes('role name') && message.includes('exists')) {
+    return { code: ROLE_ERROR_CODES.ROLE_NAME_EXISTS };
   }
   
-  if (errorMessage.includes('invalid service') || errorMessage.includes('service not found')) {
-    return 'One or more selected services are invalid or no longer available.';
+  if (message.includes('permission') && message.includes('invalid')) {
+    return { code: ROLE_ERROR_CODES.INVALID_PERMISSIONS };
   }
   
-  if (errorMessage.includes('lookup key') || errorMessage.includes('invalid key')) {
-    return 'Invalid lookup key configuration. Please verify the lookup key values.';
+  if (message.includes('service access') || message.includes('access denied')) {
+    return { code: ROLE_ERROR_CODES.SERVICE_ACCESS_DENIED };
   }
   
-  if (errorMessage.includes('permission') || errorMessage.includes('access denied')) {
-    return 'You do not have sufficient permissions to create roles with the selected configuration.';
+  if (message.includes('lookup key')) {
+    return { code: ROLE_ERROR_CODES.LOOKUP_KEY_INVALID };
   }
-  
-  if (errorMessage.includes('validation') || error.field) {
-    return `Validation failed${error.field ? ` for field: ${error.field}` : ''}. Please check the form values and try again.`;
-  }
-  
-  if (errorMessage.includes('network') || errorMessage.includes('connection')) {
-    return 'Network connection failed. Please check your internet connection and try again.';
-  }
-  
-  if (error.status === 404) {
-    return 'The role creation endpoint is not available. Please contact your administrator.';
-  }
-  
-  if (error.status === 409) {
-    return 'A role with this configuration already exists or conflicts with existing roles.';
-  }
-  
-  if (error.status === 422) {
-    return 'The role configuration is invalid. Please review all fields and try again.';
-  }
-  
-  if (error.status && error.status >= 500) {
-    return 'The server encountered an internal error. Please try again later or contact support.';
-  }
-  
-  // Fallback to original error message or generic message
-  return error.message || 'An unexpected error occurred while creating the role.';
+
+  return { code: ROLE_ERROR_CODES.ROLE_CREATION_FAILED };
 };
-
-// ============================================================================
-// ERROR DISPLAY COMPONENT
-// ============================================================================
-
-function ErrorDisplay({ 
-  error, 
-  onRetry, 
-  onGoBack, 
-  onGoHome, 
-  onToggleDetails, 
-  showDetails 
-}: ErrorDisplayProps) {
-  const category = getErrorCategory(error);
-  const categoryConfig = ERROR_CATEGORIES[category];
-  const Icon = categoryConfig.icon;
-  const errorMessage = getErrorMessage(error);
-
-  return (
-    <div 
-      className={cn(
-        "max-w-2xl mx-auto p-6 rounded-lg border",
-        categoryConfig.bgColor,
-        categoryConfig.borderColor
-      )}
-      role="alert"
-      aria-labelledby="error-title"
-      aria-describedby="error-description"
-    >
-      {/* Error Header */}
-      <div className="flex items-start space-x-4">
-        <div className={cn("flex-shrink-0", categoryConfig.color)}>
-          <Icon 
-            className="h-8 w-8" 
-            aria-hidden="true"
-          />
-        </div>
-        
-        <div className="flex-1 min-w-0">
-          <h2 
-            id="error-title"
-            className={cn(
-              "text-xl font-semibold mb-2",
-              categoryConfig.color
-            )}
-          >
-            {categoryConfig.title}
-          </h2>
-          
-          <p 
-            id="error-description"
-            className="text-gray-700 dark:text-gray-300 mb-4"
-          >
-            {categoryConfig.description}
-          </p>
-          
-          <div className={cn(
-            "p-4 rounded-md border-l-4 mb-6",
-            "bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600"
-          )}>
-            <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
-              Error Details:
-            </p>
-            <p className="text-sm text-gray-700 dark:text-gray-300">
-              {errorMessage}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Error Actions */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-4">
-        {categoryConfig.canRetry && (
-          <Button
-            onClick={onRetry}
-            variant="default"
-            className="flex items-center justify-center"
-            aria-label={`${categoryConfig.primaryAction}: Retry role creation operation`}
-          >
-            <RefreshCw className="h-4 w-4 mr-2" />
-            {categoryConfig.primaryAction}
-          </Button>
-        )}
-        
-        <Button
-          onClick={onGoBack}
-          variant="outline"
-          className="flex items-center justify-center"
-          aria-label="Go back to role creation form"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Go Back to Form
-        </Button>
-        
-        <Button
-          onClick={onGoHome}
-          variant="ghost"
-          className="flex items-center justify-center"
-          aria-label="Return to dashboard home page"
-        >
-          <Home className="h-4 w-4 mr-2" />
-          Return to Dashboard
-        </Button>
-      </div>
-
-      {/* Technical Details Toggle */}
-      <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-        <button
-          onClick={onToggleDetails}
-          className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
-          aria-expanded={showDetails}
-          aria-controls="technical-details"
-          aria-label={`${showDetails ? 'Hide' : 'Show'} technical error details`}
-        >
-          {showDetails ? (
-            <EyeOff className="h-4 w-4" />
-          ) : (
-            <Eye className="h-4 w-4" />
-          )}
-          <span>{showDetails ? 'Hide' : 'Show'} Technical Details</span>
-        </button>
-        
-        {showDetails && (
-          <div 
-            id="technical-details"
-            className="mt-3 p-4 bg-gray-100 dark:bg-gray-900 rounded-md border"
-            role="region"
-            aria-label="Technical error information"
-          >
-            <dl className="space-y-2 text-sm">
-              <div>
-                <dt className="font-medium text-gray-900 dark:text-gray-100">Error Code:</dt>
-                <dd className="text-gray-700 dark:text-gray-300 font-mono">
-                  {error.code || error.status || 'N/A'}
-                </dd>
-              </div>
-              
-              <div>
-                <dt className="font-medium text-gray-900 dark:text-gray-100">Timestamp:</dt>
-                <dd className="text-gray-700 dark:text-gray-300 font-mono">
-                  {error.timestamp?.toISOString() || new Date().toISOString()}
-                </dd>
-              </div>
-              
-              {error.field && (
-                <div>
-                  <dt className="font-medium text-gray-900 dark:text-gray-100">Field:</dt>
-                  <dd className="text-gray-700 dark:text-gray-300 font-mono">{error.field}</dd>
-                </div>
-              )}
-              
-              {error.context && (
-                <div>
-                  <dt className="font-medium text-gray-900 dark:text-gray-100">Context:</dt>
-                  <dd className="text-gray-700 dark:text-gray-300 font-mono">{error.context}</dd>
-                </div>
-              )}
-              
-              <div>
-                <dt className="font-medium text-gray-900 dark:text-gray-100">Stack Trace:</dt>
-                <dd className="text-gray-700 dark:text-gray-300 font-mono text-xs mt-1 max-h-32 overflow-y-auto">
-                  {error.stack || 'No stack trace available'}
-                </dd>
-              </div>
-              
-              {error.details && Object.keys(error.details).length > 0 && (
-                <div>
-                  <dt className="font-medium text-gray-900 dark:text-gray-100">Additional Details:</dt>
-                  <dd className="text-gray-700 dark:text-gray-300 font-mono text-xs mt-1">
-                    <pre className="whitespace-pre-wrap max-h-32 overflow-y-auto">
-                      {JSON.stringify(error.details, null, 2)}
-                    </pre>
-                  </dd>
-                </div>
-              )}
-            </dl>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ============================================================================
-// MAIN ERROR BOUNDARY COMPONENT
-// ============================================================================
 
 /**
  * Role Creation Error Boundary Component
  * 
- * Next.js error boundary component that handles errors during role creation
- * workflows with comprehensive error categorization and recovery actions.
+ * Provides comprehensive error handling for role creation workflows with:
+ * - User-friendly error messaging with accessibility support
+ * - Context-aware recovery actions for different error types
+ * - Role-specific error handling for validation and service configuration
+ * - WCAG 2.1 AA compliant error presentation
+ * - Integration with global error handling system
  */
-export default function RoleCreateError({ error, reset }: ErrorBoundaryProps) {
+export default function RoleCreateError({ error, reset }: RoleCreateErrorProps) {
   const router = useRouter();
-  const [showDetails, setShowDetails] = React.useState(false);
+  const { handleError, recoverFromError } = useErrorHandler();
+  const [errorMessage, setErrorMessage] = useState<UserFriendlyErrorMessage | null>(null);
+  const [isRecovering, setIsRecovering] = useState(false);
+  const errorIdRef = useRef<string>(`role-error-${Date.now()}`);
+  const focusRef = useRef<HTMLDivElement>(null);
 
-  // Enhanced error object with role creation context
-  const roleCreationError: RoleCreationError = {
-    ...error,
-    timestamp: new Date(),
-    context: error.message?.includes('validation') ? 'validation' :
-             error.message?.includes('service') ? 'service' :
-             error.message?.includes('lookup') ? 'lookup' : 'api'
-  };
-
-  // Log error for monitoring and debugging
+  /**
+   * Process and classify the error on component mount
+   */
   useEffect(() => {
-    console.error('Role Creation Error:', {
-      message: roleCreationError.message,
-      code: roleCreationError.code,
-      status: roleCreationError.status,
-      context: roleCreationError.context,
-      field: roleCreationError.field,
-      timestamp: roleCreationError.timestamp,
-      stack: roleCreationError.stack
-    });
+    const processError = async () => {
+      try {
+        // Extract role-specific error information
+        const { code, context } = extractRoleErrorInfo(error);
+        
+        // Get user-friendly error message
+        const roleErrorMessage = getRoleErrorMessage(code, error);
+        setErrorMessage(roleErrorMessage);
 
-    // Report to error monitoring service in production
-    if (process.env.NODE_ENV === 'production') {
-      // Integration point for error monitoring services like Sentry
-      // window.Sentry?.captureException(roleCreationError);
+        // Report error to global error handling system
+        await handleError(error, {
+          component: 'RoleCreateError',
+          feature: 'role-management',
+          context: {
+            errorCode: code,
+            roleContext: context,
+            route: '/api-security/roles/create',
+          },
+        });
+      } catch (processingError) {
+        console.error('Error processing role creation error:', processingError);
+        
+        // Fallback error message
+        setErrorMessage({
+          title: 'System Error',
+          message: 'An error occurred while processing the role creation error.',
+          actionableMessage: 'Please refresh the page or contact support.',
+          recoveryOptions: [
+            {
+              type: 'refresh',
+              label: 'Refresh Page',
+              primary: true,
+              accessibility: {
+                ariaLabel: 'Refresh the current page',
+                keyboardShortcut: 'F5',
+              },
+            },
+            {
+              type: 'contact',
+              label: 'Contact Support',
+              primary: false,
+              accessibility: {
+                ariaLabel: 'Contact technical support',
+              },
+            },
+          ],
+          accessibility: {
+            ariaLabel: 'Error: System error occurred',
+            role: 'alert',
+            screenReaderText: 'A system error occurred while processing the role creation error. Please refresh the page or contact support.',
+          },
+        });
+      }
+    };
+
+    processError();
+  }, [error, handleError]);
+
+  /**
+   * Focus management for accessibility
+   */
+  useEffect(() => {
+    if (focusRef.current) {
+      focusRef.current.focus();
     }
-  }, [roleCreationError]);
+  }, [errorMessage]);
 
-  // Error recovery actions
-  const handleRetry = useCallback(() => {
-    startTransition(() => {
-      reset();
-    });
-  }, [reset]);
+  /**
+   * Handle recovery action execution
+   */
+  const handleRecoveryAction = useCallback(async (action: RecoveryAction) => {
+    setIsRecovering(true);
+    
+    try {
+      switch (action.type) {
+        case 'retry':
+          // Reset the error boundary to retry the operation
+          reset();
+          break;
 
-  const handleGoBack = useCallback(() => {
-    startTransition(() => {
-      router.back();
-    });
-  }, [router]);
+        case 'refresh':
+          // Refresh the current page
+          window.location.reload();
+          break;
 
-  const handleGoHome = useCallback(() => {
-    startTransition(() => {
-      router.push('/');
-    });
-  }, [router]);
+        case 'contact':
+          // Open support contact
+          window.open('mailto:support@dreamfactory.com?subject=Role Creation Error&body=Error occurred during role creation. Please provide assistance.', '_blank');
+          break;
 
-  const handleToggleDetails = useCallback(() => {
-    setShowDetails(prev => !prev);
-  }, []);
+        case 'dismiss':
+          // Navigate back to roles list
+          router.push('/api-security/roles');
+          break;
+
+        default:
+          console.warn('Unknown recovery action type:', action.type);
+      }
+
+      // Report recovery action to error handling system
+      await recoverFromError(errorIdRef.current, action);
+    } catch (recoveryError) {
+      console.error('Error during recovery action:', recoveryError);
+    } finally {
+      setIsRecovering(false);
+    }
+  }, [reset, router, recoverFromError]);
+
+  /**
+   * Handle keyboard navigation for accessibility
+   */
+  const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
+    if (!errorMessage) return;
+
+    const action = errorMessage.recoveryOptions.find(option => 
+      option.accessibility?.keyboardShortcut === event.key ||
+      (event.key === 'Enter' && option.primary) ||
+      (event.key === 'Escape' && option.type === 'dismiss')
+    );
+
+    if (action) {
+      event.preventDefault();
+      handleRecoveryAction(action);
+    }
+  }, [errorMessage, handleRecoveryAction]);
+
+  if (!errorMessage) {
+    // Loading state while processing error
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="max-w-md w-full mx-auto p-6">
+          <div className="animate-pulse space-y-4">
+            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-4xl">
-        {/* Page Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-            Role Creation Error
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            An error occurred while creating the role. Please review the details below and try again.
-          </p>
-        </div>
-
-        {/* Error Display */}
-        <ErrorDisplay
-          error={roleCreationError}
-          onRetry={handleRetry}
-          onGoBack={handleGoBack}
-          onGoHome={handleGoHome}
-          onToggleDetails={handleToggleDetails}
-          showDetails={showDetails}
-        />
-
-        {/* Additional Help */}
-        <div className="mt-8 p-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-            Need Additional Help?
-          </h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <h4 className="font-medium text-gray-900 dark:text-gray-100">
-                Common Solutions:
-              </h4>
-              <ul className="text-sm text-gray-700 dark:text-gray-300 space-y-1 list-disc list-inside">
-                <li>Ensure the role name is unique and follows naming conventions</li>
-                <li>Verify all selected services are still available and accessible</li>
-                <li>Check that lookup key values are properly configured</li>
-                <li>Confirm you have the necessary permissions to create roles</li>
-              </ul>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
+      <div 
+        ref={focusRef}
+        className="max-w-2xl w-full mx-auto"
+        tabIndex={-1}
+        onKeyDown={handleKeyDown}
+        role={errorMessage.accessibility?.role}
+        aria-label={errorMessage.accessibility?.ariaLabel}
+      >
+        {/* Error Alert Container */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-red-200 dark:border-red-800 overflow-hidden">
+          {/* Error Icon and Title */}
+          <div className="bg-red-50 dark:bg-red-900/20 px-6 py-4 border-b border-red-200 dark:border-red-800">
+            <div className="flex items-center space-x-3">
+              <div className="flex-shrink-0">
+                <svg 
+                  className="h-8 w-8 text-red-600 dark:text-red-400" 
+                  fill="none" 
+                  viewBox="0 0 24 24" 
+                  stroke="currentColor"
+                  aria-hidden="true"
+                >
+                  <path 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    strokeWidth={2} 
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z" 
+                  />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h1 className="text-xl font-semibold text-red-900 dark:text-red-100">
+                  {errorMessage.title}
+                </h1>
+              </div>
             </div>
-            
-            <div className="space-y-2">
-              <h4 className="font-medium text-gray-900 dark:text-gray-100">
-                If the problem persists:
-              </h4>
-              <ul className="text-sm text-gray-700 dark:text-gray-300 space-y-1 list-disc list-inside">
-                <li>Contact your system administrator for assistance</li>
-                <li>Check the system status and maintenance schedule</li>
-                <li>Review the role creation documentation</li>
-                <li>Report this error with the technical details shown above</li>
-              </ul>
+          </div>
+
+          {/* Error Content */}
+          <div className="px-6 py-6 space-y-6">
+            {/* Primary Error Message */}
+            <div className="space-y-3">
+              <p className="text-gray-900 dark:text-gray-100 leading-relaxed">
+                {errorMessage.message}
+              </p>
+              
+              {errorMessage.actionableMessage && (
+                <p className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed bg-gray-50 dark:bg-gray-800 p-3 rounded-md border border-gray-200 dark:border-gray-700">
+                  <span className="font-medium">What you can do:</span> {errorMessage.actionableMessage}
+                </p>
+              )}
+            </div>
+
+            {/* Technical Details (in development) */}
+            {errorMessage.technicalDetails && process.env.NODE_ENV === 'development' && (
+              <details className="bg-gray-50 dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700">
+                <summary className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md">
+                  Technical Details
+                </summary>
+                <div className="px-3 pb-3 pt-1 text-xs font-mono text-gray-600 dark:text-gray-400 space-y-1">
+                  <div>Code: {errorMessage.technicalDetails.code}</div>
+                  <div>Time: {errorMessage.technicalDetails.timestamp}</div>
+                  {errorMessage.technicalDetails.correlationId && (
+                    <div>ID: {errorMessage.technicalDetails.correlationId}</div>
+                  )}
+                </div>
+              </details>
+            )}
+
+            {/* Recovery Actions */}
+            {errorMessage.recoveryOptions && errorMessage.recoveryOptions.length > 0 && (
+              <div className="space-y-3">
+                <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+                  Available Actions
+                </h2>
+                
+                <div className="flex flex-wrap gap-3">
+                  {errorMessage.recoveryOptions.map((option, index) => (
+                    <button
+                      key={index}
+                      type="button"
+                      onClick={() => handleRecoveryAction(option)}
+                      disabled={isRecovering}
+                      className={`
+                        inline-flex items-center px-4 py-2 rounded-md text-sm font-medium
+                        transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2
+                        disabled:opacity-50 disabled:cursor-not-allowed
+                        ${option.primary 
+                          ? 'bg-red-600 hover:bg-red-700 text-white focus:ring-red-500 dark:bg-red-700 dark:hover:bg-red-600' 
+                          : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 focus:ring-gray-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-600'
+                        }
+                      `}
+                      aria-label={option.accessibility?.ariaLabel}
+                      title={option.accessibility?.keyboardShortcut ? `Keyboard shortcut: ${option.accessibility.keyboardShortcut}` : undefined}
+                    >
+                      {isRecovering && option.primary && (
+                        <svg 
+                          className="animate-spin -ml-1 mr-2 h-4 w-4" 
+                          fill="none" 
+                          viewBox="0 0 24 24"
+                          aria-hidden="true"
+                        >
+                          <circle 
+                            className="opacity-25" 
+                            cx="12" 
+                            cy="12" 
+                            r="10" 
+                            stroke="currentColor" 
+                            strokeWidth="4"
+                          />
+                          <path 
+                            className="opacity-75" 
+                            fill="currentColor" 
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          />
+                        </svg>
+                      )}
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Keyboard Instructions for Screen Readers */}
+            <div className="sr-only" aria-live="polite">
+              {errorMessage.accessibility?.screenReaderText}
+              {errorMessage.recoveryOptions.some(option => option.accessibility?.keyboardShortcut) && (
+                <span>
+                  {' '}Keyboard shortcuts available: {
+                    errorMessage.recoveryOptions
+                      .filter(option => option.accessibility?.keyboardShortcut)
+                      .map(option => `${option.label} (${option.accessibility?.keyboardShortcut})`)
+                      .join(', ')
+                  }.
+                </span>
+              )}
+            </div>
+
+            {/* Help Text */}
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md p-4">
+              <div className="flex items-start space-x-3">
+                <svg 
+                  className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" 
+                  fill="none" 
+                  viewBox="0 0 24 24" 
+                  stroke="currentColor"
+                  aria-hidden="true"
+                >
+                  <path 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    strokeWidth={2} 
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" 
+                  />
+                </svg>
+                <div className="text-sm">
+                  <h3 className="font-medium text-blue-900 dark:text-blue-100 mb-1">
+                    Need Additional Help?
+                  </h3>
+                  <p className="text-blue-700 dark:text-blue-300">
+                    If this error persists, please check your role configuration or contact your system administrator. 
+                    You can also visit the <a 
+                      href="/help/roles" 
+                      className="underline hover:no-underline"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      role management documentation
+                    </a> for guidance.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Accessibility Information */}
-        <div className="sr-only">
-          <p>
-            This page displays an error that occurred during role creation. 
-            Use the provided buttons to retry the operation, go back to the form, 
-            or return to the dashboard. Technical details can be shown or hidden 
-            using the toggle button for debugging purposes.
-          </p>
+        {/* Quick Navigation */}
+        <div className="mt-6 text-center">
+          <button
+            type="button"
+            onClick={() => router.push('/api-security/roles')}
+            className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 underline hover:no-underline transition-colors duration-200"
+            aria-label="Return to roles management page"
+          >
+            ← Return to Roles Management
+          </button>
         </div>
       </div>
     </div>
   );
-}
-
-// ============================================================================
-// DEVELOPMENT HELPERS
-// ============================================================================
-
-// Mock Service Worker integration for development error testing
-if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-  // Enable MSW for comprehensive error scenario testing
-  import('@/test/mocks/browser').then(({ worker }) => {
-    if (!worker.listHandlers().length) {
-      worker.start({
-        onUnhandledRequest: 'bypass',
-        quiet: true,
-      });
-    }
-  }).catch(() => {
-    // MSW not available, continue without mocking
-  });
 }
