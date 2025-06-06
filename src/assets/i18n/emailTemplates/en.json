@@ -1,230 +1,229 @@
 {
-  "$schema": "../../types.ts#EmailTemplatesTranslations",
-  "_metadata": {
-    "version": "1.0.0",
-    "locale": "en",
-    "direction": "ltr",
-    "lastModified": "2024-12-19T00:00:00.000Z",
-    "framework": "next.js",
-    "ssrOptimized": true
-  },
+  "title": "Email Templates",
+  "subtitle": "Create and edit email templates for User Registration, User Invite, Password Reset, and your custom email services.",
   "description": "Create and edit email templates for User Registration, User Invite, Password Reset, and your custom email services.",
-  "templateName": {
-    "label": "Template Name",
-    "placeholder": "Enter template name",
-    "error": "Template name required",
-    "validation": {
-      "required": "Template name is required",
-      "minLength": "Template name must be at least 3 characters",
-      "maxLength": "Template name must be less than 100 characters",
-      "pattern": "Template name can only contain letters, numbers, spaces, and hyphens"
-    }
+  "labels": {
+    "name": "Template Name",
+    "subject": "Subject",
+    "to": "Recipient",
+    "cc": "CC",
+    "bcc": "BCC",
+    "from": "Sender Email",
+    "replyTo": "Reply To Email",
+    "contentType": "Content Type",
+    "bodyText": "Body",
+    "bodyHtml": "HTML Body",
+    "defaults": "Default Templates",
+    "templateName": "Template Name",
+    "templateDescription": "Template Description",
+    "recipient": "Recipient",
+    "attachment": "Attachment",
+    "body": "Body",
+    "senderName": "Sender Name",
+    "senderEmail": "Sender Email",
+    "replyToName": "Reply To Name",
+    "replyToEmail": "Reply To Email"
   },
-  "templateDescription": {
-    "label": "Template Description",
-    "placeholder": "Enter template description",
-    "validation": {
-      "maxLength": "Template description must be less than 500 characters"
-    }
+  "placeholders": {
+    "enterTemplateName": "Enter template name",
+    "enterTemplateDescription": "Enter template description",
+    "enterEmailSubject": "Enter email subject",
+    "enterSenderName": "Enter sender name",
+    "enterSenderEmail": "Enter sender email",
+    "enterReplyToName": "Enter reply to name",
+    "enterReplyToEmail": "Enter reply to email",
+    "enterEmailAttachment": "Enter email attachment"
   },
-  "recipient": {
-    "label": "Recipient",
-    "placeholder": "Enter recipient email address(es)",
-    "tooltip": "Enter recipient address. Enter multiple addresses separated by comma.",
-    "validation": {
-      "required": "At least one recipient is required",
-      "email": "Please enter valid email address(es)",
-      "pattern": "Invalid email format. Use commas to separate multiple addresses"
-    }
+  "tooltips": {
+    "recipient": "Enter recipient address. Enter multiple addresses separated by comma.",
+    "cc": "Enter cc address. Enter multiple addresses separated by comma",
+    "bcc": "Enter bcc address. Enter multiple addresses separated by comma.",
+    "attachment": "You can enter URL for attachment. Enter multiple URLs separated by comma. You can use lookup keys here too. Example: {key1},{key2}."
   },
-  "cc": {
-    "label": "CC",
-    "placeholder": "Enter CC email address(es)",
-    "tooltip": "Enter cc address. Enter multiple addresses separated by comma",
-    "validation": {
-      "email": "Please enter valid CC email address(es)",
-      "pattern": "Invalid email format. Use commas to separate multiple addresses"
-    }
+  "types": {
+    "plain": "Plain Text",
+    "html": "HTML",
+    "both": "Both"
   },
-  "bcc": {
-    "label": "BCC",
-    "placeholder": "Enter BCC email address(es)",
-    "tooltip": "Enter bcc address. Enter multiple addresses separated by comma.",
-    "validation": {
-      "email": "Please enter valid BCC email address(es)",
-      "pattern": "Invalid email format. Use commas to separate multiple addresses"
-    }
+  "defaults": {
+    "userInvite": "User Invite",
+    "passwordReset": "Password Reset", 
+    "registration": "User Registration",
+    "notification": "Notification"
   },
-  "subject": {
-    "label": "Subject",
-    "placeholder": "Enter email subject",
-    "validation": {
-      "required": "Email subject is required",
-      "minLength": "Subject must be at least 5 characters",
-      "maxLength": "Subject must be less than 200 characters"
-    }
+  "editor": {
+    "preview": "Preview",
+    "variables": "Variables",
+    "insertVariable": "Insert Variable",
+    "testSend": "Test Send"
   },
-  "attachment": {
-    "label": "Attachment",
-    "tooltip": "You can enter URL for attachment. Enter multiple URLs separated by comma. You can use lookup keys here too. Example: {key1},{key2}.",
-    "placeholder": "Enter email attachment URL(s)",
-    "validation": {
-      "url": "Please enter valid URL(s) for attachments",
-      "pattern": "Invalid URL format. Use commas to separate multiple URLs"
-    }
+  "validation": {
+    "required": "This field is required",
+    "email": "Please enter a valid email address",
+    "emailFormat": "Please enter a valid email format",
+    "minLength": "Minimum length is {{length}} characters",
+    "maxLength": "Maximum length is {{length}} characters", 
+    "pattern": "Please enter a valid format",
+    "numeric": "Please enter a valid number",
+    "url": "Please enter a valid URL",
+    "custom": "Validation failed",
+    "templateNameRequired": "Template name required",
+    "subjectRequired": "Email subject is required",
+    "bodyRequired": "Email body is required"
   },
-  "body": {
-    "label": "Body",
-    "placeholder": "Enter email body content",
-    "validation": {
-      "required": "Email body is required",
-      "minLength": "Email body must be at least 10 characters"
-    }
-  },
-  "senderName": {
-    "label": "Sender Name",
-    "placeholder": "Enter sender name",
-    "validation": {
-      "required": "Sender name is required",
-      "minLength": "Sender name must be at least 2 characters",
-      "maxLength": "Sender name must be less than 100 characters"
-    }
-  },
-  "senderEmail": {
-    "label": "Sender Email",
-    "placeholder": "Enter sender email",
-    "validation": {
-      "required": "Sender email is required",
-      "email": "Please enter a valid sender email address"
-    }
-  },
-  "replyToName": {
-    "label": "Reply To Name",
-    "placeholder": "Enter reply to name",
-    "validation": {
-      "maxLength": "Reply to name must be less than 100 characters"
-    }
-  },
-  "replyToEmail": {
-    "label": "Reply To Email",
-    "placeholder": "Enter reply to email",
-    "validation": {
-      "email": "Please enter a valid reply-to email address"
+  "messages": {
+    "create": {
+      "success": "Email template successfully created",
+      "error": "Failed to create email template",
+      "pending": "Creating email template..."
+    },
+    "update": {
+      "success": "Email template successfully updated", 
+      "error": "Failed to update email template",
+      "pending": "Updating email template..."
+    },
+    "delete": {
+      "success": "Email template successfully deleted",
+      "error": "Failed to delete email template", 
+      "pending": "Deleting email template...",
+      "confirm": "Are you sure you want to delete this email template?"
+    },
+    "fetch": {
+      "error": "Failed to load email templates",
+      "pending": "Loading email templates...",
+      "empty": "No email templates found"
     }
   },
   "alerts": {
     "createSuccess": "Email template successfully created",
     "updateSuccess": "Email template successfully updated",
     "deleteSuccess": "Email template successfully deleted",
-    "validationError": "Please correct the validation errors before saving",
-    "saveError": "Failed to save email template. Please try again.",
-    "loadError": "Failed to load email template data",
-    "duplicateName": "Template name already exists. Please choose a different name."
+    "createError": "Failed to create email template",
+    "updateError": "Failed to update email template", 
+    "deleteError": "Failed to delete email template"
   },
-  "form": {
-    "title": {
-      "create": "Create Email Template",
-      "edit": "Edit Email Template",
-      "view": "View Email Template"
+  "actions": {
+    "create": "Create Template",
+    "edit": "Edit Template",
+    "delete": "Delete Template",
+    "save": "Save Template",
+    "cancel": "Cancel",
+    "preview": "Preview",
+    "testSend": "Test Send",
+    "duplicate": "Duplicate",
+    "export": "Export",
+    "import": "Import"
+  },
+  "dialogs": {
+    "delete": {
+      "title": "Delete Email Template",
+      "message": "Are you sure you want to delete this email template? This action cannot be undone.",
+      "confirm": "Delete",
+      "cancel": "Cancel"
     },
-    "sections": {
-      "basic": "Basic Information",
-      "recipients": "Recipients",
-      "content": "Email Content",
-      "sender": "Sender Information",
-      "advanced": "Advanced Settings"
+    "testSend": {
+      "title": "Test Email Template",
+      "message": "Send a test email using this template",
+      "recipientLabel": "Test Recipient",
+      "recipientPlaceholder": "Enter test email address",
+      "send": "Send Test",
+      "cancel": "Cancel"
+    }
+  },
+  "forms": {
+    "createTemplate": {
+      "title": "Create Email Template",
+      "subtitle": "Create a new email template for your application"
     },
-    "actions": {
-      "save": "Save Template",
-      "saveAndTest": "Save & Test",
-      "cancel": "Cancel",
-      "delete": "Delete Template",
-      "duplicate": "Duplicate Template",
-      "preview": "Preview",
-      "sendTest": "Send Test Email"
+    "editTemplate": {
+      "title": "Edit Email Template", 
+      "subtitle": "Modify the selected email template"
     },
-    "validation": {
-      "invalidForm": "Please correct all validation errors before proceeding",
-      "unsavedChanges": "You have unsaved changes. Are you sure you want to leave?",
-      "confirmDelete": "Are you sure you want to delete this email template? This action cannot be undone."
+    "fields": {
+      "templateName": {
+        "label": "Template Name",
+        "placeholder": "Enter template name",
+        "error": "Template name required",
+        "helpText": "A unique name to identify this email template"
+      },
+      "templateDescription": {
+        "label": "Template Description",
+        "placeholder": "Enter template description", 
+        "helpText": "Optional description of this template's purpose"
+      },
+      "subject": {
+        "label": "Subject",
+        "placeholder": "Enter email subject",
+        "helpText": "The subject line for emails sent using this template"
+      },
+      "recipient": {
+        "label": "Recipient",
+        "placeholder": "Enter recipient email",
+        "helpText": "Enter recipient address. Enter multiple addresses separated by comma."
+      },
+      "cc": {
+        "label": "CC",
+        "placeholder": "Enter CC email addresses",
+        "helpText": "Enter cc address. Enter multiple addresses separated by comma"
+      },
+      "bcc": {
+        "label": "BCC", 
+        "placeholder": "Enter BCC email addresses",
+        "helpText": "Enter bcc address. Enter multiple addresses separated by comma."
+      },
+      "senderName": {
+        "label": "Sender Name",
+        "placeholder": "Enter sender name",
+        "helpText": "The name that will appear as the sender"
+      },
+      "senderEmail": {
+        "label": "Sender Email",
+        "placeholder": "Enter sender email",
+        "helpText": "The email address that will appear as the sender"
+      },
+      "replyToName": {
+        "label": "Reply To Name", 
+        "placeholder": "Enter reply to name",
+        "helpText": "The name for reply-to address"
+      },
+      "replyToEmail": {
+        "label": "Reply To Email",
+        "placeholder": "Enter reply to email",
+        "helpText": "The email address for replies"
+      },
+      "attachment": {
+        "label": "Attachment",
+        "placeholder": "Enter email attachment",
+        "helpText": "You can enter URL for attachment. Enter multiple URLs separated by comma. You can use lookup keys here too. Example: {key1},{key2}."
+      },
+      "body": {
+        "label": "Body",
+        "placeholder": "Enter email body content",
+        "helpText": "The main content of the email template"
+      }
     }
   },
   "table": {
-    "headers": {
-      "name": "Template Name",
-      "description": "Description",
-      "lastModified": "Last Modified",
+    "columns": {
+      "name": "Name",
+      "description": "Description", 
+      "subject": "Subject",
+      "createdDate": "Created",
+      "lastModified": "Modified",
       "actions": "Actions"
     },
-    "emptyState": {
-      "title": "No Email Templates",
-      "description": "Create your first email template to get started",
-      "action": "Create Template"
-    },
-    "actions": {
-      "edit": "Edit template",
-      "delete": "Delete template",
-      "duplicate": "Duplicate template",
-      "view": "View template"
-    }
+    "noData": "No email templates found",
+    "loading": "Loading email templates...",
+    "error": "Failed to load email templates"
   },
-  "testEmail": {
-    "title": "Send Test Email",
-    "description": "Send a test email to verify your template configuration",
-    "testRecipient": {
-      "label": "Test Recipient",
-      "placeholder": "Enter test email address",
-      "validation": {
-        "required": "Test recipient email is required",
-        "email": "Please enter a valid email address"
-      }
-    },
-    "actions": {
-      "send": "Send Test Email",
-      "cancel": "Cancel"
-    },
-    "alerts": {
-      "sendSuccess": "Test email sent successfully",
-      "sendError": "Failed to send test email. Please check your configuration."
-    }
+  "search": {
+    "placeholder": "Search email templates...",
+    "noResults": "No templates match your search criteria",
+    "resultsCount": "{{count}} template(s) found"
   },
-  "templates": {
-    "types": {
-      "userRegistration": "User Registration",
-      "userInvite": "User Invite",
-      "passwordReset": "Password Reset",
-      "custom": "Custom Template"
-    },
-    "defaults": {
-      "userRegistration": {
-        "subject": "Welcome to {{app_name}}",
-        "body": "Thank you for registering with {{app_name}}. Please click the link below to verify your email address."
-      },
-      "userInvite": {
-        "subject": "You've been invited to {{app_name}}",
-        "body": "You have been invited to join {{app_name}}. Click the link below to accept your invitation."
-      },
-      "passwordReset": {
-        "subject": "Reset your {{app_name}} password",
-        "body": "We received a request to reset your password. Click the link below to create a new password."
-      }
-    }
-  },
-  "variables": {
-    "title": "Available Variables",
-    "description": "You can use these variables in your email content. They will be replaced with actual values when the email is sent.",
-    "common": {
-      "app_name": "Application name",
-      "user_name": "User's full name",
-      "user_email": "User's email address",
-      "confirm_url": "Confirmation URL",
-      "reset_url": "Password reset URL",
-      "login_url": "Login page URL"
-    },
-    "syntax": {
-      "title": "Variable Syntax",
-      "description": "Use double curly braces to insert variables: {{variable_name}}",
-      "example": "Example: Hello {{user_name}}, welcome to {{app_name}}!"
-    }
+  "status": {
+    "active": "Active",
+    "inactive": "Inactive", 
+    "draft": "Draft"
   }
 }
