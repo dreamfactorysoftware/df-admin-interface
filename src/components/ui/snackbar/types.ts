@@ -1,21 +1,25 @@
 /**
- * Snackbar Notification System Type Definitions
+ * Snackbar Notification System Types for DreamFactory Admin Interface
  * 
- * Comprehensive TypeScript 5.8+ interface definitions for the snackbar notification system.
- * Provides type safety for notification queue management, accessibility compliance (WCAG 2.1 AA),
- * and seamless integration with Zustand store state and React 19 component patterns.
+ * Comprehensive TypeScript 5.8+ type definitions for the snackbar notification system.
+ * Provides type safety for notification queue management, accessibility compliance,
+ * and seamless integration with Zustand state management and React component patterns.
  * 
- * @fileoverview TypeScript type definitions for snackbar notifications
- * @version 1.0.0
- * @since React 19.0 / Next.js 15.1
+ * Replaces Angular Material Snackbar types with modern React/Tailwind CSS equivalents
+ * while maintaining functional parity per Section 0.2.6 minimal change requirements.
  */
 
-import { type ReactNode, type MouseEvent, type KeyboardEvent } from 'react';
-import { type BaseComponentProps, type ThemeProps, type AccessibilityProps, type AnimationProps } from '@/types/ui';
+import { ReactNode, ComponentType, HTMLAttributes } from 'react';
+import { BaseComponent, ComponentVariant, ComponentSize } from '@/types/ui';
+
+// ============================================================================
+// ALERT SEVERITY TYPES - MATCHING ANGULAR IMPLEMENTATION
+// ============================================================================
 
 /**
- * Alert severity levels matching existing Angular implementation
- * Preserves functionality during framework migration per Section 0.2.6 minimal change requirements
+ * Alert severity types matching existing Angular implementation
+ * Maintains functional parity with Angular Material Snackbar severity levels
+ * per Section 0.2.6 minimal change requirements
  */
 export enum AlertType {
   SUCCESS = 'success',
@@ -25,580 +29,974 @@ export enum AlertType {
 }
 
 /**
- * Union type for alert severity with strict type checking
- * Ensures compile-time validation of severity values
+ * Alert severity union type for stricter type checking
+ * Provides TypeScript 5.8+ enhanced literal type support
  */
-export type AlertSeverity = `${AlertType}`;
+export type AlertSeverity = AlertType | 'success' | 'warning' | 'error' | 'info';
 
 /**
- * Duration configuration options for notification display
- * Supports accessibility requirements with extended durations for screen readers
+ * Alert severity with enhanced metadata for UI rendering
+ * Includes WCAG 2.1 AA compliant color mappings and accessibility properties
+ */
+export interface AlertSeverityConfig {
+  type: AlertType;
+  label: string;
+  icon?: ComponentType<{ className?: string; 'aria-hidden'?: boolean }>;
+  color: {
+    bg: string;           // Background color - WCAG 2.1 AA compliant
+    text: string;         // Text color - minimum 4.5:1 contrast ratio
+    border: string;       // Border color - minimum 3:1 contrast ratio for UI components
+    icon: string;         // Icon color
+  };
+  darkMode: {
+    bg: string;
+    text: string;
+    border: string;
+    icon: string;
+  };
+  ariaLabel: string;      // Screen reader label for severity
+  announceText: string;   // Screen reader announcement text
+}
+
+// ============================================================================
+// SNACKBAR POSITIONING AND DURATION TYPES
+// ============================================================================
+
+/**
+ * Snackbar positioning options following design system patterns
+ * Enhanced with mobile-responsive considerations
+ */
+export type SnackbarPosition = 
+  | 'top-left' 
+  | 'top-center' 
+  | 'top-right'
+  | 'bottom-left' 
+  | 'bottom-center' 
+  | 'bottom-right'
+  | 'center';
+
+/**
+ * Duration configuration for snackbar display
+ * Includes accessibility considerations for screen reader announcements
  */
 export interface DurationConfig {
-  /** Base duration in milliseconds for notification display */
-  base: number;
-  /** Extended duration for accessibility (screen readers, reduced motion) */
-  accessible: number;
-  /** Minimum duration to ensure readability */
-  minimum: number;
-  /** Maximum duration before auto-dismiss */
-  maximum: number;
+  /**
+   * Display duration in milliseconds
+   * Minimum 4000ms for WCAG 2.1 AA compliance (adequate reading time)
+   */
+  duration: number;
+  
+  /**
+   * Whether notification persists until manually dismissed
+   * Important for error messages requiring user acknowledgment
+   */
+  persistent?: boolean;
+  
+  /**
+   * Auto-dismiss delay for non-persistent notifications
+   * Default: 6000ms for accessibility compliance
+   */
+  autoHideDelay?: number;
+  
+  /**
+   * Pause auto-hide on hover for accessibility
+   * Allows users more time to read content
+   */
+  pauseOnHover?: boolean;
+  
+  /**
+   * Pause auto-hide when focused for keyboard navigation
+   */
+  pauseOnFocus?: boolean;
 }
 
 /**
- * Predefined duration configurations for different alert types
- * Follows WCAG 2.1 guidelines for timing adjustments
+ * Responsive positioning configuration
+ * Adapts to different screen sizes per mobile-first design
  */
-export type DurationPreset = 'short' | 'medium' | 'long' | 'persistent';
-
-/**
- * Map of duration presets to actual configurations
- */
-export interface DurationPresets {
-  short: DurationConfig;
-  medium: DurationConfig;
-  long: DurationConfig;
-  persistent: DurationConfig;
+export interface ResponsivePositioning {
+  mobile: SnackbarPosition;     // < 768px
+  tablet: SnackbarPosition;     // 768px - 1023px  
+  desktop: SnackbarPosition;    // >= 1024px
+  
+  /**
+   * Safe area adjustments for mobile devices
+   * Accounts for notches, home indicators, etc.
+   */
+  safePadding?: {
+    top?: number;
+    bottom?: number;
+    left?: number;
+    right?: number;
+  };
 }
 
+// ============================================================================
+// ACTION BUTTON AND INTERACTION TYPES
+// ============================================================================
+
 /**
- * Action button configuration for snackbar notifications
- * Supports accessibility attributes and keyboard navigation
+ * Action button configuration for snackbar interactions
+ * Follows WCAG 2.1 AA guidelines for touch targets and contrast
  */
 export interface SnackbarAction {
-  /** Action button label text */
+  /**
+   * Action button label
+   * Must be descriptive for screen readers
+   */
   label: string;
-  /** Action handler function */
-  handler: (notificationId: string) => void | Promise<void>;
-  /** Button variant styling */
-  variant?: 'text' | 'outlined' | 'contained';
-  /** Button color theme */
-  color?: 'primary' | 'secondary' | 'inherit';
-  /** Accessibility label for screen readers */
-  ariaLabel?: string;
-  /** Keyboard shortcut key */
-  hotkey?: string;
-  /** Loading state for async actions */
+  
+  /**
+   * Action handler function
+   * Called when action button is clicked/activated
+   */
+  handler: () => void | Promise<void>;
+  
+  /**
+   * Button variant following design system
+   */
+  variant?: ComponentVariant;
+  
+  /**
+   * Button size - minimum 44x44px for touch accessibility
+   */
+  size?: ComponentSize;
+  
+  /**
+   * Loading state for async actions
+   */
   loading?: boolean;
-  /** Disabled state */
+  
+  /**
+   * Disabled state
+   */
   disabled?: boolean;
-}
-
-/**
- * Icon configuration for snackbar notifications
- * Supports custom icons and accessibility requirements
- */
-export interface SnackbarIcon {
-  /** Icon component or element */
-  icon?: ReactNode;
-  /** Hide default severity icon */
-  hideDefault?: boolean;
-  /** Custom icon color */
-  color?: string;
-  /** Icon accessibility label */
+  
+  /**
+   * Icon component for visual enhancement
+   */
+  icon?: ComponentType<{ className?: string; 'aria-hidden'?: boolean }>;
+  
+  /**
+   * Icon position relative to label
+   */
+  iconPosition?: 'left' | 'right';
+  
+  // Accessibility properties
+  /**
+   * ARIA label for screen readers
+   * Overrides label if more descriptive text needed
+   */
   ariaLabel?: string;
-  /** Icon size variant */
-  size?: 'sm' | 'md' | 'lg';
+  
+  /**
+   * ARIA description for additional context
+   */
+  ariaDescription?: string;
+  
+  /**
+   * Keyboard shortcut for action
+   * e.g., 'Enter', 'Escape', 'Ctrl+Z'
+   */
+  keyboardShortcut?: string;
+  
+  /**
+   * Screen reader announcement when action is performed
+   */
+  announceOnPress?: string;
 }
 
 /**
- * Position configuration for snackbar placement
- * Supports responsive positioning and accessibility considerations
+ * Dismiss/close action configuration
+ * Enhanced with accessibility considerations
  */
-export interface SnackbarPosition {
-  /** Vertical position */
-  vertical: 'top' | 'bottom';
-  /** Horizontal position */
-  horizontal: 'left' | 'center' | 'right';
-  /** Offset from edges in pixels */
-  offset?: {
-    x?: number;
-    y?: number;
-  };
-  /** Responsive position overrides */
-  responsive?: {
-    mobile?: Partial<SnackbarPosition>;
-    tablet?: Partial<SnackbarPosition>;
-    desktop?: Partial<SnackbarPosition>;
-  };
+export interface DismissAction {
+  /**
+   * Whether dismiss button is shown
+   * Default: true for accessibility
+   */
+  showDismiss?: boolean;
+  
+  /**
+   * Custom dismiss icon
+   */
+  dismissIcon?: ComponentType<{ className?: string; 'aria-hidden'?: boolean }>;
+  
+  /**
+   * Dismiss button label for screen readers
+   */
+  dismissLabel?: string;
+  
+  /**
+   * Custom dismiss handler
+   * Called before default dismiss behavior
+   */
+  onDismiss?: () => void | Promise<void>;
+  
+  /**
+   * Whether clicking outside dismisses the snackbar
+   */
+  dismissOnClickOutside?: boolean;
+  
+  /**
+   * Whether escape key dismisses the snackbar
+   */
+  dismissOnEscape?: boolean;
+  
+  /**
+   * Keyboard shortcuts for dismissal
+   */
+  keyboardShortcuts?: string[];
 }
 
-/**
- * Transition and animation configuration
- * Respects user's reduced motion preferences
- */
-export interface SnackbarTransition {
-  /** Transition type */
-  type: 'slide' | 'fade' | 'scale' | 'zoom';
-  /** Transition duration in milliseconds */
-  duration: number;
-  /** Transition easing function */
-  easing: 'ease' | 'ease-in' | 'ease-out' | 'ease-in-out' | 'linear';
-  /** Respect reduced motion preference */
-  respectReducedMotion: boolean;
-  /** Custom transition CSS classes */
-  customClasses?: {
-    enter?: string;
-    enterActive?: string;
-    exit?: string;
-    exitActive?: string;
-  };
-}
+// ============================================================================
+// NOTIFICATION DATA AND QUEUE MANAGEMENT TYPES
+// ============================================================================
 
 /**
- * Comprehensive notification data structure for Zustand store management
- * Includes all necessary properties for queue management and state tracking
+ * Core notification data structure for Zustand store integration
+ * Provides comprehensive state management for notification queue
  */
 export interface NotificationData {
-  /** Unique notification identifier */
+  /**
+   * Unique identifier for the notification
+   * Used for queue management and React keys
+   */
   id: string;
-  /** Notification message content */
+  
+  /**
+   * Primary notification message
+   * Required - main content displayed to user
+   */
   message: string;
-  /** Alert severity type */
-  alertType: AlertSeverity;
-  /** Notification timestamp */
+  
+  /**
+   * Alert severity/type
+   * Determines visual styling and accessibility properties
+   */
+  type: AlertType;
+  
+  /**
+   * Detailed description or secondary content
+   * Optional - provides additional context
+   */
+  description?: string;
+  
+  /**
+   * Creation timestamp
+   * Used for queue ordering and analytics
+   */
   timestamp: number;
-  /** Auto-dismiss duration in milliseconds (null for persistent) */
-  duration: number | null;
-  /** User can manually dismiss notification */
+  
+  /**
+   * Duration configuration
+   * Controls auto-hide behavior and persistence
+   */
+  duration: DurationConfig;
+  
+  /**
+   * Whether notification can be manually dismissed
+   * Important for required acknowledgments
+   */
   dismissible: boolean;
-  /** Queue priority for ordering (higher numbers = higher priority) */
-  priority: number;
-  /** Notification has been read by user */
-  read: boolean;
-  /** Notification is currently visible */
-  visible: boolean;
-  /** Action buttons configuration */
+  
+  /**
+   * Current state of the notification
+   */
+  state: NotificationState;
+  
+  /**
+   * Priority level for queue ordering
+   * Higher priority notifications appear first
+   */
+  priority: NotificationPriority;
+  
+  /**
+   * Action buttons configuration
+   */
   actions?: SnackbarAction[];
-  /** Icon configuration */
-  icon?: SnackbarIcon;
-  /** Additional metadata */
-  metadata?: Record<string, any>;
-  /** Source component or feature that created notification */
-  source?: string;
-  /** Notification category for filtering */
-  category?: string;
-  /** Stack multiple similar notifications */
-  stackable?: boolean;
-  /** Stack count for grouped notifications */
-  stackCount?: number;
+  
+  /**
+   * Dismiss configuration
+   */
+  dismiss?: DismissAction;
+  
+  /**
+   * Custom positioning for this notification
+   * Overrides global positioning settings
+   */
+  position?: SnackbarPosition | ResponsivePositioning;
+  
+  /**
+   * Custom styling/theming
+   */
+  styling?: NotificationStyling;
+  
+  /**
+   * Metadata for analytics and debugging
+   */
+  metadata?: {
+    source?: string;          // Component or service that created notification
+    context?: string;         // User action that triggered notification
+    category?: string;        // Grouping for analytics
+    tags?: string[];          // Additional classification
+    userId?: string;          // Associated user (for audit logs)
+    sessionId?: string;       // Session tracking
+  };
+  
+  // Accessibility enhancements
+  /**
+   * ARIA live region politeness level
+   * Controls urgency of screen reader announcements
+   */
+  ariaLive?: 'off' | 'polite' | 'assertive';
+  
+  /**
+   * Whether to announce message to screen readers
+   */
+  announce?: boolean;
+  
+  /**
+   * Custom announcement text for screen readers
+   * Overrides default message if more descriptive
+   */
+  announceText?: string;
+  
+  /**
+   * ARIA atomic - whether entire content should be announced as single unit
+   */
+  ariaAtomic?: boolean;
+  
+  /**
+   * ARIA relevant - what changes should be announced
+   */
+  ariaRelevant?: 'additions' | 'removals' | 'text' | 'all';
 }
 
 /**
- * Notification queue configuration and state management
- * Supports advanced queue management features for enterprise applications
+ * Notification lifecycle states
+ * Tracks notification progression through display cycle
  */
-export interface NotificationQueue {
-  /** Array of active notifications */
-  notifications: NotificationData[];
-  /** Maximum notifications to display simultaneously */
+export enum NotificationState {
+  QUEUED = 'queued',           // Waiting to be displayed
+  ENTERING = 'entering',       // Animation in progress
+  VISIBLE = 'visible',         // Fully displayed and active
+  PAUSED = 'paused',          // Auto-hide paused (hover/focus)
+  EXITING = 'exiting',        // Dismissal animation in progress
+  DISMISSED = 'dismissed',     // Removed from display
+  ERROR = 'error'             // Failed to display
+}
+
+/**
+ * Notification priority levels for queue management
+ * Higher priority notifications bypass queue order
+ */
+export enum NotificationPriority {
+  LOW = 0,                    // Background notifications
+  NORMAL = 1,                 // Standard user feedback
+  HIGH = 2,                   // Important warnings
+  CRITICAL = 3,               // Errors requiring immediate attention
+  URGENT = 4                  // System-critical alerts
+}
+
+/**
+ * Queue management configuration
+ * Controls global notification behavior
+ */
+export interface NotificationQueueConfig {
+  /**
+   * Maximum number of notifications displayed simultaneously
+   * Prevents UI overflow and cognitive overload
+   */
   maxVisible: number;
-  /** Maximum notifications to store in queue */
-  maxQueue: number;
-  /** Queue processing strategy */
-  strategy: 'fifo' | 'lifo' | 'priority';
-  /** Auto-clear read notifications after delay */
-  autoClearRead: boolean;
-  /** Auto-clear delay in milliseconds */
-  autoClearDelay: number;
-  /** Pause queue processing */
-  paused: boolean;
-  /** Group similar notifications */
-  groupSimilar: boolean;
-  /** Similarity threshold for grouping */
-  similarityThreshold: number;
+  
+  /**
+   * Maximum queue size before dropping old notifications
+   * Prevents memory issues with long-running sessions
+   */
+  maxQueueSize: number;
+  
+  /**
+   * Default position for new notifications
+   */
+  defaultPosition: SnackbarPosition | ResponsivePositioning;
+  
+  /**
+   * Default duration configuration
+   */
+  defaultDuration: DurationConfig;
+  
+  /**
+   * Global animation settings
+   */
+  animation: {
+    enterDuration: number;    // Entrance animation duration (ms)
+    exitDuration: number;     // Exit animation duration (ms)
+    enterEasing: string;      // CSS easing function for entrance
+    exitEasing: string;       // CSS easing function for exit
+    staggerDelay: number;     // Delay between multiple notifications (ms)
+  };
+  
+  /**
+   * Stacking behavior when multiple notifications are shown
+   */
+  stacking: {
+    direction: 'up' | 'down';           // Stacking direction
+    overlap: boolean;                   // Whether notifications can overlap
+    maxStack: number;                   // Maximum stacked notifications
+    spacing: number;                    // Spacing between stacked items (px)
+  };
+  
+  /**
+   * Auto-cleanup configuration
+   */
+  cleanup: {
+    enabled: boolean;                   // Auto-cleanup dismissed notifications
+    delay: number;                      // Delay before cleanup (ms)
+    maxRetained: number;                // Max dismissed notifications to retain
+  };
+  
+  /**
+   * Duplicate handling
+   */
+  duplicates: {
+    prevent: boolean;                   // Prevent duplicate messages
+    mergeStrategy: 'replace' | 'stack' | 'extend'; // How to handle duplicates
+    timeWindow: number;                 // Time window for duplicate detection (ms)
+  };
 }
 
-/**
- * Snackbar store state interface for Zustand integration
- * Provides comprehensive state management for notification system
- */
-export interface SnackbarStore {
-  /** Notification queue state */
-  queue: NotificationQueue;
-  /** Global position configuration */
-  position: SnackbarPosition;
-  /** Global transition configuration */
-  transition: SnackbarTransition;
-  /** Duration presets configuration */
-  durations: DurationPresets;
-  /** Store is initialized */
-  initialized: boolean;
-  
-  // Action methods
-  /** Add notification to queue */
-  addNotification: (notification: Omit<NotificationData, 'id' | 'timestamp' | 'visible'>) => string;
-  /** Remove notification by ID */
-  removeNotification: (id: string) => void;
-  /** Clear all notifications */
-  clearAll: () => void;
-  /** Clear notifications by type */
-  clearByType: (alertType: AlertSeverity) => void;
-  /** Clear notifications by source */
-  clearBySource: (source: string) => void;
-  /** Mark notification as read */
-  markAsRead: (id: string) => void;
-  /** Mark all notifications as read */
-  markAllAsRead: () => void;
-  /** Update notification data */
-  updateNotification: (id: string, updates: Partial<NotificationData>) => void;
-  /** Pause/resume queue processing */
-  pauseQueue: (paused: boolean) => void;
-  /** Update global configuration */
-  updateConfig: (config: Partial<{
-    position: SnackbarPosition;
-    transition: SnackbarTransition;
-    durations: DurationPresets;
-  }>) => void;
-}
+// ============================================================================
+// STYLING AND THEMING TYPES
+// ============================================================================
 
 /**
- * Core snackbar component props interface
- * Extends base component patterns with notification-specific properties
+ * Custom styling configuration for notifications
+ * Provides Tailwind CSS integration with theme-aware utilities
  */
-export interface SnackbarProps extends 
-  BaseComponentProps<HTMLDivElement>,
-  ThemeProps,
-  AccessibilityProps,
-  AnimationProps {
+export interface NotificationStyling {
+  /**
+   * Container styling
+   */
+  container?: {
+    className?: string;       // Custom Tailwind classes
+    style?: React.CSSProperties; // Inline styles for dynamic values
+    padding?: string;         // Custom padding override
+    margin?: string;          // Custom margin override
+    borderRadius?: string;    // Custom border radius
+    maxWidth?: string;        // Custom max width
+    minWidth?: string;        // Custom min width
+  };
   
-  /** Notification data to display */
-  notification: NotificationData;
-  /** Notification is open/visible */
-  open: boolean;
-  /** Close/dismiss handler */
-  onClose: (notificationId: string, reason?: SnackbarCloseReason) => void;
-  /** Action button click handler */
-  onActionClick?: (action: SnackbarAction, notificationId: string) => void;
-  /** Animation complete handler */
-  onAnimationComplete?: (notificationId: string, phase: 'enter' | 'exit') => void;
+  /**
+   * Content area styling
+   */
+  content?: {
+    className?: string;
+    style?: React.CSSProperties;
+    typography?: {
+      message?: string;       // Typography classes for message
+      description?: string;   // Typography classes for description
+    };
+  };
   
-  /** Position override for individual notification */
-  position?: SnackbarPosition;
-  /** Transition override for individual notification */
-  transition?: SnackbarTransition;
-  /** Custom styling classes */
-  classes?: {
-    root?: string;
-    message?: string;
-    actions?: string;
+  /**
+   * Icon styling
+   */
+  icon?: {
+    className?: string;
+    style?: React.CSSProperties;
+    size?: ComponentSize;
+    position?: 'left' | 'top' | 'none';
+  };
+  
+  /**
+   * Action buttons styling
+   */
+  actions?: {
+    container?: string;       // Actions container classes
+    button?: string;          // Individual button classes
+    spacing?: string;         // Spacing between actions
+  };
+  
+  /**
+   * Animation overrides
+   */
+  animation?: {
+    enter?: string;           // Custom entrance animation
+    exit?: string;            // Custom exit animation
+    duration?: number;        // Animation duration override
+  };
+  
+  /**
+   * Theme variant override
+   */
+  variant?: ComponentVariant;
+  
+  /**
+   * Size override
+   */
+  size?: ComponentSize;
+  
+  /**
+   * Dark mode specific overrides
+   */
+  darkMode?: {
+    container?: string;
+    content?: string;
     icon?: string;
-    closeButton?: string;
+    actions?: string;
   };
-  
-  /** Show close button */
-  showCloseButton?: boolean;
-  /** Close button accessibility label */
-  closeButtonAriaLabel?: string;
-  /** Custom close button icon */
-  closeButtonIcon?: ReactNode;
-  
-  /** Compact display mode */
-  compact?: boolean;
-  /** Full width display */
-  fullWidth?: boolean;
-  /** Elevation/shadow level */
-  elevation?: 0 | 1 | 2 | 3 | 4 | 6 | 8 | 12 | 16 | 24;
 }
 
 /**
- * Snackbar close reasons for analytics and behavior tracking
+ * Theme-aware color scheme for notifications
+ * Integrates with design system color tokens
  */
-export type SnackbarCloseReason = 
-  | 'timeout'           // Auto-dismiss timeout
-  | 'clickaway'         // Click outside notification
-  | 'escapeKeyDown'     // Escape key pressed
-  | 'closeButton'       // Close button clicked
-  | 'action'            // Action button triggered close
-  | 'programmatic'      // Closed via code
-  | 'maxQueue'          // Removed due to queue limit
-  | 'user';             // Generic user interaction
-
-/**
- * Event handlers for snackbar interactions
- * Supports comprehensive interaction tracking and analytics
- */
-export interface SnackbarEventHandlers {
-  /** Notification displayed */
-  onShow?: (notification: NotificationData) => void;
-  /** Notification hidden */
-  onHide?: (notification: NotificationData, reason: SnackbarCloseReason) => void;
-  /** Notification clicked */
-  onClick?: (notification: NotificationData, event: MouseEvent) => void;
-  /** Keyboard interaction */
-  onKeyDown?: (notification: NotificationData, event: KeyboardEvent) => void;
-  /** Action button clicked */
-  onActionClick?: (action: SnackbarAction, notification: NotificationData) => void;
-  /** Hover state changed */
-  onHover?: (notification: NotificationData, hovered: boolean) => void;
-  /** Focus state changed */
-  onFocus?: (notification: NotificationData, focused: boolean) => void;
-}
-
-/**
- * Snackbar container props for managing multiple notifications
- * Handles positioning, stacking, and queue management
- */
-export interface SnackbarContainerProps extends 
-  BaseComponentProps<HTMLDivElement>,
-  AccessibilityProps {
-  
-  /** Notifications to display */
-  notifications: NotificationData[];
-  /** Maximum visible notifications */
-  maxVisible?: number;
-  /** Position configuration */
-  position?: SnackbarPosition;
-  /** Spacing between notifications */
-  spacing?: number;
-  /** Stack direction for multiple notifications */
-  stackDirection?: 'up' | 'down';
-  /** Event handlers */
-  eventHandlers?: SnackbarEventHandlers;
-  /** Portal container element */
-  container?: HTMLElement | null;
-  /** Z-index for stacking context */
-  zIndex?: number;
-}
-
-/**
- * Utility types for notification management
- */
-
-/**
- * Notification builder for creating notifications with defaults
- */
-export interface NotificationBuilder {
-  /** Set message content */
-  message(content: string): NotificationBuilder;
-  /** Set alert type */
-  type(alertType: AlertSeverity): NotificationBuilder;
-  /** Set duration */
-  duration(ms: number | null): NotificationBuilder;
-  /** Add action button */
-  action(action: SnackbarAction): NotificationBuilder;
-  /** Set priority */
-  priority(level: number): NotificationBuilder;
-  /** Set source */
-  source(source: string): NotificationBuilder;
-  /** Set metadata */
-  metadata(data: Record<string, any>): NotificationBuilder;
-  /** Build final notification */
-  build(): Omit<NotificationData, 'id' | 'timestamp' | 'visible'>;
-}
-
-/**
- * Notification filter criteria for queue operations
- */
-export interface NotificationFilter {
-  /** Filter by alert type */
-  alertType?: AlertSeverity | AlertSeverity[];
-  /** Filter by source */
-  source?: string | string[];
-  /** Filter by category */
-  category?: string | string[];
-  /** Filter by read status */
-  read?: boolean;
-  /** Filter by timestamp range */
-  timestampRange?: {
-    from?: number;
-    to?: number;
+export interface NotificationTheme {
+  light: {
+    [K in AlertType]: {
+      background: string;     // Background color (WCAG AA compliant)
+      text: string;          // Text color (4.5:1 contrast minimum)
+      border: string;        // Border color (3:1 contrast minimum)
+      icon: string;          // Icon color
+      accent: string;        // Accent/highlight color
+    }
   };
-  /** Custom filter function */
-  custom?: (notification: NotificationData) => boolean;
-}
-
-/**
- * Notification sorting configuration
- */
-export interface NotificationSort {
-  /** Sort field */
-  field: keyof NotificationData;
-  /** Sort direction */
-  direction: 'asc' | 'desc';
-  /** Custom comparator function */
-  comparator?: (a: NotificationData, b: NotificationData) => number;
-}
-
-/**
- * Queue operation result
- */
-export interface QueueOperationResult {
-  /** Operation was successful */
-  success: boolean;
-  /** Number of notifications affected */
-  affected: number;
-  /** Error message if operation failed */
-  error?: string;
-  /** Notifications that were affected */
-  notifications?: NotificationData[];
-}
-
-/**
- * Notification analytics data
- */
-export interface NotificationAnalytics {
-  /** Total notifications created */
-  totalCreated: number;
-  /** Total notifications dismissed */
-  totalDismissed: number;
-  /** Total actions triggered */
-  totalActions: number;
-  /** Average display duration */
-  averageDisplayDuration: number;
-  /** Dismiss reasons breakdown */
-  dismissReasons: Record<SnackbarCloseReason, number>;
-  /** Most active sources */
-  sourceActivity: Record<string, number>;
-  /** Alert type distribution */
-  alertTypeDistribution: Record<AlertSeverity, number>;
-}
-
-/**
- * Theme configuration for snackbar styling
- * Compatible with Tailwind CSS utility classes and design tokens
- */
-export interface SnackbarTheme {
-  /** Alert type specific styling */
-  alertTypes: {
-    [K in AlertSeverity]: {
-      /** Background color classes */
+  dark: {
+    [K in AlertType]: {
       background: string;
-      /** Text color classes */
       text: string;
-      /** Border color classes */
       border: string;
-      /** Icon color classes */
       icon: string;
-      /** Progress bar color (for timed notifications) */
-      progress: string;
+      accent: string;
+    }
+  };
+}
+
+// ============================================================================
+// MAIN SNACKBAR COMPONENT TYPES
+// ============================================================================
+
+/**
+ * Comprehensive snackbar component props interface
+ * Provides complete type safety for all snackbar functionality
+ */
+export interface SnackbarProps extends BaseComponent {
+  /**
+   * Primary notification message (required)
+   */
+  message: string;
+  
+  /**
+   * Alert type/severity
+   */
+  alertType: AlertType;
+  
+  /**
+   * Optional detailed description
+   */
+  description?: string;
+  
+  /**
+   * Display duration configuration
+   */
+  duration?: DurationConfig;
+  
+  /**
+   * Action buttons configuration
+   */
+  actions?: SnackbarAction[];
+  
+  /**
+   * Dismiss configuration
+   */
+  dismiss?: DismissAction;
+  
+  /**
+   * Positioning configuration
+   */
+  position?: SnackbarPosition | ResponsivePositioning;
+  
+  /**
+   * Priority for queue management
+   */
+  priority?: NotificationPriority;
+  
+  /**
+   * Custom styling overrides
+   */
+  styling?: NotificationStyling;
+  
+  /**
+   * Visibility state
+   */
+  open?: boolean;
+  
+  /**
+   * Callback when notification is dismissed
+   */
+  onDismiss?: (id: string, reason: DismissReason) => void;
+  
+  /**
+   * Callback when action is performed
+   */
+  onAction?: (actionIndex: number, action: SnackbarAction) => void;
+  
+  /**
+   * Callback when notification state changes
+   */
+  onStateChange?: (state: NotificationState) => void;
+  
+  // Enhanced accessibility props
+  /**
+   * ARIA live region politeness
+   */
+  'aria-live'?: 'off' | 'polite' | 'assertive';
+  
+  /**
+   * ARIA atomic behavior
+   */
+  'aria-atomic'?: boolean;
+  
+  /**
+   * ARIA relevant changes
+   */
+  'aria-relevant'?: 'additions' | 'removals' | 'text' | 'all';
+  
+  /**
+   * Custom ARIA label
+   */
+  'aria-label'?: string;
+  
+  /**
+   * ARIA described by reference
+   */
+  'aria-describedby'?: string;
+  
+  /**
+   * Role override for accessibility
+   */
+  role?: 'alert' | 'status' | 'log' | 'none';
+  
+  /**
+   * Whether to announce to screen readers
+   */
+  announceMessage?: boolean;
+  
+  /**
+   * Custom announcement text
+   */
+  announceText?: string;
+  
+  /**
+   * Focus management options
+   */
+  focus?: {
+    autoFocus?: boolean;      // Auto-focus notification on appear
+    trapFocus?: boolean;      // Trap focus within notification
+    restoreFocus?: boolean;   // Restore focus on dismiss
+    initialFocus?: React.RefObject<HTMLElement>; // Element to focus initially
+  };
+  
+  /**
+   * Keyboard navigation configuration
+   */
+  keyboard?: {
+    enabled?: boolean;        // Enable keyboard navigation
+    shortcuts?: {
+      dismiss?: string[];     // Keys to dismiss (default: ['Escape'])
+      actions?: string[];     // Keys to activate primary action
+      navigation?: string[];  // Keys for action navigation
     };
   };
-  /** Default component styling */
-  components: {
-    /** Root container classes */
-    root: string;
-    /** Message content classes */
-    message: string;
-    /** Actions container classes */
-    actions: string;
-    /** Close button classes */
-    closeButton: string;
-    /** Icon container classes */
-    icon: string;
-    /** Progress bar classes */
-    progress: string;
+}
+
+/**
+ * Dismiss reason enumeration
+ * Provides context for why notification was dismissed
+ */
+export enum DismissReason {
+  USER_ACTION = 'user_action',        // User clicked dismiss button
+  AUTO_HIDE = 'auto_hide',           // Auto-hide timer expired
+  CLICK_OUTSIDE = 'click_outside',    // Clicked outside notification
+  KEYBOARD = 'keyboard',             // Dismissed via keyboard
+  PROGRAMMATIC = 'programmatic',     // Dismissed programmatically
+  REPLACE = 'replace',               // Replaced by new notification
+  QUEUE_OVERFLOW = 'queue_overflow', // Removed due to queue limits
+  ERROR = 'error'                    // Error during display
+}
+
+// ============================================================================
+// NOTIFICATION QUEUE OPERATIONS AND STORE INTEGRATION
+// ============================================================================
+
+/**
+ * Notification queue operations for Zustand store integration
+ * Provides type-safe methods for queue management
+ */
+export interface NotificationQueueOperations {
+  /**
+   * Add notification to queue
+   */
+  add: (notification: Omit<NotificationData, 'id' | 'timestamp' | 'state'>) => string;
+  
+  /**
+   * Remove notification by ID
+   */
+  remove: (id: string, reason?: DismissReason) => void;
+  
+  /**
+   * Update notification by ID
+   */
+  update: (id: string, updates: Partial<NotificationData>) => void;
+  
+  /**
+   * Clear all notifications
+   */
+  clear: (filterFn?: (notification: NotificationData) => boolean) => void;
+  
+  /**
+   * Pause notification auto-hide
+   */
+  pause: (id: string) => void;
+  
+  /**
+   * Resume notification auto-hide
+   */
+  resume: (id: string) => void;
+  
+  /**
+   * Move notification to front of queue
+   */
+  prioritize: (id: string) => void;
+  
+  /**
+   * Get notification by ID
+   */
+  get: (id: string) => NotificationData | undefined;
+  
+  /**
+   * Get all notifications matching filter
+   */
+  getAll: (filterFn?: (notification: NotificationData) => boolean) => NotificationData[];
+  
+  /**
+   * Get currently visible notifications
+   */
+  getVisible: () => NotificationData[];
+  
+  /**
+   * Get queued notifications waiting to be displayed
+   */
+  getQueued: () => NotificationData[];
+  
+  /**
+   * Check if notification with message already exists
+   */
+  exists: (message: string, timeWindow?: number) => boolean;
+  
+  /**
+   * Get queue statistics
+   */
+  getStats: () => {
+    total: number;
+    visible: number;
+    queued: number;
+    byType: Record<AlertType, number>;
+    byPriority: Record<NotificationPriority, number>;
   };
-  /** Dark mode overrides */
-  darkMode: {
-    /** Dark mode alert type styling */
-    alertTypes: {
-      [K in AlertSeverity]: Partial<SnackbarTheme['alertTypes'][K]>;
-    };
-    /** Dark mode component styling */
-    components: Partial<SnackbarTheme['components']>;
-  };
 }
 
 /**
- * Accessibility configuration for WCAG 2.1 AA compliance
+ * Zustand store state interface for notification management
+ * Integrates with global application state
  */
-export interface SnackbarAccessibility {
-  /** Announce notifications to screen readers */
-  announceToScreenReader: boolean;
-  /** Live region politeness setting */
-  liveRegionPoliteness: 'polite' | 'assertive' | 'off';
-  /** Focus management strategy */
-  focusManagement: 'none' | 'first-action' | 'container';
-  /** High contrast mode support */
-  highContrastMode: boolean;
-  /** Respect reduced motion preferences */
-  respectReducedMotion: boolean;
-  /** Keyboard navigation support */
-  keyboardNavigation: boolean;
-  /** Voice control support */
-  voiceControlSupport: boolean;
-  /** Custom accessibility attributes */
-  customAttributes?: Record<string, string>;
+export interface NotificationStore {
+  /**
+   * Active notifications queue
+   */
+  notifications: NotificationData[];
+  
+  /**
+   * Queue configuration
+   */
+  config: NotificationQueueConfig;
+  
+  /**
+   * Theme configuration
+   */
+  theme: NotificationTheme;
+  
+  /**
+   * Global enabled/disabled state
+   */
+  enabled: boolean;
+  
+  /**
+   * Queue operations
+   */
+  operations: NotificationQueueOperations;
+  
+  /**
+   * Update configuration
+   */
+  updateConfig: (config: Partial<NotificationQueueConfig>) => void;
+  
+  /**
+   * Update theme
+   */
+  updateTheme: (theme: Partial<NotificationTheme>) => void;
+  
+  /**
+   * Enable/disable notification system
+   */
+  setEnabled: (enabled: boolean) => void;
+  
+  /**
+   * Reset store to initial state
+   */
+  reset: () => void;
+}
+
+// ============================================================================
+// UTILITY TYPES AND HELPERS
+// ============================================================================
+
+/**
+ * Notification factory helper types
+ * Simplifies creation of common notification patterns
+ */
+export interface NotificationHelpers {
+  /**
+   * Create success notification
+   */
+  success: (message: string, options?: Partial<NotificationData>) => string;
+  
+  /**
+   * Create warning notification
+   */
+  warning: (message: string, options?: Partial<NotificationData>) => string;
+  
+  /**
+   * Create error notification
+   */
+  error: (message: string, options?: Partial<NotificationData>) => string;
+  
+  /**
+   * Create info notification
+   */
+  info: (message: string, options?: Partial<NotificationData>) => string;
+  
+  /**
+   * Create confirmation dialog notification
+   */
+  confirm: (message: string, onConfirm: () => void, onCancel?: () => void) => string;
+  
+  /**
+   * Create loading notification with progress
+   */
+  loading: (message: string, options?: { 
+    progress?: number; 
+    onCancel?: () => void;
+  }) => string;
+  
+  /**
+   * Update loading notification
+   */
+  updateLoading: (id: string, updates: { 
+    message?: string; 
+    progress?: number; 
+  }) => void;
+  
+  /**
+   * Complete loading notification
+   */
+  completeLoading: (id: string, finalMessage?: string, finalType?: AlertType) => void;
 }
 
 /**
- * Export consolidated notification configuration
+ * Conditional notification type
+ * For programmatic notification creation
  */
-export interface SnackbarConfiguration {
-  /** Queue management settings */
-  queue: Partial<NotificationQueue>;
-  /** Position settings */
-  position: SnackbarPosition;
-  /** Transition settings */
-  transition: SnackbarTransition;
-  /** Duration presets */
-  durations: DurationPresets;
-  /** Theme configuration */
-  theme: SnackbarTheme;
-  /** Accessibility configuration */
-  accessibility: SnackbarAccessibility;
-  /** Event handlers */
-  eventHandlers?: SnackbarEventHandlers;
+export type ConditionalNotification = Partial<NotificationData> & {
+  message: string;
+  type: AlertType;
+};
+
+/**
+ * Notification template type
+ * For reusable notification patterns
+ */
+export interface NotificationTemplate {
+  name: string;
+  message: string;
+  type: AlertType;
+  duration?: DurationConfig;
+  actions?: SnackbarAction[];
+  styling?: NotificationStyling;
+  metadata?: NotificationData['metadata'];
 }
 
 /**
- * Type guards for runtime type checking
+ * Bulk notification operation type
+ * For batch queue operations
  */
-export const isValidAlertType = (value: any): value is AlertSeverity => {
-  return Object.values(AlertType).includes(value);
-};
+export interface BulkNotificationOperation {
+  operation: 'add' | 'remove' | 'update' | 'clear';
+  notifications?: ConditionalNotification[];
+  filter?: (notification: NotificationData) => boolean;
+  updates?: Partial<NotificationData>;
+}
 
-export const isNotificationData = (value: any): value is NotificationData => {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    typeof value.id === 'string' &&
-    typeof value.message === 'string' &&
-    isValidAlertType(value.alertType) &&
-    typeof value.timestamp === 'number'
-  );
+// ============================================================================
+// EXPORTED TYPE COLLECTIONS
+// ============================================================================
+
+/**
+ * Main export of all snackbar-related types
+ * Provides convenient access to the complete type system
+ */
+export type {
+  // Core component types
+  SnackbarProps,
+  NotificationData,
+  NotificationStore,
+  
+  // Configuration types
+  DurationConfig,
+  ResponsivePositioning,
+  NotificationQueueConfig,
+  NotificationStyling,
+  NotificationTheme,
+  
+  // Action and interaction types
+  SnackbarAction,
+  DismissAction,
+  
+  // Queue management types
+  NotificationQueueOperations,
+  NotificationHelpers,
+  
+  // Utility types
+  ConditionalNotification,
+  NotificationTemplate,
+  BulkNotificationOperation,
+  
+  // Enums as types
+  AlertSeverity,
+  SnackbarPosition,
+  NotificationState,
+  NotificationPriority,
+  DismissReason,
 };
 
 /**
- * Default configuration values
+ * Default export for main snackbar configuration
  */
-export const DEFAULT_DURATION_PRESETS: DurationPresets = {
-  short: {
-    base: 3000,
-    accessible: 5000,
-    minimum: 2000,
-    maximum: 8000
-  },
-  medium: {
-    base: 5000,
-    accessible: 8000,
-    minimum: 3000,
-    maximum: 12000
-  },
-  long: {
-    base: 8000,
-    accessible: 12000,
-    minimum: 5000,
-    maximum: 20000
-  },
-  persistent: {
-    base: Infinity,
-    accessible: Infinity,
-    minimum: Infinity,
-    maximum: Infinity
-  }
-};
-
-export const DEFAULT_POSITION: SnackbarPosition = {
-  vertical: 'bottom',
-  horizontal: 'left',
-  offset: { x: 16, y: 16 }
-};
-
-export const DEFAULT_TRANSITION: SnackbarTransition = {
-  type: 'slide',
-  duration: 300,
-  easing: 'ease-out',
-  respectReducedMotion: true
-};
+export interface SnackbarConfig {
+  queue: NotificationQueueConfig;
+  theme: NotificationTheme;
+  helpers: NotificationHelpers;
+  operations: NotificationQueueOperations;
+}
