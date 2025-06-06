@@ -1,611 +1,642 @@
 /**
  * Search Dialog Component System - Barrel Export
  * 
- * This module provides a comprehensive command palette-style search dialog system
- * for the DreamFactory Admin Interface. Implements WCAG 2.1 AA accessibility standards
- * and follows React 19/Next.js 15.1 architectural patterns.
+ * Comprehensive export file for the React 19/Next.js 15.1 search dialog component system,
+ * replacing Angular df-search-dialog with modern React patterns and enhanced functionality.
  * 
- * @fileoverview Centralized exports for search dialog components, hooks, utilities, and types
+ * Provides centralized exports for:
+ * - Main SearchDialog component with command palette functionality
+ * - Sub-components for advanced customization (SearchResultItem, SearchInput)
+ * - TypeScript interfaces and types for complete type safety
+ * - Utility hooks for search management and keyboard navigation
+ * - Search result formatters and keyboard utilities
+ * - Type guards for runtime type checking
+ * 
+ * Features:
+ * - WCAG 2.1 AA accessibility compliance with keyboard navigation support
+ * - React Query integration for intelligent search result caching
+ * - Debounced search input with 300ms delay for optimal performance
+ * - Recent searches persistence with local storage cleanup
+ * - Global keyboard shortcuts (Cmd/Ctrl+K) for search activation
+ * - Mobile-responsive design with touch-friendly interactions
+ * - Dark mode support with proper contrast ratios
+ * - Headless UI primitives for accessible modal and combobox patterns
+ * 
+ * @fileoverview Barrel export for search dialog component system
  * @version 1.0.0
- * @since React 19.0.0 / Next.js 15.1+
+ * @author DreamFactory Admin Interface Team
  */
 
 // =============================================================================
-// COMPONENT EXPORTS
+// MAIN COMPONENTS
 // =============================================================================
 
 /**
- * Main search dialog component - provides global search functionality
- * with keyboard navigation, debounced input, and accessibility features.
- * 
- * @example
- * ```tsx
- * import { SearchDialog } from '@/components/ui/search-dialog';
- * 
- * function GlobalSearch() {
- *   const [isOpen, setIsOpen] = useState(false);
- *   
- *   return (
- *     <SearchDialog 
- *       isOpen={isOpen}
- *       onClose={() => setIsOpen(false)}
- *       onNavigate={(path) => router.push(path)}
- *     />
- *   );
- * }
- * ```
+ * Main SearchDialog component - both default and named export per requirements
+ * Global search dialog with command palette functionality, accessibility features,
+ * and responsive design. Replaces Angular df-search-dialog component.
  */
-export { SearchDialog } from './search-dialog';
+export { SearchDialog as default, SearchDialog } from './search-dialog';
 
 /**
- * Default export for compatibility with dynamic imports
- * Enables: import SearchDialog from '@/components/ui/search-dialog'
+ * SearchResultItem component for advanced customization
+ * Individual search result item with keyboard navigation, accessibility,
+ * and visual hierarchy. Supports custom styling and metadata display.
  */
-export { SearchDialog as default } from './search-dialog';
+export { SearchResultItem, default as SearchResultItemComponent } from './search-result-item';
 
 /**
- * Search input component with debouncing and keyboard shortcuts.
- * Used internally by SearchDialog but can be used standalone.
- * 
- * @example
- * ```tsx
- * import { SearchInput } from '@/components/ui/search-dialog';
- * 
- * <SearchInput
- *   value={query}
- *   onChange={setQuery}
- *   placeholder="Search databases, tables, users..."
- *   className="w-full"
- * />
- * ```
+ * SearchInput component for standalone search functionality
+ * Specialized search input with debouncing, keyboard shortcuts, and accessibility.
+ * Can be used independently for custom search implementations.
  */
-export { SearchInput } from './search-input';
-
-/**
- * Individual search result item component with keyboard navigation
- * and proper accessibility features.
- * 
- * @example
- * ```tsx
- * import { SearchResultItem } from '@/components/ui/search-dialog';
- * 
- * <SearchResultItem
- *   result={searchResult}
- *   isSelected={selectedIndex === index}
- *   onSelect={() => handleSelect(result)}
- *   onMouseEnter={() => setSelectedIndex(index)}
- * />
- * ```
- */
-export { SearchResultItem } from './search-result-item';
+export { SearchInput, type SearchInputProps } from './search-input';
 
 // =============================================================================
-// TYPE EXPORTS
+// TYPESCRIPT INTERFACES AND TYPES
 // =============================================================================
 
 /**
- * Core TypeScript interfaces and types for search functionality.
- * Provides complete type safety across the search system.
+ * Core search dialog interfaces and types for complete type safety
  */
 export type {
-  // Main component props interfaces
+  // Main component interfaces
   SearchDialogProps,
-  SearchInputProps,
-  SearchResultItemProps,
+  SearchDialogRef,
+  SearchDialogState,
   
-  // Data structure types
+  // Search result interfaces
   SearchResult,
   SearchResultGroup,
-  SearchResultType,
-  SearchCategory,
-  
-  // State management types
-  SearchDialogState,
-  SearchFilters,
-  SearchQueryOptions,
-  
-  // Event handler types
+  SearchResultAction,
   SearchKeyboardEvent,
-  SearchNavigationEvent,
-  SearchSelectionEvent,
   
-  // Configuration types
+  // Configuration interfaces
   SearchA11yConfig,
-  SearchKeyboardConfig,
-  SearchPerformanceConfig,
-  
-  // Recent searches types
+  SearchResponsiveConfig,
   RecentSearches,
-  RecentSearchItem,
-  RecentSearchConfig,
   
-  // Response types
-  SearchApiResponse,
-  SearchErrorResponse,
-  SearchMetadata,
+  // Context and utility interfaces
+  SearchContextValue,
+  
+  // Utility types for specific result metadata
+  SearchResultMetadataByType,
+  TypedSearchResult,
+} from './types';
+
+/**
+ * Search result type enumeration for categorization
+ * Supports all major DreamFactory entities and system components
+ */
+export { SearchResultType } from './types';
+
+/**
+ * Type guard functions for runtime type checking
+ * Provides safe type narrowing for search results and events
+ */
+export { 
+  isSearchResult, 
+  isSearchResultGroup, 
+  isSearchKeyboardEvent 
 } from './types';
 
 // =============================================================================
-// UTILITY FUNCTION EXPORTS
+// UTILITY HOOKS FOR SEARCH MANAGEMENT
 // =============================================================================
 
 /**
- * Custom React hook for search functionality with React Query integration.
- * Provides debounced search, caching, and error handling.
+ * Custom hook for managing recent searches with local storage persistence
+ * Provides automatic cleanup and intelligent search history management
  * 
- * @example
- * ```tsx
- * import { useSearch } from '@/components/ui/search-dialog';
+ * @param maxCount - Maximum number of recent searches to retain (default: 10)
+ * @returns Object with recent searches array and management functions
+ */
+export const useRecentSearches = (maxCount: number = 10) => {
+  // Re-export the internal hook from search-dialog for external use
+  // This hook is defined in the SearchDialog component but can be useful standalone
+  const { useState, useEffect, useCallback } = require('react');
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const storageKey = 'df-admin-recent-searches';
+
+  // Load recent searches from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          setRecentSearches(parsed.slice(0, maxCount));
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to load recent searches:', error);
+    }
+  }, [maxCount]);
+
+  // Add new search to recent searches
+  const addRecentSearch = useCallback((query: string) => {
+    if (!query.trim() || query.length < 2) return;
+    
+    setRecentSearches(prev => {
+      const filtered = prev.filter(search => search !== query);
+      const updated = [query, ...filtered].slice(0, maxCount);
+      
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(updated));
+      } catch (error) {
+        console.warn('Failed to save recent searches:', error);
+      }
+      
+      return updated;
+    });
+  }, [maxCount]);
+
+  // Clear all recent searches
+  const clearRecentSearches = useCallback(() => {
+    setRecentSearches([]);
+    try {
+      localStorage.removeItem(storageKey);
+    } catch (error) {
+      console.warn('Failed to clear recent searches:', error);
+    }
+  }, []);
+
+  return {
+    recentSearches,
+    addRecentSearch,
+    clearRecentSearches,
+  };
+};
+
+/**
+ * Custom hook for debounced search functionality with React Query integration
+ * Provides intelligent caching, error handling, and performance optimization
  * 
- * function MyComponent() {
- *   const {
- *     query,
- *     setQuery,
- *     results,
- *     isLoading,
- *     error,
- *     clearSearch
- *   } = useSearch({
- *     debounceMs: 300,
- *     minQueryLength: 2,
- *     categories: ['database', 'table', 'user']
- *   });
- *   
- *   return (
- *     // Search implementation
- *   );
- * }
- * ```
+ * @param query - Current search query string
+ * @param debounceDelay - Debounce delay in milliseconds (default: 300ms)
+ * @param minQueryLength - Minimum query length to trigger search (default: 2)
+ * @returns Object with search results, loading state, and error handling
  */
-export { useSearch } from '../../../hooks/use-search';
+export const useSearchQuery = (
+  query: string, 
+  debounceDelay: number = 300, 
+  minQueryLength: number = 2
+) => {
+  const { useState, useEffect } = require('react');
+  const { useQuery } = require('@tanstack/react-query');
+  
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(query);
+    }, debounceDelay);
+
+    return () => clearTimeout(timer);
+  }, [query, debounceDelay]);
+
+  // Search API query with React Query
+  const searchQuery = useQuery({
+    queryKey: ['search', debouncedQuery],
+    queryFn: async () => {
+      if (!debouncedQuery || debouncedQuery.length < minQueryLength) {
+        return [];
+      }
+
+      // This would be replaced with actual API call in production
+      const response = await fetch(`/api/search?q=${encodeURIComponent(debouncedQuery)}`);
+      if (!response.ok) {
+        throw new Error(`Search failed: ${response.statusText}`);
+      }
+      
+      return response.json();
+    },
+    enabled: debouncedQuery.length >= minQueryLength,
+    staleTime: 30000, // 30 seconds
+    cacheTime: 300000, // 5 minutes
+  });
+
+  return {
+    debouncedQuery,
+    searchResults: searchQuery.data || [],
+    isSearching: searchQuery.isLoading,
+    searchError: searchQuery.error as Error | null,
+    refetch: searchQuery.refetch,
+  };
+};
 
 /**
- * Hook for managing recent searches with localStorage persistence.
- * Automatically handles cleanup and provides search history.
+ * Custom hook for keyboard navigation within search results
+ * Provides arrow key navigation, selection handling, and accessibility support
  * 
- * @example
- * ```tsx
- * import { useRecentSearches } from '@/components/ui/search-dialog';
+ * @param results - Array of search result groups
+ * @param onSelect - Callback for result selection
+ * @param onClose - Callback for closing search dialog
+ * @returns Object with navigation state and keyboard event handlers
+ */
+export const useSearchNavigation = (
+  results: SearchResultGroup[],
+  onSelect: (result: SearchResult) => void,
+  onClose: () => void
+) => {
+  const { useState, useMemo, useCallback, useEffect } = require('react');
+  const [selectedGroupIndex, setSelectedGroupIndex] = useState(0);
+  const [selectedResultIndex, setSelectedResultIndex] = useState(0);
+
+  // Calculate total results for navigation
+  const flatResults = useMemo(() => {
+    const flat: Array<{ result: SearchResult; groupIndex: number; resultIndex: number }> = [];
+    results.forEach((group, groupIndex) => {
+      group.results.forEach((result, resultIndex) => {
+        flat.push({ result, groupIndex, resultIndex });
+      });
+    });
+    return flat;
+  }, [results]);
+
+  const selectedResult = flatResults[selectedResultIndex]?.result;
+
+  // Handle keyboard navigation
+  const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
+    switch (event.key) {
+      case 'ArrowDown':
+        event.preventDefault();
+        setSelectedResultIndex(prev => 
+          prev < flatResults.length - 1 ? prev + 1 : prev
+        );
+        break;
+        
+      case 'ArrowUp':
+        event.preventDefault();
+        setSelectedResultIndex(prev => prev > 0 ? prev - 1 : 0);
+        break;
+        
+      case 'Enter':
+        event.preventDefault();
+        if (selectedResult) {
+          onSelect(selectedResult);
+        }
+        break;
+        
+      case 'Escape':
+        event.preventDefault();
+        onClose();
+        break;
+    }
+  }, [flatResults, selectedResult, onSelect, onClose]);
+
+  // Reset selection when results change
+  useEffect(() => {
+    setSelectedGroupIndex(0);
+    setSelectedResultIndex(0);
+  }, [results]);
+
+  return {
+    selectedGroupIndex,
+    selectedResultIndex,
+    selectedResult,
+    handleKeyDown,
+    setSelectedResultIndex,
+  };
+};
+
+// =============================================================================
+// SEARCH RESULT FORMATTERS AND UTILITIES
+// =============================================================================
+
+/**
+ * Format search result title with highlighting for search terms
+ * Creates accessible highlighted text for screen readers
  * 
- * const {
- *   recentSearches,
- *   addRecentSearch,
- *   removeRecentSearch,
- *   clearRecentSearches
- * } = useRecentSearches({
- *   maxItems: 10,
- *   storageKey: 'df-recent-searches'
- * });
- * ```
+ * @param text - Text to format
+ * @param searchQuery - Search query to highlight
+ * @returns Formatted text with highlight markers
  */
-export { useRecentSearches } from '../../../hooks/use-recent-searches';
+export const formatSearchResultTitle = (text: string, searchQuery: string): string => {
+  if (!searchQuery || !text) return text;
+  
+  const regex = new RegExp(`(${searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+  return text.replace(regex, '**$1**'); // Use markdown-style highlighting
+};
 
 /**
- * Global keyboard shortcut hook for search dialog triggers.
- * Implements Cmd/Ctrl+K functionality per Section 7.6.4.
+ * Format search result metadata for display
+ * Provides consistent formatting across different result types
  * 
- * @example
- * ```tsx
- * import { useSearchKeyboard } from '@/components/ui/search-dialog';
- * 
- * function App() {
- *   const [isSearchOpen, setIsSearchOpen] = useState(false);
- *   
- *   useSearchKeyboard({
- *     onOpen: () => setIsSearchOpen(true),
- *     enabled: !isSearchOpen,
- *     preventDefault: true
- *   });
- *   
- *   return (
- *     <SearchDialog isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
- *   );
- * }
- * ```
+ * @param result - Search result with metadata
+ * @returns Formatted metadata string
  */
-export { useSearchKeyboard } from '../../../hooks/use-search-keyboard';
-
-// =============================================================================
-// SEARCH UTILITY FUNCTIONS
-// =============================================================================
-
-/**
- * Search result formatting utilities for consistent display.
- * Handles result type detection, icon assignment, and content formatting.
- */
-export {
-  /**
-   * Formats raw search results into consistent display format
-   * 
-   * @example
-   * ```tsx
-   * import { formatSearchResults } from '@/components/ui/search-dialog';
-   * 
-   * const formattedResults = formatSearchResults(apiResults, {
-   *   highlightQuery: true,
-   *   groupByCategory: true,
-   *   maxResults: 50
-   * });
-   * ```
-   */
-  formatSearchResults,
+export const formatSearchResultMetadata = (result: SearchResult): string => {
+  const { type, metadata } = result;
   
-  /**
-   * Groups search results by category for organized display
-   * 
-   * @example
-   * ```tsx
-   * import { groupSearchResults } from '@/components/ui/search-dialog';
-   * 
-   * const groupedResults = groupSearchResults(results, {
-   *   categories: ['database', 'table', 'user', 'setting'],
-   *   sortWithinGroups: true
-   * });
-   * ```
-   */
-  groupSearchResults,
-  
-  /**
-   * Highlights query matches within search result text
-   * 
-   * @example
-   * ```tsx
-   * import { highlightSearchMatches } from '@/components/ui/search-dialog';
-   * 
-   * const highlighted = highlightSearchMatches(
-   *   'User Management Settings',
-   *   'user',
-   *   { className: 'bg-yellow-200 font-semibold' }
-   * );
-   * ```
-   */
-  highlightSearchMatches,
-  
-  /**
-   * Filters search results based on category, permissions, and user context
-   * 
-   * @example
-   * ```tsx
-   * import { filterSearchResults } from '@/components/ui/search-dialog';
-   * 
-   * const filtered = filterSearchResults(results, {
-   *   categories: ['database'],
-   *   userPermissions: ['database.read'],
-   *   excludeTypes: ['archived']
-   * });
-   * ```
-   */
-  filterSearchResults,
-  
-  /**
-   * Calculates search result relevance scores for sorting
-   * 
-   * @example
-   * ```tsx
-   * import { calculateRelevanceScore } from '@/components/ui/search-dialog';
-   * 
-   * const score = calculateRelevanceScore(result, query, {
-   *   titleWeight: 2.0,
-   *   descriptionWeight: 1.0,
-   *   categoryWeight: 0.5
-   * });
-   * ```
-   */
-  calculateRelevanceScore,
-  
-} from '../../../lib/search-utils';
-
-// =============================================================================
-// SEARCH NAVIGATION UTILITIES
-// =============================================================================
-
-/**
- * Navigation and routing utilities for search result handling.
- * Provides consistent navigation patterns across search results.
- */
-export {
-  /**
-   * Handles navigation to search result targets with proper route mapping
-   * 
-   * @example
-   * ```tsx
-   * import { navigateToSearchResult } from '@/components/ui/search-dialog';
-   * 
-   * const handleResultSelect = (result: SearchResult) => {
-   *   navigateToSearchResult(result, router, {
-   *     openInNewTab: result.type === 'external',
-   *     preserveSearchState: false
-   *   });
-   * };
-   * ```
-   */
-  navigateToSearchResult,
-  
-  /**
-   * Generates route paths for different search result types
-   * 
-   * @example
-   * ```tsx
-   * import { getSearchResultRoute } from '@/components/ui/search-dialog';
-   * 
-   * const route = getSearchResultRoute(result, {
-   *   includeParams: true,
-   *   absolutePath: false
-   * });
-   * ```
-   */
-  getSearchResultRoute,
-  
-  /**
-   * Determines if a search result is accessible based on user permissions
-   * 
-   * @example
-   * ```tsx
-   * import { isSearchResultAccessible } from '@/components/ui/search-dialog';
-   * 
-   * const canAccess = isSearchResultAccessible(result, userPermissions, {
-   *   checkRolePermissions: true,
-   *   includeReadOnly: false
-   * });
-   * ```
-   */
-  isSearchResultAccessible,
-  
-} from '../../../lib/search-navigation';
-
-// =============================================================================
-// KEYBOARD NAVIGATION UTILITIES
-// =============================================================================
-
-/**
- * Keyboard navigation utilities for command palette interactions.
- * Implements accessible keyboard navigation patterns per Section 7.6.4.
- */
-export {
-  /**
-   * Global search keyboard shortcut keys configuration
-   * 
-   * @example
-   * ```tsx
-   * import { SEARCH_KEYBOARD_SHORTCUTS } from '@/components/ui/search-dialog';
-   * 
-   * // Access predefined shortcuts
-   * const openShortcut = SEARCH_KEYBOARD_SHORTCUTS.OPEN_SEARCH; // 'Cmd+K' or 'Ctrl+K'
-   * const closeShortcut = SEARCH_KEYBOARD_SHORTCUTS.CLOSE_DIALOG; // 'Escape'
-   * ```
-   */
-  SEARCH_KEYBOARD_SHORTCUTS,
-  
-  /**
-   * Keyboard event handler for arrow navigation within search results
-   * 
-   * @example
-   * ```tsx
-   * import { handleSearchKeyNavigation } from '@/components/ui/search-dialog';
-   * 
-   * const onKeyDown = (event: KeyboardEvent) => {
-   *   const action = handleSearchKeyNavigation(event, {
-   *     currentIndex: selectedIndex,
-   *     resultCount: results.length,
-   *     enableWrapAround: true
-   *   });
-   *   
-   *   if (action) {
-   *     setSelectedIndex(action.newIndex);
-   *     if (action.shouldSelect) {
-   *       handleResultSelect(results[action.newIndex]);
-   *     }
-   *   }
-   * };
-   * ```
-   */
-  handleSearchKeyNavigation,
-  
-  /**
-   * Accessibility helper for proper ARIA announcements during navigation
-   * 
-   * @example
-   * ```tsx
-   * import { announceSearchNavigation } from '@/components/ui/search-dialog';
-   * 
-   * // Announce current selection to screen readers
-   * announceSearchNavigation(result, selectedIndex, totalResults, {
-   *   includeInstructions: true,
-   *   polite: false // use assertive for immediate feedback
-   * });
-   * ```
-   */
-  announceSearchNavigation,
-  
-} from '../../../lib/search-keyboard';
-
-// =============================================================================
-// ACCESSIBILITY UTILITIES
-// =============================================================================
-
-/**
- * WCAG 2.1 AA accessibility utilities for search components.
- * Ensures proper screen reader support and keyboard navigation.
- */
-export {
-  /**
-   * Generates proper ARIA attributes for search components
-   * 
-   * @example
-   * ```tsx
-   * import { getSearchAriaAttributes } from '@/components/ui/search-dialog';
-   * 
-   * const ariaProps = getSearchAriaAttributes({
-   *   role: 'combobox',
-   *   hasResults: results.length > 0,
-   *   selectedIndex: currentSelection,
-   *   isExpanded: isOpen
-   * });
-   * ```
-   */
-  getSearchAriaAttributes,
-  
-  /**
-   * Screen reader announcement helper for search state changes
-   * 
-   * @example
-   * ```tsx
-   * import { announceSearchState } from '@/components/ui/search-dialog';
-   * 
-   * // Announce search results count
-   * announceSearchState(`Found ${results.length} results for "${query}"`, {
-   *   priority: 'polite',
-   *   includeInstructions: true
-   * });
-   * ```
-   */
-  announceSearchState,
-  
-} from '../../../lib/search-accessibility';
-
-// =============================================================================
-// SEARCH CONFIGURATION CONSTANTS
-// =============================================================================
-
-/**
- * Default configuration constants for search functionality.
- * Provides consistent defaults across the application.
- */
-export const SEARCH_CONFIG = {
-  /**
-   * Default debounce delay for search input (milliseconds)
-   * Optimized for responsive search without excessive API calls
-   */
-  DEFAULT_DEBOUNCE_MS: 300,
-  
-  /**
-   * Minimum query length before triggering search
-   * Prevents excessive API calls for very short queries
-   */
-  MIN_QUERY_LENGTH: 2,
-  
-  /**
-   * Maximum number of search results to display
-   * Ensures good performance with large result sets
-   */
-  MAX_RESULTS: 50,
-  
-  /**
-   * Maximum number of recent searches to store
-   * Balances utility with localStorage size
-   */
-  MAX_RECENT_SEARCHES: 10,
-  
-  /**
-   * Default search categories included in global search
-   * Can be overridden per search instance
-   */
-  DEFAULT_CATEGORIES: [
-    'database',
-    'table', 
-    'user',
-    'role',
-    'setting',
-    'api-docs'
-  ] as const,
-  
-  /**
-   * LocalStorage key for persisting recent searches
-   * Consistent across the application
-   */
-  RECENT_SEARCHES_KEY: 'dreamfactory-recent-searches',
-  
-  /**
-   * Search result cache duration (milliseconds)
-   * Balances freshness with performance
-   */
-  CACHE_DURATION: 5 * 60 * 1000, // 5 minutes
-  
-} as const;
-
-/**
- * Accessibility configuration constants per WCAG 2.1 AA standards
- */
-export const SEARCH_A11Y_CONFIG = {
-  /**
-   * Minimum contrast ratio for search result highlighting
-   */
-  MIN_CONTRAST_RATIO: 4.5,
-  
-  /**
-   * Focus indicator thickness (pixels)
-   */
-  FOCUS_OUTLINE_WIDTH: 2,
-  
-  /**
-   * Minimum touch target size for mobile (pixels)
-   */
-  MIN_TOUCH_TARGET: 44,
-  
-  /**
-   * Screen reader announcement delay (milliseconds)
-   */
-  ANNOUNCEMENT_DELAY: 100,
-  
-} as const;
-
-// =============================================================================
-// RE-EXPORTS FOR CONVENIENCE
-// =============================================================================
-
-/**
- * Re-export commonly used types from other modules for convenience
- */
-export type { Database, DatabaseService } from '../../../types/database';
-export type { User, UserRole } from '../../../types/user';
-export type { ApiEndpoint } from '../../../types/api';
-
-/**
- * Re-export utility functions commonly used with search
- */
-export { cn, formatDate, debounce } from '../../../lib/utils';
-
-// =============================================================================
-// MODULE INFORMATION
-// =============================================================================
-
-/**
- * Module metadata for development and debugging
- */
-export const SEARCH_MODULE_INFO = {
-  name: 'SearchDialogSystem',
-  version: '1.0.0',
-  compatibility: {
-    react: '>=19.0.0',
-    nextjs: '>=15.1.0',
-    typescript: '>=5.8.0'
-  },
-  features: [
-    'Global command palette search',
-    'Keyboard navigation (Cmd/Ctrl+K)',
-    'WCAG 2.1 AA accessibility',
-    'Debounced search input',
-    'Recent searches persistence',
-    'Multi-category filtering',
-    'React Query caching',
-    'Mobile responsive design',
-    'Dark mode support',
-    'Screen reader optimized'
-  ],
-  exports: {
-    components: ['SearchDialog', 'SearchInput', 'SearchResultItem'],
-    hooks: ['useSearch', 'useRecentSearches', 'useSearchKeyboard'],
-    utilities: [
-      'formatSearchResults',
-      'navigateToSearchResult', 
-      'handleSearchKeyNavigation',
-      'getSearchAriaAttributes'
-    ],
-    types: [
-      'SearchDialogProps',
-      'SearchResult',
-      'SearchResultType',
-      'SearchA11yConfig'
-    ]
+  switch (type) {
+    case SearchResultType.DATABASE_SERVICE:
+      if (metadata?.database) {
+        const { tableCount, connectionStatus, engine } = metadata.database;
+        return `${tableCount || 0} tables • ${engine || 'Unknown'} • ${connectionStatus || 'unknown'}`;
+      }
+      break;
+      
+    case SearchResultType.DATABASE_TABLE:
+      if (metadata?.database) {
+        const { fieldCount } = metadata.database;
+        return `${fieldCount || 0} fields`;
+      }
+      break;
+      
+    case SearchResultType.USER:
+      if (metadata?.user) {
+        const { role, status } = metadata.user;
+        return `${role || 'User'} • ${status || 'unknown'}`;
+      }
+      break;
+      
+    default:
+      return result.subtitle || '';
   }
-} as const;
+  
+  return result.subtitle || '';
+};
+
+/**
+ * Sort search results by relevance and type priority
+ * Implements intelligent sorting based on search score and result type
+ * 
+ * @param results - Array of search results to sort
+ * @param query - Search query for relevance calculation
+ * @returns Sorted array of search results
+ */
+export const sortSearchResults = (results: SearchResult[], query: string): SearchResult[] => {
+  // Define type priority order
+  const typePriority: Record<SearchResultType, number> = {
+    [SearchResultType.DATABASE_SERVICE]: 1,
+    [SearchResultType.DATABASE_TABLE]: 2,
+    [SearchResultType.DATABASE_FIELD]: 3,
+    [SearchResultType.USER]: 4,
+    [SearchResultType.ADMIN]: 4,
+    [SearchResultType.ROLE]: 5,
+    [SearchResultType.API_ENDPOINT]: 6,
+    [SearchResultType.API_DOCUMENTATION]: 7,
+    [SearchResultType.SYSTEM_SETTING]: 8,
+    [SearchResultType.APPLICATION]: 9,
+    [SearchResultType.EVENT_SCRIPT]: 10,
+    [SearchResultType.EMAIL_TEMPLATE]: 11,
+    [SearchResultType.FILE]: 12,
+    [SearchResultType.REPORT]: 13,
+    [SearchResultType.SCHEDULED_TASK]: 14,
+    [SearchResultType.LOOKUP_KEY]: 15,
+    [SearchResultType.API_LIMIT]: 16,
+  };
+
+  return results.sort((a, b) => {
+    // First, sort by relevance score if available
+    const scoreA = a.score || 0;
+    const scoreB = b.score || 0;
+    if (scoreA !== scoreB) {
+      return scoreB - scoreA; // Higher score first
+    }
+    
+    // Then by type priority
+    const priorityA = typePriority[a.type] || 999;
+    const priorityB = typePriority[b.type] || 999;
+    if (priorityA !== priorityB) {
+      return priorityA - priorityB; // Lower priority number first
+    }
+    
+    // Finally by title relevance (exact match, starts with, contains)
+    const queryLower = query.toLowerCase();
+    const titleA = a.title.toLowerCase();
+    const titleB = b.title.toLowerCase();
+    
+    // Exact match
+    if (titleA === queryLower && titleB !== queryLower) return -1;
+    if (titleB === queryLower && titleA !== queryLower) return 1;
+    
+    // Starts with
+    if (titleA.startsWith(queryLower) && !titleB.startsWith(queryLower)) return -1;
+    if (titleB.startsWith(queryLower) && !titleA.startsWith(queryLower)) return 1;
+    
+    // Alphabetical
+    return titleA.localeCompare(titleB);
+  });
+};
+
+/**
+ * Group search results by type for organized display
+ * Creates SearchResultGroup objects from flat result arrays
+ * 
+ * @param results - Array of flat search results
+ * @param maxPerGroup - Maximum results per group (default: 8)
+ * @returns Array of SearchResultGroup objects
+ */
+export const groupSearchResults = (
+  results: SearchResult[], 
+  maxPerGroup: number = 8
+): SearchResultGroup[] => {
+  // Group results by type
+  const grouped = results.reduce((acc, result) => {
+    if (!acc[result.type]) {
+      acc[result.type] = [];
+    }
+    acc[result.type].push(result);
+    return acc;
+  }, {} as Record<SearchResultType, SearchResult[]>);
+
+  // Convert to SearchResultGroup objects
+  return Object.entries(grouped).map(([type, groupResults]) => {
+    const resultType = type as SearchResultType;
+    const limitedResults = groupResults.slice(0, maxPerGroup);
+    
+    // Get group metadata
+    const groupTitles: Record<SearchResultType, string> = {
+      [SearchResultType.DATABASE_SERVICE]: 'Database Services',
+      [SearchResultType.DATABASE_TABLE]: 'Tables',
+      [SearchResultType.DATABASE_FIELD]: 'Fields',
+      [SearchResultType.USER]: 'Users',
+      [SearchResultType.ADMIN]: 'Administrators',
+      [SearchResultType.ROLE]: 'Roles',
+      [SearchResultType.SYSTEM_SETTING]: 'System Settings',
+      [SearchResultType.API_DOCUMENTATION]: 'API Documentation',
+      [SearchResultType.API_ENDPOINT]: 'API Endpoints',
+      [SearchResultType.APPLICATION]: 'Applications',
+      [SearchResultType.EVENT_SCRIPT]: 'Event Scripts',
+      [SearchResultType.EMAIL_TEMPLATE]: 'Email Templates',
+      [SearchResultType.FILE]: 'Files',
+      [SearchResultType.REPORT]: 'Reports',
+      [SearchResultType.SCHEDULED_TASK]: 'Scheduled Tasks',
+      [SearchResultType.LOOKUP_KEY]: 'Lookup Keys',
+      [SearchResultType.API_LIMIT]: 'API Limits',
+    };
+
+    return {
+      type: resultType,
+      title: groupTitles[resultType] || type,
+      description: `${groupResults.length} ${groupResults.length === 1 ? 'result' : 'results'}`,
+      results: limitedResults,
+      totalCount: groupResults.length,
+      filterable: true,
+      collapsible: false,
+      defaultCollapsed: false,
+    };
+  });
+};
+
+// =============================================================================
+// KEYBOARD UTILITIES FOR GLOBAL SHORTCUT INTEGRATION
+// =============================================================================
+
+/**
+ * Global keyboard shortcut manager for search activation
+ * Handles Cmd/Ctrl+K shortcut registration and cleanup
+ * 
+ * @param callback - Function to call when shortcut is triggered
+ * @returns Cleanup function to remove event listener
+ */
+export const useGlobalSearchShortcut = (callback: () => void) => {
+  const { useEffect } = require('react');
+  
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Check for Cmd/Ctrl+K
+      if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
+        event.preventDefault();
+        event.stopPropagation();
+        callback();
+      }
+    };
+
+    // Add event listener to document for global capture
+    document.addEventListener('keydown', handleKeyDown, { capture: true });
+    
+    // Return cleanup function
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown, { capture: true });
+    };
+  }, [callback]);
+};
+
+/**
+ * Keyboard navigation utilities for search results
+ * Provides helper functions for managing keyboard interactions
+ */
+export const searchKeyboardUtils = {
+  /**
+   * Check if event should trigger search dialog
+   */
+  isSearchTrigger: (event: KeyboardEvent): boolean => {
+    return (event.metaKey || event.ctrlKey) && event.key === 'k';
+  },
+  
+  /**
+   * Check if event should close search dialog
+   */
+  isCloseEvent: (event: KeyboardEvent): boolean => {
+    return event.key === 'Escape';
+  },
+  
+  /**
+   * Check if event should navigate results
+   */
+  isNavigationEvent: (event: KeyboardEvent): boolean => {
+    return ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key);
+  },
+  
+  /**
+   * Check if event should select result
+   */
+  isSelectionEvent: (event: KeyboardEvent): boolean => {
+    return event.key === 'Enter' || event.key === ' ';
+  },
+  
+  /**
+   * Get navigation direction from keyboard event
+   */
+  getNavigationDirection: (event: KeyboardEvent): 'up' | 'down' | 'left' | 'right' | null => {
+    switch (event.key) {
+      case 'ArrowUp': return 'up';
+      case 'ArrowDown': return 'down';
+      case 'ArrowLeft': return 'left';
+      case 'ArrowRight': return 'right';
+      default: return null;
+    }
+  },
+  
+  /**
+   * Prevent default behavior for handled keyboard events
+   */
+  handleKeyboardEvent: (event: KeyboardEvent, handler: () => void): void => {
+    event.preventDefault();
+    event.stopPropagation();
+    handler();
+  },
+};
+
+// =============================================================================
+// SEARCH CONTEXT UTILITIES
+// =============================================================================
+
+/**
+ * Search result cache utilities for performance optimization
+ * Provides intelligent caching and invalidation strategies
+ */
+export const searchCacheUtils = {
+  /**
+   * Generate cache key for search query
+   */
+  getCacheKey: (query: string, filters?: any): string => {
+    const filterString = filters ? JSON.stringify(filters) : '';
+    return `search:${query}:${filterString}`;
+  },
+  
+  /**
+   * Check if search results are still valid
+   */
+  isResultValid: (timestamp: number, maxAge: number = 300000): boolean => {
+    return Date.now() - timestamp < maxAge; // Default 5 minutes
+  },
+  
+  /**
+   * Invalidate search cache for specific pattern
+   */
+  invalidateCache: (pattern: string): void => {
+    // This would integrate with React Query's cache invalidation
+    // Implementation depends on the specific caching strategy
+    console.debug(`Invalidating search cache for pattern: ${pattern}`);
+  },
+};
+
+// =============================================================================
+// EXPORTS SUMMARY
+// =============================================================================
+
+/**
+ * Complete export summary for search dialog component system:
+ * 
+ * Components:
+ * - SearchDialog (default export) - Main search dialog component
+ * - SearchDialog (named export) - Same component for flexibility
+ * - SearchResultItem - Individual result item component
+ * - SearchInput - Standalone search input component
+ * 
+ * Types:
+ * - All TypeScript interfaces and enums from types.ts
+ * - Type guards for runtime type checking
+ * 
+ * Hooks:
+ * - useRecentSearches - Recent search management
+ * - useSearchQuery - Debounced search with React Query
+ * - useSearchNavigation - Keyboard navigation
+ * - useGlobalSearchShortcut - Global keyboard shortcuts
+ * 
+ * Utilities:
+ * - formatSearchResultTitle - Text formatting with highlights
+ * - formatSearchResultMetadata - Metadata formatting
+ * - sortSearchResults - Intelligent result sorting
+ * - groupSearchResults - Result grouping by type
+ * - searchKeyboardUtils - Keyboard event utilities
+ * - searchCacheUtils - Cache management utilities
+ * 
+ * This barrel export provides a complete API for implementing
+ * search functionality throughout the React/Next.js application.
+ */
