@@ -2,803 +2,823 @@
  * Service Form Container Component
  * 
  * React container component that manages the database service form page, implementing
- * routing, form state initialization, and component orchestration. Combines the functionality
- * of the Angular df-service-details component into a React container that handles both creation
- * and editing workflows, paywall logic, service type detection, and navigation patterns.
+ * routing, form state initialization, and component orchestration. Combines the 
+ * functionality of the Angular df-service-details component into a React container 
+ * that handles both creation and editing workflows, paywall logic, service type 
+ * detection, and navigation patterns. Provides context and shared state to child 
+ * form components.
  * 
- * Key Features:
+ * Features:
  * - Next.js 15.1+ App Router with dynamic routing for service management pages
- * - React Context API for component communication and shared state management
- * - React 19 server components for initial page loads per integration requirements
- * - Integration with database service provider context for configuration and type detection
- * - Support for both service creation and editing workflows maintaining existing functionality
+ * - React Context API for component communication and shared state
+ * - React 19 server components for initial page loads
+ * - Integration with database service provider context for service configuration
+ * - Support for both service creation and editing workflows
  * - Paywall access control functionality maintaining existing authorization patterns
- * - Navigation integration with Next.js router for service management and API documentation flows
+ * - Navigation integration with Next.js router for service management flows
  * 
- * @fileoverview Database service form container with routing and state orchestration
+ * @fileoverview Database service form container with routing and state management
  * @version 1.0.0
- * @since 2024-01-01
+ * @since React 19.0.0, Next.js 15.1+, TypeScript 5.8+
  */
 
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo, createContext, useContext } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
-import { useSWRConfig } from 'swr';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { notFound } from 'next/navigation';
 import { 
-  DatabaseIcon, 
-  ArrowLeftIcon, 
   ExclamationTriangleIcon,
-  ShieldExclamationIcon,
-  CogIcon
+  ArrowLeftIcon,
+  Cog6ToothIcon,
+  DocumentTextIcon,
+  EyeIcon,
+  ClockIcon
 } from '@heroicons/react/24/outline';
-import { cn } from '@/lib/utils';
 
-// Import database service context and related hooks
-import { 
-  useDatabaseServiceContext, 
-  useDatabaseServiceActions,
-  useDatabaseServiceState,
-  useSelectedService
-} from '../database-service-provider';
+import { ServiceFormWizard } from './service-form-wizard';
+import { useDatabaseServiceContext, useDatabaseServiceStore } from '../database-service-provider';
+import { useAuth } from '../../../hooks/use-auth';
+import { apiClient } from '../../../lib/api-client';
+import { Button } from '../../ui/button';
+import { cn } from '../../../lib/utils';
 
-// Import form components and utilities
-import ServiceFormWizard from './service-form-wizard';
-
-// Import types and interfaces
 import type {
-  DatabaseService,
-  DatabaseServiceFormData,
   ServiceFormMode,
+  ServiceFormData,
+  ServiceFormInput,
+  ServiceTierAccess,
+  WizardStep,
   ServiceFormContainerProps,
-  ServiceFormContextType,
-  PaywallState,
-  ServiceFormError,
-  ApiErrorResponse
+  DatabaseService,
+  DatabaseDriver,
+  ServiceType
 } from './service-form-types';
-
-// Import authentication and paywall components
-import { useAuth } from '@/hooks/use-auth';
-import { usePaywall } from '@/hooks/use-paywall';
-
-// Import UI components
-import { Button } from '@/components/ui/button';
-import { Alert } from '@/components/ui/alert';
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Spinner } from '@/components/ui/spinner';
+import type { 
+  BaseComponentProps,
+  ApiErrorResponse 
+} from '../types';
 
 // =============================================================================
-// SERVICE FORM CONTEXT DEFINITION
+// TYPES AND INTERFACES
 // =============================================================================
 
 /**
- * Service Form Context for sharing state across form components
- * Provides form configuration, mode, and shared utilities to child components
+ * Container initialization state for loading management
  */
-interface ServiceFormContextValue {
-  // Form configuration
-  mode: ServiceFormMode;
-  serviceId?: number;
-  initialData?: Partial<DatabaseServiceFormData>;
-  
-  // State flags
+interface ContainerState {
   isLoading: boolean;
-  isSubmitting: boolean;
-  hasUnsavedChanges: boolean;
-  
-  // Paywall integration
-  paywallState: PaywallState;
-  isPaywallBlocked: boolean;
-  
-  // Navigation handlers
-  onCancel: () => void;
-  onSubmit: (data: DatabaseServiceFormData) => Promise<void>;
-  onNavigateToApiDocs: (serviceName: string) => void;
-  
-  // Error handling
-  error: ServiceFormError | null;
-  clearError: () => void;
-  
-  // Utility functions
-  validateServiceAccess: () => boolean;
-  checkPaywallRestrictions: (serviceType: string) => boolean;
+  isInitialized: boolean;
+  error: string | null;
+  service: DatabaseService | null;
+  mode: ServiceFormMode;
+  canAccess: boolean;
+  tierRequired: ServiceTierAccess | null;
 }
 
-const ServiceFormContext = createContext<ServiceFormContextValue | null>(null);
+/**
+ * Route parameters for service form pages
+ */
+interface ServiceFormRouteParams {
+  service?: string;
+  serviceId?: string;
+}
 
 /**
- * Hook to access service form context with error handling
+ * Search parameters for service form configuration
  */
-export const useServiceFormContext = (): ServiceFormContextValue => {
-  const context = useContext(ServiceFormContext);
-  
-  if (!context) {
-    throw new Error(
-      'useServiceFormContext must be used within a ServiceFormContainer. ' +
-      'Ensure your component is wrapped with the service form container.'
-    );
-  }
-  
-  return context;
+interface ServiceFormSearchParams {
+  mode?: ServiceFormMode;
+  type?: DatabaseDriver;
+  clone?: string;
+  redirect?: string;
+  step?: string;
+}
+
+/**
+ * Navigation configuration for service form flows
+ */
+interface NavigationConfig {
+  backUrl: string;
+  apiDocsUrl?: string;
+  serviceListUrl: string;
+  redirectOnSuccess?: string;
+  redirectOnCancel?: string;
+}
+
+// =============================================================================
+// DEFAULT CONFIGURATIONS
+// =============================================================================
+
+/**
+ * Default wizard steps for service creation
+ */
+const DEFAULT_WIZARD_STEPS: WizardStep[] = [
+  {
+    id: 'service-type',
+    title: 'Database Type',
+    description: 'Choose the type of database you want to connect',
+    fields: ['type', 'serviceTypeId'],
+    optional: false,
+  },
+  {
+    id: 'basic-info',
+    title: 'Basic Information',
+    description: 'Provide basic details about your service',
+    fields: ['name', 'label', 'description'],
+    optional: false,
+  },
+  {
+    id: 'connection-config',
+    title: 'Connection Settings',
+    description: 'Configure database connection parameters',
+    fields: ['config.host', 'config.port', 'config.database', 'config.username', 'config.password'],
+    optional: false,
+  },
+  {
+    id: 'security-config',
+    title: 'Security Configuration',
+    description: 'Set up access control and security settings',
+    fields: ['security'],
+    optional: true,
+  },
+  {
+    id: 'advanced-config',
+    title: 'Advanced Options',
+    description: 'Configure advanced features and optimizations',
+    fields: ['advanced'],
+    optional: true,
+  },
+];
+
+/**
+ * Default tier access mapping for service types
+ */
+const SERVICE_TIER_MAPPING: Record<DatabaseDriver, ServiceTierAccess> = {
+  mysql: 'free',
+  pgsql: 'free',
+  sqlite: 'free',
+  sqlsrv: 'basic',
+  mongodb: 'basic',
+  oracle: 'premium',
+  snowflake: 'premium',
+  ibmdb2: 'enterprise',
+  informix: 'enterprise',
+  sqlanywhere: 'enterprise',
+  memsql: 'premium',
+  salesforce_db: 'premium',
+  hana: 'enterprise',
+  apache_hive: 'premium',
+  databricks: 'premium',
+  dremio: 'premium',
 };
 
 // =============================================================================
-// PAYWALL MODAL COMPONENT
+// LOADING COMPONENT
 // =============================================================================
 
 /**
- * Paywall Modal for premium service access control
- * Displays when user attempts to create premium database services
+ * Loading skeleton component for container initialization
  */
-interface PaywallModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  serviceType: string;
-  onUpgrade: () => void;
+const ContainerLoadingSkeleton: React.FC = () => (
+  <div className="max-w-6xl mx-auto p-6">
+    <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg overflow-hidden">
+      {/* Header skeleton */}
+      <div className="p-8 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center space-x-4">
+          <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+          <div className="flex-1">
+            <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-64 mb-2 animate-pulse" />
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-96 animate-pulse" />
+          </div>
+        </div>
+      </div>
+      
+      {/* Content skeleton */}
+      <div className="flex">
+        {/* Sidebar skeleton */}
+        <div className="w-80 bg-gray-50 dark:bg-gray-800 p-6">
+          <div className="space-y-4">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="flex items-center space-x-3 p-3">
+                <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
+                <div className="flex-1">
+                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24 mb-1 animate-pulse" />
+                  <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-32 animate-pulse" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        
+        {/* Main content skeleton */}
+        <div className="flex-1 p-8">
+          <div className="space-y-6">
+            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-48 animate-pulse" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="space-y-2">
+                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24 animate-pulse" />
+                  <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+// =============================================================================
+// ERROR BOUNDARY COMPONENT
+// =============================================================================
+
+/**
+ * Error display component for container errors
+ */
+interface ContainerErrorProps {
+  error: string;
+  onRetry?: () => void;
+  onGoBack?: () => void;
 }
 
-const PaywallModal: React.FC<PaywallModalProps> = ({
-  isOpen,
-  onClose,
+const ContainerError: React.FC<ContainerErrorProps> = ({ 
+  error, 
+  onRetry, 
+  onGoBack 
+}) => (
+  <div className="max-w-2xl mx-auto p-6">
+    <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-8 text-center">
+      <ExclamationTriangleIcon className="w-16 h-16 text-red-500 mx-auto mb-4" />
+      <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+        Unable to Load Service Form
+      </h2>
+      <p className="text-gray-600 dark:text-gray-400 mb-6">
+        {error}
+      </p>
+      <div className="flex justify-center space-x-4">
+        {onRetry && (
+          <Button onClick={onRetry} variant="primary">
+            Try Again
+          </Button>
+        )}
+        {onGoBack && (
+          <Button onClick={onGoBack} variant="outline">
+            <ArrowLeftIcon className="w-4 h-4 mr-2" />
+            Go Back
+          </Button>
+        )}
+      </div>
+    </div>
+  </div>
+);
+
+// =============================================================================
+// PAYWALL ACCESS COMPONENT
+// =============================================================================
+
+/**
+ * Paywall blocking component for premium services
+ */
+interface PaywallAccessBlockProps {
+  serviceType: DatabaseDriver;
+  requiredTier: ServiceTierAccess;
+  currentTier: ServiceTierAccess;
+  onUpgrade?: () => void;
+  onGoBack?: () => void;
+}
+
+const PaywallAccessBlock: React.FC<PaywallAccessBlockProps> = ({
   serviceType,
-  onUpgrade
-}) => {
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-lg">
-        <div className="flex items-center space-x-3 mb-4">
-          <div className="flex-shrink-0">
-            <ShieldExclamationIcon className="h-8 w-8 text-amber-500" />
-          </div>
-          <div>
-            <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              Premium Service Required
-            </DialogTitle>
-            <DialogDescription className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              {serviceType} connections require a premium license
-            </DialogDescription>
-          </div>
-        </div>
-        
-        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 mb-6">
-          <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">
-            Premium Features Include:
-          </h4>
-          <ul className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
-            <li>• Enterprise database connections ({serviceType})</li>
-            <li>• Advanced security and encryption</li>
-            <li>• Priority support and documentation</li>
-            <li>• Advanced API generation features</li>
-            <li>• Enhanced monitoring and analytics</li>
-          </ul>
-        </div>
-        
-        <div className="flex justify-end space-x-3">
-          <Button variant="outline" onClick={onClose}>
-            Cancel
+  requiredTier,
+  currentTier,
+  onUpgrade,
+  onGoBack
+}) => (
+  <div className="max-w-2xl mx-auto p-6">
+    <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-8 text-center">
+      <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+        <Cog6ToothIcon className="w-8 h-8 text-amber-600 dark:text-amber-400" />
+      </div>
+      <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+        Premium Database Service
+      </h2>
+      <p className="text-gray-600 dark:text-gray-400 mb-6">
+        {serviceType.toUpperCase()} database connections require a{' '}
+        <span className="font-semibold text-amber-600 dark:text-amber-400 capitalize">
+          {requiredTier}
+        </span>{' '}
+        plan or higher. Your current plan is{' '}
+        <span className="font-semibold capitalize">{currentTier}</span>.
+      </p>
+      <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 mb-6">
+        <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-2">
+          Upgrade to unlock:
+        </h3>
+        <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+          <li>• {serviceType.toUpperCase()} database connections</li>
+          <li>• Advanced configuration options</li>
+          <li>• Priority support</li>
+          <li>• Enhanced security features</li>
+        </ul>
+      </div>
+      <div className="flex justify-center space-x-4">
+        {onUpgrade && (
+          <Button onClick={onUpgrade} variant="primary">
+            Upgrade to {requiredTier}
           </Button>
-          <Button onClick={onUpgrade} className="bg-blue-600 hover:bg-blue-700">
-            Upgrade to Premium
+        )}
+        {onGoBack && (
+          <Button onClick={onGoBack} variant="outline">
+            <ArrowLeftIcon className="w-4 h-4 mr-2" />
+            Choose Different Database
           </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-};
+        )}
+      </div>
+    </div>
+  </div>
+);
 
 // =============================================================================
-// MAIN SERVICE FORM CONTAINER COMPONENT
+// MAIN CONTAINER COMPONENT
 // =============================================================================
+
+/**
+ * Service Form Container Component Props
+ */
+interface ServiceFormContainerComponentProps extends BaseComponentProps {
+  enablePaywall?: boolean;
+  customSteps?: WizardStep[];
+  onSuccess?: (service: DatabaseService) => void;
+  onCancel?: () => void;
+  onError?: (error: ApiErrorResponse) => void;
+}
 
 /**
  * Service Form Container Component
  * 
- * Main container component that orchestrates the database service form workflow.
- * Handles routing, authentication, paywall logic, and form state management.
- * Implements the complete service creation and editing flow with proper error handling.
+ * Main container component that handles database service form page routing,
+ * state initialization, and component orchestration for both creation and
+ * editing workflows.
  */
-export const ServiceFormContainer: React.FC<ServiceFormContainerProps> = ({
+export const ServiceFormContainer: React.FC<ServiceFormContainerComponentProps> = ({
+  enablePaywall = true,
+  customSteps,
+  onSuccess,
+  onCancel,
+  onError,
   className,
-  'data-testid': testId
+  ...props
 }) => {
-  // =============================================================================
-  // ROUTING AND NAVIGATION HOOKS
-  // =============================================================================
-  
-  const params = useParams();
+  // Next.js routing hooks
+  const params = useParams<ServiceFormRouteParams>();
   const searchParams = useSearchParams();
   const router = useRouter();
+
+  // Extract route parameters
+  const serviceParam = params?.service;
+  const serviceId = params?.serviceId ? parseInt(params.serviceId, 10) : undefined;
   
-  // Extract route parameters for mode and service ID detection
-  const serviceId = params?.service ? parseInt(params.service as string, 10) : undefined;
-  const mode: ServiceFormMode = serviceId ? 'edit' : 'create';
-  const returnUrl = searchParams?.get('returnUrl') || '/api-connections/database';
-  
-  // =============================================================================
-  // AUTHENTICATION AND AUTHORIZATION
-  // =============================================================================
-  
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
-  const { 
-    checkFeatureAccess, 
-    isPaywallActive, 
-    openUpgradeDialog,
-    paywallState 
-  } = usePaywall();
-  
-  // =============================================================================
-  // DATABASE SERVICE CONTEXT AND STATE
-  // =============================================================================
-  
-  const {
-    services,
-    selectedService,
-    loading: servicesLoading,
-    error: servicesError,
-    createService,
-    updateService,
-    refreshServices
-  } = useDatabaseServiceContext();
-  
-  const { selectServiceById, clearSelection } = useSelectedService();
-  
-  // =============================================================================
-  // LOCAL COMPONENT STATE
-  // =============================================================================
-  
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [error, setError] = useState<ServiceFormError | null>(null);
-  const [showPaywallModal, setShowPaywallModal] = useState(false);
-  const [blockedServiceType, setBlockedServiceType] = useState<string>('');
-  
-  // =============================================================================
-  // SERVICE DATA LOADING FOR EDIT MODE
-  // =============================================================================
-  
-  /**
-   * Query for loading existing service data in edit mode
-   * Uses React Query for intelligent caching with service data
-   */
-  const {
-    data: existingService,
-    isLoading: serviceLoading,
-    error: serviceError,
-    refetch: refetchService
-  } = useQuery({
-    queryKey: ['database-service', serviceId],
-    queryFn: async () => {
-      if (!serviceId || mode === 'create') return null;
-      
-      // Find service in context first (cache hit)
-      const cachedService = services.find(s => s.id === serviceId);
-      if (cachedService) return cachedService;
-      
-      // Fetch from API if not in cache
-      const response = await fetch(`/api/v2/system/service/${serviceId}`);
-      if (!response.ok) {
-        throw new Error(`Failed to load service: ${response.statusText}`);
-      }
-      
-      return response.json();
-    },
-    enabled: mode === 'edit' && !!serviceId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: (failureCount, error) => {
-      // Don't retry on 404 (service not found)
-      if (error instanceof Error && error.message.includes('404')) {
-        return false;
-      }
-      return failureCount < 3;
-    }
+  // Extract search parameters
+  const modeParam = searchParams?.get('mode') as ServiceFormMode | null;
+  const typeParam = searchParams?.get('type') as DatabaseDriver | null;
+  const cloneParam = searchParams?.get('clone');
+  const redirectParam = searchParams?.get('redirect');
+  const stepParam = searchParams?.get('step');
+
+  // Authentication and context
+  const { user, isAuthenticated, currentTier = 'free' } = useAuth();
+  const { useStore, actions, selectors } = useDatabaseServiceContext();
+  const store = useStore();
+
+  // Container state management
+  const [containerState, setContainerState] = useState<ContainerState>({
+    isLoading: true,
+    isInitialized: false,
+    error: null,
+    service: null,
+    mode: 'create',
+    canAccess: true,
+    tierRequired: null,
   });
-  
-  // =============================================================================
-  // FORM DATA INITIALIZATION
-  // =============================================================================
-  
-  /**
-   * Initialize form data based on mode and existing service
-   * Transforms database service to form data format
-   */
-  const initialFormData = useMemo<Partial<DatabaseServiceFormData> | undefined>(() => {
-    if (mode === 'create') {
-      return {
-        serviceType: 'mysql',
-        name: '',
-        label: '',
-        description: '',
-        isActive: true,
-        host: '',
-        database: '',
-        username: '',
-        password: '',
-        accessType: 'public',
-        requireApiKey: false,
-        enableAuditing: false
-      };
+
+  // Determine operation mode
+  const operationMode = useMemo((): ServiceFormMode => {
+    if (modeParam) return modeParam;
+    if (serviceId) return 'edit';
+    if (cloneParam) return 'clone';
+    return 'create';
+  }, [modeParam, serviceId, cloneParam]);
+
+  // Determine service type for paywall checking
+  const serviceType = useMemo((): DatabaseDriver | null => {
+    if (typeParam) return typeParam;
+    if (containerState.service) return containerState.service.type;
+    return null;
+  }, [typeParam, containerState.service]);
+
+  // Navigation configuration
+  const navigationConfig = useMemo((): NavigationConfig => {
+    const baseUrl = '/api-connections/database';
+    return {
+      backUrl: baseUrl,
+      serviceListUrl: baseUrl,
+      apiDocsUrl: serviceId ? `/api-docs/services/${serviceId}` : undefined,
+      redirectOnSuccess: redirectParam || baseUrl,
+      redirectOnCancel: redirectParam || baseUrl,
+    };
+  }, [serviceId, redirectParam]);
+
+  // Check paywall access for service type
+  const checkPaywallAccess = useCallback((dbType: DatabaseDriver): { canAccess: boolean; tierRequired: ServiceTierAccess | null } => {
+    if (!enablePaywall) {
+      return { canAccess: true, tierRequired: null };
     }
-    
-    if (mode === 'edit' && existingService) {
-      return {
-        serviceType: existingService.type as any,
-        name: existingService.name,
-        label: existingService.label || '',
-        description: existingService.description || '',
-        isActive: existingService.is_active,
-        host: existingService.config?.host || '',
-        port: existingService.config?.port,
-        database: existingService.config?.database || '',
-        username: existingService.config?.username || '',
-        password: '', // Never pre-populate password for security
-        connectionString: existingService.config?.dsn || '',
-        sslEnabled: existingService.config?.ssl_enabled || false,
-        sslMode: existingService.config?.ssl_mode || 'prefer',
-        timezone: existingService.config?.timezone || 'UTC',
-        charset: existingService.config?.charset || 'utf8mb4',
-        poolingEnabled: existingService.config?.pooling_enabled !== false,
-        minConnections: existingService.config?.min_connections || 1,
-        maxConnections: existingService.config?.max_connections || 10,
-        connectionTimeout: existingService.config?.connection_timeout || 30000,
-        accessType: 'public', // Default - would need API to get actual security config
-        allowedRoles: [],
-        allowedApps: [],
-        requireApiKey: false,
-        enableAuditing: false
-      };
-    }
-    
-    return undefined;
-  }, [mode, existingService]);
-  
-  // =============================================================================
-  // PAYWALL AND ACCESS CONTROL
-  // =============================================================================
-  
-  /**
-   * Validate service access based on license and paywall restrictions
-   */
-  const validateServiceAccess = useCallback((): boolean => {
-    if (!isAuthenticated) return false;
-    
-    return checkFeatureAccess('database-services');
-  }, [isAuthenticated, checkFeatureAccess]);
-  
-  /**
-   * Check paywall restrictions for specific service types
-   */
-  const checkPaywallRestrictions = useCallback((serviceType: string): boolean => {
-    const premiumServiceTypes = ['oracle', 'snowflake', 'mongodb'];
-    
-    if (premiumServiceTypes.includes(serviceType)) {
-      return !checkFeatureAccess('premium-databases');
-    }
-    
-    return false;
-  }, [checkFeatureAccess]);
-  
-  // =============================================================================
-  // NAVIGATION HANDLERS
-  // =============================================================================
-  
-  /**
-   * Handle cancel navigation with unsaved changes confirmation
-   */
-  const handleCancel = useCallback(() => {
-    if (hasUnsavedChanges) {
-      const confirmed = window.confirm(
-        'You have unsaved changes. Are you sure you want to leave?'
-      );
-      if (!confirmed) return;
-    }
-    
-    // Clear selected service and navigate back
-    clearSelection();
-    router.push(returnUrl);
-  }, [hasUnsavedChanges, clearSelection, router, returnUrl]);
-  
-  /**
-   * Navigate to API documentation for service
-   */
-  const handleNavigateToApiDocs = useCallback((serviceName: string) => {
-    router.push(`/adf-api-docs/services/${encodeURIComponent(serviceName)}`);
-  }, [router]);
-  
-  // =============================================================================
-  // FORM SUBMISSION HANDLERS
-  // =============================================================================
-  
-  /**
-   * Handle form submission for service creation or update
-   */
-  const handleSubmit = useCallback(async (formData: DatabaseServiceFormData): Promise<void> => {
-    setIsSubmitting(true);
-    setError(null);
-    
+
+    const requiredTier = SERVICE_TIER_MAPPING[dbType] || 'free';
+    const tierLevels = { free: 0, basic: 1, premium: 2, enterprise: 3 };
+    const canAccess = tierLevels[currentTier] >= tierLevels[requiredTier];
+
+    return {
+      canAccess,
+      tierRequired: canAccess ? null : requiredTier,
+    };
+  }, [enablePaywall, currentTier]);
+
+  // Initialize container state and load service data
+  const initializeContainer = useCallback(async () => {
     try {
-      // Check paywall restrictions before submission
-      if (checkPaywallRestrictions(formData.serviceType)) {
-        setBlockedServiceType(formData.serviceType);
-        setShowPaywallModal(true);
+      setContainerState(prev => ({ ...prev, isLoading: true, error: null }));
+
+      // Check authentication
+      if (!isAuthenticated) {
+        router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
         return;
       }
-      
-      // Transform form data to API format
-      const serviceData = {
-        name: formData.name,
-        label: formData.label || formData.name,
-        description: formData.description || '',
-        type: formData.serviceType,
-        is_active: formData.isActive,
-        config: {
-          host: formData.host,
-          port: formData.port,
-          database: formData.database,
-          username: formData.username,
-          password: formData.password,
-          dsn: formData.connectionString,
-          ssl_enabled: formData.sslEnabled,
-          ssl_mode: formData.sslMode,
-          timezone: formData.timezone,
-          charset: formData.charset,
-          pooling_enabled: formData.poolingEnabled,
-          min_connections: formData.minConnections,
-          max_connections: formData.maxConnections,
-          connection_timeout: formData.connectionTimeout
+
+      let service: DatabaseService | null = null;
+      let mode = operationMode;
+
+      // Load existing service for edit/clone modes
+      if (serviceId && (mode === 'edit' || mode === 'view')) {
+        try {
+          const response = await apiClient.get(`/system/service/${serviceId}`);
+          if (response.error) {
+            throw new Error(response.error.message || 'Failed to load service');
+          }
+          service = response.data || response.resource;
+          
+          if (!service) {
+            notFound();
+            return;
+          }
+        } catch (error) {
+          console.error('Failed to load service:', error);
+          setContainerState(prev => ({
+            ...prev,
+            isLoading: false,
+            error: error instanceof Error ? error.message : 'Failed to load service',
+          }));
+          return;
         }
-      };
-      
-      let result: DatabaseService;
-      
-      if (mode === 'create') {
-        result = await createService(serviceData);
-      } else if (mode === 'edit' && serviceId) {
-        result = await updateService(serviceId, serviceData);
-      } else {
-        throw new Error('Invalid form mode or missing service ID');
       }
-      
-      // Clear unsaved changes flag
-      setHasUnsavedChanges(false);
-      
-      // Navigate to service details or API docs
-      if (mode === 'create') {
-        router.push(`/api-connections/database/${result.name}/schema`);
-      } else {
-        router.push(returnUrl);
+
+      // Load service for cloning
+      if (cloneParam && mode === 'clone') {
+        try {
+          const cloneId = parseInt(cloneParam, 10);
+          const response = await apiClient.get(`/system/service/${cloneId}`);
+          if (response.error) {
+            throw new Error(response.error.message || 'Failed to load service for cloning');
+          }
+          const sourceService = response.data || response.resource;
+          
+          if (sourceService) {
+            // Create cloned service data with reset fields
+            service = {
+              ...sourceService,
+              id: undefined,
+              name: `${sourceService.name}_copy`,
+              label: `${sourceService.label} (Copy)`,
+              created_date: undefined,
+              last_modified_date: undefined,
+            } as DatabaseService;
+            mode = 'create';
+          }
+        } catch (error) {
+          console.error('Failed to load service for cloning:', error);
+          setContainerState(prev => ({
+            ...prev,
+            isLoading: false,
+            error: error instanceof Error ? error.message : 'Failed to load service for cloning',
+          }));
+          return;
+        }
       }
-      
-    } catch (err) {
-      console.error('Service submission error:', err);
-      
-      const errorMessage = err instanceof Error 
-        ? err.message 
-        : 'An unexpected error occurred while saving the service';
-      
-      setError({
-        type: 'submission',
-        message: errorMessage,
-        details: err instanceof Error ? err.stack : undefined
+
+      // Check paywall access if service type is determined
+      let canAccess = true;
+      let tierRequired: ServiceTierAccess | null = null;
+
+      const dbType = serviceType || service?.type;
+      if (dbType) {
+        const accessCheck = checkPaywallAccess(dbType);
+        canAccess = accessCheck.canAccess;
+        tierRequired = accessCheck.tierRequired;
+      }
+
+      // Update store with selected service
+      if (service) {
+        store.selectService(service);
+      }
+
+      // Set initialized state
+      setContainerState({
+        isLoading: false,
+        isInitialized: true,
+        error: null,
+        service,
+        mode,
+        canAccess,
+        tierRequired,
       });
-    } finally {
-      setIsSubmitting(false);
+
+    } catch (error) {
+      console.error('Container initialization failed:', error);
+      setContainerState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: error instanceof Error ? error.message : 'Failed to initialize service form',
+      }));
     }
   }, [
-    mode, 
-    serviceId, 
-    createService, 
-    updateService, 
-    checkPaywallRestrictions,
-    router, 
-    returnUrl
+    isAuthenticated,
+    serviceId,
+    operationMode,
+    cloneParam,
+    serviceType,
+    checkPaywallAccess,
+    router,
+    store
   ]);
-  
-  // =============================================================================
-  // PAYWALL HANDLERS
-  // =============================================================================
-  
-  /**
-   * Handle paywall modal close
-   */
-  const handlePaywallClose = useCallback(() => {
-    setShowPaywallModal(false);
-    setBlockedServiceType('');
-  }, []);
-  
-  /**
-   * Handle upgrade to premium workflow
-   */
-  const handleUpgrade = useCallback(() => {
-    setShowPaywallModal(false);
-    openUpgradeDialog();
-  }, [openUpgradeDialog]);
-  
-  // =============================================================================
-  // ERROR HANDLING
-  // =============================================================================
-  
-  /**
-   * Clear current error state
-   */
-  const clearError = useCallback(() => {
-    setError(null);
-  }, []);
-  
-  // =============================================================================
-  // LIFECYCLE EFFECTS
-  // =============================================================================
-  
-  /**
-   * Initialize selected service for edit mode
-   */
+
+  // Initialize container on mount and parameter changes
   useEffect(() => {
-    if (mode === 'edit' && serviceId && existingService) {
-      selectServiceById(serviceId);
-    }
-    
-    return () => {
-      // Cleanup on unmount
-      if (mode === 'edit') {
-        clearSelection();
+    initializeContainer();
+  }, [initializeContainer]);
+
+  // Form submission handler
+  const handleFormSubmit = useCallback(async (formData: ServiceFormInput) => {
+    try {
+      let result: DatabaseService;
+
+      if (containerState.mode === 'create' || containerState.mode === 'clone') {
+        // Create new service
+        result = await actions.createService(formData);
+      } else if (containerState.mode === 'edit' && serviceId) {
+        // Update existing service
+        result = await actions.updateService(serviceId, formData);
+      } else {
+        throw new Error('Invalid operation mode or missing service ID');
       }
+
+      // Call success callback
+      if (onSuccess) {
+        onSuccess(result);
+      }
+
+      // Navigate to success page or service list
+      if (navigationConfig.redirectOnSuccess) {
+        router.push(navigationConfig.redirectOnSuccess);
+      }
+
+    } catch (error) {
+      console.error('Form submission failed:', error);
+      
+      const apiError: ApiErrorResponse = {
+        message: error instanceof Error ? error.message : 'Form submission failed',
+        code: 'FORM_SUBMISSION_ERROR',
+        details: error,
+      };
+
+      if (onError) {
+        onError(apiError);
+      }
+
+      // Set error state for user feedback
+      setContainerState(prev => ({
+        ...prev,
+        error: apiError.message,
+      }));
+    }
+  }, [containerState.mode, serviceId, actions, onSuccess, onError, navigationConfig.redirectOnSuccess, router]);
+
+  // Form cancellation handler
+  const handleFormCancel = useCallback(() => {
+    if (onCancel) {
+      onCancel();
+    } else if (navigationConfig.redirectOnCancel) {
+      router.push(navigationConfig.redirectOnCancel);
+    }
+  }, [onCancel, navigationConfig.redirectOnCancel, router]);
+
+  // Retry initialization handler
+  const handleRetry = useCallback(() => {
+    initializeContainer();
+  }, [initializeContainer]);
+
+  // Navigation handlers
+  const handleGoBack = useCallback(() => {
+    router.push(navigationConfig.backUrl);
+  }, [router, navigationConfig.backUrl]);
+
+  const handleUpgrade = useCallback(() => {
+    // Navigate to upgrade page or show upgrade modal
+    // This would integrate with the actual billing/upgrade system
+    router.push('/upgrade');
+  }, [router]);
+
+  // Prepare wizard steps
+  const wizardSteps = useMemo(() => {
+    return customSteps || DEFAULT_WIZARD_STEPS;
+  }, [customSteps]);
+
+  // Prepare initial form data
+  const initialFormData = useMemo((): Partial<ServiceFormData> | undefined => {
+    if (!containerState.service) return undefined;
+
+    return {
+      name: containerState.service.name,
+      label: containerState.service.label,
+      description: containerState.service.description,
+      type: containerState.service.type,
+      config: containerState.service.config,
+      is_active: containerState.service.is_active,
+      // Map additional fields as needed
     };
-  }, [mode, serviceId, existingService, selectServiceById, clearSelection]);
-  
-  /**
-   * Handle authentication redirects
-   */
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.push(`/login?returnUrl=${encodeURIComponent(window.location.pathname)}`);
+  }, [containerState.service]);
+
+  // Page title and breadcrumbs
+  const pageTitle = useMemo(() => {
+    switch (containerState.mode) {
+      case 'create':
+        return 'Create Database Service';
+      case 'edit':
+        return `Edit ${containerState.service?.label || 'Service'}`;
+      case 'clone':
+        return `Clone ${containerState.service?.label || 'Service'}`;
+      case 'view':
+        return `View ${containerState.service?.label || 'Service'}`;
+      default:
+        return 'Database Service';
     }
-  }, [authLoading, isAuthenticated, router]);
-  
-  /**
-   * Handle access validation
-   */
-  useEffect(() => {
-    if (isAuthenticated && !validateServiceAccess()) {
-      setError({
-        type: 'access',
-        message: 'You do not have permission to manage database services',
-        details: 'Contact your administrator for access to database service management'
-      });
-    }
-  }, [isAuthenticated, validateServiceAccess]);
-  
-  // =============================================================================
-  // CONTEXT VALUE ASSEMBLY
-  // =============================================================================
-  
-  /**
-   * Assemble context value for child components
-   */
-  const contextValue = useMemo<ServiceFormContextValue>(() => ({
-    // Form configuration
-    mode,
-    serviceId,
-    initialData: initialFormData,
-    
-    // State flags
-    isLoading: isLoading || serviceLoading || servicesLoading,
-    isSubmitting,
-    hasUnsavedChanges,
-    
-    // Paywall integration
-    paywallState,
-    isPaywallBlocked: isPaywallActive,
-    
-    // Navigation handlers
-    onCancel: handleCancel,
-    onSubmit: handleSubmit,
-    onNavigateToApiDocs: handleNavigateToApiDocs,
-    
-    // Error handling
-    error,
-    clearError,
-    
-    // Utility functions
-    validateServiceAccess,
-    checkPaywallRestrictions
-  }), [
-    mode,
-    serviceId,
-    initialFormData,
-    isLoading,
-    serviceLoading,
-    servicesLoading,
-    isSubmitting,
-    hasUnsavedChanges,
-    paywallState,
-    isPaywallActive,
-    handleCancel,
-    handleSubmit,
-    handleNavigateToApiDocs,
-    error,
-    clearError,
-    validateServiceAccess,
-    checkPaywallRestrictions
-  ]);
-  
-  // =============================================================================
-  // LOADING AND ERROR STATES
-  // =============================================================================
-  
-  // Show loading spinner during authentication or service data loading
-  if (authLoading || (mode === 'edit' && serviceLoading)) {
+  }, [containerState.mode, containerState.service]);
+
+  // Render loading state
+  if (containerState.isLoading) {
+    return <ContainerLoadingSkeleton />;
+  }
+
+  // Render error state
+  if (containerState.error) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <Spinner size="large" className="mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400">
-            {authLoading ? 'Authenticating...' : 'Loading service details...'}
-          </p>
-        </div>
-      </div>
+      <ContainerError
+        error={containerState.error}
+        onRetry={handleRetry}
+        onGoBack={handleGoBack}
+      />
     );
   }
-  
-  // Show error state for service loading failures
-  if (mode === 'edit' && serviceError) {
+
+  // Render paywall block if access is denied
+  if (!containerState.canAccess && containerState.tierRequired && serviceType) {
     return (
-      <div className="max-w-2xl mx-auto p-6">
-        <Alert variant="destructive" className="mb-6">
-          <ExclamationTriangleIcon className="h-4 w-4" />
-          <div>
-            <h3 className="font-semibold">Failed to Load Service</h3>
-            <p className="text-sm mt-1">
-              {serviceError instanceof Error 
-                ? serviceError.message 
-                : 'Unable to load service details'}
-            </p>
-          </div>
-        </Alert>
-        
-        <div className="flex space-x-3">
-          <Button variant="outline" onClick={handleCancel}>
-            <ArrowLeftIcon className="h-4 w-4 mr-2" />
-            Back to Services
-          </Button>
-          <Button onClick={() => refetchService()}>
-            Try Again
-          </Button>
-        </div>
-      </div>
+      <PaywallAccessBlock
+        serviceType={serviceType}
+        requiredTier={containerState.tierRequired}
+        currentTier={currentTier}
+        onUpgrade={handleUpgrade}
+        onGoBack={handleGoBack}
+      />
     );
   }
-  
-  // Show access denied state
-  if (error?.type === 'access') {
-    return (
-      <div className="max-w-2xl mx-auto p-6">
-        <Alert variant="destructive" className="mb-6">
-          <ShieldExclamationIcon className="h-4 w-4" />
-          <div>
-            <h3 className="font-semibold">Access Denied</h3>
-            <p className="text-sm mt-1">{error.message}</p>
-            {error.details && (
-              <p className="text-xs mt-2 text-gray-500">{error.details}</p>
-            )}
-          </div>
-        </Alert>
-        
-        <Button variant="outline" onClick={handleCancel}>
-          <ArrowLeftIcon className="h-4 w-4 mr-2" />
-          Back to Services
-        </Button>
-      </div>
-    );
-  }
-  
-  // =============================================================================
-  // MAIN RENDER
-  // =============================================================================
-  
+
+  // Render main form container
   return (
-    <div className={cn('min-h-screen bg-gray-50 dark:bg-gray-900', className)} data-testid={testId}>
-      {/* Header Section */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between py-6">
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={handleCancel}
-                className="flex items-center text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 transition-colors"
-              >
-                <ArrowLeftIcon className="h-5 w-5 mr-2" />
-                Back to Services
-              </button>
-              
-              <div className="flex items-center space-x-3">
-                <div className="flex-shrink-0">
-                  <DatabaseIcon className="h-8 w-8 text-blue-600" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                    {mode === 'create' ? 'Create Database Service' : 'Edit Database Service'}
-                  </h1>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {mode === 'create' 
-                      ? 'Configure a new database connection for API generation'
-                      : `Editing service: ${existingService?.name || 'Unknown'}`
-                    }
-                  </p>
-                </div>
-              </div>
+    <div className={cn('service-form-container', className)} {...props}>
+      {/* Page Header */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleGoBack}
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            >
+              <ArrowLeftIcon className="w-4 h-4 mr-2" />
+              Back to Services
+            </Button>
+            <div className="text-sm text-gray-500 dark:text-gray-400">
+              /
             </div>
-            
-            {mode === 'edit' && existingService && (
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+              {pageTitle}
+            </h1>
+          </div>
+
+          <div className="flex items-center space-x-3">
+            {/* View API Docs Button (for existing services) */}
+            {serviceId && containerState.mode !== 'create' && (
               <Button
                 variant="outline"
-                onClick={() => handleNavigateToApiDocs(existingService.name)}
-                className="flex items-center"
+                size="sm"
+                onClick={() => navigationConfig.apiDocsUrl && router.push(navigationConfig.apiDocsUrl)}
+                className="inline-flex items-center"
               >
-                <CogIcon className="h-4 w-4 mr-2" />
-                API Documentation
+                <DocumentTextIcon className="w-4 h-4 mr-2" />
+                API Docs
               </Button>
+            )}
+
+            {/* Status Indicator */}
+            {containerState.service && (
+              <div className="flex items-center space-x-2 text-sm">
+                <div className={cn(
+                  'w-2 h-2 rounded-full',
+                  containerState.service.is_active 
+                    ? 'bg-green-500' 
+                    : 'bg-gray-400'
+                )} />
+                <span className="text-gray-600 dark:text-gray-400">
+                  {containerState.service.is_active ? 'Active' : 'Inactive'}
+                </span>
+              </div>
             )}
           </div>
         </div>
+
+        {/* Service Type Badge */}
+        {serviceType && (
+          <div className="mt-2">
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+              <Cog6ToothIcon className="w-4 h-4 mr-1" />
+              {serviceType.toUpperCase()} Database
+            </span>
+          </div>
+        )}
       </div>
-      
-      {/* Error Display */}
-      {error && error.type !== 'access' && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
-          <Alert variant="destructive" className="mb-6">
-            <ExclamationTriangleIcon className="h-4 w-4" />
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-semibold">
-                  {error.type === 'submission' ? 'Submission Error' : 'Error'}
-                </h3>
-                <p className="text-sm mt-1">{error.message}</p>
-              </div>
-              <Button variant="ghost" size="sm" onClick={clearError}>
-                Dismiss
-              </Button>
-            </div>
-          </Alert>
-        </div>
-      )}
-      
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <ServiceFormContext.Provider value={contextValue}>
-          <ServiceFormWizard
-            mode={mode}
-            initialData={initialFormData}
-            onSubmit={handleSubmit}
-            onCancel={handleCancel}
-            isLoading={isSubmitting}
-            onFormChange={(hasChanges) => setHasUnsavedChanges(hasChanges)}
-          />
-        </ServiceFormContext.Provider>
-      </div>
-      
-      {/* Paywall Modal */}
-      <PaywallModal
-        isOpen={showPaywallModal}
-        onClose={handlePaywallClose}
-        serviceType={blockedServiceType}
-        onUpgrade={handleUpgrade}
-      />
+
+      {/* Service Form Wizard */}
+      <Suspense fallback={<ContainerLoadingSkeleton />}>
+        <ServiceFormWizard
+          mode={containerState.mode}
+          serviceId={serviceId}
+          initialData={initialFormData}
+          steps={wizardSteps}
+          onSubmit={handleFormSubmit}
+          onCancel={handleFormCancel}
+          enablePaywall={enablePaywall}
+          currentTier={currentTier}
+          redirectOnSuccess={navigationConfig.redirectOnSuccess}
+          redirectOnCancel={navigationConfig.redirectOnCancel}
+          submitButtonText={
+            containerState.mode === 'create' ? 'Create Service' :
+            containerState.mode === 'clone' ? 'Clone Service' :
+            'Update Service'
+          }
+          showProgress={true}
+          showStepIndicator={true}
+          enableStepValidation={true}
+          allowSkipOptionalSteps={true}
+        />
+      </Suspense>
     </div>
   );
 };
 
 // =============================================================================
-// EXPORTS
+// EXPORT DEFAULT COMPONENT
 // =============================================================================
 
-export default ServiceFormContainer;
+/**
+ * Default export with Suspense wrapper for dynamic imports
+ */
+const ServiceFormContainerWithSuspense: React.FC<ServiceFormContainerComponentProps> = (props) => (
+  <Suspense fallback={<ContainerLoadingSkeleton />}>
+    <ServiceFormContainer {...props} />
+  </Suspense>
+);
 
-// Export context hook for child components
-export { useServiceFormContext };
+export default ServiceFormContainerWithSuspense;
 
-// Export types for external use
+// Re-export component and types
+export { ServiceFormContainer };
 export type {
-  ServiceFormContextValue,
-  PaywallModalProps
+  ServiceFormContainerComponentProps,
+  ContainerState,
+  ServiceFormRouteParams,
+  ServiceFormSearchParams,
+  NavigationConfig,
 };
