@@ -2,956 +2,991 @@
  * CORS Configuration Table Component
  * 
  * React table component for displaying and managing CORS configuration entries,
- * implementing virtual scrolling for performance with large datasets. Provides 
- * CORS refresh functionality, delete operations, and real-time CORS status updates 
- * using SWR for intelligent caching and synchronization with comprehensive 
+ * implementing virtual scrolling for performance with large datasets. Provides
+ * CORS refresh functionality, delete operations, and real-time CORS status updates
+ * using SWR for intelligent caching and synchronization with comprehensive
  * accessibility features.
  * 
- * Features:
- * - Data fetching with SWR/React Query for intelligent caching per React/Next.js Integration Requirements
- * - Cache hit responses under 50ms per React/Next.js Integration Requirements
- * - Virtual scrolling for large datasets per Section 7.6.2 performance optimization workflows
- * - WCAG 2.1 AA compliance per Section 7.6.4 accessibility requirements
- * - React Hook Form integration for form operations
- * - Comprehensive error handling and loading states
- * - Optimistic updates with rollback capabilities
- * - Keyboard navigation and screen reader support
+ * Replaces Angular DfManageCorsTableComponent with modern React 19/Next.js 15.1+
+ * implementation using Headless UI table patterns and Tailwind CSS styling.
  * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
+ * @fileoverview CORS configuration table with virtual scrolling and accessibility
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
 'use client';
 
-import React, { useCallback, useMemo, useState, useRef, useId, useTransition, startTransition } from 'react';
-import { useVirtualizer } from '@tanstack/react-virtual';
+import React, { 
+  useState, 
+  useCallback, 
+  useMemo, 
+  useId, 
+  useRef,
+  useEffect,
+  startTransition,
+  forwardRef,
+  KeyboardEvent
+} from 'react';
+import { useVirtualizer, type Virtualizer } from '@tanstack/react-virtual';
 import { 
-  CheckCircleIcon, 
-  XCircleIcon, 
-  TrashIcon, 
-  ArrowPathIcon,
-  ExclamationTriangleIcon,
-  EyeIcon,
-  PencilIcon,
-  ChevronUpDownIcon,
-  InformationCircleIcon,
-} from '@heroicons/react/24/outline';
-import { CheckIcon, XMarkIcon } from '@heroicons/react/24/solid';
-import { useCorsOperations } from './use-cors-operations';
+  ChevronDown, 
+  ChevronUp, 
+  MoreHorizontal, 
+  RefreshCw, 
+  Trash2, 
+  Edit,
+  Plus,
+  Search,
+  CheckCircle,
+  XCircle,
+  Clock,
+  Globe,
+  Shield,
+  AlertTriangle
+} from 'lucide-react';
 import { cn } from '../../../lib/utils';
+import { Button } from '../../../components/ui/button';
+import { Dialog } from '../../../components/ui/dialog';
+import { 
+  useCorsOperations,
+  useCorsList,
+  useCorsDelete,
+  useCorsToggle,
+  type CorsConfig,
+  type CorsConfigQuery,
+  type CorsConfigSort 
+} from './use-cors-operations';
+import type { CorsConfig as CorsConfigType } from '../../../types/cors';
+
+// ============================================================================
+// Types and Interfaces
+// ============================================================================
 
 /**
- * CORS Configuration Data Interface
- * Represents a CORS configuration entry with all required fields
+ * Props for the main CORS table component
  */
-interface CorsConfigData {
-  id: number;
-  path: string;
-  description: string;
-  enabled: boolean;
-  origin: string;
-  header: string;
-  exposedHeader: string | null;
-  maxAge: number;
-  method: string[];
-  supportsCredentials: boolean;
-  createdById: number | null;
-  createdDate: string | null;
-  lastModifiedById: number | null;
-  lastModifiedDate: string | null;
-}
-
-/**
- * Table column definition interface
- */
-interface TableColumn {
-  key: keyof CorsConfigData | 'actions';
-  header: string;
-  sortable?: boolean;
-  width?: string;
-  minWidth?: string;
-  cell?: (value: any, row: CorsConfigData) => React.ReactNode;
-  ariaLabel?: string;
-}
-
-/**
- * Sort configuration interface
- */
-interface SortConfig {
-  key: keyof CorsConfigData | null;
-  direction: 'asc' | 'desc';
-}
-
-/**
- * Props for the CORS table component
- */
-interface CorsTableProps {
+export interface CorsTableProps {
   /**
-   * Optional class name for styling
+   * Optional external data for testing/storybook
+   * When provided, disables internal data fetching
+   */
+  data?: CorsConfig[];
+  
+  /**
+   * Whether to show the create button
+   * Defaults to true
+   */
+  allowCreate?: boolean;
+  
+  /**
+   * Whether to show the filter/search functionality
+   * Defaults to true
+   */
+  allowFilter?: boolean;
+  
+  /**
+   * Initial page size for the table
+   * Defaults to 25
+   */
+  initialPageSize?: number;
+  
+  /**
+   * Callback when a row is selected/clicked
+   */
+  onRowSelect?: (corsConfig: CorsConfig) => void;
+  
+  /**
+   * Callback when a row is edited
+   */
+  onRowEdit?: (corsConfig: CorsConfig) => void;
+  
+  /**
+   * Callback when create is triggered
+   */
+  onCreate?: () => void;
+  
+  /**
+   * Additional CSS classes for table styling
    */
   className?: string;
   
   /**
-   * Callback when a CORS configuration is selected
+   * Test ID for testing purposes
    */
-  onSelect?: (corsConfig: CorsConfigData) => void;
-  
-  /**
-   * Callback when edit action is triggered
-   */
-  onEdit?: (corsConfig: CorsConfigData) => void;
-  
-  /**
-   * Callback when view action is triggered
-   */
-  onView?: (corsConfig: CorsConfigData) => void;
-  
-  /**
-   * Currently selected CORS configuration ID
-   */
-  selectedId?: number;
-  
-  /**
-   * Enable bulk selection
-   */
-  enableBulkActions?: boolean;
-  
-  /**
-   * Maximum height for the table container
-   */
-  maxHeight?: number;
-  
-  /**
-   * Show loading overlay
-   */
-  showLoadingOverlay?: boolean;
-  
-  /**
-   * Enable real-time updates
-   */
-  enableRealTimeUpdates?: boolean;
-  
-  /**
-   * Table accessibility label
-   */
-  ariaLabel?: string;
+  'data-testid'?: string;
 }
 
 /**
- * CORS Configuration Table Component
- * 
- * High-performance table component with virtual scrolling for managing
- * CORS configurations with comprehensive accessibility features and
- * intelligent caching through React Query.
+ * Column definition for the CORS table
  */
-export function CorsTable({
-  className,
-  onSelect,
+interface CorsTableColumn {
+  key: keyof CorsConfig | 'actions';
+  header: string;
+  sortable?: boolean;
+  width?: string;
+  align?: 'left' | 'center' | 'right';
+  render?: (value: any, row: CorsConfig) => React.ReactNode;
+}
+
+/**
+ * Virtual table row props
+ */
+interface VirtualRowProps {
+  index: number;
+  corsConfig: CorsConfig;
+  columns: CorsTableColumn[];
+  isSelected: boolean;
+  isEven: boolean;
+  style: React.CSSProperties;
+  onClick: (corsConfig: CorsConfig) => void;
+  onEdit: (corsConfig: CorsConfig) => void;
+  onDelete: (corsConfig: CorsConfig) => void;
+  onToggle: (corsConfig: CorsConfig) => void;
+}
+
+/**
+ * Confirmation dialog props
+ */
+interface DeleteConfirmDialogProps {
+  isOpen: boolean;
+  corsConfig: CorsConfig | null;
+  isDeleting: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+// ============================================================================
+// Constants and Configuration
+// ============================================================================
+
+/**
+ * Default page sizes for pagination
+ */
+const PAGE_SIZES = [10, 25, 50, 100, 250] as const;
+
+/**
+ * Virtual scrolling configuration
+ * Optimized for 1000+ CORS entries per requirements
+ */
+const VIRTUAL_CONFIG = {
+  ESTIMATED_ROW_HEIGHT: 72, // Height per row in pixels
+  OVERSCAN: 10, // Extra rows to render for smooth scrolling
+  BUFFER_SIZE: 50, // Number of items to maintain in memory
+} as const;
+
+/**
+ * Column definitions for the CORS table
+ * Maps to original Angular component columns with React patterns
+ */
+const CORS_TABLE_COLUMNS: CorsTableColumn[] = [
+  {
+    key: 'enabled',
+    header: 'Status',
+    sortable: true,
+    width: 'w-20',
+    align: 'center',
+    render: (enabled: boolean, row: CorsConfig) => (
+      <div 
+        className="flex items-center justify-center"
+        data-testid={`cors-status-${row.id}`}
+      >
+        {enabled ? (
+          <CheckCircle 
+            className="h-5 w-5 text-green-600 dark:text-green-400" 
+            aria-label="CORS configuration enabled"
+          />
+        ) : (
+          <XCircle 
+            className="h-5 w-5 text-red-600 dark:text-red-400" 
+            aria-label="CORS configuration disabled"
+          />
+        )}
+        <span className="sr-only">
+          {enabled ? 'Enabled' : 'Disabled'}
+        </span>
+      </div>
+    ),
+  },
+  {
+    key: 'path',
+    header: 'Path',
+    sortable: true,
+    width: 'w-48',
+    render: (path: string, row: CorsConfig) => (
+      <div 
+        className="font-mono text-sm truncate"
+        title={path}
+        data-testid={`cors-path-${row.id}`}
+      >
+        <Globe className="inline h-4 w-4 mr-2 text-blue-500" aria-hidden="true" />
+        {path}
+      </div>
+    ),
+  },
+  {
+    key: 'description',
+    header: 'Description',
+    sortable: true,
+    width: 'flex-1',
+    render: (description: string, row: CorsConfig) => (
+      <div 
+        className="text-sm text-gray-900 dark:text-gray-100 truncate"
+        title={description}
+        data-testid={`cors-description-${row.id}`}
+      >
+        {description || <span className="text-gray-400 italic">No description</span>}
+      </div>
+    ),
+  },
+  {
+    key: 'origin',
+    header: 'Origin',
+    sortable: true,
+    width: 'w-32',
+    render: (origin: string, row: CorsConfig) => (
+      <div 
+        className="font-mono text-xs truncate"
+        title={origin}
+        data-testid={`cors-origin-${row.id}`}
+      >
+        {origin === '*' ? (
+          <span className="inline-flex items-center px-2 py-1 rounded-full bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200">
+            <AlertTriangle className="h-3 w-3 mr-1" aria-hidden="true" />
+            Any
+          </span>
+        ) : (
+          <span className="inline-flex items-center px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
+            <Shield className="h-3 w-3 mr-1" aria-hidden="true" />
+            {origin}
+          </span>
+        )}
+      </div>
+    ),
+  },
+  {
+    key: 'maxAge',
+    header: 'Max Age',
+    sortable: true,
+    width: 'w-24',
+    align: 'right',
+    render: (maxAge: number, row: CorsConfig) => (
+      <div 
+        className="text-sm font-mono text-right"
+        data-testid={`cors-max-age-${row.id}`}
+      >
+        <Clock className="inline h-4 w-4 mr-1 text-gray-500" aria-hidden="true" />
+        {maxAge.toLocaleString()}s
+      </div>
+    ),
+  },
+  {
+    key: 'actions',
+    header: 'Actions',
+    width: 'w-32',
+    align: 'center',
+  },
+] as const;
+
+// ============================================================================
+// Virtual Row Component
+// ============================================================================
+
+/**
+ * Individual virtualized table row component
+ * Optimized for performance with large datasets
+ */
+const VirtualTableRow = React.memo<VirtualRowProps>(({
+  index,
+  corsConfig,
+  columns,
+  isSelected,
+  isEven,
+  style,
+  onClick,
   onEdit,
-  onView,
-  selectedId,
-  enableBulkActions = false,
-  maxHeight = 600,
-  showLoadingOverlay = false,
-  enableRealTimeUpdates = true,
-  ariaLabel = 'CORS configuration management table',
-}: CorsTableProps) {
-  // Hooks and state management
-  const [isPending, startTransition] = useTransition();
-  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: null, direction: 'asc' });
-  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
-  const [searchTerm, setSearchTerm] = useState('');
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState<number | null>(null);
+  onDelete,
+  onToggle,
+}) => {
+  const rowId = useId();
   
-  // Refs for virtualization and accessibility
-  const tableContainerRef = useRef<HTMLDivElement>(null);
-  const tableId = useId();
-  const captionId = useId();
-  const announcementRef = useRef<HTMLDivElement>(null);
-  
-  // CORS operations hook with intelligent caching
-  const {
-    corsConfigurations,
-    isLoadingList,
-    isFetchingList,
-    isErrorList,
-    lastError,
-    isAnyMutationLoading,
-    deleteCors,
-    bulkDeleteCors,
-    refreshCorsConfigurations,
-    isDeleting,
-    isBulkDeleting,
-    deleteError,
-    bulkDeleteError,
-  } = useCorsOperations({
-    refetchOnFocus: enableRealTimeUpdates,
-    optimisticUpdates: true,
-    onError: (error) => {
-      announceToScreenReader(`Error: ${error.message}`);
-    },
-    onSuccess: () => {
-      announceToScreenReader('CORS configurations updated successfully');
-    },
-  });
-
-  /**
-   * Column definitions with accessibility enhancements
-   */
-  const columns: TableColumn[] = useMemo(() => [
-    {
-      key: 'enabled',
-      header: 'Status',
-      sortable: true,
-      width: '80px',
-      minWidth: '80px',
-      ariaLabel: 'CORS configuration status',
-      cell: (value: boolean) => (
-        <div className="flex items-center justify-center">
-          {value ? (
-            <CheckCircleIcon 
-              className="h-5 w-5 text-green-600 dark:text-green-400" 
-              aria-label="Enabled"
-            />
-          ) : (
-            <XCircleIcon 
-              className="h-5 w-5 text-red-600 dark:text-red-400" 
-              aria-label="Disabled"
-            />
-          )}
-          <span className="sr-only">{value ? 'Enabled' : 'Disabled'}</span>
-        </div>
-      ),
-    },
-    {
-      key: 'path',
-      header: 'Path',
-      sortable: true,
-      minWidth: '150px',
-      ariaLabel: 'CORS path pattern',
-      cell: (value: string) => (
-        <code className="px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded text-sm font-mono text-gray-900 dark:text-gray-100">
-          {value || '/'}
-        </code>
-      ),
-    },
-    {
-      key: 'origin',
-      header: 'Origin',
-      sortable: true,
-      minWidth: '180px',
-      ariaLabel: 'Allowed origin domains',
-      cell: (value: string) => (
-        <span className="text-sm text-gray-900 dark:text-gray-100">
-          {value || '*'}
-        </span>
-      ),
-    },
-    {
-      key: 'method',
-      header: 'Methods',
-      sortable: false,
-      minWidth: '120px',
-      ariaLabel: 'Allowed HTTP methods',
-      cell: (value: string[]) => (
-        <div className="flex flex-wrap gap-1">
-          {value?.length > 0 ? value.map((method) => (
-            <span
-              key={method}
-              className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 text-xs rounded-md font-medium"
-            >
-              {method}
-            </span>
-          )) : (
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              None
-            </span>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: 'maxAge',
-      header: 'Max Age',
-      sortable: true,
-      width: '100px',
-      minWidth: '100px',
-      ariaLabel: 'Cache max age in seconds',
-      cell: (value: number) => (
-        <span className="text-sm text-gray-900 dark:text-gray-100">
-          {value > 0 ? `${value}s` : '0'}
-        </span>
-      ),
-    },
-    {
-      key: 'supportsCredentials',
-      header: 'Credentials',
-      sortable: true,
-      width: '100px',
-      minWidth: '100px',
-      ariaLabel: 'Supports credentials',
-      cell: (value: boolean) => (
-        <div className="flex items-center justify-center">
-          {value ? (
-            <CheckIcon className="h-4 w-4 text-green-600 dark:text-green-400" />
-          ) : (
-            <XMarkIcon className="h-4 w-4 text-red-600 dark:text-red-400" />
-          )}
-          <span className="sr-only">{value ? 'Supports credentials' : 'No credentials'}</span>
-        </div>
-      ),
-    },
-    {
-      key: 'description',
-      header: 'Description',
-      sortable: true,
-      minWidth: '200px',
-      ariaLabel: 'CORS configuration description',
-      cell: (value: string) => (
-        <span 
-          className="text-sm text-gray-900 dark:text-gray-100 truncate block"
-          title={value}
-        >
-          {value || '—'}
-        </span>
-      ),
-    },
-    {
-      key: 'actions',
-      header: 'Actions',
-      sortable: false,
-      width: '120px',
-      minWidth: '120px',
-      ariaLabel: 'Row actions',
-      cell: (_, row: CorsConfigData) => (
-        <div className="flex items-center space-x-2">
-          <button
-            type="button"
-            onClick={() => onView?.(row)}
-            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-            aria-label={`View CORS configuration for ${row.path}`}
-            data-testid={`view-cors-${row.id}`}
-          >
-            <EyeIcon className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-          </button>
-          <button
-            type="button"
-            onClick={() => onEdit?.(row)}
-            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-            aria-label={`Edit CORS configuration for ${row.path}`}
-            data-testid={`edit-cors-${row.id}`}
-          >
-            <PencilIcon className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-          </button>
-          <button
-            type="button"
-            onClick={() => handleDeleteClick(row.id)}
-            disabled={isDeleting}
-            className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors disabled:opacity-50"
-            aria-label={`Delete CORS configuration for ${row.path}`}
-            data-testid={`delete-cors-${row.id}`}
-          >
-            <TrashIcon className="h-4 w-4 text-red-600 dark:text-red-400" />
-          </button>
-        </div>
-      ),
-    },
-  ], [onView, onEdit, isDeleting]);
-
-  /**
-   * Filter and sort data based on search term and sort configuration
-   */
-  const filteredAndSortedData = useMemo(() => {
-    let filtered = corsConfigurations;
-
-    // Apply search filter
-    if (searchTerm) {
-      const searchLower = searchTerm.toLowerCase();
-      filtered = corsConfigurations.filter((cors) =>
-        cors.path?.toLowerCase().includes(searchLower) ||
-        cors.origin?.toLowerCase().includes(searchLower) ||
-        cors.description?.toLowerCase().includes(searchLower) ||
-        cors.method?.some(m => m.toLowerCase().includes(searchLower))
-      );
-    }
-
-    // Apply sorting
-    if (sortConfig.key) {
-      filtered = [...filtered].sort((a, b) => {
-        const aValue = a[sortConfig.key!];
-        const bValue = b[sortConfig.key!];
-        
-        let comparison = 0;
-        if (aValue < bValue) comparison = -1;
-        if (aValue > bValue) comparison = 1;
-        
-        return sortConfig.direction === 'desc' ? comparison * -1 : comparison;
-      });
-    }
-
-    return filtered;
-  }, [corsConfigurations, searchTerm, sortConfig]);
-
-  /**
-   * Virtual scrolling setup for performance with large datasets
-   */
-  const virtualizer = useVirtualizer({
-    count: filteredAndSortedData.length,
-    getScrollElement: () => tableContainerRef.current,
-    estimateSize: () => 56, // Estimated row height in pixels
-    overscan: 10, // Render extra items for smooth scrolling
-  });
-
-  /**
-   * Handle column sorting with accessibility announcements
-   */
-  const handleSort = useCallback((columnKey: keyof CorsConfigData) => {
-    startTransition(() => {
-      setSortConfig(prev => {
-        const newDirection = prev.key === columnKey && prev.direction === 'asc' ? 'desc' : 'asc';
-        const newConfig = { key: columnKey, direction: newDirection };
-        
-        announceToScreenReader(
-          `Table sorted by ${columnKey} in ${newDirection}ending order. ${filteredAndSortedData.length} rows displayed.`
-        );
-        
-        return newConfig;
-      });
-    });
-  }, [filteredAndSortedData.length]);
-
-  /**
-   * Handle row selection for bulk operations
-   */
-  const handleRowSelect = useCallback((corsId: number, selected: boolean) => {
-    startTransition(() => {
-      setSelectedRows(prev => {
-        const newSet = new Set(prev);
-        if (selected) {
-          newSet.add(corsId);
-        } else {
-          newSet.delete(corsId);
-        }
-        
-        announceToScreenReader(
-          `Row ${selected ? 'selected' : 'deselected'}. ${newSet.size} of ${filteredAndSortedData.length} rows selected.`
-        );
-        
-        return newSet;
-      });
-    });
-  }, [filteredAndSortedData.length]);
-
-  /**
-   * Handle bulk selection (select all/none)
-   */
-  const handleBulkSelect = useCallback((selectAll: boolean) => {
-    startTransition(() => {
-      if (selectAll) {
-        const allIds = new Set(filteredAndSortedData.map(cors => cors.id));
-        setSelectedRows(allIds);
-        announceToScreenReader(`All ${allIds.size} rows selected.`);
-      } else {
-        setSelectedRows(new Set());
-        announceToScreenReader('All rows deselected.');
-      }
-    });
-  }, [filteredAndSortedData]);
-
-  /**
-   * Handle delete confirmation
-   */
-  const handleDeleteClick = useCallback((corsId: number) => {
-    setShowDeleteConfirm(corsId);
-    announceToScreenReader('Delete confirmation dialog opened.');
-  }, []);
-
-  /**
-   * Handle delete confirmation
-   */
-  const handleDeleteConfirm = useCallback(async (corsId: number) => {
-    try {
-      await deleteCors(corsId);
-      setShowDeleteConfirm(null);
-      announceToScreenReader('CORS configuration deleted successfully.');
-    } catch (error) {
-      announceToScreenReader(`Failed to delete CORS configuration: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }, [deleteCors]);
-
-  /**
-   * Handle bulk delete
-   */
-  const handleBulkDelete = useCallback(async () => {
-    if (selectedRows.size === 0) return;
-    
-    try {
-      await bulkDeleteCors(Array.from(selectedRows));
-      setSelectedRows(new Set());
-      announceToScreenReader(`${selectedRows.size} CORS configurations deleted successfully.`);
-    } catch (error) {
-      announceToScreenReader(`Failed to delete CORS configurations: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }, [bulkDeleteCors, selectedRows]);
-
-  /**
-   * Handle search input
-   */
-  const handleSearchChange = useCallback((value: string) => {
-    startTransition(() => {
-      setSearchTerm(value);
-      announceToScreenReader(
-        value 
-          ? `Filtering CORS configurations by "${value}". ${filteredAndSortedData.length} results found.`
-          : 'Search filter cleared. Showing all CORS configurations.'
-      );
-    });
-  }, [filteredAndSortedData.length]);
-
-  /**
-   * Handle refresh action
-   */
-  const handleRefresh = useCallback(async () => {
-    try {
-      await refreshCorsConfigurations();
-      announceToScreenReader('CORS configurations refreshed successfully.');
-    } catch (error) {
-      announceToScreenReader(`Failed to refresh CORS configurations: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }, [refreshCorsConfigurations]);
-
-  /**
-   * Screen reader announcements utility
-   */
-  const announceToScreenReader = useCallback((message: string) => {
-    if (announcementRef.current) {
-      announcementRef.current.textContent = message;
-    }
-  }, []);
-
-  /**
-   * Keyboard navigation handler
-   */
-  const handleKeyDown = useCallback((event: React.KeyboardEvent, rowIndex: number) => {
+  const handleKeyDown = useCallback((event: KeyboardEvent<HTMLTableRowElement>) => {
     switch (event.key) {
-      case 'ArrowDown':
-        event.preventDefault();
-        if (rowIndex < filteredAndSortedData.length - 1) {
-          const nextRow = tableContainerRef.current?.querySelector(
-            `[data-row-index="${rowIndex + 1}"]`
-          ) as HTMLElement;
-          nextRow?.focus();
-        }
-        break;
-        
-      case 'ArrowUp':
-        event.preventDefault();
-        if (rowIndex > 0) {
-          const prevRow = tableContainerRef.current?.querySelector(
-            `[data-row-index="${rowIndex - 1}"]`
-          ) as HTMLElement;
-          prevRow?.focus();
-        }
-        break;
-        
       case 'Enter':
       case ' ':
         event.preventDefault();
-        const corsConfig = filteredAndSortedData[rowIndex];
-        if (corsConfig) {
-          onSelect?.(corsConfig);
+        onClick(corsConfig);
+        break;
+      case 'e':
+      case 'E':
+        if (event.ctrlKey || event.metaKey) {
+          event.preventDefault();
+          onEdit(corsConfig);
         }
         break;
-        
-      case 'Home':
-        event.preventDefault();
-        const firstRow = tableContainerRef.current?.querySelector(
-          '[data-row-index="0"]'
-        ) as HTMLElement;
-        firstRow?.focus();
-        break;
-        
-      case 'End':
-        event.preventDefault();
-        const lastRow = tableContainerRef.current?.querySelector(
-          `[data-row-index="${filteredAndSortedData.length - 1}"]`
-        ) as HTMLElement;
-        lastRow?.focus();
+      case 'Delete':
+        if (event.ctrlKey || event.metaKey) {
+          event.preventDefault();
+          onDelete(corsConfig);
+        }
         break;
     }
-  }, [filteredAndSortedData, onSelect]);
-
-  // Loading state
-  if (isLoadingList && corsConfigurations.length === 0) {
-    return (
-      <div 
-        className={cn("space-y-4 p-6", className)}
-        data-testid="cors-table-loading"
-      >
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded mb-4"></div>
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-14 bg-gray-200 dark:bg-gray-700 rounded mb-2"></div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  // Error state
-  if (isErrorList && corsConfigurations.length === 0) {
-    return (
-      <div 
-        className={cn("p-6 text-center", className)}
-        data-testid="cors-table-error"
-        role="alert"
-        aria-live="polite"
-      >
-        <ExclamationTriangleIcon className="h-12 w-12 text-red-500 mx-auto mb-4" />
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-          Failed to Load CORS Configurations
-        </h3>
-        <p className="text-gray-600 dark:text-gray-400 mb-4">
-          {lastError?.message || 'An unexpected error occurred while loading CORS configurations.'}
-        </p>
-        <button
-          onClick={handleRefresh}
-          disabled={isFetchingList}
-          className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          data-testid="retry-load-cors"
-        >
-          {isFetchingList ? 'Retrying...' : 'Try Again'}
-        </button>
-      </div>
-    );
-  }
+  }, [corsConfig, onClick, onEdit, onDelete]);
 
   return (
-    <div 
-      className={cn("flex flex-col h-full", className)}
-      data-testid="cors-table-container"
+    <tr
+      id={rowId}
+      style={style}
+      role="row"
+      tabIndex={0}
+      aria-rowindex={index + 2} // +2 because header is row 1, and rows are 1-indexed
+      aria-selected={isSelected}
+      className={cn(
+        'absolute inset-x-0 flex items-center border-b border-gray-200 dark:border-gray-700 transition-colors',
+        'hover:bg-gray-50 dark:hover:bg-gray-800/50',
+        'focus:bg-blue-50 dark:focus:bg-blue-900/20 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset',
+        isSelected && 'bg-blue-50 dark:bg-blue-900/20',
+        isEven ? 'bg-white dark:bg-gray-900' : 'bg-gray-50/50 dark:bg-gray-800/50'
+      )}
+      onClick={() => onClick(corsConfig)}
+      onKeyDown={handleKeyDown}
+      data-testid={`cors-table-row-${corsConfig.id}`}
+      aria-label={`CORS configuration ${corsConfig.description || corsConfig.path}, ${corsConfig.enabled ? 'enabled' : 'disabled'}`}
     >
-      {/* Header Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
-        {/* Search and Filter Controls */}
-        <div className="flex-1 max-w-md">
-          <label htmlFor="cors-search" className="sr-only">
-            Search CORS configurations
-          </label>
-          <input
-            id="cors-search"
-            type="text"
-            placeholder="Search by path, origin, or description..."
-            value={searchTerm}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            data-testid="cors-search-input"
-          />
-        </div>
-
-        {/* Action Controls */}
-        <div className="flex items-center space-x-2">
-          {/* Bulk Actions */}
-          {enableBulkActions && selectedRows.size > 0 && (
-            <div className="flex items-center space-x-2 mr-4">
-              <span className="text-sm text-gray-600 dark:text-gray-400">
-                {selectedRows.size} selected
-              </span>
-              <button
-                onClick={handleBulkDelete}
-                disabled={isBulkDeleting}
-                className="px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
-                data-testid="bulk-delete-cors"
-                aria-label={`Delete ${selectedRows.size} selected CORS configurations`}
+      {columns.map((column) => (
+        <td
+          key={column.key}
+          role="gridcell"
+          className={cn(
+            'px-4 py-3 text-sm',
+            column.width,
+            column.align === 'center' && 'text-center',
+            column.align === 'right' && 'text-right'
+          )}
+          data-testid={`cors-table-cell-${corsConfig.id}-${column.key}`}
+        >
+          {column.key === 'actions' ? (
+            <div className="flex items-center justify-center space-x-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggle(corsConfig);
+                }}
+                aria-label={`${corsConfig.enabled ? 'Disable' : 'Enable'} CORS configuration ${corsConfig.description || corsConfig.path}`}
+                data-testid={`cors-toggle-button-${corsConfig.id}`}
+                className="h-8 w-8 p-0"
               >
-                {isBulkDeleting ? 'Deleting...' : 'Delete Selected'}
-              </button>
+                {corsConfig.enabled ? (
+                  <XCircle className="h-4 w-4 text-red-600" />
+                ) : (
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                )}
+              </Button>
+              
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit(corsConfig);
+                }}
+                aria-label={`Edit CORS configuration ${corsConfig.description || corsConfig.path}`}
+                data-testid={`cors-edit-button-${corsConfig.id}`}
+                className="h-8 w-8 p-0"
+              >
+                <Edit className="h-4 w-4 text-blue-600" />
+              </Button>
+              
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(corsConfig);
+                }}
+                aria-label={`Delete CORS configuration ${corsConfig.description || corsConfig.path}`}
+                data-testid={`cors-delete-button-${corsConfig.id}`}
+                className="h-8 w-8 p-0"
+              >
+                <Trash2 className="h-4 w-4 text-red-600" />
+              </Button>
             </div>
+          ) : column.render ? (
+            column.render(corsConfig[column.key], corsConfig)
+          ) : (
+            <span className="truncate">
+              {String(corsConfig[column.key] ?? '')}
+            </span>
           )}
+        </td>
+      ))}
+    </tr>
+  );
+});
 
-          {/* Refresh Button */}
-          <button
-            onClick={handleRefresh}
-            disabled={isFetchingList}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            aria-label="Refresh CORS configurations"
-            data-testid="refresh-cors-list"
+VirtualTableRow.displayName = 'VirtualTableRow';
+
+// ============================================================================
+// Delete Confirmation Dialog
+// ============================================================================
+
+const DeleteConfirmDialog: React.FC<DeleteConfirmDialogProps> = ({
+  isOpen,
+  corsConfig,
+  isDeleting,
+  onConfirm,
+  onCancel,
+}) => {
+  return (
+    <Dialog open={isOpen} onClose={onCancel}>
+      <Dialog.Content className="sm:max-w-md">
+        <Dialog.Header>
+          <Dialog.Title className="flex items-center space-x-2">
+            <AlertTriangle className="h-5 w-5 text-red-600" />
+            <span>Delete CORS Configuration</span>
+          </Dialog.Title>
+        </Dialog.Header>
+        
+        <div className="mt-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Are you sure you want to delete the CORS configuration for{' '}
+            <span className="font-mono font-medium text-gray-900 dark:text-gray-100">
+              {corsConfig?.path}
+            </span>
+            ?
+          </p>
+          
+          <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+            This action cannot be undone.
+          </p>
+        </div>
+        
+        <Dialog.Footer className="mt-6">
+          <Button
+            variant="outline"
+            onClick={onCancel}
+            disabled={isDeleting}
+            data-testid="cors-delete-cancel"
           >
-            <ArrowPathIcon 
-              className={cn(
-                "h-5 w-5 text-gray-600 dark:text-gray-400",
-                isFetchingList && "animate-spin"
-              )} 
-            />
-          </button>
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={onConfirm}
+            loading={isDeleting}
+            loadingText="Deleting..."
+            data-testid="cors-delete-confirm"
+          >
+            Delete CORS Configuration
+          </Button>
+        </Dialog.Footer>
+      </Dialog.Content>
+    </Dialog>
+  );
+};
 
-          {/* Status Indicator */}
-          {(isFetchingList || isAnyMutationLoading) && (
-            <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
-              <div className="h-2 w-2 bg-blue-500 rounded-full animate-pulse mr-2"></div>
-              {isFetchingList ? 'Refreshing...' : 'Updating...'}
-            </div>
-          )}
-        </div>
-      </div>
+// ============================================================================
+// Main Component Implementation
+// ============================================================================
 
-      {/* Table Stats */}
-      <div className="px-4 py-2 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
-          <span data-testid="cors-table-stats">
-            {filteredAndSortedData.length} of {corsConfigurations.length} CORS configurations
-            {searchTerm && ` matching "${searchTerm}"`}
-          </span>
-          {enableBulkActions && (
-            <div className="flex items-center space-x-4">
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={selectedRows.size === filteredAndSortedData.length && filteredAndSortedData.length > 0}
-                  onChange={(e) => handleBulkSelect(e.target.checked)}
-                  className="mr-2 rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
-                  aria-label="Select all visible CORS configurations"
-                  data-testid="select-all-cors"
-                />
-                Select All
-              </label>
-            </div>
-          )}
-        </div>
-      </div>
+/**
+ * Main CORS table component with virtual scrolling and accessibility
+ */
+export const CorsTable = forwardRef<HTMLDivElement, CorsTableProps>(({
+  data: externalData,
+  allowCreate = true,
+  allowFilter = true,
+  initialPageSize = 25,
+  onRowSelect,
+  onRowEdit,
+  onCreate,
+  className,
+  'data-testid': testId = 'cors-table',
+}, ref) => {
+  // ============================================================================
+  // State Management
+  // ============================================================================
+  
+  const [selectedRowId, setSelectedRowId] = useState<number | null>(null);
+  const [pageSize, setPageSize] = useState(initialPageSize);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortConfig, setSortConfig] = useState<CorsConfigSort>({
+    field: 'path',
+    direction: 'asc',
+  });
+  const [deleteDialog, setDeleteDialog] = useState<{
+    isOpen: boolean;
+    corsConfig: CorsConfig | null;
+  }>({
+    isOpen: false,
+    corsConfig: null,
+  });
 
-      {/* Table Container with Virtual Scrolling */}
-      <div
-        ref={tableContainerRef}
-        className="flex-1 overflow-auto"
-        style={{ maxHeight }}
-        data-testid="cors-table-scroll-container"
-      >
-        {filteredAndSortedData.length === 0 ? (
-          <div className="p-8 text-center">
-            <InformationCircleIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-              No CORS Configurations Found
-            </h3>
-            <p className="text-gray-600 dark:text-gray-400">
-              {searchTerm 
-                ? `No CORS configurations match "${searchTerm}". Try adjusting your search terms.`
-                : 'No CORS configurations have been created yet.'
-              }
+  // ============================================================================
+  // Data Fetching and Operations
+  // ============================================================================
+  
+  // Build query configuration for API calls
+  const query = useMemo<CorsConfigQuery>(() => ({
+    limit: pageSize,
+    offset: 0,
+    sort: [sortConfig],
+    filter: searchTerm ? {
+      description: searchTerm,
+      path: searchTerm,
+    } : undefined,
+    includeCount: true,
+  }), [pageSize, sortConfig, searchTerm]);
+
+  // Fetch CORS configurations with SWR caching
+  const {
+    data: corsResponse,
+    isLoading: isCorsLoading,
+    error: corsError,
+    mutate: refreshCors,
+  } = useCorsList({
+    query,
+    // Enable auto-refresh every 30 seconds for real-time updates
+    autoRefresh: true,
+    refreshInterval: 30000,
+    // Cache hit responses under 50ms per requirements
+    staleTime: 60000, // 1 minute
+    // Keep previous data during refetches for smooth UX
+    keepPreviousData: true,
+  });
+
+  // Mutation hooks for CORS operations
+  const deleteMutation = useCorsDelete({
+    onSuccess: () => {
+      setDeleteDialog({ isOpen: false, corsConfig: null });
+      // Refresh the table after successful deletion
+      refreshCors();
+    },
+    onError: (error) => {
+      console.error('Failed to delete CORS configuration:', error);
+    },
+  });
+
+  const toggleMutation = useCorsToggle({
+    onSuccess: () => {
+      // Refresh handled automatically by optimistic updates
+      refreshCors();
+    },
+    onError: (error) => {
+      console.error('Failed to toggle CORS configuration:', error);
+    },
+  });
+
+  // ============================================================================
+  // Data Processing
+  // ============================================================================
+  
+  // Use external data for testing or API response for production
+  const corsConfigs = useMemo(() => {
+    if (externalData) return externalData;
+    return corsResponse?.resource || [];
+  }, [externalData, corsResponse?.resource]);
+
+  const totalCount = useMemo(() => {
+    if (externalData) return externalData.length;
+    return corsResponse?.count || 0;
+  }, [externalData, corsResponse?.count]);
+
+  // ============================================================================
+  // Virtual Scrolling Setup
+  // ============================================================================
+  
+  const parentRef = useRef<HTMLDivElement>(null);
+  
+  const virtualizer = useVirtualizer({
+    count: corsConfigs.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => VIRTUAL_CONFIG.ESTIMATED_ROW_HEIGHT,
+    overscan: VIRTUAL_CONFIG.OVERSCAN,
+  });
+
+  // ============================================================================
+  // Event Handlers
+  // ============================================================================
+  
+  const handleRowClick = useCallback((corsConfig: CorsConfig) => {
+    setSelectedRowId(corsConfig.id);
+    onRowSelect?.(corsConfig);
+  }, [onRowSelect]);
+
+  const handleRowEdit = useCallback((corsConfig: CorsConfig) => {
+    onRowEdit?.(corsConfig);
+  }, [onRowEdit]);
+
+  const handleRowDelete = useCallback((corsConfig: CorsConfig) => {
+    setDeleteDialog({
+      isOpen: true,
+      corsConfig,
+    });
+  }, []);
+
+  const handleToggleEnabled = useCallback((corsConfig: CorsConfig) => {
+    toggleMutation.mutate({
+      id: corsConfig.id,
+      enabled: !corsConfig.enabled,
+    });
+  }, [toggleMutation]);
+
+  const handleDeleteConfirm = useCallback(() => {
+    if (deleteDialog.corsConfig) {
+      deleteMutation.mutate({ id: deleteDialog.corsConfig.id });
+    }
+  }, [deleteDialog.corsConfig, deleteMutation]);
+
+  const handleDeleteCancel = useCallback(() => {
+    setDeleteDialog({ isOpen: false, corsConfig: null });
+  }, []);
+
+  const handleRefresh = useCallback(() => {
+    startTransition(() => {
+      refreshCors();
+    });
+  }, [refreshCors]);
+
+  const handleSort = useCallback((field: keyof CorsConfig) => {
+    startTransition(() => {
+      setSortConfig(prev => ({
+        field,
+        direction: prev.field === field && prev.direction === 'asc' ? 'desc' : 'asc',
+      }));
+    });
+  }, []);
+
+  const handleSearch = useCallback((value: string) => {
+    startTransition(() => {
+      setSearchTerm(value);
+    });
+  }, []);
+
+  const handleCreate = useCallback(() => {
+    onCreate?.();
+  }, [onCreate]);
+
+  // ============================================================================
+  // Keyboard Navigation
+  // ============================================================================
+  
+  const handleTableKeyDown = useCallback((event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'F5' || (event.ctrlKey && event.key === 'r')) {
+      event.preventDefault();
+      handleRefresh();
+    }
+  }, [handleRefresh]);
+
+  // ============================================================================
+  // Accessibility Announcements
+  // ============================================================================
+  
+  const tableId = useId();
+  const captionId = useId();
+  const searchId = useId();
+
+  const loadingAnnouncement = isCorsLoading ? 'Loading CORS configurations...' : '';
+  const resultAnnouncement = `${totalCount} CORS configuration${totalCount !== 1 ? 's' : ''} found`;
+
+  // ============================================================================
+  // Render Component
+  // ============================================================================
+  
+  return (
+    <div
+      ref={ref}
+      className={cn('flex flex-col h-full bg-white dark:bg-gray-900', className)}
+      data-testid={testId}
+      onKeyDown={handleTableKeyDown}
+    >
+      {/* Table Header with Controls */}
+      <div className="flex-shrink-0 p-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              CORS Configuration
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Manage Cross-Origin Resource Sharing settings
             </p>
           </div>
-        ) : (
-          <div
-            style={{
-              height: `${virtualizer.getTotalSize()}px`,
-              width: '100%',
-              position: 'relative',
-            }}
-          >
-            {/* Table Header */}
-            <div
-              className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700"
-              role="rowgroup"
+          
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              loading={isCorsLoading}
+              aria-label="Refresh CORS configurations"
+              data-testid="cors-refresh-button"
             >
-              <div className="flex" role="row">
-                {enableBulkActions && (
-                  <div 
-                    className="flex items-center justify-center px-4 py-3 w-12 min-w-[48px]"
-                    role="columnheader"
-                  >
-                    <span className="sr-only">Select</span>
-                  </div>
-                )}
-                
-                {columns.map((column) => (
-                  <div
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+            
+            {allowCreate && (
+              <Button
+                onClick={handleCreate}
+                size="sm"
+                aria-label="Create new CORS configuration"
+                data-testid="cors-create-button"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Create CORS Rule
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Search and Filters */}
+        {allowFilter && (
+          <div className="flex items-center space-x-4">
+            <div className="flex-1 max-w-md">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  id={searchId}
+                  type="text"
+                  placeholder="Search CORS configurations..."
+                  value={searchTerm}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  data-testid="cors-search-input"
+                  aria-label="Filter CORS configurations by description or path"
+                />
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <label htmlFor="page-size-select" className="text-sm text-gray-600 dark:text-gray-400">
+                Per page:
+              </label>
+              <select
+                id="page-size-select"
+                value={pageSize}
+                onChange={(e) => setPageSize(Number(e.target.value))}
+                className="border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-1 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                data-testid="cors-page-size-select"
+                aria-label="Number of CORS configurations per page"
+              >
+                {PAGE_SIZES.map(size => (
+                  <option key={size} value={size}>
+                    {size}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+        
+        {/* Status Information */}
+        <div className="mt-3 flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
+          <div>
+            {corsError ? (
+              <span className="text-red-600 dark:text-red-400">
+                Error loading CORS configurations: {corsError.message}
+              </span>
+            ) : (
+              <span data-testid="cors-count-display">
+                {resultAnnouncement}
+              </span>
+            )}
+          </div>
+          
+          {selectedRowId && (
+            <div className="text-blue-600 dark:text-blue-400">
+              Configuration {selectedRowId} selected
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Virtual Table Container */}
+      <div className="flex-1 overflow-hidden">
+        {/* Table Header */}
+        <div className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+          <table
+            id={tableId}
+            role="table"
+            aria-labelledby={captionId}
+            aria-rowcount={corsConfigs.length + 1}
+            className="w-full"
+          >
+            <caption id={captionId} className="sr-only">
+              CORS configuration table with {totalCount} entries. Use arrow keys to navigate, Enter to select, Ctrl+E to edit, Ctrl+Delete to delete.
+            </caption>
+            
+            <thead>
+              <tr role="row" aria-rowindex={1} className="flex">
+                {CORS_TABLE_COLUMNS.map((column, index) => (
+                  <th
                     key={column.key}
                     role="columnheader"
                     scope="col"
+                    aria-colindex={index + 1}
                     aria-sort={
-                      sortConfig.key === column.key 
+                      column.sortable && sortConfig.field === column.key
                         ? sortConfig.direction === 'asc' ? 'ascending' : 'descending'
                         : column.sortable ? 'none' : undefined
                     }
                     className={cn(
-                      "flex items-center px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider",
-                      column.sortable && "cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700",
-                      column.width && `w-[${column.width}]`,
-                      column.minWidth && `min-w-[${column.minWidth}]`,
-                      !column.width && !column.minWidth && "flex-1"
+                      'px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider',
+                      column.width,
+                      column.align === 'center' && 'text-center',
+                      column.align === 'right' && 'text-right',
+                      column.sortable && 'cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 focus:bg-gray-100 dark:focus:bg-gray-700 focus:outline-none',
                     )}
-                    style={{
-                      width: column.width,
-                      minWidth: column.minWidth,
-                    }}
-                    onClick={column.sortable ? () => handleSort(column.key as keyof CorsConfigData) : undefined}
                     tabIndex={column.sortable ? 0 : undefined}
+                    onClick={column.sortable ? () => handleSort(column.key as keyof CorsConfig) : undefined}
                     onKeyDown={column.sortable ? (e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
-                        handleSort(column.key as keyof CorsConfigData);
+                        handleSort(column.key as keyof CorsConfig);
                       }
                     } : undefined}
-                    aria-label={column.ariaLabel}
+                    data-testid={`cors-header-${column.key}`}
                   >
-                    <span>{column.header}</span>
-                    {column.sortable && (
-                      <ChevronUpDownIcon className="ml-1 h-4 w-4" aria-hidden="true" />
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Virtual Table Rows */}
-            {virtualizer.getVirtualItems().map((virtualRow) => {
-              const corsConfig = filteredAndSortedData[virtualRow.index];
-              const isSelected = selectedRows.has(corsConfig.id);
-              
-              return (
-                <div
-                  key={corsConfig.id}
-                  data-row-index={virtualRow.index}
-                  role="row"
-                  aria-selected={isSelected}
-                  tabIndex={0}
-                  className={cn(
-                    "absolute top-0 left-0 w-full flex items-center border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 focus:bg-primary-50 dark:focus:bg-primary-900/20 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-inset transition-colors",
-                    selectedId === corsConfig.id && "bg-primary-50 dark:bg-primary-900/20",
-                    isSelected && "bg-blue-50 dark:bg-blue-900/20"
-                  )}
-                  style={{
-                    height: `${virtualRow.size}px`,
-                    transform: `translateY(${virtualRow.start}px)`,
-                  }}
-                  onClick={() => onSelect?.(corsConfig)}
-                  onKeyDown={(e) => handleKeyDown(e, virtualRow.index)}
-                  data-testid={`cors-row-${corsConfig.id}`}
-                >
-                  {enableBulkActions && (
-                    <div className="flex items-center justify-center px-4 w-12 min-w-[48px]" role="gridcell">
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={(e) => {
-                          e.stopPropagation();
-                          handleRowSelect(corsConfig.id, e.target.checked);
-                        }}
-                        className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
-                        aria-label={`Select CORS configuration for ${corsConfig.path}`}
-                        data-testid={`select-cors-${corsConfig.id}`}
-                      />
-                    </div>
-                  )}
-                  
-                  {columns.map((column) => (
-                    <div
-                      key={column.key}
-                      role="gridcell"
-                      className={cn(
-                        "px-4 py-3 text-sm",
-                        column.width && `w-[${column.width}]`,
-                        column.minWidth && `min-w-[${column.minWidth}]`,
-                        !column.width && !column.minWidth && "flex-1"
+                    <div className="flex items-center space-x-1">
+                      <span>{column.header}</span>
+                      {column.sortable && (
+                        <span className="ml-1">
+                          {sortConfig.field === column.key ? (
+                            sortConfig.direction === 'asc' ? (
+                              <ChevronUp className="h-4 w-4" aria-hidden="true" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" aria-hidden="true" />
+                            )
+                          ) : (
+                            <div className="h-4 w-4 opacity-50">
+                              <ChevronUp className="h-2 w-4" aria-hidden="true" />
+                              <ChevronDown className="h-2 w-4 -mt-1" aria-hidden="true" />
+                            </div>
+                          )}
+                        </span>
                       )}
-                      style={{
-                        width: column.width,
-                        minWidth: column.minWidth,
-                      }}
-                    >
-                      {column.cell 
-                        ? column.cell(corsConfig[column.key as keyof CorsConfigData], corsConfig)
-                        : String(corsConfig[column.key as keyof CorsConfigData] || '')
-                      }
                     </div>
-                  ))}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+          </table>
+        </div>
+
+        {/* Virtual Table Body */}
+        <div
+          ref={parentRef}
+          className="flex-1 overflow-auto"
+          style={{ height: '100%' }}
+          data-testid="cors-table-body"
+        >
+          {corsConfigs.length > 0 ? (
+            <div
+              style={{
+                height: `${virtualizer.getTotalSize()}px`,
+                width: '100%',
+                position: 'relative',
+              }}
+            >
+              {virtualizer.getVirtualItems().map(virtualItem => {
+                const corsConfig = corsConfigs[virtualItem.index];
+                const isSelected = selectedRowId === corsConfig.id;
+                const isEven = virtualItem.index % 2 === 0;
+
+                return (
+                  <VirtualTableRow
+                    key={corsConfig.id}
+                    index={virtualItem.index}
+                    corsConfig={corsConfig}
+                    columns={CORS_TABLE_COLUMNS}
+                    isSelected={isSelected}
+                    isEven={isEven}
+                    style={{
+                      transform: `translateY(${virtualItem.start}px)`,
+                      height: `${virtualItem.size}px`,
+                    }}
+                    onClick={handleRowClick}
+                    onEdit={handleRowEdit}
+                    onDelete={handleRowDelete}
+                    onToggle={handleToggleEnabled}
+                  />
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-64">
+              {isCorsLoading ? (
+                <div className="flex items-center space-x-2 text-gray-500">
+                  <RefreshCw className="h-5 w-5 animate-spin" />
+                  <span>Loading CORS configurations...</span>
                 </div>
-              );
-            })}
-          </div>
-        )}
+              ) : corsError ? (
+                <div className="text-center text-red-600 dark:text-red-400">
+                  <AlertTriangle className="h-8 w-8 mx-auto mb-2" />
+                  <p>Failed to load CORS configurations</p>
+                  <p className="text-sm mt-1">{corsError.message}</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRefresh}
+                    className="mt-3"
+                  >
+                    Try Again
+                  </Button>
+                </div>
+              ) : (
+                <div className="text-center text-gray-500 dark:text-gray-400">
+                  <Globe className="h-8 w-8 mx-auto mb-2" />
+                  <p>No CORS configurations found</p>
+                  {allowCreate && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCreate}
+                      className="mt-3"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create First CORS Rule
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Screen Reader Announcements */}
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {loadingAnnouncement || resultAnnouncement}
+        {selectedRowId && ` Selected configuration ${selectedRowId}.`}
       </div>
 
       {/* Delete Confirmation Dialog */}
-      {showDeleteConfirm && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="delete-dialog-title"
-          aria-describedby="delete-dialog-description"
-          data-testid="delete-confirmation-dialog"
-        >
-          <div className="bg-white dark:bg-gray-900 rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 
-              id="delete-dialog-title"
-              className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2"
-            >
-              Delete CORS Configuration
-            </h3>
-            <p 
-              id="delete-dialog-description"
-              className="text-gray-600 dark:text-gray-400 mb-6"
-            >
-              Are you sure you want to delete this CORS configuration? This action cannot be undone.
-            </p>
-            <div className="flex justify-end space-x-4">
-              <button
-                onClick={() => setShowDeleteConfirm(null)}
-                className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
-                data-testid="cancel-delete-cors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleDeleteConfirm(showDeleteConfirm)}
-                disabled={isDeleting}
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                data-testid="confirm-delete-cors"
-              >
-                {isDeleting ? 'Deleting...' : 'Delete'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Screen Reader Announcements */}
-      <div
-        ref={announcementRef}
-        className="sr-only"
-        aria-live="polite"
-        aria-atomic="true"
-        data-testid="screen-reader-announcements"
+      <DeleteConfirmDialog
+        isOpen={deleteDialog.isOpen}
+        corsConfig={deleteDialog.corsConfig}
+        isDeleting={deleteMutation.isLoading}
+        onConfirm={handleDeleteConfirm}
+        onCancel={handleDeleteCancel}
       />
-
-      {/* Table Caption for Screen Readers */}
-      <div className="sr-only">
-        <p id={captionId}>
-          {ariaLabel}. Use arrow keys to navigate between rows. Press Enter or Space to select a row.
-          {filteredAndSortedData.length > 0 && ` Currently showing ${filteredAndSortedData.length} CORS configurations.`}
-          {selectedRows.size > 0 && ` ${selectedRows.size} rows selected.`}
-        </p>
-      </div>
-
-      {/* Loading Overlay */}
-      {showLoadingOverlay && isAnyMutationLoading && (
-        <div 
-          className="absolute inset-0 bg-white dark:bg-gray-900 bg-opacity-75 flex items-center justify-center z-40"
-          data-testid="loading-overlay"
-        >
-          <div className="flex items-center space-x-3">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600"></div>
-            <span className="text-gray-900 dark:text-gray-100">
-              {isDeleting ? 'Deleting CORS configuration...' : 
-               isBulkDeleting ? 'Deleting CORS configurations...' : 
-               'Processing...'}
-            </span>
-          </div>
-        </div>
-      )}
     </div>
   );
-}
+});
+
+CorsTable.displayName = 'CorsTable';
+
+// ============================================================================
+// Export Component and Types
+// ============================================================================
 
 export default CorsTable;
+
+export type {
+  CorsTableProps,
+  CorsTableColumn,
+  VirtualRowProps,
+  DeleteConfirmDialogProps,
+};
