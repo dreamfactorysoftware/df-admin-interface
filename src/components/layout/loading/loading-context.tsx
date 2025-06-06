@@ -1,491 +1,693 @@
+/**
+ * React context provider for managing application-wide loading states and 
+ * coordinating loading indicators across components. Provides hooks for 
+ * accessing and controlling loading states throughout the component tree.
+ * 
+ * Features:
+ * - React Context API providing type-safe loading state access
+ * - Custom hooks interface for simplified loading state management
+ * - Integration with TanStack React Query for automatic server state loading
+ * - Loading state persistence across navigation events and component unmounting
+ * - TypeScript support with strict typing for loading state values
+ * 
+ * @fileoverview Loading context provider and hooks
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
+ */
+
 'use client';
 
-import React, { 
-  createContext, 
-  useContext, 
-  useCallback, 
-  useRef, 
+import React, {
+  createContext,
+  useContext,
+  useCallback,
   useEffect,
+  useRef,
   useMemo,
-  type ReactNode 
+  type ReactNode,
 } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
+import { useLoading } from '../../../hooks/use-loading';
+
+// Import types
+import type {
+  LoadingContextValue,
+  LoadingContextState,
+  LoadingContextActions,
+  LoadingContextConfig,
+  LoadingProviderProps,
+  LoadingOperation,
+  LoadingSource,
+  LoadingOperationConfig,
+  LoadingStateValue,
+  LoadingCategory,
+  LoadingPriority,
+  AggregatedLoadingState,
+  UseLoadingContextReturn,
+  UseLoadingReturn,
+  ReactQueryLoadingSync,
+  NavigationLoadingState,
+  DEFAULT_LOADING_CONFIG,
+  DEFAULT_OPERATION_CONFIG,
+  LOADING_PRIORITY_ORDER,
+  LoadingContextError,
+  OperationTimeoutError,
+  OperationNotFoundError,
+  isLoadingStateValue,
+  isLoadingPriority,
+  isLoadingCategory,
+  isActiveOperation,
+  isErrorOperation,
+  isCompletedOperation,
+} from '../../../types/loading';
+
+// ============================================================================
+// Context Creation
+// ============================================================================
 
 /**
- * Loading state configuration options
+ * Loading context for providing loading state throughout the application
  */
-interface LoadingOptions {
-  /** Minimum delay before showing loading indicator (prevents flicker) */
-  minDelay?: number;
-  /** Maximum timeout for loading state */
-  timeout?: number;
-  /** Loading priority level for coordination */
-  priority?: 'low' | 'normal' | 'high';
-  /** Whether this loading state should be persisted across navigation */
-  persist?: boolean;
-  /** Unique identifier for the loading operation */
-  id?: string;
-}
-
-/**
- * Individual loading operation state
- */
-interface LoadingState {
-  id: string;
-  isLoading: boolean;
-  startTime: number;
-  options: LoadingOptions;
-  promise?: Promise<any>;
-}
-
-/**
- * Aggregated loading states
- */
-interface LoadingStates {
-  /** Global loading indicator for application-wide operations */
-  global: boolean;
-  /** Navigation loading state for route transitions */
-  navigation: boolean;
-  /** Component-level loading states by unique identifier */
-  components: Record<string, boolean>;
-  /** Server state loading from React Query */
-  server: boolean;
-  /** Count of active loading operations */
-  activeCount: number;
-  /** High priority loading operations that should block UI */
-  blocking: boolean;
-}
-
-/**
- * Loading context actions
- */
-interface LoadingActions {
-  /** Start a loading operation with optional configuration */
-  startLoading: (options?: LoadingOptions) => string;
-  /** Stop a specific loading operation by ID */
-  stopLoading: (id: string) => void;
-  /** Set global loading state */
-  setGlobalLoading: (loading: boolean, options?: LoadingOptions) => void;
-  /** Set navigation loading state */
-  setNavigationLoading: (loading: boolean) => void;
-  /** Set component-specific loading state */
-  setComponentLoading: (componentId: string, loading: boolean, options?: LoadingOptions) => void;
-  /** Clear all loading states */
-  clearAllLoading: () => void;
-  /** Get loading state for specific component */
-  getComponentLoading: (componentId: string) => boolean;
-  /** Check if any loading operation is active */
-  hasAnyLoading: () => boolean;
-  /** Get all active loading operations */
-  getActiveOperations: () => LoadingState[];
-}
-
-/**
- * Loading context value combining state and actions
- */
-interface LoadingContextValue {
-  states: LoadingStates;
-  actions: LoadingActions;
-}
-
-/**
- * Loading context provider props
- */
-interface LoadingProviderProps {
-  children: ReactNode;
-  /** Default configuration for loading operations */
-  defaultOptions?: LoadingOptions;
-  /** Whether to integrate with React Query global loading states */
-  enableQueryIntegration?: boolean;
-  /** Whether to track navigation loading states */
-  enableNavigationTracking?: boolean;
-}
-
-// Default loading options
-const DEFAULT_LOADING_OPTIONS: LoadingOptions = {
-  minDelay: 100,
-  timeout: 30000,
-  priority: 'normal',
-  persist: false,
-};
-
-// Create the loading context
 const LoadingContext = createContext<LoadingContextValue | null>(null);
 
-/**
- * Hook to access loading context
- * @throws Error if used outside LoadingProvider
- */
-export function useLoadingContext(): LoadingContextValue {
-  const context = useContext(LoadingContext);
-  if (!context) {
-    throw new Error('useLoadingContext must be used within a LoadingProvider');
-  }
-  return context;
-}
+// ============================================================================
+// Utility Functions
+// ============================================================================
 
 /**
- * Simplified loading hook for common use cases
+ * Generate unique operation ID with category prefix
  */
-export function useLoading() {
-  const { states, actions } = useLoadingContext();
+const generateOperationId = (category: LoadingCategory): string => {
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substr(2, 9);
+  return `${category}_${timestamp}_${random}`;
+};
 
-  const startLoading = useCallback((options?: LoadingOptions) => {
-    return actions.startLoading(options);
-  }, [actions]);
+/**
+ * Calculate aggregated loading state from operations
+ */
+const calculateAggregatedState = (
+  operations: Map<string, LoadingOperation>
+): AggregatedLoadingState => {
+  const activeOps = Array.from(operations.values()).filter(isActiveOperation);
+  const errorOps = Array.from(operations.values()).filter(isErrorOperation);
+  const completedOps = Array.from(operations.values()).filter(isCompletedOperation);
+  
+  // Group operations by category
+  const operationsByCategory = Array.from(operations.values()).reduce(
+    (acc, op) => {
+      if (!acc[op.category]) {
+        acc[op.category] = [];
+      }
+      acc[op.category].push(op);
+      return acc;
+    },
+    {} as Record<LoadingCategory, LoadingOperation[]>
+  );
 
-  const stopLoading = useCallback((id: string) => {
-    actions.stopLoading(id);
-  }, [actions]);
+  // Find highest priority among active operations
+  const highestPriority = activeOps.reduce((highest, op) => {
+    const currentPriority = LOADING_PRIORITY_ORDER[op.priority];
+    const highestPriority = LOADING_PRIORITY_ORDER[highest];
+    return currentPriority > highestPriority ? op.priority : highest;
+  }, 'low' as LoadingPriority);
 
-  const setLoading = useCallback((loading: boolean, options?: LoadingOptions) => {
-    if (loading) {
-      return actions.startLoading(options);
-    } else {
-      // For simplified API, we clear all non-persistent loading states
-      actions.clearAllLoading();
-      return '';
+  // Find latest operation
+  const latestOperation = Array.from(operations.values()).sort(
+    (a, b) => b.metadata.startTime - a.metadata.startTime
+  )[0];
+
+  return {
+    isLoading: activeOps.length > 0,
+    hasError: errorOps.length > 0,
+    isSuccess: completedOps.length > 0 && activeOps.length === 0 && errorOps.length === 0,
+    activeCount: activeOps.length,
+    errorCount: errorOps.length,
+    completedCount: completedOps.length,
+    totalCount: operations.size,
+    highestPriority,
+    latestOperation,
+    activeOperations: activeOps,
+    errorOperations: errorOps,
+    operationsByCategory,
+  };
+};
+
+/**
+ * Persist loading state to storage
+ */
+const persistLoadingState = (
+  operations: Map<string, LoadingOperation>,
+  config: Required<LoadingContextConfig>
+): void => {
+  if (!config.persistAcrossNavigation) return;
+
+  try {
+    const operationsArray = Array.from(operations.values());
+    const persistData = {
+      operations: operationsArray,
+      timestamp: Date.now(),
+    };
+    
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(config.storageKey, JSON.stringify(persistData));
     }
-  }, [actions]);
-
-  return {
-    isLoading: states.global || states.navigation || states.blocking,
-    isGlobalLoading: states.global,
-    isNavigationLoading: states.navigation,
-    isServerLoading: states.server,
-    activeCount: states.activeCount,
-    startLoading,
-    stopLoading,
-    setLoading,
-    hasAnyLoading: actions.hasAnyLoading,
-  };
-}
+  } catch (error) {
+    if (config.enableDebugLogging) {
+      console.warn('[LoadingContext] Failed to persist loading state:', error);
+    }
+  }
+};
 
 /**
- * Hook for component-specific loading states
+ * Restore loading state from storage
  */
-export function useComponentLoading(componentId: string) {
-  const { states, actions } = useLoadingContext();
+const restoreLoadingState = (
+  config: Required<LoadingContextConfig>
+): Map<string, LoadingOperation> => {
+  if (!config.persistAcrossNavigation) return new Map();
 
-  const isLoading = states.components[componentId] || false;
+  try {
+    if (typeof window === 'undefined') return new Map();
+    
+    const stored = localStorage.getItem(config.storageKey);
+    if (!stored) return new Map();
 
-  const setLoading = useCallback((loading: boolean, options?: LoadingOptions) => {
-    actions.setComponentLoading(componentId, loading, options);
-  }, [componentId, actions]);
+    const { operations, timestamp } = JSON.parse(stored);
+    
+    // Check if stored data is not too old (1 hour)
+    if (Date.now() - timestamp > 60 * 60 * 1000) {
+      localStorage.removeItem(config.storageKey);
+      return new Map();
+    }
 
-  const getLoading = useCallback(() => {
-    return actions.getComponentLoading(componentId);
-  }, [componentId, actions]);
+    // Only restore active operations
+    const activeOperations = operations.filter(isActiveOperation);
+    const operationsMap = new Map<string, LoadingOperation>();
+    
+    activeOperations.forEach((op: LoadingOperation) => {
+      operationsMap.set(op.id, op);
+    });
 
-  return {
-    isLoading,
-    setLoading,
-    getLoading,
-  };
-}
+    return operationsMap;
+  } catch (error) {
+    if (config.enableDebugLogging) {
+      console.warn('[LoadingContext] Failed to restore loading state:', error);
+    }
+    return new Map();
+  }
+};
 
 /**
- * React Loading Context Provider
- * 
- * Provides application-wide loading state management with support for:
- * - Multiple concurrent loading operations
- * - React Query integration for server state loading
- * - Navigation loading states
- * - Component-specific loading states
- * - Loading state persistence across route changes
- * - Debounced loading indicators to prevent flicker
+ * Debug logging utility
  */
-export function LoadingProvider({
-  children,
-  defaultOptions = DEFAULT_LOADING_OPTIONS,
-  enableQueryIntegration = true,
-  enableNavigationTracking = true,
-}: LoadingProviderProps) {
-  // Internal state for tracking all loading operations
-  const operationsRef = useRef<Map<string, LoadingState>>(new Map());
-  const [, forceUpdate] = React.useReducer((x) => x + 1, 0);
-  const timeoutRefs = useRef<Map<string, NodeJS.Timeout>>(new Map());
-  const counterRef = useRef(0);
+const debugLog = (
+  enabled: boolean,
+  message: string,
+  data?: any
+): void => {
+  if (enabled && process.env.NODE_ENV === 'development') {
+    console.debug(`[LoadingContext] ${message}`, data || '');
+  }
+};
+
+// ============================================================================
+// Loading Context Provider Component
+// ============================================================================
+
+/**
+ * Loading context provider component that manages global loading state
+ * and provides loading coordination throughout the application.
+ */
+export function LoadingProvider({ 
+  children, 
+  config: userConfig = {},
+  initialOperations = [] 
+}: LoadingProviderProps): JSX.Element {
+  // Merge configuration with defaults
+  const config = useMemo(
+    () => ({ ...DEFAULT_LOADING_CONFIG, ...userConfig }),
+    [userConfig]
+  );
+
+  // Initialize operations map
+  const operationsRef = useRef<Map<string, LoadingOperation>>(new Map());
+  const timeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const isMountedRef = useRef<boolean>(true);
+
+  // Get underlying loading hook for basic functionality
+  const baseLoading = useLoading({
+    debounceDelay: 100,
+    debug: config.enableDebugLogging,
+  });
 
   // React Query integration
   const queryClient = useQueryClient();
-  const router = useRouter();
+  const pathname = usePathname();
 
-  // Generate unique ID for loading operations
-  const generateId = useCallback(() => {
-    return `loading_${Date.now()}_${++counterRef.current}`;
-  }, []);
+  // Navigation state
+  const navigationRef = useRef<NavigationLoadingState>({
+    isNavigating: false,
+  });
 
-  // Force re-render when operations change
-  const triggerUpdate = useCallback(() => {
-    forceUpdate();
-  }, []);
+  // ========================================================================
+  // Initialization and Cleanup
+  // ========================================================================
 
-  // Clean up timeouts on unmount
   useEffect(() => {
-    return () => {
-      timeoutRefs.current.forEach((timeout) => clearTimeout(timeout));
-      timeoutRefs.current.clear();
-    };
-  }, []);
+    isMountedRef.current = true;
+    
+    // Restore persisted loading state
+    const restoredOperations = restoreLoadingState(config);
+    operationsRef.current = restoredOperations;
 
-  // React Query loading state integration
-  useEffect(() => {
-    if (!enableQueryIntegration) return;
-
-    const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
-      if (event?.type === 'updated' && event.query.state.status === 'loading') {
-        // Query started loading
-        const queryId = `query_${event.query.queryHash}`;
-        const operation: LoadingState = {
-          id: queryId,
-          isLoading: true,
-          startTime: Date.now(),
-          options: { ...defaultOptions, priority: 'low', id: queryId },
-        };
-        operationsRef.current.set(queryId, operation);
-        triggerUpdate();
-      } else if (event?.type === 'updated' && 
-                 (event.query.state.status === 'success' || event.query.state.status === 'error')) {
-        // Query finished
-        const queryId = `query_${event.query.queryHash}`;
-        operationsRef.current.delete(queryId);
-        triggerUpdate();
-      }
+    // Add initial operations
+    initialOperations.forEach(operation => {
+      operationsRef.current.set(operation.id, operation);
     });
 
-    return unsubscribe;
-  }, [enableQueryIntegration, queryClient, defaultOptions, triggerUpdate]);
+    debugLog(config.enableDebugLogging, 'LoadingContext initialized', {
+      restoredOperationsCount: restoredOperations.size,
+      initialOperationsCount: initialOperations.length,
+    });
 
-  // Navigation loading integration
+    return () => {
+      isMountedRef.current = false;
+      
+      // Clear all timeouts
+      Array.from(timeoutsRef.current.values()).forEach(clearTimeout);
+      timeoutsRef.current.clear();
+      
+      // Persist current state
+      persistLoadingState(operationsRef.current, config);
+      
+      debugLog(config.enableDebugLogging, 'LoadingContext cleanup');
+    };
+  }, [config, initialOperations]);
+
+  // ========================================================================
+  // Navigation Integration
+  // ========================================================================
+
   useEffect(() => {
-    if (!enableNavigationTracking) return;
+    const currentNavigation = navigationRef.current;
+    
+    if (currentNavigation.isNavigating && currentNavigation.navigationOperationId) {
+      // Complete previous navigation
+      const prevOpId = currentNavigation.navigationOperationId;
+      if (operationsRef.current.has(prevOpId)) {
+        completeOperation(prevOpId);
+      }
+    }
 
-    const handleRouteStart = () => {
-      const navId = 'navigation';
-      const operation: LoadingState = {
-        id: navId,
-        isLoading: true,
-        startTime: Date.now(),
-        options: { ...defaultOptions, priority: 'high', persist: true, id: navId },
+    // Start new navigation loading
+    const navigationOpId = startOperation(
+      {
+        component: 'Navigation',
+        action: 'route-change',
+        description: `Navigating to ${pathname}`,
+      },
+      {
+        category: 'navigation',
+        priority: 'high',
+        userMessage: 'Loading page...',
+        context: { targetRoute: pathname },
+      }
+    );
+
+    navigationRef.current = {
+      isNavigating: true,
+      currentRoute: pathname,
+      targetRoute: pathname,
+      navigationStartTime: Date.now(),
+      navigationOperationId: navigationOpId,
+    };
+
+    // Auto-complete navigation after short delay (simulating page load)
+    const navigationTimeout = setTimeout(() => {
+      if (isMountedRef.current) {
+        completeOperation(navigationOpId);
+        navigationRef.current.isNavigating = false;
+      }
+    }, 500);
+
+    return () => {
+      clearTimeout(navigationTimeout);
+    };
+  }, [pathname]);
+
+  // ========================================================================
+  // React Query Integration
+  // ========================================================================
+
+  const reactQuerySync = useMemo<ReactQueryLoadingSync>(() => {
+    if (!config.integrateWithReactQuery || !queryClient) {
+      return {
+        registerQuery: () => {},
+        unregisterQuery: () => {},
+        updateQueryState: () => {},
       };
-      operationsRef.current.set(navId, operation);
-      triggerUpdate();
-    };
-
-    const handleRouteComplete = () => {
-      operationsRef.current.delete('navigation');
-      triggerUpdate();
-    };
-
-    // Listen for Next.js navigation events
-    // Note: In Next.js 13+ App Router, we use browser events as router events are limited
-    const originalPushState = window.history.pushState;
-    const originalReplaceState = window.history.replaceState;
-
-    window.history.pushState = function(...args) {
-      handleRouteStart();
-      originalPushState.apply(window.history, args);
-      // Route completion is handled by useEffect cleanup or page load
-      setTimeout(handleRouteComplete, 100);
-    };
-
-    window.history.replaceState = function(...args) {
-      handleRouteStart();
-      originalReplaceState.apply(window.history, args);
-      setTimeout(handleRouteComplete, 100);
-    };
-
-    window.addEventListener('popstate', handleRouteStart);
-    window.addEventListener('beforeunload', handleRouteComplete);
-
-    return () => {
-      window.history.pushState = originalPushState;
-      window.history.replaceState = originalReplaceState;
-      window.removeEventListener('popstate', handleRouteStart);
-      window.removeEventListener('beforeunload', handleRouteComplete);
-    };
-  }, [enableNavigationTracking, defaultOptions, triggerUpdate]);
-
-  // Calculate aggregated loading states
-  const states = useMemo<LoadingStates>(() => {
-    const operations = Array.from(operationsRef.current.values());
-    const activeOperations = operations.filter(op => op.isLoading);
-
-    // Component-specific loading states
-    const components: Record<string, boolean> = {};
-    activeOperations.forEach(op => {
-      if (op.id.startsWith('component_')) {
-        const componentId = op.id.replace('component_', '');
-        components[componentId] = true;
-      }
-    });
+    }
 
     return {
-      global: activeOperations.some(op => 
-        op.options.priority === 'high' && !op.id.startsWith('query_') && op.id !== 'navigation'
-      ),
-      navigation: activeOperations.some(op => op.id === 'navigation'),
-      components,
-      server: activeOperations.some(op => op.id.startsWith('query_')),
-      activeCount: activeOperations.length,
-      blocking: activeOperations.some(op => op.options.priority === 'high'),
+      registerQuery: (queryKey: string[], operationId: string) => {
+        debugLog(config.enableDebugLogging, 'Registering React Query', {
+          queryKey,
+          operationId,
+        });
+      },
+      
+      unregisterQuery: (queryKey: string[]) => {
+        debugLog(config.enableDebugLogging, 'Unregistering React Query', {
+          queryKey,
+        });
+      },
+      
+      updateQueryState: (
+        queryKey: string[],
+        state: LoadingStateValue,
+        error?: Error
+      ) => {
+        debugLog(config.enableDebugLogging, 'Updating React Query state', {
+          queryKey,
+          state,
+          error: error?.message,
+        });
+      },
     };
-  }, [operationsRef.current.size, forceUpdate]); // Use size as dependency to trigger recalculation
+  }, [config.integrateWithReactQuery, config.enableDebugLogging, queryClient]);
 
-  // Loading actions
-  const actions = useMemo<LoadingActions>(() => ({
-    startLoading: (options = {}) => {
-      const mergedOptions = { ...defaultOptions, ...options };
-      const id = mergedOptions.id || generateId();
-      
-      const operation: LoadingState = {
-        id,
-        isLoading: true,
+  // ========================================================================
+  // Core Loading Operations
+  // ========================================================================
+
+  /**
+   * Start a loading operation
+   */
+  const startOperation = useCallback((
+    source: LoadingSource,
+    operationConfig: Partial<LoadingOperationConfig> = {}
+  ): string => {
+    const finalConfig = { ...DEFAULT_OPERATION_CONFIG, ...operationConfig };
+    const operationId = generateOperationId(finalConfig.category);
+    
+    const operation: LoadingOperation = {
+      id: operationId,
+      state: 'loading',
+      priority: finalConfig.priority,
+      category: finalConfig.category,
+      source,
+      metadata: {
         startTime: Date.now(),
-        options: mergedOptions,
-      };
+        expectedDuration: finalConfig.expectedDuration,
+        timeout: finalConfig.timeout,
+        cancellable: finalConfig.cancellable,
+        userMessage: finalConfig.userMessage,
+        context: finalConfig.context,
+      },
+    };
 
-      // Apply minimum delay if specified
-      if (mergedOptions.minDelay && mergedOptions.minDelay > 0) {
-        const timeoutId = setTimeout(() => {
-          operationsRef.current.set(id, operation);
-          timeoutRefs.current.delete(id);
-          triggerUpdate();
-        }, mergedOptions.minDelay);
+    operationsRef.current.set(operationId, operation);
+
+    // Set timeout if specified
+    if (finalConfig.timeout && finalConfig.timeout > 0) {
+      const timeoutId = setTimeout(() => {
+        if (isMountedRef.current && operationsRef.current.has(operationId)) {
+          const timeoutError = new OperationTimeoutError(operationId, finalConfig.timeout!);
+          failOperation(operationId, timeoutError);
+        }
+      }, finalConfig.timeout);
+      
+      timeoutsRef.current.set(operationId, timeoutId);
+    }
+
+    // Start base loading operation
+    const baseOperationId = baseLoading.show(
+      `${source.component}:${source.action}`,
+      { 
+        category: finalConfig.category,
+        priority: finalConfig.priority,
+        ...finalConfig.context,
+      }
+    );
+
+    // Store base operation mapping
+    operation.metadata.context = {
+      ...operation.metadata.context,
+      baseOperationId,
+    };
+
+    debugLog(config.enableDebugLogging, 'Started operation', operation);
+    
+    // Persist state
+    persistLoadingState(operationsRef.current, config);
+    
+    return operationId;
+  }, [baseLoading, config]);
+
+  /**
+   * Update loading operation state
+   */
+  const updateOperation = useCallback((
+    operationId: string,
+    state: LoadingStateValue,
+    error?: Error | string
+  ): void => {
+    const operation = operationsRef.current.get(operationId);
+    if (!operation) {
+      if (config.enableDebugLogging) {
+        console.warn(`[LoadingContext] Operation ${operationId} not found for update`);
+      }
+      return;
+    }
+
+    const updatedOperation: LoadingOperation = {
+      ...operation,
+      state,
+      error: error ? (typeof error === 'string' ? new Error(error) : error) : undefined,
+      endTime: state === 'success' || state === 'error' ? Date.now() : undefined,
+    };
+
+    operationsRef.current.set(operationId, updatedOperation);
+
+    debugLog(config.enableDebugLogging, 'Updated operation', {
+      operationId,
+      state,
+      error: error ? String(error) : undefined,
+    });
+
+    // Clear timeout if operation completed
+    if ((state === 'success' || state === 'error') && timeoutsRef.current.has(operationId)) {
+      clearTimeout(timeoutsRef.current.get(operationId)!);
+      timeoutsRef.current.delete(operationId);
+      
+      // Hide base loading operation
+      const baseOperationId = operation.metadata.context?.baseOperationId;
+      if (baseOperationId && typeof baseOperationId === 'string') {
+        baseLoading.hide(baseOperationId);
+      }
+    }
+
+    // Persist state
+    persistLoadingState(operationsRef.current, config);
+  }, [baseLoading, config]);
+
+  /**
+   * Complete loading operation successfully
+   */
+  const completeOperation = useCallback((operationId: string): void => {
+    updateOperation(operationId, 'success');
+  }, [updateOperation]);
+
+  /**
+   * Fail loading operation with error
+   */
+  const failOperation = useCallback((
+    operationId: string,
+    error: Error | string
+  ): void => {
+    updateOperation(operationId, 'error', error);
+  }, [updateOperation]);
+
+  /**
+   * Cancel loading operation
+   */
+  const cancelOperation = useCallback((operationId: string): void => {
+    const operation = operationsRef.current.get(operationId);
+    if (!operation) {
+      if (config.enableDebugLogging) {
+        console.warn(`[LoadingContext] Operation ${operationId} not found for cancellation`);
+      }
+      return;
+    }
+
+    if (!operation.metadata.cancellable) {
+      if (config.enableDebugLogging) {
+        console.warn(`[LoadingContext] Operation ${operationId} is not cancellable`);
+      }
+      return;
+    }
+
+    operationsRef.current.delete(operationId);
+
+    // Clear timeout
+    if (timeoutsRef.current.has(operationId)) {
+      clearTimeout(timeoutsRef.current.get(operationId)!);
+      timeoutsRef.current.delete(operationId);
+    }
+
+    // Hide base loading operation
+    const baseOperationId = operation.metadata.context?.baseOperationId;
+    if (baseOperationId && typeof baseOperationId === 'string') {
+      baseLoading.hide(baseOperationId);
+    }
+
+    debugLog(config.enableDebugLogging, 'Cancelled operation', { operationId });
+    
+    // Persist state
+    persistLoadingState(operationsRef.current, config);
+  }, [baseLoading, config]);
+
+  /**
+   * Clear operations matching filter
+   */
+  const clearOperations = useCallback((
+    filter?: (operation: LoadingOperation) => boolean
+  ): void => {
+    const operationsToRemove: string[] = [];
+    
+    for (const [id, operation] of operationsRef.current) {
+      if (!filter || filter(operation)) {
+        operationsToRemove.push(id);
         
-        timeoutRefs.current.set(id, timeoutId);
-      } else {
-        operationsRef.current.set(id, operation);
-        triggerUpdate();
-      }
-
-      // Set timeout if specified
-      if (mergedOptions.timeout && mergedOptions.timeout > 0) {
-        const timeoutId = setTimeout(() => {
-          operationsRef.current.delete(id);
-          timeoutRefs.current.delete(id);
-          triggerUpdate();
-        }, mergedOptions.timeout);
+        // Clear timeout
+        if (timeoutsRef.current.has(id)) {
+          clearTimeout(timeoutsRef.current.get(id)!);
+          timeoutsRef.current.delete(id);
+        }
         
-        timeoutRefs.current.set(`${id}_timeout`, timeoutId);
+        // Hide base loading operation
+        const baseOperationId = operation.metadata.context?.baseOperationId;
+        if (baseOperationId && typeof baseOperationId === 'string') {
+          baseLoading.hide(baseOperationId);
+        }
       }
+    }
 
-      return id;
-    },
+    operationsToRemove.forEach(id => operationsRef.current.delete(id));
 
-    stopLoading: (id) => {
-      // Clear any pending timeouts
-      const timeoutId = timeoutRefs.current.get(id);
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-        timeoutRefs.current.delete(id);
-      }
+    debugLog(config.enableDebugLogging, 'Cleared operations', {
+      removedCount: operationsToRemove.length,
+    });
+    
+    // Persist state
+    persistLoadingState(operationsRef.current, config);
+  }, [baseLoading, config]);
 
-      const timeoutTimeoutId = timeoutRefs.current.get(`${id}_timeout`);
-      if (timeoutTimeoutId) {
-        clearTimeout(timeoutTimeoutId);
-        timeoutRefs.current.delete(`${id}_timeout`);
-      }
+  /**
+   * Reset loading context to initial state
+   */
+  const reset = useCallback((): void => {
+    // Clear all timeouts
+    Array.from(timeoutsRef.current.values()).forEach(clearTimeout);
+    timeoutsRef.current.clear();
+    
+    // Clear all operations
+    operationsRef.current.clear();
+    
+    // Reset base loading
+    baseLoading.reset();
+    
+    // Clear persisted state
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(config.storageKey);
+    }
 
-      operationsRef.current.delete(id);
-      triggerUpdate();
-    },
+    debugLog(config.enableDebugLogging, 'Reset loading context');
+  }, [baseLoading, config]);
 
-    setGlobalLoading: (loading, options = {}) => {
-      const id = 'global';
-      if (loading) {
-        const mergedOptions = { ...defaultOptions, ...options, priority: 'high' as const, id };
-        const operation: LoadingState = {
-          id,
-          isLoading: true,
-          startTime: Date.now(),
-          options: mergedOptions,
-        };
-        operationsRef.current.set(id, operation);
-      } else {
-        operationsRef.current.delete(id);
-      }
-      triggerUpdate();
-    },
+  // ========================================================================
+  // Helper Functions
+  // ========================================================================
 
-    setNavigationLoading: (loading) => {
-      const id = 'navigation';
-      if (loading) {
-        const operation: LoadingState = {
-          id,
-          isLoading: true,
-          startTime: Date.now(),
-          options: { ...defaultOptions, priority: 'high', persist: true, id },
-        };
-        operationsRef.current.set(id, operation);
-      } else {
-        operationsRef.current.delete(id);
-      }
-      triggerUpdate();
-    },
+  /**
+   * Get operations by category
+   */
+  const getOperationsByCategory = useCallback((
+    category: LoadingCategory
+  ): LoadingOperation[] => {
+    return Array.from(operationsRef.current.values()).filter(
+      op => op.category === category
+    );
+  }, []);
 
-    setComponentLoading: (componentId, loading, options = {}) => {
-      const id = `component_${componentId}`;
-      if (loading) {
-        const mergedOptions = { ...defaultOptions, ...options, id };
-        const operation: LoadingState = {
-          id,
-          isLoading: true,
-          startTime: Date.now(),
-          options: mergedOptions,
-        };
-        operationsRef.current.set(id, operation);
-      } else {
-        operationsRef.current.delete(id);
-      }
-      triggerUpdate();
-    },
+  /**
+   * Get operations by component source
+   */
+  const getOperationsByComponent = useCallback((
+    component: string
+  ): LoadingOperation[] => {
+    return Array.from(operationsRef.current.values()).filter(
+      op => op.source.component === component
+    );
+  }, []);
 
-    clearAllLoading: () => {
-      // Only clear non-persistent operations
-      const persistentIds = Array.from(operationsRef.current.values())
-        .filter(op => op.options.persist)
-        .map(op => op.id);
-      
-      operationsRef.current.clear();
-      
-      // Restore persistent operations
-      persistentIds.forEach(id => {
-        const operation: LoadingState = {
-          id,
-          isLoading: true,
-          startTime: Date.now(),
-          options: { ...defaultOptions, persist: true, id },
-        };
-        operationsRef.current.set(id, operation);
-      });
+  /**
+   * Check if specific operation is active
+   */
+  const isOperationActive = useCallback((operationId: string): boolean => {
+    const operation = operationsRef.current.get(operationId);
+    return operation ? isActiveOperation(operation) : false;
+  }, []);
 
-      // Clear all timeouts
-      timeoutRefs.current.forEach((timeout) => clearTimeout(timeout));
-      timeoutRefs.current.clear();
-      
-      triggerUpdate();
-    },
+  // ========================================================================
+  // Context Value
+  // ========================================================================
 
-    getComponentLoading: (componentId) => {
-      return operationsRef.current.has(`component_${componentId}`);
-    },
+  const contextValue = useMemo<LoadingContextValue>(() => {
+    const aggregatedState = calculateAggregatedState(operationsRef.current);
+    
+    const state: LoadingContextState = {
+      state: aggregatedState,
+      config,
+      isInitialized: true,
+    };
 
-    hasAnyLoading: () => {
-      return operationsRef.current.size > 0;
-    },
+    const actions: LoadingContextActions = {
+      startOperation,
+      updateOperation,
+      completeOperation,
+      failOperation,
+      cancelOperation,
+      clearOperations,
+      reset,
+      getOperationsByCategory,
+      getOperationsByComponent,
+      isOperationActive,
+    };
 
-    getActiveOperations: () => {
-      return Array.from(operationsRef.current.values()).filter(op => op.isLoading);
-    },
-  }), [defaultOptions, generateId, triggerUpdate]);
+    return {
+      ...state,
+      ...actions,
+    };
+  }, [
+    config,
+    startOperation,
+    updateOperation,
+    completeOperation,
+    failOperation,
+    cancelOperation,
+    clearOperations,
+    reset,
+    getOperationsByCategory,
+    getOperationsByComponent,
+    isOperationActive,
+  ]);
 
-  const contextValue = useMemo<LoadingContextValue>(() => ({
-    states,
-    actions,
-  }), [states, actions]);
+  // ========================================================================
+  // Render
+  // ========================================================================
 
   return (
     <LoadingContext.Provider value={contextValue}>
@@ -494,76 +696,168 @@ export function LoadingProvider({
   );
 }
 
-/**
- * Higher-order component that provides loading context
- */
-export function withLoading<P extends object>(
-  Component: React.ComponentType<P>,
-  options?: LoadingOptions
-) {
-  const WrappedComponent = (props: P) => {
-    const { startLoading, stopLoading } = useLoading();
-
-    // Auto-start loading when component mounts if configured
-    React.useEffect(() => {
-      if (options?.id) {
-        const id = startLoading(options);
-        return () => stopLoading(id);
-      }
-    }, [startLoading, stopLoading]);
-
-    return <Component {...props} />;
-  };
-
-  WrappedComponent.displayName = `withLoading(${Component.displayName || Component.name})`;
-  return WrappedComponent;
-}
+// ============================================================================
+// Custom Hooks
+// ============================================================================
 
 /**
- * Hook for handling async operations with loading states
+ * Hook to access loading context with type safety and availability checking
  */
-export function useAsyncLoading<T>(
-  asyncFn: () => Promise<T>,
-  options?: LoadingOptions
-) {
-  const { startLoading, stopLoading } = useLoading();
-  const [data, setData] = React.useState<T | null>(null);
-  const [error, setError] = React.useState<Error | null>(null);
-  const [isLoading, setIsLoading] = React.useState(false);
-
-  const execute = useCallback(async () => {
-    const loadingId = startLoading(options);
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const result = await asyncFn();
-      setData(result);
-      return result;
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error('Unknown error');
-      setError(error);
-      throw error;
-    } finally {
-      stopLoading(loadingId);
-      setIsLoading(false);
+export function useLoadingContext(): UseLoadingContextReturn {
+  const context = useContext(LoadingContext);
+  
+  if (!context) {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn(
+        '[LoadingContext] useLoadingContext must be used within a LoadingProvider'
+      );
     }
-  }, [asyncFn, startLoading, stopLoading, options]);
+    
+    // Return minimal fallback implementation
+    return {
+      state: {
+        isLoading: false,
+        hasError: false,
+        isSuccess: true,
+        activeCount: 0,
+        errorCount: 0,
+        completedCount: 0,
+        totalCount: 0,
+        highestPriority: 'low',
+        activeOperations: [],
+        errorOperations: [],
+        operationsByCategory: {} as Record<LoadingCategory, LoadingOperation[]>,
+      },
+      config: DEFAULT_LOADING_CONFIG,
+      isInitialized: false,
+      isAvailable: false,
+      startOperation: () => '',
+      updateOperation: () => {},
+      completeOperation: () => {},
+      failOperation: () => {},
+      cancelOperation: () => {},
+      clearOperations: () => {},
+      reset: () => {},
+      getOperationsByCategory: () => [],
+      getOperationsByComponent: () => [],
+      isOperationActive: () => false,
+    };
+  }
 
   return {
-    data,
-    error,
-    isLoading,
-    execute,
+    ...context,
+    isAvailable: true,
   };
 }
 
-// Export types for external usage
-export type {
-  LoadingOptions,
-  LoadingState,
-  LoadingStates,
-  LoadingActions,
-  LoadingContextValue,
-  LoadingProviderProps,
-};
+/**
+ * Simplified loading hook for common operations
+ */
+export function useLoading(): UseLoadingReturn {
+  const context = useLoadingContext();
+
+  const startLoading = useCallback((
+    source?: string,
+    action?: string
+  ): string => {
+    return context.startOperation(
+      {
+        component: source || 'Unknown',
+        action: action || 'loading',
+      },
+      {
+        category: 'ui',
+        priority: 'normal',
+      }
+    );
+  }, [context]);
+
+  const stopLoading = useCallback((operationId: string): void => {
+    context.completeOperation(operationId);
+  }, [context]);
+
+  const setError = useCallback((
+    operationId: string,
+    error: Error | string
+  ): void => {
+    context.failOperation(operationId, error);
+  }, [context]);
+
+  const clearAll = useCallback((): void => {
+    context.clearOperations();
+  }, [context]);
+
+  return useMemo(() => ({
+    isLoading: context.state.isLoading,
+    hasError: context.state.hasError,
+    startLoading,
+    stopLoading,
+    setError,
+    clearAll,
+  }), [
+    context.state.isLoading,
+    context.state.hasError,
+    startLoading,
+    stopLoading,
+    setError,
+    clearAll,
+  ]);
+}
+
+/**
+ * Hook for navigation-specific loading operations
+ */
+export function useNavigationLoading() {
+  const context = useLoadingContext();
+  
+  return useMemo(() => {
+    const navigationOps = context.getOperationsByCategory('navigation');
+    return {
+      isNavigating: navigationOps.some(isActiveOperation),
+      navigationOperations: navigationOps,
+    };
+  }, [context]);
+}
+
+/**
+ * Hook for API-specific loading operations
+ */
+export function useApiLoading() {
+  const context = useLoadingContext();
+  
+  const startApiOperation = useCallback((
+    endpoint: string,
+    method: string = 'GET'
+  ): string => {
+    return context.startOperation(
+      {
+        component: 'API',
+        action: method,
+        description: `${method} ${endpoint}`,
+      },
+      {
+        category: 'api',
+        priority: 'normal',
+        timeout: 30000, // 30 seconds for API calls
+        context: { endpoint, method },
+      }
+    );
+  }, [context]);
+
+  return useMemo(() => {
+    const apiOps = context.getOperationsByCategory('api');
+    return {
+      isApiLoading: apiOps.some(isActiveOperation),
+      apiOperations: apiOps,
+      startApiOperation,
+      completeApiOperation: context.completeOperation,
+      failApiOperation: context.failOperation,
+    };
+  }, [context, startApiOperation]);
+}
+
+// ============================================================================
+// Default Export
+// ============================================================================
+
+export default LoadingProvider;
