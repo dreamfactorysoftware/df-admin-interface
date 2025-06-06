@@ -1,306 +1,356 @@
 /**
- * Loading UI component for the scheduler management section.
+ * Loading UI component for the scheduler management section
  * 
- * This component displays skeleton states and loading indicators while scheduler 
- * task data is being fetched. Implements Tailwind CSS animations and responsive 
- * design patterns to provide smooth user experience during data loading operations.
+ * This component displays skeleton states and loading indicators while scheduler task data
+ * is being fetched. It implements Tailwind CSS animations and responsive design patterns
+ * to provide smooth user experience during scheduler data loading operations.
  * 
  * Features:
- * - Skeleton layout matching actual scheduler table structure
- * - WCAG 2.1 AA compliant loading animations
- * - SSR and client-side navigation support
- * - Progressive loading indicators for large datasets
- * - Responsive design across all supported browsers
- * - React Query loading state integration
+ * - Skeleton layouts that match the actual scheduler table structure
+ * - WCAG 2.1 AA compliant loading animations and accessibility attributes
+ * - Support for SSR and client-side navigation scenarios
+ * - Progressive loading indicators for large dataset scenarios
+ * - Responsive design across all supported viewport sizes
+ * - Integration with React Query loading states
+ * 
+ * @component
+ * @example
+ * // Used automatically by Next.js App Router when loading.tsx is present
+ * // in the same directory as page.tsx
  */
 
 import React from 'react';
 
 /**
- * Skeleton component for individual table cells with animation
+ * Skeleton component for individual table cells
+ * Provides consistent skeleton animation across different cell types
  */
-const SkeletonCell = ({ 
-  width = 'w-full', 
-  height = 'h-4',
-  rounded = 'rounded',
-  className = '' 
-}: {
-  width?: string;
-  height?: string;
-  rounded?: string;
-  className?: string;
-}) => (
-  <div 
-    className={`bg-gray-200 dark:bg-gray-700 animate-pulse ${width} ${height} ${rounded} ${className}`}
-    role="presentation"
-    aria-hidden="true"
-  />
-);
+const SkeletonCell: React.FC<{ 
+  className?: string; 
+  width?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
+  'aria-label'?: string;
+}> = ({ 
+  className = '', 
+  width = 'full',
+  'aria-label': ariaLabel
+}) => {
+  const widthClasses = {
+    xs: 'w-8',      // For icons/status indicators
+    sm: 'w-12',     // For IDs
+    md: 'w-24',     // For short text fields
+    lg: 'w-32',     // For medium text fields
+    xl: 'w-48',     // For long text fields like descriptions
+    full: 'w-full'  // For flexible content
+  };
+
+  return (
+    <div 
+      className={`h-4 loading-skeleton ${widthClasses[width]} ${className}`}
+      role="status"
+      aria-label={ariaLabel || "Loading content"}
+      aria-live="polite"
+    />
+  );
+};
 
 /**
  * Skeleton component for action buttons
+ * Represents the circular action buttons in the actions column
  */
-const SkeletonButton = ({ size = 'w-8 h-8' }: { size?: string }) => (
+const SkeletonActionButton: React.FC = () => (
   <div 
-    className={`bg-gray-200 dark:bg-gray-700 animate-pulse ${size} rounded-full`}
-    role="presentation"
-    aria-hidden="true"
+    className="w-8 h-8 loading-skeleton rounded-full"
+    role="status"
+    aria-label="Loading action button"
   />
 );
 
 /**
- * Skeleton component for the top action bar
+ * Skeleton component for status icons
+ * Represents active/inactive status indicators and log status icons
  */
-const SkeletonActionBar = () => (
+const SkeletonStatusIcon: React.FC = () => (
   <div 
-    className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700"
-    role="presentation"
-    aria-label="Loading scheduler management actions"
-  >
-    {/* Left side - Action buttons */}
-    <div className="flex items-center space-x-3">
-      <SkeletonButton size="w-10 h-10" />
-      <SkeletonButton size="w-10 h-10" />
-    </div>
-    
-    {/* Right side - Search input */}
-    <div className="flex items-center">
-      <div className="w-64 md:w-80">
-        <SkeletonCell width="w-full" height="h-10" rounded="rounded-md" />
-      </div>
-    </div>
-  </div>
-);
-
-/**
- * Skeleton component for table header
- */
-const SkeletonTableHeader = () => (
-  <thead className="bg-gray-50 dark:bg-gray-800">
-    <tr>
-      {/* Column headers matching scheduler table structure */}
-      <th className="px-6 py-3 text-left">
-        <SkeletonCell width="w-16" height="h-4" />
-      </th>
-      <th className="px-6 py-3 text-left">
-        <SkeletonCell width="w-8" height="h-4" />
-      </th>
-      <th className="px-6 py-3 text-left">
-        <SkeletonCell width="w-20" height="h-4" />
-      </th>
-      <th className="px-6 py-3 text-left hidden md:table-cell">
-        <SkeletonCell width="w-24" height="h-4" />
-      </th>
-      <th className="px-6 py-3 text-left hidden lg:table-cell">
-        <SkeletonCell width="w-20" height="h-4" />
-      </th>
-      <th className="px-6 py-3 text-left hidden lg:table-cell">
-        <SkeletonCell width="w-24" height="h-4" />
-      </th>
-      <th className="px-6 py-3 text-left hidden xl:table-cell">
-        <SkeletonCell width="w-20" height="h-4" />
-      </th>
-      <th className="px-6 py-3 text-left hidden xl:table-cell">
-        <SkeletonCell width="w-24" height="h-4" />
-      </th>
-      <th className="px-6 py-3 text-left hidden xl:table-cell">
-        <SkeletonCell width="w-12" height="h-4" />
-      </th>
-      <th className="px-6 py-3 text-right">
-        <SkeletonCell width="w-16" height="h-4" className="ml-auto" />
-      </th>
-    </tr>
-  </thead>
-);
-
-/**
- * Skeleton component for individual table row
- */
-const SkeletonTableRow = ({ index }: { index: number }) => (
-  <tr 
-    className={`border-b border-gray-200 dark:border-gray-700 ${
-      index % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800'
-    }`}
-  >
-    {/* Active status - boolean indicator */}
-    <td className="px-6 py-4">
-      <SkeletonCell width="w-4" height="h-4" rounded="rounded-full" />
-    </td>
-    
-    {/* ID */}
-    <td className="px-6 py-4">
-      <SkeletonCell width="w-8" height="h-4" />
-    </td>
-    
-    {/* Name */}
-    <td className="px-6 py-4">
-      <SkeletonCell width="w-24 sm:w-32" height="h-4" />
-    </td>
-    
-    {/* Description - hidden on mobile */}
-    <td className="px-6 py-4 hidden md:table-cell">
-      <SkeletonCell width="w-32 lg:w-48" height="h-4" />
-    </td>
-    
-    {/* Service - hidden on smaller screens */}
-    <td className="px-6 py-4 hidden lg:table-cell">
-      <SkeletonCell width="w-20" height="h-4" />
-    </td>
-    
-    {/* Component - hidden on smaller screens */}
-    <td className="px-6 py-4 hidden lg:table-cell">
-      <SkeletonCell width="w-24" height="h-4" />
-    </td>
-    
-    {/* Method - hidden on smaller screens */}
-    <td className="px-6 py-4 hidden xl:table-cell">
-      <SkeletonCell width="w-16" height="h-4" />
-    </td>
-    
-    {/* Frequency - hidden on smaller screens */}
-    <td className="px-6 py-4 hidden xl:table-cell">
-      <SkeletonCell width="w-20" height="h-4" />
-    </td>
-    
-    {/* Log - hidden on smaller screens */}
-    <td className="px-6 py-4 hidden xl:table-cell">
-      <SkeletonCell width="w-4" height="h-4" rounded="rounded-full" />
-    </td>
-    
-    {/* Actions */}
-    <td className="px-6 py-4">
-      <div className="flex items-center justify-end space-x-2">
-        <SkeletonButton size="w-6 h-6" />
-        <SkeletonButton size="w-6 h-6" />
-      </div>
-    </td>
-  </tr>
-);
-
-/**
- * Skeleton component for pagination
- */
-const SkeletonPagination = () => (
-  <div 
-    className="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900"
-    role="presentation"
-    aria-label="Loading pagination controls"
-  >
-    {/* Results info */}
-    <div className="flex items-center">
-      <SkeletonCell width="w-32 sm:w-48" height="h-4" />
-    </div>
-    
-    {/* Page size selector and navigation */}
-    <div className="flex items-center space-x-4">
-      {/* Page size selector - hidden on mobile */}
-      <div className="hidden sm:flex items-center space-x-2">
-        <SkeletonCell width="w-16" height="h-4" />
-        <SkeletonCell width="w-16" height="h-8" rounded="rounded-md" />
-      </div>
-      
-      {/* Navigation buttons */}
-      <div className="flex items-center space-x-1">
-        <SkeletonButton size="w-8 h-8" />
-        <SkeletonButton size="w-8 h-8" />
-        <SkeletonButton size="w-8 h-8" />
-        <SkeletonButton size="w-8 h-8" />
-      </div>
-    </div>
-  </div>
+    className="w-5 h-5 loading-skeleton rounded-sm"
+    role="status"
+    aria-label="Loading status indicator"
+  />
 );
 
 /**
  * Main loading component for the scheduler management page
+ * 
+ * This component creates a skeleton layout that matches the structure of the
+ * actual scheduler table, including:
+ * - Top action bar with create button and search field
+ * - Table headers for all scheduler columns
+ * - Multiple skeleton rows representing loading data
+ * - Bottom pagination controls
+ * 
+ * The skeleton layout is responsive and maintains proper accessibility attributes
+ * for screen readers and other assistive technologies.
  */
-export default function SchedulerLoading() {
-  // Generate array of row indices for skeleton rows
-  // Using 8 rows to simulate a typical page size while loading
-  const skeletonRows = Array.from({ length: 8 }, (_, index) => index);
-
+export default function SchedulerLoading(): React.JSX.Element {
   return (
     <div 
-      className="h-full bg-white dark:bg-gray-900"
+      className="w-full space-y-6 animate-fade-in"
       role="status"
+      aria-label="Loading scheduler management page"
       aria-live="polite"
-      aria-label="Loading scheduler management interface"
     >
-      {/* Screen reader announcement */}
-      <div className="sr-only">
-        Loading scheduler task data, please wait...
+      {/* Screen reader announcement for loading state */}
+      <div className="sr-only" aria-live="assertive">
+        Loading scheduler tasks. Please wait...
       </div>
-      
-      {/* Main content container */}
-      <div className="flex flex-col h-full">
-        {/* Action bar */}
-        <SkeletonActionBar />
-        
-        {/* Table container with responsive overflow */}
-        <div className="flex-1 overflow-hidden">
-          <div className="overflow-x-auto h-full">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <SkeletonTableHeader />
-              <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-                {skeletonRows.map((index) => (
-                  <SkeletonTableRow key={index} index={index} />
-                ))}
-              </tbody>
-            </table>
+
+      {/* Top Action Bar Skeleton */}
+      <div 
+        className="flex items-center justify-between p-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm theme-transition"
+        role="region"
+        aria-label="Loading action bar"
+      >
+        {/* Left side: Action buttons */}
+        <div className="flex items-center space-x-3">
+          {/* Create new scheduler task button skeleton */}
+          <div 
+            className="w-10 h-10 loading-skeleton rounded-full"
+            role="status"
+            aria-label="Loading create button"
+          />
+          
+          {/* Refresh button skeleton */}
+          <div 
+            className="w-10 h-10 loading-skeleton rounded-full"
+            role="status"
+            aria-label="Loading refresh button"
+          />
+        </div>
+
+        {/* Right side: Search field skeleton */}
+        <div 
+          className="w-64 h-10 loading-skeleton rounded-md"
+          role="status"
+          aria-label="Loading search field"
+        />
+      </div>
+
+      {/* Table Container Skeleton */}
+      <div 
+        className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm overflow-hidden theme-transition"
+        role="region"
+        aria-label="Loading scheduler table"
+      >
+        {/* Table Header Skeleton */}
+        <div className="border-b border-gray-200 dark:border-gray-700">
+          <div className="grid grid-cols-12 gap-4 p-4 bg-gray-50 dark:bg-gray-800">
+            {/* Active Status Column */}
+            <div className="col-span-1 flex justify-center">
+              <SkeletonCell width="xs" aria-label="Loading active status header" />
+            </div>
+            
+            {/* ID Column */}
+            <div className="col-span-1">
+              <SkeletonCell width="sm" aria-label="Loading ID header" />
+            </div>
+            
+            {/* Name Column */}
+            <div className="col-span-2">
+              <SkeletonCell width="md" aria-label="Loading name header" />
+            </div>
+            
+            {/* Description Column */}
+            <div className="col-span-3">
+              <SkeletonCell width="lg" aria-label="Loading description header" />
+            </div>
+            
+            {/* Service Column */}
+            <div className="col-span-1">
+              <SkeletonCell width="md" aria-label="Loading service header" />
+            </div>
+            
+            {/* Component Column */}
+            <div className="col-span-1">
+              <SkeletonCell width="md" aria-label="Loading component header" />
+            </div>
+            
+            {/* Method Column */}
+            <div className="col-span-1">
+              <SkeletonCell width="sm" aria-label="Loading method header" />
+            </div>
+            
+            {/* Frequency Column */}
+            <div className="col-span-1">
+              <SkeletonCell width="md" aria-label="Loading frequency header" />
+            </div>
+            
+            {/* Log Column */}
+            <div className="col-span-1 flex justify-center">
+              <SkeletonCell width="xs" aria-label="Loading log header" />
+            </div>
           </div>
         </div>
-        
-        {/* Pagination */}
-        <SkeletonPagination />
-      </div>
-      
-      {/* Progressive loading indicator for slow networks */}
-      <div className="fixed bottom-4 right-4 z-50">
-        <div 
-          className="bg-primary-600 text-white px-4 py-2 rounded-full shadow-lg flex items-center space-x-2 animate-pulse"
-          role="status"
-          aria-label="Loading in progress"
-        >
-          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm font-medium hidden sm:inline">
-            Loading scheduler tasks...
-          </span>
+
+        {/* Table Body Skeleton - Multiple rows to simulate loading data */}
+        <div className="divide-y divide-gray-200 dark:divide-gray-700">
+          {/* Generate 8 skeleton rows for realistic loading appearance */}
+          {Array.from({ length: 8 }, (_, index) => (
+            <div 
+              key={`skeleton-row-${index}`}
+              className="grid grid-cols-12 gap-4 p-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-200"
+              role="row"
+              aria-label={`Loading scheduler task ${index + 1}`}
+            >
+              {/* Active Status - Icon skeleton */}
+              <div className="col-span-1 flex justify-center items-center">
+                <SkeletonStatusIcon />
+              </div>
+              
+              {/* ID - Short number */}
+              <div className="col-span-1 flex items-center">
+                <SkeletonCell width="sm" />
+              </div>
+              
+              {/* Name - Medium text */}
+              <div className="col-span-2 flex items-center">
+                <SkeletonCell width="lg" />
+              </div>
+              
+              {/* Description - Long text with varied widths for realism */}
+              <div className="col-span-3 flex items-center">
+                <SkeletonCell 
+                  width={index % 3 === 0 ? 'full' : index % 2 === 0 ? 'xl' : 'lg'} 
+                />
+              </div>
+              
+              {/* Service - Medium text */}
+              <div className="col-span-1 flex items-center">
+                <SkeletonCell width="md" />
+              </div>
+              
+              {/* Component - Medium text */}
+              <div className="col-span-1 flex items-center">
+                <SkeletonCell width="md" />
+              </div>
+              
+              {/* Method - Short text (GET, POST, etc.) */}
+              <div className="col-span-1 flex items-center">
+                <SkeletonCell width="sm" />
+              </div>
+              
+              {/* Frequency - Medium text */}
+              <div className="col-span-1 flex items-center">
+                <SkeletonCell width="md" />
+              </div>
+              
+              {/* Log Status - Icon skeleton */}
+              <div className="col-span-1 flex justify-center items-center">
+                <SkeletonStatusIcon />
+              </div>
+            </div>
+          ))}
         </div>
+
+        {/* Actions Column - Positioned absolutely to overlay the right side */}
+        <div className="absolute right-4 top-20 space-y-6">
+          {Array.from({ length: 8 }, (_, index) => (
+            <div 
+              key={`action-skeleton-${index}`}
+              className="flex items-center justify-end space-x-2 h-12"
+            >
+              <SkeletonActionButton />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Bottom Pagination Skeleton */}
+      <div 
+        className="flex items-center justify-between p-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm theme-transition"
+        role="region"
+        aria-label="Loading pagination controls"
+      >
+        {/* Pagination info text skeleton */}
+        <div className="flex items-center space-x-2">
+          <SkeletonCell width="md" />
+          <span className="text-gray-500 dark:text-gray-400">of</span>
+          <SkeletonCell width="sm" />
+          <span className="text-gray-500 dark:text-gray-400">entries</span>
+        </div>
+
+        {/* Pagination controls skeleton */}
+        <div className="flex items-center space-x-2">
+          {/* First page button */}
+          <div className="w-8 h-8 loading-skeleton rounded" />
+          
+          {/* Previous page button */}
+          <div className="w-8 h-8 loading-skeleton rounded" />
+          
+          {/* Page numbers */}
+          <div className="flex space-x-1">
+            {Array.from({ length: 5 }, (_, index) => (
+              <div 
+                key={`page-skeleton-${index}`}
+                className="w-8 h-8 loading-skeleton rounded"
+              />
+            ))}
+          </div>
+          
+          {/* Next page button */}
+          <div className="w-8 h-8 loading-skeleton rounded" />
+          
+          {/* Last page button */}
+          <div className="w-8 h-8 loading-skeleton rounded" />
+        </div>
+
+        {/* Page size selector skeleton */}
+        <div className="flex items-center space-x-2">
+          <span className="text-gray-500 dark:text-gray-400 text-sm">Show</span>
+          <div className="w-16 h-8 loading-skeleton rounded" />
+          <span className="text-gray-500 dark:text-gray-400 text-sm">per page</span>
+        </div>
+      </div>
+
+      {/* Loading Progress Indicator for Slow Networks */}
+      <div 
+        className="flex items-center justify-center space-x-3 p-4"
+        role="status"
+        aria-label="Loading progress indicator"
+      >
+        {/* Spinner for visual feedback */}
+        <div className="w-6 h-6 loading-spinner" />
+        
+        {/* Loading text with animation */}
+        <div className="text-sm text-gray-600 dark:text-gray-300 animate-pulse">
+          Loading scheduler tasks...
+        </div>
+
+        {/* Progress dots animation */}
+        <div className="flex space-x-1">
+          {Array.from({ length: 3 }, (_, index) => (
+            <div
+              key={`dot-${index}`}
+              className="w-2 h-2 bg-primary-600 rounded-full animate-pulse"
+              style={{
+                animationDelay: `${index * 0.2}s`
+              }}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Accessibility: Provide context for screen readers */}
+      <div 
+        className="sr-only" 
+        aria-live="polite"
+        role="status"
+      >
+        The scheduler management interface is loading. This page will show a table 
+        of scheduled tasks with options to create, edit, and delete scheduler tasks. 
+        Please wait while the data is being fetched.
       </div>
     </div>
   );
 }
 
-/**
- * Type definitions for skeleton component props
- * These ensure type safety while maintaining flexibility
- */
-export interface SkeletonProps {
-  /** Custom width class */
-  width?: string;
-  /** Custom height class */
-  height?: string;
-  /** Border radius class */
-  rounded?: string;
-  /** Additional CSS classes */
-  className?: string;
-}
-
-/**
- * Performance considerations:
- * - Uses CSS animations (animate-pulse) for better performance than JavaScript animations
- * - Leverages Tailwind's optimized CSS for minimal bundle impact
- * - Responsive design prevents layout shifts during loading
- * - Proper semantic structure maintains accessibility during loading states
- * 
- * Accessibility features:
- * - ARIA live regions announce loading state changes
- * - Screen reader friendly loading messages
- * - Proper role attributes for skeleton elements
- * - Focus management considerations for when real content loads
- * 
- * Integration notes:
- * - Compatible with React Query loading states
- * - Supports both SSR and client-side navigation
- * - Maintains consistent styling with the actual scheduler table
- * - Progressive enhancement for slow network conditions
- */
+// Export type for TypeScript support
+export type SchedulerLoadingProps = Record<string, never>;
