@@ -1,14 +1,6 @@
 {
-  "$schema": "../schema.json",
-  "_metadata": {
-    "version": "1.0.0",
-    "locale": "en",
-    "direction": "ltr",
-    "lastModified": "2024-12-19T10:30:00.000Z",
-    "framework": "next.js",
-    "ssrOptimized": true,
-    "namespace": "files"
-  },
+  "title": "Files",
+  "subtitle": "File Management",
   "createFolder": "Create Folder",
   "folderName": "Folder Name",
   "importList": "Upload File",
@@ -17,12 +9,81 @@
   "downloadFile": "Download File",
   "editFile": "Edit File",
   "deleteFolder": "Delete Folder",
-  "openFolder": "Open {name} folder",
+  "openFolder": "Open {{name}} folder",
   "download": "Download",
   "alerts": {
     "uploadSuccess": "File uploaded successfully",
     "createFolderSuccess": "Folder created successfully",
     "deleteFolderSuccess": "Folder deleted successfully",
     "downloadSuccess": "File downloaded successfully"
+  },
+  "labels": {
+    "name": "Name",
+    "size": "Size",
+    "type": "Type",
+    "modified": "Modified",
+    "path": "Path",
+    "permissions": "Permissions"
+  },
+  "actions": {
+    "upload": "Upload",
+    "download": "Download",
+    "delete": "Delete",
+    "rename": "Rename",
+    "createFolder": "Create Folder",
+    "viewDetails": "View Details"
+  },
+  "upload": {
+    "dropzone": "Drop files here or click to select",
+    "selectFiles": "Select Files",
+    "uploading": "Uploading...",
+    "success": "Upload successful",
+    "error": "Upload failed",
+    "maxSize": "Maximum file size exceeded",
+    "allowedTypes": "File type not allowed"
+  },
+  "validation": {
+    "required": "This field is required",
+    "folderName": "Folder name is required",
+    "fileName": "File name is required",
+    "fileSize": "File size must be less than {{maxSize}}",
+    "fileType": "File type {{type}} is not allowed"
+  },
+  "messages": {
+    "create": {
+      "success": "Folder created successfully",
+      "error": "Failed to create folder",
+      "pending": "Creating folder..."
+    },
+    "update": {
+      "success": "File updated successfully",
+      "error": "Failed to update file",
+      "pending": "Updating file..."
+    },
+    "delete": {
+      "success": "Deleted successfully",
+      "error": "Failed to delete",
+      "pending": "Deleting...",
+      "confirm": "Are you sure you want to delete this item?"
+    },
+    "fetch": {
+      "error": "Failed to load files",
+      "pending": "Loading files...",
+      "empty": "No files found"
+    }
+  },
+  "dialogs": {
+    "delete": {
+      "title": "Confirm Delete",
+      "message": "Are you sure you want to delete \"{{name}}\"?",
+      "confirm": "Delete",
+      "cancel": "Cancel"
+    },
+    "rename": {
+      "title": "Rename",
+      "placeholder": "Enter new name",
+      "confirm": "Rename",
+      "cancel": "Cancel"
+    }
   }
 }
