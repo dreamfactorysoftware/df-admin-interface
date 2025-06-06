@@ -1,782 +1,795 @@
 /**
- * Database Service Form Component Types
+ * Database Service Form Types
  * 
- * TypeScript interface definitions, type exports, and Zod schema validators specific to 
- * database service form components. Defines type-safe contracts for service form operations,
- * wizard steps, dynamic field configurations, paywall states, and form validation schemas.
- * Provides comprehensive type safety for React Hook Form integration and service configuration workflows.
+ * TypeScript interface definitions, type exports, and Zod schema validators 
+ * specific to database service form components. Defines type-safe contracts 
+ * for service form operations, wizard steps, dynamic field configurations, 
+ * paywall states, and form validation schemas. Provides comprehensive type 
+ * safety for React Hook Form integration and service configuration workflows.
  * 
- * @fileoverview Comprehensive form types for database service management in React/Next.js
+ * @fileoverview Database service form types for React/Next.js application
  * @version 1.0.0
- * @since 2024-01-01
+ * @since React 19.0.0, Next.js 15.1+, TypeScript 5.8+
  */
 
 import { z } from 'zod';
-import { ReactNode, ComponentType, FormEvent } from 'react';
+import type { ReactNode, ComponentType, FormEvent, RefObject } from 'react';
 import type { 
   UseFormReturn, 
-  FieldValues, 
-  FieldPath, 
-  Control,
-  FormState,
-  FieldError,
-  UseFormRegister,
-  UseFormHandleSubmit,
+  FieldError, 
+  FieldErrors,
+  Path, 
+  PathValue,
+  UseFormSetError,
+  UseFormClearErrors,
   UseFormWatch,
+  UseFormGetValues,
   UseFormSetValue,
   UseFormTrigger,
-  UseFormClearErrors,
-  UseFormReset,
-  Path,
-  PathValue,
-  UseFormSetError
+  Control,
+  FieldValues,
+  DefaultValues,
+  SubmitHandler,
+  SubmitErrorHandler,
 } from 'react-hook-form';
-import type { 
-  UseQueryResult, 
-  UseMutationResult,
-  QueryKey
-} from '@tanstack/react-query';
-import type { SWRResponse } from 'swr';
-import type { 
-  DatabaseService,
-  DatabaseConfig,
-  ServiceType,
-  ConfigSchema,
+
+// Import base types and schemas
+import type {
   DatabaseDriver,
   ServiceStatus,
+  DatabaseService,
+  DatabaseConnectionFormData,
   ConnectionTestResult,
-  ConnectionTestStatus,
-  DatabaseConnectionInput,
-  SSLConfig,
-  PoolingConfig,
-  DatabaseOptions,
+  DatabaseConnectionSchema,
+  ConnectionTestFormData,
   BaseComponentProps,
-  ApiErrorResponse
+  ConnectionTestProps,
+  ValidationMode,
 } from '../types';
 
-// =============================================================================
-// CORE SERVICE FORM TYPES
-// =============================================================================
-
-/**
- * Service form operation modes
- */
-export type ServiceFormMode = 'create' | 'edit' | 'view' | 'clone';
-
-/**
- * Service form submission states for UI feedback
- */
-export type ServiceFormSubmissionState = 'idle' | 'submitting' | 'success' | 'error';
-
-/**
- * Service tier access levels for paywall integration
- */
-export type ServiceTierAccess = 'free' | 'basic' | 'premium' | 'enterprise';
-
-/**
- * Wizard step validation states
- */
-export type WizardStepValidationState = 'pending' | 'valid' | 'invalid' | 'skipped';
+import type {
+  FormFieldType,
+  FormField,
+  FormSchema,
+  ConditionalLogic,
+  FieldFormatting,
+  GridConfig,
+  FormValidation,
+  FormLayout,
+  LayoutType,
+  SpacingSize,
+} from '../../../types/form-schema';
 
 // =============================================================================
-// WIZARD STEP DEFINITIONS
+// ENHANCED ZOD SCHEMA VALIDATORS FOR SERVICE FORMS
 // =============================================================================
 
 /**
- * Wizard step configuration for multi-step service creation workflow
+ * Service form wizard step schema for multi-step validation
  */
-export interface WizardStep {
-  id: string;
-  title: string;
-  description?: string;
-  icon?: ComponentType<{ className?: string }>;
-  validationSchema?: z.ZodSchema<any>;
-  fields: string[];
-  optional?: boolean;
-  conditionalDisplay?: (formData: any) => boolean;
-  estimatedDuration?: number; // in minutes
-  helpText?: string;
-  warningText?: string;
-}
-
-/**
- * Wizard navigation state management
- */
-export interface WizardNavigationState {
-  currentStep: number;
-  totalSteps: number;
-  completedSteps: Set<number>;
-  validationStates: Map<number, WizardStepValidationState>;
-  canNavigateNext: boolean;
-  canNavigatePrevious: boolean;
-  isLastStep: boolean;
-  isFirstStep: boolean;
-}
-
-/**
- * Wizard step progression tracking
- */
-export interface WizardStepProgress {
-  stepId: string;
-  stepIndex: number;
-  isActive: boolean;
-  isCompleted: boolean;
-  isValid: boolean;
-  hasError: boolean;
-  errorMessage?: string;
-  completedAt?: string;
-  estimatedTimeRemaining?: number;
-}
-
-// =============================================================================
-// FORM DATA TYPES
-// =============================================================================
-
-/**
- * Base service form data structure extending database connection input
- */
-export interface ServiceFormData extends DatabaseConnectionInput {
-  // Wizard-specific fields
-  serviceTypeId?: string;
-  displayLabel?: string;
-  
-  // Security configuration
-  security?: ServiceSecurityConfig;
-  
-  // Advanced configuration
-  advanced?: ServiceAdvancedConfig;
-  
-  // Paywall and licensing
-  requiresPremium?: boolean;
-  tierAccess?: ServiceTierAccess;
-  
-  // Metadata
-  tags?: string[];
-  category?: string;
-  notes?: string;
-}
-
-/**
- * Security configuration for service access control
- */
-export interface ServiceSecurityConfig {
-  accessType: 'public' | 'private' | 'role-based' | 'api-key';
-  allowedOrigins?: string[];
-  rateLimiting?: RateLimitConfig;
-  authentication?: AuthenticationConfig;
-  roles?: string[];
-  permissions?: string[];
-  ipWhitelist?: string[];
-  ipBlacklist?: string[];
-  requireHttps?: boolean;
-  corsEnabled?: boolean;
-  corsOrigins?: string[];
-}
-
-/**
- * Rate limiting configuration
- */
-export interface RateLimitConfig {
-  enabled: boolean;
-  requestsPerMinute?: number;
-  requestsPerHour?: number;
-  requestsPerDay?: number;
-  burstAllowance?: number;
-  penaltyDuration?: number; // in minutes
-}
-
-/**
- * Authentication configuration options
- */
-export interface AuthenticationConfig {
-  type: 'none' | 'api-key' | 'jwt' | 'oauth' | 'basic';
-  apiKeyHeader?: string;
-  jwtSecret?: string;
-  oauthProvider?: string;
-  basicAuthRealm?: string;
-  sessionTimeout?: number; // in minutes
-  refreshTokenEnabled?: boolean;
-}
-
-/**
- * Advanced service configuration options
- */
-export interface ServiceAdvancedConfig {
-  caching?: CachingConfig;
-  logging?: LoggingConfig;
-  monitoring?: MonitoringConfig;
-  performance?: PerformanceConfig;
-  backup?: BackupConfig;
-  maintenance?: MaintenanceConfig;
-}
-
-/**
- * Caching configuration for service optimization
- */
-export interface CachingConfig {
-  enabled: boolean;
-  strategy: 'memory' | 'redis' | 'file' | 'database';
-  ttl?: number; // in seconds
-  maxSize?: number; // in MB
-  compression?: boolean;
-  invalidationRules?: string[];
-}
-
-/**
- * Logging configuration for service monitoring
- */
-export interface LoggingConfig {
-  enabled: boolean;
-  level: 'debug' | 'info' | 'warn' | 'error';
-  destination: 'console' | 'file' | 'database' | 'external';
-  maxFileSize?: number; // in MB
-  rotationDays?: number;
-  includeQueryParams?: boolean;
-  includeHeaders?: boolean;
-  excludeFields?: string[];
-}
-
-/**
- * Monitoring configuration for service observability
- */
-export interface MonitoringConfig {
-  enabled: boolean;
-  metricsEndpoint?: string;
-  healthCheckInterval?: number; // in seconds
-  alertingRules?: AlertingRule[];
-  performanceThresholds?: PerformanceThresholds;
-}
-
-/**
- * Alerting rule configuration
- */
-export interface AlertingRule {
-  name: string;
-  condition: string;
-  threshold: number;
-  severity: 'low' | 'medium' | 'high' | 'critical';
-  notificationChannels: string[];
-  cooldownPeriod?: number; // in minutes
-}
-
-/**
- * Performance threshold definitions
- */
-export interface PerformanceThresholds {
-  responseTime: number; // in milliseconds
-  throughput: number; // requests per second
-  errorRate: number; // percentage
-  uptime: number; // percentage
-}
-
-/**
- * Performance optimization configuration
- */
-export interface PerformanceConfig {
-  connectionPooling?: PoolingConfig;
-  queryOptimization?: boolean;
-  indexHints?: boolean;
-  parallelQueries?: boolean;
-  resultCaching?: boolean;
-  compressionEnabled?: boolean;
-  keepAliveTimeout?: number; // in seconds
-}
-
-/**
- * Backup configuration for data protection
- */
-export interface BackupConfig {
-  enabled: boolean;
-  schedule?: string; // cron expression
-  retentionDays?: number;
-  compressionEnabled?: boolean;
-  encryptionEnabled?: boolean;
-  destination?: string;
-  notificationOnFailure?: boolean;
-}
-
-/**
- * Maintenance configuration for service management
- */
-export interface MaintenanceConfig {
-  autoUpdatesEnabled?: boolean;
-  maintenanceWindow?: string;
-  notifyBeforeMaintenance?: boolean;
-  notificationLeadTime?: number; // in hours
-  allowDuringPeakHours?: boolean;
-}
-
-// =============================================================================
-// ZOD VALIDATION SCHEMAS
-// =============================================================================
-
-/**
- * Core service form validation schema with enhanced validation rules
- */
-export const ServiceFormSchema = z.object({
-  // Basic service information
-  name: z.string()
-    .min(1, 'Service name is required')
-    .max(64, 'Service name must be less than 64 characters')
-    .regex(/^[a-zA-Z][a-zA-Z0-9_-]*$/, 'Service name must start with a letter and contain only letters, numbers, underscores, and hyphens'),
-  
-  label: z.string()
-    .min(1, 'Display label is required')
-    .max(255, 'Display label must be less than 255 characters'),
-  
-  description: z.string()
-    .max(1024, 'Description must be less than 1024 characters')
-    .optional(),
-  
-  // Service type and configuration
-  type: z.enum([
-    'mysql', 'pgsql', 'sqlite', 'mongodb', 'oracle', 'sqlsrv', 'snowflake',
-    'ibmdb2', 'informix', 'sqlanywhere', 'memsql', 'salesforce_db', 'hana',
-    'apache_hive', 'databricks', 'dremio'
-  ]),
-  
-  serviceTypeId: z.string().optional(),
-  displayLabel: z.string().optional(),
-  
-  // Database connection configuration
-  config: z.object({
-    driver: z.enum([
-      'mysql', 'pgsql', 'sqlite', 'mongodb', 'oracle', 'sqlsrv', 'snowflake',
-      'ibmdb2', 'informix', 'sqlanywhere', 'memsql', 'salesforce_db', 'hana',
-      'apache_hive', 'databricks', 'dremio'
-    ]),
-    
-    host: z.string()
-      .min(1, 'Host is required')
-      .max(255, 'Host must be less than 255 characters'),
-    
-    port: z.number()
-      .int('Port must be an integer')
-      .min(1, 'Port must be greater than 0')
-      .max(65535, 'Port must be less than 65536')
-      .optional(),
-    
-    database: z.string()
-      .min(1, 'Database name is required')
-      .max(64, 'Database name must be less than 64 characters'),
-    
-    username: z.string()
-      .min(1, 'Username is required')
-      .max(64, 'Username must be less than 64 characters'),
-    
-    password: z.string()
-      .max(255, 'Password must be less than 255 characters')
-      .optional(),
-    
-    options: z.record(z.any()).optional(),
-    connectionTimeout: z.number().int().min(1000).max(60000).optional(),
-    
-    ssl: z.object({
-      enabled: z.boolean(),
-      verify: z.boolean().optional(),
-      mode: z.enum(['disable', 'allow', 'prefer', 'require', 'verify-ca', 'verify-full']).optional(),
-      ca: z.string().optional(),
-      cert: z.string().optional(),
-      key: z.string().optional(),
-      rejectUnauthorized: z.boolean().optional()
-    }).optional(),
-    
-    pooling: z.object({
-      min: z.number().int().min(0),
-      max: z.number().int().min(1),
-      acquireTimeoutMillis: z.number().int().min(1000).optional(),
-      createTimeoutMillis: z.number().int().min(1000).optional(),
-      destroyTimeoutMillis: z.number().int().min(1000).optional(),
-      idleTimeoutMillis: z.number().int().min(1000).optional(),
-      reapIntervalMillis: z.number().int().min(1000).optional(),
-      createRetryIntervalMillis: z.number().int().min(100).optional()
-    }).optional()
-  }),
-  
-  // Service status and metadata
-  is_active: z.boolean().default(true),
-  tags: z.array(z.string()).optional(),
-  category: z.string().optional(),
-  notes: z.string().max(2048).optional(),
-  
-  // Premium service configuration
-  requiresPremium: z.boolean().optional(),
-  tierAccess: z.enum(['free', 'basic', 'premium', 'enterprise']).optional(),
-  
-  // Security configuration schema
-  security: z.object({
-    accessType: z.enum(['public', 'private', 'role-based', 'api-key']),
-    allowedOrigins: z.array(z.string().url()).optional(),
-    roles: z.array(z.string()).optional(),
-    permissions: z.array(z.string()).optional(),
-    ipWhitelist: z.array(z.string().ip()).optional(),
-    ipBlacklist: z.array(z.string().ip()).optional(),
-    requireHttps: z.boolean().optional(),
-    corsEnabled: z.boolean().optional(),
-    corsOrigins: z.array(z.string()).optional(),
-    
-    rateLimiting: z.object({
-      enabled: z.boolean(),
-      requestsPerMinute: z.number().int().min(1).optional(),
-      requestsPerHour: z.number().int().min(1).optional(),
-      requestsPerDay: z.number().int().min(1).optional(),
-      burstAllowance: z.number().int().min(1).optional(),
-      penaltyDuration: z.number().int().min(1).optional()
-    }).optional(),
-    
-    authentication: z.object({
-      type: z.enum(['none', 'api-key', 'jwt', 'oauth', 'basic']),
-      apiKeyHeader: z.string().optional(),
-      jwtSecret: z.string().optional(),
-      oauthProvider: z.string().optional(),
-      basicAuthRealm: z.string().optional(),
-      sessionTimeout: z.number().int().min(5).max(1440).optional(), // 5 minutes to 24 hours
-      refreshTokenEnabled: z.boolean().optional()
-    }).optional()
-  }).optional(),
-  
-  // Advanced configuration schema
-  advanced: z.object({
-    caching: z.object({
-      enabled: z.boolean(),
-      strategy: z.enum(['memory', 'redis', 'file', 'database']),
-      ttl: z.number().int().min(1).optional(),
-      maxSize: z.number().int().min(1).optional(),
-      compression: z.boolean().optional(),
-      invalidationRules: z.array(z.string()).optional()
-    }).optional(),
-    
-    logging: z.object({
-      enabled: z.boolean(),
-      level: z.enum(['debug', 'info', 'warn', 'error']),
-      destination: z.enum(['console', 'file', 'database', 'external']),
-      maxFileSize: z.number().int().min(1).optional(),
-      rotationDays: z.number().int().min(1).optional(),
-      includeQueryParams: z.boolean().optional(),
-      includeHeaders: z.boolean().optional(),
-      excludeFields: z.array(z.string()).optional()
-    }).optional(),
-    
-    monitoring: z.object({
-      enabled: z.boolean(),
-      metricsEndpoint: z.string().url().optional(),
-      healthCheckInterval: z.number().int().min(1).optional(),
-      performanceThresholds: z.object({
-        responseTime: z.number().min(1),
-        throughput: z.number().min(1),
-        errorRate: z.number().min(0).max(100),
-        uptime: z.number().min(0).max(100)
-      }).optional()
-    }).optional(),
-    
-    performance: z.object({
-      queryOptimization: z.boolean().optional(),
-      indexHints: z.boolean().optional(),
-      parallelQueries: z.boolean().optional(),
-      resultCaching: z.boolean().optional(),
-      compressionEnabled: z.boolean().optional(),
-      keepAliveTimeout: z.number().int().min(1).optional()
-    }).optional(),
-    
-    backup: z.object({
-      enabled: z.boolean(),
-      schedule: z.string().optional(), // TODO: Add cron validation
-      retentionDays: z.number().int().min(1).optional(),
-      compressionEnabled: z.boolean().optional(),
-      encryptionEnabled: z.boolean().optional(),
-      destination: z.string().optional(),
-      notificationOnFailure: z.boolean().optional()
-    }).optional(),
-    
-    maintenance: z.object({
-      autoUpdatesEnabled: z.boolean().optional(),
-      maintenanceWindow: z.string().optional(),
-      notifyBeforeMaintenance: z.boolean().optional(),
-      notificationLeadTime: z.number().int().min(1).max(168).optional(), // 1 hour to 1 week
-      allowDuringPeakHours: z.boolean().optional()
-    }).optional()
-  }).optional()
+export const ServiceFormStepSchema = z.object({
+  stepId: z.string().min(1, 'Step ID is required'),
+  stepName: z.string().min(1, 'Step name is required'),
+  isValid: z.boolean(),
+  isComplete: z.boolean(),
+  data: z.record(z.any()).optional(),
+  errors: z.record(z.string()).optional(),
 });
 
 /**
- * Service type selection schema for wizard first step
+ * Service form wizard navigation schema
+ */
+export const ServiceFormWizardNavigationSchema = z.object({
+  currentStep: z.number().int().min(0),
+  totalSteps: z.number().int().min(1),
+  canGoNext: z.boolean(),
+  canGoPrevious: z.boolean(),
+  canFinish: z.boolean(),
+  steps: z.array(ServiceFormStepSchema),
+});
+
+/**
+ * Service type selection schema with enhanced validation
  */
 export const ServiceTypeSelectionSchema = z.object({
-  type: z.enum([
-    'mysql', 'pgsql', 'sqlite', 'mongodb', 'oracle', 'sqlsrv', 'snowflake',
-    'ibmdb2', 'informix', 'sqlanywhere', 'memsql', 'salesforce_db', 'hana',
-    'apache_hive', 'databricks', 'dremio'
-  ]),
-  serviceTypeId: z.string().optional()
+  selectedType: z.enum(['mysql', 'postgresql', 'sqlserver', 'oracle', 'mongodb', 'snowflake', 'sqlite'], {
+    required_error: 'Database type selection is required',
+    invalid_type_error: 'Invalid database type selected',
+  }),
+  typeMetadata: z.object({
+    displayName: z.string(),
+    description: z.string(),
+    defaultPort: z.number().optional(),
+    supportsSSL: z.boolean(),
+    supportsPooling: z.boolean(),
+    requiredFields: z.array(z.string()),
+    optionalFields: z.array(z.string()),
+    helpUrl: z.string().url().optional(),
+  }).optional(),
 });
 
 /**
- * Basic service information schema for wizard second step
+ * Enhanced database connection schema with wizard-specific validation
  */
-export const BasicServiceInfoSchema = z.object({
-  name: z.string()
-    .min(1, 'Service name is required')
-    .max(64, 'Service name must be less than 64 characters')
-    .regex(/^[a-zA-Z][a-zA-Z0-9_-]*$/, 'Service name must start with a letter and contain only letters, numbers, underscores, and hyphens'),
+export const WizardDatabaseConnectionSchema = DatabaseConnectionSchema.extend({
+  // Wizard-specific fields
+  stepData: z.record(z.any()).optional(),
+  skipValidation: z.boolean().default(false),
+  saveAsDraft: z.boolean().default(false),
   
-  label: z.string()
-    .min(1, 'Display label is required')
-    .max(255, 'Display label must be less than 255 characters'),
+  // Enhanced validation for wizard context
+  connectionValidated: z.boolean().default(false),
+  schemaDiscovered: z.boolean().default(false),
+  securityConfigured: z.boolean().default(false),
   
-  description: z.string()
-    .max(1024, 'Description must be less than 1024 characters')
-    .optional(),
+  // Wizard flow control
+  allowIncompleteSubmission: z.boolean().default(false),
+  forceRevalidation: z.boolean().default(false),
+});
+
+/**
+ * Paywall configuration schema for premium features
+ */
+export const PaywallConfigurationSchema = z.object({
+  feature: z.string().min(1, 'Feature identifier is required'),
+  tier: z.enum(['free', 'premium', 'enterprise'], {
+    required_error: 'Service tier is required',
+  }),
+  isBlocked: z.boolean(),
+  blockReason: z.string().optional(),
+  upgradeUrl: z.string().url().optional(),
+  trialAvailable: z.boolean().default(false),
+  trialDaysRemaining: z.number().int().min(0).optional(),
+  featureDescription: z.string().optional(),
+  limitationMessage: z.string().optional(),
+});
+
+/**
+ * Security configuration schema for service setup
+ */
+export const SecurityConfigurationSchema = z.object({
+  accessType: z.enum(['public', 'private', 'restricted'], {
+    required_error: 'Access type is required',
+  }),
+  requireApiKey: z.boolean().default(true),
+  allowedOrigins: z.array(z.string().url()).optional(),
+  allowedIPs: z.array(z.string().ip()).optional(),
+  rateLimiting: z.object({
+    enabled: z.boolean().default(false),
+    requestsPerMinute: z.number().int().min(1).max(10000).optional(),
+    requestsPerHour: z.number().int().min(1).max(100000).optional(),
+    requestsPerDay: z.number().int().min(1).max(1000000).optional(),
+  }).optional(),
+  roles: z.array(z.object({
+    id: z.number().int().positive(),
+    name: z.string().min(1),
+    permissions: z.array(z.string()),
+  })).optional(),
+  customHeaders: z.record(z.string()).optional(),
+});
+
+/**
+ * Service form configuration schema
+ */
+export const ServiceFormConfigurationSchema = z.object({
+  mode: z.enum(['create', 'edit', 'clone', 'view']),
+  initialData: WizardDatabaseConnectionSchema.partial().optional(),
+  serviceId: z.number().int().positive().optional(),
   
-  category: z.string().optional(),
-  tags: z.array(z.string()).optional()
+  // Form behavior
+  enableWizard: z.boolean().default(true),
+  enableAutoSave: z.boolean().default(false),
+  autoSaveInterval: z.number().int().min(1000).max(60000).default(5000),
+  
+  // Validation settings
+  enableRealTimeValidation: z.boolean().default(true),
+  validationMode: z.enum(['onSubmit', 'onBlur', 'onChange', 'onTouched']).default('onChange'),
+  reValidateMode: z.enum(['onSubmit', 'onBlur', 'onChange', 'onTouched']).default('onChange'),
+  
+  // Feature toggles
+  enableConnectionTest: z.boolean().default(true),
+  enableSchemaDiscovery: z.boolean().default(true),
+  enableSecurityConfiguration: z.boolean().default(true),
+  enablePaywallChecks: z.boolean().default(true),
+  
+  // UI customization
+  layout: z.enum(['vertical', 'horizontal', 'wizard']).default('wizard'),
+  theme: z.enum(['default', 'compact', 'comfortable']).default('default'),
+  showProgress: z.boolean().default(true),
+  showHelpText: z.boolean().default(true),
 });
 
 /**
- * Connection configuration schema for wizard third step
+ * Inferred types from enhanced Zod schemas
  */
-export const ConnectionConfigSchema = z.object({
-  config: ServiceFormSchema.shape.config
-});
-
-/**
- * Security configuration schema for wizard fourth step
- */
-export const SecurityConfigSchema = z.object({
-  security: ServiceFormSchema.shape.security.optional()
-});
-
-/**
- * Advanced configuration schema for wizard fifth step
- */
-export const AdvancedConfigSchema = z.object({
-  advanced: ServiceFormSchema.shape.advanced.optional(),
-  requiresPremium: z.boolean().optional(),
-  tierAccess: z.enum(['free', 'basic', 'premium', 'enterprise']).optional()
-});
-
-/**
- * Inferred types from Zod schemas
- */
-export type ServiceFormInput = z.infer<typeof ServiceFormSchema>;
-export type ServiceTypeSelectionInput = z.infer<typeof ServiceTypeSelectionSchema>;
-export type BasicServiceInfoInput = z.infer<typeof BasicServiceInfoSchema>;
-export type ConnectionConfigInput = z.infer<typeof ConnectionConfigSchema>;
-export type SecurityConfigInput = z.infer<typeof SecurityConfigSchema>;
-export type AdvancedConfigInput = z.infer<typeof AdvancedConfigSchema>;
+export type ServiceFormStepData = z.infer<typeof ServiceFormStepSchema>;
+export type ServiceFormWizardNavigation = z.infer<typeof ServiceFormWizardNavigationSchema>;
+export type ServiceTypeSelection = z.infer<typeof ServiceTypeSelectionSchema>;
+export type WizardDatabaseConnectionFormData = z.infer<typeof WizardDatabaseConnectionSchema>;
+export type PaywallConfiguration = z.infer<typeof PaywallConfigurationSchema>;
+export type SecurityConfiguration = z.infer<typeof SecurityConfigurationSchema>;
+export type ServiceFormConfiguration = z.infer<typeof ServiceFormConfigurationSchema>;
 
 // =============================================================================
-// DYNAMIC FIELD CONFIGURATION
+// REACT COMPONENT PROP INTERFACES FOR SERVICE FORMS
 // =============================================================================
 
 /**
- * Dynamic field configuration for service-specific forms
+ * Service Form Wizard Component Props
+ * Multi-step wizard for database service configuration
  */
-export interface DynamicFieldConfig {
-  id: string;
-  name: string;
-  type: DynamicFieldType;
-  label: string;
-  placeholder?: string;
-  description?: string;
-  helpText?: string;
+export interface ServiceFormWizardProps extends BaseComponentProps {
+  /** Wizard configuration */
+  config: ServiceFormConfiguration;
+  
+  /** Initial form data */
+  initialData?: Partial<WizardDatabaseConnectionFormData>;
+  
+  /** Form submission callback */
+  onSubmit: SubmitHandler<WizardDatabaseConnectionFormData>;
+  
+  /** Form cancellation callback */
+  onCancel?: () => void;
+  
+  /** Step change callback */
+  onStepChange?: (stepIndex: number, stepData: ServiceFormStepData) => void;
+  
+  /** Form validation callback */
+  onValidationChange?: (isValid: boolean, errors: FieldErrors<WizardDatabaseConnectionFormData>) => void;
+  
+  /** Auto-save callback */
+  onAutoSave?: (data: Partial<WizardDatabaseConnectionFormData>) => void;
+  
+  /** Connection test callback */
+  onConnectionTest?: (data: WizardDatabaseConnectionFormData) => Promise<ConnectionTestResult>;
+  
+  /** Schema discovery callback */
+  onSchemaDiscovery?: (data: WizardDatabaseConnectionFormData) => Promise<void>;
+  
+  /** Security configuration callback */
+  onSecurityConfiguration?: (securityConfig: SecurityConfiguration) => Promise<void>;
+  
+  /** Paywall check callback */
+  onPaywallCheck?: (feature: string) => Promise<PaywallConfiguration>;
+  
+  /** Custom wizard steps */
+  customSteps?: WizardStepDefinition[];
+  
+  /** Step validation overrides */
+  stepValidation?: Record<string, (data: any) => Promise<boolean>>;
+  
+  /** Loading states for async operations */
+  loadingStates?: {
+    submitting?: boolean;
+    testing?: boolean;
+    discovering?: boolean;
+    validating?: boolean;
+  };
+  
+  /** Error states */
+  errors?: {
+    submission?: string;
+    connection?: string;
+    discovery?: string;
+    validation?: string;
+  };
+  
+  /** Feature flags */
+  features?: {
+    enableAdvancedOptions?: boolean;
+    enableBulkOperations?: boolean;
+    enableTemplates?: boolean;
+    enableImportExport?: boolean;
+  };
+  
+  /** Accessibility options */
+  accessibility?: {
+    announceStepChanges?: boolean;
+    highContrast?: boolean;
+    reducedMotion?: boolean;
+    screenReaderOptimized?: boolean;
+  };
+  
+  /** Debug mode */
+  debug?: boolean;
+}
+
+/**
+ * Service Form Container Component Props
+ * Container wrapper for service form components
+ */
+export interface ServiceFormContainerProps extends BaseComponentProps {
+  /** Form mode */
+  mode: 'create' | 'edit' | 'clone' | 'view';
+  
+  /** Service ID for edit/view modes */
+  serviceId?: number;
+  
+  /** Initial service data */
+  initialService?: DatabaseService;
+  
+  /** Form submission callback */
+  onSubmit: (data: WizardDatabaseConnectionFormData) => Promise<void>;
+  
+  /** Navigation callbacks */
+  onCancel?: () => void;
+  onBack?: () => void;
+  onNext?: () => void;
+  
+  /** Container layout */
+  layout?: 'wizard' | 'tabbed' | 'accordion' | 'single-page';
+  
+  /** Show navigation */
+  showNavigation?: boolean;
+  
+  /** Show progress indicator */
+  showProgress?: boolean;
+  
+  /** Show form actions */
+  showActions?: boolean;
+  
+  /** Custom action buttons */
+  customActions?: ReactNode;
+  
+  /** Container loading state */
+  loading?: boolean;
+  
+  /** Container error state */
+  error?: string | null;
+  
+  /** Enable form persistence */
+  enablePersistence?: boolean;
+  
+  /** Persistence key */
+  persistenceKey?: string;
+  
+  /** Form state change callback */
+  onStateChange?: (state: ServiceFormState) => void;
+  
+  /** Form validation callback */
+  onValidation?: (isValid: boolean, errors: FieldErrors<WizardDatabaseConnectionFormData>) => void;
+  
+  /** Custom form renderer */
+  formRenderer?: ComponentType<ServiceFormWizardProps>;
+  
+  /** Custom header content */
+  headerContent?: ReactNode;
+  
+  /** Custom footer content */
+  footerContent?: ReactNode;
+  
+  /** Custom sidebar content */
+  sidebarContent?: ReactNode;
+  
+  /** Container variant */
+  variant?: 'default' | 'compact' | 'full-screen' | 'modal';
+  
+  /** Enable keyboard navigation */
+  enableKeyboardNav?: boolean;
+  
+  /** Custom CSS classes */
+  containerClassName?: string;
+  headerClassName?: string;
+  contentClassName?: string;
+  footerClassName?: string;
+}
+
+/**
+ * Dynamic Field Component Props
+ * Configurable field component for service forms
+ */
+export interface DynamicFieldProps extends BaseComponentProps {
+  /** Field configuration */
+  field: FormField;
+  
+  /** Form control instance */
+  control: Control<WizardDatabaseConnectionFormData>;
+  
+  /** Field value */
+  value?: any;
+  
+  /** Field change callback */
+  onChange?: (value: any) => void;
+  
+  /** Field validation callback */
+  onValidation?: (isValid: boolean, error?: string) => void;
+  
+  /** Field error */
+  error?: FieldError;
+  
+  /** Field is required */
   required?: boolean;
+  
+  /** Field is disabled */
   disabled?: boolean;
+  
+  /** Field is readonly */
   readonly?: boolean;
+  
+  /** Field is hidden */
   hidden?: boolean;
   
-  // Field validation
-  validation?: DynamicFieldValidation;
+  /** Show field validation state */
+  showValidationState?: boolean;
   
-  // Conditional logic
-  conditional?: ConditionalLogic;
+  /** Enable real-time validation */
+  enableRealTimeValidation?: boolean;
   
-  // Field-specific options
-  options?: SelectOption[];
-  multiselect?: boolean;
-  searchable?: boolean;
-  creatable?: boolean;
+  /** Validation debounce delay */
+  validationDelay?: number;
   
-  // Formatting and masks
-  mask?: string;
-  transform?: FieldTransform;
+  /** Custom field renderer */
+  renderer?: ComponentType<FieldRendererProps>;
   
-  // Layout configuration
-  width?: FieldWidth;
-  order?: number;
-  section?: string;
+  /** Field context */
+  context?: FieldContext;
+  
+  /** Field dependencies */
+  dependencies?: FieldDependency[];
+  
+  /** Custom validation rules */
+  customValidation?: FieldValidationRule[];
+  
+  /** Field formatting options */
+  formatting?: FieldFormatting;
+  
+  /** Field grid configuration */
   grid?: GridConfig;
   
-  // Default values
-  defaultValue?: any;
-  computedDefault?: (formData: any) => any;
+  /** Field conditional logic */
+  conditional?: ConditionalLogic;
   
-  // Dependencies
-  dependsOn?: string[];
-  affects?: string[];
+  /** Field help content */
+  helpContent?: ReactNode;
   
-  // Accessibility
-  ariaLabel?: string;
-  ariaDescribedBy?: string;
+  /** Field accessibility options */
+  accessibility?: FieldAccessibilityOptions;
 }
 
 /**
- * Supported dynamic field types for database service configuration
+ * Service Form State Management
  */
-export type DynamicFieldType = 
-  | 'text'
-  | 'password'
-  | 'email'
-  | 'url'
-  | 'tel'
-  | 'number'
-  | 'range'
-  | 'select'
-  | 'multiselect'
-  | 'checkbox'
-  | 'radio'
-  | 'switch'
-  | 'textarea'
-  | 'file'
-  | 'date'
-  | 'datetime-local'
-  | 'time'
-  | 'color'
-  | 'json'
-  | 'code'
-  | 'tags'
-  | 'key-value'
-  | 'array'
-  | 'object'
-  | 'connection-test'
-  | 'port-scanner'
-  | 'certificate-upload';
-
-/**
- * Field validation configuration
- */
-export interface DynamicFieldValidation {
-  required?: boolean;
-  minLength?: number;
-  maxLength?: number;
-  min?: number;
-  max?: number;
-  pattern?: string;
-  customValidator?: (value: any, formData: any) => string | undefined;
-  asyncValidator?: (value: any, formData: any) => Promise<string | undefined>;
-  debounceMs?: number;
-}
-
-/**
- * Conditional logic for dynamic field display and behavior
- */
-export interface ConditionalLogic {
-  conditions: FieldCondition[];
-  operator: 'AND' | 'OR';
-  action: ConditionalAction;
-  targetValue?: any;
-}
-
-/**
- * Individual condition for conditional logic
- */
-export interface FieldCondition {
-  field: string;
-  operator: ComparisonOperator;
-  value: any;
-  caseSensitive?: boolean;
-}
-
-/**
- * Comparison operators for field conditions
- */
-export type ComparisonOperator = 
-  | 'equals'
-  | 'notEquals'
-  | 'contains'
-  | 'notContains'
-  | 'startsWith'
-  | 'endsWith'
-  | 'greaterThan'
-  | 'lessThan'
-  | 'greaterThanOrEqual'
-  | 'lessThanOrEqual'
-  | 'isEmpty'
-  | 'isNotEmpty'
-  | 'isNull'
-  | 'isNotNull'
-  | 'oneOf'
-  | 'noneOf';
-
-/**
- * Actions for conditional logic
- */
-export type ConditionalAction = 
-  | 'show'
-  | 'hide'
-  | 'enable'
-  | 'disable'
-  | 'require'
-  | 'optional'
-  | 'focus'
-  | 'clear'
-  | 'setValue'
-  | 'addValidation'
-  | 'removeValidation';
-
-/**
- * Field transformation options
- */
-export type FieldTransform = 
-  | 'uppercase'
-  | 'lowercase'
-  | 'capitalize'
-  | 'trim'
-  | 'slugify'
-  | 'camelCase'
-  | 'pascalCase'
-  | 'kebabCase'
-  | 'snakeCase';
-
-/**
- * Field width configuration for responsive layouts
- */
-export type FieldWidth = 
-  | 'full'
-  | 'half'
-  | 'third'
-  | 'quarter'
-  | 'auto'
-  | { xs?: number; sm?: number; md?: number; lg?: number; xl?: number };
-
-/**
- * Grid configuration for field layout
- */
-export interface GridConfig {
-  xs?: number;
-  sm?: number;
-  md?: number;
-  lg?: number;
-  xl?: number;
-  offset?: {
-    xs?: number;
-    sm?: number;
-    md?: number;
-    lg?: number;
-    xl?: number;
+export interface ServiceFormState {
+  /** Current wizard step */
+  currentStep: number;
+  
+  /** Form data */
+  data: Partial<WizardDatabaseConnectionFormData>;
+  
+  /** Form validation state */
+  isValid: boolean;
+  
+  /** Form dirty state */
+  isDirty: boolean;
+  
+  /** Form submission state */
+  isSubmitting: boolean;
+  
+  /** Form errors */
+  errors: FieldErrors<WizardDatabaseConnectionFormData>;
+  
+  /** Step completion status */
+  stepStates: Record<number, ServiceFormStepData>;
+  
+  /** Connection test results */
+  connectionTestResult?: ConnectionTestResult;
+  
+  /** Schema discovery state */
+  schemaDiscoveryState?: {
+    isDiscovering: boolean;
+    discoveredTables: number;
+    totalTables: number;
+    errors: string[];
+  };
+  
+  /** Security configuration state */
+  securityConfiguration?: SecurityConfiguration;
+  
+  /** Paywall states */
+  paywallStates: Record<string, PaywallConfiguration>;
+  
+  /** Auto-save state */
+  autoSaveState?: {
+    enabled: boolean;
+    lastSaved: number;
+    isDirty: boolean;
+    error?: string;
+  };
+  
+  /** Form history for undo/redo */
+  history?: {
+    undoStack: Partial<WizardDatabaseConnectionFormData>[];
+    redoStack: Partial<WizardDatabaseConnectionFormData>[];
+    canUndo: boolean;
+    canRedo: boolean;
   };
 }
 
 /**
- * Select option configuration for dropdown and radio fields
+ * Wizard Step Definition
  */
-export interface SelectOption {
-  value: string | number | boolean;
-  label: string;
+export interface WizardStepDefinition {
+  /** Step identifier */
+  id: string;
+  
+  /** Step display name */
+  name: string;
+  
+  /** Step description */
   description?: string;
+  
+  /** Step icon */
   icon?: ComponentType<{ className?: string }>;
+  
+  /** Step component */
+  component: ComponentType<WizardStepProps>;
+  
+  /** Step validation function */
+  validate?: (data: Partial<WizardDatabaseConnectionFormData>) => Promise<boolean>;
+  
+  /** Step can be skipped */
+  optional?: boolean;
+  
+  /** Step requires previous steps to be complete */
+  requiresPrevious?: boolean;
+  
+  /** Step dependencies */
+  dependencies?: string[];
+  
+  /** Step order/index */
+  order: number;
+  
+  /** Step visibility condition */
+  visibilityCondition?: (data: Partial<WizardDatabaseConnectionFormData>) => boolean;
+  
+  /** Step configuration */
+  config?: Record<string, any>;
+  
+  /** Step help content */
+  helpContent?: ReactNode;
+  
+  /** Step accessibility label */
+  accessibilityLabel?: string;
+}
+
+/**
+ * Wizard Step Component Props
+ */
+export interface WizardStepProps {
+  /** Step definition */
+  step: WizardStepDefinition;
+  
+  /** Form data */
+  data: Partial<WizardDatabaseConnectionFormData>;
+  
+  /** Form control */
+  control: Control<WizardDatabaseConnectionFormData>;
+  
+  /** Step validation state */
+  isValid: boolean;
+  
+  /** Step errors */
+  errors: FieldErrors<WizardDatabaseConnectionFormData>;
+  
+  /** Data change callback */
+  onDataChange: (updates: Partial<WizardDatabaseConnectionFormData>) => void;
+  
+  /** Validation callback */
+  onValidationChange: (isValid: boolean) => void;
+  
+  /** Step completion callback */
+  onComplete: () => void;
+  
+  /** Navigation callbacks */
+  onNext?: () => void;
+  onPrevious?: () => void;
+  onCancel?: () => void;
+  
+  /** Step context */
+  context?: StepContext;
+  
+  /** Loading states */
+  loading?: boolean;
+  
+  /** Read-only mode */
+  readonly?: boolean;
+  
+  /** Debug mode */
+  debug?: boolean;
+}
+
+/**
+ * Field Renderer Component Props
+ */
+export interface FieldRendererProps {
+  /** Field configuration */
+  field: FormField;
+  
+  /** Field value */
+  value: any;
+  
+  /** Field change callback */
+  onChange: (value: any) => void;
+  
+  /** Field blur callback */
+  onBlur: () => void;
+  
+  /** Field focus callback */
+  onFocus: () => void;
+  
+  /** Field error */
+  error?: string;
+  
+  /** Field validation state */
+  isValid?: boolean;
+  
+  /** Field is required */
+  required?: boolean;
+  
+  /** Field is disabled */
   disabled?: boolean;
+  
+  /** Field is readonly */
+  readonly?: boolean;
+  
+  /** Field ref */
+  ref?: RefObject<any>;
+  
+  /** Additional props */
+  [key: string]: any;
+}
+
+/**
+ * Field Context Information
+ */
+export interface FieldContext {
+  /** Parent form name */
+  formName: string;
+  
+  /** Field path in form */
+  fieldPath: string;
+  
+  /** Related fields */
+  relatedFields: string[];
+  
+  /** Field group */
   group?: string;
-  metadata?: Record<string, any>;
+  
+  /** Field section */
+  section?: string;
+  
+  /** Form mode */
+  mode: 'create' | 'edit' | 'clone' | 'view';
+  
+  /** Service type context */
+  serviceType?: DatabaseDriver;
+  
+  /** Feature flags */
+  features: Record<string, boolean>;
+  
+  /** User permissions */
+  permissions: string[];
+  
+  /** Localization */
+  locale: string;
+  
+  /** Theme */
+  theme: string;
+}
+
+/**
+ * Field Dependency Configuration
+ */
+export interface FieldDependency {
+  /** Dependent field name */
+  field: string;
+  
+  /** Dependency type */
+  type: 'value' | 'visibility' | 'enabled' | 'required' | 'options';
+  
+  /** Dependency condition */
+  condition: (value: any, allValues: Partial<WizardDatabaseConnectionFormData>) => boolean;
+  
+  /** Dependency action */
+  action: (dependentValue: any, currentValue: any) => any;
+}
+
+/**
+ * Field Validation Rule
+ */
+export interface FieldValidationRule {
+  /** Rule name */
+  name: string;
+  
+  /** Validation function */
+  validate: (value: any, allValues: Partial<WizardDatabaseConnectionFormData>) => boolean | string;
+  
+  /** Error message */
+  message: string;
+  
+  /** Rule priority */
+  priority?: number;
+  
+  /** Rule applies to field types */
+  fieldTypes?: FormFieldType[];
+  
+  /** Rule conditions */
+  conditions?: Array<{
+    field: string;
+    operator: string;
+    value: any;
+  }>;
+}
+
+/**
+ * Field Accessibility Options
+ */
+export interface FieldAccessibilityOptions {
+  /** ARIA label */
+  ariaLabel?: string;
+  
+  /** ARIA described by */
+  ariaDescribedBy?: string;
+  
+  /** ARIA required */
+  ariaRequired?: boolean;
+  
+  /** ARIA invalid */
+  ariaInvalid?: boolean;
+  
+  /** Tab index */
+  tabIndex?: number;
+  
+  /** Skip to next field key */
+  skipToNextKey?: string;
+  
+  /** Screen reader text */
+  screenReaderText?: string;
+  
+  /** High contrast mode */
+  highContrast?: boolean;
+  
+  /** Focus management */
+  focusManagement?: {
+    autoFocus?: boolean;
+    focusOnError?: boolean;
+    focusOnSuccess?: boolean;
+  };
+}
+
+/**
+ * Step Context Information
+ */
+export interface StepContext {
+  /** Current step index */
+  stepIndex: number;
+  
+  /** Total steps */
+  totalSteps: number;
+  
+  /** Step progress percentage */
+  progress: number;
+  
+  /** Previous step data */
+  previousStepData?: Partial<WizardDatabaseConnectionFormData>;
+  
+  /** Navigation history */
+  navigationHistory: number[];
+  
+  /** Step timing */
+  timing: {
+    startTime: number;
+    currentTime: number;
+    timeSpent: number;
+  };
+  
+  /** Step analytics */
+  analytics?: {
+    interactions: number;
+    validationAttempts: number;
+    helpViewed: boolean;
+    completed: boolean;
+  };
 }
 
 // =============================================================================
@@ -784,492 +797,441 @@ export interface SelectOption {
 // =============================================================================
 
 /**
- * Paywall modal state and configuration
+ * Paywall State Management
  */
-export interface PaywallModalState {
-  isOpen: boolean;
-  serviceType?: DatabaseDriver;
-  featureName?: string;
-  requiredTier: ServiceTierAccess;
-  currentTier: ServiceTierAccess;
-  upgradeUrl?: string;
-  contactSalesUrl?: string;
-  trialAvailable?: boolean;
-  trialDaysRemaining?: number;
-}
-
-/**
- * Paywall feature access configuration
- */
-export interface PaywallFeatureAccess {
-  id: string;
-  name: string;
-  description: string;
-  requiredTier: ServiceTierAccess;
-  isAvailable: boolean;
-  reason?: string;
-  upgradePrompt?: string;
-  documentationUrl?: string;
-  contactSalesPrompt?: string;
-}
-
-/**
- * Premium service access configuration
- */
-export interface PremiumServiceConfig {
-  serviceType: DatabaseDriver;
-  tierRequired: ServiceTierAccess;
-  features: string[];
-  limitations?: ServiceLimitation[];
-  trialPeriod?: number; // in days
-  upgradeIncentives?: UpgradeIncentive[];
-}
-
-/**
- * Service limitation configuration for different tiers
- */
-export interface ServiceLimitation {
+export interface PaywallState {
+  /** Feature identifier */
   feature: string;
-  limitation: string;
-  maxValue?: number;
-  unit?: string;
-  tier: ServiceTierAccess;
+  
+  /** User's current tier */
+  userTier: 'free' | 'premium' | 'enterprise';
+  
+  /** Feature is blocked */
+  isBlocked: boolean;
+  
+  /** Block reason */
+  reason?: string;
+  
+  /** Upgrade options */
+  upgradeOptions?: PaywallUpgradeOption[];
+  
+  /** Trial status */
+  trial?: {
+    available: boolean;
+    daysRemaining: number;
+    isActive: boolean;
+  };
+  
+  /** Usage limits */
+  limits?: {
+    current: number;
+    maximum: number;
+    resetDate?: string;
+  };
 }
 
 /**
- * Upgrade incentive configuration for premium features
+ * Paywall Upgrade Option
  */
-export interface UpgradeIncentive {
-  title: string;
+export interface PaywallUpgradeOption {
+  /** Tier name */
+  tier: 'premium' | 'enterprise';
+  
+  /** Tier display name */
+  displayName: string;
+  
+  /** Tier description */
   description: string;
-  value: string;
-  highlight?: boolean;
-  icon?: ComponentType<{ className?: string }>;
-}
-
-// =============================================================================
-// REACT COMPONENT PROP INTERFACES
-// =============================================================================
-
-/**
- * Service Form Container component props
- */
-export interface ServiceFormContainerProps extends BaseComponentProps {
-  mode: ServiceFormMode;
-  serviceId?: number;
-  serviceName?: string;
-  initialData?: Partial<ServiceFormData>;
-  onSubmit?: (data: ServiceFormInput) => void | Promise<void>;
-  onCancel?: () => void;
-  onNavigate?: (route: string) => void;
-  redirectOnSuccess?: string;
-  redirectOnCancel?: string;
-  enablePaywall?: boolean;
-  customValidation?: (data: ServiceFormInput) => Promise<Record<string, string> | undefined>;
+  
+  /** Pricing information */
+  pricing: {
+    amount: number;
+    currency: string;
+    interval: 'monthly' | 'yearly';
+    discountPercentage?: number;
+  };
+  
+  /** Features included */
+  features: string[];
+  
+  /** Upgrade URL */
+  upgradeUrl: string;
+  
+  /** CTA text */
+  ctaText: string;
+  
+  /** Recommended option */
+  recommended?: boolean;
 }
 
 /**
- * Service Form Wizard component props
+ * Paywall Component Props
  */
-export interface ServiceFormWizardProps extends BaseComponentProps {
-  steps: WizardStep[];
-  initialStep?: number;
-  onStepChange?: (step: number) => void;
-  onSubmit?: (data: ServiceFormInput) => void | Promise<void>;
-  onCancel?: () => void;
-  enableStepValidation?: boolean;
-  allowSkipOptionalSteps?: boolean;
-  showProgress?: boolean;
-  showStepIndicator?: boolean;
-  navigationStyle?: 'buttons' | 'stepper' | 'tabs' | 'sidebar';
-  submitButtonText?: string;
-  cancelButtonText?: string;
-  previousButtonText?: string;
-  nextButtonText?: string;
-  customValidation?: Record<string, (data: any) => Promise<Record<string, string> | undefined>>;
-}
-
-/**
- * Service Form Fields component props for dynamic field rendering
- */
-export interface ServiceFormFieldsProps extends BaseComponentProps {
-  fields: DynamicFieldConfig[];
-  control: Control<any>;
-  register: UseFormRegister<any>;
-  watch: UseFormWatch<any>;
-  setValue: UseFormSetValue<any>;
-  trigger: UseFormTrigger<any>;
-  errors: Record<string, FieldError>;
-  isSubmitting?: boolean;
-  section?: string;
-  layout?: 'single' | 'two-column' | 'grid';
-  showFieldGroups?: boolean;
-  enableConditionalLogic?: boolean;
-  enableAsyncValidation?: boolean;
-  onFieldChange?: (fieldName: string, value: any) => void;
-  onFieldBlur?: (fieldName: string) => void;
-  customComponents?: Record<string, ComponentType<any>>;
-}
-
-/**
- * Dynamic Field component props for individual field rendering
- */
-export interface DynamicFieldProps extends BaseComponentProps {
-  config: DynamicFieldConfig;
-  control: Control<any>;
-  register: UseFormRegister<any>;
-  watch: UseFormWatch<any>;
-  setValue: UseFormSetValue<any>;
-  trigger: UseFormTrigger<any>;
-  error?: FieldError;
-  isSubmitting?: boolean;
-  formData?: any;
-  onFieldChange?: (value: any) => void;
-  onFieldBlur?: () => void;
-  customComponent?: ComponentType<any>;
-}
-
-/**
- * Paywall Modal component props
- */
-export interface PaywallModalProps extends BaseComponentProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onUpgrade?: () => void;
-  onContactSales?: () => void;
+export interface PaywallComponentProps extends BaseComponentProps {
+  /** Paywall state */
+  state: PaywallState;
+  
+  /** Feature being accessed */
+  feature: string;
+  
+  /** Blocking mode */
+  mode: 'soft-block' | 'hard-block' | 'overlay' | 'inline';
+  
+  /** Custom blocked content */
+  blockedContent?: ReactNode;
+  
+  /** Custom upgrade prompt */
+  upgradePrompt?: ReactNode;
+  
+  /** Upgrade callback */
+  onUpgrade?: (tier: string) => void;
+  
+  /** Trial start callback */
   onStartTrial?: () => void;
-  modalState: PaywallModalState;
-  featureAccess?: PaywallFeatureAccess;
-  premiumConfig?: PremiumServiceConfig;
-  showCalendlyWidget?: boolean;
-  calendlyUrl?: string;
-  customContent?: ReactNode;
-}
-
-/**
- * Service Type Selector component props
- */
-export interface ServiceTypeSelectorProps extends BaseComponentProps {
-  serviceTypes: ServiceType[];
-  selectedType?: DatabaseDriver;
-  onTypeSelect: (type: DatabaseDriver, serviceType: ServiceType) => void;
-  layout?: 'grid' | 'list' | 'cards';
-  showDescriptions?: boolean;
-  showIcons?: boolean;
-  groupByCategory?: boolean;
-  filterByTier?: ServiceTierAccess[];
-  enableSearch?: boolean;
-  customFilter?: (serviceType: ServiceType) => boolean;
-}
-
-/**
- * Connection Test component props
- */
-export interface ConnectionTestProps extends BaseComponentProps {
-  config: DatabaseConfig;
-  onTest?: (config: DatabaseConfig) => void | Promise<void>;
-  result?: ConnectionTestResult | null;
-  status: ConnectionTestStatus;
-  autoTest?: boolean;
-  testOnConfigChange?: boolean;
-  showDetails?: boolean;
-  showMetadata?: boolean;
-  enableRetry?: boolean;
-  maxRetries?: number;
-  retryDelay?: number; // in milliseconds
-}
-
-/**
- * Service Form Navigation component props
- */
-export interface ServiceFormNavigationProps extends BaseComponentProps {
-  navigation: WizardNavigationState;
-  progress: WizardStepProgress[];
-  onPrevious?: () => void;
-  onNext?: () => void;
-  onStepClick?: (stepIndex: number) => void;
-  onCancel?: () => void;
-  onSubmit?: () => void;
-  showProgress?: boolean;
-  showStepLabels?: boolean;
-  enableStepClick?: boolean;
-  style?: 'horizontal' | 'vertical' | 'minimal';
-  previousButtonText?: string;
-  nextButtonText?: string;
-  submitButtonText?: string;
-  cancelButtonText?: string;
+  
+  /** Dismiss callback */
+  onDismiss?: () => void;
+  
+  /** Analytics callback */
+  onAnalytics?: (event: string, data: Record<string, any>) => void;
+  
+  /** Show trial option */
+  showTrial?: boolean;
+  
+  /** Show usage limits */
+  showLimits?: boolean;
+  
+  /** Custom styling */
+  styling?: {
+    variant?: 'default' | 'minimal' | 'card' | 'banner';
+    size?: 'sm' | 'md' | 'lg';
+    theme?: 'light' | 'dark' | 'auto';
+  };
 }
 
 // =============================================================================
-// FORM HOOK INTERFACES
+// CONNECTION TESTING INTEGRATION TYPES
 // =============================================================================
 
 /**
- * Service Form hook return type
+ * Enhanced Connection Test Props for Form Integration
  */
-export interface UseServiceFormReturn extends UseFormReturn<ServiceFormInput> {
-  submitForm: (onSuccess?: (data: ServiceFormInput) => void) => Promise<void>;
-  resetForm: (data?: Partial<ServiceFormInput>) => void;
-  validateForm: () => Promise<boolean>;
-  isValid: boolean;
-  isDirty: boolean;
-  isSubmitting: boolean;
-  submitCount: number;
-  errors: Record<string, FieldError>;
-  touchedFields: Record<string, boolean>;
-  dirtyFields: Record<string, boolean>;
+export interface FormConnectionTestProps extends Omit<ConnectionTestProps, 'config'> {
+  /** Form data for testing */
+  formData: Partial<WizardDatabaseConnectionFormData>;
+  
+  /** Form control for field validation */
+  control: Control<WizardDatabaseConnectionFormData>;
+  
+  /** Test on form change */
+  testOnChange?: boolean;
+  
+  /** Fields to watch for auto-testing */
+  watchFields?: Array<Path<WizardDatabaseConnectionFormData>>;
+  
+  /** Validation requirements before testing */
+  requireValid?: Array<Path<WizardDatabaseConnectionFormData>>;
+  
+  /** Form validation callback */
+  onFormValidation?: (isValid: boolean) => void;
+  
+  /** Test progress callback */
+  onProgress?: (progress: ConnectionTestProgress) => void;
+  
+  /** Advanced test options */
+  advancedOptions?: ConnectionTestAdvancedOptions;
 }
 
 /**
- * Service Form Wizard hook return type
+ * Connection Test Progress Information
  */
-export interface UseServiceFormWizardReturn {
-  // Current state
-  currentStep: number;
-  navigation: WizardNavigationState;
-  progress: WizardStepProgress[];
+export interface ConnectionTestProgress {
+  /** Current test phase */
+  phase: 'validating' | 'connecting' | 'authenticating' | 'querying' | 'cleanup';
   
-  // Navigation methods
-  goToStep: (stepIndex: number) => Promise<boolean>;
-  goToNextStep: () => Promise<boolean>;
-  goToPreviousStep: () => void;
-  goToFirstStep: () => void;
-  goToLastStep: () => void;
+  /** Progress percentage */
+  percentage: number;
   
-  // Validation methods
-  validateCurrentStep: () => Promise<boolean>;
-  validateAllSteps: () => Promise<boolean>;
-  validateStep: (stepIndex: number) => Promise<boolean>;
+  /** Current step description */
+  description: string;
   
-  // Step management
-  completeStep: (stepIndex: number) => void;
-  skipStep: (stepIndex: number) => void;
-  resetStep: (stepIndex: number) => void;
+  /** Elapsed time */
+  elapsedTime: number;
   
-  // Data management
-  getStepData: (stepIndex: number) => any;
-  setStepData: (stepIndex: number, data: any) => void;
-  getAllData: () => ServiceFormInput;
-  resetAllData: () => void;
+  /** Estimated remaining time */
+  estimatedRemaining?: number;
   
-  // Submission
-  submitWizard: () => Promise<void>;
-  
-  // State flags
-  canNavigateNext: boolean;
-  canNavigatePrevious: boolean;
-  isFirstStep: boolean;
-  isLastStep: boolean;
-  isCompleted: boolean;
+  /** Test warnings */
+  warnings: string[];
 }
 
 /**
- * Connection Test hook return type
+ * Advanced Connection Test Options
  */
-export interface UseConnectionTestReturn {
-  testConnection: (config?: DatabaseConfig) => Promise<void>;
-  result: ConnectionTestResult | null;
-  status: ConnectionTestStatus;
-  isLoading: boolean;
-  error: ApiErrorResponse | null;
-  lastTested: string | null;
-  retryCount: number;
-  resetTest: () => void;
-  retryTest: () => Promise<void>;
-}
-
-/**
- * Paywall Access hook return type
- */
-export interface UsePaywallAccessReturn {
-  // Access checking
-  checkFeatureAccess: (feature: string) => PaywallFeatureAccess;
-  checkServiceAccess: (serviceType: DatabaseDriver) => boolean;
-  isFeatureAvailable: (feature: string) => boolean;
+export interface ConnectionTestAdvancedOptions {
+  /** Test query to execute */
+  testQuery?: string;
   
-  // Modal management
-  modalState: PaywallModalState;
-  openPaywallModal: (config: Partial<PaywallModalState>) => void;
-  closePaywallModal: () => void;
+  /** Connection timeout */
+  connectionTimeout?: number;
   
-  // Tier management
-  currentTier: ServiceTierAccess;
-  upgradeToTier: (tier: ServiceTierAccess) => Promise<void>;
-  startTrial: (serviceType: DatabaseDriver) => Promise<void>;
+  /** Query timeout */
+  queryTimeout?: number;
   
-  // Premium configuration
-  getPremiumConfig: (serviceType: DatabaseDriver) => PremiumServiceConfig | null;
-  getUpgradeUrl: (tier: ServiceTierAccess) => string;
-  getContactSalesUrl: (serviceType: DatabaseDriver) => string;
-}
-
-/**
- * Dynamic Fields hook return type
- */
-export interface UseDynamicFieldsReturn {
-  // Field configuration
-  fields: DynamicFieldConfig[];
-  getFieldConfig: (fieldName: string) => DynamicFieldConfig | undefined;
-  updateFieldConfig: (fieldName: string, config: Partial<DynamicFieldConfig>) => void;
+  /** SSL verification mode */
+  sslVerification?: 'strict' | 'lax' | 'disabled';
   
-  // Field visibility and state
-  getFieldVisibility: (fieldName: string) => boolean;
-  getFieldDisabled: (fieldName: string) => boolean;
-  getFieldRequired: (fieldName: string) => boolean;
+  /** Test database features */
+  testFeatures?: {
+    testTables?: boolean;
+    testViews?: boolean;
+    testProcedures?: boolean;
+    testPermissions?: boolean;
+  };
   
-  // Conditional logic
-  evaluateConditions: (fieldName: string) => boolean;
-  applyConditionalLogic: () => void;
+  /** Performance testing */
+  performanceTest?: {
+    enabled: boolean;
+    iterations?: number;
+    measureLatency?: boolean;
+    measureThroughput?: boolean;
+  };
   
-  // Field dependencies
-  getDependentFields: (fieldName: string) => string[];
-  getFieldDependencies: (fieldName: string) => string[];
-  refreshDependentFields: (fieldName: string) => void;
-  
-  // Validation
-  validateField: (fieldName: string, value: any) => Promise<string | undefined>;
-  validateAllFields: () => Promise<Record<string, string>>;
+  /** Connection pool testing */
+  poolTest?: {
+    enabled: boolean;
+    maxConnections?: number;
+    testConcurrency?: boolean;
+  };
 }
 
 // =============================================================================
-// UTILITY TYPES AND HELPERS
+// FORM UTILITIES AND HELPERS
 // =============================================================================
 
 /**
- * Wizard step key mapping for type safety
+ * Form Utility Functions Interface
  */
-export const WIZARD_STEPS = {
-  SERVICE_TYPE: 'service-type',
-  BASIC_INFO: 'basic-info',
-  CONNECTION_CONFIG: 'connection-config',
-  SECURITY_CONFIG: 'security-config',
-  ADVANCED_CONFIG: 'advanced-config',
-  REVIEW: 'review'
-} as const;
-
-export type WizardStepKey = typeof WIZARD_STEPS[keyof typeof WIZARD_STEPS];
-
-/**
- * Default wizard steps configuration
- */
-export const DEFAULT_WIZARD_STEPS: WizardStep[] = [
-  {
-    id: WIZARD_STEPS.SERVICE_TYPE,
-    title: 'Select Service Type',
-    description: 'Choose the database type for your new service',
-    fields: ['type', 'serviceTypeId'],
-    validationSchema: ServiceTypeSelectionSchema,
-    estimatedDuration: 2
-  },
-  {
-    id: WIZARD_STEPS.BASIC_INFO,
-    title: 'Basic Information',
-    description: 'Configure basic service details and metadata',
-    fields: ['name', 'label', 'description', 'category', 'tags'],
-    validationSchema: BasicServiceInfoSchema,
-    estimatedDuration: 3
-  },
-  {
-    id: WIZARD_STEPS.CONNECTION_CONFIG,
-    title: 'Connection Configuration',
-    description: 'Set up database connection parameters',
-    fields: ['config'],
-    validationSchema: ConnectionConfigSchema,
-    estimatedDuration: 5
-  },
-  {
-    id: WIZARD_STEPS.SECURITY_CONFIG,
-    title: 'Security Configuration',
-    description: 'Configure access control and security settings',
-    fields: ['security'],
-    validationSchema: SecurityConfigSchema,
-    optional: true,
-    estimatedDuration: 4
-  },
-  {
-    id: WIZARD_STEPS.ADVANCED_CONFIG,
-    title: 'Advanced Configuration',
-    description: 'Configure advanced options and premium features',
-    fields: ['advanced', 'requiresPremium', 'tierAccess'],
-    validationSchema: AdvancedConfigSchema,
-    optional: true,
-    estimatedDuration: 6
-  }
-];
-
-/**
- * Form field validation error types
- */
-export interface FormFieldError extends FieldError {
-  field: string;
-  code?: string;
-  context?: Record<string, any>;
+export interface ServiceFormUtils {
+  /** Validate single field */
+  validateField: (
+    fieldName: Path<WizardDatabaseConnectionFormData>,
+    value: any,
+    allValues: Partial<WizardDatabaseConnectionFormData>
+  ) => Promise<boolean | string>;
+  
+  /** Validate all fields */
+  validateAllFields: (
+    data: Partial<WizardDatabaseConnectionFormData>
+  ) => Promise<FieldErrors<WizardDatabaseConnectionFormData>>;
+  
+  /** Transform form data for submission */
+  transformForSubmission: (
+    data: WizardDatabaseConnectionFormData
+  ) => DatabaseConnectionFormData;
+  
+  /** Transform service data for form */
+  transformFromService: (
+    service: DatabaseService
+  ) => Partial<WizardDatabaseConnectionFormData>;
+  
+  /** Get default values for service type */
+  getDefaultValues: (
+    type: DatabaseDriver
+  ) => Partial<WizardDatabaseConnectionFormData>;
+  
+  /** Format field value for display */
+  formatFieldValue: (
+    fieldName: string,
+    value: any,
+    formatting?: FieldFormatting
+  ) => string;
+  
+  /** Parse field value from input */
+  parseFieldValue: (
+    fieldName: string,
+    value: string,
+    fieldType: FormFieldType
+  ) => any;
+  
+  /** Get field dependencies */
+  getFieldDependencies: (
+    fieldName: string,
+    serviceType: DatabaseDriver
+  ) => FieldDependency[];
+  
+  /** Check field visibility */
+  isFieldVisible: (
+    fieldName: string,
+    data: Partial<WizardDatabaseConnectionFormData>,
+    conditionalLogic?: ConditionalLogic
+  ) => boolean;
+  
+  /** Generate field validation schema */
+  generateFieldSchema: (
+    field: FormField,
+    serviceType?: DatabaseDriver
+  ) => z.ZodSchema<any>;
 }
 
 /**
- * Service form submission result
+ * Form Configuration Factory
  */
-export interface ServiceFormSubmissionResult {
-  success: boolean;
-  service?: DatabaseService;
-  errors?: FormFieldError[];
-  warnings?: string[];
-  redirectUrl?: string;
-  nextSteps?: string[];
-}
-
-/**
- * Service form analytics event data
- */
-export interface ServiceFormAnalyticsEvent {
-  event: 'form_started' | 'step_completed' | 'form_submitted' | 'form_abandoned' | 'error_occurred';
-  serviceType?: DatabaseDriver;
-  step?: string;
-  duration?: number;
-  errors?: string[];
-  metadata?: Record<string, any>;
+export interface ServiceFormConfigFactory {
+  /** Create form configuration for service type */
+  createConfiguration: (
+    type: DatabaseDriver,
+    mode: 'create' | 'edit' | 'clone' | 'view'
+  ) => ServiceFormConfiguration;
+  
+  /** Create wizard steps for service type */
+  createWizardSteps: (
+    type: DatabaseDriver,
+    features: Record<string, boolean>
+  ) => WizardStepDefinition[];
+  
+  /** Create field definitions for service type */
+  createFieldDefinitions: (
+    type: DatabaseDriver,
+    mode: 'create' | 'edit' | 'clone' | 'view'
+  ) => FormField[];
+  
+  /** Create validation schema for service type */
+  createValidationSchema: (
+    type: DatabaseDriver,
+    stepId?: string
+  ) => z.ZodSchema<any>;
+  
+  /** Create layout configuration */
+  createLayoutConfiguration: (
+    type: DatabaseDriver,
+    layout: LayoutType
+  ) => FormLayout;
 }
 
 // =============================================================================
-// EXPORTS
+// TYPE GUARDS AND UTILITIES
 // =============================================================================
 
-// Re-export commonly used types from base types
+/**
+ * Type guard for wizard database connection form data
+ */
+export function isWizardFormData(
+  data: unknown
+): data is WizardDatabaseConnectionFormData {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    'type' in data &&
+    typeof (data as any).type === 'string'
+  );
+}
+
+/**
+ * Type guard for service form step data
+ */
+export function isServiceFormStep(
+  step: unknown
+): step is ServiceFormStepData {
+  return (
+    typeof step === 'object' &&
+    step !== null &&
+    'stepId' in step &&
+    'isValid' in step &&
+    'isComplete' in step
+  );
+}
+
+/**
+ * Type guard for paywall configuration
+ */
+export function isPaywallConfiguration(
+  config: unknown
+): config is PaywallConfiguration {
+  return (
+    typeof config === 'object' &&
+    config !== null &&
+    'feature' in config &&
+    'tier' in config &&
+    'isBlocked' in config
+  );
+}
+
+/**
+ * Utility to create initial wizard form data
+ */
+export function createInitialWizardFormData(
+  type: DatabaseDriver,
+  existingData?: Partial<WizardDatabaseConnectionFormData>
+): Partial<WizardDatabaseConnectionFormData> {
+  const baseData: Partial<WizardDatabaseConnectionFormData> = {
+    type,
+    is_active: true,
+    stepData: {},
+    connectionValidated: false,
+    schemaDiscovered: false,
+    securityConfigured: false,
+    allowIncompleteSubmission: false,
+    forceRevalidation: false,
+    saveAsDraft: false,
+    skipValidation: false,
+  };
+  
+  return {
+    ...baseData,
+    ...existingData,
+  };
+}
+
+/**
+ * Utility to validate wizard step completion
+ */
+export function validateStepCompletion(
+  step: WizardStepDefinition,
+  data: Partial<WizardDatabaseConnectionFormData>
+): boolean {
+  if (step.optional) return true;
+  if (step.validate) return false; // Async validation required
+  
+  // Basic validation based on step requirements
+  const requiredFields = getStepRequiredFields(step.id);
+  return requiredFields.every(field => {
+    const value = getNestedValue(data, field);
+    return value !== undefined && value !== null && value !== '';
+  });
+}
+
+/**
+ * Helper to get required fields for a step
+ */
+function getStepRequiredFields(stepId: string): string[] {
+  const stepFieldMap: Record<string, string[]> = {
+    'service-type': ['type'],
+    'connection': ['host', 'database', 'username', 'password'],
+    'connection-test': ['connectionValidated'],
+    'security': ['securityConfigured'],
+    'review': ['type', 'host', 'database'],
+  };
+  
+  return stepFieldMap[stepId] || [];
+}
+
+/**
+ * Helper to get nested value from object
+ */
+function getNestedValue(obj: any, path: string): any {
+  return path.split('.').reduce((current, key) => current?.[key], obj);
+}
+
+/**
+ * Export commonly used types for external consumption
+ */
 export type {
-  DatabaseService,
-  DatabaseConfig,
-  ServiceType,
-  DatabaseDriver,
-  ServiceStatus,
-  ConnectionTestResult,
-  ConnectionTestStatus,
-  DatabaseConnectionInput,
-  BaseComponentProps,
-  ApiErrorResponse
-} from '../types';
-
-// Export all schemas
-export {
-  ServiceFormSchema,
-  ServiceTypeSelectionSchema,
-  BasicServiceInfoSchema,
-  ConnectionConfigSchema,
-  SecurityConfigSchema,
-  AdvancedConfigSchema
-};
-
-// Export inferred types
-export type {
-  ServiceFormInput,
-  ServiceTypeSelectionInput,
-  BasicServiceInfoInput,
-  ConnectionConfigInput,
-  SecurityConfigInput,
-  AdvancedConfigInput
-};
-
-// Export constants
-export {
-  WIZARD_STEPS,
-  DEFAULT_WIZARD_STEPS
+  WizardDatabaseConnectionFormData as ServiceFormData,
+  ServiceFormWizardProps as WizardProps,
+  ServiceFormContainerProps as ContainerProps,
+  DynamicFieldProps as FieldProps,
+  ServiceFormState as FormState,
+  WizardStepDefinition as StepDefinition,
+  PaywallState as PaywallState,
 };
