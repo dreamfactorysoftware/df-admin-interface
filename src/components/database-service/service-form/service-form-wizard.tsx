@@ -1,442 +1,284 @@
-'use client';
+/**
+ * Service Form Wizard Component
+ * 
+ * React multi-step wizard component for database service creation that migrates Angular mat-stepper 
+ * functionality to React. Implements comprehensive step-by-step service configuration workflow
+ * including service type selection, basic details, connection parameters, security configuration,
+ * and advanced options using React Hook Form with Zod validation.
+ * 
+ * Features:
+ * - Multi-step wizard navigation with progress tracking
+ * - Dynamic form field generation based on service schemas  
+ * - Real-time validation under 100ms per integration requirements
+ * - Security configuration with role and app creation
+ * - Support for all database types (MySQL, PostgreSQL, Oracle, MongoDB, Snowflake)
+ * - Tailwind CSS 4.1+ styling with Headless UI 2.0+ accessibility
+ * - Step validation and conditional navigation
+ * - Form state persistence across steps
+ * 
+ * @fileoverview Multi-step wizard for database service form management
+ * @version 1.0.0
+ * @since 2024-01-01
+ */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, Fragment } from 'react';
 import { useForm, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { 
+  CheckIcon, 
+  ExclamationTriangleIcon,
+  InformationCircleIcon,
   ChevronLeftIcon, 
-  ChevronRightIcon, 
-  CheckIcon,
+  ChevronRightIcon,
   DatabaseIcon,
   CogIcon,
   ShieldCheckIcon,
-  DocumentCheckIcon
+  AdjustmentsHorizontalIcon,
+  EyeIcon,
+  PlayIcon
 } from '@heroicons/react/24/outline';
+import { Tab } from '@headlessui/react';
+
+import { Button } from '@/components/ui/button';
+import { ServiceFormFields } from './service-form-fields';
+import type {
+  ServiceFormInput,
+  ServiceFormWizardProps,
+  WizardStep,
+  WizardNavigationState,
+  WizardStepProgress,
+  WizardStepValidationState,
+  ServiceFormMode,
+  ServiceFormData,
+  ServiceTypeSelectionInput,
+  BasicServiceInfoInput,
+  ConnectionConfigInput,
+  SecurityConfigInput,
+  AdvancedConfigInput,
+  DynamicFieldConfig,
+  ServiceTierAccess,
+  DatabaseDriver,
+  ServiceType,
+  BaseComponentProps
+} from './service-form-types';
+import {
+  ServiceFormSchema,
+  ServiceTypeSelectionSchema,
+  BasicServiceInfoSchema,
+  ConnectionConfigSchema,
+  SecurityConfigSchema,
+  AdvancedConfigSchema,
+  WIZARD_STEPS,
+  DEFAULT_WIZARD_STEPS
+} from './service-form-types';
+import {
+  useServiceForm,
+  useServiceFormWizard,
+  useServiceFormFields,
+  useServiceConnectionTest,
+  useServiceFormPaywall,
+  useServiceFormSecurity,
+  useServiceFormSubmission
+} from './service-form-hooks';
 import { cn } from '@/lib/utils';
 
-// Types and interfaces for service configuration
-interface DatabaseServiceFormData {
-  // Service Type Step
-  serviceType: 'mysql' | 'postgresql' | 'oracle' | 'mongodb' | 'snowflake' | 'sqlserver' | 'sqlite';
-  
-  // Basic Details Step
-  name: string;
-  label?: string;
-  description?: string;
-  isActive: boolean;
-  
-  // Connection Configuration
-  host: string;
-  port?: number;
-  database: string;
-  username: string;
-  password: string;
-  
-  // Advanced Options
-  connectionString?: string;
-  sslEnabled?: boolean;
-  sslMode?: 'disable' | 'allow' | 'prefer' | 'require' | 'verify-ca' | 'verify-full';
-  timezone?: string;
-  charset?: string;
-  
-  // Pooling Configuration
-  poolingEnabled?: boolean;
-  minConnections?: number;
-  maxConnections?: number;
-  connectionTimeout?: number;
-  
-  // Security Configuration
-  accessType: 'public' | 'private' | 'role-based';
-  allowedRoles?: string[];
-  allowedApps?: string[];
-  requireApiKey?: boolean;
-  enableAuditing?: boolean;
+// =============================================================================
+// WIZARD STEP CONFIGURATIONS
+// =============================================================================
+
+/**
+ * Service type selector component with grid layout
+ */
+interface ServiceTypeSelectorProps {
+  selectedType?: DatabaseDriver | null;
+  onTypeSelect: (type: DatabaseDriver, serviceType: ServiceType) => void;
+  showDescriptions?: boolean;
+  enablePaywall?: boolean;
+  currentTier?: ServiceTierAccess;
 }
 
-// Service type definitions with configuration schemas
-const SERVICE_TYPES = [
-  {
-    id: 'mysql',
-    name: 'MySQL',
-    description: 'Connect to MySQL database servers',
-    icon: DatabaseIcon,
-    defaultPort: 3306,
-    supportsSsl: true,
-    supportsPooling: true,
-  },
-  {
-    id: 'postgresql',
-    name: 'PostgreSQL',
-    description: 'Connect to PostgreSQL database servers',
-    icon: DatabaseIcon,
-    defaultPort: 5432,
-    supportsSsl: true,
-    supportsPooling: true,
-  },
-  {
-    id: 'oracle',
-    name: 'Oracle',
-    description: 'Connect to Oracle database servers',
-    icon: DatabaseIcon,
-    defaultPort: 1521,
-    supportsSsl: true,
-    supportsPooling: true,
-  },
-  {
-    id: 'mongodb',
-    name: 'MongoDB',
-    description: 'Connect to MongoDB NoSQL databases',
-    icon: DatabaseIcon,
-    defaultPort: 27017,
-    supportsSsl: true,
-    supportsPooling: false,
-  },
-  {
-    id: 'snowflake',
-    name: 'Snowflake',
-    description: 'Connect to Snowflake cloud data warehouse',
-    icon: DatabaseIcon,
-    defaultPort: 443,
-    supportsSsl: true,
-    supportsPooling: true,
-  },
-  {
-    id: 'sqlserver',
-    name: 'SQL Server',
-    description: 'Connect to Microsoft SQL Server databases',
-    icon: DatabaseIcon,
-    defaultPort: 1433,
-    supportsSsl: true,
-    supportsPooling: true,
-  },
-  {
-    id: 'sqlite',
-    name: 'SQLite',
-    description: 'Connect to SQLite database files',
-    icon: DatabaseIcon,
-    defaultPort: null,
-    supportsSsl: false,
-    supportsPooling: false,
-  },
-] as const;
-
-// Validation schema using Zod
-const createServiceFormSchema = (currentStep: number) => {
-  const baseSchema = z.object({
-    // Service Type (Step 1)
-    serviceType: z.enum(['mysql', 'postgresql', 'oracle', 'mongodb', 'snowflake', 'sqlserver', 'sqlite']),
-    
-    // Basic Details (Step 2)
-    name: currentStep >= 2 ? z.string().min(1, 'Service name is required').max(50, 'Name must be 50 characters or less') : z.string().optional(),
-    label: z.string().max(100, 'Label must be 100 characters or less').optional(),
-    description: z.string().max(500, 'Description must be 500 characters or less').optional(),
-    isActive: z.boolean().default(true),
-    
-    // Connection Configuration (Step 2)
-    host: currentStep >= 2 ? z.string().min(1, 'Host is required') : z.string().optional(),
-    port: z.number().min(1).max(65535).optional(),
-    database: currentStep >= 2 ? z.string().min(1, 'Database name is required') : z.string().optional(),
-    username: currentStep >= 2 ? z.string().min(1, 'Username is required') : z.string().optional(),
-    password: currentStep >= 2 ? z.string().min(1, 'Password is required') : z.string().optional(),
-    
-    // Advanced Options (Step 3)
-    connectionString: z.string().optional(),
-    sslEnabled: z.boolean().optional(),
-    sslMode: z.enum(['disable', 'allow', 'prefer', 'require', 'verify-ca', 'verify-full']).optional(),
-    timezone: z.string().optional(),
-    charset: z.string().optional(),
-    
-    // Pooling Configuration (Step 3)
-    poolingEnabled: z.boolean().optional(),
-    minConnections: z.number().min(1).max(100).optional(),
-    maxConnections: z.number().min(1).max(100).optional(),
-    connectionTimeout: z.number().min(1000).max(300000).optional(),
-    
-    // Security Configuration (Step 4)
-    accessType: z.enum(['public', 'private', 'role-based']).default('public'),
-    allowedRoles: z.array(z.string()).optional(),
-    allowedApps: z.array(z.string()).optional(),
-    requireApiKey: z.boolean().optional(),
-    enableAuditing: z.boolean().optional(),
-  });
-
-  return baseSchema;
-};
-
-// Wizard step configuration
-const WIZARD_STEPS = [
-  {
-    id: 1,
-    title: 'Service Type',
-    description: 'Select the type of database service to create',
-    icon: DatabaseIcon,
-  },
-  {
-    id: 2,
-    title: 'Basic Details',
-    description: 'Configure connection details and service information',
-    icon: CogIcon,
-  },
-  {
-    id: 3,
-    title: 'Advanced Options',
-    description: 'Configure advanced connection and pooling settings',
-    icon: DocumentCheckIcon,
-  },
-  {
-    id: 4,
-    title: 'Security',
-    description: 'Configure access control and security settings',
-    icon: ShieldCheckIcon,
-  },
-];
-
-interface ServiceFormWizardProps {
-  onSubmit: (data: DatabaseServiceFormData) => void;
-  onCancel: () => void;
-  initialData?: Partial<DatabaseServiceFormData>;
-  isLoading?: boolean;
-  mode: 'create' | 'edit';
-}
-
-export default function ServiceFormWizard({
-  onSubmit,
-  onCancel,
-  initialData,
-  isLoading = false,
-  mode = 'create',
-}: ServiceFormWizardProps) {
-  const [currentStep, setCurrentStep] = useState(1);
-  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
-
-  // Initialize form with React Hook Form and Zod validation
-  const form = useForm<DatabaseServiceFormData>({
-    resolver: zodResolver(createServiceFormSchema(currentStep)),
-    mode: 'onChange',
-    defaultValues: {
-      serviceType: 'mysql',
-      name: '',
-      label: '',
-      description: '',
-      isActive: true,
-      host: '',
-      port: undefined,
-      database: '',
-      username: '',
-      password: '',
-      connectionString: '',
-      sslEnabled: false,
-      sslMode: 'prefer',
-      timezone: 'UTC',
-      charset: 'utf8mb4',
-      poolingEnabled: true,
-      minConnections: 1,
-      maxConnections: 10,
-      connectionTimeout: 30000,
-      accessType: 'public',
-      allowedRoles: [],
-      allowedApps: [],
-      requireApiKey: false,
-      enableAuditing: false,
-      ...initialData,
+const ServiceTypeSelector: React.FC<ServiceTypeSelectorProps> = ({
+  selectedType,
+  onTypeSelect,
+  showDescriptions = true,
+  enablePaywall = true,
+  currentTier = 'free'
+}) => {
+  // Mock service types - in real implementation, this would come from API
+  const serviceTypes: ServiceType[] = useMemo(() => [
+    {
+      id: 'mysql',
+      name: 'MySQL',
+      driver: 'mysql',
+      description: 'Popular open-source relational database',
+      icon: 'database',
+      category: 'SQL',
+      tier: 'free',
+      features: ['ACID transactions', 'High performance', 'Scalable'],
+      configSchema: []
     },
-  });
-
-  const { watch, trigger, getValues, setValue } = form;
-  const selectedServiceType = watch('serviceType');
-
-  // Update default port when service type changes
-  useEffect(() => {
-    const serviceTypeConfig = SERVICE_TYPES.find(type => type.id === selectedServiceType);
-    if (serviceTypeConfig?.defaultPort && !getValues('port')) {
-      setValue('port', serviceTypeConfig.defaultPort);
+    {
+      id: 'postgresql',
+      name: 'PostgreSQL', 
+      driver: 'pgsql',
+      description: 'Advanced open-source relational database',
+      icon: 'database',
+      category: 'SQL',
+      tier: 'free',
+      features: ['Advanced SQL features', 'JSON support', 'Extensible'],
+      configSchema: []
+    },
+    {
+      id: 'oracle',
+      name: 'Oracle Database',
+      driver: 'oracle',
+      description: 'Enterprise-grade relational database',
+      icon: 'database',
+      category: 'Enterprise SQL',
+      tier: 'premium',
+      features: ['Enterprise features', 'High availability', 'Advanced security'],
+      configSchema: []
+    },
+    {
+      id: 'mongodb',
+      name: 'MongoDB',
+      driver: 'mongodb',
+      description: 'Leading NoSQL document database',
+      icon: 'database',
+      category: 'NoSQL',
+      tier: 'basic',
+      features: ['Document storage', 'Flexible schema', 'Horizontal scaling'],
+      configSchema: []
+    },
+    {
+      id: 'snowflake',
+      name: 'Snowflake',
+      driver: 'snowflake',
+      description: 'Cloud-native data warehouse',
+      icon: 'database',
+      category: 'Cloud',
+      tier: 'premium',
+      features: ['Cloud-native', 'Data sharing', 'Elastic scaling'],
+      configSchema: []
+    },
+    {
+      id: 'sqlserver',
+      name: 'SQL Server',
+      driver: 'sqlsrv',
+      description: 'Microsoft SQL Server database',
+      icon: 'database',
+      category: 'Enterprise SQL',
+      tier: 'basic',
+      features: ['Windows integration', 'Business intelligence', 'Enterprise tools'],
+      configSchema: []
     }
-  }, [selectedServiceType, setValue, getValues]);
+  ], []);
 
-  // Validate current step before proceeding
-  const validateCurrentStep = async (): Promise<boolean> => {
-    const fieldsToValidate = getFieldsForStep(currentStep);
-    const result = await trigger(fieldsToValidate);
-    return result;
-  };
-
-  // Get fields that need validation for current step
-  const getFieldsForStep = (step: number): (keyof DatabaseServiceFormData)[] => {
-    switch (step) {
-      case 1:
-        return ['serviceType'];
-      case 2:
-        return ['name', 'host', 'database', 'username', 'password'];
-      case 3:
-        return []; // Advanced options are all optional
-      case 4:
-        return ['accessType']; // Security step validation
-      default:
-        return [];
+  const getTierColor = useCallback((tier: ServiceTierAccess) => {
+    switch (tier) {
+      case 'free': return 'text-green-600 bg-green-50';
+      case 'basic': return 'text-blue-600 bg-blue-50';
+      case 'premium': return 'text-purple-600 bg-purple-50';
+      case 'enterprise': return 'text-amber-600 bg-amber-50';
+      default: return 'text-gray-600 bg-gray-50';
     }
-  };
+  }, []);
 
-  // Navigate to next step
-  const handleNext = useCallback(async () => {
-    const isValid = await validateCurrentStep();
-    if (isValid && currentStep < WIZARD_STEPS.length) {
-      setCompletedSteps(prev => new Set([...prev, currentStep]));
-      setCurrentStep(prev => prev + 1);
-    }
-  }, [currentStep, validateCurrentStep]);
+  const isAccessible = useCallback((tier: ServiceTierAccess) => {
+    const tierLevels = { free: 0, basic: 1, premium: 2, enterprise: 3 };
+    return tierLevels[currentTier] >= tierLevels[tier];
+  }, [currentTier]);
 
-  // Navigate to previous step
-  const handlePrevious = useCallback(() => {
-    if (currentStep > 1) {
-      setCurrentStep(prev => prev - 1);
-    }
-  }, [currentStep]);
-
-  // Navigate directly to a specific step
-  const handleStepClick = useCallback(async (stepNumber: number) => {
-    if (stepNumber < currentStep || completedSteps.has(stepNumber)) {
-      setCurrentStep(stepNumber);
-    } else if (stepNumber === currentStep + 1) {
-      await handleNext();
-    }
-  }, [currentStep, completedSteps, handleNext]);
-
-  // Handle form submission
-  const handleSubmit = async (data: DatabaseServiceFormData) => {
-    const isValid = await validateCurrentStep();
-    if (isValid) {
-      onSubmit(data);
-    }
-  };
-
-  // Render step indicator
-  const StepIndicator = () => (
-    <div className="flex items-center justify-between mb-8">
-      {WIZARD_STEPS.map((step, index) => {
-        const isCompleted = completedSteps.has(step.id);
-        const isCurrent = currentStep === step.id;
-        const isAccessible = step.id <= currentStep || completedSteps.has(step.id);
-
-        return (
-          <React.Fragment key={step.id}>
-            <button
-              type="button"
-              onClick={() => handleStepClick(step.id)}
-              disabled={!isAccessible}
-              className={cn(
-                'flex flex-col items-center space-y-2 transition-colors duration-200',
-                isAccessible ? 'cursor-pointer hover:text-primary-600' : 'cursor-not-allowed opacity-50'
-              )}
-            >
-              <div
-                className={cn(
-                  'flex items-center justify-center w-10 h-10 rounded-full border-2 transition-colors duration-200',
-                  isCompleted
-                    ? 'bg-primary-600 border-primary-600 text-white'
-                    : isCurrent
-                    ? 'border-primary-600 text-primary-600 bg-white'
-                    : 'border-gray-300 text-gray-400 bg-white'
-                )}
-              >
-                {isCompleted ? (
-                  <CheckIcon className="w-6 h-6" />
-                ) : (
-                  <step.icon className="w-6 h-6" />
-                )}
-              </div>
-              <div className="text-center">
-                <div
-                  className={cn(
-                    'text-sm font-medium',
-                    isCurrent ? 'text-primary-600' : isCompleted ? 'text-gray-900' : 'text-gray-500'
-                  )}
-                >
-                  {step.title}
-                </div>
-                <div className="text-xs text-gray-500 max-w-20 leading-tight">
-                  {step.description}
-                </div>
-              </div>
-            </button>
-            {index < WIZARD_STEPS.length - 1 && (
-              <div
-                className={cn(
-                  'flex-1 h-0.5 mx-4 transition-colors duration-200',
-                  completedSteps.has(step.id) ? 'bg-primary-600' : 'bg-gray-200'
-                )}
-              />
-            )}
-          </React.Fragment>
-        );
-      })}
-    </div>
-  );
-
-  // Render service type selection step
-  const ServiceTypeStep = () => (
+  return (
     <div className="space-y-6">
       <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-900">Select Database Type</h2>
-        <p className="mt-2 text-gray-600">
-          Choose the type of database you want to connect to
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+          Choose Database Type
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          Select the type of database you want to connect to your API
         </p>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {SERVICE_TYPES.map((serviceType) => {
-          const isSelected = selectedServiceType === serviceType.id;
+        {serviceTypes.map((serviceType) => {
+          const accessible = isAccessible(serviceType.tier);
+          const selected = selectedType === serviceType.driver;
           
           return (
             <button
               key={serviceType.id}
               type="button"
-              onClick={() => setValue('serviceType', serviceType.id as any)}
+              onClick={() => accessible && onTypeSelect(serviceType.driver, serviceType)}
+              disabled={!accessible}
               className={cn(
-                'relative p-6 rounded-lg border-2 transition-all duration-200 text-left hover:shadow-md',
-                isSelected
-                  ? 'border-primary-600 bg-primary-50 shadow-md'
-                  : 'border-gray-200 bg-white hover:border-gray-300'
+                'relative p-6 rounded-lg border-2 transition-all duration-200',
+                'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
+                'text-left hover:shadow-md',
+                selected
+                  ? 'border-primary-500 bg-primary-50 shadow-md dark:bg-primary-900/20'
+                  : 'border-gray-200 bg-white hover:border-gray-300 dark:border-gray-700 dark:bg-gray-800',
+                !accessible && 'opacity-60 cursor-not-allowed hover:shadow-none'
               )}
             >
-              <div className="flex items-start space-x-4">
-                <div
-                  className={cn(
-                    'flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center',
-                    isSelected ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600'
-                  )}
-                >
-                  <serviceType.icon className="w-6 h-6" />
+              {/* Selection indicator */}
+              {selected && (
+                <div className="absolute top-2 right-2">
+                  <CheckIcon className="h-5 w-5 text-primary-600" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <h3
-                    className={cn(
-                      'text-lg font-semibold',
-                      isSelected ? 'text-primary-900' : 'text-gray-900'
-                    )}
-                  >
+              )}
+
+              {/* Service tier badge */}
+              <div className="absolute top-2 left-2">
+                <span className={cn(
+                  'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium',
+                  getTierColor(serviceType.tier)
+                )}>
+                  {serviceType.tier}
+                </span>
+              </div>
+
+              {/* Service icon and name */}
+              <div className="flex items-center space-x-3 mt-6 mb-3">
+                <DatabaseIcon className="h-8 w-8 text-gray-400" />
+                <div>
+                  <h4 className="font-semibold text-gray-900 dark:text-gray-100">
                     {serviceType.name}
-                  </h3>
-                  <p
-                    className={cn(
-                      'text-sm mt-1',
-                      isSelected ? 'text-primary-700' : 'text-gray-600'
-                    )}
-                  >
-                    {serviceType.description}
+                  </h4>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {serviceType.category}
                   </p>
-                  {serviceType.defaultPort && (
-                    <p className="text-xs text-gray-500 mt-2">
-                      Default port: {serviceType.defaultPort}
-                    </p>
-                  )}
                 </div>
               </div>
-              
-              {isSelected && (
-                <div className="absolute top-4 right-4">
-                  <div className="w-6 h-6 bg-primary-600 rounded-full flex items-center justify-center">
-                    <CheckIcon className="w-4 h-4 text-white" />
+
+              {/* Description */}
+              {showDescriptions && (
+                <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
+                  {serviceType.description}
+                </p>
+              )}
+
+              {/* Features */}
+              <div className="space-y-1">
+                {serviceType.features.slice(0, 2).map((feature, index) => (
+                  <div key={index} className="flex items-center space-x-2">
+                    <CheckIcon className="h-3 w-3 text-green-500 flex-shrink-0" />
+                    <span className="text-xs text-gray-600 dark:text-gray-400">
+                      {feature}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Upgrade indicator for inaccessible tiers */}
+              {!accessible && (
+                <div className="absolute inset-0 flex items-center justify-center bg-white/80 dark:bg-gray-800/80 rounded-lg">
+                  <div className="text-center">
+                    <ShieldCheckIcon className="h-6 w-6 text-amber-500 mx-auto mb-1" />
+                    <p className="text-xs font-medium text-gray-900 dark:text-gray-100">
+                      Upgrade Required
+                    </p>
                   </div>
                 </div>
               )}
@@ -446,562 +288,834 @@ export default function ServiceFormWizard({
       </div>
     </div>
   );
+};
 
-  // Render basic details step
-  const BasicDetailsStep = () => (
-    <div className="space-y-6">
-      <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-900">Basic Details</h2>
-        <p className="mt-2 text-gray-600">
-          Configure your {SERVICE_TYPES.find(t => t.id === selectedServiceType)?.name} connection
-        </p>
-      </div>
+/**
+ * Wizard step navigation component
+ */
+interface WizardNavigationProps {
+  steps: WizardStep[];
+  currentStep: number;
+  completedSteps: Set<number>;
+  onStepClick: (stepIndex: number) => void;
+  canNavigate: (stepIndex: number) => boolean;
+  showProgress?: boolean;
+}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Service Information */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium text-gray-900">Service Information</h3>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Service Name *
-            </label>
-            <input
-              {...form.register('name')}
-              type="text"
-              className={cn(
-                'w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500',
-                form.formState.errors.name ? 'border-red-300' : 'border-gray-300'
-              )}
-              placeholder="Enter service name"
-            />
-            {form.formState.errors.name && (
-              <p className="mt-1 text-sm text-red-600">{form.formState.errors.name.message}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Label
-            </label>
-            <input
-              {...form.register('label')}
-              type="text"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              placeholder="Enter display label"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description
-            </label>
-            <textarea
-              {...form.register('description')}
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              placeholder="Enter service description"
-            />
-          </div>
-
-          <div className="flex items-center">
-            <input
-              {...form.register('isActive')}
-              type="checkbox"
-              className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-            />
-            <label className="ml-2 block text-sm text-gray-900">
-              Service is active
-            </label>
-          </div>
-        </div>
-
-        {/* Connection Configuration */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium text-gray-900">Connection Details</h3>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Host *
-            </label>
-            <input
-              {...form.register('host')}
-              type="text"
-              className={cn(
-                'w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500',
-                form.formState.errors.host ? 'border-red-300' : 'border-gray-300'
-              )}
-              placeholder="localhost"
-            />
-            {form.formState.errors.host && (
-              <p className="mt-1 text-sm text-red-600">{form.formState.errors.host.message}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Port
-            </label>
-            <input
-              {...form.register('port', { valueAsNumber: true })}
-              type="number"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              placeholder={SERVICE_TYPES.find(t => t.id === selectedServiceType)?.defaultPort?.toString()}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Database *
-            </label>
-            <input
-              {...form.register('database')}
-              type="text"
-              className={cn(
-                'w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500',
-                form.formState.errors.database ? 'border-red-300' : 'border-gray-300'
-              )}
-              placeholder="Enter database name"
-            />
-            {form.formState.errors.database && (
-              <p className="mt-1 text-sm text-red-600">{form.formState.errors.database.message}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Username *
-            </label>
-            <input
-              {...form.register('username')}
-              type="text"
-              className={cn(
-                'w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500',
-                form.formState.errors.username ? 'border-red-300' : 'border-gray-300'
-              )}
-              placeholder="Enter username"
-            />
-            {form.formState.errors.username && (
-              <p className="mt-1 text-sm text-red-600">{form.formState.errors.username.message}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Password *
-            </label>
-            <input
-              {...form.register('password')}
-              type="password"
-              className={cn(
-                'w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500',
-                form.formState.errors.password ? 'border-red-300' : 'border-gray-300'
-              )}
-              placeholder="Enter password"
-            />
-            {form.formState.errors.password && (
-              <p className="mt-1 text-sm text-red-600">{form.formState.errors.password.message}</p>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Render advanced options step
-  const AdvancedOptionsStep = () => {
-    const serviceTypeConfig = SERVICE_TYPES.find(t => t.id === selectedServiceType);
-    
-    return (
-      <div className="space-y-6">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900">Advanced Options</h2>
-          <p className="mt-2 text-gray-600">
-            Configure advanced connection and performance settings
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Connection Options */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium text-gray-900">Connection Options</h3>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Connection String
-              </label>
-              <textarea
-                {...form.register('connectionString')}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                placeholder="Optional: Override with custom connection string"
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                Leave empty to use individual connection parameters
-              </p>
-            </div>
-
-            {serviceTypeConfig?.supportsSsl && (
-              <>
-                <div className="flex items-center">
-                  <input
-                    {...form.register('sslEnabled')}
-                    type="checkbox"
-                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                  />
-                  <label className="ml-2 block text-sm text-gray-900">
-                    Enable SSL/TLS
-                  </label>
-                </div>
-
-                {watch('sslEnabled') && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      SSL Mode
-                    </label>
-                    <select
-                      {...form.register('sslMode')}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                    >
-                      <option value="disable">Disable</option>
-                      <option value="allow">Allow</option>
-                      <option value="prefer">Prefer</option>
-                      <option value="require">Require</option>
-                      <option value="verify-ca">Verify CA</option>
-                      <option value="verify-full">Verify Full</option>
-                    </select>
-                  </div>
-                )}
-              </>
-            )}
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Timezone
-              </label>
-              <input
-                {...form.register('timezone')}
-                type="text"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                placeholder="UTC"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Character Set
-              </label>
-              <input
-                {...form.register('charset')}
-                type="text"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                placeholder="utf8mb4"
-              />
-            </div>
-          </div>
-
-          {/* Connection Pooling */}
-          {serviceTypeConfig?.supportsPooling && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium text-gray-900">Connection Pooling</h3>
-              
-              <div className="flex items-center">
-                <input
-                  {...form.register('poolingEnabled')}
-                  type="checkbox"
-                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                />
-                <label className="ml-2 block text-sm text-gray-900">
-                  Enable connection pooling
-                </label>
-              </div>
-
-              {watch('poolingEnabled') && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Minimum Connections
-                    </label>
-                    <input
-                      {...form.register('minConnections', { valueAsNumber: true })}
-                      type="number"
-                      min="1"
-                      max="100"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                      placeholder="1"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Maximum Connections
-                    </label>
-                    <input
-                      {...form.register('maxConnections', { valueAsNumber: true })}
-                      type="number"
-                      min="1"
-                      max="100"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                      placeholder="10"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Connection Timeout (ms)
-                    </label>
-                    <input
-                      {...form.register('connectionTimeout', { valueAsNumber: true })}
-                      type="number"
-                      min="1000"
-                      max="300000"
-                      step="1000"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                      placeholder="30000"
-                    />
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  // Render security configuration step
-  const SecurityStep = () => (
-    <div className="space-y-6">
-      <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-900">Security Configuration</h2>
-        <p className="mt-2 text-gray-600">
-          Configure access control and security settings for your service
-        </p>
-      </div>
-
-      <div className="space-y-6">
-        {/* Access Type */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-3">
-            Access Type
-          </label>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[
-              { 
-                value: 'public', 
-                title: 'Public Access', 
-                description: 'Anyone with API access can use this service' 
-              },
-              { 
-                value: 'private', 
-                title: 'Private Access', 
-                description: 'Only authenticated users can access this service' 
-              },
-              { 
-                value: 'role-based', 
-                title: 'Role-Based Access', 
-                description: 'Only users with specific roles can access' 
-              },
-            ].map((option) => {
-              const isSelected = watch('accessType') === option.value;
-              
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => setValue('accessType', option.value as any)}
-                  className={cn(
-                    'p-4 border-2 rounded-lg text-left transition-all duration-200',
-                    isSelected
-                      ? 'border-primary-600 bg-primary-50'
-                      : 'border-gray-200 bg-white hover:border-gray-300'
-                  )}
-                >
-                  <h4
-                    className={cn(
-                      'font-medium text-sm',
-                      isSelected ? 'text-primary-900' : 'text-gray-900'
-                    )}
-                  >
-                    {option.title}
-                  </h4>
-                  <p
-                    className={cn(
-                      'text-xs mt-1',
-                      isSelected ? 'text-primary-700' : 'text-gray-600'
-                    )}
-                  >
-                    {option.description}
-                  </p>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Role-based Access Configuration */}
-        {watch('accessType') === 'role-based' && (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Allowed Roles
-              </label>
-              <input
-                type="text"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                placeholder="Enter comma-separated role names"
-                onChange={(e) => {
-                  const roles = e.target.value.split(',').map(r => r.trim()).filter(Boolean);
-                  setValue('allowedRoles', roles);
-                }}
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                Enter role names separated by commas
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Allowed Applications
-              </label>
-              <input
-                type="text"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                placeholder="Enter comma-separated app names"
-                onChange={(e) => {
-                  const apps = e.target.value.split(',').map(a => a.trim()).filter(Boolean);
-                  setValue('allowedApps', apps);
-                }}
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                Enter application names separated by commas
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Additional Security Options */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium text-gray-900">Additional Security Options</h3>
-          
-          <div className="flex items-center">
-            <input
-              {...form.register('requireApiKey')}
-              type="checkbox"
-              className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-            />
-            <label className="ml-2 block text-sm text-gray-900">
-              Require API key for all requests
-            </label>
-          </div>
-
-          <div className="flex items-center">
-            <input
-              {...form.register('enableAuditing')}
-              type="checkbox"
-              className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-            />
-            <label className="ml-2 block text-sm text-gray-900">
-              Enable audit logging for this service
-            </label>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Render current step content
-  const renderStepContent = () => {
-    switch (currentStep) {
-      case 1:
-        return <ServiceTypeStep />;
-      case 2:
-        return <BasicDetailsStep />;
-      case 3:
-        return <AdvancedOptionsStep />;
-      case 4:
-        return <SecurityStep />;
+const WizardNavigation: React.FC<WizardNavigationProps> = ({
+  steps,
+  currentStep,
+  completedSteps,
+  onStepClick,
+  canNavigate,
+  showProgress = true
+}) => {
+  const getStepIcon = useCallback((step: WizardStep, index: number) => {
+    switch (step.id) {
+      case WIZARD_STEPS.SERVICE_TYPE:
+        return DatabaseIcon;
+      case WIZARD_STEPS.BASIC_INFO:
+        return InformationCircleIcon;
+      case WIZARD_STEPS.CONNECTION_CONFIG:
+        return CogIcon;
+      case WIZARD_STEPS.SECURITY_CONFIG:
+        return ShieldCheckIcon;
+      case WIZARD_STEPS.ADVANCED_CONFIG:
+        return AdjustmentsHorizontalIcon;
       default:
-        return null;
+        return InformationCircleIcon;
     }
-  };
+  }, []);
+
+  const getStepStatus = useCallback((index: number) => {
+    if (completedSteps.has(index)) return 'completed';
+    if (index === currentStep) return 'current';
+    if (canNavigate(index)) return 'available';
+    return 'disabled';
+  }, [completedSteps, currentStep, canNavigate]);
+
+  const progress = useMemo(() => {
+    const completedCount = completedSteps.size;
+    const totalSteps = steps.length;
+    return Math.round((completedCount / totalSteps) * 100);
+  }, [completedSteps.size, steps.length]);
 
   return (
-    <div className="max-w-6xl mx-auto p-6 bg-white rounded-lg shadow-lg">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">
-          {mode === 'create' ? 'Create Database Service' : 'Edit Database Service'}
-        </h1>
-        <p className="mt-2 text-gray-600">
-          Follow the steps below to configure your database service connection
-        </p>
-      </div>
-
-      <FormProvider {...form}>
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
-          {/* Step Indicator */}
-          <StepIndicator />
-
-          {/* Step Content */}
-          <div className="min-h-96">
-            {renderStepContent()}
+    <div className="space-y-6">
+      {/* Progress bar */}
+      {showProgress && (
+        <div className="space-y-2">
+          <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+            <span>Progress</span>
+            <span>{progress}% complete</span>
           </div>
+          <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
+            <div 
+              className="bg-primary-600 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        </div>
+      )}
 
-          {/* Navigation Buttons */}
-          <div className="flex items-center justify-between pt-6 border-t border-gray-200">
+      {/* Step indicators */}
+      <nav className="space-y-2">
+        {steps.map((step, index) => {
+          const status = getStepStatus(index);
+          const Icon = getStepIcon(step, index);
+          
+          return (
             <button
+              key={step.id}
               type="button"
-              onClick={onCancel}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+              onClick={() => canNavigate(index) && onStepClick(index)}
+              disabled={!canNavigate(index)}
+              className={cn(
+                'w-full flex items-center space-x-3 p-3 rounded-lg text-left transition-all',
+                'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
+                status === 'current' && 'bg-primary-50 border border-primary-200 dark:bg-primary-900/20 dark:border-primary-800',
+                status === 'completed' && 'bg-green-50 border border-green-200 dark:bg-green-900/20 dark:border-green-800',
+                status === 'available' && 'hover:bg-gray-50 border border-transparent dark:hover:bg-gray-800',
+                status === 'disabled' && 'opacity-50 cursor-not-allowed'
+              )}
             >
-              Cancel
+              {/* Step icon */}
+              <div className={cn(
+                'flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center',
+                status === 'current' && 'bg-primary-600 text-white',
+                status === 'completed' && 'bg-green-600 text-white',
+                status === 'available' && 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400',
+                status === 'disabled' && 'bg-gray-100 text-gray-400 dark:bg-gray-800'
+              )}>
+                {status === 'completed' ? (
+                  <CheckIcon className="w-4 h-4" />
+                ) : (
+                  <Icon className="w-4 h-4" />
+                )}
+              </div>
+
+              {/* Step content */}
+              <div className="flex-1 min-w-0">
+                <p className={cn(
+                  'text-sm font-medium truncate',
+                  status === 'current' && 'text-primary-900 dark:text-primary-100',
+                  status === 'completed' && 'text-green-900 dark:text-green-100',
+                  status === 'available' && 'text-gray-900 dark:text-gray-100',
+                  status === 'disabled' && 'text-gray-500 dark:text-gray-400'
+                )}>
+                  {step.title}
+                </p>
+                {step.description && (
+                  <p className={cn(
+                    'text-xs truncate',
+                    status === 'current' && 'text-primary-700 dark:text-primary-300',
+                    status === 'completed' && 'text-green-700 dark:text-green-300',
+                    status === 'available' && 'text-gray-500 dark:text-gray-400',
+                    status === 'disabled' && 'text-gray-400 dark:text-gray-500'
+                  )}>
+                    {step.description}
+                  </p>
+                )}
+              </div>
+
+              {/* Step indicator */}
+              <div className="flex-shrink-0">
+                <span className={cn(
+                  'inline-flex items-center justify-center w-6 h-6 text-xs font-medium rounded-full',
+                  status === 'current' && 'bg-primary-100 text-primary-800 dark:bg-primary-800 dark:text-primary-200',
+                  status === 'completed' && 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-200',
+                  status === 'available' && 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
+                  status === 'disabled' && 'bg-gray-50 text-gray-400 dark:bg-gray-800'
+                )}>
+                  {index + 1}
+                </span>
+              </div>
             </button>
+          );
+        })}
+      </nav>
+    </div>
+  );
+};
 
-            <div className="flex items-center space-x-3">
-              {currentStep > 1 && (
-                <button
-                  type="button"
-                  onClick={handlePrevious}
-                  className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                >
-                  <ChevronLeftIcon className="w-4 h-4 mr-1" />
-                  Previous
-                </button>
+// =============================================================================
+// MAIN WIZARD COMPONENT
+// =============================================================================
+
+/**
+ * Service Form Wizard Props interface
+ */
+export interface ServiceFormWizardComponentProps extends BaseComponentProps {
+  mode?: ServiceFormMode;
+  serviceId?: number;
+  initialData?: Partial<ServiceFormData>;
+  onSubmit?: (data: ServiceFormInput) => void | Promise<void>;
+  onCancel?: () => void;
+  onStepChange?: (step: number) => void;
+  steps?: WizardStep[];
+  enableStepValidation?: boolean;
+  allowSkipOptionalSteps?: boolean;
+  showProgress?: boolean;
+  showStepIndicator?: boolean;
+  submitButtonText?: string;
+  cancelButtonText?: string;
+  previousButtonText?: string;
+  nextButtonText?: string;
+  enablePaywall?: boolean;
+  currentTier?: ServiceTierAccess;
+  redirectOnSuccess?: string;
+  redirectOnCancel?: string;
+}
+
+/**
+ * Service Form Wizard Component
+ * 
+ * Main component implementing multi-step wizard for database service creation.
+ * Migrates Angular mat-stepper functionality to React with enhanced features.
+ */
+export const ServiceFormWizard: React.FC<ServiceFormWizardComponentProps> = ({
+  mode = 'create',
+  serviceId,
+  initialData,
+  onSubmit,
+  onCancel,
+  onStepChange,
+  steps = DEFAULT_WIZARD_STEPS,
+  enableStepValidation = true,
+  allowSkipOptionalSteps = true,
+  showProgress = true,
+  showStepIndicator = true,
+  submitButtonText = 'Create Service',
+  cancelButtonText = 'Cancel',
+  previousButtonText = 'Previous',
+  nextButtonText = 'Next',
+  enablePaywall = true,
+  currentTier = 'free',
+  redirectOnSuccess,
+  redirectOnCancel,
+  className,
+  ...props
+}) => {
+  // Form state management with React Hook Form
+  const form = useForm<ServiceFormInput>({
+    resolver: zodResolver(ServiceFormSchema),
+    defaultValues: {
+      name: initialData?.name || '',
+      label: initialData?.label || '',
+      description: initialData?.description || '',
+      type: initialData?.type || 'mysql',
+      config: {
+        driver: initialData?.config?.driver || 'mysql',
+        host: initialData?.config?.host || '',
+        port: initialData?.config?.port || 3306,
+        database: initialData?.config?.database || '',
+        username: initialData?.config?.username || '',
+        password: initialData?.config?.password || '',
+        ssl: {
+          enabled: false,
+          verify: true,
+          mode: 'prefer'
+        },
+        pooling: {
+          min: 2,
+          max: 10,
+          acquireTimeoutMillis: 60000,
+          createTimeoutMillis: 30000,
+          destroyTimeoutMillis: 5000,
+          idleTimeoutMillis: 300000
+        }
+      },
+      is_active: initialData?.is_active ?? true,
+      security: {
+        accessType: 'private',
+        requireHttps: true,
+        corsEnabled: false,
+        rateLimiting: {
+          enabled: false,
+          requestsPerMinute: 60,
+          requestsPerHour: 1000
+        },
+        authentication: {
+          type: 'api-key',
+          sessionTimeout: 60
+        }
+      },
+      advanced: {
+        caching: {
+          enabled: false,
+          strategy: 'memory',
+          ttl: 300
+        },
+        logging: {
+          enabled: true,
+          level: 'info',
+          destination: 'console'
+        },
+        monitoring: {
+          enabled: false,
+          healthCheckInterval: 30
+        }
+      }
+    },
+    mode: 'onBlur',
+    reValidateMode: 'onChange'
+  });
+
+  const { watch, trigger, getValues, formState } = form;
+  const watchedValues = watch();
+
+  // Wizard navigation state
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
+  const [visitedSteps, setVisitedSteps] = useState<Set<number>>(new Set([0]));
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Form submission handling
+  const { submitForm } = useServiceFormSubmission(mode, serviceId);
+
+  // Current step information
+  const currentStep = steps[currentStepIndex];
+  const isFirstStep = currentStepIndex === 0;
+  const isLastStep = currentStepIndex === steps.length - 1;
+
+  // Step validation
+  const validateCurrentStep = useCallback(async () => {
+    if (!enableStepValidation) return true;
+
+    const stepFields = currentStep.fields;
+    let isValid = true;
+
+    // Validate individual fields
+    for (const field of stepFields) {
+      const fieldValid = await trigger(field as any);
+      if (!fieldValid) isValid = false;
+    }
+
+    // Validate with step schema if provided
+    if (currentStep.validationSchema && isValid) {
+      try {
+        const formData = getValues();
+        const stepData = stepFields.reduce((acc, field) => {
+          const value = formData[field as keyof ServiceFormInput];
+          if (value !== undefined) {
+            acc[field] = value;
+          }
+          return acc;
+        }, {} as any);
+
+        await currentStep.validationSchema.parseAsync(stepData);
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          // Set form errors
+          error.errors.forEach((err) => {
+            const path = err.path.join('.');
+            form.setError(path as any, {
+              type: 'validation',
+              message: err.message,
+            });
+          });
+          isValid = false;
+        }
+      }
+    }
+
+    return isValid;
+  }, [currentStep, enableStepValidation, trigger, getValues, form]);
+
+  // Navigation handlers
+  const goToStep = useCallback(async (stepIndex: number) => {
+    if (stepIndex < 0 || stepIndex >= steps.length) return false;
+
+    // If going forward, validate current step
+    if (stepIndex > currentStepIndex) {
+      const isValid = await validateCurrentStep();
+      if (!isValid && !currentStep.optional) return false;
+      
+      if (isValid) {
+        setCompletedSteps(prev => new Set([...prev, currentStepIndex]));
+      }
+    }
+
+    setCurrentStepIndex(stepIndex);
+    setVisitedSteps(prev => new Set([...prev, stepIndex]));
+    
+    if (onStepChange) {
+      onStepChange(stepIndex);
+    }
+
+    return true;
+  }, [currentStepIndex, validateCurrentStep, currentStep, onStepChange, steps.length]);
+
+  const goToNextStep = useCallback(async () => {
+    if (isLastStep) return false;
+    return await goToStep(currentStepIndex + 1);
+  }, [isLastStep, goToStep, currentStepIndex]);
+
+  const goToPreviousStep = useCallback(() => {
+    if (isFirstStep) return false;
+    return goToStep(currentStepIndex - 1);
+  }, [isFirstStep, goToStep, currentStepIndex]);
+
+  // Step accessibility check
+  const canNavigateToStep = useCallback((stepIndex: number) => {
+    if (stepIndex <= currentStepIndex) return true;
+    if (visitedSteps.has(stepIndex)) return true;
+    
+    // Check if all previous required steps are completed
+    for (let i = 0; i < stepIndex; i++) {
+      if (!steps[i].optional && !completedSteps.has(i)) {
+        return false;
+      }
+    }
+    
+    return true;
+  }, [currentStepIndex, visitedSteps, completedSteps, steps]);
+
+  // Form submission
+  const handleSubmit = useCallback(async () => {
+    setIsSubmitting(true);
+    
+    try {
+      // Validate all steps
+      const isValid = await trigger();
+      if (!isValid) {
+        setIsSubmitting(false);
+        return;
+      }
+
+      const formData = getValues();
+      
+      if (onSubmit) {
+        await onSubmit(formData);
+      } else {
+        await submitForm(formData, {
+          redirect: !!redirectOnSuccess,
+          onSuccess: (service) => {
+            console.log('Service created successfully:', service);
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Form submission failed:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [trigger, getValues, onSubmit, submitForm, redirectOnSuccess]);
+
+  // Cancel handler
+  const handleCancel = useCallback(() => {
+    if (onCancel) {
+      onCancel();
+    } else if (redirectOnCancel) {
+      window.location.href = redirectOnCancel;
+    }
+  }, [onCancel, redirectOnCancel]);
+
+  // Dynamic field generation for current step
+  const stepFields: DynamicFieldConfig[] = useMemo(() => {
+    const fields: DynamicFieldConfig[] = [];
+    
+    switch (currentStep.id) {
+      case WIZARD_STEPS.SERVICE_TYPE:
+        // Service type selection is handled by custom component
+        break;
+        
+      case WIZARD_STEPS.BASIC_INFO:
+        fields.push(
+          {
+            id: 'name',
+            name: 'name',
+            type: 'text',
+            label: 'Service Name',
+            placeholder: 'my_database_service',
+            description: 'Unique identifier for your database service',
+            required: true,
+            validation: {
+              required: true,
+              minLength: 1,
+              maxLength: 64,
+              pattern: '^[a-zA-Z][a-zA-Z0-9_-]*$'
+            },
+            transform: 'snakeCase',
+            section: 'basic',
+            order: 1
+          },
+          {
+            id: 'label',
+            name: 'label',
+            type: 'text',
+            label: 'Display Label',
+            placeholder: 'My Database Service',
+            description: 'Human-readable name for your service',
+            required: true,
+            validation: {
+              required: true,
+              minLength: 1,
+              maxLength: 255
+            },
+            section: 'basic',
+            order: 2
+          },
+          {
+            id: 'description',
+            name: 'description',
+            type: 'textarea',
+            label: 'Description',
+            placeholder: 'Describe what this database service will be used for...',
+            description: 'Optional description for documentation purposes',
+            required: false,
+            validation: {
+              maxLength: 1024
+            },
+            section: 'basic',
+            order: 3
+          }
+        );
+        break;
+        
+      case WIZARD_STEPS.CONNECTION_CONFIG:
+        fields.push(
+          {
+            id: 'config.host',
+            name: 'config.host',
+            type: 'text',
+            label: 'Host',
+            placeholder: 'localhost',
+            description: 'Database server hostname or IP address',
+            required: true,
+            validation: {
+              required: true,
+              minLength: 1,
+              maxLength: 255
+            },
+            section: 'connection',
+            order: 1
+          },
+          {
+            id: 'config.port',
+            name: 'config.port',
+            type: 'number',
+            label: 'Port',
+            placeholder: '3306',
+            description: 'Database server port number',
+            required: false,
+            validation: {
+              min: 1,
+              max: 65535
+            },
+            section: 'connection',
+            order: 2
+          },
+          {
+            id: 'config.database',
+            name: 'config.database',
+            type: 'text',
+            label: 'Database Name',
+            placeholder: 'my_database',
+            description: 'Name of the database to connect to',
+            required: true,
+            validation: {
+              required: true,
+              minLength: 1,
+              maxLength: 64
+            },
+            section: 'connection',
+            order: 3
+          },
+          {
+            id: 'config.username',
+            name: 'config.username',
+            type: 'text',
+            label: 'Username',
+            placeholder: 'db_user',
+            description: 'Database username for authentication',
+            required: true,
+            validation: {
+              required: true,
+              minLength: 1,
+              maxLength: 64
+            },
+            section: 'connection',
+            order: 4
+          },
+          {
+            id: 'config.password',
+            name: 'config.password',
+            type: 'password',
+            label: 'Password',
+            placeholder: '••••••••',
+            description: 'Database password for authentication',
+            required: false,
+            validation: {
+              maxLength: 255
+            },
+            section: 'connection',
+            order: 5
+          }
+        );
+        break;
+        
+      case WIZARD_STEPS.SECURITY_CONFIG:
+        fields.push(
+          {
+            id: 'security.accessType',
+            name: 'security.accessType',
+            type: 'select',
+            label: 'Access Type',
+            description: 'How the service can be accessed',
+            required: true,
+            options: [
+              { value: 'public', label: 'Public', description: 'Anyone can access' },
+              { value: 'private', label: 'Private', description: 'Restricted access' },
+              { value: 'role-based', label: 'Role-based', description: 'Access by roles' },
+              { value: 'api-key', label: 'API Key', description: 'Requires API key' }
+            ],
+            section: 'security',
+            order: 1
+          },
+          {
+            id: 'security.requireHttps',
+            name: 'security.requireHttps',
+            type: 'checkbox',
+            label: 'Require HTTPS',
+            description: 'Force all connections to use HTTPS',
+            required: false,
+            section: 'security',
+            order: 2
+          },
+          {
+            id: 'security.corsEnabled',
+            name: 'security.corsEnabled',
+            type: 'checkbox',
+            label: 'Enable CORS',
+            description: 'Allow cross-origin requests',
+            required: false,
+            section: 'security',
+            order: 3
+          }
+        );
+        break;
+        
+      case WIZARD_STEPS.ADVANCED_CONFIG:
+        fields.push(
+          {
+            id: 'advanced.caching.enabled',
+            name: 'advanced.caching.enabled',
+            type: 'checkbox',
+            label: 'Enable Caching',
+            description: 'Cache database queries for better performance',
+            required: false,
+            section: 'caching',
+            order: 1
+          },
+          {
+            id: 'advanced.logging.enabled',
+            name: 'advanced.logging.enabled',
+            type: 'checkbox',
+            label: 'Enable Logging',
+            description: 'Log database operations for monitoring',
+            required: false,
+            section: 'logging',
+            order: 2
+          },
+          {
+            id: 'advanced.monitoring.enabled',
+            name: 'advanced.monitoring.enabled',
+            type: 'checkbox',
+            label: 'Enable Monitoring',
+            description: 'Monitor service health and performance',
+            required: false,
+            section: 'monitoring',
+            order: 3
+          }
+        );
+        break;
+    }
+    
+    return fields;
+  }, [currentStep.id]);
+
+  // Service type selection handler
+  const handleServiceTypeSelect = useCallback((driver: DatabaseDriver, serviceType: ServiceType) => {
+    form.setValue('type', driver);
+    form.setValue('config.driver', driver);
+    
+    // Set default port based on database type
+    const defaultPorts: Record<DatabaseDriver, number> = {
+      mysql: 3306,
+      pgsql: 5432,
+      oracle: 1521,
+      mongodb: 27017,
+      snowflake: 443,
+      sqlsrv: 1433,
+      sqlite: 0,
+      ibmdb2: 50000,
+      informix: 9088,
+      sqlanywhere: 2638,
+      memsql: 3306,
+      salesforce_db: 443,
+      hana: 30015,
+      apache_hive: 10000,
+      databricks: 443,
+      dremio: 31010
+    };
+    
+    form.setValue('config.port', defaultPorts[driver] || 3306);
+  }, [form]);
+
+  return (
+    <div className={cn('service-form-wizard', className)} {...props}>
+      <FormProvider {...form}>
+        <div className="max-w-6xl mx-auto">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg overflow-hidden">
+            <div className="flex">
+              {/* Sidebar Navigation */}
+              {showStepIndicator && (
+                <div className="w-80 bg-gray-50 dark:bg-gray-800 p-6 border-r border-gray-200 dark:border-gray-700">
+                  <WizardNavigation
+                    steps={steps}
+                    currentStep={currentStepIndex}
+                    completedSteps={completedSteps}
+                    onStepClick={goToStep}
+                    canNavigate={canNavigateToStep}
+                    showProgress={showProgress}
+                  />
+                </div>
               )}
 
-              {currentStep < WIZARD_STEPS.length ? (
-                <button
-                  type="button"
-                  onClick={handleNext}
-                  disabled={isLoading}
-                  className="flex items-center px-4 py-2 text-sm font-medium text-white bg-primary-600 border border-transparent rounded-md shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Next
-                  <ChevronRightIcon className="w-4 h-4 ml-1" />
-                </button>
-              ) : (
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="flex items-center px-6 py-2 text-sm font-medium text-white bg-primary-600 border border-transparent rounded-md shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isLoading ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      {mode === 'create' ? 'Creating...' : 'Saving...'}
-                    </>
-                  ) : (
-                    mode === 'create' ? 'Create Service' : 'Save Changes'
-                  )}
-                </button>
-              )}
+              {/* Main Content */}
+              <div className="flex-1">
+                <div className="p-8">
+                  {/* Step Header */}
+                  <div className="mb-8">
+                    <div className="flex items-center space-x-3 mb-4">
+                      <div className="flex-shrink-0 w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center dark:bg-primary-900">
+                        <span className="text-primary-600 font-semibold dark:text-primary-400">
+                          {currentStepIndex + 1}
+                        </span>
+                      </div>
+                      <div>
+                        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                          {currentStep.title}
+                        </h2>
+                        {currentStep.description && (
+                          <p className="text-gray-600 dark:text-gray-400 mt-1">
+                            {currentStep.description}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Progress indicator for mobile */}
+                    {!showStepIndicator && showProgress && (
+                      <div className="mb-6">
+                        <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 mb-2">
+                          <span>Step {currentStepIndex + 1} of {steps.length}</span>
+                          <span>{Math.round(((currentStepIndex + 1) / steps.length) * 100)}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
+                          <div 
+                            className="bg-primary-600 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${((currentStepIndex + 1) / steps.length) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Step Content */}
+                  <div className="mb-8">
+                    {currentStep.id === WIZARD_STEPS.SERVICE_TYPE ? (
+                      <ServiceTypeSelector
+                        selectedType={watchedValues.type}
+                        onTypeSelect={handleServiceTypeSelect}
+                        currentTier={currentTier}
+                        enablePaywall={enablePaywall}
+                      />
+                    ) : (
+                      <ServiceFormFields
+                        fields={stepFields}
+                        control={form.control}
+                        register={form.register}
+                        watch={form.watch}
+                        setValue={form.setValue}
+                        trigger={form.trigger}
+                        errors={formState.errors}
+                        isSubmitting={isSubmitting}
+                        enableConditionalLogic={true}
+                        layout="single"
+                        showFieldGroups={true}
+                      />
+                    )}
+                  </div>
+
+                  {/* Step Actions */}
+                  <div className="flex items-center justify-between pt-6 border-t border-gray-200 dark:border-gray-700">
+                    <div>
+                      {!isFirstStep && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={goToPreviousStep}
+                          disabled={isSubmitting}
+                          className="inline-flex items-center"
+                        >
+                          <ChevronLeftIcon className="w-4 h-4 mr-2" />
+                          {previousButtonText}
+                        </Button>
+                      )}
+                    </div>
+
+                    <div className="flex items-center space-x-3">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={handleCancel}
+                        disabled={isSubmitting}
+                      >
+                        {cancelButtonText}
+                      </Button>
+
+                      {isLastStep ? (
+                        <Button
+                          type="button"
+                          onClick={handleSubmit}
+                          disabled={isSubmitting}
+                          className="inline-flex items-center"
+                        >
+                          {isSubmitting ? (
+                            <>
+                              <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              Creating...
+                            </>
+                          ) : (
+                            <>
+                              <PlayIcon className="w-4 h-4 mr-2" />
+                              {submitButtonText}
+                            </>
+                          )}
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          onClick={goToNextStep}
+                          disabled={isSubmitting}
+                          className="inline-flex items-center"
+                        >
+                          {nextButtonText}
+                          <ChevronRightIcon className="w-4 h-4 ml-2" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-        </form>
+        </div>
       </FormProvider>
     </div>
   );
-}
+};
+
+export default ServiceFormWizard;
