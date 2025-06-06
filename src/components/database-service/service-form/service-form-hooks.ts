@@ -6,516 +6,618 @@
  * dynamic schema-driven field generation, connection testing with SWR, and paywall access control.
  * Provides hooks for service creation, modification, and security configuration workflows.
  * 
- * @fileoverview Comprehensive hooks for database service form management
+ * @fileoverview Service form hooks with React Hook Form 7.52+, SWR, and React Query integration
  * @version 1.0.0
- * @since 2024-01-01
+ * @since React 19.0.0, Next.js 15.1+, TypeScript 5.8+
  */
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useForm, UseFormReturn, UseFormProps, FormState, FieldValues } from 'react-hook-form';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useForm, useFormContext, UseFormReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import useSWR, { mutate } from 'swr';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import useSWR, { mutate as swrMutate } from 'swr';
+import { 
+  useQuery, 
+  useMutation, 
+  useQueryClient,
+  UseQueryResult,
+  UseMutationResult
+} from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
+import { z } from 'zod';
 
+// Internal imports
+import { apiClient } from '../../../lib/api-client';
+import type {
+  ServiceFormData,
+  ServiceFormInput,
+  ServiceFormMode,
+  ServiceFormSubmissionState,
+  ServiceFormSubmissionResult,
+  WizardStep,
+  WizardNavigationState,
+  WizardStepProgress,
+  WizardStepValidationState,
+  DynamicFieldConfig,
+  PaywallModalState,
+  PaywallFeatureAccess,
+  PremiumServiceConfig,
+  ServiceSecurityConfig,
+  ServiceAdvancedConfig,
+  UseServiceFormReturn,
+  UseServiceFormWizardReturn,
+  UseConnectionTestReturn,
+  UsePaywallAccessReturn,
+  UseDynamicFieldsReturn,
+  ServiceFormSchema,
+  ServiceTypeSelectionSchema,
+  BasicServiceInfoSchema,
+  ConnectionConfigSchema,
+  SecurityConfigSchema,
+  AdvancedConfigSchema,
+  DEFAULT_WIZARD_STEPS,
+  WIZARD_STEPS,
+  WizardStepKey,
+  ServiceTierAccess,
+  FormFieldError
+} from './service-form-types';
 import type {
   DatabaseService,
   DatabaseConfig,
-  ServiceType,
-  ConfigSchema,
-  DatabaseConnectionInput,
+  DatabaseDriver,
   ConnectionTestResult,
   ConnectionTestStatus,
-  DatabaseDriver,
-  ServiceTier,
-  DatabaseConnectionSchema,
-  ConnectionTestSchema,
-  DatabaseServiceQueryKeys,
   ApiErrorResponse,
-  GenericListResponse,
-  DatabaseServiceCreateInput,
-  DatabaseServiceUpdateInput,
+  DatabaseConnectionFormData,
+  ServiceQueryParams
 } from '../types';
+import { useNotifications } from '../../../hooks/use-notifications';
+import { useLoading } from '../../../hooks/use-loading';
+import { useDebounce } from '../../../hooks/use-debounce';
+import { usePaywall } from '../../../hooks/use-paywall';
 
 // =============================================================================
-// HOOK CONFIGURATION TYPES
+// CONSTANTS AND CONFIGURATION
 // =============================================================================
 
 /**
- * Service form configuration interface
+ * SWR configuration for connection testing
  */
-export interface ServiceFormConfig {
-  mode: 'create' | 'edit' | 'view';
-  initialData?: DatabaseService | null;
-  onSuccess?: (service: DatabaseService) => void;
-  onError?: (error: ApiErrorResponse) => void;
-  onCancel?: () => void;
-  autoSave?: boolean;
-  validationMode?: 'onSubmit' | 'onBlur' | 'onChange' | 'onTouched' | 'all';
-  reValidateMode?: 'onSubmit' | 'onBlur' | 'onChange' | 'onTouched' | 'all';
-}
+const CONNECTION_TEST_SWR_CONFIG = {
+  revalidateOnFocus: false,
+  revalidateOnReconnect: false,
+  revalidateIfStale: false,
+  dedupingInterval: 0, // No deduplication for testing
+  errorRetryCount: 1,
+  errorRetryInterval: 1000,
+  focusThrottleInterval: 0,
+} as const;
 
 /**
- * Wizard step configuration interface
+ * React Query configuration for service operations
  */
-export interface WizardStepConfig {
-  id: string;
-  title: string;
-  description?: string;
-  fields: string[];
-  validation?: z.ZodSchema;
-  skipCondition?: (data: any) => boolean;
-  optional?: boolean;
-}
+const SERVICE_QUERY_CONFIG = {
+  staleTime: 5 * 60 * 1000, // 5 minutes
+  cacheTime: 10 * 60 * 1000, // 10 minutes
+} as const;
 
 /**
- * Form field configuration interface for dynamic field generation
+ * Form validation timing configuration
  */
-export interface FormFieldConfig extends ConfigSchema {
-  hidden?: boolean;
-  readonly?: boolean;
-  conditional?: {
-    field: string;
-    value: any;
-    operator?: 'equals' | 'notEquals' | 'contains' | 'notContains';
-  };
-  groupId?: string;
-  order?: number;
-}
+const VALIDATION_CONFIG = {
+  debounceMs: 300,
+  realTimeValidation: true,
+  validationMode: 'onChange' as const,
+  reValidateMode: 'onChange' as const,
+  shouldFocusError: true,
+} as const;
 
 /**
- * Connection test configuration interface
+ * Wizard navigation configuration
  */
-export interface ConnectionTestConfig {
-  autoTest?: boolean;
-  timeout?: number;
-  retryCount?: number;
-  retryDelay?: number;
-  showDetails?: boolean;
-  onSuccess?: (result: ConnectionTestResult) => void;
-  onError?: (error: ApiErrorResponse) => void;
-}
+const WIZARD_CONFIG = {
+  autoSave: true,
+  autoSaveInterval: 30000, // 30 seconds
+  validateOnStepChange: true,
+  allowSkipOptionalSteps: true,
+} as const;
+
+// =============================================================================
+// QUERY KEYS FOR REACT QUERY
+// =============================================================================
 
 /**
- * Paywall configuration interface
+ * Query keys for service form operations
  */
-export interface PaywallConfig {
-  tier: ServiceTier;
-  requiredTier: ServiceTier;
-  blockAccess?: boolean;
-  showUpgrade?: boolean;
-  onUpgrade?: () => void;
-  customMessage?: string;
-}
-
-/**
- * Security configuration interface
- */
-export interface SecurityConfig {
-  enableRoleCreation?: boolean;
-  enableAppCreation?: boolean;
-  defaultRoles?: string[];
-  defaultApps?: string[];
-  customPermissions?: string[];
-}
+export const ServiceFormQueryKeys = {
+  all: ['service-form'] as const,
+  services: () => [...ServiceFormQueryKeys.all, 'services'] as const,
+  service: (id: number) => [...ServiceFormQueryKeys.services(), id] as const,
+  connectionTest: (config: any) => [...ServiceFormQueryKeys.all, 'test', config] as const,
+  serviceTypes: () => [...ServiceFormQueryKeys.all, 'types'] as const,
+  fieldConfigs: (type: DatabaseDriver) => [...ServiceFormQueryKeys.all, 'fields', type] as const,
+  paywall: (feature: string) => [...ServiceFormQueryKeys.all, 'paywall', feature] as const,
+} as const;
 
 // =============================================================================
 // MAIN SERVICE FORM HOOK
 // =============================================================================
 
 /**
- * Main service form hook with React Hook Form integration and Zod validation
- * Provides type-safe form handling with real-time validation under 100ms per integration requirements
+ * Primary service form hook with React Hook Form integration and Zod validation
+ * Provides comprehensive form state management with type-safe validation
  */
-export function useServiceForm(config: ServiceFormConfig) {
-  const {
-    mode,
-    initialData,
-    onSuccess,
-    onError,
-    onCancel,
-    autoSave = false,
-    validationMode = 'onBlur',
-    reValidateMode = 'onChange',
-  } = config;
-
-  // Form initialization with React Hook Form 7.52+
-  const form = useForm<DatabaseConnectionInput>({
-    resolver: zodResolver(DatabaseConnectionSchema),
-    defaultValues: initialData ? {
-      name: initialData.name,
-      label: initialData.label,
-      description: initialData.description || '',
-      type: initialData.type,
-      config: initialData.config,
-      is_active: initialData.is_active,
-    } : {
+export function useServiceForm(
+  mode: ServiceFormMode = 'create',
+  initialData?: Partial<ServiceFormData>,
+  options?: {
+    enableRealTimeValidation?: boolean;
+    customValidation?: (data: ServiceFormInput) => Promise<Record<string, string> | undefined>;
+    onSubmit?: (data: ServiceFormInput) => void | Promise<void>;
+    onError?: (errors: Record<string, any>) => void;
+  }
+): UseServiceFormReturn {
+  const { addNotification } = useNotifications();
+  const { setLoading } = useLoading();
+  const router = useRouter();
+  
+  // Form configuration with Zod resolver
+  const form = useForm<ServiceFormInput>({
+    resolver: zodResolver(ServiceFormSchema),
+    defaultValues: {
       name: '',
       label: '',
       description: '',
-      type: 'mysql' as DatabaseDriver,
+      type: 'mysql',
       config: {
-        driver: 'mysql' as DatabaseDriver,
+        driver: 'mysql',
         host: '',
         port: 3306,
         database: '',
         username: '',
         password: '',
+        ssl: {
+          enabled: false,
+        },
+        pooling: {
+          min: 0,
+          max: 10,
+        },
       },
       is_active: true,
+      requiresPremium: false,
+      tierAccess: 'free',
+      ...initialData,
     },
-    mode: validationMode,
-    reValidateMode,
-    shouldFocusError: true,
-    shouldUnregister: false,
+    mode: options?.enableRealTimeValidation !== false ? VALIDATION_CONFIG.validationMode : 'onSubmit',
+    reValidateMode: VALIDATION_CONFIG.reValidateMode,
+    shouldFocusError: VALIDATION_CONFIG.shouldFocusError,
   });
 
   const {
-    register,
     handleSubmit,
-    formState,
-    control,
-    watch,
-    setValue,
-    getValues,
-    trigger,
     reset,
+    formState: { errors, isValid, isDirty, isSubmitting, touchedFields, dirtyFields, submitCount },
+    trigger,
     clearErrors,
-    setError,
   } = form;
 
-  // Auto-save functionality
-  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const watchedValues = watch();
+  // Debounced validation for real-time feedback
+  const debouncedTrigger = useDebounce(
+    useCallback(() => {
+      if (options?.enableRealTimeValidation !== false && isDirty) {
+        trigger();
+      }
+    }, [trigger, isDirty, options?.enableRealTimeValidation]),
+    VALIDATION_CONFIG.debounceMs
+  );
 
+  // Effect for real-time validation
   useEffect(() => {
-    if (autoSave && mode === 'edit' && initialData) {
-      if (autoSaveTimeoutRef.current) {
-        clearTimeout(autoSaveTimeoutRef.current);
-      }
-
-      autoSaveTimeoutRef.current = setTimeout(() => {
-        const currentValues = getValues();
-        if (JSON.stringify(currentValues) !== JSON.stringify(initialData)) {
-          handleAutoSave(currentValues);
-        }
-      }, 2000); // 2 second debounce
+    if (options?.enableRealTimeValidation !== false) {
+      debouncedTrigger();
     }
+  }, [debouncedTrigger, options?.enableRealTimeValidation]);
 
-    return () => {
-      if (autoSaveTimeoutRef.current) {
-        clearTimeout(autoSaveTimeoutRef.current);
+  // Service creation/update mutation
+  const queryClient = useQueryClient();
+  const serviceMutation = useMutation({
+    mutationFn: async (data: ServiceFormInput) => {
+      setLoading(true);
+      try {
+        // Apply custom validation if provided
+        if (options?.customValidation) {
+          const customErrors = await options.customValidation(data);
+          if (customErrors && Object.keys(customErrors).length > 0) {
+            throw new Error('Custom validation failed');
+          }
+        }
+
+        const endpoint = mode === 'create' 
+          ? '/system/service'
+          : `/system/service/${initialData?.name}`;
+        
+        const method = mode === 'create' ? 'post' : 'patch';
+        const response = await apiClient[method]<DatabaseService>(endpoint, data);
+        
+        if (!response.data && !response.resource) {
+          throw new Error('Invalid response from server');
+        }
+
+        return response.data || response.resource;
+      } finally {
+        setLoading(false);
       }
-    };
-  }, [watchedValues, autoSave, mode, initialData]);
-
-  // Auto-save mutation
-  const { mutate: autoSaveMutate } = useMutation({
-    mutationFn: async (data: DatabaseConnectionInput) => {
-      if (!initialData) return;
-      // Auto-save API call would go here
-      const response = await fetch(`/api/services/${initialData.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error('Auto-save failed');
-      return response.json();
     },
-    onError: () => {
-      // Silent fail for auto-save
-      console.warn('Auto-save failed');
+    onSuccess: (service: DatabaseService) => {
+      // Invalidate related queries
+      queryClient.invalidateQueries({ queryKey: ServiceFormQueryKeys.services() });
+      queryClient.invalidateQueries({ queryKey: ServiceFormQueryKeys.service(service.id) });
+      
+      addNotification({
+        type: 'success',
+        title: mode === 'create' ? 'Service Created' : 'Service Updated',
+        message: `Database service "${service.label || service.name}" has been ${mode === 'create' ? 'created' : 'updated'} successfully.`,
+      });
+
+      // Call external success handler
+      if (options?.onSubmit) {
+        options.onSubmit(form.getValues());
+      }
+    },
+    onError: (error: Error) => {
+      const errorMessage = error.message || 'An unexpected error occurred';
+      
+      addNotification({
+        type: 'error',
+        title: mode === 'create' ? 'Service Creation Failed' : 'Service Update Failed',
+        message: errorMessage,
+      });
+
+      // Call external error handler
+      if (options?.onError) {
+        options.onError({ submit: errorMessage });
+      }
     },
   });
 
-  const handleAutoSave = useCallback(
-    (data: DatabaseConnectionInput) => {
-      autoSaveMutate(data);
-    },
-    [autoSaveMutate]
-  );
-
-  // Form validation with performance optimization
-  const validateForm = useCallback(
-    async (data?: DatabaseConnectionInput) => {
-      const values = data || getValues();
+  // Form submission handler
+  const submitForm = useCallback(async (onSuccess?: (data: ServiceFormInput) => void) => {
+    return handleSubmit(async (data) => {
       try {
-        await DatabaseConnectionSchema.parseAsync(values);
-        return true;
-      } catch (error) {
-        if (error instanceof z.ZodError) {
-          error.errors.forEach((err) => {
-            const path = err.path.join('.');
-            setError(path as any, {
-              type: 'validation',
-              message: err.message,
-            });
-          });
+        await serviceMutation.mutateAsync(data);
+        if (onSuccess) {
+          onSuccess(data);
         }
-        return false;
+      } catch (error) {
+        // Error handling is done in mutation onError
+        console.error('Form submission error:', error);
       }
-    },
-    [getValues, setError]
-  );
+    })();
+  }, [handleSubmit, serviceMutation]);
 
-  // Form reset with type safety
-  const resetForm = useCallback(
-    (data?: DatabaseService | null) => {
-      const resetData = data || initialData;
-      if (resetData) {
-        reset({
-          name: resetData.name,
-          label: resetData.label,
-          description: resetData.description || '',
-          type: resetData.type,
-          config: resetData.config,
-          is_active: resetData.is_active,
-        });
-      } else {
-        reset();
-      }
-      clearErrors();
-    },
-    [reset, clearErrors, initialData]
-  );
-
-  // Field update with validation
-  const updateField = useCallback(
-    async (fieldName: string, value: any, validate = true) => {
-      setValue(fieldName as any, value, {
-        shouldValidate: validate,
-        shouldDirty: true,
-        shouldTouch: true,
-      });
-
-      if (validate) {
-        await trigger(fieldName as any);
-      }
-    },
-    [setValue, trigger]
-  );
-
-  // Get field value with type safety
-  const getFieldValue = useCallback(
-    (fieldName: string) => {
-      return getValues(fieldName as any);
-    },
-    [getValues]
-  );
-
-  // Check if form has changes
-  const hasChanges = useMemo(() => {
-    if (!initialData) return formState.isDirty;
-    
-    const currentValues = getValues();
-    return JSON.stringify(currentValues) !== JSON.stringify({
-      name: initialData.name,
-      label: initialData.label,
-      description: initialData.description || '',
-      type: initialData.type,
-      config: initialData.config,
-      is_active: initialData.is_active,
+  // Form reset handler
+  const resetForm = useCallback((data?: Partial<ServiceFormInput>) => {
+    reset({
+      ...form.formState.defaultValues,
+      ...data,
     });
-  }, [formState.isDirty, getValues, initialData]);
+    clearErrors();
+  }, [reset, clearErrors, form.formState.defaultValues]);
+
+  // Form validation handler
+  const validateForm = useCallback(async (): Promise<boolean> => {
+    return trigger();
+  }, [trigger]);
 
   return {
-    // Form instance
-    form,
-    
-    // Form methods
-    register,
-    handleSubmit,
-    control,
-    formState,
-    
-    // Custom methods
-    validateForm,
+    ...form,
+    submitForm,
     resetForm,
-    updateField,
-    getFieldValue,
-    
-    // State
-    hasChanges,
-    isValid: formState.isValid,
-    isSubmitting: formState.isSubmitting,
-    errors: formState.errors,
-    
-    // Configuration
-    mode,
-    initialData,
-    
-    // Callbacks
-    onSuccess,
-    onError,
-    onCancel,
+    validateForm,
+    isValid,
+    isDirty,
+    isSubmitting: isSubmitting || serviceMutation.isPending,
+    submitCount,
+    errors,
+    touchedFields,
+    dirtyFields,
   };
 }
 
 // =============================================================================
-// WIZARD NAVIGATION HOOK
+// SERVICE FORM WIZARD HOOK
 // =============================================================================
 
 /**
- * Multi-step wizard navigation and state management hook
- * Manages wizard flow for database service creation workflow
+ * Multi-step wizard hook for service creation workflow
+ * Manages wizard navigation, step validation, and progress tracking
  */
-export function useServiceFormWizard(steps: WizardStepConfig[], form: UseFormReturn<DatabaseConnectionInput>) {
-  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+export function useServiceFormWizard(
+  steps: WizardStep[] = DEFAULT_WIZARD_STEPS,
+  options?: {
+    initialStep?: number;
+    enableStepValidation?: boolean;
+    allowSkipOptionalSteps?: boolean;
+    onStepChange?: (step: number) => void;
+    onSubmit?: (data: ServiceFormInput) => void | Promise<void>;
+    onCancel?: () => void;
+  }
+): UseServiceFormWizardReturn {
+  const { addNotification } = useNotifications();
+  const form = useFormContext<ServiceFormInput>();
+  
+  // Wizard state
+  const [currentStep, setCurrentStep] = useState(options?.initialStep || 0);
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
-  const [visitedSteps, setVisitedSteps] = useState<Set<number>>(new Set([0]));
+  const [validationStates, setValidationStates] = useState<Map<number, WizardStepValidationState>>(new Map());
+  const [stepData, setStepData] = useState<Map<number, any>>(new Map());
 
-  const currentStep = steps[currentStepIndex];
-  const isFirstStep = currentStepIndex === 0;
-  const isLastStep = currentStepIndex === steps.length - 1;
-
-  // Get available steps (non-skipped)
-  const availableSteps = useMemo(() => {
-    const formData = form.getValues();
-    return steps.filter((step, index) => {
-      if (!step.skipCondition) return true;
-      return !step.skipCondition(formData);
-    });
-  }, [steps, form]);
-
-  // Validate current step
-  const validateCurrentStep = useCallback(async () => {
-    const stepFields = currentStep.fields;
-    const isValid = await form.trigger(stepFields as any);
-    
-    if (isValid && currentStep.validation) {
-      try {
-        const formData = form.getValues();
-        const stepData = stepFields.reduce((acc, field) => {
-          acc[field] = formData[field as keyof DatabaseConnectionInput];
-          return acc;
-        }, {} as any);
-        
-        await currentStep.validation.parseAsync(stepData);
-        return true;
-      } catch (error) {
-        if (error instanceof z.ZodError) {
-          error.errors.forEach((err) => {
-            const path = err.path.join('.');
-            form.setError(path as any, {
-              type: 'validation',
-              message: err.message,
-            });
-          });
+  // Auto-save functionality
+  const autoSaveInterval = useRef<NodeJS.Timeout>();
+  
+  useEffect(() => {
+    if (WIZARD_CONFIG.autoSave) {
+      autoSaveInterval.current = setInterval(() => {
+        const currentData = form?.getValues();
+        if (currentData) {
+          setStepData(prev => new Map(prev.set(currentStep, currentData)));
         }
-        return false;
-      }
+      }, WIZARD_CONFIG.autoSaveInterval);
     }
-    
-    return isValid;
+
+    return () => {
+      if (autoSaveInterval.current) {
+        clearInterval(autoSaveInterval.current);
+      }
+    };
   }, [currentStep, form]);
 
-  // Navigate to next step
-  const nextStep = useCallback(async () => {
-    const isValid = await validateCurrentStep();
-    
-    if (isValid && !isLastStep) {
-      const nextIndex = currentStepIndex + 1;
-      setCurrentStepIndex(nextIndex);
-      setCompletedSteps(prev => new Set([...prev, currentStepIndex]));
-      setVisitedSteps(prev => new Set([...prev, nextIndex]));
-    }
-    
-    return isValid;
-  }, [validateCurrentStep, isLastStep, currentStepIndex]);
+  // Navigation state calculation
+  const navigation = useMemo((): WizardNavigationState => {
+    const totalSteps = steps.length;
+    const canNavigateNext = currentStep < totalSteps - 1 && 
+      (!WIZARD_CONFIG.validateOnStepChange || validationStates.get(currentStep) === 'valid' || 
+       (steps[currentStep]?.optional && WIZARD_CONFIG.allowSkipOptionalSteps));
+    const canNavigatePrevious = currentStep > 0;
+    const isLastStep = currentStep === totalSteps - 1;
+    const isFirstStep = currentStep === 0;
 
-  // Navigate to previous step
-  const previousStep = useCallback(() => {
-    if (!isFirstStep) {
-      setCurrentStepIndex(currentStepIndex - 1);
-    }
-  }, [isFirstStep, currentStepIndex]);
+    return {
+      currentStep,
+      totalSteps,
+      completedSteps,
+      validationStates,
+      canNavigateNext,
+      canNavigatePrevious,
+      isLastStep,
+      isFirstStep,
+    };
+  }, [currentStep, steps.length, completedSteps, validationStates]);
 
-  // Navigate to specific step
-  const goToStep = useCallback(async (stepIndex: number) => {
-    if (stepIndex < 0 || stepIndex >= steps.length) return false;
-    
-    // If going forward, validate all steps in between
-    if (stepIndex > currentStepIndex) {
-      for (let i = currentStepIndex; i < stepIndex; i++) {
-        setCurrentStepIndex(i);
-        const isValid = await validateCurrentStep();
-        if (!isValid && !steps[i].optional) {
-          setCurrentStepIndex(currentStepIndex);
-          return false;
-        }
-        setCompletedSteps(prev => new Set([...prev, i]));
+  // Progress calculation
+  const progress = useMemo((): WizardStepProgress[] => {
+    return steps.map((step, index) => ({
+      stepId: step.id,
+      stepIndex: index,
+      isActive: index === currentStep,
+      isCompleted: completedSteps.has(index),
+      isValid: validationStates.get(index) === 'valid',
+      hasError: validationStates.get(index) === 'invalid',
+      completedAt: completedSteps.has(index) ? new Date().toISOString() : undefined,
+    }));
+  }, [steps, currentStep, completedSteps, validationStates]);
+
+  // Step validation
+  const validateStep = useCallback(async (stepIndex: number): Promise<boolean> => {
+    const step = steps[stepIndex];
+    if (!step || !form) return true;
+
+    setValidationStates(prev => new Map(prev.set(stepIndex, 'pending')));
+
+    try {
+      if (step.validationSchema) {
+        const formData = form.getValues();
+        const stepFields = step.fields.reduce((acc, fieldName) => {
+          const value = form.getValues(fieldName as any);
+          if (value !== undefined) {
+            acc[fieldName] = value;
+          }
+          return acc;
+        }, {} as any);
+
+        await step.validationSchema.parseAsync(stepFields);
       }
-    }
-    
-    setCurrentStepIndex(stepIndex);
-    setVisitedSteps(prev => new Set([...prev, stepIndex]));
-    return true;
-  }, [steps, currentStepIndex, validateCurrentStep]);
 
-  // Check if step is accessible
-  const isStepAccessible = useCallback((stepIndex: number) => {
-    if (stepIndex <= currentStepIndex) return true;
-    if (visitedSteps.has(stepIndex)) return true;
-    
-    // Check if all previous required steps are completed
-    for (let i = 0; i < stepIndex; i++) {
-      if (!steps[i].optional && !completedSteps.has(i)) {
+      // Trigger React Hook Form validation for step fields
+      const isValid = await form.trigger(step.fields as any);
+      
+      if (isValid) {
+        setValidationStates(prev => new Map(prev.set(stepIndex, 'valid')));
+        return true;
+      } else {
+        setValidationStates(prev => new Map(prev.set(stepIndex, 'invalid')));
+        return false;
+      }
+    } catch (error) {
+      setValidationStates(prev => new Map(prev.set(stepIndex, 'invalid')));
+      return false;
+    }
+  }, [steps, form]);
+
+  // Current step validation
+  const validateCurrentStep = useCallback(async (): Promise<boolean> => {
+    return validateStep(currentStep);
+  }, [validateStep, currentStep]);
+
+  // All steps validation
+  const validateAllSteps = useCallback(async (): Promise<boolean> => {
+    const results = await Promise.all(
+      steps.map((_, index) => validateStep(index))
+    );
+    return results.every(result => result);
+  }, [validateStep, steps]);
+
+  // Navigation methods
+  const goToStep = useCallback(async (stepIndex: number): Promise<boolean> => {
+    if (stepIndex < 0 || stepIndex >= steps.length) return false;
+
+    // Validate current step before navigation if enabled
+    if (WIZARD_CONFIG.validateOnStepChange && stepIndex > currentStep) {
+      const isCurrentStepValid = await validateCurrentStep();
+      if (!isCurrentStepValid && !steps[currentStep]?.optional) {
+        addNotification({
+          type: 'warning',
+          title: 'Step Validation Failed',
+          message: 'Please complete the current step before proceeding.',
+        });
         return false;
       }
     }
+
+    // Save current step data
+    const currentData = form?.getValues();
+    if (currentData) {
+      setStepData(prev => new Map(prev.set(currentStep, currentData)));
+    }
+
+    setCurrentStep(stepIndex);
     
+    if (options?.onStepChange) {
+      options.onStepChange(stepIndex);
+    }
+
     return true;
-  }, [currentStepIndex, visitedSteps, completedSteps, steps]);
+  }, [currentStep, steps, validateCurrentStep, form, addNotification, options]);
 
-  // Get step progress
-  const getProgress = useCallback(() => {
-    const requiredSteps = steps.filter(step => !step.optional).length;
-    const completedRequiredSteps = Array.from(completedSteps).filter(
-      index => !steps[index].optional
-    ).length;
-    
-    return {
-      current: currentStepIndex + 1,
-      total: steps.length,
-      completed: completedSteps.size,
-      percentage: Math.round((completedRequiredSteps / requiredSteps) * 100),
-    };
-  }, [steps, currentStepIndex, completedSteps]);
+  const goToNextStep = useCallback(async (): Promise<boolean> => {
+    if (currentStep < steps.length - 1) {
+      const success = await goToStep(currentStep + 1);
+      if (success) {
+        setCompletedSteps(prev => new Set(prev.add(currentStep)));
+      }
+      return success;
+    }
+    return false;
+  }, [currentStep, steps.length, goToStep]);
 
-  // Reset wizard
-  const resetWizard = useCallback(() => {
-    setCurrentStepIndex(0);
-    setCompletedSteps(new Set());
-    setVisitedSteps(new Set([0]));
+  const goToPreviousStep = useCallback((): void => {
+    if (currentStep > 0) {
+      goToStep(currentStep - 1);
+    }
+  }, [currentStep, goToStep]);
+
+  const goToFirstStep = useCallback((): void => {
+    goToStep(0);
+  }, [goToStep]);
+
+  const goToLastStep = useCallback((): void => {
+    goToStep(steps.length - 1);
+  }, [goToStep, steps.length]);
+
+  // Step management
+  const completeStep = useCallback((stepIndex: number): void => {
+    setCompletedSteps(prev => new Set(prev.add(stepIndex)));
+    setValidationStates(prev => new Map(prev.set(stepIndex, 'valid')));
   }, []);
 
-  return {
-    // Current state
-    currentStep,
-    currentStepIndex,
-    availableSteps,
+  const skipStep = useCallback((stepIndex: number): void => {
+    if (steps[stepIndex]?.optional) {
+      setValidationStates(prev => new Map(prev.set(stepIndex, 'skipped')));
+      setCompletedSteps(prev => new Set(prev.add(stepIndex)));
+    }
+  }, [steps]);
+
+  const resetStep = useCallback((stepIndex: number): void => {
+    setCompletedSteps(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(stepIndex);
+      return newSet;
+    });
+    setValidationStates(prev => {
+      const newMap = new Map(prev);
+      newMap.delete(stepIndex);
+      return newMap;
+    });
+    setStepData(prev => {
+      const newMap = new Map(prev);
+      newMap.delete(stepIndex);
+      return newMap;
+    });
+  }, []);
+
+  // Data management
+  const getStepData = useCallback((stepIndex: number): any => {
+    return stepData.get(stepIndex);
+  }, [stepData]);
+
+  const setStepDataValue = useCallback((stepIndex: number, data: any): void => {
+    setStepData(prev => new Map(prev.set(stepIndex, data)));
+  }, []);
+
+  const getAllData = useCallback((): ServiceFormInput => {
+    return form?.getValues() || {} as ServiceFormInput;
+  }, [form]);
+
+  const resetAllData = useCallback((): void => {
+    form?.reset();
+    setStepData(new Map());
+    setCompletedSteps(new Set());
+    setValidationStates(new Map());
+    setCurrentStep(0);
+  }, [form]);
+
+  // Wizard submission
+  const submitWizard = useCallback(async (): Promise<void> => {
+    const isAllValid = await validateAllSteps();
     
-    // Navigation state
+    if (!isAllValid) {
+      addNotification({
+        type: 'error',
+        title: 'Validation Failed',
+        message: 'Please complete all required steps before submitting.',
+      });
+      return;
+    }
+
+    const finalData = getAllData();
+    
+    if (options?.onSubmit) {
+      await options.onSubmit(finalData);
+    }
+  }, [validateAllSteps, getAllData, addNotification, options]);
+
+  // State flags
+  const canNavigateNext = navigation.canNavigateNext;
+  const canNavigatePrevious = navigation.canNavigatePrevious;
+  const isFirstStep = navigation.isFirstStep;
+  const isLastStep = navigation.isLastStep;
+  const isCompleted = completedSteps.size === steps.length;
+
+  return {
+    currentStep,
+    navigation,
+    progress,
+    goToStep,
+    goToNextStep,
+    goToPreviousStep,
+    goToFirstStep,
+    goToLastStep,
+    validateCurrentStep,
+    validateAllSteps,
+    validateStep,
+    completeStep,
+    skipStep,
+    resetStep,
+    getStepData,
+    setStepData: setStepDataValue,
+    getAllData,
+    resetAllData,
+    submitWizard,
+    canNavigateNext,
+    canNavigatePrevious,
     isFirstStep,
     isLastStep,
-    canGoNext: !isLastStep,
-    canGoPrevious: !isFirstStep,
-    
-    // Step states
-    completedSteps,
-    visitedSteps,
-    
-    // Navigation methods
-    nextStep,
-    previousStep,
-    goToStep,
-    
-    // Utility methods
-    validateCurrentStep,
-    isStepAccessible,
-    getProgress,
-    resetWizard,
+    isCompleted,
   };
 }
 
@@ -524,201 +626,165 @@ export function useServiceFormWizard(steps: WizardStepConfig[], form: UseFormRet
 // =============================================================================
 
 /**
- * Dynamic form field generation hook based on service configuration schemas
- * Generates type-safe form fields from database service configuration schemas
+ * Dynamic form fields hook for schema-driven field generation
+ * Manages field configurations, visibility, and conditional logic
  */
 export function useServiceFormFields(
-  serviceType: ServiceType | null,
-  formValues: DatabaseConnectionInput,
-  options: {
-    grouping?: boolean;
-    filtering?: boolean;
-    conditionalLogic?: boolean;
-  } = {}
-) {
-  const { grouping = true, filtering = true, conditionalLogic = true } = options;
+  serviceType: DatabaseDriver,
+  options?: {
+    enableConditionalLogic?: boolean;
+    enableAsyncValidation?: boolean;
+    customFields?: Record<string, any>;
+  }
+): UseDynamicFieldsReturn {
+  const form = useFormContext<ServiceFormInput>();
+  const watchedValues = form?.watch();
 
-  // Generate field configurations from service type schema
-  const fieldConfigs = useMemo(() => {
-    if (!serviceType?.configSchema) return [];
-
-    return serviceType.configSchema.map((schema, index): FormFieldConfig => ({
-      ...schema,
-      order: index,
-      groupId: grouping ? schema.name.split('.')[0] : undefined,
-    }));
-  }, [serviceType, grouping]);
-
-  // Filter fields based on conditional logic
-  const visibleFields = useMemo(() => {
-    if (!conditionalLogic) return fieldConfigs;
-
-    return fieldConfigs.filter((field) => {
-      if (!field.conditional) return true;
-
-      const { field: conditionField, value: conditionValue, operator = 'equals' } = field.conditional;
-      const currentValue = formValues[conditionField as keyof DatabaseConnectionInput];
-
-      switch (operator) {
-        case 'equals':
-          return currentValue === conditionValue;
-        case 'notEquals':
-          return currentValue !== conditionValue;
-        case 'contains':
-          return String(currentValue).includes(String(conditionValue));
-        case 'notContains':
-          return !String(currentValue).includes(String(conditionValue));
-        default:
-          return true;
-      }
-    });
-  }, [fieldConfigs, formValues, conditionalLogic]);
-
-  // Group fields by groupId
-  const groupedFields = useMemo(() => {
-    if (!grouping) return { default: visibleFields };
-
-    return visibleFields.reduce((groups, field) => {
-      const groupId = field.groupId || 'default';
-      if (!groups[groupId]) {
-        groups[groupId] = [];
-      }
-      groups[groupId].push(field);
-      return groups;
-    }, {} as Record<string, FormFieldConfig[]>);
-  }, [visibleFields, grouping]);
-
-  // Get field by name
-  const getField = useCallback(
-    (fieldName: string) => {
-      return fieldConfigs.find(field => field.name === fieldName);
+  // Fetch field configurations for service type
+  const { data: fieldConfigs = [], error } = useQuery({
+    queryKey: ServiceFormQueryKeys.fieldConfigs(serviceType),
+    queryFn: async () => {
+      // This would fetch dynamic field configurations from the backend
+      // For now, return default configurations based on service type
+      return getDefaultFieldConfigs(serviceType);
     },
-    [fieldConfigs]
-  );
+    enabled: !!serviceType,
+    ...SERVICE_QUERY_CONFIG,
+  });
 
-  // Get fields by group
-  const getFieldsByGroup = useCallback(
-    (groupId: string) => {
-      return groupedFields[groupId] || [];
-    },
-    [groupedFields]
-  );
+  // Field state management
+  const [fieldVisibility, setFieldVisibility] = useState<Map<string, boolean>>(new Map());
+  const [fieldDisabled, setFieldDisabled] = useState<Map<string, boolean>>(new Map());
+  const [fieldRequired, setFieldRequired] = useState<Map<string, boolean>>(new Map());
 
-  // Get required fields
-  const requiredFields = useMemo(() => {
-    return visibleFields.filter(field => field.required);
-  }, [visibleFields]);
+  // Get field configuration
+  const getFieldConfig = useCallback((fieldName: string): DynamicFieldConfig | undefined => {
+    return fieldConfigs.find(field => field.name === fieldName);
+  }, [fieldConfigs]);
 
-  // Get optional fields
-  const optionalFields = useMemo(() => {
-    return visibleFields.filter(field => !field.required);
-  }, [visibleFields]);
+  // Update field configuration
+  const updateFieldConfig = useCallback((fieldName: string, config: Partial<DynamicFieldConfig>): void => {
+    // This would update field configuration in state or backend
+    console.log('Updating field config:', fieldName, config);
+  }, []);
 
-  // Get field default value
-  const getFieldDefaultValue = useCallback(
-    (field: FormFieldConfig) => {
-      if (field.default !== undefined) return field.default;
-      
-      switch (field.type) {
-        case 'string':
-        case 'text':
-        case 'password':
-          return '';
-        case 'integer':
-          return 0;
-        case 'boolean':
-          return false;
-        case 'array':
-          return [];
-        case 'object':
-          return {};
-        case 'picklist':
-        case 'multi_picklist':
-          return field.multiple ? [] : '';
-        default:
-          return null;
-      }
-    },
-    []
-  );
+  // Field state getters
+  const getFieldVisibility = useCallback((fieldName: string): boolean => {
+    return fieldVisibility.get(fieldName) ?? true;
+  }, [fieldVisibility]);
 
-  // Generate Zod schema for dynamic validation
-  const generateValidationSchema = useCallback(() => {
-    const schemaObject: Record<string, z.ZodTypeAny> = {};
+  const getFieldDisabled = useCallback((fieldName: string): boolean => {
+    return fieldDisabled.get(fieldName) ?? false;
+  }, [fieldDisabled]);
 
-    visibleFields.forEach((field) => {
-      let fieldSchema: z.ZodTypeAny;
+  const getFieldRequired = useCallback((fieldName: string): boolean => {
+    const config = getFieldConfig(fieldName);
+    return fieldRequired.get(fieldName) ?? config?.required ?? false;
+  }, [fieldRequired, getFieldConfig]);
 
-      switch (field.type) {
-        case 'string':
-        case 'text':
-        case 'password':
-          fieldSchema = z.string();
-          if (field.minLength) fieldSchema = (fieldSchema as z.ZodString).min(field.minLength);
-          if (field.maxLength) fieldSchema = (fieldSchema as z.ZodString).max(field.maxLength);
-          break;
-        case 'integer':
-          fieldSchema = z.number().int();
-          if (field.min !== undefined) fieldSchema = (fieldSchema as z.ZodNumber).min(field.min);
-          if (field.max !== undefined) fieldSchema = (fieldSchema as z.ZodNumber).max(field.max);
-          break;
-        case 'boolean':
-          fieldSchema = z.boolean();
-          break;
-        case 'array':
-          fieldSchema = z.array(z.any());
-          break;
-        case 'object':
-          fieldSchema = z.object({});
-          break;
-        case 'picklist':
-          if (field.values && field.values.length > 0) {
-            fieldSchema = z.enum(field.values as [string, ...string[]]);
-          } else {
-            fieldSchema = z.string();
-          }
-          break;
-        case 'multi_picklist':
-          if (field.values && field.values.length > 0) {
-            fieldSchema = z.array(z.enum(field.values as [string, ...string[]]));
-          } else {
-            fieldSchema = z.array(z.string());
-          }
-          break;
-        default:
-          fieldSchema = z.any();
-      }
+  // Conditional logic evaluation
+  const evaluateConditions = useCallback((fieldName: string): boolean => {
+    if (!options?.enableConditionalLogic) return true;
 
-      if (!field.required) {
-        fieldSchema = fieldSchema.optional();
-      }
+    const config = getFieldConfig(fieldName);
+    if (!config?.conditional) return true;
 
-      schemaObject[field.name] = fieldSchema;
+    const { conditions, operator } = config.conditional;
+    
+    const results = conditions.map(condition => {
+      const fieldValue = form?.getValues(condition.field as any);
+      return evaluateCondition(fieldValue, condition);
     });
 
-    return z.object(schemaObject);
-  }, [visibleFields]);
+    return operator === 'AND' ? results.every(Boolean) : results.some(Boolean);
+  }, [options?.enableConditionalLogic, getFieldConfig, form]);
+
+  // Apply conditional logic
+  const applyConditionalLogic = useCallback((): void => {
+    if (!options?.enableConditionalLogic || !watchedValues) return;
+
+    fieldConfigs.forEach(field => {
+      if (field.conditional) {
+        const shouldShow = evaluateConditions(field.name);
+        setFieldVisibility(prev => new Map(prev.set(field.name, shouldShow)));
+      }
+    });
+  }, [options?.enableConditionalLogic, watchedValues, fieldConfigs, evaluateConditions]);
+
+  // Apply conditional logic when form values change
+  useEffect(() => {
+    applyConditionalLogic();
+  }, [applyConditionalLogic]);
+
+  // Field dependencies
+  const getDependentFields = useCallback((fieldName: string): string[] => {
+    const config = getFieldConfig(fieldName);
+    return config?.affects || [];
+  }, [getFieldConfig]);
+
+  const getFieldDependencies = useCallback((fieldName: string): string[] => {
+    const config = getFieldConfig(fieldName);
+    return config?.dependsOn || [];
+  }, [getFieldConfig]);
+
+  const refreshDependentFields = useCallback((fieldName: string): void => {
+    const dependentFields = getDependentFields(fieldName);
+    dependentFields.forEach(dependentField => {
+      applyConditionalLogic();
+    });
+  }, [getDependentFields, applyConditionalLogic]);
+
+  // Field validation
+  const validateField = useCallback(async (fieldName: string, value: any): Promise<string | undefined> => {
+    const config = getFieldConfig(fieldName);
+    if (!config?.validation) return undefined;
+
+    const { validation } = config;
+
+    // Custom validator
+    if (validation.customValidator) {
+      return validation.customValidator(value, form?.getValues());
+    }
+
+    // Async validator
+    if (validation.asyncValidator && options?.enableAsyncValidation) {
+      return validation.asyncValidator(value, form?.getValues());
+    }
+
+    return undefined;
+  }, [getFieldConfig, form, options?.enableAsyncValidation]);
+
+  const validateAllFields = useCallback(async (): Promise<Record<string, string>> => {
+    const errors: Record<string, string> = {};
+    const formData = form?.getValues();
+
+    if (!formData) return errors;
+
+    for (const field of fieldConfigs) {
+      const value = formData[field.name as keyof ServiceFormInput];
+      const error = await validateField(field.name, value);
+      if (error) {
+        errors[field.name] = error;
+      }
+    }
+
+    return errors;
+  }, [fieldConfigs, form, validateField]);
 
   return {
-    // Field configurations
-    fieldConfigs,
-    visibleFields,
-    groupedFields,
-    
-    // Field categories
-    requiredFields,
-    optionalFields,
-    
-    // Utility methods
-    getField,
-    getFieldsByGroup,
-    getFieldDefaultValue,
-    generateValidationSchema,
-    
-    // Metadata
-    totalFields: fieldConfigs.length,
-    visibleFieldsCount: visibleFields.length,
-    groupsCount: Object.keys(groupedFields).length,
+    fields: fieldConfigs,
+    getFieldConfig,
+    updateFieldConfig,
+    getFieldVisibility,
+    getFieldDisabled,
+    getFieldRequired,
+    evaluateConditions,
+    applyConditionalLogic,
+    getDependentFields,
+    getFieldDependencies,
+    refreshDependentFields,
+    validateField,
+    validateAllFields,
   };
 }
 
@@ -727,678 +793,701 @@ export function useServiceFormFields(
 // =============================================================================
 
 /**
- * Connection testing hook with SWR for real-time validation
- * Provides database connection testing with caching and performance optimization
+ * Connection test hook with SWR for real-time testing and caching
+ * Provides connection testing functionality with retry logic and status tracking
  */
 export function useServiceConnectionTest(
-  config: DatabaseConfig | null,
-  options: ConnectionTestConfig = {}
-) {
-  const {
-    autoTest = false,
-    timeout = 10000,
-    retryCount = 2,
-    retryDelay = 1000,
-    showDetails = true,
-    onSuccess,
-    onError,
-  } = options;
+  config?: DatabaseConnectionFormData,
+  options?: {
+    autoTest?: boolean;
+    testOnConfigChange?: boolean;
+    debounceDelay?: number;
+    maxRetries?: number;
+    retryDelay?: number;
+  }
+): UseConnectionTestReturn {
+  const { addNotification } = useNotifications();
+  const [status, setStatus] = useState<ConnectionTestStatus>('idle');
+  const [retryCount, setRetryCount] = useState(0);
+  const [lastTested, setLastTested] = useState<string | null>(null);
 
-  const [isManualTesting, setIsManualTesting] = useState(false);
-  const [lastTestedConfig, setLastTestedConfig] = useState<string | null>(null);
+  // Debounced config for auto-testing
+  const debouncedConfig = useDebounce(config, options?.debounceDelay || 1000);
 
-  // Generate cache key for SWR
-  const cacheKey = useMemo(() => {
-    if (!config) return null;
-    const configString = JSON.stringify(config);
-    return ['connection-test', configString];
-  }, [config]);
-
-  // SWR configuration for connection testing with intelligent caching
-  const swrConfig = useMemo(() => ({
-    revalidateOnFocus: false,
-    revalidateOnReconnect: false,
-    shouldRetryOnError: false,
-    dedupingInterval: 5000, // 5 seconds deduplication
-    refreshInterval: autoTest ? 30000 : 0, // Auto-refresh if enabled
-    errorRetryCount: retryCount,
-    errorRetryInterval: retryDelay,
-    onSuccess: (data: ConnectionTestResult) => {
-      setIsManualTesting(false);
-      if (onSuccess) onSuccess(data);
-    },
-    onError: (error: ApiErrorResponse) => {
-      setIsManualTesting(false);
-      if (onError) onError(error);
-    },
-  }), [autoTest, retryCount, retryDelay, onSuccess, onError]);
-
-  // Connection test fetcher function
-  const connectionTestFetcher = useCallback(
-    async ([, configString]: [string, string]) => {
-      const testConfig = JSON.parse(configString) as DatabaseConfig;
-      
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-      try {
-        const response = await fetch('/api/services/connection-test', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ config: testConfig }),
-          signal: controller.signal,
-        });
-
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error?.message || 'Connection test failed');
-        }
-
-        const result: ConnectionTestResult = await response.json();
-        setLastTestedConfig(configString);
-        return result;
-      } catch (error) {
-        clearTimeout(timeoutId);
-        if (error instanceof Error && error.name === 'AbortError') {
-          throw new Error('Connection test timed out');
-        }
-        throw error;
-      }
-    },
-    [timeout]
-  );
-
-  // Use SWR for connection testing with caching
+  // SWR for connection testing
   const {
     data: result,
     error,
     isLoading,
-    mutate: revalidate,
+    mutate,
   } = useSWR(
-    cacheKey,
-    connectionTestFetcher,
-    swrConfig
-  );
-
-  // Manual connection test function
-  const testConnection = useCallback(
-    async (testConfig?: DatabaseConfig) => {
-      const configToTest = testConfig || config;
-      if (!configToTest) {
-        throw new Error('No configuration provided for testing');
-      }
-
-      setIsManualTesting(true);
-      const configString = JSON.stringify(configToTest);
+    config && (options?.autoTest || options?.testOnConfigChange) ? 
+      ServiceFormQueryKeys.connectionTest(debouncedConfig) : null,
+    async () => {
+      if (!debouncedConfig) return null;
+      
+      setStatus('testing');
       
       try {
-        // Update cache key if different config
-        if (configString !== lastTestedConfig) {
-          setLastTestedConfig(configString);
-          await mutate(['connection-test', configString], undefined, {
-            revalidate: true,
-          });
-        } else {
-          await revalidate();
+        const response = await apiClient.post<ConnectionTestResult>('/system/service/_test', {
+          config: debouncedConfig,
+        });
+        
+        if (!response.data && !response.resource) {
+          throw new Error('Invalid response from server');
         }
+
+        const testResult = response.data || response.resource;
+        setStatus(testResult.success ? 'success' : 'error');
+        setLastTested(new Date().toISOString());
+        setRetryCount(0);
+        
+        return testResult;
       } catch (error) {
-        setIsManualTesting(false);
+        setStatus('error');
         throw error;
       }
     },
-    [config, lastTestedConfig, revalidate]
+    {
+      ...CONNECTION_TEST_SWR_CONFIG,
+      onError: (error) => {
+        setStatus('error');
+        console.error('Connection test failed:', error);
+      },
+    }
   );
 
-  // Get connection status
-  const status: ConnectionTestStatus = useMemo(() => {
-    if (isLoading || isManualTesting) return 'testing';
-    if (error) return 'error';
-    if (result?.success) return 'success';
-    if (result && !result.success) return 'error';
-    return 'idle';
-  }, [isLoading, isManualTesting, error, result]);
-
-  // Check if current config has been tested
-  const hasBeenTested = useMemo(() => {
-    if (!config) return false;
-    const configString = JSON.stringify(config);
-    return configString === lastTestedConfig;
-  }, [config, lastTestedConfig]);
-
-  // Clear test results
-  const clearResults = useCallback(() => {
-    setLastTestedConfig(null);
-    setIsManualTesting(false);
-    if (cacheKey) {
-      mutate(cacheKey, undefined, { revalidate: false });
+  // Manual test connection function
+  const testConnection = useCallback(async (testConfig?: DatabaseConnectionFormData): Promise<ConnectionTestResult> => {
+    const configToTest = testConfig || config;
+    
+    if (!configToTest) {
+      throw new Error('No configuration provided for testing');
     }
-  }, [cacheKey]);
+
+    setStatus('testing');
+    setRetryCount(0);
+
+    try {
+      const response = await apiClient.post<ConnectionTestResult>('/system/service/_test', {
+        config: configToTest,
+      });
+
+      if (!response.data && !response.resource) {
+        throw new Error('Invalid response from server');
+      }
+
+      const testResult = response.data || response.resource;
+      setStatus(testResult.success ? 'success' : 'error');
+      setLastTested(new Date().toISOString());
+
+      if (testResult.success) {
+        addNotification({
+          type: 'success',
+          title: 'Connection Successful',
+          message: 'Database connection test completed successfully.',
+        });
+      } else {
+        addNotification({
+          type: 'error',
+          title: 'Connection Failed',
+          message: testResult.message || 'Connection test failed.',
+        });
+      }
+
+      // Update SWR cache
+      mutate(testResult, false);
+
+      return testResult;
+    } catch (error) {
+      setStatus('error');
+      const errorMessage = error instanceof Error ? error.message : 'Connection test failed';
+      
+      addNotification({
+        type: 'error',
+        title: 'Connection Test Error',
+        message: errorMessage,
+      });
+
+      throw error;
+    }
+  }, [config, addNotification, mutate]);
+
+  // Retry test function
+  const retryTest = useCallback(async (): Promise<ConnectionTestResult> => {
+    const maxRetries = options?.maxRetries || 3;
+    
+    if (retryCount >= maxRetries) {
+      throw new Error('Maximum retry attempts exceeded');
+    }
+
+    setRetryCount(prev => prev + 1);
+    
+    // Wait for retry delay
+    if (options?.retryDelay) {
+      await new Promise(resolve => setTimeout(resolve, options.retryDelay));
+    }
+
+    return testConnection();
+  }, [retryCount, options?.maxRetries, options?.retryDelay, testConnection]);
+
+  // Reset test function
+  const resetTest = useCallback((): void => {
+    setStatus('idle');
+    setRetryCount(0);
+    setLastTested(null);
+    mutate(null, false);
+  }, [mutate]);
 
   return {
-    // Test results
-    result,
-    error,
-    status,
-    
-    // State
-    isLoading: isLoading || isManualTesting,
-    isManualTesting,
-    hasBeenTested,
-    
-    // Methods
     testConnection,
-    clearResults,
-    revalidate,
-    
-    // Configuration
-    config,
-    autoTest,
-    showDetails,
+    result,
+    status,
+    isLoading,
+    error: error as ApiErrorResponse | null,
+    lastTested,
+    retryCount,
+    resetTest,
+    retryTest,
   };
 }
 
 // =============================================================================
-// PAYWALL ACCESS CONTROL HOOK
+// PAYWALL ACCESS HOOK
 // =============================================================================
 
 /**
- * Paywall access control hook for premium service management
- * Manages premium service access control and paywall state
+ * Paywall access hook for managing premium service access control
+ * Integrates with licensing system and manages paywall modal state
  */
 export function useServiceFormPaywall(
-  serviceType: ServiceType | null,
-  currentTier: ServiceTier = 'core'
-) {
-  const [showPaywall, setShowPaywall] = useState(false);
-  const [paywallMessage, setPaywallMessage] = useState<string | null>(null);
+  serviceType?: DatabaseDriver
+): UsePaywallAccessReturn {
+  const paywall = usePaywall();
+  const [modalState, setModalState] = useState<PaywallModalState>({
+    isOpen: false,
+    requiredTier: 'free',
+    currentTier: 'free',
+  });
 
-  // Check if service requires upgrade
-  const requiresUpgrade = useMemo(() => {
-    if (!serviceType?.tier) return false;
-    
-    const tierLevels: Record<ServiceTier, number> = {
-      core: 0,
-      silver: 1,
-      gold: 2,
+  // Check feature access
+  const checkFeatureAccess = useCallback((feature: string): PaywallFeatureAccess => {
+    // This would integrate with the actual paywall service
+    return {
+      id: feature,
+      name: feature,
+      description: `Access to ${feature} feature`,
+      requiredTier: 'premium',
+      isAvailable: paywall.isFeatureAvailable(feature),
+      reason: paywall.isFeatureAvailable(feature) ? undefined : 'Premium feature',
     };
-    
-    return tierLevels[serviceType.tier] > tierLevels[currentTier];
-  }, [serviceType, currentTier]);
+  }, [paywall]);
 
-  // Get required tier for service
-  const requiredTier = useMemo(() => {
-    return serviceType?.tier || 'core';
-  }, [serviceType]);
+  // Check service access
+  const checkServiceAccess = useCallback((type: DatabaseDriver): boolean => {
+    return paywall.checkServiceAccess(type);
+  }, [paywall]);
 
-  // Check access permission
-  const hasAccess = useMemo(() => {
-    return !requiresUpgrade;
-  }, [requiresUpgrade]);
+  // Check if feature is available
+  const isFeatureAvailable = useCallback((feature: string): boolean => {
+    return paywall.isFeatureAvailable(feature);
+  }, [paywall]);
 
-  // Show paywall modal
-  const triggerPaywall = useCallback((customMessage?: string) => {
-    setPaywallMessage(customMessage || `This ${serviceType?.name} service requires a ${requiredTier} tier subscription.`);
-    setShowPaywall(true);
-  }, [serviceType, requiredTier]);
-
-  // Hide paywall modal
-  const hidePaywall = useCallback(() => {
-    setShowPaywall(false);
-    setPaywallMessage(null);
-  }, []);
-
-  // Handle upgrade action
-  const handleUpgrade = useCallback(() => {
-    hidePaywall();
-    // Navigate to upgrade page or trigger upgrade flow
-    window.open('/upgrade', '_blank');
-  }, [hidePaywall]);
-
-  // Get tier display information
-  const getTierInfo = useCallback((tier: ServiceTier) => {
-    const tierInfo = {
-      core: {
-        name: 'Core',
-        features: ['Basic database connections', 'Standard API generation'],
-        color: 'gray',
-      },
-      silver: {
-        name: 'Silver',
-        features: ['Advanced databases', 'Enhanced security', 'Priority support'],
-        color: 'blue',
-      },
-      gold: {
-        name: 'Gold',
-        features: ['Enterprise databases', 'Advanced analytics', '24/7 support'],
-        color: 'yellow',
-      },
-    };
-    
-    return tierInfo[tier];
-  }, []);
-
-  // Get upgrade benefits
-  const getUpgradeBenefits = useCallback(() => {
-    if (!requiresUpgrade) return [];
-    
-    const benefits = [];
-    const requiredTierInfo = getTierInfo(requiredTier);
-    
-    benefits.push(`Access to ${serviceType?.name} database service`);
-    benefits.push(...requiredTierInfo.features);
-    
-    return benefits;
-  }, [requiresUpgrade, requiredTier, serviceType, getTierInfo]);
-
-  return {
-    // Access state
-    hasAccess,
-    requiresUpgrade,
-    requiredTier,
-    currentTier,
-    
-    // Paywall state
-    showPaywall,
-    paywallMessage,
-    
-    // Methods
-    triggerPaywall,
-    hidePaywall,
-    handleUpgrade,
-    getTierInfo,
-    getUpgradeBenefits,
-    
-    // Service info
-    serviceType,
-  };
-}
-
-// =============================================================================
-// SECURITY CONFIGURATION HOOK
-// =============================================================================
-
-/**
- * Security configuration workflow hook
- * Manages security configuration including role and app creation
- */
-export function useServiceFormSecurity(
-  serviceData: DatabaseConnectionInput | null,
-  config: SecurityConfig = {}
-) {
-  const {
-    enableRoleCreation = true,
-    enableAppCreation = true,
-    defaultRoles = ['user', 'admin'],
-    defaultApps = ['web', 'mobile'],
-    customPermissions = [],
-  } = config;
-
-  const [selectedRoles, setSelectedRoles] = useState<string[]>(defaultRoles);
-  const [selectedApps, setSelectedApps] = useState<string[]>(defaultApps);
-  const [customRoles, setCustomRoles] = useState<string[]>([]);
-  const [customApps, setCustomApps] = useState<string[]>([]);
-  const [permissions, setPermissions] = useState<Record<string, string[]>>({});
-
-  // Available permissions based on service type
-  const availablePermissions = useMemo(() => {
-    const basePermissions = [
-      'GET',
-      'POST',
-      'PUT',
-      'PATCH',
-      'DELETE',
-    ];
-    
-    return [...basePermissions, ...customPermissions];
-  }, [customPermissions]);
-
-  // Add custom role
-  const addCustomRole = useCallback((roleName: string) => {
-    if (!customRoles.includes(roleName)) {
-      setCustomRoles(prev => [...prev, roleName]);
-      setSelectedRoles(prev => [...prev, roleName]);
-    }
-  }, [customRoles]);
-
-  // Remove custom role
-  const removeCustomRole = useCallback((roleName: string) => {
-    setCustomRoles(prev => prev.filter(role => role !== roleName));
-    setSelectedRoles(prev => prev.filter(role => role !== roleName));
-    setPermissions(prev => {
-      const updated = { ...prev };
-      delete updated[roleName];
-      return updated;
-    });
-  }, []);
-
-  // Add custom app
-  const addCustomApp = useCallback((appName: string) => {
-    if (!customApps.includes(appName)) {
-      setCustomApps(prev => [...prev, appName]);
-      setSelectedApps(prev => [...prev, appName]);
-    }
-  }, [customApps]);
-
-  // Remove custom app
-  const removeCustomApp = useCallback((appName: string) => {
-    setCustomApps(prev => prev.filter(app => app !== appName));
-    setSelectedApps(prev => prev.filter(app => app !== appName));
-  }, []);
-
-  // Update role permissions
-  const updateRolePermissions = useCallback((roleName: string, rolePermissions: string[]) => {
-    setPermissions(prev => ({
+  // Modal management
+  const openPaywallModal = useCallback((config: Partial<PaywallModalState>): void => {
+    setModalState(prev => ({
       ...prev,
-      [roleName]: rolePermissions,
+      ...config,
+      isOpen: true,
     }));
   }, []);
 
-  // Toggle role selection
-  const toggleRole = useCallback((roleName: string) => {
-    setSelectedRoles(prev => 
-      prev.includes(roleName)
-        ? prev.filter(role => role !== roleName)
-        : [...prev, roleName]
-    );
+  const closePaywallModal = useCallback((): void => {
+    setModalState(prev => ({
+      ...prev,
+      isOpen: false,
+    }));
   }, []);
 
-  // Toggle app selection
-  const toggleApp = useCallback((appName: string) => {
-    setSelectedApps(prev => 
-      prev.includes(appName)
-        ? prev.filter(app => app !== appName)
-        : [...prev, appName]
-    );
-  }, []);
+  // Tier management
+  const currentTier = paywall.currentTier;
 
-  // Generate security configuration
-  const generateSecurityConfig = useCallback(() => {
-    return {
-      roles: selectedRoles.map(role => ({
-        name: role,
-        permissions: permissions[role] || [],
-        isCustom: customRoles.includes(role),
-      })),
-      apps: selectedApps.map(app => ({
-        name: app,
-        isCustom: customApps.includes(app),
-      })),
-      serviceAccess: serviceData ? {
-        serviceName: serviceData.name,
-        endpoints: availablePermissions,
-      } : null,
-    };
-  }, [selectedRoles, selectedApps, permissions, customRoles, customApps, serviceData, availablePermissions]);
+  const upgradeToTier = useCallback(async (tier: ServiceTierAccess): Promise<void> => {
+    return paywall.upgradeToTier(tier);
+  }, [paywall]);
 
-  // Validate security configuration
-  const validateSecurityConfig = useCallback(() => {
-    const errors: string[] = [];
-    
-    if (selectedRoles.length === 0) {
-      errors.push('At least one role must be selected');
-    }
-    
-    if (selectedApps.length === 0) {
-      errors.push('At least one app must be selected');
-    }
-    
-    selectedRoles.forEach(role => {
-      if (!permissions[role] || permissions[role].length === 0) {
-        errors.push(`Role "${role}" must have at least one permission`);
-      }
-    });
-    
-    return {
-      isValid: errors.length === 0,
-      errors,
-    };
-  }, [selectedRoles, selectedApps, permissions]);
+  const startTrial = useCallback(async (type: DatabaseDriver): Promise<void> => {
+    return paywall.startTrial(type);
+  }, [paywall]);
 
-  // Reset security configuration
-  const resetSecurityConfig = useCallback(() => {
-    setSelectedRoles(defaultRoles);
-    setSelectedApps(defaultApps);
-    setCustomRoles([]);
-    setCustomApps([]);
-    setPermissions({});
-  }, [defaultRoles, defaultApps]);
+  // Premium configuration
+  const getPremiumConfig = useCallback((type: DatabaseDriver): PremiumServiceConfig | null => {
+    return paywall.getPremiumConfig(type);
+  }, [paywall]);
+
+  const getUpgradeUrl = useCallback((tier: ServiceTierAccess): string => {
+    return paywall.getUpgradeUrl(tier);
+  }, [paywall]);
+
+  const getContactSalesUrl = useCallback((type: DatabaseDriver): string => {
+    return paywall.getContactSalesUrl(type);
+  }, [paywall]);
 
   return {
-    // Role management
-    selectedRoles,
-    customRoles,
-    addCustomRole,
-    removeCustomRole,
-    toggleRole,
-    
-    // App management
-    selectedApps,
-    customApps,
-    addCustomApp,
-    removeCustomApp,
-    toggleApp,
-    
-    // Permissions
-    permissions,
-    availablePermissions,
-    updateRolePermissions,
-    
-    // Configuration
-    generateSecurityConfig,
-    validateSecurityConfig,
-    resetSecurityConfig,
-    
-    // Settings
-    enableRoleCreation,
-    enableAppCreation,
-    serviceData,
+    checkFeatureAccess,
+    checkServiceAccess,
+    isFeatureAvailable,
+    modalState,
+    openPaywallModal,
+    closePaywallModal,
+    currentTier,
+    upgradeToTier,
+    startTrial,
+    getPremiumConfig,
+    getUpgradeUrl,
+    getContactSalesUrl,
   };
 }
 
 // =============================================================================
-// FORM SUBMISSION HOOK
+// SERVICE FORM SECURITY HOOK
 // =============================================================================
 
 /**
- * Form submission hook with React Query integration
- * Handles form submission, validation, and API integration with optimistic updates
+ * Security configuration hook for service access control and permissions
+ * Manages security settings, role creation, and access control workflows
+ */
+export function useServiceFormSecurity(
+  initialConfig?: ServiceSecurityConfig
+) {
+  const { addNotification } = useNotifications();
+  const queryClient = useQueryClient();
+
+  // Security configuration state
+  const [securityConfig, setSecurityConfig] = useState<ServiceSecurityConfig>(
+    initialConfig || {
+      accessType: 'public',
+      requireHttps: true,
+      corsEnabled: false,
+    }
+  );
+
+  // Role creation mutation
+  const createRoleMutation = useMutation({
+    mutationFn: async (roleData: any) => {
+      const response = await apiClient.post('/system/role', roleData);
+      return response.data || response.resource;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['roles'] });
+      addNotification({
+        type: 'success',
+        title: 'Role Created',
+        message: 'Security role has been created successfully.',
+      });
+    },
+    onError: (error: Error) => {
+      addNotification({
+        type: 'error',
+        title: 'Role Creation Failed',
+        message: error.message || 'Failed to create security role.',
+      });
+    },
+  });
+
+  // Update security configuration
+  const updateSecurityConfig = useCallback((updates: Partial<ServiceSecurityConfig>): void => {
+    setSecurityConfig(prev => ({ ...prev, ...updates }));
+  }, []);
+
+  // Validate security configuration
+  const validateSecurityConfig = useCallback((): string[] => {
+    const errors: string[] = [];
+
+    if (securityConfig.accessType === 'role-based' && (!securityConfig.roles || securityConfig.roles.length === 0)) {
+      errors.push('At least one role must be specified for role-based access');
+    }
+
+    if (securityConfig.rateLimiting?.enabled && !securityConfig.rateLimiting.requestsPerMinute) {
+      errors.push('Request limit must be specified when rate limiting is enabled');
+    }
+
+    if (securityConfig.corsEnabled && (!securityConfig.corsOrigins || securityConfig.corsOrigins.length === 0)) {
+      errors.push('CORS origins must be specified when CORS is enabled');
+    }
+
+    return errors;
+  }, [securityConfig]);
+
+  // Create security role
+  const createRole = useCallback(async (roleData: any): Promise<void> => {
+    await createRoleMutation.mutateAsync(roleData);
+  }, [createRoleMutation]);
+
+  return {
+    securityConfig,
+    updateSecurityConfig,
+    validateSecurityConfig,
+    createRole,
+    isCreatingRole: createRoleMutation.isPending,
+  };
+}
+
+// =============================================================================
+// SERVICE FORM SUBMISSION HOOK
+// =============================================================================
+
+/**
+ * Form submission hook for handling validation, API integration, and optimistic updates
+ * Provides comprehensive submission workflow with error handling and progress tracking
  */
 export function useServiceFormSubmission(
-  mode: 'create' | 'edit',
-  serviceId?: number
+  mode: ServiceFormMode,
+  options?: {
+    enableOptimisticUpdates?: boolean;
+    redirectOnSuccess?: string;
+    onSuccess?: (service: DatabaseService) => void;
+    onError?: (error: Error) => void;
+  }
 ) {
+  const { addNotification } = useNotifications();
+  const { setLoading } = useLoading();
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  // Create service mutation
-  const createServiceMutation = useMutation({
-    mutationFn: async (data: DatabaseConnectionInput): Promise<DatabaseService> => {
-      const response = await fetch('/api/services', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
+  const [submissionState, setSubmissionState] = useState<ServiceFormSubmissionState>('idle');
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || 'Failed to create service');
+  // Main submission mutation
+  const submissionMutation = useMutation({
+    mutationFn: async (data: ServiceFormInput): Promise<DatabaseService> => {
+      setSubmissionState('submitting');
+      
+      const endpoint = mode === 'create' 
+        ? '/system/service'
+        : `/system/service/${data.name}`;
+      
+      const method = mode === 'create' ? 'post' : 'patch';
+      
+      const response = await apiClient[method]<DatabaseService>(endpoint, data);
+      
+      if (!response.data && !response.resource) {
+        throw new Error('Invalid response from server');
       }
 
-      return response.json();
+      return response.data || response.resource;
     },
-    onMutate: async (newService) => {
-      // Cancel outgoing queries
-      await queryClient.cancelQueries({ queryKey: DatabaseServiceQueryKeys.lists() });
+    onMutate: async (data: ServiceFormInput) => {
+      if (options?.enableOptimisticUpdates && mode === 'create') {
+        // Cancel outgoing queries
+        await queryClient.cancelQueries({ queryKey: ServiceFormQueryKeys.services() });
 
-      // Snapshot previous value
-      const previousServices = queryClient.getQueryData(DatabaseServiceQueryKeys.lists());
+        // Snapshot previous value
+        const previousServices = queryClient.getQueryData(ServiceFormQueryKeys.services());
 
-      // Optimistically update
-      queryClient.setQueryData(DatabaseServiceQueryKeys.lists(), (old: DatabaseService[] = []) => [
-        ...old,
-        {
-          ...newService,
-          id: Date.now(), // Temporary ID
-          created_date: new Date().toISOString(),
-          last_modified_date: new Date().toISOString(),
-          created_by_id: null,
-          last_modified_by_id: null,
-          mutable: true,
-          deletable: true,
-        } as DatabaseService,
-      ]);
+        // Optimistically update cache
+        queryClient.setQueryData(ServiceFormQueryKeys.services(), (old: any) => {
+          const optimisticService: DatabaseService = {
+            id: Date.now(), // Temporary ID
+            name: data.name,
+            label: data.label || data.name,
+            description: data.description || '',
+            type: data.type,
+            config: data.config,
+            is_active: data.is_active ?? true,
+            created_date: new Date().toISOString(),
+            last_modified_date: new Date().toISOString(),
+            // Add other required fields with defaults
+          } as DatabaseService;
 
-      return { previousServices };
+          return old ? [...old, optimisticService] : [optimisticService];
+        });
+
+        return { previousServices };
+      }
     },
-    onError: (error, newService, context) => {
+    onSuccess: (service: DatabaseService) => {
+      setSubmissionState('success');
+      
+      // Invalidate and refetch queries
+      queryClient.invalidateQueries({ queryKey: ServiceFormQueryKeys.services() });
+      queryClient.invalidateQueries({ queryKey: ServiceFormQueryKeys.service(service.id) });
+
+      addNotification({
+        type: 'success',
+        title: mode === 'create' ? 'Service Created' : 'Service Updated',
+        message: `Database service "${service.label || service.name}" has been ${mode === 'create' ? 'created' : 'updated'} successfully.`,
+      });
+
+      // Handle navigation
+      if (options?.redirectOnSuccess) {
+        router.push(options.redirectOnSuccess);
+      }
+
+      // Call success callback
+      if (options?.onSuccess) {
+        options.onSuccess(service);
+      }
+
+      // Reset state after delay
+      setTimeout(() => setSubmissionState('idle'), 2000);
+    },
+    onError: (error: Error, _variables, context) => {
+      setSubmissionState('error');
+
       // Rollback optimistic update
       if (context?.previousServices) {
-        queryClient.setQueryData(DatabaseServiceQueryKeys.lists(), context.previousServices);
+        queryClient.setQueryData(ServiceFormQueryKeys.services(), context.previousServices);
       }
-    },
-    onSuccess: (data) => {
-      // Invalidate and refetch
-      queryClient.invalidateQueries({ queryKey: DatabaseServiceQueryKeys.lists() });
-      queryClient.setQueryData(DatabaseServiceQueryKeys.detail(data.id), data);
-    },
-  });
 
-  // Update service mutation
-  const updateServiceMutation = useMutation({
-    mutationFn: async (data: DatabaseConnectionInput): Promise<DatabaseService> => {
-      if (!serviceId) throw new Error('Service ID is required for updates');
-
-      const response = await fetch(`/api/services/${serviceId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+      addNotification({
+        type: 'error',
+        title: mode === 'create' ? 'Service Creation Failed' : 'Service Update Failed',
+        message: error.message || 'An unexpected error occurred.',
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || 'Failed to update service');
+      // Call error callback
+      if (options?.onError) {
+        options.onError(error);
       }
 
-      return response.json();
+      // Reset state after delay
+      setTimeout(() => setSubmissionState('idle'), 2000);
     },
-    onMutate: async (updatedService) => {
-      if (!serviceId) return;
-
-      // Cancel outgoing queries
-      await queryClient.cancelQueries({ queryKey: DatabaseServiceQueryKeys.detail(serviceId) });
-      await queryClient.cancelQueries({ queryKey: DatabaseServiceQueryKeys.lists() });
-
-      // Snapshot previous values
-      const previousService = queryClient.getQueryData(DatabaseServiceQueryKeys.detail(serviceId));
-      const previousServices = queryClient.getQueryData(DatabaseServiceQueryKeys.lists());
-
-      // Optimistically update single service
-      queryClient.setQueryData(DatabaseServiceQueryKeys.detail(serviceId), (old: DatabaseService) => ({
-        ...old,
-        ...updatedService,
-        last_modified_date: new Date().toISOString(),
-      }));
-
-      // Optimistically update service list
-      queryClient.setQueryData(DatabaseServiceQueryKeys.lists(), (old: DatabaseService[] = []) =>
-        old.map(service =>
-          service.id === serviceId
-            ? { ...service, ...updatedService, last_modified_date: new Date().toISOString() }
-            : service
-        )
-      );
-
-      return { previousService, previousServices };
-    },
-    onError: (error, updatedService, context) => {
-      if (!serviceId) return;
-
-      // Rollback optimistic updates
-      if (context?.previousService) {
-        queryClient.setQueryData(DatabaseServiceQueryKeys.detail(serviceId), context.previousService);
-      }
-      if (context?.previousServices) {
-        queryClient.setQueryData(DatabaseServiceQueryKeys.lists(), context.previousServices);
-      }
-    },
-    onSuccess: (data) => {
-      // Invalidate and refetch
-      queryClient.invalidateQueries({ queryKey: DatabaseServiceQueryKeys.lists() });
-      queryClient.setQueryData(DatabaseServiceQueryKeys.detail(data.id), data);
+    onSettled: () => {
+      setLoading(false);
     },
   });
 
-  // Submit form with appropriate mutation
-  const submitForm = useCallback(
-    async (data: DatabaseConnectionInput, options?: {
-      onSuccess?: (service: DatabaseService) => void;
-      onError?: (error: Error) => void;
-      redirect?: boolean;
-    }) => {
-      try {
-        let result: DatabaseService;
-
-        if (mode === 'create') {
-          result = await createServiceMutation.mutateAsync(data);
-        } else {
-          result = await updateServiceMutation.mutateAsync(data);
-        }
-
-        // Handle success callback
-        if (options?.onSuccess) {
-          options.onSuccess(result);
-        }
-
-        // Handle redirect
-        if (options?.redirect !== false) {
-          router.push(`/api-connections/database/${result.name}`);
-        }
-
-        return result;
-      } catch (error) {
-        // Handle error callback
-        if (options?.onError && error instanceof Error) {
-          options.onError(error);
-        }
-        throw error;
-      }
-    },
-    [mode, createServiceMutation, updateServiceMutation, router]
-  );
-
-  // Get submission state
-  const isSubmitting = createServiceMutation.isPending || updateServiceMutation.isPending;
-  const error = createServiceMutation.error || updateServiceMutation.error;
+  // Submit function
+  const submitForm = useCallback(async (data: ServiceFormInput): Promise<ServiceFormSubmissionResult> => {
+    setLoading(true);
+    
+    try {
+      const service = await submissionMutation.mutateAsync(data);
+      
+      return {
+        success: true,
+        service,
+        redirectUrl: options?.redirectOnSuccess,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        errors: [{
+          field: 'submit',
+          message: error instanceof Error ? error.message : 'Submission failed',
+          type: 'submit',
+        }],
+      };
+    }
+  }, [submissionMutation, setLoading, options?.redirectOnSuccess]);
 
   return {
-    // Submission methods
     submitForm,
-    
-    // Mutation objects
-    createServiceMutation,
-    updateServiceMutation,
-    
-    // State
-    isSubmitting,
-    error,
-    
-    // Configuration
-    mode,
-    serviceId,
+    submissionState,
+    isSubmitting: submissionMutation.isPending,
+    error: submissionMutation.error,
   };
+}
+
+// =============================================================================
+// UTILITY FUNCTIONS
+// =============================================================================
+
+/**
+ * Get default field configurations for a database type
+ */
+function getDefaultFieldConfigs(serviceType: DatabaseDriver): DynamicFieldConfig[] {
+  const baseFields: DynamicFieldConfig[] = [
+    {
+      id: 'name',
+      name: 'name',
+      type: 'text',
+      label: 'Service Name',
+      required: true,
+      placeholder: 'Enter unique service name',
+      validation: {
+        required: true,
+        minLength: 1,
+        maxLength: 64,
+        pattern: '^[a-zA-Z][a-zA-Z0-9_-]*$',
+      },
+    },
+    {
+      id: 'label',
+      name: 'label',
+      type: 'text',
+      label: 'Display Label',
+      required: true,
+      placeholder: 'Enter display label',
+      validation: {
+        required: true,
+        maxLength: 255,
+      },
+    },
+    {
+      id: 'description',
+      name: 'description',
+      type: 'textarea',
+      label: 'Description',
+      placeholder: 'Enter service description (optional)',
+      validation: {
+        maxLength: 1024,
+      },
+    },
+    {
+      id: 'host',
+      name: 'config.host',
+      type: 'text',
+      label: 'Host',
+      required: true,
+      placeholder: 'Enter database host',
+      validation: {
+        required: true,
+        maxLength: 255,
+      },
+    },
+    {
+      id: 'port',
+      name: 'config.port',
+      type: 'number',
+      label: 'Port',
+      placeholder: 'Enter port number',
+      validation: {
+        min: 1,
+        max: 65535,
+      },
+    },
+    {
+      id: 'database',
+      name: 'config.database',
+      type: 'text',
+      label: 'Database Name',
+      required: true,
+      placeholder: 'Enter database name',
+      validation: {
+        required: true,
+        maxLength: 64,
+      },
+    },
+    {
+      id: 'username',
+      name: 'config.username',
+      type: 'text',
+      label: 'Username',
+      required: true,
+      placeholder: 'Enter username',
+      validation: {
+        required: true,
+        maxLength: 64,
+      },
+    },
+    {
+      id: 'password',
+      name: 'config.password',
+      type: 'password',
+      label: 'Password',
+      required: true,
+      placeholder: 'Enter password',
+      validation: {
+        required: true,
+        maxLength: 255,
+      },
+    },
+  ];
+
+  // Add service-specific fields
+  switch (serviceType) {
+    case 'mysql':
+      baseFields.push({
+        id: 'charset',
+        name: 'config.charset',
+        type: 'select',
+        label: 'Character Set',
+        options: [
+          { value: 'utf8', label: 'UTF-8' },
+          { value: 'utf8mb4', label: 'UTF-8 MB4' },
+          { value: 'latin1', label: 'Latin1' },
+        ],
+        defaultValue: 'utf8mb4',
+      });
+      break;
+    
+    case 'postgresql':
+      baseFields.push({
+        id: 'schema',
+        name: 'config.schema',
+        type: 'text',
+        label: 'Schema',
+        placeholder: 'public',
+        defaultValue: 'public',
+      });
+      break;
+    
+    case 'mongodb':
+      // Remove port validation for MongoDB (optional)
+      const portField = baseFields.find(f => f.id === 'port');
+      if (portField) {
+        portField.required = false;
+        portField.defaultValue = 27017;
+      }
+      break;
+  }
+
+  return baseFields;
+}
+
+/**
+ * Evaluate a single condition for conditional logic
+ */
+function evaluateCondition(value: any, condition: any): boolean {
+  const { operator, value: conditionValue } = condition;
+
+  switch (operator) {
+    case 'equals':
+      return value === conditionValue;
+    case 'notEquals':
+      return value !== conditionValue;
+    case 'contains':
+      return typeof value === 'string' && value.includes(conditionValue);
+    case 'notContains':
+      return typeof value === 'string' && !value.includes(conditionValue);
+    case 'isEmpty':
+      return !value || (typeof value === 'string' && value.trim() === '');
+    case 'isNotEmpty':
+      return !!value && (typeof value !== 'string' || value.trim() !== '');
+    case 'greaterThan':
+      return typeof value === 'number' && value > conditionValue;
+    case 'lessThan':
+      return typeof value === 'number' && value < conditionValue;
+    case 'oneOf':
+      return Array.isArray(conditionValue) && conditionValue.includes(value);
+    case 'noneOf':
+      return Array.isArray(conditionValue) && !conditionValue.includes(value);
+    default:
+      return true;
+  }
 }
 
 // =============================================================================
 // EXPORTS
 // =============================================================================
 
+export {
+  useServiceForm,
+  useServiceFormWizard,
+  useServiceFormFields,
+  useServiceConnectionTest,
+  useServiceFormPaywall,
+  useServiceFormSecurity,
+  useServiceFormSubmission,
+  ServiceFormQueryKeys,
+};
+
 export type {
-  ServiceFormConfig,
-  WizardStepConfig,
-  FormFieldConfig,
-  ConnectionTestConfig,
-  PaywallConfig,
-  SecurityConfig,
+  UseServiceFormReturn,
+  UseServiceFormWizardReturn,
+  UseDynamicFieldsReturn,
+  UseConnectionTestReturn,
+  UsePaywallAccessReturn,
 };
