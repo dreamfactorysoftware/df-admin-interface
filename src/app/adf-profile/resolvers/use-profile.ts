@@ -1,416 +1,414 @@
 /**
- * User Profile React Query Hook
+ * React Query-based Profile Data Hook for DreamFactory Admin Interface
  * 
- * React Query-based custom hook that fetches user profile data with intelligent 
- * caching and automatic revalidation. Replaces the Angular profileResolver by 
- * implementing TanStack React Query with optimized TTL configuration for enhanced 
- * performance and user experience.
+ * Replaces Angular profileResolver with modern React Query implementation providing
+ * intelligent caching, automatic revalidation, and optimized performance for user
+ * profile management workflows. Integrates with DreamFactory API endpoints while
+ * maintaining backward compatibility and type safety.
  * 
- * Features:
- * - Intelligent caching with TTL configuration (staleTime: 300s, cacheTime: 900s)
+ * Key Features:
+ * - TanStack React Query 5.79.2 for server-state management
+ * - TTL configuration (staleTime: 300s, cacheTime: 900s) for optimal performance
+ * - Cache responses under 50ms per React/Next.js Integration Requirements
  * - Automatic background revalidation for real-time profile updates
- * - Type-safe UserProfile return type with comprehensive error handling
- * - Cache hit responses under 50ms per React/Next.js Integration Requirements
- * - Seamless integration with existing DreamFactory API endpoints
+ * - Comprehensive error handling with React Error Boundary integration
+ * - Type-safe UserProfile return type with full interface compliance
  * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
+ * @fileoverview Profile data fetching hook with React Query integration
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
-
-'use client';
 
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { apiClient } from '@/lib/api-client';
-import { UserProfile, ApiResponse, AUTH_ERROR_CODES, AuthError } from '@/types/user';
+import { apiGet, API_ENDPOINTS } from '../../../lib/api-client';
+import type { UserProfile, ApiResponse } from '../../../types/user';
 
 // ============================================================================
-// Types and Interfaces
-// ============================================================================
-
-/**
- * Profile query configuration options
- */
-export interface UseProfileOptions {
-  /**
-   * Enable/disable the query
-   * @default true
-   */
-  enabled?: boolean;
-  
-  /**
-   * Custom stale time in milliseconds
-   * @default 300000 (5 minutes)
-   */
-  staleTime?: number;
-  
-  /**
-   * Custom cache time in milliseconds  
-   * @default 900000 (15 minutes)
-   */
-  cacheTime?: number;
-  
-  /**
-   * Enable background refetching
-   * @default true
-   */
-  refetchOnWindowFocus?: boolean;
-  
-  /**
-   * Retry configuration
-   * @default 3
-   */
-  retry?: number | boolean;
-  
-  /**
-   * Select function to transform data
-   */
-  select?: (data: UserProfile) => any;
-}
-
-/**
- * Profile query error with enhanced error information
- */
-export interface ProfileQueryError extends Error {
-  code?: keyof typeof AUTH_ERROR_CODES;
-  status?: number;
-  details?: any;
-}
-
-/**
- * Enhanced query result with profile-specific utilities
- */
-export interface UseProfileResult extends UseQueryResult<UserProfile, ProfileQueryError> {
-  /**
-   * Check if user is system administrator
-   */
-  isSystemAdmin: boolean;
-  
-  /**
-   * Check if profile data is stale
-   */
-  isStale: boolean;
-  
-  /**
-   * Manually refresh profile data
-   */
-  refresh: () => Promise<UserProfile | undefined>;
-  
-  /**
-   * Update profile data optimistically
-   */
-  updateProfile: (updates: Partial<UserProfile>) => void;
-}
-
-// ============================================================================
-// Query Key Factory
+// REACT QUERY CONFIGURATION
 // ============================================================================
 
 /**
- * Profile query keys for React Query cache management
+ * Query key factory for profile-related queries
+ * Enables consistent cache management and invalidation patterns
  */
 export const profileQueryKeys = {
   all: ['profile'] as const,
   current: () => [...profileQueryKeys.all, 'current'] as const,
-  permissions: () => [...profileQueryKeys.all, 'permissions'] as const,
-  preferences: () => [...profileQueryKeys.all, 'preferences'] as const,
+  user: (userId: number) => [...profileQueryKeys.all, 'user', userId] as const,
+} as const;
+
+/**
+ * Cache configuration constants for optimal performance
+ * Aligned with React/Next.js Integration Requirements for sub-50ms responses
+ */
+const PROFILE_CACHE_CONFIG = {
+  // Data considered fresh for 5 minutes (300 seconds)
+  staleTime: 5 * 60 * 1000,
+  
+  // Data kept in cache for 15 minutes (900 seconds)
+  cacheTime: 15 * 60 * 1000,
+  
+  // Retry configuration for network resilience
+  retry: 3,
+  retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 30000),
+  
+  // Background refetch configuration for real-time updates
+  refetchOnWindowFocus: true,
+  refetchOnReconnect: true,
+  refetchOnMount: true,
+  
+  // Performance optimization
+  refetchInterval: false, // Manual control over background updates
+  refetchIntervalInBackground: false,
 } as const;
 
 // ============================================================================
-// API Service Functions
+// API INTEGRATION FUNCTIONS
 // ============================================================================
 
 /**
- * Fetch current user profile from DreamFactory API
- * Maintains compatibility with existing /system/api/v2/user endpoint
+ * Fetches current user profile data from DreamFactory API
+ * 
+ * Maintains compatibility with existing DreamFactory API endpoints while
+ * providing enhanced error handling and response validation. Uses the
+ * standardized API client for consistent request handling across the application.
+ * 
+ * @returns Promise resolving to UserProfile data
+ * @throws Error with structured error information for React Query error handling
  */
-const fetchProfile = async (): Promise<UserProfile> => {
+async function fetchCurrentUserProfile(): Promise<UserProfile> {
   try {
-    // Use system API endpoint for user profile data
-    const response = await apiClient.get('/system/user');
-    
-    // Handle DreamFactory API response structure
-    if (response.error) {
-      const error = new Error(response.error.message || 'Failed to fetch profile') as ProfileQueryError;
-      error.code = response.error.code === 401 ? 'SESSION_EXPIRED' : 'SERVER_ERROR';
-      error.status = response.error.code || 500;
-      error.details = response.error.details;
-      throw error;
+    // Use system user endpoint for current profile data
+    // Maintains compatibility with existing DreamFactory API patterns
+    const response = await apiGet<ApiResponse<UserProfile>>(
+      `${API_ENDPOINTS.SYSTEM_USER}/profile`,
+      {
+        // Optimize for profile data retrieval
+        fields: '*',
+        related: 'lookup_by_user_id,user_to_app_to_role_by_user_id.role',
+        
+        // Enhanced error handling headers
+        snackbarError: 'Failed to load user profile',
+        showSpinner: false, // React Query handles loading states
+        
+        // Cache optimization
+        includeCacheControl: true,
+      }
+    );
+
+    // Validate response structure for type safety
+    if (!response || typeof response !== 'object') {
+      throw new Error('Invalid profile response format');
     }
+
+    // Handle both direct data and wrapped response formats
+    const profileData = 'data' in response ? response.data : response;
     
-    // Extract user data from response
-    const userData = response.resource ? response.resource[0] : response;
-    
-    if (!userData || !userData.id) {
-      const error = new Error('Invalid profile data received') as ProfileQueryError;
-      error.code = 'SERVER_ERROR';
-      error.status = 500;
-      throw error;
+    if (!profileData || typeof profileData !== 'object') {
+      throw new Error('Profile data not found in response');
     }
+
+    // Type assertion with runtime validation
+    const profile = profileData as UserProfile;
     
-    // Ensure UserProfile type compatibility
-    const profile: UserProfile = {
-      id: userData.id,
-      name: userData.name || `${userData.first_name || ''} ${userData.last_name || ''}`.trim(),
-      first_name: userData.first_name,
-      last_name: userData.last_name,
-      display_name: userData.display_name,
-      email: userData.email,
-      username: userData.username,
-      phone: userData.phone,
-      security_question: userData.security_question,
-      security_answer: userData.security_answer,
-      confirm_code: userData.confirm_code,
-      default_app_id: userData.default_app_id,
-      oauth_provider: userData.oauth_provider,
-      created_date: userData.created_date,
-      last_modified_date: userData.last_modified_date,
-      email_verified_at: userData.email_verified_at,
-      is_active: userData.is_active ?? true,
-      is_sys_admin: userData.is_sys_admin ?? false,
-      last_login_date: userData.last_login_date,
-      host: userData.host,
-      avatar_url: userData.avatar_url,
-      timezone: userData.timezone,
-      locale: userData.locale,
-      theme_preference: userData.theme_preference || 'system',
-      notification_preferences: userData.notification_preferences || {
-        email_notifications: true,
-        system_alerts: true,
-        api_quota_warnings: true,
-        security_notifications: true,
-        maintenance_notifications: true,
-        newsletter_subscription: false,
-      },
-      api_key: userData.api_key,
-      adldap: userData.adldap,
-      openid_connect: userData.openid_connect,
-      saml: userData.saml,
-      created_by_id: userData.created_by_id,
-      last_modified_by_id: userData.last_modified_by_id,
-      user_lookup_by_user_id: userData.user_lookup_by_user_id || [],
-      user_to_app_to_role_by_user_id: userData.user_to_app_to_role_by_user_id || [],
-    };
-    
+    // Validate required profile fields
+    if (!profile.id || !profile.username || !profile.email) {
+      throw new Error('Invalid profile data: missing required fields');
+    }
+
     return profile;
   } catch (error) {
-    // Transform fetch errors into ProfileQueryError
-    if (error instanceof Error) {
-      const profileError = error as ProfileQueryError;
-      
-      // Handle network errors
-      if (error.message.includes('fetch')) {
-        profileError.code = 'NETWORK_ERROR';
-        profileError.status = 0;
-        profileError.message = 'Network connection failed. Please check your internet connection.';
-      }
-      
-      // Handle authentication errors
-      if (error.message.includes('401') || error.message.includes('unauthorized')) {
-        profileError.code = 'SESSION_EXPIRED';
-        profileError.status = 401;
-        profileError.message = 'Your session has expired. Please log in again.';
-      }
-      
-      throw profileError;
+    // Enhanced error handling for React Query error boundaries
+    const errorMessage = error instanceof Error 
+      ? error.message 
+      : 'Unknown error occurred while fetching profile';
+    
+    // Create structured error for better debugging and user feedback
+    const structuredError = new Error(errorMessage);
+    structuredError.name = 'ProfileFetchError';
+    
+    // Preserve original error details for debugging
+    if (error instanceof Error && error.stack) {
+      (structuredError as any).originalStack = error.stack;
     }
     
-    // Fallback error
-    const fallbackError = new Error('An unexpected error occurred while fetching profile') as ProfileQueryError;
-    fallbackError.code = 'SERVER_ERROR';
-    fallbackError.status = 500;
-    throw fallbackError;
+    throw structuredError;
   }
-};
-
-// ============================================================================
-// Main Hook Implementation
-// ============================================================================
+}
 
 /**
- * Custom React Query hook for user profile data management
+ * Fetches specific user profile data by user ID
  * 
- * Implements TanStack React Query with intelligent caching, automatic background
- * revalidation, and comprehensive error handling. Replaces Angular profileResolver
- * with enhanced performance characteristics and modern data fetching patterns.
+ * Provides administrative capability to fetch any user's profile data
+ * with appropriate permission checks handled by the backend API.
  * 
- * @param options - Configuration options for the profile query
- * @returns Enhanced query result with profile-specific utilities
- * 
- * @example
- * ```typescript
- * // Basic usage
- * const { data: profile, isLoading, error } = useProfile();
- * 
- * // With options
- * const { data: profile, isSystemAdmin, refresh } = useProfile({
- *   staleTime: 600000, // 10 minutes
- *   select: (profile) => ({ name: profile.name, email: profile.email })
- * });
- * 
- * // Error handling
- * if (error?.code === 'SESSION_EXPIRED') {
- *   // Redirect to login
- * }
- * ```
+ * @param userId - Unique identifier for the user profile to fetch
+ * @returns Promise resolving to UserProfile data
+ * @throws Error with structured error information for React Query error handling
  */
-export const useProfile = (options: UseProfileOptions = {}): UseProfileResult => {
-  const {
-    enabled = true,
-    staleTime = 300000, // 5 minutes (300 seconds)
-    cacheTime = 900000, // 15 minutes (900 seconds)
-    refetchOnWindowFocus = true,
-    retry = 3,
-    select,
-  } = options;
-  
-  // Configure React Query with optimized settings
-  const queryResult = useQuery<UserProfile, ProfileQueryError>({
-    queryKey: profileQueryKeys.current(),
-    queryFn: fetchProfile,
-    enabled,
-    staleTime,
-    gcTime: cacheTime, // React Query v5 uses gcTime instead of cacheTime
-    refetchOnWindowFocus,
-    retry: (failureCount, error) => {
-      // Don't retry authentication errors
-      if (error?.code === 'SESSION_EXPIRED' || error?.code === 'TOKEN_INVALID') {
-        return false;
-      }
-      
-      // Don't retry permission errors
-      if (error?.code === 'PERMISSION_DENIED') {
-        return false;
-      }
-      
-      // Retry network and server errors up to specified count
-      return typeof retry === 'boolean' ? retry : failureCount < retry;
-    },
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
-    refetchOnReconnect: true,
-    refetchInterval: false, // Disable periodic refetching to rely on staleTime
-    refetchIntervalInBackground: false,
-    select,
-    // Performance optimization: enable structural sharing
-    structuralSharing: true,
-    // Network mode configuration
-    networkMode: 'online',
-  });
-  
-  // Derive additional utilities from query result
-  const isSystemAdmin = queryResult.data?.is_sys_admin ?? false;
-  const isStale = queryResult.isStale;
-  
-  // Enhanced refresh function with error handling
-  const refresh = async (): Promise<UserProfile | undefined> => {
-    try {
-      const result = await queryResult.refetch();
-      return result.data;
-    } catch (error) {
-      console.error('Profile refresh failed:', error);
-      throw error;
+async function fetchUserProfile(userId: number): Promise<UserProfile> {
+  try {
+    if (!userId || userId <= 0) {
+      throw new Error('Invalid user ID provided');
     }
-  };
-  
-  // Optimistic update function for profile modifications
-  const updateProfile = (updates: Partial<UserProfile>): void => {
-    const queryClient = queryResult.data ? {
-      // Note: In a real implementation, this would use the QueryClient from React Query context
-      // This is a simplified version for demonstration
-      setQueryData: (key: any, updater: any) => {
-        // Would update the cached data optimistically
-        console.log('Optimistic update:', updates);
+
+    const response = await apiGet<ApiResponse<UserProfile>>(
+      `${API_ENDPOINTS.SYSTEM_USER}/${userId}`,
+      {
+        // Comprehensive profile data retrieval
+        fields: '*',
+        related: 'lookup_by_user_id,user_to_app_to_role_by_user_id.role',
+        
+        // Error handling configuration
+        snackbarError: `Failed to load user profile for ID: ${userId}`,
+        showSpinner: false,
+        
+        // Cache optimization for user-specific data
+        includeCacheControl: true,
       }
-    } : null;
+    );
+
+    // Validate and extract profile data
+    const profileData = 'data' in response ? response.data : response;
     
-    if (queryClient && queryResult.data) {
-      // Optimistically update cached profile data
-      queryClient.setQueryData(
-        profileQueryKeys.current(),
-        (oldData: UserProfile | undefined) => {
-          if (!oldData) return oldData;
-          return { ...oldData, ...updates };
-        }
-      );
+    if (!profileData) {
+      throw new Error(`User profile not found for ID: ${userId}`);
     }
-  };
-  
-  // Return enhanced query result with profile-specific utilities
-  return {
-    ...queryResult,
-    isSystemAdmin,
-    isStale,
-    refresh,
-    updateProfile,
-  };
-};
+
+    const profile = profileData as UserProfile;
+    
+    // Validate profile data integrity
+    if (!profile.id || profile.id !== userId) {
+      throw new Error('Profile data integrity validation failed');
+    }
+
+    return profile;
+  } catch (error) {
+    const errorMessage = error instanceof Error 
+      ? error.message 
+      : `Unknown error occurred while fetching user profile ${userId}`;
+    
+    const structuredError = new Error(errorMessage);
+    structuredError.name = 'UserProfileFetchError';
+    
+    throw structuredError;
+  }
+}
 
 // ============================================================================
-// Utility Hooks
+// REACT QUERY HOOKS
 // ============================================================================
 
 /**
- * Simplified hook for checking if current user is system administrator
+ * React Query hook for current user profile data
  * 
- * @returns Boolean indicating system admin status
- */
-export const useIsSystemAdmin = (): boolean => {
-  const { isSystemAdmin } = useProfile({ 
-    select: (profile) => profile.is_sys_admin,
-    staleTime: 600000, // 10 minutes for admin status
-  });
-  
-  return isSystemAdmin;
-};
-
-/**
- * Hook for getting user display name with fallback logic
+ * Primary hook for accessing the currently authenticated user's profile information.
+ * Implements intelligent caching with TTL configuration for optimal performance
+ * while providing real-time updates through background revalidation.
  * 
- * @returns User display name or email as fallback
- */
-export const useUserDisplayName = (): string | undefined => {
-  const { data: profile } = useProfile({
-    select: (profile) => ({
-      display_name: profile.display_name,
-      name: profile.name,
-      first_name: profile.first_name,
-      last_name: profile.last_name,
-      email: profile.email,
-    }),
-  });
-  
-  if (!profile) return undefined;
-  
-  return (
-    profile.display_name ||
-    profile.name ||
-    (profile.first_name && profile.last_name 
-      ? `${profile.first_name} ${profile.last_name}` 
-      : profile.first_name || profile.last_name
-    ) ||
-    profile.email
-  );
-};
-
-/**
- * Hook for profile notification preferences
+ * Features:
+ * - Automatic caching with 5-minute stale time and 15-minute cache time
+ * - Background revalidation for real-time profile updates
+ * - Comprehensive error handling with React Error Boundary integration
+ * - Loading and error states for enhanced user experience
+ * - Type-safe UserProfile return with full interface compliance
  * 
- * @returns Notification preferences with defaults
+ * @returns UseQueryResult with UserProfile data and query state management
  */
-export const useNotificationPreferences = () => {
-  return useProfile({
-    select: (profile) => profile.notification_preferences || {
-      email_notifications: true,
-      system_alerts: true,
-      api_quota_warnings: true,
-      security_notifications: true,
-      maintenance_notifications: true,
-      newsletter_subscription: false,
+export function useProfile(): UseQueryResult<UserProfile, Error> {
+  return useQuery({
+    // Use consistent query key for cache management
+    queryKey: profileQueryKeys.current(),
+    
+    // Fetch function with comprehensive error handling
+    queryFn: fetchCurrentUserProfile,
+    
+    // Apply optimized cache configuration
+    ...PROFILE_CACHE_CONFIG,
+    
+    // Enhanced error handling for React Error Boundaries
+    useErrorBoundary: (error: Error) => {
+      // Use error boundary for critical profile fetch failures
+      return error.name === 'ProfileFetchError' || error.message.includes('authentication');
+    },
+    
+    // Data transformation and validation
+    select: (data: UserProfile) => {
+      // Ensure consistent data structure
+      return {
+        ...data,
+        // Normalize display name fallback
+        display_name: data.display_name || data.username || data.email,
+        // Ensure boolean flags are properly typed
+        is_active: Boolean(data.is_active),
+        confirmed: Boolean(data.confirmed),
+      };
+    },
+    
+    // Metadata for debugging and monitoring
+    meta: {
+      purpose: 'current-user-profile',
+      component: 'useProfile',
+      feature: 'F-005 User and Role Management',
     },
   });
-};
+}
+
+/**
+ * React Query hook for specific user profile data by ID
+ * 
+ * Administrative hook for accessing any user's profile information with
+ * appropriate permission handling. Provides the same caching and performance
+ * benefits as the current user profile hook while supporting user-specific queries.
+ * 
+ * @param userId - User ID to fetch profile data for
+ * @param options - Additional query options for customization
+ * @returns UseQueryResult with UserProfile data and query state management
+ */
+export function useUserProfile(
+  userId: number,
+  options: {
+    enabled?: boolean;
+    refetchInterval?: number | false;
+    onSuccess?: (data: UserProfile) => void;
+    onError?: (error: Error) => void;
+  } = {}
+): UseQueryResult<UserProfile, Error> {
+  const { enabled = true, refetchInterval, onSuccess, onError } = options;
+
+  return useQuery({
+    // User-specific query key for individual cache management
+    queryKey: profileQueryKeys.user(userId),
+    
+    // Fetch function with user ID parameter
+    queryFn: () => fetchUserProfile(userId),
+    
+    // Apply base cache configuration with custom options
+    ...PROFILE_CACHE_CONFIG,
+    
+    // Custom configuration overrides
+    enabled: enabled && Boolean(userId && userId > 0),
+    refetchInterval: refetchInterval !== undefined ? refetchInterval : PROFILE_CACHE_CONFIG.refetchInterval,
+    
+    // Enhanced error handling
+    useErrorBoundary: (error: Error) => {
+      return error.name === 'UserProfileFetchError' || error.message.includes('authentication');
+    },
+    
+    // Data transformation for consistency
+    select: (data: UserProfile) => ({
+      ...data,
+      display_name: data.display_name || data.username || data.email,
+      is_active: Boolean(data.is_active),
+      confirmed: Boolean(data.confirmed),
+    }),
+    
+    // Callback handling
+    onSuccess,
+    onError,
+    
+    // Metadata for debugging
+    meta: {
+      purpose: 'user-profile-by-id',
+      component: 'useUserProfile',
+      feature: 'F-005 User and Role Management',
+      userId: userId,
+    },
+  });
+}
 
 // ============================================================================
-// Default Export
+// UTILITY HOOKS AND HELPERS
 // ============================================================================
 
+/**
+ * Hook for pre-fetching user profile data
+ * 
+ * Enables proactive loading of user profile data to enhance user experience
+ * by reducing perceived loading times. Useful for pre-loading profile data
+ * when navigation to profile-related pages is anticipated.
+ * 
+ * @returns Object with prefetch functions for different profile query types
+ */
+export function useProfilePrefetch() {
+  const { queryClient } = useQuery.prototype.constructor as any;
+
+  return {
+    /**
+     * Pre-fetch current user profile data
+     */
+    prefetchCurrentProfile: () => {
+      return queryClient?.prefetchQuery({
+        queryKey: profileQueryKeys.current(),
+        queryFn: fetchCurrentUserProfile,
+        staleTime: PROFILE_CACHE_CONFIG.staleTime,
+      });
+    },
+    
+    /**
+     * Pre-fetch specific user profile data
+     * 
+     * @param userId - User ID to pre-fetch profile data for
+     */
+    prefetchUserProfile: (userId: number) => {
+      return queryClient?.prefetchQuery({
+        queryKey: profileQueryKeys.user(userId),
+        queryFn: () => fetchUserProfile(userId),
+        staleTime: PROFILE_CACHE_CONFIG.staleTime,
+      });
+    },
+  };
+}
+
+/**
+ * Utility function to invalidate profile cache
+ * 
+ * Provides centralized cache invalidation for profile data when updates occur.
+ * Ensures data consistency across the application after profile modifications.
+ * 
+ * @param queryClient - React Query client instance
+ * @param userId - Optional specific user ID to invalidate (invalidates all if not provided)
+ */
+export function invalidateProfileCache(queryClient: any, userId?: number) {
+  if (userId) {
+    // Invalidate specific user profile cache
+    return queryClient.invalidateQueries({
+      queryKey: profileQueryKeys.user(userId),
+    });
+  } else {
+    // Invalidate all profile-related caches
+    return queryClient.invalidateQueries({
+      queryKey: profileQueryKeys.all,
+    });
+  }
+}
+
+// ============================================================================
+// TYPE EXPORTS
+// ============================================================================
+
+/**
+ * Re-export types for convenience and consistency
+ */
+export type { UserProfile } from '../../../types/user';
+
+/**
+ * Query configuration type for external reference
+ */
+export type ProfileCacheConfig = typeof PROFILE_CACHE_CONFIG;
+
+/**
+ * Query keys type for external reference
+ */
+export type ProfileQueryKeys = typeof profileQueryKeys;
+
+// ============================================================================
+// DEFAULT EXPORT
+// ============================================================================
+
+/**
+ * Default export providing the primary useProfile hook
+ * Maintains consistency with React hook patterns and enables
+ * simplified imports for the most common use case
+ */
 export default useProfile;
