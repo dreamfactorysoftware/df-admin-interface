@@ -1,466 +1,269 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { 
-  AlertTriangle, 
-  Ban, 
-  ServerCrash, 
-  RefreshCw, 
-  ArrowLeft, 
-  Shield,
-  Bug,
-  Home
-} from 'lucide-react';
+import { AlertTriangle, RefreshCw, ArrowLeft, Bug, Network, Lock, FileQuestion } from 'lucide-react';
 
-// Error types for categorization
-type ErrorType = 'not-found' | 'forbidden' | 'server-error' | 'network-error' | 'validation-error' | 'unknown';
-
-interface ErrorInfo {
-  title: string;
-  description: string;
-  icon: React.ComponentType<any>;
-  variant: 'error' | 'warning' | 'destructive';
-  recoveryActions: {
-    label: string;
-    action: () => void;
-    variant: 'primary' | 'secondary' | 'outline';
-    icon?: React.ComponentType<any>;
-  }[];
-}
-
-interface LimitEditErrorProps {
-  error: Error & { digest?: string; status?: number };
+/**
+ * Error boundary component for the edit limit page
+ * Handles and displays errors in the limit editing workflow with comprehensive error categorization
+ * and recovery actions per Section 4.2 error handling requirements
+ */
+interface ErrorProps {
+  error: Error & { digest?: string };
   reset: () => void;
 }
 
-/**
- * Error boundary component for the edit limit page that handles and displays errors
- * in the limit editing workflow. Provides user-friendly error messages for invalid 
- * limit IDs, data fetching failures, form submission errors, and provides recovery 
- * actions including navigation back to the limits list and retry mechanisms.
- * 
- * Implements Next.js 15.1+ error boundary patterns with comprehensive error handling
- * per Section 4.2 error handling requirements.
- */
-export default function LimitEditError({ error, reset }: LimitEditErrorProps) {
+export default function EditLimitError({ error, reset }: ErrorProps) {
   const router = useRouter();
-  const [retryCount, setRetryCount] = useState(0);
-  const [isRetrying, setIsRetrying] = useState(false);
 
-  // Log error for monitoring and observability per Section 6.5 requirements
+  // Error categorization based on HTTP status codes and error types
+  const getErrorCategory = useCallback((error: Error) => {
+    const errorMessage = error.message.toLowerCase();
+    const errorDigest = error.digest;
+
+    // Check for HTTP status codes in error message or digest
+    if (errorMessage.includes('404') || errorMessage.includes('not found') || errorDigest?.includes('404')) {
+      return {
+        type: 'not_found',
+        status: 404,
+        title: 'Limit Not Found',
+        message: 'The requested limit configuration could not be found. It may have been deleted or the ID is invalid.',
+        icon: FileQuestion,
+        primaryAction: 'Return to Limits List',
+        canRetry: false
+      };
+    }
+
+    if (errorMessage.includes('403') || errorMessage.includes('forbidden') || errorMessage.includes('unauthorized') || errorDigest?.includes('403')) {
+      return {
+        type: 'access_denied',
+        status: 403,
+        title: 'Access Denied',
+        message: 'You do not have permission to edit this limit configuration. Please contact your administrator for access.',
+        icon: Lock,
+        primaryAction: 'Return to Limits List',
+        canRetry: false
+      };
+    }
+
+    if (errorMessage.includes('401') || errorMessage.includes('unauthenticated')) {
+      return {
+        type: 'authentication',
+        status: 401,
+        title: 'Authentication Required',
+        message: 'Your session has expired. Please log in again to continue editing this limit.',
+        icon: Lock,
+        primaryAction: 'Log In',
+        canRetry: false
+      };
+    }
+
+    if (errorMessage.includes('network') || errorMessage.includes('fetch') || errorMessage.includes('connection')) {
+      return {
+        type: 'network',
+        status: 0,
+        title: 'Network Error',
+        message: 'Unable to connect to the server. Please check your internet connection and try again.',
+        icon: Network,
+        primaryAction: 'Retry',
+        canRetry: true
+      };
+    }
+
+    if (errorMessage.includes('500') || errorMessage.includes('internal server') || errorDigest?.includes('500')) {
+      return {
+        type: 'server_error',
+        status: 500,
+        title: 'Server Error',
+        message: 'An unexpected server error occurred while loading the limit configuration. Our team has been notified.',
+        icon: AlertTriangle,
+        primaryAction: 'Retry',
+        canRetry: true
+      };
+    }
+
+    // Default to generic error
+    return {
+      type: 'generic',
+      status: 0,
+      title: 'Unexpected Error',
+      message: 'An unexpected error occurred while loading the limit editor. Please try again or contact support if the problem persists.',
+      icon: Bug,
+      primaryAction: 'Retry',
+      canRetry: true
+    };
+  }, []);
+
+  // Error reporting for monitoring and observability per Section 6.5
   useEffect(() => {
-    const logError = async () => {
+    const errorDetails = getErrorCategory(error);
+    
+    // Report error to monitoring service (placeholder for actual implementation)
+    const reportError = async () => {
       try {
-        // Enhanced error context for debugging and monitoring
-        const errorContext = {
-          error: {
-            name: error.name,
-            message: error.message,
-            stack: error.stack,
-            digest: error.digest,
-            status: error.status,
-          },
-          route: '/api-security/limits/[id]',
+        // In a real implementation, this would integrate with monitoring services like Sentry, LogRocket, etc.
+        console.error('Edit Limit Error:', {
+          errorType: errorDetails.type,
+          status: errorDetails.status,
+          message: error.message,
+          stack: error.stack,
+          digest: error.digest,
           timestamp: new Date().toISOString(),
-          userAgent: navigator.userAgent,
           url: window.location.href,
-          retryCount,
-          sessionId: document.cookie.match(/session-id=([^;]+)/)?.[1] || 'unknown',
-        };
+          userAgent: navigator.userAgent,
+        });
 
-        // Log to console in development
-        if (process.env.NODE_ENV === 'development') {
-          console.error('Limit Edit Error:', errorContext);
-        }
-
-        // In production, this would integrate with monitoring services
-        // such as Sentry, DataDog, or AWS CloudWatch
-        if (process.env.NODE_ENV === 'production') {
-          // Example error reporting integration
-          // await reportError(errorContext);
-        }
-      } catch (logError) {
-        console.error('Failed to log error:', logError);
+        // Placeholder for actual error reporting API call
+        // await fetch('/api/monitoring/errors', {
+        //   method: 'POST',
+        //   headers: { 'Content-Type': 'application/json' },
+        //   body: JSON.stringify({
+        //     component: 'edit-limit-error-boundary',
+        //     error: errorDetails,
+        //     context: { url: window.location.href }
+        //   })
+        // });
+      } catch (reportingError) {
+        console.error('Failed to report error:', reportingError);
       }
     };
 
-    logError();
-  }, [error, retryCount]);
+    reportError();
+  }, [error, getErrorCategory]);
 
-  /**
-   * Categorize error type based on error properties and HTTP status codes
-   * per HTTP standards and REST API error handling patterns
-   */
-  const getErrorType = (): ErrorType => {
-    // Check HTTP status codes first
-    if (error.status === 404) return 'not-found';
-    if (error.status === 403) return 'forbidden';
-    if (error.status >= 500) return 'server-error';
-    if (error.status >= 400 && error.status < 500) return 'validation-error';
+  const errorDetails = getErrorCategory(error);
+  const IconComponent = errorDetails.icon;
 
-    // Check error message patterns for client-side errors
-    const message = error.message.toLowerCase();
-    if (message.includes('not found') || message.includes('404')) return 'not-found';
-    if (message.includes('forbidden') || message.includes('unauthorized') || message.includes('403')) return 'forbidden';
-    if (message.includes('network') || message.includes('fetch')) return 'network-error';
-    if (message.includes('validation') || message.includes('invalid')) return 'validation-error';
-    if (message.includes('server') || message.includes('500')) return 'server-error';
-
-    return 'unknown';
-  };
-
-  /**
-   * Handle retry with exponential backoff pattern
-   * Implements retry mechanisms per Section 4.2 error handling
-   */
-  const handleRetry = async () => {
-    setIsRetrying(true);
-    setRetryCount(prev => prev + 1);
-
-    try {
-      // Add exponential backoff delay for subsequent retries
-      if (retryCount > 0) {
-        const delay = Math.min(1000 * Math.pow(2, retryCount), 5000); // Max 5 seconds
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-
-      reset();
-    } catch (retryError) {
-      console.error('Retry failed:', retryError);
-    } finally {
-      setIsRetrying(false);
+  // Recovery action handlers
+  const handlePrimaryAction = useCallback(() => {
+    switch (errorDetails.type) {
+      case 'authentication':
+        // Redirect to login page
+        router.push('/login?redirect=' + encodeURIComponent(window.location.pathname));
+        break;
+      case 'not_found':
+      case 'access_denied':
+        // Navigate back to limits list
+        router.push('/api-security/limits');
+        break;
+      case 'network':
+      case 'server_error':
+      case 'generic':
+        // Attempt to retry the operation
+        reset();
+        break;
+      default:
+        router.push('/api-security/limits');
     }
-  };
+  }, [errorDetails.type, router, reset]);
 
-  /**
-   * Navigate back to limits list with proper route handling
-   * Implements user-friendly error recovery per Section 7.6 user interactions
-   */
-  const handleBackToList = () => {
+  const handleSecondaryAction = useCallback(() => {
+    // Always provide option to return to limits list
     router.push('/api-security/limits');
-  };
-
-  /**
-   * Navigate to dashboard home
-   */
-  const handleGoHome = () => {
-    router.push('/');
-  };
-
-  /**
-   * Get error information based on error type for user-friendly display
-   * Implements comprehensive error categorization per requirements
-   */
-  const getErrorInfo = (): ErrorInfo => {
-    const errorType = getErrorType();
-
-    switch (errorType) {
-      case 'not-found':
-        return {
-          title: 'Limit Not Found',
-          description: 'The requested limit could not be found. It may have been deleted or the ID is invalid.',
-          icon: AlertTriangle,
-          variant: 'warning',
-          recoveryActions: [
-            {
-              label: 'Back to Limits List',
-              action: handleBackToList,
-              variant: 'primary',
-              icon: ArrowLeft,
-            },
-            {
-              label: 'Go to Dashboard',
-              action: handleGoHome,
-              variant: 'outline',
-              icon: Home,
-            },
-          ],
-        };
-
-      case 'forbidden':
-        return {
-          title: 'Access Denied',
-          description: 'You do not have permission to edit this limit. Please contact your administrator if you need access.',
-          icon: Ban,
-          variant: 'error',
-          recoveryActions: [
-            {
-              label: 'Back to Limits List',
-              action: handleBackToList,
-              variant: 'primary',
-              icon: ArrowLeft,
-            },
-            {
-              label: 'Go to Dashboard',
-              action: handleGoHome,
-              variant: 'outline',
-              icon: Home,
-            },
-          ],
-        };
-
-      case 'server-error':
-        return {
-          title: 'Server Error',
-          description: 'A server error occurred while loading the limit. Please try again in a few moments.',
-          icon: ServerCrash,
-          variant: 'error',
-          recoveryActions: [
-            {
-              label: isRetrying ? 'Retrying...' : `Retry ${retryCount > 0 ? `(${retryCount + 1})` : ''}`,
-              action: handleRetry,
-              variant: 'primary',
-              icon: RefreshCw,
-            },
-            {
-              label: 'Back to Limits List',
-              action: handleBackToList,
-              variant: 'secondary',
-              icon: ArrowLeft,
-            },
-          ],
-        };
-
-      case 'network-error':
-        return {
-          title: 'Connection Error',
-          description: 'Unable to connect to the server. Please check your internet connection and try again.',
-          icon: AlertTriangle,
-          variant: 'warning',
-          recoveryActions: [
-            {
-              label: isRetrying ? 'Retrying...' : `Retry ${retryCount > 0 ? `(${retryCount + 1})` : ''}`,
-              action: handleRetry,
-              variant: 'primary',
-              icon: RefreshCw,
-            },
-            {
-              label: 'Back to Limits List',
-              action: handleBackToList,
-              variant: 'secondary',
-              icon: ArrowLeft,
-            },
-          ],
-        };
-
-      case 'validation-error':
-        return {
-          title: 'Validation Error',
-          description: 'The limit data is invalid or corrupted. Please try accessing the limit again.',
-          icon: AlertTriangle,
-          variant: 'warning',
-          recoveryActions: [
-            {
-              label: 'Try Again',
-              action: handleRetry,
-              variant: 'primary',
-              icon: RefreshCw,
-            },
-            {
-              label: 'Back to Limits List',
-              action: handleBackToList,
-              variant: 'secondary',
-              icon: ArrowLeft,
-            },
-          ],
-        };
-
-      default:
-        return {
-          title: 'Something Went Wrong',
-          description: 'An unexpected error occurred while loading the limit. Please try again or contact support if the problem persists.',
-          icon: Bug,
-          variant: 'error',
-          recoveryActions: [
-            {
-              label: isRetrying ? 'Retrying...' : `Retry ${retryCount > 0 ? `(${retryCount + 1})` : ''}`,
-              action: handleRetry,
-              variant: 'primary',
-              icon: RefreshCw,
-            },
-            {
-              label: 'Back to Limits List',
-              action: handleBackToList,
-              variant: 'secondary',
-              icon: ArrowLeft,
-            },
-            {
-              label: 'Go to Dashboard',
-              action: handleGoHome,
-              variant: 'outline',
-              icon: Home,
-            },
-          ],
-        };
-    }
-  };
-
-  const errorInfo = getErrorInfo();
-  const IconComponent = errorInfo.icon;
-
-  // Variant-specific styling for WCAG 2.1 AA compliance
-  const getVariantStyles = () => {
-    switch (errorInfo.variant) {
-      case 'error':
-        return {
-          container: 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20',
-          icon: 'text-red-600 dark:text-red-400',
-          title: 'text-red-900 dark:text-red-100',
-          description: 'text-red-700 dark:text-red-200',
-        };
-      case 'warning':
-        return {
-          container: 'border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20',
-          icon: 'text-amber-600 dark:text-amber-400',
-          title: 'text-amber-900 dark:text-amber-100',
-          description: 'text-amber-700 dark:text-amber-200',
-        };
-      case 'destructive':
-        return {
-          container: 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20',
-          icon: 'text-red-600 dark:text-red-400',
-          title: 'text-red-900 dark:text-red-100',
-          description: 'text-red-700 dark:text-red-200',
-        };
-      default:
-        return {
-          container: 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800',
-          icon: 'text-gray-600 dark:text-gray-400',
-          title: 'text-gray-900 dark:text-gray-100',
-          description: 'text-gray-700 dark:text-gray-300',
-        };
-    }
-  };
-
-  const styles = getVariantStyles();
-
-  // Button variant styling for accessibility and consistency
-  const getButtonStyles = (variant: 'primary' | 'secondary' | 'outline') => {
-    const baseStyles = 'inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 min-w-[100px] h-10 px-4 py-2';
-    
-    switch (variant) {
-      case 'primary':
-        return `${baseStyles} bg-primary-600 text-white hover:bg-primary-700 dark:bg-primary-600 dark:hover:bg-primary-700`;
-      case 'secondary':
-        return `${baseStyles} bg-secondary-100 text-secondary-900 hover:bg-secondary-200 dark:bg-secondary-800 dark:text-secondary-100 dark:hover:bg-secondary-700`;
-      case 'outline':
-        return `${baseStyles} border border-input bg-background hover:bg-accent hover:text-accent-foreground`;
-      default:
-        return baseStyles;
-    }
-  };
+  }, [router]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-background">
-      <div className="w-full max-w-2xl mx-auto">
-        {/* Main Error Card */}
-        <div 
-          className={`rounded-lg border p-8 ${styles.container}`}
-          role="alert"
-          aria-live="assertive"
-          aria-labelledby="error-title"
-          aria-describedby="error-description"
-        >
-          {/* Header with Icon and Title */}
-          <div className="flex items-start space-x-4">
-            <div className={`flex-shrink-0 p-2 rounded-full bg-white dark:bg-gray-900 ${styles.icon}`}>
-              <IconComponent 
-                className="h-8 w-8"
-                aria-hidden="true"
-              />
-            </div>
-            
-            <div className="flex-1 min-w-0">
-              <h1 
-                id="error-title"
-                className={`text-xl font-semibold ${styles.title}`}
-              >
-                {errorInfo.title}
-              </h1>
-              
-              <p 
-                id="error-description"
-                className={`mt-2 text-sm leading-relaxed ${styles.description}`}
-              >
-                {errorInfo.description}
-              </p>
-
-              {/* Error Details for Development */}
-              {process.env.NODE_ENV === 'development' && (
-                <details className="mt-4">
-                  <summary className={`cursor-pointer text-xs font-mono ${styles.description} hover:opacity-75`}>
-                    Technical Details (Development)
-                  </summary>
-                  <div className="mt-2 p-3 bg-gray-100 dark:bg-gray-800 rounded text-xs font-mono text-gray-600 dark:text-gray-400 overflow-auto">
-                    <div><strong>Error:</strong> {error.name}</div>
-                    <div><strong>Message:</strong> {error.message}</div>
-                    {error.status && <div><strong>Status:</strong> {error.status}</div>}
-                    {error.digest && <div><strong>Digest:</strong> {error.digest}</div>}
-                    {error.stack && (
-                      <div className="mt-2">
-                        <strong>Stack:</strong>
-                        <pre className="mt-1 whitespace-pre-wrap text-xs">{error.stack}</pre>
-                      </div>
-                    )}
-                  </div>
-                </details>
-              )}
-            </div>
+    <div 
+      className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4"
+      role="alert"
+      aria-live="assertive"
+    >
+      <div className="w-full max-w-md">
+        {/* Error Card */}
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-6">
+          {/* Error Icon and Status */}
+          <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-red-100 dark:bg-red-900/20 rounded-full">
+            <IconComponent 
+              className="w-8 h-8 text-red-600 dark:text-red-400" 
+              aria-hidden="true"
+            />
           </div>
 
-          {/* Recovery Actions */}
-          <div className="mt-8">
-            <h2 className="sr-only">Recovery Actions</h2>
-            <div className="flex flex-col sm:flex-row gap-3">
-              {errorInfo.recoveryActions.map((action, index) => {
-                const ActionIcon = action.icon;
-                const isDisabled = action.label.includes('Retrying') || isRetrying;
-                
-                return (
-                  <button
-                    key={index}
-                    onClick={action.action}
-                    disabled={isDisabled}
-                    className={getButtonStyles(action.variant)}
-                    aria-label={`${action.label}${isDisabled ? ' - Please wait' : ''}`}
-                  >
-                    {ActionIcon && (
-                      <ActionIcon 
-                        className={`mr-2 h-4 w-4 ${isRetrying && action.icon === RefreshCw ? 'animate-spin' : ''}`}
-                        aria-hidden="true"
-                      />
-                    )}
-                    {action.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          {/* Error Title */}
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100 text-center mb-2">
+            {errorDetails.title}
+          </h1>
 
-          {/* Additional Context */}
-          <div className="mt-6 pt-6 border-t border-current/10">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <div className="flex items-center space-x-2">
-                <Shield className="h-3 w-3" aria-hidden="true" />
-                <span>API Security - Rate Limits</span>
-              </div>
-              {retryCount > 0 && (
-                <span>
-                  Retry attempts: {retryCount}
-                </span>
-              )}
+          {/* Error Message */}
+          <p className="text-gray-600 dark:text-gray-400 text-center mb-6 leading-relaxed">
+            {errorDetails.message}
+          </p>
+
+          {/* Status Code Badge (if applicable) */}
+          {errorDetails.status > 0 && (
+            <div className="flex justify-center mb-6">
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-200">
+                Error {errorDetails.status}
+              </span>
             </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="space-y-3">
+            {/* Primary Action Button */}
+            <button
+              onClick={handlePrimaryAction}
+              className="w-full flex items-center justify-center px-4 py-2 bg-primary-600 hover:bg-primary-700 focus:bg-primary-700 text-white font-medium rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+              aria-label={`${errorDetails.primaryAction} - primary recovery action`}
+            >
+              {errorDetails.canRetry ? (
+                <RefreshCw className="w-4 h-4 mr-2" aria-hidden="true" />
+              ) : errorDetails.type === 'authentication' ? (
+                <Lock className="w-4 h-4 mr-2" aria-hidden="true" />
+              ) : (
+                <ArrowLeft className="w-4 h-4 mr-2" aria-hidden="true" />
+              )}
+              {errorDetails.primaryAction}
+            </button>
+
+            {/* Secondary Action Button - Always show option to return to list */}
+            {errorDetails.type !== 'not_found' && errorDetails.type !== 'access_denied' && (
+              <button
+                onClick={handleSecondaryAction}
+                className="w-full flex items-center justify-center px-4 py-2 bg-gray-100 hover:bg-gray-200 focus:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 dark:focus:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+                aria-label="Return to limits list - secondary recovery action"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" aria-hidden="true" />
+                Return to Limits List
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Screen Reader Instructions */}
-        <div className="sr-only" aria-live="polite">
-          Error occurred on the limit editing page. Use the provided buttons to retry loading the limit, 
-          navigate back to the limits list, or go to the dashboard home page. 
-          {retryCount > 0 && `You have attempted to retry ${retryCount} time${retryCount > 1 ? 's' : ''}.`}
+        {/* Additional Help Text */}
+        <div className="mt-6 text-center">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            If this problem persists, please contact your system administrator.
+          </p>
+          
+          {/* Error ID for support (when available) */}
+          {error.digest && (
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-2 font-mono">
+              Error ID: {error.digest}
+            </p>
+          )}
+        </div>
+
+        {/* Accessibility Instructions */}
+        <div className="sr-only">
+          An error occurred while loading the limit editor. 
+          Use the primary action button to {errorDetails.canRetry ? 'retry the operation' : 'navigate away from this error'}. 
+          Additional recovery options may be available below the primary action.
+          {error.digest && ` Error reference ID: ${error.digest}`}
         </div>
       </div>
     </div>
   );
+}
+
+// Type definitions for error categorization
+interface ErrorCategory {
+  type: 'not_found' | 'access_denied' | 'authentication' | 'network' | 'server_error' | 'generic';
+  status: number;
+  title: string;
+  message: string;
+  icon: React.ComponentType<{ className?: string }>;
+  primaryAction: string;
+  canRetry: boolean;
 }
