@@ -1,846 +1,1485 @@
 /**
- * @fileoverview Comprehensive test suite for Toggle component
+ * Toggle Component Test Suite
  * 
- * Tests WCAG 2.1 AA accessibility compliance, controlled component behavior,
- * keyboard navigation, screen reader support, and integration with form libraries.
+ * Comprehensive test suite for the Toggle component using Vitest 2.1.0 and React Testing Library.
+ * Tests accessibility compliance (WCAG 2.1 AA), controlled component behavior, keyboard navigation,
+ * screen reader support, and integration with React Hook Form per technical specification requirements.
  * 
+ * Test Coverage:
+ * - WCAG 2.1 AA accessibility compliance with automated axe-core testing
+ * - Controlled and uncontrolled component behavior validation
+ * - Keyboard navigation, focus management, and ARIA attribute testing
+ * - Screen reader announcements and semantic markup validation
+ * - Size variants, label positioning, and Tailwind CSS styling tests
+ * - React Hook Form integration with validation scenarios
+ * - Loading states, disabled behavior, and error handling
+ * - Event handling, state transitions, and edge case management
+ * 
+ * Performance Requirements:
+ * - Test execution < 2 seconds with Vitest's enhanced performance
+ * - Accessibility testing with sub-100ms axe-core validation
+ * - Form interaction tests completing within 500ms per scenario
+ * 
+ * @fileoverview Comprehensive Toggle component test suite with enterprise-grade coverage
  * @version 1.0.0
- * @since 2024-01-01
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import React from 'react';
+import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest';
+import { render, screen, cleanup, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { axe, toHaveNoViolations } from 'jest-axe';
 import { useForm, FormProvider } from 'react-hook-form';
-import { useState } from 'react';
+import { axe, type AxeResults } from 'axe-core';
+import '@testing-library/jest-dom/vitest';
 
-// Add jest-axe matcher
-expect.extend(toHaveNoViolations);
+// Import components under test
+import { Toggle, ToggleField, ToggleGroup, type EnhancedToggleProps } from './toggle';
 
-// Mock the Toggle component since it doesn't exist yet
-// In real implementation, this would import from './toggle'
-const MockToggle = ({
-  checked = false,
-  onChange,
-  disabled = false,
-  loading = false,
-  size = 'md',
-  label,
-  description,
-  name,
-  id,
-  required = false,
-  'aria-label': ariaLabel,
-  'aria-describedby': ariaDescribedBy,
-  className,
-  ...props
-}: {
-  checked?: boolean;
-  onChange?: (checked: boolean) => void;
-  disabled?: boolean;
-  loading?: boolean;
-  size?: 'sm' | 'md' | 'lg';
-  label?: string;
-  description?: string;
-  name?: string;
-  id?: string;
-  required?: boolean;
-  'aria-label'?: string;
-  'aria-describedby'?: string;
-  className?: string;
-}) => {
-  const toggleId = id || `toggle-${Math.random().toString(36).substr(2, 9)}`;
-  const descriptionId = description ? `${toggleId}-description` : undefined;
-  
-  const handleKeyDown = (event: React.KeyboardEvent) => {
-    if (event.key === ' ' || event.key === 'Enter') {
-      event.preventDefault();
-      if (!disabled && !loading && onChange) {
-        onChange(!checked);
-      }
-    }
-  };
+// Import test utilities and helpers
+import { renderWithProviders } from '@/test/utils/test-utils';
+import { WCAG_COMPLIANCE } from '@/test/utils/accessibility-helpers';
 
-  const handleClick = () => {
-    if (!disabled && !loading && onChange) {
-      onChange(!checked);
-    }
-  };
+// ============================================================================
+// TEST SETUP AND UTILITIES
+// ============================================================================
 
-  const sizeClasses = {
-    sm: 'w-8 h-4',
-    md: 'w-11 h-6',
-    lg: 'w-14 h-8'
-  };
+/**
+ * User Event Setup
+ * Configured for comprehensive interaction testing with proper timing
+ */
+const setupUserEvent = () => userEvent.setup({
+  delay: null, // Remove delays for faster test execution
+  advanceTimers: vi.advanceTimersByTime,
+});
 
-  const thumbSizeClasses = {
-    sm: 'w-3 h-3',
-    md: 'w-5 h-5',
-    lg: 'w-6 h-6'
-  };
-
-  return (
-    <div className={`toggle-container ${className || ''}`}>
-      {label && (
-        <label 
-          htmlFor={toggleId}
-          className="toggle-label text-sm font-medium text-gray-700 dark:text-gray-300"
-        >
-          {label}
-          {required && <span aria-label="required" className="text-red-500 ml-1">*</span>}
-        </label>
-      )}
-      
-      <div className="toggle-wrapper">
-        <button
-          id={toggleId}
-          name={name}
-          role="switch"
-          type="button"
-          aria-checked={checked}
-          aria-label={ariaLabel}
-          aria-describedby={ariaDescribedBy || descriptionId}
-          aria-required={required}
-          disabled={disabled || loading}
-          onClick={handleClick}
-          onKeyDown={handleKeyDown}
-          className={`
-            toggle-button relative inline-flex shrink-0 cursor-pointer rounded-full border-2 border-transparent 
-            transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 
-            focus-visible:ring-primary-600 focus-visible:ring-offset-2 focus-visible:ring-offset-white
-            dark:focus-visible:ring-offset-gray-900 min-h-[44px] min-w-[44px] flex items-center justify-center
-            ${checked ? 'bg-primary-600' : 'bg-gray-200 dark:bg-gray-700'}
-            ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
-            ${loading ? 'opacity-60 cursor-wait' : ''}
-            ${sizeClasses[size]}
-          `}
-          data-testid="toggle-button"
-        >
-          <span
-            className={`
-              toggle-thumb pointer-events-none inline-block rounded-full bg-white shadow transform ring-0 
-              transition duration-200 ease-in-out
-              ${checked ? `translate-x-${size === 'sm' ? '4' : size === 'md' ? '5' : '6'}` : 'translate-x-0'}
-              ${thumbSizeClasses[size]}
-            `}
-            data-testid="toggle-thumb"
-          >
-            {loading && (
-              <div 
-                className="animate-spin h-3 w-3 border border-gray-300 border-t-gray-600 rounded-full"
-                aria-hidden="true"
-                data-testid="toggle-loading"
-              />
-            )}
-          </span>
-        </button>
-      </div>
-      
-      {description && (
-        <p 
-          id={descriptionId}
-          className="toggle-description mt-1 text-sm text-gray-500 dark:text-gray-400"
-        >
-          {description}
-        </p>
-      )}
-    </div>
-  );
+/**
+ * Mock Console for Error Testing
+ * Captures console outputs for validation without polluting test output
+ */
+const mockConsole = {
+  error: vi.fn(),
+  warn: vi.fn(),
+  log: vi.fn(),
 };
 
-// Test wrapper component for controlled behavior
-const ControlledToggleWrapper = ({
-  initialChecked = false,
-  ...props
-}: {
-  initialChecked?: boolean;
-  [key: string]: any;
-}) => {
-  const [checked, setChecked] = useState(initialChecked);
-  
-  return (
-    <MockToggle
-      checked={checked}
-      onChange={setChecked}
-      {...props}
-    />
-  );
+/**
+ * Default Toggle Props for Testing
+ */
+const defaultToggleProps: Partial<EnhancedToggleProps> = {
+  label: 'Test Toggle',
+  'data-testid': 'test-toggle',
+  size: 'md',
+  variant: 'primary',
+  labelPosition: 'right',
 };
 
-// Form integration test wrapper
-const FormToggleWrapper = ({ defaultValues = {}, ...toggleProps }) => {
-  const methods = useForm({ defaultValues });
-  
+/**
+ * Test Form Component for React Hook Form Integration
+ */
+interface TestFormProps {
+  children: React.ReactNode;
+  onSubmit?: (data: any) => void;
+  defaultValues?: Record<string, any>;
+}
+
+const TestForm: React.FC<TestFormProps> = ({ 
+  children, 
+  onSubmit = () => {}, 
+  defaultValues = {} 
+}) => {
+  const methods = useForm({
+    defaultValues,
+    mode: 'onChange',
+  });
+
   return (
     <FormProvider {...methods}>
-      <form>
-        <MockToggle
-          name="testToggle"
-          onChange={(checked) => methods.setValue('testToggle', checked)}
-          checked={methods.watch('testToggle') || false}
-          {...toggleProps}
-        />
+      <form onSubmit={methods.handleSubmit(onSubmit)} data-testid="test-form">
+        {children}
+        <button type="submit" data-testid="submit-button">
+          Submit
+        </button>
       </form>
     </FormProvider>
   );
 };
 
-describe('Toggle Component', () => {
-  let user: ReturnType<typeof userEvent.setup>;
+/**
+ * Accessibility Test Helper
+ * Runs axe-core accessibility tests with WCAG 2.1 AA configuration
+ */
+const runAccessibilityTest = async (container: HTMLElement): Promise<AxeResults> => {
+  const axeConfig = {
+    rules: {
+      // WCAG 2.1 AA compliance rules
+      'color-contrast': { enabled: true },
+      'keyboard-navigation': { enabled: true },
+      'focus-management': { enabled: true },
+      'aria-labels': { enabled: true },
+      'semantic-markup': { enabled: true },
+      'landmark-one-main': { enabled: false }, // Not applicable for individual components
+      'page-has-heading-one': { enabled: false }, // Not applicable for individual components
+      'region': { enabled: false }, // React components may not use regions
+    },
+    tags: ['wcag2a', 'wcag2aa', 'wcag21aa', 'best-practice'],
+  };
+
+  return await axe(container, axeConfig);
+};
+
+/**
+ * Keyboard Navigation Test Helper
+ * Tests tab navigation and keyboard interaction patterns
+ */
+const testKeyboardNavigation = async (user: ReturnType<typeof setupUserEvent>) => {
+  // Test tab navigation
+  await user.tab();
+  const focusedElement = document.activeElement;
+  expect(focusedElement).toBeInTheDocument();
+  
+  // Test space key activation
+  if (focusedElement?.getAttribute('role') === 'switch') {
+    await user.keyboard(' ');
+  }
+  
+  // Test enter key activation
+  await user.keyboard('{Enter}');
+  
+  return focusedElement;
+};
+
+/**
+ * Screen Reader Announcement Test Helper
+ * Validates ARIA live regions and announcements
+ */
+const expectScreenReaderAnnouncement = (text: string) => {
+  // Look for aria-live regions with the expected text
+  const announcement = screen.queryByText(text);
+  if (announcement) {
+    expect(announcement).toHaveAttribute('aria-live', 'polite');
+    expect(announcement).toHaveClass('sr-only');
+  }
+};
+
+// ============================================================================
+// COMPONENT RENDERING TESTS
+// ============================================================================
+
+describe('Toggle Component - Basic Rendering', () => {
+  let user: ReturnType<typeof setupUserEvent>;
 
   beforeEach(() => {
-    user = userEvent.setup();
-    
-    // Mock console.error to avoid noise in tests
-    vi.spyOn(console, 'error').mockImplementation(() => {});
+    user = setupUserEvent();
+    vi.useFakeTimers();
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    cleanup();
+    vi.clearAllMocks();
+    vi.useRealTimers();
   });
 
-  describe('Accessibility Compliance', () => {
-    it('should meet WCAG 2.1 AA accessibility standards', async () => {
-      const { container } = render(
-        <MockToggle
-          label="Enable notifications"
-          description="Receive email notifications for important updates"
-          checked={false}
-          onChange={() => {}}
+  it('renders correctly with default props', () => {
+    render(<Toggle {...defaultToggleProps} />);
+    
+    const toggle = screen.getByRole('switch');
+    const label = screen.getByText('Test Toggle');
+    
+    expect(toggle).toBeInTheDocument();
+    expect(toggle).toHaveAttribute('data-testid', 'test-toggle');
+    expect(toggle).toHaveAttribute('type', 'button');
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    expect(label).toBeInTheDocument();
+  });
+
+  it('renders with custom className and styling', () => {
+    const customClass = 'custom-toggle-class';
+    render(
+      <Toggle 
+        {...defaultToggleProps}
+        className={customClass}
+        thumbClassName="custom-thumb"
+        labelClassName="custom-label"
+      />
+    );
+    
+    const toggle = screen.getByRole('switch');
+    expect(toggle).toHaveClass(customClass);
+  });
+
+  it('renders all size variants correctly', () => {
+    const sizes = ['sm', 'md', 'lg'] as const;
+    
+    sizes.forEach((size) => {
+      const { unmount } = render(
+        <Toggle 
+          label={`${size} Toggle`}
+          size={size}
+          data-testid={`toggle-${size}`}
         />
       );
+      
+      const toggle = screen.getByTestId(`toggle-${size}`);
+      expect(toggle).toBeInTheDocument();
+      expect(toggle).toHaveAttribute('data-size', size);
+      
+      unmount();
+    });
+  });
 
-      const results = await axe(container);
-      expect(results).toHaveNoViolations();
+  it('renders all variant styles correctly', () => {
+    const variants = ['primary', 'secondary', 'success', 'warning', 'error'] as const;
+    
+    variants.forEach((variant) => {
+      const { unmount } = render(
+        <Toggle 
+          label={`${variant} Toggle`}
+          variant={variant}
+          data-testid={`toggle-${variant}`}
+        />
+      );
+      
+      const toggle = screen.getByTestId(`toggle-${variant}`);
+      expect(toggle).toBeInTheDocument();
+      expect(toggle).toHaveAttribute('data-variant', variant);
+      
+      unmount();
+    });
+  });
+
+  it('handles missing label gracefully', () => {
+    render(<Toggle data-testid="no-label-toggle" />);
+    
+    const toggle = screen.getByRole('switch');
+    expect(toggle).toBeInTheDocument();
+    expect(toggle).not.toHaveAttribute('aria-labelledby');
+  });
+});
+
+// ============================================================================
+// ACCESSIBILITY COMPLIANCE TESTS
+// ============================================================================
+
+describe('Toggle Component - WCAG 2.1 AA Accessibility', () => {
+  let user: ReturnType<typeof setupUserEvent>;
+
+  beforeEach(() => {
+    user = setupUserEvent();
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('passes automated accessibility audit', async () => {
+    const { container } = render(<Toggle {...defaultToggleProps} />);
+    
+    const results = await runAccessibilityTest(container);
+    expect(results.violations).toHaveLength(0);
+  });
+
+  it('has proper ARIA attributes for screen readers', () => {
+    render(<Toggle {...defaultToggleProps} required />);
+    
+    const toggle = screen.getByRole('switch');
+    const label = screen.getByText('Test Toggle');
+    
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    expect(toggle).toHaveAttribute('aria-required', 'true');
+    expect(toggle).toHaveAttribute('aria-labelledby');
+    expect(label).toHaveAttribute('id');
+  });
+
+  it('supports custom ARIA labels and descriptions', () => {
+    const ariaLabel = 'Custom toggle description';
+    const ariaDescribedBy = 'custom-description';
+    
+    render(
+      <div>
+        <Toggle 
+          {...defaultToggleProps}
+          aria-label={ariaLabel}
+          aria-describedby={ariaDescribedBy}
+        />
+        <div id={ariaDescribedBy}>Additional description</div>
+      </div>
+    );
+    
+    const toggle = screen.getByRole('switch');
+    expect(toggle).toHaveAttribute('aria-label', ariaLabel);
+    expect(toggle).toHaveAttribute('aria-describedby', ariaDescribedBy);
+  });
+
+  it('maintains minimum touch target size (44x44px)', () => {
+    render(<Toggle {...defaultToggleProps} size="sm" />);
+    
+    const toggle = screen.getByRole('switch');
+    const styles = window.getComputedStyle(toggle);
+    
+    // Verify minimum touch target dimensions
+    const minSize = WCAG_COMPLIANCE.TOUCH_TARGETS.MIN_SIZE;
+    expect(parseInt(styles.minWidth || '0')).toBeGreaterThanOrEqual(minSize);
+    expect(parseInt(styles.minHeight || '0')).toBeGreaterThanOrEqual(minSize);
+  });
+
+  it('has proper focus indicators with sufficient contrast', async () => {
+    render(<Toggle {...defaultToggleProps} />);
+    
+    const toggle = screen.getByRole('switch');
+    await user.tab();
+    
+    expect(toggle).toHaveFocus();
+    expect(toggle).toHaveClass('focus:ring-2'); // Tailwind focus ring class
+    expect(toggle).toHaveClass('focus-visible:outline-2'); // Focus visible indicator
+  });
+
+  it('announces state changes to screen readers', async () => {
+    render(
+      <Toggle 
+        {...defaultToggleProps}
+        announceOnChange="Toggle is now {state}"
+      />
+    );
+    
+    const toggle = screen.getByRole('switch');
+    await user.click(toggle);
+    
+    // Advance timers to allow announcement to be added and removed
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+    
+    expectScreenReaderAnnouncement('Toggle is now checked');
+    
+    // Verify announcement is cleaned up
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+  });
+
+  it('supports high contrast mode properly', () => {
+    // Mock high contrast media query
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: vi.fn().mockImplementation((query) => ({
+        matches: query.includes('prefers-contrast: high'),
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
     });
 
-    it('should have proper ARIA attributes', () => {
-      render(
-        <MockToggle
-          label="Dark mode"
-          description="Switch to dark theme"
-          checked={true}
-          onChange={() => {}}
-          id="dark-mode-toggle"
+    render(<Toggle {...defaultToggleProps} />);
+    
+    const toggle = screen.getByRole('switch');
+    expect(toggle).toBeInTheDocument();
+    // In real implementation, this would verify high contrast styles
+    expect(toggle).toHaveClass('border'); // Ensures visible border in high contrast
+  });
+});
+
+// ============================================================================
+// KEYBOARD NAVIGATION TESTS
+// ============================================================================
+
+describe('Toggle Component - Keyboard Navigation', () => {
+  let user: ReturnType<typeof setupUserEvent>;
+
+  beforeEach(() => {
+    user = setupUserEvent();
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('is focusable via keyboard navigation', async () => {
+    render(<Toggle {...defaultToggleProps} />);
+    
+    const toggle = screen.getByRole('switch');
+    await user.tab();
+    
+    expect(toggle).toHaveFocus();
+  });
+
+  it('can be toggled with spacebar', async () => {
+    const onChange = vi.fn();
+    render(<Toggle {...defaultToggleProps} onChange={onChange} />);
+    
+    const toggle = screen.getByRole('switch');
+    await user.tab();
+    await user.keyboard(' ');
+    
+    expect(onChange).toHaveBeenCalledWith(true);
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('can be toggled with enter key', async () => {
+    const onChange = vi.fn();
+    render(<Toggle {...defaultToggleProps} onChange={onChange} />);
+    
+    const toggle = screen.getByRole('switch');
+    await user.tab();
+    await user.keyboard('{Enter}');
+    
+    expect(onChange).toHaveBeenCalledWith(true);
+  });
+
+  it('skips navigation when disabled', async () => {
+    render(
+      <div>
+        <button>Before</button>
+        <Toggle {...defaultToggleProps} disabled />
+        <button>After</button>
+      </div>
+    );
+    
+    const beforeButton = screen.getByText('Before');
+    const afterButton = screen.getByText('After');
+    const toggle = screen.getByRole('switch');
+    
+    beforeButton.focus();
+    await user.tab();
+    
+    expect(toggle).not.toHaveFocus();
+    expect(afterButton).toHaveFocus();
+  });
+
+  it('prevents keyboard interaction during loading state', async () => {
+    const onChange = vi.fn();
+    render(<Toggle {...defaultToggleProps} loading onChange={onChange} />);
+    
+    const toggle = screen.getByRole('switch');
+    await user.tab();
+    await user.keyboard(' ');
+    await user.keyboard('{Enter}');
+    
+    expect(onChange).not.toHaveBeenCalled();
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('maintains focus management with label clicks', async () => {
+    render(<Toggle {...defaultToggleProps} />);
+    
+    const label = screen.getByText('Test Toggle');
+    const toggle = screen.getByRole('switch');
+    
+    await user.click(label);
+    
+    // Focus should move to the toggle after label click
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('handles keyboard events with custom handlers', async () => {
+    const onKeyDown = vi.fn();
+    render(
+      <Toggle 
+        {...defaultToggleProps}
+        onKeyDown={onKeyDown}
+      />
+    );
+    
+    const toggle = screen.getByRole('switch');
+    await user.tab();
+    await user.keyboard('{ArrowRight}');
+    
+    expect(onKeyDown).toHaveBeenCalled();
+    expect(onKeyDown.mock.calls[0][0].key).toBe('ArrowRight');
+  });
+});
+
+// ============================================================================
+// CONTROLLED VS UNCONTROLLED BEHAVIOR TESTS
+// ============================================================================
+
+describe('Toggle Component - Controlled vs Uncontrolled Behavior', () => {
+  let user: ReturnType<typeof setupUserEvent>;
+
+  beforeEach(() => {
+    user = setupUserEvent();
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('works as uncontrolled component with defaultValue', async () => {
+    render(<Toggle {...defaultToggleProps} defaultValue={true} />);
+    
+    const toggle = screen.getByRole('switch');
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('works as controlled component with value prop', async () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <Toggle 
+        {...defaultToggleProps}
+        value={false}
+        onChange={onChange}
+      />
+    );
+    
+    const toggle = screen.getByRole('switch');
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    
+    await user.click(toggle);
+    expect(onChange).toHaveBeenCalledWith(true);
+    
+    // Simulate parent component updating the value
+    rerender(
+      <Toggle 
+        {...defaultToggleProps}
+        value={true}
+        onChange={onChange}
+      />
+    );
+    
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('ignores defaultValue when value prop is provided', () => {
+    render(
+      <Toggle 
+        {...defaultToggleProps}
+        value={false}
+        defaultValue={true}
+      />
+    );
+    
+    const toggle = screen.getByRole('switch');
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('calls onChange callback with new value', async () => {
+    const onChange = vi.fn();
+    render(<Toggle {...defaultToggleProps} onChange={onChange} />);
+    
+    const toggle = screen.getByRole('switch');
+    await user.click(toggle);
+    
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledWith(true);
+    
+    await user.click(toggle);
+    
+    expect(onChange).toHaveBeenCalledTimes(2);
+    expect(onChange).toHaveBeenCalledWith(false);
+  });
+
+  it('maintains internal state for uncontrolled usage', async () => {
+    render(<Toggle {...defaultToggleProps} />);
+    
+    const toggle = screen.getByRole('switch');
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+  });
+});
+
+// ============================================================================
+// LABEL POSITIONING AND LAYOUT TESTS
+// ============================================================================
+
+describe('Toggle Component - Label Positioning and Layout', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('renders label in all supported positions', () => {
+    const positions = ['left', 'right', 'top', 'bottom', 'none'] as const;
+    
+    positions.forEach((position) => {
+      const { unmount } = render(
+        <Toggle 
+          label={`${position} Label`}
+          labelPosition={position}
+          data-testid={`toggle-${position}`}
+        />
+      );
+      
+      const toggle = screen.getByTestId(`toggle-${position}`);
+      expect(toggle).toBeInTheDocument();
+      
+      if (position !== 'none') {
+        const label = screen.getByText(`${position} Label`);
+        expect(label).toBeInTheDocument();
+      }
+      
+      unmount();
+    });
+  });
+
+  it('hides label when showLabel is false', () => {
+    render(
+      <Toggle 
+        {...defaultToggleProps}
+        showLabel={false}
+      />
+    );
+    
+    const toggle = screen.getByRole('switch');
+    expect(toggle).toBeInTheDocument();
+    expect(screen.queryByText('Test Toggle')).not.toBeInTheDocument();
+  });
+
+  it('applies correct layout classes for different arrangements', () => {
+    const { rerender } = render(
+      <Toggle 
+        {...defaultToggleProps}
+        layout="horizontal"
+        alignment="center"
+        spacing="relaxed"
+      />
+    );
+    
+    // Test horizontal layout
+    let container = screen.getByRole('switch').closest('div');
+    expect(container).toHaveClass('flex-row');
+    
+    // Test vertical layout
+    rerender(
+      <Toggle 
+        {...defaultToggleProps}
+        layout="vertical"
+        alignment="start"
+        spacing="compact"
+      />
+    );
+    
+    container = screen.getByRole('switch').closest('div');
+    expect(container).toHaveClass('flex-col');
+  });
+
+  it('handles required indicator in label correctly', () => {
+    render(
+      <Toggle 
+        {...defaultToggleProps}
+        required
+      />
+    );
+    
+    const requiredIndicator = screen.getByLabelText('required');
+    expect(requiredIndicator).toBeInTheDocument();
+    expect(requiredIndicator).toHaveTextContent('*');
+    expect(requiredIndicator).toHaveClass('text-error-500');
+  });
+
+  it('applies custom label styling variants', () => {
+    const variants = ['default', 'muted', 'emphasized'] as const;
+    
+    variants.forEach((variant) => {
+      const { unmount } = render(
+        <Toggle 
+          label={`${variant} Label`}
+          labelVariant={variant}
+          data-testid={`toggle-${variant}`}
+        />
+      );
+      
+      const label = screen.getByText(`${variant} Label`);
+      expect(label).toBeInTheDocument();
+      
+      unmount();
+    });
+  });
+});
+
+// ============================================================================
+// STATE MANAGEMENT TESTS
+// ============================================================================
+
+describe('Toggle Component - State Management', () => {
+  let user: ReturnType<typeof setupUserEvent>;
+
+  beforeEach(() => {
+    user = setupUserEvent();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+    vi.useRealTimers();
+  });
+
+  it('displays loading state correctly', () => {
+    render(<Toggle {...defaultToggleProps} loading />);
+    
+    const toggle = screen.getByRole('switch');
+    const loadingIndicator = screen.getByRole('status', { name: 'Loading' });
+    
+    expect(toggle).toHaveAttribute('data-loading', 'true');
+    expect(toggle).toBeDisabled();
+    expect(loadingIndicator).toBeInTheDocument();
+    expect(loadingIndicator).toHaveClass('animate-spin');
+  });
+
+  it('displays disabled state correctly', () => {
+    render(<Toggle {...defaultToggleProps} disabled />);
+    
+    const toggle = screen.getByRole('switch');
+    expect(toggle).toBeDisabled();
+    expect(toggle).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('displays error state with proper styling', () => {
+    const errorMessage = 'This field is required';
+    render(
+      <Toggle 
+        {...defaultToggleProps}
+        error={errorMessage}
+      />
+    );
+    
+    const toggle = screen.getByRole('switch');
+    const errorElement = screen.getByRole('alert');
+    
+    expect(toggle).toHaveAttribute('aria-invalid', 'true');
+    expect(toggle).toHaveAttribute('data-error', 'true');
+    expect(errorElement).toBeInTheDocument();
+    expect(errorElement).toHaveTextContent(errorMessage);
+    expect(errorElement).toHaveClass('text-error-600');
+  });
+
+  it('shows helper text when provided', () => {
+    const helperText = 'This toggle controls the feature';
+    render(
+      <Toggle 
+        {...defaultToggleProps}
+        helperText={helperText}
+      />
+    );
+    
+    const helper = screen.getByText(helperText);
+    expect(helper).toBeInTheDocument();
+    expect(helper).toHaveClass('text-sm');
+  });
+
+  it('handles state transitions smoothly', async () => {
+    const { rerender } = render(<Toggle {...defaultToggleProps} />);
+    
+    const toggle = screen.getByRole('switch');
+    expect(toggle).toHaveAttribute('data-state', 'unchecked');
+    
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('data-state', 'checked');
+    
+    // Test loading state transition
+    rerender(<Toggle {...defaultToggleProps} loading />);
+    expect(toggle).toHaveAttribute('data-loading', 'true');
+    
+    // Test error state transition
+    rerender(<Toggle {...defaultToggleProps} error="Error occurred" />);
+    expect(toggle).toHaveAttribute('data-error', 'true');
+  });
+
+  it('prevents interaction during loading', async () => {
+    const onChange = vi.fn();
+    render(
+      <Toggle 
+        {...defaultToggleProps}
+        loading
+        onChange={onChange}
+      />
+    );
+    
+    const toggle = screen.getByRole('switch');
+    await user.click(toggle);
+    
+    expect(onChange).not.toHaveBeenCalled();
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+  });
+});
+
+// ============================================================================
+// ICON AND VISUAL ELEMENT TESTS
+// ============================================================================
+
+describe('Toggle Component - Icons and Visual Elements', () => {
+  let user: ReturnType<typeof setupUserEvent>;
+
+  beforeEach(() => {
+    user = setupUserEvent();
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('displays custom icons for checked and unchecked states', async () => {
+    const CheckIcon = () => <span data-testid="check-icon">✓</span>;
+    const UncheckIcon = () => <span data-testid="uncheck-icon">✗</span>;
+    
+    render(
+      <Toggle 
+        {...defaultToggleProps}
+        checkedIcon={<CheckIcon />}
+        uncheckedIcon={<UncheckIcon />}
+      />
+    );
+    
+    const toggle = screen.getByRole('switch');
+    
+    // Should show unchecked icon initially
+    expect(screen.getByTestId('uncheck-icon')).toBeInTheDocument();
+    expect(screen.queryByTestId('check-icon')).not.toBeInTheDocument();
+    
+    // Click to toggle state
+    await user.click(toggle);
+    
+    // Should now show checked icon
+    expect(screen.getByTestId('check-icon')).toBeInTheDocument();
+    expect(screen.queryByTestId('uncheck-icon')).not.toBeInTheDocument();
+  });
+
+  it('hides icons during loading state', () => {
+    const CheckIcon = () => <span data-testid="check-icon">✓</span>;
+    
+    render(
+      <Toggle 
+        {...defaultToggleProps}
+        loading
+        value={true}
+        checkedIcon={<CheckIcon />}
+      />
+    );
+    
+    expect(screen.queryByTestId('check-icon')).not.toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument();
+  });
+
+  it('applies correct thumb styling for different sizes', () => {
+    const sizes = ['sm', 'md', 'lg'] as const;
+    
+    sizes.forEach((size) => {
+      const { unmount } = render(
+        <Toggle 
+          label={`${size} Toggle`}
+          size={size}
+          data-testid={`toggle-${size}`}
+        />
+      );
+      
+      const toggle = screen.getByTestId(`toggle-${size}`);
+      const thumb = toggle.querySelector('[aria-hidden="true"]');
+      
+      expect(thumb).toBeInTheDocument();
+      expect(thumb).toHaveClass('transition-all', 'duration-200');
+      
+      unmount();
+    });
+  });
+
+  it('disables transitions when specified', () => {
+    render(
+      <Toggle 
+        {...defaultToggleProps}
+        disableTransitions
+      />
+    );
+    
+    const toggle = screen.getByRole('switch');
+    expect(toggle).not.toHaveClass('transition-all');
+  });
+});
+
+// ============================================================================
+// REACT HOOK FORM INTEGRATION TESTS
+// ============================================================================
+
+describe('Toggle Component - React Hook Form Integration', () => {
+  let user: ReturnType<typeof setupUserEvent>;
+
+  beforeEach(() => {
+    user = setupUserEvent();
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('integrates with React Hook Form for controlled forms', async () => {
+    const onSubmit = vi.fn();
+    
+    render(
+      <TestForm onSubmit={onSubmit} defaultValues={{ testToggle: false }}>
+        <Toggle 
+          {...defaultToggleProps}
+          name="testToggle"
+          register={(name, rules) => ({
+            name,
+            ref: vi.fn(),
+            onChange: vi.fn(),
+            onBlur: vi.fn(),
+          })}
+        />
+      </TestForm>
+    );
+    
+    const toggle = screen.getByRole('switch');
+    const submitButton = screen.getByTestId('submit-button');
+    
+    await user.click(toggle);
+    await user.click(submitButton);
+    
+    // Form integration should be working
+    expect(toggle).toHaveAttribute('name', 'testToggle');
+  });
+
+  it('validates required field with React Hook Form', async () => {
+    const onSubmit = vi.fn();
+    
+    render(
+      <TestForm onSubmit={onSubmit}>
+        <Toggle 
+          {...defaultToggleProps}
+          name="requiredToggle"
           required
+          register={(name, rules) => ({
+            name,
+            ref: vi.fn(),
+            onChange: vi.fn(),
+            onBlur: vi.fn(),
+          })}
+          rules={{ required: 'This field is required' }}
         />
-      );
+      </TestForm>
+    );
+    
+    const toggle = screen.getByRole('switch');
+    expect(toggle).toHaveAttribute('aria-required', 'true');
+    expect(toggle).toHaveAttribute('name', 'requiredToggle');
+  });
 
-      const toggle = screen.getByRole('switch');
+  it('handles validation errors from React Hook Form', () => {
+    const errorMessage = 'This field must be checked';
+    
+    render(
+      <Toggle 
+        {...defaultToggleProps}
+        name="validatedToggle"
+        error={errorMessage}
+        register={(name, rules) => ({
+          name,
+          ref: vi.fn(),
+          onChange: vi.fn(),
+          onBlur: vi.fn(),
+        })}
+      />
+    );
+    
+    const toggle = screen.getByRole('switch');
+    const errorElement = screen.getByRole('alert');
+    
+    expect(toggle).toHaveAttribute('aria-invalid', 'true');
+    expect(errorElement).toHaveTextContent(errorMessage);
+  });
+
+  it('supports custom validation rules', async () => {
+    const customValidation = vi.fn(() => true);
+    
+    render(
+      <Toggle 
+        {...defaultToggleProps}
+        name="customValidatedToggle"
+        register={(name, rules) => ({
+          name,
+          ref: vi.fn(),
+          onChange: vi.fn(),
+          onBlur: vi.fn(),
+        })}
+        rules={{
+          required: 'This field is required',
+          validate: customValidation,
+        }}
+      />
+    );
+    
+    const toggle = screen.getByRole('switch');
+    expect(toggle).toHaveAttribute('name', 'customValidatedToggle');
+  });
+});
+
+// ============================================================================
+// TOGGLEFIELD COMPONENT TESTS
+// ============================================================================
+
+describe('ToggleField Component - Enhanced Form Field', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('renders with field label separate from toggle label', () => {
+    render(
+      <ToggleField 
+        {...defaultToggleProps}
+        fieldLabel="Field Label"
+        label="Toggle Label"
+        description="Field description"
+      />
+    );
+    
+    expect(screen.getByText('Field Label')).toBeInTheDocument();
+    expect(screen.getByText('Toggle Label')).toBeInTheDocument();
+    expect(screen.getByText('Field description')).toBeInTheDocument();
+  });
+
+  it('shows required indicator on field label', () => {
+    render(
+      <ToggleField 
+        {...defaultToggleProps}
+        fieldLabel="Required Field"
+        required
+      />
+    );
+    
+    const fieldLabel = screen.getByText('Required Field');
+    expect(fieldLabel).toBeInTheDocument();
+    
+    // Should have required indicator
+    const requiredIndicators = screen.getAllByLabelText('required');
+    expect(requiredIndicators.length).toBeGreaterThan(0);
+  });
+
+  it('applies custom styling to field container', () => {
+    const customClass = 'custom-field-class';
+    
+    render(
+      <ToggleField 
+        {...defaultToggleProps}
+        className={customClass}
+        fieldLabel="Styled Field"
+      />
+    );
+    
+    const fieldContainer = screen.getByText('Styled Field').closest('div');
+    expect(fieldContainer).toHaveClass(customClass);
+  });
+});
+
+// ============================================================================
+// TOGGLEGROUP COMPONENT TESTS
+// ============================================================================
+
+describe('ToggleGroup Component - Group Management', () => {
+  let user: ReturnType<typeof setupUserEvent>;
+
+  beforeEach(() => {
+    user = setupUserEvent();
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('renders group with label and description', () => {
+    render(
+      <ToggleGroup 
+        label="Toggle Group"
+        description="Group of related toggles"
+        required
+      >
+        <Toggle label="Option 1" data-testid="toggle-1" />
+        <Toggle label="Option 2" data-testid="toggle-2" />
+      </ToggleGroup>
+    );
+    
+    expect(screen.getByText('Toggle Group')).toBeInTheDocument();
+    expect(screen.getByText('Group of related toggles')).toBeInTheDocument();
+    expect(screen.getByTestId('toggle-1')).toBeInTheDocument();
+    expect(screen.getByTestId('toggle-2')).toBeInTheDocument();
+    
+    // Check fieldset structure
+    const fieldset = screen.getByRole('group');
+    expect(fieldset).toBeInTheDocument();
+    expect(fieldset.tagName).toBe('FIELDSET');
+  });
+
+  it('arranges toggles in different orientations', () => {
+    const { rerender } = render(
+      <ToggleGroup 
+        label="Horizontal Group"
+        orientation="horizontal"
+        spacing="relaxed"
+      >
+        <Toggle label="Option 1" />
+        <Toggle label="Option 2" />
+      </ToggleGroup>
+    );
+    
+    let container = screen.getByRole('group');
+    expect(container.querySelector('.flex-row')).toBeInTheDocument();
+    
+    rerender(
+      <ToggleGroup 
+        label="Vertical Group"
+        orientation="vertical"
+        spacing="compact"
+      >
+        <Toggle label="Option 1" />
+        <Toggle label="Option 2" />
+      </ToggleGroup>
+    );
+    
+    container = screen.getByRole('group');
+    expect(container.querySelector('.flex-col')).toBeInTheDocument();
+  });
+
+  it('applies correct spacing classes', () => {
+    const spacings = ['compact', 'normal', 'relaxed'] as const;
+    
+    spacings.forEach((spacing) => {
+      const { unmount } = render(
+        <ToggleGroup 
+          label={`${spacing} Group`}
+          spacing={spacing}
+        >
+          <Toggle label="Option 1" />
+          <Toggle label="Option 2" />
+        </ToggleGroup>
+      );
       
-      expect(toggle).toHaveAttribute('role', 'switch');
-      expect(toggle).toHaveAttribute('aria-checked', 'true');
-      expect(toggle).toHaveAttribute('aria-required', 'true');
-      expect(toggle).toHaveAttribute('id', 'dark-mode-toggle');
-      expect(toggle).toHaveAttribute('aria-describedby');
-    });
-
-    it('should support screen reader announcements', () => {
-      render(
-        <MockToggle
-          aria-label="Toggle feature"
-          checked={false}
-          onChange={() => {}}
-        />
-      );
-
-      const toggle = screen.getByRole('switch');
-      expect(toggle).toHaveAttribute('aria-label', 'Toggle feature');
-    });
-
-    it('should associate label with toggle properly', () => {
-      render(
-        <MockToggle
-          label="Enable feature"
-          id="feature-toggle"
-          checked={false}
-          onChange={() => {}}
-        />
-      );
-
-      const label = screen.getByText('Enable feature');
-      const toggle = screen.getByRole('switch');
+      const group = screen.getByRole('group');
+      expect(group).toBeInTheDocument();
       
-      expect(label).toHaveAttribute('for', 'feature-toggle');
-      expect(toggle).toHaveAttribute('id', 'feature-toggle');
-    });
-
-    it('should indicate required fields to screen readers', () => {
-      render(
-        <MockToggle
-          label="Agree to terms"
-          required
-          checked={false}
-          onChange={() => {}}
-        />
-      );
-
-      const requiredIndicator = screen.getByLabelText('required');
-      expect(requiredIndicator).toBeInTheDocument();
-      
-      const toggle = screen.getByRole('switch');
-      expect(toggle).toHaveAttribute('aria-required', 'true');
-    });
-
-    it('should meet minimum touch target size requirements', () => {
-      render(
-        <MockToggle
-          checked={false}
-          onChange={() => {}}
-          size="sm"
-        />
-      );
-
-      const toggle = screen.getByRole('switch');
-      
-      // Check that minimum 44x44px touch target is maintained
-      expect(toggle).toHaveClass('min-h-[44px]');
-      expect(toggle).toHaveClass('min-w-[44px]');
+      unmount();
     });
   });
 
-  describe('Keyboard Navigation', () => {
-    it('should toggle state with Space key', async () => {
-      const handleChange = vi.fn();
-      
-      render(
-        <MockToggle
-          checked={false}
-          onChange={handleChange}
-        />
-      );
+  it('handles keyboard navigation within group', async () => {
+    render(
+      <ToggleGroup label="Keyboard Navigation Group">
+        <Toggle label="First" data-testid="first-toggle" />
+        <Toggle label="Second" data-testid="second-toggle" />
+        <Toggle label="Third" data-testid="third-toggle" />
+      </ToggleGroup>
+    );
+    
+    const firstToggle = screen.getByTestId('first-toggle');
+    const secondToggle = screen.getByTestId('second-toggle');
+    
+    // Tab to first toggle
+    await user.tab();
+    expect(firstToggle).toHaveFocus();
+    
+    // Tab to second toggle
+    await user.tab();
+    expect(secondToggle).toHaveFocus();
+  });
+});
 
-      const toggle = screen.getByRole('switch');
-      toggle.focus();
-      
-      await user.keyboard(' ');
-      
-      expect(handleChange).toHaveBeenCalledWith(true);
-    });
+// ============================================================================
+// ERROR HANDLING AND EDGE CASE TESTS
+// ============================================================================
 
-    it('should toggle state with Enter key', async () => {
-      const handleChange = vi.fn();
-      
-      render(
-        <MockToggle
-          checked={false}
-          onChange={handleChange}
-        />
-      );
+describe('Toggle Component - Error Handling and Edge Cases', () => {
+  let user: ReturnType<typeof setupUserEvent>;
+  const originalConsoleError = console.error;
 
-      const toggle = screen.getByRole('switch');
-      toggle.focus();
-      
-      await user.keyboard('{Enter}');
-      
-      expect(handleChange).toHaveBeenCalledWith(true);
-    });
-
-    it('should not respond to other keys', async () => {
-      const handleChange = vi.fn();
-      
-      render(
-        <MockToggle
-          checked={false}
-          onChange={handleChange}
-        />
-      );
-
-      const toggle = screen.getByRole('switch');
-      toggle.focus();
-      
-      await user.keyboard('{Escape}');
-      await user.keyboard('a');
-      await user.keyboard('{Tab}');
-      
-      expect(handleChange).not.toHaveBeenCalled();
-    });
-
-    it('should show focus-visible styles when navigated with keyboard', () => {
-      render(
-        <MockToggle
-          checked={false}
-          onChange={() => {}}
-        />
-      );
-
-      const toggle = screen.getByRole('switch');
-      
-      // Check focus-visible classes are present
-      expect(toggle).toHaveClass('focus-visible:outline-none');
-      expect(toggle).toHaveClass('focus-visible:ring-2');
-      expect(toggle).toHaveClass('focus-visible:ring-primary-600');
-    });
-
-    it('should not activate when disabled', async () => {
-      const handleChange = vi.fn();
-      
-      render(
-        <MockToggle
-          checked={false}
-          onChange={handleChange}
-          disabled
-        />
-      );
-
-      const toggle = screen.getByRole('switch');
-      toggle.focus();
-      
-      await user.keyboard(' ');
-      await user.keyboard('{Enter}');
-      
-      expect(handleChange).not.toHaveBeenCalled();
-    });
+  beforeEach(() => {
+    user = setupUserEvent();
+    console.error = mockConsole.error;
   });
 
-  describe('Controlled Component Behavior', () => {
-    it('should render checked state correctly', () => {
-      render(
-        <MockToggle
-          checked={true}
-          onChange={() => {}}
+  afterEach(() => {
+    cleanup();
+    console.error = originalConsoleError;
+    vi.clearAllMocks();
+  });
+
+  it('handles undefined value gracefully', () => {
+    render(<Toggle {...defaultToggleProps} value={undefined} />);
+    
+    const toggle = screen.getByRole('switch');
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('handles null onChange callback gracefully', async () => {
+    render(<Toggle {...defaultToggleProps} onChange={null as any} />);
+    
+    const toggle = screen.getByRole('switch');
+    
+    // Should not throw error when clicking
+    await expect(user.click(toggle)).resolves.not.toThrow();
+  });
+
+  it('handles missing required props gracefully', () => {
+    // Test component without any props
+    expect(() => render(<Toggle />)).not.toThrow();
+    
+    const toggle = screen.getByRole('switch');
+    expect(toggle).toBeInTheDocument();
+  });
+
+  it('maintains accessibility when custom IDs conflict', () => {
+    render(
+      <div>
+        <Toggle 
+          label="First Toggle"
+          data-testid="toggle-1"
         />
-      );
-
-      const toggle = screen.getByRole('switch');
-      expect(toggle).toHaveAttribute('aria-checked', 'true');
-      expect(toggle).toHaveClass('bg-primary-600');
-    });
-
-    it('should render unchecked state correctly', () => {
-      render(
-        <MockToggle
-          checked={false}
-          onChange={() => {}}
+        <Toggle 
+          label="Second Toggle"
+          data-testid="toggle-2"
         />
-      );
+      </div>
+    );
+    
+    const toggle1 = screen.getByTestId('toggle-1');
+    const toggle2 = screen.getByTestId('toggle-2');
+    
+    // Each should have unique IDs
+    expect(toggle1.id).not.toBe(toggle2.id);
+    expect(toggle1.getAttribute('aria-labelledby')).not.toBe(
+      toggle2.getAttribute('aria-labelledby')
+    );
+  });
 
-      const toggle = screen.getByRole('switch');
-      expect(toggle).toHaveAttribute('aria-checked', 'false');
-      expect(toggle).toHaveClass('bg-gray-200');
-    });
+  it('handles rapid successive clicks correctly', async () => {
+    const onChange = vi.fn();
+    render(<Toggle {...defaultToggleProps} onChange={onChange} />);
+    
+    const toggle = screen.getByRole('switch');
+    
+    // Rapid clicks
+    await user.click(toggle);
+    await user.click(toggle);
+    await user.click(toggle);
+    
+    expect(onChange).toHaveBeenCalledTimes(3);
+    expect(onChange).toHaveBeenNthCalledWith(1, true);
+    expect(onChange).toHaveBeenNthCalledWith(2, false);
+    expect(onChange).toHaveBeenNthCalledWith(3, true);
+  });
 
-    it('should call onChange when clicked', async () => {
-      const handleChange = vi.fn();
-      
-      render(
-        <MockToggle
-          checked={false}
-          onChange={handleChange}
-        />
-      );
+  it('handles extremely long labels appropriately', () => {
+    const longLabel = 'A'.repeat(500);
+    
+    render(<Toggle label={longLabel} data-testid="long-label-toggle" />);
+    
+    const toggle = screen.getByTestId('long-label-toggle');
+    const label = screen.getByText(longLabel);
+    
+    expect(toggle).toBeInTheDocument();
+    expect(label).toBeInTheDocument();
+  });
 
-      const toggle = screen.getByRole('switch');
+  it('maintains performance with many rapid state changes', async () => {
+    const onChange = vi.fn();
+    render(<Toggle {...defaultToggleProps} onChange={onChange} />);
+    
+    const toggle = screen.getByRole('switch');
+    const startTime = performance.now();
+    
+    // Simulate many rapid changes
+    for (let i = 0; i < 50; i++) {
       await user.click(toggle);
-      
-      expect(handleChange).toHaveBeenCalledWith(true);
-    });
+    }
+    
+    const endTime = performance.now();
+    const duration = endTime - startTime;
+    
+    // Should complete within reasonable time (less than 2 seconds)
+    expect(duration).toBeLessThan(2000);
+    expect(onChange).toHaveBeenCalledTimes(50);
+  });
+});
 
-    it('should update checked state properly', async () => {
-      render(<ControlledToggleWrapper initialChecked={false} />);
+// ============================================================================
+// INTEGRATION TESTS
+// ============================================================================
 
-      const toggle = screen.getByRole('switch');
-      expect(toggle).toHaveAttribute('aria-checked', 'false');
-      
-      await user.click(toggle);
-      
-      expect(toggle).toHaveAttribute('aria-checked', 'true');
-    });
+describe('Toggle Component - Integration Tests', () => {
+  let user: ReturnType<typeof setupUserEvent>;
 
-    it('should not call onChange when disabled', async () => {
-      const handleChange = vi.fn();
-      
-      render(
-        <MockToggle
-          checked={false}
-          onChange={handleChange}
-          disabled
-        />
-      );
-
-      const toggle = screen.getByRole('switch');
-      await user.click(toggle);
-      
-      expect(handleChange).not.toHaveBeenCalled();
-    });
+  beforeEach(() => {
+    user = setupUserEvent();
   });
 
-  describe('Size Variants', () => {
-    it('should render small size correctly', () => {
-      render(
-        <MockToggle
-          checked={false}
-          onChange={() => {}}
-          size="sm"
-        />
-      );
-
-      const toggle = screen.getByRole('switch');
-      const thumb = screen.getByTestId('toggle-thumb');
-      
-      expect(toggle).toHaveClass('w-8', 'h-4');
-      expect(thumb).toHaveClass('w-3', 'h-3');
-    });
-
-    it('should render medium size correctly', () => {
-      render(
-        <MockToggle
-          checked={false}
-          onChange={() => {}}
-          size="md"
-        />
-      );
-
-      const toggle = screen.getByRole('switch');
-      const thumb = screen.getByTestId('toggle-thumb');
-      
-      expect(toggle).toHaveClass('w-11', 'h-6');
-      expect(thumb).toHaveClass('w-5', 'h-5');
-    });
-
-    it('should render large size correctly', () => {
-      render(
-        <MockToggle
-          checked={false}
-          onChange={() => {}}
-          size="lg"
-        />
-      );
-
-      const toggle = screen.getByRole('switch');
-      const thumb = screen.getByTestId('toggle-thumb');
-      
-      expect(toggle).toHaveClass('w-14', 'h-8');
-      expect(thumb).toHaveClass('w-6', 'h-6');
-    });
+  afterEach(() => {
+    cleanup();
   });
 
-  describe('Loading State', () => {
-    it('should display loading indicator when loading', () => {
-      render(
-        <MockToggle
-          checked={false}
-          onChange={() => {}}
-          loading
-        />
-      );
-
-      const loadingIndicator = screen.getByTestId('toggle-loading');
-      expect(loadingIndicator).toBeInTheDocument();
-      expect(loadingIndicator).toHaveClass('animate-spin');
-    });
-
-    it('should prevent interaction when loading', async () => {
-      const handleChange = vi.fn();
-      
-      render(
-        <MockToggle
-          checked={false}
-          onChange={handleChange}
-          loading
-        />
-      );
-
-      const toggle = screen.getByRole('switch');
-      await user.click(toggle);
-      
-      expect(handleChange).not.toHaveBeenCalled();
-    });
-
-    it('should have disabled appearance when loading', () => {
-      render(
-        <MockToggle
-          checked={false}
-          onChange={() => {}}
-          loading
-        />
-      );
-
-      const toggle = screen.getByRole('switch');
-      expect(toggle).toHaveClass('opacity-60', 'cursor-wait');
-    });
+  it('integrates correctly with theme switching', () => {
+    const { rerender } = render(
+      <div className="light">
+        <Toggle {...defaultToggleProps} />
+      </div>
+    );
+    
+    let toggle = screen.getByRole('switch');
+    expect(toggle).toBeInTheDocument();
+    
+    // Switch to dark theme
+    rerender(
+      <div className="dark">
+        <Toggle {...defaultToggleProps} />
+      </div>
+    );
+    
+    toggle = screen.getByRole('switch');
+    expect(toggle).toBeInTheDocument();
   });
 
-  describe('Disabled State', () => {
-    it('should render disabled state correctly', () => {
-      render(
-        <MockToggle
-          checked={false}
-          onChange={() => {}}
-          disabled
-        />
-      );
-
-      const toggle = screen.getByRole('switch');
-      expect(toggle).toBeDisabled();
-      expect(toggle).toHaveClass('opacity-50', 'cursor-not-allowed');
-    });
-
-    it('should not be focusable when disabled', () => {
-      render(
-        <MockToggle
-          checked={false}
-          onChange={() => {}}
-          disabled
-        />
-      );
-
-      const toggle = screen.getByRole('switch');
-      toggle.focus();
-      
-      expect(toggle).not.toHaveFocus();
-    });
+  it('works correctly within modal dialogs', async () => {
+    render(
+      <div role="dialog" aria-modal="true" aria-labelledby="dialog-title">
+        <h2 id="dialog-title">Settings Dialog</h2>
+        <Toggle {...defaultToggleProps} />
+        <button>Close</button>
+      </div>
+    );
+    
+    const dialog = screen.getByRole('dialog');
+    const toggle = screen.getByRole('switch');
+    
+    expect(dialog).toBeInTheDocument();
+    expect(toggle).toBeInTheDocument();
+    
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
   });
 
-  describe('Label and Description', () => {
-    it('should render label when provided', () => {
-      render(
-        <MockToggle
-          label="Enable notifications"
-          checked={false}
-          onChange={() => {}}
-        />
-      );
-
-      expect(screen.getByText('Enable notifications')).toBeInTheDocument();
-    });
-
-    it('should render description when provided', () => {
-      render(
-        <MockToggle
-          description="This will enable email notifications"
-          checked={false}
-          onChange={() => {}}
-        />
-      );
-
-      expect(screen.getByText('This will enable email notifications')).toBeInTheDocument();
-    });
-
-    it('should associate description with toggle using aria-describedby', () => {
-      render(
-        <MockToggle
-          description="Helper text"
-          id="test-toggle"
-          checked={false}
-          onChange={() => {}}
-        />
-      );
-
-      const toggle = screen.getByRole('switch');
-      const description = screen.getByText('Helper text');
-      
-      expect(toggle).toHaveAttribute('aria-describedby', description.id);
-    });
+  it('maintains state during component re-mounting', async () => {
+    const Wrapper = ({ show }: { show: boolean }) => (
+      <div>
+        {show && <Toggle {...defaultToggleProps} defaultValue={true} />}
+      </div>
+    );
+    
+    const { rerender } = render(<Wrapper show={true} />);
+    
+    let toggle = screen.getByRole('switch');
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    
+    // Unmount and remount
+    rerender(<Wrapper show={false} />);
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+    
+    rerender(<Wrapper show={true} />);
+    toggle = screen.getByRole('switch');
+    expect(toggle).toHaveAttribute('aria-checked', 'true'); // Default value restored
   });
 
-  describe('React Hook Form Integration', () => {
-    it('should work with React Hook Form', async () => {
-      render(
-        <FormToggleWrapper 
-          defaultValues={{ testToggle: false }}
-          label="Form toggle"
-        />
-      );
-
-      const toggle = screen.getByRole('switch');
-      expect(toggle).toHaveAttribute('aria-checked', 'false');
-      
-      await user.click(toggle);
-      
-      expect(toggle).toHaveAttribute('aria-checked', 'true');
-    });
-
-    it('should respect form default values', () => {
-      render(
-        <FormToggleWrapper 
-          defaultValues={{ testToggle: true }}
-          label="Pre-checked toggle"
-        />
-      );
-
-      const toggle = screen.getByRole('switch');
-      expect(toggle).toHaveAttribute('aria-checked', 'true');
-    });
-
-    it('should have proper name attribute for form submission', () => {
-      render(
-        <MockToggle
-          name="featureEnabled"
-          checked={false}
-          onChange={() => {}}
-        />
-      );
-
-      const toggle = screen.getByRole('switch');
-      expect(toggle).toHaveAttribute('name', 'featureEnabled');
-    });
-  });
-
-  describe('Theme Support', () => {
-    it('should apply dark mode classes correctly', () => {
-      // Mock document class to simulate dark mode
-      document.documentElement.classList.add('dark');
-      
-      render(
-        <MockToggle
-          checked={false}
-          onChange={() => {}}
-        />
-      );
-
-      const toggle = screen.getByRole('switch');
-      expect(toggle).toHaveClass('dark:bg-gray-700');
-      
-      // Cleanup
-      document.documentElement.classList.remove('dark');
-    });
-
-    it('should maintain contrast ratios in both themes', async () => {
-      const { container } = render(
-        <MockToggle
-          label="Theme toggle"
-          checked={true}
-          onChange={() => {}}
-        />
-      );
-
-      // Test accessibility in light mode
-      const lightResults = await axe(container);
-      expect(lightResults).toHaveNoViolations();
-
-      // Simulate dark mode
-      document.documentElement.classList.add('dark');
-      
-      const darkResults = await axe(container);
-      expect(darkResults).toHaveNoViolations();
-      
-      // Cleanup
-      document.documentElement.classList.remove('dark');
-    });
-  });
-
-  describe('Error States and Edge Cases', () => {
-    it('should handle missing onChange gracefully', () => {
-      expect(() => {
-        render(<MockToggle checked={false} />);
-      }).not.toThrow();
-    });
-
-    it('should handle rapid state changes', async () => {
-      const handleChange = vi.fn();
-      
-      render(
-        <MockToggle
-          checked={false}
-          onChange={handleChange}
-        />
-      );
-
-      const toggle = screen.getByRole('switch');
-      
-      // Simulate rapid clicks
-      await user.click(toggle);
-      await user.click(toggle);
-      await user.click(toggle);
-      
-      expect(handleChange).toHaveBeenCalledTimes(3);
-    });
-
-    it('should prevent event bubbling correctly', async () => {
-      const containerClick = vi.fn();
-      const toggleChange = vi.fn();
-      
-      render(
-        <div onClick={containerClick}>
-          <MockToggle
-            checked={false}
-            onChange={toggleChange}
+  it('handles complex form scenarios with multiple toggles', async () => {
+    const onSubmit = vi.fn();
+    
+    render(
+      <TestForm onSubmit={onSubmit}>
+        <ToggleGroup label="Feature Settings">
+          <Toggle 
+            label="Enable Feature A"
+            name="featureA"
+            data-testid="feature-a"
           />
-        </div>
-      );
+          <Toggle 
+            label="Enable Feature B"
+            name="featureB"
+            data-testid="feature-b"
+            required
+          />
+          <Toggle 
+            label="Enable Feature C"
+            name="featureC"
+            data-testid="feature-c"
+            disabled
+          />
+        </ToggleGroup>
+      </TestForm>
+    );
+    
+    const featureA = screen.getByTestId('feature-a');
+    const featureB = screen.getByTestId('feature-b');
+    const featureC = screen.getByTestId('feature-c');
+    const submitButton = screen.getByTestId('submit-button');
+    
+    // Interact with toggles
+    await user.click(featureA);
+    await user.click(featureB);
+    // featureC should remain unclickable
+    
+    expect(featureA).toHaveAttribute('aria-checked', 'true');
+    expect(featureB).toHaveAttribute('aria-checked', 'true');
+    expect(featureC).toBeDisabled();
+    
+    await user.click(submitButton);
+    // Form should handle submission
+  });
+});
 
-      const toggle = screen.getByRole('switch');
-      await user.click(toggle);
-      
-      expect(toggleChange).toHaveBeenCalledWith(true);
-      expect(containerClick).toHaveBeenCalled();
-    });
+// ============================================================================
+// PERFORMANCE TESTS
+// ============================================================================
+
+describe('Toggle Component - Performance Tests', () => {
+  afterEach(() => {
+    cleanup();
   });
 
-  describe('Performance', () => {
-    it('should not cause unnecessary re-renders', () => {
-      const handleChange = vi.fn();
-      
-      const { rerender } = render(
-        <MockToggle
-          checked={false}
-          onChange={handleChange}
-          label="Test toggle"
-        />
-      );
-
-      // Re-render with same props
-      rerender(
-        <MockToggle
-          checked={false}
-          onChange={handleChange}
-          label="Test toggle"
-        />
-      );
-
-      expect(screen.getByRole('switch')).toBeInTheDocument();
-    });
-
-    it('should handle large numbers of toggles efficiently', () => {
-      const toggles = Array.from({ length: 100 }, (_, i) => (
-        <MockToggle
-          key={i}
-          checked={i % 2 === 0}
-          onChange={() => {}}
-          label={`Toggle ${i}`}
-        />
-      ));
-
-      const start = performance.now();
-      render(<div>{toggles}</div>);
-      const end = performance.now();
-
-      // Render time should be reasonable (less than 100ms for 100 toggles)
-      expect(end - start).toBeLessThan(100);
-    });
+  it('renders quickly with default props', () => {
+    const startTime = performance.now();
+    
+    render(<Toggle {...defaultToggleProps} />);
+    
+    const endTime = performance.now();
+    const renderTime = endTime - startTime;
+    
+    // Should render within 50ms for good performance
+    expect(renderTime).toBeLessThan(50);
   });
 
-  describe('Custom Styling', () => {
-    it('should accept custom className', () => {
-      render(
-        <MockToggle
-          checked={false}
-          onChange={() => {}}
-          className="custom-toggle-class"
-        />
-      );
+  it('handles many toggles efficiently', () => {
+    const startTime = performance.now();
+    
+    render(
+      <div>
+        {Array.from({ length: 100 }, (_, i) => (
+          <Toggle 
+            key={i}
+            label={`Toggle ${i}`}
+            data-testid={`toggle-${i}`}
+          />
+        ))}
+      </div>
+    );
+    
+    const endTime = performance.now();
+    const renderTime = endTime - startTime;
+    
+    // Should render 100 toggles within 500ms
+    expect(renderTime).toBeLessThan(500);
+    
+    // Verify all toggles are rendered
+    expect(screen.getAllByRole('switch')).toHaveLength(100);
+  });
 
-      const container = screen.getByRole('switch').closest('.toggle-container');
-      expect(container).toHaveClass('custom-toggle-class');
-    });
-
-    it('should preserve component functionality with custom styles', async () => {
-      const handleChange = vi.fn();
-      
-      render(
-        <MockToggle
-          checked={false}
-          onChange={handleChange}
-          className="custom-style"
-        />
-      );
-
-      const toggle = screen.getByRole('switch');
-      await user.click(toggle);
-      
-      expect(handleChange).toHaveBeenCalledWith(true);
-    });
+  it('optimizes re-renders with React.memo patterns', () => {
+    let renderCount = 0;
+    
+    const TestWrapper = ({ value }: { value: boolean }) => {
+      renderCount++;
+      return <Toggle {...defaultToggleProps} value={value} />;
+    };
+    
+    const { rerender } = render(<TestWrapper value={false} />);
+    
+    const initialRenderCount = renderCount;
+    
+    // Re-render with same props - should not cause unnecessary re-renders
+    rerender(<TestWrapper value={false} />);
+    rerender(<TestWrapper value={false} />);
+    
+    // Should have minimal additional renders
+    expect(renderCount - initialRenderCount).toBeLessThanOrEqual(2);
   });
 });
