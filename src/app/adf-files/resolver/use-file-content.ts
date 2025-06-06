@@ -1,361 +1,483 @@
 /**
- * File Content Hook for React/Next.js DreamFactory Admin Interface
+ * React Query-based file content hook for DreamFactory admin interface.
  * 
- * React Query-based custom hook that downloads file content and converts Blob responses 
- * to UTF-8 text with intelligent caching and streaming support. Replaces the Angular 
- * fileResolver by implementing React Query useQuery with downloadFile operations followed 
+ * Downloads file content and converts Blob responses to UTF-8 text with 
+ * intelligent caching and streaming support. Replaces Angular fileResolver 
+ * by implementing React Query useQuery with downloadFile operations followed 
  * by readAsText conversion.
  * 
- * Key Features:
- * - React Query useQuery hook replacing Angular ResolveFn fileResolver
- * - Blob to UTF-8 text conversion using select function for data transformation
- * - TTL configuration optimized for file content caching with longer staleTime
- * - Enhanced error handling for large file operations and network failures
- * - Next.js streaming API route support for file downloads
- * - Background synchronization and intelligent cache invalidation
+ * Features:
+ * - Optimized file content retrieval with background synchronization
+ * - Error handling for large file operations
+ * - TTL configuration optimized for file content caching
+ * - Next.js streaming support for enhanced performance
+ * - Blob to text transformation using React Query select functions
  * 
- * Migration Notes:
- * - Converts RxJS switchMap and readAsText pipeline to React Query select function
- * - Replaces Angular DI BASE_SERVICE_TOKEN injection with React Query-powered API client
- * - Transforms Angular route parameters (type, entity) to hook parameters
- * - Maintains equivalent functionality for file content download and text conversion
- * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
- * @implements F-008: File and Log Management feature per Section 2.1 Feature Catalog
+ * @fileoverview File content downloading and text conversion hook
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-import { useQuery, UseQueryOptions } from '@tanstack/react-query'
-import { apiClient } from '../../../lib/api-client'
-import { readAsText } from '../../../lib/file-utils'
+import { useQuery, type UseQueryOptions } from '@tanstack/react-query';
+import { apiRequest } from '../../../lib/api-client';
 
-// =============================================================================
-// TYPE DEFINITIONS AND INTERFACES
-// =============================================================================
+// ============================================================================
+// Types and Interfaces
+// ============================================================================
 
 /**
- * File content download parameters
- * Replaces Angular ActivatedRouteSnapshot paramMap and data access
+ * File content query parameters
  */
 export interface FileContentParams {
-  /** File service type from route data */
-  type: string
-  /** Entity/file identifier from route parameters */
-  entity: string
+  /** File service name */
+  serviceName: string;
+  /** File path within the service */
+  filePath: string;
+  /** Container or folder path */
+  container?: string;
+  /** Download options */
+  options?: {
+    /** Force download as attachment */
+    asAttachment?: boolean;
+    /** Content type override */
+    contentType?: string;
+    /** File encoding for text conversion */
+    encoding?: 'utf-8' | 'ascii' | 'base64';
+  };
 }
 
 /**
- * File content query configuration options
- * Extends React Query options with file-specific optimizations
+ * File content response structure
  */
-export interface FileContentQueryOptions extends Omit<UseQueryOptions<string, Error>, 'queryKey' | 'queryFn' | 'select'> {
-  /** Enable/disable the query based on parameters availability */
-  enabled?: boolean
-  /** Custom stale time for file content caching (default: 10 minutes) */
-  staleTime?: number
-  /** Custom cache time for file content retention (default: 30 minutes) */
-  cacheTime?: number
-  /** Force refetch on window focus for real-time file updates */
-  refetchOnWindowFocus?: boolean
-  /** Background refetch interval for file content synchronization */
-  refetchInterval?: number | false
+export interface FileContentResponse {
+  /** Original file content as Blob */
+  blob: Blob;
+  /** Converted text content */
+  textContent: string;
+  /** File metadata */
+  metadata: {
+    size: number;
+    type: string;
+    lastModified?: number;
+    encoding: string;
+  };
 }
 
 /**
- * File content query result interface
- * Provides file content string with React Query state management
+ * File download API response
  */
-export interface FileContentQueryResult {
-  /** File content as UTF-8 string */
-  data: string | undefined
-  /** Loading state indicator */
-  isLoading: boolean
-  /** Error state with detailed error information */
-  error: Error | null
-  /** Success state indicator */
-  isSuccess: boolean
-  /** Initial loading state */
-  isInitialLoading: boolean
-  /** Background refetching indicator */
-  isFetching: boolean
-  /** Refetch function for manual content refresh */
-  refetch: () => Promise<any>
-  /** Query status for advanced state management */
-  status: 'idle' | 'loading' | 'error' | 'success'
-}
-
-// =============================================================================
-// UTILITY FUNCTIONS
-// =============================================================================
-
-/**
- * Generate React Query cache key for file content
- * Ensures proper cache invalidation and isolation between different files
- * 
- * @param type - File service type
- * @param entity - File entity identifier
- * @returns Array cache key for React Query
- */
-const getFileContentQueryKey = (type: string, entity: string): [string, string, string] => {
-  return ['file-content', type, entity]
+interface FileDownloadResponse {
+  content: Blob;
+  headers: Record<string, string>;
+  status: number;
 }
 
 /**
- * Validate file content parameters
- * Ensures required parameters are provided and valid
- * 
- * @param params - File content parameters to validate
- * @returns Boolean indicating parameter validity
+ * Hook configuration options
  */
-const validateFileContentParams = (params: FileContentParams): boolean => {
-  return Boolean(
-    params.type && 
-    params.entity && 
-    typeof params.type === 'string' && 
-    typeof params.entity === 'string' &&
-    params.type.trim().length > 0 &&
-    params.entity.trim().length > 0
-  )
+export interface UseFileContentOptions extends Omit<UseQueryOptions<FileContentResponse>, 'queryKey' | 'queryFn' | 'select'> {
+  /** Enable automatic refetching on file changes */
+  enableAutoRefetch?: boolean;
+  /** Custom stale time for static content (default: 5 minutes) */
+  staleTimeMinutes?: number;
+  /** Cache time for file content (default: 10 minutes) */
+  cacheTimeMinutes?: number;
+  /** Maximum file size for text conversion (default: 10MB) */
+  maxFileSizeBytes?: number;
+  /** Text encoding for conversion */
+  textEncoding?: 'utf-8' | 'ascii' | 'latin1';
+}
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+/**
+ * Default configuration values
+ */
+const DEFAULT_CONFIG = {
+  STALE_TIME_MINUTES: 5,
+  CACHE_TIME_MINUTES: 10,
+  MAX_FILE_SIZE_BYTES: 10 * 1024 * 1024, // 10MB
+  TEXT_ENCODING: 'utf-8' as const,
+  QUERY_KEY_PREFIX: 'file-content',
+} as const;
+
+/**
+ * Supported text file MIME types for automatic conversion
+ */
+const TEXT_MIME_TYPES = [
+  'text/plain',
+  'text/html',
+  'text/css',
+  'text/javascript',
+  'text/xml',
+  'application/json',
+  'application/xml',
+  'application/javascript',
+  'application/x-yaml',
+  'application/yaml',
+] as const;
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
+/**
+ * Build file download URL with proper query parameters
+ */
+function buildFileDownloadUrl(params: FileContentParams): string {
+  const { serviceName, filePath, container, options } = params;
+  
+  // Build base path
+  let path = `/api/v2/${serviceName}`;
+  
+  // Add container if specified
+  if (container) {
+    path += `/${encodeURIComponent(container)}`;
+  }
+  
+  // Add file path
+  path += `/${encodeURIComponent(filePath)}`;
+  
+  // Add query parameters
+  const searchParams = new URLSearchParams();
+  
+  if (options?.asAttachment) {
+    searchParams.append('download', 'true');
+  }
+  
+  if (options?.contentType) {
+    searchParams.append('content_type', options.contentType);
+  }
+  
+  const queryString = searchParams.toString();
+  return queryString ? `${path}?${queryString}` : path;
 }
 
 /**
- * Download file and convert to text
- * Core file content fetching logic with proper error handling
- * 
- * @param type - File service type
- * @param entity - File entity identifier
- * @returns Promise resolving to file content as UTF-8 string
+ * Generate consistent query key for file content
  */
-const downloadFileContent = async (type: string, entity: string): Promise<string> => {
-  try {
-    // Construct file download path matching Angular fileResolver pattern
-    const filePath = `${type}/${entity}`
+function generateQueryKey(params: FileContentParams): string[] {
+  const { serviceName, filePath, container, options } = params;
+  
+  const baseKey = [
+    DEFAULT_CONFIG.QUERY_KEY_PREFIX,
+    serviceName,
+    container || 'root',
+    filePath,
+  ];
+  
+  // Include relevant options in key for cache invalidation
+  if (options) {
+    const optionsKey = Object.entries(options)
+      .filter(([, value]) => value !== undefined)
+      .map(([key, value]) => `${key}:${value}`)
+      .join(',');
     
-    // Use API client to download file as Blob
-    // This replaces Angular DfBaseCrudService.downloadFile() call
-    const response = await fetch(`/api/v2/${filePath}`, {
+    if (optionsKey) {
+      baseKey.push(optionsKey);
+    }
+  }
+  
+  return baseKey;
+}
+
+/**
+ * Download file content as Blob with streaming support
+ */
+async function downloadFileContent(params: FileContentParams): Promise<FileDownloadResponse> {
+  const url = buildFileDownloadUrl(params);
+  
+  try {
+    const response = await fetch(url, {
       method: 'GET',
+      credentials: 'include',
       headers: {
         'Accept': '*/*',
-        // Authentication headers will be added by API client middleware
+        'Cache-Control': 'no-cache, private',
       },
-    })
-
+    });
+    
     if (!response.ok) {
-      throw new Error(`Failed to download file: ${response.status} ${response.statusText}`)
+      const errorText = await response.text().catch(() => 'Unknown error');
+      throw new Error(
+        `Failed to download file: HTTP ${response.status} - ${errorText}`
+      );
     }
-
-    // Get response as Blob for binary file handling
-    const blob = await response.blob()
     
-    // Convert Blob to UTF-8 text string
-    // This replaces the RxJS switchMap(res => readAsText(res as Blob)) pipeline
-    const textContent = await readAsText(blob)
+    // Extract headers
+    const headers: Record<string, string> = {};
+    response.headers.forEach((value, key) => {
+      headers[key] = value;
+    });
     
-    return textContent
+    // Get content as Blob for streaming support
+    const blob = await response.blob();
+    
+    return {
+      content: blob,
+      headers,
+      status: response.status,
+    };
   } catch (error) {
-    // Enhanced error handling for file operations
     if (error instanceof Error) {
-      throw new Error(`File content download failed: ${error.message}`)
+      throw new Error(`File download failed: ${error.message}`);
     }
-    throw new Error('Unknown error occurred during file content download')
+    throw new Error('File download failed due to network error');
   }
 }
 
-// =============================================================================
-// MAIN HOOK IMPLEMENTATION
-// =============================================================================
+/**
+ * Convert Blob to text with proper encoding handling
+ */
+async function convertBlobToText(
+  blob: Blob,
+  encoding: string = DEFAULT_CONFIG.TEXT_ENCODING,
+  maxSize: number = DEFAULT_CONFIG.MAX_FILE_SIZE_BYTES
+): Promise<string> {
+  // Check file size limit
+  if (blob.size > maxSize) {
+    throw new Error(
+      `File too large for text conversion: ${blob.size} bytes (max: ${maxSize} bytes)`
+    );
+  }
+  
+  // Check if MIME type indicates text content
+  const isTextType = TEXT_MIME_TYPES.some(type => blob.type.includes(type));
+  
+  if (!isTextType && blob.type && !blob.type.startsWith('text/')) {
+    throw new Error(
+      `Cannot convert binary file to text: ${blob.type || 'unknown type'}`
+    );
+  }
+  
+  try {
+    // Use FileReader for proper encoding support
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          resolve(reader.result);
+        } else {
+          reject(new Error('Failed to read file as text'));
+        }
+      };
+      
+      reader.onerror = () => {
+        reject(new Error(`File reading failed: ${reader.error?.message || 'Unknown error'}`));
+      };
+      
+      // Read as text with specified encoding
+      reader.readAsText(blob, encoding);
+    });
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(`Text conversion failed: ${error.message}`);
+    }
+    throw new Error('Text conversion failed due to unknown error');
+  }
+}
 
 /**
- * React Query-based file content hook
+ * Transform download response to file content with text conversion
+ */
+async function transformToFileContent(
+  downloadResponse: FileDownloadResponse,
+  encoding: string = DEFAULT_CONFIG.TEXT_ENCODING,
+  maxSize: number = DEFAULT_CONFIG.MAX_FILE_SIZE_BYTES
+): Promise<FileContentResponse> {
+  const { content: blob, headers } = downloadResponse;
+  
+  try {
+    // Convert blob to text
+    const textContent = await convertBlobToText(blob, encoding, maxSize);
+    
+    // Extract metadata from blob and headers
+    const metadata = {
+      size: blob.size,
+      type: blob.type || headers['content-type'] || 'application/octet-stream',
+      lastModified: headers['last-modified'] 
+        ? new Date(headers['last-modified']).getTime() 
+        : undefined,
+      encoding,
+    };
+    
+    return {
+      blob,
+      textContent,
+      metadata,
+    };
+  } catch (error) {
+    // If text conversion fails, still return blob with error info
+    const metadata = {
+      size: blob.size,
+      type: blob.type || headers['content-type'] || 'application/octet-stream',
+      lastModified: headers['last-modified'] 
+        ? new Date(headers['last-modified']).getTime() 
+        : undefined,
+      encoding,
+    };
+    
+    throw new Error(
+      `File content processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+  }
+}
+
+// ============================================================================
+// Main Hook Implementation
+// ============================================================================
+
+/**
+ * React Query hook for downloading and converting file content to text.
  * 
- * Downloads file content and converts Blob responses to UTF-8 text with intelligent 
- * caching and streaming support. Replaces Angular fileResolver with React Query 
- * patterns for enhanced performance and better developer experience.
+ * Provides intelligent caching, background synchronization, and error handling
+ * for file operations. Optimized for DreamFactory file service integration.
  * 
- * Key Features:
- * - Intelligent caching with configurable TTL for static file content
- * - Background synchronization for file content updates
- * - Optimistic caching with stale-while-revalidate semantics
- * - Enhanced error handling with automatic retry capabilities
- * - Next.js streaming support for large file operations
- * - TypeScript type safety with proper error boundaries
- * 
- * Cache Configuration:
- * - Default staleTime: 10 minutes (longer than typical API data)
- * - Default cacheTime: 30 minutes (extended retention for file content)
- * - Background refetching disabled by default (files are typically static)
- * - Refetch on window focus disabled (prevents unnecessary downloads)
- * 
- * Performance Optimizations:
- * - React Query select function for Blob to text transformation
- * - Automatic query deduplication for concurrent requests
- * - Intelligent cache invalidation based on file path changes
- * - Memory-efficient Blob handling with proper cleanup
- * 
- * @param params - File content parameters (type and entity)
- * @param options - Additional React Query configuration options
- * @returns File content query result with loading states and data
+ * @param params - File content parameters including service, path, and options
+ * @param options - Hook configuration options for caching and behavior
+ * @returns React Query result with file content, loading state, and error handling
  * 
  * @example
- * ```typescript
- * const { data: fileContent, isLoading, error } = useFileContent({
- *   type: 'logs',
- *   entity: 'application.log'
- * })
+ * ```tsx
+ * const { data, isLoading, error } = useFileContent(
+ *   {
+ *     serviceName: 'files',
+ *     filePath: 'logs/application.log',
+ *     container: 'system',
+ *   },
+ *   {
+ *     staleTimeMinutes: 2, // Refresh every 2 minutes for logs
+ *     maxFileSizeBytes: 5 * 1024 * 1024, // 5MB limit
+ *   }
+ * );
  * 
- * if (isLoading) return <div>Loading file...</div>
- * if (error) return <div>Error: {error.message}</div>
- * if (fileContent) return <pre>{fileContent}</pre>
- * ```
- * 
- * @example
- * ```typescript
- * // With custom caching configuration
- * const { data: logContent } = useFileContent({
- *   type: 'logs',
- *   entity: 'debug.log'
- * }, {
- *   staleTime: 5 * 60 * 1000, // 5 minutes for log files
- *   refetchInterval: 30 * 1000, // Auto-refresh every 30 seconds
- *   refetchOnWindowFocus: true // Refresh when user returns to tab
- * })
+ * if (data) {
+ *   console.log('File content:', data.textContent);
+ *   console.log('File size:', data.metadata.size);
+ * }
  * ```
  */
-export const useFileContent = (
+export function useFileContent(
   params: FileContentParams,
-  options: FileContentQueryOptions = {}
-): FileContentQueryResult => {
-  // Validate input parameters
-  const isValidParams = validateFileContentParams(params)
-  
-  // Extract configuration options with optimized defaults for file content
+  options: UseFileContentOptions = {}
+) {
   const {
-    enabled = isValidParams,
-    staleTime = 10 * 60 * 1000, // 10 minutes - longer for static file content
-    cacheTime = 30 * 60 * 1000, // 30 minutes - extended retention
-    refetchOnWindowFocus = false, // Disabled to prevent unnecessary downloads
-    refetchInterval = false, // Disabled by default - files are typically static
-    ...restOptions
-  } = options
-
-  // React Query implementation replacing Angular fileResolver
-  const queryResult = useQuery({
-    // Generate unique cache key for this file
-    queryKey: getFileContentQueryKey(params.type, params.entity),
-    
-    // Core file download and text conversion logic
-    queryFn: () => downloadFileContent(params.type, params.entity),
-    
-    // React Query configuration optimized for file content
-    enabled,
+    enableAutoRefetch = false,
+    staleTimeMinutes = DEFAULT_CONFIG.STALE_TIME_MINUTES,
+    cacheTimeMinutes = DEFAULT_CONFIG.CACHE_TIME_MINUTES,
+    maxFileSizeBytes = DEFAULT_CONFIG.MAX_FILE_SIZE_BYTES,
+    textEncoding = DEFAULT_CONFIG.TEXT_ENCODING,
+    ...queryOptions
+  } = options;
+  
+  // Generate consistent query key
+  const queryKey = generateQueryKey(params);
+  
+  // Calculate cache times in milliseconds
+  const staleTime = staleTimeMinutes * 60 * 1000;
+  const cacheTime = cacheTimeMinutes * 60 * 1000;
+  
+  return useQuery({
+    queryKey,
+    queryFn: async (): Promise<FileContentResponse> => {
+      // Download file content
+      const downloadResponse = await downloadFileContent(params);
+      
+      // Transform to file content with text conversion
+      return transformToFileContent(
+        downloadResponse,
+        textEncoding,
+        maxFileSizeBytes
+      );
+    },
     staleTime,
     cacheTime,
-    refetchOnWindowFocus,
-    refetchInterval,
-    
-    // Enhanced error handling with retry logic
+    enabled: !!(params.serviceName && params.filePath),
+    refetchOnWindowFocus: enableAutoRefetch,
+    refetchOnReconnect: enableAutoRefetch,
     retry: (failureCount, error) => {
-      // Don't retry on authentication errors (401, 403)
-      if (error instanceof Error && error.message.includes('401')) return false
-      if (error instanceof Error && error.message.includes('403')) return false
+      // Don't retry for client errors (4xx)
+      if (error instanceof Error && error.message.includes('HTTP 4')) {
+        return false;
+      }
       
-      // Retry up to 3 times for network errors
-      return failureCount < 3
+      // Retry up to 2 times for network errors
+      return failureCount < 2;
     },
-    
-    // Retry delay with exponential backoff
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-    
-    // Additional React Query options
-    ...restOptions
-  })
-
-  // Return properly typed result interface
-  return {
-    data: queryResult.data,
-    isLoading: queryResult.isLoading,
-    error: queryResult.error,
-    isSuccess: queryResult.isSuccess,
-    isInitialLoading: queryResult.isInitialLoading,
-    isFetching: queryResult.isFetching,
-    refetch: queryResult.refetch,
-    status: queryResult.status
-  }
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
+    ...queryOptions,
+  });
 }
 
-// =============================================================================
-// ADDITIONAL UTILITIES AND EXPORTS
-// =============================================================================
+// ============================================================================
+// Additional Utility Hooks
+// ============================================================================
 
 /**
- * Query key factory for file content operations
- * Useful for manual cache invalidation and management
+ * Hook for downloading file content without text conversion.
+ * Useful for binary files or when only the Blob is needed.
  */
-export const fileContentQueryKeys = {
-  /** All file content queries */
-  all: ['file-content'] as const,
-  
-  /** All file content for a specific service type */
-  type: (type: string) => ['file-content', type] as const,
-  
-  /** Specific file content query */
-  content: (type: string, entity: string) => ['file-content', type, entity] as const,
-}
-
-/**
- * Pre-fetch file content utility
- * Allows pre-loading file content for improved user experience
- * 
- * @param queryClient - React Query client instance
- * @param params - File content parameters
- * @param options - Pre-fetch options
- */
-export const prefetchFileContent = async (
-  queryClient: any, // QueryClient type from @tanstack/react-query
+export function useFileDownload(
   params: FileContentParams,
-  options: FileContentQueryOptions = {}
-) => {
-  if (!validateFileContentParams(params)) {
-    throw new Error('Invalid file content parameters for prefetch')
-  }
-
-  return queryClient.prefetchQuery({
-    queryKey: getFileContentQueryKey(params.type, params.entity),
-    queryFn: () => downloadFileContent(params.type, params.entity),
-    staleTime: options.staleTime || 10 * 60 * 1000,
-    cacheTime: options.cacheTime || 30 * 60 * 1000,
-  })
+  options: UseFileContentOptions = {}
+) {
+  const queryKey = [...generateQueryKey(params), 'blob-only'];
+  
+  const {
+    staleTimeMinutes = DEFAULT_CONFIG.STALE_TIME_MINUTES,
+    cacheTimeMinutes = DEFAULT_CONFIG.CACHE_TIME_MINUTES,
+    ...queryOptions
+  } = options;
+  
+  return useQuery({
+    queryKey,
+    queryFn: () => downloadFileContent(params),
+    staleTime: staleTimeMinutes * 60 * 1000,
+    cacheTime: cacheTimeMinutes * 60 * 1000,
+    enabled: !!(params.serviceName && params.filePath),
+    ...queryOptions,
+  });
 }
 
 /**
- * Invalidate file content cache utility
- * Force refresh of file content cache for specific files or all files
- * 
- * @param queryClient - React Query client instance
- * @param params - Optional parameters to invalidate specific files
+ * Prefetch file content for improved user experience.
+ * Useful for preloading files that users are likely to access.
  */
-export const invalidateFileContent = async (
-  queryClient: any, // QueryClient type from @tanstack/react-query
-  params?: Partial<FileContentParams>
-) => {
-  if (params?.type && params?.entity) {
-    // Invalidate specific file
-    return queryClient.invalidateQueries({
-      queryKey: getFileContentQueryKey(params.type, params.entity)
-    })
-  } else if (params?.type) {
-    // Invalidate all files for service type
-    return queryClient.invalidateQueries({
-      queryKey: fileContentQueryKeys.type(params.type)
-    })
-  } else {
-    // Invalidate all file content
-    return queryClient.invalidateQueries({
-      queryKey: fileContentQueryKeys.all
-    })
-  }
+export function usePrefetchFileContent() {
+  const { prefetchQuery } = useQuery.context || {};
+  
+  return (
+    params: FileContentParams,
+    options: UseFileContentOptions = {}
+  ) => {
+    if (!prefetchQuery) {
+      console.warn('Prefetch not available in current context');
+      return;
+    }
+    
+    const queryKey = generateQueryKey(params);
+    const staleTime = (options.staleTimeMinutes || DEFAULT_CONFIG.STALE_TIME_MINUTES) * 60 * 1000;
+    
+    return prefetchQuery({
+      queryKey,
+      queryFn: async () => {
+        const downloadResponse = await downloadFileContent(params);
+        return transformToFileContent(
+          downloadResponse,
+          options.textEncoding || DEFAULT_CONFIG.TEXT_ENCODING,
+          options.maxFileSizeBytes || DEFAULT_CONFIG.MAX_FILE_SIZE_BYTES
+        );
+      },
+      staleTime,
+    });
+  };
 }
 
-// Export hook as default for convenient importing
-export default useFileContent
+// ============================================================================
+// Default Export
+// ============================================================================
+
+export default useFileContent;
