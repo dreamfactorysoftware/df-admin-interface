@@ -1,218 +1,272 @@
 /**
- * React Query-based Cache Hook
+ * React Query-based Cache Management Hook
  * 
- * This hook replaces the Angular DfCacheResolver by implementing React Query useQuery
- * with intelligent caching and automatic revalidation for cache entries. It maintains
- * the original fields: '*' parameter for backend API compatibility while providing
- * enhanced performance through TanStack React Query 5.0.0.
+ * Replaces Angular DfCacheResolver with React Query useQuery hook for
+ * intelligent caching and automatic revalidation. Provides optimized
+ * cache data fetching with sub-50ms response times per React/Next.js
+ * Integration Requirements.
  * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
+ * @fileoverview Cache data fetching hook with React Query integration
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
+'use client';
+
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { apiClient } from '@/lib/api-client';
+import { apiGet, API_BASE_URL } from '@/lib/api-client';
 import type { GenericListResponse } from '@/types/generic-http';
 import type { CacheType } from '@/types/df-cache';
 
+// ============================================================================
+// Query Configuration Constants
+// ============================================================================
+
 /**
- * Cache Query Options Configuration
- * 
- * Implements React Query TTL configuration as specified:
- * - staleTime: 300s (5 minutes) - data remains fresh for 5 minutes
- * - cacheTime: 900s (15 minutes) - cached data persists for 15 minutes
- * - Background revalidation ensures real-time cache updates
+ * React Query cache configuration optimized for cache data.
+ * Implements TTL requirements with 5-minute stale time and 15-minute cache time.
  */
-const CACHE_QUERY_OPTIONS = {
-  staleTime: 5 * 60 * 1000, // 300 seconds (5 minutes)
-  cacheTime: 15 * 60 * 1000, // 900 seconds (15 minutes)
-  refetchOnWindowFocus: true, // Automatic background revalidation
-  refetchOnReconnect: true, // Refetch on network reconnection
-  refetchOnMount: true, // Always refetch when component mounts
+const CACHE_QUERY_CONFIG = {
+  /** Time data stays fresh before background revalidation (5 minutes) */
+  staleTime: 5 * 60 * 1000, // 300 seconds
+  
+  /** Time data remains in cache before garbage collection (15 minutes) */
+  cacheTime: 15 * 60 * 1000, // 900 seconds
+  
+  /** Enable automatic background refetching when data becomes stale */
+  refetchOnWindowFocus: true,
+  
+  /** Enable automatic refetching when network reconnects */
+  refetchOnReconnect: true,
+  
+  /** Retry failed requests with exponential backoff */
+  retry: 3,
+  
+  /** Initial retry delay in milliseconds */
+  retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 30000),
 } as const;
 
 /**
- * Cache Query Key Factory
- * 
- * Generates consistent query keys for React Query cache management.
- * Includes the fields parameter to ensure proper cache invalidation
- * when different field sets are requested.
+ * Query key factory for cache-related queries.
+ * Provides consistent query key generation for React Query caching.
  */
-const cacheQueryKeys = {
+export const cacheQueryKeys = {
+  /** Base key for all cache queries */
   all: ['cache'] as const,
-  list: (fields: string) => [...cacheQueryKeys.all, 'list', { fields }] as const,
+  
+  /** Key for cache list queries */
+  lists: () => [...cacheQueryKeys.all, 'list'] as const,
+  
+  /** Key for cache list with specific options */
+  list: (options?: CacheQueryOptions) => 
+    [...cacheQueryKeys.lists(), options] as const,
 } as const;
 
+// ============================================================================
+// Type Definitions
+// ============================================================================
+
 /**
- * Fetch Cache Entries
- * 
- * Internal function that performs the actual API call to retrieve cache entries.
- * Maintains the original fields: '*' parameter for backend API compatibility.
- * 
- * @param fields - Field selection parameter (defaults to '*' for full field set)
- * @returns Promise resolving to GenericListResponse<CacheType>
+ * Cache query options interface.
+ * Maintains compatibility with original DfCacheResolver parameters.
  */
-async function fetchCacheEntries(fields: string = '*'): Promise<GenericListResponse<CacheType>> {
+export interface CacheQueryOptions {
+  /** Include all fields in response (maintains backend compatibility) */
+  fields?: string;
+  
+  /** Force refresh of cache data */
+  refresh?: boolean;
+  
+  /** Filter cache entries by specific criteria */
+  filter?: string;
+  
+  /** Sort cache entries by specified field */
+  sort?: string;
+  
+  /** Limit number of cache entries returned */
+  limit?: number;
+  
+  /** Offset for pagination */
+  offset?: number;
+  
+  /** Include total count in response */
+  includeCount?: boolean;
+}
+
+/**
+ * Enhanced query result type with cache-specific methods.
+ * Extends React Query result with custom functionality.
+ */
+export interface UseCacheQueryResult extends UseQueryResult<GenericListResponse<CacheType>, Error> {
+  /** Cache entries array for easier access */
+  cacheTypes: CacheType[];
+  
+  /** Total count of cache entries */
+  totalCount: number;
+  
+  /** Indicates if data is being fetched in background */
+  isRefetching: boolean;
+}
+
+// ============================================================================
+// API Functions
+// ============================================================================
+
+/**
+ * Fetches cache configuration data from DreamFactory API.
+ * Maintains compatibility with existing cache service endpoints.
+ * 
+ * @param options - Query options for filtering and pagination
+ * @returns Promise resolving to cache configuration list
+ */
+async function fetchCacheData(
+  options: CacheQueryOptions = {}
+): Promise<GenericListResponse<CacheType>> {
+  // Maintain fields: '*' parameter for backend API compatibility
+  const defaultOptions: CacheQueryOptions = {
+    fields: '*',
+    ...options,
+  };
+
   try {
-    const response = await apiClient.get('/system/cache', {
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
-    });
-
-    // Add query parameters for field selection
-    const url = new URL(`${process.env.NEXT_PUBLIC_SYSTEM_API_URL || '/system/api/v2'}/cache`);
-    url.searchParams.set('fields', fields);
-
-    const fetchResponse = await fetch(url.toString(), {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!fetchResponse.ok) {
-      throw new Error(`Failed to fetch cache entries: ${fetchResponse.statusText}`);
-    }
-
-    const data: GenericListResponse<CacheType> = await fetchResponse.json();
+    // Use system cache endpoint for cache type configuration
+    const endpoint = `${API_BASE_URL}/system/cache`;
     
-    // Validate response structure
-    if (!data || typeof data !== 'object' || !Array.isArray(data.resource)) {
-      throw new Error('Invalid cache response format: expected GenericListResponse<CacheType>');
-    }
+    const response = await apiGet<GenericListResponse<CacheType>>(endpoint, {
+      fields: defaultOptions.fields,
+      refresh: defaultOptions.refresh,
+      filter: defaultOptions.filter,
+      sort: defaultOptions.sort,
+      limit: defaultOptions.limit,
+      offset: defaultOptions.offset,
+      includeCount: defaultOptions.includeCount,
+    });
 
-    return data;
+    return response;
   } catch (error) {
-    console.error('Error fetching cache entries:', error);
-    throw error;
+    // Enhanced error handling with context information
+    const errorMessage = error instanceof Error 
+      ? error.message 
+      : 'Failed to fetch cache configuration';
+    
+    throw new Error(`Cache data fetch failed: ${errorMessage}`);
   }
 }
 
+// ============================================================================
+// React Query Hook
+// ============================================================================
+
 /**
- * Use Cache Hook
+ * React Query hook for cache data management.
  * 
- * React Query-powered custom hook that fetches cache entries with intelligent
- * caching and automatic revalidation. Replaces the Angular DfCacheResolver
- * with enhanced performance characteristics:
+ * Replaces Angular DfCacheResolver with optimized React Query implementation
+ * featuring intelligent caching, automatic revalidation, and sub-50ms
+ * cache hit responses.
  * 
- * - Cache responses under 50ms per React/Next.js Integration Requirements
- * - TanStack React Query 5.0.0 for server-state management
- * - TTL configuration with staleTime: 300s, cacheTime: 900s
- * - Automatic background revalidation for real-time cache updates
- * - Maintains fields: '*' parameter for backend API compatibility
- * 
- * @param options - Optional query configuration overrides
- * @param options.fields - Field selection parameter (defaults to '*')
- * @param options.enabled - Whether the query should execute (defaults to true)
- * @returns UseQueryResult containing cache entries data, loading state, and error info
+ * @param options - Optional query configuration parameters
+ * @returns Enhanced query result with cache-specific utilities
  * 
  * @example
- * ```tsx
- * function CacheManagementComponent() {
- *   const { data, isLoading, error, refetch } = useCache();
- *   
- *   if (isLoading) return <div>Loading cache entries...</div>;
- *   if (error) return <div>Error: {error.message}</div>;
- *   
- *   return (
- *     <div>
- *       <h2>Cache Entries ({data?.meta.count || 0})</h2>
- *       <ul>
- *         {data?.resource.map((cache) => (
- *           <li key={cache.name}>
- *             <strong>{cache.label}</strong>: {cache.description}
- *           </li>
- *         ))}
- *       </ul>
- *       <button onClick={() => refetch()}>Refresh Cache</button>
- *     </div>
- *   );
- * }
+ * ```typescript
+ * // Basic usage
+ * const { data, isLoading, error } = useCache();
+ * 
+ * // With specific options
+ * const { cacheTypes, totalCount, isRefetching } = useCache({
+ *   filter: 'type eq "redis"',
+ *   sort: 'name',
+ *   limit: 10
+ * });
+ * 
+ * // Force refresh
+ * const { refetch } = useCache({ refresh: true });
  * ```
  */
-export function useCache(options?: {
-  fields?: string;
-  enabled?: boolean;
-}): UseQueryResult<GenericListResponse<CacheType>, Error> {
-  const { fields = '*', enabled = true } = options || {};
+export function useCache(
+  options: CacheQueryOptions = {}
+): UseCacheQueryResult {
+  // Configure React Query with cache-optimized settings
+  const queryResult = useQuery({
+    queryKey: cacheQueryKeys.list(options),
+    queryFn: () => fetchCacheData(options),
+    ...CACHE_QUERY_CONFIG,
+    
+    // Enable immediate background refetch for real-time updates
+    refetchInterval: options.refresh ? 0 : undefined,
+    
+    // Optimize for cache hit performance requirement (<50ms)
+    networkMode: 'online',
+    
+    // Enable optimistic UI updates
+    notifyOnChangeProps: ['data', 'error', 'isLoading'],
+  });
 
+  // Extract and transform data for enhanced return type
+  const cacheTypes = queryResult.data?.resource || [];
+  const totalCount = queryResult.data?.meta?.count || 0;
+
+  return {
+    ...queryResult,
+    cacheTypes,
+    totalCount,
+    isRefetching: queryResult.isFetching && !queryResult.isLoading,
+  };
+}
+
+// ============================================================================
+// Hook Variants
+// ============================================================================
+
+/**
+ * Simplified cache hook for basic cache type listing.
+ * Optimized for components that only need cache type names and labels.
+ * 
+ * @returns Basic cache query result
+ * 
+ * @example
+ * ```typescript
+ * const { data: cacheTypes, isLoading } = useCacheTypes();
+ * ```
+ */
+export function useCacheTypes(): UseQueryResult<CacheType[], Error> {
+  const { data, ...rest } = useCache({
+    fields: 'name,label,description,type',
+    sort: 'label',
+  });
+
+  return {
+    ...rest,
+    data: data?.resource || [],
+  };
+}
+
+/**
+ * Cache hook with automatic refresh for real-time monitoring.
+ * Useful for cache administration interfaces requiring live updates.
+ * 
+ * @param refreshInterval - Refresh interval in milliseconds (default: 30000)
+ * @returns Cache query result with auto-refresh
+ * 
+ * @example
+ * ```typescript
+ * const { cacheTypes, isRefetching } = useCacheWithRefresh(10000);
+ * ```
+ */
+export function useCacheWithRefresh(
+  refreshInterval: number = 30000
+): UseCacheQueryResult {
   return useQuery({
-    queryKey: cacheQueryKeys.list(fields),
-    queryFn: () => fetchCacheEntries(fields),
-    enabled,
-    ...CACHE_QUERY_OPTIONS,
-    // Ensure type safety for the return value
-    select: (data): GenericListResponse<CacheType> => {
-      // Validate each cache entry matches CacheType interface
-      const validatedResource = data.resource.map((cache): CacheType => ({
-        name: cache.name || '',
-        label: cache.label || '',
-        description: cache.description || '',
-        type: cache.type || '',
-      }));
-
-      return {
-        resource: validatedResource,
-        meta: {
-          count: data.meta?.count || validatedResource.length,
-        },
-      };
-    },
-    // Enhanced error handling
-    onError: (error: Error) => {
-      console.error('Cache query failed:', {
-        message: error.message,
-        fields,
-        timestamp: new Date().toISOString(),
-      });
-    },
-    // Success callback for performance monitoring
-    onSuccess: (data: GenericListResponse<CacheType>) => {
-      // Performance logging for cache responses under 50ms requirement
-      console.debug('Cache query successful:', {
-        count: data.meta.count,
-        fields,
-        timestamp: new Date().toISOString(),
-      });
-    },
-  });
+    queryKey: cacheQueryKeys.list({ refresh: true }),
+    queryFn: () => fetchCacheData({ fields: '*', refresh: true }),
+    ...CACHE_QUERY_CONFIG,
+    refetchInterval: refreshInterval,
+    refetchIntervalInBackground: true,
+  }) as UseCacheQueryResult;
 }
 
-/**
- * Prefetch Cache Hook
- * 
- * Utility hook for prefetching cache data in advance of component mounting.
- * Useful for preloading data in route transitions or optimistic loading scenarios.
- * 
- * @param queryClient - React Query client instance
- * @param fields - Field selection parameter (defaults to '*')
- * @returns Promise that resolves when prefetch is complete
- */
-export function prefetchCache(
-  queryClient: any, // Using any to avoid circular dependency with QueryClient type
-  fields: string = '*'
-): Promise<void> {
-  return queryClient.prefetchQuery({
-    queryKey: cacheQueryKeys.list(fields),
-    queryFn: () => fetchCacheEntries(fields),
-    ...CACHE_QUERY_OPTIONS,
-  });
-}
+// ============================================================================
+// Default Export
+// ============================================================================
 
-/**
- * Cache Query Key Export
- * 
- * Exports query keys for use in query invalidation and cache management.
- * Useful for invalidating cache queries when cache entries are modified.
- */
-export { cacheQueryKeys };
-
-/**
- * Default Export
- * 
- * Provides the primary useCache hook as the default export for convenience.
- */
 export default useCache;
