@@ -1,1004 +1,1029 @@
 /**
- * Testing Utilities for ADF Limits Components
+ * ADF Limits Components Testing Utilities
  * 
- * Provides comprehensive testing utilities including MSW request handlers for realistic API mocking,
- * React Query testing patterns, Zustand store mocking, and specialized data factories for limits
- * management testing scenarios. Replaces Angular TestBed patterns with React Testing Library
- * best practices per Section 3.2.5 development tools requirements.
+ * Comprehensive MSW handlers, React Query testing utilities, and mock data factories
+ * specifically for the limits management components. Provides realistic API mocking,
+ * state management testing support, and custom render functions for isolated component testing.
  * 
  * Features:
- * - MSW handlers for browser and Node API mocking per Section 3.2.5 development tools
- * - React Query testing utilities for server state testing per Section 3.2.2 state management
- * - Zustand testing utilities for global state management testing per Section 3.2.2 state management
- * - React Testing Library custom render functions with providers per Section 7.1.2 testing configuration
- * - Comprehensive mock data generation for limits management scenarios per testing requirements
+ * - MSW handlers for all limits-related API endpoints
+ * - React Query testing utilities with cache behavior mocking
+ * - Zustand store mock providers for component testing isolation  
+ * - React Testing Library wrapper functions with providers
+ * - Comprehensive test data factories for limits, users, services, and roles
+ * - Connection testing simulation and validation workflows
  * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
- * @since 2024-12-19
+ * @fileoverview Testing utilities for adf-limits components
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-import { http, HttpResponse } from 'msw'
-import { QueryClient } from '@tanstack/react-query'
-import { render, RenderOptions, screen } from '@testing-library/react'
-import { userEvent } from '@testing-library/user-event'
-import { ReactElement, ReactNode } from 'react'
-import { 
+import { rest, type RequestHandler } from 'msw';
+import { render, type RenderOptions } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ReactElement, ReactNode } from 'react';
+import { create } from 'zustand';
+import { faker } from '@faker-js/faker';
+
+import type {
   LimitTableRowData,
+  LimitConfiguration,
+  LimitUsageStats,
   LimitType,
-  LimitCounter,
-  CreateLimitFormData,
-  EditLimitFormData,
-  LimitMetadata,
-  AlertConfiguration,
-  LIMITS_QUERY_KEYS
-} from '../types'
-import {
+  LimitCounterType,
+  LimitPeriodUnit,
+  LimitFormState,
+  CreateLimitMutationVariables,
+  UpdateLimitMutationVariables,
+  DeleteLimitMutationVariables,
+  BulkLimitMutationVariables
+} from '../types';
+import type {
   ApiListResponse,
-  ApiCreateResponse,
-  ApiUpdateResponse,
-  ApiDeleteResponse,
+  ApiResourceResponse,
   ApiErrorResponse,
-  PaginationMeta,
-  ApiRequestOptions
-} from '@/types/api'
+  PaginationMeta
+} from '../../../types/api';
 
-// =============================================================================
-// MOCK DATA FACTORIES AND GENERATORS
-// =============================================================================
+// ============================================================================
+// MOCK DATA FACTORIES
+// ============================================================================
 
 /**
- * Factory for generating realistic limit table row data
- * 
- * Creates comprehensive test data with all required fields and optional metadata
- * for testing various limit management scenarios including user, service, and role-based limits.
+ * Generate realistic mock limit data for testing
+ * Creates comprehensive limit configurations with proper relationships
  */
-export const createMockLimit = (overrides: Partial<LimitTableRowData> = {}): LimitTableRowData => {
-  const id = overrides.id ?? Math.floor(Math.random() * 1000) + 1
-  const limitType = overrides.limitType ?? LimitType.ENDPOINT
-  
-  // Generate appropriate scope values based on limit type
-  const getDefaultScopeValues = (type: LimitType) => {
-    switch (type) {
-      case LimitType.USER:
-        return { user: Math.floor(Math.random() * 100) + 1, service: null, role: null }
-      case LimitType.SERVICE:
-        return { user: null, service: Math.floor(Math.random() * 50) + 1, role: null }
-      case LimitType.ROLE:
-        return { user: null, service: null, role: Math.floor(Math.random() * 20) + 1 }
-      case LimitType.GLOBAL:
-      case LimitType.IP:
-        return { user: null, service: null, role: null }
-      default:
-        return { user: null, service: Math.floor(Math.random() * 50) + 1, role: null }
-    }
-  }
-
-  const defaultScopeValues = getDefaultScopeValues(limitType)
-  const now = new Date().toISOString()
-
-  return {
-    id,
-    name: `Test Limit ${id}`,
-    limitType,
-    limitRate: '100/minute',
-    limitCounter: LimitCounter.REQUEST,
-    user: overrides.user !== undefined ? overrides.user : defaultScopeValues.user,
-    service: overrides.service !== undefined ? overrides.service : defaultScopeValues.service,
-    role: overrides.role !== undefined ? overrides.role : defaultScopeValues.role,
-    active: true,
-    createdAt: now,
-    updatedAt: now,
-    createdBy: 'test-user@example.com',
-    metadata: {
-      description: `Test limit for ${limitType}`,
-      tags: ['test', 'automation'],
-      priority: 5,
-      customHeaders: {
-        'X-Rate-Limit-Source': 'test-environment'
-      },
-      alertConfig: {
-        enabled: true,
-        warningThreshold: 80,
-        criticalThreshold: 95,
-        emailAddresses: ['admin@example.com']
-      }
+export const mockLimitFactory = {
+  /**
+   * Create a single limit table row with realistic data
+   */
+  createLimit: (overrides: Partial<LimitTableRowData> = {}): LimitTableRowData => ({
+    id: faker.number.int({ min: 1, max: 10000 }),
+    name: faker.hacker.phrase().replace(/\s+/g, '_').toLowerCase(),
+    limitType: faker.helpers.arrayElement([
+      'api.calls_per_period',
+      'api.calls_per_minute',
+      'api.calls_per_hour',
+      'api.calls_per_day',
+      'db.calls_per_period',
+      'service.calls_per_period',
+      'user.calls_per_period'
+    ] as LimitType[]),
+    limitRate: `${faker.number.int({ min: 10, max: 10000 })} per ${faker.helpers.arrayElement(['minute', 'hour', 'day'])}`,
+    limitCounter: faker.helpers.arrayElement([
+      'api.calls_made',
+      'db.calls_made',
+      'service.calls_made',
+      'user.calls_made'
+    ] as LimitCounterType[]),
+    user: Math.random() > 0.7 ? faker.number.int({ min: 1, max: 100 }) : null,
+    service: Math.random() > 0.6 ? faker.number.int({ min: 1, max: 50 }) : null,
+    role: Math.random() > 0.8 ? faker.number.int({ min: 1, max: 20 }) : null,
+    active: faker.datatype.boolean(),
+    description: Math.random() > 0.5 ? faker.lorem.sentence() : undefined,
+    createdAt: faker.date.past().toISOString(),
+    updatedAt: faker.date.recent().toISOString(),
+    createdBy: faker.internet.userName(),
+    currentUsage: faker.number.int({ min: 0, max: 1000 }),
+    period: {
+      value: faker.number.int({ min: 1, max: 24 }),
+      unit: faker.helpers.arrayElement(['minute', 'hour', 'day', 'week', 'month'] as LimitPeriodUnit[])
     },
     ...overrides
-  }
-}
+  }),
 
-/**
- * Factory for generating realistic pagination metadata
- * 
- * Creates pagination data with configurable parameters for testing
- * different list view scenarios and infinite scroll patterns.
- */
-export const createMockPagination = (overrides: Partial<PaginationMeta> = {}): PaginationMeta => ({
-  count: 25,
-  limit: 25,
-  offset: 0,
-  total: 150,
-  has_more: true,
-  next_cursor: 'next-cursor-token',
-  prev_cursor: null,
-  ...overrides
-})
+  /**
+   * Create multiple limits with different configurations
+   */
+  createLimits: (count: number = 10): LimitTableRowData[] => {
+    return Array.from({ length: count }, () => mockLimitFactory.createLimit());
+  },
 
-/**
- * Factory for generating paginated limits list responses
- * 
- * Creates realistic API responses with multiple limit records and pagination metadata
- * for testing list components and infinite loading scenarios.
- */
-export const createMockLimitsList = (
-  count: number = 5,
-  paginationOverrides: Partial<PaginationMeta> = {},
-  limitOverrides: Partial<LimitTableRowData> = {}
-): ApiListResponse<LimitTableRowData> => {
-  const limits = Array.from({ length: count }, (_, index) =>
-    createMockLimit({
-      id: index + 1,
-      name: `Limit ${index + 1}`,
-      limitType: Object.values(LimitType)[index % Object.values(LimitType).length] as LimitType,
-      limitCounter: Object.values(LimitCounter)[index % Object.values(LimitCounter).length] as LimitCounter,
-      active: index % 2 === 0, // Alternate active/inactive
-      ...limitOverrides
-    })
-  )
-
-  return {
-    resource: limits,
-    meta: createMockPagination({
-      count,
-      total: Math.max(count, 150),
-      ...paginationOverrides
-    })
-  }
-}
-
-/**
- * Factory for generating form data for limit creation/editing
- * 
- * Creates valid form data objects that can be used for testing
- * form submission, validation, and error handling scenarios.
- */
-export const createMockFormData = (
-  mode: 'create' | 'edit' = 'create',
-  overrides: Partial<CreateLimitFormData | EditLimitFormData> = {}
-): CreateLimitFormData | EditLimitFormData => {
-  const baseData: CreateLimitFormData = {
-    name: 'Test API Limit',
-    limitType: LimitType.ENDPOINT,
-    limitRate: '1000/hour',
-    limitCounter: LimitCounter.SLIDING_WINDOW,
-    service: 1,
-    active: true,
-    metadata: {
-      description: 'Test limit for API endpoints',
-      tags: ['api', 'production'],
-      priority: 7,
-      alertConfig: {
-        enabled: true,
-        warningThreshold: 75,
-        criticalThreshold: 90,
-        emailAddresses: ['ops@example.com']
-      }
-    },
-    ...overrides
-  }
-
-  if (mode === 'edit') {
-    return {
-      id: 1,
-      ...baseData,
+  /**
+   * Create a global API limit
+   */
+  createGlobalLimit: (overrides: Partial<LimitTableRowData> = {}): LimitTableRowData => 
+    mockLimitFactory.createLimit({
+      limitType: 'api.calls_per_hour',
+      limitCounter: 'api.calls_made',
+      user: null,
+      service: null,
+      role: null,
+      name: 'global_api_limit',
       ...overrides
-    } as EditLimitFormData
-  }
+    }),
 
-  return baseData
-}
+  /**
+   * Create a user-specific limit
+   */
+  createUserLimit: (userId: number, overrides: Partial<LimitTableRowData> = {}): LimitTableRowData =>
+    mockLimitFactory.createLimit({
+      limitType: 'user.calls_per_period',
+      limitCounter: 'user.calls_made',
+      user: userId,
+      service: null,
+      role: null,
+      name: `user_${userId}_limit`,
+      ...overrides
+    }),
+
+  /**
+   * Create a service-specific limit
+   */
+  createServiceLimit: (serviceId: number, overrides: Partial<LimitTableRowData> = {}): LimitTableRowData =>
+    mockLimitFactory.createLimit({
+      limitType: 'service.calls_per_period',
+      limitCounter: 'service.calls_made',
+      user: null,
+      service: serviceId,
+      role: null,
+      name: `service_${serviceId}_limit`,
+      ...overrides
+    }),
+
+  /**
+   * Create a role-based limit
+   */
+  createRoleLimit: (roleId: number, overrides: Partial<LimitTableRowData> = {}): LimitTableRowData =>
+    mockLimitFactory.createLimit({
+      limitType: 'api.calls_per_period',
+      limitCounter: 'api.calls_made',
+      user: null,
+      service: null,
+      role: roleId,
+      name: `role_${roleId}_limit`,
+      ...overrides
+    }),
+
+  /**
+   * Create usage statistics for a limit
+   */
+  createUsageStats: (limitId: number, overrides: Partial<LimitUsageStats> = {}): LimitUsageStats => ({
+    limitId,
+    currentUsage: faker.number.int({ min: 0, max: 1000 }),
+    maxAllowed: faker.number.int({ min: 1000, max: 10000 }),
+    usagePercentage: faker.number.float({ min: 0, max: 100, precision: 0.01 }),
+    timeUntilReset: faker.number.int({ min: 0, max: 3600 }),
+    violations: faker.number.int({ min: 0, max: 10 }),
+    history: Array.from({ length: 7 }, (_, i) => ({
+      period: faker.date.past({ days: i + 1 }).toISOString(),
+      usage: faker.number.int({ min: 0, max: 1000 }),
+      violations: faker.number.int({ min: 0, max: 5 })
+    })),
+    ...overrides
+  })
+};
 
 /**
- * Factory for generating API error responses
- * 
- * Creates realistic error responses for testing error handling,
- * form validation, and user feedback scenarios.
+ * Generate mock dependent data for form testing
  */
-export const createMockError = (
-  statusCode: number = 400,
-  message: string = 'Validation failed',
-  code: string = 'VALIDATION_ERROR'
-): ApiErrorResponse => ({
-  error: {
-    code,
-    message,
-    status_code: statusCode as any,
-    context: {
-      error: [
-        {
-          field: 'name',
-          code: 'REQUIRED',
-          message: 'Limit name is required',
-          value: ''
-        },
-        {
-          field: 'limitRate',
-          code: 'INVALID_FORMAT',
-          message: 'Rate must be in format "number/timeunit"',
-          value: 'invalid-rate'
-        }
-      ]
-    },
-    trace_id: `test-trace-${Date.now()}`,
-    timestamp: new Date().toISOString()
-  }
-})
-
-/**
- * Factory for generating realistic user, service, and role data
- * 
- * Creates related entity data for testing form dropdowns,
- * autocomplete components, and relationship scenarios.
- */
-export const createMockRelatedData = () => ({
-  users: Array.from({ length: 10 }, (_, index) => ({
-    id: index + 1,
-    name: `User ${index + 1}`,
-    email: `user${index + 1}@example.com`,
-    active: true
+export const mockDependentDataFactory = {
+  /**
+   * Create mock users for limit assignment
+   */
+  createUsers: (count: number = 5) => Array.from({ length: count }, (_, i) => ({
+    id: i + 1,
+    name: faker.person.fullName(),
+    email: faker.internet.email(),
+    username: faker.internet.userName(),
+    active: faker.datatype.boolean(),
+    role: faker.helpers.arrayElement(['user', 'admin', 'developer'])
   })),
-  services: Array.from({ length: 8 }, (_, index) => ({
-    id: index + 1,
-    name: `Service ${index + 1}`,
-    type: ['mysql', 'postgresql', 'mongodb', 'redis'][index % 4],
-    active: true
-  })),
-  roles: Array.from({ length: 5 }, (_, index) => ({
-    id: index + 1,
-    name: `Role ${index + 1}`,
-    description: `Test role ${index + 1}`,
-    permissions: ['read', 'write', 'delete'].slice(0, (index % 3) + 1)
-  }))
-})
 
-// =============================================================================
-// MSW REQUEST HANDLERS FOR API MOCKING
-// =============================================================================
-
-/**
- * Base URL for DreamFactory API endpoints
- */
-const API_BASE_URL = 'http://localhost:3000/api/v2'
-
-/**
- * MSW handlers for limits CRUD operations
- * 
- * Provides realistic API responses for all limits management operations
- * including listing, creating, updating, deleting, and status toggling.
- * Includes proper error scenarios and edge cases for comprehensive testing.
- */
-export const limitsHandlers = [
-  // GET /api/v2/system/limits - List all limits with filtering and pagination
-  http.get(`${API_BASE_URL}/system/limits`, ({ request }) => {
-    const url = new URL(request.url)
-    const limit = parseInt(url.searchParams.get('limit') || '25')
-    const offset = parseInt(url.searchParams.get('offset') || '0')
-    const filter = url.searchParams.get('filter')
-    const search = url.searchParams.get('search')
-    const sort = url.searchParams.get('sort')
-
-    // Simulate filtering
-    let limits = createMockLimitsList(50).resource
-    
-    if (search) {
-      limits = limits.filter(limit => 
-        limit.name.toLowerCase().includes(search.toLowerCase())
-      )
+  /**
+   * Create mock services for limit assignment
+   */
+  createServices: (count: number = 5) => Array.from({ length: count }, (_, i) => ({
+    id: i + 1,
+    name: `${faker.hacker.noun()}_service`,
+    type: faker.helpers.arrayElement(['mysql', 'postgresql', 'mongodb', 'sqlsrv', 'oracle']),
+    label: faker.company.name(),
+    description: faker.lorem.sentence(),
+    active: faker.datatype.boolean(),
+    config: {
+      host: faker.internet.ip(),
+      port: faker.number.int({ min: 1000, max: 9999 }),
+      database: faker.database.mongodbObjectId()
     }
+  })),
 
+  /**
+   * Create mock roles for limit assignment
+   */
+  createRoles: (count: number = 5) => Array.from({ length: count }, (_, i) => ({
+    id: i + 1,
+    name: faker.hacker.noun().toLowerCase(),
+    description: faker.lorem.sentence(),
+    active: faker.datatype.boolean(),
+    default_app_id: faker.number.int({ min: 1, max: 10 }),
+    role_service_access_by_service_id: {}
+  }))
+};
+
+// ============================================================================
+// MSW HANDLERS FOR LIMITS API
+// ============================================================================
+
+/**
+ * API base URL for DreamFactory endpoints
+ */
+const API_BASE = '/api/v2';
+const SYSTEM_API_BASE = `${API_BASE}/system`;
+
+/**
+ * MSW handlers for limits management API endpoints
+ * Provides realistic API behavior for all CRUD operations
+ */
+export const limitsApiHandlers: RequestHandler[] = [
+  // Get limits list with pagination and filtering
+  rest.get(`${SYSTEM_API_BASE}/limit`, (req, res, ctx) => {
+    const url = new URL(req.url);
+    const offset = parseInt(url.searchParams.get('offset') || '0');
+    const limit = parseInt(url.searchParams.get('limit') || '25');
+    const filter = url.searchParams.get('filter');
+    const sort = url.searchParams.get('sort');
+    const activeOnly = url.searchParams.get('active');
+    const userId = url.searchParams.get('user_id');
+    const serviceId = url.searchParams.get('service_id');
+    const roleId = url.searchParams.get('role_id');
+
+    // Generate base data
+    let limits = mockLimitFactory.createLimits(50);
+
+    // Apply filters
+    if (activeOnly === 'true') {
+      limits = limits.filter(limit => limit.active);
+    }
+    if (userId) {
+      limits = limits.filter(limit => limit.user === parseInt(userId));
+    }
+    if (serviceId) {
+      limits = limits.filter(limit => limit.service === parseInt(serviceId));
+    }
+    if (roleId) {
+      limits = limits.filter(limit => limit.role === parseInt(roleId));
+    }
     if (filter) {
-      // Simulate simple filter parsing (e.g., "active=true", "limitType=USER")
-      const [field, value] = filter.split('=')
-      if (field && value) {
-        limits = limits.filter(limit => {
-          const fieldValue = (limit as any)[field]
-          return fieldValue?.toString().toLowerCase() === value.toLowerCase()
-        })
-      }
+      const filterLower = filter.toLowerCase();
+      limits = limits.filter(limit => 
+        limit.name.toLowerCase().includes(filterLower) ||
+        limit.limitType.includes(filterLower) ||
+        (limit.description && limit.description.toLowerCase().includes(filterLower))
+      );
     }
 
     // Apply sorting
     if (sort) {
-      const [field, direction = 'asc'] = sort.split(',')
+      const [field, direction = 'asc'] = sort.split(',');
       limits.sort((a, b) => {
-        const aValue = (a as any)[field]
-        const bValue = (b as any)[field]
-        const multiplier = direction === 'desc' ? -1 : 1
-        return aValue < bValue ? -1 * multiplier : aValue > bValue ? 1 * multiplier : 0
-      })
+        const aVal = (a as any)[field];
+        const bVal = (b as any)[field];
+        const comparison = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+        return direction === 'desc' ? -comparison : comparison;
+      });
     }
 
     // Apply pagination
-    const paginatedLimits = limits.slice(offset, offset + limit)
+    const total = limits.length;
+    const paginatedLimits = limits.slice(offset, offset + limit);
 
-    return HttpResponse.json({
+    const response: ApiListResponse<LimitTableRowData> = {
       resource: paginatedLimits,
       meta: {
-        count: paginatedLimits.length,
-        limit,
+        count: total,
         offset,
-        total: limits.length,
-        has_more: offset + limit < limits.length,
-        next_cursor: offset + limit < limits.length ? `cursor-${offset + limit}` : null,
-        prev_cursor: offset > 0 ? `cursor-${Math.max(0, offset - limit)}` : null
-      }
-    })
+        limit,
+        has_next: offset + limit < total,
+        has_previous: offset > 0,
+        page_count: Math.ceil(total / limit),
+        links: {
+          first: `${SYSTEM_API_BASE}/limit?offset=0&limit=${limit}`,
+          last: `${SYSTEM_API_BASE}/limit?offset=${Math.floor((total - 1) / limit) * limit}&limit=${limit}`,
+          ...(offset + limit < total && {
+            next: `${SYSTEM_API_BASE}/limit?offset=${offset + limit}&limit=${limit}`
+          }),
+          ...(offset > 0 && {
+            previous: `${SYSTEM_API_BASE}/limit?offset=${Math.max(0, offset - limit)}&limit=${limit}`
+          })
+        }
+      },
+      timestamp: new Date().toISOString()
+    };
+
+    return res(ctx.status(200), ctx.json(response));
   }),
 
-  // GET /api/v2/system/limits/:id - Get specific limit details
-  http.get(`${API_BASE_URL}/system/limits/:id`, ({ params }) => {
-    const id = parseInt(params.id as string)
+  // Get single limit by ID
+  rest.get(`${SYSTEM_API_BASE}/limit/:id`, (req, res, ctx) => {
+    const { id } = req.params;
+    const limitId = parseInt(id as string);
+
+    const limit = mockLimitFactory.createLimit({ id: limitId });
+
+    const response: ApiResourceResponse<LimitTableRowData> = {
+      resource: limit,
+      timestamp: new Date().toISOString()
+    };
+
+    return res(ctx.status(200), ctx.json(response));
+  }),
+
+  // Create new limit
+  rest.post(`${SYSTEM_API_BASE}/limit`, async (req, res, ctx) => {
+    const data = await req.json() as CreateLimitMutationVariables;
     
-    if (id === 999) {
-      // Test error scenario
-      return HttpResponse.json(
-        createMockError(404, 'Limit not found', 'NOT_FOUND'),
-        { status: 404 }
-      )
-    }
+    // Simulate validation delay
+    await new Promise(resolve => setTimeout(resolve, 500));
 
-    return HttpResponse.json(createMockLimit({ id }))
+    // Create new limit with generated ID
+    const newLimit = mockLimitFactory.createLimit({
+      ...data.data,
+      id: faker.number.int({ min: 10001, max: 99999 }),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      createdBy: 'test_user'
+    });
+
+    const response: ApiResourceResponse<LimitTableRowData> = {
+      resource: newLimit,
+      timestamp: new Date().toISOString()
+    };
+
+    return res(ctx.status(201), ctx.json(response));
   }),
 
-  // POST /api/v2/system/limits - Create new limit
-  http.post(`${API_BASE_URL}/system/limits`, async ({ request }) => {
-    const body = await request.json() as CreateLimitFormData
+  // Update existing limit
+  rest.put(`${SYSTEM_API_BASE}/limit/:id`, async (req, res, ctx) => {
+    const { id } = req.params;
+    const data = await req.json() as UpdateLimitMutationVariables;
+    
+    // Simulate validation delay
+    await new Promise(resolve => setTimeout(resolve, 300));
 
-    // Simulate validation errors
-    if (body.name === 'invalid-name') {
-      return HttpResponse.json(
-        createMockError(422, 'Validation failed', 'VALIDATION_ERROR'),
-        { status: 422 }
-      )
-    }
+    const limitId = parseInt(id as string);
+    const updatedLimit = mockLimitFactory.createLimit({
+      ...data.data,
+      id: limitId,
+      updatedAt: new Date().toISOString()
+    });
 
-    // Simulate duplicate name error
-    if (body.name === 'duplicate-limit') {
-      return HttpResponse.json(
-        createMockError(409, 'Limit name already exists', 'DUPLICATE_NAME'),
-        { status: 409 }
-      )
-    }
+    const response: ApiResourceResponse<LimitTableRowData> = {
+      resource: updatedLimit,
+      timestamp: new Date().toISOString()
+    };
 
-    // Simulate successful creation
-    const newId = Math.floor(Math.random() * 1000) + 100
-    return HttpResponse.json({ id: newId } as ApiCreateResponse, { status: 201 })
+    return res(ctx.status(200), ctx.json(response));
   }),
 
-  // PUT /api/v2/system/limits/:id - Update existing limit
-  http.put(`${API_BASE_URL}/system/limits/:id`, async ({ params, request }) => {
-    const id = parseInt(params.id as string)
-    const body = await request.json() as EditLimitFormData
+  // Delete limit
+  rest.delete(`${SYSTEM_API_BASE}/limit/:id`, async (req, res, ctx) => {
+    const { id } = req.params;
+    
+    // Simulate deletion delay
+    await new Promise(resolve => setTimeout(resolve, 200));
 
-    // Simulate not found error
-    if (id === 999) {
-      return HttpResponse.json(
-        createMockError(404, 'Limit not found', 'NOT_FOUND'),
-        { status: 404 }
-      )
-    }
-
-    // Simulate validation errors
-    if (body.name === 'invalid-name') {
-      return HttpResponse.json(
-        createMockError(422, 'Validation failed', 'VALIDATION_ERROR'),
-        { status: 422 }
-      )
-    }
-
-    // Simulate successful update
-    return HttpResponse.json({ 
-      id, 
-      updated_at: new Date().toISOString() 
-    } as ApiUpdateResponse)
-  }),
-
-  // DELETE /api/v2/system/limits/:id - Delete limit
-  http.delete(`${API_BASE_URL}/system/limits/:id`, ({ params }) => {
-    const id = parseInt(params.id as string)
-
-    // Simulate not found error
-    if (id === 999) {
-      return HttpResponse.json(
-        createMockError(404, 'Limit not found', 'NOT_FOUND'),
-        { status: 404 }
-      )
-    }
-
-    // Simulate dependency error
-    if (id === 888) {
-      return HttpResponse.json(
-        createMockError(409, 'Cannot delete limit: active sessions exist', 'DEPENDENCY_EXISTS'),
-        { status: 409 }
-      )
-    }
-
-    // Simulate successful deletion
-    return HttpResponse.json({ 
-      id, 
+    return res(ctx.status(200), ctx.json({
       success: true,
-      deleted_at: new Date().toISOString() 
-    } as ApiDeleteResponse)
+      message: `Limit ${id} deleted successfully`,
+      timestamp: new Date().toISOString()
+    }));
   }),
 
-  // PATCH /api/v2/system/limits/:id/toggle - Toggle limit active status
-  http.patch(`${API_BASE_URL}/system/limits/:id/toggle`, ({ params }) => {
-    const id = parseInt(params.id as string)
+  // Bulk operations
+  rest.patch(`${SYSTEM_API_BASE}/limit`, async (req, res, ctx) => {
+    const data = await req.json() as BulkLimitMutationVariables;
+    
+    // Simulate bulk operation delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
-    if (id === 999) {
-      return HttpResponse.json(
-        createMockError(404, 'Limit not found', 'NOT_FOUND'),
-        { status: 404 }
-      )
+    const results = data.limitIds.map(id => ({
+      id,
+      success: Math.random() > 0.1, // 90% success rate
+      error: Math.random() > 0.9 ? 'Random test error' : undefined
+    }));
+
+    return res(ctx.status(200), ctx.json({
+      success: true,
+      message: `Bulk ${data.operation} completed`,
+      results,
+      timestamp: new Date().toISOString()
+    }));
+  }),
+
+  // Get limit usage statistics
+  rest.get(`${SYSTEM_API_BASE}/limit/:id/usage`, (req, res, ctx) => {
+    const { id } = req.params;
+    const limitId = parseInt(id as string);
+
+    const usageStats = mockLimitFactory.createUsageStats(limitId);
+
+    const response: ApiResourceResponse<LimitUsageStats> = {
+      resource: usageStats,
+      timestamp: new Date().toISOString()
+    };
+
+    return res(ctx.status(200), ctx.json(response));
+  }),
+
+  // Test service connection for service limits
+  rest.post(`${SYSTEM_API_BASE}/service/:serviceId/test`, async (req, res, ctx) => {
+    const { serviceId } = req.params;
+    
+    // Simulate connection test delay
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    // 90% success rate for connection tests
+    const success = Math.random() > 0.1;
+
+    if (success) {
+      return res(ctx.status(200), ctx.json({
+        success: true,
+        message: `Connection to service ${serviceId} successful`,
+        timestamp: new Date().toISOString()
+      }));
+    } else {
+      const errorResponse: ApiErrorResponse = {
+        success: false,
+        error: {
+          code: 'CONNECTION_FAILED',
+          message: 'Failed to connect to database service',
+          status_code: 400,
+          context: {
+            service_id: serviceId,
+            details: 'Connection timeout after 30 seconds'
+          }
+        },
+        timestamp: new Date().toISOString()
+      };
+      return res(ctx.status(400), ctx.json(errorResponse));
     }
-
-    return HttpResponse.json({ 
-      id, 
-      updated_at: new Date().toISOString() 
-    } as ApiUpdateResponse)
   }),
 
-  // GET /api/v2/system/users - Get users for form dropdowns
-  http.get(`${API_BASE_URL}/system/users`, () => {
-    const relatedData = createMockRelatedData()
-    return HttpResponse.json({
-      resource: relatedData.users,
-      meta: createMockPagination({ count: relatedData.users.length, total: relatedData.users.length })
-    })
+  // Get dependent data for forms
+  rest.get(`${SYSTEM_API_BASE}/user`, (req, res, ctx) => {
+    const users = mockDependentDataFactory.createUsers(20);
+    const response: ApiListResponse<any> = {
+      resource: users,
+      meta: { count: users.length, offset: 0, limit: users.length },
+      timestamp: new Date().toISOString()
+    };
+    return res(ctx.status(200), ctx.json(response));
   }),
 
-  // GET /api/v2/services - Get services for form dropdowns
-  http.get(`${API_BASE_URL}/services`, () => {
-    const relatedData = createMockRelatedData()
-    return HttpResponse.json({
-      resource: relatedData.services,
-      meta: createMockPagination({ count: relatedData.services.length, total: relatedData.services.length })
-    })
+  rest.get(`${SYSTEM_API_BASE}/service`, (req, res, ctx) => {
+    const services = mockDependentDataFactory.createServices(15);
+    const response: ApiListResponse<any> = {
+      resource: services,
+      meta: { count: services.length, offset: 0, limit: services.length },
+      timestamp: new Date().toISOString()
+    };
+    return res(ctx.status(200), ctx.json(response));
   }),
 
-  // GET /api/v2/system/roles - Get roles for form dropdowns
-  http.get(`${API_BASE_URL}/system/roles`, () => {
-    const relatedData = createMockRelatedData()
-    return HttpResponse.json({
-      resource: relatedData.roles,
-      meta: createMockPagination({ count: relatedData.roles.length, total: relatedData.roles.length })
-    })
+  rest.get(`${SYSTEM_API_BASE}/role`, (req, res, ctx) => {
+    const roles = mockDependentDataFactory.createRoles(10);
+    const response: ApiListResponse<any> = {
+      resource: roles,
+      meta: { count: roles.length, offset: 0, limit: roles.length },
+      timestamp: new Date().toISOString()
+    };
+    return res(ctx.status(200), ctx.json(response));
   })
-]
+];
 
-// =============================================================================
+// ============================================================================
 // REACT QUERY TESTING UTILITIES
-// =============================================================================
+// ============================================================================
 
 /**
- * Creates a test-specific React Query client with optimized settings
- * 
- * Provides a clean QueryClient instance for each test with disabled
- * retries, logging, and caching to ensure predictable test behavior.
+ * Create a test QueryClient with optimized settings for testing
  */
-export const createTestQueryClient = (): QueryClient => {
+export const createTestQueryClient = () => {
   return new QueryClient({
     defaultOptions: {
       queries: {
+        // Disable retries in tests
         retry: false,
+        // Disable cache time for immediate garbage collection
         cacheTime: 0,
-        staleTime: 0,
+        // Disable background refetching
         refetchOnWindowFocus: false,
+        refetchOnMount: false,
         refetchOnReconnect: false,
-        refetchOnMount: false
+        // Set stale time to 0 for predictable testing
+        staleTime: 0
       },
       mutations: {
-        retry: false,
-        cacheTime: 0
+        // Disable retries in tests
+        retry: false
       }
     },
+    // Suppress error logging in tests
     logger: {
       log: () => {},
       warn: () => {},
       error: () => {}
     }
-  })
-}
+  });
+};
 
 /**
- * Utilities for testing React Query cache behavior
- * 
- * Provides helpers for inspecting query cache, triggering invalidations,
- * and testing optimistic updates in limit management scenarios.
+ * React Query test utilities for server state testing
  */
-export const queryTestUtils = {
+export const reactQueryTestUtils = {
   /**
-   * Get cached data for limits list query
+   * Create a QueryClient with cached limits data
    */
-  getLimitsListCache: (queryClient: QueryClient, params?: ApiRequestOptions) => {
-    return queryClient.getQueryData(LIMITS_QUERY_KEYS.list(params))
+  createQueryClientWithLimitsData: (limits: LimitTableRowData[] = []) => {
+    const queryClient = createTestQueryClient();
+    
+    // Pre-populate cache with limits data
+    queryClient.setQueryData(['limits'], {
+      resource: limits,
+      meta: { count: limits.length, offset: 0, limit: limits.length }
+    } as ApiListResponse<LimitTableRowData>);
+
+    return queryClient;
   },
 
   /**
-   * Get cached data for specific limit detail query
+   * Create a QueryClient with specific limit data
    */
-  getLimitDetailCache: (queryClient: QueryClient, id: number) => {
-    return queryClient.getQueryData(LIMITS_QUERY_KEYS.detail(id))
+  createQueryClientWithLimit: (limit: LimitTableRowData) => {
+    const queryClient = createTestQueryClient();
+    
+    // Pre-populate cache with single limit
+    queryClient.setQueryData(['limit', limit.id], {
+      resource: limit
+    } as ApiResourceResponse<LimitTableRowData>);
+
+    return queryClient;
   },
 
   /**
-   * Invalidate all limits-related queries
+   * Create a QueryClient with usage statistics
    */
-  invalidateAllLimitsQueries: async (queryClient: QueryClient) => {
-    await queryClient.invalidateQueries({ queryKey: LIMITS_QUERY_KEYS.all })
+  createQueryClientWithUsageStats: (limitId: number, stats: LimitUsageStats) => {
+    const queryClient = createTestQueryClient();
+    
+    queryClient.setQueryData(['limit', limitId, 'usage'], {
+      resource: stats
+    } as ApiResourceResponse<LimitUsageStats>);
+
+    return queryClient;
   },
 
   /**
-   * Set optimistic data for limit creation
+   * Clear all React Query caches
    */
-  setOptimisticLimit: (queryClient: QueryClient, tempLimit: LimitTableRowData) => {
-    queryClient.setQueryData(LIMITS_QUERY_KEYS.detail(tempLimit.id), tempLimit)
+  clearAllCaches: (queryClient: QueryClient) => {
+    queryClient.clear();
   },
 
   /**
-   * Remove optimistic data and rollback
+   * Get cached data from QueryClient
    */
-  rollbackOptimisticLimit: (queryClient: QueryClient, limitId: number) => {
-    queryClient.removeQueries({ queryKey: LIMITS_QUERY_KEYS.detail(limitId) })
+  getCachedData: <T>(queryClient: QueryClient, queryKey: any[]): T | undefined => {
+    return queryClient.getQueryData<T>(queryKey);
   },
 
   /**
-   * Simulate query success with custom data
+   * Set cache data in QueryClient
    */
-  mockQuerySuccess: (queryClient: QueryClient, queryKey: any[], data: any) => {
-    queryClient.setQueryData(queryKey, data)
+  setCachedData: <T>(queryClient: QueryClient, queryKey: any[], data: T) => {
+    queryClient.setQueryData<T>(queryKey, data);
   },
 
   /**
-   * Simulate query error
+   * Invalidate specific queries
    */
-  mockQueryError: (queryClient: QueryClient, queryKey: any[], error: ApiErrorResponse) => {
-    queryClient.setQueryState(queryKey, {
-      status: 'error',
-      error,
-      data: undefined,
-      dataUpdatedAt: 0,
-      errorUpdatedAt: Date.now()
-    })
-  },
-
-  /**
-   * Wait for all queries to settle (useful for async testing)
-   */
-  waitForQueries: async (queryClient: QueryClient) => {
-    await queryClient.getQueryCache().getAll().map(query => query.fetch())
+  invalidateQueries: async (queryClient: QueryClient, queryKey: any[]) => {
+    await queryClient.invalidateQueries({ queryKey });
   }
-}
+};
 
-// =============================================================================
+// ============================================================================
 // ZUSTAND TESTING UTILITIES
-// =============================================================================
+// ============================================================================
 
 /**
- * Mock Zustand store utilities for testing global state management
- * 
- * Provides utilities for creating mock stores, testing state updates,
- * and isolating component tests from global state dependencies.
+ * Mock Zustand store for limits management
+ */
+export const createMockLimitsStore = (initialState: Partial<any> = {}) => {
+  return create<any>()((set, get) => ({
+    // Default state
+    limits: [],
+    selectedLimitIds: [],
+    filters: {
+      active: undefined,
+      search: '',
+      limitType: undefined
+    },
+    pagination: {
+      offset: 0,
+      limit: 25
+    },
+    loading: {
+      list: false,
+      create: false,
+      update: false,
+      delete: false
+    },
+    errors: {
+      list: null,
+      create: null,
+      update: null,
+      delete: null
+    },
+
+    // Actions
+    setLimits: (limits: LimitTableRowData[]) => set({ limits }),
+    setSelectedLimitIds: (ids: number[]) => set({ selectedLimitIds: ids }),
+    setFilters: (filters: any) => set((state: any) => ({ 
+      filters: { ...state.filters, ...filters } 
+    })),
+    setPagination: (pagination: any) => set((state: any) => ({ 
+      pagination: { ...state.pagination, ...pagination } 
+    })),
+    setLoading: (loading: any) => set((state: any) => ({ 
+      loading: { ...state.loading, ...loading } 
+    })),
+    setErrors: (errors: any) => set((state: any) => ({ 
+      errors: { ...state.errors, ...errors } 
+    })),
+    clearSelection: () => set({ selectedLimitIds: [] }),
+    clearErrors: () => set({ 
+      errors: { list: null, create: null, update: null, delete: null } 
+    }),
+
+    // Override with initial state
+    ...initialState
+  }));
+};
+
+/**
+ * Zustand testing utilities for state management testing
  */
 export const zustandTestUtils = {
   /**
-   * Create a mock store with initial state
+   * Create a mock store with limits data
    */
-  createMockStore: <T>(initialState: T) => {
-    let state = initialState
-    const listeners = new Set<() => void>()
-
-    return {
-      getState: () => state,
-      setState: (updater: (state: T) => T | Partial<T>) => {
-        const newState = typeof updater === 'function' ? updater(state) : updater
-        state = { ...state, ...newState }
-        listeners.forEach(listener => listener())
-      },
-      subscribe: (listener: () => void) => {
-        listeners.add(listener)
-        return () => listeners.delete(listener)
-      },
-      destroy: () => {
-        listeners.clear()
-      }
-    }
+  createStoreWithLimits: (limits: LimitTableRowData[]) => {
+    return createMockLimitsStore({ limits });
   },
 
   /**
-   * Mock authentication store for testing
+   * Create a mock store with loading states
    */
-  createMockAuthStore: (overrides: any = {}) => {
-    return zustandTestUtils.createMockStore({
-      user: {
-        id: 1,
-        email: 'test@example.com',
-        name: 'Test User',
-        roles: ['admin']
-      },
-      isAuthenticated: true,
-      permissions: ['limits:read', 'limits:write', 'limits:delete'],
-      login: vi.fn(),
-      logout: vi.fn(),
-      checkPermission: vi.fn((permission: string) => true),
-      ...overrides
-    })
+  createStoreWithLoading: (loadingStates: Record<string, boolean>) => {
+    return createMockLimitsStore({ 
+      loading: { list: false, create: false, update: false, delete: false, ...loadingStates }
+    });
   },
 
   /**
-   * Mock UI store for testing theme, sidebar, etc.
+   * Create a mock store with error states
    */
-  createMockUIStore: (overrides: any = {}) => {
-    return zustandTestUtils.createMockStore({
-      theme: 'light',
-      sidebarCollapsed: false,
-      notifications: [],
-      setTheme: vi.fn(),
-      toggleSidebar: vi.fn(),
-      addNotification: vi.fn(),
-      removeNotification: vi.fn(),
-      ...overrides
-    })
+  createStoreWithErrors: (errors: Record<string, any>) => {
+    return createMockLimitsStore({ 
+      errors: { list: null, create: null, update: null, delete: null, ...errors }
+    });
+  },
+
+  /**
+   * Create a mock store with selected items
+   */
+  createStoreWithSelection: (selectedIds: number[]) => {
+    return createMockLimitsStore({ selectedLimitIds: selectedIds });
+  },
+
+  /**
+   * Create a mock store with filters applied
+   */
+  createStoreWithFilters: (filters: any) => {
+    return createMockLimitsStore({ 
+      filters: { active: undefined, search: '', limitType: undefined, ...filters }
+    });
   }
-}
+};
 
-// =============================================================================
-// REACT TESTING LIBRARY CUSTOM RENDER UTILITIES
-// =============================================================================
+// ============================================================================
+// REACT TESTING LIBRARY UTILITIES
+// ============================================================================
 
 /**
- * Custom render options extending React Testing Library RenderOptions
- * 
- * Provides configuration for testing providers, initial state,
- * and component-specific testing requirements.
+ * Custom render options with providers
  */
 interface CustomRenderOptions extends Omit<RenderOptions, 'wrapper'> {
-  /**
-   * Initial React Query data to pre-populate cache
-   */
-  initialQueryData?: Record<string, any>
-  
-  /**
-   * Mock authentication state
-   */
-  authState?: any
-  
-  /**
-   * Mock UI state (theme, sidebar, etc.)
-   */
-  uiState?: any
-  
-  /**
-   * Mock router state for Next.js navigation
-   */
-  routerState?: {
-    pathname?: string
-    query?: Record<string, string>
-    asPath?: string
-  }
-  
-  /**
-   * Custom user event configuration
-   */
-  userEventOptions?: Parameters<typeof userEvent.setup>[0]
+  /** Custom QueryClient for React Query */
+  queryClient?: QueryClient;
+  /** Custom Zustand store */
+  store?: any;
+  /** Initial route for router */
+  initialRoute?: string;
+  /** Mock user session */
+  user?: any;
 }
 
 /**
- * Creates a test wrapper with all necessary providers
- * 
- * Provides React Query, authentication, theme, and router contexts
- * for comprehensive component testing in isolation.
+ * Create a wrapper component with all necessary providers
  */
-const createTestWrapper = (options: CustomRenderOptions = {}) => {
-  const {
-    initialQueryData,
-    authState,
-    uiState,
-    routerState,
-    userEventOptions
-  } = options
-
-  const queryClient = createTestQueryClient()
-
-  // Pre-populate query cache if provided
-  if (initialQueryData) {
-    Object.entries(initialQueryData).forEach(([key, data]) => {
-      queryClient.setQueryData(JSON.parse(key), data)
-    })
-  }
-
-  // Create mock stores
-  const mockAuthStore = zustandTestUtils.createMockAuthStore(authState)
-  const mockUIStore = zustandTestUtils.createMockUIStore(uiState)
-
-  // Test wrapper component
-  const TestWrapper = ({ children }: { children: ReactNode }) => {
+const createWrapper = ({
+  queryClient = createTestQueryClient(),
+  store,
+  initialRoute = '/',
+  user
+}: CustomRenderOptions = {}) => {
+  return ({ children }: { children: ReactNode }) => {
     return (
       <QueryClientProvider client={queryClient}>
-        <AuthProvider store={mockAuthStore}>
-          <UIProvider store={mockUIStore}>
-            <RouterProvider state={routerState}>
-              <ThemeProvider>
-                {children}
-              </ThemeProvider>
-            </RouterProvider>
-          </UIProvider>
-        </AuthProvider>
+        {children}
       </QueryClientProvider>
-    )
-  }
-
-  return {
-    TestWrapper,
-    queryClient,
-    authStore: mockAuthStore,
-    uiStore: mockUIStore,
-    user: userEvent.setup(userEventOptions)
-  }
-}
+    );
+  };
+};
 
 /**
- * Enhanced render function with provider setup
- * 
- * Renders components with all necessary testing contexts and returns
- * additional utilities for interacting with stores and query cache.
+ * Custom render function with providers for component testing
  */
 export const renderWithProviders = (
   ui: ReactElement,
   options: CustomRenderOptions = {}
 ) => {
-  const { TestWrapper, queryClient, authStore, uiStore, user } = createTestWrapper(options)
+  const { queryClient, store, initialRoute, user, ...renderOptions } = options;
 
-  const renderResult = render(ui, {
-    wrapper: TestWrapper,
-    ...options
-  })
+  const Wrapper = createWrapper({ queryClient, store, initialRoute, user });
 
   return {
-    ...renderResult,
-    queryClient,
-    authStore,
-    uiStore,
-    user,
-    
-    // Convenience methods for common testing patterns
-    rerender: (newUi: ReactElement) => renderResult.rerender(newUi),
-    
-    // Query utilities bound to this render's query client
-    queryUtils: {
-      ...queryTestUtils,
-      client: queryClient
-    }
-  }
-}
+    ...render(ui, { wrapper: Wrapper, ...renderOptions }),
+    // Return utilities for further testing
+    queryClient: queryClient || createTestQueryClient(),
+    store: store || createMockLimitsStore()
+  };
+};
 
 /**
- * Specialized render function for form components
- * 
- * Pre-configures common form testing scenarios including validation,
- * submission, and error handling with appropriate mock data.
+ * Render with pre-loaded limits data
  */
-export const renderLimitForm = (
+export const renderWithLimitsData = (
   ui: ReactElement,
-  options: CustomRenderOptions & {
-    formMode?: 'create' | 'edit'
-    initialFormData?: Partial<CreateLimitFormData | EditLimitFormData>
-    validationErrors?: Record<string, string>
-  } = {}
+  limits: LimitTableRowData[] = [],
+  options: CustomRenderOptions = {}
 ) => {
-  const { formMode = 'create', initialFormData, validationErrors } = options
+  const queryClient = reactQueryTestUtils.createQueryClientWithLimitsData(limits);
+  const store = zustandTestUtils.createStoreWithLimits(limits);
 
-  // Pre-populate related data cache
-  const relatedData = createMockRelatedData()
-  const initialQueryData = {
-    '["users","list"]': { resource: relatedData.users, meta: createMockPagination() },
-    '["services","list"]': { resource: relatedData.services, meta: createMockPagination() },
-    '["roles","list"]': { resource: relatedData.roles, meta: createMockPagination() }
-  }
-
-  if (formMode === 'edit' && initialFormData?.id) {
-    initialQueryData[`["limits","detail",${initialFormData.id}]`] = createMockLimit(initialFormData)
-  }
-
-  return renderWithProviders(ui, {
-    ...options,
-    initialQueryData
-  })
-}
+  return renderWithProviders(ui, { 
+    queryClient, 
+    store, 
+    ...options 
+  });
+};
 
 /**
- * Specialized render function for list components
- * 
- * Pre-configures list testing scenarios with pagination, filtering,
- * and selection capabilities with appropriate mock data.
+ * Render with loading state
  */
-export const renderLimitsList = (
+export const renderWithLoadingState = (
   ui: ReactElement,
-  options: CustomRenderOptions & {
-    limitsCount?: number
-    initialFilters?: ApiRequestOptions
-    selectedIds?: number[]
-  } = {}
+  loadingStates: Record<string, boolean> = { list: true },
+  options: CustomRenderOptions = {}
 ) => {
-  const { limitsCount = 10, initialFilters, selectedIds = [] } = options
+  const store = zustandTestUtils.createStoreWithLoading(loadingStates);
 
-  // Pre-populate limits list cache
-  const mockLimitsList = createMockLimitsList(limitsCount)
-  const initialQueryData = {
-    [`["limits","list",${JSON.stringify(initialFilters || {})}]`]: mockLimitsList
-  }
+  return renderWithProviders(ui, { 
+    store, 
+    ...options 
+  });
+};
 
-  return renderWithProviders(ui, {
-    ...options,
-    initialQueryData
+/**
+ * Render with error state
+ */
+export const renderWithErrorState = (
+  ui: ReactElement,
+  errors: Record<string, any> = { list: new Error('Test error') },
+  options: CustomRenderOptions = {}
+) => {
+  const store = zustandTestUtils.createStoreWithErrors(errors);
+
+  return renderWithProviders(ui, { 
+    store, 
+    ...options 
+  });
+};
+
+// ============================================================================
+// FORM TESTING UTILITIES
+// ============================================================================
+
+/**
+ * Mock form state factory for testing form components
+ */
+export const mockFormStateFactory = {
+  /**
+   * Create a default form state
+   */
+  createFormState: (overrides: Partial<LimitFormState> = {}): LimitFormState => ({
+    data: {},
+    isSubmitting: false,
+    isValidating: false,
+    isDirty: false,
+    isTouched: false,
+    isValid: true,
+    errors: {},
+    fieldStates: {},
+    mode: 'create',
+    dependentDataLoading: {
+      users: false,
+      services: false,
+      roles: false
+    },
+    fieldOptions: {
+      users: mockDependentDataFactory.createUsers(),
+      services: mockDependentDataFactory.createServices(),
+      roles: mockDependentDataFactory.createRoles()
+    },
+    ...overrides
+  }),
+
+  /**
+   * Create form state with validation errors
+   */
+  createFormStateWithErrors: (errors: Record<string, any>): LimitFormState => 
+    mockFormStateFactory.createFormState({
+      isValid: false,
+      errors,
+      fieldStates: Object.keys(errors).reduce((acc, key) => ({
+        ...acc,
+        [key]: { hasError: true, error: errors[key], touched: true }
+      }), {})
+    }),
+
+  /**
+   * Create form state with loading dependent data
+   */
+  createFormStateWithLoading: (): LimitFormState => 
+    mockFormStateFactory.createFormState({
+      dependentDataLoading: {
+        users: true,
+        services: true,
+        roles: true
+      },
+      fieldOptions: {
+        users: [],
+        services: [],
+        roles: []
+      }
+    }),
+
+  /**
+   * Create form state for editing
+   */
+  createEditFormState: (limit: LimitTableRowData): LimitFormState => 
+    mockFormStateFactory.createFormState({
+      mode: 'edit',
+      data: limit,
+      isDirty: false,
+      isTouched: false
+    })
+};
+
+/**
+ * Test scenario builders for common testing patterns
+ */
+export const testScenarios = {
+  /**
+   * Empty limits list scenario
+   */
+  emptyLimitsList: () => ({
+    limits: [],
+    loading: false,
+    error: null
+  }),
+
+  /**
+   * Populated limits list scenario
+   */
+  populatedLimitsList: (count: number = 10) => ({
+    limits: mockLimitFactory.createLimits(count),
+    loading: false,
+    error: null
+  }),
+
+  /**
+   * Loading limits list scenario
+   */
+  loadingLimitsList: () => ({
+    limits: [],
+    loading: true,
+    error: null
+  }),
+
+  /**
+   * Error loading limits scenario
+   */
+  errorLimitsList: (error: string = 'Failed to load limits') => ({
+    limits: [],
+    loading: false,
+    error: new Error(error)
+  }),
+
+  /**
+   * Form submission scenarios
+   */
+  formSubmissionSuccess: () => ({
+    isSubmitting: false,
+    errors: {},
+    lastSubmissionSuccess: true
+  }),
+
+  formSubmissionError: (errors: Record<string, string>) => ({
+    isSubmitting: false,
+    errors,
+    lastSubmissionSuccess: false
+  }),
+
+  formSubmissionLoading: () => ({
+    isSubmitting: true,
+    errors: {},
+    lastSubmissionSuccess: null
   })
-}
+};
 
-// =============================================================================
-// SPECIALIZED TESTING UTILITIES
-// =============================================================================
+// ============================================================================
+// INTEGRATION TEST UTILITIES
+// ============================================================================
 
 /**
- * Performance testing utilities for validating response times
- * 
- * Measures component rendering performance and interaction timing
- * to ensure compliance with sub-100ms validation requirements.
+ * Utilities for integration testing with MSW
  */
-export const performanceTestUtils = {
+export const integrationTestUtils = {
   /**
-   * Measure component render time
+   * Wait for React Query to settle
    */
-  measureRenderTime: async (renderFn: () => Promise<any> | any) => {
-    const startTime = performance.now()
-    await renderFn()
-    const endTime = performance.now()
-    return endTime - startTime
+  waitForQueryToSettle: async (queryClient: QueryClient) => {
+    await new Promise(resolve => {
+      const unsubscribe = queryClient.getQueryCache().subscribe(() => {
+        if (queryClient.isFetching() === 0) {
+          unsubscribe();
+          resolve(void 0);
+        }
+      });
+    });
   },
 
   /**
-   * Measure form validation time
+   * Trigger a mutation and wait for completion
    */
-  measureValidationTime: async (
-    formElement: HTMLFormElement,
-    triggerValidation: () => Promise<void> | void
-  ) => {
-    const startTime = performance.now()
-    await triggerValidation()
-    const endTime = performance.now()
-    return endTime - startTime
+  triggerMutationAndWait: async (queryClient: QueryClient, mutationFn: () => Promise<any>) => {
+    const promise = mutationFn();
+    await integrationTestUtils.waitForQueryToSettle(queryClient);
+    return promise;
   },
 
   /**
-   * Ensure validation meets 100ms requirement
+   * Setup MSW handlers for a test scenario
    */
-  expectValidationUnder100ms: async (validationFn: () => Promise<void> | void) => {
-    const time = await performanceTestUtils.measureValidationTime(
-      document.createElement('form'),
-      validationFn
-    )
-    expect(time).toBeLessThan(100)
+  setupHandlersForScenario: (scenario: 'success' | 'error' | 'loading', handlers: RequestHandler[]) => {
+    // This would be used with MSW's server.use() in individual tests
+    return handlers;
   }
-}
+};
 
-/**
- * Accessibility testing utilities for WCAG 2.1 AA compliance
- * 
- * Provides helpers for testing keyboard navigation, screen reader
- * compatibility, and focus management in limits components.
- */
-export const accessibilityTestUtils = {
-  /**
-   * Test keyboard navigation through form fields
-   */
-  testKeyboardNavigation: async (user: ReturnType<typeof userEvent.setup>) => {
-    // Tab through all focusable elements
-    await user.tab()
-    const firstFocused = document.activeElement
-    
-    // Continue tabbing to test navigation
-    await user.tab()
-    const secondFocused = document.activeElement
-    
-    expect(firstFocused).not.toBe(secondFocused)
-    return { firstFocused, secondFocused }
-  },
+// ============================================================================
+// EXPORTS
+// ============================================================================
 
-  /**
-   * Test escape key handling for modals and dialogs
-   */
-  testEscapeKeyHandling: async (user: ReturnType<typeof userEvent.setup>) => {
-    await user.keyboard('{Escape}')
-  },
-
-  /**
-   * Test ARIA labels and descriptions
-   */
-  testAriaLabels: (element: HTMLElement) => {
-    const ariaLabel = element.getAttribute('aria-label')
-    const ariaLabelledBy = element.getAttribute('aria-labelledby')
-    const ariaDescribedBy = element.getAttribute('aria-describedby')
-    
-    expect(ariaLabel || ariaLabelledBy).toBeTruthy()
-    return { ariaLabel, ariaLabelledBy, ariaDescribedBy }
-  },
-
-  /**
-   * Test focus management in dynamic content
-   */
-  testFocusManagement: (expectedFocusedElement: HTMLElement) => {
-    expect(document.activeElement).toBe(expectedFocusedElement)
-  }
-}
-
-/**
- * Error testing utilities for comprehensive error scenario coverage
- * 
- * Provides helpers for testing various error conditions, validation
- * failures, and error recovery mechanisms in limits management.
- */
-export const errorTestUtils = {
-  /**
-   * Test form validation error display
-   */
-  expectValidationError: (fieldName: string, errorMessage: string) => {
-    const errorElement = screen.getByText(errorMessage)
-    expect(errorElement).toBeInTheDocument()
-    
-    // Check if error is associated with correct field
-    const fieldElement = screen.getByRole('textbox', { name: new RegExp(fieldName, 'i') })
-    expect(fieldElement).toHaveAttribute('aria-invalid', 'true')
-  },
-
-  /**
-   * Test API error handling and user feedback
-   */
-  expectApiError: (errorMessage: string) => {
-    const errorElement = screen.getByRole('alert')
-    expect(errorElement).toHaveTextContent(errorMessage)
-  },
-
-  /**
-   * Test network error scenarios
-   */
-  simulateNetworkError: () => {
-    // This would be used with MSW to simulate network failures
-    return createMockError(500, 'Network error', 'NETWORK_ERROR')
-  }
-}
-
-// =============================================================================
-// TYPE EXPORTS FOR EXTERNAL USE
-// =============================================================================
-
-export type {
-  CustomRenderOptions
-}
-
-/**
- * Re-export testing utilities for convenience
- */
+// Export all utilities for easy importing
 export {
-  screen,
-  userEvent,
-  vi,
-  expect,
-  describe,
-  it,
-  beforeEach,
-  afterEach,
-  beforeAll,
-  afterAll
-} from 'vitest'
+  // Mock factories
+  mockLimitFactory,
+  mockDependentDataFactory,
+  mockFormStateFactory,
+  
+  // MSW handlers
+  limitsApiHandlers,
+  
+  // React Query utilities
+  createTestQueryClient,
+  reactQueryTestUtils,
+  
+  // Zustand utilities
+  createMockLimitsStore,
+  zustandTestUtils,
+  
+  // Testing Library utilities
+  renderWithProviders,
+  renderWithLimitsData,
+  renderWithLoadingState,
+  renderWithErrorState,
+  
+  // Test scenarios
+  testScenarios,
+  
+  // Integration utilities
+  integrationTestUtils
+};
 
-export { waitFor, waitForElementToBeRemoved } from '@testing-library/react'
+// Default export provides the most commonly used handlers
+export default limitsApiHandlers;
