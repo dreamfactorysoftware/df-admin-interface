@@ -1,422 +1,373 @@
-'use client';
+'use client'
 
-/**
- * Service Reports Error Boundary Component
- * 
- * Next.js app router error boundary providing graceful error handling and recovery
- * options for service reports functionality. Implements React Error Boundary with
- * fallback UI, retry mechanisms, and error reporting integration, ensuring robust
- * user experience during service report failures.
- * 
- * Features:
- * - React Error Boundary integration for comprehensive client-side error capture
- * - Error boundary fallback UI rendering with Tailwind CSS styling
- * - Retry mechanisms with exponential backoff for transient failures
- * - Error reporting and recovery options for enhanced reliability
- * - WCAG 2.1 AA compliant accessibility features
- * - Integration with Next.js app router architecture
- * 
- * Requirements Compliance:
- * - Section 4.2.1.1: React Error Boundary integration for comprehensive client-side error capture
- * - Section 4.2.1.1: Error boundary fallback UI rendering through error boundary components
- * - Section 4.2.1: Graceful degradation and optimal user experience across all error scenarios
- * - Section 0.2.1: Next.js app router error boundary component per file-based routing requirements
- * - React/Next.js Integration Requirements: Error reporting and recovery options
- */
+import React, { useEffect, useState } from 'react'
+import { ExclamationTriangleIcon, ArrowPathIcon } from '@heroicons/react/24/outline'
 
-import React, { useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
-
-// ============================================================================
-// ERROR BOUNDARY INTERFACES
-// ============================================================================
-
-interface ErrorBoundaryProps {
-  error: Error & { digest?: string };
-  reset: () => void;
+// Error boundary types
+interface ErrorInfo {
+  componentStack: string
+  errorBoundary?: string
 }
 
-interface ErrorDetails {
-  message: string;
-  stack?: string;
-  digest?: string;
-  timestamp: Date;
-  userAgent: string;
-  url: string;
+interface ErrorBoundaryState {
+  hasError: boolean
+  error: Error | null
+  errorInfo: ErrorInfo | null
+  retryCount: number
+  retryAttempted: boolean
 }
 
-interface RetryState {
-  count: number;
-  isRetrying: boolean;
-  lastAttempt: Date | null;
-  backoffMs: number;
-}
+// Constants for retry logic
+const MAX_RETRY_COUNT = 3
+const BASE_RETRY_DELAY = 1000 // 1 second
+const RETRY_BACKOFF_MULTIPLIER = 2
 
-// ============================================================================
-// ERROR REPORTING UTILITIES
-// ============================================================================
-
-/**
- * Log error details for monitoring and debugging
- * Implements error reporting integration per React/Next.js Integration Requirements
- */
-function logError(errorDetails: ErrorDetails): void {
-  // Log to console in development
-  if (process.env.NODE_ENV === 'development') {
-    console.group('🚨 Service Reports Error Boundary');
-    console.error('Error Message:', errorDetails.message);
-    console.error('Timestamp:', errorDetails.timestamp.toISOString());
-    console.error('URL:', errorDetails.url);
-    console.error('User Agent:', errorDetails.userAgent);
-    if (errorDetails.stack) {
-      console.error('Stack Trace:', errorDetails.stack);
-    }
-    if (errorDetails.digest) {
-      console.error('Error Digest:', errorDetails.digest);
-    }
-    console.groupEnd();
-  }
-
-  // In production, this would integrate with error monitoring services
-  // such as Sentry, DataDog, or similar error reporting platforms
-  try {
-    // Example error reporting (would be configured based on environment)
-    if (typeof window !== 'undefined' && window.navigator.sendBeacon) {
-      const errorPayload = JSON.stringify({
-        level: 'error',
-        message: errorDetails.message,
-        timestamp: errorDetails.timestamp.toISOString(),
-        url: errorDetails.url,
-        userAgent: errorDetails.userAgent,
-        digest: errorDetails.digest,
-        component: 'service-reports-error-boundary',
-        stack: errorDetails.stack?.substring(0, 1000), // Limit stack trace size
-      });
-
-      // Send error data to monitoring endpoint
-      window.navigator.sendBeacon('/api/errors', errorPayload);
-    }
-  } catch (reportingError) {
-    // Silently fail if error reporting fails to avoid recursive errors
-    console.warn('Failed to report error:', reportingError);
-  }
+// Props interface for fallback UI
+interface ErrorFallbackProps {
+  error: Error | null
+  errorInfo: ErrorInfo | null
+  onRetry: () => void
+  retryCount: number
+  canRetry: boolean
+  isRetrying: boolean
 }
 
 /**
- * Calculate exponential backoff delay with jitter
- * Implements retry mechanisms with exponential backoff per Section 4.2.1 error handling flowchart
- */
-function calculateBackoffDelay(retryCount: number): number {
-  const baseDelay = 1000; // 1 second
-  const maxDelay = 30000; // 30 seconds
-  const exponentialDelay = Math.min(baseDelay * Math.pow(2, retryCount), maxDelay);
-  
-  // Add jitter (±25%) to prevent thundering herd
-  const jitter = exponentialDelay * 0.25 * (Math.random() - 0.5);
-  return Math.floor(exponentialDelay + jitter);
-}
-
-// ============================================================================
-// ERROR BOUNDARY COMPONENT
-// ============================================================================
-
-/**
- * Service Reports Error Boundary Component
+ * Service Reports Error Fallback UI Component
  * 
- * Next.js app router error boundary component providing graceful error handling
- * and recovery options for service reports functionality. Implements comprehensive
- * error capture, fallback UI, and retry mechanisms per technical specification.
+ * Provides user-friendly error display with retry mechanisms
+ * and error reporting integration for graceful degradation
  */
-export default function ServiceReportsErrorBoundary({ error, reset }: ErrorBoundaryProps) {
-  const [retryState, setRetryState] = useState<RetryState>({
-    count: 0,
-    isRetrying: false,
-    lastAttempt: null,
-    backoffMs: 0,
-  });
+function ServiceReportsErrorFallback({ 
+  error, 
+  errorInfo, 
+  onRetry, 
+  retryCount, 
+  canRetry,
+  isRetrying 
+}: ErrorFallbackProps) {
+  const [errorDetails, setErrorDetails] = useState(false)
 
-  const [showDetails, setShowDetails] = useState(false);
-  const [errorDetails, setErrorDetails] = useState<ErrorDetails | null>(null);
-
-  // Maximum retry attempts before giving up
-  const MAX_RETRY_ATTEMPTS = 3;
-
-  /**
-   * Initialize error details and logging on component mount
-   */
-  useEffect(() => {
-    const details: ErrorDetails = {
-      message: error.message,
-      stack: error.stack,
-      digest: error.digest,
-      timestamp: new Date(),
-      userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : 'server',
-      url: typeof window !== 'undefined' ? window.location.href : 'unknown',
-    };
-
-    setErrorDetails(details);
-    logError(details);
-  }, [error]);
-
-  /**
-   * Handle retry attempt with exponential backoff
-   * Implements retry mechanisms with exponential backoff per Section 4.2.1
-   */
-  const handleRetry = async () => {
-    if (retryState.count >= MAX_RETRY_ATTEMPTS) {
-      return;
+  // Determine error type and message
+  const getErrorDisplayInfo = () => {
+    if (!error) {
+      return {
+        title: 'Service Reports Unavailable',
+        message: 'An unexpected error occurred while loading service reports.',
+        type: 'general' as const
+      }
     }
 
-    const backoffDelay = calculateBackoffDelay(retryState.count);
+    const errorMessage = error.message || 'Unknown error'
     
-    setRetryState(prev => ({
-      ...prev,
-      isRetrying: true,
-      backoffMs: backoffDelay,
-    }));
-
-    // Wait for backoff delay
-    await new Promise(resolve => setTimeout(resolve, backoffDelay));
-
-    setRetryState(prev => ({
-      count: prev.count + 1,
-      isRetrying: false,
-      lastAttempt: new Date(),
-      backoffMs: 0,
-    }));
-
-    // Attempt to reset the error boundary
-    reset();
-  };
-
-  /**
-   * Handle page refresh as fallback recovery option
-   */
-  const handleRefresh = () => {
-    if (typeof window !== 'undefined') {
-      window.location.reload();
+    // Categorize common error types
+    if (errorMessage.includes('Network') || errorMessage.includes('fetch')) {
+      return {
+        title: 'Network Connection Error',
+        message: 'Unable to connect to the service reports API. Please check your network connection.',
+        type: 'network' as const
+      }
     }
-  };
-
-  /**
-   * Handle navigation back to dashboard
-   */
-  const handleGoToDashboard = () => {
-    if (typeof window !== 'undefined') {
-      window.location.href = '/';
+    
+    if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
+      return {
+        title: 'Authentication Required',
+        message: 'Your session may have expired. Please refresh the page to log in again.',
+        type: 'auth' as const
+      }
     }
-  };
+    
+    if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
+      return {
+        title: 'Access Denied',
+        message: 'You do not have permission to view service reports. Contact your administrator.',
+        type: 'permission' as const
+      }
+    }
+    
+    if (errorMessage.includes('500') || errorMessage.includes('Server')) {
+      return {
+        title: 'Server Error',
+        message: 'The service reports system is temporarily unavailable. Please try again later.',
+        type: 'server' as const
+      }
+    }
 
-  /**
-   * Toggle error details visibility
-   */
-  const toggleDetails = () => {
-    setShowDetails(prev => !prev);
-  };
+    return {
+      title: 'Service Reports Error',
+      message: errorMessage,
+      type: 'general' as const
+    }
+  }
 
-  /**
-   * Determine if retry is available
-   */
-  const canRetry = retryState.count < MAX_RETRY_ATTEMPTS && !retryState.isRetrying;
+  const { title, message, type } = getErrorDisplayInfo()
+
+  // Error reporting - Log error for monitoring
+  useEffect(() => {
+    if (error) {
+      // Basic error logging - will integrate with error-reporting.ts when available
+      console.error('Service Reports Error:', {
+        error: error.message,
+        stack: error.stack,
+        componentStack: errorInfo?.componentStack,
+        retryCount,
+        timestamp: new Date().toISOString(),
+        userAgent: navigator.userAgent,
+        url: window.location.href
+      })
+
+      // TODO: Integrate with error-reporting.ts service when available
+      // errorReportingService.report({
+      //   error,
+      //   context: 'service-reports',
+      //   severity: 'high',
+      //   metadata: { retryCount, errorInfo }
+      // })
+    }
+  }, [error, errorInfo, retryCount])
 
   return (
-    <div className="min-h-96 flex items-center justify-center p-6">
-      <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg border border-red-200 dark:border-red-800 shadow-lg">
-        {/* Error Header */}
-        <div className="p-6 border-b border-red-200 dark:border-red-800">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <svg
-                className="h-8 w-8 text-red-500"
-                fill="none"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                aria-hidden="true"
-              >
-                <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <h2 className="text-lg font-semibold text-red-800 dark:text-red-200">
-                Service Reports Error
-              </h2>
-              <p className="text-sm text-red-600 dark:text-red-400">
-                An error occurred while loading the service reports
-              </p>
+    <div className="min-h-96 flex items-center justify-center p-6" role="alert" aria-live="polite">
+      <div className="max-w-lg w-full">
+        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-lg p-8">
+          {/* Error Icon */}
+          <div className="flex justify-center mb-6">
+            <div className={`rounded-full p-3 ${
+              type === 'network' ? 'bg-orange-100 dark:bg-orange-900/20' :
+              type === 'auth' ? 'bg-yellow-100 dark:bg-yellow-900/20' :
+              type === 'permission' ? 'bg-red-100 dark:bg-red-900/20' :
+              'bg-red-100 dark:bg-red-900/20'
+            }`}>
+              <ExclamationTriangleIcon className={`h-8 w-8 ${
+                type === 'network' ? 'text-orange-600 dark:text-orange-400' :
+                type === 'auth' ? 'text-yellow-600 dark:text-yellow-400' :
+                type === 'permission' ? 'text-red-600 dark:text-red-400' :
+                'text-red-600 dark:text-red-400'
+              }`} />
             </div>
           </div>
-        </div>
 
-        {/* Error Content */}
-        <div className="p-6">
+          {/* Error Message */}
+          <div className="text-center mb-8">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
+              {title}
+            </h2>
+            <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+              {message}
+            </p>
+          </div>
+
+          {/* Action Buttons */}
           <div className="space-y-4">
-            {/* Error Message */}
-            <div>
-              <p className="text-sm text-gray-700 dark:text-gray-300">
-                {error.message || 'An unexpected error occurred while processing service reports.'}
-              </p>
-            </div>
-
-            {/* Retry Information */}
-            {retryState.count > 0 && (
-              <div className="text-xs text-gray-500 dark:text-gray-400">
-                Retry attempts: {retryState.count} / {MAX_RETRY_ATTEMPTS}
-                {retryState.lastAttempt && (
-                  <span className="ml-2">
-                    Last attempt: {retryState.lastAttempt.toLocaleTimeString()}
-                  </span>
-                )}
-              </div>
-            )}
-
-            {/* Retry Loading State */}
-            {retryState.isRetrying && (
-              <div className="flex items-center space-x-2 text-sm text-blue-600 dark:text-blue-400">
-                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
-                </svg>
-                <span>
-                  Retrying in {Math.ceil(retryState.backoffMs / 1000)} seconds...
-                </span>
-              </div>
-            )}
-
-            {/* Action Buttons */}
-            <div className="flex flex-col space-y-3">
-              {/* Retry Button */}
-              {canRetry && (
-                <Button
-                  onClick={handleRetry}
-                  variant="default"
-                  size="default"
-                  fullWidth
-                  disabled={retryState.isRetrying}
-                  className="flex items-center justify-center space-x-2"
-                >
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  <span>Retry Loading</span>
-                </Button>
-              )}
-
-              {/* Alternative Actions */}
-              <div className="flex space-x-3">
-                <Button
-                  onClick={handleRefresh}
-                  variant="outline"
-                  size="default"
-                  className="flex-1"
-                >
-                  Refresh Page
-                </Button>
-                <Button
-                  onClick={handleGoToDashboard}
-                  variant="secondary"
-                  size="default"
-                  className="flex-1"
-                >
-                  Go to Dashboard
-                </Button>
-              </div>
-            </div>
-
-            {/* Error Details Toggle */}
-            <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+            {/* Retry Button */}
+            {canRetry && (
               <button
-                onClick={toggleDetails}
-                className="flex items-center justify-between w-full text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
-                aria-expanded={showDetails}
-                aria-controls="error-details"
+                onClick={onRetry}
+                disabled={isRetrying}
+                className="w-full flex items-center justify-center px-4 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                aria-label={isRetrying ? 'Retrying...' : `Retry loading service reports (${retryCount}/${MAX_RETRY_COUNT} attempts)`}
               >
-                <span>Error Details</span>
-                <svg
-                  className={cn(
-                    'h-4 w-4 transition-transform',
-                    showDetails ? 'rotate-180' : ''
-                  )}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                </svg>
+                <ArrowPathIcon className={`h-5 w-5 mr-2 ${isRetrying ? 'animate-spin' : ''}`} />
+                {isRetrying ? 'Retrying...' : 'Try Again'}
               </button>
+            )}
 
-              {/* Expandable Error Details */}
-              {showDetails && errorDetails && (
-                <div id="error-details" className="mt-3 space-y-3">
-                  <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-md">
-                    <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                      Error Information
-                    </h4>
-                    <div className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
-                      <div>
-                        <span className="font-medium">Time:</span>{' '}
-                        {errorDetails.timestamp.toLocaleString()}
-                      </div>
-                      {errorDetails.digest && (
-                        <div>
-                          <span className="font-medium">Error ID:</span>{' '}
-                          {errorDetails.digest}
-                        </div>
-                      )}
-                      <div>
-                        <span className="font-medium">URL:</span>{' '}
-                        <span className="break-all">{errorDetails.url}</span>
-                      </div>
+            {/* Refresh Page Button */}
+            <button
+              onClick={() => window.location.reload()}
+              className="w-full flex items-center justify-center px-4 py-3 border border-gray-300 dark:border-gray-600 text-base font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors duration-200"
+            >
+              Refresh Page
+            </button>
+
+            {/* Additional Help Actions */}
+            {type === 'permission' && (
+              <button
+                onClick={() => window.location.href = '/admin-settings'}
+                className="w-full flex items-center justify-center px-4 py-3 border border-gray-300 dark:border-gray-600 text-base font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors duration-200"
+              >
+                Go to Admin Settings
+              </button>
+            )}
+
+            {type === 'auth' && (
+              <button
+                onClick={() => window.location.href = '/login'}
+                className="w-full flex items-center justify-center px-4 py-3 border border-gray-300 dark:border-gray-600 text-base font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors duration-200"
+              >
+                Sign In Again
+              </button>
+            )}
+          </div>
+
+          {/* Error Details Toggle */}
+          {error && (
+            <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+              <button
+                onClick={() => setErrorDetails(!errorDetails)}
+                className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+              >
+                {errorDetails ? 'Hide' : 'Show'} Error Details
+              </button>
+              
+              {errorDetails && (
+                <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-md">
+                  <div className="text-xs font-mono text-gray-600 dark:text-gray-300 break-all">
+                    <div className="mb-2">
+                      <strong>Error:</strong> {error.message}
                     </div>
+                    {error.stack && (
+                      <div className="mb-2">
+                        <strong>Stack:</strong>
+                        <pre className="mt-1 whitespace-pre-wrap text-xs">{error.stack}</pre>
+                      </div>
+                    )}
+                    {errorInfo?.componentStack && (
+                      <div>
+                        <strong>Component Stack:</strong>
+                        <pre className="mt-1 whitespace-pre-wrap text-xs">{errorInfo.componentStack}</pre>
+                      </div>
+                    )}
                   </div>
-
-                  {/* Stack Trace (Development Only) */}
-                  {process.env.NODE_ENV === 'development' && errorDetails.stack && (
-                    <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-md">
-                      <h4 className="text-xs font-semibold text-red-700 dark:text-red-300 mb-2">
-                        Stack Trace (Development)
-                      </h4>
-                      <pre className="text-xs text-red-600 dark:text-red-400 overflow-x-auto whitespace-pre-wrap">
-                        {errorDetails.stack}
-                      </pre>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
-          </div>
-        </div>
+          )}
 
-        {/* Footer with Help Information */}
-        <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700 rounded-b-lg">
-          <p className="text-xs text-gray-600 dark:text-gray-400">
-            If this problem persists, please contact your system administrator or check the
-            {' '}
-            <a
-              href="/api-docs"
-              className="text-blue-600 dark:text-blue-400 hover:underline"
-            >
-              API documentation
-            </a>
-            {' '}
-            for troubleshooting guidance.
-          </p>
+          {/* Retry Count Information */}
+          {retryCount > 0 && (
+            <div className="mt-4 text-center">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Retry attempts: {retryCount} of {MAX_RETRY_COUNT}
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
-  );
+  )
+}
+
+/**
+ * React Error Boundary Class Component for Service Reports
+ * 
+ * Implements comprehensive error catching with:
+ * - React Error Boundary integration per Section 4.2.1.1
+ * - Exponential backoff retry mechanisms per Section 4.2.1
+ * - Error reporting and recovery options per React/Next.js Integration Requirements
+ * - Graceful degradation and optimal user experience per Section 4.2.1
+ */
+export default class ServiceReportsErrorBoundary extends React.Component<
+  React.PropsWithChildren<{}>,
+  ErrorBoundaryState
+> {
+  private retryTimeoutId: NodeJS.Timeout | null = null
+
+  constructor(props: React.PropsWithChildren<{}>) {
+    super(props)
+
+    this.state = {
+      hasError: false,
+      error: null,
+      errorInfo: null,
+      retryCount: 0,
+      retryAttempted: false
+    }
+  }
+
+  static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
+    // Update state so the next render will show the fallback UI
+    return {
+      hasError: true,
+      error
+    }
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    // Log the error information
+    console.error('Service Reports Error Boundary caught an error:', error, errorInfo)
+    
+    this.setState({
+      error,
+      errorInfo
+    })
+  }
+
+  componentWillUnmount() {
+    // Clean up timeout if component unmounts
+    if (this.retryTimeoutId) {
+      clearTimeout(this.retryTimeoutId)
+    }
+  }
+
+  /**
+   * Retry mechanism with exponential backoff
+   * Implements retry logic per Section 4.2.1 error handling flowchart
+   */
+  handleRetry = () => {
+    const { retryCount } = this.state
+
+    if (retryCount >= MAX_RETRY_COUNT) {
+      return
+    }
+
+    // Calculate delay with exponential backoff
+    const delay = BASE_RETRY_DELAY * Math.pow(RETRY_BACKOFF_MULTIPLIER, retryCount)
+
+    this.setState({
+      retryAttempted: true
+    })
+
+    // Set timeout for retry with exponential backoff
+    this.retryTimeoutId = setTimeout(() => {
+      this.setState({
+        hasError: false,
+        error: null,
+        errorInfo: null,
+        retryCount: retryCount + 1,
+        retryAttempted: false
+      })
+    }, delay)
+  }
+
+  render() {
+    const { hasError, error, errorInfo, retryCount, retryAttempted } = this.state
+    const { children } = this.props
+
+    if (hasError) {
+      const canRetry = retryCount < MAX_RETRY_COUNT
+
+      return (
+        <ServiceReportsErrorFallback
+          error={error}
+          errorInfo={errorInfo}
+          onRetry={this.handleRetry}
+          retryCount={retryCount}
+          canRetry={canRetry}
+          isRetrying={retryAttempted}
+        />
+      )
+    }
+
+    return children
+  }
+}
+
+// Named export for specific use cases
+export { ServiceReportsErrorBoundary, ServiceReportsErrorFallback }
+
+// Additional utility types for integration with error reporting service
+export interface ServiceReportsErrorContext {
+  component: 'service-reports'
+  route: '/system-settings/reports'
+  retryCount: number
+  userAgent: string
+  timestamp: string
+}
+
+export interface ServiceReportsErrorReport {
+  error: Error
+  context: ServiceReportsErrorContext
+  severity: 'low' | 'medium' | 'high' | 'critical'
+  metadata?: Record<string, unknown>
 }
