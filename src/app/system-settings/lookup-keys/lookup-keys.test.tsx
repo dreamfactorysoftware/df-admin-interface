@@ -1,1812 +1,1215 @@
 /**
- * Comprehensive Vitest Test Suite for Global Lookup Keys Management
+ * Lookup Keys Management Test Suite
  * 
- * This test suite provides comprehensive coverage for lookup keys management components
- * within the system settings section. Implements Vitest 2.1.0 with React Testing Library
- * patterns and MSW for realistic API mocking, targeting 90%+ code coverage.
+ * Comprehensive Vitest test suite for global lookup keys management components
+ * within the system settings section. Implements React Testing Library patterns
+ * with MSW for API mocking, providing comprehensive test coverage for lookup key
+ * operations, form validation, user interactions, error handling, and accessibility
+ * compliance including keyboard navigation and screen reader support.
  * 
- * Key Features:
- * - React Testing Library for component testing
- * - MSW (Mock Service Worker) for realistic API mocking  
- * - Accessibility testing with jest-axe
- * - Form validation testing (React Hook Form + Zod)
- * - SWR/React Query hooks testing
- * - User interaction testing
- * - Error handling and edge case coverage
- * - Performance validation (<100ms validation)
- * 
- * Conversion Notes:
- * - Migrated from Angular TestBed to React Testing Library
- * - Replaced Angular Jest/Karma with Vitest for 10x faster execution
- * - Enhanced accessibility compliance testing per WCAG 2.1 AA
- * - Added comprehensive API mocking with MSW
+ * Test Coverage Areas:
+ * - Page component rendering and server-side rendering (SSR)
+ * - Form component validation and user interactions
+ * - Custom hook data operations and state management
+ * - SWR/React Query integration and caching behavior
+ * - MSW API mocking for realistic testing scenarios
+ * - WCAG 2.1 AA accessibility compliance validation
+ * - Keyboard navigation and focus management
+ * - Error handling and edge case scenarios
+ * - Performance requirements validation
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
-import { axe, toHaveNoViolations } from 'jest-axe';
-import userEvent from '@testing-library/user-event';
+import React from 'react';
+import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
+import { 
+  screen, 
+  waitFor, 
+  waitForElementToBeRemoved,
+  within,
+  fireEvent
+} from '@testing-library/react';
+import { userEvent } from '@testing-library/user-event';
+import { axe, type AxeResults } from 'axe-core';
+import { rest } from 'msw';
 import { server } from '@/test/mocks/server';
-import { http, HttpResponse } from 'msw';
-
-// Add jest-axe matcher for accessibility testing
-expect.extend(toHaveNoViolations);
+import { QueryClient } from '@tanstack/react-query';
+import { 
+  renderWithProviders,
+  renderWithQuery,
+  renderWithForm,
+  accessibilityUtils,
+  testUtils
+} from '@/test/utils/test-utils';
 
 // Import components under test
 import LookupKeysPage from './page';
-import { LookupKeysForm } from './lookup-keys-form';
+import LookupKeysForm from './lookup-keys-form';
 import { useLookupKeys } from './use-lookup-keys';
 
-// Import test utilities and mocks
-import { TestWrapper } from '@/test/utils/test-wrapper';
-import { mockLookupKeysData, createMockLookupKey } from '@/test/mocks/mock-data';
-
-// Mock Next.js navigation
-const mockPush = vi.fn();
-const mockRefresh = vi.fn();
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({
-    push: mockPush,
-    refresh: mockRefresh,
-  }),
-}));
-
-// Mock notifications/toast
-const mockToast = vi.fn();
-vi.mock('@/hooks/use-toast', () => ({
-  useToast: () => ({
-    toast: mockToast,
-  }),
-}));
-
-// Mock validation timing for performance testing
-const mockValidationTimer = vi.fn();
-
-/**
- * Test Wrapper Component with Providers
- * 
- * Wraps components with necessary providers:
- * - SWR configuration
- * - Theme provider
- * - Error boundary
- * - Mock router context
- */
-const WrapperComponent = ({ children }: { children: React.ReactNode }) => (
-  <TestWrapper>
-    {children}
-  </TestWrapper>
-);
-
-// =============================================================================
-// MOCK DATA SETUP
-// =============================================================================
+// Mock data factories
+const mockLookupKey = {
+  id: 1,
+  name: 'test_key',
+  value: 'Test Value',
+  description: 'Test lookup key description',
+  private: false,
+  created_date: '2024-01-01T10:00:00.000Z',
+  last_modified_date: '2024-01-01T10:00:00.000Z',
+};
 
 const mockLookupKeys = [
+  mockLookupKey,
   {
-    id: 1,
-    name: 'test_key_1',
-    value: 'Test Value 1',
-    private: false,
-  },
-  {
-    id: 2, 
-    name: 'test_key_2',
-    value: 'Test Value 2',
+    id: 2,
+    name: 'private_key',
+    value: 'Private Value',
+    description: 'Private lookup key',
     private: true,
+    created_date: '2024-01-02T10:00:00.000Z',
+    last_modified_date: '2024-01-02T10:00:00.000Z',
   },
   {
     id: 3,
-    name: 'app_config',
-    value: 'Application Configuration',
+    name: 'system_config',
+    value: 'System Configuration',
+    description: 'System configuration key',
     private: false,
-  },
+    created_date: '2024-01-03T10:00:00.000Z',
+    last_modified_date: '2024-01-03T10:00:00.000Z',
+  }
 ];
 
-const mockEmptyLookupKeys: any[] = [];
+// MSW handlers for lookup keys API
+const lookupKeysHandlers = [
+  // GET /api/v2/system/lookup_key - List all lookup keys
+  rest.get('/api/v2/system/lookup_key', (req, res, ctx) => {
+    const limit = req.url.searchParams.get('limit');
+    const offset = req.url.searchParams.get('offset');
+    const includeCount = req.url.searchParams.get('include_count');
+    
+    const startIndex = offset ? parseInt(offset) : 0;
+    const limitNum = limit ? parseInt(limit) : mockLookupKeys.length;
+    const paginatedData = mockLookupKeys.slice(startIndex, startIndex + limitNum);
+    
+    return res(
+      ctx.status(200),
+      ctx.json({
+        resource: paginatedData,
+        meta: includeCount === 'true' ? { count: mockLookupKeys.length } : undefined
+      })
+    );
+  }),
 
-// =============================================================================
-// MSW HANDLER SETUP
-// =============================================================================
+  // POST /api/v2/system/lookup_key - Create new lookup key
+  rest.post('/api/v2/system/lookup_key', async (req, res, ctx) => {
+    const body = await req.json();
+    const newLookupKey = {
+      id: mockLookupKeys.length + 1,
+      ...body,
+      created_date: new Date().toISOString(),
+      last_modified_date: new Date().toISOString(),
+    };
+    
+    return res(
+      ctx.status(201),
+      ctx.json({
+        resource: [newLookupKey]
+      })
+    );
+  }),
 
-/**
- * Setup MSW handlers for lookup keys API endpoints
- * Provides realistic API mocking for development and testing
- */
-const setupMockHandlers = (scenario: 'success' | 'error' | 'empty' | 'validation' = 'success') => {
-  const handlers = [];
+  // PUT /api/v2/system/lookup_key/[id] - Update existing lookup key
+  rest.put('/api/v2/system/lookup_key/:id', async (req, res, ctx) => {
+    const { id } = req.params;
+    const body = await req.json();
+    const updatedKey = {
+      ...mockLookupKey,
+      id: parseInt(id as string),
+      ...body,
+      last_modified_date: new Date().toISOString(),
+    };
+    
+    return res(
+      ctx.status(200),
+      ctx.json({
+        resource: [updatedKey]
+      })
+    );
+  }),
 
-  // GET /api/v2/system/constant - Fetch lookup keys
-  handlers.push(
-    http.get('/api/v2/system/constant', ({ request }) => {
-      const url = new URL(request.url);
-      const include_count = url.searchParams.get('include_count');
-      
-      switch (scenario) {
-        case 'error':
-          return HttpResponse.json(
-            {
-              error: {
-                code: 500,
-                message: 'Internal server error retrieving lookup keys',
-                status_code: 500,
-              },
-            },
-            { status: 500 }
-          );
-        case 'empty':
-          return HttpResponse.json({
-            resource: mockEmptyLookupKeys,
-            meta: include_count ? { count: 0 } : undefined,
-          });
-        default:
-          return HttpResponse.json({
-            resource: mockLookupKeys,
-            meta: include_count ? { count: mockLookupKeys.length } : undefined,
-          });
-      }
-    })
-  );
+  // DELETE /api/v2/system/lookup_key/[id] - Delete lookup key
+  rest.delete('/api/v2/system/lookup_key/:id', (req, res, ctx) => {
+    return res(
+      ctx.status(200),
+      ctx.json({
+        success: true
+      })
+    );
+  }),
 
-  // POST /api/v2/system/constant - Create lookup keys
-  handlers.push(
-    http.post('/api/v2/system/constant', async ({ request }) => {
-      const body = await request.json() as { resource: any[] };
-      
-      if (scenario === 'validation') {
-        return HttpResponse.json(
-          {
-            error: {
-              code: 422,
-              message: 'Validation error',
-              status_code: 422,
-              context: {
-                field_errors: {
-                  'resource.0.name': ['Name already exists'],
-                },
-              },
-            },
-          },
-          { status: 422 }
+  // GET /api/v2/system/lookup_key/[id] - Get single lookup key
+  rest.get('/api/v2/system/lookup_key/:id', (req, res, ctx) => {
+    const { id } = req.params;
+    const lookupKey = mockLookupKeys.find(key => key.id === parseInt(id as string));
+    
+    if (!lookupKey) {
+      return res(
+        ctx.status(404),
+        ctx.json({
+          error: {
+            code: 404,
+            message: 'Lookup key not found'
+          }
+        })
+      );
+    }
+    
+    return res(
+      ctx.status(200),
+      ctx.json({
+        resource: [lookupKey]
+      })
+    );
+  }),
+
+  // Validation endpoint for unique name checking
+  rest.get('/api/v2/system/lookup_key', (req, res, ctx) => {
+    const filter = req.url.searchParams.get('filter');
+    if (filter && filter.includes('name=')) {
+      const nameMatch = filter.match(/name=([^&]+)/);
+      if (nameMatch) {
+        const name = decodeURIComponent(nameMatch[1]);
+        const existingKey = mockLookupKeys.find(key => key.name === name);
+        return res(
+          ctx.status(200),
+          ctx.json({
+            resource: existingKey ? [existingKey] : [],
+            meta: { count: existingKey ? 1 : 0 }
+          })
         );
       }
+    }
+    
+    return res(
+      ctx.status(200),
+      ctx.json({
+        resource: mockLookupKeys,
+        meta: { count: mockLookupKeys.length }
+      })
+    );
+  }),
+];
 
-      if (scenario === 'error') {
-        return HttpResponse.json(
-          {
-            error: {
-              code: 500,
-              message: 'Internal server error creating lookup keys',
-              status_code: 500,
-            },
-          },
-          { status: 500 }
-        );
-      }
+// Error scenario handlers
+const lookupKeysErrorHandlers = [
+  rest.get('/api/v2/system/lookup_key', (req, res, ctx) => {
+    return res(
+      ctx.status(500),
+      ctx.json({
+        error: {
+          code: 500,
+          message: 'Internal server error'
+        }
+      })
+    );
+  }),
 
-      // Simulate successful creation
-      const createdKeys = (body.resource || []).map((key, index) => ({
-        ...key,
-        id: mockLookupKeys.length + index + 1,
-        created_date: new Date().toISOString(),
-        last_modified_date: new Date().toISOString(),
-      }));
+  rest.post('/api/v2/system/lookup_key', (req, res, ctx) => {
+    return res(
+      ctx.status(422),
+      ctx.json({
+        error: {
+          code: 422,
+          message: 'Validation failed',
+          context: {
+            field_errors: {
+              name: ['Name already exists']
+            }
+          }
+        }
+      })
+    );
+  }),
+];
 
-      return HttpResponse.json({
-        resource: createdKeys,
-      });
-    })
-  );
-
-  // PUT /api/v2/system/constant/{id} - Update lookup key
-  handlers.push(
-    http.put('/api/v2/system/constant/:id', async ({ params, request }) => {
-      const { id } = params;
-      const body = await request.json() as any;
-
-      if (scenario === 'validation') {
-        return HttpResponse.json(
-          {
-            error: {
-              code: 422,
-              message: 'Validation error',
-              status_code: 422,
-              context: {
-                field_errors: {
-                  name: ['Name already exists'],
-                },
-              },
-            },
-          },
-          { status: 422 }
-        );
-      }
-
-      if (scenario === 'error') {
-        return HttpResponse.json(
-          {
-            error: {
-              code: 500,
-              message: 'Internal server error updating lookup key',
-              status_code: 500,
-            },
-          },
-          { status: 500 }
-        );
-      }
-
-      // Find and update the key
-      const existingKey = mockLookupKeys.find(key => key.id === parseInt(id as string));
-      if (!existingKey) {
-        return HttpResponse.json(
-          {
-            error: {
-              code: 404,
-              message: 'Lookup key not found',
-              status_code: 404,
-            },
-          },
-          { status: 404 }
-        );
-      }
-
-      const updatedKey = {
-        ...existingKey,
-        ...body,
-        last_modified_date: new Date().toISOString(),
-      };
-
-      return HttpResponse.json(updatedKey);
-    })
-  );
-
-  // DELETE /api/v2/system/constant/{id} - Delete lookup key
-  handlers.push(
-    http.delete('/api/v2/system/constant/:id', ({ params }) => {
-      const { id } = params;
-
-      if (scenario === 'error') {
-        return HttpResponse.json(
-          {
-            error: {
-              code: 500,
-              message: 'Internal server error deleting lookup key',
-              status_code: 500,
-            },
-          },
-          { status: 500 }
-        );
-      }
-
-      return HttpResponse.json({ success: true });
-    })
-  );
-
-  return handlers;
-};
-
-// =============================================================================
-// MAIN TEST SUITES
-// =============================================================================
-
-describe('LookupKeysPage Component', () => {
+describe('Lookup Keys Management', () => {
   let user: ReturnType<typeof userEvent.setup>;
 
   beforeEach(() => {
-    // Setup user event with realistic timing
-    user = userEvent.setup({
-      delay: null, // No artificial delay for testing
-    });
-
-    // Clear all mocks
-    vi.clearAllMocks();
-    mockPush.mockClear();
-    mockRefresh.mockClear();
-    mockToast.mockClear();
-
-    // Setup default successful mock handlers
-    server.use(...setupMockHandlers('success'));
+    user = userEvent.setup();
+    server.use(...lookupKeysHandlers);
   });
 
   afterEach(() => {
-    // Reset handlers after each test
     server.resetHandlers();
   });
 
-  describe('Component Rendering', () => {
-    it('should render without crashing', async () => {
-      render(
-        <WrapperComponent>
-          <LookupKeysPage />
-        </WrapperComponent>
-      );
+  describe('Page Component', () => {
+    test('renders lookup keys page with correct structure and SSR support', async () => {
+      const { container } = renderWithProviders(<LookupKeysPage />);
 
-      // Wait for initial data load
+      // Test SSR-compatible structure
+      expect(screen.getByRole('main')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: /global lookup keys/i })).toBeInTheDocument();
+      
+      // Test page metadata and accessibility
+      expect(container.querySelector('main')).toHaveAttribute('data-testid', 'lookup-keys-page');
+      
+      // Wait for data to load
       await waitFor(() => {
-        expect(screen.getByTestId('lookup-keys-page')).toBeInTheDocument();
+        expect(screen.getByText('test_key')).toBeInTheDocument();
       });
+
+      // Test table structure with accessibility
+      const table = screen.getByRole('table');
+      expect(table).toBeInTheDocument();
+      expect(table).toHaveAttribute('aria-label');
+      
+      const columnHeaders = within(table).getAllByRole('columnheader');
+      expect(columnHeaders).toHaveLength(5); // Name, Value, Description, Private, Actions
+      
+      expect(columnHeaders[0]).toHaveTextContent('Name');
+      expect(columnHeaders[1]).toHaveTextContent('Value');
+      expect(columnHeaders[2]).toHaveTextContent('Description');
+      expect(columnHeaders[3]).toHaveTextContent('Private');
+      expect(columnHeaders[4]).toHaveTextContent('Actions');
     });
 
-    it('should display page title and description', async () => {
-      render(
-        <WrapperComponent>
-          <LookupKeysPage />
-        </WrapperComponent>
-      );
+    test('renders create new lookup key button with proper accessibility', async () => {
+      renderWithProviders(<LookupKeysPage />);
 
-      await waitFor(() => {
-        expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/Global Lookup Keys/i);
-        expect(screen.getByText(/Manage global lookup key-value pairs/i)).toBeInTheDocument();
-      });
+      const createButton = screen.getByRole('button', { name: /create new lookup key/i });
+      expect(createButton).toBeInTheDocument();
+      expect(createButton).toHaveAttribute('aria-label');
+      expect(createButton).not.toHaveAttribute('disabled');
+
+      // Test keyboard accessibility
+      createButton.focus();
+      expect(createButton).toHaveFocus();
+      
+      await user.keyboard('{Enter}');
+      // Should open the create form
     });
 
-    it('should render lookup keys table with data', async () => {
-      render(
-        <WrapperComponent>
-          <LookupKeysPage />
-        </WrapperComponent>
-      );
-
-      await waitFor(() => {
-        // Check for table headers
-        expect(screen.getByRole('columnheader', { name: /name/i })).toBeInTheDocument();
-        expect(screen.getByRole('columnheader', { name: /value/i })).toBeInTheDocument();
-        expect(screen.getByRole('columnheader', { name: /private/i })).toBeInTheDocument();
-        expect(screen.getByRole('columnheader', { name: /actions/i })).toBeInTheDocument();
-
-        // Check for lookup key data
-        expect(screen.getByText('test_key_1')).toBeInTheDocument();
-        expect(screen.getByText('Test Value 1')).toBeInTheDocument();
-        expect(screen.getByText('test_key_2')).toBeInTheDocument();
+    test('displays loading state correctly', () => {
+      // Render with loading state
+      renderWithQuery(<LookupKeysPage />, {
+        initialData: {},
       });
-    });
 
-    it('should show loading state initially', () => {
-      render(
-        <WrapperComponent>
-          <LookupKeysPage />
-        </WrapperComponent>
-      );
-
+      // Check for loading indicators
       expect(screen.getByTestId('lookup-keys-loading')).toBeInTheDocument();
+      expect(screen.getByRole('progressbar')).toBeInTheDocument();
     });
 
-    it('should show empty state when no lookup keys exist', async () => {
-      server.use(...setupMockHandlers('empty'));
-
-      render(
-        <WrapperComponent>
-          <LookupKeysPage />
-        </WrapperComponent>
-      );
+    test('displays error state with retry functionality', async () => {
+      server.use(...lookupKeysErrorHandlers);
+      
+      renderWithProviders(<LookupKeysPage />);
 
       await waitFor(() => {
-        expect(screen.getByTestId('lookup-keys-empty-state')).toBeInTheDocument();
-        expect(screen.getByText(/No lookup keys found/i)).toBeInTheDocument();
-      });
-    });
-
-    it('should show error state when API fails', async () => {
-      server.use(...setupMockHandlers('error'));
-
-      render(
-        <WrapperComponent>
-          <LookupKeysPage />
-        </WrapperComponent>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByTestId('lookup-keys-error-state')).toBeInTheDocument();
-        expect(screen.getByText(/Failed to load lookup keys/i)).toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('User Interactions', () => {
-    it('should open create form when "Add Lookup Key" button is clicked', async () => {
-      render(
-        <WrapperComponent>
-          <LookupKeysPage />
-        </WrapperComponent>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByTestId('lookup-keys-page')).toBeInTheDocument();
+        expect(screen.getByTestId('lookup-keys-error')).toBeInTheDocument();
       });
 
-      const addButton = screen.getByRole('button', { name: /add lookup key/i });
-      await user.click(addButton);
+      const errorMessage = screen.getByText(/failed to load lookup keys/i);
+      expect(errorMessage).toBeInTheDocument();
 
-      expect(screen.getByTestId('lookup-keys-form-dialog')).toBeInTheDocument();
-      expect(screen.getByRole('heading', { name: /create lookup key/i })).toBeInTheDocument();
-    });
-
-    it('should open edit form when edit button is clicked', async () => {
-      render(
-        <WrapperComponent>
-          <LookupKeysPage />
-        </WrapperComponent>
-      );
+      const retryButton = screen.getByRole('button', { name: /retry/i });
+      expect(retryButton).toBeInTheDocument();
+      
+      // Test retry functionality
+      server.use(...lookupKeysHandlers); // Reset to success handlers
+      await user.click(retryButton);
 
       await waitFor(() => {
-        expect(screen.getByText('test_key_1')).toBeInTheDocument();
-      });
-
-      const editButtons = screen.getAllByRole('button', { name: /edit/i });
-      await user.click(editButtons[0]);
-
-      expect(screen.getByTestId('lookup-keys-form-dialog')).toBeInTheDocument();
-      expect(screen.getByRole('heading', { name: /edit lookup key/i })).toBeInTheDocument();
-      expect(screen.getByDisplayValue('test_key_1')).toBeInTheDocument();
-    });
-
-    it('should confirm deletion when delete button is clicked', async () => {
-      render(
-        <WrapperComponent>
-          <LookupKeysPage />
-        </WrapperComponent>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('test_key_1')).toBeInTheDocument();
-      });
-
-      const deleteButtons = screen.getAllByRole('button', { name: /delete/i });
-      await user.click(deleteButtons[0]);
-
-      expect(screen.getByTestId('confirm-delete-dialog')).toBeInTheDocument();
-      expect(screen.getByText(/Are you sure you want to delete/i)).toBeInTheDocument();
-    });
-
-    it('should handle bulk operations with selected items', async () => {
-      render(
-        <WrapperComponent>
-          <LookupKeysPage />
-        </WrapperComponent>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('test_key_1')).toBeInTheDocument();
-      });
-
-      // Select multiple checkboxes
-      const checkboxes = screen.getAllByRole('checkbox');
-      await user.click(checkboxes[1]); // First data row
-      await user.click(checkboxes[2]); // Second data row
-
-      // Bulk actions should now be available
-      expect(screen.getByTestId('bulk-actions-toolbar')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /delete selected/i })).toBeInTheDocument();
-    });
-
-    it('should refresh data when refresh button is clicked', async () => {
-      render(
-        <WrapperComponent>
-          <LookupKeysPage />
-        </WrapperComponent>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('test_key_1')).toBeInTheDocument();
-      });
-
-      const refreshButton = screen.getByRole('button', { name: /refresh/i });
-      await user.click(refreshButton);
-
-      // Should show loading state briefly
-      expect(screen.getByTestId('lookup-keys-loading')).toBeInTheDocument();
-    });
-  });
-
-  describe('Search and Filtering', () => {
-    it('should filter lookup keys based on search input', async () => {
-      render(
-        <WrapperComponent>
-          <LookupKeysPage />
-        </WrapperComponent>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('test_key_1')).toBeInTheDocument();
-      });
-
-      const searchInput = screen.getByRole('textbox', { name: /search lookup keys/i });
-      await user.type(searchInput, 'test_key_1');
-
-      await waitFor(() => {
-        expect(screen.getByText('test_key_1')).toBeInTheDocument();
-        expect(screen.queryByText('test_key_2')).not.toBeInTheDocument();
+        expect(screen.queryByTestId('lookup-keys-error')).not.toBeInTheDocument();
+        expect(screen.getByText('test_key')).toBeInTheDocument();
       });
     });
 
-    it('should show no results message when search yields no matches', async () => {
-      render(
-        <WrapperComponent>
-          <LookupKeysPage />
-        </WrapperComponent>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('test_key_1')).toBeInTheDocument();
-      });
-
-      const searchInput = screen.getByRole('textbox', { name: /search lookup keys/i });
-      await user.type(searchInput, 'nonexistent_key');
-
-      await waitFor(() => {
-        expect(screen.getByText(/No lookup keys match your search/i)).toBeInTheDocument();
-      });
-    });
-
-    it('should clear search when clear button is clicked', async () => {
-      render(
-        <WrapperComponent>
-          <LookupKeysPage />
-        </WrapperComponent>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('test_key_1')).toBeInTheDocument();
-      });
-
-      const searchInput = screen.getByRole('textbox', { name: /search lookup keys/i });
-      await user.type(searchInput, 'test');
-
-      const clearButton = screen.getByRole('button', { name: /clear search/i });
-      await user.click(clearButton);
-
-      expect(searchInput).toHaveValue('');
-      expect(screen.getByText('test_key_1')).toBeInTheDocument();
-      expect(screen.getByText('test_key_2')).toBeInTheDocument();
-    });
-  });
-
-  describe('Performance Testing', () => {
-    it('should load initial data within performance targets', async () => {
-      const startTime = performance.now();
-
-      render(
-        <WrapperComponent>
-          <LookupKeysPage />
-        </WrapperComponent>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('test_key_1')).toBeInTheDocument();
-      });
-
-      const endTime = performance.now();
-      const loadTime = endTime - startTime;
-
-      // Should load within 2 seconds as per React/Next.js Integration Requirements
-      expect(loadTime).toBeLessThan(2000);
-    });
-
-    it('should handle large datasets efficiently', async () => {
-      // Mock a large dataset
-      const largeMockData = Array.from({ length: 1000 }, (_, i) => ({
+    test('supports pagination with accessible controls', async () => {
+      // Mock large dataset
+      const largeMockData = Array.from({ length: 50 }, (_, i) => ({
+        ...mockLookupKey,
         id: i + 1,
         name: `test_key_${i + 1}`,
         value: `Test Value ${i + 1}`,
-        private: i % 2 === 0,
       }));
 
       server.use(
-        http.get('/api/v2/system/constant', () => {
-          return HttpResponse.json({
-            resource: largeMockData,
-            meta: { count: largeMockData.length },
-          });
+        rest.get('/api/v2/system/lookup_key', (req, res, ctx) => {
+          const limit = parseInt(req.url.searchParams.get('limit') || '25');
+          const offset = parseInt(req.url.searchParams.get('offset') || '0');
+          const paginatedData = largeMockData.slice(offset, offset + limit);
+          
+          return res(
+            ctx.status(200),
+            ctx.json({
+              resource: paginatedData,
+              meta: { count: largeMockData.length }
+            })
+          );
         })
       );
 
-      const startTime = performance.now();
-
-      render(
-        <WrapperComponent>
-          <LookupKeysPage />
-        </WrapperComponent>
-      );
+      renderWithProviders(<LookupKeysPage />);
 
       await waitFor(() => {
-        expect(screen.getByTestId('lookup-keys-page')).toBeInTheDocument();
+        expect(screen.getByText('test_key_1')).toBeInTheDocument();
       });
 
-      const endTime = performance.now();
-      const renderTime = endTime - startTime;
+      // Test pagination controls
+      const pagination = screen.getByRole('navigation', { name: /pagination/i });
+      expect(pagination).toBeInTheDocument();
 
-      // Should still render efficiently with large datasets
-      expect(renderTime).toBeLessThan(3000);
-    });
-  });
+      const nextButton = within(pagination).getByRole('button', { name: /next page/i });
+      expect(nextButton).toBeInTheDocument();
+      expect(nextButton).not.toHaveAttribute('disabled');
 
-  describe('Error Handling', () => {
-    it('should display appropriate error message when API fails', async () => {
-      server.use(...setupMockHandlers('error'));
-
-      render(
-        <WrapperComponent>
-          <LookupKeysPage />
-        </WrapperComponent>
-      );
-
+      // Test keyboard navigation in pagination
+      await user.click(nextButton);
+      
       await waitFor(() => {
-        expect(screen.getByText(/Failed to load lookup keys/i)).toBeInTheDocument();
-        expect(screen.getByText(/Internal server error/i)).toBeInTheDocument();
+        expect(screen.getByText('test_key_26')).toBeInTheDocument();
       });
     });
 
-    it('should show retry option when data loading fails', async () => {
-      server.use(...setupMockHandlers('error'));
-
-      render(
-        <WrapperComponent>
-          <LookupKeysPage />
-        </WrapperComponent>
-      );
+    test('implements search functionality with real-time filtering', async () => {
+      renderWithProviders(<LookupKeysPage />);
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument();
+        expect(screen.getByText('test_key')).toBeInTheDocument();
       });
 
-      // Clicking retry should attempt to reload
-      const retryButton = screen.getByRole('button', { name: /try again/i });
-      await user.click(retryButton);
+      const searchInput = screen.getByRole('searchbox', { name: /search lookup keys/i });
+      expect(searchInput).toBeInTheDocument();
+      expect(searchInput).toHaveAttribute('placeholder');
 
-      expect(screen.getByTestId('lookup-keys-loading')).toBeInTheDocument();
-    });
-
-    it('should handle network errors gracefully', async () => {
-      server.use(
-        http.get('/api/v2/system/constant', () => {
-          return HttpResponse.error();
-        })
-      );
-
-      render(
-        <WrapperComponent>
-          <LookupKeysPage />
-        </WrapperComponent>
-      );
+      // Test search functionality
+      await user.type(searchInput, 'private');
 
       await waitFor(() => {
-        expect(screen.getByText(/Network error/i)).toBeInTheDocument();
+        expect(screen.getByText('private_key')).toBeInTheDocument();
+        expect(screen.queryByText('test_key')).not.toBeInTheDocument();
+      });
+
+      // Test clearing search
+      await user.clear(searchInput);
+      
+      await waitFor(() => {
+        expect(screen.getByText('test_key')).toBeInTheDocument();
+        expect(screen.getByText('private_key')).toBeInTheDocument();
+      });
+    });
+
+    test('validates WCAG 2.1 AA accessibility compliance', async () => {
+      const { container } = renderWithProviders(<LookupKeysPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('test_key')).toBeInTheDocument();
+      });
+
+      // Run axe accessibility tests
+      const results: AxeResults = await axe(container, {
+        rules: {
+          'color-contrast': { enabled: true },
+          'keyboard-navigation': { enabled: true },
+          'focus-management': { enabled: true },
+          'aria-labels': { enabled: true },
+          'landmark-one-main': { enabled: false }, // Single component test
+        },
+        tags: ['wcag2a', 'wcag2aa', 'wcag21aa']
+      });
+
+      expect(results.violations).toHaveLength(0);
+
+      // Test keyboard navigation
+      const navigationResult = await accessibilityUtils.testKeyboardNavigation(container, user);
+      expect(navigationResult.success).toBe(true);
+      
+      // Test focus management
+      const focusableElements = accessibilityUtils.getFocusableElements(container);
+      expect(focusableElements.length).toBeGreaterThan(0);
+      
+      focusableElements.forEach(element => {
+        expect(accessibilityUtils.hasAriaLabel(element) || element.textContent?.trim()).toBeTruthy();
       });
     });
   });
-});
 
-describe('LookupKeysForm Component', () => {
-  let user: ReturnType<typeof userEvent.setup>;
+  describe('Form Component', () => {
+    const mockOnSubmit = vi.fn();
+    const mockOnCancel = vi.fn();
 
-  beforeEach(() => {
-    user = userEvent.setup({ delay: null });
-    vi.clearAllMocks();
-    server.use(...setupMockHandlers('success'));
-  });
-
-  describe('Form Rendering', () => {
-    it('should render create form with empty fields', () => {
-      render(
-        <WrapperComponent>
-          <LookupKeysForm 
-            isOpen={true}
-            onClose={vi.fn()}
-            onSuccess={vi.fn()}
-          />
-        </WrapperComponent>
-      );
-
-      expect(screen.getByRole('dialog')).toBeInTheDocument();
-      expect(screen.getByRole('heading', { name: /create lookup key/i })).toBeInTheDocument();
-      expect(screen.getByLabelText(/name/i)).toHaveValue('');
-      expect(screen.getByLabelText(/value/i)).toHaveValue('');
-      expect(screen.getByLabelText(/private/i)).not.toBeChecked();
+    beforeEach(() => {
+      mockOnSubmit.mockClear();
+      mockOnCancel.mockClear();
     });
 
-    it('should render edit form with pre-filled data', () => {
-      const mockKey = mockLookupKeys[0];
-
-      render(
-        <WrapperComponent>
-          <LookupKeysForm 
-            isOpen={true}
-            onClose={vi.fn()}
-            onSuccess={vi.fn()}
-            initialData={mockKey}
-          />
-        </WrapperComponent>
+    test('renders create form with proper validation', () => {
+      renderWithProviders(
+        <LookupKeysForm 
+          onSubmit={mockOnSubmit}
+          onCancel={mockOnCancel}
+          mode="create"
+        />
       );
 
-      expect(screen.getByRole('heading', { name: /edit lookup key/i })).toBeInTheDocument();
-      expect(screen.getByDisplayValue('test_key_1')).toBeInTheDocument();
-      expect(screen.getByDisplayValue('Test Value 1')).toBeInTheDocument();
-      expect(screen.getByLabelText(/private/i)).not.toBeChecked();
+      // Test form structure
+      expect(screen.getByRole('form')).toBeInTheDocument();
+      expect(screen.getByLabelText(/name/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/value/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/description/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/private/i)).toBeInTheDocument();
+
+      // Test form accessibility
+      const form = screen.getByRole('form');
+      expect(form).toHaveAttribute('noValidate'); // Client-side validation
+      
+      const nameInput = screen.getByLabelText(/name/i);
+      expect(nameInput).toHaveAttribute('required');
+      expect(nameInput).toHaveAttribute('aria-describedby');
     });
 
-    it('should display required field indicators', () => {
-      render(
-        <WrapperComponent>
-          <LookupKeysForm 
-            isOpen={true}
-            onClose={vi.fn()}
-            onSuccess={vi.fn()}
-          />
-        </WrapperComponent>
+    test('renders edit form with pre-populated data', () => {
+      renderWithProviders(
+        <LookupKeysForm 
+          onSubmit={mockOnSubmit}
+          onCancel={mockOnCancel}
+          mode="edit"
+          initialData={mockLookupKey}
+        />
       );
 
-      // Check for required field indicators (usually asterisks or aria-required)
-      const nameField = screen.getByLabelText(/name/i);
-      expect(nameField).toHaveAttribute('aria-required', 'true');
+      expect(screen.getByDisplayValue('test_key')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('Test Value')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('Test lookup key description')).toBeInTheDocument();
+      
+      const privateCheckbox = screen.getByLabelText(/private/i) as HTMLInputElement;
+      expect(privateCheckbox.checked).toBe(false);
     });
-  });
 
-  describe('Form Validation', () => {
-    it('should validate required fields on submit', async () => {
-      const onSuccess = vi.fn();
-
-      render(
-        <WrapperComponent>
-          <LookupKeysForm 
-            isOpen={true}
-            onClose={vi.fn()}
-            onSuccess={onSuccess}
-          />
-        </WrapperComponent>
+    test('validates form fields with real-time feedback', async () => {
+      renderWithProviders(
+        <LookupKeysForm 
+          onSubmit={mockOnSubmit}
+          onCancel={mockOnCancel}
+          mode="create"
+        />
       );
 
-      const submitButton = screen.getByRole('button', { name: /create/i });
+      const nameInput = screen.getByLabelText(/name/i);
+      const submitButton = screen.getByRole('button', { name: /save/i });
+
+      // Test required field validation
       await user.click(submitButton);
-
+      
       await waitFor(() => {
         expect(screen.getByText(/name is required/i)).toBeInTheDocument();
       });
 
-      expect(onSuccess).not.toHaveBeenCalled();
-    });
-
-    it('should validate name uniqueness', async () => {
-      server.use(...setupMockHandlers('validation'));
-
-      render(
-        <WrapperComponent>
-          <LookupKeysForm 
-            isOpen={true}
-            onClose={vi.fn()}
-            onSuccess={vi.fn()}
-          />
-        </WrapperComponent>
-      );
-
-      const nameField = screen.getByLabelText(/name/i);
-      const valueField = screen.getByLabelText(/value/i);
-      const submitButton = screen.getByRole('button', { name: /create/i });
-
-      await user.type(nameField, 'duplicate_name');
-      await user.type(valueField, 'Some value');
-      await user.click(submitButton);
+      // Test invalid name format
+      await user.type(nameInput, 'invalid name with spaces');
+      await user.tab(); // Trigger validation
 
       await waitFor(() => {
-        expect(screen.getByText(/Name already exists/i)).toBeInTheDocument();
+        expect(screen.getByText(/name must contain only letters, numbers, and underscores/i))
+          .toBeInTheDocument();
+      });
+
+      // Test valid input
+      await user.clear(nameInput);
+      await user.type(nameInput, 'valid_name');
+
+      await waitFor(() => {
+        expect(screen.queryByText(/name is required/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/name must contain only/i)).not.toBeInTheDocument();
       });
     });
 
-    it('should validate name format (no spaces, special characters)', async () => {
-      render(
-        <WrapperComponent>
-          <LookupKeysForm 
-            isOpen={true}
-            onClose={vi.fn()}
-            onSuccess={vi.fn()}
-          />
-        </WrapperComponent>
+    test('validates unique name constraint', async () => {
+      server.use(
+        rest.get('/api/v2/system/lookup_key', (req, res, ctx) => {
+          const filter = req.url.searchParams.get('filter');
+          if (filter && filter.includes('name=existing_key')) {
+            return res(
+              ctx.status(200),
+              ctx.json({
+                resource: [{ ...mockLookupKey, name: 'existing_key' }],
+                meta: { count: 1 }
+              })
+            );
+          }
+          return res(
+            ctx.status(200),
+            ctx.json({ resource: [], meta: { count: 0 } })
+          );
+        })
       );
 
-      const nameField = screen.getByLabelText(/name/i);
-      const submitButton = screen.getByRole('button', { name: /create/i });
+      renderWithProviders(
+        <LookupKeysForm 
+          onSubmit={mockOnSubmit}
+          onCancel={mockOnCancel}
+          mode="create"
+        />
+      );
 
-      await user.type(nameField, 'invalid name with spaces');
-      await user.type(screen.getByLabelText(/value/i), 'Some value');
-      await user.click(submitButton);
+      const nameInput = screen.getByLabelText(/name/i);
+      
+      await user.type(nameInput, 'existing_key');
+      await user.tab(); // Trigger async validation
 
       await waitFor(() => {
-        expect(screen.getByText(/Name must only contain letters, numbers, and underscores/i)).toBeInTheDocument();
+        expect(screen.getByText(/name already exists/i)).toBeInTheDocument();
       });
+
+      // Test that form cannot be submitted with duplicate name
+      const submitButton = screen.getByRole('button', { name: /save/i });
+      expect(submitButton).toHaveAttribute('disabled');
     });
 
-    it('should perform real-time validation under 100ms', async () => {
-      render(
-        <WrapperComponent>
-          <LookupKeysForm 
-            isOpen={true}
-            onClose={vi.fn()}
-            onSuccess={vi.fn()}
-          />
-        </WrapperComponent>
+    test('submits form with correct data transformation', async () => {
+      renderWithProviders(
+        <LookupKeysForm 
+          onSubmit={mockOnSubmit}
+          onCancel={mockOnCancel}
+          mode="create"
+        />
       );
 
-      const nameField = screen.getByLabelText(/name/i);
-      const startTime = performance.now();
+      const nameInput = screen.getByLabelText(/name/i);
+      const valueInput = screen.getByLabelText(/value/i);
+      const descriptionInput = screen.getByLabelText(/description/i);
+      const privateCheckbox = screen.getByLabelText(/private/i);
+      const submitButton = screen.getByRole('button', { name: /save/i });
 
-      await user.type(nameField, 'invalid name');
-
-      await waitFor(() => {
-        expect(screen.getByText(/Name must only contain letters, numbers, and underscores/i)).toBeInTheDocument();
-      });
-
-      const endTime = performance.now();
-      const validationTime = endTime - startTime;
-
-      // Should validate within 100ms as per React/Next.js Integration Requirements
-      expect(validationTime).toBeLessThan(100);
-    });
-
-    it('should clear validation errors when input is corrected', async () => {
-      render(
-        <WrapperComponent>
-          <LookupKeysForm 
-            isOpen={true}
-            onClose={vi.fn()}
-            onSuccess={vi.fn()}
-          />
-        </WrapperComponent>
-      );
-
-      const nameField = screen.getByLabelText(/name/i);
-
-      // Enter invalid input
-      await user.type(nameField, 'invalid name');
-      await waitFor(() => {
-        expect(screen.getByText(/Name must only contain letters, numbers, and underscores/i)).toBeInTheDocument();
-      });
-
-      // Clear and enter valid input
-      await user.clear(nameField);
-      await user.type(nameField, 'valid_name');
-
-      await waitFor(() => {
-        expect(screen.queryByText(/Name must only contain letters, numbers, and underscores/i)).not.toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('Form Submission', () => {
-    it('should successfully create new lookup key', async () => {
-      const onSuccess = vi.fn();
-
-      render(
-        <WrapperComponent>
-          <LookupKeysForm 
-            isOpen={true}
-            onClose={vi.fn()}
-            onSuccess={onSuccess}
-          />
-        </WrapperComponent>
-      );
-
-      const nameField = screen.getByLabelText(/name/i);
-      const valueField = screen.getByLabelText(/value/i);
-      const privateField = screen.getByLabelText(/private/i);
-      const submitButton = screen.getByRole('button', { name: /create/i });
-
-      await user.type(nameField, 'new_test_key');
-      await user.type(valueField, 'New Test Value');
-      await user.click(privateField);
-      await user.click(submitButton);
-
-      await waitFor(() => {
-        expect(onSuccess).toHaveBeenCalled();
-        expect(mockToast).toHaveBeenCalledWith({
-          title: 'Success',
-          description: 'Lookup key created successfully',
-        });
-      });
-    });
-
-    it('should successfully update existing lookup key', async () => {
-      const onSuccess = vi.fn();
-      const mockKey = mockLookupKeys[0];
-
-      render(
-        <WrapperComponent>
-          <LookupKeysForm 
-            isOpen={true}
-            onClose={vi.fn()}
-            onSuccess={onSuccess}
-            initialData={mockKey}
-          />
-        </WrapperComponent>
-      );
-
-      const valueField = screen.getByDisplayValue('Test Value 1');
-      const submitButton = screen.getByRole('button', { name: /update/i });
-
-      await user.clear(valueField);
-      await user.type(valueField, 'Updated Test Value');
-      await user.click(submitButton);
-
-      await waitFor(() => {
-        expect(onSuccess).toHaveBeenCalled();
-        expect(mockToast).toHaveBeenCalledWith({
-          title: 'Success',
-          description: 'Lookup key updated successfully',
-        });
-      });
-    });
-
-    it('should disable submit button while form is submitting', async () => {
-      render(
-        <WrapperComponent>
-          <LookupKeysForm 
-            isOpen={true}
-            onClose={vi.fn()}
-            onSuccess={vi.fn()}
-          />
-        </WrapperComponent>
-      );
-
-      const nameField = screen.getByLabelText(/name/i);
-      const valueField = screen.getByLabelText(/value/i);
-      const submitButton = screen.getByRole('button', { name: /create/i });
-
-      await user.type(nameField, 'new_key');
-      await user.type(valueField, 'New Value');
+      // Fill form
+      await user.type(nameInput, 'new_test_key');
+      await user.type(valueInput, 'New Test Value');
+      await user.type(descriptionInput, 'New test description');
+      await user.click(privateCheckbox);
 
       // Submit form
       await user.click(submitButton);
 
-      // Button should be disabled during submission
-      expect(submitButton).toBeDisabled();
-      expect(submitButton).toHaveTextContent(/creating/i);
-    });
-
-    it('should handle server errors during submission', async () => {
-      server.use(...setupMockHandlers('error'));
-
-      render(
-        <WrapperComponent>
-          <LookupKeysForm 
-            isOpen={true}
-            onClose={vi.fn()}
-            onSuccess={vi.fn()}
-          />
-        </WrapperComponent>
-      );
-
-      const nameField = screen.getByLabelText(/name/i);
-      const valueField = screen.getByLabelText(/value/i);
-      const submitButton = screen.getByRole('button', { name: /create/i });
-
-      await user.type(nameField, 'new_key');
-      await user.type(valueField, 'New Value');
-      await user.click(submitButton);
-
       await waitFor(() => {
-        expect(screen.getByText(/Internal server error/i)).toBeInTheDocument();
-        expect(mockToast).toHaveBeenCalledWith({
-          title: 'Error',
-          description: expect.stringContaining('Internal server error'),
-          variant: 'destructive',
+        expect(mockOnSubmit).toHaveBeenCalledWith({
+          name: 'new_test_key',
+          value: 'New Test Value',
+          description: 'New test description',
+          private: true,
         });
       });
     });
-  });
 
-  describe('Form State Management', () => {
-    it('should mark form as dirty when fields are modified', async () => {
-      render(
-        <WrapperComponent>
-          <LookupKeysForm 
-            isOpen={true}
-            onClose={vi.fn()}
-            onSuccess={vi.fn()}
-          />
-        </WrapperComponent>
+    test('handles form submission errors gracefully', async () => {
+      server.use(
+        rest.post('/api/v2/system/lookup_key', (req, res, ctx) => {
+          return res(
+            ctx.status(422),
+            ctx.json({
+              error: {
+                code: 422,
+                message: 'Validation failed',
+                context: {
+                  field_errors: {
+                    name: ['Name already exists'],
+                    value: ['Value cannot be empty']
+                  }
+                }
+              }
+            })
+          );
+        })
       );
 
-      const nameField = screen.getByLabelText(/name/i);
-      
-      // Initially form should not show unsaved changes warning
-      expect(screen.queryByText(/unsaved changes/i)).not.toBeInTheDocument();
+      const mockSubmitWithError = vi.fn().mockRejectedValue(new Error('Validation failed'));
 
-      // Type in field to make form dirty
-      await user.type(nameField, 'test');
+      renderWithProviders(
+        <LookupKeysForm 
+          onSubmit={mockSubmitWithError}
+          onCancel={mockOnCancel}
+          mode="create"
+        />
+      );
 
-      // Form should now indicate unsaved changes
+      const nameInput = screen.getByLabelText(/name/i);
+      const valueInput = screen.getByLabelText(/value/i);
+      const submitButton = screen.getByRole('button', { name: /save/i });
+
+      await user.type(nameInput, 'test_name');
+      await user.type(valueInput, 'test_value');
+      await user.click(submitButton);
+
       await waitFor(() => {
-        expect(screen.getByTestId('form-dirty-indicator')).toBeInTheDocument();
+        expect(screen.getByText(/validation failed/i)).toBeInTheDocument();
       });
+
+      // Form should remain editable after error
+      expect(nameInput).not.toHaveAttribute('disabled');
+      expect(submitButton).not.toHaveAttribute('disabled');
     });
 
-    it('should reset form when cancelled', async () => {
-      const onClose = vi.fn();
-
-      render(
-        <WrapperComponent>
-          <LookupKeysForm 
-            isOpen={true}
-            onClose={onClose}
-            onSuccess={vi.fn()}
-          />
-        </WrapperComponent>
+    test('supports keyboard navigation and form accessibility', async () => {
+      const { container } = renderWithProviders(
+        <LookupKeysForm 
+          onSubmit={mockOnSubmit}
+          onCancel={mockOnCancel}
+          mode="create"
+        />
       );
 
-      const nameField = screen.getByLabelText(/name/i);
+      // Test tab order
+      const nameInput = screen.getByLabelText(/name/i);
+      const valueInput = screen.getByLabelText(/value/i);
+      const descriptionInput = screen.getByLabelText(/description/i);
+      const privateCheckbox = screen.getByLabelText(/private/i);
       const cancelButton = screen.getByRole('button', { name: /cancel/i });
+      const submitButton = screen.getByRole('button', { name: /save/i });
 
-      await user.type(nameField, 'test_input');
-      await user.click(cancelButton);
-
-      expect(onClose).toHaveBeenCalled();
-    });
-
-    it('should warn about unsaved changes when closing dirty form', async () => {
-      const onClose = vi.fn();
-
-      render(
-        <WrapperComponent>
-          <LookupKeysForm 
-            isOpen={true}
-            onClose={onClose}
-            onSuccess={vi.fn()}
-          />
-        </WrapperComponent>
-      );
-
-      const nameField = screen.getByLabelText(/name/i);
-      const closeButton = screen.getByRole('button', { name: /close/i });
-
-      await user.type(nameField, 'test_input');
-      await user.click(closeButton);
-
-      // Should show confirmation dialog
-      expect(screen.getByText(/unsaved changes/i)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /discard changes/i })).toBeInTheDocument();
-    });
-  });
-
-  describe('Accessibility Testing', () => {
-    it('should have no accessibility violations in create mode', async () => {
-      const { container } = render(
-        <WrapperComponent>
-          <LookupKeysForm 
-            isOpen={true}
-            onClose={vi.fn()}
-            onSuccess={vi.fn()}
-          />
-        </WrapperComponent>
-      );
-
-      const results = await axe(container);
-      expect(results).toHaveNoViolations();
-    });
-
-    it('should have no accessibility violations in edit mode', async () => {
-      const mockKey = mockLookupKeys[0];
-
-      const { container } = render(
-        <WrapperComponent>
-          <LookupKeysForm 
-            isOpen={true}
-            onClose={vi.fn()}
-            onSuccess={vi.fn()}
-            initialData={mockKey}
-          />
-        </WrapperComponent>
-      );
-
-      const results = await axe(container);
-      expect(results).toHaveNoViolations();
-    });
-
-    it('should support keyboard navigation', async () => {
-      render(
-        <WrapperComponent>
-          <LookupKeysForm 
-            isOpen={true}
-            onClose={vi.fn()}
-            onSuccess={vi.fn()}
-          />
-        </WrapperComponent>
-      );
-
-      const dialog = screen.getByRole('dialog');
-      expect(dialog).toHaveAttribute('aria-modal', 'true');
-
-      // Test tab navigation through form fields
-      const nameField = screen.getByLabelText(/name/i);
-      const valueField = screen.getByLabelText(/value/i);
-      const privateField = screen.getByLabelText(/private/i);
-      const submitButton = screen.getByRole('button', { name: /create/i });
-
-      nameField.focus();
-      expect(nameField).toHaveFocus();
+      nameInput.focus();
+      expect(nameInput).toHaveFocus();
 
       await user.tab();
-      expect(valueField).toHaveFocus();
+      expect(valueInput).toHaveFocus();
 
       await user.tab();
-      expect(privateField).toHaveFocus();
+      expect(descriptionInput).toHaveFocus();
+
+      await user.tab();
+      expect(privateCheckbox).toHaveFocus();
+
+      await user.tab();
+      expect(cancelButton).toHaveFocus();
 
       await user.tab();
       expect(submitButton).toHaveFocus();
+
+      // Test form submission with Enter key
+      nameInput.focus();
+      await user.type(nameInput, 'keyboard_test');
+      await user.keyboard('{Enter}');
+
+      // Should focus next field, not submit
+      expect(valueInput).toHaveFocus();
+
+      // Test accessibility
+      const results: AxeResults = await axe(container);
+      expect(results.violations).toHaveLength(0);
     });
 
-    it('should announce form errors to screen readers', async () => {
-      render(
-        <WrapperComponent>
-          <LookupKeysForm 
-            isOpen={true}
-            onClose={vi.fn()}
-            onSuccess={vi.fn()}
-          />
-        </WrapperComponent>
+    test('provides proper form field validation feedback', async () => {
+      renderWithProviders(
+        <LookupKeysForm 
+          onSubmit={mockOnSubmit}
+          onCancel={mockOnCancel}
+          mode="create"
+        />
       );
 
-      const submitButton = screen.getByRole('button', { name: /create/i });
-      await user.click(submitButton);
+      const nameInput = screen.getByLabelText(/name/i);
+      
+      // Test invalid characters
+      await user.type(nameInput, 'invalid-name-with-hyphens');
+      await user.tab();
 
       await waitFor(() => {
-        const errorMessage = screen.getByText(/name is required/i);
-        expect(errorMessage).toHaveAttribute('role', 'alert');
-        expect(errorMessage).toHaveAttribute('aria-live', 'polite');
-      });
-    });
-
-    it('should provide proper field descriptions', () => {
-      render(
-        <WrapperComponent>
-          <LookupKeysForm 
-            isOpen={true}
-            onClose={vi.fn()}
-            onSuccess={vi.fn()}
-          />
-        </WrapperComponent>
-      );
-
-      const nameField = screen.getByLabelText(/name/i);
-      const privateField = screen.getByLabelText(/private/i);
-
-      expect(nameField).toHaveAttribute('aria-describedby');
-      expect(privateField).toHaveAttribute('aria-describedby');
-
-      // Check for helper text
-      expect(screen.getByText(/Unique identifier for the lookup key/i)).toBeInTheDocument();
-      expect(screen.getByText(/Mark as private to restrict access/i)).toBeInTheDocument();
-    });
-
-    it('should escape key to close dialog', async () => {
-      const onClose = vi.fn();
-
-      render(
-        <WrapperComponent>
-          <LookupKeysForm 
-            isOpen={true}
-            onClose={onClose}
-            onSuccess={vi.fn()}
-          />
-        </WrapperComponent>
-      );
-
-      const dialog = screen.getByRole('dialog');
-      await user.keyboard('{Escape}');
-
-      expect(onClose).toHaveBeenCalled();
-    });
-  });
-});
-
-describe('useLookupKeys Hook', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    server.use(...setupMockHandlers('success'));
-  });
-
-  describe('Data Fetching', () => {
-    it('should fetch lookup keys successfully', async () => {
-      const TestComponent = () => {
-        const { data, isLoading, error } = useLookupKeys();
-        
-        if (isLoading) return <div data-testid="loading">Loading...</div>;
-        if (error) return <div data-testid="error">{error.message}</div>;
-        
-        return (
-          <div data-testid="success">
-            {data?.map(key => (
-              <div key={key.id} data-testid={`key-${key.id}`}>
-                {key.name}: {key.value}
-              </div>
-            ))}
-          </div>
-        );
-      };
-
-      render(
-        <WrapperComponent>
-          <TestComponent />
-        </WrapperComponent>
-      );
-
-      // Should show loading initially
-      expect(screen.getByTestId('loading')).toBeInTheDocument();
-
-      // Should show data after loading
-      await waitFor(() => {
-        expect(screen.getByTestId('success')).toBeInTheDocument();
-        expect(screen.getByTestId('key-1')).toHaveTextContent('test_key_1: Test Value 1');
-        expect(screen.getByTestId('key-2')).toHaveTextContent('test_key_2: Test Value 2');
-      });
-    });
-
-    it('should handle fetch errors gracefully', async () => {
-      server.use(...setupMockHandlers('error'));
-
-      const TestComponent = () => {
-        const { data, isLoading, error } = useLookupKeys();
-        
-        if (isLoading) return <div data-testid="loading">Loading...</div>;
-        if (error) return <div data-testid="error">{error.message}</div>;
-        
-        return <div data-testid="success">Success</div>;
-      };
-
-      render(
-        <WrapperComponent>
-          <TestComponent />
-        </WrapperComponent>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByTestId('error')).toBeInTheDocument();
-        expect(screen.getByText(/Internal server error/i)).toBeInTheDocument();
-      });
-    });
-
-    it('should support data revalidation', async () => {
-      const TestComponent = () => {
-        const { data, isLoading, mutate } = useLookupKeys();
-        
-        return (
-          <div>
-            <div data-testid="count">{data?.length || 0}</div>
-            <button 
-              onClick={() => mutate()}
-              data-testid="revalidate"
-            >
-              Revalidate
-            </button>
-          </div>
-        );
-      };
-
-      render(
-        <WrapperComponent>
-          <TestComponent />
-        </WrapperComponent>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByTestId('count')).toHaveTextContent('3');
+        const errorMessage = screen.getByText(/name must contain only letters, numbers, and underscores/i);
+        expect(errorMessage).toBeInTheDocument();
+        expect(errorMessage).toHaveAttribute('id');
+        expect(nameInput).toHaveAttribute('aria-describedby', errorMessage.id);
       });
 
-      // Change mock data and revalidate
-      server.use(
-        http.get('/api/v2/system/constant', () => {
-          return HttpResponse.json({
-            resource: [...mockLookupKeys, { id: 4, name: 'new_key', value: 'New Value', private: false }],
-          });
-        })
-      );
-
-      const revalidateButton = screen.getByTestId('revalidate');
-      await user.click(revalidateButton);
+      // Test maximum length
+      const longName = 'a'.repeat(256);
+      await user.clear(nameInput);
+      await user.type(nameInput, longName);
+      await user.tab();
 
       await waitFor(() => {
-        expect(screen.getByTestId('count')).toHaveTextContent('4');
+        expect(screen.getByText(/name must be less than 255 characters/i)).toBeInTheDocument();
+      });
+
+      // Test valid input clears errors
+      await user.clear(nameInput);
+      await user.type(nameInput, 'valid_name');
+      await user.tab();
+
+      await waitFor(() => {
+        expect(screen.queryByText(/name must contain only/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/name must be less than/i)).not.toBeInTheDocument();
       });
     });
   });
 
-  describe('CRUD Operations', () => {
-    it('should create lookup key with optimistic updates', async () => {
-      const TestComponent = () => {
-        const { data, createLookupKey } = useLookupKeys();
-        
-        const handleCreate = () => {
-          createLookupKey({
-            name: 'optimistic_key',
-            value: 'Optimistic Value',
-            private: false,
-          });
-        };
-        
-        return (
-          <div>
-            <div data-testid="count">{data?.length || 0}</div>
-            <button onClick={handleCreate} data-testid="create">
-              Create
-            </button>
-          </div>
-        );
+  describe('Custom Hook (useLookupKeys)', () => {
+    const TestComponent: React.FC = () => {
+      const { 
+        data, 
+        isLoading, 
+        error, 
+        createLookupKey, 
+        updateLookupKey, 
+        deleteLookupKey,
+        validateUniqueName 
+      } = useLookupKeys();
+
+      const handleCreate = () => {
+        createLookupKey.mutate({
+          name: 'hook_test',
+          value: 'Hook Test Value',
+          description: 'Test from hook',
+          private: false,
+        });
       };
 
-      render(
-        <WrapperComponent>
-          <TestComponent />
-        </WrapperComponent>
+      const handleUpdate = () => {
+        updateLookupKey.mutate({
+          id: 1,
+          name: 'updated_key',
+          value: 'Updated Value',
+          description: 'Updated description',
+          private: true,
+        });
+      };
+
+      const handleDelete = () => {
+        deleteLookupKey.mutate(1);
+      };
+
+      const testValidation = async () => {
+        const isUnique = await validateUniqueName('test_unique_name');
+        // Store result for testing
+        (window as any).validationResult = isUnique;
+      };
+
+      return (
+        <div>
+          <div data-testid="loading">{isLoading ? 'Loading' : 'Not Loading'}</div>
+          <div data-testid="error">{error ? error.message : 'No Error'}</div>
+          <div data-testid="data-count">{data?.length || 0}</div>
+          <button onClick={handleCreate} data-testid="create-button">Create</button>
+          <button onClick={handleUpdate} data-testid="update-button">Update</button>
+          <button onClick={handleDelete} data-testid="delete-button">Delete</button>
+          <button onClick={testValidation} data-testid="validate-button">Validate</button>
+          <div data-testid="create-loading">{createLookupKey.isPending ? 'Creating' : 'Not Creating'}</div>
+          <div data-testid="update-loading">{updateLookupKey.isPending ? 'Updating' : 'Not Updating'}</div>
+          <div data-testid="delete-loading">{deleteLookupKey.isPending ? 'Deleting' : 'Not Deleting'}</div>
+        </div>
       );
+    };
 
+    test('fetches lookup keys data with proper caching', async () => {
+      renderWithQuery(<TestComponent />);
+
+      // Initially loading
+      expect(screen.getByTestId('loading')).toHaveTextContent('Loading');
+
+      // Wait for data to load
       await waitFor(() => {
-        expect(screen.getByTestId('count')).toHaveTextContent('3');
-      });
-
-      const createButton = screen.getByTestId('create');
-      await user.click(createButton);
-
-      // Should optimistically update count immediately
-      expect(screen.getByTestId('count')).toHaveTextContent('4');
-
-      // Should maintain optimistic update after API response
-      await waitFor(() => {
-        expect(screen.getByTestId('count')).toHaveTextContent('4');
+        expect(screen.getByTestId('loading')).toHaveTextContent('Not Loading');
+        expect(screen.getByTestId('data-count')).toHaveTextContent('3');
+        expect(screen.getByTestId('error')).toHaveTextContent('No Error');
       });
     });
 
-    it('should update lookup key with optimistic updates', async () => {
-      const TestComponent = () => {
-        const { data, updateLookupKey } = useLookupKeys();
-        
-        const handleUpdate = () => {
-          if (data && data[0]) {
-            updateLookupKey(data[0].id, {
-              ...data[0],
-              value: 'Updated Value',
-            });
-          }
-        };
-        
-        return (
-          <div>
-            <div data-testid="first-value">{data?.[0]?.value || 'Loading'}</div>
-            <button onClick={handleUpdate} data-testid="update">
-              Update
-            </button>
-          </div>
-        );
-      };
-
-      render(
-        <WrapperComponent>
-          <TestComponent />
-        </WrapperComponent>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByTestId('first-value')).toHaveTextContent('Test Value 1');
-      });
-
-      const updateButton = screen.getByTestId('update');
-      await user.click(updateButton);
-
-      // Should optimistically show updated value
-      expect(screen.getByTestId('first-value')).toHaveTextContent('Updated Value');
-    });
-
-    it('should delete lookup key with optimistic updates', async () => {
-      const TestComponent = () => {
-        const { data, deleteLookupKey } = useLookupKeys();
-        
-        const handleDelete = () => {
-          if (data && data[0]) {
-            deleteLookupKey(data[0].id);
-          }
-        };
-        
-        return (
-          <div>
-            <div data-testid="count">{data?.length || 0}</div>
-            <button onClick={handleDelete} data-testid="delete">
-              Delete
-            </button>
-          </div>
-        );
-      };
-
-      render(
-        <WrapperComponent>
-          <TestComponent />
-        </WrapperComponent>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByTestId('count')).toHaveTextContent('3');
-      });
-
-      const deleteButton = screen.getByTestId('delete');
-      await user.click(deleteButton);
-
-      // Should optimistically reduce count
-      expect(screen.getByTestId('count')).toHaveTextContent('2');
-    });
-
-    it('should rollback optimistic updates on API failure', async () => {
-      server.use(...setupMockHandlers('error'));
-
-      const TestComponent = () => {
-        const { data, createLookupKey } = useLookupKeys();
-        
-        const handleCreate = () => {
-          createLookupKey({
-            name: 'failing_key',
-            value: 'This will fail',
-            private: false,
-          });
-        };
-        
-        return (
-          <div>
-            <div data-testid="count">{data?.length || 0}</div>
-            <button onClick={handleCreate} data-testid="create">
-              Create
-            </button>
-          </div>
-        );
-      };
-
-      render(
-        <WrapperComponent>
-          <TestComponent />
-        </WrapperComponent>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByTestId('count')).toHaveTextContent('3');
-      });
-
-      const createButton = screen.getByTestId('create');
-      await user.click(createButton);
-
-      // Should optimistically update first
-      expect(screen.getByTestId('count')).toHaveTextContent('4');
-
-      // Should rollback after API failure
-      await waitFor(() => {
-        expect(screen.getByTestId('count')).toHaveTextContent('3');
-      });
-    });
-  });
-
-  describe('SWR Cache Management', () => {
-    it('should cache responses for performance', async () => {
-      let requestCount = 0;
-
-      server.use(
-        http.get('/api/v2/system/constant', () => {
-          requestCount++;
-          return HttpResponse.json({
-            resource: mockLookupKeys,
-          });
-        })
-      );
-
-      const TestComponent1 = () => {
-        const { data, isLoading } = useLookupKeys();
-        return <div data-testid="component1">{isLoading ? 'Loading' : 'Loaded'}</div>;
-      };
-
-      const TestComponent2 = () => {
-        const { data, isLoading } = useLookupKeys();
-        return <div data-testid="component2">{isLoading ? 'Loading' : 'Loaded'}</div>;
-      };
-
-      render(
-        <WrapperComponent>
-          <TestComponent1 />
-          <TestComponent2 />
-        </WrapperComponent>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByTestId('component1')).toHaveTextContent('Loaded');
-        expect(screen.getByTestId('component2')).toHaveTextContent('Loaded');
-      });
-
-      // Should only make one request due to caching
-      expect(requestCount).toBe(1);
-    });
-
-    it('should provide cache hit responses under 50ms', async () => {
-      const TestComponent = () => {
-        const { data, isLoading } = useLookupKeys();
-        return <div data-testid="status">{isLoading ? 'Loading' : 'Loaded'}</div>;
-      };
-
-      // First render to populate cache
-      const { unmount } = render(
-        <WrapperComponent>
-          <TestComponent />
-        </WrapperComponent>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByTestId('status')).toHaveTextContent('Loaded');
-      });
-
-      unmount();
-
-      // Second render should use cache
-      const startTime = performance.now();
-
-      render(
-        <WrapperComponent>
-          <TestComponent />
-        </WrapperComponent>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByTestId('status')).toHaveTextContent('Loaded');
-      });
-
-      const endTime = performance.now();
-      const cacheHitTime = endTime - startTime;
-
-      // Should be much faster on cache hit (under 50ms per requirements)
-      expect(cacheHitTime).toBeLessThan(50);
-    });
-  });
-});
-
-describe('Integration Tests', () => {
-  let user: ReturnType<typeof userEvent.setup>;
-
-  beforeEach(() => {
-    user = userEvent.setup({ delay: null });
-    vi.clearAllMocks();
-    server.use(...setupMockHandlers('success'));
-  });
-
-  describe('Complete Workflow Tests', () => {
-    it('should complete full CRUD workflow', async () => {
-      render(
-        <WrapperComponent>
-          <LookupKeysPage />
-        </WrapperComponent>
-      );
+    test('handles create mutation with optimistic updates', async () => {
+      renderWithQuery(<TestComponent />);
 
       // Wait for initial load
       await waitFor(() => {
-        expect(screen.getByText('test_key_1')).toBeInTheDocument();
+        expect(screen.getByTestId('data-count')).toHaveTextContent('3');
       });
 
-      // CREATE: Add new lookup key
-      const addButton = screen.getByRole('button', { name: /add lookup key/i });
-      await user.click(addButton);
-
-      const nameField = screen.getByLabelText(/name/i);
-      const valueField = screen.getByLabelText(/value/i);
-      const createButton = screen.getByRole('button', { name: /create/i });
-
-      await user.type(nameField, 'integration_test_key');
-      await user.type(valueField, 'Integration Test Value');
+      const createButton = screen.getByTestId('create-button');
       await user.click(createButton);
 
+      // Should show creating state
+      expect(screen.getByTestId('create-loading')).toHaveTextContent('Creating');
+
+      // Wait for completion
       await waitFor(() => {
-        expect(mockToast).toHaveBeenCalledWith({
-          title: 'Success',
-          description: 'Lookup key created successfully',
-        });
+        expect(screen.getByTestId('create-loading')).toHaveTextContent('Not Creating');
+      });
+    });
+
+    test('handles update mutation correctly', async () => {
+      renderWithQuery(<TestComponent />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('data-count')).toHaveTextContent('3');
       });
 
-      // READ: Verify new key appears in list
+      const updateButton = screen.getByTestId('update-button');
+      await user.click(updateButton);
+
+      expect(screen.getByTestId('update-loading')).toHaveTextContent('Updating');
+
+      await waitFor(() => {
+        expect(screen.getByTestId('update-loading')).toHaveTextContent('Not Updating');
+      });
+    });
+
+    test('handles delete mutation with cache invalidation', async () => {
+      renderWithQuery(<TestComponent />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('data-count')).toHaveTextContent('3');
+      });
+
+      const deleteButton = screen.getByTestId('delete-button');
+      await user.click(deleteButton);
+
+      expect(screen.getByTestId('delete-loading')).toHaveTextContent('Deleting');
+
+      await waitFor(() => {
+        expect(screen.getByTestId('delete-loading')).toHaveTextContent('Not Deleting');
+      });
+    });
+
+    test('validates unique names correctly', async () => {
+      server.use(
+        rest.get('/api/v2/system/lookup_key', (req, res, ctx) => {
+          const filter = req.url.searchParams.get('filter');
+          if (filter && filter.includes('name=test_unique_name')) {
+            return res(
+              ctx.status(200),
+              ctx.json({ resource: [], meta: { count: 0 } })
+            );
+          }
+          return res(
+            ctx.status(200),
+            ctx.json({ resource: mockLookupKeys, meta: { count: mockLookupKeys.length } })
+          );
+        })
+      );
+
+      renderWithQuery(<TestComponent />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('data-count')).toHaveTextContent('3');
+      });
+
+      const validateButton = screen.getByTestId('validate-button');
+      await user.click(validateButton);
+
+      await waitFor(() => {
+        expect((window as any).validationResult).toBe(true);
+      });
+    });
+
+    test('handles network errors gracefully', async () => {
+      server.use(...lookupKeysErrorHandlers);
+
+      renderWithQuery(<TestComponent />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('error')).toHaveTextContent('Internal server error');
+      });
+    });
+
+    test('implements proper retry logic for failed requests', async () => {
+      let callCount = 0;
+      server.use(
+        rest.get('/api/v2/system/lookup_key', (req, res, ctx) => {
+          callCount++;
+          if (callCount <= 2) {
+            return res(ctx.status(500), ctx.json({ error: { message: 'Server error' } }));
+          }
+          return res(
+            ctx.status(200),
+            ctx.json({ resource: mockLookupKeys, meta: { count: mockLookupKeys.length } })
+          );
+        })
+      );
+
+      const queryClient = new QueryClient({
+        defaultOptions: {
+          queries: {
+            retry: 2,
+            retryDelay: 100,
+          },
+        },
+      });
+
+      renderWithQuery(<TestComponent />, { queryClient });
+
+      // Should eventually succeed after retries
+      await waitFor(() => {
+        expect(screen.getByTestId('data-count')).toHaveTextContent('3');
+      }, { timeout: 5000 });
+
+      expect(callCount).toBe(3); // Initial call + 2 retries
+    });
+  });
+
+  describe('Integration Tests', () => {
+    test('complete CRUD workflow integration', async () => {
+      renderWithProviders(<LookupKeysPage />);
+
+      // Wait for initial data load
+      await waitFor(() => {
+        expect(screen.getByText('test_key')).toBeInTheDocument();
+      });
+
+      // Test create workflow
+      const createButton = screen.getByRole('button', { name: /create new lookup key/i });
+      await user.click(createButton);
+
+      // Fill create form
+      const nameInput = screen.getByLabelText(/name/i);
+      const valueInput = screen.getByLabelText(/value/i);
+      const descriptionInput = screen.getByLabelText(/description/i);
+
+      await user.type(nameInput, 'integration_test_key');
+      await user.type(valueInput, 'Integration Test Value');
+      await user.type(descriptionInput, 'Created during integration test');
+
+      const saveButton = screen.getByRole('button', { name: /save/i });
+      await user.click(saveButton);
+
+      // Should return to list and show new item
       await waitFor(() => {
         expect(screen.getByText('integration_test_key')).toBeInTheDocument();
       });
 
-      // UPDATE: Edit the new key
-      const editButtons = screen.getAllByRole('button', { name: /edit/i });
-      const newKeyEditButton = editButtons.find(button => 
-        button.closest('tr')?.textContent?.includes('integration_test_key')
-      );
-      
-      if (newKeyEditButton) {
-        await user.click(newKeyEditButton);
+      // Test edit workflow
+      const editButton = screen.getByRole('button', { name: /edit integration_test_key/i });
+      await user.click(editButton);
 
-        const editValueField = screen.getByDisplayValue('Integration Test Value');
-        const updateButton = screen.getByRole('button', { name: /update/i });
+      const editValueInput = screen.getByDisplayValue('Integration Test Value');
+      await user.clear(editValueInput);
+      await user.type(editValueInput, 'Updated Integration Test Value');
 
-        await user.clear(editValueField);
-        await user.type(editValueField, 'Updated Integration Test Value');
-        await user.click(updateButton);
-
-        await waitFor(() => {
-          expect(mockToast).toHaveBeenCalledWith({
-            title: 'Success',
-            description: 'Lookup key updated successfully',
-          });
-        });
-      }
-
-      // DELETE: Remove the key
-      const deleteButtons = screen.getAllByRole('button', { name: /delete/i });
-      const newKeyDeleteButton = deleteButtons.find(button => 
-        button.closest('tr')?.textContent?.includes('integration_test_key')
-      );
-      
-      if (newKeyDeleteButton) {
-        await user.click(newKeyDeleteButton);
-
-        const confirmButton = screen.getByRole('button', { name: /confirm delete/i });
-        await user.click(confirmButton);
-
-        await waitFor(() => {
-          expect(mockToast).toHaveBeenCalledWith({
-            title: 'Success',
-            description: 'Lookup key deleted successfully',
-          });
-        });
-      }
-    });
-
-    it('should handle form validation throughout workflow', async () => {
-      render(
-        <WrapperComponent>
-          <LookupKeysPage />
-        </WrapperComponent>
-      );
+      const updateButton = screen.getByRole('button', { name: /save/i });
+      await user.click(updateButton);
 
       await waitFor(() => {
-        expect(screen.getByTestId('lookup-keys-page')).toBeInTheDocument();
+        expect(screen.getByText('Updated Integration Test Value')).toBeInTheDocument();
       });
 
-      // Open create form
-      const addButton = screen.getByRole('button', { name: /add lookup key/i });
-      await user.click(addButton);
+      // Test delete workflow
+      const deleteButton = screen.getByRole('button', { name: /delete integration_test_key/i });
+      await user.click(deleteButton);
 
-      // Test validation on empty submit
-      const createButton = screen.getByRole('button', { name: /create/i });
+      // Confirm deletion
+      const confirmButton = screen.getByRole('button', { name: /confirm delete/i });
+      await user.click(confirmButton);
+
+      await waitFor(() => {
+        expect(screen.queryByText('integration_test_key')).not.toBeInTheDocument();
+      });
+    });
+
+    test('performance requirements validation', async () => {
+      const startTime = performance.now();
+      
+      renderWithProviders(<LookupKeysPage />);
+
+      // Test initial load performance
+      await waitFor(() => {
+        expect(screen.getByText('test_key')).toBeInTheDocument();
+      });
+
+      const loadTime = performance.now() - startTime;
+      
+      // Should load within 2 seconds (SSR requirement)
+      expect(loadTime).toBeLessThan(2000);
+
+      // Test form validation performance
+      const createButton = screen.getByRole('button', { name: /create new lookup key/i });
       await user.click(createButton);
 
+      const nameInput = screen.getByLabelText(/name/i);
+      
+      const validationStartTime = performance.now();
+      await user.type(nameInput, 'performance_test');
+      await user.tab(); // Trigger validation
+
+      const validationTime = performance.now() - validationStartTime;
+      
+      // Real-time validation should complete under 100ms
+      expect(validationTime).toBeLessThan(100);
+    });
+
+    test('accessibility compliance across complete workflow', async () => {
+      const { container } = renderWithProviders(<LookupKeysPage />);
+
+      // Test main page accessibility
       await waitFor(() => {
-        expect(screen.getByText(/name is required/i)).toBeInTheDocument();
+        expect(screen.getByText('test_key')).toBeInTheDocument();
       });
 
-      // Test validation on invalid name
-      const nameField = screen.getByLabelText(/name/i);
-      await user.type(nameField, 'invalid name with spaces');
+      let results: AxeResults = await axe(container);
+      expect(results.violations).toHaveLength(0);
 
-      await waitFor(() => {
-        expect(screen.getByText(/Name must only contain letters, numbers, and underscores/i)).toBeInTheDocument();
-      });
-
-      // Test successful submission with valid data
-      await user.clear(nameField);
-      await user.type(nameField, 'valid_test_key');
-      await user.type(screen.getByLabelText(/value/i), 'Valid Test Value');
+      // Test create form accessibility
+      const createButton = screen.getByRole('button', { name: /create new lookup key/i });
       await user.click(createButton);
 
-      await waitFor(() => {
-        expect(mockToast).toHaveBeenCalledWith({
-          title: 'Success',
-          description: 'Lookup key created successfully',
-        });
-      });
+      results = await axe(container);
+      expect(results.violations).toHaveLength(0);
+
+      // Test keyboard navigation through entire workflow
+      const nameInput = screen.getByLabelText(/name/i);
+      nameInput.focus();
+
+      const navigationResult = await accessibilityUtils.testKeyboardNavigation(container, user);
+      expect(navigationResult.success).toBe(true);
+
+      // Test screen reader announcements
+      await user.type(nameInput, 'accessibility_test');
+      
+      // Should have proper live region announcements for validation
+      const liveRegions = container.querySelectorAll('[aria-live]');
+      expect(liveRegions.length).toBeGreaterThan(0);
     });
 
-    it('should maintain data consistency across operations', async () => {
-      render(
-        <WrapperComponent>
-          <LookupKeysPage />
-        </WrapperComponent>
-      );
-
-      // Wait for initial data
-      await waitFor(() => {
-        expect(screen.getByText('test_key_1')).toBeInTheDocument();
-        expect(screen.getByText('test_key_2')).toBeInTheDocument();
-        expect(screen.getByText('app_config')).toBeInTheDocument();
-      });
-
-      // Count initial items
-      const initialRows = screen.getAllByRole('row').length - 1; // Subtract header row
-      expect(initialRows).toBe(3);
-
-      // Add new item and verify count increases
-      const addButton = screen.getByRole('button', { name: /add lookup key/i });
-      await user.click(addButton);
-
-      await user.type(screen.getByLabelText(/name/i), 'consistency_test');
-      await user.type(screen.getByLabelText(/value/i), 'Consistency Test');
-      await user.click(screen.getByRole('button', { name: /create/i }));
-
-      await waitFor(() => {
-        const newRows = screen.getAllByRole('row').length - 1;
-        expect(newRows).toBe(4);
-      });
-
-      // Verify data integrity
-      expect(screen.getByText('consistency_test')).toBeInTheDocument();
-      expect(screen.getByText('Consistency Test')).toBeInTheDocument();
-    });
-  });
-
-  describe('Error Recovery Tests', () => {
-    it('should recover from temporary network failures', async () => {
-      // Start with successful state
-      render(
-        <WrapperComponent>
-          <LookupKeysPage />
-        </WrapperComponent>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('test_key_1')).toBeInTheDocument();
-      });
-
+    test('error boundary integration and recovery', async () => {
       // Simulate network failure
-      server.use(...setupMockHandlers('error'));
+      server.use(
+        rest.get('/api/v2/system/lookup_key', (req, res) => {
+          return res.networkError('Network connection failed');
+        })
+      );
 
-      // Try to refresh data
-      const refreshButton = screen.getByRole('button', { name: /refresh/i });
-      await user.click(refreshButton);
+      renderWithProviders(<LookupKeysPage />);
 
       await waitFor(() => {
-        expect(screen.getByText(/Failed to load lookup keys/i)).toBeInTheDocument();
+        expect(screen.getByTestId('lookup-keys-error')).toBeInTheDocument();
       });
 
-      // Restore network and retry
-      server.use(...setupMockHandlers('success'));
+      // Test error recovery
+      server.resetHandlers();
+      server.use(...lookupKeysHandlers);
 
-      const retryButton = screen.getByRole('button', { name: /try again/i });
+      const retryButton = screen.getByRole('button', { name: /retry/i });
       await user.click(retryButton);
 
       await waitFor(() => {
-        expect(screen.getByText('test_key_1')).toBeInTheDocument();
-        expect(screen.queryByText(/Failed to load lookup keys/i)).not.toBeInTheDocument();
+        expect(screen.getByText('test_key')).toBeInTheDocument();
+        expect(screen.queryByTestId('lookup-keys-error')).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Edge Cases and Error Scenarios', () => {
+    test('handles empty dataset gracefully', async () => {
+      server.use(
+        rest.get('/api/v2/system/lookup_key', (req, res, ctx) => {
+          return res(
+            ctx.status(200),
+            ctx.json({
+              resource: [],
+              meta: { count: 0 }
+            })
+          );
+        })
+      );
+
+      renderWithProviders(<LookupKeysPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText(/no lookup keys found/i)).toBeInTheDocument();
+      });
+
+      // Should still show create button
+      expect(screen.getByRole('button', { name: /create new lookup key/i })).toBeInTheDocument();
+    });
+
+    test('handles malformed API responses', async () => {
+      server.use(
+        rest.get('/api/v2/system/lookup_key', (req, res, ctx) => {
+          return res(
+            ctx.status(200),
+            ctx.json({
+              // Missing resource field
+              meta: { count: 0 }
+            })
+          );
+        })
+      );
+
+      renderWithProviders(<LookupKeysPage />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('lookup-keys-error')).toBeInTheDocument();
       });
     });
 
-    it('should handle validation errors gracefully', async () => {
-      server.use(...setupMockHandlers('validation'));
+    test('handles extremely long text values', async () => {
+      const longDescription = 'A'.repeat(1000);
+      const longValue = 'B'.repeat(500);
 
-      render(
-        <WrapperComponent>
-          <LookupKeysPage />
-        </WrapperComponent>
+      renderWithProviders(
+        <LookupKeysForm 
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+          mode="create"
+          initialData={{
+            ...mockLookupKey,
+            description: longDescription,
+            value: longValue,
+          }}
+        />
       );
 
+      // Should truncate display appropriately
+      const descriptionDisplay = screen.getByDisplayValue(longDescription);
+      expect(descriptionDisplay).toBeInTheDocument();
+      
+      // Check that scrolling works for long content
+      expect(descriptionDisplay.scrollHeight).toBeGreaterThan(descriptionDisplay.clientHeight);
+    });
+
+    test('handles concurrent modifications gracefully', async () => {
+      let createCount = 0;
+      server.use(
+        rest.post('/api/v2/system/lookup_key', async (req, res, ctx) => {
+          createCount++;
+          if (createCount === 2) {
+            // Simulate race condition
+            return res(
+              ctx.status(409),
+              ctx.json({
+                error: {
+                  code: 409,
+                  message: 'Resource has been modified by another user'
+                }
+              })
+            );
+          }
+          
+          const body = await req.json();
+          return res(
+            ctx.status(201),
+            ctx.json({
+              resource: [{
+                id: createCount,
+                ...body,
+                created_date: new Date().toISOString(),
+                last_modified_date: new Date().toISOString(),
+              }]
+            })
+          );
+        })
+      );
+
+      renderWithProviders(<LookupKeysPage />);
+
+      // Simulate two rapid creates
+      const createButton = screen.getByRole('button', { name: /create new lookup key/i });
+      
+      await user.click(createButton);
+      const nameInput = screen.getByLabelText(/name/i);
+      await user.type(nameInput, 'concurrent_test_1');
+      const saveButton = screen.getByRole('button', { name: /save/i });
+      await user.click(saveButton);
+
+      // Should handle conflict gracefully
       await waitFor(() => {
-        expect(screen.getByTestId('lookup-keys-page')).toBeInTheDocument();
-      });
-
-      // Try to create duplicate
-      const addButton = screen.getByRole('button', { name: /add lookup key/i });
-      await user.click(addButton);
-
-      await user.type(screen.getByLabelText(/name/i), 'duplicate_key');
-      await user.type(screen.getByLabelText(/value/i), 'Duplicate Value');
-      await user.click(screen.getByRole('button', { name: /create/i }));
-
-      await waitFor(() => {
-        expect(screen.getByText(/Name already exists/i)).toBeInTheDocument();
-      });
-
-      // Form should remain open for correction
-      expect(screen.getByRole('dialog')).toBeInTheDocument();
-
-      // Correct the name and retry
-      const nameField = screen.getByLabelText(/name/i);
-      await user.clear(nameField);
-      await user.type(nameField, 'unique_key');
-
-      // Switch back to success scenario
-      server.use(...setupMockHandlers('success'));
-
-      await user.click(screen.getByRole('button', { name: /create/i }));
-
-      await waitFor(() => {
-        expect(mockToast).toHaveBeenCalledWith({
-          title: 'Success',
-          description: 'Lookup key created successfully',
-        });
+        expect(screen.getByText(/resource has been modified/i)).toBeInTheDocument();
       });
     });
   });
