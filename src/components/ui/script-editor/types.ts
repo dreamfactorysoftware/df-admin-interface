@@ -1,1049 +1,973 @@
 /**
  * Script Editor Component Type Definitions
  * 
- * Comprehensive TypeScript interfaces for the script editor component system
- * following React 19/Next.js 15.1 patterns with React Hook Form integration,
- * Zod schema validation, and DreamFactory API compatibility.
+ * Comprehensive TypeScript interface definitions for the script editor component system.
+ * Provides type safety for React Hook Form integration, DreamFactory service compatibility,
+ * storage service configurations, and script content management with Zod validation schemas.
  * 
- * @fileoverview Script editor component type definitions with form validation
+ * @fileoverview Script editor type definitions with React Hook Form and Zod integration
  * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-import { type ReactNode, type ComponentPropsWithoutRef } from 'react';
-import { type z } from 'zod';
-import { type UseFormReturn, type FieldValues, type Control } from 'react-hook-form';
+import { ReactNode, ComponentType, HTMLAttributes } from 'react';
+import { FieldPath, FieldValues, UseFormRegister, Control, FieldErrors } from 'react-hook-form';
+import { z } from 'zod';
 import { 
-  type BaseComponentProps, 
-  type FormComponentProps, 
-  type ThemeProps,
-  type AccessibilityProps,
-  type LoadingState,
-  type ValidationState 
-} from '../../../types/ui';
+  BaseComponent, 
+  ComponentVariant, 
+  ComponentSize, 
+  FormFieldComponent,
+  LoadingState,
+  DataState 
+} from '@/types/ui';
+import { 
+  ApiResponse, 
+  ApiListResponse, 
+  ApiResourceResponse,
+  HttpMethod 
+} from '@/types/api';
+import { 
+  AceEditorProps, 
+  AceEditorMode, 
+  AceEditorRef,
+  AceEditorConfig 
+} from '../ace-editor/types';
 
-// =============================================================================
-// CORE SCRIPT EDITOR INTERFACES
-// =============================================================================
+// ============================================================================
+// SCRIPT CONTENT AND TYPE DEFINITIONS
+// ============================================================================
 
 /**
- * Main ScriptEditor component props interface
- * Provides comprehensive configuration for the script editor with form integration,
- * storage services, and GitHub import capabilities
+ * Supported script types in DreamFactory
+ * Maps to DreamFactory service script configuration options
  */
-export interface ScriptEditorProps extends 
-  BaseComponentProps<HTMLDivElement>,
-  FormComponentProps,
-  ThemeProps,
-  AccessibilityProps {
-  
-  /** Current script content value */
-  value?: string;
-  /** Default script content for uncontrolled usage */
-  defaultValue?: string;
-  /** Content change handler */
-  onChange?: (content: string) => void;
-  
-  /** ACE editor configuration */
-  editorConfig?: AceEditorConfig;
-  /** Enable/disable syntax highlighting */
-  syntaxHighlighting?: boolean;
-  /** Programming language for syntax highlighting */
-  language?: ScriptLanguage;
-  /** Editor theme (auto uses global theme) */
-  editorTheme?: EditorTheme | 'auto';
-  
-  /** Storage service configuration */
-  storageConfig?: StorageServiceConfig;
-  /** Enable storage service integration */
-  enableStorage?: boolean;
-  /** Default storage service ID */
-  defaultStorageServiceId?: string;
-  /** Default storage path */
-  defaultStoragePath?: string;
-  
-  /** File upload configuration */
-  fileUploadConfig?: FileUploadConfig;
-  /** Enable file upload functionality */
-  enableFileUpload?: boolean;
-  /** Accepted file types for upload */
-  acceptedFileTypes?: string[];
+export enum ScriptType {
+  /** Server-side JavaScript (V8 engine) */
+  NODEJS = 'nodejs',
+  /** PHP scripting */
+  PHP = 'php',
+  /** Python 2.x (legacy support) */
+  PYTHON = 'python',
+  /** Python 3.x */
+  PYTHON3 = 'python3',
+  /** Client-side JavaScript */
+  JAVASCRIPT = 'javascript',
+  /** JSON configuration */
+  JSON = 'json',
+  /** YAML configuration */
+  YAML = 'yaml',
+  /** Plain text */
+  TEXT = 'text'
+}
+
+/**
+ * Script execution context within DreamFactory services
+ */
+export enum ScriptContext {
+  /** Pre-process scripts (before API operation) */
+  PRE_PROCESS = 'pre_process',
+  /** Post-process scripts (after API operation) */
+  POST_PROCESS = 'post_process',
+  /** Event handler scripts */
+  EVENT_HANDLER = 'event_handler',
+  /** Scheduled task scripts */
+  SCHEDULER = 'scheduler',
+  /** Custom service scripts */
+  CUSTOM_SERVICE = 'custom_service',
+  /** Workflow automation scripts */
+  WORKFLOW = 'workflow'
+}
+
+/**
+ * Script storage sources for content management
+ */
+export enum ScriptSource {
+  /** Inline script content stored in database */
+  INLINE = 'inline',
+  /** Script stored in file service */
+  FILE = 'file',
+  /** Script stored in GitHub repository */
+  GITHUB = 'github',
+  /** Script stored in external URL */
+  URL = 'url',
+  /** Local file upload */
+  UPLOAD = 'upload'
+}
+
+/**
+ * Script content metadata with DreamFactory API compatibility
+ */
+export interface ScriptContent {
+  /** Unique identifier for the script */
+  id?: string | number;
+  /** Script display name */
+  name: string;
+  /** Script description */
+  description?: string;
+  /** Script type for syntax highlighting and execution */
+  type: ScriptType;
+  /** Execution context */
+  context: ScriptContext;
+  /** Content source type */
+  source: ScriptSource;
+  /** Script content (for inline scripts) */
+  content?: string;
+  /** File path (for file/GitHub scripts) */
+  path?: string;
+  /** GitHub repository URL */
+  repository_url?: string;
+  /** Git branch/tag reference */
+  ref?: string;
+  /** External URL (for URL source) */
+  url?: string;
+  /** Script parameters/configuration */
+  config?: Record<string, any>;
+  /** Whether script is active */
+  is_active?: boolean;
+  /** Script version */
+  version?: string;
+  /** Created timestamp */
+  created_date?: string;
+  /** Last modified timestamp */
+  last_modified_date?: string;
+  /** Created by user ID */
+  created_by_id?: number;
+  /** Last modified by user ID */
+  last_modified_by_id?: number;
+}
+
+// ============================================================================
+// STORAGE SERVICE CONFIGURATION TYPES
+// ============================================================================
+
+/**
+ * GitHub service configuration for script storage
+ * Compatible with DreamFactory GitHub service API
+ */
+export interface GitHubServiceConfig {
+  /** GitHub service name in DreamFactory */
+  service_name: string;
+  /** Repository owner/organization */
+  owner: string;
+  /** Repository name */
+  repository: string;
+  /** Default branch */
+  branch?: string;
+  /** Base path within repository */
+  base_path?: string;
+  /** GitHub API token (encrypted) */
+  access_token?: string;
+  /** Repository visibility */
+  private?: boolean;
+  /** Enable webhook notifications */
+  webhook_enabled?: boolean;
+  /** Webhook URL */
+  webhook_url?: string;
+}
+
+/**
+ * File service configuration for script storage
+ * Compatible with DreamFactory file service API
+ */
+export interface FileServiceConfig {
+  /** File service name in DreamFactory */
+  service_name: string;
+  /** Base directory for scripts */
+  base_path?: string;
+  /** Allowed file extensions */
+  allowed_extensions?: string[];
   /** Maximum file size in bytes */
-  maxFileSize?: number;
-  
-  /** GitHub integration configuration */
-  githubConfig?: GitHubIntegrationConfig;
-  /** Enable GitHub import functionality */
-  enableGitHubImport?: boolean;
-  
-  /** Cache management configuration */
-  cacheConfig?: CacheConfig;
-  /** Enable cache operations */
-  enableCache?: boolean;
-  
-  /** Form integration props */
-  form?: UseFormReturn<any>;
-  /** Field name for form registration */
-  name?: string;
-  /** Control instance for external form management */
-  control?: Control<FieldValues>;
-  
-  /** Layout and display options */
-  layout?: ScriptEditorLayout;
-  /** Show/hide toolbar */
-  showToolbar?: boolean;
-  /** Show/hide file operations */
-  showFileOperations?: boolean;
-  /** Show/hide storage operations */
-  showStorageOperations?: boolean;
-  
-  /** Event handlers */
-  onContentSave?: (content: string, metadata?: ScriptMetadata) => void;
-  onFileUpload?: (file: File, content: string) => void;
-  onGitHubImport?: (content: string, metadata: GitHubFileMetadata) => void;
-  onCacheOperation?: (operation: CacheOperation, result: CacheOperationResult) => void;
-  onStorageServiceChange?: (serviceId: string | null) => void;
-  onStoragePathChange?: (path: string) => void;
-  
-  /** Accessibility overrides */
-  editorAriaLabel?: string;
-  toolbarAriaLabel?: string;
-  /** Screen reader announcements */
-  announceContentChanges?: boolean;
+  max_file_size?: number;
+  /** Enable versioning */
+  versioning_enabled?: boolean;
+  /** Backup retention policy */
+  backup_retention_days?: number;
 }
 
 /**
- * ACE editor configuration interface
- * Provides configuration options for the underlying ACE code editor
+ * Storage service configuration union type
  */
-export interface AceEditorConfig {
-  /** Editor mode (language) */
-  mode?: string;
-  /** Editor theme */
-  theme?: string;
-  /** Font size in pixels */
-  fontSize?: number;
-  /** Font family */
-  fontFamily?: string;
-  /** Show line numbers */
-  showLineNumbers?: boolean;
-  /** Show gutter */
-  showGutter?: boolean;
-  /** Enable word wrap */
-  wordWrap?: boolean;
-  /** Tab size */
-  tabSize?: number;
-  /** Use soft tabs (spaces) */
-  useSoftTabs?: boolean;
-  /** Enable auto-completion */
-  enableAutoCompletion?: boolean;
-  /** Enable live auto-completion */
-  enableLiveAutocompletion?: boolean;
-  /** Enable snippets */
-  enableSnippets?: boolean;
-  /** Read-only mode */
-  readOnly?: boolean;
-  /** Highlight active line */
-  highlightActiveLine?: boolean;
-  /** Show print margin */
-  showPrintMargin?: boolean;
-  /** Print margin column */
-  printMarginColumn?: number;
-  /** Additional ACE editor options */
-  options?: Record<string, any>;
-}
+export type StorageServiceConfig = GitHubServiceConfig | FileServiceConfig;
 
 /**
- * Supported script languages for syntax highlighting
- */
-export type ScriptLanguage = 
-  | 'javascript'
-  | 'typescript'
-  | 'python'
-  | 'php'
-  | 'json'
-  | 'yaml'
-  | 'xml'
-  | 'html'
-  | 'css'
-  | 'sql'
-  | 'markdown'
-  | 'text';
-
-/**
- * Editor theme options
- */
-export type EditorTheme = 
-  | 'github'
-  | 'github_dark'
-  | 'monokai'
-  | 'tomorrow'
-  | 'tomorrow_night'
-  | 'solarized_light'
-  | 'solarized_dark'
-  | 'textmate'
-  | 'terminal';
-
-/**
- * Script editor layout configurations
- */
-export interface ScriptEditorLayout {
-  /** Layout orientation */
-  orientation?: 'vertical' | 'horizontal';
-  /** Toolbar position */
-  toolbarPosition?: 'top' | 'bottom' | 'left' | 'right';
-  /** Editor height */
-  editorHeight?: string | number;
-  /** Minimum editor height */
-  minEditorHeight?: string | number;
-  /** Maximum editor height */
-  maxEditorHeight?: string | number;
-  /** Enable resizable editor */
-  resizable?: boolean;
-  /** Show borders */
-  showBorders?: boolean;
-  /** Panel spacing */
-  spacing?: 'compact' | 'normal' | 'relaxed';
-}
-
-// =============================================================================
-// STORAGE SERVICE INTERFACES
-// =============================================================================
-
-/**
- * Storage service configuration for script management
- */
-export interface StorageServiceConfig {
-  /** Available storage services */
-  services?: StorageService[];
-  /** Default service selection */
-  defaultServiceId?: string;
-  /** Path validation rules */
-  pathValidation?: StoragePathValidation;
-  /** Service-specific options */
-  serviceOptions?: Record<string, any>;
-}
-
-/**
- * Storage service interface compatible with DreamFactory API
+ * Storage service selection interface
  */
 export interface StorageService {
-  /** Service unique identifier */
+  /** Service identifier */
   id: string;
-  /** Service name */
+  /** Service display name */
   name: string;
-  /** Display label */
-  label?: string;
-  /** Service description */
-  description?: string;
   /** Service type */
-  type: StorageServiceType;
-  /** Service group */
-  group?: ServiceGroup;
+  type: 'github' | 'file' | 'local';
   /** Service configuration */
-  config?: StorageServiceApiConfig;
-  /** Service status */
-  is_active?: boolean;
-  /** Creation metadata */
-  created_date?: string;
-  /** Last modification metadata */
-  last_modified_date?: string;
+  config?: StorageServiceConfig;
+  /** Whether service is available */
+  available: boolean;
+  /** Service capabilities */
+  capabilities: {
+    /** Supports versioning */
+    versioning: boolean;
+    /** Supports collaborative editing */
+    collaboration: boolean;
+    /** Supports webhook notifications */
+    webhooks: boolean;
+    /** Supports backup/restore */
+    backup: boolean;
+  };
 }
 
-/**
- * Storage service types supported by DreamFactory
- */
-export type StorageServiceType = 
-  | 'file'
-  | 'github'
-  | 'gitlab'
-  | 'bitbucket'
-  | 's3'
-  | 'azure_blob'
-  | 'google_cloud'
-  | 'local_file'
-  | 'ftp'
-  | 'sftp';
+// ============================================================================
+// FILE OPERATIONS AND CONTENT MANAGEMENT
+// ============================================================================
 
 /**
- * Service groups for categorization
- */
-export type ServiceGroup = 'source control' | 'file' | 'cloud storage' | 'database';
-
-/**
- * Storage service API configuration
- */
-export interface StorageServiceApiConfig {
-  /** Base URL for API endpoints */
-  base_url?: string;
-  /** Authentication configuration */
-  auth?: StorageServiceAuth;
-  /** Connection parameters */
-  connection?: Record<string, any>;
-  /** Service-specific options */
-  options?: Record<string, any>;
-}
-
-/**
- * Storage service authentication configuration
- */
-export interface StorageServiceAuth {
-  /** Authentication type */
-  type?: 'token' | 'oauth' | 'basic' | 'key';
-  /** Authentication token/key */
-  token?: string;
-  /** Username for basic auth */
-  username?: string;
-  /** Password for basic auth */
-  password?: string;
-  /** OAuth configuration */
-  oauth?: OAuthConfig;
-}
-
-/**
- * OAuth configuration for storage services
- */
-export interface OAuthConfig {
-  /** Client ID */
-  client_id?: string;
-  /** Client secret */
-  client_secret?: string;
-  /** Redirect URI */
-  redirect_uri?: string;
-  /** Access token */
-  access_token?: string;
-  /** Refresh token */
-  refresh_token?: string;
-  /** Token expiration */
-  expires_at?: string;
-}
-
-/**
- * Storage path validation configuration
- */
-export interface StoragePathValidation {
-  /** Path is required when service is selected */
-  requiredWhenServiceSelected?: boolean;
-  /** Allowed path patterns */
-  allowedPatterns?: string[];
-  /** Forbidden path patterns */
-  forbiddenPatterns?: string[];
-  /** Maximum path length */
-  maxLength?: number;
-  /** Minimum path length */
-  minLength?: number;
-  /** Custom validation function */
-  customValidator?: (path: string, serviceType: StorageServiceType) => string | null;
-}
-
-// =============================================================================
-// FILE UPLOAD INTERFACES
-// =============================================================================
-
-/**
- * File upload configuration
- */
-export interface FileUploadConfig {
-  /** Accepted MIME types */
-  acceptedTypes?: string[];
-  /** Maximum file size in bytes */
-  maxSize?: number;
-  /** Allow multiple file selection */
-  multiple?: boolean;
-  /** Enable drag and drop */
-  enableDragDrop?: boolean;
-  /** Upload progress tracking */
-  trackProgress?: boolean;
-  /** Validation rules */
-  validation?: FileUploadValidation;
-}
-
-/**
- * File upload validation rules
- */
-export interface FileUploadValidation {
-  /** Check file extension */
-  validateExtension?: boolean;
-  /** Check MIME type */
-  validateMimeType?: boolean;
-  /** Check file content */
-  validateContent?: boolean;
-  /** Maximum file size */
-  maxSize?: number;
-  /** Minimum file size */
-  minSize?: number;
-  /** Custom validation function */
-  customValidator?: (file: File) => Promise<string | null>;
-}
-
-/**
- * File upload state interface
+ * File upload progress and state management
  */
 export interface FileUploadState extends LoadingState {
-  /** Selected file */
-  file?: File;
-  /** Upload progress (0-100) */
-  progress?: number;
-  /** File content */
-  content?: string;
-  /** File metadata */
-  metadata?: FileMetadata;
-  /** Upload result */
-  result?: FileUploadResult;
+  /** Upload progress percentage (0-100) */
+  progress: number;
+  /** Uploaded file size in bytes */
+  uploaded_bytes?: number;
+  /** Total file size in bytes */
+  total_bytes?: number;
+  /** Upload speed in bytes/second */
+  upload_speed?: number;
+  /** Estimated time remaining in seconds */
+  eta?: number;
 }
 
 /**
- * File metadata interface
+ * File metadata for script content management
  */
-export interface FileMetadata {
-  /** File name */
+export interface ScriptFile {
+  /** File identifier */
+  id: string;
+  /** File name with extension */
   name: string;
+  /** File path within storage service */
+  path: string;
   /** File size in bytes */
   size: number;
   /** MIME type */
-  type: string;
-  /** Last modified date */
-  lastModified: number;
+  mime_type: string;
   /** File extension */
-  extension?: string;
-  /** Detected encoding */
-  encoding?: string;
-  /** Content hash */
-  hash?: string;
-}
-
-/**
- * File upload result interface
- */
-export interface FileUploadResult {
-  /** Upload success status */
-  success: boolean;
-  /** Result message */
-  message?: string;
-  /** Error details */
-  error?: string;
-  /** Uploaded file path */
-  path?: string;
-  /** Upload timestamp */
-  timestamp: Date;
-}
-
-// =============================================================================
-// GITHUB INTEGRATION INTERFACES
-// =============================================================================
-
-/**
- * GitHub integration configuration
- */
-export interface GitHubIntegrationConfig {
-  /** GitHub API base URL */
-  apiBaseUrl?: string;
-  /** Default repository owner */
-  defaultOwner?: string;
-  /** Default repository name */
-  defaultRepo?: string;
-  /** Default branch */
-  defaultBranch?: string;
-  /** Authentication configuration */
-  auth?: GitHubAuthConfig;
-  /** File filters */
-  fileFilters?: GitHubFileFilter[];
-}
-
-/**
- * GitHub authentication configuration
- */
-export interface GitHubAuthConfig {
-  /** Personal access token */
-  token?: string;
-  /** OAuth app configuration */
-  oauth?: {
-    clientId: string;
-    clientSecret?: string;
-    redirectUri?: string;
+  extension: string;
+  /** Script type (derived from extension) */
+  script_type: ScriptType;
+  /** Last modified timestamp */
+  last_modified: string;
+  /** File checksum for integrity verification */
+  checksum?: string;
+  /** File version (for versioned storage) */
+  version?: string;
+  /** Whether file is encrypted */
+  encrypted?: boolean;
+  /** File permissions */
+  permissions?: {
+    read: boolean;
+    write: boolean;
+    execute: boolean;
   };
 }
 
 /**
- * GitHub file filter configuration
+ * File operation result with error handling
  */
-export interface GitHubFileFilter {
-  /** File extension pattern */
-  extension?: string;
-  /** File name pattern */
-  namePattern?: RegExp;
-  /** Path pattern */
-  pathPattern?: RegExp;
-  /** Include/exclude filter */
-  include: boolean;
-}
-
-/**
- * GitHub file metadata from API
- */
-export interface GitHubFileMetadata {
-  /** File name */
-  name: string;
-  /** File path in repository */
-  path: string;
-  /** File SHA hash */
-  sha: string;
-  /** File size in bytes */
-  size: number;
-  /** Download URL */
-  download_url: string;
-  /** Git URL */
-  git_url: string;
-  /** HTML URL */
-  html_url: string;
-  /** File type */
-  type: 'file' | 'dir';
-  /** Repository information */
-  repository?: {
-    owner: string;
-    name: string;
-    branch: string;
-  };
-  /** Commit information */
-  commit?: {
-    sha: string;
-    message: string;
-    author: string;
-    date: string;
-  };
-}
-
-/**
- * GitHub import state interface
- */
-export interface GitHubImportState extends LoadingState {
-  /** Dialog open state */
-  dialogOpen: boolean;
-  /** Repository information */
-  repository?: {
-    owner: string;
-    name: string;
-    branch: string;
-  };
-  /** Available files */
-  files?: GitHubFileMetadata[];
-  /** Selected file */
-  selectedFile?: GitHubFileMetadata;
-  /** File content */
-  content?: string;
-  /** Import result */
-  result?: GitHubImportResult;
-}
-
-/**
- * GitHub import result interface
- */
-export interface GitHubImportResult {
-  /** Import success status */
-  success: boolean;
-  /** Result message */
-  message?: string;
-  /** Error details */
-  error?: string;
-  /** Imported content */
-  content?: string;
-  /** File metadata */
-  metadata?: GitHubFileMetadata;
-  /** Import timestamp */
-  timestamp: Date;
-}
-
-// =============================================================================
-// CACHE MANAGEMENT INTERFACES
-// =============================================================================
-
-/**
- * Cache configuration for script management
- */
-export interface CacheConfig {
-  /** Enable cache operations */
-  enabled?: boolean;
-  /** Cache key prefix */
-  keyPrefix?: string;
-  /** Default TTL in seconds */
-  defaultTtl?: number;
-  /** Cache storage backend */
-  storage?: CacheStorageType;
-  /** Cache invalidation rules */
-  invalidation?: CacheInvalidationConfig;
-}
-
-/**
- * Cache storage types
- */
-export type CacheStorageType = 'memory' | 'localStorage' | 'sessionStorage' | 'indexedDB' | 'server';
-
-/**
- * Cache invalidation configuration
- */
-export interface CacheInvalidationConfig {
-  /** Automatic invalidation on content change */
-  invalidateOnChange?: boolean;
-  /** Invalidation patterns */
-  patterns?: string[];
-  /** TTL-based invalidation */
-  ttlBased?: boolean;
-  /** Manual invalidation triggers */
-  manualTriggers?: CacheInvalidationTrigger[];
-}
-
-/**
- * Cache invalidation triggers
- */
-export type CacheInvalidationTrigger = 'content_change' | 'storage_change' | 'service_change' | 'manual';
-
-/**
- * Cache operation types
- */
-export type CacheOperation = 'get' | 'set' | 'delete' | 'clear' | 'viewLatest' | 'deleteCache';
-
-/**
- * Cache operation result interface
- */
-export interface CacheOperationResult {
+export interface FileOperationResult {
   /** Operation success status */
   success: boolean;
-  /** Operation type */
-  operation: CacheOperation;
-  /** Result data */
-  data?: any;
-  /** Error message */
+  /** File information (on success) */
+  file?: ScriptFile;
+  /** Error message (on failure) */
   error?: string;
-  /** Cache key affected */
-  key?: string;
-  /** Operation timestamp */
-  timestamp: Date;
-}
-
-/**
- * Cache content interface
- */
-export interface CacheContent {
-  /** Content value */
-  content: string;
-  /** Content metadata */
-  metadata?: ScriptMetadata;
-  /** Cache timestamp */
-  cachedAt: Date;
-  /** Cache expiry */
-  expiresAt?: Date;
-  /** Content hash for validation */
-  hash?: string;
-}
-
-// =============================================================================
-// SCRIPT METADATA INTERFACES
-// =============================================================================
-
-/**
- * Script metadata interface
- */
-export interface ScriptMetadata {
-  /** Script name/title */
-  name?: string;
-  /** Script description */
-  description?: string;
-  /** Script language */
-  language?: ScriptLanguage;
-  /** Script version */
-  version?: string;
-  /** Author information */
-  author?: string;
-  /** Creation date */
-  createdAt?: Date;
-  /** Last modification date */
-  modifiedAt?: Date;
-  /** File size in bytes */
-  size?: number;
-  /** Line count */
-  lineCount?: number;
-  /** Character count */
-  characterCount?: number;
-  /** Storage information */
-  storage?: {
-    serviceId?: string;
-    path?: string;
-    url?: string;
+  /** Additional operation metadata */
+  metadata?: {
+    /** Operation type */
+    operation: 'upload' | 'download' | 'delete' | 'rename' | 'move';
+    /** Operation timestamp */
+    timestamp: string;
+    /** User who performed operation */
+    user_id?: number;
   };
-  /** Tags */
-  tags?: string[];
-  /** Custom properties */
-  properties?: Record<string, any>;
 }
 
-// =============================================================================
-// FORM VALIDATION SCHEMAS (ZOD)
-// =============================================================================
+// ============================================================================
+// SCRIPT EDITOR COMPONENT PROPS
+// ============================================================================
 
 /**
- * Zod schema for script editor form validation
- * Provides runtime type checking and form validation integration
+ * Script editor validation configuration
  */
-export const ScriptEditorFormSchema = z.object({
-  /** Script content */
-  content: z.string().min(1, 'Script content is required'),
+export interface ScriptEditorValidation {
+  /** Whether script content is required */
+  required?: boolean;
+  /** Minimum content length */
+  min_length?: number;
+  /** Maximum content length */
+  max_length?: number;
+  /** Custom validation function */
+  validate?: (content: string, type: ScriptType) => string | boolean | undefined;
+  /** Syntax validation enabled */
+  syntax_validation?: boolean;
+  /** Real-time validation enabled */
+  real_time_validation?: boolean;
+}
+
+/**
+ * Script editor accessibility configuration
+ */
+export interface ScriptEditorAccessibility {
+  /** Screen reader label */
+  'aria-label'?: string;
+  /** Element that labels the editor */
+  'aria-labelledby'?: string;
+  /** Element that describes the editor */
+  'aria-describedby'?: string;
+  /** Whether editor is required */
+  'aria-required'?: boolean;
+  /** Whether editor has invalid content */
+  'aria-invalid'?: boolean;
+  /** Current script type for screen readers */
+  'aria-valuetext'?: string;
+  /** Tab index for keyboard navigation */
+  tabIndex?: number;
+  /** Skip to content link */
+  skipToContentText?: string;
+}
+
+/**
+ * Script editor theme configuration
+ */
+export interface ScriptEditorTheme {
+  /** Editor theme mode */
+  mode: 'light' | 'dark' | 'auto';
+  /** Syntax highlighting theme */
+  syntax_theme?: string;
+  /** Editor background color override */
+  background_color?: string;
+  /** Text color override */
+  text_color?: string;
+  /** Custom CSS classes */
+  custom_classes?: string[];
+}
+
+/**
+ * Script editor actions and toolbar configuration
+ */
+export interface ScriptEditorActions {
+  /** Enable save action */
+  save?: boolean;
+  /** Enable load from file action */
+  load?: boolean;
+  /** Enable download action */
+  download?: boolean;
+  /** Enable copy to clipboard action */
+  copy?: boolean;
+  /** Enable format/prettify action */
+  format?: boolean;
+  /** Enable syntax validation action */
+  validate?: boolean;
+  /** Enable fullscreen mode */
+  fullscreen?: boolean;
+  /** Custom actions */
+  custom?: Array<{
+    id: string;
+    label: string;
+    icon?: ComponentType<{ className?: string }>;
+    handler: (content: string) => void;
+    disabled?: boolean;
+  }>;
+}
+
+/**
+ * React Hook Form integration for script editor
+ */
+export interface ScriptEditorFormControl<T extends FieldValues = FieldValues> {
+  /** Form field name */
+  name?: FieldPath<T>;
+  /** React Hook Form register function */
+  register?: UseFormRegister<T>;
+  /** React Hook Form control object */
+  control?: Control<T>;
+  /** Form validation errors */
+  errors?: FieldErrors<T>;
+  /** Default value */
+  defaultValue?: string;
+  /** Form submission trigger */
+  trigger?: (name?: FieldPath<T>) => Promise<boolean>;
+  /** Get field values */
+  getValues?: (name?: FieldPath<T>) => any;
+  /** Set field value */
+  setValue?: (name: FieldPath<T>, value: any) => void;
+}
+
+/**
+ * Comprehensive script editor component props interface
+ * Integrates ACE editor with React Hook Form and DreamFactory services
+ */
+export interface ScriptEditorProps<T extends FieldValues = FieldValues> 
+  extends BaseComponent, 
+    Omit<HTMLAttributes<HTMLDivElement>, 'onChange' | 'onError'> {
   
-  /** Storage service ID */
-  storageServiceId: z.string().optional(),
+  // ============================================================================
+  // CORE CONTENT PROPERTIES
+  // ============================================================================
   
-  /** Storage path - required when storage service is selected */
-  storagePath: z.string().optional(),
+  /** Script content (controlled component) */
+  value?: string;
+  /** Default script content (uncontrolled) */
+  defaultValue?: string;
+  /** Script type for syntax highlighting */
+  scriptType?: ScriptType;
+  /** Script execution context */
+  context?: ScriptContext;
+  /** Content source type */
+  source?: ScriptSource;
   
-  /** Script language */
-  language: z.enum([
-    'javascript', 'typescript', 'python', 'php', 'json', 
-    'yaml', 'xml', 'html', 'css', 'sql', 'markdown', 'text'
-  ]).optional(),
+  // ============================================================================
+  // ACE EDITOR INTEGRATION
+  // ============================================================================
   
-  /** Script metadata */
-  metadata: z.object({
-    name: z.string().optional(),
-    description: z.string().optional(),
-    version: z.string().optional(),
-    author: z.string().optional(),
-    tags: z.array(z.string()).optional(),
-  }).optional(),
-}).refine(
-  (data) => {
-    // Storage path is required when storage service is selected
-    if (data.storageServiceId && !data.storagePath) {
-      return false;
-    }
-    return true;
-  },
-  {
-    message: "Storage path is required when a storage service is selected",
-    path: ["storagePath"],
+  /** ACE editor configuration */
+  editorConfig?: AceEditorConfig;
+  /** ACE editor mode override */
+  editorMode?: AceEditorMode;
+  /** ACE editor theme */
+  editorTheme?: 'light' | 'dark' | 'auto';
+  /** ACE editor size */
+  editorSize?: ComponentSize;
+  /** ACE editor ref for imperative access */
+  editorRef?: React.RefObject<AceEditorRef>;
+  
+  // ============================================================================
+  // REACT HOOK FORM INTEGRATION
+  // ============================================================================
+  
+  /** React Hook Form integration */
+  form?: ScriptEditorFormControl<T>;
+  /** Validation configuration */
+  validation?: ScriptEditorValidation;
+  
+  // ============================================================================
+  // STORAGE AND FILE MANAGEMENT
+  // ============================================================================
+  
+  /** Available storage services */
+  storageServices?: StorageService[];
+  /** Currently selected storage service */
+  selectedStorage?: StorageService;
+  /** Enable file upload functionality */
+  enableFileUpload?: boolean;
+  /** Allowed file types for upload */
+  allowedFileTypes?: string[];
+  /** Maximum file size for upload (bytes) */
+  maxFileSize?: number;
+  
+  // ============================================================================
+  // UI CONFIGURATION
+  // ============================================================================
+  
+  /** Component variant */
+  variant?: ComponentVariant;
+  /** Component size */
+  size?: ComponentSize;
+  /** Editor theme configuration */
+  theme?: ScriptEditorTheme;
+  /** Toolbar actions configuration */
+  actions?: ScriptEditorActions;
+  /** Show line numbers */
+  showLineNumbers?: boolean;
+  /** Show minimap */
+  showMinimap?: boolean;
+  /** Enable word wrap */
+  wordWrap?: boolean;
+  /** Show invisible characters */
+  showInvisibles?: boolean;
+  
+  // ============================================================================
+  // ACCESSIBILITY
+  // ============================================================================
+  
+  /** Accessibility configuration */
+  accessibility?: ScriptEditorAccessibility;
+  /** Screen reader announcements */
+  announceChanges?: boolean;
+  /** High contrast mode */
+  highContrast?: boolean;
+  
+  // ============================================================================
+  // STATE MANAGEMENT
+  // ============================================================================
+  
+  /** Loading state */
+  loading?: boolean;
+  /** Error state */
+  error?: string | null;
+  /** Disabled state */
+  disabled?: boolean;
+  /** Read-only state */
+  readonly?: boolean;
+  /** Auto-save configuration */
+  autoSave?: {
+    enabled: boolean;
+    interval: number; // milliseconds
+    indicator: boolean;
+  };
+  
+  // ============================================================================
+  // EVENT HANDLERS
+  // ============================================================================
+  
+  /** Content change handler */
+  onChange?: (content: string, scriptType?: ScriptType) => void;
+  /** Script type change handler */
+  onScriptTypeChange?: (type: ScriptType) => void;
+  /** Storage service change handler */
+  onStorageChange?: (service: StorageService) => void;
+  /** File upload handler */
+  onFileUpload?: (file: File) => Promise<ScriptFile>;
+  /** File save handler */
+  onFileSave?: (content: string, filename?: string) => Promise<FileOperationResult>;
+  /** File load handler */
+  onFileLoad?: (file: ScriptFile) => Promise<string>;
+  /** Error handler */
+  onError?: (error: string, context?: string) => void;
+  /** Focus handler */
+  onFocus?: () => void;
+  /** Blur handler */
+  onBlur?: () => void;
+  /** Validation handler */
+  onValidate?: (isValid: boolean, errors?: string[]) => void;
+  
+  // ============================================================================
+  // ADVANCED FEATURES
+  // ============================================================================
+  
+  /** Enable collaborative editing */
+  collaborative?: boolean;
+  /** Enable version history */
+  versionHistory?: boolean;
+  /** Enable syntax checking */
+  syntaxChecking?: boolean;
+  /** Enable code completion */
+  codeCompletion?: boolean;
+  /** Enable code folding */
+  codeFolding?: boolean;
+  /** Enable search and replace */
+  searchReplace?: boolean;
+  /** Custom keyboard shortcuts */
+  keyboardShortcuts?: Record<string, () => void>;
+  
+  // ============================================================================
+  // INTERNATIONALIZATION
+  // ============================================================================
+  
+  /** Locale for editor messages */
+  locale?: string;
+  /** Custom translations */
+  translations?: Record<string, string>;
+  
+  // ============================================================================
+  // PERFORMANCE OPTIMIZATION
+  // ============================================================================
+  
+  /** Debounce interval for change events (ms) */
+  debounceInterval?: number;
+  /** Virtualization for large content */
+  virtualized?: boolean;
+  /** Lazy loading configuration */
+  lazyLoad?: boolean;
+}
+
+// ============================================================================
+// SERVICE API TYPES
+// ============================================================================
+
+/**
+ * DreamFactory script service API response types
+ */
+export interface ScriptServiceResponse extends ApiResourceResponse<ScriptContent> {}
+export interface ScriptListResponse extends ApiListResponse<ScriptContent> {}
+
+/**
+ * Script service API endpoints
+ */
+export interface ScriptServiceAPI {
+  /** List all scripts */
+  list: (params?: { filter?: string; limit?: number; offset?: number }) => Promise<ScriptListResponse>;
+  /** Get script by ID */
+  get: (id: string | number) => Promise<ScriptServiceResponse>;
+  /** Create new script */
+  create: (script: Omit<ScriptContent, 'id'>) => Promise<ScriptServiceResponse>;
+  /** Update existing script */
+  update: (id: string | number, script: Partial<ScriptContent>) => Promise<ScriptServiceResponse>;
+  /** Delete script */
+  delete: (id: string | number) => Promise<ApiResponse>;
+  /** Execute script */
+  execute: (id: string | number, params?: Record<string, any>) => Promise<ApiResponse>;
+  /** Validate script syntax */
+  validate: (content: string, type: ScriptType) => Promise<{
+    valid: boolean;
+    errors?: string[];
+    warnings?: string[];
+  }>;
+}
+
+/**
+ * Storage service API for file operations
+ */
+export interface StorageServiceAPI {
+  /** Upload file */
+  upload: (file: File, path?: string) => Promise<FileOperationResult>;
+  /** Download file */
+  download: (path: string) => Promise<Blob>;
+  /** Delete file */
+  delete: (path: string) => Promise<FileOperationResult>;
+  /** List files */
+  list: (path?: string) => Promise<ScriptFile[]>;
+  /** Get file metadata */
+  metadata: (path: string) => Promise<ScriptFile>;
+  /** Create directory */
+  createDirectory: (path: string) => Promise<FileOperationResult>;
+}
+
+// ============================================================================
+// ZOD VALIDATION SCHEMAS
+// ============================================================================
+
+/**
+ * Zod schema for script type validation
+ */
+export const ScriptTypeSchema = z.nativeEnum(ScriptType);
+
+/**
+ * Zod schema for script context validation
+ */
+export const ScriptContextSchema = z.nativeEnum(ScriptContext);
+
+/**
+ * Zod schema for script source validation
+ */
+export const ScriptSourceSchema = z.nativeEnum(ScriptSource);
+
+/**
+ * Zod schema for script content validation
+ */
+export const ScriptContentSchema = z.object({
+  id: z.union([z.string(), z.number()]).optional(),
+  name: z.string().min(1, 'Script name is required').max(255, 'Script name too long'),
+  description: z.string().max(1000, 'Description too long').optional(),
+  type: ScriptTypeSchema,
+  context: ScriptContextSchema,
+  source: ScriptSourceSchema,
+  content: z.string().optional(),
+  path: z.string().optional(),
+  repository_url: z.string().url('Invalid repository URL').optional(),
+  ref: z.string().optional(),
+  url: z.string().url('Invalid URL').optional(),
+  config: z.record(z.any()).optional(),
+  is_active: z.boolean().optional().default(true),
+  version: z.string().optional(),
+  created_date: z.string().optional(),
+  last_modified_date: z.string().optional(),
+  created_by_id: z.number().optional(),
+  last_modified_by_id: z.number().optional(),
+}).refine((data) => {
+  // Validate that content source has corresponding data
+  switch (data.source) {
+    case ScriptSource.INLINE:
+      return data.content !== undefined && data.content.length > 0;
+    case ScriptSource.FILE:
+    case ScriptSource.GITHUB:
+      return data.path !== undefined && data.path.length > 0;
+    case ScriptSource.URL:
+      return data.url !== undefined;
+    default:
+      return true;
   }
-);
+}, {
+  message: 'Content source requires corresponding data (content, path, or url)',
+});
 
 /**
- * Inferred TypeScript type from Zod schema
+ * Zod schema for GitHub service configuration
  */
-export type ScriptEditorFormData = z.infer<typeof ScriptEditorFormSchema>;
+export const GitHubServiceConfigSchema = z.object({
+  service_name: z.string().min(1, 'Service name is required'),
+  owner: z.string().min(1, 'Repository owner is required'),
+  repository: z.string().min(1, 'Repository name is required'),
+  branch: z.string().optional().default('main'),
+  base_path: z.string().optional(),
+  access_token: z.string().optional(),
+  private: z.boolean().optional().default(false),
+  webhook_enabled: z.boolean().optional().default(false),
+  webhook_url: z.string().url('Invalid webhook URL').optional(),
+});
+
+/**
+ * Zod schema for file service configuration
+ */
+export const FileServiceConfigSchema = z.object({
+  service_name: z.string().min(1, 'Service name is required'),
+  base_path: z.string().optional(),
+  allowed_extensions: z.array(z.string()).optional().default([
+    '.js', '.php', '.py', '.json', '.yaml', '.yml', '.txt'
+  ]),
+  max_file_size: z.number().positive('File size must be positive').optional().default(10 * 1024 * 1024), // 10MB
+  versioning_enabled: z.boolean().optional().default(false),
+  backup_retention_days: z.number().positive('Retention days must be positive').optional().default(30),
+});
+
+/**
+ * Zod schema for storage service configuration
+ */
+export const StorageServiceSchema = z.object({
+  id: z.string().min(1, 'Service ID is required'),
+  name: z.string().min(1, 'Service name is required'),
+  type: z.enum(['github', 'file', 'local']),
+  config: z.union([GitHubServiceConfigSchema, FileServiceConfigSchema]).optional(),
+  available: z.boolean(),
+  capabilities: z.object({
+    versioning: z.boolean(),
+    collaboration: z.boolean(),
+    webhooks: z.boolean(),
+    backup: z.boolean(),
+  }),
+});
+
+/**
+ * Zod schema for script file validation
+ */
+export const ScriptFileSchema = z.object({
+  id: z.string().min(1, 'File ID is required'),
+  name: z.string().min(1, 'File name is required'),
+  path: z.string().min(1, 'File path is required'),
+  size: z.number().nonnegative('File size must be non-negative'),
+  mime_type: z.string().min(1, 'MIME type is required'),
+  extension: z.string().min(1, 'File extension is required'),
+  script_type: ScriptTypeSchema,
+  last_modified: z.string(),
+  checksum: z.string().optional(),
+  version: z.string().optional(),
+  encrypted: z.boolean().optional().default(false),
+  permissions: z.object({
+    read: z.boolean(),
+    write: z.boolean(),
+    execute: z.boolean(),
+  }).optional(),
+});
 
 /**
  * Zod schema for file upload validation
  */
 export const FileUploadSchema = z.object({
-  /** File object */
-  file: z.instanceof(File, { message: 'Valid file is required' }),
-  
-  /** File size validation */
-  size: z.number().max(10 * 1024 * 1024, 'File size must be less than 10MB'),
-  
-  /** File type validation */
-  type: z.string().refine(
-    (type) => [
-      'text/plain',
+  file: z.instanceof(File, 'Invalid file object'),
+  path: z.string().optional(),
+  overwrite: z.boolean().optional().default(false),
+  validate_type: z.boolean().optional().default(true),
+}).refine((data) => {
+  // Validate file type if validation is enabled
+  if (data.validate_type) {
+    const allowedTypes = [
       'text/javascript',
       'application/javascript',
-      'text/typescript',
-      'application/typescript',
-      'text/python',
+      'text/x-php',
+      'text/x-python',
       'application/json',
       'text/yaml',
-      'application/yaml',
-      'text/xml',
-      'application/xml',
-      'text/html',
-      'text/css',
-      'text/sql',
-      'text/markdown',
-    ].includes(type),
-    { message: 'Unsupported file type' }
-  ),
+      'application/x-yaml',
+      'text/plain',
+    ];
+    return allowedTypes.includes(data.file.type) || 
+           data.file.name.match(/\.(js|php|py|json|yaml|yml|txt)$/i);
+  }
+  return true;
+}, {
+  message: 'Invalid file type for script content',
 });
 
 /**
- * Inferred TypeScript type for file upload
+ * Zod schema for script editor form validation
  */
-export type FileUploadData = z.infer<typeof FileUploadSchema>;
-
-/**
- * Zod schema for GitHub import validation
- */
-export const GitHubImportSchema = z.object({
-  /** Repository owner */
-  owner: z.string().min(1, 'Repository owner is required'),
+export const ScriptEditorFormSchema = z.object({
+  content: z.string().min(1, 'Script content is required'),
+  type: ScriptTypeSchema,
+  name: z.string().min(1, 'Script name is required').max(255, 'Script name too long'),
+  description: z.string().max(1000, 'Description too long').optional(),
+  context: ScriptContextSchema,
+  source: ScriptSourceSchema,
+  storage_service: z.string().optional(),
+  file_path: z.string().optional(),
+  is_active: z.boolean().optional().default(true),
+}).refine((data) => {
+  // Validate content length based on script type
+  const maxLengths = {
+    [ScriptType.NODEJS]: 1000000,    // 1MB
+    [ScriptType.PHP]: 1000000,       // 1MB
+    [ScriptType.PYTHON]: 1000000,    // 1MB
+    [ScriptType.PYTHON3]: 1000000,   // 1MB
+    [ScriptType.JAVASCRIPT]: 500000, // 500KB
+    [ScriptType.JSON]: 100000,       // 100KB
+    [ScriptType.YAML]: 100000,       // 100KB
+    [ScriptType.TEXT]: 100000,       // 100KB
+  };
   
-  /** Repository name */
-  repo: z.string().min(1, 'Repository name is required'),
-  
-  /** Branch name */
-  branch: z.string().default('main'),
-  
-  /** File path */
-  path: z.string().min(1, 'File path is required'),
+  const maxLength = maxLengths[data.type] || 100000;
+  return data.content.length <= maxLength;
+}, {
+  message: 'Script content exceeds maximum length for this script type',
 });
 
-/**
- * Inferred TypeScript type for GitHub import
- */
-export type GitHubImportData = z.infer<typeof GitHubImportSchema>;
-
-// =============================================================================
-// ERROR HANDLING AND STATE INTERFACES
-// =============================================================================
+// ============================================================================
+// UTILITY TYPES AND TYPE GUARDS
+// ============================================================================
 
 /**
- * Script editor error types
+ * Type guard to check if storage config is GitHub config
  */
-export type ScriptEditorError = 
-  | 'validation_error'
-  | 'file_upload_error'
-  | 'github_import_error'
-  | 'cache_operation_error'
-  | 'storage_service_error'
-  | 'editor_error'
-  | 'network_error'
-  | 'authentication_error'
-  | 'permission_error'
-  | 'unknown_error';
-
-/**
- * Error state interface for script editor
- */
-export interface ScriptEditorErrorState {
-  /** Error type */
-  type: ScriptEditorError;
-  /** Error message */
-  message: string;
-  /** Error details */
-  details?: string;
-  /** Error code */
-  code?: string | number;
-  /** Error timestamp */
-  timestamp: Date;
-  /** Recovery suggestions */
-  recovery?: string[];
-  /** Is error recoverable */
-  recoverable: boolean;
+export function isGitHubConfig(config: StorageServiceConfig): config is GitHubServiceConfig {
+  return 'owner' in config && 'repository' in config;
 }
 
 /**
- * Loading state interface for async operations
+ * Type guard to check if storage config is file config
  */
-export interface ScriptEditorLoadingState extends LoadingState {
-  /** Current operation */
-  operation?: 'loading_services' | 'uploading_file' | 'importing_github' | 'cache_operation' | 'saving_content';
-  /** Operation details */
-  operationDetails?: string;
-  /** Can cancel operation */
-  cancellable?: boolean;
-  /** Cancel handler */
-  onCancel?: () => void;
+export function isFileConfig(config: StorageServiceConfig): config is FileServiceConfig {
+  return 'service_name' in config && !('owner' in config);
 }
 
 /**
- * Validation state interface for form fields
+ * Map script type to ACE editor mode
  */
-export interface ScriptEditorValidationState extends ValidationState {
-  /** Field-specific validation states */
-  fields: {
-    content: ValidationState;
-    storageServiceId: ValidationState;
-    storagePath: ValidationState;
-    language: ValidationState;
-    metadata: ValidationState;
-  };
-  /** Real-time validation enabled */
-  realTimeValidation: boolean;
-  /** Validation debounce time in ms */
-  debounceTime: number;
-}
-
-// =============================================================================
-// HOOK INTERFACES
-// =============================================================================
+export const scriptTypeToAceMode: Record<ScriptType, AceEditorMode> = {
+  [ScriptType.NODEJS]: AceEditorMode.NODEJS,
+  [ScriptType.PHP]: AceEditorMode.PHP,
+  [ScriptType.PYTHON]: AceEditorMode.PYTHON,
+  [ScriptType.PYTHON3]: AceEditorMode.PYTHON3,
+  [ScriptType.JAVASCRIPT]: AceEditorMode.JAVASCRIPT,
+  [ScriptType.JSON]: AceEditorMode.JSON,
+  [ScriptType.YAML]: AceEditorMode.YAML,
+  [ScriptType.TEXT]: AceEditorMode.TEXT,
+};
 
 /**
- * Return type for useScriptEditor hook
+ * Map file extension to script type
  */
-export interface UseScriptEditorReturn {
-  /** Form control instance */
-  form: UseFormReturn<ScriptEditorFormData>;
-  
-  /** Storage services state */
-  storageServices: {
-    data: StorageService[];
-    loading: boolean;
-    error: string | null;
-    refetch: () => void;
-  };
-  
-  /** File upload state */
-  fileUpload: FileUploadState & {
-    uploadFile: (file: File) => Promise<void>;
-    clearFile: () => void;
-  };
-  
-  /** GitHub import state */
-  githubImport: GitHubImportState & {
-    openDialog: () => void;
-    closeDialog: () => void;
-    importFile: (metadata: GitHubFileMetadata) => Promise<void>;
-  };
-  
-  /** Cache operations */
-  cache: {
-    viewLatest: () => Promise<void>;
-    deleteCache: (key?: string) => Promise<void>;
-    loading: boolean;
-    error: string | null;
-  };
-  
-  /** Validation state */
-  validation: ScriptEditorValidationState;
-  
-  /** Error state */
-  error: ScriptEditorErrorState | null;
-  
-  /** Loading state */
-  loading: ScriptEditorLoadingState;
-  
-  /** Utility functions */
-  utils: {
-    resetForm: () => void;
-    saveContent: (content: string) => Promise<void>;
-    validateContent: (content: string) => Promise<boolean>;
-    getContentMetadata: (content: string) => ScriptMetadata;
-  };
-}
+export const extensionToScriptType: Record<string, ScriptType> = {
+  '.js': ScriptType.JAVASCRIPT,
+  '.mjs': ScriptType.NODEJS,
+  '.php': ScriptType.PHP,
+  '.py': ScriptType.PYTHON3,
+  '.python': ScriptType.PYTHON,
+  '.json': ScriptType.JSON,
+  '.yaml': ScriptType.YAML,
+  '.yml': ScriptType.YAML,
+  '.txt': ScriptType.TEXT,
+  '.md': ScriptType.TEXT,
+};
 
 /**
- * Configuration options for useScriptEditor hook
+ * Default editor configuration for each script type
  */
-export interface UseScriptEditorConfig {
-  /** Default form values */
-  defaultValues?: Partial<ScriptEditorFormData>;
-  /** Validation configuration */
-  validation?: {
-    mode?: 'onSubmit' | 'onBlur' | 'onChange' | 'onTouched' | 'all';
-    reValidateMode?: 'onSubmit' | 'onBlur' | 'onChange' | 'onTouched' | 'all';
-    debounceTime?: number;
-  };
-  /** Storage configuration */
-  storage?: StorageServiceConfig;
-  /** File upload configuration */
-  fileUpload?: FileUploadConfig;
-  /** GitHub configuration */
-  github?: GitHubIntegrationConfig;
-  /** Cache configuration */
-  cache?: CacheConfig;
-  /** Event handlers */
-  onContentChange?: (content: string) => void;
-  onStorageServiceChange?: (serviceId: string | null) => void;
-  onError?: (error: ScriptEditorErrorState) => void;
-}
+export const defaultEditorConfig: Record<ScriptType, Partial<AceEditorConfig>> = {
+  [ScriptType.NODEJS]: {
+    enableBasicAutocompletion: true,
+    enableLiveAutocompletion: true,
+    enableSnippets: true,
+    tabSize: 2,
+  },
+  [ScriptType.PHP]: {
+    enableBasicAutocompletion: true,
+    enableLiveAutocompletion: true,
+    enableSnippets: true,
+    tabSize: 4,
+  },
+  [ScriptType.PYTHON]: {
+    enableBasicAutocompletion: true,
+    enableLiveAutocompletion: true,
+    enableSnippets: true,
+    tabSize: 4,
+  },
+  [ScriptType.PYTHON3]: {
+    enableBasicAutocompletion: true,
+    enableLiveAutocompletion: true,
+    enableSnippets: true,
+    tabSize: 4,
+  },
+  [ScriptType.JAVASCRIPT]: {
+    enableBasicAutocompletion: true,
+    enableLiveAutocompletion: true,
+    enableSnippets: true,
+    tabSize: 2,
+  },
+  [ScriptType.JSON]: {
+    enableBasicAutocompletion: false,
+    enableLiveAutocompletion: false,
+    enableSnippets: false,
+    tabSize: 2,
+    wrap: true,
+  },
+  [ScriptType.YAML]: {
+    enableBasicAutocompletion: false,
+    enableLiveAutocompletion: false,
+    enableSnippets: false,
+    tabSize: 2,
+    wrap: true,
+  },
+  [ScriptType.TEXT]: {
+    enableBasicAutocompletion: false,
+    enableLiveAutocompletion: false,
+    enableSnippets: false,
+    tabSize: 4,
+    wrap: true,
+  },
+};
 
-// =============================================================================
-// UTILITY TYPES
-// =============================================================================
+// ============================================================================
+// EXPORT TYPES FOR EXTERNAL USAGE
+// ============================================================================
 
-/**
- * Generic API response wrapper
- */
-export interface ApiResponse<T = any> {
-  /** Response success status */
-  success: boolean;
-  /** Response data */
-  data?: T;
-  /** Error message */
-  error?: string;
-  /** Response metadata */
-  meta?: {
-    total?: number;
-    page?: number;
-    limit?: number;
-    timestamp?: string;
-  };
-}
-
-/**
- * Generic list response format (DreamFactory compatible)
- */
-export interface GenericListResponse<T = any> {
-  /** Response data array */
-  resource: T[];
-  /** Response metadata */
-  meta?: {
-    count?: number;
-    offset?: number;
-    limit?: number;
-    total?: number;
-  };
-}
-
-/**
- * Event handler types for script editor
- */
-export interface ScriptEditorEventHandlers {
-  onContentChange?: (content: string, metadata?: ScriptMetadata) => void;
-  onContentSave?: (content: string, metadata?: ScriptMetadata) => Promise<void>;
-  onFileUpload?: (file: File, content: string) => Promise<void>;
-  onGitHubImport?: (content: string, metadata: GitHubFileMetadata) => Promise<void>;
-  onCacheOperation?: (operation: CacheOperation, result: CacheOperationResult) => void;
-  onStorageServiceChange?: (serviceId: string | null, service?: StorageService) => void;
-  onStoragePathChange?: (path: string, valid: boolean) => void;
-  onLanguageChange?: (language: ScriptLanguage) => void;
-  onThemeChange?: (theme: EditorTheme) => void;
-  onValidationChange?: (state: ScriptEditorValidationState) => void;
-  onError?: (error: ScriptEditorErrorState) => void;
-  onLoadingChange?: (loading: ScriptEditorLoadingState) => void;
-}
-
-/**
- * Theme-aware prop types for script editor components
- */
-export interface ScriptEditorThemeProps {
-  /** Component variant */
-  variant?: 'default' | 'compact' | 'expanded';
-  /** Color scheme */
-  colorScheme?: 'light' | 'dark' | 'auto';
-  /** Border style */
-  bordered?: boolean;
-  /** Shadow style */
-  shadow?: 'none' | 'sm' | 'md' | 'lg';
-  /** Corner radius */
-  rounded?: 'none' | 'sm' | 'md' | 'lg' | 'full';
-  /** Background style */
-  background?: 'default' | 'muted' | 'accent' | 'transparent';
-}
-
-// =============================================================================
-// EXPORTS
-// =============================================================================
-
-/**
- * Re-export common types for convenience
- */
 export type {
-  BaseComponentProps,
-  FormComponentProps,
-  ThemeProps,
-  AccessibilityProps,
-  LoadingState,
-  ValidationState
-} from '../../../types/ui';
-
-/**
- * Default export containing all main interfaces
- */
-export default {
-  ScriptEditorProps,
-  StorageService,
+  ScriptContent,
+  ScriptFile,
+  ScriptServiceAPI,
+  StorageServiceAPI,
+  FileOperationResult,
   FileUploadState,
-  GitHubImportState,
-  CacheConfig,
-  ScriptMetadata,
-  UseScriptEditorReturn,
-  UseScriptEditorConfig,
-  ScriptEditorFormSchema,
+  GitHubServiceConfig,
+  FileServiceConfig,
+  StorageService,
+  ScriptEditorValidation,
+  ScriptEditorAccessibility,
+  ScriptEditorTheme,
+  ScriptEditorActions,
+  ScriptEditorFormControl,
+};
+
+// Export schemas for runtime validation
+export {
+  ScriptContentSchema,
+  GitHubServiceConfigSchema,
+  FileServiceConfigSchema,
+  StorageServiceSchema,
+  ScriptFileSchema,
   FileUploadSchema,
-  GitHubImportSchema,
-} as const;
+  ScriptEditorFormSchema,
+};
+
+// Export enums
+export {
+  ScriptType,
+  ScriptContext,
+  ScriptSource,
+};
+
+// Export utility functions
+export {
+  isGitHubConfig,
+  isFileConfig,
+  scriptTypeToAceMode,
+  extensionToScriptType,
+  defaultEditorConfig,
+};
