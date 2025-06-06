@@ -1,899 +1,1143 @@
 /**
- * Testing Utilities for API Security Components
+ * API Security Components Test Utilities
  * 
- * Provides comprehensive testing utilities specifically for API security components
- * including MSW handlers, mock data generators, and reusable test setup functions.
- * Replaces Angular testing mocks with MSW-based API mocking for realistic component
- * testing scenarios across both limits and roles features.
+ * Comprehensive testing utilities and MSW handlers specifically for API security components,
+ * providing mock data generators, API response handlers, and reusable test setup functions.
+ * Replaces Angular testing mocks with MSW-based API mocking for realistic component testing
+ * scenarios across both limits and roles features.
  * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
+ * Features:
+ * - MSW request handlers for security operations
+ * - React Testing Library wrapper functions with providers
+ * - React Query testing utilities for cache behavior mocking
+ * - Zustand store mock providers for component testing isolation
+ * - Comprehensive test data factories for limits, roles, permissions, and users
+ * - Dynamic MSW response generators for various testing scenarios
+ * 
+ * @fileoverview Test utilities for API security components
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-import React from 'react'
-import { render, renderHook, RenderOptions, RenderHookOptions } from '@testing-library/react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { http, HttpResponse } from 'msw'
-import { setupServer } from 'msw/node'
-import { create } from 'zustand'
-import type { ReactElement, ReactNode } from 'react'
+import React, { type ReactElement } from 'react';
+import { render, type RenderOptions } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { rest, type RequestHandler } from 'msw';
+import { faker } from '@faker-js/faker';
+import { create, type StoreApi } from 'zustand';
 
-// Import types from the shared type definitions
-import type {
-  ApiListResponse,
-  ApiCreateResponse,
-  ApiUpdateResponse,
-  ApiDeleteResponse,
-  ApiErrorResponse,
-  HttpStatusCode,
-  PaginationMeta,
-} from '../../../types/api'
-import type {
-  RoleType,
-  RoleCreatePayload,
-  RoleUpdatePayload,
-  RoleServiceAccessType,
-  RolePermission,
-  RoleListParams,
-  AccessLevel,
-  RequesterLevel,
-} from '../../../types/role'
-import type {
-  LimitType,
-  CreateLimitPayload,
-  UpdateLimitPayload,
-  CacheLimitType,
-  LimitTableRowData,
-  LimitListParams,
-  RATE_LIMIT_PERIODS,
-  RATE_LIMIT_TYPES,
-} from '../../../types/limit'
+// Types
+import type { 
+  ApiListResponse, 
+  ApiResourceResponse, 
+  ApiErrorResponse, 
+  ApiSuccessResponse,
+  HttpMethod 
+} from '@/types/api';
+import type { 
+  RoleType, 
+  RoleWithRelations, 
+  CreateRoleData, 
+  UpdateRoleData,
+  RoleServiceAccess,
+  RoleLookup,
+  RoleListItem,
+  RolePermissionSummary,
+  HttpVerb 
+} from '@/types/role';
 
-// =============================================================================
-// MOCK DATA FACTORIES
-// =============================================================================
+// ============================================================================
+// TEST DATA FACTORIES
+// ============================================================================
 
 /**
- * Generate a mock cache limit entry
+ * Factory for generating mock role data
+ * Creates realistic role instances with proper relationships and constraints
  */
-export function createMockCacheLimit(overrides: Partial<CacheLimitType> = {}): CacheLimitType {
+export const createMockRole = (overrides: Partial<RoleType> = {}): RoleType => ({
+  id: faker.number.int({ min: 1, max: 1000 }),
+  name: faker.internet.username(),
+  description: faker.lorem.sentence(),
+  isActive: faker.datatype.boolean(),
+  createdById: faker.number.int({ min: 1, max: 100 }),
+  createdDate: faker.date.past().toISOString(),
+  lastModifiedById: faker.number.int({ min: 1, max: 100 }),
+  lastModifiedDate: faker.date.recent().toISOString(),
+  lookupByRoleId: faker.helpers.multiple(() => faker.number.int({ min: 1, max: 50 }), { count: { min: 0, max: 5 } }),
+  accessibleTabs: faker.helpers.multiple(() => faker.helpers.arrayElement([
+    'dashboard', 'users', 'roles', 'services', 'schema', 'apps', 'limits'
+  ]), { count: { min: 1, max: 4 } }),
+  ...overrides,
+});
+
+/**
+ * Factory for generating mock role service access configurations
+ */
+export const createMockRoleServiceAccess = (overrides: Partial<RoleServiceAccess> = {}): RoleServiceAccess => ({
+  id: faker.number.int({ min: 1, max: 1000 }),
+  roleId: faker.number.int({ min: 1, max: 100 }),
+  serviceId: faker.number.int({ min: 1, max: 50 }),
+  component: faker.helpers.maybe(() => faker.helpers.arrayElement(['_table', '_view', '_schema', '_openapi'])),
+  verbMask: faker.helpers.arrayElement([1, 3, 7, 15, 31, 63, 127]), // Various HTTP verb combinations
+  requestorType: faker.number.int({ min: 0, max: 3 }),
+  filters: faker.helpers.maybe(() => `field1 = '${faker.lorem.word()}'`),
+  filterOp: faker.helpers.maybe(() => faker.helpers.arrayElement(['AND', 'OR'])),
+  ...overrides,
+});
+
+/**
+ * Factory for generating mock role lookup configurations
+ */
+export const createMockRoleLookup = (overrides: Partial<RoleLookup> = {}): RoleLookup => ({
+  id: faker.number.int({ min: 1, max: 1000 }),
+  roleId: faker.number.int({ min: 1, max: 100 }),
+  name: faker.database.column(),
+  value: faker.lorem.word(),
+  private: faker.datatype.boolean(),
+  description: faker.helpers.maybe(() => faker.lorem.sentence()),
+  ...overrides,
+});
+
+/**
+ * Factory for generating complete role with relations
+ */
+export const createMockRoleWithRelations = (overrides: Partial<RoleWithRelations> = {}): RoleWithRelations => {
+  const baseRole = createMockRole(overrides);
   return {
-    id: Math.floor(Math.random() * 1000) + 1,
-    key: `instance.user:${Math.floor(Math.random() * 100)}.minute`,
-    max: Math.floor(Math.random() * 1000) + 10,
-    attempts: Math.floor(Math.random() * 50),
-    remaining: Math.floor(Math.random() * 950) + 50,
-    reset_time: new Date(Date.now() + 60000).toISOString(),
-    window_start: new Date(Date.now() - 30000).toISOString(),
+    ...baseRole,
+    roleServiceAccessByRoleId: faker.helpers.multiple(
+      () => createMockRoleServiceAccess({ roleId: baseRole.id }),
+      { count: { min: 0, max: 8 } }
+    ),
+    lookupByRoleId: faker.helpers.multiple(
+      () => createMockRoleLookup({ roleId: baseRole.id }),
+      { count: { min: 0, max: 5 } }
+    ),
     ...overrides,
-  }
-}
+  };
+};
 
 /**
- * Generate a mock rate limit configuration
+ * Factory for generating role list items for table displays
  */
-export function createMockLimit(overrides: Partial<LimitType> = {}): LimitType {
-  const id = Math.floor(Math.random() * 1000) + 1
-  const type = overrides.type || 'api'
-  const period = overrides.period || 'minute'
-  const rate = overrides.rate || Math.floor(Math.random() * 1000) + 10
-  
-  return {
-    id,
-    name: `Test Limit ${id}`,
-    description: `Generated test limit for ${type}`,
-    isActive: true,
-    rate,
-    period,
-    type,
-    endpoint: type === 'endpoint' ? '/api/v2/test' : null,
-    verb: type === 'endpoint' ? 'GET' : null,
-    serviceId: type === 'service' ? Math.floor(Math.random() * 10) + 1 : null,
-    roleId: type === 'role' ? Math.floor(Math.random() * 10) + 1 : null,
-    userId: type === 'user' ? Math.floor(Math.random() * 100) + 1 : null,
-    keyText: `${type}.${period}`,
-    createdDate: new Date(Date.now() - 86400000).toISOString(),
-    lastModifiedDate: new Date().toISOString(),
-    limitCacheByLimitId: [createMockCacheLimit({ id, max: rate })],
-    roleByRoleId: null,
-    serviceByServiceId: null,
-    userByUserId: null,
-    ...overrides,
-  }
-}
+export const createMockRoleListItem = (overrides: Partial<RoleListItem> = {}): RoleListItem => ({
+  id: faker.number.int({ min: 1, max: 1000 }),
+  name: faker.internet.username(),
+  description: faker.lorem.sentence(),
+  isActive: faker.datatype.boolean(),
+  userCount: faker.number.int({ min: 0, max: 50 }),
+  serviceAccessCount: faker.number.int({ min: 0, max: 20 }),
+  lastModifiedDate: faker.date.recent().toISOString(),
+  ...overrides,
+});
 
 /**
- * Generate a mock limit table row
+ * Factory for generating role permission summaries
  */
-export function createMockLimitTableRow(overrides: Partial<LimitTableRowData> = {}): LimitTableRowData {
-  const id = Math.floor(Math.random() * 1000) + 1
-  const type = overrides.limitType || 'api'
-  const rate = Math.floor(Math.random() * 1000) + 10
-  const period = 'minute'
-  
-  return {
-    id,
-    name: `Test Limit ${id}`,
-    limitType: type,
-    limitRate: `${rate} / ${period}`,
-    limitCounter: `${Math.floor(Math.random() * rate)} / ${rate}`,
-    user: type === 'user' ? Math.floor(Math.random() * 100) + 1 : null,
-    service: type === 'service' ? Math.floor(Math.random() * 10) + 1 : null,
-    role: type === 'role' ? Math.floor(Math.random() * 10) + 1 : null,
-    active: true,
-    description: `Generated test limit`,
-    period,
-    endpoint: type === 'endpoint' ? '/api/v2/test' : undefined,
-    verb: type === 'endpoint' ? 'GET' : undefined,
-    createdDate: new Date().toISOString(),
-    lastModifiedDate: new Date().toISOString(),
-    ...overrides,
-  }
-}
+export const createMockRolePermissionSummary = (overrides: Partial<RolePermissionSummary> = {}): RolePermissionSummary => ({
+  roleId: faker.number.int({ min: 1, max: 100 }),
+  serviceCount: faker.number.int({ min: 0, max: 20 }),
+  fullAccessServices: faker.helpers.multiple(() => faker.helpers.arrayElement([
+    'mysql', 'postgresql', 'mongodb', 'files', 'email'
+  ]), { count: { min: 0, max: 5 } }),
+  limitedAccessServices: faker.helpers.multiple(() => faker.helpers.arrayElement([
+    'system', 'cache', 'cors', 'logs'
+  ]), { count: { min: 0, max: 3 } }),
+  lookupCount: faker.number.int({ min: 0, max: 10 }),
+  isAdmin: faker.datatype.boolean({ probability: 0.2 }),
+  ...overrides,
+});
 
 /**
- * Generate a mock role service access configuration
+ * Factory for generating limit data (placeholder for when limit types are available)
  */
-export function createMockRoleServiceAccess(overrides: Partial<RoleServiceAccessType> = {}): RoleServiceAccessType {
-  return {
-    id: Math.floor(Math.random() * 1000) + 1,
-    roleId: Math.floor(Math.random() * 10) + 1,
-    serviceId: Math.floor(Math.random() * 10) + 1,
-    serviceName: `test-service-${Math.floor(Math.random() * 10)}`,
-    component: `component_${Math.floor(Math.random() * 100)}`,
-    access: AccessLevel.READ | AccessLevel.CREATE, // Bitmask for read and create
-    requester: RequesterLevel.SELF,
-    filters: [],
-    description: 'Test service access configuration',
-    isActive: true,
-    createdDate: new Date().toISOString(),
-    lastModifiedDate: new Date().toISOString(),
-    ...overrides,
-  }
-}
+export const createMockLimit = (overrides: any = {}): any => ({
+  id: faker.number.int({ min: 1, max: 1000 }),
+  name: faker.helpers.arrayElement(['Rate Limit', 'Request Limit', 'Data Limit', 'Connection Limit']),
+  description: faker.lorem.sentence(),
+  type: faker.helpers.arrayElement(['per_minute', 'per_hour', 'per_day', 'concurrent']),
+  value: faker.number.int({ min: 10, max: 10000 }),
+  isActive: faker.datatype.boolean(),
+  roleId: faker.helpers.maybe(() => faker.number.int({ min: 1, max: 100 })),
+  userId: faker.helpers.maybe(() => faker.number.int({ min: 1, max: 100 })),
+  serviceId: faker.helpers.maybe(() => faker.number.int({ min: 1, max: 50 })),
+  createdDate: faker.date.past().toISOString(),
+  lastModifiedDate: faker.date.recent().toISOString(),
+  ...overrides,
+});
 
 /**
- * Generate a mock role permission
+ * Factory for generating permission data
  */
-export function createMockRolePermission(overrides: Partial<RolePermission> = {}): RolePermission {
-  return {
-    id: Math.floor(Math.random() * 1000) + 1,
-    roleId: Math.floor(Math.random() * 10) + 1,
-    resource: `resource_${Math.floor(Math.random() * 100)}`,
-    action: 'GET',
-    allow: true,
-    conditions: {},
-    description: 'Test role permission',
-    priority: 1,
-    isActive: true,
-    ...overrides,
-  }
-}
+export const createMockPermission = (overrides: any = {}): any => ({
+  id: faker.number.int({ min: 1, max: 1000 }),
+  name: faker.helpers.arrayElement(['read', 'write', 'delete', 'admin', 'execute']),
+  description: faker.lorem.sentence(),
+  resource: faker.helpers.arrayElement(['users', 'roles', 'services', 'system', 'files']),
+  action: faker.helpers.arrayElement(['GET', 'POST', 'PUT', 'DELETE', 'PATCH']),
+  isDefault: faker.datatype.boolean({ probability: 0.3 }),
+  ...overrides,
+});
 
 /**
- * Generate a mock role configuration
+ * Factory for generating user data for security context
  */
-export function createMockRole(overrides: Partial<RoleType> = {}): RoleType {
-  const id = Math.floor(Math.random() * 1000) + 1
-  
-  return {
-    id,
-    name: `Test Role ${id}`,
-    description: `Generated test role for testing purposes`,
-    isActive: true,
-    createdById: 1,
-    createdDate: new Date(Date.now() - 86400000).toISOString(),
-    lastModifiedById: 1,
-    lastModifiedDate: new Date().toISOString(),
-    lookupByRoleId: [],
-    accessibleTabs: ['tab1', 'tab2'],
-    roleServiceAccessByRoleId: [createMockRoleServiceAccess({ roleId: id })],
-    permissions: [createMockRolePermission({ roleId: id })],
-    userCount: Math.floor(Math.random() * 50),
-    lastUsed: new Date(Date.now() - 3600000).toISOString(),
-    ...overrides,
-  }
-}
+export const createMockUser = (overrides: any = {}): any => ({
+  id: faker.number.int({ min: 1, max: 1000 }),
+  name: faker.person.fullName(),
+  email: faker.internet.email(),
+  username: faker.internet.username(),
+  isActive: faker.datatype.boolean(),
+  roleIds: faker.helpers.multiple(() => faker.number.int({ min: 1, max: 100 }), { count: { min: 1, max: 3 } }),
+  lastLoginDate: faker.helpers.maybe(() => faker.date.recent().toISOString()),
+  createdDate: faker.date.past().toISOString(),
+  lastModifiedDate: faker.date.recent().toISOString(),
+  ...overrides,
+});
 
-/**
- * Generate mock pagination metadata
- */
-export function createMockPagination(overrides: Partial<PaginationMeta> = {}): PaginationMeta {
-  const count = overrides.count || 25
-  const total = overrides.total || 150
-  
-  return {
-    count,
-    limit: 25,
-    offset: 0,
-    total,
-    has_more: count < total,
-    next_cursor: count < total ? 'next_cursor_token' : undefined,
-    prev_cursor: undefined,
-    ...overrides,
-  }
-}
-
-/**
- * Generate a mock error response
- */
-export function createMockError(overrides: Partial<ApiErrorResponse['error']> = {}): ApiErrorResponse {
-  return {
-    error: {
-      code: 'TEST_ERROR',
-      message: 'A test error occurred',
-      status_code: 400,
-      context: 'Test context',
-      trace_id: `trace_${Math.random().toString(36).substr(2, 9)}`,
-      timestamp: new Date().toISOString(),
-      ...overrides,
-    },
-  }
-}
-
-// =============================================================================
-// MOCK DATA COLLECTIONS
-// =============================================================================
-
-/**
- * Pre-generated mock data collections for consistent testing
- */
-export const mockData = {
-  limits: Array.from({ length: 10 }, () => createMockLimit()),
-  limitTableRows: Array.from({ length: 10 }, () => createMockLimitTableRow()),
-  roles: Array.from({ length: 8 }, () => createMockRole()),
-  serviceAccess: Array.from({ length: 15 }, () => createMockRoleServiceAccess()),
-  permissions: Array.from({ length: 20 }, () => createMockRolePermission()),
-  cacheEntries: Array.from({ length: 12 }, () => createMockCacheLimit()),
-}
-
-// =============================================================================
+// ============================================================================
 // MSW REQUEST HANDLERS
-// =============================================================================
+// ============================================================================
 
 /**
- * Rate limiting API handlers for MSW
+ * Base URL for DreamFactory API endpoints
  */
-export const limitHandlers = [
-  // Get all limits
-  http.get('/api/v2/system/limit', ({ request }) => {
-    const url = new URL(request.url)
-    const limit = parseInt(url.searchParams.get('limit') || '25')
-    const offset = parseInt(url.searchParams.get('offset') || '0')
-    const search = url.searchParams.get('search')
-    
-    let filteredLimits = [...mockData.limits]
-    
-    // Apply search filter
-    if (search) {
-      filteredLimits = filteredLimits.filter(limit => 
-        limit.name.toLowerCase().includes(search.toLowerCase()) ||
-        limit.description.toLowerCase().includes(search.toLowerCase())
-      )
-    }
-    
-    // Apply pagination
-    const paginatedLimits = filteredLimits.slice(offset, offset + limit)
-    
-    const response: ApiListResponse<LimitType> = {
-      resource: paginatedLimits,
-      meta: createMockPagination({
-        count: paginatedLimits.length,
-        limit,
-        offset,
-        total: filteredLimits.length,
-      })
-    }
-    
-    return HttpResponse.json(response)
-  }),
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v2';
 
-  // Get single limit
-  http.get('/api/v2/system/limit/:id', ({ params }) => {
-    const id = parseInt(params.id as string)
-    const limit = mockData.limits.find(l => l.id === id)
-    
-    if (!limit) {
-      return HttpResponse.json(
-        createMockError({ code: 'LIMIT_NOT_FOUND', message: 'Limit not found', status_code: 404 }),
-        { status: 404 }
-      )
+/**
+ * Helper function to create paginated list responses
+ */
+const createPaginatedResponse = <T>(
+  items: T[],
+  page: number = 0,
+  limit: number = 25
+): ApiListResponse<T> => {
+  const start = page * limit;
+  const end = start + limit;
+  const paginatedItems = items.slice(start, end);
+  
+  return {
+    resource: paginatedItems,
+    meta: {
+      count: items.length,
+      offset: start,
+      limit,
+      has_next: end < items.length,
+      has_previous: page > 0,
+      page_count: Math.ceil(items.length / limit),
+      links: {
+        first: `${API_BASE_URL}/system/role?limit=${limit}&offset=0`,
+        last: `${API_BASE_URL}/system/role?limit=${limit}&offset=${Math.floor(items.length / limit) * limit}`,
+        ...(end < items.length && { next: `${API_BASE_URL}/system/role?limit=${limit}&offset=${end}` }),
+        ...(page > 0 && { previous: `${API_BASE_URL}/system/role?limit=${limit}&offset=${Math.max(0, start - limit)}` }),
+      },
+    },
+    timestamp: new Date().toISOString(),
+    request_id: faker.string.uuid(),
+  };
+};
+
+/**
+ * Helper function to create single resource responses
+ */
+const createResourceResponse = <T>(resource: T): ApiResourceResponse<T> => ({
+  resource,
+  timestamp: new Date().toISOString(),
+  request_id: faker.string.uuid(),
+});
+
+/**
+ * Helper function to create error responses
+ */
+const createErrorResponse = (
+  code: string,
+  message: string,
+  statusCode: number = 400,
+  context?: any
+): ApiErrorResponse => ({
+  success: false,
+  error: {
+    code,
+    message,
+    status_code: statusCode,
+    context,
+    stack: process.env.NODE_ENV === 'development' ? new Error().stack : undefined,
+  },
+  timestamp: new Date().toISOString(),
+  request_id: faker.string.uuid(),
+});
+
+/**
+ * In-memory data store for MSW handlers
+ * Simulates database state during testing
+ */
+class MockDataStore {
+  private roles: Map<number, RoleWithRelations> = new Map();
+  private limits: Map<number, any> = new Map();
+  private users: Map<number, any> = new Map();
+  private permissions: Map<number, any> = new Map();
+  
+  constructor() {
+    this.seedInitialData();
+  }
+  
+  private seedInitialData() {
+    // Create initial roles
+    for (let i = 1; i <= 10; i++) {
+      const role = createMockRoleWithRelations({ id: i });
+      this.roles.set(i, role);
     }
     
-    return HttpResponse.json({ resource: limit })
-  }),
-
-  // Create new limit
-  http.post('/api/v2/system/limit', async ({ request }) => {
-    const payload = await request.json() as CreateLimitPayload
-    const newLimit = createMockLimit({
-      name: payload.name,
-      description: payload.description,
-      type: payload.type,
-      rate: parseInt(payload.rate),
-      period: payload.period,
-      isActive: payload.isActive,
-      endpoint: payload.endpoint,
-      verb: payload.verb,
-      serviceId: payload.serviceId,
-      roleId: payload.roleId,
-      userId: payload.userId,
-    })
-    
-    mockData.limits.push(newLimit)
-    
-    const response: ApiCreateResponse = { id: newLimit.id }
-    return HttpResponse.json(response, { status: 201 })
-  }),
-
-  // Update limit
-  http.put('/api/v2/system/limit/:id', async ({ params, request }) => {
-    const id = parseInt(params.id as string)
-    const payload = await request.json() as UpdateLimitPayload
-    const limitIndex = mockData.limits.findIndex(l => l.id === id)
-    
-    if (limitIndex === -1) {
-      return HttpResponse.json(
-        createMockError({ code: 'LIMIT_NOT_FOUND', message: 'Limit not found', status_code: 404 }),
-        { status: 404 }
-      )
+    // Create initial limits
+    for (let i = 1; i <= 15; i++) {
+      const limit = createMockLimit({ id: i });
+      this.limits.set(i, limit);
     }
     
-    mockData.limits[limitIndex] = {
-      ...mockData.limits[limitIndex],
-      ...payload,
+    // Create initial users
+    for (let i = 1; i <= 20; i++) {
+      const user = createMockUser({ id: i });
+      this.users.set(i, user);
+    }
+    
+    // Create initial permissions
+    for (let i = 1; i <= 25; i++) {
+      const permission = createMockPermission({ id: i });
+      this.permissions.set(i, permission);
+    }
+  }
+  
+  // Role operations
+  getRoles(): RoleWithRelations[] {
+    return Array.from(this.roles.values());
+  }
+  
+  getRole(id: number): RoleWithRelations | undefined {
+    return this.roles.get(id);
+  }
+  
+  createRole(data: CreateRoleData): RoleWithRelations {
+    const id = Math.max(...this.roles.keys()) + 1;
+    const role = createMockRoleWithRelations({
+      id,
+      ...data,
+      createdDate: new Date().toISOString(),
       lastModifiedDate: new Date().toISOString(),
-    }
+      createdById: 1, // Current user ID
+      lastModifiedById: 1,
+    });
+    this.roles.set(id, role);
+    return role;
+  }
+  
+  updateRole(id: number, data: Partial<UpdateRoleData>): RoleWithRelations | undefined {
+    const role = this.roles.get(id);
+    if (!role) return undefined;
     
-    const response: ApiUpdateResponse = { id, updated_at: new Date().toISOString() }
-    return HttpResponse.json(response)
-  }),
-
-  // Delete limit
-  http.delete('/api/v2/system/limit/:id', ({ params }) => {
-    const id = parseInt(params.id as string)
-    const limitIndex = mockData.limits.findIndex(l => l.id === id)
-    
-    if (limitIndex === -1) {
-      return HttpResponse.json(
-        createMockError({ code: 'LIMIT_NOT_FOUND', message: 'Limit not found', status_code: 404 }),
-        { status: 404 }
-      )
-    }
-    
-    mockData.limits.splice(limitIndex, 1)
-    
-    const response: ApiDeleteResponse = { 
-      success: true,
+    const updatedRole = {
+      ...role,
+      ...data,
+      lastModifiedDate: new Date().toISOString(),
+      lastModifiedById: 1, // Current user ID
+    };
+    this.roles.set(id, updatedRole);
+    return updatedRole;
+  }
+  
+  deleteRole(id: number): boolean {
+    return this.roles.delete(id);
+  }
+  
+  // Limit operations
+  getLimits(): any[] {
+    return Array.from(this.limits.values());
+  }
+  
+  getLimit(id: number): any | undefined {
+    return this.limits.get(id);
+  }
+  
+  createLimit(data: any): any {
+    const id = Math.max(...this.limits.keys()) + 1;
+    const limit = createMockLimit({
       id,
-      deleted_at: new Date().toISOString() 
-    }
-    return HttpResponse.json(response)
-  }),
+      ...data,
+      createdDate: new Date().toISOString(),
+      lastModifiedDate: new Date().toISOString(),
+    });
+    this.limits.set(id, limit);
+    return limit;
+  }
+  
+  updateLimit(id: number, data: any): any | undefined {
+    const limit = this.limits.get(id);
+    if (!limit) return undefined;
+    
+    const updatedLimit = {
+      ...limit,
+      ...data,
+      lastModifiedDate: new Date().toISOString(),
+    };
+    this.limits.set(id, updatedLimit);
+    return updatedLimit;
+  }
+  
+  deleteLimit(id: number): boolean {
+    return this.limits.delete(id);
+  }
+  
+  // User operations
+  getUsers(): any[] {
+    return Array.from(this.users.values());
+  }
+  
+  getUser(id: number): any | undefined {
+    return this.users.get(id);
+  }
+  
+  // Permission operations
+  getPermissions(): any[] {
+    return Array.from(this.permissions.values());
+  }
+  
+  getPermission(id: number): any | undefined {
+    return this.permissions.get(id);
+  }
+  
+  // Utility methods
+  reset() {
+    this.roles.clear();
+    this.limits.clear();
+    this.users.clear();
+    this.permissions.clear();
+    this.seedInitialData();
+  }
+  
+  clear() {
+    this.roles.clear();
+    this.limits.clear();
+    this.users.clear();
+    this.permissions.clear();
+  }
+}
 
-  // Clear limit cache
-  http.delete('/api/v2/system/limit/:id/cache', ({ params }) => {
-    const id = parseInt(params.id as string)
-    const limit = mockData.limits.find(l => l.id === id)
-    
-    if (!limit) {
-      return HttpResponse.json(
-        createMockError({ code: 'LIMIT_NOT_FOUND', message: 'Limit not found', status_code: 404 }),
-        { status: 404 }
-      )
-    }
-    
-    // Reset cache counters
-    limit.limitCacheByLimitId.forEach(cache => {
-      cache.attempts = 0
-      cache.remaining = cache.max
-      cache.window_start = new Date().toISOString()
-      cache.reset_time = new Date(Date.now() + 60000).toISOString()
-    })
-    
-    const response: ApiDeleteResponse = { 
-      success: true,
-      id,
-      deleted_at: new Date().toISOString() 
-    }
-    return HttpResponse.json(response)
-  }),
-]
+// Global mock data store instance
+const mockDataStore = new MockDataStore();
 
 /**
- * Role management API handlers for MSW
+ * MSW request handlers for role management operations
  */
-export const roleHandlers = [
-  // Get all roles
-  http.get('/api/v2/system/role', ({ request }) => {
-    const url = new URL(request.url)
-    const limit = parseInt(url.searchParams.get('limit') || '25')
-    const offset = parseInt(url.searchParams.get('offset') || '0')
-    const search = url.searchParams.get('search')
-    const related = url.searchParams.get('related')
+export const roleHandlers: RequestHandler[] = [
+  // Get roles list with pagination and filtering
+  rest.get(`${API_BASE_URL}/system/role`, (req, res, ctx) => {
+    const url = new URL(req.url);
+    const limit = parseInt(url.searchParams.get('limit') || '25');
+    const offset = parseInt(url.searchParams.get('offset') || '0');
+    const filter = url.searchParams.get('filter');
+    const sort = url.searchParams.get('sort');
+    const includeCount = url.searchParams.get('includeCount') === 'true';
     
-    let filteredRoles = [...mockData.roles]
+    let roles = mockDataStore.getRoles();
     
-    // Apply search filter
-    if (search) {
-      filteredRoles = filteredRoles.filter(role => 
-        role.name.toLowerCase().includes(search.toLowerCase()) ||
-        role.description.toLowerCase().includes(search.toLowerCase())
-      )
+    // Apply filtering
+    if (filter) {
+      const filterLower = filter.toLowerCase();
+      roles = roles.filter(role => 
+        role.name.toLowerCase().includes(filterLower) ||
+        role.description.toLowerCase().includes(filterLower)
+      );
     }
     
-    // Apply pagination
-    const paginatedRoles = filteredRoles.slice(offset, offset + limit)
-    
-    // Include related data if requested
-    if (related?.includes('roleServiceAccessByRoleId')) {
-      paginatedRoles.forEach(role => {
-        role.roleServiceAccessByRoleId = mockData.serviceAccess.filter(sa => sa.roleId === role.id)
-      })
+    // Apply sorting
+    if (sort) {
+      const [field, direction = 'asc'] = sort.split(' ');
+      roles.sort((a, b) => {
+        const aVal = (a as any)[field];
+        const bVal = (b as any)[field];
+        const comparison = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+        return direction === 'desc' ? -comparison : comparison;
+      });
     }
     
-    const response: ApiListResponse<RoleType> = {
-      resource: paginatedRoles,
-      meta: createMockPagination({
-        count: paginatedRoles.length,
-        limit,
-        offset,
-        total: filteredRoles.length,
-      })
-    }
+    const page = Math.floor(offset / limit);
+    const response = createPaginatedResponse(roles, page, limit);
     
-    return HttpResponse.json(response)
+    return res(ctx.status(200), ctx.json(response));
   }),
-
-  // Get single role
-  http.get('/api/v2/system/role/:id', ({ params, request }) => {
-    const id = parseInt(params.id as string)
-    const url = new URL(request.url)
-    const related = url.searchParams.get('related')
-    
-    const role = mockData.roles.find(r => r.id === id)
+  
+  // Get single role by ID
+  rest.get(`${API_BASE_URL}/system/role/:id`, (req, res, ctx) => {
+    const id = parseInt(req.params.id as string);
+    const role = mockDataStore.getRole(id);
     
     if (!role) {
-      return HttpResponse.json(
-        createMockError({ code: 'ROLE_NOT_FOUND', message: 'Role not found', status_code: 404 }),
-        { status: 404 }
-      )
+      return res(
+        ctx.status(404),
+        ctx.json(createErrorResponse('ROLE_NOT_FOUND', `Role with ID ${id} not found`, 404))
+      );
     }
     
-    // Include related data if requested
-    const roleWithRelated = { ...role }
-    if (related?.includes('roleServiceAccessByRoleId')) {
-      roleWithRelated.roleServiceAccessByRoleId = mockData.serviceAccess.filter(sa => sa.roleId === role.id)
-    }
-    if (related?.includes('permissions')) {
-      roleWithRelated.permissions = mockData.permissions.filter(p => p.roleId === role.id)
-    }
-    
-    return HttpResponse.json({ resource: roleWithRelated })
+    return res(ctx.status(200), ctx.json(createResourceResponse(role)));
   }),
-
+  
   // Create new role
-  http.post('/api/v2/system/role', async ({ request }) => {
-    const payload = await request.json() as RoleCreatePayload
-    const newRole = createMockRole({
-      name: payload.name,
-      description: payload.description,
-      isActive: payload.isActive,
-      lookupByRoleId: payload.lookupByRoleId || [],
-      accessibleTabs: payload.accessibleTabs || [],
-    })
-    
-    // Handle service access configurations
-    if (payload.roleServiceAccessByRoleId) {
-      payload.roleServiceAccessByRoleId.forEach(accessConfig => {
-        const serviceAccess = createMockRoleServiceAccess({
-          ...accessConfig,
-          roleId: newRole.id,
-        })
-        mockData.serviceAccess.push(serviceAccess)
-      })
+  rest.post(`${API_BASE_URL}/system/role`, async (req, res, ctx) => {
+    try {
+      const roleData = await req.json() as CreateRoleData;
+      
+      // Validate required fields
+      if (!roleData.name || !roleData.description) {
+        return res(
+          ctx.status(400),
+          ctx.json(createErrorResponse(
+            'VALIDATION_ERROR',
+            'Name and description are required',
+            400,
+            { errors: { name: ['Name is required'], description: ['Description is required'] } }
+          ))
+        );
+      }
+      
+      // Check for duplicate name
+      const existingRoles = mockDataStore.getRoles();
+      if (existingRoles.some(role => role.name === roleData.name)) {
+        return res(
+          ctx.status(409),
+          ctx.json(createErrorResponse(
+            'DUPLICATE_ROLE_NAME',
+            `Role with name '${roleData.name}' already exists`,
+            409
+          ))
+        );
+      }
+      
+      const newRole = mockDataStore.createRole(roleData);
+      return res(ctx.status(201), ctx.json(createResourceResponse(newRole)));
+    } catch (error) {
+      return res(
+        ctx.status(400),
+        ctx.json(createErrorResponse('INVALID_JSON', 'Invalid JSON in request body', 400))
+      );
     }
-    
-    mockData.roles.push(newRole)
-    
-    const response: ApiCreateResponse = { id: newRole.id }
-    return HttpResponse.json(response, { status: 201 })
   }),
-
-  // Update role
-  http.put('/api/v2/system/role/:id', async ({ params, request }) => {
-    const id = parseInt(params.id as string)
-    const payload = await request.json() as RoleUpdatePayload
-    const roleIndex = mockData.roles.findIndex(r => r.id === id)
-    
-    if (roleIndex === -1) {
-      return HttpResponse.json(
-        createMockError({ code: 'ROLE_NOT_FOUND', message: 'Role not found', status_code: 404 }),
-        { status: 404 }
-      )
+  
+  // Update existing role
+  rest.put(`${API_BASE_URL}/system/role/:id`, async (req, res, ctx) => {
+    try {
+      const id = parseInt(req.params.id as string);
+      const updateData = await req.json() as Partial<UpdateRoleData>;
+      
+      const updatedRole = mockDataStore.updateRole(id, updateData);
+      
+      if (!updatedRole) {
+        return res(
+          ctx.status(404),
+          ctx.json(createErrorResponse('ROLE_NOT_FOUND', `Role with ID ${id} not found`, 404))
+        );
+      }
+      
+      return res(ctx.status(200), ctx.json(createResourceResponse(updatedRole)));
+    } catch (error) {
+      return res(
+        ctx.status(400),
+        ctx.json(createErrorResponse('INVALID_JSON', 'Invalid JSON in request body', 400))
+      );
     }
-    
-    mockData.roles[roleIndex] = {
-      ...mockData.roles[roleIndex],
-      ...payload,
-      id, // Ensure ID doesn't change
-      lastModifiedDate: new Date().toISOString(),
-    }
-    
-    const response: ApiUpdateResponse = { id, updated_at: new Date().toISOString() }
-    return HttpResponse.json(response)
   }),
-
+  
   // Delete role
-  http.delete('/api/v2/system/role/:id', ({ params }) => {
-    const id = parseInt(params.id as string)
-    const roleIndex = mockData.roles.findIndex(r => r.id === id)
+  rest.delete(`${API_BASE_URL}/system/role/:id`, (req, res, ctx) => {
+    const id = parseInt(req.params.id as string);
+    const deleted = mockDataStore.deleteRole(id);
     
-    if (roleIndex === -1) {
-      return HttpResponse.json(
-        createMockError({ code: 'ROLE_NOT_FOUND', message: 'Role not found', status_code: 404 }),
-        { status: 404 }
-      )
+    if (!deleted) {
+      return res(
+        ctx.status(404),
+        ctx.json(createErrorResponse('ROLE_NOT_FOUND', `Role with ID ${id} not found`, 404))
+      );
     }
     
-    // Remove role and related data
-    mockData.roles.splice(roleIndex, 1)
-    mockData.serviceAccess.splice(0, mockData.serviceAccess.length, 
-      ...mockData.serviceAccess.filter(sa => sa.roleId !== id)
-    )
-    mockData.permissions.splice(0, mockData.permissions.length,
-      ...mockData.permissions.filter(p => p.roleId !== id)
-    )
-    
-    const response: ApiDeleteResponse = { 
+    const response: ApiSuccessResponse = {
       success: true,
-      id,
-      deleted_at: new Date().toISOString() 
-    }
-    return HttpResponse.json(response)
+      message: `Role with ID ${id} deleted successfully`,
+      timestamp: new Date().toISOString(),
+      request_id: faker.string.uuid(),
+    };
+    
+    return res(ctx.status(200), ctx.json(response));
   }),
-
-  // Get services for role access configuration
-  http.get('/api/v2/system/service', () => {
-    const services = [
-      { id: 1, name: 'api_docs', label: 'Live API Docs', type: 'swagger', is_active: true },
-      { id: 2, name: 'db', label: 'Local SQL Database', type: 'sqlite', is_active: true },
-      { id: 3, name: 'email', label: 'Local Email Service', type: 'local_email', is_active: true },
-      { id: 4, name: 'files', label: 'Local File Storage', type: 'local_file', is_active: true },
-      { id: 5, name: 'logs', label: 'Log Files', type: 'log', is_active: true },
-    ]
-    
-    return HttpResponse.json({ resource: services })
-  }),
-
-  // Get service components for a specific service
-  http.get('/api/v2/:serviceName/_schema', ({ params }) => {
-    const serviceName = params.serviceName as string
-    
-    // Mock schema response with different components based on service
-    const components = serviceName === 'db' 
-      ? ['table1', 'table2', 'table3', '_schema/', '_proc/']
-      : ['component1/', 'component2/', '_schema/']
-    
-    const response = {
-      resource: components.map(name => ({ name, access: ['GET', 'POST', 'PUT', 'DELETE'] }))
-    }
-    
-    return HttpResponse.json(response)
-  }),
-]
+];
 
 /**
- * All API security handlers combined
+ * MSW request handlers for limit management operations
  */
-export const apiSecurityHandlers = [
-  ...limitHandlers,
+export const limitHandlers: RequestHandler[] = [
+  // Get limits list
+  rest.get(`${API_BASE_URL}/system/limit`, (req, res, ctx) => {
+    const url = new URL(req.url);
+    const limit = parseInt(url.searchParams.get('limit') || '25');
+    const offset = parseInt(url.searchParams.get('offset') || '0');
+    const filter = url.searchParams.get('filter');
+    
+    let limits = mockDataStore.getLimits();
+    
+    // Apply filtering
+    if (filter) {
+      const filterLower = filter.toLowerCase();
+      limits = limits.filter(limit => 
+        limit.name.toLowerCase().includes(filterLower) ||
+        limit.description.toLowerCase().includes(filterLower)
+      );
+    }
+    
+    const page = Math.floor(offset / limit);
+    const response = createPaginatedResponse(limits, page, limit);
+    
+    return res(ctx.status(200), ctx.json(response));
+  }),
+  
+  // Get single limit by ID
+  rest.get(`${API_BASE_URL}/system/limit/:id`, (req, res, ctx) => {
+    const id = parseInt(req.params.id as string);
+    const limit = mockDataStore.getLimit(id);
+    
+    if (!limit) {
+      return res(
+        ctx.status(404),
+        ctx.json(createErrorResponse('LIMIT_NOT_FOUND', `Limit with ID ${id} not found`, 404))
+      );
+    }
+    
+    return res(ctx.status(200), ctx.json(createResourceResponse(limit)));
+  }),
+  
+  // Create new limit
+  rest.post(`${API_BASE_URL}/system/limit`, async (req, res, ctx) => {
+    try {
+      const limitData = await req.json();
+      const newLimit = mockDataStore.createLimit(limitData);
+      return res(ctx.status(201), ctx.json(createResourceResponse(newLimit)));
+    } catch (error) {
+      return res(
+        ctx.status(400),
+        ctx.json(createErrorResponse('INVALID_JSON', 'Invalid JSON in request body', 400))
+      );
+    }
+  }),
+  
+  // Update existing limit
+  rest.put(`${API_BASE_URL}/system/limit/:id`, async (req, res, ctx) => {
+    try {
+      const id = parseInt(req.params.id as string);
+      const updateData = await req.json();
+      
+      const updatedLimit = mockDataStore.updateLimit(id, updateData);
+      
+      if (!updatedLimit) {
+        return res(
+          ctx.status(404),
+          ctx.json(createErrorResponse('LIMIT_NOT_FOUND', `Limit with ID ${id} not found`, 404))
+        );
+      }
+      
+      return res(ctx.status(200), ctx.json(createResourceResponse(updatedLimit)));
+    } catch (error) {
+      return res(
+        ctx.status(400),
+        ctx.json(createErrorResponse('INVALID_JSON', 'Invalid JSON in request body', 400))
+      );
+    }
+  }),
+  
+  // Delete limit
+  rest.delete(`${API_BASE_URL}/system/limit/:id`, (req, res, ctx) => {
+    const id = parseInt(req.params.id as string);
+    const deleted = mockDataStore.deleteLimit(id);
+    
+    if (!deleted) {
+      return res(
+        ctx.status(404),
+        ctx.json(createErrorResponse('LIMIT_NOT_FOUND', `Limit with ID ${id} not found`, 404))
+      );
+    }
+    
+    const response: ApiSuccessResponse = {
+      success: true,
+      message: `Limit with ID ${id} deleted successfully`,
+      timestamp: new Date().toISOString(),
+      request_id: faker.string.uuid(),
+    };
+    
+    return res(ctx.status(200), ctx.json(response));
+  }),
+];
+
+/**
+ * MSW request handlers for user management operations
+ */
+export const userHandlers: RequestHandler[] = [
+  // Get users list
+  rest.get(`${API_BASE_URL}/system/user`, (req, res, ctx) => {
+    const url = new URL(req.url);
+    const limit = parseInt(url.searchParams.get('limit') || '25');
+    const offset = parseInt(url.searchParams.get('offset') || '0');
+    
+    const users = mockDataStore.getUsers();
+    const page = Math.floor(offset / limit);
+    const response = createPaginatedResponse(users, page, limit);
+    
+    return res(ctx.status(200), ctx.json(response));
+  }),
+  
+  // Get single user by ID
+  rest.get(`${API_BASE_URL}/system/user/:id`, (req, res, ctx) => {
+    const id = parseInt(req.params.id as string);
+    const user = mockDataStore.getUser(id);
+    
+    if (!user) {
+      return res(
+        ctx.status(404),
+        ctx.json(createErrorResponse('USER_NOT_FOUND', `User with ID ${id} not found`, 404))
+      );
+    }
+    
+    return res(ctx.status(200), ctx.json(createResourceResponse(user)));
+  }),
+];
+
+/**
+ * MSW request handlers for permission operations
+ */
+export const permissionHandlers: RequestHandler[] = [
+  // Get permissions list
+  rest.get(`${API_BASE_URL}/system/permission`, (req, res, ctx) => {
+    const permissions = mockDataStore.getPermissions();
+    const response = createPaginatedResponse(permissions, 0, permissions.length);
+    return res(ctx.status(200), ctx.json(response));
+  }),
+];
+
+/**
+ * MSW request handlers for security statistics
+ */
+export const securityStatsHandlers: RequestHandler[] = [
+  // Get security statistics
+  rest.get(`${API_BASE_URL}/system/stats/security`, (req, res, ctx) => {
+    const roles = mockDataStore.getRoles();
+    const limits = mockDataStore.getLimits();
+    const users = mockDataStore.getUsers();
+    
+    const stats = {
+      totalRoles: roles.length,
+      activeRoles: roles.filter(role => role.isActive).length,
+      totalLimits: limits.length,
+      activeLimits: limits.filter(limit => limit.isActive).length,
+      totalUsers: users.length,
+      activeUsers: users.filter(user => user.isActive).length,
+      recentViolations: faker.number.int({ min: 0, max: 10 }),
+      securityScore: faker.number.int({ min: 75, max: 100 }),
+      lastUpdated: new Date().toISOString(),
+    };
+    
+    return res(ctx.status(200), ctx.json(createResourceResponse(stats)));
+  }),
+];
+
+// ============================================================================
+// COMPLETE HANDLER COLLECTION
+// ============================================================================
+
+/**
+ * Complete collection of MSW handlers for API security components
+ */
+export const apiSecurityHandlers: RequestHandler[] = [
   ...roleHandlers,
-]
+  ...limitHandlers,
+  ...userHandlers,
+  ...permissionHandlers,
+  ...securityStatsHandlers,
+];
 
-// =============================================================================
-// TESTING UTILITIES FOR STATE MANAGEMENT
-// =============================================================================
+// ============================================================================
+// REACT QUERY TESTING UTILITIES
+// ============================================================================
 
 /**
- * Create a fresh QueryClient for testing
+ * Creates a new QueryClient instance for testing
+ * Configured with appropriate defaults for test scenarios
  */
-export function createTestQueryClient(): QueryClient {
+export const createTestQueryClient = () => {
   return new QueryClient({
     defaultOptions: {
       queries: {
         retry: false,
-        cacheTime: Infinity,
-        staleTime: Infinity,
+        cacheTime: 0,
+        staleTime: 0,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+      },
+      mutations: {
+        retry: false,
       },
     },
-  })
-}
+    logger: {
+      log: () => {},
+      warn: () => {},
+      error: () => {},
+    },
+  });
+};
 
 /**
- * Mock Zustand store for testing
+ * Wrapper component that provides React Query client for testing
  */
-interface TestAppStore {
-  theme: 'light' | 'dark' | 'system'
-  sidebarCollapsed: boolean
-  globalLoading: boolean
-  preferences: {
-    defaultDatabaseType: string
-    tablePageSize: number
-    autoRefreshSchemas: boolean
-    showAdvancedOptions: boolean
-  }
-  setTheme: (theme: 'light' | 'dark' | 'system') => void
-  setSidebarCollapsed: (collapsed: boolean) => void
-  setGlobalLoading: (loading: boolean) => void
-  updatePreferences: (preferences: Partial<TestAppStore['preferences']>) => void
-}
+export const QueryClientWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const queryClient = createTestQueryClient();
+  return (
+    <QueryClientProvider client={queryClient}>
+      {children}
+    </QueryClientProvider>
+  );
+};
 
-export const createMockAppStore = () => create<TestAppStore>((set, get) => ({
-  theme: 'light',
-  sidebarCollapsed: false,
-  globalLoading: false,
-  preferences: {
-    defaultDatabaseType: 'mysql',
-    tablePageSize: 25,
-    autoRefreshSchemas: true,
-    showAdvancedOptions: false,
-  },
-  setTheme: (theme) => set({ theme }),
-  setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
-  setGlobalLoading: (loading) => set({ globalLoading: loading }),
-  updatePreferences: (newPreferences) => 
-    set({ preferences: { ...get().preferences, ...newPreferences } }),
-}))
-
-// =============================================================================
-// CUSTOM RENDER FUNCTIONS WITH PROVIDERS
-// =============================================================================
+// ============================================================================
+// ZUSTAND TESTING UTILITIES
+// ============================================================================
 
 /**
- * Props for the test providers wrapper
+ * Mock store factory for Zustand stores
  */
-interface TestProvidersProps {
-  children: ReactNode
-  queryClient?: QueryClient
-  initialEntries?: string[]
-}
+export const createMockStore = <T>(initialState: T): StoreApi<T> => {
+  return create(() => initialState);
+};
 
 /**
- * Test providers wrapper component
+ * Mock security store for testing security components
  */
-function TestProviders({ children, queryClient }: TestProvidersProps) {
-  const testQueryClient = queryClient || createTestQueryClient()
+export const createMockSecurityStore = (initialState?: any) => {
+  const defaultState = {
+    selectedRole: null,
+    selectedLimit: null,
+    securityStats: {
+      totalRoles: 10,
+      activeRoles: 8,
+      totalLimits: 15,
+      activeLimits: 12,
+      recentViolations: 3,
+    },
+    isLoading: false,
+    error: null,
+    setSelectedRole: (role: any) => {},
+    setSelectedLimit: (limit: any) => {},
+    updateSecurityStats: (stats: any) => {},
+    setLoading: (loading: boolean) => {},
+    setError: (error: any) => {},
+  };
+  
+  return createMockStore({
+    ...defaultState,
+    ...initialState,
+  });
+};
+
+// ============================================================================
+// REACT TESTING LIBRARY UTILITIES
+// ============================================================================
+
+/**
+ * All providers wrapper for comprehensive testing setup
+ */
+interface AllProvidersProps {
+  children: React.ReactNode;
+  queryClient?: QueryClient;
+  securityStore?: any;
+}
+
+export const AllProviders: React.FC<AllProvidersProps> = ({
+  children,
+  queryClient,
+  securityStore,
+}) => {
+  const testQueryClient = queryClient || createTestQueryClient();
   
   return (
     <QueryClientProvider client={testQueryClient}>
       {children}
     </QueryClientProvider>
-  )
-}
+  );
+};
 
 /**
- * Custom render function with all necessary providers
+ * Custom render function with providers
  */
-export function renderWithProviders(
+interface CustomRenderOptions extends Omit<RenderOptions, 'wrapper'> {
+  queryClient?: QueryClient;
+  securityStore?: any;
+}
+
+export const renderWithProviders = (
   ui: ReactElement,
-  options: RenderOptions & {
-    queryClient?: QueryClient
-    initialEntries?: string[]
-  } = {}
-) {
-  const { queryClient, initialEntries, ...renderOptions } = options
+  options?: CustomRenderOptions
+) => {
+  const { queryClient, securityStore, ...renderOptions } = options || {};
   
-  function Wrapper({ children }: { children: ReactNode }) {
-    return (
-      <TestProviders queryClient={queryClient} initialEntries={initialEntries}>
-        {children}
-      </TestProviders>
-    )
-  }
+  const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+    <AllProviders queryClient={queryClient} securityStore={securityStore}>
+      {children}
+    </AllProviders>
+  );
   
-  return {
-    ...render(ui, { wrapper: Wrapper, ...renderOptions }),
-    queryClient: queryClient || createTestQueryClient(),
-  }
-}
+  return render(ui, { wrapper: Wrapper, ...renderOptions });
+};
 
 /**
- * Custom render hook function with providers
+ * Utility for testing React Query hooks in isolation
  */
-export function renderHookWithProviders<TProps, TResult>(
-  callback: (props: TProps) => TResult,
-  options: RenderHookOptions<TProps> & {
-    queryClient?: QueryClient
-    initialEntries?: string[]
-  } = {}
-) {
-  const { queryClient, initialEntries, ...renderHookOptions } = options
-  
-  function Wrapper({ children }: { children: ReactNode }) {
-    return (
-      <TestProviders queryClient={queryClient} initialEntries={initialEntries}>
-        {children}
-      </TestProviders>
-    )
+export const renderHookWithProviders = <T,>(
+  hook: () => T,
+  options?: {
+    queryClient?: QueryClient;
+    securityStore?: any;
   }
+) => {
+  const { queryClient, securityStore } = options || {};
   
-  return {
-    ...renderHook(callback, { wrapper: Wrapper, ...renderHookOptions }),
-    queryClient: queryClient || createTestQueryClient(),
-  }
-}
+  const wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+    <AllProviders queryClient={queryClient} securityStore={securityStore}>
+      {children}
+    </AllProviders>
+  );
+  
+  return { wrapper };
+};
 
-// =============================================================================
-// REACT QUERY TESTING UTILITIES
-// =============================================================================
+// ============================================================================
+// TESTING SCENARIO HELPERS
+// ============================================================================
 
 /**
- * Wait for React Query to settle (no more pending queries/mutations)
+ * Creates error scenarios for testing error handling
  */
-export async function waitForQueryToSettle(queryClient: QueryClient, timeout = 5000): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const timeoutId = setTimeout(() => {
-      reject(new Error(`Query did not settle within ${timeout}ms`))
-    }, timeout)
-    
-    const checkForSettlement = () => {
-      const queryCache = queryClient.getQueryCache()
-      const mutationCache = queryClient.getMutationCache()
+export const createErrorScenarios = {
+  networkError: () => {
+    return rest.get(`${API_BASE_URL}/*`, (req, res, ctx) => {
+      return res.networkError('Network connection failed');
+    });
+  },
+  
+  serverError: (message: string = 'Internal server error') => {
+    return rest.get(`${API_BASE_URL}/*`, (req, res, ctx) => {
+      return res(
+        ctx.status(500),
+        ctx.json(createErrorResponse('INTERNAL_ERROR', message, 500))
+      );
+    });
+  },
+  
+  validationError: (field: string, message: string) => {
+    return rest.post(`${API_BASE_URL}/*`, (req, res, ctx) => {
+      return res(
+        ctx.status(422),
+        ctx.json(createErrorResponse(
+          'VALIDATION_ERROR',
+          'Validation failed',
+          422,
+          { errors: { [field]: [message] } }
+        ))
+      );
+    });
+  },
+  
+  authenticationError: () => {
+    return rest.get(`${API_BASE_URL}/*`, (req, res, ctx) => {
+      return res(
+        ctx.status(401),
+        ctx.json(createErrorResponse('UNAUTHORIZED', 'Authentication required', 401))
+      );
+    });
+  },
+  
+  authorizationError: () => {
+    return rest.get(`${API_BASE_URL}/*`, (req, res, ctx) => {
+      return res(
+        ctx.status(403),
+        ctx.json(createErrorResponse('FORBIDDEN', 'Insufficient permissions', 403))
+      );
+    });
+  },
+};
+
+/**
+ * Creates loading scenarios for testing loading states
+ */
+export const createLoadingScenarios = {
+  slowResponse: (delay: number = 2000) => {
+    return rest.get(`${API_BASE_URL}/*`, (req, res, ctx) => {
+      return res(ctx.delay(delay), ctx.status(200), ctx.json({}));
+    });
+  },
+  
+  timeoutResponse: () => {
+    return rest.get(`${API_BASE_URL}/*`, (req, res, ctx) => {
+      return res(ctx.delay('infinite'));
+    });
+  },
+};
+
+/**
+ * Creates pagination scenarios for testing pagination components
+ */
+export const createPaginationScenarios = {
+  emptyResult: () => {
+    return rest.get(`${API_BASE_URL}/system/role`, (req, res, ctx) => {
+      return res(ctx.status(200), ctx.json(createPaginatedResponse([], 0, 25)));
+    });
+  },
+  
+  singlePage: (count: number = 10) => {
+    const roles = Array.from({ length: count }, (_, i) => createMockRole({ id: i + 1 }));
+    return rest.get(`${API_BASE_URL}/system/role`, (req, res, ctx) => {
+      return res(ctx.status(200), ctx.json(createPaginatedResponse(roles, 0, 25)));
+    });
+  },
+  
+  multiplePages: (totalCount: number = 100, pageSize: number = 25) => {
+    return rest.get(`${API_BASE_URL}/system/role`, (req, res, ctx) => {
+      const url = new URL(req.url);
+      const offset = parseInt(url.searchParams.get('offset') || '0');
+      const limit = parseInt(url.searchParams.get('limit') || '25');
+      const page = Math.floor(offset / limit);
       
-      const pendingQueries = queryCache.getAll().filter(query => query.state.isFetching)
-      const pendingMutations = mutationCache.getAll().filter(mutation => mutation.state.isPending)
-      
-      if (pendingQueries.length === 0 && pendingMutations.length === 0) {
-        clearTimeout(timeoutId)
-        resolve()
-      } else {
-        setTimeout(checkForSettlement, 10)
-      }
-    }
-    
-    checkForSettlement()
-  })
-}
+      const roles = Array.from({ length: totalCount }, (_, i) => createMockRole({ id: i + 1 }));
+      return res(ctx.status(200), ctx.json(createPaginatedResponse(roles, page, limit)));
+    });
+  },
+};
+
+// ============================================================================
+// DATA STORE UTILITIES
+// ============================================================================
 
 /**
- * Mock successful query response
+ * Utilities for managing the mock data store during tests
  */
-export function mockQuerySuccess<T>(queryClient: QueryClient, queryKey: string[], data: T): void {
-  queryClient.setQueryData(queryKey, data)
-}
-
-/**
- * Mock query error response
- */
-export function mockQueryError(queryClient: QueryClient, queryKey: string[], error: Error): void {
-  queryClient.setQueryData(queryKey, undefined)
-  queryClient.setQueryState(queryKey, {
-    status: 'error',
-    error,
-    data: undefined,
-    dataUpdatedAt: 0,
-    errorUpdatedAt: Date.now(),
-    fetchFailureCount: 1,
-    fetchFailureReason: error,
-    fetchStatus: 'idle',
-    isInvalidated: false,
-  })
-}
-
-/**
- * Clear all queries and mutations from the query client
- */
-export function clearQueryClient(queryClient: QueryClient): void {
-  queryClient.clear()
-}
-
-// =============================================================================
-// MSW SERVER SETUP FOR TESTS
-// =============================================================================
-
-/**
- * Setup MSW server for Node.js testing environment
- */
-export const setupTestServer = () => {
-  return setupServer(...apiSecurityHandlers)
-}
-
-// =============================================================================
-// ACCESSIBILITY TESTING UTILITIES
-// =============================================================================
-
-/**
- * Common accessibility test cases for security components
- */
-export const a11yTestCases = {
-  formLabels: 'All form inputs should have associated labels',
-  buttonText: 'All buttons should have descriptive text or aria-label',
-  tableHeaders: 'Tables should have proper headers and captions',
-  errorMessages: 'Error messages should be associated with form fields',
-  focusManagement: 'Focus should be managed appropriately for modals and navigation',
-  keyboardNavigation: 'All interactive elements should be keyboard accessible',
-  colorContrast: 'Text should meet WCAG color contrast requirements',
-  semanticHeadings: 'Heading hierarchy should be semantic and proper',
-}
-
-// =============================================================================
-// PERFORMANCE TESTING UTILITIES
-// =============================================================================
-
-/**
- * Performance benchmarking utility for testing component render times
- */
-export function measureRenderTime<T>(renderFn: () => T): { result: T; renderTime: number } {
-  const startTime = performance.now()
-  const result = renderFn()
-  const endTime = performance.now()
+export const dataStoreUtils = {
+  /**
+   * Reset the data store to initial state
+   */
+  reset: () => {
+    mockDataStore.reset();
+  },
   
-  return {
-    result,
-    renderTime: endTime - startTime,
-  }
-}
-
-/**
- * Assert that a render operation completes within the specified time
- */
-export function assertRenderTimeUnder(maxTime: number, renderFn: () => unknown): void {
-  const { renderTime } = measureRenderTime(renderFn)
+  /**
+   * Clear all data from the store
+   */
+  clear: () => {
+    mockDataStore.clear();
+  },
   
-  if (renderTime > maxTime) {
-    throw new Error(`Render time ${renderTime}ms exceeded maximum allowed time ${maxTime}ms`)
-  }
-}
+  /**
+   * Seed the store with specific data
+   */
+  seedRoles: (roles: RoleWithRelations[]) => {
+    mockDataStore.clear();
+    roles.forEach(role => {
+      mockDataStore.createRole(role);
+    });
+  },
+  
+  seedLimits: (limits: any[]) => {
+    mockDataStore.clear();
+    limits.forEach(limit => {
+      mockDataStore.createLimit(limit);
+    });
+  },
+  
+  /**
+   * Get current data for assertions
+   */
+  getCurrentRoles: () => mockDataStore.getRoles(),
+  getCurrentLimits: () => mockDataStore.getLimits(),
+  getCurrentUsers: () => mockDataStore.getUsers(),
+  
+  /**
+   * Create specific test scenarios
+   */
+  createEmptyState: () => {
+    mockDataStore.clear();
+  },
+  
+  createMinimalState: () => {
+    mockDataStore.clear();
+    mockDataStore.createRole(createMockRole({ name: 'Admin', isActive: true }));
+    mockDataStore.createLimit(createMockLimit({ name: 'Default Limit', isActive: true }));
+  },
+};
 
-// =============================================================================
+// ============================================================================
 // EXPORTS
-// =============================================================================
+// ============================================================================
 
+// Export everything for easy importing
 export {
-  // Mock data factories
-  createMockLimit,
-  createMockLimitTableRow,
-  createMockRole,
-  createMockRoleServiceAccess,
-  createMockRolePermission,
-  createMockCacheLimit,
-  createMockPagination,
-  createMockError,
-  
-  // Mock data collections
-  mockData,
-  
-  // MSW handlers
-  limitHandlers,
+  // Handlers
   roleHandlers,
-  apiSecurityHandlers,
+  limitHandlers,
+  userHandlers,
+  permissionHandlers,
+  securityStatsHandlers,
   
-  // Testing utilities
-  createTestQueryClient,
-  createMockAppStore,
-  
-  // React Query testing
-  waitForQueryToSettle,
-  mockQuerySuccess,
-  mockQueryError,
-  clearQueryClient,
-  
-  // Accessibility testing
-  a11yTestCases,
-  
-  // Performance testing
-  measureRenderTime,
-  assertRenderTimeUnder,
-}
-
-// Default export for convenience
-export default {
+  // Test utilities
+  QueryClientWrapper,
   renderWithProviders,
   renderHookWithProviders,
-  setupTestServer,
-  mockData,
-  apiSecurityHandlers,
   createTestQueryClient,
-  createMockAppStore,
-}
+  createMockStore,
+  createMockSecurityStore,
+  
+  // Data factories
+  createMockRole,
+  createMockRoleWithRelations,
+  createMockRoleListItem,
+  createMockRoleServiceAccess,
+  createMockRoleLookup,
+  createMockRolePermissionSummary,
+  createMockLimit,
+  createMockPermission,
+  createMockUser,
+  
+  // Scenario helpers
+  createErrorScenarios,
+  createLoadingScenarios,
+  createPaginationScenarios,
+  
+  // Response helpers
+  createPaginatedResponse,
+  createResourceResponse,
+  createErrorResponse,
+  
+  // Data store
+  dataStoreUtils,
+};
+
+// Default export
+export default {
+  handlers: apiSecurityHandlers,
+  factories: {
+    createMockRole,
+    createMockRoleWithRelations,
+    createMockLimit,
+    createMockUser,
+    createMockPermission,
+  },
+  utilities: {
+    renderWithProviders,
+    createTestQueryClient,
+    dataStoreUtils,
+  },
+  scenarios: {
+    errors: createErrorScenarios,
+    loading: createLoadingScenarios,
+    pagination: createPaginationScenarios,
+  },
+};
