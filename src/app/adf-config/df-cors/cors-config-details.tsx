@@ -1,1141 +1,1241 @@
 /**
  * CORS Configuration Details Form Component
  * 
- * React functional component for CORS configuration details form, implementing
- * React Hook Form with Zod validation for creating and editing CORS entries.
- * Provides comprehensive form controls for path, origins, methods, headers, and
- * credentials configuration with real-time validation under 100ms and accessibility
- * features including keyboard navigation and screen reader support.
+ * React functional component for creating and editing CORS (Cross-Origin Resource Sharing)
+ * configuration entries. Provides comprehensive form controls for path patterns, origins,
+ * HTTP methods, headers, and security settings with real-time validation under 100ms.
  * 
  * Features:
- * - React Hook Form with Zod schema validation per React/Next.js Integration Requirements
+ * - React Hook Form integration with Zod schema validation
  * - Real-time validation under 100ms per React/Next.js Integration Requirements
- * - WCAG 2.1 AA compliance with focus management per Section 7.6.4 accessibility requirements
- * - User feedback systems with loading and error states per Section 7.6.3
- * - SWR/React Query hooks for CORS configuration management per Section 4.3 state management workflows
- * - Next.js useRouter hook for navigation per Section 4.1 system workflows
- * - Comprehensive accessibility features with ARIA labels and keyboard navigation
+ * - WCAG 2.1 AA accessibility compliance with focus management and screen reader support
+ * - Comprehensive error handling with user feedback systems
+ * - Dark/light theme support via Zustand theme store
+ * - HTTP method selection with checkbox group
+ * - Origin and path validation with helpful error messages
+ * - Auto-save functionality and form persistence
+ * - Keyboard navigation and accessibility features
  * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
+ * @fileoverview CORS configuration details form component
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useForm, Controller, useWatch } from 'react-hook-form';
+import React, { 
+  useCallback, 
+  useEffect, 
+  useMemo, 
+  useState,
+  useRef,
+  type ReactNode 
+} from 'react';
+import { useRouter } from 'next/navigation';
+import { useForm, useWatch, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { AlertCircle, CheckCircle2, Loader2, Save, ArrowLeft, Plus, X, Info } from 'lucide-react';
-
-// Import UI components (when available)
+import { ChevronLeft, Save, TestTube, AlertCircle, Check, X, Globe, Shield, Clock } from 'lucide-react';
+import { cn } from '../../../lib/utils';
+import { useTheme } from '../../../hooks/use-theme';
 import { Button } from '../../../components/ui/button';
+import { Form } from '../../../components/ui/form';
 import { Input } from '../../../components/ui/input';
 import { Textarea } from '../../../components/ui/textarea';
 import { Checkbox } from '../../../components/ui/checkbox';
-import { 
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage 
-} from '../../../components/ui/form';
-
-// Import hooks and utilities
 import { useCorsOperations } from './use-cors-operations';
-import { CorsConfigSchema } from '../../../lib/validations/cors';
-import type { CorsConfigData } from '../../../types/cors';
+import {
+  corsConfigCreateSchema,
+  corsConfigUpdateSchema,
+  type CorsConfigCreateForm,
+  type CorsConfigUpdateForm,
+} from '../../../lib/validations/cors';
+import type {
+  CorsConfig,
+  CorsConfigCreate,
+  CorsConfigUpdate,
+  HttpMethod,
+  HTTP_METHODS,
+  COMMON_CORS_HEADERS,
+  DEFAULT_CORS_CONFIG,
+} from '../../../types/cors';
 
-// =============================================================================
-// TYPES AND INTERFACES
-// =============================================================================
+// ============================================================================
+// Component Props and Types
+// ============================================================================
 
 /**
- * CORS Configuration Form Data
- * Extends base schema with additional UI state management
+ * Props interface for CORS configuration details component
  */
-type CorsConfigFormData = z.infer<typeof CorsConfigSchema> & {
-  id?: number;
-  path?: string;
-  description?: string;
-};
-
-/**
- * Component Props Interface
- */
-interface CorsConfigDetailsProps {
-  /**
-   * CORS configuration ID for editing (undefined for creating new)
+export interface CorsConfigDetailsProps {
+  /** 
+   * CORS configuration ID for editing existing entries
+   * If undefined, creates a new CORS configuration
    */
   corsId?: number;
   
   /**
-   * Initial data for form (useful for defaults or editing)
-   */
-  initialData?: Partial<CorsConfigData>;
-  
-  /**
    * Callback fired when form is successfully submitted
    */
-  onSuccess?: (data: CorsConfigData) => void;
+  onSuccess?: (config: CorsConfig) => void;
   
   /**
-   * Callback fired when user cancels or navigates away
+   * Callback fired when user cancels the form
    */
   onCancel?: () => void;
   
   /**
-   * Whether to show header and navigation controls
+   * Whether to show the back navigation button
+   * @default true
    */
-  standalone?: boolean;
+  showBackButton?: boolean;
   
   /**
-   * Custom CSS classes
+   * Additional CSS classes for the container
    */
   className?: string;
+  
+  /**
+   * Component test identifier
+   */
+  'data-testid'?: string;
 }
 
 /**
- * HTTP Methods enum for CORS configuration
+ * Form data type union for create and update operations
  */
-const HTTP_METHODS = [
-  { value: 'GET', label: 'GET', description: 'Retrieve data' },
-  { value: 'POST', label: 'POST', description: 'Create new resources' },
-  { value: 'PUT', label: 'PUT', description: 'Update existing resources' },
-  { value: 'PATCH', label: 'PATCH', description: 'Partial updates' },
-  { value: 'DELETE', label: 'DELETE', description: 'Remove resources' },
-  { value: 'OPTIONS', label: 'OPTIONS', description: 'CORS preflight requests' },
-  { value: 'HEAD', label: 'HEAD', description: 'Retrieve headers only' },
+type FormData = CorsConfigCreateForm | CorsConfigUpdateForm;
+
+/**
+ * Validation performance metrics for monitoring sub-100ms requirement
+ */
+interface ValidationMetrics {
+  lastValidationTime: number;
+  averageValidationTime: number;
+  validationCount: number;
+  exceededThresholdCount: number;
+}
+
+// ============================================================================
+// Constants and Configuration
+// ============================================================================
+
+/**
+ * Form configuration constants
+ */
+const FORM_CONFIG = {
+  VALIDATION_TIMEOUT: 100, // Maximum validation time in milliseconds
+  AUTO_SAVE_DELAY: 2000, // Auto-save delay in milliseconds
+  DEBOUNCE_DELAY: 300, // Input debounce delay in milliseconds
+  MAX_DESCRIPTION_LENGTH: 255,
+  MAX_PATH_LENGTH: 255,
+  MAX_ORIGIN_LENGTH: 255,
+  MAX_HEADERS_LENGTH: 1000,
+  DEFAULT_MAX_AGE: 3600,
+  MIN_MAX_AGE: 0,
+  MAX_MAX_AGE: 86400, // 24 hours
+} as const;
+
+/**
+ * Common origin suggestions for better UX
+ */
+const ORIGIN_SUGGESTIONS = [
+  '*',
+  'https://localhost:3000',
+  'https://localhost:8080',
+  'https://localhost:4200',
+  'https://example.com',
+  'https://*.example.com',
 ] as const;
 
 /**
- * Common CORS headers for auto-suggestion
+ * Common path pattern suggestions
  */
-const COMMON_HEADERS = [
-  'Content-Type',
-  'Authorization',
-  'X-Requested-With',
-  'Accept',
-  'Accept-Language',
-  'Cache-Control',
-  'Content-Language',
-  'Content-Length',
-  'Content-Range',
-  'Content-Encoding',
-  'Date',
-  'ETag',
-  'Expires',
-  'Last-Modified',
-  'Location',
-  'Range',
-  'User-Agent',
-  'X-API-Key',
-  'X-Custom-Header',
+const PATH_SUGGESTIONS = [
+  '/*',
+  '/api/*',
+  '/api/v2/*',
+  '/public/*',
+  '/assets/*',
 ] as const;
 
 /**
- * Default form values with sensible CORS defaults
+ * HTTP method labels for accessibility
  */
-const DEFAULT_FORM_VALUES: Partial<CorsConfigFormData> = {
-  enabled: true,
-  allowedOrigins: ['*'],
-  allowedMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  exposedHeaders: [],
-  allowCredentials: false,
-  maxAge: 3600, // 1 hour
-  path: '/*',
-  description: '',
-};
+const HTTP_METHOD_LABELS: Record<HttpMethod, string> = {
+  GET: 'GET - Retrieve data',
+  POST: 'POST - Create new resources',
+  PUT: 'PUT - Update entire resources',
+  PATCH: 'PATCH - Partial updates',
+  DELETE: 'DELETE - Remove resources',
+  HEAD: 'HEAD - Retrieve headers only',
+  OPTIONS: 'OPTIONS - Preflight requests',
+} as const;
 
-// =============================================================================
-// MAIN COMPONENT
-// =============================================================================
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
+/**
+ * Formats validation time for display
+ */
+function formatValidationTime(milliseconds: number): string {
+  return `${milliseconds.toFixed(1)}ms`;
+}
+
+/**
+ * Checks if validation time exceeds threshold
+ */
+function isValidationSlow(milliseconds: number): boolean {
+  return milliseconds > FORM_CONFIG.VALIDATION_TIMEOUT;
+}
+
+/**
+ * Creates accessibility description for HTTP methods
+ */
+function createMethodsDescription(methods: HttpMethod[]): string {
+  if (methods.length === 0) return 'No HTTP methods selected';
+  if (methods.length === 1) return `${methods[0]} method selected`;
+  if (methods.length === HTTP_METHODS.length) return 'All HTTP methods selected';
+  return `${methods.length} HTTP methods selected: ${methods.join(', ')}`;
+}
+
+// ============================================================================
+// Main Component
+// ============================================================================
 
 /**
  * CORS Configuration Details Form Component
  */
 export function CorsConfigDetails({
   corsId,
-  initialData,
   onSuccess,
   onCancel,
-  standalone = true,
+  showBackButton = true,
   className,
-}: CorsConfigDetailsProps) {
+  'data-testid': testId = 'cors-config-details',
+}: CorsConfigDetailsProps): ReactNode {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const [isPending, startTransition] = useTransition();
-  const [newOriginInput, setNewOriginInput] = useState('');
-  const [newHeaderInput, setNewHeaderInput] = useState('');
-  const [newExposedHeaderInput, setNewExposedHeaderInput] = useState('');
-
-  // CORS operations hook with SWR/React Query integration
+  const { resolvedTheme } = useTheme();
+  const formRef = useRef<HTMLFormElement>(null);
+  
+  // CORS operations hook for data fetching and mutations
   const {
-    corsConfigurations,
-    isLoading,
-    error,
-    createCors,
-    updateCors,
-    isCreating,
-    isUpdating,
-  } = useCorsOperations({
-    refetchOnFocus: false,
-    optimisticUpdates: true,
-    onError: (error) => {
-      console.error('CORS operation failed:', error);
-    },
-    onSuccess: (data) => {
-      console.log('CORS operation succeeded:', data);
-    },
+    useCorsDetail,
+    useCorsCreate,
+    useCorsUpdate,
+  } = useCorsOperations();
+  
+  // State management
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [validationMetrics, setValidationMetrics] = useState<ValidationMetrics>({
+    lastValidationTime: 0,
+    averageValidationTime: 0,
+    validationCount: 0,
+    exceededThresholdCount: 0,
   });
-
-  // Determine if we're editing an existing CORS configuration
-  const isEditing = Boolean(corsId);
-  const editingConfig = useMemo(() => {
-    if (!isEditing || !corsConfigurations) return null;
-    return corsConfigurations.find(config => config.id === corsId) || null;
-  }, [corsId, corsConfigurations, isEditing]);
-
-  // Form setup with React Hook Form and Zod validation
-  const form = useForm<CorsConfigFormData>({
-    resolver: zodResolver(CorsConfigSchema),
-    defaultValues: {
-      ...DEFAULT_FORM_VALUES,
-      ...initialData,
-      ...editingConfig,
-    },
-    mode: 'onChange', // Real-time validation under 100ms
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+  
+  // Determine if this is an edit operation
+  const isEditing = corsId !== undefined;
+  
+  // Fetch existing CORS configuration for editing
+  const {
+    data: corsConfigResponse,
+    isLoading: isLoadingConfig,
+    error: loadError,
+  } = useCorsDetail(corsId!, {
+    enabled: isEditing,
+    refetchOnMount: true,
   });
-
+  
+  const existingConfig = corsConfigResponse?.resource;
+  
+  // Form configuration with dynamic schema based on operation type
+  const formSchema = useMemo(() => {
+    return isEditing ? corsConfigUpdateSchema : corsConfigCreateSchema;
+  }, [isEditing]);
+  
+  // Form default values
+  const defaultValues = useMemo(() => {
+    if (isEditing && existingConfig) {
+      return {
+        id: existingConfig.id,
+        description: existingConfig.description,
+        enabled: existingConfig.enabled,
+        path: existingConfig.path,
+        origin: existingConfig.origin,
+        method: existingConfig.method,
+        header: existingConfig.header,
+        exposedHeader: existingConfig.exposedHeader || '',
+        maxAge: existingConfig.maxAge,
+        supportsCredentials: existingConfig.supportsCredentials,
+      } satisfies CorsConfigUpdateForm;
+    } else {
+      return {
+        description: '',
+        enabled: DEFAULT_CORS_CONFIG.enabled!,
+        path: DEFAULT_CORS_CONFIG.path!,
+        origin: DEFAULT_CORS_CONFIG.origin!,
+        method: DEFAULT_CORS_CONFIG.method!,
+        header: DEFAULT_CORS_CONFIG.header!,
+        exposedHeader: DEFAULT_CORS_CONFIG.exposedHeader!,
+        maxAge: DEFAULT_CORS_CONFIG.maxAge!,
+        supportsCredentials: DEFAULT_CORS_CONFIG.supportsCredentials!,
+      } satisfies CorsConfigCreateForm;
+    }
+  }, [isEditing, existingConfig]);
+  
+  // Initialize form with performance monitoring
+  const form = useForm<FormData>({
+    resolver: zodResolver(formSchema),
+    defaultValues,
+    mode: 'onChange', // Enable real-time validation
+    revalidateMode: 'onChange',
+    shouldFocusError: true,
+    criteriaMode: 'all',
+  });
+  
   const {
     control,
     handleSubmit,
-    formState: { errors, isValid, isDirty },
+    reset,
+    trigger,
+    watch,
     setValue,
     getValues,
-    reset,
-    watch,
+    formState: { 
+      errors, 
+      isValid, 
+      isDirty, 
+      isValidating,
+      touchedFields,
+    },
   } = form;
-
-  // Watch form values for real-time updates
+  
+  // Watch form values for auto-save and live validation
   const watchedValues = useWatch({ control });
-  const allowedOrigins = watch('allowedOrigins', []);
-  const allowedHeaders = watch('allowedHeaders', []);
-  const exposedHeaders = watch('exposedHeaders', []);
-  const allowedMethods = watch('allowedMethods', []);
-
-  // =============================================================================
-  // FORM HANDLERS
-  // =============================================================================
-
-  /**
-   * Handle form submission with validation and API call
-   */
-  const onSubmit = useCallback(async (data: CorsConfigFormData) => {
-    startTransition(async () => {
-      try {
-        let result;
-        
-        if (isEditing && corsId) {
-          // Update existing CORS configuration
-          result = await updateCors.mutateAsync({
-            id: corsId,
-            ...data,
-          });
-        } else {
-          // Create new CORS configuration
-          result = await createCors.mutateAsync({
-            resource: [data],
-          });
-        }
-
-        if (result.success) {
-          // Call success callback if provided
-          onSuccess?.(result.data!);
-          
-          // Navigate back to CORS list if standalone
-          if (standalone) {
-            router.push('/adf-config/df-cors');
-          }
-        } else {
-          throw new Error(result.error || 'Failed to save CORS configuration');
-        }
-      } catch (error) {
-        console.error('Failed to save CORS configuration:', error);
-        // Error handling is managed by the mutation hook
+  const enabledValue = useWatch({ control, name: 'enabled' });
+  const methodsValue = useWatch({ control, name: 'method' });
+  const supportsCredentialsValue = useWatch({ control, name: 'supportsCredentials' });
+  
+  // Performance monitoring for validation times
+  const trackValidationPerformance = useCallback((startTime: number) => {
+    const endTime = performance.now();
+    const duration = endTime - startTime;
+    
+    setValidationMetrics(prev => {
+      const newCount = prev.validationCount + 1;
+      const newAverage = (prev.averageValidationTime * prev.validationCount + duration) / newCount;
+      const newExceededCount = prev.exceededThresholdCount + (isValidationSlow(duration) ? 1 : 0);
+      
+      // Log performance warning if validation is slow
+      if (isValidationSlow(duration)) {
+        console.warn(
+          `[CorsConfigDetails] Validation exceeded ${FORM_CONFIG.VALIDATION_TIMEOUT}ms threshold: ${formatValidationTime(duration)}`
+        );
       }
+      
+      return {
+        lastValidationTime: duration,
+        averageValidationTime: newAverage,
+        validationCount: newCount,
+        exceededThresholdCount: newExceededCount,
+      };
     });
-  }, [corsId, isEditing, updateCors, createCors, onSuccess, standalone, router]);
-
-  /**
-   * Handle cancel action with navigation
-   */
+  }, []);
+  
+  // Trigger validation with performance monitoring
+  const validateWithMetrics = useCallback(async (fieldName?: string) => {
+    const startTime = performance.now();
+    const result = await trigger(fieldName as any);
+    trackValidationPerformance(startTime);
+    return result;
+  }, [trigger, trackValidationPerformance]);
+  
+  // Mutation hooks for create and update operations
+  const createMutation = useCorsCreate({
+    onSuccess: (response) => {
+      setIsSubmitting(false);
+      onSuccess?.(response.resource);
+      
+      // Navigate to CORS list if no success callback provided
+      if (!onSuccess) {
+        router.push('/adf-config/df-cors');
+      }
+    },
+    onError: (error) => {
+      setIsSubmitting(false);
+      console.error('[CorsConfigDetails] Create failed:', error);
+    },
+  });
+  
+  const updateMutation = useCorsUpdate({
+    onSuccess: (response) => {
+      setIsSubmitting(false);
+      reset(response.resource);
+      onSuccess?.(response.resource);
+      
+      // Navigate to CORS list if no success callback provided
+      if (!onSuccess) {
+        router.push('/adf-config/df-cors');
+      }
+    },
+    onError: (error) => {
+      setIsSubmitting(false);
+      console.error('[CorsConfigDetails] Update failed:', error);
+    },
+  });
+  
+  // Form submission handler
+  const onSubmit: SubmitHandler<FormData> = useCallback(async (data) => {
+    setIsSubmitting(true);
+    
+    try {
+      if (isEditing) {
+        await updateMutation.mutateAsync(data as CorsConfigUpdateForm);
+      } else {
+        await createMutation.mutateAsync(data as CorsConfigCreateForm);
+      }
+    } catch (error) {
+      setIsSubmitting(false);
+      // Error is handled by mutation onError callbacks
+    }
+  }, [isEditing, createMutation, updateMutation]);
+  
+  // Navigation handlers
   const handleCancel = useCallback(() => {
     if (onCancel) {
       onCancel();
-    } else if (standalone) {
+    } else {
       router.push('/adf-config/df-cors');
     }
-  }, [onCancel, standalone, router]);
-
-  /**
-   * Reset form to default values
-   */
-  const handleReset = useCallback(() => {
-    reset({
-      ...DEFAULT_FORM_VALUES,
-      ...initialData,
-      ...editingConfig,
-    });
-  }, [reset, initialData, editingConfig]);
-
-  // =============================================================================
-  // DYNAMIC FIELD HANDLERS
-  // =============================================================================
-
-  /**
-   * Add new origin to allowed origins list
-   */
-  const addOrigin = useCallback(() => {
-    if (newOriginInput.trim()) {
-      const currentOrigins = getValues('allowedOrigins') || [];
-      if (!currentOrigins.includes(newOriginInput.trim())) {
-        setValue('allowedOrigins', [...currentOrigins, newOriginInput.trim()], {
-          shouldValidate: true,
-          shouldDirty: true,
-        });
-        setNewOriginInput('');
+  }, [onCancel, router]);
+  
+  const handleBack = useCallback(() => {
+    router.back();
+  }, [router]);
+  
+  // Reset form when existing config loads
+  useEffect(() => {
+    if (existingConfig && isEditing) {
+      reset(defaultValues);
+    }
+  }, [existingConfig, defaultValues, isEditing, reset]);
+  
+  // Auto-save functionality for form persistence
+  useEffect(() => {
+    if (!isDirty || !isValid) return;
+    
+    const timeoutId = setTimeout(() => {
+      const values = getValues();
+      try {
+        localStorage.setItem(
+          `cors-config-draft-${corsId || 'new'}`,
+          JSON.stringify(values)
+        );
+      } catch (error) {
+        console.warn('[CorsConfigDetails] Failed to auto-save:', error);
+      }
+    }, FORM_CONFIG.AUTO_SAVE_DELAY);
+    
+    return () => clearTimeout(timeoutId);
+  }, [watchedValues, isDirty, isValid, getValues, corsId]);
+  
+  // Load auto-saved draft for new configurations
+  useEffect(() => {
+    if (!isEditing) {
+      try {
+        const draft = localStorage.getItem('cors-config-draft-new');
+        if (draft) {
+          const savedValues = JSON.parse(draft);
+          reset(savedValues);
+        }
+      } catch (error) {
+        console.warn('[CorsConfigDetails] Failed to load draft:', error);
       }
     }
-  }, [newOriginInput, getValues, setValue]);
-
-  /**
-   * Remove origin from allowed origins list
-   */
-  const removeOrigin = useCallback((index: number) => {
-    const currentOrigins = getValues('allowedOrigins') || [];
-    setValue('allowedOrigins', currentOrigins.filter((_, i) => i !== index), {
-      shouldValidate: true,
+  }, [isEditing, reset]);
+  
+  // HTTP method toggle handler
+  const handleMethodToggle = useCallback((method: HttpMethod, checked: boolean) => {
+    const currentMethods = getValues('method') || [];
+    const updatedMethods = checked
+      ? [...currentMethods, method].filter((m, i, arr) => arr.indexOf(m) === i)
+      : currentMethods.filter(m => m !== method);
+    
+    setValue('method', updatedMethods, { 
+      shouldValidate: true, 
       shouldDirty: true,
+      shouldTouch: true,
     });
-  }, [getValues, setValue]);
-
-  /**
-   * Add new header to allowed headers list
-   */
-  const addHeader = useCallback(() => {
-    if (newHeaderInput.trim()) {
-      const currentHeaders = getValues('allowedHeaders') || [];
-      if (!currentHeaders.includes(newHeaderInput.trim())) {
-        setValue('allowedHeaders', [...currentHeaders, newHeaderInput.trim()], {
-          shouldValidate: true,
-          shouldDirty: true,
-        });
-        setNewHeaderInput('');
-      }
-    }
-  }, [newHeaderInput, getValues, setValue]);
-
-  /**
-   * Remove header from allowed headers list
-   */
-  const removeHeader = useCallback((index: number) => {
-    const currentHeaders = getValues('allowedHeaders') || [];
-    setValue('allowedHeaders', currentHeaders.filter((_, i) => i !== index), {
-      shouldValidate: true,
-      shouldDirty: true,
-    });
-  }, [getValues, setValue]);
-
-  /**
-   * Add new exposed header
-   */
-  const addExposedHeader = useCallback(() => {
-    if (newExposedHeaderInput.trim()) {
-      const currentHeaders = getValues('exposedHeaders') || [];
-      if (!currentHeaders.includes(newExposedHeaderInput.trim())) {
-        setValue('exposedHeaders', [...currentHeaders, newExposedHeaderInput.trim()], {
-          shouldValidate: true,
-          shouldDirty: true,
-        });
-        setNewExposedHeaderInput('');
-      }
-    }
-  }, [newExposedHeaderInput, getValues, setValue]);
-
-  /**
-   * Remove exposed header
-   */
-  const removeExposedHeader = useCallback((index: number) => {
-    const currentHeaders = getValues('exposedHeaders') || [];
-    setValue('exposedHeaders', currentHeaders.filter((_, i) => i !== index), {
-      shouldValidate: true,
-      shouldDirty: true,
-    });
-  }, [getValues, setValue]);
-
-  /**
-   * Toggle HTTP method selection
-   */
-  const toggleMethod = useCallback((method: string) => {
-    const currentMethods = getValues('allowedMethods') || [];
-    if (currentMethods.includes(method)) {
-      setValue('allowedMethods', currentMethods.filter(m => m !== method), {
-        shouldValidate: true,
+    
+    // Trigger validation with performance monitoring
+    validateWithMetrics('method');
+  }, [getValues, setValue, validateWithMetrics]);
+  
+  // Header suggestions handler
+  const handleHeaderSuggestion = useCallback((header: string) => {
+    const currentHeaders = getValues('header') || '';
+    const headers = currentHeaders.split(',').map(h => h.trim()).filter(Boolean);
+    
+    if (!headers.includes(header)) {
+      const newHeaders = [...headers, header].join(', ');
+      setValue('header', newHeaders, { 
+        shouldValidate: true, 
         shouldDirty: true,
+        shouldTouch: true,
       });
-    } else {
-      setValue('allowedMethods', [...currentMethods, method], {
-        shouldValidate: true,
-        shouldDirty: true,
-      });
+      validateWithMetrics('header');
     }
-  }, [getValues, setValue]);
-
-  // =============================================================================
-  // LOADING AND ERROR STATES
-  // =============================================================================
-
-  if (isLoading && isEditing) {
+  }, [getValues, setValue, validateWithMetrics]);
+  
+  // Show loading state while fetching existing config
+  if (isEditing && (isLoadingConfig || !existingConfig)) {
     return (
       <div 
-        className="flex items-center justify-center p-8"
-        data-testid="cors-config-loading"
+        className="flex items-center justify-center min-h-[400px]"
+        data-testid={`${testId}-loading`}
         role="status"
         aria-label="Loading CORS configuration"
       >
-        <Loader2 className="w-6 h-6 animate-spin text-primary-600 mr-3" />
-        <span className="text-gray-600 dark:text-gray-400">
-          Loading CORS configuration...
-        </span>
+        <div className="flex items-center space-x-3">
+          <svg
+            className="animate-spin h-6 w-6 text-primary-600"
+            fill="none"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            />
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            />
+          </svg>
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Loading CORS configuration...
+          </span>
+        </div>
       </div>
     );
   }
-
-  if (error) {
+  
+  // Show error state if config loading failed
+  if (isEditing && loadError) {
     return (
       <div 
-        className="p-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg"
-        data-testid="cors-config-error"
+        className="flex flex-col items-center justify-center min-h-[400px] space-y-4"
+        data-testid={`${testId}-error`}
         role="alert"
-        aria-describedby="error-description"
       >
-        <div className="flex items-start">
-          <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 mr-3 mt-0.5 flex-shrink-0" />
-          <div>
-            <h3 className="text-sm font-medium text-red-800 dark:text-red-200">
-              Failed to load CORS configuration
-            </h3>
-            <p 
-              id="error-description"
-              className="mt-1 text-sm text-red-700 dark:text-red-300"
+        <AlertCircle className="h-12 w-12 text-red-500" aria-hidden="true" />
+        <div className="text-center">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+            Failed to Load CORS Configuration
+          </h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            {loadError.message || 'An error occurred while loading the CORS configuration.'}
+          </p>
+          <div className="flex space-x-3">
+            <Button
+              variant="outline"
+              onClick={handleBack}
+              data-testid={`${testId}-back-button`}
             >
-              {error.message || 'An unexpected error occurred while loading the CORS configuration.'}
-            </p>
-            <div className="mt-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => window.location.reload()}
-                className="text-red-700 border-red-300 hover:bg-red-100 dark:text-red-300 dark:border-red-600 dark:hover:bg-red-900/30"
-              >
-                Try Again
-              </Button>
-            </div>
+              <ChevronLeft className="h-4 w-4 mr-2" aria-hidden="true" />
+              Go Back
+            </Button>
+            <Button
+              onClick={() => window.location.reload()}
+              data-testid={`${testId}-retry-button`}
+            >
+              Try Again
+            </Button>
           </div>
         </div>
       </div>
     );
   }
-
-  // =============================================================================
-  // RENDER COMPONENT
-  // =============================================================================
-
+  
   return (
     <div 
-      className={`bg-white dark:bg-gray-900 ${className || ''}`}
-      data-testid="cors-config-details"
+      className={cn(
+        'w-full max-w-4xl mx-auto space-y-6',
+        className
+      )}
+      data-testid={testId}
     >
-      {/* Header */}
-      {standalone && (
-        <div className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={handleCancel}
-                className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
-                data-testid="cors-config-back-button"
-                aria-label="Go back to CORS configuration list"
+      {/* Header Section */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          {showBackButton && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleBack}
+              className="p-2"
+              data-testid={`${testId}-back-nav`}
+              aria-label="Go back to previous page"
+            >
+              <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+            </Button>
+          )}
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+              {isEditing ? 'Edit CORS Configuration' : 'Create CORS Configuration'}
+            </h1>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              {isEditing 
+                ? 'Modify the cross-origin resource sharing settings for this entry.'
+                : 'Configure cross-origin resource sharing settings for your API endpoints.'
+              }
+            </p>
+          </div>
+        </div>
+        
+        {/* Configuration Status Indicator */}
+        {isEditing && existingConfig && (
+          <div 
+            className={cn(
+              'flex items-center space-x-2 px-3 py-1 rounded-full text-sm font-medium',
+              existingConfig.enabled
+                ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300'
+                : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
+            )}
+            data-testid={`${testId}-status-indicator`}
+            aria-label={`CORS configuration is currently ${existingConfig.enabled ? 'enabled' : 'disabled'}`}
+          >
+            {existingConfig.enabled ? (
+              <Check className="h-4 w-4" aria-hidden="true" />
+            ) : (
+              <X className="h-4 w-4" aria-hidden="true" />
+            )}
+            <span>{existingConfig.enabled ? 'Enabled' : 'Disabled'}</span>
+          </div>
+        )}
+      </div>
+      
+      {/* Main Form */}
+      <Form
+        ref={formRef}
+        onSubmit={handleSubmit(onSubmit)}
+        className="space-y-8"
+        data-testid={`${testId}-form`}
+        aria-label={`${isEditing ? 'Edit' : 'Create'} CORS configuration form`}
+      >
+        {/* Basic Configuration Section */}
+        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <div className="flex items-center space-x-2 mb-6">
+            <Globe className="h-5 w-5 text-primary-600" aria-hidden="true" />
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              Basic Configuration
+            </h2>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Description Field */}
+            <div className="md:col-span-2">
+              <label 
+                htmlFor="description"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
               >
-                <ArrowLeft className="w-4 h-4 mr-1" />
-                Back
-              </Button>
-              <div>
-                <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-                  {isEditing ? 'Edit CORS Configuration' : 'Create CORS Configuration'}
-                </h1>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Configure Cross-Origin Resource Sharing (CORS) settings for API endpoints
+                Description <span className="text-red-500" aria-label="required">*</span>
+              </label>
+              <Input
+                id="description"
+                {...form.register('description')}
+                placeholder="e.g., Allow frontend app access to API"
+                maxLength={FORM_CONFIG.MAX_DESCRIPTION_LENGTH}
+                error={!!errors.description}
+                aria-describedby={errors.description ? 'description-error' : 'description-help'}
+                data-testid={`${testId}-description-input`}
+              />
+              {errors.description && (
+                <p 
+                  id="description-error"
+                  className="mt-1 text-sm text-red-600 dark:text-red-400"
+                  role="alert"
+                >
+                  {errors.description.message}
                 </p>
+              )}
+              <p 
+                id="description-help"
+                className="mt-1 text-xs text-gray-500 dark:text-gray-400"
+              >
+                Provide a clear description of what this CORS configuration is for.
+              </p>
+            </div>
+            
+            {/* Enabled Toggle */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Status
+              </label>
+              <div className="flex items-center space-x-3">
+                <Checkbox
+                  id="enabled"
+                  {...form.register('enabled')}
+                  checked={enabledValue}
+                  onCheckedChange={(checked) => {
+                    setValue('enabled', checked as boolean, { 
+                      shouldValidate: true,
+                      shouldDirty: true,
+                      shouldTouch: true,
+                    });
+                  }}
+                  data-testid={`${testId}-enabled-checkbox`}
+                  aria-describedby="enabled-help"
+                />
+                <label 
+                  htmlFor="enabled"
+                  className="text-sm text-gray-900 dark:text-gray-100 cursor-pointer"
+                >
+                  Enable this CORS configuration
+                </label>
+              </div>
+              <p 
+                id="enabled-help"
+                className="mt-1 text-xs text-gray-500 dark:text-gray-400"
+              >
+                Disabled configurations will not apply to requests.
+              </p>
+            </div>
+            
+            {/* Path Pattern */}
+            <div>
+              <label 
+                htmlFor="path"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+              >
+                Path Pattern <span className="text-red-500" aria-label="required">*</span>
+              </label>
+              <Input
+                id="path"
+                {...form.register('path')}
+                placeholder="e.g., /api/*, /*"
+                maxLength={FORM_CONFIG.MAX_PATH_LENGTH}
+                error={!!errors.path}
+                aria-describedby={errors.path ? 'path-error' : 'path-help'}
+                data-testid={`${testId}-path-input`}
+              />
+              {errors.path && (
+                <p 
+                  id="path-error"
+                  className="mt-1 text-sm text-red-600 dark:text-red-400"
+                  role="alert"
+                >
+                  {errors.path.message}
+                </p>
+              )}
+              <div id="path-help" className="mt-1">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                  URL path pattern this CORS rule applies to. Supports wildcards (*).
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {PATH_SUGGESTIONS.map((suggestion) => (
+                    <button
+                      key={suggestion}
+                      type="button"
+                      onClick={() => {
+                        setValue('path', suggestion, { 
+                          shouldValidate: true,
+                          shouldDirty: true,
+                          shouldTouch: true,
+                        });
+                        validateWithMetrics('path');
+                      }}
+                      className="inline-flex items-center px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                      data-testid={`${testId}-path-suggestion-${suggestion.replace(/[/*]/g, '-')}`}
+                      aria-label={`Set path pattern to ${suggestion}`}
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
             
-            {/* Save indicator */}
-            <div className="flex items-center space-x-3">
-              {isDirty && (
-                <div className="flex items-center text-sm text-amber-600 dark:text-amber-400">
-                  <AlertCircle className="w-4 h-4 mr-1" />
-                  Unsaved changes
-                </div>
+            {/* Origin */}
+            <div>
+              <label 
+                htmlFor="origin"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+              >
+                Allowed Origins <span className="text-red-500" aria-label="required">*</span>
+              </label>
+              <Input
+                id="origin"
+                {...form.register('origin')}
+                placeholder="e.g., https://example.com, *"
+                maxLength={FORM_CONFIG.MAX_ORIGIN_LENGTH}
+                error={!!errors.origin}
+                aria-describedby={errors.origin ? 'origin-error' : 'origin-help'}
+                data-testid={`${testId}-origin-input`}
+              />
+              {errors.origin && (
+                <p 
+                  id="origin-error"
+                  className="mt-1 text-sm text-red-600 dark:text-red-400"
+                  role="alert"
+                >
+                  {errors.origin.message}
+                </p>
               )}
-              <div className="text-xs text-gray-500 dark:text-gray-400">
-                {isValid ? (
-                  <div className="flex items-center text-green-600 dark:text-green-400">
-                    <CheckCircle2 className="w-3 h-3 mr-1" />
-                    Valid
-                  </div>
-                ) : (
-                  <div className="flex items-center text-red-600 dark:text-red-400">
-                    <AlertCircle className="w-3 h-3 mr-1" />
-                    Invalid
-                  </div>
-                )}
+              <div id="origin-help" className="mt-1">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                  Domain(s) allowed to make cross-origin requests. Use * for all origins.
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {ORIGIN_SUGGESTIONS.map((suggestion) => (
+                    <button
+                      key={suggestion}
+                      type="button"
+                      onClick={() => {
+                        setValue('origin', suggestion, { 
+                          shouldValidate: true,
+                          shouldDirty: true,
+                          shouldTouch: true,
+                        });
+                        validateWithMetrics('origin');
+                      }}
+                      className="inline-flex items-center px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                      data-testid={`${testId}-origin-suggestion-${suggestion.replace(/[*:.]/g, '-')}`}
+                      aria-label={`Set origin to ${suggestion}`}
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
         </div>
-      )}
-
-      {/* Form Content */}
-      <div className="max-w-4xl mx-auto p-6">
-        <Form {...form}>
-          <form 
-            onSubmit={handleSubmit(onSubmit)}
-            className="space-y-8"
-            data-testid="cors-config-form"
-            noValidate
+        
+        {/* HTTP Methods Section */}
+        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <div className="flex items-center space-x-2 mb-6">
+            <TestTube className="h-5 w-5 text-primary-600" aria-hidden="true" />
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              HTTP Methods
+            </h2>
+          </div>
+          
+          <div 
+            role="group"
+            aria-labelledby="methods-label"
+            aria-describedby="methods-description"
+            data-testid={`${testId}-methods-group`}
           >
-            {/* Basic Configuration Section */}
-            <section 
-              className="space-y-6"
-              aria-labelledby="basic-config-heading"
+            <div 
+              id="methods-label"
+              className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
             >
-              <div className="flex items-center space-x-2">
-                <h2 
-                  id="basic-config-heading"
-                  className="text-lg font-medium text-gray-900 dark:text-gray-100"
-                >
-                  Basic Configuration
-                </h2>
-                <Info className="w-4 h-4 text-gray-400" />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Path Pattern */}
-                <FormField
-                  control={control}
-                  name="path"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel 
-                        htmlFor="cors-path"
-                        className="text-sm font-medium text-gray-700 dark:text-gray-300"
-                      >
-                        Path Pattern
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          id="cors-path"
-                          placeholder="e.g., /api/*, /users/*, /*"
-                          className="mt-1"
-                          data-testid="cors-path-input"
-                          aria-describedby="cors-path-description cors-path-error"
-                          autoComplete="off"
-                        />
-                      </FormControl>
-                      <FormDescription id="cors-path-description">
-                        URL path pattern this CORS rule applies to. Use * for wildcards.
-                      </FormDescription>
-                      <FormMessage id="cors-path-error" />
-                    </FormItem>
-                  )}
-                />
-
-                {/* Enabled Toggle */}
-                <FormField
-                  control={control}
-                  name="enabled"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          id="cors-enabled"
-                          data-testid="cors-enabled-checkbox"
-                          aria-describedby="cors-enabled-description"
-                        />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel 
-                          htmlFor="cors-enabled"
-                          className="text-sm font-medium text-gray-700 dark:text-gray-300"
-                        >
-                          Enable CORS
-                        </FormLabel>
-                        <FormDescription id="cors-enabled-description">
-                          Enable Cross-Origin Resource Sharing for this path pattern
-                        </FormDescription>
-                      </div>
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              {/* Description */}
-              <FormField
-                control={control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel 
-                      htmlFor="cors-description"
-                      className="text-sm font-medium text-gray-700 dark:text-gray-300"
-                    >
-                      Description
-                    </FormLabel>
-                    <FormControl>
-                      <Textarea
-                        {...field}
-                        id="cors-description"
-                        placeholder="Describe the purpose of this CORS configuration..."
-                        rows={3}
-                        className="mt-1"
-                        data-testid="cors-description-textarea"
-                        aria-describedby="cors-description-description"
-                      />
-                    </FormControl>
-                    <FormDescription id="cors-description-description">
-                      Optional description to help identify this CORS configuration
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </section>
-
-            {/* Origins Section */}
-            <section 
-              className="space-y-6"
-              aria-labelledby="origins-heading"
+              Allowed HTTP Methods <span className="text-red-500" aria-label="required">*</span>
+            </div>
+            <div 
+              id="methods-description"
+              className="text-xs text-gray-500 dark:text-gray-400 mb-4"
             >
-              <div className="flex items-center space-x-2">
-                <h2 
-                  id="origins-heading"
-                  className="text-lg font-medium text-gray-900 dark:text-gray-100"
-                >
-                  Allowed Origins
-                </h2>
-                <Info className="w-4 h-4 text-gray-400" />
-              </div>
-
-              {/* Add new origin */}
-              <div className="flex items-end space-x-3">
-                <div className="flex-1">
-                  <label 
-                    htmlFor="new-origin-input"
-                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-                  >
-                    Add Origin
-                  </label>
-                  <Input
-                    id="new-origin-input"
-                    value={newOriginInput}
-                    onChange={(e) => setNewOriginInput(e.target.value)}
-                    placeholder="https://example.com or *"
-                    className="w-full"
-                    data-testid="new-origin-input"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        addOrigin();
-                      }
-                    }}
-                    aria-describedby="new-origin-description"
-                  />
-                  <p 
-                    id="new-origin-description"
-                    className="text-xs text-gray-500 dark:text-gray-400 mt-1"
-                  >
-                    Enter a full URL (e.g., https://example.com) or * for all origins
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  onClick={addOrigin}
-                  disabled={!newOriginInput.trim()}
-                  size="sm"
-                  data-testid="add-origin-button"
-                  aria-label="Add origin to allowed list"
-                >
-                  <Plus className="w-4 h-4 mr-1" />
-                  Add
-                </Button>
-              </div>
-
-              {/* Origins list */}
-              <div className="space-y-2">
-                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Current Origins ({allowedOrigins.length})
-                </h3>
-                <div 
-                  className="space-y-2"
-                  data-testid="origins-list"
-                  role="list"
-                  aria-label="List of allowed origins"
-                >
-                  {allowedOrigins.length === 0 ? (
-                    <p className="text-sm text-gray-500 dark:text-gray-400 italic py-2">
-                      No origins configured. Add at least one origin above.
-                    </p>
-                  ) : (
-                    allowedOrigins.map((origin, index) => (
-                      <div 
-                        key={`${origin}-${index}`}
-                        className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 px-3 py-2 rounded-md"
-                        role="listitem"
-                        data-testid={`origin-item-${index}`}
-                      >
-                        <code className="text-sm font-mono text-gray-900 dark:text-gray-100 flex-1">
-                          {origin}
-                        </code>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeOrigin(index)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900/30 ml-2"
-                          data-testid={`remove-origin-${index}`}
-                          aria-label={`Remove origin ${origin}`}
-                        >
-                          <X className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </section>
-
-            {/* HTTP Methods Section */}
-            <section 
-              className="space-y-6"
-              aria-labelledby="methods-heading"
-            >
-              <div className="flex items-center space-x-2">
-                <h2 
-                  id="methods-heading"
-                  className="text-lg font-medium text-gray-900 dark:text-gray-100"
-                >
-                  Allowed HTTP Methods
-                </h2>
-                <Info className="w-4 h-4 text-gray-400" />
-              </div>
-
-              <div 
-                className="grid grid-cols-2 md:grid-cols-4 gap-3"
-                role="group"
-                aria-labelledby="methods-heading"
-                data-testid="http-methods-grid"
+              Select the HTTP methods that should be allowed for cross-origin requests.
+              <span className="sr-only">
+                {createMethodsDescription(methodsValue || [])}
+              </span>
+            </div>
+            
+            {errors.method && (
+              <p 
+                className="mb-4 text-sm text-red-600 dark:text-red-400"
+                role="alert"
               >
-                {HTTP_METHODS.map((method) => (
-                  <div 
-                    key={method.value}
-                    className="flex items-start space-x-3"
-                  >
-                    <Checkbox
-                      id={`method-${method.value}`}
-                      checked={allowedMethods.includes(method.value)}
-                      onCheckedChange={() => toggleMethod(method.value)}
-                      data-testid={`method-checkbox-${method.value}`}
-                      aria-describedby={`method-description-${method.value}`}
-                    />
-                    <div className="space-y-1 leading-none">
-                      <label 
-                        htmlFor={`method-${method.value}`}
-                        className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer"
-                      >
-                        {method.label}
-                      </label>
-                      <p 
-                        id={`method-description-${method.value}`}
-                        className="text-xs text-gray-500 dark:text-gray-400"
-                      >
-                        {method.description}
-                      </p>
-                    </div>
+                {errors.method.message}
+              </p>
+            )}
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {HTTP_METHODS.map((method) => (
+                <div 
+                  key={method}
+                  className="flex items-start space-x-3"
+                >
+                  <Checkbox
+                    id={`method-${method}`}
+                    checked={methodsValue?.includes(method) || false}
+                    onCheckedChange={(checked) => handleMethodToggle(method, checked as boolean)}
+                    data-testid={`${testId}-method-${method.toLowerCase()}`}
+                    aria-describedby={`method-${method}-description`}
+                  />
+                  <div className="flex-1">
+                    <label 
+                      htmlFor={`method-${method}`}
+                      className="text-sm font-medium text-gray-900 dark:text-gray-100 cursor-pointer"
+                    >
+                      {method}
+                    </label>
+                    <p 
+                      id={`method-${method}-description`}
+                      className="text-xs text-gray-500 dark:text-gray-400"
+                    >
+                      {HTTP_METHOD_LABELS[method]}
+                    </p>
                   </div>
-                ))}
-              </div>
-
-              <FormField
-                control={control}
-                name="allowedMethods"
-                render={() => (
-                  <FormItem>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        
+        {/* Headers Configuration Section */}
+        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <div className="flex items-center space-x-2 mb-6">
+            <Shield className="h-5 w-5 text-primary-600" aria-hidden="true" />
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              Headers Configuration
+            </h2>
+          </div>
+          
+          <div className="space-y-6">
+            {/* Allowed Headers */}
+            <div>
+              <label 
+                htmlFor="header"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+              >
+                Allowed Headers
+              </label>
+              <Textarea
+                id="header"
+                {...form.register('header')}
+                placeholder="Content-Type, Authorization, X-Requested-With"
+                maxLength={FORM_CONFIG.MAX_HEADERS_LENGTH}
+                rows={3}
+                error={!!errors.header}
+                aria-describedby={errors.header ? 'header-error' : 'header-help'}
+                data-testid={`${testId}-header-textarea`}
               />
-            </section>
-
-            {/* Headers Section */}
-            <section 
-              className="space-y-6"
-              aria-labelledby="headers-heading"
-            >
-              <div className="flex items-center space-x-2">
-                <h2 
-                  id="headers-heading"
-                  className="text-lg font-medium text-gray-900 dark:text-gray-100"
+              {errors.header && (
+                <p 
+                  id="header-error"
+                  className="mt-1 text-sm text-red-600 dark:text-red-400"
+                  role="alert"
                 >
-                  Headers Configuration
-                </h2>
-                <Info className="w-4 h-4 text-gray-400" />
-              </div>
-
-              {/* Allowed Headers */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Allowed Request Headers
-                </h3>
-                
-                {/* Add new header */}
-                <div className="flex items-end space-x-3">
-                  <div className="flex-1">
-                    <label 
-                      htmlFor="new-header-input"
-                      className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                  {errors.header.message}
+                </p>
+              )}
+              <div id="header-help" className="mt-1">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                  Comma-separated list of headers that can be used during the actual request.
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {COMMON_CORS_HEADERS.map((header) => (
+                    <button
+                      key={header}
+                      type="button"
+                      onClick={() => handleHeaderSuggestion(header)}
+                      className="inline-flex items-center px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                      data-testid={`${testId}-header-suggestion-${header.toLowerCase().replace(/[^a-z]/g, '-')}`}
+                      aria-label={`Add ${header} to allowed headers`}
                     >
-                      Add Header
-                    </label>
-                    <Input
-                      id="new-header-input"
-                      value={newHeaderInput}
-                      onChange={(e) => setNewHeaderInput(e.target.value)}
-                      placeholder="e.g., Content-Type, Authorization"
-                      className="w-full"
-                      list="common-headers"
-                      data-testid="new-header-input"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          addHeader();
-                        }
-                      }}
-                      aria-describedby="new-header-description"
-                    />
-                    <datalist id="common-headers">
-                      {COMMON_HEADERS.map((header) => (
-                        <option key={header} value={header} />
-                      ))}
-                    </datalist>
-                    <p 
-                      id="new-header-description"
-                      className="text-xs text-gray-500 dark:text-gray-400 mt-1"
-                    >
-                      Headers that clients are allowed to send in requests
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    onClick={addHeader}
-                    disabled={!newHeaderInput.trim()}
-                    size="sm"
-                    data-testid="add-header-button"
-                    aria-label="Add header to allowed list"
-                  >
-                    <Plus className="w-4 h-4 mr-1" />
-                    Add
-                  </Button>
+                      {header}
+                    </button>
+                  ))}
                 </div>
-
-                {/* Headers list */}
-                <div 
-                  className="space-y-2"
-                  data-testid="allowed-headers-list"
-                  role="list"
-                  aria-label="List of allowed request headers"
-                >
-                  {allowedHeaders.length === 0 ? (
-                    <p className="text-sm text-gray-500 dark:text-gray-400 italic py-2">
-                      No headers configured. Add headers that clients can send.
-                    </p>
-                  ) : (
-                    allowedHeaders.map((header, index) => (
-                      <div 
-                        key={`${header}-${index}`}
-                        className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 px-3 py-2 rounded-md"
-                        role="listitem"
-                        data-testid={`allowed-header-item-${index}`}
-                      >
-                        <code className="text-sm font-mono text-gray-900 dark:text-gray-100 flex-1">
-                          {header}
-                        </code>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeHeader(index)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900/30 ml-2"
-                          data-testid={`remove-allowed-header-${index}`}
-                          aria-label={`Remove allowed header ${header}`}
-                        >
-                          <X className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              {/* Exposed Headers */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Exposed Response Headers
-                </h3>
-                
-                {/* Add new exposed header */}
-                <div className="flex items-end space-x-3">
-                  <div className="flex-1">
-                    <label 
-                      htmlFor="new-exposed-header-input"
-                      className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-                    >
-                      Add Exposed Header
-                    </label>
-                    <Input
-                      id="new-exposed-header-input"
-                      value={newExposedHeaderInput}
-                      onChange={(e) => setNewExposedHeaderInput(e.target.value)}
-                      placeholder="e.g., X-Total-Count, ETag"
-                      className="w-full"
-                      list="common-headers"
-                      data-testid="new-exposed-header-input"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          addExposedHeader();
-                        }
-                      }}
-                      aria-describedby="new-exposed-header-description"
-                    />
-                    <p 
-                      id="new-exposed-header-description"
-                      className="text-xs text-gray-500 dark:text-gray-400 mt-1"
-                    >
-                      Headers that clients can access in responses (optional)
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    onClick={addExposedHeader}
-                    disabled={!newExposedHeaderInput.trim()}
-                    size="sm"
-                    data-testid="add-exposed-header-button"
-                    aria-label="Add header to exposed list"
-                  >
-                    <Plus className="w-4 h-4 mr-1" />
-                    Add
-                  </Button>
-                </div>
-
-                {/* Exposed headers list */}
-                <div 
-                  className="space-y-2"
-                  data-testid="exposed-headers-list"
-                  role="list"
-                  aria-label="List of exposed response headers"
-                >
-                  {exposedHeaders.length === 0 ? (
-                    <p className="text-sm text-gray-500 dark:text-gray-400 italic py-2">
-                      No exposed headers configured. This is optional.
-                    </p>
-                  ) : (
-                    exposedHeaders.map((header, index) => (
-                      <div 
-                        key={`${header}-${index}`}
-                        className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 px-3 py-2 rounded-md"
-                        role="listitem"
-                        data-testid={`exposed-header-item-${index}`}
-                      >
-                        <code className="text-sm font-mono text-gray-900 dark:text-gray-100 flex-1">
-                          {header}
-                        </code>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeExposedHeader(index)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900/30 ml-2"
-                          data-testid={`remove-exposed-header-${index}`}
-                          aria-label={`Remove exposed header ${header}`}
-                        >
-                          <X className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </section>
-
-            {/* Advanced Options Section */}
-            <section 
-              className="space-y-6"
-              aria-labelledby="advanced-heading"
-            >
-              <div className="flex items-center space-x-2">
-                <h2 
-                  id="advanced-heading"
-                  className="text-lg font-medium text-gray-900 dark:text-gray-100"
-                >
-                  Advanced Options
-                </h2>
-                <Info className="w-4 h-4 text-gray-400" />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Allow Credentials */}
-                <FormField
-                  control={control}
-                  name="allowCredentials"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          id="cors-allow-credentials"
-                          data-testid="cors-allow-credentials-checkbox"
-                          aria-describedby="cors-allow-credentials-description"
-                        />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel 
-                          htmlFor="cors-allow-credentials"
-                          className="text-sm font-medium text-gray-700 dark:text-gray-300"
-                        >
-                          Allow Credentials
-                        </FormLabel>
-                        <FormDescription id="cors-allow-credentials-description">
-                          Allow requests to include credentials (cookies, authorization headers)
-                        </FormDescription>
-                      </div>
-                    </FormItem>
-                  )}
-                />
-
-                {/* Max Age */}
-                <FormField
-                  control={control}
-                  name="maxAge"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel 
-                        htmlFor="cors-max-age"
-                        className="text-sm font-medium text-gray-700 dark:text-gray-300"
-                      >
-                        Max Age (seconds)
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          id="cors-max-age"
-                          type="number"
-                          min="0"
-                          max="86400"
-                          step="60"
-                          className="mt-1"
-                          data-testid="cors-max-age-input"
-                          aria-describedby="cors-max-age-description cors-max-age-error"
-                          onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                        />
-                      </FormControl>
-                      <FormDescription id="cors-max-age-description">
-                        How long (in seconds) browsers can cache preflight requests (0-86400)
-                      </FormDescription>
-                      <FormMessage id="cors-max-age-error" />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </section>
-
-            {/* Form Actions */}
-            <div className="flex items-center justify-between pt-6 border-t border-gray-200 dark:border-gray-700">
-              <div className="flex items-center space-x-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleCancel}
-                  disabled={isPending || isCreating || isUpdating}
-                  data-testid="cors-config-cancel-button"
-                  aria-label="Cancel changes and return to CORS list"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={handleReset}
-                  disabled={isPending || isCreating || isUpdating || !isDirty}
-                  data-testid="cors-config-reset-button"
-                  aria-label="Reset form to original values"
-                >
-                  Reset
-                </Button>
-              </div>
-
-              <div className="flex items-center space-x-3">
-                <Button
-                  type="submit"
-                  disabled={!isValid || isPending || isCreating || isUpdating || !isDirty}
-                  className="bg-primary-600 hover:bg-primary-700 text-white"
-                  data-testid="cors-config-save-button"
-                  aria-label={isEditing ? 'Update CORS configuration' : 'Create CORS configuration'}
-                >
-                  {(isPending || isCreating || isUpdating) ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      {isEditing ? 'Updating...' : 'Creating...'}
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4 mr-2" />
-                      {isEditing ? 'Update' : 'Create'} CORS Configuration
-                    </>
-                  )}
-                </Button>
               </div>
             </div>
-          </form>
-        </Form>
-      </div>
+            
+            {/* Advanced Options Toggle */}
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+              <button
+                type="button"
+                onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+                className="flex items-center space-x-2 text-sm font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300"
+                data-testid={`${testId}-advanced-toggle`}
+                aria-expanded={showAdvancedOptions}
+                aria-controls="advanced-options"
+              >
+                <span>{showAdvancedOptions ? 'Hide' : 'Show'} Advanced Options</span>
+                <svg
+                  className={cn(
+                    'h-4 w-4 transition-transform',
+                    showAdvancedOptions && 'rotate-180'
+                  )}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 9l-7 7-7-7"
+                  />
+                </svg>
+              </button>
+            </div>
+            
+            {/* Advanced Options */}
+            {showAdvancedOptions && (
+              <div 
+                id="advanced-options"
+                className="space-y-6 border-l-2 border-primary-200 dark:border-primary-800 pl-4"
+                data-testid={`${testId}-advanced-options`}
+              >
+                {/* Exposed Headers */}
+                <div>
+                  <label 
+                    htmlFor="exposedHeader"
+                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                  >
+                    Exposed Headers
+                  </label>
+                  <Textarea
+                    id="exposedHeader"
+                    {...form.register('exposedHeader')}
+                    placeholder="X-Total-Count, X-Page-Size"
+                    maxLength={FORM_CONFIG.MAX_HEADERS_LENGTH}
+                    rows={2}
+                    error={!!errors.exposedHeader}
+                    aria-describedby={errors.exposedHeader ? 'exposedHeader-error' : 'exposedHeader-help'}
+                    data-testid={`${testId}-exposed-header-textarea`}
+                  />
+                  {errors.exposedHeader && (
+                    <p 
+                      id="exposedHeader-error"
+                      className="mt-1 text-sm text-red-600 dark:text-red-400"
+                      role="alert"
+                    >
+                      {errors.exposedHeader.message}
+                    </p>
+                  )}
+                  <p 
+                    id="exposedHeader-help"
+                    className="mt-1 text-xs text-gray-500 dark:text-gray-400"
+                  >
+                    Headers that browsers are allowed to access from JavaScript.
+                  </p>
+                </div>
+                
+                {/* Max Age */}
+                <div>
+                  <label 
+                    htmlFor="maxAge"
+                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                  >
+                    Cache Duration (Max Age)
+                  </label>
+                  <div className="flex items-center space-x-2">
+                    <Input
+                      id="maxAge"
+                      type="number"
+                      {...form.register('maxAge', { valueAsNumber: true })}
+                      min={FORM_CONFIG.MIN_MAX_AGE}
+                      max={FORM_CONFIG.MAX_MAX_AGE}
+                      error={!!errors.maxAge}
+                      aria-describedby={errors.maxAge ? 'maxAge-error' : 'maxAge-help'}
+                      data-testid={`${testId}-max-age-input`}
+                      className="w-32"
+                    />
+                    <Clock className="h-4 w-4 text-gray-400" aria-hidden="true" />
+                    <span className="text-sm text-gray-500 dark:text-gray-400">seconds</span>
+                  </div>
+                  {errors.maxAge && (
+                    <p 
+                      id="maxAge-error"
+                      className="mt-1 text-sm text-red-600 dark:text-red-400"
+                      role="alert"
+                    >
+                      {errors.maxAge.message}
+                    </p>
+                  )}
+                  <p 
+                    id="maxAge-help"
+                    className="mt-1 text-xs text-gray-500 dark:text-gray-400"
+                  >
+                    How long (in seconds) browsers can cache preflight response. Default: 3600 (1 hour).
+                  </p>
+                </div>
+                
+                {/* Supports Credentials */}
+                <div>
+                  <div className="flex items-center space-x-3">
+                    <Checkbox
+                      id="supportsCredentials"
+                      {...form.register('supportsCredentials')}
+                      checked={supportsCredentialsValue}
+                      onCheckedChange={(checked) => {
+                        setValue('supportsCredentials', checked as boolean, { 
+                          shouldValidate: true,
+                          shouldDirty: true,
+                          shouldTouch: true,
+                        });
+                      }}
+                      data-testid={`${testId}-credentials-checkbox`}
+                      aria-describedby="credentials-help"
+                    />
+                    <label 
+                      htmlFor="supportsCredentials"
+                      className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer"
+                    >
+                      Support Credentials
+                    </label>
+                  </div>
+                  <p 
+                    id="credentials-help"
+                    className="mt-1 text-xs text-gray-500 dark:text-gray-400 pl-7"
+                  >
+                    Allow cookies, authorization headers, and TLS client certificates to be included in cross-origin requests.
+                    <strong className="text-orange-600 dark:text-orange-400 block mt-1">
+                      Warning: Cannot be used with wildcard origins (*) for security reasons.
+                    </strong>
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        {/* Form Actions */}
+        <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+          <div className="flex items-center space-x-4">
+            {/* Validation Performance Indicator (Development Only) */}
+            {process.env.NODE_ENV === 'development' && (
+              <div className="text-xs text-gray-500 dark:text-gray-400">
+                <div>
+                  Validation: {formatValidationTime(validationMetrics.lastValidationTime)}
+                  {isValidationSlow(validationMetrics.lastValidationTime) && (
+                    <span className="text-orange-500 ml-1">⚠️</span>
+                  )}
+                </div>
+                {validationMetrics.validationCount > 0 && (
+                  <div>
+                    Avg: {formatValidationTime(validationMetrics.averageValidationTime)} 
+                    ({validationMetrics.validationCount} validations)
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* Form Status */}
+            {isDirty && (
+              <div className="flex items-center space-x-1 text-xs text-orange-600 dark:text-orange-400">
+                <svg
+                  className="h-3 w-3"
+                  fill="currentColor"
+                  viewBox="0 0 8 8"
+                  aria-hidden="true"
+                >
+                  <circle cx="4" cy="4" r="3" />
+                </svg>
+                <span>Unsaved changes</span>
+              </div>
+            )}
+          </div>
+          
+          <div className="flex items-center space-x-3">
+            {/* Cancel Button */}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleCancel}
+              disabled={isSubmitting}
+              data-testid={`${testId}-cancel-button`}
+            >
+              Cancel
+            </Button>
+            
+            {/* Submit Button */}
+            <Button
+              type="submit"
+              disabled={isSubmitting || !isValid}
+              className="min-w-[120px]"
+              data-testid={`${testId}-submit-button`}
+              aria-describedby="submit-help"
+            >
+              {isSubmitting ? (
+                <>
+                  <svg
+                    className="animate-spin h-4 w-4 mr-2"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                  {isEditing ? 'Updating...' : 'Creating...'}
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" aria-hidden="true" />
+                  {isEditing ? 'Update Configuration' : 'Create Configuration'}
+                </>
+              )}
+            </Button>
+          </div>
+          
+          {/* Screen reader submit help */}
+          <p id="submit-help" className="sr-only">
+            {isValid 
+              ? `Ready to ${isEditing ? 'update' : 'create'} CORS configuration`
+              : 'Please fix validation errors before submitting'
+            }
+          </p>
+        </div>
+      </Form>
     </div>
   );
 }
 
-/**
- * Default export for convenience
- */
+// Export default component
 export default CorsConfigDetails;
+
+/**
+ * Export component metadata for testing and documentation
+ */
+export const CorsConfigDetailsMeta = {
+  name: 'CorsConfigDetails',
+  description: 'CORS configuration details form component',
+  version: '1.0.0',
+  accessibility: {
+    wcag: '2.1 AA',
+    features: [
+      'Keyboard navigation',
+      'Screen reader support',
+      'Focus management',
+      'ARIA attributes',
+      'High contrast support',
+      'Minimum touch targets',
+    ],
+  },
+  performance: {
+    validation: '<100ms',
+    rendering: 'Optimized with React 19',
+    bundle: 'Tree-shakeable',
+  },
+  dependencies: [
+    'react-hook-form',
+    'zod',
+    '@hookform/resolvers/zod',
+    'lucide-react',
+    'next/navigation',
+  ],
+};
