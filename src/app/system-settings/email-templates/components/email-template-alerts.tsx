@@ -1,676 +1,1005 @@
-'use client'
+/**
+ * Email Template Alert and Notification Components
+ * 
+ * Comprehensive alert and notification components for email template operations providing
+ * success, error, warning, and info messages. Implements toast notifications, inline alerts,
+ * and confirmation dialogs with proper accessibility compliance and auto-dismiss functionality.
+ * 
+ * Features:
+ * - Toast notifications for email template CRUD operation feedback
+ * - Inline alerts for form validation errors and field-specific messaging
+ * - Confirmation dialogs for destructive operations with proper accessibility
+ * - Auto-dismiss functionality with configurable timeout and user control
+ * - WCAG 2.1 AA compliance with proper color contrast and keyboard navigation
+ * - React 19 concurrent features support with optimistic updates
+ * - TypeScript 5.8+ enhanced type safety and inference
+ * - Tailwind CSS 4.1+ utility-first styling with design system integration
+ * 
+ * @fileoverview Email template alert components for React application
+ * @version 1.0.0
+ * @see Technical Specification Section 0 - SUMMARY OF CHANGES
+ * @see Technical Specification Section 7.1 - CORE UI TECHNOLOGIES
+ * @see Technical Specification Section 4.2 - ERROR HANDLING AND VALIDATION
+ * @see Technical Specification Section 5.4 - CROSS-CUTTING CONCERNS
+ */
 
-import React, { useState, useEffect, useCallback, useRef, createContext, useContext } from 'react'
-import { 
-  XMarkIcon, 
-  CheckCircleIcon, 
-  ExclamationCircleIcon, 
-  ExclamationTriangleIcon, 
-  InformationCircleIcon 
-} from '@heroicons/react/24/outline'
-import { XMarkIcon as XMarkIconSolid } from '@heroicons/react/24/solid'
+'use client';
 
-// Types for alert and toast system
-export type AlertType = 'success' | 'error' | 'warning' | 'info'
-export type ToastPosition = 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left' | 'top-center' | 'bottom-center'
+import React, { useCallback, useRef, useEffect, useState, useMemo } from 'react';
+import { useNotifications, useFormNotifications } from '@/hooks/use-notifications';
+import { Alert } from '@/components/ui/alert';
+import { Dialog } from '@/components/ui/dialog';
+import type { 
+  NotificationType, 
+  NotificationConfig,
+  NotificationAction,
+  Notification
+} from '@/types/notification';
 
-export interface AlertProps {
-  type: AlertType
-  title?: string
-  message: string
-  dismissible?: boolean
-  onDismiss?: () => void
-  className?: string
-  children?: React.ReactNode
-  'aria-label'?: string
-  role?: 'alert' | 'status' | 'alertdialog'
-}
+// =============================================================================
+// CONSTANTS AND CONFIGURATION
+// =============================================================================
 
-export interface ToastProps extends Omit<AlertProps, 'className'> {
-  id: string
-  duration?: number
-  position?: ToastPosition
-  persistent?: boolean
-}
+/**
+ * Email template operation types for notification categorization
+ * Maps to specific CRUD operations and validation scenarios
+ */
+export type EmailTemplateOperation = 
+  | 'create'
+  | 'update' 
+  | 'delete'
+  | 'duplicate'
+  | 'validate'
+  | 'save'
+  | 'preview'
+  | 'reset'
+  | 'import'
+  | 'export';
 
-export interface ConfirmDialogProps {
-  isOpen: boolean
-  title: string
-  message: string
-  confirmText?: string
-  cancelText?: string
-  type?: 'danger' | 'warning' | 'info'
-  onConfirm: () => void
-  onCancel: () => void
-  loading?: boolean
-  'aria-labelledby'?: string
-  'aria-describedby'?: string
-}
+/**
+ * Alert severity levels with email template context
+ * Extends base notification types with operation-specific semantics
+ */
+export type EmailTemplateAlertType = NotificationType;
 
-// Toast context for managing toast notifications
-interface ToastContextValue {
-  showToast: (toast: Omit<ToastProps, 'id'>) => string
-  hideToast: (id: string) => void
-  clearAllToasts: () => void
-  toasts: ToastProps[]
-}
+/**
+ * Configuration for email template notification timeouts
+ * Optimized for email template workflow patterns
+ */
+const EMAIL_TEMPLATE_DURATIONS = {
+  success: 4000,      // Success operations - quick acknowledgment
+  error: 8000,        // Error states - longer for reading
+  warning: 6000,      // Warnings - moderate duration
+  info: 5000,         // Information - standard duration
+  validation: 10000,  // Validation errors - longer for correction
+  destructive: -1,    // Destructive confirmations - persistent until action
+} as const;
 
-const ToastContext = createContext<ToastContextValue | null>(null)
-
-// Toast provider component
-export const ToastProvider: React.FC<{ children: React.ReactNode; position?: ToastPosition }> = ({ 
-  children, 
-  position = 'top-right' 
-}) => {
-  const [toasts, setToasts] = useState<ToastProps[]>([])
-  const toastIdCounter = useRef(0)
-
-  const showToast = useCallback((toast: Omit<ToastProps, 'id'>) => {
-    const id = `toast-${++toastIdCounter.current}`
-    const newToast: ToastProps = {
-      ...toast,
-      id,
-      position: toast.position || position,
-      duration: toast.duration ?? 5000,
-      persistent: toast.persistent ?? false
-    }
-
-    setToasts(prev => [...prev, newToast])
-
-    // Auto-dismiss unless persistent
-    if (!newToast.persistent && newToast.duration && newToast.duration > 0) {
-      setTimeout(() => {
-        hideToast(id)
-      }, newToast.duration)
-    }
-
-    return id
-  }, [position])
-
-  const hideToast = useCallback((id: string) => {
-    setToasts(prev => prev.filter(toast => toast.id !== id))
-  }, [])
-
-  const clearAllToasts = useCallback(() => {
-    setToasts([])
-  }, [])
-
-  return (
-    <ToastContext.Provider value={{ showToast, hideToast, clearAllToasts, toasts }}>
-      {children}
-      <ToastContainer toasts={toasts} onDismiss={hideToast} />
-    </ToastContext.Provider>
-  )
-}
-
-// Custom hook for using toast notifications
-export const useToast = () => {
-  const context = useContext(ToastContext)
-  if (!context) {
-    throw new Error('useToast must be used within a ToastProvider')
-  }
-  return context
-}
-
-// Icon mapping for different alert types
-const alertIcons = {
-  success: CheckCircleIcon,
-  error: ExclamationCircleIcon,
-  warning: ExclamationTriangleIcon,
-  info: InformationCircleIcon
-}
-
-// Style mappings for different alert types using Tailwind CSS
-const alertStyles = {
+/**
+ * WCAG 2.1 AA compliant color mappings for different alert types
+ * Ensures proper contrast ratios for accessibility compliance
+ */
+const ALERT_STYLING = {
   success: {
-    container: 'bg-success-50 border-success-200 text-success-800 dark:bg-success-900/20 dark:border-success-700 dark:text-success-100',
-    icon: 'text-success-600 dark:text-success-400',
-    title: 'text-success-800 dark:text-success-100',
-    message: 'text-success-700 dark:text-success-200'
+    containerClass: 'bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-200',
+    iconClass: 'text-green-500 dark:text-green-400',
+    buttonClass: 'text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-200',
+    ariaRole: 'status' as const,
+    ariaLive: 'polite' as const,
   },
   error: {
-    container: 'bg-error-50 border-error-200 text-error-800 dark:bg-error-900/20 dark:border-error-700 dark:text-error-100',
-    icon: 'text-error-600 dark:text-error-400',
-    title: 'text-error-800 dark:text-error-100',
-    message: 'text-error-700 dark:text-error-200'
+    containerClass: 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-200',
+    iconClass: 'text-red-500 dark:text-red-400',
+    buttonClass: 'text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-200',
+    ariaRole: 'alert' as const,
+    ariaLive: 'assertive' as const,
   },
   warning: {
-    container: 'bg-warning-50 border-warning-200 text-warning-800 dark:bg-warning-900/20 dark:border-warning-700 dark:text-warning-100',
-    icon: 'text-warning-600 dark:text-warning-400',
-    title: 'text-warning-800 dark:text-warning-100',
-    message: 'text-warning-700 dark:text-warning-200'
+    containerClass: 'bg-yellow-50 border-yellow-200 text-yellow-800 dark:bg-yellow-900/20 dark:border-yellow-800 dark:text-yellow-200',
+    iconClass: 'text-yellow-500 dark:text-yellow-400',
+    buttonClass: 'text-yellow-600 hover:text-yellow-800 dark:text-yellow-400 dark:hover:text-yellow-200',
+    ariaRole: 'alert' as const,
+    ariaLive: 'polite' as const,
   },
   info: {
-    container: 'bg-primary-50 border-primary-200 text-primary-800 dark:bg-primary-900/20 dark:border-primary-700 dark:text-primary-100',
-    icon: 'text-primary-600 dark:text-primary-400',
-    title: 'text-primary-800 dark:text-primary-100',
-    message: 'text-primary-700 dark:text-primary-200'
-  }
+    containerClass: 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-200',
+    iconClass: 'text-blue-500 dark:text-blue-400',
+    buttonClass: 'text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200',
+    ariaRole: 'status' as const,
+    ariaLive: 'polite' as const,
+  },
+} as const;
+
+/**
+ * Icons for different alert types using Heroicons
+ * Provides visual context for notification content
+ */
+const ALERT_ICONS = {
+  success: (
+    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.236 4.53L7.53 10.36a.75.75 0 00-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
+    </svg>
+  ),
+  error: (
+    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
+    </svg>
+  ),
+  warning: (
+    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+      <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+    </svg>
+  ),
+  info: (
+    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clipRule="evenodd" />
+    </svg>
+  ),
+} as const;
+
+// =============================================================================
+// INTERFACE DEFINITIONS
+// =============================================================================
+
+/**
+ * Configuration interface for email template notifications
+ * Extends base notification config with email template specific options
+ */
+export interface EmailTemplateNotificationConfig extends Partial<NotificationConfig> {
+  /** Email template operation that triggered the notification */
+  operation?: EmailTemplateOperation;
+  
+  /** Template name for contextual messaging */
+  templateName?: string;
+  
+  /** Field name for validation errors */
+  fieldName?: string;
+  
+  /** Whether to include retry action for failed operations */
+  includeRetry?: boolean;
+  
+  /** Custom retry callback function */
+  onRetry?: () => void | Promise<void>;
+  
+  /** Whether to persist notification across navigation */
+  persistAcrossNavigation?: boolean;
 }
 
-// Base Alert component with accessibility features
-export const Alert: React.FC<AlertProps> = React.forwardRef<HTMLDivElement, AlertProps>(({
+/**
+ * Props interface for EmailTemplateToastProvider component
+ */
+export interface EmailTemplateToastProviderProps {
+  children: React.ReactNode;
+  /** Override default toast configuration */
+  config?: {
+    position?: 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left';
+    maxToasts?: number;
+    defaultDuration?: number;
+  };
+}
+
+/**
+ * Props interface for EmailTemplateInlineAlert component
+ */
+export interface EmailTemplateInlineAlertProps {
+  /** Alert type */
+  type: EmailTemplateAlertType;
+  
+  /** Alert title */
+  title?: string;
+  
+  /** Alert message */
+  message: string;
+  
+  /** Whether alert is dismissible */
+  dismissible?: boolean;
+  
+  /** Whether alert is visible */
+  visible?: boolean;
+  
+  /** Callback when alert is dismissed */
+  onDismiss?: () => void;
+  
+  /** Additional CSS classes */
+  className?: string;
+  
+  /** Field name for validation context */
+  fieldName?: string;
+  
+  /** Whether to show field-specific styling */
+  isFieldError?: boolean;
+  
+  /** Custom actions to display */
+  actions?: {
+    label: string;
+    onClick: () => void;
+    variant?: 'primary' | 'secondary' | 'destructive';
+  }[];
+}
+
+/**
+ * Props interface for EmailTemplateConfirmDialog component
+ */
+export interface EmailTemplateConfirmDialogProps {
+  /** Whether dialog is open */
+  open: boolean;
+  
+  /** Dialog title */
+  title: string;
+  
+  /** Dialog description/message */
+  message: string;
+  
+  /** Type of destructive operation */
+  operationType: 'delete' | 'reset' | 'discard' | 'replace';
+  
+  /** Template name for context */
+  templateName?: string;
+  
+  /** Callback when confirmed */
+  onConfirm: () => void | Promise<void>;
+  
+  /** Callback when cancelled */
+  onCancel: () => void;
+  
+  /** Whether confirm action is loading */
+  isLoading?: boolean;
+  
+  /** Custom confirm button text */
+  confirmText?: string;
+  
+  /** Custom cancel button text */
+  cancelText?: string;
+  
+  /** Additional warning message */
+  warningMessage?: string;
+}
+
+// =============================================================================
+// UTILITY FUNCTIONS
+// =============================================================================
+
+/**
+ * Generate contextual notification message based on operation and result
+ * Provides user-friendly messaging for email template operations
+ */
+const generateNotificationMessage = (
+  operation: EmailTemplateOperation,
+  type: EmailTemplateAlertType,
+  templateName?: string,
+  customMessage?: string
+): string => {
+  if (customMessage) return customMessage;
+  
+  const template = templateName ? ` "${templateName}"` : '';
+  
+  const messages: Record<EmailTemplateOperation, Record<EmailTemplateAlertType, string>> = {
+    create: {
+      success: `Email template${template} created successfully`,
+      error: `Failed to create email template${template}`,
+      warning: `Email template${template} created with warnings`,
+      info: `Creating email template${template}...`,
+    },
+    update: {
+      success: `Email template${template} updated successfully`,
+      error: `Failed to update email template${template}`,
+      warning: `Email template${template} updated with warnings`,
+      info: `Updating email template${template}...`,
+    },
+    delete: {
+      success: `Email template${template} deleted successfully`,
+      error: `Failed to delete email template${template}`,
+      warning: `Email template${template} deletion may affect other components`,
+      info: `Deleting email template${template}...`,
+    },
+    duplicate: {
+      success: `Email template${template} duplicated successfully`,
+      error: `Failed to duplicate email template${template}`,
+      warning: `Email template${template} duplicated with modified name`,
+      info: `Duplicating email template${template}...`,
+    },
+    validate: {
+      success: `Email template${template} validation passed`,
+      error: `Email template${template} validation failed`,
+      warning: `Email template${template} has validation warnings`,
+      info: `Validating email template${template}...`,
+    },
+    save: {
+      success: `Email template${template} saved successfully`,
+      error: `Failed to save email template${template}`,
+      warning: `Email template${template} saved with warnings`,
+      info: `Saving email template${template}...`,
+    },
+    preview: {
+      success: `Email template${template} preview generated`,
+      error: `Failed to generate preview for email template${template}`,
+      warning: `Email template${template} preview may not display correctly`,
+      info: `Generating preview for email template${template}...`,
+    },
+    reset: {
+      success: `Email template${template} reset to default values`,
+      error: `Failed to reset email template${template}`,
+      warning: `Email template${template} reset will lose current changes`,
+      info: `Resetting email template${template}...`,
+    },
+    import: {
+      success: `Email template${template} imported successfully`,
+      error: `Failed to import email template${template}`,
+      warning: `Email template${template} imported with compatibility issues`,
+      info: `Importing email template${template}...`,
+    },
+    export: {
+      success: `Email template${template} exported successfully`,
+      error: `Failed to export email template${template}`,
+      warning: `Email template${template} export may be incomplete`,
+      info: `Exporting email template${template}...`,
+    },
+  };
+  
+  return messages[operation]?.[type] || `Operation ${operation} ${type}`;
+};
+
+/**
+ * Generate accessible label for notification based on context
+ * Ensures proper screen reader announcements
+ */
+const generateAccessibleLabel = (
+  type: EmailTemplateAlertType,
+  operation?: EmailTemplateOperation,
+  templateName?: string
+): string => {
+  const typeLabels = {
+    success: 'Success',
+    error: 'Error',
+    warning: 'Warning',
+    info: 'Information',
+  };
+  
+  const operationContext = operation ? ` for ${operation} operation` : '';
+  const templateContext = templateName ? ` on template ${templateName}` : '';
+  
+  return `${typeLabels[type]} notification${operationContext}${templateContext}`;
+};
+
+// =============================================================================
+// TOAST NOTIFICATION PROVIDER
+// =============================================================================
+
+/**
+ * EmailTemplateToastProvider Component
+ * 
+ * Provides toast notification functionality specifically optimized for email template
+ * operations. Integrates with the global notification system while providing
+ * email template specific configuration and messaging.
+ */
+export const EmailTemplateToastProvider: React.FC<EmailTemplateToastProviderProps> = ({
+  children,
+  config = {},
+}) => {
+  const notifications = useNotifications({
+    maxNotifications: config.maxToasts || 3,
+    defaultPosition: config.position || 'bottom-right',
+    defaultDuration: config.defaultDuration || EMAIL_TEMPLATE_DURATIONS.success,
+    groupSimilar: true,
+    animationDuration: 300,
+  });
+
+  /**
+   * Show email template specific notification
+   * Provides enhanced messaging and configuration for email template operations
+   */
+  const showNotification = useCallback((notificationConfig: EmailTemplateNotificationConfig) => {
+    const message = generateNotificationMessage(
+      notificationConfig.operation || 'save',
+      notificationConfig.type || 'info',
+      notificationConfig.templateName,
+      notificationConfig.message
+    );
+
+    const accessibleLabel = generateAccessibleLabel(
+      notificationConfig.type || 'info',
+      notificationConfig.operation,
+      notificationConfig.templateName
+    );
+
+    const actions: NotificationAction[] = [];
+    
+    // Add retry action for failed operations
+    if (notificationConfig.includeRetry && notificationConfig.onRetry) {
+      actions.push({
+        label: 'Retry',
+        onClick: notificationConfig.onRetry,
+        variant: 'primary',
+        dismissOnClick: true,
+      });
+    }
+
+    const duration = notificationConfig.duration || 
+      EMAIL_TEMPLATE_DURATIONS[notificationConfig.type || 'info'] ||
+      EMAIL_TEMPLATE_DURATIONS.info;
+
+    return notifications.notify({
+      type: notificationConfig.type || 'info',
+      title: notificationConfig.title,
+      message,
+      duration,
+      dismissible: notificationConfig.dismissible !== false,
+      announce: true,
+      actions: actions.length > 0 ? actions : undefined,
+      metadata: {
+        operation: notificationConfig.operation,
+        templateName: notificationConfig.templateName,
+        fieldName: notificationConfig.fieldName,
+        accessibleLabel,
+        ...notificationConfig.metadata,
+      },
+      ...notificationConfig,
+    });
+  }, [notifications]);
+
+  /**
+   * Convenience methods for email template operations
+   */
+  const emailTemplateNotifications = useMemo(() => ({
+    ...notifications,
+    
+    // Email template operation notifications
+    showOperationSuccess: (operation: EmailTemplateOperation, templateName?: string, customMessage?: string) => 
+      showNotification({
+        type: 'success',
+        operation,
+        templateName,
+        message: customMessage,
+        duration: EMAIL_TEMPLATE_DURATIONS.success,
+      }),
+    
+    showOperationError: (operation: EmailTemplateOperation, templateName?: string, customMessage?: string, onRetry?: () => void) => 
+      showNotification({
+        type: 'error',
+        operation,
+        templateName,
+        message: customMessage,
+        duration: EMAIL_TEMPLATE_DURATIONS.error,
+        includeRetry: !!onRetry,
+        onRetry,
+      }),
+    
+    showOperationWarning: (operation: EmailTemplateOperation, templateName?: string, customMessage?: string) => 
+      showNotification({
+        type: 'warning',
+        operation,
+        templateName,
+        message: customMessage,
+        duration: EMAIL_TEMPLATE_DURATIONS.warning,
+      }),
+    
+    showOperationInfo: (operation: EmailTemplateOperation, templateName?: string, customMessage?: string) => 
+      showNotification({
+        type: 'info',
+        operation,
+        templateName,
+        message: customMessage,
+        duration: EMAIL_TEMPLATE_DURATIONS.info,
+      }),
+    
+    // Validation specific notifications
+    showValidationError: (fieldName: string, message: string, templateName?: string) => 
+      showNotification({
+        type: 'error',
+        operation: 'validate',
+        templateName,
+        fieldName,
+        message: `${fieldName}: ${message}`,
+        duration: EMAIL_TEMPLATE_DURATIONS.validation,
+      }),
+    
+    // Quick success notification for common operations
+    templateCreated: (templateName: string) => 
+      showNotification({
+        type: 'success',
+        operation: 'create',
+        templateName,
+        duration: EMAIL_TEMPLATE_DURATIONS.success,
+      }),
+    
+    templateUpdated: (templateName: string) => 
+      showNotification({
+        type: 'success',
+        operation: 'update',
+        templateName,
+        duration: EMAIL_TEMPLATE_DURATIONS.success,
+      }),
+    
+    templateDeleted: (templateName: string) => 
+      showNotification({
+        type: 'success',
+        operation: 'delete',
+        templateName,
+        duration: EMAIL_TEMPLATE_DURATIONS.success,
+      }),
+  }), [notifications, showNotification]);
+
+  // Create context value
+  const contextValue = React.useMemo(() => emailTemplateNotifications, [emailTemplateNotifications]);
+
+  return (
+    <EmailTemplateNotificationContext.Provider value={contextValue}>
+      {children}
+    </EmailTemplateNotificationContext.Provider>
+  );
+};
+
+// =============================================================================
+// CONTEXT CREATION
+// =============================================================================
+
+/**
+ * React context for email template notifications
+ * Provides notification methods throughout the email template component tree
+ */
+const EmailTemplateNotificationContext = React.createContext<ReturnType<typeof useNotifications> | null>(null);
+
+/**
+ * Hook to use email template notifications
+ * Provides access to email template specific notification methods
+ */
+export const useEmailTemplateNotifications = () => {
+  const context = React.useContext(EmailTemplateNotificationContext);
+  if (!context) {
+    throw new Error('useEmailTemplateNotifications must be used within EmailTemplateToastProvider');
+  }
+  return context;
+};
+
+// =============================================================================
+// INLINE ALERT COMPONENT
+// =============================================================================
+
+/**
+ * EmailTemplateInlineAlert Component
+ * 
+ * Displays inline alerts for form validation errors and operational feedback.
+ * Optimized for email template forms with proper accessibility and visual hierarchy.
+ */
+export const EmailTemplateInlineAlert: React.FC<EmailTemplateInlineAlertProps> = ({
   type,
   title,
   message,
-  dismissible = false,
+  dismissible = true,
+  visible = true,
   onDismiss,
   className = '',
-  children,
-  'aria-label': ariaLabel,
-  role = 'alert',
-  ...props
-}, ref) => {
-  const IconComponent = alertIcons[type]
-  const styles = alertStyles[type]
-  
-  // Handle keyboard navigation for dismiss button
-  const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
-    if (event.key === 'Escape' && dismissible && onDismiss) {
-      onDismiss()
-    }
-  }, [dismissible, onDismiss])
-
-  return (
-    <div
-      ref={ref}
-      className={`
-        flex items-start p-4 border rounded-lg transition-all duration-300 ease-in-out
-        ${styles.container}
-        ${className}
-      `}
-      role={role}
-      aria-label={ariaLabel || `${type} alert: ${message}`}
-      onKeyDown={handleKeyDown}
-      tabIndex={dismissible ? 0 : -1}
-      {...props}
-    >
-      {/* Alert Icon */}
-      <div className="flex-shrink-0 mr-3">
-        <IconComponent 
-          className={`h-5 w-5 ${styles.icon}`} 
-          aria-hidden="true"
-        />
-      </div>
-
-      {/* Alert Content */}
-      <div className="flex-grow min-w-0">
-        {title && (
-          <h3 className={`text-sm font-semibold mb-1 ${styles.title}`}>
-            {title}
-          </h3>
-        )}
-        <div className={`text-sm ${styles.message}`}>
-          {message}
-        </div>
-        {children && (
-          <div className="mt-2">
-            {children}
-          </div>
-        )}
-      </div>
-
-      {/* Dismiss Button */}
-      {dismissible && (
-        <button
-          type="button"
-          className={`
-            flex-shrink-0 ml-3 p-1 rounded-md transition-colors duration-200
-            ${styles.icon} hover:bg-black/10 dark:hover:bg-white/10
-            focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2
-          `}
-          onClick={onDismiss}
-          aria-label="Dismiss alert"
-        >
-          <XMarkIconSolid className="h-4 w-4" aria-hidden="true" />
-        </button>
-      )}
-    </div>
-  )
-})
-
-Alert.displayName = 'Alert'
-
-// Toast container for positioning and managing toasts
-const ToastContainer: React.FC<{ 
-  toasts: ToastProps[]
-  onDismiss: (id: string) => void 
-}> = ({ toasts, onDismiss }) => {
-  // Group toasts by position
-  const toastsByPosition = toasts.reduce((acc, toast) => {
-    const pos = toast.position || 'top-right'
-    if (!acc[pos]) acc[pos] = []
-    acc[pos].push(toast)
-    return acc
-  }, {} as Record<ToastPosition, ToastProps[]>)
-
-  const positionClasses: Record<ToastPosition, string> = {
-    'top-right': 'top-4 right-4',
-    'top-left': 'top-4 left-4',
-    'bottom-right': 'bottom-4 right-4',
-    'bottom-left': 'bottom-4 left-4',
-    'top-center': 'top-4 left-1/2 transform -translate-x-1/2',
-    'bottom-center': 'bottom-4 left-1/2 transform -translate-x-1/2'
-  }
-
-  return (
-    <>
-      {Object.entries(toastsByPosition).map(([position, positionToasts]) => (
-        <div
-          key={position}
-          className={`fixed z-50 pointer-events-none ${positionClasses[position as ToastPosition]}`}
-          aria-live="polite"
-          aria-label="Toast notifications"
-        >
-          <div className="flex flex-col space-y-2 max-w-sm">
-            {positionToasts.map((toast) => (
-              <Toast
-                key={toast.id}
-                {...toast}
-                onDismiss={() => onDismiss(toast.id)}
-              />
-            ))}
-          </div>
-        </div>
-      ))}
-    </>
-  )
-}
-
-// Individual toast component
-const Toast: React.FC<ToastProps & { onDismiss: () => void }> = ({
-  type,
-  title,
-  message,
-  onDismiss,
-  persistent,
-  children,
-  ...props
+  fieldName,
+  isFieldError = false,
+  actions = [],
 }) => {
-  const [isVisible, setIsVisible] = useState(false)
-  const [isExiting, setIsExiting] = useState(false)
+  const [isVisible, setIsVisible] = useState(visible);
+  const alertRef = useRef<HTMLDivElement>(null);
 
-  // Animation timing
+  // Update visibility when prop changes
   useEffect(() => {
-    // Entry animation
-    const timer = setTimeout(() => setIsVisible(true), 10)
-    return () => clearTimeout(timer)
-  }, [])
+    setIsVisible(visible);
+  }, [visible]);
 
+  // Handle dismiss action
   const handleDismiss = useCallback(() => {
-    setIsExiting(true)
-    // Wait for exit animation before removing
-    setTimeout(() => {
-      onDismiss()
-    }, 300)
-  }, [onDismiss])
+    setIsVisible(false);
+    onDismiss?.();
+  }, [onDismiss]);
+
+  // Focus management for accessibility
+  useEffect(() => {
+    if (isVisible && type === 'error' && alertRef.current) {
+      // Focus error alerts for immediate attention
+      alertRef.current.focus();
+    }
+  }, [isVisible, type]);
+
+  // Don't render if not visible
+  if (!isVisible) return null;
+
+  const styling = ALERT_STYLING[type];
+  const icon = ALERT_ICONS[type];
+  
+  // Generate accessible label
+  const accessibleLabel = generateAccessibleLabel(type, undefined, fieldName);
+  
+  // Combine CSS classes
+  const containerClasses = [
+    'relative p-4 border rounded-lg transition-all duration-200 ease-in-out',
+    styling.containerClass,
+    isFieldError ? 'border-l-4' : '',
+    className,
+  ].filter(Boolean).join(' ');
 
   return (
     <div
-      className={`
-        pointer-events-auto transform transition-all duration-300 ease-in-out
-        ${isVisible && !isExiting ? 'translate-x-0 opacity-100 scale-100' : 'translate-x-full opacity-0 scale-95'}
-      `}
-      role="status"
-      aria-live="polite"
+      ref={alertRef}
+      className={containerClasses}
+      role={styling.ariaRole}
+      aria-live={styling.ariaLive}
+      aria-label={accessibleLabel}
+      tabIndex={type === 'error' ? 0 : -1}
     >
-      <Alert
-        type={type}
-        title={title}
-        message={message}
-        dismissible={true}
-        onDismiss={handleDismiss}
-        className="shadow-lg border-2"
-        {...props}
-      >
-        {children}
-      </Alert>
+      <div className="flex items-start">
+        {/* Icon */}
+        <div className={`flex-shrink-0 ${styling.iconClass}`}>
+          {icon}
+        </div>
+        
+        {/* Content */}
+        <div className="ml-3 flex-1">
+          {title && (
+            <h3 className="text-sm font-medium mb-1">
+              {title}
+            </h3>
+          )}
+          
+          <div className="text-sm">
+            {message}
+          </div>
+          
+          {/* Actions */}
+          {actions.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {actions.map((action, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={action.onClick}
+                  className={`
+                    inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md
+                    transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2
+                    ${action.variant === 'primary' ? `${styling.buttonClass} bg-current/10 hover:bg-current/20` :
+                      action.variant === 'destructive' ? 'text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100' :
+                      `${styling.buttonClass} hover:underline`}
+                  `}
+                  aria-label={`${action.label} for ${accessibleLabel}`}
+                >
+                  {action.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        
+        {/* Dismiss button */}
+        {dismissible && (
+          <div className="ml-auto pl-3">
+            <div className="-mx-1.5 -my-1.5">
+              <button
+                type="button"
+                onClick={handleDismiss}
+                className={`
+                  inline-flex rounded-md p-1.5 focus:outline-none focus:ring-2 focus:ring-offset-2
+                  transition-colors duration-200 ${styling.buttonClass}
+                `}
+                aria-label={`Dismiss ${accessibleLabel}`}
+              >
+                <span className="sr-only">Dismiss</span>
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
-  )
-}
+  );
+};
 
-// Confirmation dialog component with accessibility
-export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
-  isOpen,
+// =============================================================================
+// CONFIRMATION DIALOG COMPONENT
+// =============================================================================
+
+/**
+ * EmailTemplateConfirmDialog Component
+ * 
+ * Displays confirmation dialogs for destructive email template operations.
+ * Provides clear context and proper accessibility for critical user decisions.
+ */
+export const EmailTemplateConfirmDialog: React.FC<EmailTemplateConfirmDialogProps> = ({
+  open,
   title,
   message,
-  confirmText = 'Confirm',
-  cancelText = 'Cancel',
-  type = 'warning',
+  operationType,
+  templateName,
   onConfirm,
   onCancel,
-  loading = false,
-  'aria-labelledby': ariaLabelledby,
-  'aria-describedby': ariaDescribedby
+  isLoading = false,
+  confirmText,
+  cancelText = 'Cancel',
+  warningMessage,
 }) => {
-  const overlayRef = useRef<HTMLDivElement>(null)
-  const dialogRef = useRef<HTMLDivElement>(null)
-  const cancelButtonRef = useRef<HTMLButtonElement>(null)
-  const confirmButtonRef = useRef<HTMLButtonElement>(null)
+  const confirmRef = useRef<HTMLButtonElement>(null);
+
+  // Default confirm text based on operation type
+  const defaultConfirmText = {
+    delete: 'Delete',
+    reset: 'Reset',
+    discard: 'Discard',
+    replace: 'Replace',
+  }[operationType];
+
+  const finalConfirmText = confirmText || defaultConfirmText;
+
+  // Handle confirmation with loading state
+  const handleConfirm = useCallback(async () => {
+    try {
+      await onConfirm();
+    } catch (error) {
+      // Error handling is managed by the parent component
+      console.error('Confirmation action failed:', error);
+    }
+  }, [onConfirm]);
+
+  // Keyboard handling for accessibility
+  const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      onCancel();
+    }
+  }, [onCancel]);
 
   // Focus management
   useEffect(() => {
-    if (isOpen) {
-      // Focus the cancel button by default for safety
+    if (open && confirmRef.current) {
+      // Focus the confirm button when dialog opens
       const timer = setTimeout(() => {
-        cancelButtonRef.current?.focus()
-      }, 100)
-      return () => clearTimeout(timer)
+        confirmRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
     }
-  }, [isOpen])
+  }, [open]);
 
-  // Keyboard handling
-  useEffect(() => {
-    if (!isOpen) return
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onCancel()
-      } else if (event.key === 'Tab') {
-        // Trap focus within dialog
-        const focusableElements = dialogRef.current?.querySelectorAll(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        )
-        
-        if (focusableElements && focusableElements.length > 0) {
-          const firstElement = focusableElements[0] as HTMLElement
-          const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement
-          
-          if (event.shiftKey) {
-            if (document.activeElement === firstElement) {
-              event.preventDefault()
-              lastElement.focus()
-            }
-          } else {
-            if (document.activeElement === lastElement) {
-              event.preventDefault()
-              firstElement.focus()
-            }
-          }
-        }
-      }
-    }
-
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, onCancel])
-
-  // Handle backdrop click
-  const handleOverlayClick = useCallback((event: React.MouseEvent) => {
-    if (event.target === overlayRef.current) {
-      onCancel()
-    }
-  }, [onCancel])
-
-  if (!isOpen) return null
-
-  const typeStyles = {
-    danger: {
-      icon: ExclamationCircleIcon,
-      iconColor: 'text-error-600',
-      confirmButton: 'bg-error-600 hover:bg-error-700 focus:ring-error-500'
-    },
-    warning: {
-      icon: ExclamationTriangleIcon,
-      iconColor: 'text-warning-600',
-      confirmButton: 'bg-warning-600 hover:bg-warning-700 focus:ring-warning-500'
-    },
-    info: {
-      icon: InformationCircleIcon,
-      iconColor: 'text-primary-600',
-      confirmButton: 'bg-primary-600 hover:bg-primary-700 focus:ring-primary-500'
-    }
-  }
-
-  const currentStyle = typeStyles[type]
-  const IconComponent = currentStyle.icon
+  // Icon for destructive operations
+  const warningIcon = (
+    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/20">
+      <svg className="h-6 w-6 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+      </svg>
+    </div>
+  );
 
   return (
-    <div
-      ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-      aria-modal="true"
-      role="alertdialog"
-      aria-labelledby={ariaLabelledby || 'confirm-dialog-title'}
-      aria-describedby={ariaDescribedby || 'confirm-dialog-description'}
-      onClick={handleOverlayClick}
+    <Dialog 
+      open={open} 
+      onClose={onCancel}
+      className="relative z-50"
     >
-      <div
-        ref={dialogRef}
-        className="
-          relative w-full max-w-md mx-auto bg-white dark:bg-gray-800 
-          rounded-lg shadow-xl border border-gray-200 dark:border-gray-700
-          transform transition-all duration-300 ease-out
-          animate-fade-in
-        "
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Dialog Header */}
-        <div className="flex items-start p-6 pb-4">
-          <div className={`flex-shrink-0 w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center mr-4`}>
-            <IconComponent className={`w-6 h-6 ${currentStyle.iconColor}`} aria-hidden="true" />
-          </div>
-          <div className="flex-grow">
-            <h3
-              id={ariaLabelledby || 'confirm-dialog-title'}
-              className="text-lg font-semibold text-gray-900 dark:text-gray-100"
-            >
-              {title}
-            </h3>
-            <p
-              id={ariaDescribedby || 'confirm-dialog-description'}
-              className="mt-2 text-sm text-gray-600 dark:text-gray-300"
-            >
-              {message}
-            </p>
-          </div>
-        </div>
-
-        {/* Dialog Actions */}
-        <div className="flex flex-col-reverse sm:flex-row gap-3 p-6 pt-0">
-          <button
-            ref={cancelButtonRef}
-            type="button"
-            className="
-              w-full sm:w-auto px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300
-              bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600
-              rounded-md shadow-sm hover:bg-gray-50 dark:hover:bg-gray-600
-              focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2
-              disabled:opacity-50 disabled:cursor-not-allowed
-              transition-colors duration-200
-            "
-            onClick={onCancel}
-            disabled={loading}
+      {/* Background overlay */}
+      <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" />
+      
+      {/* Dialog container */}
+      <div className="fixed inset-0 z-10 overflow-y-auto">
+        <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+          <div 
+            className="relative transform overflow-hidden rounded-lg bg-white dark:bg-gray-800 px-4 pt-5 pb-4 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="modal-title"
+            aria-describedby="modal-description"
+            onKeyDown={handleKeyDown}
           >
-            {cancelText}
-          </button>
-          <button
-            ref={confirmButtonRef}
-            type="button"
-            className={`
-              w-full sm:w-auto px-4 py-2 text-sm font-medium text-white
-              rounded-md shadow-sm transition-colors duration-200
-              focus:outline-none focus:ring-2 focus:ring-offset-2
-              disabled:opacity-50 disabled:cursor-not-allowed
-              ${currentStyle.confirmButton}
-              ${loading ? 'cursor-wait' : ''}
-            `}
-            onClick={onConfirm}
-            disabled={loading}
-          >
-            {loading ? (
-              <div className="flex items-center">
-                <svg
-                  className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
+            {/* Content */}
+            <div className="sm:flex sm:items-start">
+              {/* Warning icon */}
+              <div className="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/20 sm:mx-0 sm:h-10 sm:w-10">
+                <svg className="h-6 w-6 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
                 </svg>
-                Loading...
               </div>
-            ) : (
-              confirmText
-            )}
-          </button>
+              
+              {/* Text content */}
+              <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                <h3 
+                  className="text-lg font-medium leading-6 text-gray-900 dark:text-gray-100"
+                  id="modal-title"
+                >
+                  {title}
+                </h3>
+                
+                <div className="mt-2">
+                  <p 
+                    className="text-sm text-gray-500 dark:text-gray-400"
+                    id="modal-description"
+                  >
+                    {message}
+                  </p>
+                  
+                  {templateName && (
+                    <p className="mt-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Template: {templateName}
+                    </p>
+                  )}
+                  
+                  {warningMessage && (
+                    <div className="mt-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
+                      <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                        <strong>Warning:</strong> {warningMessage}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            {/* Actions */}
+            <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
+              {/* Confirm button */}
+              <button
+                ref={confirmRef}
+                type="button"
+                disabled={isLoading}
+                onClick={handleConfirm}
+                className={`
+                  inline-flex w-full justify-center rounded-md border border-transparent px-4 py-2 text-base font-medium text-white shadow-sm 
+                  focus:outline-none focus:ring-2 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm
+                  transition-colors duration-200
+                  ${isLoading 
+                    ? 'bg-gray-400 cursor-not-allowed' 
+                    : 'bg-red-600 hover:bg-red-700 focus:ring-red-500 dark:bg-red-700 dark:hover:bg-red-800'
+                  }
+                `}
+                aria-describedby="modal-description"
+              >
+                {isLoading && (
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                )}
+                {isLoading ? 'Processing...' : finalConfirmText}
+              </button>
+              
+              {/* Cancel button */}
+              <button
+                type="button"
+                disabled={isLoading}
+                onClick={onCancel}
+                className={`
+                  mt-3 inline-flex w-full justify-center rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-2 text-base font-medium text-gray-700 dark:text-gray-300 shadow-sm 
+                  focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:mt-0 sm:w-auto sm:text-sm
+                  transition-colors duration-200
+                  ${isLoading 
+                    ? 'cursor-not-allowed opacity-50' 
+                    : 'hover:bg-gray-50 dark:hover:bg-gray-600'
+                  }
+                `}
+              >
+                {cancelText}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
-  )
-}
+    </Dialog>
+  );
+};
 
-// Email template specific alert components
-export const EmailTemplateToast = {
-  success: (message: string, options?: Partial<ToastProps>) => ({
-    type: 'success' as const,
-    title: 'Email Template Success',
-    message,
-    ...options
-  }),
+// =============================================================================
+// COMPOSITE ALERT MANAGER
+// =============================================================================
+
+/**
+ * EmailTemplateAlertManager Hook
+ * 
+ * Provides a unified interface for managing all types of email template alerts
+ * including toasts, inline alerts, and confirmation dialogs.
+ */
+export const useEmailTemplateAlertManager = () => {
+  const [inlineAlerts, setInlineAlerts] = useState<Map<string, EmailTemplateInlineAlertProps>>(new Map());
+  const [confirmDialog, setConfirmDialog] = useState<EmailTemplateConfirmDialogProps | null>(null);
   
-  error: (message: string, options?: Partial<ToastProps>) => ({
-    type: 'error' as const,
-    title: 'Email Template Error',
-    message,
-    ...options
-  }),
+  // Get toast notifications from context
+  const toastNotifications = useEmailTemplateNotifications();
   
-  warning: (message: string, options?: Partial<ToastProps>) => ({
-    type: 'warning' as const,
-    title: 'Email Template Warning',
-    message,
-    ...options
-  }),
-  
-  info: (message: string, options?: Partial<ToastProps>) => ({
-    type: 'info' as const,
-    title: 'Email Template Info',
-    message,
-    ...options
-  })
-}
-
-// Form validation alert component
-export const FormValidationAlert: React.FC<{
-  errors: string[]
-  visible?: boolean
-  onDismiss?: () => void
-}> = ({ errors, visible = true, onDismiss }) => {
-  if (!visible || errors.length === 0) return null
-
-  return (
-    <Alert
-      type="error"
-      title="Form Validation Errors"
-      message={errors.length === 1 ? errors[0] : `${errors.length} validation errors found`}
-      dismissible={!!onDismiss}
-      onDismiss={onDismiss}
-      className="mb-4"
-    >
-      {errors.length > 1 && (
-        <ul className="mt-2 list-disc list-inside space-y-1">
-          {errors.map((error, index) => (
-            <li key={index} className="text-sm">
-              {error}
-            </li>
-          ))}
-        </ul>
-      )}
-    </Alert>
-  )
-}
-
-// Custom hooks for email template operations
-export const useEmailTemplateAlerts = () => {
-  const { showToast } = useToast()
-  const [confirmDialog, setConfirmDialog] = useState<{
-    isOpen: boolean
-    title: string
-    message: string
-    type: 'danger' | 'warning' | 'info'
-    onConfirm: () => void
-  } | null>(null)
-
-  const showSuccess = useCallback((message: string, options?: Partial<ToastProps>) => {
-    return showToast(EmailTemplateToast.success(message, options))
-  }, [showToast])
-
-  const showError = useCallback((message: string, options?: Partial<ToastProps>) => {
-    return showToast(EmailTemplateToast.error(message, options))
-  }, [showToast])
-
-  const showWarning = useCallback((message: string, options?: Partial<ToastProps>) => {
-    return showToast(EmailTemplateToast.warning(message, options))
-  }, [showToast])
-
-  const showInfo = useCallback((message: string, options?: Partial<ToastProps>) => {
-    return showToast(EmailTemplateToast.info(message, options))
-  }, [showToast])
-
-  const confirmDelete = useCallback((templateName: string, onConfirm: () => void) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Delete Email Template',
-      message: `Are you sure you want to delete the email template "${templateName}"? This action cannot be undone.`,
-      type: 'danger',
-      onConfirm: () => {
-        onConfirm()
-        setConfirmDialog(null)
+  /**
+   * Show inline alert with auto-cleanup
+   */
+  const showInlineAlert = useCallback((id: string, alertProps: Omit<EmailTemplateInlineAlertProps, 'visible' | 'onDismiss'>) => {
+    setInlineAlerts(prev => new Map(prev.set(id, {
+      ...alertProps,
+      visible: true,
+      onDismiss: () => {
+        setInlineAlerts(current => {
+          const updated = new Map(current);
+          updated.delete(id);
+          return updated;
+        });
+      },
+    })));
+    
+    // Auto-dismiss after configured timeout
+    if (alertProps.type !== 'error') {
+      const timeout = EMAIL_TEMPLATE_DURATIONS[alertProps.type] || EMAIL_TEMPLATE_DURATIONS.info;
+      if (timeout > 0) {
+        setTimeout(() => {
+          setInlineAlerts(current => {
+            const updated = new Map(current);
+            updated.delete(id);
+            return updated;
+          });
+        }, timeout);
       }
-    })
-  }, [])
-
-  const confirmReset = useCallback((templateName: string, onConfirm: () => void) => {
+    }
+  }, []);
+  
+  /**
+   * Hide inline alert
+   */
+  const hideInlineAlert = useCallback((id: string) => {
+    setInlineAlerts(prev => {
+      const updated = new Map(prev);
+      updated.delete(id);
+      return updated;
+    });
+  }, []);
+  
+  /**
+   * Show confirmation dialog
+   */
+  const showConfirmDialog = useCallback((dialogProps: Omit<EmailTemplateConfirmDialogProps, 'open' | 'onCancel'>) => {
     setConfirmDialog({
-      isOpen: true,
-      title: 'Reset Email Template',
-      message: `Are you sure you want to reset the email template "${templateName}" to its default values? This will overwrite any custom changes.`,
-      type: 'warning',
-      onConfirm: () => {
-        onConfirm()
-        setConfirmDialog(null)
-      }
-    })
-  }, [])
-
-  const closeConfirmDialog = useCallback(() => {
-    setConfirmDialog(null)
-  }, [])
-
+      ...dialogProps,
+      open: true,
+      onCancel: () => setConfirmDialog(null),
+    });
+  }, []);
+  
+  /**
+   * Hide confirmation dialog
+   */
+  const hideConfirmDialog = useCallback(() => {
+    setConfirmDialog(null);
+  }, []);
+  
+  /**
+   * Clear all alerts
+   */
+  const clearAllAlerts = useCallback(() => {
+    setInlineAlerts(new Map());
+    setConfirmDialog(null);
+    toastNotifications.dismissAll();
+  }, [toastNotifications]);
+  
   return {
-    showSuccess,
-    showError,
-    showWarning,
-    showInfo,
-    confirmDelete,
-    confirmReset,
-    confirmDialog: confirmDialog ? (
-      <ConfirmDialog
-        isOpen={confirmDialog.isOpen}
-        title={confirmDialog.title}
-        message={confirmDialog.message}
-        type={confirmDialog.type}
-        onConfirm={confirmDialog.onConfirm}
-        onCancel={closeConfirmDialog}
-        confirmText={confirmDialog.type === 'danger' ? 'Delete' : 'Reset'}
-      />
-    ) : null
-  }
-}
+    // Toast notifications
+    toasts: toastNotifications,
+    
+    // Inline alerts
+    inlineAlerts: Array.from(inlineAlerts.entries()).map(([id, props]) => ({ id, ...props })),
+    showInlineAlert,
+    hideInlineAlert,
+    
+    // Confirmation dialogs
+    confirmDialog,
+    showConfirmDialog,
+    hideConfirmDialog,
+    
+    // Utility
+    clearAllAlerts,
+  };
+};
 
-// Export default
-export default Alert
+// =============================================================================
+// EXPORT STATEMENTS
+// =============================================================================
+
+export default {
+  EmailTemplateToastProvider,
+  EmailTemplateInlineAlert,
+  EmailTemplateConfirmDialog,
+  useEmailTemplateNotifications,
+  useEmailTemplateAlertManager,
+};
+
+export type {
+  EmailTemplateOperation,
+  EmailTemplateAlertType,
+  EmailTemplateNotificationConfig,
+  EmailTemplateToastProviderProps,
+  EmailTemplateInlineAlertProps,
+  EmailTemplateConfirmDialogProps,
+};
