@@ -1,387 +1,283 @@
 /**
- * File Entities Collection Hook for React/Next.js DreamFactory Admin Interface
+ * React Query-based custom hook for fetching file entity collections.
  * 
- * React Query-based custom hook that fetches file entity collections with intelligent
- * caching and automatic revalidation. Replaces the Angular entitiesResolver by implementing
- * React Query useQuery with TTL configuration for file list operations. Provides type-safe
- * Files response while maintaining the original type-based filtering parameters for different
- * file service types.
+ * Replaces the Angular entitiesResolver by implementing React Query useQuery
+ * with intelligent caching and automatic revalidation for file list operations.
+ * Provides type-safe Files response while maintaining the original type-based 
+ * filtering parameters for different file service types.
  * 
- * Key features:
- * - React Query-powered data fetching with intelligent caching per Section 3.2.2
- * - Cache hit responses under 50ms per React/Next.js Integration Requirements
- * - Automatic background revalidation for real-time file entity updates
- * - Type-based filtering parameters for different file service types
- * - Comprehensive error handling with retry strategies and exponential backoff
- * - TypeScript type safety with Files interface integration
- * 
- * Migration notes:
- * - Transforms Angular ResolveFn entitiesResolver to React Query useQuery hook
- * - Replaces Angular DI BASE_SERVICE_TOKEN injection with React Query-powered API client
- * - Converts RxJS observable pattern to React Query caching with TTL configuration
- * - Converts Angular route data access to hook parameters accepting type string
- * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
- * @feature F-008: File and Log Management
+ * @fileoverview File entities fetching hook with TanStack React Query
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-'use client';
+import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { apiGet } from '../../../lib/api-client';
+import type { Files } from '../../../types/files';
 
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useMemo } from 'react';
-import { apiClient } from '@/lib/api-client';
-import { Files, Service, ServiceType } from '@/types/files';
-
-// =============================================================================
-// TYPE DEFINITIONS AND INTERFACES
-// =============================================================================
+// ============================================================================
+// Type Definitions
+// ============================================================================
 
 /**
- * File entities query parameters for filtering and configuration
+ * Hook configuration options for file entities fetching
  */
-export interface FileEntitiesParams {
-  /** Service type filter (e.g., 'file', 'aws_s3', 'azure_blob', etc.) */
-  type?: string;
-  /** Include inactive services in the response */
-  includeInactive?: boolean;
-  /** Custom query parameters for API request */
-  queryParams?: Record<string, unknown>;
+export interface UseFileEntitiesOptions {
+  /** Enable/disable the query execution */
+  enabled?: boolean;
+  /** Custom stale time override in milliseconds */
+  staleTime?: number;
+  /** Custom cache time override in milliseconds */
+  cacheTime?: number;
+  /** Additional query options for specialized use cases */
+  refetchOnWindowFocus?: boolean;
+  /** Retry configuration for failed requests */
+  retry?: number | boolean;
 }
 
 /**
- * File entities query result with enhanced metadata
+ * Hook parameters for file entities fetching
  */
-export interface FileEntitiesResult {
-  /** Complete files response with services and service types */
-  data: Files | undefined;
-  /** Services filtered by type if specified */
-  services: Service[];
-  /** Available service types for file operations */
-  serviceTypes: ServiceType[];
-  /** Loading state indicator */
-  isLoading: boolean;
-  /** Error state indicator */
-  isError: boolean;
-  /** Error object if request failed */
-  error: Error | null;
-  /** Background fetching indicator */
-  isFetching: boolean;
-  /** Stale data indicator */
-  isStale: boolean;
-  /** Data freshness timestamp */
-  dataUpdatedAt: number;
-  /** Manual refresh function */
-  refresh: () => Promise<void>;
-  /** Clear cache function */
-  clearCache: () => void;
+export interface UseFileEntitiesParams {
+  /** File service type for filtering entities */
+  type: string;
+  /** Additional hook configuration options */
+  options?: UseFileEntitiesOptions;
 }
 
-/**
- * API response structure for file services endpoint
- */
-interface FileServicesResponse {
-  resource: Service[];
-}
+// ============================================================================
+// React Query Configuration Constants
+// ============================================================================
 
 /**
- * API response structure for service types endpoint
+ * Default caching configuration for file entities
+ * Implements React/Next.js Integration Requirements:
+ * - Cache hit responses under 50ms
+ * - Intelligent caching with TTL configuration
  */
-interface ServiceTypesResponse {
-  resource: ServiceType[];
-}
-
-// =============================================================================
-// QUERY KEYS AND CACHING CONFIGURATION
-// =============================================================================
-
-/**
- * Query keys for React Query caching and invalidation
- */
-const QUERY_KEYS = {
-  fileEntities: (params?: FileEntitiesParams) => 
-    ['file-entities', params?.type || 'all', params?.includeInactive || false] as const,
-  fileServices: ['file-services'] as const,
-  serviceTypes: ['service-types'] as const,
-} as const;
-
-/**
- * Cache configuration constants per Section 4.7.1.2 migration requirements
- */
-const CACHE_CONFIG = {
-  /** Stale time: 300 seconds (5 minutes) - data considered fresh */
+const DEFAULT_QUERY_CONFIG = {
+  /** Data considered fresh for 5 minutes (300 seconds) */
   staleTime: 5 * 60 * 1000,
-  /** Cache time: 900 seconds (15 minutes) - data retained in cache */
-  gcTime: 15 * 60 * 1000,
-  /** Maximum retry attempts for failed requests */
+  /** Data cached for 15 minutes (900 seconds) */
+  cacheTime: 15 * 60 * 1000,
+  /** Enable background refetching for real-time updates */
+  refetchOnWindowFocus: true,
+  /** Retry failed requests up to 3 times */
   retry: 3,
-  /** Retry delay with exponential backoff */
-  retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 30000),
+  /** Enable automatic background revalidation */
+  refetchOnMount: true,
 } as const;
 
-// =============================================================================
-// API FETCHING FUNCTIONS
-// =============================================================================
+// ============================================================================
+// Query Key Factory
+// ============================================================================
 
 /**
- * Fetch file services from DreamFactory backend
- * @param includeInactive - Whether to include inactive services
- * @returns Promise resolving to array of file services
+ * Generate consistent query keys for file entities
+ * Ensures proper cache invalidation and data synchronization
  */
-async function fetchFileServices(includeInactive: boolean = false): Promise<Service[]> {
-  try {
-    const queryParams = new URLSearchParams();
-    if (includeInactive) {
-      queryParams.append('include_inactive', 'true');
-    }
-    
-    const url = `/system/service?${queryParams.toString()}`;
-    const response = await apiClient.get<FileServicesResponse>(url);
-    
-    // Filter to only file-type services based on service type groups
-    const fileServices = response.resource?.filter((service: Service) => {
-      // File service types typically include: file, aws_s3, azure_blob, etc.
-      const fileServiceTypes = [
-        'file', 'local_file', 'aws_s3', 'azure_blob', 'azure_file',
-        'aws_s3_glacier', 'rackspace_cloudfiles', 'openstack_object_storage',
-        'google_cloud_storage', 'dropbox', 'ftp', 'sftp', 'webdav'
-      ];
-      return fileServiceTypes.includes(service.type);
-    }) || [];
-    
-    return fileServices;
-  } catch (error) {
-    console.error('[useFileEntities] Failed to fetch file services:', error);
-    throw new Error(`Failed to fetch file services: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
-}
+export const fileEntitiesQueryKeys = {
+  /** Base key for all file entities queries */
+  all: ['file-entities'] as const,
+  /** Key for specific file type entities */
+  byType: (type: string) => [...fileEntitiesQueryKeys.all, 'type', type] as const,
+} as const;
+
+// ============================================================================
+// API Fetcher Function
+// ============================================================================
 
 /**
- * Fetch service types from DreamFactory backend
- * @returns Promise resolving to array of service types
- */
-async function fetchServiceTypes(): Promise<ServiceType[]> {
-  try {
-    const response = await apiClient.get<ServiceTypesResponse>('/system/service_type');
-    
-    // Filter to only file-related service types
-    const fileServiceTypes = response.resource?.filter((serviceType: ServiceType) => {
-      return serviceType.group === 'File' || serviceType.group === 'file';
-    }) || [];
-    
-    return fileServiceTypes;
-  } catch (error) {
-    console.error('[useFileEntities] Failed to fetch service types:', error);
-    throw new Error(`Failed to fetch service types: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
-}
-
-/**
- * Fetch complete file entities data combining services and service types
- * @param params - Query parameters for filtering and configuration
- * @returns Promise resolving to Files object
- */
-async function fetchFileEntities(params: FileEntitiesParams = {}): Promise<Files> {
-  try {
-    // Fetch both services and service types in parallel for optimal performance
-    const [services, serviceTypes] = await Promise.all([
-      fetchFileServices(params.includeInactive),
-      fetchServiceTypes(),
-    ]);
-    
-    // Apply type filtering if specified
-    let filteredServices = services;
-    if (params.type) {
-      filteredServices = services.filter((service: Service) => service.type === params.type);
-    }
-    
-    return {
-      services: filteredServices,
-      serviceTypes,
-    };
-  } catch (error) {
-    console.error('[useFileEntities] Failed to fetch file entities:', error);
-    throw new Error(`Failed to fetch file entities: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
-}
-
-// =============================================================================
-// MAIN HOOK IMPLEMENTATION
-// =============================================================================
-
-/**
- * File entities collection hook with React Query intelligent caching
+ * Fetch file entities from the API
+ * Implements the core API call that replaces Angular's crudService.get(type)
  * 
- * Provides type-safe access to file entity collections with automatic background
- * revalidation and intelligent caching. Replaces Angular entitiesResolver with
- * modern React Query patterns for optimal performance and developer experience.
+ * @param type - File service type for entity filtering
+ * @returns Promise resolving to Files response
+ */
+async function fetchFileEntities(type: string): Promise<Files> {
+  try {
+    // Use the modern API client to fetch file entities
+    // This replaces the Angular DI BASE_SERVICE_TOKEN injection pattern
+    const response = await apiGet<Files>(type, {
+      // Enable cache control headers for optimal performance
+      includeCacheControl: true,
+      // Show loading indicator during fetch
+      showSpinner: true,
+      // Configure success/error notifications
+      snackbarError: 'Failed to load file entities',
+    });
+    
+    return response;
+  } catch (error) {
+    // Enhanced error handling with context information
+    const errorMessage = error instanceof Error 
+      ? error.message 
+      : 'Unknown error occurred while fetching file entities';
+    
+    throw new Error(`File entities fetch failed for type "${type}": ${errorMessage}`);
+  }
+}
+
+// ============================================================================
+// Main Hook Implementation
+// ============================================================================
+
+/**
+ * Custom hook for fetching file entity collections with React Query.
  * 
- * @param params - Optional parameters for filtering and configuration
- * @returns FileEntitiesResult with data, loading states, and control functions
+ * Transforms Angular ResolveFn entitiesResolver to React Query useQuery hook
+ * per Section 4.7.1.2 interceptor to middleware migration architecture.
+ * Replaces Angular DI BASE_SERVICE_TOKEN injection with React Query-powered 
+ * API client per Section 3.2.2 state management architecture.
+ * 
+ * Features:
+ * - Intelligent caching with TTL configuration (staleTime: 300s, cacheTime: 900s)
+ * - Automatic background revalidation for real-time file entity updates
+ * - Type-safe Files response with Services and ServiceTypes
+ * - Performance optimized for cache hit responses under 50ms
+ * 
+ * @param params - Hook parameters containing type and options
+ * @returns React Query result with file entities data, loading, and error states
  * 
  * @example
  * ```typescript
- * // Basic usage - fetch all file entities
- * const { data, services, serviceTypes, isLoading } = useFileEntities();
+ * // Basic usage for file service entities
+ * const { data: fileEntities, isLoading, error } = useFileEntities({
+ *   type: 'files'
+ * });
  * 
- * // Type-filtered usage - fetch only AWS S3 services
- * const { services: s3Services } = useFileEntities({ type: 'aws_s3' });
+ * // With custom options
+ * const { data: logEntities } = useFileEntities({
+ *   type: 'logs',
+ *   options: {
+ *     enabled: true,
+ *     staleTime: 60000, // 1 minute
+ *     retry: 1
+ *   }
+ * });
  * 
- * // Include inactive services
- * const { services: allServices } = useFileEntities({ includeInactive: true });
- * 
- * // Manual refresh
- * const { refresh } = useFileEntities();
- * await refresh();
+ * // Access services and service types
+ * if (fileEntities) {
+ *   console.log('Available services:', fileEntities.services);
+ *   console.log('Service types:', fileEntities.serviceTypes);
+ * }
  * ```
  */
-export function useFileEntities(params: FileEntitiesParams = {}): FileEntitiesResult {
-  const queryClient = useQueryClient();
-  
-  // Memoize query key to prevent unnecessary re-renders
-  const queryKey = useMemo(() => QUERY_KEYS.fileEntities(params), [params]);
-  
-  // Main file entities query with intelligent caching
-  const {
-    data,
-    isLoading,
-    isError,
-    error,
-    isFetching,
-    isStale,
-    dataUpdatedAt,
-  } = useQuery({
-    queryKey,
-    queryFn: () => fetchFileEntities(params),
-    staleTime: CACHE_CONFIG.staleTime,
-    gcTime: CACHE_CONFIG.gcTime,
-    retry: CACHE_CONFIG.retry,
-    retryDelay: CACHE_CONFIG.retryDelay,
-    // Enable background refetching for real-time updates
-    refetchOnWindowFocus: true,
-    refetchOnReconnect: true,
-    // Ensure data is considered stale and refetched appropriately
-    refetchInterval: false, // Disable automatic polling to rely on stale-while-revalidate
-    // Network mode configuration for proper offline handling
-    networkMode: 'online',
-  });
-  
-  // Manual refresh function for forced data updates
-  const refresh = useCallback(async (): Promise<void> => {
-    await queryClient.invalidateQueries({
-      queryKey,
-    });
-  }, [queryClient, queryKey]);
-  
-  // Clear cache function for cleanup operations
-  const clearCache = useCallback((): void => {
-    queryClient.removeQueries({
-      queryKey,
-    });
-  }, [queryClient, queryKey]);
-  
-  // Memoized derived data for performance optimization
-  const derivedData = useMemo(() => {
-    if (!data) {
-      return {
-        services: [],
-        serviceTypes: [],
-      };
-    }
-    
-    return {
-      services: data.services || [],
-      serviceTypes: data.serviceTypes || [],
-    };
-  }, [data]);
-  
-  return {
-    // Core data properties
-    data,
-    services: derivedData.services,
-    serviceTypes: derivedData.serviceTypes,
-    
-    // Loading and error states
-    isLoading,
-    isError,
-    error: error as Error | null,
-    isFetching,
-    isStale,
-    dataUpdatedAt,
-    
-    // Control functions
-    refresh,
-    clearCache,
+export function useFileEntities({
+  type,
+  options = {}
+}: UseFileEntitiesParams): UseQueryResult<Files, Error> {
+  // Merge user options with defaults
+  const queryConfig = {
+    ...DEFAULT_QUERY_CONFIG,
+    ...options,
   };
+  
+  // Execute React Query with intelligent caching
+  return useQuery({
+    // Generate consistent query key for caching
+    queryKey: fileEntitiesQueryKeys.byType(type),
+    
+    // Fetch function with error handling
+    queryFn: () => fetchFileEntities(type),
+    
+    // Enable query only when type is provided and enabled option is true
+    enabled: Boolean(type) && (queryConfig.enabled ?? true),
+    
+    // Caching configuration per React/Next.js Integration Requirements
+    staleTime: queryConfig.staleTime,
+    cacheTime: queryConfig.cacheTime,
+    
+    // Background synchronization for real-time updates
+    refetchOnWindowFocus: queryConfig.refetchOnWindowFocus,
+    refetchOnMount: queryConfig.refetchOnMount,
+    
+    // Error handling configuration
+    retry: queryConfig.retry,
+    
+    // Ensure data consistency and prevent race conditions
+    refetchOnReconnect: true,
+    
+    // Performance optimization: return previous data while refetching
+    keepPreviousData: true,
+    
+    // Data transformation and validation
+    select: (data: Files) => {
+      // Ensure data structure integrity
+      return {
+        services: data.services || [],
+        serviceTypes: data.serviceTypes || [],
+      };
+    },
+    
+    // Error boundary integration
+    useErrorBoundary: (error: Error) => {
+      // Only use error boundary for critical errors
+      return error.message.includes('network') || error.message.includes('authentication');
+    },
+    
+    // Development debugging
+    meta: {
+      entityType: 'file-entities',
+      serviceType: type,
+    },
+  });
 }
 
-// =============================================================================
-// UTILITY FUNCTIONS AND HELPERS
-// =============================================================================
+// ============================================================================
+// Utility Functions
+// ============================================================================
 
 /**
- * Prefetch file entities data for performance optimization
+ * Prefetch file entities for improved performance
+ * Useful for preloading data on route navigation or user interactions
  * 
- * Useful for preloading data before navigation or user interactions.
- * Should be called from components that know file entities will be needed soon.
- * 
- * @param queryClient - React Query client instance
- * @param params - Optional parameters for the prefetch operation
- * @returns Promise that resolves when prefetch is complete
+ * @param queryClient - TanStack Query client instance
+ * @param type - File service type to prefetch
+ * @param options - Optional prefetch configuration
  */
 export async function prefetchFileEntities(
-  queryClient: ReturnType<typeof useQueryClient>,
-  params: FileEntitiesParams = {}
+  queryClient: any, // QueryClient type from @tanstack/react-query
+  type: string,
+  options: UseFileEntitiesOptions = {}
 ): Promise<void> {
-  const queryKey = QUERY_KEYS.fileEntities(params);
+  const queryConfig = {
+    ...DEFAULT_QUERY_CONFIG,
+    ...options,
+  };
   
   await queryClient.prefetchQuery({
-    queryKey,
-    queryFn: () => fetchFileEntities(params),
-    staleTime: CACHE_CONFIG.staleTime,
+    queryKey: fileEntitiesQueryKeys.byType(type),
+    queryFn: () => fetchFileEntities(type),
+    staleTime: queryConfig.staleTime,
+    cacheTime: queryConfig.cacheTime,
   });
 }
 
 /**
- * Get cached file entities data without triggering a fetch
+ * Invalidate file entities cache
+ * Triggers refetch of file entities data when needed
  * 
- * Useful for accessing already-loaded data in components that don't need
- * to trigger loading states.
- * 
- * @param queryClient - React Query client instance
- * @param params - Optional parameters matching the original query
- * @returns Cached Files data or undefined if not in cache
+ * @param queryClient - TanStack Query client instance
+ * @param type - Optional specific type to invalidate, or all if not provided
  */
-export function getCachedFileEntities(
-  queryClient: ReturnType<typeof useQueryClient>,
-  params: FileEntitiesParams = {}
-): Files | undefined {
-  const queryKey = QUERY_KEYS.fileEntities(params);
-  return queryClient.getQueryData<Files>(queryKey);
-}
-
-/**
- * Invalidate all file entities queries
- * 
- * Useful for clearing all file-related cache when global changes occur
- * (e.g., service configuration updates, user permissions changes).
- * 
- * @param queryClient - React Query client instance
- * @returns Promise that resolves when invalidation is complete
- */
-export async function invalidateAllFileEntities(
-  queryClient: ReturnType<typeof useQueryClient>
+export async function invalidateFileEntities(
+  queryClient: any, // QueryClient type from @tanstack/react-query
+  type?: string
 ): Promise<void> {
-  await queryClient.invalidateQueries({
-    queryKey: ['file-entities'],
-  });
+  if (type) {
+    await queryClient.invalidateQueries({
+      queryKey: fileEntitiesQueryKeys.byType(type),
+    });
+  } else {
+    await queryClient.invalidateQueries({
+      queryKey: fileEntitiesQueryKeys.all,
+    });
+  }
 }
 
-// Export types for use throughout the application
-export type {
-  FileEntitiesParams,
-  FileEntitiesResult,
-  Files,
-  Service,
-  ServiceType,
-};
+// ============================================================================
+// Default Export
+// ============================================================================
+
+export default useFileEntities;
