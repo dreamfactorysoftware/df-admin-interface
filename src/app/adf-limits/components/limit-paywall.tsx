@@ -1,571 +1,555 @@
 /**
- * Rate Limit Paywall Component for Premium Feature Access Control
+ * Limit Paywall Component for Premium Feature Access Control
  * 
- * React paywall component that replaces Angular route guard patterns with conditional rendering
- * for premium feature access control in the limits management interface. Implements Next.js 
- * middleware authentication patterns, Headless UI with Tailwind CSS styling, and Zustand
- * state management for subscription status.
+ * React component that replaces Angular route guard patterns with conditional rendering
+ * for premium feature access control in the limits management interface. Implements
+ * enterprise-grade subscription validation with Headless UI components, Tailwind CSS
+ * styling, and Zustand state management for seamless access control integration.
  * 
- * This component provides WCAG 2.1 AA compliant access control with comprehensive error
- * handling, loading states, and seamless integration with the DreamFactory subscription
- * system.
+ * Features:
+ * - Conditional rendering based on subscription status replacing Angular guards
+ * - WCAG 2.1 AA compliant Headless UI components with Tailwind CSS styling
+ * - Integration with Next.js middleware authentication patterns
+ * - Zustand global state management for subscription status
+ * - Premium feature flag management and validation
+ * - Responsive design with mobile-first approach
+ * - Comprehensive error handling and loading states
  * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
- * @since 2024-12-19
+ * @fileoverview Premium paywall component for DreamFactory Admin Interface
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-'use client'
+'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Dialog, Transition } from '@headlessui/react'
-import { Fragment } from 'react'
+import { useEffect, useRef, useState } from 'react';
+import { Dialog, Transition } from '@headlessui/react';
+import { Fragment } from 'react';
+import { ExclamationTriangleIcon, PhoneIcon, EnvelopeIcon } from '@heroicons/react/24/outline';
+import { useAppStore } from '@/stores/app-store';
+import { cn } from '@/lib/utils';
 
-// Type definitions for missing dependencies
-// These will be replaced when the actual files are created
+// ============================================================================
+// Types and Interfaces
+// ============================================================================
+
+/**
+ * Subscription status interface for paywall validation
+ * Simplified interface based on Angular paywall service patterns
+ */
 interface SubscriptionStatus {
-  tier: 'free' | 'premium' | 'enterprise'
-  isActive: boolean
-  features: string[]
-  expiresAt?: string
-  planName: string
-  billingCycle?: 'monthly' | 'yearly'
-  trialEndsAt?: string
-  isTrialActive?: boolean
-}
-
-interface SubscriptionHook {
-  data: SubscriptionStatus | null
-  isLoading: boolean
-  error: Error | null
-  refetch: () => Promise<void>
-  mutate: (data: SubscriptionStatus) => void
-}
-
-interface AppStore {
-  user: {
-    id: number
-    email: string
-    permissions: string[]
-  } | null
-  subscription: SubscriptionStatus | null
-  updateSubscription: (subscription: SubscriptionStatus) => void
-  theme: 'light' | 'dark'
-}
-
-// Mock hooks and stores - these will be replaced with actual implementations
-const useSubscription = (): SubscriptionHook => {
-  const [data, setData] = useState<SubscriptionStatus | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<Error | null>(null)
-
-  useEffect(() => {
-    // Simulate loading subscription data
-    const timer = setTimeout(() => {
-      setData({
-        tier: 'free',
-        isActive: true,
-        features: ['basic_limits'],
-        planName: 'Free Plan',
-        isTrialActive: false
-      })
-      setIsLoading(false)
-    }, 1000)
-
-    return () => clearTimeout(timer)
-  }, [])
-
-  const refetch = useCallback(async () => {
-    setIsLoading(true)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500))
-    setIsLoading(false)
-  }, [])
-
-  const mutate = useCallback((newData: SubscriptionStatus) => {
-    setData(newData)
-  }, [])
-
-  return { data, isLoading, error, refetch, mutate }
-}
-
-const useAppStore = (): AppStore => {
-  const [store] = useState<AppStore>({
-    user: {
-      id: 1,
-      email: 'user@example.com',
-      permissions: ['limits.read']
-    },
-    subscription: null,
-    updateSubscription: () => {},
-    theme: 'light'
-  })
-
-  return store
-}
-
-// UI Components - simplified versions that will be replaced with actual components
-interface CardProps {
-  children: React.ReactNode
-  className?: string
-}
-
-const Card: React.FC<CardProps> = ({ children, className = '' }) => (
-  <div className={`bg-white rounded-lg shadow-md border border-gray-200 ${className}`}>
-    {children}
-  </div>
-)
-
-interface ButtonProps {
-  children: React.ReactNode
-  variant?: 'primary' | 'secondary' | 'outline'
-  size?: 'sm' | 'md' | 'lg'
-  disabled?: boolean
-  loading?: boolean
-  onClick?: () => void
-  className?: string
-  'aria-label'?: string
-  type?: 'button' | 'submit' | 'reset'
-}
-
-const Button: React.FC<ButtonProps> = ({ 
-  children, 
-  variant = 'primary', 
-  size = 'md', 
-  disabled = false,
-  loading = false,
-  onClick,
-  className = '',
-  'aria-label': ariaLabel,
-  type = 'button'
-}) => {
-  const baseClasses = 'inline-flex items-center justify-center font-medium rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2'
+  /** Whether the feature is locked for current subscription */
+  isLocked: boolean;
   
-  const variantClasses = {
-    primary: 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500 disabled:bg-blue-300',
-    secondary: 'bg-gray-600 text-white hover:bg-gray-700 focus:ring-gray-500 disabled:bg-gray-300',
-    outline: 'border border-gray-300 text-gray-700 hover:bg-gray-50 focus:ring-blue-500 disabled:text-gray-400'
-  }
+  /** License type (GOLD, SILVER, OPEN_SOURCE) */
+  licenseType: 'GOLD' | 'SILVER' | 'OPEN_SOURCE';
   
-  const sizeClasses = {
-    sm: 'px-3 py-1.5 text-sm',
-    md: 'px-4 py-2 text-base',
-    lg: 'px-6 py-3 text-lg'
-  }
-
-  return (
-    <button
-      type={type}
-      className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
-      disabled={disabled || loading}
-      onClick={onClick}
-      aria-label={ariaLabel}
-      aria-disabled={disabled || loading}
-    >
-      {loading && (
-        <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-      )}
-      {children}
-    </button>
-  )
+  /** Available resources for current subscription */
+  availableResources: string[];
+  
+  /** Loading state for subscription check */
+  isLoading: boolean;
+  
+  /** Error state for subscription validation */
+  error: string | null;
 }
 
-interface IconProps {
-  name: string
-  className?: string
-  'aria-hidden'?: boolean
+/**
+ * Premium features configuration
+ * Maps features to their subscription requirements
+ */
+interface PremiumFeature {
+  /** Feature identifier */
+  id: string;
+  
+  /** Display name for the feature */
+  name: string;
+  
+  /** Description of the feature benefits */
+  description: string;
+  
+  /** Required license types that unlock this feature */
+  requiredLicense: ('GOLD' | 'SILVER')[];
+  
+  /** Resource names that must be available */
+  requiredResources: string[];
 }
-
-const Icon: React.FC<IconProps> = ({ name, className = '', 'aria-hidden': ariaHidden = true }) => {
-  // Simplified icon component - will be replaced with actual icon library
-  const iconMap: Record<string, string> = {
-    'lock': '🔒',
-    'star': '⭐',
-    'check': '✓',
-    'x': '✕',
-    'arrow-right': '→',
-    'credit-card': '💳',
-    'shield': '🛡️',
-    'zap': '⚡'
-  }
-
-  return (
-    <span 
-      className={`inline-block ${className}`}
-      aria-hidden={ariaHidden}
-      role={ariaHidden ? undefined : 'img'}
-    >
-      {iconMap[name] || '?'}
-    </span>
-  )
-}
-
-// =============================================================================
-// MAIN PAYWALL COMPONENT INTERFACES
-// =============================================================================
 
 /**
  * Props for the LimitPaywall component
  */
-export interface LimitPaywallProps {
-  /** Feature identifier that requires premium access */
-  feature: string
-  /** Child components to render when access is granted */
-  children: React.ReactNode
-  /** Fallback component when access is denied (optional) */
-  fallback?: React.ReactNode
-  /** Whether to show the upgrade modal automatically */
-  showModal?: boolean
-  /** Custom upgrade URL (optional) */
-  upgradeUrl?: string
-  /** Additional CSS classes */
-  className?: string
-  /** Component test ID for testing */
-  'data-testid'?: string
+interface LimitPaywallProps {
+  /** Feature being accessed (defaults to 'limits') */
+  feature?: string;
+  
+  /** Children to render when access is granted */
+  children: React.ReactNode;
+  
+  /** Custom title for the paywall dialog */
+  title?: string;
+  
+  /** Custom description for the paywall */
+  description?: string;
+  
+  /** Whether to show as a modal dialog */
+  showAsModal?: boolean;
+  
+  /** Whether the paywall check is enforced */
+  enforcePaywall?: boolean;
+  
+  /** Custom CSS classes */
+  className?: string;
+  
+  /** Callback when paywall is dismissed */
+  onDismiss?: () => void;
+  
+  /** Callback when access is granted */
+  onAccessGranted?: () => void;
+  
   /** Callback when access is denied */
-  onAccessDenied?: (feature: string) => void
-  /** Callback when user attempts to upgrade */
-  onUpgradeAttempt?: (feature: string, currentPlan: string) => void
+  onAccessDenied?: () => void;
 }
 
-/**
- * Configuration for premium features
- */
-interface PremiumFeatureConfig {
-  id: string
-  name: string
-  description: string
-  icon: string
-  requiredTier: 'premium' | 'enterprise'
-  benefits: string[]
-  unavailableMessage?: string
-}
+// ============================================================================
+// Premium Features Configuration
+// ============================================================================
 
 /**
- * Upgrade plan configuration
+ * Configuration for premium features and their requirements
+ * Based on Angular paywall service feature locks
  */
-interface UpgradePlan {
-  id: string
-  name: string
-  tier: 'premium' | 'enterprise'
-  price: {
-    monthly: number
-    yearly: number
-  }
-  features: string[]
-  popular?: boolean
-  description: string
-}
-
-// =============================================================================
-// PREMIUM FEATURE CONFIGURATIONS
-// =============================================================================
-
-/**
- * Configuration for premium features in the limits system
- */
-const PREMIUM_FEATURES: Record<string, PremiumFeatureConfig> = {
-  'advanced_limits': {
-    id: 'advanced_limits',
+const PREMIUM_FEATURES: Record<string, PremiumFeature> = {
+  'limits': {
+    id: 'limits',
+    name: 'API Rate Limiting',
+    description: 'Protect your APIs with advanced rate limiting controls. Set user-specific, service-specific, and global rate limits to ensure optimal performance and prevent abuse.',
+    requiredLicense: ['GOLD', 'SILVER'],
+    requiredResources: ['limit']
+  },
+  'rate-limiting': {
+    id: 'rate-limiting',
     name: 'Advanced Rate Limiting',
-    description: 'Create sophisticated rate limiting rules with custom algorithms',
-    icon: 'shield',
-    requiredTier: 'premium',
-    benefits: [
-      'Custom rate limiting algorithms',
-      'Per-user and per-role limits',
-      'Advanced counter types (token bucket, leaky bucket)',
-      'Burst allowance configuration',
-      'Real-time monitoring and alerts'
-    ],
-    unavailableMessage: 'Advanced rate limiting features require a Premium subscription'
+    description: 'Enterprise-grade rate limiting with burst controls, custom time windows, and detailed analytics.',
+    requiredLicense: ['GOLD', 'SILVER'],
+    requiredResources: ['limit']
   },
-  'enterprise_limits': {
-    id: 'enterprise_limits',
-    name: 'Enterprise Rate Limiting',
-    description: 'Enterprise-grade rate limiting with advanced analytics',
-    icon: 'zap',
-    requiredTier: 'enterprise',
-    benefits: [
-      'All Premium features',
-      'Multi-tenant rate limiting',
-      'Advanced analytics and reporting',
-      'Custom webhook notifications',
-      'Priority support',
-      'SLA guarantees'
-    ],
-    unavailableMessage: 'Enterprise rate limiting features require an Enterprise subscription'
+  'scheduler': {
+    id: 'scheduler',
+    name: 'Task Scheduler',
+    description: 'Automate your workflows with advanced scheduling capabilities, including cron expressions and event-driven triggers.',
+    requiredLicense: ['GOLD'],
+    requiredResources: ['scheduler']
   },
-  'bulk_operations': {
-    id: 'bulk_operations',
-    name: 'Bulk Limit Operations',
-    description: 'Manage multiple rate limits simultaneously',
-    icon: 'check',
-    requiredTier: 'premium',
-    benefits: [
-      'Bulk create, update, and delete limits',
-      'CSV import/export functionality',
-      'Batch testing and validation',
-      'Mass configuration changes'
-    ],
-    unavailableMessage: 'Bulk operations require a Premium subscription'
+  'reporting': {
+    id: 'reporting',
+    name: 'Advanced Reporting',
+    description: 'Generate comprehensive reports on API usage, performance metrics, and system analytics.',
+    requiredLicense: ['GOLD'],
+    requiredResources: ['reporting']
+  },
+  'event-scripts': {
+    id: 'event-scripts',
+    name: 'Event Scripts',
+    description: 'Create custom business logic with server-side scripts triggered by API events.',
+    requiredLicense: ['GOLD'],
+    requiredResources: ['event-scripts']
   }
-}
+};
+
+// ============================================================================
+// Custom Hooks
+// ============================================================================
 
 /**
- * Available upgrade plans
+ * Hook for subscription status management
+ * Replaces Angular DfPaywallService with React patterns
  */
-const UPGRADE_PLANS: UpgradePlan[] = [
-  {
-    id: 'premium',
-    name: 'Premium',
-    tier: 'premium',
-    price: {
-      monthly: 29,
-      yearly: 299
-    },
-    features: [
-      'Advanced rate limiting algorithms',
-      'Per-user and per-role limits',
-      'Bulk operations',
-      'Real-time monitoring',
-      'Email support'
-    ],
-    popular: true,
-    description: 'Perfect for growing teams and applications'
-  },
-  {
-    id: 'enterprise',
-    name: 'Enterprise',
-    tier: 'enterprise',
-    price: {
-      monthly: 99,
-      yearly: 999
-    },
-    features: [
-      'All Premium features',
-      'Multi-tenant management',
-      'Advanced analytics',
-      'Custom integrations',
-      'Priority support',
-      'SLA guarantees'
-    ],
-    description: 'For large-scale applications and organizations'
-  }
-]
+function useSubscription(feature?: string): SubscriptionStatus {
+  const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus>({
+    isLocked: false,
+    licenseType: 'GOLD',
+    availableResources: [],
+    isLoading: true,
+    error: null
+  });
 
-// =============================================================================
-// PAYWALL COMPONENT IMPLEMENTATION
-// =============================================================================
+  useEffect(() => {
+    // Simulate subscription check - in real implementation this would
+    // call the system config API to get license and resource information
+    const checkSubscription = async () => {
+      try {
+        setSubscriptionStatus(prev => ({ ...prev, isLoading: true, error: null }));
+        
+        // Simulate API call delay
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Mock subscription data - in real implementation this would come from API
+        const mockLicenseType: SubscriptionStatus['licenseType'] = 'OPEN_SOURCE'; // Change to test different scenarios
+        const mockAvailableResources = mockLicenseType === 'GOLD' ? ['limit', 'scheduler', 'reporting', 'event-scripts'] :
+                                      mockLicenseType === 'SILVER' ? ['limit'] : [];
+        
+        // Check if current feature is locked
+        let isLocked = false;
+        if (feature && PREMIUM_FEATURES[feature]) {
+          const featureConfig = PREMIUM_FEATURES[feature];
+          const hasRequiredLicense = featureConfig.requiredLicense.includes(mockLicenseType);
+          const hasRequiredResources = featureConfig.requiredResources.every(
+            resource => mockAvailableResources.includes(resource)
+          );
+          isLocked = !hasRequiredLicense || !hasRequiredResources;
+        }
+        
+        setSubscriptionStatus({
+          isLocked,
+          licenseType: mockLicenseType,
+          availableResources: mockAvailableResources,
+          isLoading: false,
+          error: null
+        });
+      } catch (error) {
+        setSubscriptionStatus(prev => ({
+          ...prev,
+          isLoading: false,
+          error: error instanceof Error ? error.message : 'Failed to check subscription status'
+        }));
+      }
+    };
+
+    checkSubscription();
+  }, [feature]);
+
+  return subscriptionStatus;
+}
+
+// ============================================================================
+// Main Component
+// ============================================================================
 
 /**
  * LimitPaywall Component
  * 
- * Provides conditional access control for premium features in the rate limiting
- * interface. Replaces Angular route guards with React conditional rendering
- * patterns while maintaining security and user experience standards.
+ * Provides premium feature access control with conditional rendering based on
+ * subscription status. Replaces Angular route guard patterns with React
+ * component-level access control using Headless UI and Tailwind CSS.
  */
-export const LimitPaywall: React.FC<LimitPaywallProps> = ({
-  feature,
+export function LimitPaywall({
+  feature = 'limits',
   children,
-  fallback,
-  showModal: initialShowModal = false,
-  upgradeUrl,
-  className = '',
-  'data-testid': testId = 'limit-paywall',
-  onAccessDenied,
-  onUpgradeAttempt
-}) => {
-  // Hooks for subscription data and app state
-  const { data: subscription, isLoading: subscriptionLoading, error: subscriptionError, refetch } = useSubscription()
-  const { user, updateSubscription } = useAppStore()
-
-  // Local state for modal management
-  const [showUpgradeModal, setShowUpgradeModal] = useState(initialShowModal)
-  const [selectedPlan, setSelectedPlan] = useState<UpgradePlan | null>(null)
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
-
+  title,
+  description,
+  showAsModal = false,
+  enforcePaywall = true,
+  className,
+  onDismiss,
+  onAccessGranted,
+  onAccessDenied
+}: LimitPaywallProps) {
+  // ============================================================================
+  // State and Refs
+  // ============================================================================
+  
+  const calendlyWidgetRef = useRef<HTMLDivElement>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [calendlyLoaded, setCalendlyLoaded] = useState(false);
+  
+  // Get app store state for theme and loading
+  const { theme, resolvedTheme, globalLoading } = useAppStore();
+  
+  // Get subscription status
+  const subscription = useSubscription(feature);
+  
   // Get feature configuration
-  const featureConfig = PREMIUM_FEATURES[feature]
-
+  const featureConfig = PREMIUM_FEATURES[feature] || PREMIUM_FEATURES.limits;
+  
+  // ============================================================================
+  // Effects
+  // ============================================================================
+  
   /**
-   * Determine if user has access to the requested feature
+   * Initialize Calendly widget when component mounts and paywall is shown
    */
-  const hasAccess = useMemo(() => {
-    if (!subscription || !featureConfig) return false
-
-    // Check if subscription is active
-    if (!subscription.isActive) return false
-
-    // Check if user has required tier
-    switch (featureConfig.requiredTier) {
-      case 'premium':
-        return subscription.tier === 'premium' || subscription.tier === 'enterprise'
-      case 'enterprise':
-        return subscription.tier === 'enterprise'
-      default:
-        return false
+  useEffect(() => {
+    if (subscription.isLocked && calendlyWidgetRef.current && !calendlyLoaded) {
+      // Load Calendly script if not already loaded
+      if (typeof window !== 'undefined' && !(window as any).Calendly) {
+        const script = document.createElement('script');
+        script.src = 'https://assets.calendly.com/assets/external/widget.js';
+        script.async = true;
+        script.onload = () => {
+          initializeCalendlyWidget();
+        };
+        document.head.appendChild(script);
+      } else if ((window as any).Calendly) {
+        initializeCalendlyWidget();
+      }
     }
-  }, [subscription, featureConfig])
-
+  }, [subscription.isLocked, calendlyLoaded]);
+  
   /**
-   * Handle access denied - show modal and call callback
+   * Call access callbacks based on subscription status
    */
-  const handleAccessDenied = useCallback(() => {
-    setShowUpgradeModal(true)
-    onAccessDenied?.(feature)
-  }, [feature, onAccessDenied])
-
-  /**
-   * Handle upgrade attempt
-   */
-  const handleUpgradeAttempt = useCallback((plan: UpgradePlan) => {
-    setSelectedPlan(plan)
-    onUpgradeAttempt?.(feature, subscription?.planName || 'free')
-
-    if (upgradeUrl) {
-      // Navigate to custom upgrade URL
-      window.open(upgradeUrl, '_blank', 'noopener,noreferrer')
-    } else {
-      // Handle upgrade within the application
-      console.log('Upgrade to plan:', plan.name)
+  useEffect(() => {
+    if (!subscription.isLoading) {
+      if (subscription.isLocked) {
+        onAccessDenied?.();
+        if (showAsModal) {
+          setIsModalOpen(true);
+        }
+      } else {
+        onAccessGranted?.();
+      }
     }
-  }, [feature, subscription?.planName, upgradeUrl, onUpgradeAttempt])
-
+  }, [subscription.isLoading, subscription.isLocked, onAccessGranted, onAccessDenied, showAsModal]);
+  
+  // ============================================================================
+  // Helper Functions
+  // ============================================================================
+  
   /**
-   * Close upgrade modal
+   * Initialize the Calendly inline widget
    */
-  const closeModal = useCallback(() => {
-    setShowUpgradeModal(false)
-    setSelectedPlan(null)
-  }, [])
-
-  /**
-   * Refresh subscription data
-   */
-  const handleRefreshSubscription = useCallback(async () => {
-    try {
-      await refetch()
-    } catch (error) {
-      console.error('Failed to refresh subscription:', error)
+  const initializeCalendlyWidget = () => {
+    if (calendlyWidgetRef.current && (window as any).Calendly && !calendlyLoaded) {
+      (window as any).Calendly.initInlineWidget({
+        url: 'https://calendly.com/dreamfactory-platform/unlock-all-features',
+        parentElement: calendlyWidgetRef.current,
+        prefill: {},
+        utm: {
+          utmSource: 'dreamfactory-admin',
+          utmMedium: 'paywall',
+          utmCampaign: feature
+        }
+      });
+      setCalendlyLoaded(true);
     }
-  }, [refetch])
-
-  // Show loading state while subscription data is loading
-  if (subscriptionLoading) {
+  };
+  
+  /**
+   * Handle modal dismiss
+   */
+  const handleDismiss = () => {
+    setIsModalOpen(false);
+    onDismiss?.();
+  };
+  
+  // ============================================================================
+  // Conditional Rendering Logic
+  // ============================================================================
+  
+  // Show loading state while checking subscription
+  if (subscription.isLoading || globalLoading) {
     return (
-      <div 
-        className={`flex items-center justify-center p-6 ${className}`}
-        data-testid={`${testId}-loading`}
-        role="status"
-        aria-label="Loading subscription information"
-      >
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        <span className="ml-3 text-gray-600">Loading subscription details...</span>
+      <div className={cn(
+        "flex items-center justify-center min-h-[200px] w-full",
+        "bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800",
+        "rounded-lg border border-gray-200 dark:border-gray-700",
+        className
+      )}>
+        <div className="flex flex-col items-center space-y-4 p-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 dark:border-blue-400" />
+          <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">
+            Checking subscription status...
+          </p>
+        </div>
       </div>
-    )
+    );
   }
-
-  // Show error state if subscription loading failed
-  if (subscriptionError) {
+  
+  // Show error state if subscription check failed
+  if (subscription.error) {
     return (
-      <div 
-        className={`bg-red-50 border border-red-200 rounded-md p-4 ${className}`}
-        data-testid={`${testId}-error`}
-        role="alert"
-      >
-        <div className="flex">
-          <Icon name="x" className="text-red-400 mr-2" />
+      <div className={cn(
+        "flex items-center justify-center min-h-[200px] w-full",
+        "bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20",
+        "rounded-lg border border-red-200 dark:border-red-800",
+        className
+      )}>
+        <div className="flex flex-col items-center space-y-4 p-8 text-center">
+          <ExclamationTriangleIcon className="h-8 w-8 text-red-600 dark:text-red-400" />
           <div>
-            <h3 className="text-sm font-medium text-red-800">
+            <p className="text-sm font-medium text-red-800 dark:text-red-200">
               Unable to verify subscription
-            </h3>
-            <p className="mt-1 text-sm text-red-700">
-              There was an error loading your subscription information. Please try again.
             </p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRefreshSubscription}
-              className="mt-2 text-red-700 border-red-300 hover:bg-red-50"
+            <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+              {subscription.error}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  // If paywall is not enforced or feature is not locked, render children
+  if (!enforcePaywall || !subscription.isLocked) {
+    return <>{children}</>;
+  }
+  
+  // ============================================================================
+  // Paywall Content Component
+  // ============================================================================
+  
+  const PaywallContent = () => (
+    <div className={cn(
+      "w-full max-w-4xl mx-auto",
+      "bg-white dark:bg-gray-900",
+      "shadow-xl rounded-lg border border-gray-200 dark:border-gray-700",
+      className
+    )}>
+      {/* Header Section */}
+      <div className="relative px-6 py-8 sm:px-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-t-lg">
+        <div className="text-center">
+          <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2">
+            {title || `Unlock ${featureConfig.name}`}
+          </h2>
+          <p className="text-lg text-blue-100 max-w-2xl mx-auto">
+            {description || 'Upgrade your subscription to access premium features and enhance your API management capabilities'}
+          </p>
+        </div>
+      </div>
+      
+      {/* Feature Details Section */}
+      <div className="px-6 py-8 sm:px-8">
+        <div className="grid md:grid-cols-2 gap-8">
+          {/* Feature Information */}
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
+                About {featureConfig.name}
+              </h3>
+              <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+                {featureConfig.description}
+              </p>
+            </div>
+            
+            <div>
+              <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-3">
+                What you'll gain with an upgrade:
+              </h4>
+              <ul className="space-y-2 text-gray-600 dark:text-gray-300">
+                <li className="flex items-start">
+                  <svg className="w-5 h-5 text-green-500 mt-0.5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  <span>Advanced {featureConfig.name.toLowerCase()} capabilities</span>
+                </li>
+                <li className="flex items-start">
+                  <svg className="w-5 h-5 text-green-500 mt-0.5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  <span>Enhanced performance and reliability</span>
+                </li>
+                <li className="flex items-start">
+                  <svg className="w-5 h-5 text-green-500 mt-0.5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  <span>Priority technical support</span>
+                </li>
+                <li className="flex items-start">
+                  <svg className="w-5 h-5 text-green-500 mt-0.5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  <span>Access to all premium features</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+          
+          {/* Upgrade Options */}
+          <div className="space-y-6">
+            <div>
+              <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                Ready to upgrade? Let's talk!
+              </h4>
+              <p className="text-gray-600 dark:text-gray-300 mb-6">
+                Schedule a consultation with our team to discuss your needs and find the perfect plan for your organization.
+              </p>
+              
+              {/* Calendly Widget Container */}
+              <div 
+                ref={calendlyWidgetRef} 
+                className="calendly-inline-widget bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 min-h-[400px]"
+                data-auto-load="false"
+              />
+            </div>
+          </div>
+        </div>
+        
+        {/* Contact Section */}
+        <div className="mt-12 pt-8 border-t border-gray-200 dark:border-gray-700">
+          <h4 className="text-lg font-medium text-gray-900 dark:text-white text-center mb-6">
+            Prefer to speak with a human?
+          </h4>
+          <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-8">
+            <a 
+              href="tel:+14159935877" 
+              className={cn(
+                "flex items-center space-x-2 px-4 py-2 rounded-lg",
+                "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/30",
+                "border border-blue-200 dark:border-blue-800",
+                "text-blue-700 dark:text-blue-300 hover:text-blue-800 dark:hover:text-blue-200",
+                "transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              )}
+              aria-label="Call DreamFactory sales team"
             >
-              Retry
-            </Button>
+              <PhoneIcon className="w-5 h-5" />
+              <span className="font-medium">+1 (415) 993-5877</span>
+            </a>
+            
+            <a 
+              href="mailto:info@dreamfactory.com" 
+              className={cn(
+                "flex items-center space-x-2 px-4 py-2 rounded-lg",
+                "bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/20 dark:hover:bg-purple-900/30",
+                "border border-purple-200 dark:border-purple-800",
+                "text-purple-700 dark:text-purple-300 hover:text-purple-800 dark:hover:text-purple-200",
+                "transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              )}
+              aria-label="Email DreamFactory sales team"
+            >
+              <EnvelopeIcon className="w-5 h-5" />
+              <span className="font-medium">info@dreamfactory.com</span>
+            </a>
+          </div>
+        </div>
+        
+        {/* Current Subscription Info */}
+        <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-medium text-gray-700 dark:text-gray-300">
+                Current License:
+              </span>
+              <span className={cn(
+                "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
+                subscription.licenseType === 'GOLD' && "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300",
+                subscription.licenseType === 'SILVER' && "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300",
+                subscription.licenseType === 'OPEN_SOURCE' && "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300"
+              )}>
+                {subscription.licenseType.replace('_', ' ')}
+              </span>
+            </div>
+            {subscription.availableResources.length > 0 && (
+              <div className="mt-2">
+                <span className="text-xs text-gray-600 dark:text-gray-400">
+                  Available features: {subscription.availableResources.join(', ')}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>
-    )
-  }
-
-  // Show feature not found error
-  if (!featureConfig) {
+    </div>
+  );
+  
+  // ============================================================================
+  // Render Logic
+  // ============================================================================
+  
+  // Render as modal if requested
+  if (showAsModal) {
     return (
-      <div 
-        className={`bg-yellow-50 border border-yellow-200 rounded-md p-4 ${className}`}
-        data-testid={`${testId}-not-found`}
-        role="alert"
-      >
-        <div className="flex">
-          <Icon name="x" className="text-yellow-400 mr-2" />
-          <div>
-            <h3 className="text-sm font-medium text-yellow-800">
-              Feature not configured
-            </h3>
-            <p className="mt-1 text-sm text-yellow-700">
-              The requested feature "{feature}" is not properly configured.
-            </p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // If user has access, render children
-  if (hasAccess) {
-    return (
-      <div className={className} data-testid={`${testId}-granted`}>
-        {children}
-      </div>
-    )
-  }
-
-  // If user doesn't have access, show fallback or default paywall
-  const paywallContent = fallback || (
-    <Card className="p-6 text-center">
-      <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-yellow-100">
-        <Icon name="lock" className="text-yellow-600 text-2xl" aria-hidden="false" />
-      </div>
-      <h3 className="mt-4 text-lg font-medium text-gray-900">
-        {featureConfig.name}
-      </h3>
-      <p className="mt-2 text-sm text-gray-500">
-        {featureConfig.unavailableMessage || featureConfig.description}
-      </p>
-      <div className="mt-4">
-        <Button
-          variant="primary"
-          onClick={handleAccessDenied}
-          aria-label={`Upgrade to access ${featureConfig.name}`}
-        >
-          <Icon name="star" className="mr-2" />
-          Upgrade to Premium
-        </Button>
-      </div>
-    </Card>
-  )
-
-  return (
-    <>
-      <div className={className} data-testid={`${testId}-denied`}>
-        {paywallContent}
-      </div>
-
-      {/* Upgrade Modal */}
-      <Transition appear show={showUpgradeModal} as={Fragment}>
-        <Dialog as="div" className="relative z-50" onClose={closeModal}>
+      <Transition appear show={isModalOpen} as={Fragment}>
+        <Dialog as="div" className="relative z-50" onClose={handleDismiss}>
           <Transition.Child
             as={Fragment}
             enter="ease-out duration-300"
@@ -575,9 +559,9 @@ export const LimitPaywall: React.FC<LimitPaywallProps> = ({
             leaveFrom="opacity-100"
             leaveTo="opacity-0"
           >
-            <div className="fixed inset-0 bg-black bg-opacity-25" />
+            <div className="fixed inset-0 bg-black bg-opacity-25 backdrop-blur-sm" />
           </Transition.Child>
-
+          
           <div className="fixed inset-0 overflow-y-auto">
             <div className="flex min-h-full items-center justify-center p-4 text-center">
               <Transition.Child
@@ -589,270 +573,55 @@ export const LimitPaywall: React.FC<LimitPaywallProps> = ({
                 leaveFrom="opacity-100 scale-100"
                 leaveTo="opacity-0 scale-95"
               >
-                <Dialog.Panel className="w-full max-w-4xl transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
-                  <Dialog.Title
-                    as="h3"
-                    className="text-2xl font-bold leading-6 text-gray-900 text-center mb-2"
-                  >
-                    Upgrade to Access {featureConfig.name}
-                  </Dialog.Title>
-                  
-                  <Dialog.Description className="text-center text-gray-600 mb-6">
-                    {featureConfig.description}
-                  </Dialog.Description>
-
-                  {/* Benefits Section */}
-                  <div className="mb-8">
-                    <h4 className="text-lg font-semibold text-gray-900 mb-4">
-                      What you'll get:
-                    </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {featureConfig.benefits.map((benefit, index) => (
-                        <div key={index} className="flex items-start">
-                          <Icon name="check" className="text-green-500 mr-3 mt-0.5" />
-                          <span className="text-gray-700">{benefit}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Billing Cycle Toggle */}
-                  <div className="flex justify-center mb-6">
-                    <div className="bg-gray-100 p-1 rounded-lg">
-                      <button
-                        type="button"
-                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                          billingCycle === 'monthly'
-                            ? 'bg-white text-gray-900 shadow'
-                            : 'text-gray-600 hover:text-gray-900'
-                        }`}
-                        onClick={() => setBillingCycle('monthly')}
-                        aria-pressed={billingCycle === 'monthly'}
-                      >
-                        Monthly
-                      </button>
-                      <button
-                        type="button"
-                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                          billingCycle === 'yearly'
-                            ? 'bg-white text-gray-900 shadow'
-                            : 'text-gray-600 hover:text-gray-900'
-                        }`}
-                        onClick={() => setBillingCycle('yearly')}
-                        aria-pressed={billingCycle === 'yearly'}
-                      >
-                        Yearly
-                        <span className="ml-1 text-xs text-green-600 font-bold">Save 17%</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Pricing Plans */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                    {UPGRADE_PLANS
-                      .filter(plan => 
-                        plan.tier === featureConfig.requiredTier || 
-                        (featureConfig.requiredTier === 'premium' && plan.tier === 'enterprise')
-                      )
-                      .map((plan) => (
-                        <div
-                          key={plan.id}
-                          className={`relative border-2 rounded-lg p-6 ${
-                            plan.popular
-                              ? 'border-blue-500 ring-2 ring-blue-500 ring-opacity-20'
-                              : 'border-gray-200'
-                          }`}
-                        >
-                          {plan.popular && (
-                            <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                              <span className="bg-blue-500 text-white px-3 py-1 text-xs font-bold rounded-full">
-                                POPULAR
-                              </span>
-                            </div>
-                          )}
-                          
-                          <div className="text-center">
-                            <h4 className="text-xl font-bold text-gray-900">{plan.name}</h4>
-                            <p className="text-gray-600 mt-1">{plan.description}</p>
-                            
-                            <div className="mt-4">
-                              <span className="text-4xl font-bold text-gray-900">
-                                ${billingCycle === 'monthly' ? plan.price.monthly : plan.price.yearly}
-                              </span>
-                              <span className="text-gray-600">
-                                /{billingCycle === 'monthly' ? 'month' : 'year'}
-                              </span>
-                            </div>
-                            
-                            {billingCycle === 'yearly' && (
-                              <p className="text-sm text-green-600 mt-1">
-                                ${plan.price.monthly * 12 - plan.price.yearly} saved annually
-                              </p>
-                            )}
-                          </div>
-
-                          <ul className="mt-6 space-y-3">
-                            {plan.features.map((feature, index) => (
-                              <li key={index} className="flex items-start">
-                                <Icon name="check" className="text-green-500 mr-3 mt-0.5" />
-                                <span className="text-gray-700 text-sm">{feature}</span>
-                              </li>
-                            ))}
-                          </ul>
-
-                          <Button
-                            variant={plan.popular ? "primary" : "outline"}
-                            className="w-full mt-6"
-                            onClick={() => handleUpgradeAttempt(plan)}
-                            aria-label={`Upgrade to ${plan.name} plan`}
-                          >
-                            <Icon name="credit-card" className="mr-2" />
-                            Choose {plan.name}
-                          </Button>
-                        </div>
-                      ))}
-                  </div>
-
-                  {/* Footer */}
-                  <div className="flex justify-between items-center pt-4 border-t border-gray-200">
-                    <p className="text-sm text-gray-500">
-                      30-day money-back guarantee • Cancel anytime
-                    </p>
-                    <Button
-                      variant="outline"
-                      onClick={closeModal}
-                      aria-label="Close upgrade dialog"
+                <Dialog.Panel className="w-full max-w-4xl transform overflow-hidden rounded-2xl bg-white dark:bg-gray-900 text-left align-middle shadow-xl transition-all">
+                  <div className="absolute top-4 right-4 z-10">
+                    <button
+                      type="button"
+                      className={cn(
+                        "rounded-md p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200",
+                        "focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      )}
+                      onClick={handleDismiss}
+                      aria-label="Close paywall dialog"
                     >
-                      Maybe Later
-                    </Button>
+                      <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
                   </div>
+                  <PaywallContent />
                 </Dialog.Panel>
               </Transition.Child>
             </div>
           </div>
         </Dialog>
       </Transition>
-    </>
-  )
-}
-
-// =============================================================================
-// UTILITY HOOKS FOR PAYWALL INTEGRATION
-// =============================================================================
-
-/**
- * Hook for checking premium feature access
- * 
- * Provides a convenient way to check feature access throughout the application
- * without rendering the full paywall component.
- */
-export const usePremiumFeature = (feature: string) => {
-  const { data: subscription, isLoading, error } = useSubscription()
-  const featureConfig = PREMIUM_FEATURES[feature]
-
-  const hasAccess = useMemo(() => {
-    if (!subscription || !featureConfig) return false
-    if (!subscription.isActive) return false
-
-    switch (featureConfig.requiredTier) {
-      case 'premium':
-        return subscription.tier === 'premium' || subscription.tier === 'enterprise'
-      case 'enterprise':
-        return subscription.tier === 'enterprise'
-      default:
-        return false
-    }
-  }, [subscription, featureConfig])
-
-  return {
-    hasAccess,
-    isLoading,
-    error,
-    featureConfig,
-    subscription
+    );
   }
-}
-
-/**
- * Hook for managing paywall state
- * 
- * Provides centralized state management for paywall interactions
- * and upgrade flows throughout the application.
- */
-export const usePaywallState = () => {
-  const [activeFeature, setActiveFeature] = useState<string | null>(null)
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
-  const { updateSubscription } = useAppStore()
-
-  const openPaywall = useCallback((feature: string) => {
-    setActiveFeature(feature)
-    setShowUpgradeModal(true)
-  }, [])
-
-  const closePaywall = useCallback(() => {
-    setActiveFeature(null)
-    setShowUpgradeModal(false)
-  }, [])
-
-  const handleUpgradeSuccess = useCallback((newSubscription: SubscriptionStatus) => {
-    updateSubscription(newSubscription)
-    closePaywall()
-  }, [updateSubscription, closePaywall])
-
-  return {
-    activeFeature,
-    showUpgradeModal,
-    openPaywall,
-    closePaywall,
-    handleUpgradeSuccess
-  }
-}
-
-// =============================================================================
-// COMPONENT EXPORTS
-// =============================================================================
-
-export default LimitPaywall
-
-/**
- * Pre-configured paywall components for common premium features
- */
-export const AdvancedLimitsPaywall: React.FC<Omit<LimitPaywallProps, 'feature'>> = (props) => (
-  <LimitPaywall {...props} feature="advanced_limits" />
-)
-
-export const EnterpriseLimitsPaywall: React.FC<Omit<LimitPaywallProps, 'feature'>> = (props) => (
-  <LimitPaywall {...props} feature="enterprise_limits" />
-)
-
-export const BulkOperationsPaywall: React.FC<Omit<LimitPaywallProps, 'feature'>> = (props) => (
-  <LimitPaywall {...props} feature="bulk_operations" />
-)
-
-/**
- * HOC for wrapping components with paywall protection
- */
-export const withPaywall = <P extends object>(
-  WrappedComponent: React.ComponentType<P>,
-  feature: string
-) => {
-  const PaywallWrappedComponent: React.FC<P> = (props) => (
-    <LimitPaywall feature={feature}>
-      <WrappedComponent {...props} />
-    </LimitPaywall>
-  )
-
-  PaywallWrappedComponent.displayName = `withPaywall(${WrappedComponent.displayName || WrappedComponent.name})`
   
-  return PaywallWrappedComponent
+  // Render as inline content
+  return (
+    <div className={cn(
+      "flex items-center justify-center min-h-screen w-full",
+      "bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800",
+      "px-4 py-8"
+    )}>
+      <PaywallContent />
+    </div>
+  );
 }
 
+// ============================================================================
+// Export and Default Props
+// ============================================================================
+
 /**
- * Type exports for external use
+ * Default export for the LimitPaywall component
  */
-export type {
-  LimitPaywallProps,
-  SubscriptionStatus,
-  PremiumFeatureConfig,
-  UpgradePlan
-}
+export default LimitPaywall;
+
+/**
+ * Named exports for component parts and utilities
+ */
+export { useSubscription, PREMIUM_FEATURES };
+export type { LimitPaywallProps, SubscriptionStatus, PremiumFeature };
