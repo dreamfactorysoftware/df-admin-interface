@@ -1,1068 +1,633 @@
 /**
- * Rate Limit Options Hook for React/Next.js Admin Interface
+ * Limit Options Hook for DreamFactory React/Next.js Admin Interface
  * 
- * Custom React hook implementing SWR-based data fetching for limit form dropdown
- * options including services, users, and roles with intelligent caching and 
- * conditional loading. Manages the dropdown data sources for limit configuration 
- * forms with cache hit responses under 50ms and automatic revalidation when 
- * related data changes.
+ * Custom React hook implementing SWR-based data fetching for limit form dropdown options
+ * including services, users, and roles with intelligent caching and conditional loading.
  * 
  * Features:
- * - SWR conditional fetching for dropdown options per React/Next.js Integration Requirements
- * - Cache hit responses under 50ms per React/Next.js Integration Requirements  
- * - Automatic revalidation for dropdown data changes per Section 4.3.2 Server State Management
+ * - SWR conditional fetching per React/Next.js Integration Requirements
+ * - Cache hit responses under 50ms per performance standards
+ * - Automatic revalidation for dropdown data changes
  * - Type-safe dropdown data management per Section 5.2 Component Details
  * - Comprehensive dropdown options per existing Angular resolver patterns
- * - Error handling and retry logic per Section 4.2 error handling requirements
- * - Optimistic updates and cache invalidation strategies
+ * - Error handling and retry logic for dropdown data fetching failures
  * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
- * @since 2024-12-19
+ * Replaces Angular ActivatedRoute.data subscriptions with modern React Query patterns,
+ * implementing cascading data fetching with intelligent caching and conditional loading
+ * based on form requirements and user permissions.
+ * 
+ * @fileoverview Limit form dropdown options hook
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-import { useMemo, useCallback } from 'react'
-import useSWR, { mutate } from 'swr'
-import { 
-  LimitType, 
-  LimitFormProps,
-  LIMITS_QUERY_KEYS,
-  type CreateLimitFormData,
-  type EditLimitFormData 
-} from '@/app/adf-limits/types'
-import { apiClient } from '@/lib/api-client'
-import { 
+import { useMemo, useCallback } from 'react';
+import useSWR from 'swr';
+import type { 
   ApiListResponse, 
-  ApiErrorResponse, 
-  ApiRequestOptions,
-  SWRConfig 
-} from '@/types/api'
-import { 
-  UserProfile, 
-  UserRole,
-  userQueryKeys 
-} from '@/types/user'
+  ApiErrorResponse,
+  ApiRequestOptions 
+} from '../../../types/api';
+import type { UserProfile } from '../../../types/user';
+import { apiGet, API_ENDPOINTS } from '../../../lib/api-client';
 
-// =============================================================================
-// DROPDOWN OPTION TYPES
-// =============================================================================
+// ============================================================================
+// Type Definitions for Dropdown Options
+// ============================================================================
 
 /**
- * Service option for dropdown selection
- * Derived from DreamFactory service configuration
+ * Service information for dropdown display
+ * Simplified representation focusing on limit management needs
  */
 export interface ServiceOption {
   /** Unique service identifier */
-  id: number
+  id: number;
   /** Service display name */
-  name: string
-  /** Service type (database, file, email, etc.) */
-  type: string
+  name: string;
+  /** Service type (database, rest, etc.) */
+  type: string;
+  /** Service label for display */
+  label?: string;
   /** Service description */
-  description?: string
-  /** Service is active and available */
-  is_active: boolean
-  /** Service label for dropdown display */
-  label: string
-  /** Service value for form selection */
-  value: number
-  /** Service group for categorization */
-  group?: string
-  /** Database-specific service indicator */
-  isDatabase?: boolean
-  /** API-specific service indicator */
-  isApi?: boolean
+  description?: string;
+  /** Whether service is currently active */
+  is_active: boolean;
+  /** Service configuration URL */
+  config?: string;
 }
 
 /**
- * User option for dropdown selection
- * Based on UserProfile with dropdown-specific formatting
+ * User information for dropdown display
+ * Optimized for limit assignment workflows
  */
 export interface UserOption {
   /** Unique user identifier */
-  id: number
-  /** User display name or constructed name */
-  name: string
+  id: number;
+  /** Username for identification */
+  username: string;
   /** User email address */
-  email: string
-  /** User first name */
-  first_name?: string
-  /** User last name */
-  last_name?: string
-  /** User is active */
-  is_active: boolean
-  /** User is system administrator */
-  is_sys_admin?: boolean
-  /** User label for dropdown display */
-  label: string
-  /** User value for form selection */
-  value: number
-  /** User group for categorization (admin, regular, etc.) */
-  group?: string
+  email: string;
+  /** User display name */
+  display_name?: string;
+  /** Full name combination */
+  name?: string;
+  /** Whether user is currently active */
+  is_active: boolean;
+  /** User's primary role */
+  role?: string;
+  /** Last login date for context */
+  last_login_date?: string;
 }
 
 /**
- * Role option for dropdown selection
- * Based on UserRole with dropdown-specific formatting
+ * Role information for dropdown display
+ * Enhanced for RBAC limit management
  */
 export interface RoleOption {
   /** Unique role identifier */
-  id: number
+  id: number;
   /** Role name */
-  name: string
+  name: string;
   /** Role description */
-  description?: string
-  /** Role is active */
-  is_active: boolean
-  /** Role label for dropdown display */
-  label: string
-  /** Role value for form selection */
-  value: number
-  /** Role group for categorization */
-  group?: string
-  /** Number of users assigned to this role */
-  userCount?: number
+  description?: string;
+  /** Whether role is currently active */
+  is_active: boolean;
+  /** Role creation date */
+  created_date?: string;
+  /** Number of users with this role */
+  user_count?: number;
 }
 
 /**
- * Comprehensive dropdown options data structure
- * Contains all option types with loading and error states
+ * Consolidated dropdown options interface
+ * Provides all required data for limit form dropdowns
  */
 export interface LimitDropdownOptions {
-  /** Service options for service-based limits */
-  services: ServiceOption[]
-  /** User options for user-based limits */
-  users: UserOption[]
-  /** Role options for role-based limits */
-  roles: RoleOption[]
-  /** Loading states for each option type */
-  loading: {
-    services: boolean
-    users: boolean
-    roles: boolean
-    /** Any option type is currently loading */
-    any: boolean
-    /** All option types are currently loading */
-    all: boolean
-  }
-  /** Error states for each option type */
-  errors: {
-    services: ApiErrorResponse | null
-    users: ApiErrorResponse | null
-    roles: ApiErrorResponse | null
-    /** Any option type has an error */
-    hasError: boolean
-  }
-  /** Cache status for performance monitoring */
-  cache: {
-    services: CacheStatus
-    users: CacheStatus
-    roles: CacheStatus
-  }
-  /** Performance metrics for cache hit compliance */
-  performance: PerformanceMetrics
+  /** Available services for service-specific limits */
+  services: ServiceOption[];
+  /** Available users for user-specific limits */
+  users: UserOption[];
+  /** Available roles for role-based limits */
+  roles: RoleOption[];
 }
 
 /**
- * Cache status information for performance monitoring
+ * Loading states for each dropdown type
+ * Enables granular loading UI control
  */
-export interface CacheStatus {
-  /** Data is cached and fresh */
-  isCached: boolean
-  /** Cache hit occurred (data served from cache) */
-  isHit: boolean
-  /** Data is stale but served from cache */
-  isStale: boolean
-  /** Background revalidation is in progress */
-  isValidating: boolean
-  /** Last cache update timestamp */
-  lastUpdated?: Date
-  /** Cache TTL in milliseconds */
-  ttl?: number
+export interface LimitOptionsLoadingState {
+  /** Services data loading state */
+  services: boolean;
+  /** Users data loading state */
+  users: boolean;
+  /** Roles data loading state */
+  roles: boolean;
+  /** Overall loading state (any pending) */
+  isLoading: boolean;
 }
 
 /**
- * Performance metrics for cache compliance monitoring
+ * Error states for each dropdown type
+ * Provides detailed error information for debugging
  */
-export interface PerformanceMetrics {
-  /** Average response time for cache hits in milliseconds */
-  averageCacheHitTime: number
-  /** Maximum response time recorded */
-  maxResponseTime: number
-  /** Cache hit rate percentage (0-100) */
-  cacheHitRate: number
-  /** Number of requests under 50ms threshold */
-  fastRequestCount: number
-  /** Total number of requests made */
-  totalRequestCount: number
-  /** Compliance rate with 50ms requirement */
-  complianceRate: number
-  /** Last performance measurement timestamp */
-  lastMeasurement: Date
+export interface LimitOptionsErrorState {
+  /** Services data error */
+  services: ApiErrorResponse | null;
+  /** Users data error */
+  users: ApiErrorResponse | null;
+  /** Roles data error */
+  roles: ApiErrorResponse | null;
+  /** Whether any errors exist */
+  hasErrors: boolean;
 }
 
-// =============================================================================
-// HOOK CONFIGURATION TYPES
-// =============================================================================
-
 /**
- * Configuration options for the useLimitOptions hook
- * Supports conditional loading and permission-based filtering
+ * Hook configuration options
+ * Controls conditional fetching and caching behavior
  */
 export interface UseLimitOptionsConfig {
-  /** Current form mode affecting which options to load */
-  formMode?: 'create' | 'edit'
-  /** Current limit type to determine required options */
-  limitType?: LimitType
-  /** Enable/disable specific option types based on form state */
-  enabled?: {
-    services?: boolean
-    users?: boolean
-    roles?: boolean
-  }
-  /** Filtering options for dropdown data */
-  filters?: {
-    services?: ServiceFilterOptions
-    users?: UserFilterOptions
-    roles?: RoleFilterOptions
-  }
-  /** Cache configuration overrides */
-  cache?: {
-    staleTime?: number
-    cacheTime?: number
-    revalidateOnFocus?: boolean
-  }
-  /** Performance monitoring configuration */
-  performance?: {
-    enableMetrics?: boolean
-    trackCacheHits?: boolean
-    alertThreshold?: number
-  }
-  /** Error handling configuration */
-  errors?: {
-    retryCount?: number
-    retryDelay?: number
-    showNotifications?: boolean
-  }
+  /** Whether to fetch services data */
+  fetchServices?: boolean;
+  /** Whether to fetch users data */
+  fetchUsers?: boolean;
+  /** Whether to fetch roles data */
+  fetchRoles?: boolean;
+  /** Refresh interval in milliseconds (default: 5 minutes) */
+  refreshInterval?: number;
+  /** Whether to revalidate on focus (default: true) */
+  revalidateOnFocus?: boolean;
+  /** Whether to revalidate on reconnect (default: true) */
+  revalidateOnReconnect?: boolean;
+  /** Enable background revalidation (default: true) */
+  revalidateOnMount?: boolean;
+  /** Custom error retry count (default: 3) */
+  errorRetryCount?: number;
+  /** Custom error retry interval in milliseconds (default: 1000) */
+  errorRetryInterval?: number;
+  /** Dedupe interval for identical requests (default: 2000ms) */
+  dedupingInterval?: number;
 }
 
 /**
- * Service filtering options for dropdown optimization
+ * Hook return type providing all dropdown data and utilities
  */
-export interface ServiceFilterOptions {
-  /** Filter by service type */
-  types?: string[]
-  /** Filter by active status */
-  activeOnly?: boolean
-  /** Filter by database services only */
-  databaseOnly?: boolean
-  /** Filter by API services only */
-  apiOnly?: boolean
-  /** Custom filter function */
-  customFilter?: (service: ServiceOption) => boolean
+export interface UseLimitOptionsReturn {
+  /** Dropdown options data */
+  data: LimitDropdownOptions;
+  /** Loading states */
+  loading: LimitOptionsLoadingState;
+  /** Error states */
+  errors: LimitOptionsErrorState;
+  /** Manual refresh function */
+  refresh: () => Promise<void>;
+  /** Mutate specific data type */
+  mutate: {
+    services: () => Promise<ServiceOption[] | undefined>;
+    users: () => Promise<UserOption[] | undefined>;
+    roles: () => Promise<RoleOption[] | undefined>;
+    all: () => Promise<void>;
+  };
+  /** Validate that required data is loaded */
+  isReady: boolean;
 }
 
-/**
- * User filtering options for dropdown optimization
- */
-export interface UserFilterOptions {
-  /** Filter by active status */
-  activeOnly?: boolean
-  /** Include system administrators */
-  includeSysAdmins?: boolean
-  /** Exclude system administrators */
-  excludeSysAdmins?: boolean
-  /** Filter by user roles */
-  roles?: string[]
-  /** Custom filter function */
-  customFilter?: (user: UserOption) => boolean
-}
+// ============================================================================
+// SWR Fetcher Functions
+// ============================================================================
 
 /**
- * Role filtering options for dropdown optimization
- */
-export interface RoleFilterOptions {
-  /** Filter by active status */
-  activeOnly?: boolean
-  /** Include system roles */
-  includeSystemRoles?: boolean
-  /** Exclude system roles */
-  excludeSystemRoles?: boolean
-  /** Filter by minimum user count */
-  minUserCount?: number
-  /** Custom filter function */
-  customFilter?: (role: RoleOption) => boolean
-}
-
-// =============================================================================
-// SWR CONFIGURATION CONSTANTS
-// =============================================================================
-
-/**
- * Optimized SWR configuration for dropdown options
- * Configured for sub-50ms cache hit responses per requirements
- */
-const DROPDOWN_SWR_CONFIG: SWRConfig = {
-  // Cache optimization for 50ms requirement
-  revalidateOnFocus: false,
-  revalidateOnReconnect: true,
-  revalidateIfStale: true,
-  dedupingInterval: 30000, // 30 seconds deduplication
-  
-  // Performance optimization
-  refreshInterval: 300000, // 5 minutes background refresh
-  loadingTimeout: 10000, // 10 second timeout
-  errorRetryCount: 3,
-  errorRetryInterval: 1000, // 1 second base retry interval
-  
-  // Cache persistence
-  keepPreviousData: true,
-  suspense: false
-}
-
-/**
- * Cache configuration per Section 5.2 Component Details
- * TTL configuration: staleTime: 300 seconds, cacheTime: 900 seconds
- */
-const CACHE_CONFIG = {
-  STALE_TIME: 300000, // 5 minutes
-  CACHE_TIME: 900000, // 15 minutes
-  BACKGROUND_REFETCH_INTERVAL: 300000, // 5 minutes
-  DEDUPING_INTERVAL: 30000 // 30 seconds
-}
-
-// =============================================================================
-// API CLIENT FUNCTIONS
-// =============================================================================
-
-/**
- * Fetch services for dropdown options
- * Optimized for database service filtering per limit requirements
+ * Fetcher function for services data
+ * Optimized for limit management dropdown needs
  */
 const fetchServices = async (): Promise<ServiceOption[]> => {
-  const startTime = performance.now()
-  
+  const options: ApiRequestOptions = {
+    fields: 'id,name,type,label,description,is_active,config',
+    filter: 'is_active=true',
+    sort: 'name',
+    limit: 1000, // Services list is typically small
+    includeCacheControl: true,
+    snackbarError: 'Failed to load services for limit configuration'
+  };
+
   try {
-    const response = await apiClient.get('/system/service', {
-      headers: {
-        'Cache-Control': 'max-age=300', // 5 minute browser cache
-        'X-Request-Type': 'dropdown-options'
-      }
-    }) as ApiListResponse<any>
-    
-    const endTime = performance.now()
-    const responseTime = endTime - startTime
-    
-    // Log performance metrics for monitoring
-    if (typeof window !== 'undefined' && window.performance) {
-      performance.mark('services-fetch-end')
-      performance.measure('services-fetch-time', 'services-fetch-start', 'services-fetch-end')
-    }
-    
-    // Transform service data to dropdown options
-    const services: ServiceOption[] = response.resource.map((service: any) => ({
+    const response = await apiGet<ApiListResponse<ServiceOption>>(
+      `${API_ENDPOINTS.SYSTEM_SERVICE}`,
+      options
+    );
+
+    // Transform response to ensure consistent format
+    return response.resource.map(service => ({
       id: service.id,
       name: service.name,
       type: service.type,
+      label: service.label || service.name,
       description: service.description,
       is_active: service.is_active,
-      label: `${service.name} (${service.type})`,
-      value: service.id,
-      group: service.type,
-      isDatabase: ['mysql', 'postgresql', 'mongodb', 'oracle', 'snowflake', 'sqlite'].includes(service.type?.toLowerCase()),
-      isApi: ['rest', 'soap', 'graphql'].includes(service.type?.toLowerCase())
-    }))
-    
-    return services
+      config: service.config,
+    }));
   } catch (error) {
-    // Enhanced error handling per Section 4.2
-    const enhancedError: ApiErrorResponse = {
-      error: {
-        code: 'SERVICES_FETCH_ERROR',
-        message: error instanceof Error ? error.message : 'Failed to fetch services',
-        status_code: 500,
-        context: 'dropdown-options-services',
-        timestamp: new Date().toISOString()
-      }
-    }
-    
-    throw enhancedError
+    console.error('Failed to fetch services for limits:', error);
+    throw error;
   }
-}
+};
 
 /**
- * Fetch users for dropdown options
- * Includes filtering for active users and permission-based access
+ * Fetcher function for users data
+ * Optimized for limit assignment workflows
  */
 const fetchUsers = async (): Promise<UserOption[]> => {
-  const startTime = performance.now()
-  
+  const options: ApiRequestOptions = {
+    fields: 'id,username,email,display_name,name,is_active,last_login_date',
+    filter: 'is_active=true',
+    sort: 'username',
+    limit: 500, // Reasonable limit for dropdown
+    includeCacheControl: true,
+    snackbarError: 'Failed to load users for limit configuration'
+  };
+
   try {
-    const response = await apiClient.get('/system/user', {
-      headers: {
-        'Cache-Control': 'max-age=300',
-        'X-Request-Type': 'dropdown-options'
-      }
-    }) as ApiListResponse<UserProfile>
-    
-    const endTime = performance.now()
-    const responseTime = endTime - startTime
-    
-    // Performance monitoring
-    if (typeof window !== 'undefined') {
-      performance.mark('users-fetch-end')
-      performance.measure('users-fetch-time', 'users-fetch-start', 'users-fetch-end')
-    }
-    
-    // Transform user data to dropdown options
-    const users: UserOption[] = response.resource.map((user: UserProfile) => {
-      const displayName = user.display_name || 
-                         `${user.first_name || ''} ${user.last_name || ''}`.trim() || 
-                         user.name || 
-                         user.email
-      
-      return {
-        id: user.id,
-        name: displayName,
-        email: user.email,
-        first_name: user.first_name,
-        last_name: user.last_name,
-        is_active: user.is_active,
-        is_sys_admin: user.is_sys_admin,
-        label: `${displayName} (${user.email})`,
-        value: user.id,
-        group: user.is_sys_admin ? 'System Administrators' : 'Users'
-      }
-    })
-    
-    return users
+    const response = await apiGet<ApiListResponse<UserProfile>>(
+      `${API_ENDPOINTS.SYSTEM_USER}`,
+      options
+    );
+
+    // Transform response to consistent format
+    return response.resource.map(user => ({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      display_name: user.display_name,
+      name: user.name || user.display_name || `${user.first_name || ''} ${user.last_name || ''}`.trim(),
+      is_active: user.is_active,
+      role: user.role?.name,
+      last_login_date: user.last_login_date,
+    }));
   } catch (error) {
-    const enhancedError: ApiErrorResponse = {
-      error: {
-        code: 'USERS_FETCH_ERROR',
-        message: error instanceof Error ? error.message : 'Failed to fetch users',
-        status_code: 500,
-        context: 'dropdown-options-users',
-        timestamp: new Date().toISOString()
-      }
-    }
-    
-    throw enhancedError
+    console.error('Failed to fetch users for limits:', error);
+    throw error;
   }
-}
+};
 
 /**
- * Fetch roles for dropdown options
- * Includes role descriptions and user count information
+ * Fetcher function for roles data
+ * Enhanced for RBAC limit management
  */
 const fetchRoles = async (): Promise<RoleOption[]> => {
-  const startTime = performance.now()
-  
+  const options: ApiRequestOptions = {
+    fields: 'id,name,description,is_active,created_date',
+    filter: 'is_active=true',
+    sort: 'name',
+    limit: 100, // Roles list is typically small
+    includeCacheControl: true,
+    snackbarError: 'Failed to load roles for limit configuration'
+  };
+
   try {
-    const response = await apiClient.get('/system/role', {
-      headers: {
-        'Cache-Control': 'max-age=300',
-        'X-Request-Type': 'dropdown-options'
-      }
-    }) as ApiListResponse<UserRole>
-    
-    const endTime = performance.now()
-    const responseTime = endTime - startTime
-    
-    // Performance monitoring
-    if (typeof window !== 'undefined') {
-      performance.mark('roles-fetch-end')
-      performance.measure('roles-fetch-time', 'roles-fetch-start', 'roles-fetch-end')
-    }
-    
-    // Transform role data to dropdown options
-    const roles: RoleOption[] = response.resource.map((role: UserRole) => ({
+    const response = await apiGet<ApiListResponse<RoleOption>>(
+      `${API_ENDPOINTS.SYSTEM_ROLE}`,
+      options
+    );
+
+    // Transform response to ensure consistent format
+    return response.resource.map(role => ({
       id: role.id,
       name: role.name,
       description: role.description,
       is_active: role.is_active,
-      label: role.description ? `${role.name} - ${role.description}` : role.name,
-      value: role.id,
-      group: 'Roles',
-      userCount: 0 // Would be populated from a separate endpoint if needed
-    }))
-    
-    return roles
+      created_date: role.created_date,
+      user_count: 0, // TODO: Add user count if available
+    }));
   } catch (error) {
-    const enhancedError: ApiErrorResponse = {
-      error: {
-        code: 'ROLES_FETCH_ERROR',
-        message: error instanceof Error ? error.message : 'Failed to fetch roles',
-        status_code: 500,
-        context: 'dropdown-options-roles',
-        timestamp: new Date().toISOString()
-      }
-    }
-    
-    throw enhancedError
+    console.error('Failed to fetch roles for limits:', error);
+    throw error;
   }
-}
+};
 
-// =============================================================================
-// PERFORMANCE MONITORING UTILITIES
-// =============================================================================
+// ============================================================================
+// Main Hook Implementation
+// ============================================================================
 
 /**
- * Track cache performance metrics for compliance monitoring
+ * Custom hook for managing limit form dropdown options
+ * 
+ * Implements SWR-based conditional fetching for services, users, and roles
+ * with intelligent caching, automatic revalidation, and comprehensive error handling.
+ * 
+ * Performance Requirements:
+ * - Cache hit responses under 50ms
+ * - Automatic revalidation when related data changes
+ * - Conditional loading based on form requirements
+ * 
+ * @param config - Hook configuration options
+ * @returns Comprehensive dropdown options data and utilities
  */
-const trackPerformanceMetrics = (() => {
-  let metrics: PerformanceMetrics = {
-    averageCacheHitTime: 0,
-    maxResponseTime: 0,
-    cacheHitRate: 0,
-    fastRequestCount: 0,
-    totalRequestCount: 0,
-    complianceRate: 0,
-    lastMeasurement: new Date()
-  }
-  
-  return {
-    record: (responseTime: number, isCacheHit: boolean) => {
-      metrics.totalRequestCount++
-      
-      if (isCacheHit) {
-        metrics.averageCacheHitTime = (
-          (metrics.averageCacheHitTime * (metrics.totalRequestCount - 1)) + responseTime
-        ) / metrics.totalRequestCount
+export function useLimitOptions(config: UseLimitOptionsConfig = {}): UseLimitOptionsReturn {
+  // Extract configuration with defaults
+  const {
+    fetchServices = true,
+    fetchUsers = true,
+    fetchRoles = true,
+    refreshInterval = 5 * 60 * 1000, // 5 minutes
+    revalidateOnFocus = true,
+    revalidateOnReconnect = true,
+    revalidateOnMount = true,
+    errorRetryCount = 3,
+    errorRetryInterval = 1000,
+    dedupingInterval = 2000, // 2 seconds
+  } = config;
+
+  // SWR configuration for optimal performance
+  const swrConfig = useMemo(() => ({
+    refreshInterval,
+    revalidateOnFocus,
+    revalidateOnReconnect,
+    revalidateOnMount,
+    errorRetryCount,
+    errorRetryInterval,
+    dedupingInterval,
+    // Enhanced caching for sub-50ms cache hits
+    focusThrottleInterval: 5000, // 5 seconds
+    shouldRetryOnError: (error: any) => {
+      // Don't retry on 4xx errors (client errors)
+      if (error?.status >= 400 && error?.status < 500) {
+        return false;
       }
-      
-      if (responseTime > metrics.maxResponseTime) {
-        metrics.maxResponseTime = responseTime
-      }
-      
-      if (responseTime < 50) {
-        metrics.fastRequestCount++
-      }
-      
-      metrics.cacheHitRate = (metrics.fastRequestCount / metrics.totalRequestCount) * 100
-      metrics.complianceRate = (metrics.fastRequestCount / metrics.totalRequestCount) * 100
-      metrics.lastMeasurement = new Date()
-      
-      // Alert if compliance rate drops below threshold
-      if (metrics.complianceRate < 90) {
-        console.warn('Cache performance below threshold:', metrics.complianceRate)
-      }
+      return true;
     },
-    
-    get: () => ({ ...metrics }),
-    
-    reset: () => {
-      metrics = {
-        averageCacheHitTime: 0,
-        maxResponseTime: 0,
-        cacheHitRate: 0,
-        fastRequestCount: 0,
-        totalRequestCount: 0,
-        complianceRate: 0,
-        lastMeasurement: new Date()
-      }
-    }
-  }
-})()
+  }), [
+    refreshInterval,
+    revalidateOnFocus,
+    revalidateOnReconnect,
+    revalidateOnMount,
+    errorRetryCount,
+    errorRetryInterval,
+    dedupingInterval,
+  ]);
 
-// =============================================================================
-// MAIN HOOK IMPLEMENTATION
-// =============================================================================
-
-/**
- * Custom React hook for managing limit form dropdown options
- * 
- * Implements SWR-based conditional fetching with intelligent caching,
- * automatic revalidation, and performance monitoring per technical requirements.
- * 
- * @param config Configuration options for conditional loading and filtering
- * @returns Comprehensive dropdown options with loading states and cache metrics
- */
-export function useLimitOptions(config: UseLimitOptionsConfig = {}): LimitDropdownOptions {
+  // Services data fetching with conditional loading
   const {
-    formMode = 'create',
-    limitType,
-    enabled = {},
-    filters = {},
-    cache: cacheConfig = {},
-    performance: performanceConfig = { enableMetrics: true },
-    errors: errorConfig = { retryCount: 3, retryDelay: 1000 }
-  } = config
-  
-  // =============================================================================
-  // CONDITIONAL LOADING LOGIC
-  // =============================================================================
-  
-  /**
-   * Determine which option types should be loaded based on form state
-   * Implements conditional SWR hooks per React/Next.js Integration Requirements
-   */
-  const shouldLoadOptions = useMemo(() => {
-    const baseEnabled = {
-      services: enabled.services !== false,
-      users: enabled.users !== false,
-      roles: enabled.roles !== false
-    }
-    
-    // Conditional loading based on limit type per Section 4.3.2
-    if (limitType) {
-      switch (limitType) {
-        case LimitType.SERVICE:
-          return { ...baseEnabled, services: true, users: false, roles: false }
-        case LimitType.USER:
-          return { ...baseEnabled, services: false, users: true, roles: false }
-        case LimitType.ROLE:
-          return { ...baseEnabled, services: false, users: false, roles: true }
-        case LimitType.GLOBAL:
-        case LimitType.IP:
-          return { ...baseEnabled, services: false, users: false, roles: false }
-        case LimitType.ENDPOINT:
-          return { ...baseEnabled, services: true, users: false, roles: false }
-        default:
-          return baseEnabled
-      }
-    }
-    
-    return baseEnabled
-  }, [limitType, enabled])
-  
-  // =============================================================================
-  // SWR DATA FETCHING WITH INTELLIGENT CACHING
-  // =============================================================================
-  
-  /**
-   * Services data fetching with conditional loading
-   * Cache configuration per Section 5.2 Component Details
-   */
-  const {
-    data: services,
+    data: servicesData,
     error: servicesError,
-    isValidating: servicesValidating,
-    mutate: mutateServices
-  } = useSWR(
-    shouldLoadOptions.services ? 'dropdown-services' : null,
-    fetchServices,
-    {
-      ...DROPDOWN_SWR_CONFIG,
-      revalidateOnFocus: cacheConfig.revalidateOnFocus ?? false,
-      onSuccess: (data) => {
-        if (performanceConfig.enableMetrics) {
-          trackPerformanceMetrics.record(performance.now(), true)
-        }
-      },
-      onError: (error) => {
-        console.error('Services fetch error:', error)
-      }
-    }
-  )
-  
-  /**
-   * Users data fetching with conditional loading
-   * Implements user permission-based access control
-   */
+    isLoading: servicesLoading,
+    mutate: mutateServices,
+  } = useSWR<ServiceOption[], ApiErrorResponse>(
+    fetchServices ? 'limit-options-services' : null,
+    fetchServices ? fetchServices : null,
+    swrConfig
+  );
+
+  // Users data fetching with conditional loading
   const {
-    data: users,
+    data: usersData,
     error: usersError,
-    isValidating: usersValidating,
-    mutate: mutateUsers
-  } = useSWR(
-    shouldLoadOptions.users ? 'dropdown-users' : null,
-    fetchUsers,
-    {
-      ...DROPDOWN_SWR_CONFIG,
-      revalidateOnFocus: cacheConfig.revalidateOnFocus ?? false,
-      onSuccess: (data) => {
-        if (performanceConfig.enableMetrics) {
-          trackPerformanceMetrics.record(performance.now(), true)
-        }
-      },
-      onError: (error) => {
-        console.error('Users fetch error:', error)
-      }
-    }
-  )
-  
-  /**
-   * Roles data fetching with conditional loading
-   * Supports role-based limit configuration
-   */
+    isLoading: usersLoading,
+    mutate: mutateUsers,
+  } = useSWR<UserOption[], ApiErrorResponse>(
+    fetchUsers ? 'limit-options-users' : null,
+    fetchUsers ? fetchUsers : null,
+    swrConfig
+  );
+
+  // Roles data fetching with conditional loading
   const {
-    data: roles,
+    data: rolesData,
     error: rolesError,
-    isValidating: rolesValidating,
-    mutate: mutateRoles
-  } = useSWR(
-    shouldLoadOptions.roles ? 'dropdown-roles' : null,
-    fetchRoles,
-    {
-      ...DROPDOWN_SWR_CONFIG,
-      revalidateOnFocus: cacheConfig.revalidateOnFocus ?? false,
-      onSuccess: (data) => {
-        if (performanceConfig.enableMetrics) {
-          trackPerformanceMetrics.record(performance.now(), true)
-        }
-      },
-      onError: (error) => {
-        console.error('Roles fetch error:', error)
-      }
+    isLoading: rolesLoading,
+    mutate: mutateRoles,
+  } = useSWR<RoleOption[], ApiErrorResponse>(
+    fetchRoles ? 'limit-options-roles' : null,
+    fetchRoles ? fetchRoles : null,
+    swrConfig
+  );
+
+  // Consolidate dropdown options data
+  const data: LimitDropdownOptions = useMemo(() => ({
+    services: servicesData || [],
+    users: usersData || [],
+    roles: rolesData || [],
+  }), [servicesData, usersData, rolesData]);
+
+  // Consolidate loading states
+  const loading: LimitOptionsLoadingState = useMemo(() => {
+    const activeLoadingStates = [
+      fetchServices && servicesLoading,
+      fetchUsers && usersLoading,
+      fetchRoles && rolesLoading,
+    ].filter(Boolean);
+
+    return {
+      services: servicesLoading || false,
+      users: usersLoading || false,
+      roles: rolesLoading || false,
+      isLoading: activeLoadingStates.length > 0,
+    };
+  }, [
+    fetchServices, servicesLoading,
+    fetchUsers, usersLoading,
+    fetchRoles, rolesLoading,
+  ]);
+
+  // Consolidate error states
+  const errors: LimitOptionsErrorState = useMemo(() => {
+    const hasErrors = !!(servicesError || usersError || rolesError);
+
+    return {
+      services: servicesError || null,
+      users: usersError || null,
+      roles: rolesError || null,
+      hasErrors,
+    };
+  }, [servicesError, usersError, rolesError]);
+
+  // Manual refresh function for all enabled data sources
+  const refresh = useCallback(async (): Promise<void> => {
+    const refreshPromises: Promise<any>[] = [];
+
+    if (fetchServices) {
+      refreshPromises.push(mutateServices());
     }
-  )
-  
-  // =============================================================================
-  // DATA FILTERING AND TRANSFORMATION
-  // =============================================================================
-  
-  /**
-   * Apply filters to services data
-   * Supports database-only filtering for database services
-   */
-  const filteredServices = useMemo(() => {
-    if (!services) return []
-    
-    let filtered = services
-    
-    const serviceFilters = filters.services
-    if (serviceFilters) {
-      if (serviceFilters.activeOnly) {
-        filtered = filtered.filter(service => service.is_active)
-      }
-      
-      if (serviceFilters.types?.length) {
-        filtered = filtered.filter(service => serviceFilters.types!.includes(service.type))
-      }
-      
-      if (serviceFilters.databaseOnly) {
-        filtered = filtered.filter(service => service.isDatabase)
-      }
-      
-      if (serviceFilters.apiOnly) {
-        filtered = filtered.filter(service => service.isApi)
-      }
-      
-      if (serviceFilters.customFilter) {
-        filtered = filtered.filter(serviceFilters.customFilter)
-      }
+    if (fetchUsers) {
+      refreshPromises.push(mutateUsers());
     }
-    
-    return filtered.sort((a, b) => a.label.localeCompare(b.label))
-  }, [services, filters.services])
-  
-  /**
-   * Apply filters to users data
-   * Supports admin inclusion/exclusion and role filtering
-   */
-  const filteredUsers = useMemo(() => {
-    if (!users) return []
-    
-    let filtered = users
-    
-    const userFilters = filters.users
-    if (userFilters) {
-      if (userFilters.activeOnly) {
-        filtered = filtered.filter(user => user.is_active)
-      }
-      
-      if (userFilters.excludeSysAdmins) {
-        filtered = filtered.filter(user => !user.is_sys_admin)
-      }
-      
-      if (userFilters.includeSysAdmins === false) {
-        filtered = filtered.filter(user => !user.is_sys_admin)
-      }
-      
-      if (userFilters.customFilter) {
-        filtered = filtered.filter(userFilters.customFilter)
-      }
+    if (fetchRoles) {
+      refreshPromises.push(mutateRoles());
     }
-    
-    return filtered.sort((a, b) => a.label.localeCompare(b.label))
-  }, [users, filters.users])
-  
-  /**
-   * Apply filters to roles data
-   * Supports system role filtering and user count thresholds
-   */
-  const filteredRoles = useMemo(() => {
-    if (!roles) return []
-    
-    let filtered = roles
-    
-    const roleFilters = filters.roles
-    if (roleFilters) {
-      if (roleFilters.activeOnly) {
-        filtered = filtered.filter(role => role.is_active)
-      }
-      
-      if (roleFilters.minUserCount !== undefined) {
-        filtered = filtered.filter(role => (role.userCount || 0) >= roleFilters.minUserCount!)
-      }
-      
-      if (roleFilters.customFilter) {
-        filtered = filtered.filter(roleFilters.customFilter)
-      }
+
+    try {
+      await Promise.all(refreshPromises);
+    } catch (error) {
+      console.error('Failed to refresh limit options:', error);
+      throw error;
     }
-    
-    return filtered.sort((a, b) => a.label.localeCompare(b.label))
-  }, [roles, filters.roles])
-  
-  // =============================================================================
-  // CACHE STATUS AND PERFORMANCE MONITORING
-  // =============================================================================
-  
-  /**
-   * Generate cache status information for performance monitoring
-   */
-  const cacheStatus = useMemo(() => ({
-    services: {
-      isCached: !!services,
-      isHit: !!services && !servicesValidating,
-      isStale: false, // SWR handles stale detection internally
-      isValidating: servicesValidating,
-      lastUpdated: services ? new Date() : undefined,
-      ttl: CACHE_CONFIG.STALE_TIME
-    } as CacheStatus,
-    users: {
-      isCached: !!users,
-      isHit: !!users && !usersValidating,
-      isStale: false,
-      isValidating: usersValidating,
-      lastUpdated: users ? new Date() : undefined,
-      ttl: CACHE_CONFIG.STALE_TIME
-    } as CacheStatus,
-    roles: {
-      isCached: !!roles,
-      isHit: !!roles && !rolesValidating,
-      isStale: false,
-      isValidating: rolesValidating,
-      lastUpdated: roles ? new Date() : undefined,
-      ttl: CACHE_CONFIG.STALE_TIME
-    } as CacheStatus
-  }), [services, users, roles, servicesValidating, usersValidating, rolesValidating])
-  
-  /**
-   * Calculate loading states with granular control
-   */
-  const loadingStates = useMemo(() => ({
-    services: servicesValidating && !services,
-    users: usersValidating && !users,
-    roles: rolesValidating && !roles,
-    any: (servicesValidating && !services) || (usersValidating && !users) || (rolesValidating && !roles),
-    all: (servicesValidating && !services) && (usersValidating && !users) && (rolesValidating && !roles)
-  }), [services, users, roles, servicesValidating, usersValidating, rolesValidating])
-  
-  /**
-   * Aggregate error states with enhanced error information
-   */
-  const errorStates = useMemo(() => ({
-    services: servicesError || null,
-    users: usersError || null,
-    roles: rolesError || null,
-    hasError: !!(servicesError || usersError || rolesError)
-  }), [servicesError, usersError, rolesError])
-  
-  // =============================================================================
-  // CACHE INVALIDATION AND REVALIDATION
-  // =============================================================================
-  
-  /**
-   * Invalidate specific option type cache
-   * Implements cache invalidation per Section 4.3.2 cache management
-   */
-  const invalidateCache = useCallback(async (optionType: 'services' | 'users' | 'roles' | 'all') => {
-    if (optionType === 'all') {
-      await Promise.all([
-        mutateServices(),
-        mutateUsers(),
-        mutateRoles()
-      ])
-    } else {
-      switch (optionType) {
-        case 'services':
-          await mutateServices()
-          break
-        case 'users':
-          await mutateUsers()
-          break
-        case 'roles':
-          await mutateRoles()
-          break
-      }
-    }
-  }, [mutateServices, mutateUsers, mutateRoles])
-  
-  /**
-   * Refresh specific option type data
-   * Forces revalidation regardless of cache state
-   */
-  const refreshOptions = useCallback(async (optionType: 'services' | 'users' | 'roles' | 'all') => {
-    const refreshPromises: Promise<any>[] = []
-    
-    if (optionType === 'all' || optionType === 'services') {
-      refreshPromises.push(mutateServices(fetchServices(), false))
-    }
-    
-    if (optionType === 'all' || optionType === 'users') {
-      refreshPromises.push(mutateUsers(fetchUsers(), false))
-    }
-    
-    if (optionType === 'all' || optionType === 'roles') {
-      refreshPromises.push(mutateRoles(fetchRoles(), false))
-    }
-    
-    await Promise.all(refreshPromises)
-  }, [mutateServices, mutateUsers, mutateRoles])
-  
-  // =============================================================================
-  // RETURN COMPREHENSIVE OPTIONS DATA
-  // =============================================================================
-  
+  }, [fetchServices, fetchUsers, fetchRoles, mutateServices, mutateUsers, mutateRoles]);
+
+  // Mutation utilities for individual data types
+  const mutate = useMemo(() => ({
+    services: mutateServices,
+    users: mutateUsers,
+    roles: mutateRoles,
+    all: refresh,
+  }), [mutateServices, mutateUsers, mutateRoles, refresh]);
+
+  // Check if all required data is ready
+  const isReady = useMemo(() => {
+    const requiredData = [
+      fetchServices && !!servicesData,
+      fetchUsers && !!usersData,
+      fetchRoles && !!rolesData,
+    ];
+
+    // Filter enabled requirements and check if all are met
+    const enabledRequirements = requiredData.filter((_, index) => {
+      return [fetchServices, fetchUsers, fetchRoles][index];
+    });
+
+    return enabledRequirements.length === 0 || enabledRequirements.every(Boolean);
+  }, [
+    fetchServices, servicesData,
+    fetchUsers, usersData,
+    fetchRoles, rolesData,
+  ]);
+
   return {
-    services: filteredServices,
-    users: filteredUsers,
-    roles: filteredRoles,
-    loading: loadingStates,
-    errors: errorStates,
-    cache: cacheStatus,
-    performance: performanceConfig.enableMetrics ? trackPerformanceMetrics.get() : {
-      averageCacheHitTime: 0,
-      maxResponseTime: 0,
-      cacheHitRate: 0,
-      fastRequestCount: 0,
-      totalRequestCount: 0,
-      complianceRate: 0,
-      lastMeasurement: new Date()
-    },
-    
-    // Utility methods (not part of the main interface but useful for debugging)
-    _internal: {
-      invalidateCache,
-      refreshOptions,
-      resetMetrics: performanceConfig.enableMetrics ? trackPerformanceMetrics.reset : () => {},
-      getQueryKeys: () => ({
-        services: 'dropdown-services',
-        users: 'dropdown-users',
-        roles: 'dropdown-roles'
-      })
-    }
-  } as LimitDropdownOptions & {
-    _internal: {
-      invalidateCache: typeof invalidateCache
-      refreshOptions: typeof refreshOptions
-      resetMetrics: () => void
-      getQueryKeys: () => Record<string, string>
-    }
-  }
+    data,
+    loading,
+    errors,
+    refresh,
+    mutate,
+    isReady,
+  };
 }
 
-// =============================================================================
-// HELPER HOOKS FOR SPECIFIC OPTION TYPES
-// =============================================================================
+// ============================================================================
+// Utility Functions for Dropdown Processing
+// ============================================================================
 
 /**
- * Hook for fetching only service options
- * Optimized for service-specific limit forms
+ * Transform service options for React Hook Form
+ * Optimizes data structure for form integration
  */
-export function useServiceOptions(config: Pick<UseLimitOptionsConfig, 'filters' | 'cache'> = {}) {
-  const options = useLimitOptions({
-    ...config,
-    enabled: { services: true, users: false, roles: false }
-  })
-  
+export function transformServicesForForm(services: ServiceOption[]) {
+  return services.map(service => ({
+    value: service.id,
+    label: service.label || service.name,
+    group: service.type,
+    description: service.description,
+    disabled: !service.is_active,
+  }));
+}
+
+/**
+ * Transform user options for React Hook Form
+ * Optimizes data structure for form integration
+ */
+export function transformUsersForForm(users: UserOption[]) {
+  return users.map(user => ({
+    value: user.id,
+    label: user.name || user.display_name || user.username,
+    sublabel: user.email,
+    group: user.role,
+    disabled: !user.is_active,
+    lastLogin: user.last_login_date,
+  }));
+}
+
+/**
+ * Transform role options for React Hook Form
+ * Optimizes data structure for form integration
+ */
+export function transformRolesForForm(roles: RoleOption[]) {
+  return roles.map(role => ({
+    value: role.id,
+    label: role.name,
+    description: role.description,
+    disabled: !role.is_active,
+    userCount: role.user_count,
+  }));
+}
+
+/**
+ * Validate dropdown options against form requirements
+ * Ensures required options are available
+ */
+export function validateLimitOptions(
+  options: LimitDropdownOptions,
+  requirements: {
+    requireServices?: boolean;
+    requireUsers?: boolean;
+    requireRoles?: boolean;
+    minServices?: number;
+    minUsers?: number;
+    minRoles?: number;
+  }
+): { isValid: boolean; errors: string[] } {
+  const errors: string[] = [];
+
+  // Check services requirements
+  if (requirements.requireServices && options.services.length === 0) {
+    errors.push('At least one service is required for service-based limits');
+  }
+  if (requirements.minServices && options.services.length < requirements.minServices) {
+    errors.push(`At least ${requirements.minServices} services are required`);
+  }
+
+  // Check users requirements
+  if (requirements.requireUsers && options.users.length === 0) {
+    errors.push('At least one user is required for user-based limits');
+  }
+  if (requirements.minUsers && options.users.length < requirements.minUsers) {
+    errors.push(`At least ${requirements.minUsers} users are required`);
+  }
+
+  // Check roles requirements
+  if (requirements.requireRoles && options.roles.length === 0) {
+    errors.push('At least one role is required for role-based limits');
+  }
+  if (requirements.minRoles && options.roles.length < requirements.minRoles) {
+    errors.push(`At least ${requirements.minRoles} roles are required`);
+  }
+
   return {
-    services: options.services,
-    loading: options.loading.services,
-    error: options.errors.services,
-    cache: options.cache.services,
-    refresh: () => (options as any)._internal.refreshOptions('services')
-  }
+    isValid: errors.length === 0,
+    errors,
+  };
 }
 
 /**
- * Hook for fetching only user options
- * Optimized for user-specific limit forms
+ * Filter dropdown options based on search query
+ * Provides client-side filtering for large datasets
  */
-export function useUserOptions(config: Pick<UseLimitOptionsConfig, 'filters' | 'cache'> = {}) {
-  const options = useLimitOptions({
-    ...config,
-    enabled: { services: false, users: true, roles: false }
-  })
-  
+export function filterLimitOptions(
+  options: LimitDropdownOptions,
+  searchQuery: string
+): LimitDropdownOptions {
+  if (!searchQuery.trim()) {
+    return options;
+  }
+
+  const query = searchQuery.toLowerCase();
+
   return {
-    users: options.users,
-    loading: options.loading.users,
-    error: options.errors.users,
-    cache: options.cache.users,
-    refresh: () => (options as any)._internal.refreshOptions('users')
-  }
+    services: options.services.filter(service =>
+      service.name.toLowerCase().includes(query) ||
+      service.type.toLowerCase().includes(query) ||
+      service.description?.toLowerCase().includes(query)
+    ),
+    users: options.users.filter(user =>
+      user.username.toLowerCase().includes(query) ||
+      user.email.toLowerCase().includes(query) ||
+      user.name?.toLowerCase().includes(query) ||
+      user.display_name?.toLowerCase().includes(query)
+    ),
+    roles: options.roles.filter(role =>
+      role.name.toLowerCase().includes(query) ||
+      role.description?.toLowerCase().includes(query)
+    ),
+  };
 }
 
-/**
- * Hook for fetching only role options
- * Optimized for role-specific limit forms
- */
-export function useRoleOptions(config: Pick<UseLimitOptionsConfig, 'filters' | 'cache'> = {}) {
-  const options = useLimitOptions({
-    ...config,
-    enabled: { services: false, users: false, roles: true }
-  })
-  
-  return {
-    roles: options.roles,
-    loading: options.loading.roles,
-    error: options.errors.roles,
-    cache: options.cache.roles,
-    refresh: () => (options as any)._internal.refreshOptions('roles')
-  }
-}
+// ============================================================================
+// Default Export
+// ============================================================================
 
-// =============================================================================
-// TYPE EXPORTS FOR EXTERNAL USE
-// =============================================================================
-
-export type {
-  ServiceOption,
-  UserOption,
-  RoleOption,
-  LimitDropdownOptions,
-  CacheStatus,
-  PerformanceMetrics,
-  UseLimitOptionsConfig,
-  ServiceFilterOptions,
-  UserFilterOptions,
-  RoleFilterOptions
-}
-
-// =============================================================================
-// QUERY KEY EXPORTS FOR CACHE MANAGEMENT
-// =============================================================================
-
-/**
- * Query keys for external cache invalidation
- * Enables coordination with other hooks and components
- */
-export const DROPDOWN_QUERY_KEYS = {
-  services: 'dropdown-services',
-  users: 'dropdown-users',
-  roles: 'dropdown-roles',
-  all: ['dropdown-services', 'dropdown-users', 'dropdown-roles']
-} as const
-
-/**
- * Utility function for invalidating dropdown caches from external components
- * Supports integration with mutation operations and data updates
- */
-export const invalidateDropdownCache = async (
-  optionType: 'services' | 'users' | 'roles' | 'all' = 'all'
-) => {
-  const { mutate } = await import('swr')
-  
-  if (optionType === 'all') {
-    await Promise.all([
-      mutate(DROPDOWN_QUERY_KEYS.services),
-      mutate(DROPDOWN_QUERY_KEYS.users),
-      mutate(DROPDOWN_QUERY_KEYS.roles)
-    ])
-  } else {
-    await mutate(DROPDOWN_QUERY_KEYS[optionType])
-  }
-}
+export default useLimitOptions;
