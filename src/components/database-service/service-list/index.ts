@@ -1,289 +1,278 @@
 /**
- * @fileoverview Barrel export file for database service list module
+ * Database Service List Module - Barrel Export
  * 
- * Provides centralized imports for database service list components, hooks, types, 
- * and utilities. Enables clean imports like:
- * `import { ServiceListContainer, useServiceList } from '@/components/database-service/service-list'`
- * with full TypeScript support and tree-shaking optimization.
+ * Centralized export file for all database service list components, hooks, types, and utilities.
+ * Provides a clean API surface for importing service list functionality throughout the application.
+ * Organized by category for optimal tree-shaking and developer experience.
  * 
+ * This module implements React 19 stable features with TypeScript 5.8+ module system support,
+ * following React ecosystem best practices for component organization and export patterns.
+ * Optimized for Turbopack build pipeline with tree-shaking support per Section 7.1.1 requirements.
+ * 
+ * @fileoverview Service list module barrel exports with TypeScript optimization
  * @version 1.0.0
- * @since React 19.0.0 / Next.js 15.1.0
+ * @since 2024-01-01
  */
 
 // =============================================================================
-// MAIN COMPONENTS
+// COMPONENT EXPORTS
 // =============================================================================
 
-// Container component for service list page
-export { ServiceListContainer } from './service-list-container';
-export type { ServiceListContainerProps } from './service-list-container';
+/**
+ * Main service list components
+ * Primary React components for database service list management
+ */
+export { default as ServiceListContainer } from './service-list-container';
+export { 
+  ServiceListTable,
+  default as ServiceListTableComponent 
+} from './service-list-table';
 
-// Table component for service display and management
-export { ServiceListTable } from './service-list-table';
-export type { ServiceListTableProps } from './service-list-table';
+/**
+ * Component implementation exports for testing and advanced usage
+ * Internal components exposed for unit testing and custom integrations
+ */
+export {
+  ServiceListContainerImplementation,
+  useServiceListContainerStore
+} from './service-list-container';
 
 // =============================================================================
-// REACT HOOKS
+// HOOK EXPORTS
 // =============================================================================
 
-// Core service list data fetching and state management
-export { useServiceList } from './service-list-hooks';
-export { useServiceListFilters } from './service-list-hooks';
-export { useServiceListMutations } from './service-list-hooks';
-export { useServiceListSelection } from './service-list-hooks';
+/**
+ * Core service list hooks
+ * Primary React hooks for service list data management and operations
+ */
+export {
+  useServiceList,
+  useServiceListComplete,
+  useServiceListStore
+} from './service-list-hooks';
 
-// Advanced functionality hooks
-export { useServiceListVirtualization } from './service-list-hooks';
-export { useServiceConnectionStatus } from './service-list-hooks';
-export { useServiceListExport } from './service-list-hooks';
-
-// Hook return types for type safety
-export type {
-  UseServiceListResult,
-  UseServiceListFiltersResult,
-  UseServiceListMutationsResult,
-  UseServiceListSelectionResult,
-  UseServiceListVirtualizationResult,
-  UseServiceConnectionStatusResult,
-  UseServiceListExportResult
+/**
+ * Specialized service list hooks
+ * Focused hooks for specific service list functionality
+ */
+export {
+  useServiceListFilters,
+  useServiceListMutations,
+  useServiceListSelection,
+  useServiceListVirtualization,
+  useServiceConnectionStatus,
+  useServiceListExport
 } from './service-list-hooks';
 
 // =============================================================================
-// TYPE DEFINITIONS
+// TYPE EXPORTS
 // =============================================================================
 
-// Component prop interfaces
+/**
+ * Component prop types
+ * TypeScript interfaces for service list component props
+ */
 export type {
-  ServiceListProps,
-  ServiceListTableProps as ServiceListTableComponentProps,
-  ServiceListFilterProps,
-  ServiceListHeaderProps,
-  ServiceListRowProps
+  ServiceListContainerProps,
+  ServiceListTableProps,
+  ServiceListItemProps,
+  ServiceListCellProps
 } from './service-list-types';
 
-// Data and state types
+/**
+ * Component ref types
+ * TypeScript interfaces for component imperative handles
+ */
 export type {
-  ServiceListItem,
-  ServiceListData,
-  ServiceListState,
-  ServiceListFilter,
+  ServiceListTableRef
+} from './service-list-table';
+
+export type {
+  ServiceListContainerStore
+} from './service-list-container';
+
+/**
+ * Table configuration types
+ * TypeScript interfaces for table behavior and display
+ */
+export type {
+  ServiceListColumn,
+  TableSelectionConfig,
+  PaginationConfig,
+  SortingConfig,
+  FilteringConfig,
+  VirtualizationConfig
+} from './service-list-types';
+
+/**
+ * Data and filter types
+ * TypeScript interfaces for service list data structures
+ */
+export type {
+  ServiceListFilters,
   ServiceListSort,
-  ServiceListConfig
+  ServiceListState,
+  ServiceListActions,
+  ServiceListContextType,
+  DateRange,
+  QuickFilter,
+  AdvancedFilter,
+  FilterOption
 } from './service-list-types';
 
-// Table configuration types
+/**
+ * Hook return types
+ * TypeScript interfaces for custom hook return values
+ */
 export type {
-  ServiceListColumnConfig,
-  ServiceListTableConfig,
-  ServiceListVirtualizationConfig,
-  ServiceListPaginationConfig
+  UseServiceListReturn,
+  ServiceListQueryOptions,
+  ServiceListMutationOptions
 } from './service-list-types';
 
-// Query and API types
 export type {
+  ServiceListFilters as ServiceListFiltersType,
+  ServiceListPagination,
   ServiceListQuery,
-  ServiceListQueryParams,
   ServiceListResponse,
-  ServiceListMutationData
+  ServiceListStore as ServiceListStoreType,
+  ExportFormat,
+  ExportOptions
+} from './service-list-hooks';
+
+/**
+ * Action and interaction types
+ * TypeScript interfaces for user interactions and bulk operations
+ */
+export type {
+  BulkActionType,
+  BulkActionConfig,
+  ServiceActionConfig,
+  ContextMenuItem
 } from './service-list-types';
 
-// Selection and action types
+/**
+ * Virtualization types
+ * TypeScript interfaces for virtual scrolling implementation
+ */
 export type {
-  ServiceListSelection,
-  ServiceListAction,
-  ServiceListBulkAction,
-  ServiceListActionType
+  VirtualListItemProps,
+  VirtualListRef
 } from './service-list-types';
 
-// Form and validation types
+/**
+ * Paywall and access control types
+ * TypeScript interfaces for feature restrictions and upgrade prompts
+ */
 export type {
-  ServiceListFilterForm,
-  ServiceListFilterSchema,
-  ServiceListValidation,
-  ServiceListFormState
+  PaywallConfig,
+  FeatureRestriction,
+  PaywallFeature,
+  UpgradePrompt,
+  PaywallTrigger,
+  PromptFrequency
 } from './service-list-types';
 
-// Export types
+/**
+ * Accessibility types
+ * TypeScript interfaces for WCAG 2.1 AA compliance and screen reader support
+ */
 export type {
-  ServiceListExportFormat,
-  ServiceListExportConfig,
-  ServiceListExportData,
-  ServiceListExportOptions
-} from './service-list-types';
-
-// Connection status types
-export type {
-  ServiceConnectionStatus,
-  ServiceConnectionTest,
-  ServiceConnectionResult
+  AccessibilityConfig,
+  FocusManagementConfig,
+  AriaLabelsConfig
 } from './service-list-types';
 
 // =============================================================================
-// CONSTANTS AND CONFIGURATION
-// =============================================================================
-
-// Default configuration values
-export const SERVICE_LIST_DEFAULTS = {
-  PAGE_SIZE: 25,
-  CACHE_TIME: 900, // 15 minutes
-  STALE_TIME: 300, // 5 minutes
-  VIRTUAL_ITEM_HEIGHT: 60,
-  MAX_SELECTIONS: 100
-} as const;
-
-// Table column identifiers
-export const SERVICE_LIST_COLUMNS = {
-  NAME: 'name',
-  TYPE: 'type',
-  STATUS: 'status',
-  LAST_MODIFIED: 'lastModified',
-  ACTIONS: 'actions'
-} as const;
-
-// Filter options
-export const SERVICE_LIST_FILTERS = {
-  TYPES: ['mysql', 'postgresql', 'oracle', 'mongodb', 'snowflake'],
-  STATUS: ['active', 'inactive', 'error'],
-  SORT_FIELDS: ['name', 'type', 'lastModified', 'status']
-} as const;
-
-// Action types
-export const SERVICE_LIST_ACTIONS = {
-  VIEW: 'view',
-  EDIT: 'edit',
-  DELETE: 'delete',
-  TEST_CONNECTION: 'test_connection',
-  CLONE: 'clone',
-  EXPORT: 'export'
-} as const;
-
-// Export formats
-export const SERVICE_LIST_EXPORT_FORMATS = {
-  CSV: 'csv',
-  JSON: 'json',
-  EXCEL: 'xlsx'
-} as const;
-
-// =============================================================================
-// UTILITY FUNCTIONS
+// VALIDATION SCHEMA EXPORTS
 // =============================================================================
 
 /**
- * Type guard to check if a value is a valid service list action
+ * Zod validation schemas
+ * Runtime validation for service list parameters and inputs
  */
-export const isValidServiceListAction = (action: unknown): action is ServiceListActionType => {
-  return typeof action === 'string' && 
-    Object.values(SERVICE_LIST_ACTIONS).includes(action as ServiceListActionType);
+export {
+  ServiceListFiltersSchema,
+  ServiceListSortSchema,
+  PaginationParamsSchema,
+  BulkActionSchema,
+  ServiceListQueryParamsSchema
+} from './service-list-types';
+
+/**
+ * Zod inferred types
+ * TypeScript types inferred from validation schemas
+ */
+export type {
+  ServiceListFiltersInput,
+  ServiceListSortInput,
+  PaginationParamsInput,
+  BulkActionInput,
+  ServiceListQueryParamsInput
+} from './service-list-types';
+
+// =============================================================================
+// QUERY KEY EXPORTS
+// =============================================================================
+
+/**
+ * React Query cache keys
+ * Standardized query keys for React Query cache management
+ */
+export {
+  ServiceListQueryKeys
+} from './service-list-types';
+
+// =============================================================================
+// UTILITY EXPORTS
+// =============================================================================
+
+/**
+ * Re-exported common enums and constants
+ * Frequently used values for service list operations
+ */
+export type {
+  FilterOperator,
+  FilterFieldType,
+  SortingState
+} from './service-list-types';
+
+// =============================================================================
+// DEFAULT EXPORT
+// =============================================================================
+
+/**
+ * Default export for convenient importing
+ * Main service list container component as the primary interface
+ */
+export { default } from './service-list-container';
+
+// =============================================================================
+// MODULE METADATA
+// =============================================================================
+
+/**
+ * Module version and compatibility information
+ * Used for debugging and version tracking
+ */
+export const SERVICE_LIST_MODULE_VERSION = '1.0.0';
+export const SERVICE_LIST_MODULE_COMPATABILITY = {
+  react: '^19.0.0',
+  typescript: '^5.8.0',
+  nextjs: '^15.1.0'
 };
 
 /**
- * Type guard to check if a value is a valid export format
+ * Module feature flags
+ * Runtime feature detection for conditional functionality
  */
-export const isValidExportFormat = (format: unknown): format is ServiceListExportFormat => {
-  return typeof format === 'string' && 
-    Object.values(SERVICE_LIST_EXPORT_FORMATS).includes(format as ServiceListExportFormat);
-};
-
-/**
- * Validates service list filter configuration
- */
-export const validateServiceListFilters = (filters: Partial<ServiceListFilter>): boolean => {
-  if (filters.types && !Array.isArray(filters.types)) return false;
-  if (filters.status && !Array.isArray(filters.status)) return false;
-  if (filters.sortField && !SERVICE_LIST_FILTERS.SORT_FIELDS.includes(filters.sortField)) return false;
-  return true;
-};
-
-/**
- * Creates default service list configuration
- */
-export const createDefaultServiceListConfig = (): ServiceListConfig => ({
-  pageSize: SERVICE_LIST_DEFAULTS.PAGE_SIZE,
-  virtualItemHeight: SERVICE_LIST_DEFAULTS.VIRTUAL_ITEM_HEIGHT,
-  enableVirtualization: true,
-  enableSelection: true,
-  enableBulkActions: true,
-  enableExport: true,
-  cacheConfig: {
-    staleTime: SERVICE_LIST_DEFAULTS.STALE_TIME * 1000,
-    cacheTime: SERVICE_LIST_DEFAULTS.CACHE_TIME * 1000
-  }
-});
-
-/**
- * Formats service list data for export
- */
-export const formatServiceListForExport = (
-  services: ServiceListItem[],
-  format: ServiceListExportFormat
-): ServiceListExportData => {
-  const data = services.map(service => ({
-    name: service.name,
-    type: service.type,
-    status: service.status,
-    lastModified: service.lastModified
-  }));
-
-  return {
-    data,
-    format,
-    filename: `database-services-${new Date().toISOString().split('T')[0]}`,
-    timestamp: new Date().toISOString()
-  };
-};
-
-/**
- * Generates service list query parameters from filter state
- */
-export const createServiceListQueryParams = (filters: ServiceListFilter): ServiceListQueryParams => ({
-  page: filters.page || 1,
-  pageSize: filters.pageSize || SERVICE_LIST_DEFAULTS.PAGE_SIZE,
-  search: filters.search,
-  types: filters.types,
-  status: filters.status,
-  sortField: filters.sortField,
-  sortDirection: filters.sortDirection || 'asc'
-});
-
-// =============================================================================
-// RE-EXPORTS FOR COMPONENT COMPOSITION
-// =============================================================================
-
-// Re-export common React types for convenience
-export type { 
-  ReactNode, 
-  ReactElement, 
-  ComponentType, 
-  FC, 
-  PropsWithChildren 
-} from 'react';
-
-// Re-export React Query types for hook consumers
-export type {
-  UseQueryResult,
-  UseMutationResult,
-  QueryKey,
-  MutationFunction
-} from '@tanstack/react-query';
-
-// Re-export TanStack Virtual types for table virtualization
-export type {
-  VirtualItem,
-  Virtualizer,
-  VirtualizerOptions
-} from '@tanstack/react-virtual';
-
-// Re-export common form types for filter components
-export type {
-  UseFormReturn,
-  FieldValues,
-  Control,
-  UseFormRegister
-} from 'react-hook-form';
-
-// Re-export Zod types for validation schemas
-export type {
-  ZodSchema,
-  ZodType,
-  ZodError
-} from 'zod';
+export const SERVICE_LIST_FEATURES = {
+  VIRTUALIZATION: true,
+  BULK_ACTIONS: true,
+  REAL_TIME_UPDATES: true,
+  ACCESSIBILITY: true,
+  PAYWALL: true,
+  EXPORT: true,
+  ADVANCED_FILTERING: true,
+  CONNECTION_TESTING: true
+} as const;
