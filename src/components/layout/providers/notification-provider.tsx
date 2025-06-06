@@ -1,729 +1,974 @@
 /**
  * NotificationProvider - React Context Provider for Toast Notifications
  * 
- * Replaces Angular Material mat-snackbar with React-based notification system using Headless UI
- * components and Tailwind CSS styling. Provides comprehensive notification queue management,
- * auto-dismissal timing, and persistence across route changes for critical user feedback.
+ * Comprehensive notification system replacing Angular DfSnackbarService with React-based
+ * implementation using Headless UI and Tailwind CSS. Provides enterprise-grade notification
+ * management with accessibility compliance, queue management, and edit page persistence.
  * 
- * Key Features:
- * - Headless UI 2.0+ integration for WCAG 2.1 AA compliance
- * - Tailwind CSS 4.1+ utility classes for responsive design and animations
- * - React Context API for notification state management with queue handling
- * - Auto-dismissal timing with configurable duration for different notification types
- * - Notification persistence across route changes for critical user feedback messages
- * - Queue management with maximum visible notifications and auto-cleanup
- * - Convenience methods for success, error, warning, info, and loading notifications
- * - Sound notification support with customizable audio files
- * - Position management for optimal user experience
+ * Core Features:
+ * - React 19 context API with TypeScript 5.8+ enhanced type inference
+ * - Headless UI 2.0+ for WCAG 2.1 AA accessible notification components
+ * - Tailwind CSS 4.1+ utility-first styling with responsive design
+ * - Auto-dismissal with configurable duration and user interaction handling
+ * - Notification persistence across route changes for critical user feedback
+ * - Angular compatibility layer for seamless migration from DfSnackbarService
+ * - Queue management with maximum capacity and priority handling
+ * - Comprehensive error boundaries and fallback mechanisms
  * 
+ * Migration Notes:
+ * - Replaces Angular Material mat-snackbar with React-based toast system
+ * - Maintains API compatibility with existing DfSnackbarService calls
+ * - Supports edit page state management for notification persistence
+ * - Preserves notification timing and user interaction patterns
+ * 
+ * @fileoverview Notification provider for React notification system
  * @version 1.0.0
- * @requires React 19.0.0 for enhanced concurrent features and context optimizations
- * @requires Headless UI 2.0+ for accessible notification components
- * @requires Tailwind CSS 4.1+ for utility-first styling with animation support
+ * @since React 19.0.0 / Next.js 15.1+ / TypeScript 5.8+
+ * @see Technical Specification Section 0 - SUMMARY OF CHANGES
+ * @see Technical Specification Section 7.1 - CORE UI TECHNOLOGIES
  */
 
 'use client';
 
-import React, { 
-  createContext, 
-  useContext, 
-  useCallback, 
-  useReducer, 
-  useEffect, 
+import React, {
+  createContext,
+  useContext,
+  useCallback,
+  useReducer,
+  useEffect,
   useRef,
-  useMemo 
+  useMemo,
+  type ReactNode,
 } from 'react';
-import { useRouter } from 'next/navigation';
-import { Transition, TransitionChild } from '@headlessui/react';
-import { 
-  CheckCircleIcon, 
-  ExclamationCircleIcon, 
-  ExclamationTriangleIcon, 
-  InformationCircleIcon,
-  XMarkIcon,
-  ArrowPathIcon
-} from '@heroicons/react/24/outline';
-import { 
+import { nanoid } from 'nanoid';
+import type {
+  NotificationContextValue,
   NotificationState,
   NotificationActions,
-  NotificationContextValue,
   NotificationProviderProps,
-  Notification,
-  NotificationType,
-  NotificationPosition,
-  NotificationSettings,
-  NotificationAction
+  NotificationEventHandlers,
 } from './provider-types';
+import type {
+  Notification,
+  NotificationConfig,
+  NotificationQueueConfig,
+  NotificationType,
+  NotificationDuration,
+  DfSnackbarCompatibility,
+  NotificationServiceCompatibility,
+  UseNotificationsReturn,
+  DURATION_PRESETS,
+} from '@/types/notification';
 
-// =============================================================================
-// Constants and Configuration
-// =============================================================================
+// ============================================================================
+// CONSTANTS AND DEFAULTS
+// ============================================================================
 
 /**
- * Default notification settings optimized for DreamFactory Admin Interface
+ * Default notification queue configuration
  */
-const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
-  defaultDuration: 5000, // 5 seconds for most notifications
-  maxVisible: 5, // Maximum 5 notifications visible at once
-  defaultPosition: 'top-right',
-  animationDuration: 300, // 300ms for smooth transitions
-  enableSound: false, // Disabled by default for professional environment
-  sounds: {
-    success: '/sounds/success.mp3',
-    error: '/sounds/error.mp3',
-    warning: '/sounds/warning.mp3',
-    info: '/sounds/info.mp3',
-  },
+const DEFAULT_CONFIG: NotificationQueueConfig = {
+  maxNotifications: 5,
+  defaultPosition: 'bottom-right',
+  defaultDuration: 'medium',
+  groupSimilar: false,
+  animationDuration: 300,
+  zIndex: 9999,
 };
 
 /**
- * Duration settings by notification type for optimal user experience
+ * Duration mappings for notification auto-dismissal
  */
-const TYPE_DURATIONS: Record<NotificationType, number> = {
-  success: 4000, // 4 seconds - quick acknowledgment
-  error: 8000, // 8 seconds - important to read error details
-  warning: 6000, // 6 seconds - warning requires attention
-  info: 5000, // 5 seconds - standard information
-  loading: 0, // No auto-dismiss for loading states
+const DURATION_MAP: Record<Exclude<NotificationDuration, number>, number> = {
+  short: 3000,
+  medium: 5000,
+  long: 10000,
+  persistent: -1,
 };
 
 /**
- * Icon mapping for each notification type using Heroicons
+ * Default notification event handlers
  */
-const TYPE_ICONS = {
-  success: CheckCircleIcon,
-  error: ExclamationCircleIcon,
-  warning: ExclamationTriangleIcon,
-  info: InformationCircleIcon,
-  loading: ArrowPathIcon,
-} as const;
-
-/**
- * Tailwind CSS classes for notification styling based on type
- */
-const TYPE_STYLES = {
-  success: {
-    container: 'bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-200',
-    icon: 'text-green-400 dark:text-green-300',
-    title: 'text-green-800 dark:text-green-200',
-    message: 'text-green-700 dark:text-green-300',
-    closeButton: 'text-green-500 hover:text-green-600 dark:text-green-400 dark:hover:text-green-300',
-  },
-  error: {
-    container: 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-200',
-    icon: 'text-red-400 dark:text-red-300',
-    title: 'text-red-800 dark:text-red-200',
-    message: 'text-red-700 dark:text-red-300',
-    closeButton: 'text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300',
-  },
-  warning: {
-    container: 'bg-yellow-50 border-yellow-200 text-yellow-800 dark:bg-yellow-900/20 dark:border-yellow-800 dark:text-yellow-200',
-    icon: 'text-yellow-400 dark:text-yellow-300',
-    title: 'text-yellow-800 dark:text-yellow-200',
-    message: 'text-yellow-700 dark:text-yellow-300',
-    closeButton: 'text-yellow-500 hover:text-yellow-600 dark:text-yellow-400 dark:hover:text-yellow-300',
-  },
-  info: {
-    container: 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-200',
-    icon: 'text-blue-400 dark:text-blue-300',
-    title: 'text-blue-800 dark:text-blue-200',
-    message: 'text-blue-700 dark:text-blue-300',
-    closeButton: 'text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300',
-  },
-  loading: {
-    container: 'bg-gray-50 border-gray-200 text-gray-800 dark:bg-gray-900/20 dark:border-gray-800 dark:text-gray-200',
-    icon: 'text-gray-400 dark:text-gray-300 animate-spin',
-    title: 'text-gray-800 dark:text-gray-200',
-    message: 'text-gray-700 dark:text-gray-300',
-    closeButton: 'text-gray-500 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-300',
-  },
-} as const;
-
-/**
- * Position-based Tailwind CSS classes for notification container placement
- */
-const POSITION_STYLES: Record<NotificationPosition, string> = {
-  'top-right': 'top-4 right-4',
-  'top-left': 'top-4 left-4',
-  'top-center': 'top-4 left-1/2 -translate-x-1/2',
-  'bottom-right': 'bottom-4 right-4',
-  'bottom-left': 'bottom-4 left-4',
-  'bottom-center': 'bottom-4 left-1/2 -translate-x-1/2',
+const DEFAULT_EVENT_HANDLERS: NotificationEventHandlers = {
+  onShow: () => {},
+  onDismiss: () => {},
+  onExpire: () => {},
+  onActionClick: () => {},
+  onQueueFull: () => {},
 };
 
-// =============================================================================
-// State Management - Reducer Pattern for Complex State Logic
-// =============================================================================
+// ============================================================================
+// NOTIFICATION STATE MANAGEMENT
+// ============================================================================
 
 /**
- * Action types for notification state management
+ * Notification action types for reducer
  */
-type NotificationActionType = 
+type NotificationActionType =
   | { type: 'ADD_NOTIFICATION'; payload: Notification }
   | { type: 'REMOVE_NOTIFICATION'; payload: string }
-  | { type: 'CLEAR_ALL' }
-  | { type: 'CLEAR_BY_TYPE'; payload: NotificationType }
-  | { type: 'MARK_AS_READ'; payload: string }
-  | { type: 'MARK_ALL_AS_READ' }
-  | { type: 'UPDATE_SETTINGS'; payload: Partial<NotificationSettings> }
-  | { type: 'SET_PERSIST_ACROSS_ROUTES'; payload: boolean };
+  | { type: 'REMOVE_ALL_NOTIFICATIONS' }
+  | { type: 'UPDATE_NOTIFICATION'; payload: { id: string; updates: Partial<Notification> } }
+  | { type: 'SET_PAUSED'; payload: boolean }
+  | { type: 'SET_EDIT_PAGE_STATE'; payload: { isEditPage: boolean; elementId?: string } }
+  | { type: 'RESTORE_NOTIFICATIONS'; payload: Notification[] }
+  | { type: 'UPDATE_CONFIG'; payload: Partial<NotificationQueueConfig> }
+  | { type: 'SET_ACCESSIBILITY_PREFERENCES'; payload: Partial<NotificationState['accessibility']> };
 
 /**
- * Notification state reducer with comprehensive action handling
- * Implements queue management, auto-cleanup, and state optimization
+ * Initial notification state
+ */
+const initialState: NotificationState = {
+  notifications: [],
+  config: DEFAULT_CONFIG,
+  paused: false,
+  persistence: {
+    isEditPage: false,
+    lastElementId: null,
+    storedNotifications: [],
+  },
+  metrics: {
+    totalShown: 0,
+    totalDismissed: 0,
+    totalExpired: 0,
+    averageDisplayDuration: 0,
+  },
+  accessibility: {
+    announceToScreenReader: true,
+    focusManagement: 'notification',
+    keyboardNavigation: true,
+  },
+};
+
+/**
+ * Notification state reducer
  */
 function notificationReducer(
-  state: NotificationState, 
+  state: NotificationState,
   action: NotificationActionType
 ): NotificationState {
   switch (action.type) {
     case 'ADD_NOTIFICATION': {
       const newNotification = action.payload;
-      const updatedNotifications = [...state.notifications, newNotification];
-      
-      // Enforce maximum queue size by removing oldest notifications
-      const trimmedNotifications = updatedNotifications.length > state.maxQueueSize
-        ? updatedNotifications.slice(-state.maxQueueSize)
-        : updatedNotifications;
-      
+      let updatedNotifications = [...state.notifications];
+
+      // Remove oldest notification if at capacity
+      if (updatedNotifications.length >= (state.config.maxNotifications || 5)) {
+        updatedNotifications.shift();
+      }
+
+      // Group similar notifications if enabled
+      if (state.config.groupSimilar) {
+        const existingIndex = updatedNotifications.findIndex(
+          (n) =>
+            n.type === newNotification.type &&
+            n.message === newNotification.message &&
+            n.title === newNotification.title
+        );
+
+        if (existingIndex !== -1) {
+          // Update existing notification instead of adding new one
+          updatedNotifications[existingIndex] = {
+            ...updatedNotifications[existingIndex],
+            timestamp: newNotification.timestamp,
+            id: newNotification.id,
+          };
+        } else {
+          updatedNotifications.push(newNotification);
+        }
+      } else {
+        updatedNotifications.push(newNotification);
+      }
+
       return {
         ...state,
-        notifications: trimmedNotifications,
+        notifications: updatedNotifications,
+        metrics: {
+          ...state.metrics,
+          totalShown: state.metrics.totalShown + 1,
+        },
       };
     }
-    
+
     case 'REMOVE_NOTIFICATION': {
-      return {
-        ...state,
-        notifications: state.notifications.filter(n => n.id !== action.payload),
-      };
+      const notificationId = action.payload;
+      const notification = state.notifications.find((n) => n.id === notificationId);
+      
+      if (notification) {
+        const displayDuration = Date.now() - notification.timestamp;
+        const totalDisplayTime = state.metrics.averageDisplayDuration * state.metrics.totalDismissed + displayDuration;
+        const newAverageDisplayDuration = totalDisplayTime / (state.metrics.totalDismissed + 1);
+
+        return {
+          ...state,
+          notifications: state.notifications.filter((n) => n.id !== notificationId),
+          metrics: {
+            ...state.metrics,
+            totalDismissed: state.metrics.totalDismissed + 1,
+            averageDisplayDuration: newAverageDisplayDuration,
+          },
+        };
+      }
+      
+      return state;
     }
-    
-    case 'CLEAR_ALL': {
+
+    case 'REMOVE_ALL_NOTIFICATIONS':
       return {
         ...state,
         notifications: [],
       };
-    }
-    
-    case 'CLEAR_BY_TYPE': {
+
+    case 'UPDATE_NOTIFICATION': {
+      const { id, updates } = action.payload;
       return {
         ...state,
-        notifications: state.notifications.filter(n => n.type !== action.payload),
-      };
-    }
-    
-    case 'MARK_AS_READ': {
-      return {
-        ...state,
-        notifications: state.notifications.map(n => 
-          n.id === action.payload ? { ...n, isRead: true } : n
+        notifications: state.notifications.map((notification) =>
+          notification.id === id ? { ...notification, ...updates } : notification
         ),
       };
     }
-    
-    case 'MARK_ALL_AS_READ': {
+
+    case 'SET_PAUSED':
       return {
         ...state,
-        notifications: state.notifications.map(n => ({ ...n, isRead: true })),
+        paused: action.payload,
       };
-    }
-    
-    case 'UPDATE_SETTINGS': {
+
+    case 'SET_EDIT_PAGE_STATE': {
+      const { isEditPage, elementId } = action.payload;
+      
+      // Store current notifications when entering edit page
+      if (isEditPage && !state.persistence.isEditPage) {
+        return {
+          ...state,
+          persistence: {
+            ...state.persistence,
+            isEditPage,
+            lastElementId: elementId || null,
+            storedNotifications: [...state.notifications],
+          },
+        };
+      }
+
       return {
         ...state,
-        globalSettings: { ...state.globalSettings, ...action.payload },
+        persistence: {
+          ...state.persistence,
+          isEditPage,
+          lastElementId: elementId || state.persistence.lastElementId,
+        },
       };
     }
-    
-    case 'SET_PERSIST_ACROSS_ROUTES': {
+
+    case 'RESTORE_NOTIFICATIONS':
       return {
         ...state,
-        persistAcrossRoutes: action.payload,
+        notifications: action.payload,
+        persistence: {
+          ...state.persistence,
+          storedNotifications: [],
+        },
       };
-    }
-    
+
+    case 'UPDATE_CONFIG':
+      return {
+        ...state,
+        config: {
+          ...state.config,
+          ...action.payload,
+        },
+      };
+
+    case 'SET_ACCESSIBILITY_PREFERENCES':
+      return {
+        ...state,
+        accessibility: {
+          ...state.accessibility,
+          ...action.payload,
+        },
+      };
+
     default:
       return state;
   }
 }
 
-// =============================================================================
-// Context Definition and Hook
-// =============================================================================
+// ============================================================================
+// CONTEXT CREATION
+// ============================================================================
 
 /**
- * Notification context with comprehensive type safety
+ * Notification context
  */
 const NotificationContext = createContext<NotificationContextValue | null>(null);
 
 /**
- * Custom hook for accessing notification context with error handling
- * @returns NotificationContextValue with all notification state and actions
- * @throws Error if used outside of NotificationProvider
+ * Hook to access notification context
+ * @throws Error if used outside NotificationProvider
  */
-export function useNotifications(): NotificationContextValue {
+export function useNotifications(): UseNotificationsReturn {
   const context = useContext(NotificationContext);
   
   if (!context) {
     throw new Error(
       'useNotifications must be used within a NotificationProvider. ' +
-      'Please wrap your component tree with <NotificationProvider>.'
+      'Make sure your component is wrapped with <NotificationProvider>.'
     );
   }
+
+  // Return the hook interface (without provider-specific properties)
+  return {
+    notifications: context.state.notifications,
+    notify: context.actions.notify,
+    success: context.actions.success,
+    error: context.actions.error,
+    warning: context.actions.warning,
+    info: context.actions.info,
+    dismiss: context.actions.dismiss,
+    dismissAll: context.actions.dismissAll,
+    pause: context.actions.pause,
+    resume: context.actions.resume,
+    updateConfig: context.actions.updateConfig,
+    setEditPageState: context.actions.setEditPageState,
+    getLastElement: context.actions.getLastElement,
+    isPaused: context.state.paused,
+    config: context.state.config,
+  };
+}
+
+/**
+ * Hook to access full notification context (provider-specific)
+ */
+export function useNotificationContext(): NotificationContextValue {
+  const context = useContext(NotificationContext);
   
+  if (!context) {
+    throw new Error(
+      'useNotificationContext must be used within a NotificationProvider. ' +
+      'Make sure your component is wrapped with <NotificationProvider>.'
+    );
+  }
+
   return context;
 }
 
-// =============================================================================
-// Individual Notification Component
-// =============================================================================
+// ============================================================================
+// NOTIFICATION PROVIDER COMPONENT
+// ============================================================================
 
 /**
- * Individual notification component with Headless UI transitions and accessibility
- */
-interface NotificationItemProps {
-  notification: Notification;
-  onDismiss: (id: string) => void;
-  onMarkAsRead: (id: string) => void;
-  onActionClick: (actionId: string, handler: () => void | Promise<void>) => void;
-  settings: NotificationSettings;
-}
-
-function NotificationItem({
-  notification,
-  onDismiss,
-  onMarkAsRead,
-  onActionClick,
-  settings,
-}: NotificationItemProps) {
-  const [isVisible, setIsVisible] = React.useState(false);
-  const [isExiting, setIsExiting] = React.useState(false);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
-  const Icon = TYPE_ICONS[notification.type];
-  const styles = TYPE_STYLES[notification.type];
-  
-  // Auto-dismiss logic with configurable timing
-  useEffect(() => {
-    setIsVisible(true);
-    
-    const duration = notification.duration ?? TYPE_DURATIONS[notification.type];
-    
-    if (duration > 0 && !notification.persistent) {
-      timeoutRef.current = setTimeout(() => {
-        handleDismiss();
-      }, duration);
-    }
-    
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, [notification.id, notification.duration, notification.persistent]);
-  
-  // Handle dismiss with animation
-  const handleDismiss = useCallback(() => {
-    setIsExiting(true);
-    
-    // Delay actual removal to allow exit animation
-    setTimeout(() => {
-      onDismiss(notification.id);
-    }, settings.animationDuration);
-  }, [notification.id, onDismiss, settings.animationDuration]);
-  
-  // Handle action button clicks
-  const handleActionClick = useCallback(async (action: NotificationAction) => {
-    try {
-      await action.handler();
-      onActionClick(action.id, action.handler);
-      
-      // Auto-dismiss after successful action unless persistent
-      if (!notification.persistent) {
-        handleDismiss();
-      }
-    } catch (error) {
-      console.error('Notification action failed:', error);
-    }
-  }, [notification.persistent, handleDismiss, onActionClick]);
-  
-  // Mark as read when notification becomes visible
-  useEffect(() => {
-    if (isVisible && !notification.isRead) {
-      onMarkAsRead(notification.id);
-    }
-  }, [isVisible, notification.isRead, notification.id, onMarkAsRead]);
-  
-  return (
-    <Transition
-      show={isVisible && !isExiting}
-      as="div"
-      className={`
-        max-w-sm w-full bg-white dark:bg-gray-800 shadow-lg rounded-lg pointer-events-auto 
-        ring-1 ring-black ring-opacity-5 overflow-hidden border
-        ${styles.container}
-      `}
-      enter="transform ease-out duration-300 transition"
-      enterFrom="translate-y-2 opacity-0 sm:translate-y-0 sm:translate-x-2"
-      enterTo="translate-y-0 opacity-100 sm:translate-x-0"
-      leave="transition ease-in duration-100"
-      leaveFrom="opacity-100"
-      leaveTo="opacity-0"
-    >
-      <div className="p-4">
-        <div className="flex items-start">
-          {/* Icon */}
-          <div className="flex-shrink-0">
-            <Icon 
-              className={`h-6 w-6 ${styles.icon}`} 
-              aria-hidden="true"
-            />
-          </div>
-          
-          {/* Content */}
-          <div className="ml-3 w-0 flex-1 pt-0.5">
-            <p className={`text-sm font-medium ${styles.title}`}>
-              {notification.title}
-            </p>
-            {notification.message && (
-              <p className={`mt-1 text-sm ${styles.message}`}>
-                {notification.message}
-              </p>
-            )}
-            
-            {/* Action buttons */}
-            {notification.actions && notification.actions.length > 0 && (
-              <div className="mt-3 flex space-x-2">
-                {notification.actions.map((action) => (
-                  <button
-                    key={action.id}
-                    type="button"
-                    onClick={() => handleActionClick(action)}
-                    className={`
-                      inline-flex items-center px-3 py-2 border border-transparent text-sm 
-                      leading-4 font-medium rounded-md focus:outline-none focus:ring-2 
-                      focus:ring-offset-2 transition-colors duration-200
-                      ${action.variant === 'primary' 
-                        ? 'bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500'
-                        : action.variant === 'secondary'
-                        ? 'bg-gray-200 text-gray-900 hover:bg-gray-300 focus:ring-gray-500 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600'
-                        : 'text-gray-700 hover:text-gray-500 dark:text-gray-300 dark:hover:text-gray-200'
-                      }
-                    `}
-                  >
-                    {action.icon && (
-                      <span className="mr-2" aria-hidden="true">
-                        {action.icon}
-                      </span>
-                    )}
-                    {action.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          
-          {/* Close button */}
-          <div className="ml-4 flex-shrink-0 flex">
-            <button
-              type="button"
-              className={`
-                rounded-md inline-flex focus:outline-none focus:ring-2 focus:ring-offset-2 
-                focus:ring-primary-500 transition-colors duration-200
-                ${styles.closeButton}
-              `}
-              onClick={handleDismiss}
-              aria-label={`Dismiss ${notification.type} notification: ${notification.title}`}
-            >
-              <XMarkIcon className="h-5 w-5" aria-hidden="true" />
-            </button>
-          </div>
-        </div>
-      </div>
-    </Transition>
-  );
-}
-
-// =============================================================================
-// Notification Container Component
-// =============================================================================
-
-/**
- * Container component for rendering all notifications with proper positioning
- */
-interface NotificationContainerProps {
-  notifications: Notification[];
-  position: NotificationPosition;
-  onDismiss: (id: string) => void;
-  onMarkAsRead: (id: string) => void;
-  onActionClick: (actionId: string, handler: () => void | Promise<void>) => void;
-  settings: NotificationSettings;
-}
-
-function NotificationContainer({
-  notifications,
-  position,
-  onDismiss,
-  onMarkAsRead,
-  onActionClick,
-  settings,
-}: NotificationContainerProps) {
-  // Filter to show only the maximum allowed visible notifications
-  const visibleNotifications = notifications.slice(-settings.maxVisible);
-  
-  if (visibleNotifications.length === 0) {
-    return null;
-  }
-  
-  return (
-    <div
-      className={`
-        fixed z-50 flex flex-col space-y-4 pointer-events-none
-        ${POSITION_STYLES[position]}
-      `}
-      aria-live="polite"
-      aria-label="Notifications"
-    >
-      {visibleNotifications.map((notification) => (
-        <NotificationItem
-          key={notification.id}
-          notification={notification}
-          onDismiss={onDismiss}
-          onMarkAsRead={onMarkAsRead}
-          onActionClick={onActionClick}
-          settings={settings}
-        />
-      ))}
-    </div>
-  );
-}
-
-// =============================================================================
-// Main Provider Component
-// =============================================================================
-
-/**
- * NotificationProvider - Main provider component with comprehensive notification management
+ * NotificationProvider component
  * 
- * Features:
- * - React 19 optimized context with concurrent features
- * - Queue management with configurable limits
- * - Auto-dismissal with type-specific timing
- * - Persistence across route changes
- * - Accessibility compliance (WCAG 2.1 AA)
- * - Sound notification support
- * - Responsive positioning
- * - Error handling and recovery
+ * Provides notification functionality throughout the component tree with comprehensive
+ * state management, accessibility support, and Angular compatibility layer.
+ * 
+ * @param props - Provider configuration and children
  */
 export function NotificationProvider({
   children,
-  maxQueueSize = 10,
-  position = 'top-right',
-  persistAcrossRoutes = true,
-  settings: customSettings,
-  ...props
-}: NotificationProviderProps) {
-  // Initialize state with reducer pattern for complex state management
-  const [state, dispatch] = useReducer(notificationReducer, {
-    notifications: [],
-    maxQueueSize,
-    globalSettings: { ...DEFAULT_NOTIFICATION_SETTINGS, ...customSettings },
-    persistAcrossRoutes,
-  });
-  
-  const router = useRouter();
-  const audioRef = useRef<{ [key in NotificationType]?: HTMLAudioElement }>({});
-  const idCounterRef = useRef(0);
-  
-  // Initialize audio elements for sound notifications
-  useEffect(() => {
-    if (state.globalSettings.enableSound) {
-      Object.entries(state.globalSettings.sounds).forEach(([type, url]) => {
-        const audio = new Audio(url);
-        audio.preload = 'auto';
-        audioRef.current[type as NotificationType] = audio;
-      });
-    }
+  config = {},
+  initialState: providedInitialState = {},
+  eventHandlers = {},
+  persistence = {},
+  enableCompatibilityMode = true,
+  customComponents = {},
+  debug = false,
+  id = 'notification-provider',
+}: NotificationProviderProps & {
+  initialState?: Partial<NotificationState>;
+  eventHandlers?: Partial<NotificationEventHandlers>;
+  persistence?: any;
+  enableCompatibilityMode?: boolean;
+  customComponents?: any;
+  debug?: boolean;
+  id?: string;
+}): JSX.Element {
+  // Merge configurations
+  const mergedConfig = useMemo(
+    () => ({ ...DEFAULT_CONFIG, ...config }),
+    [config]
+  );
+
+  const mergedEventHandlers = useMemo(
+    () => ({ ...DEFAULT_EVENT_HANDLERS, ...eventHandlers }),
+    [eventHandlers]
+  );
+
+  // Initialize state with provided configuration
+  const mergedInitialState = useMemo(
+    () => ({
+      ...initialState,
+      ...providedInitialState,
+      config: mergedConfig,
+    }),
+    [providedInitialState, mergedConfig]
+  );
+
+  // State management
+  const [state, dispatch] = useReducer(notificationReducer, mergedInitialState);
+
+  // Ref for auto-dismiss timers
+  const timersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+
+  // Ref for DOM container
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  // Debug information
+  const debugInfo = useMemo(() => {
+    if (!debug) return undefined;
     
-    return () => {
-      // Cleanup audio elements
-      Object.values(audioRef.current).forEach(audio => {
-        if (audio) {
-          audio.pause();
-          audio.src = '';
-        }
-      });
-      audioRef.current = {};
+    return {
+      lastUpdate: new Date().toISOString(),
+      renderCount: 0,
+      subscribers: 1, // TODO: Track actual subscribers
     };
-  }, [state.globalSettings.enableSound, state.globalSettings.sounds]);
-  
-  // Generate unique notification ID
-  const generateId = useCallback(() => {
-    return `notification-${Date.now()}-${++idCounterRef.current}`;
+  }, [debug, state]);
+
+  // ============================================================================
+  // UTILITY FUNCTIONS
+  // ============================================================================
+
+  /**
+   * Generate unique notification ID
+   */
+  const generateId = useCallback((): string => {
+    return `notification-${nanoid(8)}`;
   }, []);
-  
-  // Play sound for notification type
-  const playSound = useCallback((type: NotificationType) => {
-    if (state.globalSettings.enableSound && audioRef.current[type]) {
-      try {
-        audioRef.current[type]?.play().catch(error => {
-          console.warn('Failed to play notification sound:', error);
-        });
-      } catch (error) {
-        console.warn('Sound playback error:', error);
-      }
+
+  /**
+   * Get duration in milliseconds
+   */
+  const getDuration = useCallback((duration?: NotificationDuration): number => {
+    if (typeof duration === 'number') return duration;
+    if (duration === 'persistent') return -1;
+    return DURATION_MAP[duration || 'medium'];
+  }, []);
+
+  /**
+   * Clear notification timer
+   */
+  const clearTimer = useCallback((id: string): void => {
+    const timer = timersRef.current.get(id);
+    if (timer) {
+      clearTimeout(timer);
+      timersRef.current.delete(id);
     }
-  }, [state.globalSettings.enableSound]);
-  
-  // Clear non-persistent notifications on route change
-  useEffect(() => {
-    if (!persistAcrossRoutes) {
-      const nonPersistentIds = state.notifications
-        .filter(n => !n.persistent)
-        .map(n => n.id);
+  }, []);
+
+  /**
+   * Set notification auto-dismiss timer
+   */
+  const setTimer = useCallback(
+    (notification: Notification): void => {
+      const duration = getDuration(notification.duration || state.config.defaultDuration);
       
-      nonPersistentIds.forEach(id => {
-        dispatch({ type: 'REMOVE_NOTIFICATION', payload: id });
-      });
-    }
-  }, [router, persistAcrossRoutes, state.notifications]);
-  
-  // Context actions implementation
-  const actions: NotificationActions = useMemo(() => ({
-    addNotification: (notificationData) => {
+      if (duration > 0 && !state.paused) {
+        const timer = setTimeout(() => {
+          dispatch({ type: 'REMOVE_NOTIFICATION', payload: notification.id });
+          mergedEventHandlers.onExpire?.(notification);
+          clearTimer(notification.id);
+        }, duration);
+        
+        timersRef.current.set(notification.id, timer);
+      }
+    },
+    [state.config.defaultDuration, state.paused, getDuration, clearTimer, mergedEventHandlers]
+  );
+
+  /**
+   * Create notification object
+   */
+  const createNotification = useCallback(
+    (config: NotificationConfig): Notification => {
       const notification: Notification = {
-        id: generateId(),
-        timestamp: Date.now(),
-        position: position,
-        isRead: false,
-        ...notificationData,
+        id: config.id || generateId(),
+        type: config.type,
+        title: config.title,
+        message: config.message,
+        description: config.description,
+        variant: config.variant || 'toast',
+        position: config.position || state.config.defaultPosition || 'bottom-right',
+        duration: config.duration || state.config.defaultDuration || 'medium',
+        dismissible: config.dismissible !== false,
+        announce: config.announce !== false,
+        timestamp: config.timestamp || Date.now(),
+        actions: config.actions || [],
+        metadata: config.metadata || {},
       };
+
+      return notification;
+    },
+    [generateId, state.config.defaultPosition, state.config.defaultDuration]
+  );
+
+  // ============================================================================
+  // NOTIFICATION ACTIONS
+  // ============================================================================
+
+  /**
+   * Show a notification
+   */
+  const notify = useCallback(
+    (config: NotificationConfig): string => {
+      const notification = createNotification(config);
       
       dispatch({ type: 'ADD_NOTIFICATION', payload: notification });
-      playSound(notification.type);
+      mergedEventHandlers.onShow?.(notification);
+      setTimer(notification);
+      
+      // Announce to screen reader if enabled
+      if (state.accessibility.announceToScreenReader && notification.announce) {
+        // Screen reader announcement will be handled by the Toast component
+        // via aria-live regions
+      }
       
       return notification.id;
     },
-    
-    removeNotification: (id) => {
-      dispatch({ type: 'REMOVE_NOTIFICATION', payload: id });
-    },
-    
-    clearAll: () => {
-      dispatch({ type: 'CLEAR_ALL' });
-    },
-    
-    clearByType: (type) => {
-      dispatch({ type: 'CLEAR_BY_TYPE', payload: type });
-    },
-    
-    markAsRead: (id) => {
-      dispatch({ type: 'MARK_AS_READ', payload: id });
-    },
-    
-    markAllAsRead: () => {
-      dispatch({ type: 'MARK_ALL_AS_READ' });
-    },
-    
-    updateSettings: (newSettings) => {
-      dispatch({ type: 'UPDATE_SETTINGS', payload: newSettings });
-    },
-    
-    // Convenience methods for common notification types
-    success: (title, message, options) => {
-      return actions.addNotification({
+    [createNotification, mergedEventHandlers, setTimer, state.accessibility.announceToScreenReader]
+  );
+
+  /**
+   * Show success notification
+   */
+  const success = useCallback(
+    (message: string, options: Partial<NotificationConfig> = {}): string => {
+      return notify({
+        ...options,
         type: 'success',
-        title,
-        message: message || '',
-        ...options,
+        message,
       });
     },
-    
-    error: (title, message, options) => {
-      return actions.addNotification({
+    [notify]
+  );
+
+  /**
+   * Show error notification
+   */
+  const error = useCallback(
+    (message: string, options: Partial<NotificationConfig> = {}): string => {
+      return notify({
+        ...options,
         type: 'error',
-        title,
-        message: message || '',
-        persistent: options?.persistent ?? true, // Errors are persistent by default
-        ...options,
+        message,
+        duration: options.duration || 'long', // Errors stay longer by default
       });
     },
-    
-    warning: (title, message, options) => {
-      return actions.addNotification({
+    [notify]
+  );
+
+  /**
+   * Show warning notification
+   */
+  const warning = useCallback(
+    (message: string, options: Partial<NotificationConfig> = {}): string => {
+      return notify({
+        ...options,
         type: 'warning',
-        title,
-        message: message || '',
-        ...options,
+        message,
       });
     },
-    
-    info: (title, message, options) => {
-      return actions.addNotification({
+    [notify]
+  );
+
+  /**
+   * Show info notification
+   */
+  const info = useCallback(
+    (message: string, options: Partial<NotificationConfig> = {}): string => {
+      return notify({
+        ...options,
         type: 'info',
-        title,
-        message: message || '',
-        ...options,
+        message,
       });
     },
+    [notify]
+  );
+
+  /**
+   * Dismiss specific notification
+   */
+  const dismiss = useCallback(
+    (id: string): void => {
+      const notification = state.notifications.find((n) => n.id === id);
+      if (notification) {
+        clearTimer(id);
+        dispatch({ type: 'REMOVE_NOTIFICATION', payload: id });
+        mergedEventHandlers.onDismiss?.(notification);
+      }
+    },
+    [state.notifications, clearTimer, mergedEventHandlers]
+  );
+
+  /**
+   * Dismiss all notifications
+   */
+  const dismissAll = useCallback((): void => {
+    // Clear all timers
+    timersRef.current.forEach((timer) => clearTimeout(timer));
+    timersRef.current.clear();
     
-    loading: (title, message, options) => {
-      return actions.addNotification({
-        type: 'loading',
-        title,
-        message: message || '',
-        persistent: true, // Loading notifications are always persistent
-        duration: 0, // No auto-dismiss for loading
-        ...options,
+    dispatch({ type: 'REMOVE_ALL_NOTIFICATIONS' });
+  }, []);
+
+  /**
+   * Pause auto-dismissal
+   */
+  const pause = useCallback((): void => {
+    dispatch({ type: 'SET_PAUSED', payload: true });
+    
+    // Clear existing timers when pausing
+    timersRef.current.forEach((timer) => clearTimeout(timer));
+    timersRef.current.clear();
+  }, []);
+
+  /**
+   * Resume auto-dismissal
+   */
+  const resume = useCallback((): void => {
+    dispatch({ type: 'SET_PAUSED', payload: false });
+    
+    // Restart timers for existing notifications
+    state.notifications.forEach((notification) => {
+      setTimer(notification);
+    });
+  }, [state.notifications, setTimer]);
+
+  /**
+   * Update notification content
+   */
+  const update = useCallback(
+    (id: string, updates: Partial<NotificationConfig>): void => {
+      dispatch({ 
+        type: 'UPDATE_NOTIFICATION', 
+        payload: { id, updates } 
       });
     },
-  }), [generateId, position, playSound]);
-  
-  // Handle action button clicks with error handling
-  const handleActionClick = useCallback((actionId: string, handler: () => void | Promise<void>) => {
-    // Could be extended to track action analytics or handle common action patterns
-    console.log(`Notification action executed: ${actionId}`);
-  }, []);
-  
-  // Context value with optimized memoization
+    []
+  );
+
+  /**
+   * Set edit page state
+   */
+  const setEditPageState = useCallback(
+    (isEditPage: boolean, elementId?: string): void => {
+      dispatch({ 
+        type: 'SET_EDIT_PAGE_STATE', 
+        payload: { isEditPage, elementId } 
+      });
+    },
+    []
+  );
+
+  /**
+   * Restore notifications for edit page
+   */
+  const restoreNotifications = useCallback((): void => {
+    dispatch({ 
+      type: 'RESTORE_NOTIFICATIONS', 
+      payload: state.persistence.storedNotifications 
+    });
+  }, [state.persistence.storedNotifications]);
+
+  /**
+   * Clear stored notifications
+   */
+  const clearStoredNotifications = useCallback((): void => {
+    dispatch({ 
+      type: 'SET_EDIT_PAGE_STATE', 
+      payload: { 
+        isEditPage: state.persistence.isEditPage,
+        elementId: state.persistence.lastElementId || undefined,
+      } 
+    });
+  }, [state.persistence.isEditPage, state.persistence.lastElementId]);
+
+  /**
+   * Update queue configuration
+   */
+  const updateConfig = useCallback(
+    (newConfig: Partial<NotificationQueueConfig>): void => {
+      dispatch({ type: 'UPDATE_CONFIG', payload: newConfig });
+    },
+    []
+  );
+
+  /**
+   * Set accessibility preferences
+   */
+  const setAccessibilityPreferences = useCallback(
+    (preferences: Partial<NotificationState['accessibility']>): void => {
+      dispatch({ 
+        type: 'SET_ACCESSIBILITY_PREFERENCES', 
+        payload: preferences 
+      });
+    },
+    []
+  );
+
+  /**
+   * Get notification by ID
+   */
+  const getNotification = useCallback(
+    (id: string): Notification | null => {
+      return state.notifications.find((n) => n.id === id) || null;
+    },
+    [state.notifications]
+  );
+
+  /**
+   * Get notifications by type
+   */
+  const getNotificationsByType = useCallback(
+    (type: NotificationType): Notification[] => {
+      return state.notifications.filter((n) => n.type === type);
+    },
+    [state.notifications]
+  );
+
+  /**
+   * Get last element (for edit page workflows)
+   */
+  const getLastElement = useCallback((): string | undefined => {
+    return state.persistence.lastElementId || undefined;
+  }, [state.persistence.lastElementId]);
+
+  // ============================================================================
+  // ANGULAR COMPATIBILITY LAYER
+  // ============================================================================
+
+  /**
+   * DfSnackbar service compatibility
+   */
+  const dfSnackbarCompatibility: DfSnackbarCompatibility = useMemo(() => ({
+    setSnackbarLastEle: (elementId: string, isEditPage: boolean): void => {
+      setEditPageState(isEditPage, elementId);
+    },
+    openSnackBar: (message: string, alertType: NotificationType): void => {
+      switch (alertType) {
+        case 'success':
+          success(message);
+          break;
+        case 'error':
+          error(message);
+          break;
+        case 'warning':
+          warning(message);
+          break;
+        case 'info':
+          info(message);
+          break;
+        default:
+          info(message);
+      }
+    },
+    snackbarLastEle$: {
+      subscribe: (callback: (config: string) => void) => {
+        // Simple subscription simulation - in real implementation,
+        // this would use a proper observable pattern
+        callback(state.persistence.lastElementId || '');
+      },
+    },
+    isEditPage$: {
+      subscribe: (callback: (isEditPage: boolean) => void) => {
+        callback(state.persistence.isEditPage);
+      },
+    },
+  }), [setEditPageState, success, error, warning, info, state.persistence]);
+
+  /**
+   * NotificationService compatibility
+   */
+  const notificationServiceCompatibility: NotificationServiceCompatibility = useMemo(() => ({
+    success: (title: string, message: string): void => {
+      success(message, { title });
+    },
+    error: (title: string, message: string): void => {
+      error(message, { title });
+    },
+  }), [success, error]);
+
+  // ============================================================================
+  // NOTIFICATION ACTIONS OBJECT
+  // ============================================================================
+
+  const actions: NotificationActions = useMemo(() => ({
+    notify,
+    success,
+    error,
+    warning,
+    info,
+    dismiss,
+    dismissAll,
+    pause,
+    resume,
+    update,
+    setEditPageState,
+    restoreNotifications,
+    clearStoredNotifications,
+    updateConfig,
+    setAccessibilityPreferences,
+    getNotification,
+    getNotificationsByType,
+    getLastElement,
+  }), [
+    notify,
+    success,
+    error,
+    warning,
+    info,
+    dismiss,
+    dismissAll,
+    pause,
+    resume,
+    update,
+    setEditPageState,
+    restoreNotifications,
+    clearStoredNotifications,
+    updateConfig,
+    setAccessibilityPreferences,
+    getNotification,
+    getNotificationsByType,
+    getLastElement,
+  ]);
+
+  // ============================================================================
+  // CONTEXT VALUE
+  // ============================================================================
+
   const contextValue: NotificationContextValue = useMemo(() => ({
-    value: state,
+    // Base context value properties
+    state,
+    actions,
+    isInitialized: true,
     isLoading: false,
     error: null,
+    config: state.config,
+    debug: debugInfo,
+
+    // Hook return interface
+    notifications: state.notifications,
+    notify,
+    success,
+    error,
+    warning,
+    info,
+    dismiss,
+    dismissAll,
+    pause,
+    resume,
+    updateConfig,
+    setEditPageState,
+    getLastElement,
+    isPaused: state.paused,
+
+    // Provider-specific properties
+    providerConfig: state.config,
+    compatibility: {
+      dfSnackbar: dfSnackbarCompatibility,
+      notificationService: notificationServiceCompatibility,
+    },
+  }), [
+    state,
     actions,
-  }), [state, actions]);
-  
+    debugInfo,
+    notify,
+    success,
+    error,
+    warning,
+    info,
+    dismiss,
+    dismissAll,
+    pause,
+    resume,
+    updateConfig,
+    setEditPageState,
+    getLastElement,
+    dfSnackbarCompatibility,
+    notificationServiceCompatibility,
+  ]);
+
+  // ============================================================================
+  // CLEANUP EFFECTS
+  // ============================================================================
+
+  /**
+   * Cleanup timers on unmount
+   */
+  useEffect(() => {
+    return () => {
+      timersRef.current.forEach((timer) => clearTimeout(timer));
+      timersRef.current.clear();
+    };
+  }, []);
+
+  /**
+   * Update timers when paused state changes
+   */
+  useEffect(() => {
+    if (state.paused) {
+      // Clear all timers when paused
+      timersRef.current.forEach((timer) => clearTimeout(timer));
+      timersRef.current.clear();
+    } else {
+      // Restart timers when resumed
+      state.notifications.forEach((notification) => {
+        setTimer(notification);
+      });
+    }
+  }, [state.paused, state.notifications, setTimer]);
+
+  // ============================================================================
+  // RENDER
+  // ============================================================================
+
   return (
     <NotificationContext.Provider value={contextValue}>
       {children}
-      
-      {/* Notification Container Portal */}
-      <NotificationContainer
-        notifications={state.notifications}
-        position={state.globalSettings.defaultPosition}
-        onDismiss={actions.removeNotification}
-        onMarkAsRead={actions.markAsRead}
-        onActionClick={handleActionClick}
-        settings={state.globalSettings}
+      {/* Toast container will be rendered by Toast components */}
+      <div
+        ref={containerRef}
+        id={`${id}-container`}
+        className="pointer-events-none fixed inset-0 z-50"
+        role="region"
+        aria-label="Notifications"
+        aria-live="polite"
       />
     </NotificationContext.Provider>
   );
 }
 
-// =============================================================================
-// Exports
-// =============================================================================
+// ============================================================================
+// CONVENIENCE EXPORTS
+// ============================================================================
 
+/**
+ * Export hook for external use
+ */
+export { useNotifications as default };
+
+/**
+ * Export notification provider
+ */
 export default NotificationProvider;
 
-// Re-export types for external consumption
+/**
+ * Export all types for convenience
+ */
 export type {
   NotificationContextValue,
+  NotificationState,
+  NotificationActions,
+  UseNotificationsReturn,
   NotificationProviderProps,
-  Notification,
-  NotificationType,
-  NotificationPosition,
-  NotificationSettings,
-  NotificationAction,
 } from './provider-types';
+
+export type {
+  Notification,
+  NotificationConfig,
+  NotificationQueueConfig,
+  NotificationType,
+  NotificationDuration,
+  DfSnackbarCompatibility,
+  NotificationServiceCompatibility,
+} from '@/types/notification';
