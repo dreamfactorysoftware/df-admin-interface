@@ -1,162 +1,138 @@
 /**
  * @fileoverview Scheduler Hooks Barrel Export
+ * @description Centralized export module for all scheduler-related React hooks
  * 
- * Centralized export file for all scheduler-related React hooks and their associated types.
- * Provides clean imports throughout the application while supporting tree-shaking for
- * optimal bundle size with Turbopack optimization.
+ * This barrel export file provides a single entry point for importing scheduler hooks
+ * throughout the application, following TypeScript module organization best practices
+ * per Section 3.1. Enables tree-shaking optimization and consistent import patterns
+ * across React components per React/Next.js Integration Requirements.
  * 
- * This barrel export follows TypeScript module organization patterns per Section 3.1
- * and React/Next.js Integration Requirements for consistent naming and development experience.
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  * 
  * @example
- * ```tsx
- * // Import specific hooks and types
- * import { 
- *   useSchedulerTasks, 
- *   useCreateSchedulerTask,
- *   type SchedulerTasksQueryParams 
- * } from '@/app/system-settings/scheduler/hooks';
+ * ```typescript
+ * // Import individual hooks
+ * import { useSchedulerTasks, useCreateSchedulerTask } from './hooks';
  * 
- * // Import all hooks (not recommended due to bundle size)
- * import * as schedulerHooks from '@/app/system-settings/scheduler/hooks';
+ * // Import with type definitions
+ * import { 
+ *   useSchedulerTask, 
+ *   type SchedulerTaskError 
+ * } from './hooks';
+ * 
+ * // Import utility functions
+ * import { 
+ *   getSchedulerTaskErrorMessage,
+ *   ComponentAccessListError 
+ * } from './hooks';
  * ```
  */
 
-// Component Access List Hook Exports
-export {
-  default as useComponentAccessList,
-  useComponentAccessList,
-  hasComponentAccessData,
-  getComponentOptions
-} from './useComponentAccessList';
+// =============================================================================
+// SCHEDULER TASK MANAGEMENT HOOKS
+// =============================================================================
 
-// Create Scheduler Task Hook Exports
+/**
+ * Hook for fetching and managing scheduler task lists
+ * Provides pagination, filtering, sorting, and real-time synchronization
+ */
 export {
-  useCreateSchedulerTask,
-  shouldCreateTask,
-  prepareCreatePayload,
-  useCreateSchedulerTaskAdvanced,
-  type CreateSchedulerTaskOptions
-} from './useCreateSchedulerTask';
-
-// Delete Scheduler Task Hook Exports  
-export {
-  useDeleteSchedulerTask,
-  useDeleteSchedulerTaskWithConfirmation,
-  useDeleteSchedulerTaskAdvanced,
-  type DeleteSchedulerTaskOptions
-} from './useDeleteSchedulerTask';
-
-// Individual Scheduler Task Hook Exports
-export {
-  useSchedulerTask,
-  type UseSchedulerTaskResult
-} from './useSchedulerTask';
-
-// Scheduler Tasks List Hook Exports
-export {
-  default as useSchedulerTasks,
   useSchedulerTasks,
-  type SchedulerTasksQueryParams,
-  type UseSchedulerTasksReturn
+  useInvalidateSchedulerTasks,
+  usePrefetchSchedulerTasks
 } from './useSchedulerTasks';
 
-// Services Hook Exports
+/**
+ * Hook for fetching individual scheduler task data
+ * Enables conditional fetching with intelligent caching and error handling
+ */
 export {
-  default as useServices,
-  useServices,
-  useServiceDropdownOptions,
-  type Service,
-  type GenericListResponse,
-  type ServiceFilterOptions,
-  type UseServicesOptions,
-  type UseServicesResult,
-  type ServiceDropdownOption
-} from './useServices';
+  useSchedulerTask,
+  isSchedulerTaskError,
+  getSchedulerTaskErrorMessage
+} from './useSchedulerTask';
 
-// Update Scheduler Task Hook Exports
-export {
-  useUpdateSchedulerTask,
-  shouldUpdateTask,
-  prepareUpdatePayload
+// =============================================================================
+// SCHEDULER TASK MUTATION HOOKS
+// =============================================================================
+
+/**
+ * Hook for creating new scheduler tasks
+ * Implements optimistic updates with automatic rollback on failure
+ */
+export { useCreateSchedulerTask } from './useCreateSchedulerTask';
+
+/**
+ * Hook for updating existing scheduler tasks
+ * Provides optimistic updates and comprehensive validation error handling
+ */
+export { useUpdateSchedulerTask } from './useUpdateSchedulerTask';
+
+/**
+ * Hook for deleting scheduler tasks
+ * Implements optimistic deletion with automatic rollback and confirmation workflows
+ */
+export { useDeleteSchedulerTask } from './useDeleteSchedulerTask';
+
+// =============================================================================
+// SUPPORTING DATA HOOKS
+// =============================================================================
+
+/**
+ * Hook for fetching available services for scheduler configuration
+ * Provides filtered service options optimized for dropdown components
+ */
+export { useServices } from './useServices';
+
+/**
+ * Hook for component access list fetching based on selected service
+ * Enables conditional fetching with service-dependent component options
+ */
+export { 
+  useComponentAccessList,
+  ComponentAccessListError 
+} from './useComponentAccessList';
+
+// =============================================================================
+// TYPE EXPORTS
+// =============================================================================
+
+// Scheduler task list hook types
+export type {
+  SchedulerTaskQueryParams,
+  UseSchedulerTasksOptions,
+  UseSchedulerTasksResult
+} from './useSchedulerTasks';
+
+// Individual scheduler task hook types
+export type {
+  SchedulerTaskError,
+  UseSchedulerTaskOptions
+} from './useSchedulerTask';
+
+// Create scheduler task hook types
+export type {
+  CreateSchedulePayload,
+  CreateSchedulerTaskVariables
+} from './useCreateSchedulerTask';
+
+// Update scheduler task hook types
+export type {
+  UpdateSchedulePayload,
+  UpdateSchedulerTaskVariables
 } from './useUpdateSchedulerTask';
 
-/**
- * React hook for fetching scheduler task list with intelligent caching and pagination.
- * 
- * Replaces Angular DfManageSchedulerTableComponent data fetching patterns with modern
- * server state management using TanStack React Query. Provides comprehensive pagination,
- * filtering, and background synchronization capabilities.
- * 
- * @category Data Fetching
- * @subcategory List Management
- */
-// Re-export useSchedulerTasks with JSDoc for primary hook
+// Services hook types
+export type {
+  ServiceDropdownOption,
+  ServicesFilter,
+  UseServicesOptions,
+  UseServicesReturn
+} from './useServices';
 
-/**
- * React hook for fetching individual scheduler task details.
- * 
- * Implements conditional fetching based on task ID with intelligent caching
- * and automatic background synchronization for real-time data updates.
- * 
- * @category Data Fetching  
- * @subcategory Detail Management
- */
-// Re-export useSchedulerTask with JSDoc for primary hook
-
-/**
- * React mutation hook for creating new scheduler tasks with optimistic updates.
- * 
- * Provides immediate UI feedback through optimistic cache updates and automatic
- * rollback on failure. Includes comprehensive validation error handling and
- * success notification integration.
- * 
- * @category Data Mutations
- * @subcategory Create Operations
- */
-// Re-export useCreateSchedulerTask with JSDoc for primary hook
-
-/**
- * React mutation hook for updating existing scheduler tasks with optimistic updates.
- * 
- * Implements intelligent cache management for both individual tasks and task lists
- * with automatic rollback capabilities and field-specific validation error handling.
- * 
- * @category Data Mutations
- * @subcategory Update Operations  
- */
-// Re-export useUpdateSchedulerTask with JSDoc for primary hook
-
-/**
- * React mutation hook for deleting scheduler tasks with optimistic updates.
- * 
- * Provides immediate UI feedback by optimistically removing tasks from cache
- * with automatic rollback on failure and comprehensive error handling.
- * 
- * @category Data Mutations
- * @subcategory Delete Operations
- */
-// Re-export useDeleteSchedulerTask with JSDoc for primary hook
-
-/**
- * React hook for fetching available services for scheduler configuration dropdowns.
- * 
- * Implements intelligent caching for relatively static service data with filtering
- * and search capabilities for large service lists.
- * 
- * @category Data Fetching
- * @subcategory Reference Data
- */
-// Re-export useServices with JSDoc for primary hook
-
-/**
- * React hook for fetching component access lists based on selected service.
- * 
- * Implements conditional fetching with intelligent caching and automatic refetching
- * when service selection changes. Provides comprehensive error handling for
- * authentication and authorization scenarios.
- * 
- * @category Data Fetching
- * @subcategory Dynamic Configuration
- */
-// Re-export useComponentAccessList with JSDoc for primary hook
+// Component access list hook types
+export type {
+  UseComponentAccessListParams,
+  UseComponentAccessListReturn
+} from './useComponentAccessList';
