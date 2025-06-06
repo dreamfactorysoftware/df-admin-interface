@@ -1,286 +1,342 @@
 /**
- * React Query-based CORS Configuration Hooks
+ * React Query-based custom hooks for CORS configuration data fetching.
  * 
- * Replaces Angular corsConfigResolver with React Query useQuery hooks providing
- * intelligent caching and conditional parameter handling for CORS configuration
- * data fetching. Supports both list fetching (useCorsConfigs) and individual
- * CORS configuration fetching (useCorsConfig) with advanced cache management
- * and background synchronization.
+ * Provides both CORS configuration list (useCorsConfigs) and individual CORS 
+ * configuration (useCorsConfig) data fetching with advanced caching and 
+ * conditional parameter handling. Replaces the Angular corsConfigResolver by 
+ * implementing React Query useQuery with route parameter-based conditional logic, 
+ * supporting both list fetching with includeCount and individual item fetching by ID.
  * 
  * Features:
- * - Cache hit responses under 50ms per React/Next.js Integration Requirements
- * - TanStack React Query 5.0.0 for complex conditional server-state management
- * - TTL configuration (staleTime: 300s, cacheTime: 900s) with automatic background revalidation
- * - Conditional queries based on optional ID parameter
- * - Maintains backend API compatibility with includeCount: true for list requests
+ * - Intelligent cache management with 300s stale time and 900s cache time
+ * - Background synchronization and automatic revalidation
+ * - Sub-50ms cache hit responses for optimal performance
+ * - Conditional query execution based on parameter presence
+ * - Full TypeScript integration with DreamFactory API contracts
+ * - Error handling with React Query error boundaries
  * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
+ * @fileoverview CORS configuration React Query resolver hooks
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { apiClient } from '../../../lib/api-client';
-import { GenericListResponse } from '../../../types/generic-http';
-import { CorsConfigData } from '../../../types/config';
+import { apiGet } from '@/lib/api-client';
+import type { 
+  ApiListResponse, 
+  ApiResourceResponse,
+  ApiRequestOptions 
+} from '@/types/api';
+import type { GenericListResponse } from '@/types/generic-http';
 
-// =============================================================================
-// QUERY KEYS AND CACHE CONFIGURATION
-// =============================================================================
+// ============================================================================
+// Type Definitions
+// ============================================================================
+
+/**
+ * CORS configuration data structure from DreamFactory API
+ */
+export interface CorsConfigData {
+  createdById: number | null;
+  createdDate: string | null;
+  description: string;
+  enabled: boolean;
+  exposedHeader: string | null;
+  header: string;
+  id: number;
+  lastModifiedById: number | null;
+  lastModifiedDate: string | null;
+  maxAge: number;
+  method: string[];
+  origin: string;
+  path: string;
+  supportsCredentials: boolean;
+}
 
 /**
  * Query key factory for CORS configuration queries
- * Provides centralized key management for cache invalidation and dependency tracking
  */
 export const corsConfigKeys = {
-  /** Base key for all CORS configuration queries */
   all: ['cors-config'] as const,
-  
-  /** Key for CORS configuration list queries */
   lists: () => [...corsConfigKeys.all, 'list'] as const,
-  
-  /** Key for CORS configuration list with includeCount parameter */
-  list: (includeCount = true) => [...corsConfigKeys.lists(), { includeCount }] as const,
-  
-  /** Key for individual CORS configuration detail queries */
+  list: (options?: ApiRequestOptions) => [...corsConfigKeys.lists(), options] as const,
   details: () => [...corsConfigKeys.all, 'detail'] as const,
-  
-  /** Key for specific CORS configuration by ID */
-  detail: (id: string | number) => [...corsConfigKeys.details(), id] as const,
-};
-
-/**
- * Cache configuration constants per React/Next.js Integration Requirements
- * - staleTime: 300s (5 minutes) - data considered fresh
- * - gcTime: 900s (15 minutes) - cache retention time
- * - Enables background revalidation for optimal UX
- */
-const CACHE_CONFIG = {
-  staleTime: 5 * 60 * 1000, // 300 seconds
-  gcTime: 15 * 60 * 1000,   // 900 seconds (React Query 5.0 uses gcTime instead of cacheTime)
-  refetchOnWindowFocus: false,
-  refetchOnReconnect: true,
-  retry: 3,
-  retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 30000),
+  detail: (id: number) => [...corsConfigKeys.details(), id] as const,
 } as const;
 
-// =============================================================================
-// API ENDPOINTS AND CONFIGURATION
-// =============================================================================
+// ============================================================================
+// API Client Functions
+// ============================================================================
 
 /**
- * CORS configuration API endpoints
- * Maintains compatibility with existing DreamFactory Core API structure
+ * Fetch CORS configurations list from DreamFactory API
  */
-const CORS_API_BASE = '/system/cors';
+async function fetchCorsConfigs(
+  options: ApiRequestOptions = {}
+): Promise<GenericListResponse<CorsConfigData>> {
+  const defaultOptions: ApiRequestOptions = {
+    includeCount: true,
+    snackbarError: 'Failed to load CORS configurations',
+    ...options,
+  };
 
-/**
- * Fetches CORS configuration list from the API
- * @param includeCount - Whether to include total count in response metadata
- * @returns Promise resolving to paginated list of CORS configurations
- */
-async function fetchCorsConfigs(includeCount: boolean = true): Promise<GenericListResponse<CorsConfigData>> {
-  const params = new URLSearchParams();
-  if (includeCount) {
-    params.append('include_count', 'true');
-  }
-  
-  const url = `${CORS_API_BASE}${params.toString() ? `?${params.toString()}` : ''}`;
-  return apiClient.get(url);
+  return apiGet<GenericListResponse<CorsConfigData>>(
+    '/api/v2/system/config/cors',
+    defaultOptions
+  );
 }
 
 /**
- * Fetches individual CORS configuration by ID
- * @param id - CORS configuration identifier
- * @returns Promise resolving to CORS configuration data
+ * Fetch individual CORS configuration by ID from DreamFactory API
  */
-async function fetchCorsConfig(id: string | number): Promise<CorsConfigData> {
-  return apiClient.get(`${CORS_API_BASE}/${id}`);
+async function fetchCorsConfig(
+  id: number,
+  options: ApiRequestOptions = {}
+): Promise<CorsConfigData> {
+  const defaultOptions: ApiRequestOptions = {
+    snackbarError: `Failed to load CORS configuration ${id}`,
+    ...options,
+  };
+
+  return apiGet<CorsConfigData>(
+    `/api/v2/system/config/cors/${id}`,
+    defaultOptions
+  );
 }
 
-// =============================================================================
-// REACT QUERY HOOKS
-// =============================================================================
+// ============================================================================
+// React Query Hooks
+// ============================================================================
 
 /**
- * Hook for fetching paginated list of CORS configurations
+ * Custom hook for fetching CORS configurations list with React Query.
  * 
- * Provides intelligent caching with sub-50ms cache hit responses and automatic
- * background revalidation. Maintains backend compatibility with includeCount
- * parameter for pagination metadata.
+ * Features:
+ * - Automatic caching with 300s stale time and 900s cache time
+ * - Background revalidation when data becomes stale
+ * - includeCount: true for pagination metadata
+ * - Error handling with retry logic
+ * - Cache hit responses under 50ms performance target
  * 
- * @param options - Query configuration options
- * @param options.includeCount - Include total count in response metadata (default: true)
- * @param options.enabled - Whether to enable the query (default: true)
- * @returns UseQueryResult containing CORS configurations list and metadata
+ * @param options - Optional API request configuration
+ * @returns UseQueryResult with CORS configurations list
  * 
  * @example
  * ```tsx
- * const { data, isLoading, error } = useCorsConfigs({
- *   includeCount: true,
- *   enabled: true
- * });
- * 
- * if (isLoading) return <LoadingSpinner />;
- * if (error) return <ErrorMessage error={error} />;
- * 
- * return (
- *   <div>
- *     <p>Total: {data?.meta.count}</p>
- *     {data?.resource.map(config => (
- *       <CorsConfigItem key={config.id} config={config} />
- *     ))}
- *   </div>
- * );
+ * function CorsConfigList() {
+ *   const { data, isLoading, error } = useCorsConfigs();
+ *   
+ *   if (isLoading) return <LoadingSpinner />;
+ *   if (error) return <ErrorMessage error={error} />;
+ *   
+ *   return (
+ *     <div>
+ *       <h2>CORS Configurations ({data?.meta?.count || 0})</h2>
+ *       {data?.resource?.map(config => (
+ *         <CorsConfigRow key={config.id} config={config} />
+ *       ))}
+ *     </div>
+ *   );
+ * }
  * ```
  */
-export function useCorsConfigs(options: {
-  includeCount?: boolean;
-  enabled?: boolean;
-} = {}): UseQueryResult<GenericListResponse<CorsConfigData>, Error> {
-  const { includeCount = true, enabled = true } = options;
-
+export function useCorsConfigs(
+  options?: ApiRequestOptions
+): UseQueryResult<GenericListResponse<CorsConfigData>, Error> {
   return useQuery({
-    queryKey: corsConfigKeys.list(includeCount),
-    queryFn: () => fetchCorsConfigs(includeCount),
-    enabled,
-    ...CACHE_CONFIG,
-    meta: {
-      description: 'Fetch paginated CORS configuration list with intelligent caching',
+    queryKey: corsConfigKeys.list(options),
+    queryFn: () => fetchCorsConfigs(options),
+    staleTime: 5 * 60 * 1000, // 300 seconds (5 minutes)
+    gcTime: 15 * 60 * 1000, // 900 seconds (15 minutes) - formerly cacheTime
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    retry: (failureCount, error) => {
+      // Retry up to 3 times for network errors, but not for auth errors
+      if (failureCount >= 3) return false;
+      if (error?.message?.includes('401') || error?.message?.includes('403')) {
+        return false;
+      }
+      return true;
     },
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 }
 
 /**
- * Hook for fetching individual CORS configuration by ID
+ * Custom hook for fetching individual CORS configuration by ID with React Query.
  * 
- * Implements conditional query logic based on ID parameter presence. Provides
- * optimized caching with automatic background synchronization and error handling.
- * Cache hits respond under 50ms per performance requirements.
+ * Features:
+ * - Conditional query execution (only runs when ID is provided)
+ * - Automatic caching with 300s stale time and 900s cache time
+ * - Background revalidation when data becomes stale
+ * - Error handling with retry logic
+ * - Cache hit responses under 50ms performance target
  * 
- * @param id - CORS configuration identifier (optional)
- * @param options - Query configuration options
- * @param options.enabled - Override query enabled state (default: auto-enabled when ID exists)
- * @returns UseQueryResult containing individual CORS configuration data
- * 
- * @example
- * ```tsx
- * // Conditional fetching based on route parameter
- * const { id } = useParams();
- * const { data, isLoading, error } = useCorsConfig(id);
- * 
- * if (!id) return <CorsConfigList />;
- * if (isLoading) return <LoadingSpinner />;
- * if (error) return <ErrorMessage error={error} />;
- * 
- * return <CorsConfigDetail config={data} />;
- * ```
+ * @param id - CORS configuration ID (optional)
+ * @param options - Optional API request configuration
+ * @returns UseQueryResult with individual CORS configuration
  * 
  * @example
  * ```tsx
- * // Explicit control with custom enabled state
- * const { data } = useCorsConfig('123', {
- *   enabled: userHasPermission && !!selectedId
- * });
+ * function CorsConfigDetails({ id }: { id?: number }) {
+ *   const { data, isLoading, error } = useCorsConfig(id);
+ *   
+ *   if (!id) return <div>No CORS configuration selected</div>;
+ *   if (isLoading) return <LoadingSpinner />;
+ *   if (error) return <ErrorMessage error={error} />;
+ *   
+ *   return (
+ *     <div>
+ *       <h2>{data?.description}</h2>
+ *       <p>Path: {data?.path}</p>
+ *       <p>Origin: {data?.origin}</p>
+ *       <p>Enabled: {data?.enabled ? 'Yes' : 'No'}</p>
+ *     </div>
+ *   );
+ * }
  * ```
  */
 export function useCorsConfig(
-  id?: string | number | null,
-  options: {
-    enabled?: boolean;
-  } = {}
+  id?: number,
+  options?: ApiRequestOptions
 ): UseQueryResult<CorsConfigData, Error> {
-  const { enabled } = options;
-  
-  // Automatically enable query when ID exists, unless explicitly overridden
-  const isEnabled = enabled !== undefined ? enabled : Boolean(id);
-  
   return useQuery({
     queryKey: corsConfigKeys.detail(id!),
-    queryFn: () => fetchCorsConfig(id!),
-    enabled: isEnabled && Boolean(id),
-    ...CACHE_CONFIG,
-    meta: {
-      description: `Fetch CORS configuration detail for ID: ${id}`,
+    queryFn: () => fetchCorsConfig(id!, options),
+    enabled: !!id, // Only run query when ID is provided
+    staleTime: 5 * 60 * 1000, // 300 seconds (5 minutes)
+    gcTime: 15 * 60 * 1000, // 900 seconds (15 minutes) - formerly cacheTime
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    retry: (failureCount, error) => {
+      // Retry up to 3 times for network errors, but not for auth errors
+      if (failureCount >= 3) return false;
+      if (error?.message?.includes('401') || error?.message?.includes('403')) {
+        return false;
+      }
+      return true;
     },
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 }
 
-// =============================================================================
-// UTILITY FUNCTIONS AND CACHE MANAGEMENT
-// =============================================================================
-
 /**
- * Pre-built query options for common use cases
- * Provides standardized configurations for different scenarios
- */
-export const corsConfigQueryOptions = {
-  /**
-   * Standard list query options with count
-   */
-  list: (includeCount = true) => ({
-    queryKey: corsConfigKeys.list(includeCount),
-    queryFn: () => fetchCorsConfigs(includeCount),
-    ...CACHE_CONFIG,
-  }),
-
-  /**
-   * Standard detail query options
-   */
-  detail: (id: string | number) => ({
-    queryKey: corsConfigKeys.detail(id),
-    queryFn: () => fetchCorsConfig(id),
-    ...CACHE_CONFIG,
-  }),
-
-  /**
-   * Optimized options for server-side rendering
-   * Reduces cache time for SSR scenarios
-   */
-  ssr: {
-    list: (includeCount = true) => ({
-      ...corsConfigQueryOptions.list(includeCount),
-      staleTime: 60 * 1000, // 1 minute for SSR
-      gcTime: 5 * 60 * 1000, // 5 minutes for SSR
-    }),
-    detail: (id: string | number) => ({
-      ...corsConfigQueryOptions.detail(id),
-      staleTime: 60 * 1000, // 1 minute for SSR
-      gcTime: 5 * 60 * 1000, // 5 minutes for SSR
-    }),
-  },
-} as const;
-
-/**
- * Type definitions for enhanced type safety
- */
-export type CorsConfigsQueryResult = UseQueryResult<GenericListResponse<CorsConfigData>, Error>;
-export type CorsConfigQueryResult = UseQueryResult<CorsConfigData, Error>;
-
-/**
- * Export query keys for external cache invalidation
- * Useful for mutations and cache management in other components
- */
-export { corsConfigKeys as corsConfigQueryKeys };
-
-/**
- * Cache invalidation helpers
- * Provides utilities for manual cache management when needed
+ * Custom hook that conditionally fetches either CORS configurations list or 
+ * individual configuration based on provided ID parameter.
+ * 
+ * This hook replicates the exact logic of the original Angular corsConfigResolver,
+ * providing backward compatibility while leveraging React Query benefits.
+ * 
+ * Features:
+ * - Automatic conditional logic (list vs detail based on ID presence)
+ * - Maintains original resolver behavior pattern
+ * - Full React Query caching and error handling
+ * - TypeScript union return type for proper type safety
+ * 
+ * @param id - Optional CORS configuration ID
+ * @param options - Optional API request configuration
+ * @returns UseQueryResult with either list or individual configuration
  * 
  * @example
  * ```tsx
- * import { useQueryClient } from '@tanstack/react-query';
- * import { corsConfigQueryKeys } from './use-cors-config';
- * 
- * const queryClient = useQueryClient();
- * 
- * // Invalidate all CORS config queries
- * queryClient.invalidateQueries({ queryKey: corsConfigQueryKeys.all });
- * 
- * // Invalidate specific CORS config
- * queryClient.invalidateQueries({ queryKey: corsConfigQueryKeys.detail(id) });
+ * function CorsConfigResolver({ id }: { id?: number }) {
+ *   const { data, isLoading, error } = useCorsConfigResolver(id);
+ *   
+ *   if (isLoading) return <LoadingSpinner />;
+ *   if (error) return <ErrorMessage error={error} />;
+ *   
+ *   // Type-safe handling of union result
+ *   if ('resource' in data) {
+ *     // data is GenericListResponse<CorsConfigData>
+ *     return <CorsConfigList configs={data.resource} meta={data.meta} />;
+ *   } else {
+ *     // data is CorsConfigData
+ *     return <CorsConfigDetails config={data} />;
+ *   }
+ * }
  * ```
  */
-export const corsConfigCacheUtils = {
-  keys: corsConfigKeys,
-  config: CACHE_CONFIG,
-} as const;
+export function useCorsConfigResolver(
+  id?: number,
+  options?: ApiRequestOptions
+): UseQueryResult<GenericListResponse<CorsConfigData> | CorsConfigData, Error> {
+  // Use conditional hooks pattern to replicate Angular resolver logic
+  const listQuery = useCorsConfigs(options);
+  const detailQuery = useCorsConfig(id, options);
+
+  if (id) {
+    return detailQuery as UseQueryResult<GenericListResponse<CorsConfigData> | CorsConfigData, Error>;
+  } else {
+    return listQuery as UseQueryResult<GenericListResponse<CorsConfigData> | CorsConfigData, Error>;
+  }
+}
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
+/**
+ * Prefetch CORS configurations list for improved performance.
+ * Useful for preloading data on route transitions.
+ * 
+ * @param queryClient - React Query client instance
+ * @param options - Optional API request configuration
+ */
+export async function prefetchCorsConfigs(
+  queryClient: any, // QueryClient type from @tanstack/react-query
+  options?: ApiRequestOptions
+): Promise<void> {
+  await queryClient.prefetchQuery({
+    queryKey: corsConfigKeys.list(options),
+    queryFn: () => fetchCorsConfigs(options),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+/**
+ * Prefetch individual CORS configuration for improved performance.
+ * Useful for preloading data on route transitions.
+ * 
+ * @param queryClient - React Query client instance
+ * @param id - CORS configuration ID
+ * @param options - Optional API request configuration
+ */
+export async function prefetchCorsConfig(
+  queryClient: any, // QueryClient type from @tanstack/react-query
+  id: number,
+  options?: ApiRequestOptions
+): Promise<void> {
+  await queryClient.prefetchQuery({
+    queryKey: corsConfigKeys.detail(id),
+    queryFn: () => fetchCorsConfig(id, options),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+/**
+ * Invalidate CORS configuration queries to force refetch.
+ * Useful after mutations or when manual refresh is needed.
+ * 
+ * @param queryClient - React Query client instance
+ */
+export async function invalidateCorsConfigQueries(
+  queryClient: any // QueryClient type from @tanstack/react-query
+): Promise<void> {
+  await queryClient.invalidateQueries({
+    queryKey: corsConfigKeys.all,
+  });
+}
+
+// ============================================================================
+// Default Export
+// ============================================================================
+
+export default {
+  useCorsConfigs,
+  useCorsConfig,
+  useCorsConfigResolver,
+  corsConfigKeys,
+  prefetchCorsConfigs,
+  prefetchCorsConfig,
+  invalidateCorsConfigQueries,
+};
