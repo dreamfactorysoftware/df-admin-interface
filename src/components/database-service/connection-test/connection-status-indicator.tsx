@@ -1,418 +1,662 @@
 /**
  * Connection Status Indicator Component
  * 
- * React component that displays real-time connection status with visual indicators,
- * progress animations, and status messages. Shows loading spinners during tests,
- * success checkmarks for valid connections, and error states with detailed failure messages.
+ * React component that displays real-time connection status with visual indicators, 
+ * progress animations, and status messages. Shows loading spinners during tests, 
+ * success checkmarks for valid connections, and error states with detailed failure 
+ * messages. Implements WCAG 2.1 AA accessibility compliance with proper ARIA labeling.
  * 
- * Features:
- * - Real-time status updates using SWR data synchronization
- * - Tailwind CSS animations for smooth transitions
- * - WCAG 2.1 AA accessibility compliance with proper ARIA labeling
- * - TypeScript 5.8+ with strict type safety
- * - Integration with connection testing workflow
- * 
- * @fileoverview Connection status indicator for database service testing
+ * @fileoverview Real-time connection status display component with SWR integration
  * @version 1.0.0
  * @since 2024-01-01
  */
 
 'use client';
 
-import React, { useMemo, useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 import type { 
-  ConnectionTestStatus, 
-  ConnectionTestResult,
-  ConnectionStatusProps 
+  UseConnectionTestReturn, 
+  ConnectionTestResult, 
+  ConnectionTestStatus,
+  DatabaseConnectionFormData
 } from '../types';
 
-// Icon components - using simple SVG implementations for self-contained component
-const CheckCircleIcon = ({ className }: { className?: string }) => (
-  <svg 
-    className={className} 
-    fill="none" 
-    stroke="currentColor" 
-    viewBox="0 0 24 24"
-    aria-hidden="true"
-  >
-    <path 
-      strokeLinecap="round" 
-      strokeLinejoin="round" 
-      strokeWidth={2} 
-      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" 
-    />
-  </svg>
-);
+// =============================================================================
+// TYPES AND INTERFACES
+// =============================================================================
 
-const XCircleIcon = ({ className }: { className?: string }) => (
-  <svg 
-    className={className} 
-    fill="none" 
-    stroke="currentColor" 
-    viewBox="0 0 24 24"
-    aria-hidden="true"
-  >
-    <path 
-      strokeLinecap="round" 
-      strokeLinejoin="round" 
-      strokeWidth={2} 
-      d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" 
-    />
-  </svg>
-);
-
-const LoaderIcon = ({ className }: { className?: string }) => (
-  <svg 
-    className={cn("animate-spin", className)} 
-    fill="none" 
-    stroke="currentColor" 
-    viewBox="0 0 24 24"
-    aria-hidden="true"
-  >
-    <path 
-      strokeLinecap="round" 
-      strokeLinejoin="round" 
-      strokeWidth={2} 
-      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" 
-    />
-  </svg>
-);
-
-const ClockIcon = ({ className }: { className?: string }) => (
-  <svg 
-    className={className} 
-    fill="none" 
-    stroke="currentColor" 
-    viewBox="0 0 24 24"
-    aria-hidden="true"
-  >
-    <path 
-      strokeLinecap="round" 
-      strokeLinejoin="round" 
-      strokeWidth={2} 
-      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" 
-    />
-  </svg>
-);
-
-// Badge component implementation
-interface BadgeProps {
-  children: React.ReactNode;
-  variant?: 'default' | 'success' | 'error' | 'warning' | 'info';
+/**
+ * Props interface for the ConnectionStatusIndicator component
+ */
+export interface ConnectionStatusIndicatorProps {
+  /** Connection test hook instance providing status and control functions */
+  connectionTest: UseConnectionTestReturn;
+  
+  /** Database configuration for testing (optional for existing services) */
+  config?: DatabaseConnectionFormData;
+  
+  /** Show detailed status messages */
+  showDetails?: boolean;
+  
+  /** Show test duration when available */
+  showDuration?: boolean;
+  
+  /** Show retry count for failed connections */
+  showRetryCount?: boolean;
+  
+  /** Show last test timestamp */
+  showTimestamp?: boolean;
+  
+  /** Enable auto-retry on failure */
+  enableAutoRetry?: boolean;
+  
+  /** Auto-retry delay in milliseconds */
+  autoRetryDelay?: number;
+  
+  /** Maximum auto-retry attempts */
+  maxAutoRetries?: number;
+  
+  /** Custom success message override */
+  successMessage?: string;
+  
+  /** Custom error message override */
+  errorMessage?: string;
+  
+  /** Custom loading message override */
+  loadingMessage?: string;
+  
+  /** Callback when status changes */
+  onStatusChange?: (status: ConnectionTestStatus) => void;
+  
+  /** Callback when connection test succeeds */
+  onSuccess?: (result: ConnectionTestResult) => void;
+  
+  /** Callback when connection test fails */
+  onError?: (result: ConnectionTestResult) => void;
+  
+  /** Component size variant */
   size?: 'sm' | 'md' | 'lg';
+  
+  /** Hide status badge */
+  hideBadge?: boolean;
+  
+  /** Hide status message */
+  hideMessage?: boolean;
+  
+  /** Compact display mode */
+  compact?: boolean;
+  
+  /** CSS class name */
   className?: string;
+  
+  /** Test identifier for automated testing */
+  'data-testid'?: string;
 }
 
-const Badge: React.FC<BadgeProps> = ({ 
-  children, 
-  variant = 'default', 
-  size = 'md', 
-  className 
-}) => {
-  const baseClasses = "inline-flex items-center font-medium rounded-full border";
-  
-  const variantClasses = {
-    default: "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700",
-    success: "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800",
-    error: "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800",
-    warning: "bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400 dark:border-yellow-800",
-    info: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800"
+/**
+ * Status configuration for different connection states
+ */
+interface StatusConfig {
+  badge: {
+    variant: 'default' | 'secondary' | 'destructive' | 'success' | 'warning' | 'info';
+    text: string;
+    icon: string;
   };
-  
-  const sizeClasses = {
-    sm: "px-2 py-0.5 text-xs",
-    md: "px-2.5 py-1 text-sm",
-    lg: "px-3 py-1.5 text-base"
+  message: {
+    text: string;
+    className: string;
   };
+  indicator: {
+    icon: string;
+    className: string;
+    animation?: string;
+  };
+  ariaLabel: string;
+  ariaDescription: string;
+}
+
+// =============================================================================
+// CONFIGURATION AND CONSTANTS
+// =============================================================================
+
+/**
+ * Status configuration mapping for different connection test states
+ */
+const STATUS_CONFIG: Record<ConnectionTestStatus, StatusConfig> = {
+  idle: {
+    badge: {
+      variant: 'secondary',
+      text: 'Not Tested',
+      icon: '⚪',
+    },
+    message: {
+      text: 'Connection not tested yet',
+      className: 'text-gray-600 dark:text-gray-400',
+    },
+    indicator: {
+      icon: '⚪',
+      className: 'text-gray-400',
+    },
+    ariaLabel: 'Connection status: Not tested',
+    ariaDescription: 'Database connection has not been tested yet. Click test connection to verify connectivity.',
+  },
   
-  return (
-    <span className={cn(baseClasses, variantClasses[variant], sizeClasses[size], className)}>
-      {children}
-    </span>
-  );
+  testing: {
+    badge: {
+      variant: 'info',
+      text: 'Testing...',
+      icon: '🔄',
+    },
+    message: {
+      text: 'Testing database connection...',
+      className: 'text-blue-600 dark:text-blue-400',
+    },
+    indicator: {
+      icon: '🔄',
+      className: 'text-blue-500',
+      animation: 'animate-spin',
+    },
+    ariaLabel: 'Connection status: Testing in progress',
+    ariaDescription: 'Database connection test is currently running. Please wait for results.',
+  },
+  
+  success: {
+    badge: {
+      variant: 'success',
+      text: 'Connected',
+      icon: '✅',
+    },
+    message: {
+      text: 'Connection successful',
+      className: 'text-green-600 dark:text-green-400',
+    },
+    indicator: {
+      icon: '✅',
+      className: 'text-green-500',
+    },
+    ariaLabel: 'Connection status: Successfully connected',
+    ariaDescription: 'Database connection test passed. The service is ready for API generation.',
+  },
+  
+  error: {
+    badge: {
+      variant: 'destructive',
+      text: 'Failed',
+      icon: '❌',
+    },
+    message: {
+      text: 'Connection failed',
+      className: 'text-red-600 dark:text-red-400',
+    },
+    indicator: {
+      icon: '❌',
+      className: 'text-red-500',
+    },
+    ariaLabel: 'Connection status: Connection failed',
+    ariaDescription: 'Database connection test failed. Please check your configuration and try again.',
+  },
 };
 
 /**
- * Connection Status Indicator Component
- * 
- * Displays real-time connection status with visual feedback and accessibility support.
- * Integrates with SWR-powered connection testing for automatic status updates.
- * 
- * @param props - Component props including status, result, and display options
- * @returns React component with connection status visualization
+ * Size configuration for different component variants
  */
-export const ConnectionStatusIndicator: React.FC<ConnectionStatusProps> = ({
-  status,
-  result,
-  showMessage = true,
-  size = 'md',
-  variant = 'default',
-  className,
-  'data-testid': testId,
-  ...rest
-}) => {
-  const announcementRef = useRef<HTMLDivElement>(null);
+const SIZE_CONFIG = {
+  sm: {
+    container: 'p-2',
+    badge: 'text-xs',
+    message: 'text-xs',
+    indicator: 'text-sm',
+    spacing: 'space-y-1',
+  },
+  md: {
+    container: 'p-3',
+    badge: 'text-sm',
+    message: 'text-sm',
+    indicator: 'text-base',
+    spacing: 'space-y-2',
+  },
+  lg: {
+    container: 'p-4',
+    badge: 'text-base',
+    message: 'text-base',
+    indicator: 'text-lg',
+    spacing: 'space-y-3',
+  },
+};
+
+/**
+ * Default messages for different scenarios
+ */
+const DEFAULT_MESSAGES = {
+  success: 'Database connection established successfully',
+  error: 'Unable to connect to database',
+  testing: 'Testing database connectivity',
+  idle: 'Ready to test connection',
+  timeout: 'Connection test timed out',
+  networkError: 'Network error during connection test',
+  authenticationError: 'Authentication failed',
+  databaseNotFound: 'Database not found',
+  hostNotFound: 'Database host not reachable',
+  portClosed: 'Database port is not accessible',
+  unknownError: 'An unknown error occurred',
+};
+
+// =============================================================================
+// UTILITY FUNCTIONS
+// =============================================================================
+
+/**
+ * Formats test duration for display
+ */
+const formatDuration = (durationMs: number | null): string => {
+  if (!durationMs) return '';
   
-  // Memoized status configuration for performance
-  const statusConfig = useMemo(() => {
+  if (durationMs < 1000) {
+    return `${Math.round(durationMs)}ms`;
+  } else if (durationMs < 60000) {
+    return `${Math.round(durationMs / 1000 * 10) / 10}s`;
+  } else {
+    const minutes = Math.floor(durationMs / 60000);
+    const seconds = Math.round((durationMs % 60000) / 1000);
+    return `${minutes}m ${seconds}s`;
+  }
+};
+
+/**
+ * Formats timestamp for display
+ */
+const formatTimestamp = (timestamp: string): string => {
+  try {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString(undefined, {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+  } catch {
+    return '';
+  }
+};
+
+/**
+ * Extracts detailed error message from connection test result
+ */
+const getDetailedErrorMessage = (result: ConnectionTestResult | null, error: any): string => {
+  if (result?.details) {
+    return result.details;
+  }
+  
+  if (result?.message) {
+    return result.message;
+  }
+  
+  if (error?.error?.message) {
+    return error.error.message;
+  }
+  
+  if (error?.message) {
+    return error.message;
+  }
+  
+  return DEFAULT_MESSAGES.unknownError;
+};
+
+/**
+ * Gets appropriate error message based on error type
+ */
+const getErrorMessageByType = (result: ConnectionTestResult | null): string => {
+  if (!result) return DEFAULT_MESSAGES.error;
+  
+  const message = result.message?.toLowerCase() || '';
+  const errorCode = result.errorCode?.toLowerCase() || '';
+  
+  if (message.includes('timeout') || errorCode.includes('timeout')) {
+    return DEFAULT_MESSAGES.timeout;
+  }
+  
+  if (message.includes('network') || message.includes('econnrefused')) {
+    return DEFAULT_MESSAGES.networkError;
+  }
+  
+  if (message.includes('authentication') || message.includes('auth')) {
+    return DEFAULT_MESSAGES.authenticationError;
+  }
+  
+  if (message.includes('database') && message.includes('not found')) {
+    return DEFAULT_MESSAGES.databaseNotFound;
+  }
+  
+  if (message.includes('host') && message.includes('not found')) {
+    return DEFAULT_MESSAGES.hostNotFound;
+  }
+  
+  if (message.includes('port') || message.includes('connection refused')) {
+    return DEFAULT_MESSAGES.portClosed;
+  }
+  
+  return result.message || DEFAULT_MESSAGES.error;
+};
+
+// =============================================================================
+// MAIN COMPONENT
+// =============================================================================
+
+/**
+ * ConnectionStatusIndicator Component
+ * 
+ * Displays real-time connection status with visual indicators, progress animations,
+ * and status messages. Provides comprehensive accessibility support and integrates
+ * with the connection testing workflow for automatic status updates.
+ */
+export const ConnectionStatusIndicator: React.FC<ConnectionStatusIndicatorProps> = ({
+  connectionTest,
+  config,
+  showDetails = true,
+  showDuration = true,
+  showRetryCount = true,
+  showTimestamp = false,
+  enableAutoRetry = false,
+  autoRetryDelay = 3000,
+  maxAutoRetries = 3,
+  successMessage,
+  errorMessage,
+  loadingMessage,
+  onStatusChange,
+  onSuccess,
+  onError,
+  size = 'md',
+  hideBadge = false,
+  hideMessage = false,
+  compact = false,
+  className,
+  'data-testid': dataTestId = 'connection-status-indicator',
+  ...props
+}) => {
+  // Refs for managing auto-retry logic
+  const autoRetryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const autoRetryCountRef = useRef(0);
+  
+  // Extract status and data from connection test hook
+  const { 
+    status, 
+    result, 
+    isLoading, 
+    error, 
+    testDuration, 
+    retryCount,
+    retry 
+  } = connectionTest;
+  
+  // Get configuration for current status
+  const statusConfig = STATUS_CONFIG[status];
+  const sizeConfig = SIZE_CONFIG[size];
+  
+  // Determine display messages
+  const displayMessage = React.useMemo(() => {
     switch (status) {
       case 'testing':
-        return {
-          icon: LoaderIcon,
-          iconClassName: "text-blue-600 dark:text-blue-400",
-          badgeVariant: 'info' as const,
-          label: 'Testing connection',
-          message: 'Validating database connection...',
-          containerClassName: "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800",
-          ariaLabel: 'Connection test in progress'
-        };
+        return loadingMessage || statusConfig.message.text;
       case 'success':
-        return {
-          icon: CheckCircleIcon,
-          iconClassName: "text-green-600 dark:text-green-400",
-          badgeVariant: 'success' as const,
-          label: 'Connection successful',
-          message: result?.message || 'Database connection established successfully',
-          containerClassName: "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800",
-          ariaLabel: 'Connection test successful'
-        };
+        return successMessage || result?.message || statusConfig.message.text;
       case 'error':
-        return {
-          icon: XCircleIcon,
-          iconClassName: "text-red-600 dark:text-red-400",
-          badgeVariant: 'error' as const,
-          label: 'Connection failed',
-          message: result?.message || 'Failed to connect to database',
-          containerClassName: "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800",
-          ariaLabel: 'Connection test failed'
-        };
-      case 'idle':
+        return errorMessage || getErrorMessageByType(result) || statusConfig.message.text;
       default:
-        return {
-          icon: ClockIcon,
-          iconClassName: "text-gray-500 dark:text-gray-400",
-          badgeVariant: 'default' as const,
-          label: 'Ready to test',
-          message: 'Click the test button to validate the connection',
-          containerClassName: "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700",
-          ariaLabel: 'Connection not tested'
-        };
+        return statusConfig.message.text;
     }
-  }, [status, result]);
-
-  // Size configuration for different component variants
-  const sizeConfig = useMemo(() => {
-    switch (size) {
-      case 'sm':
-        return {
-          iconSize: "h-4 w-4",
-          spacing: "space-x-2",
-          padding: "p-2",
-          textSize: "text-sm"
-        };
-      case 'lg':
-        return {
-          iconSize: "h-6 w-6",
-          spacing: "space-x-4",
-          padding: "p-4",
-          textSize: "text-base"
-        };
-      case 'md':
-      default:
-        return {
-          iconSize: "h-5 w-5",
-          spacing: "space-x-3",
-          padding: "p-3",
-          textSize: "text-sm"
-        };
-    }
-  }, [size]);
-
-  // Announce status changes to screen readers
+  }, [status, result, successMessage, errorMessage, loadingMessage, statusConfig.message.text]);
+  
+  // Handle status change notifications
   useEffect(() => {
-    if (announcementRef.current && status !== 'idle') {
-      const announcement = `Connection status: ${statusConfig.label}. ${statusConfig.message}`;
-      announcementRef.current.textContent = announcement;
+    onStatusChange?.(status);
+  }, [status, onStatusChange]);
+  
+  // Handle success/error callbacks
+  useEffect(() => {
+    if (status === 'success' && result) {
+      onSuccess?.(result);
+      autoRetryCountRef.current = 0; // Reset auto-retry count on success
+    } else if (status === 'error' && result) {
+      onError?.(result);
     }
-  }, [status, statusConfig]);
-
-  // Render compact variant for smaller display areas
-  if (variant === 'compact') {
-    const IconComponent = statusConfig.icon;
+  }, [status, result, onSuccess, onError]);
+  
+  // Auto-retry logic
+  useEffect(() => {
+    if (
+      enableAutoRetry &&
+      status === 'error' &&
+      autoRetryCountRef.current < maxAutoRetries
+    ) {
+      autoRetryTimeoutRef.current = setTimeout(() => {
+        autoRetryCountRef.current++;
+        retry();
+      }, autoRetryDelay);
+    }
     
-    return (
-      <div 
-        className={cn("flex items-center", sizeConfig.spacing, className)}
-        role="status"
-        aria-label={statusConfig.ariaLabel}
-        data-testid={testId || 'connection-status-compact'}
-        {...rest}
-      >
-        <IconComponent className={cn(sizeConfig.iconSize, statusConfig.iconClassName)} />
-        <Badge 
-          variant={statusConfig.badgeVariant} 
-          size={size}
-          className="transition-all duration-300 ease-in-out"
-        >
-          {statusConfig.label}
-        </Badge>
-        
-        {/* Screen reader announcement area */}
-        <div 
-          ref={announcementRef}
-          className="sr-only" 
-          aria-live="polite" 
-          aria-atomic="true"
-        />
-      </div>
-    );
-  }
-
-  // Render detailed variant with full information display
-  const IconComponent = statusConfig.icon;
+    return () => {
+      if (autoRetryTimeoutRef.current) {
+        clearTimeout(autoRetryTimeoutRef.current);
+        autoRetryTimeoutRef.current = null;
+      }
+    };
+  }, [status, enableAutoRetry, maxAutoRetries, autoRetryDelay, retry]);
+  
+  // Clean up auto-retry timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (autoRetryTimeoutRef.current) {
+        clearTimeout(autoRetryTimeoutRef.current);
+      }
+    };
+  }, []);
+  
+  // Format additional details
+  const durationText = showDuration && testDuration ? formatDuration(testDuration) : '';
+  const timestampText = showTimestamp && result?.timestamp ? formatTimestamp(result.timestamp) : '';
+  const retryText = showRetryCount && retryCount > 0 ? `Retry ${retryCount}` : '';
+  
+  // Combine additional info
+  const additionalInfo = [durationText, timestampText, retryText].filter(Boolean).join(' • ');
+  
+  // Get detailed error message for display
+  const detailedErrorMessage = status === 'error' && showDetails 
+    ? getDetailedErrorMessage(result, error) 
+    : '';
+  
+  // Construct ARIA live region content
+  const ariaLiveContent = React.useMemo(() => {
+    let content = statusConfig.ariaLabel;
+    
+    if (status === 'success' && result?.message) {
+      content += `. ${result.message}`;
+    } else if (status === 'error') {
+      content += `. ${displayMessage}`;
+      if (detailedErrorMessage && detailedErrorMessage !== displayMessage) {
+        content += `. Details: ${detailedErrorMessage}`;
+      }
+    }
+    
+    if (additionalInfo) {
+      content += `. ${additionalInfo}`;
+    }
+    
+    return content;
+  }, [status, result, displayMessage, detailedErrorMessage, additionalInfo, statusConfig.ariaLabel]);
+  
+  // Component layout classes
+  const containerClasses = cn(
+    'transition-all duration-300 ease-in-out',
+    sizeConfig.container,
+    !compact && sizeConfig.spacing,
+    className
+  );
+  
+  const indicatorClasses = cn(
+    'inline-flex items-center justify-center',
+    sizeConfig.indicator,
+    statusConfig.indicator.className,
+    statusConfig.indicator.animation
+  );
+  
+  const messageClasses = cn(
+    'font-medium transition-colors duration-200',
+    sizeConfig.message,
+    statusConfig.message.className
+  );
   
   return (
-    <div 
-      className={cn(
-        "flex items-start rounded-lg border transition-all duration-300 ease-in-out",
-        statusConfig.containerClassName,
-        sizeConfig.padding,
-        className
-      )}
+    <div
+      className={containerClasses}
       role="status"
       aria-label={statusConfig.ariaLabel}
-      data-testid={testId || 'connection-status-detailed'}
-      {...rest}
+      aria-describedby={`${dataTestId}-description`}
+      data-testid={dataTestId}
+      {...props}
     >
-      <div className="flex-shrink-0">
-        <IconComponent 
-          className={cn(
-            sizeConfig.iconSize, 
-            statusConfig.iconClassName,
-            // Add pulse animation for loading state
-            status === 'testing' && "animate-pulse"
-          )} 
-        />
-      </div>
-      
-      <div className={cn("flex-1 min-w-0", sizeConfig.spacing.replace('space-x-', 'ml-'))}>
-        <div className="flex items-center justify-between">
-          <Badge 
-            variant={statusConfig.badgeVariant} 
-            size={size}
-            className="transition-all duration-300 ease-in-out"
-          >
-            {statusConfig.label}
-          </Badge>
-          
-          {/* Display connection timing for successful tests */}
-          {status === 'success' && result?.testDuration && (
-            <div className={cn(
-              "flex items-center text-gray-600 dark:text-gray-400",
-              sizeConfig.textSize
-            )}>
-              <ClockIcon className="h-3 w-3 mr-1" />
-              <span>{Math.round(result.testDuration / 1000)}s</span>
-            </div>
-          )}
+      {/* Main status display */}
+      <div className={cn(
+        'flex items-center',
+        compact ? 'space-x-2' : 'space-x-3'
+      )}>
+        {/* Status indicator icon */}
+        <div
+          className={indicatorClasses}
+          role="img"
+          aria-label={`Connection status icon: ${statusConfig.badge.text}`}
+        >
+          <span className="select-none">
+            {statusConfig.indicator.icon}
+          </span>
         </div>
         
-        {/* Status message */}
-        {showMessage && (
-          <div className={cn(
-            "mt-1 text-gray-700 dark:text-gray-300",
-            sizeConfig.textSize
-          )}>
-            {statusConfig.message}
-          </div>
-        )}
-        
-        {/* Additional error details for failed connections */}
-        {status === 'error' && result?.details && (
-          <details className="mt-2">
-            <summary className={cn(
-              "cursor-pointer text-red-700 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300",
-              "text-xs font-medium"
-            )}>
-              View error details
-            </summary>
-            <div className={cn(
-              "mt-1 p-2 bg-red-100 dark:bg-red-900/40 rounded border border-red-200 dark:border-red-800",
-              "text-xs text-red-800 dark:text-red-300 font-mono whitespace-pre-wrap"
-            )}>
-              {result.details}
-            </div>
-          </details>
-        )}
-        
-        {/* Connection metadata for successful connections */}
-        {status === 'success' && result?.metadata && (
-          <div className="mt-2 space-y-1">
-            {result.metadata.serverVersion && (
-              <div className={cn("text-gray-600 dark:text-gray-400", "text-xs")}>
-                Server: {result.metadata.serverVersion}
-              </div>
+        {/* Status badge */}
+        {!hideBadge && (
+          <Badge
+            variant={statusConfig.badge.variant}
+            size={size === 'sm' ? 'sm' : 'default'}
+            className={cn(
+              'transition-all duration-200',
+              sizeConfig.badge
             )}
-            {result.metadata.tableCount !== undefined && (
-              <div className={cn("text-gray-600 dark:text-gray-400", "text-xs")}>
-                Tables: {result.metadata.tableCount}
+            data-testid={`${dataTestId}-badge`}
+          >
+            <span className="mr-1" aria-hidden="true">
+              {statusConfig.badge.icon}
+            </span>
+            {statusConfig.badge.text}
+          </Badge>
+        )}
+        
+        {/* Status message */}
+        {!hideMessage && !compact && (
+          <div className="flex-1 min-w-0">
+            <div
+              className={messageClasses}
+              data-testid={`${dataTestId}-message`}
+            >
+              {displayMessage}
+            </div>
+            
+            {/* Additional info */}
+            {additionalInfo && (
+              <div
+                className={cn(
+                  'text-xs text-gray-500 dark:text-gray-400 mt-1',
+                  sizeConfig === SIZE_CONFIG.sm && 'text-[10px]'
+                )}
+                data-testid={`${dataTestId}-additional-info`}
+              >
+                {additionalInfo}
               </div>
             )}
           </div>
         )}
       </div>
       
-      {/* Screen reader announcement area */}
-      <div 
-        ref={announcementRef}
-        className="sr-only" 
-        aria-live="polite" 
+      {/* Detailed error message */}
+      {status === 'error' && showDetails && detailedErrorMessage && 
+       detailedErrorMessage !== displayMessage && !compact && (
+        <div
+          className={cn(
+            'mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-xs text-red-700 dark:text-red-400',
+            sizeConfig === SIZE_CONFIG.sm && 'text-[10px] p-1.5 mt-1'
+          )}
+          data-testid={`${dataTestId}-error-details`}
+        >
+          <div className="font-medium mb-1">Error Details:</div>
+          <div className="break-words">
+            {detailedErrorMessage}
+          </div>
+        </div>
+      )}
+      
+      {/* Auto-retry indicator */}
+      {enableAutoRetry && status === 'error' && autoRetryCountRef.current < maxAutoRetries && (
+        <div
+          className={cn(
+            'mt-2 flex items-center space-x-2 text-xs text-blue-600 dark:text-blue-400',
+            sizeConfig === SIZE_CONFIG.sm && 'text-[10px] mt-1'
+          )}
+          data-testid={`${dataTestId}-auto-retry`}
+        >
+          <div className="flex items-center space-x-1">
+            <span className="animate-pulse">⏳</span>
+            <span>
+              Auto-retry in {Math.ceil((autoRetryDelay - (Date.now() % autoRetryDelay)) / 1000)}s
+            </span>
+          </div>
+          <div className="text-gray-500">
+            ({autoRetryCountRef.current + 1}/{maxAutoRetries})
+          </div>
+        </div>
+      )}
+      
+      {/* Screen reader live region */}
+      <div
+        id={`${dataTestId}-description`}
+        className="sr-only"
+        aria-live="polite"
         aria-atomic="true"
-      />
+      >
+        {ariaLiveContent}
+      </div>
+      
+      {/* Hidden description for screen readers */}
+      <div
+        className="sr-only"
+        id={`${dataTestId}-help`}
+      >
+        {statusConfig.ariaDescription}
+      </div>
     </div>
   );
 };
 
-// Export as default for convenient imports
+// =============================================================================
+// EXPORTS
+// =============================================================================
+
 export default ConnectionStatusIndicator;
 
-/**
- * Hook for managing connection status state
- * Provides simplified interface for common status operations
- */
-export const useConnectionStatus = (initialStatus: ConnectionTestStatus = 'idle') => {
-  const [status, setStatus] = React.useState<ConnectionTestStatus>(initialStatus);
-  const [result, setResult] = React.useState<ConnectionTestResult | null>(null);
-  
-  const updateStatus = React.useCallback((
-    newStatus: ConnectionTestStatus, 
-    newResult?: ConnectionTestResult | null
-  ) => {
-    setStatus(newStatus);
-    if (newResult !== undefined) {
-      setResult(newResult);
-    }
-  }, []);
-  
-  const reset = React.useCallback(() => {
-    setStatus('idle');
-    setResult(null);
-  }, []);
-  
-  return {
-    status,
-    result,
-    updateStatus,
-    reset
-  };
+// Export utility functions for external use
+export {
+  formatDuration,
+  formatTimestamp,
+  getDetailedErrorMessage,
+  getErrorMessageByType,
 };
 
-/**
- * Type exports for external usage
- */
-export type { 
-  ConnectionStatusProps,
-  ConnectionTestStatus,
-  ConnectionTestResult 
+// Export types for external use
+export type {
+  ConnectionStatusIndicatorProps,
+  StatusConfig,
+};
+
+// Export constants for external use
+export {
+  STATUS_CONFIG,
+  SIZE_CONFIG,
+  DEFAULT_MESSAGES,
 };
