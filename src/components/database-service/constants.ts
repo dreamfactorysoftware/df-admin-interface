@@ -1,464 +1,366 @@
 /**
- * Database Service Constants
+ * Database Service Constants and Configuration
  * 
- * This file contains all constants and configuration values for database service components,
- * including supported database types, connection parameters, validation rules, and caching
- * configuration for optimal React/Next.js performance.
+ * Centralized constants and configuration values for database service functionality,
+ * including supported database types, default connection parameters, validation rules,
+ * SWR/React Query configuration, and component settings. Provides optimized caching
+ * strategies and performance configuration for React/Next.js integration.
+ * 
+ * @fileoverview Database service constants migrated from Angular to React/Next.js
+ * @version 1.0.0
+ * @since 2024-01-01
  */
 
-import type { DatabaseType, DatabaseConfig, ConnectionTimeouts, SWRConfig, ReactQueryConfig } from './types';
+import type { 
+  DatabaseDriver, 
+  DatabaseType, 
+  ServiceTier, 
+  ConnectionTimeouts,
+  SWRConfig,
+  ReactQueryConfig,
+  DatabaseOptions,
+  DatabaseServiceSWRConfig
+} from './types';
 
 // =============================================================================
-// DATABASE TYPES AND DRIVERS
+// CORE DATABASE CONFIGURATION CONSTANTS
 // =============================================================================
 
 /**
- * Supported database types with their display labels and driver information
- * Migrated from Angular service constants to React/Next.js configuration
+ * Supported database drivers with feature parity from Angular implementation
+ * Multi-database support per F-001 feature requirements
  */
-export const DATABASE_TYPES: Record<string, DatabaseType> = {
-  // Core/Free Database Types
-  mysql: {
+export const DATABASE_DRIVERS: readonly DatabaseDriver[] = [
+  'mysql',
+  'pgsql',
+  'sqlite',
+  'mongodb',
+  'oracle',
+  'sqlsrv',
+  'snowflake',
+  'ibmdb2',
+  'informix',
+  'sqlanywhere',
+  'memsql',
+  'salesforce_db',
+  'hana',
+  'apache_hive',
+  'databricks',
+  'dremio'
+] as const;
+
+/**
+ * Database type definitions with configuration metadata
+ * Enhanced from Angular ServiceType with React-specific optimizations
+ */
+export const DATABASE_TYPES: readonly DatabaseType[] = [
+  {
     name: 'mysql',
     label: 'MySQL',
-    description: 'Database service supporting MySQL connections.',
-    group: 'Database',
+    description: 'MySQL database service for high-performance web applications',
+    group: 'SQL Databases',
     driver: 'mysql',
     defaultPort: 3306,
-    supportedFeatures: ['schema_discovery', 'relationship_mapping', 'indexes', 'stored_procedures'],
+    supportedFeatures: ['transactions', 'indexes', 'foreign_keys', 'stored_procedures'],
     tier: 'core'
   },
-  mariadb: {
-    name: 'mariadb',
-    label: 'MariaDB',
-    description: 'Database service supporting MariaDB connections.',
-    group: 'Database',
-    driver: 'mysql', // MariaDB uses MySQL driver
-    defaultPort: 3306,
-    supportedFeatures: ['schema_discovery', 'relationship_mapping', 'indexes', 'stored_procedures'],
-    tier: 'core'
-  },
-  pgsql: {
+  {
     name: 'pgsql',
     label: 'PostgreSQL',
-    description: 'Database service supporting PostgreSQL connections.',
-    group: 'Database',
+    description: 'PostgreSQL database service with advanced SQL features',
+    group: 'SQL Databases',
     driver: 'pgsql',
     defaultPort: 5432,
-    supportedFeatures: ['schema_discovery', 'relationship_mapping', 'indexes', 'stored_procedures', 'custom_types'],
+    supportedFeatures: ['transactions', 'indexes', 'foreign_keys', 'stored_procedures', 'json_support'],
     tier: 'core'
   },
-  sqlite: {
+  {
     name: 'sqlite',
     label: 'SQLite',
-    description: 'Database service supporting SQLite connections.',
-    group: 'Database',
+    description: 'Lightweight file-based database service',
+    group: 'SQL Databases',
     driver: 'sqlite',
     defaultPort: null,
-    supportedFeatures: ['schema_discovery', 'indexes'],
+    supportedFeatures: ['transactions', 'indexes', 'foreign_keys'],
     tier: 'core'
   },
-  mongodb: {
+  {
     name: 'mongodb',
     label: 'MongoDB',
-    description: 'Database service for MongoDB connections.',
-    group: 'Database',
+    description: 'NoSQL document database service',
+    group: 'NoSQL Databases',
     driver: 'mongodb',
     defaultPort: 27017,
-    supportedFeatures: ['schema_discovery', 'document_collections'],
+    supportedFeatures: ['aggregation', 'indexing', 'replication', 'sharding'],
     tier: 'core'
   },
-
-  // Silver Tier Database Types
-  oracle: {
+  {
     name: 'oracle',
-    label: 'Oracle',
-    description: 'Database service supporting Oracle SQL connections.',
-    group: 'Database',
-    driver: 'oci',
+    label: 'Oracle Database',
+    description: 'Enterprise Oracle database service',
+    group: 'SQL Databases',
+    driver: 'oracle',
     defaultPort: 1521,
-    supportedFeatures: ['schema_discovery', 'relationship_mapping', 'indexes', 'stored_procedures', 'packages'],
-    tier: 'silver'
+    supportedFeatures: ['transactions', 'indexes', 'foreign_keys', 'stored_procedures', 'partitioning'],
+    tier: 'gold'
   },
-  sqlsrv: {
+  {
     name: 'sqlsrv',
-    label: 'SQL Server',
-    description: 'Database service supporting SQL Server connections.',
-    group: 'Database',
+    label: 'Microsoft SQL Server',
+    description: 'Microsoft SQL Server database service',
+    group: 'SQL Databases',
     driver: 'sqlsrv',
     defaultPort: 1433,
-    supportedFeatures: ['schema_discovery', 'relationship_mapping', 'indexes', 'stored_procedures'],
+    supportedFeatures: ['transactions', 'indexes', 'foreign_keys', 'stored_procedures', 'json_support'],
     tier: 'silver'
   },
-  ibmdb2: {
-    name: 'ibmdb2',
-    label: 'IBM DB2',
-    description: 'Database service supporting IBM DB2 SQL connections.',
-    group: 'Database',
-    driver: 'ibm',
-    defaultPort: 50000,
-    supportedFeatures: ['schema_discovery', 'relationship_mapping', 'indexes', 'stored_procedures'],
-    tier: 'silver'
-  },
-  informix: {
-    name: 'informix',
-    label: 'IBM Informix',
-    description: 'Database service supporting IBM Informix SQL connections.',
-    group: 'Database',
-    driver: 'informix',
-    defaultPort: 9088,
-    supportedFeatures: ['schema_discovery', 'relationship_mapping', 'indexes', 'stored_procedures'],
-    tier: 'silver'
-  },
-  sqlanywhere: {
-    name: 'sqlanywhere',
-    label: 'SAP SQL Anywhere',
-    description: 'Database service supporting SAP SQL Anywhere connections.',
-    group: 'Database',
-    driver: 'sqlanywhere',
-    defaultPort: 2638,
-    supportedFeatures: ['schema_discovery', 'relationship_mapping', 'indexes', 'stored_procedures'],
-    tier: 'silver'
-  },
-  memsql: {
-    name: 'memsql',
-    label: 'MemSQL',
-    description: 'Database service supporting MemSQL connections.',
-    group: 'Database',
-    driver: 'mysql', // MemSQL is MySQL compatible
-    defaultPort: 3306,
-    supportedFeatures: ['schema_discovery', 'relationship_mapping', 'indexes'],
-    tier: 'silver'
-  },
-  salesforce_db: {
-    name: 'salesforce_db',
-    label: 'Salesforce',
-    description: 'Database service with SOAP and/or OAuth authentication support for Salesforce connections.',
-    group: 'Database',
-    driver: 'salesforce',
-    defaultPort: 443,
-    supportedFeatures: ['schema_discovery', 'oauth_auth', 'soap_auth'],
-    tier: 'silver'
-  },
-
-  // Gold Tier Database Types
-  snowflake: {
+  {
     name: 'snowflake',
     label: 'Snowflake',
-    description: 'Database service supporting Snowflake connections.',
-    group: 'Database',
+    description: 'Cloud data warehouse service',
+    group: 'Cloud Databases',
     driver: 'snowflake',
     defaultPort: 443,
-    supportedFeatures: ['schema_discovery', 'warehouse_support', 'data_sharing'],
+    supportedFeatures: ['transactions', 'scaling', 'time_travel', 'clustering'],
     tier: 'gold'
   },
-  hana: {
+  {
+    name: 'ibmdb2',
+    label: 'IBM Db2',
+    description: 'IBM Db2 database service',
+    group: 'SQL Databases',
+    driver: 'ibmdb2',
+    defaultPort: 50000,
+    supportedFeatures: ['transactions', 'indexes', 'foreign_keys', 'stored_procedures'],
+    tier: 'gold'
+  },
+  {
+    name: 'informix',
+    label: 'IBM Informix',
+    description: 'IBM Informix database service',
+    group: 'SQL Databases',
+    driver: 'informix',
+    defaultPort: 9088,
+    supportedFeatures: ['transactions', 'indexes', 'foreign_keys', 'stored_procedures'],
+    tier: 'gold'
+  },
+  {
+    name: 'sqlanywhere',
+    label: 'SAP SQL Anywhere',
+    description: 'SAP SQL Anywhere database service',
+    group: 'SQL Databases',
+    driver: 'sqlanywhere',
+    defaultPort: 2638,
+    supportedFeatures: ['transactions', 'indexes', 'foreign_keys', 'stored_procedures'],
+    tier: 'gold'
+  },
+  {
+    name: 'memsql',
+    label: 'MemSQL (SingleStore)',
+    description: 'MemSQL distributed database service',
+    group: 'SQL Databases',
+    driver: 'memsql',
+    defaultPort: 3306,
+    supportedFeatures: ['transactions', 'indexes', 'real_time_analytics', 'json_support'],
+    tier: 'silver'
+  },
+  {
+    name: 'salesforce_db',
+    label: 'Salesforce Database',
+    description: 'Salesforce cloud database service',
+    group: 'Cloud Databases',
+    driver: 'salesforce_db',
+    defaultPort: 443,
+    supportedFeatures: ['soql', 'sosl', 'metadata_api', 'bulk_api'],
+    tier: 'gold'
+  },
+  {
     name: 'hana',
     label: 'SAP HANA',
-    description: 'SAP HANA database service.',
-    group: 'Database',
-    driver: 'hdbodbc',
+    description: 'SAP HANA in-memory database service',
+    group: 'SQL Databases',
+    driver: 'hana',
     defaultPort: 30015,
-    supportedFeatures: ['schema_discovery', 'relationship_mapping', 'indexes', 'in_memory'],
+    supportedFeatures: ['transactions', 'in_memory', 'analytics', 'stored_procedures'],
     tier: 'gold'
   },
-  apache_hive: {
+  {
     name: 'apache_hive',
     label: 'Apache Hive',
-    description: 'The Apache Hive data warehouse software facilitates reading, writing, and managing large datasets residing in distributed storage using SQL',
+    description: 'Apache Hive data warehouse service',
     group: 'Big Data',
-    driver: 'hive',
+    driver: 'apache_hive',
     defaultPort: 10000,
-    supportedFeatures: ['schema_discovery', 'big_data', 'hdfs_integration'],
-    tier: 'gold'
+    supportedFeatures: ['batch_processing', 'sql_interface', 'partitioning'],
+    tier: 'silver'
   },
-  databricks: {
+  {
     name: 'databricks',
     label: 'Databricks',
-    description: 'The Databricks data intelligence platform simplifies data engineering, analytics, and AI workloads by providing scalable compute and SQL-based access to large datasets in a unified environment.',
-    group: 'Big Data',
+    description: 'Databricks unified analytics platform',
+    group: 'Cloud Databases',
     driver: 'databricks',
     defaultPort: 443,
-    supportedFeatures: ['schema_discovery', 'big_data', 'spark_integration'],
+    supportedFeatures: ['spark_sql', 'delta_lake', 'ml_integration', 'streaming'],
     tier: 'gold'
   },
-  dremio: {
+  {
     name: 'dremio',
     label: 'Dremio',
-    description: 'The Dremio data lakehouse platform enables fast querying, data exploration, and analytics on large datasets across various storage systems using SQL.',
+    description: 'Dremio data lake engine',
     group: 'Big Data',
     driver: 'dremio',
     defaultPort: 31010,
-    supportedFeatures: ['schema_discovery', 'big_data', 'data_lake'],
-    tier: 'gold'
+    supportedFeatures: ['data_virtualization', 'sql_interface', 'columnar_storage'],
+    tier: 'silver'
   }
-} as const;
-
-/**
- * Array of all database types for iteration and selection
- */
-export const DATABASE_TYPE_LIST = Object.values(DATABASE_TYPES);
-
-/**
- * Database types grouped by tier for licensing and feature availability
- */
-export const DATABASE_TYPES_BY_TIER = {
-  core: DATABASE_TYPE_LIST.filter(db => db.tier === 'core'),
-  silver: DATABASE_TYPE_LIST.filter(db => db.tier === 'silver'),
-  gold: DATABASE_TYPE_LIST.filter(db => db.tier === 'gold')
-} as const;
+] as const;
 
 // =============================================================================
-// DEFAULT CONNECTION CONFIGURATIONS
+// CONNECTION TIMEOUT CONFIGURATION
 // =============================================================================
 
 /**
- * Default connection parameters for each database type
- * These provide sensible defaults for new database service configurations
- */
-export const DEFAULT_DATABASE_CONFIGS: Record<string, DatabaseConfig> = {
-  mysql: {
-    driver: 'mysql',
-    host: 'localhost',
-    port: 3306,
-    database: '',
-    username: '',
-    password: '',
-    options: {
-      charset: 'utf8mb4',
-      collation: 'utf8mb4_unicode_ci',
-      strict: false,
-      engine: 'InnoDB'
-    },
-    connectionTimeout: 10000,
-    ssl: {
-      enabled: false,
-      verify: true
-    }
-  },
-  mariadb: {
-    driver: 'mysql',
-    host: 'localhost',
-    port: 3306,
-    database: '',
-    username: '',
-    password: '',
-    options: {
-      charset: 'utf8mb4',
-      collation: 'utf8mb4_unicode_ci',
-      strict: false,
-      engine: 'InnoDB'
-    },
-    connectionTimeout: 10000,
-    ssl: {
-      enabled: false,
-      verify: true
-    }
-  },
-  pgsql: {
-    driver: 'pgsql',
-    host: 'localhost',
-    port: 5432,
-    database: 'postgres',
-    username: '',
-    password: '',
-    options: {
-      schema: 'public',
-      charset: 'utf8',
-      application_name: 'DreamFactory'
-    },
-    connectionTimeout: 10000,
-    ssl: {
-      enabled: false,
-      verify: true,
-      mode: 'prefer'
-    }
-  },
-  sqlite: {
-    driver: 'sqlite',
-    database: '',
-    options: {
-      foreign_key_constraints: true,
-      journal_mode: 'WAL'
-    },
-    connectionTimeout: 5000
-  },
-  mongodb: {
-    driver: 'mongodb',
-    host: 'localhost',
-    port: 27017,
-    database: '',
-    username: '',
-    password: '',
-    options: {
-      authSource: 'admin',
-      readPreference: 'primary',
-      writeConcern: 'majority'
-    },
-    connectionTimeout: 10000,
-    ssl: {
-      enabled: false,
-      verify: true
-    }
-  },
-  oracle: {
-    driver: 'oci',
-    host: 'localhost',
-    port: 1521,
-    database: 'XE',
-    username: '',
-    password: '',
-    options: {
-      sid: 'XE',
-      service_name: '',
-      charset: 'UTF8'
-    },
-    connectionTimeout: 15000,
-    ssl: {
-      enabled: false,
-      verify: true
-    }
-  },
-  sqlsrv: {
-    driver: 'sqlsrv',
-    host: 'localhost',
-    port: 1433,
-    database: 'master',
-    username: '',
-    password: '',
-    options: {
-      encrypt: true,
-      trustServerCertificate: false,
-      multipleActiveResultSets: false
-    },
-    connectionTimeout: 10000,
-    ssl: {
-      enabled: false,
-      verify: true
-    }
-  },
-  snowflake: {
-    driver: 'snowflake',
-    host: '', // account.region.snowflakecomputing.com
-    port: 443,
-    database: '',
-    username: '',
-    password: '',
-    options: {
-      warehouse: '',
-      schema: 'PUBLIC',
-      role: '',
-      account: ''
-    },
-    connectionTimeout: 30000,
-    ssl: {
-      enabled: true,
-      verify: true
-    }
-  }
-};
-
-// =============================================================================
-// API ENDPOINTS AND URLS
-// =============================================================================
-
-/**
- * API endpoint URLs for database service operations
- * Migrated from Angular URL constants to React/Next.js API routes
- */
-export const DATABASE_SERVICE_ENDPOINTS = {
-  BASE_URL: '/api/v2',
-  SYSTEM_SERVICE: '/api/v2/system/service',
-  SERVICE_TYPE: '/api/v2/system/service_type',
-  SERVICE_TEST: '/api/v2/system/service_test',
-  SCHEMA_DISCOVERY: (serviceName: string) => `/${serviceName}/_schema`,
-  TABLE_SCHEMA: (serviceName: string, tableName: string) => `/${serviceName}/_schema/${tableName}`,
-  CONNECTION_TEST: (serviceId: number) => `/api/v2/system/service/${serviceId}/_test`,
-  SERVICE_DETAIL: (serviceId: number) => `/api/v2/system/service/${serviceId}`,
-  SERVICE_CONFIG: (serviceId: number) => `/api/v2/system/service/${serviceId}/config`
-} as const;
-
-// =============================================================================
-// CONNECTION TESTING AND TIMEOUTS
-// =============================================================================
-
-/**
- * Connection timeout configurations per F-001 requirement for 5-second connection testing
+ * Connection timeout configuration with 5-second requirement per F-001-RQ-002
+ * Optimized for React/Next.js integration requirements
  */
 export const CONNECTION_TIMEOUTS: ConnectionTimeouts = {
-  // Standard connection test timeout (5 seconds as per requirement)
-  CONNECTION_TEST: 5000,
-  // Schema discovery timeout for large databases
-  SCHEMA_DISCOVERY: 30000,
-  // Database query timeout
-  QUERY_TIMEOUT: 15000,
-  // Bulk operation timeout
-  BULK_OPERATION: 60000,
-  // Connection pool timeout
-  POOL_TIMEOUT: 10000
+  /** Connection test timeout - meets F-001-RQ-002 requirement */
+  CONNECTION_TEST: 5000, // 5 seconds as specified
+  /** Schema discovery timeout for large databases (1000+ tables) */
+  SCHEMA_DISCOVERY: 30000, // 30 seconds for comprehensive introspection
+  /** Standard query timeout for API operations */
+  QUERY_TIMEOUT: 15000, // 15 seconds for balanced performance
+  /** Bulk operation timeout for large dataset operations */
+  BULK_OPERATION: 60000, // 60 seconds for data-intensive operations
+  /** Connection pool timeout for resource management */
+  POOL_TIMEOUT: 10000 // 10 seconds for pool acquisition
 } as const;
 
+// =============================================================================
+// DEFAULT CONNECTION PARAMETERS
+// =============================================================================
+
 /**
- * Retry configuration for connection testing
+ * Database-specific default connection parameters
+ * Migrated from Angular injection tokens to React configuration objects
  */
-export const CONNECTION_RETRY_CONFIG = {
-  maxRetries: 3,
-  retryDelay: 1000,
-  backoffMultiplier: 2,
-  maxRetryDelay: 5000
+export const DEFAULT_CONNECTION_PARAMS: Record<DatabaseDriver, Partial<DatabaseOptions>> = {
+  mysql: {
+    charset: 'utf8mb4',
+    collation: 'utf8mb4_unicode_ci',
+    strict: false,
+    engine: 'InnoDB'
+  },
+  pgsql: {
+    charset: 'UTF8',
+    search_path: 'public',
+    application_name: 'DreamFactory Admin'
+  },
+  sqlite: {
+    // SQLite has minimal configuration options
+  },
+  mongodb: {
+    authSource: 'admin',
+    readPreference: 'primary',
+    writeConcern: 'majority'
+  },
+  oracle: {
+    charset: 'AL32UTF8',
+    // Use service_name by default instead of SID
+    service_name: ''
+  },
+  sqlsrv: {
+    charset: 'UTF-8',
+    // SQL Server specific options
+  },
+  snowflake: {
+    warehouse: 'COMPUTE_WH',
+    role: 'ACCOUNTADMIN',
+    account: ''
+  },
+  ibmdb2: {
+    charset: 'UTF-8',
+    // DB2 specific options
+  },
+  informix: {
+    charset: 'UTF-8',
+    // Informix specific options
+  },
+  sqlanywhere: {
+    charset: 'UTF-8',
+    // SQL Anywhere specific options
+  },
+  memsql: {
+    charset: 'utf8mb4',
+    collation: 'utf8mb4_unicode_ci'
+  },
+  salesforce_db: {
+    // Salesforce uses OAuth-based authentication
+  },
+  hana: {
+    charset: 'UTF-8',
+    // SAP HANA specific options
+  },
+  apache_hive: {
+    // Hive specific options
+  },
+  databricks: {
+    // Databricks specific options
+  },
+  dremio: {
+    // Dremio specific options
+  }
 } as const;
 
 // =============================================================================
-// SWR CONFIGURATION FOR DATA FETCHING
+// SWR CONFIGURATION FOR OPTIMAL PERFORMANCE
 // =============================================================================
 
 /**
- * SWR configuration for optimal caching and real-time synchronization
- * Configured per React/Next.js integration requirements for sub-50ms cache responses
+ * SWR configuration for database service operations
+ * Optimized for React/Next.js integration with cache hit responses under 50ms
  */
 export const DATABASE_SERVICE_SWR_CONFIG: SWRConfig = {
-  // Connection test caching - shorter duration for real-time validation
   connectionTest: {
-    refreshInterval: 0, // No automatic refresh for connection tests
-    revalidateOnFocus: false,
-    revalidateOnReconnect: true,
-    dedupingInterval: 1000,
-    errorRetryInterval: 2000,
-    errorRetryCount: 2,
-    focusThrottleInterval: 5000
+    // Minimal caching for connection tests due to dynamic nature
+    refreshInterval: 0, // No automatic refresh
+    revalidateOnFocus: false, // Manual trigger only
+    revalidateOnReconnect: false,
+    dedupingInterval: 1000, // 1 second deduplication
+    errorRetryInterval: 2000, // 2 second retry interval
+    errorRetryCount: 2, // Limited retries for failed connections
+    focusThrottleInterval: 5000 // Throttle focus revalidation
   },
-  
-  // Service list caching - moderate refresh for service discovery
   serviceList: {
-    refreshInterval: 30000, // 30 seconds
-    revalidateOnFocus: true,
-    revalidateOnReconnect: true,
-    dedupingInterval: 5000,
-    errorRetryInterval: 5000,
-    errorRetryCount: 3,
-    focusThrottleInterval: 10000
+    // Moderate caching for service listings
+    refreshInterval: 60000, // 1 minute auto-refresh
+    revalidateOnFocus: true, // Refresh when user returns to tab
+    revalidateOnReconnect: true, // Refresh on network reconnection
+    dedupingInterval: 5000, // 5 second deduplication
+    errorRetryInterval: 3000, // 3 second retry interval
+    errorRetryCount: 3, // Standard retry count
+    focusThrottleInterval: 10000 // 10 second focus throttle
   },
-
-  // Schema discovery caching - longer duration for stable schema data
   schemaDiscovery: {
-    refreshInterval: 300000, // 5 minutes
-    revalidateOnFocus: false,
-    revalidateOnReconnect: true,
-    dedupingInterval: 10000,
-    errorRetryInterval: 10000,
-    errorRetryCount: 2,
-    focusThrottleInterval: 30000
+    // Aggressive caching for schema data (expensive operations)
+    refreshInterval: 300000, // 5 minute auto-refresh
+    revalidateOnFocus: false, // Manual refresh for large schemas
+    revalidateOnReconnect: true, // Refresh on reconnection
+    dedupingInterval: 30000, // 30 second deduplication
+    errorRetryInterval: 5000, // 5 second retry interval
+    errorRetryCount: 2, // Limited retries for schema operations
+    focusThrottleInterval: 30000 // 30 second focus throttle
   },
-
-  // Service configuration caching - immediate updates for config changes
   serviceConfig: {
-    refreshInterval: 60000, // 1 minute
-    revalidateOnFocus: true,
-    revalidateOnReconnect: true,
-    dedupingInterval: 2000,
-    errorRetryInterval: 3000,
-    errorRetryCount: 3,
-    focusThrottleInterval: 5000
+    // Standard caching for configuration data
+    refreshInterval: 120000, // 2 minute auto-refresh
+    revalidateOnFocus: true, // Refresh on focus
+    revalidateOnReconnect: true, // Refresh on reconnection
+    dedupingInterval: 10000, // 10 second deduplication
+    errorRetryInterval: 3000, // 3 second retry interval
+    errorRetryCount: 3, // Standard retry count
+    focusThrottleInterval: 15000 // 15 second focus throttle
   }
 } as const;
 
@@ -467,96 +369,103 @@ export const DATABASE_SERVICE_SWR_CONFIG: SWRConfig = {
 // =============================================================================
 
 /**
- * React Query configuration for complex server-state management
- * Optimized for database operations with intelligent caching strategies
+ * React Query configuration for advanced server-state management
+ * Optimized for complex database operations and intelligent caching
  */
 export const DATABASE_SERVICE_REACT_QUERY_CONFIG: ReactQueryConfig = {
-  // Default query options for all database service queries
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      cacheTime: 10 * 60 * 1000, // 10 minutes
-      retry: 3,
-      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: true
+      // Default cache time for efficient memory usage
+      staleTime: 5 * 60 * 1000, // 5 minutes default stale time
+      cacheTime: 10 * 60 * 1000, // 10 minutes cache retention
+      retry: 3, // Standard retry attempts
+      retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
+      refetchOnWindowFocus: true, // Refresh on window focus
+      refetchOnReconnect: true // Refresh on network reconnection
     },
     mutations: {
-      retry: 1,
-      retryDelay: 1000
+      retry: 2, // Limited mutation retries
+      retryDelay: 1000 // 1 second mutation retry delay
     }
   },
-
-  // Specific configurations for different query types
   queryConfigs: {
-    // Database service list queries
     serviceList: {
-      staleTime: 2 * 60 * 1000, // 2 minutes
-      cacheTime: 5 * 60 * 1000, // 5 minutes
-      refetchOnWindowFocus: true
+      staleTime: 2 * 60 * 1000, // 2 minutes for service listings
+      cacheTime: 10 * 60 * 1000, // 10 minutes cache retention
+      refetchOnWindowFocus: true // Refresh service list on focus
     },
-
-    // Connection test queries
     connectionTest: {
-      staleTime: 0, // Always consider stale for real-time testing
-      cacheTime: 1 * 60 * 1000, // 1 minute
-      retry: 2,
-      refetchOnWindowFocus: false
+      staleTime: 0, // Always fresh for connection tests
+      cacheTime: 1 * 60 * 1000, // 1 minute cache for debugging
+      retry: 1, // Single retry for connection tests
+      refetchOnWindowFocus: false // Manual testing only
     },
-
-    // Schema discovery queries - longer cache for stable data
     schemaDiscovery: {
-      staleTime: 15 * 60 * 1000, // 15 minutes
-      cacheTime: 30 * 60 * 1000, // 30 minutes
-      retry: 2,
-      refetchOnWindowFocus: false
+      staleTime: 15 * 60 * 1000, // 15 minutes for schema data
+      cacheTime: 30 * 60 * 1000, // 30 minutes cache retention
+      retry: 2, // Limited retries for expensive operations
+      refetchOnWindowFocus: false // Manual refresh for large schemas
     },
-
-    // Service configuration queries
     serviceConfig: {
-      staleTime: 1 * 60 * 1000, // 1 minute
-      cacheTime: 5 * 60 * 1000, // 5 minutes
-      refetchOnWindowFocus: true
+      staleTime: 5 * 60 * 1000, // 5 minutes for configuration
+      cacheTime: 15 * 60 * 1000, // 15 minutes cache retention
+      refetchOnWindowFocus: true // Refresh config on focus
     }
   }
 } as const;
 
 // =============================================================================
-// VALIDATION RULES AND CONSTRAINTS
+// VALIDATION CONFIGURATION
 // =============================================================================
 
 /**
- * Database-specific validation rules for connection parameters
+ * Validation rules and constraints for database service configuration
+ * Enhanced from Angular validators for React Hook Form integration
  */
-export const DATABASE_VALIDATION_RULES = {
-  // Common validation patterns
-  patterns: {
-    hostname: /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/,
-    ipAddress: /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/,
-    port: /^([1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$/,
-    databaseName: /^[a-zA-Z][a-zA-Z0-9_-]*$/,
-    username: /^[a-zA-Z][a-zA-Z0-9_@.-]*$/
+export const VALIDATION_RULES = {
+  serviceName: {
+    minLength: 1,
+    maxLength: 64,
+    pattern: /^[a-zA-Z][a-zA-Z0-9_-]*$/,
+    errorMessage: 'Service name must start with a letter and contain only letters, numbers, underscores, and hyphens'
   },
-
-  // Field length limits
-  limits: {
-    serviceName: { min: 1, max: 64 },
-    serviceLabel: { min: 1, max: 255 },
-    host: { min: 1, max: 255 },
-    database: { min: 1, max: 64 },
-    username: { min: 1, max: 64 },
-    password: { min: 0, max: 255 },
-    description: { min: 0, max: 1024 }
+  displayLabel: {
+    minLength: 1,
+    maxLength: 255,
+    errorMessage: 'Display label is required and must be less than 255 characters'
   },
-
-  // Port ranges for different database types
-  portRanges: {
-    mysql: { min: 1, max: 65535, default: 3306 },
-    pgsql: { min: 1, max: 65535, default: 5432 },
-    oracle: { min: 1, max: 65535, default: 1521 },
-    sqlsrv: { min: 1, max: 65535, default: 1433 },
-    mongodb: { min: 1, max: 65535, default: 27017 },
-    snowflake: { min: 443, max: 443, default: 443 }
+  description: {
+    maxLength: 1024,
+    errorMessage: 'Description must be less than 1024 characters'
+  },
+  host: {
+    minLength: 1,
+    maxLength: 255,
+    errorMessage: 'Host is required and must be less than 255 characters'
+  },
+  port: {
+    min: 1,
+    max: 65535,
+    errorMessage: 'Port must be between 1 and 65535'
+  },
+  database: {
+    minLength: 1,
+    maxLength: 64,
+    errorMessage: 'Database name is required and must be less than 64 characters'
+  },
+  username: {
+    minLength: 1,
+    maxLength: 64,
+    errorMessage: 'Username is required and must be less than 64 characters'
+  },
+  password: {
+    maxLength: 255,
+    errorMessage: 'Password must be less than 255 characters'
+  },
+  connectionTimeout: {
+    min: 1000,
+    max: 60000,
+    errorMessage: 'Connection timeout must be between 1 and 60 seconds'
   }
 } as const;
 
@@ -565,152 +474,226 @@ export const DATABASE_VALIDATION_RULES = {
 // =============================================================================
 
 /**
- * UI component configuration options for database service forms and displays
+ * Component-specific configuration for database service UI
+ * Optimized for React/Next.js rendering performance
  */
-export const DATABASE_SERVICE_UI_CONFIG = {
-  // Form field configurations
-  formFields: {
-    serviceName: {
-      required: true,
-      placeholder: 'Enter service name',
-      helperText: 'Unique identifier for this database service'
-    },
-    serviceLabel: {
-      required: true,
-      placeholder: 'Enter display label',
-      helperText: 'Human-readable name for this service'
-    },
-    host: {
-      required: true,
-      placeholder: 'localhost or IP address',
-      helperText: 'Database server hostname or IP address'
-    },
-    port: {
-      required: false,
-      placeholder: 'Default port will be used',
-      helperText: 'Database server port number'
-    },
-    database: {
-      required: true,
-      placeholder: 'Enter database name',
-      helperText: 'Name of the database to connect to'
-    },
-    username: {
-      required: true,
-      placeholder: 'Enter username',
-      helperText: 'Database user with appropriate permissions'
-    },
-    password: {
-      required: false,
-      placeholder: 'Enter password',
-      helperText: 'Database user password',
-      type: 'password'
-    }
+export const COMPONENT_CONFIG = {
+  serviceList: {
+    defaultPageSize: 25,
+    pageSizeOptions: [10, 25, 50, 100],
+    maxVisiblePages: 7,
+    enableVirtualScrolling: true, // For large datasets
+    virtualScrollThreshold: 100 // Enable virtual scrolling above 100 items
   },
-
-  // Table pagination and display options
-  table: {
-    defaultPageSize: 10,
-    pageSizeOptions: [5, 10, 25, 50, 100],
-    defaultSortField: 'label',
-    defaultSortDirection: 'asc' as const
-  },
-
-  // Connection test UI states
   connectionTest: {
-    states: {
-      idle: 'Test Connection',
-      testing: 'Testing...',
-      success: 'Connection Successful',
-      error: 'Connection Failed'
-    },
-    colors: {
-      idle: 'blue',
-      testing: 'yellow',
-      success: 'green',
-      error: 'red'
-    }
-  }
-} as const;
-
-// =============================================================================
-// FEATURE FLAGS AND CAPABILITIES
-// =============================================================================
-
-/**
- * Feature flags for database service capabilities
- * Enables conditional rendering based on database type support
- */
-export const DATABASE_FEATURE_FLAGS = {
-  // Schema discovery features
+    showProgressIndicator: true,
+    progressUpdateInterval: 500, // 500ms progress updates
+    timeoutWarningThreshold: 3000, // Warn at 3 seconds
+    successMessageDuration: 3000, // 3 second success message
+    errorMessageDuration: 5000 // 5 second error message
+  },
   schemaDiscovery: {
-    virtualScrolling: true, // Enable for 1000+ table support
-    relationshipMapping: true,
-    indexInformation: true,
-    constraintDetails: true
+    enableLazyLoading: true,
+    nodeExpansionDepth: 2, // Default expansion depth
+    virtualScrolling: {
+      enabled: true,
+      itemHeight: 32, // Height per tree item in pixels
+      threshold: 50 // Enable virtual scrolling above 50 nodes
+    },
+    searchDebounceMs: 300, // 300ms search debounce
+    maxSearchResults: 1000 // Limit search results for performance
   },
-
-  // Connection features
-  connection: {
-    sslSupport: true,
-    connectionPooling: true,
-    readOnlyMode: true,
-    transactionSupport: true
-  },
-
-  // API generation features
-  apiGeneration: {
-    customEndpoints: true,
-    bulkOperations: true,
-    filteringSupport: true,
-    aggregationSupport: true
+  serviceForm: {
+    autoSaveEnabled: true,
+    autoSaveInterval: 30000, // 30 second auto-save
+    confirmNavigationOnChanges: true,
+    validateOnChange: true, // Real-time validation
+    validationDebounceMs: 500 // 500ms validation debounce
   }
 } as const;
 
 // =============================================================================
-// ERROR MESSAGES AND CONSTANTS
+// API ENDPOINT CONFIGURATION
 // =============================================================================
 
 /**
- * Standardized error messages for database service operations
+ * API endpoint configuration for database service operations
+ * Maintains compatibility with DreamFactory Core APIs
  */
-export const DATABASE_ERROR_MESSAGES = {
-  connection: {
-    timeout: 'Connection timed out. Please check your database server and network connectivity.',
-    refused: 'Connection refused. Please verify the host and port are correct.',
-    authentication: 'Authentication failed. Please check your username and password.',
-    database: 'Database not found. Please verify the database name is correct.',
-    ssl: 'SSL connection failed. Please check your SSL configuration.',
-    unknown: 'An unknown error occurred while connecting to the database.'
-  },
-  validation: {
-    required: 'This field is required.',
-    invalidHost: 'Please enter a valid hostname or IP address.',
-    invalidPort: 'Please enter a valid port number (1-65535).',
-    invalidDatabase: 'Please enter a valid database name.',
-    invalidUsername: 'Please enter a valid username.',
-    duplicateService: 'A service with this name already exists.'
-  },
-  schema: {
-    discoveryFailed: 'Failed to discover database schema. Please check your connection and permissions.',
-    largeSchema: 'This database has a large number of tables. Schema discovery may take longer than usual.',
-    noTables: 'No tables found in the selected database.',
-    permissionDenied: 'Insufficient permissions to access schema information.'
+export const API_ENDPOINTS = {
+  services: '/api/v2/system/service',
+  serviceTypes: '/api/v2/system/service_type',
+  serviceById: (id: number) => `/api/v2/system/service/${id}`,
+  connectionTest: '/api/v2/system/service/_test',
+  schema: (serviceName: string) => `/api/v2/${serviceName}/_schema`,
+  schemaTable: (serviceName: string, tableName: string) => `/api/v2/${serviceName}/_schema/${tableName}`,
+  schemaField: (serviceName: string, tableName: string, fieldName: string) => 
+    `/api/v2/${serviceName}/_schema/${tableName}/${fieldName}`,
+  
+  // Next.js API routes for preview and testing
+  preview: {
+    connectionTest: '/api/preview/connection-test',
+    schemaPreview: '/api/preview/schema',
+    endpointPreview: '/api/preview/endpoints'
   }
 } as const;
 
+// =============================================================================
+// ERROR HANDLING CONFIGURATION
+// =============================================================================
+
 /**
- * Success messages for database service operations
+ * Error handling configuration for database service operations
+ * Enhanced error classification and retry strategies
  */
-export const DATABASE_SUCCESS_MESSAGES = {
-  connection: {
-    successful: 'Database connection successful!',
-    updated: 'Connection settings updated successfully.',
-    created: 'Database service created successfully.',
-    deleted: 'Database service deleted successfully.'
+export const ERROR_CONFIG = {
+  connectionErrors: {
+    retryAttempts: 2,
+    retryDelay: 2000, // 2 second delay between retries
+    timeoutErrorCode: 'CONNECTION_TIMEOUT',
+    authErrorCode: 'AUTHENTICATION_FAILED',
+    networkErrorCode: 'NETWORK_ERROR',
+    configErrorCode: 'INVALID_CONFIGURATION'
   },
-  schema: {
-    discovered: 'Database schema discovered successfully.',
-    updated: 'Schema information updated.'
+  schemaErrors: {
+    retryAttempts: 1,
+    retryDelay: 3000, // 3 second delay for schema operations
+    permissionErrorCode: 'INSUFFICIENT_PERMISSIONS',
+    notFoundErrorCode: 'SCHEMA_NOT_FOUND',
+    tooLargeErrorCode: 'SCHEMA_TOO_LARGE'
+  },
+  apiErrors: {
+    retryAttempts: 3,
+    retryDelay: 1000, // 1 second delay for API operations
+    rateLimitErrorCode: 'RATE_LIMIT_EXCEEDED',
+    serverErrorCode: 'INTERNAL_SERVER_ERROR',
+    maintenanceErrorCode: 'SERVICE_MAINTENANCE'
   }
 } as const;
+
+// =============================================================================
+// PERFORMANCE MONITORING CONFIGURATION
+// =============================================================================
+
+/**
+ * Performance monitoring thresholds and configuration
+ * Aligned with React/Next.js integration requirements
+ */
+export const PERFORMANCE_CONFIG = {
+  thresholds: {
+    connectionTestMs: 5000, // F-001-RQ-002 requirement
+    cacheHitMs: 50, // React/Next.js integration requirement
+    validationMs: 100, // Real-time validation requirement
+    ssrPageMs: 2000, // SSR page load requirement
+    apiResponseMs: 2000 // API response requirement
+  },
+  monitoring: {
+    enablePerformanceLogging: true,
+    logSlowOperations: true,
+    slowOperationThreshold: 1000, // 1 second threshold
+    enableMetrics: true,
+    metricsCollectionInterval: 60000 // 1 minute metrics collection
+  }
+} as const;
+
+// =============================================================================
+// FEATURE FLAGS AND TOGGLES
+// =============================================================================
+
+/**
+ * Feature flags for progressive enhancement and A/B testing
+ * Enables gradual rollout of new database service features
+ */
+export const FEATURE_FLAGS = {
+  enableAdvancedCaching: true, // Enhanced React Query caching
+  enableVirtualScrolling: true, // TanStack Virtual for large datasets
+  enableAutoSave: true, // Auto-save form functionality
+  enableConnectionPooling: true, // Advanced connection pooling
+  enableSchemaSearch: true, // Schema search functionality
+  enablePerformanceMonitoring: true, // Performance tracking
+  enableOptimisticUpdates: true, // Optimistic UI updates
+  enableBackgroundRefresh: true, // Background data refresh
+  enableErrorRetry: true, // Automatic error retry
+  enableSSROptimization: true // Server-side rendering optimizations
+} as const;
+
+// =============================================================================
+// EXPORTED GROUPED CONSTANTS
+// =============================================================================
+
+/**
+ * Grouped export for convenient access to related constants
+ */
+export const DATABASE_SERVICE_CONSTANTS = {
+  drivers: DATABASE_DRIVERS,
+  types: DATABASE_TYPES,
+  timeouts: CONNECTION_TIMEOUTS,
+  defaults: DEFAULT_CONNECTION_PARAMS,
+  swrConfig: DATABASE_SERVICE_SWR_CONFIG,
+  reactQueryConfig: DATABASE_SERVICE_REACT_QUERY_CONFIG,
+  validation: VALIDATION_RULES,
+  components: COMPONENT_CONFIG,
+  api: API_ENDPOINTS,
+  errors: ERROR_CONFIG,
+  performance: PERFORMANCE_CONFIG,
+  features: FEATURE_FLAGS
+} as const;
+
+// =============================================================================
+// TYPE EXPORTS
+// =============================================================================
+
+/**
+ * Re-export types for convenience and type safety
+ */
+export type {
+  DatabaseDriver,
+  DatabaseType,
+  ServiceTier,
+  ConnectionTimeouts,
+  SWRConfig,
+  ReactQueryConfig,
+  DatabaseOptions,
+  DatabaseServiceSWRConfig
+} from './types';
+
+// =============================================================================
+// UTILITY FUNCTIONS
+// =============================================================================
+
+/**
+ * Utility function to get database type configuration by driver
+ */
+export const getDatabaseType = (driver: DatabaseDriver): DatabaseType | undefined => {
+  return DATABASE_TYPES.find(type => type.driver === driver);
+};
+
+/**
+ * Utility function to get default port for a database driver
+ */
+export const getDefaultPort = (driver: DatabaseDriver): number | null => {
+  const dbType = getDatabaseType(driver);
+  return dbType?.defaultPort ?? null;
+};
+
+/**
+ * Utility function to check if a database driver supports a specific feature
+ */
+export const supportsFeature = (driver: DatabaseDriver, feature: string): boolean => {
+  const dbType = getDatabaseType(driver);
+  return dbType?.supportedFeatures.includes(feature) ?? false;
+};
+
+/**
+ * Utility function to get SWR configuration for a specific operation type
+ */
+export const getSWRConfig = (operationType: keyof SWRConfig): DatabaseServiceSWRConfig => {
+  return DATABASE_SERVICE_SWR_CONFIG[operationType];
+};
+
+/**
+ * Utility function to get React Query configuration for a specific query type
+ */
+export const getReactQueryConfig = (queryType: keyof ReactQueryConfig['queryConfigs']) => {
+  return DATABASE_SERVICE_REACT_QUERY_CONFIG.queryConfigs[queryType];
+};
