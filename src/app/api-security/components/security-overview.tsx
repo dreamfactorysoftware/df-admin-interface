@@ -1,625 +1,731 @@
+'use client';
+
 /**
- * Security Overview Dashboard Component for React/Next.js refactor of DreamFactory Admin Interface
+ * @fileoverview Security Overview Dashboard Component
  * 
- * Unified security dashboard combining limits and roles overview per F-004 API Security Configuration.
- * Displays summary statistics, recent activity, and quick action buttons for security management.
- * Built with React Query for intelligent caching and real-time data synchronization.
+ * Unified security configuration interface combining limits and roles management
+ * with real-time statistics, recent activity monitoring, and quick action buttons.
+ * Replaces Angular Material cards with responsive Tailwind CSS grid layout.
  * 
  * Features:
- * - Real-time security statistics with React Query caching
- * - Interactive security metrics visualization with accessible charts
- * - Quick action buttons for limits and roles management
+ * - Real-time security statistics with React Query caching (<50ms cache hits)
+ * - Unified limits and roles overview per F-004 API Security Configuration
+ * - Interactive quick action buttons for security management
+ * - Accessible chart components with WCAG 2.1 AA compliance
  * - Responsive dashboard layout with Tailwind CSS grid system
- * - WCAG 2.1 AA compliant design
- * - Cache hit responses under 50ms per requirements
  * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1.0
  */
 
-'use client'
+import React, { useMemo, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { 
+  Shield, 
+  Users, 
+  Clock, 
+  TrendingUp, 
+  TrendingDown,
+  AlertTriangle,
+  CheckCircle,
+  Lock,
+  Unlock,
+  Settings,
+  Plus,
+  Activity,
+  BarChart3,
+  PieChart,
+  Eye,
+  RefreshCw
+} from 'lucide-react';
 
-import React, { useMemo } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-  CardFooter,
-  StatsCard,
-  ActionCard,
-} from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Chart } from '@/components/ui/chart'
-import { useSecurityOverview } from '@/hooks/use-security-stats'
+// UI Components (will be created as part of the broader migration)
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Chart } from '@/components/ui/chart';
+
+// Custom hooks for security data management
+import { useSecurityStats } from '@/hooks/use-security-stats';
+
+// Type definitions for security data
 import type { 
-  SecurityStats,
-  SecurityViolation,
-  SystemHealthIndicator,
-  ChartDataPoint
-} from '@/types/security'
+  SecurityStats, 
+  SecurityLimit, 
+  SecurityRole,
+  SecurityActivity,
+  SecurityMetrics 
+} from '@/types/security';
 
-// ============================================================================
-// TYPES AND INTERFACES
-// ============================================================================
+// Utility functions
+import { cn } from '@/lib/utils';
 
+/**
+ * Props interface for SecurityOverview component
+ */
 interface SecurityOverviewProps {
-  className?: string
-  refreshInterval?: number
+  className?: string;
+  refreshInterval?: number;
+  'data-testid'?: string;
 }
 
-interface SecurityMetricCardProps {
-  title: string
-  value: string | number
-  description?: string
-  trend?: {
-    value: number
-    label: string
-    direction: 'up' | 'down' | 'neutral'
-  }
-  icon: React.ReactNode
-  variant?: 'default' | 'success' | 'warning' | 'error'
+/**
+ * Security statistic card configuration
+ */
+interface StatCardConfig {
+  id: string;
+  title: string;
+  value: string | number;
+  trend?: 'up' | 'down' | 'stable';
+  trendValue?: string;
+  icon: React.ComponentType<{ className?: string }>;
+  description: string;
+  status: 'success' | 'warning' | 'error' | 'info';
+  action?: {
+    label: string;
+    href: string;
+  };
 }
 
-interface QuickActionProps {
-  title: string
-  description: string
-  href: string
-  icon: React.ReactNode
-  count?: number
-  disabled?: boolean
+/**
+ * Quick action button configuration
+ */
+interface QuickActionConfig {
+  id: string;
+  title: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+  href: string;
+  variant: 'primary' | 'secondary' | 'outline';
+  disabled?: boolean;
 }
 
-// ============================================================================
-// SECURITY METRIC ICONS
-// ============================================================================
-
-const SecurityIcons = {
-  Shield: () => (
-    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-    </svg>
-  ),
-  Users: () => (
-    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-    </svg>
-  ),
-  Warning: () => (
-    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-    </svg>
-  ),
-  Clock: () => (
-    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  ),
-  Limit: () => (
-    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-    </svg>
-  ),
-  Role: () => (
-    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-    </svg>
-  ),
-  Settings: () => (
-    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-    </svg>
-  ),
-  Plus: () => (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-    </svg>
-  ),
-  ChevronRight: () => (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-    </svg>
-  ),
-}
-
-// ============================================================================
-// SECURITY METRIC CARD COMPONENT
-// ============================================================================
-
-const SecurityMetricCard: React.FC<SecurityMetricCardProps> = ({ 
-  title, 
-  value, 
-  description, 
-  trend, 
-  icon, 
-  variant = 'default' 
-}) => {
-  const getVariantStyles = (variant: string) => {
-    switch (variant) {
-      case 'success':
-        return 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950'
-      case 'warning':
-        return 'border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950'
-      case 'error':
-        return 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950'
-      default:
-        return ''
-    }
-  }
-
-  return (
-    <StatsCard
-      title={title}
-      value={value}
-      description={description}
-      trend={trend}
-      icon={icon}
-      className={getVariantStyles(variant)}
-    />
-  )
-}
-
-// ============================================================================
-// QUICK ACTION COMPONENT
-// ============================================================================
-
-const QuickAction: React.FC<QuickActionProps> = ({ 
-  title, 
-  description, 
-  href, 
-  icon, 
-  count, 
-  disabled = false 
-}) => {
-  return (
-    <Link href={disabled ? '#' : href} className={disabled ? 'pointer-events-none' : ''}>
-      <ActionCard
-        title={title}
-        description={description}
-        icon={icon}
-        action={
-          <div className="flex items-center space-x-2">
-            {count !== undefined && (
-              <span className="inline-flex items-center rounded-full bg-primary-100 px-2.5 py-0.5 text-xs font-medium text-primary-800 dark:bg-primary-900 dark:text-primary-200">
-                {count}
-              </span>
-            )}
-            <SecurityIcons.ChevronRight />
-          </div>
-        }
-        className={disabled ? 'opacity-50 cursor-not-allowed' : ''}
-      />
-    </Link>
-  )
-}
-
-// ============================================================================
-// RECENT VIOLATIONS COMPONENT
-// ============================================================================
-
-interface RecentViolationsProps {
-  violations: SecurityViolation[]
-  loading: boolean
-}
-
-const RecentViolations: React.FC<RecentViolationsProps> = ({ violations, loading }) => {
-  const getSeverityColor = (severity: SecurityViolation['severity']) => {
-    switch (severity) {
-      case 'critical':
-        return 'text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900'
-      case 'high':
-        return 'text-orange-600 bg-orange-100 dark:text-orange-400 dark:bg-orange-900'
-      case 'medium':
-        return 'text-yellow-600 bg-yellow-100 dark:text-yellow-400 dark:bg-yellow-900'
-      case 'low':
-        return 'text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900'
-      default:
-        return 'text-gray-600 bg-gray-100 dark:text-gray-400 dark:bg-gray-900'
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="space-y-3">
-        {[...Array(3)].map((_, i) => (
-          <div key={i} className="animate-pulse">
-            <div className="flex items-center space-x-3">
-              <div className="h-8 w-8 rounded-full bg-gray-200 dark:bg-gray-700" />
-              <div className="flex-1 space-y-1">
-                <div className="h-4 w-3/4 rounded bg-gray-200 dark:bg-gray-700" />
-                <div className="h-3 w-1/2 rounded bg-gray-200 dark:bg-gray-700" />
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    )
-  }
-
-  if (violations.length === 0) {
-    return (
-      <div className="text-center py-6">
-        <SecurityIcons.Shield />
-        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-          No recent security violations
-        </p>
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-3">
-      {violations.slice(0, 5).map((violation) => (
-        <div key={violation.id} className="flex items-start space-x-3">
-          <div className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getSeverityColor(violation.severity)}`}>
-            {violation.severity.toUpperCase()}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-              {violation.message}
-            </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              {new Date(violation.timestamp).toLocaleString()} • {violation.type.replace('_', ' ')}
-            </p>
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// ============================================================================
-// SYSTEM HEALTH COMPONENT
-// ============================================================================
-
-interface SystemHealthProps {
-  health: SystemHealthIndicator[]
-  loading: boolean
-}
-
-const SystemHealth: React.FC<SystemHealthProps> = ({ health, loading }) => {
-  const getStatusColor = (status: SystemHealthIndicator['status']) => {
-    switch (status) {
-      case 'operational':
-        return 'text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900'
-      case 'degraded':
-        return 'text-yellow-600 bg-yellow-100 dark:text-yellow-400 dark:bg-yellow-900'
-      case 'offline':
-        return 'text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900'
-      default:
-        return 'text-gray-600 bg-gray-100 dark:text-gray-400 dark:bg-gray-900'
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="space-y-2">
-        {[...Array(5)].map((_, i) => (
-          <div key={i} className="animate-pulse flex items-center justify-between">
-            <div className="h-4 w-1/3 rounded bg-gray-200 dark:bg-gray-700" />
-            <div className="h-6 w-20 rounded-full bg-gray-200 dark:bg-gray-700" />
-          </div>
-        ))}
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-3">
-      {health.map((indicator) => (
-        <div key={indicator.component} className="flex items-center justify-between">
-          <span className="text-sm font-medium text-gray-900 dark:text-gray-100 capitalize">
-            {indicator.component.replace('_', ' ')}
-          </span>
-          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusColor(indicator.status)}`}>
-            {indicator.status}
-          </span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// ============================================================================
-// MAIN SECURITY OVERVIEW COMPONENT
-// ============================================================================
-
-const SecurityOverview: React.FC<SecurityOverviewProps> = ({ 
+/**
+ * Security Overview Dashboard Component
+ * 
+ * Provides a unified interface for monitoring and managing API security
+ * with real-time statistics, activity monitoring, and quick actions.
+ */
+export function SecurityOverview({ 
   className,
-  refreshInterval = 60000 
-}) => {
-  const router = useRouter()
-  
-  // Fetch security overview data with React Query
+  refreshInterval = 30000, // 30 seconds default refresh
+  'data-testid': testId = 'security-overview-dashboard'
+}: SecurityOverviewProps) {
+  const router = useRouter();
+
+  // Fetch security statistics with React Query intelligent caching
   const {
-    stats,
-    violations,
-    health,
-    charts,
-    metrics,
+    data: securityStats,
     isLoading,
     isError,
     error,
-    refresh,
-    isRefreshing,
-    lastUpdated,
-  } = useSecurityOverview()
+    refetch,
+    lastUpdated
+  } = useSecurityStats({
+    refetchInterval: refreshInterval,
+    staleTime: 50, // 50ms cache hit requirement per React/Next.js Integration Requirements
+    cacheTime: 300000, // 5 minutes cache time
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+  });
 
-  // Memoized chart data for performance optimization
-  const violationTrendData = useMemo((): ChartDataPoint[] => {
-    if (!charts || charts.length === 0) return []
-    
-    const violationChart = charts.find(chart => chart.id === 'violation-trend')
-    return violationChart?.data || []
-  }, [charts])
+  // Navigation handlers for quick actions
+  const handleNavigation = useCallback((href: string) => {
+    router.push(href);
+  }, [router]);
 
-  const roleUtilizationData = useMemo((): ChartDataPoint[] => {
-    if (!stats) return []
-    
+  // Manual refresh handler
+  const handleRefresh = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
+
+  // Compute security statistics cards
+  const statCards = useMemo((): StatCardConfig[] => {
+    if (!securityStats) return [];
+
+    const {
+      totalLimits,
+      activeLimits,
+      totalRoles,
+      activeRoles,
+      securityEvents,
+      accessAttempts,
+      blockedRequests,
+      averageResponseTime,
+      uptime
+    } = securityStats;
+
     return [
-      { name: 'Assigned Users', value: stats.totalUsers - stats.unassignedUsers },
-      { name: 'Unassigned Users', value: stats.unassignedUsers },
-    ]
-  }, [stats])
+      {
+        id: 'security-limits',
+        title: 'Active Limits',
+        value: `${activeLimits}/${totalLimits}`,
+        trend: activeLimits > 0 ? 'up' : 'stable',
+        trendValue: activeLimits > 0 ? `${Math.round((activeLimits / totalLimits) * 100)}% active` : 'None active',
+        icon: Shield,
+        description: `${activeLimits} rate limits currently enforced across API endpoints`,
+        status: activeLimits > 0 ? 'success' : 'warning',
+        action: {
+          label: 'Manage Limits',
+          href: '/api-security/limits'
+        }
+      },
+      {
+        id: 'security-roles',
+        title: 'Active Roles',
+        value: `${activeRoles}/${totalRoles}`,
+        trend: activeRoles > 0 ? 'up' : 'stable',
+        trendValue: activeRoles > 0 ? `${Math.round((activeRoles / totalRoles) * 100)}% active` : 'None active',
+        icon: Users,
+        description: `${activeRoles} user roles with configured permissions`,
+        status: activeRoles > 0 ? 'success' : 'warning',
+        action: {
+          label: 'Manage Roles',
+          href: '/api-security/roles'
+        }
+      },
+      {
+        id: 'security-events',
+        title: 'Security Events',
+        value: securityEvents.total,
+        trend: securityEvents.trend === 'increasing' ? 'up' : securityEvents.trend === 'decreasing' ? 'down' : 'stable',
+        trendValue: `${securityEvents.changePercent}% ${securityEvents.trend === 'increasing' ? 'increase' : securityEvents.trend === 'decreasing' ? 'decrease' : 'stable'} (24h)`,
+        icon: AlertTriangle,
+        description: `Security events logged in the last 24 hours`,
+        status: securityEvents.severity === 'high' ? 'error' : securityEvents.severity === 'medium' ? 'warning' : 'info',
+        action: {
+          label: 'View Events',
+          href: '/api-security/audit'
+        }
+      },
+      {
+        id: 'access-attempts',
+        title: 'Access Attempts',
+        value: accessAttempts.successful,
+        trend: accessAttempts.trend === 'increasing' ? 'up' : accessAttempts.trend === 'decreasing' ? 'down' : 'stable',
+        trendValue: `${accessAttempts.failureRate}% failure rate`,
+        icon: Lock,
+        description: `Successful API access attempts (${accessAttempts.failed} failed)`,
+        status: accessAttempts.failureRate < 5 ? 'success' : accessAttempts.failureRate < 15 ? 'warning' : 'error',
+        action: {
+          label: 'View Logs',
+          href: '/api-security/logs'
+        }
+      },
+      {
+        id: 'response-time',
+        title: 'Avg Response Time',
+        value: `${averageResponseTime}ms`,
+        trend: averageResponseTime <= 100 ? 'down' : 'up',
+        trendValue: averageResponseTime <= 100 ? 'Optimal' : 'Above threshold',
+        icon: Clock,
+        description: 'Average API response time including security checks',
+        status: averageResponseTime <= 100 ? 'success' : averageResponseTime <= 200 ? 'warning' : 'error',
+        action: {
+          label: 'Performance',
+          href: '/api-security/performance'
+        }
+      },
+      {
+        id: 'blocked-requests',
+        title: 'Blocked Requests',
+        value: blockedRequests.count,
+        trend: blockedRequests.trend === 'increasing' ? 'up' : blockedRequests.trend === 'decreasing' ? 'down' : 'stable',
+        trendValue: `${blockedRequests.percentage}% of total requests`,
+        icon: Unlock,
+        description: 'Requests blocked by security rules in the last 24 hours',
+        status: blockedRequests.percentage < 1 ? 'success' : blockedRequests.percentage < 5 ? 'warning' : 'error',
+        action: {
+          label: 'Review Rules',
+          href: '/api-security/rules'
+        }
+      }
+    ];
+  }, [securityStats]);
 
-  // Quick action items with real-time counts
-  const quickActions = useMemo((): QuickActionProps[] => [
+  // Quick action buttons configuration
+  const quickActions = useMemo((): QuickActionConfig[] => [
     {
-      title: 'Manage Rate Limits',
-      description: 'Configure API rate limiting rules and thresholds',
-      href: '/api-security/limits',
-      icon: <SecurityIcons.Limit />,
-      count: stats?.activeLimits || 0,
-    },
-    {
-      title: 'Manage Roles',
-      description: 'Create and configure user roles and permissions',
-      href: '/api-security/roles',
-      icon: <SecurityIcons.Role />,
-      count: stats?.activeRoles || 0,
-    },
-    {
-      title: 'Create New Limit',
-      description: 'Add a new rate limiting rule',
+      id: 'create-limit',
+      title: 'Create Rate Limit',
+      description: 'Set up new API rate limiting rules',
+      icon: Plus,
       href: '/api-security/limits/create',
-      icon: <SecurityIcons.Plus />,
+      variant: 'primary'
     },
     {
-      title: 'Create New Role',
-      description: 'Define a new user role with permissions',
+      id: 'create-role',
+      title: 'Create Role',
+      description: 'Define new user role with permissions',
+      icon: Users,
       href: '/api-security/roles/create',
-      icon: <SecurityIcons.Plus />,
+      variant: 'primary'
     },
-  ], [stats])
+    {
+      id: 'security-settings',
+      title: 'Security Settings',
+      description: 'Configure global security policies',
+      icon: Settings,
+      href: '/api-security/settings',
+      variant: 'secondary'
+    },
+    {
+      id: 'audit-logs',
+      title: 'Audit Logs',
+      description: 'Review security event history',
+      icon: Activity,
+      href: '/api-security/audit',
+      variant: 'outline'
+    }
+  ], []);
 
-  // Handle manual refresh
-  const handleRefresh = () => {
-    refresh()
+  // Chart data for security metrics visualization
+  const chartData = useMemo(() => {
+    if (!securityStats?.metrics) return null;
+
+    return {
+      securityEvents: {
+        labels: securityStats.metrics.timeline.map(item => item.timestamp),
+        datasets: [
+          {
+            label: 'Security Events',
+            data: securityStats.metrics.timeline.map(item => item.events),
+            borderColor: 'rgb(239, 68, 68)', // red-500
+            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+            tension: 0.4
+          },
+          {
+            label: 'Blocked Requests',
+            data: securityStats.metrics.timeline.map(item => item.blocked),
+            borderColor: 'rgb(249, 115, 22)', // orange-500
+            backgroundColor: 'rgba(249, 115, 22, 0.1)',
+            tension: 0.4
+          }
+        ]
+      },
+      accessPatterns: {
+        labels: ['Successful', 'Failed', 'Blocked', 'Rate Limited'],
+        datasets: [
+          {
+            data: [
+              securityStats.accessAttempts.successful,
+              securityStats.accessAttempts.failed,
+              securityStats.blockedRequests.count,
+              securityStats.rateLimitedRequests || 0
+            ],
+            backgroundColor: [
+              'rgb(34, 197, 94)',   // green-500
+              'rgb(239, 68, 68)',   // red-500
+              'rgb(249, 115, 22)',  // orange-500
+              'rgb(168, 85, 247)'   // purple-500
+            ],
+            borderWidth: 2,
+            borderColor: 'rgb(255, 255, 255)'
+          }
+        ]
+      }
+    };
+  }, [securityStats]);
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div 
+        className={cn(
+          "animate-pulse space-y-6",
+          className
+        )}
+        data-testid={`${testId}-loading`}
+        aria-label="Loading security overview dashboard"
+      >
+        {/* Loading skeleton */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-64"></div>
+          <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-32"></div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-48 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="h-80 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+          <div className="h-80 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+        </div>
+      </div>
+    );
   }
 
   // Error state
   if (isError) {
     return (
-      <Card className={className}>
-        <CardContent>
-          <div className="text-center py-6">
-            <SecurityIcons.Warning />
-            <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">
-              Failed to load security overview
-            </h3>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              {error?.message || 'An unexpected error occurred'}
-            </p>
-            <Button 
-              onClick={handleRefresh}
-              className="mt-3"
-              size="sm"
-              loading={isRefreshing}
-            >
-              Try Again
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    )
+      <div 
+        className={cn(
+          "flex flex-col items-center justify-center py-12 px-4 text-center",
+          className
+        )}
+        data-testid={`${testId}-error`}
+        role="alert"
+        aria-live="polite"
+      >
+        <AlertTriangle className="h-12 w-12 text-red-500 mb-4" aria-hidden="true" />
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+          Failed to Load Security Overview
+        </h3>
+        <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md">
+          {error?.message || 'Unable to fetch security statistics. Please check your connection and try again.'}
+        </p>
+        <Button
+          onClick={handleRefresh}
+          variant="primary"
+          size="md"
+          className="min-w-32"
+          data-testid="retry-button"
+          aria-label="Retry loading security overview"
+        >
+          <RefreshCw className="h-4 w-4 mr-2" aria-hidden="true" />
+          Try Again
+        </Button>
+      </div>
+    );
   }
 
   return (
-    <div className={`space-y-6 ${className || ''}`}>
+    <div 
+      className={cn(
+        "space-y-8 p-6 bg-gray-50 dark:bg-gray-900 min-h-screen",
+        className
+      )}
+      data-testid={testId}
+      role="main"
+      aria-label="Security overview dashboard"
+    >
       {/* Header Section */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
             Security Overview
           </h1>
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            Monitor API security metrics, violations, and system health
+          <p className="text-gray-600 dark:text-gray-400">
+            Monitor API security status, rate limits, and access control
           </p>
-        </div>
-        <div className="flex items-center space-x-3">
           {lastUpdated && (
-            <span className="text-xs text-gray-500 dark:text-gray-400">
+            <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">
               Last updated: {new Date(lastUpdated).toLocaleTimeString()}
-            </span>
+            </p>
           )}
-          <Button
-            onClick={handleRefresh}
-            variant="outline"
-            size="sm"
-            loading={isRefreshing}
-            leftIcon={<SecurityIcons.Settings />}
-          >
-            Refresh
-          </Button>
         </div>
-      </div>
-
-      {/* Security Metrics Grid */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        <SecurityMetricCard
-          title="System Health Score"
-          value={stats ? `${stats.healthScore}%` : '---'}
-          description="Overall security health"
-          trend={metrics ? {
-            value: metrics.performanceScore > 80 ? 5 : -2,
-            label: 'vs last week',
-            direction: metrics.performanceScore > 80 ? 'up' : 'down'
-          } : undefined}
-          icon={<SecurityIcons.Shield />}
-          variant={metrics?.isHealthy ? 'success' : metrics?.isCritical ? 'error' : 'warning'}
-        />
         
-        <SecurityMetricCard
-          title="Active Rate Limits"
-          value={stats ? `${stats.activeLimits}/${stats.totalLimits}` : '---'}
-          description="Configured API limits"
-          trend={metrics ? {
-            value: Math.round(metrics.limitsUtilization),
-            label: 'utilization',
-            direction: metrics.limitsUtilization > 75 ? 'down' : 'neutral'
-          } : undefined}
-          icon={<SecurityIcons.Limit />}
-          variant={metrics && metrics.limitsUtilization > 90 ? 'warning' : 'default'}
-        />
+        <Button
+          onClick={handleRefresh}
+          variant="outline"
+          size="md"
+          disabled={isLoading}
+          data-testid="refresh-button"
+          aria-label="Refresh security statistics"
+        >
+          <RefreshCw className={cn(
+            "h-4 w-4 mr-2",
+            isLoading && "animate-spin"
+          )} aria-hidden="true" />
+          Refresh
+        </Button>
+      </div>
+
+      {/* Security Statistics Grid */}
+      <section aria-labelledby="security-stats-heading">
+        <h2 id="security-stats-heading" className="sr-only">
+          Security Statistics
+        </h2>
         
-        <SecurityMetricCard
-          title="Recent Violations"
-          value={stats?.violationsLast24h || 0}
-          description="Last 24 hours"
-          trend={metrics ? {
-            value: Math.round(Math.abs(metrics.violationTrend * 100)),
-            label: 'vs 7-day avg',
-            direction: metrics.violationTrend > 0.1 ? 'up' : metrics.violationTrend < -0.1 ? 'down' : 'neutral'
-          } : undefined}
-          icon={<SecurityIcons.Warning />}
-          variant={stats && stats.violationsLast24h > 10 ? 'error' : stats && stats.violationsLast24h > 5 ? 'warning' : 'default'}
-        />
-        
-        <SecurityMetricCard
-          title="User Role Coverage"
-          value={stats && metrics ? `${Math.round(metrics.rolesCoverage)}%` : '---'}
-          description="Users with assigned roles"
-          trend={metrics ? {
-            value: Math.round(metrics.rolesCoverage),
-            label: 'coverage',
-            direction: metrics.rolesCoverage > 90 ? 'up' : metrics.rolesCoverage < 70 ? 'down' : 'neutral'
-          } : undefined}
-          icon={<SecurityIcons.Users />}
-          variant={metrics && metrics.rolesCoverage < 70 ? 'warning' : 'default'}
-        />
-      </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {statCards.map((stat) => {
+            const TrendIcon = stat.trend === 'up' ? TrendingUp : stat.trend === 'down' ? TrendingDown : Activity;
+            const StatusIcon = stat.status === 'success' ? CheckCircle : 
+                              stat.status === 'warning' ? AlertTriangle : 
+                              stat.status === 'error' ? AlertTriangle : stat.icon;
 
-      {/* Charts and Activity Grid */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Violation Trend Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Security Violations Trend</CardTitle>
-            <CardDescription>
-              Violation activity over the last 7 days
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Chart
-              type="line"
-              data={violationTrendData}
-              dataKey="value"
-              height={300}
-              loading={isLoading}
-              title="Security Violations"
-              className="w-full"
-            />
-          </CardContent>
-        </Card>
+            return (
+              <Card
+                key={stat.id}
+                className={cn(
+                  "p-6 hover:shadow-md transition-shadow duration-200",
+                  "border-l-4",
+                  stat.status === 'success' && "border-l-green-500",
+                  stat.status === 'warning' && "border-l-yellow-500",
+                  stat.status === 'error' && "border-l-red-500",
+                  stat.status === 'info' && "border-l-blue-500"
+                )}
+                data-testid={`stat-card-${stat.id}`}
+                role="article"
+                aria-labelledby={`${stat.id}-title`}
+                aria-describedby={`${stat.id}-description`}
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center space-x-3">
+                    <div className={cn(
+                      "p-2 rounded-lg",
+                      stat.status === 'success' && "bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400",
+                      stat.status === 'warning' && "bg-yellow-100 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400",
+                      stat.status === 'error' && "bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400",
+                      stat.status === 'info' && "bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
+                    )}>
+                      <stat.icon className="h-5 w-5" aria-hidden="true" />
+                    </div>
+                    <StatusIcon className={cn(
+                      "h-4 w-4",
+                      stat.status === 'success' && "text-green-500",
+                      stat.status === 'warning' && "text-yellow-500",
+                      stat.status === 'error' && "text-red-500",
+                      stat.status === 'info' && "text-blue-500"
+                    )} aria-hidden="true" />
+                  </div>
+                </div>
 
-        {/* Role Utilization Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Role Assignment Distribution</CardTitle>
-            <CardDescription>
-              User role assignment coverage
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Chart
-              type="pie"
-              data={roleUtilizationData}
-              dataKey="value"
-              height={300}
-              loading={isLoading}
-              title="Role Distribution"
-              className="w-full"
-            />
-          </CardContent>
-        </Card>
-      </div>
+                <div className="space-y-2">
+                  <h3 
+                    id={`${stat.id}-title`}
+                    className="text-sm font-medium text-gray-600 dark:text-gray-400"
+                  >
+                    {stat.title}
+                  </h3>
+                  
+                  <div className="flex items-end justify-between">
+                    <span className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                      {stat.value}
+                    </span>
+                    
+                    {stat.trend && stat.trendValue && (
+                      <div className="flex items-center space-x-1 text-sm">
+                        <TrendIcon className={cn(
+                          "h-4 w-4",
+                          stat.trend === 'up' && "text-green-500",
+                          stat.trend === 'down' && "text-red-500",
+                          stat.trend === 'stable' && "text-gray-400"
+                        )} aria-hidden="true" />
+                        <span className={cn(
+                          "text-sm",
+                          stat.trend === 'up' && "text-green-600 dark:text-green-400",
+                          stat.trend === 'down' && "text-red-600 dark:text-red-400",
+                          stat.trend === 'stable' && "text-gray-500"
+                        )}>
+                          {stat.trendValue}
+                        </span>
+                      </div>
+                    )}
+                  </div>
 
-      {/* Activity and Health Grid */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Recent Violations */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Security Violations</CardTitle>
-            <CardDescription>
-              Latest security events and violations
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <RecentViolations violations={violations || []} loading={isLoading} />
-          </CardContent>
-          <CardFooter>
-            <Link href="/api-security/violations" className="text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300">
-              View all violations →
-            </Link>
-          </CardFooter>
-        </Card>
+                  <p 
+                    id={`${stat.id}-description`}
+                    className="text-sm text-gray-600 dark:text-gray-400"
+                  >
+                    {stat.description}
+                  </p>
 
-        {/* System Health */}
-        <Card>
-          <CardHeader>
-            <CardTitle>System Health Indicators</CardTitle>
-            <CardDescription>
-              Status of security components
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <SystemHealth health={health || []} loading={isLoading} />
-          </CardContent>
-          <CardFooter>
-            <Link href="/api-security/health" className="text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300">
-              View detailed health →
-            </Link>
-          </CardFooter>
-        </Card>
-      </div>
+                  {stat.action && (
+                    <div className="pt-3">
+                      <Button
+                        onClick={() => handleNavigation(stat.action!.href)}
+                        variant="ghost"
+                        size="sm"
+                        className="w-full justify-start p-0 h-auto text-sm"
+                        data-testid={`${stat.id}-action`}
+                        aria-label={`${stat.action.label} for ${stat.title}`}
+                      >
+                        <Eye className="h-3 w-3 mr-2" aria-hidden="true" />
+                        {stat.action.label}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      </section>
 
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-          <CardDescription>
-            Common security management tasks
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {quickActions.map((action, index) => (
-              <QuickAction key={index} {...action} />
-            ))}
+      {/* Charts Section */}
+      {chartData && (
+        <section aria-labelledby="security-charts-heading">
+          <h2 id="security-charts-heading" className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-6">
+            Security Metrics
+          </h2>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Security Events Timeline */}
+            <Card className="p-6" data-testid="security-events-chart">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-medium text-gray-900 dark:text-gray-100">
+                  Security Events Timeline
+                </h3>
+                <BarChart3 className="h-5 w-5 text-gray-400" aria-hidden="true" />
+              </div>
+              
+              <div className="h-64" aria-label="Security events timeline chart">
+                <Chart
+                  type="line"
+                  data={chartData.securityEvents}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: {
+                        position: 'bottom' as const,
+                      },
+                    },
+                    scales: {
+                      y: {
+                        beginAtZero: true,
+                        grid: {
+                          color: 'rgba(156, 163, 175, 0.2)', // gray-400 with opacity
+                        },
+                      },
+                      x: {
+                        grid: {
+                          color: 'rgba(156, 163, 175, 0.2)',
+                        },
+                      },
+                    },
+                  }}
+                  aria-label="Line chart showing security events and blocked requests over time"
+                />
+              </div>
+            </Card>
+
+            {/* Access Patterns Distribution */}
+            <Card className="p-6" data-testid="access-patterns-chart">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-medium text-gray-900 dark:text-gray-100">
+                  Access Patterns
+                </h3>
+                <PieChart className="h-5 w-5 text-gray-400" aria-hidden="true" />
+              </div>
+              
+              <div className="h-64" aria-label="Access patterns distribution chart">
+                <Chart
+                  type="doughnut"
+                  data={chartData.accessPatterns}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: {
+                        position: 'bottom' as const,
+                      },
+                    },
+                  }}
+                  aria-label="Doughnut chart showing distribution of successful, failed, blocked, and rate-limited access attempts"
+                />
+              </div>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
+        </section>
+      )}
+
+      {/* Quick Actions Section */}
+      <section aria-labelledby="quick-actions-heading">
+        <h2 id="quick-actions-heading" className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-6">
+          Quick Actions
+        </h2>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {quickActions.map((action) => (
+            <Card
+              key={action.id}
+              className="group hover:shadow-md transition-all duration-200 cursor-pointer"
+              onClick={() => !action.disabled && handleNavigation(action.href)}
+              data-testid={`quick-action-${action.id}`}
+              role="button"
+              tabIndex={action.disabled ? -1 : 0}
+              aria-label={`${action.title}: ${action.description}`}
+              aria-disabled={action.disabled}
+              onKeyDown={(e) => {
+                if ((e.key === 'Enter' || e.key === ' ') && !action.disabled) {
+                  e.preventDefault();
+                  handleNavigation(action.href);
+                }
+              }}
+            >
+              <div className="p-6 text-center">
+                <div className={cn(
+                  "inline-flex items-center justify-center w-12 h-12 rounded-lg mb-4 transition-colors",
+                  action.variant === 'primary' && "bg-primary-100 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 group-hover:bg-primary-200 dark:group-hover:bg-primary-900/30",
+                  action.variant === 'secondary' && "bg-secondary-100 dark:bg-secondary-900/20 text-secondary-600 dark:text-secondary-400 group-hover:bg-secondary-200 dark:group-hover:bg-secondary-900/30",
+                  action.variant === 'outline' && "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 group-hover:bg-gray-200 dark:group-hover:bg-gray-700",
+                  action.disabled && "opacity-50"
+                )}>
+                  <action.icon className="h-6 w-6" aria-hidden="true" />
+                </div>
+                
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                  {action.title}
+                </h3>
+                
+                <p className="text-xs text-gray-600 dark:text-gray-400">
+                  {action.description}
+                </p>
+              </div>
+            </Card>
+          ))}
+        </div>
+      </section>
+
+      {/* Recent Activity Preview */}
+      {securityStats?.recentActivity && (
+        <section aria-labelledby="recent-activity-heading">
+          <h2 id="recent-activity-heading" className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-6">
+            Recent Security Activity
+          </h2>
+          
+          <Card className="p-6" data-testid="recent-activity-preview">
+            <div className="space-y-4">
+              {securityStats.recentActivity.slice(0, 5).map((activity, index) => (
+                <div 
+                  key={`${activity.id}-${index}`}
+                  className="flex items-start space-x-3 py-3 border-b border-gray-200 dark:border-gray-700 last:border-b-0"
+                  role="listitem"
+                >
+                  <div className={cn(
+                    "flex-shrink-0 w-2 h-2 rounded-full mt-2",
+                    activity.severity === 'high' && "bg-red-500",
+                    activity.severity === 'medium' && "bg-yellow-500",
+                    activity.severity === 'low' && "bg-green-500",
+                    activity.severity === 'info' && "bg-blue-500"
+                  )} aria-hidden="true" />
+                  
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-900 dark:text-gray-100">
+                      {activity.message}
+                    </p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                      {new Date(activity.timestamp).toLocaleString()} • {activity.source}
+                    </p>
+                  </div>
+                </div>
+              ))}
+              
+              <div className="pt-3 text-center">
+                <Button
+                  onClick={() => handleNavigation('/api-security/audit')}
+                  variant="ghost"
+                  size="sm"
+                  data-testid="view-all-activity"
+                  aria-label="View all security activity logs"
+                >
+                  View All Activity
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </section>
+      )}
     </div>
-  )
+  );
 }
 
-// ============================================================================
-// EXPORTS
-// ============================================================================
+// Export the component as default
+export default SecurityOverview;
 
-export default SecurityOverview
-export type { SecurityOverviewProps }
+// Component display name for debugging
+SecurityOverview.displayName = 'SecurityOverview';
