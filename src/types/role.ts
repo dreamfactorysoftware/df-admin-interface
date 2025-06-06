@@ -1,501 +1,419 @@
 /**
- * Role Management Types for React/Next.js Migration
+ * Role type definitions for DreamFactory admin interface.
  * 
- * Comprehensive type definitions for role management operations including
- * role configurations, permissions, access control rules, and data structures
- * for the DreamFactory Admin Interface React migration.
+ * Provides comprehensive type definitions for role management operations,
+ * permissions, access controls, and related data structures. Supports
+ * TypeScript 5.8+ with enhanced React 19 compatibility.
  * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
+ * @fileoverview Role type definitions for role management
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-import { z } from 'zod'
+import { z } from 'zod';
 
-// =============================================================================
-// CORE ROLE DATA STRUCTURES
-// =============================================================================
+// ============================================================================
+// Core Role Interfaces
+// ============================================================================
 
 /**
- * Role table row representation for list displays
- * Simplified interface for role listing components
+ * Table row representation for role data display
+ * Optimized for UI rendering and table operations
  */
 export interface RoleRow {
-  id: number
-  name: string
-  description: string
-  active: boolean
+  /** Unique role identifier */
+  id: number;
+  /** Role name */
+  name: string;
+  /** Role description */
+  description: string;
+  /** Whether the role is active/enabled */
+  active: boolean;
 }
 
 /**
- * Complete role entity type for CRUD operations
- * Maintains compatibility with DreamFactory backend API
+ * Complete role data structure from DreamFactory API
+ * Includes all fields for comprehensive role management
  */
 export interface RoleType {
-  id: number
-  name: string
-  description: string
-  isActive: boolean
-  createdById: number
-  createdDate: string
-  lastModifiedById: number
-  lastModifiedDate: string
-  lookupByRoleId: number[]
-  accessibleTabs?: Array<string>
-  
-  // Extended properties for role management
-  roleServiceAccessByRoleId?: RoleServiceAccessType[]
-  permissions?: RolePermission[]
-  userCount?: number
-  lastUsed?: string
+  /** Unique role identifier */
+  id: number;
+  /** Role name */
+  name: string;
+  /** Role description */
+  description: string;
+  /** Whether the role is active/enabled */
+  isActive: boolean;
+  /** ID of user who created this role */
+  createdById: number;
+  /** Creation timestamp in ISO format */
+  createdDate: string;
+  /** ID of user who last modified this role */
+  lastModifiedById: number;
+  /** Last modification timestamp in ISO format */
+  lastModifiedDate: string;
+  /** Array of lookup IDs associated with this role */
+  lookupByRoleId: number[];
+  /** Accessible tabs for this role (optional) */
+  accessibleTabs?: Array<string>;
 }
 
 /**
- * Role creation payload for API requests
- * Subset of RoleType for new role creation
+ * Role service access configuration
+ * Defines what services a role can access and with what permissions
  */
-export interface RoleCreatePayload {
-  name: string
-  description: string
-  isActive: boolean
-  lookupByRoleId?: number[]
-  accessibleTabs?: Array<string>
-  roleServiceAccessByRoleId?: Omit<RoleServiceAccessType, 'id' | 'roleId'>[]
+export interface RoleServiceAccess {
+  /** Unique access configuration ID */
+  id: number;
+  /** Role ID this access belongs to */
+  roleId: number;
+  /** Service ID being accessed */
+  serviceId: number;
+  /** Component within the service (optional) */
+  component?: string;
+  /** HTTP verbs allowed (GET, POST, PUT, DELETE, etc.) */
+  verbMask: number;
+  /** Request filters (optional) */
+  requestorType: number;
+  /** Additional filters and conditions */
+  filters?: string;
+  /** Filter operator (AND, OR) */
+  filterOp?: string;
 }
 
 /**
- * Role update payload for API requests
- * Includes ID and allows partial updates
+ * Lookup configuration associated with a role
+ * Provides dynamic value lookups for role-based functionality
  */
-export interface RoleUpdatePayload extends Partial<RoleCreatePayload> {
-  id: number
+export interface RoleLookup {
+  /** Unique lookup ID */
+  id: number;
+  /** Role ID this lookup belongs to */
+  roleId: number;
+  /** Lookup name/key */
+  name: string;
+  /** Lookup value */
+  value: string;
+  /** Whether this lookup is private to the role */
+  private: boolean;
+  /** Lookup description */
+  description?: string;
 }
 
-// =============================================================================
-// ROLE SERVICE ACCESS CONFIGURATION
-// =============================================================================
+// ============================================================================
+// Role Management Operation Types
+// ============================================================================
 
 /**
- * Service access configuration for roles
- * Defines which services a role can access and with what permissions
+ * Role creation data
+ * Data required to create a new role
  */
-export interface RoleServiceAccessType {
-  id?: number
-  roleId: number
-  serviceId: number
-  serviceName: string
-  component: string
-  access: number // Bitmask for permissions
-  requester: number // Bitmask for requester permissions
-  filters?: RoleAccessFilter[]
-  
-  // Extended properties for access management
-  description?: string
-  isActive?: boolean
-  createdDate?: string
-  lastModifiedDate?: string
-}
-
-/**
- * Advanced filter configuration for role access
- * Allows granular control over data access
- */
-export interface RoleAccessFilter {
-  name: string
-  operator: 'eq' | 'ne' | 'gt' | 'lt' | 'gte' | 'lte' | 'in' | 'not_in' | 'like' | 'not_like'
-  value: string | number | boolean | Array<string | number>
-  conjunction?: 'and' | 'or'
+export interface CreateRoleData {
+  /** Role name */
+  name: string;
+  /** Role description */
+  description: string;
+  /** Whether the role should be active */
+  isActive: boolean;
+  /** Service access configurations */
+  roleServiceAccess?: Omit<RoleServiceAccess, 'id' | 'roleId'>[];
+  /** Lookup configurations */
+  lookupByRoleId?: Omit<RoleLookup, 'id' | 'roleId'>[];
 }
 
 /**
- * Permission configuration for role-based access control
- * Defines specific permissions for resources
+ * Role update data
+ * Data for updating an existing role
  */
-export interface RolePermission {
-  id?: number
-  roleId: number
-  resource: string
-  action: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'OPTIONS' | 'HEAD'
-  allow: boolean
-  conditions?: Record<string, unknown>
-  
-  // Extended properties
-  description?: string
-  priority?: number
-  isActive?: boolean
-}
-
-// =============================================================================
-// ACCESS CONTROL ENUMS AND CONSTANTS
-// =============================================================================
-
-/**
- * Standard access levels for role permissions
- * Bitmask values for granular permission control
- */
-export enum AccessLevel {
-  NONE = 0,
-  READ = 1,
-  CREATE = 2,
-  UPDATE = 4,
-  DELETE = 8,
-  ADMIN = 15, // All permissions
+export interface UpdateRoleData extends Partial<CreateRoleData> {
+  /** Role ID being updated */
+  id: number;
 }
 
 /**
- * Requester permission levels
- * Controls who can make requests on behalf of others
+ * Role deletion data
+ * Configuration for role deletion operations
  */
-export enum RequesterLevel {
-  NONE = 0,
-  SELF = 1,
-  OTHERS = 2,
-  ALL = 3,
+export interface DeleteRoleData {
+  /** Role ID to delete */
+  id: number;
+  /** Whether to force deletion even if role has dependencies */
+  force?: boolean;
+}
+
+// ============================================================================
+// API Response Types
+// ============================================================================
+
+/**
+ * Complete role data with all related information
+ * Returned when fetching a single role with related data
+ */
+export interface RoleWithRelations extends RoleType {
+  /** Service access configurations for this role */
+  roleServiceAccessByRoleId?: RoleServiceAccess[];
+  /** Lookup configurations for this role */
+  lookupByRoleId?: RoleLookup[];
 }
 
 /**
- * Role status enumeration for filtering and management
+ * Role list item for display in tables and lists
+ * Optimized for list rendering with essential information
  */
-export enum RoleStatus {
-  ACTIVE = 'active',
-  INACTIVE = 'inactive',
-  PENDING = 'pending',
-  SUSPENDED = 'suspended',
+export interface RoleListItem {
+  /** Unique role identifier */
+  id: number;
+  /** Role name */
+  name: string;
+  /** Role description */
+  description: string;
+  /** Whether the role is active */
+  isActive: boolean;
+  /** Number of users assigned to this role */
+  userCount?: number;
+  /** Number of service access rules */
+  serviceAccessCount?: number;
+  /** Last modification date for sorting */
+  lastModifiedDate: string;
 }
 
-// =============================================================================
-// ROLE MANAGEMENT OPERATION TYPES
-// =============================================================================
+// ============================================================================
+// Role Query and Filter Types
+// ============================================================================
 
 /**
- * Role list query parameters for filtering and pagination
- * Supports comprehensive role filtering and sorting
+ * Role query parameters for filtering and pagination
  */
-export interface RoleListParams {
-  limit?: number
-  offset?: number
-  sort?: string
-  order?: 'asc' | 'desc'
-  search?: string
-  filter?: string
-  status?: RoleStatus[]
-  includeInactive?: boolean
-  related?: string | string[]
-  fields?: string | string[]
-  
-  // Cache control
-  refresh?: boolean
-  staleTime?: number
-}
-
-/**
- * Role management operation result
- * Standardized response format for role operations
- */
-export interface RoleOperationResult<T = RoleType> {
-  success: boolean
-  data?: T
-  error?: {
-    code: string
-    message: string
-    details?: Record<string, unknown>
-  }
-  metadata?: {
-    timestamp: string
-    operation: 'create' | 'read' | 'update' | 'delete' | 'list'
-    affectedRows?: number
-  }
+export interface RoleQueryParams {
+  /** Search filter */
+  filter?: string;
+  /** Sort field and direction */
+  sort?: string;
+  /** Fields to include in response */
+  fields?: string;
+  /** Related data to include */
+  related?: string;
+  /** Number of items per page */
+  limit?: number;
+  /** Page offset */
+  offset?: number;
+  /** Include total count */
+  includeCount?: boolean;
+  /** Include accessible tabs data */
+  accessibleTabs?: boolean;
 }
 
 /**
- * Bulk role operation payload
- * Supports batch operations on multiple roles
+ * Role filter options for UI components
  */
-export interface RoleBulkOperation {
-  operation: 'activate' | 'deactivate' | 'delete' | 'update'
-  roleIds: number[]
-  data?: Partial<RoleUpdatePayload>
-  confirm?: boolean
+export interface RoleFilterOptions {
+  /** Filter by active status */
+  isActive?: boolean;
+  /** Search by name or description */
+  search?: string;
+  /** Filter by creation date range */
+  createdDateFrom?: string;
+  createdDateTo?: string;
+  /** Filter by last modification date range */
+  lastModifiedDateFrom?: string;
+  lastModifiedDateTo?: string;
+  /** Filter by user who created the role */
+  createdById?: number;
 }
 
-// =============================================================================
-// HOOK CONFIGURATION TYPES
-// =============================================================================
+// ============================================================================
+// Permission and Access Control Types
+// ============================================================================
 
 /**
- * Configuration options for role management hooks
- * Customizes behavior of role data fetching and mutations
+ * HTTP verbs for API access control
  */
-export interface RoleHookOptions {
-  // Cache configuration
-  staleTime?: number
-  cacheTime?: number
-  refetchOnMount?: boolean
-  refetchOnWindowFocus?: boolean
-  refetchOnReconnect?: boolean
-  refetchInterval?: number
-  
-  // Error handling
-  retry?: boolean | number
-  retryDelay?: number
-  onError?: (error: Error) => void
-  
-  // Optimistic updates
-  enableOptimisticUpdates?: boolean
-  onMutate?: (variables: unknown) => void
-  onSuccess?: (data: unknown) => void
-  onSettled?: (data: unknown, error: Error | null) => void
-  
-  // Related data fetching
-  includeRelated?: boolean
-  relatedQueries?: string[]
-  prefetchRelated?: boolean
+export enum HttpVerb {
+  GET = 1,
+  POST = 2,
+  PUT = 4,
+  PATCH = 8,
+  DELETE = 16,
+  OPTIONS = 32,
+  HEAD = 64,
 }
 
 /**
- * Role query state for hook return values
- * Provides comprehensive state information for components
+ * Service access configuration for role permissions
  */
-export interface RoleQueryState<T = RoleType> {
-  data?: T
-  isLoading: boolean
-  isError: boolean
-  error?: Error
-  isSuccess: boolean
-  isFetching: boolean
-  isStale: boolean
-  dataUpdatedAt: number
-  errorUpdatedAt: number
-  failureCount: number
-  refetch: () => Promise<T>
-  remove: () => void
+export interface ServiceAccessConfig {
+  /** Service name */
+  serviceName: string;
+  /** Allowed HTTP verbs (bitmask) */
+  allowedVerbs: number;
+  /** Component-level access (optional) */
+  componentAccess?: {
+    /** Component name */
+    component: string;
+    /** Allowed verbs for this component */
+    verbs: number;
+  }[];
+  /** Request filters */
+  filters?: {
+    /** Filter conditions */
+    condition: string;
+    /** Filter operator */
+    operator: 'AND' | 'OR';
+  }[];
 }
 
 /**
- * Role mutation state for CRUD operations
- * Provides state management for role modifications
+ * Role permission summary
+ * Aggregated view of role permissions for display
  */
-export interface RoleMutationState<TData = unknown, TVariables = unknown> {
-  mutate: (variables: TVariables) => void
-  mutateAsync: (variables: TVariables) => Promise<TData>
-  isLoading: boolean
-  isError: boolean
-  isSuccess: boolean
-  error?: Error
-  data?: TData
-  reset: () => void
-  
-  // Status tracking
-  status: 'idle' | 'loading' | 'success' | 'error'
-  submittedAt?: number
-  variables?: TVariables
+export interface RolePermissionSummary {
+  /** Role ID */
+  roleId: number;
+  /** Total number of services accessible */
+  serviceCount: number;
+  /** Services with full access */
+  fullAccessServices: string[];
+  /** Services with limited access */
+  limitedAccessServices: string[];
+  /** Number of lookup configurations */
+  lookupCount: number;
+  /** Whether role has administrative privileges */
+  isAdmin: boolean;
 }
 
-// =============================================================================
-// ZOD VALIDATION SCHEMAS
-// =============================================================================
+// ============================================================================
+// Validation Schemas
+// ============================================================================
 
 /**
- * Zod schema for access filter validation
+ * Zod schema for role creation validation
  */
-export const RoleAccessFilterSchema = z.object({
-  name: z.string().min(1, 'Filter name is required'),
-  operator: z.enum(['eq', 'ne', 'gt', 'lt', 'gte', 'lte', 'in', 'not_in', 'like', 'not_like']),
-  value: z.union([
-    z.string(),
-    z.number(),
-    z.boolean(),
-    z.array(z.union([z.string(), z.number()]))
-  ]),
-  conjunction: z.enum(['and', 'or']).optional(),
-})
-
-/**
- * Zod schema for role service access configuration
- */
-export const RoleServiceAccessSchema = z.object({
-  id: z.number().optional(),
-  roleId: z.number().min(1, 'Role ID is required'),
-  serviceId: z.number().min(1, 'Service ID is required'),
-  serviceName: z.string().min(1, 'Service name is required'),
-  component: z.string().min(1, 'Component is required'),
-  access: z.number().min(0).max(15, 'Invalid access level'),
-  requester: z.number().min(0).max(3, 'Invalid requester level'),
-  filters: z.array(RoleAccessFilterSchema).optional(),
-  description: z.string().optional(),
-  isActive: z.boolean().optional(),
-})
-
-/**
- * Zod schema for role permission validation
- */
-export const RolePermissionSchema = z.object({
-  id: z.number().optional(),
-  roleId: z.number().min(1, 'Role ID is required'),
-  resource: z.string().min(1, 'Resource is required'),
-  action: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD']),
-  allow: z.boolean(),
-  conditions: z.record(z.unknown()).optional(),
-  description: z.string().optional(),
-  priority: z.number().optional(),
-  isActive: z.boolean().optional(),
-})
-
-/**
- * Zod schema for role creation payload validation
- */
-export const RoleCreatePayloadSchema = z.object({
+export const CreateRoleSchema = z.object({
   name: z.string()
     .min(1, 'Role name is required')
-    .max(100, 'Role name must be less than 100 characters')
-    .regex(/^[a-zA-Z0-9_\-\s]+$/, 'Role name can only contain letters, numbers, spaces, hyphens, and underscores'),
+    .max(64, 'Role name must be less than 64 characters')
+    .regex(/^[a-zA-Z0-9_-]+$/, 'Role name can only contain letters, numbers, underscores, and hyphens'),
   description: z.string()
     .max(255, 'Description must be less than 255 characters')
-    .optional(),
+    .optional()
+    .or(z.literal('')),
   isActive: z.boolean().default(true),
-  lookupByRoleId: z.array(z.number()).optional(),
-  accessibleTabs: z.array(z.string()).optional(),
-  roleServiceAccessByRoleId: z.array(RoleServiceAccessSchema.omit({ id: true, roleId: true })).optional(),
-})
+});
 
 /**
- * Zod schema for role update payload validation
+ * Zod schema for role update validation
  */
-export const RoleUpdatePayloadSchema = RoleCreatePayloadSchema.partial().extend({
-  id: z.number().min(1, 'Role ID is required'),
-})
+export const UpdateRoleSchema = CreateRoleSchema.partial().extend({
+  id: z.number().int().positive('Role ID must be a positive integer'),
+});
 
 /**
- * Zod schema for role list parameters validation
+ * Zod schema for role query parameters validation
  */
-export const RoleListParamsSchema = z.object({
-  limit: z.number().min(1).max(1000).optional(),
-  offset: z.number().min(0).optional(),
-  sort: z.string().optional(),
-  order: z.enum(['asc', 'desc']).optional(),
-  search: z.string().optional(),
+export const RoleQuerySchema = z.object({
   filter: z.string().optional(),
-  status: z.array(z.nativeEnum(RoleStatus)).optional(),
-  includeInactive: z.boolean().optional(),
-  related: z.union([z.string(), z.array(z.string())]).optional(),
-  fields: z.union([z.string(), z.array(z.string())]).optional(),
-  refresh: z.boolean().optional(),
-  staleTime: z.number().min(0).optional(),
-})
+  sort: z.string().optional(),
+  fields: z.string().optional(),
+  related: z.string().optional(),
+  limit: z.number().int().min(1).max(1000).optional(),
+  offset: z.number().int().min(0).optional(),
+  includeCount: z.boolean().optional(),
+  accessibleTabs: z.boolean().optional(),
+}).partial();
 
 /**
- * Zod schema for bulk operation validation
+ * Zod schema for service access configuration validation
  */
-export const RoleBulkOperationSchema = z.object({
-  operation: z.enum(['activate', 'deactivate', 'delete', 'update']),
-  roleIds: z.array(z.number().min(1)).min(1, 'At least one role ID is required'),
-  data: RoleUpdatePayloadSchema.partial().optional(),
-  confirm: z.boolean().optional(),
-})
+export const ServiceAccessSchema = z.object({
+  serviceId: z.number().int().positive(),
+  component: z.string().optional(),
+  verbMask: z.number().int().min(0).max(127), // Max value for all HTTP verbs
+  requestorType: z.number().int().min(0),
+  filters: z.string().optional(),
+  filterOp: z.enum(['AND', 'OR']).optional(),
+});
 
-// =============================================================================
-// TYPE UTILITIES AND HELPERS
-// =============================================================================
-
-/**
- * Extract role ID type from role entities
- */
-export type RoleId = RoleType['id']
+// ============================================================================
+// Type Guards and Utilities
+// ============================================================================
 
 /**
- * Create role list response type
+ * Type guard to check if an object is a complete RoleType
  */
-export type RoleListResponse<T = RoleType> = {
-  resource: T[]
-  meta: {
-    count: number
-    limit: number
-    offset: number
-    total?: number
-  }
+export function isRoleType(obj: any): obj is RoleType {
+  return obj && 
+    typeof obj.id === 'number' &&
+    typeof obj.name === 'string' &&
+    typeof obj.isActive === 'boolean' &&
+    typeof obj.createdDate === 'string' &&
+    typeof obj.lastModifiedDate === 'string';
 }
 
 /**
- * Role form data type for form components
+ * Type guard to check if an object is a RoleWithRelations
  */
-export type RoleFormData = z.infer<typeof RoleCreatePayloadSchema>
-
-/**
- * Role update form data type
- */
-export type RoleUpdateFormData = z.infer<typeof RoleUpdatePayloadSchema>
-
-/**
- * Role list query parameters type
- */
-export type RoleListQueryParams = z.infer<typeof RoleListParamsSchema>
-
-/**
- * Bulk operation parameters type
- */
-export type RoleBulkOperationParams = z.infer<typeof RoleBulkOperationSchema>
-
-/**
- * Role access control utility type
- * Extracts permission information for component-level access control
- */
-export type RoleAccessControl = {
-  canRead: boolean
-  canCreate: boolean
-  canUpdate: boolean
-  canDelete: boolean
-  canAdmin: boolean
-  hasAccess: (resource: string, action: string) => boolean
-  getPermissions: (resource?: string) => RolePermission[]
+export function isRoleWithRelations(obj: any): obj is RoleWithRelations {
+  return isRoleType(obj) && (
+    obj.roleServiceAccessByRoleId !== undefined ||
+    obj.lookupByRoleId !== undefined
+  );
 }
 
-// =============================================================================
-// EXPORTS
-// =============================================================================
-
-export type {
-  // Core types
-  RoleRow,
-  RoleType,
-  RoleCreatePayload,
-  RoleUpdatePayload,
-  
-  // Service access types
-  RoleServiceAccessType,
-  RoleAccessFilter,
-  RolePermission,
-  
-  // Operation types
-  RoleListParams,
-  RoleOperationResult,
-  RoleBulkOperation,
-  
-  // Hook types
-  RoleHookOptions,
-  RoleQueryState,
-  RoleMutationState,
-  
-  // Utility types
-  RoleId,
-  RoleListResponse,
-  RoleFormData,
-  RoleUpdateFormData,
-  RoleListQueryParams,
-  RoleBulkOperationParams,
-  RoleAccessControl,
+/**
+ * Utility to convert RoleType to RoleRow for table display
+ */
+export function roleTypeToRoleRow(role: RoleType): RoleRow {
+  return {
+    id: role.id,
+    name: role.name,
+    description: role.description || '',
+    active: role.isActive,
+  };
 }
 
+/**
+ * Utility to map role data for table display
+ */
+export function mapRolesToTableData(roles: RoleType[]): RoleRow[] {
+  return roles.map(roleTypeToRoleRow);
+}
+
+/**
+ * Utility to calculate HTTP verb mask from array of verbs
+ */
+export function calculateVerbMask(verbs: HttpVerb[]): number {
+  return verbs.reduce((mask, verb) => mask | verb, 0);
+}
+
+/**
+ * Utility to extract HTTP verbs from verb mask
+ */
+export function extractVerbsFromMask(verbMask: number): HttpVerb[] {
+  const verbs: HttpVerb[] = [];
+  Object.values(HttpVerb).forEach(verb => {
+    if (typeof verb === 'number' && (verbMask & verb) === verb) {
+      verbs.push(verb);
+    }
+  });
+  return verbs;
+}
+
+// ============================================================================
+// Type Exports for Convenience
+// ============================================================================
+
+export type { RoleType as Role };
+export type { RoleWithRelations as RoleDetails };
+export type { CreateRoleData as CreateRole };
+export type { UpdateRoleData as UpdateRole };
+export type { DeleteRoleData as DeleteRole };
+export type { RoleQueryParams as RoleQuery };
+export type { RoleFilterOptions as RoleFilters };
+
+// Export schemas for external validation
 export {
-  // Enums
-  AccessLevel,
-  RequesterLevel,
-  RoleStatus,
-  
-  // Validation schemas
-  RoleAccessFilterSchema,
-  RoleServiceAccessSchema,
-  RolePermissionSchema,
-  RoleCreatePayloadSchema,
-  RoleUpdatePayloadSchema,
-  RoleListParamsSchema,
-  RoleBulkOperationSchema,
-}
+  CreateRoleSchema,
+  UpdateRoleSchema,
+  RoleQuerySchema,
+  ServiceAccessSchema,
+} as RoleSchemas;
