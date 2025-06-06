@@ -1,547 +1,632 @@
 /**
- * Central i18n index file for DreamFactory Admin Interface
+ * Central i18n index file for Next.js React/Next.js migration
  * 
- * This file provides a unified export structure for all translation namespaces
- * and enables type-safe access to translation keys throughout the Next.js application.
- * It replaces Angular's ngx-translate module pattern with Next.js dynamic import
- * structure while maintaining server-side rendering compatibility.
+ * This file consolidates all translation namespaces and provides type-safe access
+ * to translation keys for React components. It supports server-side rendering,
+ * dynamic imports, and maintains feature-based organization while enabling 
+ * centralized access patterns required for the Angular to React migration.
  * 
- * Features:
- * - Unified export structure for all translation namespaces
+ * Key Features:
  * - Type-safe translation key access with TypeScript interfaces
- * - Dynamic loading for feature-specific translation modules
- * - Server-side rendering compatibility for Next.js
- * - Optimized loading strategy for better performance
+ * - Server-side rendering compatibility
+ * - Dynamic import support for Next.js optimization
+ * - React Hook Form integration for form validation messages
+ * - Centralized namespace exports for all feature modules
  * 
  * @see Section 0.2.1 - i18n migration requirements
- * @see React/Next.js Integration Requirements - SSR support
+ * @see React/Next.js Integration Requirements - SSR optimization
  * @see Section 8.2.4 - Asset optimization strategy
  */
 
-// ============================================================================
-// TYPE IMPORTS
-// ============================================================================
-
 import type {
-  RootTranslations,
-  ModuleTranslations,
-  CompleteTranslations,
-  TranslationKey,
-  RootTranslationKey,
-  ModuleTranslationKey,
+  Translations,
   TranslationNamespace,
-  TranslationVariables,
+  TranslationKey,
+  TranslationFunction,
   UseTranslationReturn,
-  TranslationProviderConfig,
-  TranslationAwareProps,
-  FormComponentTranslationProps,
-  AllTranslationKeys
+  TranslationConfig,
+  StaticTranslations,
+  PagePropsWithTranslations,
+  LocalizedComponentProps,
+  ValidatedFormComponentProps,
+  NamespaceKeys,
+  ValidationMessageKey,
+  FieldValidation,
+  TranslationProps,
+  EnsureTranslationStructure
 } from './types';
 
-// ============================================================================
-// CORE TRANSLATION IMPORTS
-// ============================================================================
+// =============================================================================
+// DYNAMIC IMPORTS FOR NEXT.JS OPTIMIZATION
+// =============================================================================
 
 /**
- * Main English translations from central en.json file
- * These contain common UI elements, navigation, and core functionality
+ * Dynamic import functions for server-side rendering and code splitting
+ * These imports support Next.js dynamic loading patterns and enable
+ * efficient bundle optimization for different locales
  */
-import coreTranslations from './en.json';
-
-// ============================================================================
-// TRANSLATION NAMESPACE MAPPING
-// ============================================================================
 
 /**
- * Mapping of translation namespaces to their dynamic import paths
- * This enables lazy loading of feature-specific translations for better performance
+ * Dynamically import the main translation file with server-side rendering support
  */
-const TRANSLATION_NAMESPACE_MAP = {
-  // Feature-specific translation modules
-  users: () => import('./users/en.json'),
-  services: () => import('./services/en.json'),
-  admins: () => import('./admins/en.json'),
-  apiDocs: () => import('./apiDocs/en.json'),
-  cache: () => import('./cache/en.json'),
-  cors: () => import('./cors/en.json'),
-  emailTemplates: () => import('./emailTemplates/en.json'),
-  files: () => import('./files/en.json'),
-  home: () => import('./home/en.json'),
-  limits: () => import('./limits/en.json'),
-  roles: () => import('./roles/en.json'),
-  scheduler: () => import('./scheduler/en.json'),
-  schema: () => import('./schema/en.json'),
-  scripts: () => import('./scripts/en.json'),
-  systemInfo: () => import('./systemInfo/en.json'),
-  userManagement: () => import('./userManagement/en.json'),
-  apps: () => import('./apps/en.json'),
+export const loadMainTranslations = async (locale: string = 'en'): Promise<typeof import('./en.json')> => {
+  try {
+    // Support both static and dynamic locale loading for Next.js
+    switch (locale) {
+      case 'en':
+      default:
+        return await import('./en.json');
+      // Additional locales can be added here as needed
+      // case 'es':
+      //   return await import('./es.json');
+    }
+  } catch (error) {
+    console.warn(`Failed to load main translations for locale: ${locale}, falling back to English`, error);
+    return await import('./en.json');
+  }
+};
+
+/**
+ * Dynamically import feature-specific translation namespaces
+ * Enables lazy loading of translations for improved performance
+ */
+export const loadFeatureTranslations = {
+  users: async (locale: string = 'en') => {
+    try {
+      return await import(`./users/${locale}.json`);
+    } catch (error) {
+      console.warn(`Failed to load users translations for locale: ${locale}`, error);
+      return await import('./users/en.json');
+    }
+  },
+
+  userManagement: async (locale: string = 'en') => {
+    try {
+      return await import(`./userManagement/${locale}.json`);
+    } catch (error) {
+      console.warn(`Failed to load userManagement translations for locale: ${locale}`, error);
+      return await import('./userManagement/en.json');
+    }
+  },
+
+  systemInfo: async (locale: string = 'en') => {
+    try {
+      return await import(`./systemInfo/${locale}.json`);
+    } catch (error) {
+      console.warn(`Failed to load systemInfo translations for locale: ${locale}`, error);
+      return await import('./systemInfo/en.json');
+    }
+  },
+
+  services: async (locale: string = 'en') => {
+    try {
+      return await import(`./services/${locale}.json`);
+    } catch (error) {
+      console.warn(`Failed to load services translations for locale: ${locale}`, error);
+      return await import('./services/en.json');
+    }
+  },
+
+  scripts: async (locale: string = 'en') => {
+    try {
+      return await import(`./scripts/${locale}.json`);
+    } catch (error) {
+      console.warn(`Failed to load scripts translations for locale: ${locale}`, error);
+      return await import('./scripts/en.json');
+    }
+  },
+
+  schema: async (locale: string = 'en') => {
+    try {
+      return await import(`./schema/${locale}.json`);
+    } catch (error) {
+      console.warn(`Failed to load schema translations for locale: ${locale}`, error);
+      return await import('./schema/en.json');
+    }
+  },
+
+  scheduler: async (locale: string = 'en') => {
+    try {
+      return await import(`./scheduler/${locale}.json`);
+    } catch (error) {
+      console.warn(`Failed to load scheduler translations for locale: ${locale}`, error);
+      return await import('./scheduler/en.json');
+    }
+  },
+
+  roles: async (locale: string = 'en') => {
+    try {
+      return await import(`./roles/${locale}.json`);
+    } catch (error) {
+      console.warn(`Failed to load roles translations for locale: ${locale}`, error);
+      return await import('./roles/en.json');
+    }
+  },
+
+  limits: async (locale: string = 'en') => {
+    try {
+      return await import(`./limits/${locale}.json`);
+    } catch (error) {
+      console.warn(`Failed to load limits translations for locale: ${locale}`, error);
+      return await import('./limits/en.json');
+    }
+  },
+
+  home: async (locale: string = 'en') => {
+    try {
+      return await import(`./home/${locale}.json`);
+    } catch (error) {
+      console.warn(`Failed to load home translations for locale: ${locale}`, error);
+      return await import('./home/en.json');
+    }
+  },
+
+  files: async (locale: string = 'en') => {
+    try {
+      return await import(`./files/${locale}.json`);
+    } catch (error) {
+      console.warn(`Failed to load files translations for locale: ${locale}`, error);
+      return await import('./files/en.json');
+    }
+  },
+
+  emailTemplates: async (locale: string = 'en') => {
+    try {
+      return await import(`./emailTemplates/${locale}.json`);
+    } catch (error) {
+      console.warn(`Failed to load emailTemplates translations for locale: ${locale}`, error);
+      return await import('./emailTemplates/en.json');
+    }
+  },
+
+  cors: async (locale: string = 'en') => {
+    try {
+      return await import(`./cors/${locale}.json`);
+    } catch (error) {
+      console.warn(`Failed to load cors translations for locale: ${locale}`, error);
+      return await import('./cors/en.json');
+    }
+  },
+
+  cache: async (locale: string = 'en') => {
+    try {
+      return await import(`./cache/${locale}.json`);
+    } catch (error) {
+      console.warn(`Failed to load cache translations for locale: ${locale}`, error);
+      return await import('./cache/en.json');
+    }
+  },
+
+  apps: async (locale: string = 'en') => {
+    try {
+      return await import(`./apps/${locale}.json`);
+    } catch (error) {
+      console.warn(`Failed to load apps translations for locale: ${locale}`, error);
+      return await import('./apps/en.json');
+    }
+  },
+
+  apiDocs: async (locale: string = 'en') => {
+    try {
+      return await import(`./apiDocs/${locale}.json`);
+    } catch (error) {
+      console.warn(`Failed to load apiDocs translations for locale: ${locale}`, error);
+      return await import('./apiDocs/en.json');
+    }
+  },
+
+  admins: async (locale: string = 'en') => {
+    try {
+      return await import(`./admins/${locale}.json`);
+    } catch (error) {
+      console.warn(`Failed to load admins translations for locale: ${locale}`, error);
+      return await import('./admins/en.json');
+    }
+  }
 } as const;
 
-/**
- * Type-safe namespace keys extracted from the mapping
- */
-export type AvailableNamespace = keyof typeof TRANSLATION_NAMESPACE_MAP;
-
-// ============================================================================
-// TRANSLATION CACHE
-// ============================================================================
+// =============================================================================
+// TRANSLATION CONFIGURATION
+// =============================================================================
 
 /**
- * In-memory cache for loaded translation modules
- * Prevents redundant dynamic imports and improves performance
+ * Default configuration for Next.js i18n integration
+ * Supports server-side rendering and static generation
  */
-const translationCache = new Map<string, any>();
-
-/**
- * Server-side translation cache for SSR compatibility
- * Ensures translations are available during server-side rendering
- */
-const serverTranslationCache = new Map<string, any>();
-
-// ============================================================================
-// DYNAMIC TRANSLATION LOADING
-// ============================================================================
-
-/**
- * Dynamically loads a translation namespace with caching
- * Supports both client-side and server-side rendering
- * 
- * @param namespace - The translation namespace to load
- * @returns Promise resolving to the translation module
- */
-export async function loadTranslationNamespace<T extends AvailableNamespace>(
-  namespace: T
-): Promise<ModuleTranslations[T]> {
-  // Check cache first for performance
-  const cacheKey = `namespace_${namespace}`;
-  
-  if (translationCache.has(cacheKey)) {
-    return translationCache.get(cacheKey);
+export const defaultTranslationConfig: TranslationConfig = {
+  defaultLocale: 'en',
+  locales: ['en'], // Additional locales can be added as needed
+  fallbackLocale: 'en',
+  load: 'currentOnly', // Optimize for SSR performance
+  interpolation: {
+    escapeValue: false, // React already does escaping
+    formatSeparator: ','
   }
-  
+};
+
+/**
+ * Available translation namespaces for type checking and validation
+ */
+export const TRANSLATION_NAMESPACES: readonly TranslationNamespace[] = [
+  'common',
+  'users',
+  'userManagement', 
+  'systemInfo',
+  'services',
+  'scripts',
+  'schema',
+  'scheduler',
+  'roles',
+  'limits',
+  'home',
+  'files',
+  'emailTemplates',
+  'cors',
+  'cache',
+  'apps',
+  'apiDocs',
+  'admins'
+] as const;
+
+// =============================================================================
+// CENTRALIZED TRANSLATION LOADER
+// =============================================================================
+
+/**
+ * Load all translations for a specific locale with server-side rendering support
+ * This function consolidates all feature-specific translations into a unified structure
+ * 
+ * @param locale - The locale to load translations for
+ * @returns Promise resolving to complete translations object
+ */
+export async function loadAllTranslations(locale: string = 'en'): Promise<Translations> {
   try {
-    const moduleLoader = TRANSLATION_NAMESPACE_MAP[namespace];
-    if (!moduleLoader) {
-      throw new Error(`Translation namespace '${namespace}' not found`);
-    }
+    // Load main translations first
+    const mainTranslations = await loadMainTranslations(locale);
     
-    // Dynamic import with error handling
-    const module = await moduleLoader();
-    const translations = module.default || module;
-    
-    // Cache the loaded translations
-    translationCache.set(cacheKey, translations);
-    
-    // Also cache on server-side for SSR
-    if (typeof window === 'undefined') {
-      serverTranslationCache.set(cacheKey, translations);
-    }
-    
+    // Load all feature-specific translations in parallel for performance
+    const [
+      usersTranslations,
+      userManagementTranslations,
+      systemInfoTranslations,
+      servicesTranslations,
+      scriptsTranslations,
+      schemaTranslations,
+      schedulerTranslations,
+      rolesTranslations,
+      limitsTranslations,
+      homeTranslations,
+      filesTranslations,
+      emailTemplatesTranslations,
+      corsTranslations,
+      cacheTranslations,
+      appsTranslations,
+      apiDocsTranslations,
+      adminsTranslations
+    ] = await Promise.all([
+      loadFeatureTranslations.users(locale),
+      loadFeatureTranslations.userManagement(locale),
+      loadFeatureTranslations.systemInfo(locale),
+      loadFeatureTranslations.services(locale),
+      loadFeatureTranslations.scripts(locale),
+      loadFeatureTranslations.schema(locale),
+      loadFeatureTranslations.scheduler(locale),
+      loadFeatureTranslations.roles(locale),
+      loadFeatureTranslations.limits(locale),
+      loadFeatureTranslations.home(locale),
+      loadFeatureTranslations.files(locale),
+      loadFeatureTranslations.emailTemplates(locale),
+      loadFeatureTranslations.cors(locale),
+      loadFeatureTranslations.cache(locale),
+      loadFeatureTranslations.apps(locale),
+      loadFeatureTranslations.apiDocs(locale),
+      loadFeatureTranslations.admins(locale)
+    ]);
+
+    // Merge all translations into a unified structure
+    // Extract common translations from main file and combine with feature-specific ones
+    const translations: Translations = {
+      // Common translations from main file
+      common: {
+        actions: mainTranslations.common?.actions || {},
+        status: {
+          active: mainTranslations.common?.labels?.active || 'Active',
+          inactive: 'Inactive',
+          pending: mainTranslations.common?.labels?.pending || 'Pending',
+          loading: 'Loading',
+          success: 'Success',
+          error: 'Error',
+          warning: 'Warning'
+        },
+        pagination: {
+          first: 'First',
+          last: 'Last',
+          next: 'Next',
+          previous: 'Previous',
+          page: 'Page',
+          of: 'of',
+          showing: 'Showing',
+          results: 'results'
+        }
+      },
+      
+      // Feature-specific translations
+      users: usersTranslations.default || usersTranslations,
+      userManagement: userManagementTranslations.default || userManagementTranslations,
+      systemInfo: systemInfoTranslations.default || systemInfoTranslations,
+      services: servicesTranslations.default || servicesTranslations,
+      scripts: scriptsTranslations.default || scriptsTranslations,
+      schema: schemaTranslations.default || schemaTranslations,
+      scheduler: schedulerTranslations.default || schedulerTranslations,
+      roles: rolesTranslations.default || rolesTranslations,
+      limits: limitsTranslations.default || limitsTranslations,
+      home: homeTranslations.default || homeTranslations,
+      files: filesTranslations.default || filesTranslations,
+      emailTemplates: emailTemplatesTranslations.default || emailTemplatesTranslations,
+      cors: corsTranslations.default || corsTranslations,
+      cache: cacheTranslations.default || cacheTranslations,
+      apps: appsTranslations.default || appsTranslations,
+      apiDocs: apiDocsTranslations.default || apiDocsTranslations,
+      admins: adminsTranslations.default || adminsTranslations
+    };
+
     return translations;
   } catch (error) {
-    console.error(`Failed to load translation namespace '${namespace}':`, error);
-    // Return empty object as fallback to prevent runtime errors
-    return {} as ModuleTranslations[T];
+    console.error('Failed to load translations:', error);
+    
+    // Return minimal fallback translations
+    return {
+      common: {
+        actions: {
+          save: 'Save',
+          cancel: 'Cancel',
+          edit: 'Edit',
+          delete: 'Delete',
+          create: 'Create',
+          update: 'Update',
+          view: 'View',
+          close: 'Close',
+          refresh: 'Refresh',
+          search: 'Search',
+          filter: 'Filter',
+          export: 'Export',
+          import: 'Import',
+          reset: 'Reset',
+          submit: 'Submit',
+          back: 'Back',
+          next: 'Next',
+          previous: 'Previous',
+          confirm: 'Confirm'
+        },
+        status: {
+          active: 'Active',
+          inactive: 'Inactive',
+          pending: 'Pending',
+          loading: 'Loading',
+          success: 'Success',
+          error: 'Error',
+          warning: 'Warning'
+        },
+        pagination: {
+          first: 'First',
+          last: 'Last',
+          next: 'Next',
+          previous: 'Previous',
+          page: 'Page',
+          of: 'of',
+          showing: 'Showing',
+          results: 'results'
+        }
+      }
+    } as Translations;
   }
 }
 
+// =============================================================================
+// STATIC TRANSLATION HELPERS FOR SSR
+// =============================================================================
+
 /**
- * Preloads multiple translation namespaces for better performance
- * Useful for critical app sections that need immediate translation access
+ * Load translations for Next.js getStaticProps or getServerSideProps
+ * Optimized for server-side rendering performance
  * 
- * @param namespaces - Array of namespaces to preload
- * @returns Promise resolving when all namespaces are loaded
+ * @param locale - The locale to load
+ * @param namespaces - Optional array of specific namespaces to load
+ * @returns Promise resolving to static translations
  */
-export async function preloadTranslationNamespaces(
-  namespaces: AvailableNamespace[]
-): Promise<void> {
-  try {
-    await Promise.all(
-      namespaces.map(namespace => loadTranslationNamespace(namespace))
-    );
-  } catch (error) {
-    console.error('Failed to preload translation namespaces:', error);
+export async function loadStaticTranslations(
+  locale: string = 'en',
+  namespaces?: TranslationNamespace[]
+): Promise<StaticTranslations> {
+  const translations = await loadAllTranslations(locale);
+  
+  // If specific namespaces are requested, filter to only those
+  if (namespaces) {
+    const filteredTranslations = { common: translations.common } as Partial<Translations>;
+    
+    for (const namespace of namespaces) {
+      if (namespace !== 'common' && translations[namespace]) {
+        filteredTranslations[namespace] = translations[namespace];
+      }
+    }
+    
+    return {
+      [locale]: filteredTranslations as Translations
+    };
   }
+  
+  return {
+    [locale]: translations
+  };
 }
 
 /**
- * Gets all available translation namespace keys
- * Useful for dynamic translation loading scenarios
- */
-export function getAvailableNamespaces(): AvailableNamespace[] {
-  return Object.keys(TRANSLATION_NAMESPACE_MAP) as AvailableNamespace[];
-}
-
-// ============================================================================
-// CORE TRANSLATIONS EXPORT
-// ============================================================================
-
-/**
- * Core translations immediately available (no dynamic loading required)
- * These include common UI elements, navigation, and essential functionality
- */
-export const coreTranslations: RootTranslations = coreTranslations as RootTranslations;
-
-/**
- * Combined translations object that merges core and dynamically loaded modules
- * This is populated as modules are loaded and provides a unified interface
- */
-let combinedTranslations: Partial<CompleteTranslations> = {
-  ...coreTranslations
-} as Partial<CompleteTranslations>;
-
-// ============================================================================
-// TRANSLATION ACCESS UTILITIES
-// ============================================================================
-
-/**
- * Type-safe translation key resolver with interpolation support
- * Supports nested key access with dot notation and variable substitution
+ * Create page props with translations for Next.js pages
+ * Supports both static generation and server-side rendering
  * 
- * @param key - Translation key with dot notation support
- * @param variables - Optional variables for interpolation
- * @param fallback - Fallback text if translation not found
- * @returns Translated string with interpolated variables
+ * @param locale - Current locale
+ * @param namespaces - Optional specific namespaces to include
+ * @returns Page props with translations
+ */
+export async function createPagePropsWithTranslations(
+  locale: string = 'en',
+  namespaces?: TranslationNamespace[]
+): Promise<PagePropsWithTranslations> {
+  const staticTranslations = await loadStaticTranslations(locale, namespaces);
+  
+  return {
+    translations: staticTranslations[locale],
+    locale,
+    fallbackTranslations: locale !== 'en' ? staticTranslations.en : undefined
+  };
+}
+
+// =============================================================================
+// UTILITY FUNCTIONS
+// =============================================================================
+
+/**
+ * Get translation key with type safety and interpolation support
+ * Compatible with React Hook Form validation patterns
+ * 
+ * @param translations - The translations object
+ * @param key - The translation key with dot notation
+ * @param values - Optional interpolation values
+ * @returns Translated string or fallback
  */
 export function getTranslation(
-  key: AllTranslationKeys | string,
-  variables?: TranslationVariables,
-  fallback?: string
+  translations: Translations,
+  key: TranslationKey,
+  values?: Record<string, string | number>
 ): string {
   try {
-    // Split key by dots to access nested properties
     const keyParts = key.split('.');
-    let result: any = combinedTranslations;
+    let current: any = translations;
     
-    // Navigate through nested object structure
     for (const part of keyParts) {
-      if (result && typeof result === 'object' && part in result) {
-        result = result[part];
+      if (current && typeof current === 'object' && part in current) {
+        current = current[part];
       } else {
-        // Key not found, return fallback or key itself
-        return fallback || key;
+        // Return the key if translation is not found
+        return key;
       }
     }
     
-    // Ensure we have a string result
-    if (typeof result !== 'string') {
-      return fallback || key;
-    }
-    
-    // Perform variable interpolation if variables provided
-    if (variables) {
-      return interpolateTranslation(result, variables);
-    }
-    
-    return result;
-  } catch (error) {
-    console.error(`Translation error for key '${key}':`, error);
-    return fallback || key;
-  }
-}
-
-/**
- * Interpolates variables into translation strings
- * Supports {{variableName}} syntax for variable substitution
- * 
- * @param text - Translation text with variable placeholders
- * @param variables - Variables to interpolate
- * @returns Text with interpolated variables
- */
-function interpolateTranslation(
-  text: string,
-  variables: TranslationVariables
-): string {
-  return text.replace(/\{\{(\w+)\}\}/g, (match, key) => {
-    const value = variables[key];
-    return value !== undefined ? String(value) : match;
-  });
-}
-
-/**
- * Checks if a translation key exists in the loaded translations
- * Useful for conditional rendering based on translation availability
- * 
- * @param key - Translation key to check
- * @returns True if key exists, false otherwise
- */
-export function hasTranslation(key: string): boolean {
-  try {
-    const keyParts = key.split('.');
-    let result: any = combinedTranslations;
-    
-    for (const part of keyParts) {
-      if (result && typeof result === 'object' && part in result) {
-        result = result[part];
-      } else {
-        return false;
+    if (typeof current === 'string') {
+      // Simple interpolation for values like {{variable}}
+      if (values) {
+        return current.replace(/\{\{(\w+)\}\}/g, (match, variable) => {
+          return values[variable]?.toString() || match;
+        });
       }
+      return current;
     }
     
-    return typeof result === 'string';
-  } catch {
-    return false;
-  }
-}
-
-// ============================================================================
-// NEXT.JS INTEGRATION UTILITIES
-// ============================================================================
-
-/**
- * Creates a translation function with namespace context
- * Optimized for Next.js components and hooks
- * 
- * @param namespace - Optional namespace to scope translations
- * @returns Translation function with namespace context
- */
-export function createNamespacedTranslation(namespace?: string) {
-  return function t(
-    key: string,
-    variables?: TranslationVariables,
-    fallback?: string
-  ): string {
-    const fullKey = namespace ? `${namespace}.${key}` : key;
-    return getTranslation(fullKey, variables, fallback);
-  };
-}
-
-/**
- * Server-side rendering compatible translation getter
- * Ensures translations are available during SSR without client-side hydration mismatches
- * 
- * @param key - Translation key
- * @param variables - Optional interpolation variables
- * @param fallback - Fallback text
- * @returns Promise resolving to translated text
- */
-export async function getTranslationSSR(
-  key: string,
-  variables?: TranslationVariables,
-  fallback?: string
-): Promise<string> {
-  // Check if we're in server environment
-  if (typeof window === 'undefined') {
-    // On server, ensure core translations are available
-    const result = getTranslation(key, variables, fallback);
-    return result;
-  }
-  
-  // On client, use regular translation function
-  return getTranslation(key, variables, fallback);
-}
-
-/**
- * Registers a translation module in the combined translations object
- * Used internally when dynamic modules are loaded
- * 
- * @param namespace - The namespace to register
- * @param translations - The translation object to register
- */
-export function registerTranslationModule(
-  namespace: string,
-  translations: any
-): void {
-  if (combinedTranslations) {
-    (combinedTranslations as any)[namespace] = translations;
-  }
-}
-
-// ============================================================================
-// REACT HOOK INTEGRATION
-// ============================================================================
-
-/**
- * Translation state interface for React hooks
- */
-interface TranslationState {
-  translations: Partial<CompleteTranslations>;
-  loadedNamespaces: Set<string>;
-  isLoading: boolean;
-  error: Error | null;
-}
-
-/**
- * Initial translation state
- */
-export const initialTranslationState: TranslationState = {
-  translations: combinedTranslations,
-  loadedNamespaces: new Set(['core']),
-  isLoading: false,
-  error: null,
-};
-
-/**
- * Hook factory for creating translation-aware React hooks
- * Provides the foundation for useTranslation and related hooks
- * 
- * @param namespace - Optional namespace to automatically load
- * @returns Translation state and utilities
- */
-export function createTranslationHook(namespace?: string) {
-  return {
-    getTranslation,
-    hasTranslation,
-    loadTranslationNamespace,
-    preloadTranslationNamespaces,
-    createNamespacedTranslation: () => createNamespacedTranslation(namespace),
-    getAvailableNamespaces,
-  };
-}
-
-// ============================================================================
-// CONFIGURATION AND SETUP
-// ============================================================================
-
-/**
- * Default translation provider configuration
- * Optimized for Next.js SSR and performance
- */
-export const defaultTranslationConfig: TranslationProviderConfig = {
-  defaultLocale: 'en',
-  supportedLocales: ['en'],
-  basePath: '/assets/i18n',
-  fallbackLocale: 'en',
-  debug: process.env.NODE_ENV === 'development',
-  cacheStrategy: 'memory',
-};
-
-/**
- * Initializes the translation system for Next.js application
- * Sets up caching, preloading, and SSR compatibility
- * 
- * @param config - Optional configuration overrides
- * @returns Promise resolving when initialization is complete
- */
-export async function initializeTranslations(
-  config: Partial<TranslationProviderConfig> = {}
-): Promise<void> {
-  const finalConfig = { ...defaultTranslationConfig, ...config };
-  
-  try {
-    // Preload critical translation namespaces for better performance
-    const criticalNamespaces: AvailableNamespace[] = [
-      'services',
-      'schema',
-      'users',
-      'admins'
-    ];
-    
-    if (finalConfig.debug) {
-      console.log('Initializing translation system with config:', finalConfig);
-      console.log('Preloading critical namespaces:', criticalNamespaces);
-    }
-    
-    // Preload critical namespaces
-    await preloadTranslationNamespaces(criticalNamespaces);
-    
-    if (finalConfig.debug) {
-      console.log('Translation system initialized successfully');
-    }
+    // Return the key if the final value is not a string
+    return key;
   } catch (error) {
-    console.error('Failed to initialize translation system:', error);
-    throw error;
+    console.warn('Translation error:', error, { key, values });
+    return key;
   }
 }
 
-// ============================================================================
-// VALIDATION AND UTILITIES
-// ============================================================================
-
 /**
- * Validates that all required translation keys exist
- * Useful for build-time validation and testing
+ * Get namespaced translation with type safety
+ * Optimized for component-level translation usage
  * 
- * @param requiredKeys - Array of keys that must exist
- * @returns Array of missing keys
+ * @param translations - The translations object
+ * @param namespace - The translation namespace
+ * @param key - The key within the namespace
+ * @param values - Optional interpolation values
+ * @returns Translated string or fallback
  */
-export function validateTranslationKeys(requiredKeys: string[]): string[] {
-  const missingKeys: string[] = [];
-  
-  for (const key of requiredKeys) {
-    if (!hasTranslation(key)) {
-      missingKeys.push(key);
-    }
-  }
-  
-  return missingKeys;
+export function getNamespacedTranslation<T extends TranslationNamespace>(
+  translations: Translations,
+  namespace: T,
+  key: NamespaceKeys<T>,
+  values?: Record<string, string | number>
+): string {
+  const fullKey = `${namespace}.${key}` as TranslationKey;
+  return getTranslation(translations, fullKey, values);
 }
 
 /**
- * Gets translation statistics for debugging and monitoring
- * Provides insight into loaded namespaces and cache usage
+ * Create validation messages for React Hook Form integration
+ * Provides type-safe form validation with i18n support
+ * 
+ * @param translations - The translations object
+ * @param namespace - The feature namespace for validation messages
+ * @returns Validation message functions
  */
-export function getTranslationStats() {
+export function createValidationMessages(
+  translations: Translations,
+  namespace: TranslationNamespace = 'common'
+): Record<ValidationMessageKey, (value?: any) => string> {
   return {
-    cacheSize: translationCache.size,
-    serverCacheSize: serverTranslationCache.size,
-    loadedNamespaces: Array.from(translationCache.keys()),
-    availableNamespaces: getAvailableNamespaces(),
-    coreTranslationsLoaded: !!coreTranslations,
+    required: () => getNamespacedTranslation(translations, namespace, 'validation.required' as any) || 'This field is required',
+    email: () => getNamespacedTranslation(translations, namespace, 'validation.email' as any) || 'Please enter a valid email address',
+    minLength: (value: number) => getNamespacedTranslation(translations, namespace, 'validation.minLength' as any, { length: value }) || `Minimum length is ${value} characters`,
+    maxLength: (value: number) => getNamespacedTranslation(translations, namespace, 'validation.maxLength' as any, { length: value }) || `Maximum length is ${value} characters`,
+    pattern: () => getNamespacedTranslation(translations, namespace, 'validation.pattern' as any) || 'Please enter a valid format',
+    numeric: () => getNamespacedTranslation(translations, namespace, 'validation.numeric' as any) || 'Please enter a valid number',
+    url: () => getNamespacedTranslation(translations, namespace, 'validation.url' as any) || 'Please enter a valid URL',
+    custom: (message: string) => message || 'Validation failed'
   };
 }
 
-// ============================================================================
-// DEFAULT EXPORTS
-// ============================================================================
-
 /**
- * Default export provides the core translation functions
- * Optimized for tree-shaking and Next.js integration
+ * Validate that translations conform to the expected structure
+ * Provides compile-time type checking for translation completeness
+ * 
+ * @param translations - The translations to validate
+ * @returns The validated translations object
  */
-export default {
-  // Core functionality
-  getTranslation,
-  hasTranslation,
-  getTranslationSSR,
+export function validateTranslationStructure<T extends Translations>(
+  translations: T
+): EnsureTranslationStructure<T> {
+  // Basic validation that common namespace exists
+  if (!translations.common) {
+    throw new Error('Translations must include a common namespace');
+  }
   
-  // Dynamic loading
-  loadTranslationNamespace,
-  preloadTranslationNamespaces,
-  
-  // Utilities
-  createNamespacedTranslation,
-  getAvailableNamespaces,
-  validateTranslationKeys,
-  getTranslationStats,
-  
-  // Setup
-  initializeTranslations,
-  defaultTranslationConfig,
-  
-  // State
-  initialTranslationState,
-  createTranslationHook,
-  
-  // Core translations
-  coreTranslations,
-} as const;
+  return translations as EnsureTranslationStructure<T>;
+}
 
-// ============================================================================
-// RE-EXPORTS FOR CONVENIENCE
-// ============================================================================
+// =============================================================================
+// EXPORTS
+// =============================================================================
 
-/**
- * Re-export types for easy importing in components
- */
+// Re-export types for easy importing
 export type {
-  RootTranslations,
-  ModuleTranslations,
-  CompleteTranslations,
-  TranslationKey,
-  RootTranslationKey,
-  ModuleTranslationKey,
+  Translations,
   TranslationNamespace,
-  TranslationVariables,
+  TranslationKey,
+  TranslationFunction,
   UseTranslationReturn,
-  TranslationProviderConfig,
-  TranslationAwareProps,
-  FormComponentTranslationProps,
-  AllTranslationKeys,
-  AvailableNamespace
+  TranslationConfig,
+  StaticTranslations,
+  PagePropsWithTranslations,
+  LocalizedComponentProps,
+  ValidatedFormComponentProps,
+  NamespaceKeys,
+  ValidationMessageKey,
+  FieldValidation,
+  TranslationProps,
+  EnsureTranslationStructure
 };
 
-/**
- * Namespace mapping re-export for external usage
- */
-export { TRANSLATION_NAMESPACE_MAP };
+// Export validation functions
+export { isValidTranslationKey, isValidNamespace } from './types';
+
+// Default export for common usage patterns
+export default {
+  loadAllTranslations,
+  loadStaticTranslations,
+  createPagePropsWithTranslations,
+  getTranslation,
+  getNamespacedTranslation,
+  createValidationMessages,
+  validateTranslationStructure,
+  config: defaultTranslationConfig,
+  namespaces: TRANSLATION_NAMESPACES
+};
