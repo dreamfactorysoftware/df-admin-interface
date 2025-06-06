@@ -1,330 +1,194 @@
 /**
- * Email Template Type Definitions
- * 
- * Comprehensive type definitions for DreamFactory email template management.
- * Provides interfaces for email template configuration, content management,
- * and template validation with support for various email types and formats.
- * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
+ * Email template types for system configuration management
+ * Supports CRUD operations, validation, and React Query integration
  */
 
-/**
- * Base email template interface
- */
+import { z } from 'zod';
+
+// Base email template interface from DreamFactory API
 export interface EmailTemplate {
   id: number;
   name: string;
   description?: string;
-  to?: string[];
-  cc?: string[];
-  bcc?: string[];
-  subject: string;
-  body_text?: string;
-  body_html?: string;
-  from_name?: string;
-  from_email?: string;
-  reply_to_name?: string;
-  reply_to_email?: string;
-  defaults?: EmailTemplateDefaults;
-  is_active: boolean;
-  created_date: string;
-  last_modified_date: string;
-  created_by_id?: number;
-  last_modified_by_id?: number;
+  to?: string;
+  cc?: string;
+  bcc?: string;
+  subject?: string;
+  attachment?: string;
+  bodyText?: string;
+  bodyHtml?: string;
+  fromName?: string;
+  fromEmail?: string;
+  replyToName?: string;
+  replyToEmail?: string;
+  defaults?: Record<string, any>;
+  createdDate: string;
+  lastModifiedDate: string;
+  createdById?: number;
+  lastModifiedById?: number;
 }
 
-/**
- * Email template defaults for common placeholders
- */
-export interface EmailTemplateDefaults {
-  from_name?: string;
-  from_email?: string;
-  reply_to_name?: string;
-  reply_to_email?: string;
-  subject_prefix?: string;
-  body_wrapper?: string;
-}
-
-/**
- * Email template creation/update payload
- */
-export interface EmailTemplateRequest {
+// Table row interface for data table display
+export interface EmailTemplateRow {
+  id: number;
   name: string;
   description?: string;
-  to?: string[];
-  cc?: string[];
-  bcc?: string[];
-  subject: string;
-  body_text?: string;
-  body_html?: string;
-  from_name?: string;
-  from_email?: string;
-  reply_to_name?: string;
-  reply_to_email?: string;
-  defaults?: EmailTemplateDefaults;
-  is_active?: boolean;
+  createdDate: string;
+  lastModifiedDate: string;
 }
 
-/**
- * Email template validation interface
- */
-export interface EmailTemplateValidation {
-  name: {
-    required: boolean;
-    minLength: number;
-    maxLength: number;
-    pattern?: string;
-  };
-  subject: {
-    required: boolean;
-    minLength: number;
-    maxLength: number;
-  };
-  email: {
-    pattern: string;
-    message: string;
-  };
-  body: {
-    minLength: number;
-    requiresContent: boolean;
-  };
+// Payload interface for create/update operations
+export interface EmailTemplatePayload {
+  name: string;
+  description?: string;
+  to?: string;
+  cc?: string;
+  bcc?: string;
+  subject?: string;
+  attachment?: string;
+  bodyText?: string;
+  bodyHtml?: string;
+  fromName?: string;
+  fromEmail?: string;
+  replyToName?: string;
+  replyToEmail?: string;
+  defaults?: Record<string, any>;
 }
 
-/**
- * Email template preview interface
- */
-export interface EmailTemplatePreview {
-  rendered_subject: string;
-  rendered_body_text?: string;
-  rendered_body_html?: string;
-  variables_used: string[];
-  missing_variables: string[];
-}
+// Zod validation schema for email template forms
+export const emailTemplateSchema = z.object({
+  name: z.string()
+    .min(1, 'Name is required')
+    .max(255, 'Name must be less than 255 characters'),
+  description: z.string()
+    .max(1000, 'Description must be less than 1000 characters')
+    .optional(),
+  to: z.string()
+    .email('Invalid email format')
+    .optional()
+    .or(z.literal('')),
+  cc: z.string()
+    .email('Invalid email format')
+    .optional()
+    .or(z.literal('')),
+  bcc: z.string()
+    .email('Invalid email format')
+    .optional()
+    .or(z.literal('')),
+  subject: z.string()
+    .max(500, 'Subject must be less than 500 characters')
+    .optional(),
+  attachment: z.string()
+    .optional(),
+  bodyText: z.string()
+    .optional(),
+  bodyHtml: z.string()
+    .optional(),
+  fromName: z.string()
+    .max(255, 'From name must be less than 255 characters')
+    .optional(),
+  fromEmail: z.string()
+    .email('Invalid email format')
+    .optional()
+    .or(z.literal('')),
+  replyToName: z.string()
+    .max(255, 'Reply-to name must be less than 255 characters')
+    .optional(),
+  replyToEmail: z.string()
+    .email('Invalid email format')
+    .optional()
+    .or(z.literal('')),
+  defaults: z.record(z.any()).optional(),
+});
 
-/**
- * Email template test interface
- */
-export interface EmailTemplateTest {
-  template_id: number;
-  test_email: string;
-  test_data?: Record<string, any>;
-  send_actual_email?: boolean;
-}
+// Type inference from Zod schema
+export type EmailTemplateForm = z.infer<typeof emailTemplateSchema>;
 
-/**
- * Email template test result
- */
-export interface EmailTemplateTestResult {
-  success: boolean;
-  message: string;
-  preview?: EmailTemplatePreview;
-  sent_email?: {
-    to: string;
-    subject: string;
-    timestamp: string;
-  };
-  errors?: string[];
-}
-
-/**
- * Email template list query parameters
- */
-export interface EmailTemplateQueryParams {
-  filter?: string;
-  sort?: string;
-  fields?: string;
+// Query options for email templates
+export interface EmailTemplateQueryOptions {
   limit?: number;
   offset?: number;
-  include_count?: boolean;
-  include_inactive?: boolean;
+  filter?: string;
+  fields?: string;
+  sort?: string;
+  order?: 'asc' | 'desc';
 }
 
-/**
- * Email template form field types
- */
-export type EmailTemplateFormField = 
-  | 'name'
-  | 'description'
-  | 'to'
-  | 'cc'
-  | 'bcc'
-  | 'subject'
-  | 'body_text'
-  | 'body_html'
-  | 'from_name'
-  | 'from_email'
-  | 'reply_to_name'
-  | 'reply_to_email'
-  | 'is_active';
-
-/**
- * Email template content types
- */
-export type EmailContentType = 'text' | 'html' | 'both';
-
-/**
- * Email template variables for dynamic content
- */
-export interface EmailTemplateVariable {
-  name: string;
-  description: string;
-  example?: string;
-  required?: boolean;
-  type: 'string' | 'number' | 'boolean' | 'date' | 'object';
-}
-
-/**
- * Email template category for organization
- */
-export interface EmailTemplateCategory {
-  id: string;
-  name: string;
+// Search/filter state for email templates
+export interface EmailTemplateFilters {
+  name?: string;
   description?: string;
-  templates?: EmailTemplate[];
-}
-
-/**
- * System email template types (predefined)
- */
-export type SystemEmailTemplateType = 
-  | 'user_registration'
-  | 'password_reset'
-  | 'email_verification'
-  | 'user_invite'
-  | 'password_changed'
-  | 'account_locked'
-  | 'login_notification'
-  | 'system_alert';
-
-/**
- * Email template settings and configuration
- */
-export interface EmailTemplateSettings {
-  default_from_name: string;
-  default_from_email: string;
-  default_reply_to_name?: string;
-  default_reply_to_email?: string;
-  max_recipients: number;
-  allow_html: boolean;
-  require_authentication: boolean;
-  enable_tracking: boolean;
-  enable_unsubscribe: boolean;
-}
-
-/**
- * Email template statistics for monitoring
- */
-export interface EmailTemplateStats {
-  template_id: number;
-  total_sent: number;
-  total_opened?: number;
-  total_clicked?: number;
-  total_bounced?: number;
-  last_sent?: string;
-  success_rate: number;
-}
-
-/**
- * Email template export/import formats
- */
-export type EmailTemplateExportFormat = 'json' | 'csv' | 'html' | 'text';
-
-/**
- * Email template export/import interface
- */
-export interface EmailTemplateExport {
-  templates: EmailTemplate[];
-  metadata: {
-    exported_at: string;
-    exported_by: string;
-    total_count: number;
-    format: EmailTemplateExportFormat;
+  dateRange?: {
+    start?: string;
+    end?: string;
   };
 }
 
-/**
- * Email template error types for validation and operations
- */
-export interface EmailTemplateError {
-  field?: EmailTemplateFormField;
-  message: string;
-  code: string;
-  details?: any;
+// Email template workflow state
+export interface EmailTemplateWorkflowState {
+  selectedTemplate?: EmailTemplate;
+  isCreating: boolean;
+  isEditing: boolean;
+  filters: EmailTemplateFilters;
+  searchQuery: string;
+  sortBy: 'name' | 'description' | 'createdDate' | 'lastModifiedDate';
+  sortOrder: 'asc' | 'desc';
+  currentPage: number;
+  pageSize: number;
 }
 
-/**
- * Email template operation result
- */
-export interface EmailTemplateOperationResult {
-  success: boolean;
-  data?: EmailTemplate;
-  message?: string;
-  errors?: EmailTemplateError[];
+// Email template actions for Zustand store
+export interface EmailTemplateActions {
+  setSelectedTemplate: (template?: EmailTemplate) => void;
+  setCreating: (creating: boolean) => void;
+  setEditing: (editing: boolean) => void;
+  setFilters: (filters: Partial<EmailTemplateFilters>) => void;
+  setSearchQuery: (query: string) => void;
+  setSorting: (sortBy: EmailTemplateWorkflowState['sortBy'], order: 'asc' | 'desc') => void;
+  setCurrentPage: (page: number) => void;
+  setPageSize: (size: number) => void;
+  resetFilters: () => void;
+  resetWorkflow: () => void;
 }
 
-/**
- * API response types for email templates
- */
+// Combined store interface
+export interface EmailTemplateStore extends EmailTemplateWorkflowState, EmailTemplateActions {}
+
+// API response types
 export interface EmailTemplateListResponse {
   resource: EmailTemplate[];
   meta: {
     count: number;
+    total: number;
+    limit: number;
+    offset: number;
   };
 }
 
-export interface EmailTemplateResponse {
-  resource: EmailTemplate[];
+// Error types for email template operations
+export interface EmailTemplateError {
+  code: string;
+  message: string;
+  details?: Record<string, any>;
 }
 
-export interface EmailTemplateCreateResponse {
-  resource: Array<{ id: number }>;
-}
+// Constants for email templates
+export const EMAIL_TEMPLATE_CONSTANTS = {
+  DEFAULT_PAGE_SIZE: 25,
+  MAX_PAGE_SIZE: 100,
+  MIN_PAGE_SIZE: 10,
+  CACHE_TIME: 5 * 60 * 1000, // 5 minutes
+  STALE_TIME: 2 * 60 * 1000, // 2 minutes
+  DEFAULT_SORT: 'name' as const,
+  DEFAULT_ORDER: 'asc' as const,
+} as const;
 
-export interface EmailTemplateUpdateResponse {
-  id: number;
-}
-
-/**
- * Email template hook configuration
- */
-export interface EmailTemplateHookConfig {
-  enableOptimisticUpdates?: boolean;
-  enableCache?: boolean;
-  cacheTime?: number;
-  staleTime?: number;
-  retryCount?: number;
-  retryDelay?: number;
-  onSuccess?: (data: any) => void;
-  onError?: (error: any) => void;
-}
-
-/**
- * Export all types for external use
- */
-export type {
-  EmailTemplate,
-  EmailTemplateRequest,
-  EmailTemplateValidation,
-  EmailTemplatePreview,
-  EmailTemplateTest,
-  EmailTemplateTestResult,
-  EmailTemplateQueryParams,
-  EmailTemplateFormField,
-  EmailContentType,
-  EmailTemplateVariable,
-  EmailTemplateCategory,
-  SystemEmailTemplateType,
-  EmailTemplateSettings,
-  EmailTemplateStats,
-  EmailTemplateExportFormat,
-  EmailTemplateExport,
-  EmailTemplateError,
-  EmailTemplateOperationResult,
-  EmailTemplateListResponse,
-  EmailTemplateResponse,
-  EmailTemplateCreateResponse,
-  EmailTemplateUpdateResponse,
-  EmailTemplateHookConfig,
-  EmailTemplateDefaults
-};
+// Query keys for React Query
+export const EMAIL_TEMPLATE_QUERY_KEYS = {
+  all: ['emailTemplates'] as const,
+  lists: () => [...EMAIL_TEMPLATE_QUERY_KEYS.all, 'list'] as const,
+  list: (options: EmailTemplateQueryOptions) => 
+    [...EMAIL_TEMPLATE_QUERY_KEYS.lists(), options] as const,
+  details: () => [...EMAIL_TEMPLATE_QUERY_KEYS.all, 'detail'] as const,
+  detail: (id: number) => [...EMAIL_TEMPLATE_QUERY_KEYS.details(), id] as const,
+} as const;
