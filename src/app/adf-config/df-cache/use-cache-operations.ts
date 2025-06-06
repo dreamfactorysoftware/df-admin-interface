@@ -1,467 +1,536 @@
 /**
  * Cache Operations Hook
  * 
- * Custom React hook providing comprehensive cache management operations including
- * system cache flush, per-service cache clearing, and cache status monitoring.
+ * Custom React hook providing cache management operations including system cache flush,
+ * per-service cache clearing, and cache status monitoring. Implements SWR and React Query
+ * patterns for intelligent caching, optimistic updates, and error recovery with comprehensive
+ * loading states and mutation management.
  * 
- * Implements SWR and React Query patterns for intelligent caching, optimistic updates,
- * and error recovery with comprehensive loading states and mutation management.
+ * This hook replaces the Angular DfBaseCrudService cache operations with modern React patterns,
+ * providing enhanced performance through intelligent caching, optimistic updates, and
+ * automatic error recovery mechanisms.
  * 
- * Key Features:
- * - System-wide cache flush operations
- * - Per-service cache clearing with granular control
- * - Real-time cache status monitoring
- * - Optimistic updates with automatic rollback on failure
- * - Intelligent error handling and retry logic
- * - MSW integration for development and testing
- * - Sub-50ms cache hit performance
- * - Comprehensive loading and error states
- * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
+ * @fileoverview Cache operations hook for DreamFactory admin interface
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-'use client'
+import { useCallback, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'react-hot-toast';
+import { apiDelete, apiGet, API_BASE_URL } from '../../../lib/api-client';
+import type { 
+  CacheEntry, 
+  CacheOperationsResult, 
+  CacheFlushOptions,
+  CacheStatusResponse,
+  SystemCacheStats 
+} from '../../../types/cache';
+import { validateCacheOperation } from '../../../lib/validations/cache';
 
-import { useState, useCallback, useMemo } from 'react'
-import useSWR, { mutate, useSWRConfig } from 'swr'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { apiClient, SYSTEM_API_URL } from '@/lib/api-client'
-
-// Cache-related types
-interface CacheStatus {
-  enabled: boolean
-  driver: string
-  prefix: string
-  default_ttl: number
-  forever_ttl: number
-  stats?: {
-    hits: number
-    misses: number
-    hit_ratio: number
-    memory_usage?: number
-    keys_count?: number
-  }
-}
-
-interface ServiceCacheInfo {
-  service_name: string
-  cache_enabled: boolean
-  cache_keys: string[]
-  cache_size: number
-  last_cleared?: string
-}
-
-interface CacheFlushResult {
-  success: boolean
-  message: string
-  cleared_keys?: number
-  execution_time?: number
-}
-
-interface CacheOperationOptions {
-  optimistic?: boolean
-  invalidateQueries?: boolean
-  showSuccess?: boolean
-  onSuccess?: (result: any) => void
-  onError?: (error: Error) => void
-}
-
-interface CacheOperationsState {
-  // Cache status
-  cacheStatus: CacheStatus | null
-  isLoadingStatus: boolean
-  statusError: Error | null
-  
-  // Service cache information
-  serviceCaches: ServiceCacheInfo[]
-  isLoadingServices: boolean
-  servicesError: Error | null
-  
-  // Operation states
-  isFlushingSystem: boolean
-  isFlushingService: boolean
-  isClearingByPattern: boolean
-  
-  // Last operation results
-  lastFlushResult: CacheFlushResult | null
-  lastError: Error | null
-}
+// ============================================================================
+// Constants and Configuration
+// ============================================================================
 
 /**
- * Cache operations hook providing comprehensive cache management functionality
- * 
- * @returns {Object} Cache operations and state management interface
+ * Cache API endpoints
  */
-export function useCacheOperations() {
-  // SWR configuration for optimal caching
-  const { cache, mutate: swrMutate } = useSWRConfig()
-  const queryClient = useQueryClient()
-  
-  // Local state for operation tracking
-  const [operationState, setOperationState] = useState<{
-    isFlushingSystem: boolean
-    isFlushingService: boolean
-    isClearingByPattern: boolean
-    lastFlushResult: CacheFlushResult | null
-    lastError: Error | null
-  }>({
-    isFlushingSystem: false,
-    isFlushingService: false,
-    isClearingByPattern: false,
-    lastFlushResult: null,
-    lastError: null
-  })
+const CACHE_ENDPOINTS = {
+  SYSTEM_CACHE: `${API_BASE_URL}/system/cache`,
+  SERVICE_CACHE: `${API_BASE_URL}/system/cache`,
+  CACHE_STATUS: `${API_BASE_URL}/system/cache/status`,
+  CACHE_STATS: `${API_BASE_URL}/system/cache/stats`,
+} as const;
 
-  // Cache status fetching with SWR
+/**
+ * React Query keys for cache operations
+ */
+export const CACHE_QUERY_KEYS = {
+  all: ['cache'] as const,
+  status: () => [...CACHE_QUERY_KEYS.all, 'status'] as const,
+  stats: () => [...CACHE_QUERY_KEYS.all, 'stats'] as const,
+  services: () => [...CACHE_QUERY_KEYS.all, 'services'] as const,
+  service: (serviceName: string) => [...CACHE_QUERY_KEYS.services(), serviceName] as const,
+} as const;
+
+/**
+ * Cache operation retry configuration
+ */
+const RETRY_CONFIG = {
+  maxRetries: 3,
+  retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 30000),
+  retryCondition: (error: Error) => {
+    // Retry on network errors or 5xx status codes
+    const errorString = error.message.toLowerCase();
+    return errorString.includes('network') || 
+           errorString.includes('timeout') ||
+           errorString.includes('500') ||
+           errorString.includes('502') ||
+           errorString.includes('503') ||
+           errorString.includes('504');
+  },
+} as const;
+
+/**
+ * Performance thresholds per React/Next.js Integration Requirements
+ */
+const PERFORMANCE_THRESHOLDS = {
+  CACHE_HIT_MAX_MS: 50,      // Cache hit responses under 50ms
+  API_RESPONSE_MAX_MS: 2000, // API responses under 2 seconds
+} as const;
+
+// ============================================================================
+// Cache Operations Hook Implementation
+// ============================================================================
+
+/**
+ * Custom React hook providing comprehensive cache management operations.
+ * 
+ * Features:
+ * - System-wide cache flushing with progress tracking
+ * - Per-service cache clearing with optimistic updates
+ * - Real-time cache status monitoring
+ * - Intelligent error handling with automatic retry
+ * - Performance monitoring and validation
+ * - MSW integration for development and testing
+ * 
+ * @returns CacheOperationsResult - Complete cache operations interface
+ */
+export function useCacheOperations(): CacheOperationsResult {
+  const queryClient = useQueryClient();
+  const [isOperationInProgress, setIsOperationInProgress] = useState(false);
+  const [operationStartTime, setOperationStartTime] = useState<number | null>(null);
+
+  // ============================================================================
+  // Cache Status and Statistics Queries
+  // ============================================================================
+
+  /**
+   * Cache status query with intelligent caching and automatic revalidation
+   */
   const {
     data: cacheStatus,
+    isLoading: isStatusLoading,
     error: statusError,
-    isLoading: isLoadingStatus,
-    mutate: mutateCacheStatus
-  } = useSWR<CacheStatus>(
-    '/cache/status',
-    async (url: string) => {
-      const response = await apiClient.get(`${SYSTEM_API_URL}${url}`)
-      return response.resource || response
-    },
-    {
-      refreshInterval: 30000, // Refresh every 30 seconds
-      revalidateOnFocus: true,
-      revalidateOnReconnect: true,
-      dedupingInterval: 5000, // Dedupe requests within 5 seconds
-      errorRetryCount: 3,
-      errorRetryInterval: 1000,
-      onError: (error) => {
-        console.error('Failed to fetch cache status:', error)
-        setOperationState(prev => ({ ...prev, lastError: error }))
+    refetch: refetchStatus,
+  } = useQuery({
+    queryKey: CACHE_QUERY_KEYS.status(),
+    queryFn: async (): Promise<CacheStatusResponse> => {
+      const startTime = performance.now();
+      
+      try {
+        const response = await apiGet<CacheStatusResponse>(CACHE_ENDPOINTS.CACHE_STATUS, {
+          // Optimize for cache hit performance
+          includeCacheControl: true,
+          snackbarError: 'Failed to fetch cache status',
+        });
+        
+        const duration = performance.now() - startTime;
+        
+        // Validate performance requirements
+        if (duration > PERFORMANCE_THRESHOLDS.API_RESPONSE_MAX_MS) {
+          console.warn(`Cache status query exceeded performance threshold: ${duration}ms`);
+        }
+        
+        return response;
+      } catch (error) {
+        console.error('Cache status query failed:', error);
+        throw error;
       }
-    }
-  )
+    },
+    staleTime: 30000, // 30 seconds - cache status is relatively stable
+    gcTime: 300000,   // 5 minutes - keep in memory for performance
+    refetchInterval: 60000, // Refresh every minute for real-time monitoring
+    retry: (failureCount, error) => {
+      return failureCount < RETRY_CONFIG.maxRetries && 
+             RETRY_CONFIG.retryCondition(error as Error);
+    },
+    retryDelay: RETRY_CONFIG.retryDelay,
+  });
 
-  // Service cache information with React Query
+  /**
+   * System cache statistics query for monitoring and analytics
+   */
   const {
-    data: serviceCaches = [],
-    error: servicesError,
-    isLoading: isLoadingServices,
-    refetch: refetchServiceCaches
-  } = useQuery<ServiceCacheInfo[]>({
-    queryKey: ['cache', 'services'],
-    queryFn: async () => {
-      const response = await apiClient.get(`${SYSTEM_API_URL}/cache/services`)
-      return response.resource || response
-    },
-    staleTime: 1000 * 60 * 2, // 2 minutes
-    gcTime: 1000 * 60 * 5, // 5 minutes
-    refetchInterval: 60000, // Refresh every minute
-    retry: 3,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000)
-  })
-
-  // System cache flush mutation
-  const systemFlushMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiClient.post(`${SYSTEM_API_URL}/cache/flush`)
-      return response
-    },
-    onMutate: async () => {
-      // Optimistic update
-      setOperationState(prev => ({
-        ...prev,
-        isFlushingSystem: true,
-        lastError: null
-      }))
-    },
-    onSuccess: (result) => {
-      setOperationState(prev => ({
-        ...prev,
-        isFlushingSystem: false,
-        lastFlushResult: {
-          success: true,
-          message: 'System cache flushed successfully',
-          cleared_keys: result.cleared_keys,
-          execution_time: result.execution_time
-        }
-      }))
-      
-      // Invalidate all cache-related queries
-      queryClient.invalidateQueries({ queryKey: ['cache'] })
-      mutateCacheStatus()
-      
-      // Clear SWR cache
-      swrMutate(() => true, undefined, { revalidate: true })
-    },
-    onError: (error: Error) => {
-      setOperationState(prev => ({
-        ...prev,
-        isFlushingSystem: false,
-        lastError: error,
-        lastFlushResult: {
-          success: false,
-          message: `Failed to flush system cache: ${error.message}`
-        }
-      }))
-    }
-  })
-
-  // Service-specific cache clear mutation
-  const serviceClearMutation = useMutation({
-    mutationFn: async ({ serviceName }: { serviceName: string }) => {
-      const response = await apiClient.post(`${SYSTEM_API_URL}/cache/clear/${serviceName}`)
-      return response
-    },
-    onMutate: async ({ serviceName }) => {
-      setOperationState(prev => ({
-        ...prev,
-        isFlushingService: true,
-        lastError: null
-      }))
-      
-      // Optimistic update: mark service cache as cleared
-      queryClient.setQueryData<ServiceCacheInfo[]>(
-        ['cache', 'services'],
-        (oldData) => oldData?.map(service => 
-          service.service_name === serviceName
-            ? { ...service, cache_keys: [], cache_size: 0, last_cleared: new Date().toISOString() }
-            : service
-        ) || []
-      )
-    },
-    onSuccess: (result, { serviceName }) => {
-      setOperationState(prev => ({
-        ...prev,
-        isFlushingService: false,
-        lastFlushResult: {
-          success: true,
-          message: `Cache cleared for service: ${serviceName}`,
-          cleared_keys: result.cleared_keys,
-          execution_time: result.execution_time
-        }
-      }))
-      
-      // Refresh service cache data
-      refetchServiceCaches()
-      mutateCacheStatus()
-    },
-    onError: (error: Error, { serviceName }) => {
-      setOperationState(prev => ({
-        ...prev,
-        isFlushingService: false,
-        lastError: error,
-        lastFlushResult: {
-          success: false,
-          message: `Failed to clear cache for service ${serviceName}: ${error.message}`
-        }
-      }))
-      
-      // Rollback optimistic update
-      queryClient.invalidateQueries({ queryKey: ['cache', 'services'] })
-    }
-  })
-
-  // Cache pattern clearing mutation
-  const patternClearMutation = useMutation({
-    mutationFn: async ({ pattern }: { pattern: string }) => {
-      const response = await apiClient.post(`${SYSTEM_API_URL}/cache/clear`, {
-        pattern
-      })
-      return response
-    },
-    onMutate: async () => {
-      setOperationState(prev => ({
-        ...prev,
-        isClearingByPattern: true,
-        lastError: null
-      }))
-    },
-    onSuccess: (result) => {
-      setOperationState(prev => ({
-        ...prev,
-        isClearingByPattern: false,
-        lastFlushResult: {
-          success: true,
-          message: 'Cache pattern cleared successfully',
-          cleared_keys: result.cleared_keys,
-          execution_time: result.execution_time
-        }
-      }))
-      
-      // Refresh all cache data
-      queryClient.invalidateQueries({ queryKey: ['cache'] })
-      mutateCacheStatus()
-      refetchServiceCaches()
-    },
-    onError: (error: Error) => {
-      setOperationState(prev => ({
-        ...prev,
-        isClearingByPattern: false,
-        lastError: error,
-        lastFlushResult: {
-          success: false,
-          message: `Failed to clear cache pattern: ${error.message}`
-        }
-      }))
-    }
-  })
-
-  // Cache operation functions
-  const flushSystemCache = useCallback(
-    async (options: CacheOperationOptions = {}) => {
-      try {
-        const result = await systemFlushMutation.mutateAsync()
-        options.onSuccess?.(result)
-        return result
-      } catch (error) {
-        options.onError?.(error as Error)
-        throw error
-      }
-    },
-    [systemFlushMutation]
-  )
-
-  const clearServiceCache = useCallback(
-    async (serviceName: string, options: CacheOperationOptions = {}) => {
-      if (!serviceName) {
-        throw new Error('Service name is required for cache clearing')
-      }
+    data: cacheStats,
+    isLoading: isStatsLoading,
+    error: statsError,
+    refetch: refetchStats,
+  } = useQuery({
+    queryKey: CACHE_QUERY_KEYS.stats(),
+    queryFn: async (): Promise<SystemCacheStats> => {
+      const startTime = performance.now();
       
       try {
-        const result = await serviceClearMutation.mutateAsync({ serviceName })
-        options.onSuccess?.(result)
-        return result
+        const response = await apiGet<SystemCacheStats>(CACHE_ENDPOINTS.CACHE_STATS, {
+          includeCacheControl: true,
+          snackbarError: 'Failed to fetch cache statistics',
+        });
+        
+        const duration = performance.now() - startTime;
+        
+        // Validate cache hit performance requirement
+        if (duration <= PERFORMANCE_THRESHOLDS.CACHE_HIT_MAX_MS) {
+          console.debug(`Cache stats retrieved in ${duration}ms (cache hit)`);
+        } else if (duration > PERFORMANCE_THRESHOLDS.API_RESPONSE_MAX_MS) {
+          console.warn(`Cache stats query exceeded performance threshold: ${duration}ms`);
+        }
+        
+        return response;
       } catch (error) {
-        options.onError?.(error as Error)
-        throw error
+        console.error('Cache statistics query failed:', error);
+        throw error;
       }
     },
-    [serviceClearMutation]
-  )
+    staleTime: 15000, // 15 seconds - stats change more frequently
+    gcTime: 300000,   // 5 minutes
+    refetchInterval: 30000, // Refresh every 30 seconds
+    retry: (failureCount, error) => {
+      return failureCount < RETRY_CONFIG.maxRetries && 
+             RETRY_CONFIG.retryCondition(error as Error);
+    },
+    retryDelay: RETRY_CONFIG.retryDelay,
+  });
 
-  const clearCacheByPattern = useCallback(
-    async (pattern: string, options: CacheOperationOptions = {}) => {
-      if (!pattern) {
-        throw new Error('Cache pattern is required')
+  // ============================================================================
+  // System Cache Flush Mutation
+  // ============================================================================
+
+  /**
+   * System cache flush mutation with optimistic updates and rollback capability
+   */
+  const flushSystemCacheMutation = useMutation({
+    mutationFn: async (options: CacheFlushOptions = {}): Promise<void> => {
+      // Validate operation parameters
+      const validation = validateCacheOperation({ type: 'system_flush', options });
+      if (!validation.isValid) {
+        throw new Error(`Cache operation validation failed: ${validation.errors.join(', ')}`);
       }
+
+      const startTime = performance.now();
+      setOperationStartTime(startTime);
       
       try {
-        const result = await patternClearMutation.mutateAsync({ pattern })
-        options.onSuccess?.(result)
-        return result
+        await apiDelete<void>(CACHE_ENDPOINTS.SYSTEM_CACHE, {
+          snackbarSuccess: options.suppressNotification ? undefined : 'cache.systemCacheFlushed',
+          snackbarError: 'cache.systemCacheFlushFailed',
+          showSpinner: !options.silent,
+          // Add operation timeout to prevent hanging requests
+          signal: AbortSignal.timeout(30000), // 30 second timeout
+        });
+        
+        const duration = performance.now() - startTime;
+        
+        // Log performance metrics
+        console.info(`System cache flush completed in ${duration}ms`);
+        
+        // Validate performance requirements
+        if (duration > PERFORMANCE_THRESHOLDS.API_RESPONSE_MAX_MS) {
+          console.warn(`System cache flush exceeded performance threshold: ${duration}ms`);
+        }
+        
       } catch (error) {
-        options.onError?.(error as Error)
-        throw error
+        console.error('System cache flush failed:', error);
+        throw error;
+      } finally {
+        setOperationStartTime(null);
       }
     },
-    [patternClearMutation]
-  )
-
-  // Cache statistics calculation
-  const cacheStatistics = useMemo(() => {
-    if (!cacheStatus || !serviceCaches) {
-      return null
-    }
-
-    const totalServiceCaches = serviceCaches.length
-    const enabledServiceCaches = serviceCaches.filter(s => s.cache_enabled).length
-    const totalCacheKeys = serviceCaches.reduce((sum, service) => sum + service.cache_keys.length, 0)
-    const totalCacheSize = serviceCaches.reduce((sum, service) => sum + service.cache_size, 0)
-
-    return {
-      system: {
-        enabled: cacheStatus.enabled,
-        driver: cacheStatus.driver,
-        hit_ratio: cacheStatus.stats?.hit_ratio || 0,
-        memory_usage: cacheStatus.stats?.memory_usage || 0
-      },
-      services: {
-        total: totalServiceCaches,
-        enabled: enabledServiceCaches,
-        total_keys: totalCacheKeys,
-        total_size: totalCacheSize
+    onMutate: async (options) => {
+      setIsOperationInProgress(true);
+      
+      if (!options.silent && !options.suppressNotification) {
+        toast.loading('Flushing system cache...', { id: 'system-cache-flush' });
       }
+      
+      // Cancel any outgoing refetches to prevent optimistic updates from being overwritten
+      await queryClient.cancelQueries({ queryKey: CACHE_QUERY_KEYS.all });
+      
+      // Snapshot the previous cache state for potential rollback
+      const previousStatus = queryClient.getQueryData(CACHE_QUERY_KEYS.status());
+      const previousStats = queryClient.getQueryData(CACHE_QUERY_KEYS.stats());
+      
+      // Optimistically update the cache status
+      queryClient.setQueryData(CACHE_QUERY_KEYS.status(), (old: CacheStatusResponse | undefined) => {
+        if (!old) return old;
+        return {
+          ...old,
+          systemCacheEnabled: true,
+          lastFlushTime: new Date().toISOString(),
+          isFlushInProgress: true,
+        };
+      });
+      
+      // Optimistically reset cache statistics
+      queryClient.setQueryData(CACHE_QUERY_KEYS.stats(), (old: SystemCacheStats | undefined) => {
+        if (!old) return old;
+        return {
+          ...old,
+          hitRate: 0,
+          totalHits: 0,
+          totalMisses: 0,
+          totalRequests: 0,
+          cacheSize: 0,
+          lastClearTime: new Date().toISOString(),
+        };
+      });
+      
+      return { previousStatus, previousStats };
+    },
+    onSuccess: (_, options) => {
+      setIsOperationInProgress(false);
+      
+      if (!options.silent && !options.suppressNotification) {
+        toast.success('System cache flushed successfully', { id: 'system-cache-flush' });
+      }
+      
+      // Invalidate and refetch cache-related queries to ensure fresh data
+      queryClient.invalidateQueries({ queryKey: CACHE_QUERY_KEYS.all });
+      
+      // Force refetch of cache status to get updated state
+      refetchStatus();
+      refetchStats();
+    },
+    onError: (error, options, context) => {
+      setIsOperationInProgress(false);
+      
+      // Rollback optimistic updates
+      if (context?.previousStatus) {
+        queryClient.setQueryData(CACHE_QUERY_KEYS.status(), context.previousStatus);
+      }
+      if (context?.previousStats) {
+        queryClient.setQueryData(CACHE_QUERY_KEYS.stats(), context.previousStats);
+      }
+      
+      if (!options.silent && !options.suppressNotification) {
+        toast.error('Failed to flush system cache', { id: 'system-cache-flush' });
+      }
+      
+      console.error('System cache flush error:', error);
+    },
+    retry: (failureCount, error) => {
+      return failureCount < RETRY_CONFIG.maxRetries && 
+             RETRY_CONFIG.retryCondition(error as Error);
+    },
+    retryDelay: RETRY_CONFIG.retryDelay,
+  });
+
+  // ============================================================================
+  // Service Cache Clear Mutation
+  // ============================================================================
+
+  /**
+   * Per-service cache clear mutation with optimistic updates
+   */
+  const clearServiceCacheMutation = useMutation({
+    mutationFn: async ({ serviceName, options = {} }: { 
+      serviceName: string; 
+      options?: CacheFlushOptions 
+    }): Promise<void> => {
+      // Validate operation parameters
+      const validation = validateCacheOperation({ 
+        type: 'service_clear', 
+        serviceName,
+        options 
+      });
+      if (!validation.isValid) {
+        throw new Error(`Cache operation validation failed: ${validation.errors.join(', ')}`);
+      }
+
+      const startTime = performance.now();
+      
+      try {
+        await apiDelete<void>(`${CACHE_ENDPOINTS.SERVICE_CACHE}/${serviceName}`, {
+          snackbarSuccess: options.suppressNotification ? undefined : 'cache.serviceCacheFlushed',
+          snackbarError: 'cache.serviceCacheFlushFailed',
+          showSpinner: !options.silent,
+          // Add operation timeout
+          signal: AbortSignal.timeout(15000), // 15 second timeout for service operations
+        });
+        
+        const duration = performance.now() - startTime;
+        console.info(`Service cache clear for '${serviceName}' completed in ${duration}ms`);
+        
+        // Validate performance requirements
+        if (duration > PERFORMANCE_THRESHOLDS.API_RESPONSE_MAX_MS) {
+          console.warn(`Service cache clear exceeded performance threshold: ${duration}ms`);
+        }
+        
+      } catch (error) {
+        console.error(`Service cache clear failed for '${serviceName}':`, error);
+        throw error;
+      }
+    },
+    onMutate: async ({ serviceName, options }) => {
+      setIsOperationInProgress(true);
+      
+      if (!options.silent && !options.suppressNotification) {
+        toast.loading(`Clearing cache for ${serviceName}...`, { id: `service-cache-${serviceName}` });
+      }
+      
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: CACHE_QUERY_KEYS.service(serviceName) });
+      
+      // Snapshot previous service cache state for rollback
+      const previousServiceData = queryClient.getQueryData(CACHE_QUERY_KEYS.service(serviceName));
+      
+      // Optimistically update service cache state
+      queryClient.setQueryData(CACHE_QUERY_KEYS.service(serviceName), (old: CacheEntry | undefined) => {
+        if (!old) return old;
+        return {
+          ...old,
+          lastClearTime: new Date().toISOString(),
+          isClearInProgress: true,
+          hitRate: 0,
+          size: 0,
+        };
+      });
+      
+      return { previousServiceData, serviceName };
+    },
+    onSuccess: (_, { serviceName, options }) => {
+      setIsOperationInProgress(false);
+      
+      if (!options.silent && !options.suppressNotification) {
+        toast.success(`Cache cleared for ${serviceName}`, { id: `service-cache-${serviceName}` });
+      }
+      
+      // Invalidate related queries
+      queryClient.invalidateQueries({ queryKey: CACHE_QUERY_KEYS.service(serviceName) });
+      queryClient.invalidateQueries({ queryKey: CACHE_QUERY_KEYS.stats() });
+      
+      // Force refetch to get updated state
+      refetchStats();
+    },
+    onError: (error, { serviceName, options }, context) => {
+      setIsOperationInProgress(false);
+      
+      // Rollback optimistic updates
+      if (context?.previousServiceData) {
+        queryClient.setQueryData(
+          CACHE_QUERY_KEYS.service(serviceName), 
+          context.previousServiceData
+        );
+      }
+      
+      if (!options.silent && !options.suppressNotification) {
+        toast.error(`Failed to clear cache for ${serviceName}`, { 
+          id: `service-cache-${serviceName}` 
+        });
+      }
+      
+      console.error(`Service cache clear error for '${serviceName}':`, error);
+    },
+    retry: (failureCount, error) => {
+      return failureCount < RETRY_CONFIG.maxRetries && 
+             RETRY_CONFIG.retryCondition(error as Error);
+    },
+    retryDelay: RETRY_CONFIG.retryDelay,
+  });
+
+  // ============================================================================
+  // Convenience Functions and Performance Monitoring
+  // ============================================================================
+
+  /**
+   * Flush system cache with enhanced error handling and performance monitoring
+   */
+  const flushSystemCache = useCallback(async (options: CacheFlushOptions = {}) => {
+    try {
+      await flushSystemCacheMutation.mutateAsync(options);
+    } catch (error) {
+      // Enhanced error handling per Section 4.1.3 connection failure recovery workflow
+      console.error('System cache flush operation failed:', error);
+      
+      if (!options.silent && !options.suppressNotification) {
+        toast.error('System cache flush failed. Please try again.');
+      }
+      
+      throw error;
     }
-  }, [cacheStatus, serviceCaches])
+  }, [flushSystemCacheMutation]);
 
-  // Refresh functions
-  const refreshCacheStatus = useCallback(async () => {
-    await mutateCacheStatus()
-  }, [mutateCacheStatus])
+  /**
+   * Clear service cache with enhanced error handling and performance monitoring
+   */
+  const clearServiceCache = useCallback(async (serviceName: string, options: CacheFlushOptions = {}) => {
+    if (!serviceName?.trim()) {
+      throw new Error('Service name is required for cache clearing operation');
+    }
+    
+    try {
+      await clearServiceCacheMutation.mutateAsync({ serviceName, options });
+    } catch (error) {
+      // Enhanced error handling per Section 4.1.3 connection failure recovery workflow
+      console.error(`Service cache clear operation failed for '${serviceName}':`, error);
+      
+      if (!options.silent && !options.suppressNotification) {
+        toast.error(`Failed to clear cache for ${serviceName}. Please try again.`);
+      }
+      
+      throw error;
+    }
+  }, [clearServiceCacheMutation]);
 
-  const refreshServiceCaches = useCallback(async () => {
-    await refetchServiceCaches()
-  }, [refetchServiceCaches])
+  /**
+   * Get current operation duration for progress tracking
+   */
+  const getCurrentOperationDuration = useCallback((): number | null => {
+    if (!operationStartTime) return null;
+    return performance.now() - operationStartTime;
+  }, [operationStartTime]);
 
-  const refreshAll = useCallback(async () => {
-    await Promise.all([
-      mutateCacheStatus(),
-      refetchServiceCaches()
-    ])
-  }, [mutateCacheStatus, refetchServiceCaches])
+  /**
+   * Check if cache operations are performing within acceptable thresholds
+   */
+  const isPerformanceOptimal = useCallback((): boolean => {
+    const duration = getCurrentOperationDuration();
+    if (!duration) return true;
+    return duration <= PERFORMANCE_THRESHOLDS.API_RESPONSE_MAX_MS;
+  }, [getCurrentOperationDuration]);
 
-  // Clear operation states
-  const clearOperationState = useCallback(() => {
-    setOperationState({
-      isFlushingSystem: false,
-      isFlushingService: false,
-      isClearingByPattern: false,
-      lastFlushResult: null,
-      lastError: null
-    })
-  }, [])
+  // ============================================================================
+  // Return Hook Interface
+  // ============================================================================
 
-  // Return comprehensive cache operations interface
   return {
-    // Cache data
+    // Cache status and statistics
     cacheStatus,
-    serviceCaches,
-    cacheStatistics,
-    
-    // Loading states
-    isLoadingStatus,
-    isLoadingServices,
-    isFlushingSystem: operationState.isFlushingSystem,
-    isFlushingService: operationState.isFlushingService,
-    isClearingByPattern: operationState.isClearingByPattern,
-    
-    // Error states
-    statusError,
-    servicesError,
-    lastError: operationState.lastError,
-    
-    // Operation results
-    lastFlushResult: operationState.lastFlushResult,
+    cacheStats,
+    isStatusLoading,
+    isStatsLoading,
+    statusError: statusError as Error | null,
+    statsError: statsError as Error | null,
     
     // Cache operations
     flushSystemCache,
     clearServiceCache,
-    clearCacheByPattern,
     
-    // Refresh operations
-    refreshCacheStatus,
-    refreshServiceCaches,
-    refreshAll,
+    // Operation state
+    isOperationInProgress,
+    isSystemFlushInProgress: flushSystemCacheMutation.isPending,
+    isServiceClearInProgress: clearServiceCacheMutation.isPending,
     
-    // Utility functions
-    clearOperationState,
+    // Error states
+    systemFlushError: flushSystemCacheMutation.error as Error | null,
+    serviceClearError: clearServiceCacheMutation.error as Error | null,
     
-    // Computed states
-    isAnyOperationRunning: operationState.isFlushingSystem || 
-                          operationState.isFlushingService || 
-                          operationState.isClearingByPattern,
+    // Performance monitoring
+    getCurrentOperationDuration,
+    isPerformanceOptimal,
     
-    hasError: !!statusError || !!servicesError || !!operationState.lastError,
+    // Manual refetch capabilities
+    refetchStatus,
+    refetchStats,
     
-    isLoading: isLoadingStatus || isLoadingServices
-  }
+    // Reset error states
+    resetSystemFlushError: flushSystemCacheMutation.reset,
+    resetServiceClearError: clearServiceCacheMutation.reset,
+  };
 }
 
-export default useCacheOperations
+// ============================================================================
+// Default Export
+// ============================================================================
 
-// Re-export types for external use
-export type {
-  CacheStatus,
-  ServiceCacheInfo,
-  CacheFlushResult,
-  CacheOperationOptions,
-  CacheOperationsState
-}
+export default useCacheOperations;
