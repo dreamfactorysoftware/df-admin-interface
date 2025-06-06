@@ -1,442 +1,557 @@
+/**
+ * User Registration Form Component for DreamFactory Admin Interface
+ * 
+ * React registration form component implementing self-registration workflow with profile details
+ * collection, email validation, and completion confirmation. Migrated from Angular df-register
+ * component to use React Hook Form with nested form groups, Zod validation, and responsive
+ * Tailwind CSS design.
+ * 
+ * Key Features:
+ * - React Hook Form with nested form group validation for profile details
+ * - Dynamic field validation based on system configuration (email vs username-based registration)
+ * - Registration completion flow with success confirmation and login page navigation
+ * - Responsive form design with proper error message display and accessibility features
+ * - Integration with authentication API endpoints maintaining existing registration flow
+ * - Loading states during registration API calls with proper user feedback
+ * - Form reset and error handling for registration failures with actionable error messages
+ * 
+ * @fileoverview Registration form component with comprehensive validation and accessibility
+ * @version 1.0.0
+ * @see Technical Specification Section 0 - SUMMARY OF CHANGES
+ * @see Technical Specification Section 4.2 - ERROR HANDLING AND VALIDATION
+ * @see WCAG 2.1 AA Guidelines: https://www.w3.org/WAI/WCAG21/Understanding/
+ */
+
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useForm, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { z } from 'zod';
-import { Loader2, CheckCircle, User, Mail, Eye, EyeOff } from 'lucide-react';
-
-// Hooks and utilities
+import { CheckCircleIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/hooks/use-auth';
 import { useSystemConfig } from '@/hooks/use-system-config';
-
-// UI Components
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { 
+  createRegistrationSchema, 
+  getFieldRequirements,
+  type RegistrationFormData,
+  type ProfileDetailsFormData,
+} from '@/lib/auth-schema';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Alert } from '@/components/ui/alert';
+import { cn } from '@/lib/utils';
+import type { AuthError } from '@/types/auth';
 
-// Types
-import type { RegisterRequest, UserProfile } from '@/types/auth';
+// =============================================================================
+// COMPONENT INTERFACES AND TYPES
+// =============================================================================
 
-// Registration schema with nested profile validation
-const createRegistrationSchema = (loginAttribute: string) => {
-  const baseSchema = {
-    email: z.string().email('Please enter a valid email address'),
-    password: z.string()
-      .min(8, 'Password must be at least 8 characters')
-      .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
-      .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
-      .regex(/[0-9]/, 'Password must contain at least one number')
-      .regex(/[^A-Za-z0-9]/, 'Password must contain at least one special character'),
-    confirmPassword: z.string(),
-    firstName: z.string().min(1, 'First name is required'),
-    lastName: z.string().min(1, 'Last name is required'),
-  };
-
-  // Add username field if system uses username for login
-  if (loginAttribute === 'username') {
-    return z.object({
-      ...baseSchema,
-      username: z.string()
-        .min(3, 'Username must be at least 3 characters')
-        .max(50, 'Username must be no more than 50 characters')
-        .regex(/^[a-zA-Z0-9_-]+$/, 'Username can only contain letters, numbers, underscores, and hyphens'),
-    }).refine((data) => data.password === data.confirmPassword, {
-      message: 'Passwords do not match',
-      path: ['confirmPassword'],
-    });
-  }
-
-  return z.object(baseSchema).refine((data) => data.password === data.confirmPassword, {
-    message: 'Passwords do not match',
-    path: ['confirmPassword'],
-  });
-};
-
-type RegistrationFormData = z.infer<ReturnType<typeof createRegistrationSchema>>;
-
-interface RegisterFormProps {
+/**
+ * Registration form component props
+ * Minimal interface for clean component composition
+ */
+export interface RegisterFormProps {
+  /**
+   * Additional CSS classes for styling customization
+   */
   className?: string;
-  onComplete?: () => void;
+  
+  /**
+   * Custom callback when registration is successful
+   * Useful for tracking analytics or custom navigation
+   */
+  onRegistrationSuccess?: (userData: ProfileDetailsFormData) => void;
+  
+  /**
+   * Custom callback when registration fails
+   * Enables custom error handling or logging
+   */
+  onRegistrationError?: (error: AuthError) => void;
 }
 
-export function RegisterForm({ className, onComplete }: RegisterFormProps) {
-  const router = useRouter();
-  const { register, isLoading: authLoading } = useAuth();
-  const { data: systemConfig, isLoading: configLoading } = useSystemConfig();
+/**
+ * Profile details form field component props
+ * Encapsulates individual form field rendering
+ */
+interface ProfileFieldProps {
+  name: keyof ProfileDetailsFormData;
+  label: string;
+  type?: 'text' | 'email';
+  required?: boolean;
+  optional?: boolean;
+  placeholder?: string;
+  autoComplete?: string;
+  'data-testid'?: string;
+}
+
+// =============================================================================
+// PROFILE DETAILS FORM FIELDS COMPONENT
+// =============================================================================
+
+/**
+ * ProfileDetailsFields component rendering all profile form fields
+ * Replaces the Angular df-profile-details component with React implementation
+ * 
+ * Features:
+ * - Dynamic field requirements based on system configuration
+ * - WCAG 2.1 AA compliant form labels and error messaging
+ * - Real-time validation with React Hook Form integration
+ * - Responsive design with consistent field spacing
+ * - Accessibility enhancements including proper ARIA attributes
+ */
+const ProfileDetailsFields: React.FC<{
+  loginAttribute: 'email' | 'username';
+  fieldRequirements: ReturnType<typeof getFieldRequirements>;
+}> = ({ loginAttribute, fieldRequirements }) => {
   
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [isRegistered, setIsRegistered] = useState(false);
+  /**
+   * Profile form field configuration
+   * Matches Angular template structure with enhanced accessibility
+   */
+  const profileFields: ProfileFieldProps[] = [
+    {
+      name: 'username',
+      label: fieldRequirements.usernameRequired ? 'Username' : 'Username (Optional)',
+      type: 'text',
+      required: fieldRequirements.usernameRequired,
+      optional: fieldRequirements.usernameOptional,
+      placeholder: 'Enter your username',
+      autoComplete: 'username',
+      'data-testid': 'registration-username-input',
+    },
+    {
+      name: 'email',
+      label: 'Email Address',
+      type: 'email',
+      required: fieldRequirements.emailRequired,
+      optional: fieldRequirements.emailOptional,
+      placeholder: 'Enter your email address',
+      autoComplete: 'email',
+      'data-testid': 'registration-email-input',
+    },
+    {
+      name: 'firstName',
+      label: 'First Name',
+      type: 'text',
+      required: true,
+      placeholder: 'Enter your first name',
+      autoComplete: 'given-name',
+      'data-testid': 'registration-first-name-input',
+    },
+    {
+      name: 'lastName',
+      label: 'Last Name',
+      type: 'text',
+      required: true,
+      placeholder: 'Enter your last name',
+      autoComplete: 'family-name',
+      'data-testid': 'registration-last-name-input',
+    },
+    {
+      name: 'name',
+      label: 'Display Name',
+      type: 'text',
+      required: true,
+      placeholder: 'Enter your display name',
+      autoComplete: 'name',
+      'data-testid': 'registration-display-name-input',
+    },
+  ];
+
+  return (
+    <div className="space-y-4">
+      {profileFields.map((field) => (
+        <div key={field.name} className="space-y-2">
+          <Input
+            name={`profileDetailsGroup.${field.name}`}
+            label={field.label}
+            type={field.type}
+            placeholder={field.placeholder}
+            autoComplete={field.autoComplete}
+            required={field.required}
+            data-testid={field['data-testid']}
+            className="w-full"
+            size="md"
+            variant="outline"
+          />
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// =============================================================================
+// MAIN REGISTRATION FORM COMPONENT
+// =============================================================================
+
+/**
+ * RegisterForm component implementing complete user registration workflow
+ * 
+ * Replaces Angular df-register component with React implementation featuring:
+ * - React Hook Form with Zod schema validation
+ * - System configuration-aware field validation
+ * - Registration completion flow with success state
+ * - Comprehensive error handling with user-friendly messages
+ * - Loading states during API operations
+ * - WCAG 2.1 AA accessibility compliance
+ * 
+ * @example
+ * ```tsx
+ * // Basic usage
+ * <RegisterForm />
+ * 
+ * // With custom callbacks
+ * <RegisterForm
+ *   onRegistrationSuccess={(userData) => {
+ *     analytics.track('User Registered', userData);
+ *   }}
+ *   onRegistrationError={(error) => {
+ *     logger.error('Registration failed', error);
+ *   }}
+ * />
+ * ```
+ */
+export const RegisterForm: React.FC<RegisterFormProps> = ({
+  className,
+  onRegistrationSuccess,
+  onRegistrationError,
+}) => {
+  // =============================================================================
+  // STATE AND HOOKS
+  // =============================================================================
+
+  const { register, isLoading: authLoading } = useAuth();
+  const { environment, isLoading: configLoading } = useSystemConfig();
+  
+  // Registration completion state
+  const [isComplete, setIsComplete] = useState(false);
+  const [registeredUserData, setRegisteredUserData] = useState<ProfileDetailsFormData | null>(null);
+  
+  // Error state management
   const [registrationError, setRegistrationError] = useState<string | null>(null);
+  const [showError, setShowError] = useState(false);
 
-  // Determine login attribute from system configuration
-  const loginAttribute = systemConfig?.authentication?.login_attribute || 'email';
-  const allowRegistration = systemConfig?.authentication?.allow_open_registration ?? false;
-
-  // Create schema based on system configuration
+  // System configuration derived state
+  const loginAttribute = environment?.authentication?.loginAttribute || 'email';
+  const fieldRequirements = getFieldRequirements(loginAttribute);
   const registrationSchema = createRegistrationSchema(loginAttribute);
 
-  const form = useForm<RegistrationFormData>({
+  // =============================================================================
+  // FORM CONFIGURATION
+  // =============================================================================
+
+  /**
+   * React Hook Form configuration with Zod validation
+   * Provides real-time validation with performance under 100ms
+   */
+  const formMethods = useForm<RegistrationFormData>({
     resolver: zodResolver(registrationSchema),
+    mode: 'onChange', // Real-time validation for immediate feedback
+    reValidateMode: 'onChange',
     defaultValues: {
-      email: '',
-      password: '',
-      confirmPassword: '',
-      firstName: '',
-      lastName: '',
-      ...(loginAttribute === 'username' && { username: '' }),
+      profileDetailsGroup: {
+        username: '',
+        email: '',
+        firstName: '',
+        lastName: '',
+        name: '',
+      },
     },
-    mode: 'onChange', // Enable real-time validation
   });
 
-  // Handle form submission
-  const onSubmit = async (data: RegistrationFormData) => {
+  const {
+    handleSubmit,
+    formState: { errors, isValid, isSubmitting },
+    watch,
+    reset,
+    setValue,
+  } = formMethods;
+
+  // =============================================================================
+  // FORM FIELD EFFECTS
+  // =============================================================================
+
+  /**
+   * Auto-generate display name from first and last name
+   * Provides user-friendly default while allowing customization
+   */
+  const firstName = watch('profileDetailsGroup.firstName');
+  const lastName = watch('profileDetailsGroup.lastName');
+
+  useEffect(() => {
+    if (firstName && lastName) {
+      const displayName = `${firstName} ${lastName}`.trim();
+      setValue('profileDetailsGroup.name', displayName, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+    }
+  }, [firstName, lastName, setValue]);
+
+  // =============================================================================
+  // EVENT HANDLERS
+  // =============================================================================
+
+  /**
+   * Registration form submission handler
+   * Processes user registration with comprehensive error handling
+   */
+  const onSubmit = useCallback(async (data: RegistrationFormData) => {
     try {
+      // Clear any existing errors
       setRegistrationError(null);
+      setShowError(false);
 
-      // Prepare registration request based on system configuration
-      const registrationRequest: RegisterRequest = {
-        email: data.email,
-        password: data.password,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        ...(loginAttribute === 'username' && { username: data.username }),
-      };
-
-      // Attempt registration
-      await register(registrationRequest);
+      // Extract profile details for registration
+      const profileData = data.profileDetailsGroup;
       
-      // Mark as successfully registered
-      setIsRegistered(true);
+      // Validate required fields based on system configuration
+      if (fieldRequirements.emailRequired && !profileData.email) {
+        throw new Error('Email address is required for registration');
+      }
       
-      // Call completion callback if provided
-      onComplete?.();
+      if (fieldRequirements.usernameRequired && !profileData.username) {
+        throw new Error('Username is required for registration');
+      }
 
-      // Redirect to login page after brief success display
-      setTimeout(() => {
-        router.push('/login?message=registration-complete');
-      }, 2000);
+      // Call authentication service register method
+      await register(profileData);
+
+      // Registration successful - update state
+      setRegisteredUserData(profileData);
+      setIsComplete(true);
+      
+      // Call success callback if provided
+      onRegistrationSuccess?.(profileData);
 
     } catch (error) {
       console.error('Registration failed:', error);
       
-      // Set user-friendly error message
-      if (error instanceof Error) {
-        setRegistrationError(error.message);
-      } else {
-        setRegistrationError('Registration failed. Please try again.');
+      // Extract user-friendly error message
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'Registration failed. Please try again.';
+      
+      setRegistrationError(errorMessage);
+      setShowError(true);
+      
+      // Call error callback if provided
+      if (onRegistrationError && error instanceof Error) {
+        onRegistrationError({
+          code: 'REGISTRATION_FAILED',
+          message: errorMessage,
+          timestamp: new Date().toISOString(),
+        } as AuthError);
       }
-
-      // Clear form errors and allow retry
-      form.clearErrors();
     }
-  };
+  }, [register, fieldRequirements, onRegistrationSuccess, onRegistrationError]);
 
-  // Show loading state while system config loads
+  /**
+   * Error alert dismissal handler
+   * Clears error state when user dismisses alert
+   */
+  const handleErrorDismiss = useCallback(() => {
+    setShowError(false);
+    setRegistrationError(null);
+  }, []);
+
+  /**
+   * Form reset handler for starting new registration
+   * Allows user to register another account if needed
+   */
+  const handleStartNewRegistration = useCallback(() => {
+    setIsComplete(false);
+    setRegisteredUserData(null);
+    setRegistrationError(null);
+    setShowError(false);
+    reset();
+  }, [reset]);
+
+  // =============================================================================
+  // LOADING STATE
+  // =============================================================================
+
+  // Show loading spinner while system configuration is loading
   if (configLoading) {
     return (
-      <Card className={`w-full max-w-md mx-auto ${className || ''}`}>
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-center space-x-2">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span className="text-sm text-muted-foreground">Loading registration form...</span>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex items-center justify-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+        <span className="ml-3 text-sm text-gray-600">Loading registration form...</span>
+      </div>
     );
   }
 
-  // Show message if registration is not allowed
-  if (!allowRegistration) {
+  // =============================================================================
+  // REGISTRATION COMPLETION STATE
+  // =============================================================================
+
+  /**
+   * Registration success state component
+   * Displays completion confirmation with navigation options
+   */
+  if (isComplete && registeredUserData) {
     return (
-      <Card className={`w-full max-w-md mx-auto ${className || ''}`}>
-        <CardHeader>
-          <CardTitle className="text-center text-xl font-semibold">Registration Unavailable</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Alert>
-            <AlertDescription>
-              Self-registration is currently disabled. Please contact your administrator for account creation.
-            </AlertDescription>
-          </Alert>
-          <div className="mt-6 text-center">
-            <Link href="/login">
-              <Button variant="outline" className="w-full">
-                Return to Login
+      <div className={cn("w-full max-w-md mx-auto bg-white dark:bg-gray-900 shadow-lg rounded-lg border border-gray-200 dark:border-gray-700", className)}>
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <h1 className="text-center text-2xl font-semibold text-gray-900 dark:text-gray-100">
+            Registration Successful
+          </h1>
+        </div>
+        
+        <div className="px-6 py-6 space-y-6">
+          <div className="text-center space-y-4">
+            {/* Success icon */}
+            <div className="mx-auto w-12 h-12 bg-success-100 dark:bg-success-900 rounded-full flex items-center justify-center">
+              <CheckCircleIcon className="w-6 h-6 text-success-600 dark:text-success-400" />
+            </div>
+            
+            {/* Success message */}
+            <div className="space-y-2">
+              <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+                Welcome, {registeredUserData.name}!
+              </h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Your account has been successfully created. You can now log in to access the DreamFactory Admin Interface.
+              </p>
+            </div>
+          </div>
+
+          {/* Action buttons */}
+          <div className="space-y-3">
+            <Link href="/login" className="block">
+              <Button 
+                className="w-full" 
+                size="lg"
+                data-testid="login-redirect-button"
+              >
+                Go to Login
               </Button>
             </Link>
+            
+            <Button 
+              variant="outline" 
+              className="w-full" 
+              size="lg"
+              onClick={handleStartNewRegistration}
+              data-testid="new-registration-button"
+            >
+              Register Another Account
+            </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     );
   }
 
-  // Show registration success state
-  if (isRegistered) {
-    return (
-      <Card className={`w-full max-w-md mx-auto ${className || ''}`}>
-        <CardHeader>
-          <CardTitle className="text-center text-xl font-semibold flex items-center justify-center space-x-2">
-            <CheckCircle className="h-6 w-6 text-green-600" />
-            <span>Registration Complete!</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center space-y-4">
-            <p className="text-muted-foreground">
-              Your account has been successfully created. You can now sign in with your credentials.
-            </p>
-            <div className="flex items-center justify-center space-x-2">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span className="text-sm text-muted-foreground">Redirecting to login...</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+  // =============================================================================
+  // REGISTRATION FORM RENDER
+  // =============================================================================
 
   return (
-    <Card className={`w-full max-w-md mx-auto ${className || ''}`}>
-      <CardHeader>
-        <CardTitle className="text-center text-2xl font-bold">Create Account</CardTitle>
-        <p className="text-center text-muted-foreground">
-          Enter your details to create a new account
+    <div className={cn("w-full max-w-md mx-auto bg-white dark:bg-gray-900 shadow-lg rounded-lg border border-gray-200 dark:border-gray-700", className)}>
+      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+        <h1 className="text-center text-2xl font-semibold text-gray-900 dark:text-gray-100">
+          Create Account
+        </h1>
+        <p className="text-center text-sm text-gray-600 dark:text-gray-400 mt-2">
+          Register for a new DreamFactory account
         </p>
-      </CardHeader>
-      <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            {/* Display registration errors */}
-            {registrationError && (
-              <Alert variant="destructive">
-                <AlertDescription>{registrationError}</AlertDescription>
-              </Alert>
-            )}
+      </div>
 
-            {/* Profile Details Group */}
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                {/* First Name */}
-                <FormField
-                  control={form.control}
-                  name="firstName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>First Name</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          placeholder="John"
-                          disabled={authLoading}
-                          autoComplete="given-name"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+      <div className="px-6 py-6">
+        {/* Error Alert */}
+        {showError && registrationError && (
+          <div className="mb-6">
+            <Alert type="error" dismissible onDismiss={handleErrorDismiss}>
+              <Alert.Icon />
+              <Alert.Content>
+                <Alert.Title>Registration Failed</Alert.Title>
+                <Alert.Description>
+                  {registrationError}
+                </Alert.Description>
+              </Alert.Content>
+            </Alert>
+          </div>
+        )}
 
-                {/* Last Name */}
-                <FormField
-                  control={form.control}
-                  name="lastName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Last Name</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          placeholder="Doe"
-                          disabled={authLoading}
-                          autoComplete="family-name"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+        {/* Registration Form */}
+        <FormProvider {...formMethods}>
+          <form 
+            onSubmit={handleSubmit(onSubmit)}
+            className="space-y-6"
+            noValidate
+            data-testid="registration-form"
+          >
+            {/* Profile Details Section */}
+            <fieldset className="space-y-4">
+              <legend className="sr-only">Profile Details</legend>
+              <ProfileDetailsFields 
+                loginAttribute={loginAttribute}
+                fieldRequirements={fieldRequirements}
+              />
+            </fieldset>
+
+            {/* Form Validation Summary for Screen Readers */}
+            {Object.keys(errors.profileDetailsGroup || {}).length > 0 && (
+              <div 
+                role="alert" 
+                aria-live="polite"
+                className="sr-only"
+                data-testid="form-errors-summary"
+              >
+                There are {Object.keys(errors.profileDetailsGroup || {}).length} errors in the form. Please review and correct them.
               </div>
-
-              {/* Username (if required by system) */}
-              {loginAttribute === 'username' && (
-                <FormField
-                  control={form.control}
-                  name="username"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Username</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                          <Input
-                            {...field}
-                            placeholder="Enter username"
-                            disabled={authLoading}
-                            autoComplete="username"
-                            className="pl-10"
-                          />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
-
-              {/* Email */}
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email Address</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          {...field}
-                          type="email"
-                          placeholder="Enter your email"
-                          disabled={authLoading}
-                          autoComplete="email"
-                          className="pl-10"
-                        />
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Password */}
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Password</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Input
-                          {...field}
-                          type={showPassword ? 'text' : 'password'}
-                          placeholder="Create a secure password"
-                          disabled={authLoading}
-                          autoComplete="new-password"
-                          className="pr-10"
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                          onClick={() => setShowPassword(!showPassword)}
-                          disabled={authLoading}
-                          aria-label={showPassword ? 'Hide password' : 'Show password'}
-                        >
-                          {showPassword ? (
-                            <EyeOff className="h-4 w-4 text-muted-foreground" />
-                          ) : (
-                            <Eye className="h-4 w-4 text-muted-foreground" />
-                          )}
-                        </Button>
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Confirm Password */}
-              <FormField
-                control={form.control}
-                name="confirmPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Confirm Password</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Input
-                          {...field}
-                          type={showConfirmPassword ? 'text' : 'password'}
-                          placeholder="Confirm your password"
-                          disabled={authLoading}
-                          autoComplete="new-password"
-                          className="pr-10"
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          disabled={authLoading}
-                          aria-label={showConfirmPassword ? 'Hide password confirmation' : 'Show password confirmation'}
-                        >
-                          {showConfirmPassword ? (
-                            <EyeOff className="h-4 w-4 text-muted-foreground" />
-                          ) : (
-                            <Eye className="h-4 w-4 text-muted-foreground" />
-                          )}
-                        </Button>
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            {/* Password Requirements */}
-            <div className="text-xs text-muted-foreground space-y-1">
-              <p className="font-medium">Password requirements:</p>
-              <ul className="list-disc list-inside space-y-0.5 ml-2">
-                <li>At least 8 characters long</li>
-                <li>One uppercase letter</li>
-                <li>One lowercase letter</li>
-                <li>One number</li>
-                <li>One special character</li>
-              </ul>
-            </div>
+            )}
 
             {/* Submit Button */}
             <Button
               type="submit"
               className="w-full"
-              disabled={authLoading}
-              aria-label="Create your account"
+              size="lg"
+              loading={isSubmitting || authLoading}
+              disabled={!isValid || isSubmitting || authLoading}
+              data-testid="register-submit-button"
+              aria-describedby="submit-button-help"
             >
-              {authLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating Account...
-                </>
-              ) : (
-                'Create Account'
-              )}
+              {isSubmitting || authLoading ? 'Creating Account...' : 'Create Account'}
             </Button>
 
-            {/* Login Link */}
-            <div className="text-center text-sm">
-              <span className="text-muted-foreground">Already have an account? </span>
-              <Link 
-                href="/login" 
-                className="font-medium text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded"
-              >
-                Sign in
-              </Link>
-            </div>
+            {/* Submit Button Help Text */}
+            <p 
+              id="submit-button-help"
+              className="text-xs text-gray-500 dark:text-gray-400 text-center"
+            >
+              By creating an account, you agree to the terms of service and privacy policy.
+            </p>
           </form>
-        </Form>
-      </CardContent>
-    </Card>
+        </FormProvider>
+
+        {/* Navigation Link */}
+        <div className="mt-6 text-center">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Already have an account?{' '}
+            <Link 
+              href="/login" 
+              className="font-medium text-primary-600 hover:text-primary-500 dark:text-primary-400 dark:hover:text-primary-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 rounded"
+              data-testid="login-link"
+            >
+              Sign in here
+            </Link>
+          </p>
+        </div>
+      </div>
+    </div>
   );
-}
+};
+
+// =============================================================================
+// COMPONENT DISPLAY NAME AND EXPORTS
+// =============================================================================
+
+RegisterForm.displayName = 'RegisterForm';
 
 export default RegisterForm;
+
+// Export types for external usage
+export type { RegisterFormProps, ProfileDetailsFormData };
