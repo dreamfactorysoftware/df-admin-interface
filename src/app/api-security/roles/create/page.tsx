@@ -1,725 +1,481 @@
 /**
  * Role Creation Page Component
  * 
- * Main role creation page component that provides a comprehensive form interface 
- * for creating new roles with service access configuration and lookup key management. 
- * Transforms the Angular DfRoleDetailsComponent create mode into a React/Next.js 
+ * Main role creation page component that provides a comprehensive form interface
+ * for creating new roles with service access configuration and lookup key management.
+ * Transforms the Angular DfRoleDetailsComponent create mode into a React/Next.js
  * server component with React Hook Form, Zod validation, and Tailwind CSS styling.
  * 
- * Features:
- * - React Hook Form with Zod schema validation for real-time validation under 100ms
- * - Next.js server component for SSR pages under 2 seconds  
- * - SWR/React Query for intelligent caching with cache hit responses under 50ms
- * - Tailwind CSS 4.1+ with WCAG 2.1 AA compliance
- * - Complex role creation workflows with permission bitmasks and service access arrays
- * - Zustand state management for form state persistence
- * - Next.js useRouter for form submission success navigation
- * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
+ * @fileoverview Role creation page implementation
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-'use client'
+'use client';
 
-import React, { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
-import { useForm, Controller } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
-import { useQuery } from '@tanstack/react-query'
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useForm, useFieldArray } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 // UI Components
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
+import { Alert } from '@/components/ui/alert';
 import {
   Form,
-  FormField,
-  FormLabel,
-  FormDescription,
-  FormErrorMessage,
   FormControl,
-  FormGroup,
-  FormActions,
-  FormSection
-} from '@/components/ui/form'
-import { Input, Textarea } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
-import { Switch, LabeledSwitch } from '@/components/ui/switch'
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
 
-// Types and Validation
-import {
-  RoleCreatePayload,
-  RoleCreatePayloadSchema,
-  RoleServiceAccessType,
-  AccessLevel,
-  RequesterLevel
-} from '@/types/role'
+// Role-specific components
+import { RoleServiceAccess } from '@/components/roles/role-service-access';
+import { LookupKeys } from '@/components/ui/lookup-keys';
 
-// Hooks and Services
-import { useCreateRole } from '@/hooks/use-roles'
-import { apiClient } from '@/lib/api-client'
+// Hooks and Types
+import { useNotifications } from '@/hooks/use-notifications';
+import { apiPost } from '@/lib/api-client';
+import type { CreateRoleData, RoleServiceAccess as RoleServiceAccessType, RoleLookup } from '@/types/role';
 
-// State Management
-import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+// ============================================================================
+// Validation Schema
+// ============================================================================
 
-// =============================================================================
-// ZUSTAND STATE MANAGEMENT
-// =============================================================================
+/**
+ * Service access form validation schema
+ */
+const ServiceAccessSchema = z.object({
+  id: z.number().optional(),
+  serviceId: z.number().min(1, 'Service is required'),
+  component: z.string().optional(),
+  access: z.array(z.number()).min(1, 'At least one access type is required'),
+  requester: z.array(z.number()).min(1, 'At least one requester type is required'),
+  advancedFilters: z.array(z.object({
+    expandField: z.string().optional(),
+    expandOperator: z.string().optional(),
+    expandValue: z.string().optional(),
+    filterOp: z.string().optional(),
+  })).default([]),
+  extendField: z.string().optional(),
+  extendOperator: z.string().optional(),
+  extendValue: z.string().optional(),
+  filterOp: z.string().optional(),
+});
 
-interface RoleCreateFormState {
-  formData: Partial<RoleCreatePayload>
-  selectedServices: number[]
-  lookupKeys: number[]
-  setFormData: (data: Partial<RoleCreatePayload>) => void
-  setSelectedServices: (services: number[]) => void
-  setLookupKeys: (keys: number[]) => void
-  clearForm: () => void
-}
+/**
+ * Lookup key form validation schema
+ */
+const LookupKeySchema = z.object({
+  name: z.string().min(1, 'Lookup key name is required'),
+  value: z.string().optional(),
+  private: z.boolean().default(false),
+  description: z.string().optional(),
+});
 
-const useRoleCreateStore = create<RoleCreateFormState>()(
-  persist(
-    (set) => ({
-      formData: {
-        name: '',
-        description: '',
-        isActive: true,
-        lookupByRoleId: [],
-        accessibleTabs: [],
-        roleServiceAccessByRoleId: []
-      },
-      selectedServices: [],
-      lookupKeys: [],
-      setFormData: (data) => set((state) => ({ 
-        formData: { ...state.formData, ...data } 
-      })),
-      setSelectedServices: (services) => set({ selectedServices: services }),
-      setLookupKeys: (keys) => set({ lookupKeys: keys }),
-      clearForm: () => set({
-        formData: {
-          name: '',
-          description: '',
-          isActive: true,
-          lookupByRoleId: [],
-          accessibleTabs: [],
-          roleServiceAccessByRoleId: []
-        },
-        selectedServices: [],
-        lookupKeys: []
-      })
-    }),
-    {
-      name: 'role-create-form',
-      partialize: (state) => ({ 
-        formData: state.formData,
-        selectedServices: state.selectedServices,
-        lookupKeys: state.lookupKeys
-      })
-    }
-  )
-)
-
-// =============================================================================
-// EXTENDED FORM VALIDATION SCHEMA
-// =============================================================================
-
-const ExtendedRoleCreateSchema = RoleCreatePayloadSchema.extend({
-  // Additional validation for role creation workflow
+/**
+ * Main role creation form validation schema
+ */
+const CreateRoleSchema = z.object({
   name: z.string()
     .min(1, 'Role name is required')
     .max(64, 'Role name must be less than 64 characters')
-    .regex(
-      /^[a-zA-Z0-9_\-\s]+$/, 
-      'Role name can only contain letters, numbers, spaces, hyphens, and underscores'
-    )
-    .refine(
-      (name) => !name.toLowerCase().includes('system'),
-      'Role name cannot contain "system" keyword'
-    ),
+    .regex(/^[a-zA-Z0-9_-]+$/, 'Role name can only contain letters, numbers, underscores, and hyphens'),
   description: z.string()
     .max(255, 'Description must be less than 255 characters')
-    .optional(),
-  // Service access validation
-  serviceAccessEnabled: z.boolean().optional(),
-  selectedServiceIds: z.array(z.number()).optional()
-})
+    .optional()
+    .or(z.literal('')),
+  isActive: z.boolean().default(true),
+  serviceAccess: z.array(ServiceAccessSchema).default([]),
+  lookupKeys: z.array(LookupKeySchema).default([]),
+});
 
-type ExtendedRoleCreateFormData = z.infer<typeof ExtendedRoleCreateSchema>
+type CreateRoleFormData = z.infer<typeof CreateRoleSchema>;
 
-// =============================================================================
-// SERVICE AND LOOKUP KEY DATA FETCHING
-// =============================================================================
+// ============================================================================
+// Helper Functions
+// ============================================================================
 
-interface ServiceType {
-  id: number
-  name: string
-  type: string
-  description: string
-  isActive: boolean
-  group?: string
+/**
+ * Convert access array to verbMask bitmask
+ */
+function calculateVerbMask(accessArray: number[]): number {
+  return accessArray.reduce((mask, value) => mask + value, 0);
 }
 
-interface LookupKeyType {
-  id: number
-  name: string
-  value: string
-  description?: string
-  private?: boolean
+/**
+ * Convert requester array to requestorMask bitmask
+ */
+function calculateRequestorMask(requesterArray: number[]): number {
+  return requesterArray.reduce((mask, value) => mask + value, 0);
 }
 
-// Fetch available services for role access configuration
-async function fetchServices(): Promise<ServiceType[]> {
-  try {
-    const response = await apiClient.get('/system/service')
-    return response.resource || []
-  } catch (error) {
-    console.error('Failed to fetch services:', error)
-    return []
-  }
+/**
+ * Transform form data to API payload
+ */
+function transformToApiPayload(formData: CreateRoleFormData): CreateRoleData {
+  return {
+    name: formData.name,
+    description: formData.description || '',
+    isActive: formData.isActive,
+    roleServiceAccess: formData.serviceAccess?.map((access) => ({
+      serviceId: access.serviceId,
+      component: access.component || '',
+      verbMask: calculateVerbMask(access.access),
+      requestorMask: calculateRequestorMask(access.requester),
+      filters: access.advancedFilters?.map(filter => ({
+        name: filter.expandField || '',
+        operator: filter.expandOperator || '',
+        value: filter.expandValue || '',
+      })) || [],
+      filterOp: access.filterOp || 'AND',
+    })) || [],
+    lookupByRoleId: formData.lookupKeys?.map((lookup) => ({
+      name: lookup.name,
+      value: lookup.value || '',
+      private: lookup.private,
+      description: lookup.description || '',
+    })) || [],
+  };
 }
 
-// Fetch available lookup keys for role configuration
-async function fetchLookupKeys(): Promise<LookupKeyType[]> {
-  try {
-    const response = await apiClient.get('/system/lookup_key')
-    return response.resource || []
-  } catch (error) {
-    console.error('Failed to fetch lookup keys:', error)
-    return []
-  }
+// ============================================================================
+// Page Metadata
+// ============================================================================
+
+/**
+ * Generate metadata for the role creation page
+ */
+export function generateMetadata() {
+  return {
+    title: 'Create Role - DreamFactory Admin',
+    description: 'Create a new role with service access configuration and lookup key management for API security.',
+    keywords: ['role', 'create', 'access control', 'permissions', 'API security'],
+  };
 }
 
-// =============================================================================
-// SERVICE ACCESS CONFIGURATION COMPONENT
-// =============================================================================
+// ============================================================================
+// Main Component
+// ============================================================================
 
-interface ServiceAccessConfigProps {
-  services: ServiceType[]
-  selectedServices: number[]
-  onServicesChange: (services: number[]) => void
-  onAccessChange: (serviceId: number, access: number, requester: number) => void
-  serviceAccess: Record<number, { access: number; requester: number }>
-}
-
-const ServiceAccessConfig: React.FC<ServiceAccessConfigProps> = ({
-  services,
-  selectedServices,
-  onServicesChange,
-  onAccessChange,
-  serviceAccess
-}) => {
-  const handleServiceToggle = useCallback((serviceId: number, enabled: boolean) => {
-    const updatedServices = enabled
-      ? [...selectedServices, serviceId]
-      : selectedServices.filter(id => id !== serviceId)
-    
-    onServicesChange(updatedServices)
-
-    // Set default access levels for newly added services
-    if (enabled && !serviceAccess[serviceId]) {
-      onAccessChange(serviceId, AccessLevel.READ, RequesterLevel.SELF)
-    }
-  }, [selectedServices, onServicesChange, onAccessChange, serviceAccess])
-
-  const handleAccessLevelChange = useCallback((serviceId: number, level: AccessLevel) => {
-    const currentRequester = serviceAccess[serviceId]?.requester || RequesterLevel.SELF
-    onAccessChange(serviceId, level, currentRequester)
-  }, [onAccessChange, serviceAccess])
-
-  const handleRequesterLevelChange = useCallback((serviceId: number, level: RequesterLevel) => {
-    const currentAccess = serviceAccess[serviceId]?.access || AccessLevel.READ
-    onAccessChange(serviceId, currentAccess, level)
-  }, [onAccessChange, serviceAccess])
-
-  // Group services by type for better organization
-  const serviceGroups = services.reduce((groups, service) => {
-    const group = service.group || service.type || 'Other'
-    if (!groups[group]) {
-      groups[group] = []
-    }
-    groups[group].push(service)
-    return groups
-  }, {} as Record<string, ServiceType[]>)
-
-  return (
-    <div className="space-y-6">
-      {Object.entries(serviceGroups).map(([groupName, groupServices]) => (
-        <FormGroup key={groupName} title={groupName} className="space-y-4">
-          {groupServices.map((service) => {
-            const isSelected = selectedServices.includes(service.id)
-            const access = serviceAccess[service.id]
-            
-            return (
-              <div key={service.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-3">
-                      <LabeledSwitch
-                        checked={isSelected}
-                        onChange={(checked) => handleServiceToggle(service.id, checked)}
-                        label={service.name}
-                        description={service.description}
-                        size="sm"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {isSelected && (
-                  <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Access Level Configuration */}
-                    <FormField>
-                      <FormLabel>Access Level</FormLabel>
-                      <div className="space-y-2">
-                        {[
-                          { value: AccessLevel.READ, label: 'Read Only' },
-                          { value: AccessLevel.READ | AccessLevel.CREATE, label: 'Read & Create' },
-                          { value: AccessLevel.READ | AccessLevel.UPDATE, label: 'Read & Update' },
-                          { value: AccessLevel.READ | AccessLevel.DELETE, label: 'Read & Delete' },
-                          { value: AccessLevel.ADMIN, label: 'Full Access' }
-                        ].map(({ value, label }) => (
-                          <LabeledSwitch
-                            key={value}
-                            checked={(access?.access || 0) === value}
-                            onChange={(checked) => checked && handleAccessLevelChange(service.id, value)}
-                            label={label}
-                            size="sm"
-                          />
-                        ))}
-                      </div>
-                    </FormField>
-
-                    {/* Requester Level Configuration */}
-                    <FormField>
-                      <FormLabel>Requester Level</FormLabel>
-                      <div className="space-y-2">
-                        {[
-                          { value: RequesterLevel.SELF, label: 'Self Only' },
-                          { value: RequesterLevel.OTHERS, label: 'Others Only' },
-                          { value: RequesterLevel.ALL, label: 'Self & Others' }
-                        ].map(({ value, label }) => (
-                          <LabeledSwitch
-                            key={value}
-                            checked={(access?.requester || 0) === value}
-                            onChange={(checked) => checked && handleRequesterLevelChange(service.id, value)}
-                            label={label}
-                            size="sm"
-                          />
-                        ))}
-                      </div>
-                    </FormField>
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </FormGroup>
-      ))}
-    </div>
-  )
-}
-
-// =============================================================================
-// LOOKUP KEYS SELECTION COMPONENT
-// =============================================================================
-
-interface LookupKeysSelectionProps {
-  lookupKeys: LookupKeyType[]
-  selectedKeys: number[]
-  onKeysChange: (keys: number[]) => void
-}
-
-const LookupKeysSelection: React.FC<LookupKeysSelectionProps> = ({
-  lookupKeys,
-  selectedKeys,
-  onKeysChange
-}) => {
-  const handleKeyToggle = useCallback((keyId: number, enabled: boolean) => {
-    const updatedKeys = enabled
-      ? [...selectedKeys, keyId]
-      : selectedKeys.filter(id => id !== keyId)
-    
-    onKeysChange(updatedKeys)
-  }, [selectedKeys, onKeysChange])
-
-  const handleSelectAll = useCallback(() => {
-    const allKeyIds = lookupKeys.map(key => key.id)
-    onKeysChange(allKeyIds)
-  }, [lookupKeys, onKeysChange])
-
-  const handleClearAll = useCallback(() => {
-    onKeysChange([])
-  }, [onKeysChange])
-
-  return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <FormDescription>
-          Select lookup keys that this role can access. Lookup keys provide configurable 
-          values that can be used in API responses and business logic.
-        </FormDescription>
-        <div className="flex space-x-2">
-          <Button 
-            type="button" 
-            variant="outline" 
-            size="sm"
-            onClick={handleSelectAll}
-          >
-            Select All
-          </Button>
-          <Button 
-            type="button" 
-            variant="outline" 
-            size="sm"
-            onClick={handleClearAll}
-          >
-            Clear All
-          </Button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-        {lookupKeys.map((lookupKey) => (
-          <div 
-            key={lookupKey.id}
-            className="border border-gray-200 dark:border-gray-700 rounded-lg p-3"
-          >
-            <LabeledSwitch
-              checked={selectedKeys.includes(lookupKey.id)}
-              onChange={(checked) => handleKeyToggle(lookupKey.id, checked)}
-              label={lookupKey.name}
-              description={lookupKey.description || lookupKey.value}
-              size="sm"
-            />
-            {lookupKey.private && (
-              <span className="inline-block mt-1 px-2 py-1 text-xs bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 rounded">
-                Private
-              </span>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-// =============================================================================
-// MAIN ROLE CREATION PAGE COMPONENT
-// =============================================================================
-
+/**
+ * Role Creation Page Component
+ */
 export default function CreateRolePage() {
-  const router = useRouter()
-  const {
-    formData,
-    selectedServices,
-    lookupKeys,
-    setFormData,
-    setSelectedServices,
-    setLookupKeys,
-    clearForm
-  } = useRoleCreateStore()
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const { showNotification } = useNotifications();
+  
+  // Form state
+  const [showAlert, setShowAlert] = useState(false);
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertType, setAlertType] = useState<'error' | 'warning' | 'info' | 'success'>('error');
 
-  // State for service access configuration
-  const [serviceAccess, setServiceAccess] = useState<Record<number, { access: number; requester: number }>>({})
-
-  // Form setup with React Hook Form and Zod validation
-  const {
-    control,
-    handleSubmit,
-    formState: { errors, isValid, isDirty },
-    watch,
-    setValue,
-    reset
-  } = useForm<ExtendedRoleCreateFormData>({
-    resolver: zodResolver(ExtendedRoleCreateSchema),
+  // Initialize form with React Hook Form and Zod validation
+  const form = useForm<CreateRoleFormData>({
+    resolver: zodResolver(CreateRoleSchema),
     defaultValues: {
-      name: formData.name || '',
-      description: formData.description || '',
-      isActive: formData.isActive ?? true,
-      serviceAccessEnabled: false,
-      selectedServiceIds: selectedServices
+      name: '',
+      description: '',
+      isActive: true,
+      serviceAccess: [],
+      lookupKeys: [],
     },
-    mode: 'onChange' // Enable real-time validation under 100ms
-  })
+    mode: 'onChange', // Real-time validation under 100ms per requirements
+  });
 
-  // Watch form values for real-time state persistence
-  const watchedValues = watch()
-
-  // Data fetching with React Query for intelligent caching
+  // Service access field array
   const {
-    data: services = [],
-    isLoading: servicesLoading,
-    error: servicesError
-  } = useQuery({
-    queryKey: ['services'],
-    queryFn: fetchServices,
-    staleTime: 5 * 60 * 1000, // 5 minutes cache
-    gcTime: 10 * 60 * 1000, // 10 minutes garbage collection
-  })
+    fields: serviceAccessFields,
+    append: appendServiceAccess,
+    remove: removeServiceAccess,
+  } = useFieldArray({
+    control: form.control,
+    name: 'serviceAccess',
+  });
 
+  // Lookup keys field array
   const {
-    data: availableLookupKeys = [],
-    isLoading: lookupKeysLoading,
-    error: lookupKeysError
-  } = useQuery({
-    queryKey: ['lookup-keys'],
-    queryFn: fetchLookupKeys,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
-  })
+    fields: lookupKeyFields,
+    append: appendLookupKey,
+    remove: removeLookupKey,
+  } = useFieldArray({
+    control: form.control,
+    name: 'lookupKeys',
+  });
 
-  // Role creation mutation with error handling
-  const createRoleMutation = useCreateRole({
+  // Role creation mutation with React Query
+  const createRoleMutation = useMutation({
+    mutationFn: async (data: CreateRoleData) => {
+      const payload = {
+        resource: [data],
+      };
+      
+      return apiPost('/system/role', payload, {
+        fields: '*',
+        related: 'role_service_access_by_role_id,lookup_by_role_id',
+        snackbarSuccess: 'Role created successfully',
+        snackbarError: 'Failed to create role',
+      });
+    },
     onSuccess: (data) => {
-      clearForm()
-      router.push(`/api-security/roles/${data.id}?created=true`)
+      // Invalidate and refetch role queries
+      queryClient.invalidateQueries({ queryKey: ['roles'] });
+      
+      showNotification({
+        type: 'success',
+        title: 'Success',
+        message: 'Role created successfully',
+      });
+      
+      // Navigate back to roles list
+      router.push('/api-security/roles');
     },
-    onError: (error) => {
-      console.error('Failed to create role:', error)
-    }
-  })
-
-  // Persist form data to Zustand store on changes
-  useEffect(() => {
-    setFormData(watchedValues)
-  }, [watchedValues, setFormData])
-
-  // Handle service access configuration changes
-  const handleServiceAccessChange = useCallback((serviceId: number, access: number, requester: number) => {
-    setServiceAccess(prev => ({
-      ...prev,
-      [serviceId]: { access, requester }
-    }))
-  }, [])
-
-  // Form submission handler with business logic
-  const onSubmit = useCallback(async (data: ExtendedRoleCreateFormData) => {
-    try {
-      // Construct role service access array with proper bitmask calculations
-      const roleServiceAccessByRoleId: Omit<RoleServiceAccessType, 'id' | 'roleId'>[] = selectedServices.map(serviceId => {
-        const service = services.find(s => s.id === serviceId)
-        const access = serviceAccess[serviceId]
-        
-        return {
-          serviceId,
-          serviceName: service?.name || '',
-          component: service?.type || '',
-          access: access?.access || AccessLevel.READ,
-          requester: access?.requester || RequesterLevel.SELF,
-          filters: [] // Default empty filters
+    onError: (error: any) => {
+      console.error('Role creation error:', error);
+      
+      let errorMessage = 'Failed to create role';
+      
+      try {
+        const errorData = JSON.parse(error.message);
+        if (errorData.error?.context?.resource?.[0]?.message) {
+          errorMessage = errorData.error.context.resource[0].message;
+        } else if (errorData.error?.message) {
+          errorMessage = errorData.error.message;
         }
-      })
-
-      // Construct complete role creation payload
-      const rolePayload: RoleCreatePayload = {
-        name: data.name.trim(),
-        description: data.description?.trim() || '',
-        isActive: data.isActive,
-        lookupByRoleId: lookupKeys,
-        roleServiceAccessByRoleId: roleServiceAccessByRoleId.length > 0 ? roleServiceAccessByRoleId : undefined
+      } catch (e) {
+        // Use default error message
       }
+      
+      setAlertType('error');
+      setAlertMessage(errorMessage);
+      setShowAlert(true);
+      
+      showNotification({
+        type: 'error',
+        title: 'Error',
+        message: errorMessage,
+      });
+    },
+  });
 
-      // Submit role creation
-      await createRoleMutation.mutateAsync(rolePayload)
-    } catch (error) {
-      console.error('Role creation failed:', error)
+  // Form submission handler
+  const onSubmit = (data: CreateRoleFormData) => {
+    if (!data.name?.trim()) {
+      setAlertType('error');
+      setAlertMessage('Role name is required');
+      setShowAlert(true);
+      return;
     }
-  }, [selectedServices, services, serviceAccess, lookupKeys, createRoleMutation])
 
-  // Handle form reset
-  const handleReset = useCallback(() => {
-    reset()
-    clearForm()
-    setServiceAccess({})
-  }, [reset, clearForm])
+    const payload = transformToApiPayload(data);
+    createRoleMutation.mutate(payload);
+  };
 
-  // Loading state for data dependencies
-  if (servicesLoading || lookupKeysLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
-          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Loading form data...</p>
-        </div>
-      </div>
-    )
-  }
+  // Navigation handlers
+  const handleCancel = () => {
+    router.push('/api-security/roles');
+  };
 
-  // Error state for data fetching
-  if (servicesError || lookupKeysError) {
-    return (
-      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-        <div className="flex">
-          <div className="flex-shrink-0">
-            <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-            </svg>
-          </div>
-          <div className="ml-3">
-            <h3 className="text-sm font-medium text-red-800 dark:text-red-200">
-              Error Loading Data
-            </h3>
-            <p className="mt-1 text-sm text-red-700 dark:text-red-300">
-              Failed to load required data for role creation. Please refresh the page to try again.
-            </p>
-          </div>
-        </div>
-      </div>
-    )
-  }
+  // Alert management
+  const handleAlertClose = () => {
+    setShowAlert(false);
+    setAlertMessage('');
+  };
+
+  // ============================================================================
+  // Render
+  // ============================================================================
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="container mx-auto px-4 py-6 max-w-6xl">
       {/* Page Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-          Create New Role
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+          Create Role
         </h1>
-        <p className="mt-2 text-gray-600 dark:text-gray-400">
-          Create a new role with custom permissions and service access configuration. 
-          Roles define what resources and operations users can access within the API system.
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          Create a new role with granular permissions and service access configuration.
+          Roles enable you to control what APIs and functionality users can access.
         </p>
       </div>
 
-      {/* Role Creation Form */}
-      <Form onSubmit={handleSubmit(onSubmit)} variant="card">
-        {/* Basic Role Information */}
-        <FormSection
-          title="Basic Information"
-          description="Define the fundamental properties of the role including name, description, and status."
+      {/* Alert Component */}
+      {showAlert && (
+        <Alert 
+          variant={alertType}
+          className="mb-6"
+          onClose={handleAlertClose}
         >
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <FormField>
-              <Controller
-                name="name"
-                control={control}
-                render={({ field }) => (
-                  <FormControl error={errors.name}>
-                    <FormLabel required>Role Name</FormLabel>
-                    <Input
-                      {...field}
-                      placeholder="Enter role name"
-                      error={!!errors.name}
-                      aria-describedby="name-description name-error"
-                    />
-                    <FormDescription id="name-description">
-                      A unique name for this role. Use descriptive names like "Database Admin" or "API Developer".
-                    </FormDescription>
-                  </FormControl>
-                )}
-              />
-            </FormField>
+          {alertMessage}
+        </Alert>
+      )}
 
-            <FormField>
-              <Controller
-                name="isActive"
-                control={control}
-                render={({ field: { value, onChange } }) => (
-                  <FormControl>
-                    <LabeledSwitch
-                      checked={value}
-                      onChange={onChange}
-                      label="Active Role"
-                      description="Whether this role is active and can be assigned to users"
-                      labelPosition="left"
-                    />
-                  </FormControl>
+      {/* Main Form */}
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+          {/* Basic Role Information */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+              Basic Information
+            </h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Role Name */}
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Role Name *
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        placeholder="Enter role name"
+                        className="mt-1"
+                        aria-describedby="name-description"
+                      />
+                    </FormControl>
+                    <FormDescription id="name-description" className="text-xs text-gray-500">
+                      Unique name for the role (letters, numbers, underscores, and hyphens only)
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
                 )}
               />
-            </FormField>
+
+              {/* Active Status */}
+              <FormField
+                control={form.control}
+                name="isActive"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Active
+                      </FormLabel>
+                      <FormDescription className="text-xs text-gray-500">
+                        Enable this role for assignment to users
+                      </FormDescription>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        aria-label="Toggle role active status"
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Description */}
+            <div className="mt-6">
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Description
+                    </FormLabel>
+                    <FormControl>
+                      <Textarea
+                        {...field}
+                        placeholder="Enter role description"
+                        rows={3}
+                        className="mt-1"
+                        aria-describedby="description-description"
+                      />
+                    </FormControl>
+                    <FormDescription id="description-description" className="text-xs text-gray-500">
+                      Optional description explaining the purpose of this role
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
           </div>
 
-          <FormField>
-            <Controller
-              name="description"
-              control={control}
-              render={({ field }) => (
-                <FormControl error={errors.description}>
-                  <FormLabel>Description</FormLabel>
-                  <Textarea
-                    {...field}
-                    placeholder="Enter role description"
-                    error={!!errors.description}
-                    rows={3}
-                    aria-describedby="description-description description-error"
-                  />
-                  <FormDescription id="description-description">
-                    Optional description explaining the purpose and scope of this role.
-                  </FormDescription>
-                </FormControl>
-              )}
+          {/* Service Access Configuration */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+              Service Access Configuration
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+              Configure which services this role can access and what operations are allowed.
+              Service access controls API endpoint permissions and request types.
+            </p>
+
+            <RoleServiceAccess
+              fields={serviceAccessFields}
+              control={form.control}
+              onAppend={appendServiceAccess}
+              onRemove={removeServiceAccess}
+              watch={form.watch}
+              errors={form.formState.errors.serviceAccess}
             />
-          </FormField>
-        </FormSection>
+          </div>
 
-        {/* Service Access Configuration */}
-        <FormSection
-          title="Service Access Configuration"
-          description="Configure which services this role can access and the level of permissions for each service."
-          collapsible
-          defaultExpanded={selectedServices.length > 0}
-        >
-          <ServiceAccessConfig
-            services={services}
-            selectedServices={selectedServices}
-            onServicesChange={setSelectedServices}
-            onAccessChange={handleServiceAccessChange}
-            serviceAccess={serviceAccess}
-          />
-        </FormSection>
+          {/* Lookup Keys Configuration */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+              Lookup Keys
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+              Define lookup keys that provide dynamic values for API operations.
+              These key-value pairs can be referenced in API calls and scripts.
+            </p>
 
-        {/* Lookup Keys Management */}
-        <FormSection
-          title="Lookup Keys Access"
-          description="Select which lookup keys this role can access. Lookup keys provide configurable values for API responses."
-          collapsible
-          defaultExpanded={lookupKeys.length > 0}
-        >
-          <LookupKeysSelection
-            lookupKeys={availableLookupKeys}
-            selectedKeys={lookupKeys}
-            onKeysChange={setLookupKeys}
-          />
-        </FormSection>
+            <LookupKeys
+              fields={lookupKeyFields}
+              control={form.control}
+              onAppend={appendLookupKey}
+              onRemove={removeLookupKey}
+              errors={form.formState.errors.lookupKeys}
+            />
+          </div>
 
-        {/* Form Actions */}
-        <FormActions justify="between">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => router.push('/api-security/roles')}
-          >
-            Cancel
-          </Button>
-          
-          <div className="flex space-x-3">
+          {/* Form Actions */}
+          <div className="flex items-center justify-end space-x-4 pt-6 border-t border-gray-200 dark:border-gray-700">
             <Button
               type="button"
-              variant="secondary"
-              onClick={handleReset}
-              disabled={!isDirty}
+              variant="outline"
+              onClick={handleCancel}
+              disabled={createRoleMutation.isPending}
+              className="min-w-24"
             >
-              Reset
+              Cancel
             </Button>
             <Button
               type="submit"
-              loading={createRoleMutation.isLoading}
-              loadingText="Creating Role..."
-              disabled={!isValid || createRoleMutation.isLoading}
+              disabled={createRoleMutation.isPending || !form.formState.isValid}
+              className="min-w-24"
             >
-              Create Role
+              {createRoleMutation.isPending ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                  Creating...
+                </>
+              ) : (
+                'Create Role'
+              )}
             </Button>
           </div>
-        </FormActions>
+        </form>
       </Form>
     </div>
-  )
-}
-
-// =============================================================================
-// METADATA EXPORT FOR NEXT.JS
-// =============================================================================
-
-export const metadata = {
-  title: 'Create Role | API Security | DreamFactory Admin',
-  description: 'Create a new role with custom permissions and service access configuration for API security management.',
-  keywords: 'role creation, API security, permissions, access control, DreamFactory',
+  );
 }
