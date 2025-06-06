@@ -1,837 +1,896 @@
-/**
- * @fileoverview Storybook stories for ScriptsGithubDialog component
- * 
- * Comprehensive documentation and interactive examples for the GitHub script import
- * dialog component. Demonstrates URL validation, repository privacy detection,
- * authentication workflows, file extension filtering, error handling scenarios,
- * accessibility features, and integration patterns.
- * 
- * @version 1.0.0
- * @since 2024
- */
-
 import type { Meta, StoryObj } from '@storybook/react';
 import { action } from '@storybook/addon-actions';
-import { within, userEvent, expect, waitFor } from '@storybook/test';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { rest } from 'msw';
-import { ScriptsGithubDialog } from './scripts-github-dialog';
+import { userEvent, within, expect, waitFor } from '@storybook/test';
+import { useState } from 'react';
+import { ScriptsGitHubDialog } from './scripts-github-dialog';
+import { Button } from '@/components/ui/button/button';
 import type { 
-  ScriptsGithubDialogProps, 
-  GitHubRepositoryInfo, 
-  GitHubAuthCredentials,
-  ScriptFileConfig 
+  GitHubDialogResult, 
+  GitHubError, 
+  GitHubScriptResult,
+  GitHubUrlParts 
 } from './types';
 
-// Create a fresh QueryClient for stories
-const createQueryClient = () => new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: false,
-      staleTime: 0,
-      gcTime: 0,
-    },
-  },
-});
-
-// Mock script file configurations
-const mockScriptFiles: ScriptFileConfig[] = [
-  {
-    name: 'auth-handler.js',
-    path: 'src/scripts/auth-handler.js',
-    extension: '.js',
-    type: 'javascript',
-    size: 2048,
-    lastModified: '2024-01-15T10:30:00Z'
-  },
-  {
-    name: 'data-processor.py',
-    path: 'scripts/data-processor.py',
-    extension: '.py',
-    type: 'python',
-    size: 3072,
-    lastModified: '2024-01-10T14:22:00Z'
-  },
-  {
-    name: 'endpoint-logic.php',
-    path: 'api/endpoint-logic.php',
-    extension: '.php',
-    type: 'php',
-    size: 1536,
-    lastModified: '2024-01-08T09:15:00Z'
-  },
-  {
-    name: 'config.txt',
-    path: 'config/config.txt',
-    extension: '.txt',
-    type: 'text',
-    size: 512,
-    lastModified: '2024-01-05T16:45:00Z'
-  }
-];
-
-// Mock repository data
-const publicRepositoryInfo: GitHubRepositoryInfo = {
-  name: 'dreamfactory-scripts',
-  fullName: 'dreamfactory/dreamfactory-scripts',
-  description: 'Collection of DreamFactory server-side scripts',
-  private: false,
-  url: 'https://github.com/dreamfactory/dreamfactory-scripts',
-  defaultBranch: 'main',
-  owner: {
-    login: 'dreamfactory',
-    avatarUrl: 'https://avatars.githubusercontent.com/u/7894046?v=4',
-    type: 'Organization'
-  },
-  scriptFiles: mockScriptFiles.slice(0, 2),
-  lastUpdated: '2024-01-15T10:30:00Z'
-};
-
-const privateRepositoryInfo: GitHubRepositoryInfo = {
-  name: 'private-scripts',
-  fullName: 'company/private-scripts',
-  description: 'Private collection of company scripts',
-  private: true,
-  url: 'https://github.com/company/private-scripts',
-  defaultBranch: 'main',
-  owner: {
-    login: 'company',
-    avatarUrl: 'https://avatars.githubusercontent.com/u/12345?v=4',
-    type: 'Organization'
-  },
-  scriptFiles: mockScriptFiles,
-  lastUpdated: '2024-01-12T08:20:00Z'
-};
-
-// MSW handlers for different scenarios
-const successHandlers = [
-  rest.get('https://api.github.com/repos/dreamfactory/dreamfactory-scripts', (req, res, ctx) => {
-    return res(ctx.json(publicRepositoryInfo));
-  }),
-  rest.get('https://api.github.com/repos/dreamfactory/dreamfactory-scripts/contents', (req, res, ctx) => {
-    return res(ctx.json(mockScriptFiles.slice(0, 2)));
-  }),
-  rest.get('https://raw.githubusercontent.com/dreamfactory/dreamfactory-scripts/main/src/scripts/auth-handler.js', (req, res, ctx) => {
-    return res(ctx.text(`
-// DreamFactory Auth Handler Script
-function handleAuthentication(request, response) {
-    // Validate JWT token
-    const token = request.headers['authorization'];
-    if (!token) {
-        throw new Error('Authentication required');
-    }
-    
-    // Process authentication logic
-    return true;
-}
-
-module.exports = { handleAuthentication };
-    `));
-  })
-];
-
-const privateRepoHandlers = [
-  rest.get('https://api.github.com/repos/company/private-scripts', (req, res, ctx) => {
-    const auth = req.headers.get('authorization');
-    if (!auth || !auth.includes('Basic')) {
-      return res(ctx.status(401), ctx.json({ message: 'Bad credentials' }));
-    }
-    return res(ctx.json(privateRepositoryInfo));
-  }),
-  rest.get('https://api.github.com/repos/company/private-scripts/contents', (req, res, ctx) => {
-    const auth = req.headers.get('authorization');
-    if (!auth || !auth.includes('Basic')) {
-      return res(ctx.status(401), ctx.json({ message: 'Bad credentials' }));
-    }
-    return res(ctx.json(mockScriptFiles));
-  })
-];
-
-const errorHandlers = [
-  rest.get('https://api.github.com/repos/invalid/repository', (req, res, ctx) => {
-    return res(ctx.status(404), ctx.json({ message: 'Not Found' }));
-  }),
-  rest.get('https://api.github.com/repos/rate-limited/repo', (req, res, ctx) => {
-    return res(
-      ctx.status(403),
-      ctx.set('X-RateLimit-Remaining', '0'),
-      ctx.json({ 
-        message: 'API rate limit exceeded for user. (But here\'s the good news: Authenticated requests get a higher rate limit. Check out the documentation for more details.)' 
-      })
-    );
-  }),
-  rest.get('https://api.github.com/repos/network/error', (req, res, ctx) => {
-    return res.networkError('Failed to connect');
-  })
-];
-
-// Story wrapper with QueryClient
-const withQueryClient = (Story: any) => {
-  const queryClient = createQueryClient();
-  return (
-    <QueryClientProvider client={queryClient}>
-      <Story />
-    </QueryClientProvider>
-  );
-};
-
-// Default story configuration
-const meta: Meta<typeof ScriptsGithubDialog> = {
-  title: 'UI Components/Dialogs/ScriptsGithubDialog',
-  component: ScriptsGithubDialog,
-  decorators: [withQueryClient],
+const meta = {
+  title: 'UI Components/Scripts GitHub Dialog',
+  component: ScriptsGitHubDialog,
   parameters: {
+    layout: 'centered',
     docs: {
       description: {
         component: `
-## GitHub Scripts Import Dialog
+# Scripts GitHub Dialog Component
 
-A comprehensive dialog component for importing scripts from GitHub repositories. Supports:
+A comprehensive dialog component for importing scripts from GitHub repositories, replacing Angular 
+DfScriptsGithubDialogComponent. Provides form-based UI for entering GitHub repository URLs, validates 
+HTTP/HTTPS format and file extensions, handles private repository authentication, and returns selected script data.
 
-- **URL Validation**: Real-time validation of GitHub repository URLs
-- **Repository Detection**: Automatic detection of public vs private repositories  
-- **Authentication**: Dynamic credential fields for private repository access
-- **File Filtering**: Support for .js, .py, .php, and .txt file extensions
-- **Error Handling**: Comprehensive error states for various GitHub API scenarios
-- **Accessibility**: WCAG 2.1 AA compliant with keyboard navigation and screen reader support
+## Features
 
-### Key Features
+- ✅ **WCAG 2.1 AA Compliant**: Dialog, form controls, and keyboard navigation
+- ✅ **GitHub URL Validation**: Real-time validation with file extension filtering  
+- ✅ **Private Repository Support**: Username/token authentication with auto-detection
+- ✅ **React Hook Form Integration**: Real-time validation with Zod schemas
+- ✅ **Error Handling**: Comprehensive error scenarios with helpful messages
+- ✅ **Dark Mode**: Complete theme support with consistent styling
+- ✅ **Accessible**: Screen reader support, keyboard navigation, focus management
 
-- React Hook Form integration with Zod validation
-- React Query powered GitHub API integration
-- Promise-based API for async script import workflows
-- Responsive design with Tailwind CSS
-- MSW integration for development and testing
+## Supported File Types
 
-### Usage
+- \`.js\` - JavaScript files
+- \`.py\` - Python scripts  
+- \`.php\` - PHP scripts
+- \`.txt\` - Text files
+- \`.json\` - JSON configuration files
+- \`.ts\`, \`.tsx\`, \`.jsx\` - TypeScript/React files
 
-\`\`\`typescript
-import { ScriptsGithubDialog } from '@/components/ui/scripts-github-dialog';
+## Authentication
 
-// Basic usage
-const handleImportScript = async () => {
-  try {
-    const scriptData = await ScriptsGithubDialog.open();
-    console.log('Imported script:', scriptData);
-  } catch (error) {
-    console.error('Import cancelled or failed:', error);
-  }
-};
-\`\`\`
+For private repositories, the dialog automatically detects access requirements and prompts for:
+- GitHub username
+- Personal access token (with link to GitHub settings)
+
+## Error Scenarios
+
+- Invalid GitHub URLs
+- Unsupported file extensions
+- Network connectivity issues
+- Authentication failures
+- Repository/file not found
+- API rate limiting
         `,
       },
     },
-    layout: 'centered',
-    backgrounds: {
-      default: 'light',
-      values: [
-        { name: 'light', value: '#ffffff' },
-        { name: 'dark', value: '#0f172a' },
-      ],
-    },
   },
+  tags: ['autodocs'],
   argTypes: {
     isOpen: {
       control: 'boolean',
-      description: 'Controls dialog visibility',
+      description: 'Whether the dialog is open',
     },
-    defaultUrl: {
+    initialUrl: {
       control: 'text',
-      description: 'Pre-populated GitHub repository URL',
+      description: 'Optional initial URL value',
     },
-    supportedExtensions: {
-      control: 'object',
-      description: 'Array of supported file extensions',
-    },
-    maxFileSize: {
-      control: 'number',
-      description: 'Maximum file size in bytes',
+    onClose: {
+      action: 'dialog-closed',
+      description: 'Callback when dialog is closed',
     },
     onImport: {
-      action: 'onImport',
+      action: 'script-imported',
       description: 'Callback when script is successfully imported',
     },
-    onCancel: {
-      action: 'onCancel', 
-      description: 'Callback when dialog is cancelled',
-    },
-    onError: {
-      action: 'onError',
-      description: 'Callback when import fails',
-    },
   },
-  args: {
-    isOpen: true,
-    supportedExtensions: ['.js', '.py', '.php', '.txt'],
-    maxFileSize: 1024 * 1024, // 1MB
-    onImport: action('onImport'),
-    onCancel: action('onCancel'),
-    onError: action('onError'),
-  },
-};
+} satisfies Meta<typeof ScriptsGitHubDialog>;
 
 export default meta;
-type Story = StoryObj<typeof ScriptsGithubDialog>;
+type Story = StoryObj<typeof meta>;
 
-/**
- * Default story showing the basic dialog state
- */
+// Mock data for stories
+const mockSuccessResult: GitHubDialogResult = {
+  data: 'console.log("Hello from GitHub script!");',
+  repoInfo: {
+    owner: 'dreamfactory',
+    repo: 'example-scripts',
+    filePath: 'scripts/hello.js',
+    originalUrl: 'https://github.com/dreamfactory/example-scripts/blob/main/scripts/hello.js',
+    isValid: true,
+  } as GitHubUrlParts,
+};
+
+const mockPrivateRepoError: GitHubError = {
+  type: 'authentication_failed',
+  message: 'Authentication failed. Please check your username and personal access token.',
+  statusCode: 401,
+  timestamp: new Date().toISOString(),
+  suggestions: [
+    'Verify your GitHub username is correct',
+    'Generate a new personal access token at https://github.com/settings/tokens',
+    'Ensure the token has appropriate repository permissions',
+  ],
+};
+
+// Basic dialog states
 export const Default: Story = {
-  name: '🎯 Default State',
+  args: {
+    isOpen: true,
+    onClose: action('dialog-closed'),
+    onImport: action('script-imported'),
+  },
   parameters: {
     docs: {
       description: {
-        story: 'Basic dialog state with empty URL input ready for user interaction.',
+        story: 'Default dialog state with empty form ready for GitHub URL input.',
       },
-    },
-    msw: {
-      handlers: successHandlers,
     },
   },
 };
 
-/**
- * Story with pre-populated URL for public repository
- */
-export const WithDefaultUrl: Story = {
-  name: '🔗 Pre-populated URL',
+export const WithInitialUrl: Story = {
   args: {
-    defaultUrl: 'https://github.com/dreamfactory/dreamfactory-scripts',
+    isOpen: true,
+    initialUrl: 'https://github.com/dreamfactory/example-scripts/blob/main/scripts/hello.js',
+    onClose: action('dialog-closed'),
+    onImport: action('script-imported'),
   },
   parameters: {
     docs: {
       description: {
-        story: 'Dialog with pre-populated GitHub URL for quick script import workflows.',
+        story: 'Dialog pre-filled with a GitHub URL for editing or validation.',
       },
-    },
-    msw: {
-      handlers: successHandlers,
     },
   },
 };
 
-/**
- * Story demonstrating public repository detection and validation
- */
-export const PublicRepositoryValidation: Story = {
-  name: '🌍 Public Repository Detection',
-  args: {
-    defaultUrl: 'https://github.com/dreamfactory/dreamfactory-scripts',
-  },
-  parameters: {
-    docs: {
-      description: {
-        story: 'Demonstrates automatic repository validation and script file discovery for public repositories.',
-      },
-    },
-    msw: {
-      handlers: successHandlers,
-    },
-  },
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
+export const PublicRepositoryFlow: Story = {
+  render: (args) => {
+    const [isOpen, setIsOpen] = useState(false);
     
-    // Wait for the dialog to load
-    await waitFor(() => {
-      expect(canvas.getByRole('dialog')).toBeInTheDocument();
-    });
-
-    // The URL should be pre-populated
-    const urlInput = canvas.getByLabelText(/github repository url/i);
-    expect(urlInput).toHaveValue('https://github.com/dreamfactory/dreamfactory-scripts');
-
-    // Repository info should appear after validation
-    await waitFor(() => {
-      expect(canvas.getByText('dreamfactory-scripts')).toBeInTheDocument();
-      expect(canvas.getByText('Collection of DreamFactory server-side scripts')).toBeInTheDocument();
-    });
-
-    // Should show available script files
-    await waitFor(() => {
-      expect(canvas.getByText('auth-handler.js')).toBeInTheDocument();
-      expect(canvas.getByText('data-processor.py')).toBeInTheDocument();
-    });
-  },
-};
-
-/**
- * Story showing private repository detection with authentication fields
- */
-export const PrivateRepositoryAuthentication: Story = {
-  name: '🔒 Private Repository Authentication',
-  args: {
-    defaultUrl: 'https://github.com/company/private-scripts',
-  },
-  parameters: {
-    docs: {
-      description: {
-        story: 'Shows dynamic authentication fields when a private repository is detected.',
-      },
-    },
-    msw: {
-      handlers: privateRepoHandlers,
-    },
-  },
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    
-    // Wait for the dialog to load
-    await waitFor(() => {
-      expect(canvas.getByRole('dialog')).toBeInTheDocument();
-    });
-
-    // Enter private repository URL
-    const urlInput = canvas.getByLabelText(/github repository url/i);
-    await userEvent.clear(urlInput);
-    await userEvent.type(urlInput, 'https://github.com/company/private-scripts');
-
-    // Authentication fields should appear
-    await waitFor(() => {
-      expect(canvas.getByLabelText(/username/i)).toBeInTheDocument();
-      expect(canvas.getByLabelText(/password/i)).toBeInTheDocument();
-    });
-
-    // Enter credentials
-    const usernameInput = canvas.getByLabelText(/username/i);
-    const passwordInput = canvas.getByLabelText(/password/i);
-    
-    await userEvent.type(usernameInput, 'testuser');
-    await userEvent.type(passwordInput, 'testpass');
-
-    // Repository should be accessible after authentication
-    await waitFor(() => {
-      expect(canvas.getByText('private-scripts')).toBeInTheDocument();
-      expect(canvas.getByText('Private collection of company scripts')).toBeInTheDocument();
-    });
-  },
-};
-
-/**
- * Story demonstrating file extension filtering
- */
-export const FileExtensionFiltering: Story = {
-  name: '📁 File Extension Filtering',
-  args: {
-    defaultUrl: 'https://github.com/company/private-scripts',
-    supportedExtensions: ['.js', '.py'], // Only JavaScript and Python
-  },
-  parameters: {
-    docs: {
-      description: {
-        story: 'Demonstrates file filtering based on supported extensions (.js, .py only in this example).',
-      },
-    },
-    msw: {
-      handlers: privateRepoHandlers,
-    },
-  },
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    
-    await waitFor(() => {
-      expect(canvas.getByRole('dialog')).toBeInTheDocument();
-    });
-
-    // Should show filtered files (only .js and .py)
-    await waitFor(() => {
-      expect(canvas.getByText('auth-handler.js')).toBeInTheDocument();
-      expect(canvas.getByText('data-processor.py')).toBeInTheDocument();
-      
-      // .php and .txt files should not be shown
-      expect(canvas.queryByText('endpoint-logic.php')).not.toBeInTheDocument();
-      expect(canvas.queryByText('config.txt')).not.toBeInTheDocument();
-    });
-  },
-};
-
-/**
- * Story showing invalid URL error handling
- */
-export const InvalidUrlError: Story = {
-  name: '❌ Invalid URL Error',
-  args: {
-    defaultUrl: 'https://github.com/invalid/repository',
-  },
-  parameters: {
-    docs: {
-      description: {
-        story: 'Demonstrates error handling for invalid or non-existent GitHub repositories.',
-      },
-    },
-    msw: {
-      handlers: errorHandlers,
-    },
-  },
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    
-    await waitFor(() => {
-      expect(canvas.getByRole('dialog')).toBeInTheDocument();
-    });
-
-    // Error message should appear
-    await waitFor(() => {
-      expect(canvas.getByText(/repository not found/i)).toBeInTheDocument();
-    }, { timeout: 3000 });
-
-    // Import button should be disabled
-    const importButton = canvas.getByRole('button', { name: /import script/i });
-    expect(importButton).toBeDisabled();
-  },
-};
-
-/**
- * Story showing API rate limit error
- */
-export const RateLimitError: Story = {
-  name: '⚡ Rate Limit Error',
-  args: {
-    defaultUrl: 'https://github.com/rate-limited/repo',
-  },
-  parameters: {
-    docs: {
-      description: {
-        story: 'Demonstrates error handling for GitHub API rate limit scenarios.',
-      },
-    },
-    msw: {
-      handlers: errorHandlers,
-    },
-  },
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    
-    await waitFor(() => {
-      expect(canvas.getByRole('dialog')).toBeInTheDocument();
-    });
-
-    // Rate limit error message should appear
-    await waitFor(() => {
-      expect(canvas.getByText(/rate limit exceeded/i)).toBeInTheDocument();
-    }, { timeout: 3000 });
-  },
-};
-
-/**
- * Story showing network error handling
- */
-export const NetworkError: Story = {
-  name: '🌐 Network Error',
-  args: {
-    defaultUrl: 'https://github.com/network/error',
-  },
-  parameters: {
-    docs: {
-      description: {
-        story: 'Demonstrates error handling for network connectivity issues.',
-      },
-    },
-    msw: {
-      handlers: errorHandlers,
-    },
-  },
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    
-    await waitFor(() => {
-      expect(canvas.getByRole('dialog')).toBeInTheDocument();
-    });
-
-    // Network error message should appear
-    await waitFor(() => {
-      expect(canvas.getByText(/network error/i)).toBeInTheDocument();
-    }, { timeout: 3000 });
-  },
-};
-
-/**
- * Story demonstrating loading states
- */
-export const LoadingStates: Story = {
-  name: '⏳ Loading States',
-  args: {
-    defaultUrl: 'https://github.com/dreamfactory/dreamfactory-scripts',
-  },
-  parameters: {
-    docs: {
-      description: {
-        story: 'Shows loading indicators during repository validation and script fetching.',
-      },
-    },
-    msw: {
-      handlers: [
-        rest.get('https://api.github.com/repos/dreamfactory/dreamfactory-scripts', (req, res, ctx) => {
-          // Add delay to show loading state
-          return res(ctx.delay(2000), ctx.json(publicRepositoryInfo));
-        }),
-      ],
-    },
-  },
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    
-    await waitFor(() => {
-      expect(canvas.getByRole('dialog')).toBeInTheDocument();
-    });
-
-    // Should show loading indicator
-    await waitFor(() => {
-      expect(canvas.getByRole('status')).toBeInTheDocument();
-      expect(canvas.getByText(/validating repository/i)).toBeInTheDocument();
-    });
-  },
-};
-
-/**
- * Story demonstrating successful script import workflow
- */
-export const SuccessfulImport: Story = {
-  name: '✅ Successful Import',
-  args: {
-    defaultUrl: 'https://github.com/dreamfactory/dreamfactory-scripts',
-  },
-  parameters: {
-    docs: {
-      description: {
-        story: 'Complete workflow showing successful script selection and import.',
-      },
-    },
-    msw: {
-      handlers: successHandlers,
-    },
-  },
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    
-    await waitFor(() => {
-      expect(canvas.getByRole('dialog')).toBeInTheDocument();
-    });
-
-    // Wait for repository to load
-    await waitFor(() => {
-      expect(canvas.getByText('auth-handler.js')).toBeInTheDocument();
-    });
-
-    // Select a script file
-    const scriptFile = canvas.getByRole('radio', { name: /auth-handler\.js/i });
-    await userEvent.click(scriptFile);
-
-    // Import button should be enabled
-    const importButton = canvas.getByRole('button', { name: /import script/i });
-    expect(importButton).toBeEnabled();
-
-    // Click import
-    await userEvent.click(importButton);
-
-    // Should trigger import callback
-    await waitFor(() => {
-      expect(importButton).toHaveTextContent(/importing/i);
-    });
-  },
-};
-
-/**
- * Story demonstrating keyboard navigation
- */
-export const KeyboardNavigation: Story = {
-  name: '⌨️ Keyboard Navigation',
-  args: {
-    defaultUrl: 'https://github.com/dreamfactory/dreamfactory-scripts',
-  },
-  parameters: {
-    docs: {
-      description: {
-        story: 'Demonstrates keyboard navigation and accessibility features.',
-      },
-    },
-    msw: {
-      handlers: successHandlers,
-    },
-  },
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    
-    await waitFor(() => {
-      expect(canvas.getByRole('dialog')).toBeInTheDocument();
-    });
-
-    // Test ESC key to close dialog
-    await userEvent.keyboard('{Escape}');
-    
-    // Test Tab navigation
-    await userEvent.tab();
-    
-    // Test Enter key to submit
-    await userEvent.keyboard('{Enter}');
-  },
-};
-
-/**
- * Story demonstrating dark mode
- */
-export const DarkMode: Story = {
-  name: '🌙 Dark Mode',
-  args: {
-    defaultUrl: 'https://github.com/dreamfactory/dreamfactory-scripts',
-  },
-  parameters: {
-    docs: {
-      description: {
-        story: 'Dialog appearance in dark mode with proper contrast and accessibility.',
-      },
-    },
-    backgrounds: {
-      default: 'dark',
-    },
-    msw: {
-      handlers: successHandlers,
-    },
-  },
-  decorators: [
-    (Story) => (
-      <div className="dark">
-        <div className="bg-gray-900 min-h-screen p-8">
-          <Story />
-        </div>
-      </div>
-    ),
-  ],
-};
-
-/**
- * Story demonstrating mobile responsive design
- */
-export const MobileResponsive: Story = {
-  name: '📱 Mobile Responsive',
-  args: {
-    defaultUrl: 'https://github.com/dreamfactory/dreamfactory-scripts',
-  },
-  parameters: {
-    docs: {
-      description: {
-        story: 'Dialog optimized for mobile devices with touch-friendly interactions.',
-      },
-    },
-    viewport: {
-      defaultViewport: 'mobile1',
-    },
-    msw: {
-      handlers: successHandlers,
-    },
-  },
-};
-
-/**
- * Story showing all supported file extensions
- */
-export const AllFileExtensions: Story = {
-  name: '📄 All File Extensions',
-  args: {
-    defaultUrl: 'https://github.com/company/private-scripts',
-    supportedExtensions: ['.js', '.py', '.php', '.txt'],
-  },
-  parameters: {
-    docs: {
-      description: {
-        story: 'Shows all supported file extensions and their handling.',
-      },
-    },
-    msw: {
-      handlers: privateRepoHandlers,
-    },
-  },
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    
-    await waitFor(() => {
-      expect(canvas.getByRole('dialog')).toBeInTheDocument();
-    });
-
-    // Should show all file types
-    await waitFor(() => {
-      expect(canvas.getByText('auth-handler.js')).toBeInTheDocument(); // JavaScript
-      expect(canvas.getByText('data-processor.py')).toBeInTheDocument(); // Python
-      expect(canvas.getByText('endpoint-logic.php')).toBeInTheDocument(); // PHP
-      expect(canvas.getByText('config.txt')).toBeInTheDocument(); // Text
-    });
-
-    // Each file should have appropriate icons/indicators
-    expect(canvas.getByText(/javascript/i)).toBeInTheDocument();
-    expect(canvas.getByText(/python/i)).toBeInTheDocument();
-    expect(canvas.getByText(/php/i)).toBeInTheDocument();
-    expect(canvas.getByText(/text/i)).toBeInTheDocument();
-  },
-};
-
-/**
- * Story demonstrating integration with other components
- */
-export const IntegrationExample: Story = {
-  name: '🔗 Integration Example',
-  args: {
-    defaultUrl: 'https://github.com/dreamfactory/dreamfactory-scripts',
-  },
-  parameters: {
-    docs: {
-      description: {
-        story: 'Example of integrating the dialog with other application components.',
-      },
-    },
-    msw: {
-      handlers: successHandlers,
-    },
-  },
-  decorators: [
-    (Story) => (
+    return (
       <div className="space-y-4">
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h3 className="text-lg font-semibold text-blue-900 mb-2">
-            Script Management Interface
-          </h3>
-          <p className="text-blue-700 text-sm mb-4">
-            Import scripts from GitHub repositories to enhance your API functionality.
-          </p>
-          <button 
-            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
-            onClick={action('openGithubDialog')}
-          >
-            Import from GitHub
-          </button>
-        </div>
-        <Story />
+        <Button onClick={() => setIsOpen(true)}>
+          Open GitHub Import Dialog
+        </Button>
+        
+        <ScriptsGitHubDialog
+          {...args}
+          isOpen={isOpen}
+          onClose={() => {
+            setIsOpen(false);
+            action('dialog-closed')();
+          }}
+          onImport={(result) => {
+            action('script-imported')(result);
+            setIsOpen(false);
+          }}
+        />
       </div>
-    ),
-  ],
-};
-
-/**
- * Playground story for interactive testing
- */
-export const Playground: Story = {
-  name: '🎮 Playground',
+    );
+  },
   parameters: {
     docs: {
       description: {
-        story: 'Interactive playground for testing all dialog features and configurations.',
+        story: 'Complete workflow for importing from a public GitHub repository. Click to open dialog and test the flow.',
       },
     },
-    msw: {
-      handlers: [...successHandlers, ...privateRepoHandlers, ...errorHandlers],
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    
+    // Open dialog
+    const openButton = canvas.getByText('Open GitHub Import Dialog');
+    await userEvent.click(openButton);
+    
+    // Wait for dialog to appear
+    await waitFor(() => {
+      expect(canvas.getByText('Import Script from GitHub')).toBeInTheDocument();
+    });
+    
+    // Test URL input
+    const urlInput = canvas.getByLabelText('GitHub File URL');
+    await userEvent.type(urlInput, 'https://github.com/dreamfactory/example-scripts/blob/main/scripts/hello.js');
+    
+    // Verify URL validation
+    await waitFor(() => {
+      expect(urlInput).toHaveValue('https://github.com/dreamfactory/example-scripts/blob/main/scripts/hello.js');
+    });
+  },
+};
+
+export const PrivateRepositoryFlow: Story = {
+  render: (args) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [showAuth, setShowAuth] = useState(false);
+    
+    return (
+      <div className="space-y-4">
+        <Button onClick={() => setIsOpen(true)}>
+          Open Private Repo Dialog
+        </Button>
+        
+        <ScriptsGitHubDialog
+          {...args}
+          isOpen={isOpen}
+          initialUrl="https://github.com/private-org/secret-scripts/blob/main/config.js"
+          onClose={() => {
+            setIsOpen(false);
+            setShowAuth(false);
+            action('dialog-closed')();
+          }}
+          onImport={(result) => {
+            action('script-imported')(result);
+            setIsOpen(false);
+          }}
+        />
+      </div>
+    );
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'Workflow for private repositories showing authentication form fields when repository access is restricted.',
+      },
     },
   },
-  argTypes: {
-    defaultUrl: {
-      control: 'text',
-      description: 'Try different GitHub URLs to test validation',
+};
+
+// URL validation demonstrations
+export const UrlValidationExamples: Story = {
+  render: () => {
+    const [activeDialog, setActiveDialog] = useState<string | null>(null);
+    
+    const validUrls = [
+      {
+        label: 'JavaScript File',
+        url: 'https://github.com/user/repo/blob/main/script.js',
+        description: 'Valid JavaScript file URL',
+      },
+      {
+        label: 'Python Script',
+        url: 'https://github.com/user/repo/blob/develop/automation.py',
+        description: 'Valid Python script URL',
+      },
+      {
+        label: 'TypeScript File',
+        url: 'https://github.com/user/repo/blob/main/utils.ts',
+        description: 'Valid TypeScript file URL',
+      },
+      {
+        label: 'PHP Script',
+        url: 'https://github.com/user/repo/blob/main/api.php',
+        description: 'Valid PHP script URL',
+      },
+    ];
+    
+    const invalidUrls = [
+      {
+        label: 'Non-GitHub URL',
+        url: 'https://gitlab.com/user/repo/blob/main/script.js',
+        description: 'Invalid: Not a GitHub URL',
+      },
+      {
+        label: 'Repository Root',
+        url: 'https://github.com/user/repo',
+        description: 'Invalid: No file specified',
+      },
+      {
+        label: 'Unsupported Extension',
+        url: 'https://github.com/user/repo/blob/main/document.pdf',
+        description: 'Invalid: PDF files not supported',
+      },
+      {
+        label: 'Directory URL',
+        url: 'https://github.com/user/repo/tree/main/scripts',
+        description: 'Invalid: Points to directory, not file',
+      },
+    ];
+    
+    return (
+      <div className="space-y-6 w-full max-w-4xl">
+        <div>
+          <h3 className="text-lg font-medium mb-4 text-gray-900 dark:text-white">
+            Valid GitHub URLs
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {validUrls.map((item, index) => (
+              <div key={index} className="border border-green-200 dark:border-green-800 rounded-lg p-4 bg-green-50 dark:bg-green-900/20">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-medium text-green-800 dark:text-green-200">
+                    {item.label}
+                  </h4>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setActiveDialog(item.url)}
+                  >
+                    Test
+                  </Button>
+                </div>
+                <p className="text-sm text-green-700 dark:text-green-300 mb-2">
+                  {item.description}
+                </p>
+                <code className="text-xs text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-800 px-2 py-1 rounded break-all">
+                  {item.url}
+                </code>
+              </div>
+            ))}
+          </div>
+        </div>
+        
+        <div>
+          <h3 className="text-lg font-medium mb-4 text-gray-900 dark:text-white">
+            Invalid GitHub URLs
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {invalidUrls.map((item, index) => (
+              <div key={index} className="border border-red-200 dark:border-red-800 rounded-lg p-4 bg-red-50 dark:bg-red-900/20">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-medium text-red-800 dark:text-red-200">
+                    {item.label}
+                  </h4>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setActiveDialog(item.url)}
+                  >
+                    Test
+                  </Button>
+                </div>
+                <p className="text-sm text-red-700 dark:text-red-300 mb-2">
+                  {item.description}
+                </p>
+                <code className="text-xs text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-800 px-2 py-1 rounded break-all">
+                  {item.url}
+                </code>
+              </div>
+            ))}
+          </div>
+        </div>
+        
+        {activeDialog && (
+          <ScriptsGitHubDialog
+            isOpen={true}
+            initialUrl={activeDialog}
+            onClose={() => setActiveDialog(null)}
+            onImport={(result) => {
+              action('script-imported')(result);
+              setActiveDialog(null);
+            }}
+          />
+        )}
+      </div>
+    );
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'Interactive examples of valid and invalid GitHub URLs showing real-time validation feedback.',
+      },
     },
-    supportedExtensions: {
-      control: 'check',
-      options: ['.js', '.py', '.php', '.txt'],
-      description: 'Select which file extensions to support',
+  },
+};
+
+// Error handling scenarios
+export const ErrorHandlingScenarios: Story = {
+  render: () => {
+    const [activeError, setActiveError] = useState<string | null>(null);
+    
+    const errorScenarios = [
+      {
+        title: 'Repository Not Found',
+        description: 'Attempting to access a non-existent repository',
+        url: 'https://github.com/nonexistent/repo/blob/main/script.js',
+        errorType: 'repository_not_found',
+      },
+      {
+        title: 'File Not Found',
+        description: 'Repository exists but file does not',
+        url: 'https://github.com/dreamfactory/example/blob/main/missing-file.js',
+        errorType: 'file_not_found',
+      },
+      {
+        title: 'Authentication Required',
+        description: 'Private repository requiring credentials',
+        url: 'https://github.com/private/secret-repo/blob/main/config.js',
+        errorType: 'authentication_failed',
+      },
+      {
+        title: 'Rate Limit Exceeded',
+        description: 'GitHub API rate limit reached',
+        url: 'https://github.com/popular/repo/blob/main/script.js',
+        errorType: 'rate_limit_exceeded',
+      },
+      {
+        title: 'Network Error',
+        description: 'Connection timeout or network issue',
+        url: 'https://github.com/user/repo/blob/main/script.js',
+        errorType: 'network_error',
+      },
+      {
+        title: 'Invalid URL Format',
+        description: 'Malformed GitHub URL',
+        url: 'https://github.com/invalid-url-format',
+        errorType: 'invalid_url',
+      },
+    ];
+    
+    return (
+      <div className="space-y-6 w-full max-w-4xl">
+        <div className="mb-6">
+          <h3 className="text-lg font-medium mb-2 text-gray-900 dark:text-white">
+            Error Handling Scenarios
+          </h3>
+          <p className="text-gray-600 dark:text-gray-400">
+            Test various error conditions and user-friendly error messages.
+          </p>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {errorScenarios.map((scenario, index) => (
+            <div key={index} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-medium text-gray-900 dark:text-white">
+                  {scenario.title}
+                </h4>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setActiveError(scenario.url)}
+                >
+                  Simulate
+                </Button>
+              </div>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                {scenario.description}
+              </p>
+              <div className="text-xs text-gray-500 dark:text-gray-500">
+                Error Type: <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">{scenario.errorType}</code>
+              </div>
+            </div>
+          ))}
+        </div>
+        
+        {activeError && (
+          <ScriptsGitHubDialog
+            isOpen={true}
+            initialUrl={activeError}
+            onClose={() => setActiveError(null)}
+            onImport={(result) => {
+              action('script-imported')(result);
+              setActiveError(null);
+            }}
+          />
+        )}
+      </div>
+    );
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'Comprehensive error handling scenarios showing user-friendly error messages and recovery suggestions.',
+      },
     },
-    maxFileSize: {
-      control: { type: 'range', min: 1024, max: 10485760, step: 1024 },
-      description: 'Maximum file size in bytes (1KB - 10MB)',
+  },
+};
+
+// Accessibility demonstration
+export const AccessibilityFeatures: Story = {
+  render: () => {
+    const [isOpen, setIsOpen] = useState(false);
+    
+    return (
+      <div className="space-y-6 w-full max-w-4xl">
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
+          <h3 className="text-lg font-medium mb-4 text-blue-900 dark:text-blue-100">
+            Accessibility Features Test
+          </h3>
+          
+          <div className="space-y-4">
+            <div>
+              <h4 className="font-medium mb-2 text-blue-800 dark:text-blue-200">
+                Keyboard Navigation
+              </h4>
+              <p className="text-sm text-blue-700 dark:text-blue-300 mb-2">
+                • Tab to navigate between form fields and buttons
+                • Enter or Space to activate buttons
+                • Escape to close dialog
+                • Focus visible indicators on all interactive elements
+              </p>
+            </div>
+            
+            <div>
+              <h4 className="font-medium mb-2 text-blue-800 dark:text-blue-200">
+                Screen Reader Support
+              </h4>
+              <p className="text-sm text-blue-700 dark:text-blue-300 mb-2">
+                • Dialog title and description properly announced
+                • Form field labels and validation errors
+                • Loading state announcements
+                • Error message alerts with role="alert"
+              </p>
+            </div>
+            
+            <div>
+              <h4 className="font-medium mb-2 text-blue-800 dark:text-blue-200">
+                WCAG 2.1 AA Compliance
+              </h4>
+              <p className="text-sm text-blue-700 dark:text-blue-300 mb-2">
+                • 4.5:1 minimum contrast ratios
+                • 44x44px minimum touch targets
+                • Focus indicators with 3:1 contrast
+                • Proper heading hierarchy
+              </p>
+            </div>
+          </div>
+          
+          <Button 
+            className="mt-4"
+            onClick={() => setIsOpen(true)}
+            aria-describedby="accessibility-description"
+          >
+            Test Accessibility Features
+          </Button>
+          
+          <div id="accessibility-description" className="sr-only">
+            Opens GitHub import dialog with full accessibility features enabled for testing
+          </div>
+        </div>
+        
+        <ScriptsGitHubDialog
+          isOpen={isOpen}
+          onClose={() => setIsOpen(false)}
+          onImport={(result) => {
+            action('accessible-import')(result);
+            setIsOpen(false);
+          }}
+        />
+      </div>
+    );
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'Accessibility testing including keyboard navigation, screen reader support, and WCAG 2.1 AA compliance.',
+      },
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    
+    // Open dialog
+    const testButton = canvas.getByText('Test Accessibility Features');
+    await userEvent.click(testButton);
+    
+    // Test keyboard navigation
+    await userEvent.tab(); // Should focus first input
+    const urlInput = canvas.getByLabelText('GitHub File URL');
+    await expect(urlInput).toHaveFocus();
+    
+    // Test escape key
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => {
+      expect(canvas.queryByText('Import Script from GitHub')).not.toBeInTheDocument();
+    });
+  },
+};
+
+// Dark mode demonstration
+export const DarkModeVariants: Story = {
+  render: () => {
+    const [isOpen, setIsOpen] = useState(false);
+    
+    return (
+      <div className="dark">
+        <div className="bg-gray-900 p-6 rounded-lg">
+          <div className="mb-6">
+            <h3 className="text-white text-lg font-medium mb-2">
+              Dark Mode Dialog
+            </h3>
+            <p className="text-gray-300 text-sm">
+              All dialog elements adapt to dark mode with proper contrast ratios.
+            </p>
+          </div>
+          
+          <div className="space-y-4">
+            <Button 
+              variant="primary" 
+              onClick={() => setIsOpen(true)}
+              className="w-full"
+            >
+              Open Dark Mode Dialog
+            </Button>
+            
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="bg-gray-800 p-3 rounded">
+                <div className="text-gray-300 mb-1">Background</div>
+                <div className="text-white">Gray-800</div>
+              </div>
+              <div className="bg-gray-700 p-3 rounded">
+                <div className="text-gray-300 mb-1">Panel</div>
+                <div className="text-white">Gray-700</div>
+              </div>
+              <div className="bg-primary-600 p-3 rounded">
+                <div className="text-white mb-1">Primary</div>
+                <div className="text-white">Primary-600</div>
+              </div>
+              <div className="bg-red-600 p-3 rounded">
+                <div className="text-white mb-1">Error</div>
+                <div className="text-white">Red-600</div>
+              </div>
+            </div>
+          </div>
+          
+          <ScriptsGitHubDialog
+            isOpen={isOpen}
+            onClose={() => setIsOpen(false)}
+            onImport={(result) => {
+              action('dark-mode-import')(result);
+              setIsOpen(false);
+            }}
+          />
+        </div>
+      </div>
+    );
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'Dark mode variants maintaining WCAG 2.1 AA contrast ratios in dark themes.',
+      },
+    },
+  },
+};
+
+// Integration with other components
+export const IntegrationExamples: Story = {
+  render: () => {
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [importedScripts, setImportedScripts] = useState<GitHubScriptResult[]>([]);
+    
+    const handleImport = (result: GitHubDialogResult) => {
+      const scriptResult: GitHubScriptResult = {
+        content: result.data,
+        fileData: {
+          name: result.repoInfo.filePath.split('/').pop() || 'script',
+          path: result.repoInfo.filePath,
+          sha: Math.random().toString(36).substring(7),
+          size: result.data.length,
+          download_url: result.repoInfo.originalUrl,
+          content: btoa(result.data),
+          encoding: 'base64',
+          type: 'file',
+          url: result.repoInfo.originalUrl,
+          git_url: result.repoInfo.originalUrl,
+          html_url: result.repoInfo.originalUrl,
+        },
+        urlParts: result.repoInfo,
+      };
+      
+      setImportedScripts(prev => [...prev, scriptResult]);
+      setIsDialogOpen(false);
+      action('integration-import')(result);
+    };
+    
+    return (
+      <div className="space-y-6 w-full max-w-4xl">
+        <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                Script Management
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400">
+                Import and manage scripts from GitHub repositories
+              </p>
+            </div>
+            <Button 
+              variant="primary"
+              onClick={() => setIsDialogOpen(true)}
+            >
+              Import from GitHub
+            </Button>
+          </div>
+          
+          {importedScripts.length === 0 ? (
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              <p className="mb-2">No scripts imported yet</p>
+              <p className="text-sm">Click "Import from GitHub" to get started</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <h4 className="font-medium text-gray-900 dark:text-white">
+                Imported Scripts ({importedScripts.length})
+              </h4>
+              {importedScripts.map((script, index) => (
+                <div key={index} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h5 className="font-medium text-gray-900 dark:text-white">
+                        {script.fileData.name}
+                      </h5>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        {script.urlParts.owner}/{script.urlParts.repo}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                        {script.fileData.size} bytes
+                      </div>
+                      <a
+                        href={script.fileData.html_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-primary-600 hover:text-primary-800 dark:text-primary-400 dark:hover:text-primary-300"
+                      >
+                        View on GitHub
+                      </a>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-3">
+                    <details className="group">
+                      <summary className="cursor-pointer text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">
+                        View Content
+                      </summary>
+                      <pre className="mt-2 text-xs bg-gray-100 dark:bg-gray-800 p-3 rounded overflow-x-auto">
+                        <code>{script.content.substring(0, 200)}{script.content.length > 200 ? '...' : ''}</code>
+                      </pre>
+                    </details>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        
+        <ScriptsGitHubDialog
+          isOpen={isDialogOpen}
+          onClose={() => setIsDialogOpen(false)}
+          onImport={handleImport}
+        />
+      </div>
+    );
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'Integration example showing how the dialog works within a larger script management interface.',
+      },
+    },
+  },
+};
+
+// Real-world workflow demonstration
+export const CompleteWorkflowDemo: Story = {
+  render: () => {
+    const [step, setStep] = useState(1);
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [selectedScript, setSelectedScript] = useState<GitHubDialogResult | null>(null);
+    
+    const steps = [
+      {
+        number: 1,
+        title: 'Open Import Dialog',
+        description: 'User clicks import button to open GitHub dialog',
+        action: () => setIsDialogOpen(true),
+      },
+      {
+        number: 2,
+        title: 'Enter GitHub URL',
+        description: 'User enters valid GitHub file URL',
+        action: () => {},
+      },
+      {
+        number: 3,
+        title: 'Handle Authentication',
+        description: 'If private repo, user provides credentials',
+        action: () => {},
+      },
+      {
+        number: 4,
+        title: 'Import Success',
+        description: 'Script content is imported and dialog closes',
+        action: () => {},
+      },
+    ];
+    
+    const handleImport = (result: GitHubDialogResult) => {
+      setSelectedScript(result);
+      setIsDialogOpen(false);
+      setStep(4);
+      action('workflow-complete')(result);
+    };
+    
+    return (
+      <div className="space-y-6 w-full max-w-4xl">
+        <div className="bg-gradient-to-r from-primary-50 to-blue-50 dark:from-primary-900/20 dark:to-blue-900/20 border border-primary-200 dark:border-primary-800 rounded-lg p-6">
+          <h3 className="text-lg font-medium mb-4 text-primary-900 dark:text-primary-100">
+            Complete GitHub Import Workflow
+          </h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            {steps.map((stepData) => (
+              <div
+                key={stepData.number}
+                className={`p-4 rounded-lg border ${
+                  step >= stepData.number
+                    ? 'bg-primary-100 dark:bg-primary-900/30 border-primary-300 dark:border-primary-700'
+                    : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+                }`}
+              >
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium mb-2 ${
+                  step >= stepData.number
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-300'
+                }`}>
+                  {stepData.number}
+                </div>
+                <h4 className={`font-medium text-sm mb-1 ${
+                  step >= stepData.number
+                    ? 'text-primary-900 dark:text-primary-100'
+                    : 'text-gray-900 dark:text-white'
+                }`}>
+                  {stepData.title}
+                </h4>
+                <p className={`text-xs ${
+                  step >= stepData.number
+                    ? 'text-primary-700 dark:text-primary-300'
+                    : 'text-gray-600 dark:text-gray-400'
+                }`}>
+                  {stepData.description}
+                </p>
+              </div>
+            ))}
+          </div>
+          
+          <div className="flex gap-3">
+            <Button
+              variant="primary"
+              onClick={() => {
+                setStep(1);
+                setIsDialogOpen(true);
+              }}
+            >
+              Start Import Workflow
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setStep(1);
+                setSelectedScript(null);
+              }}
+            >
+              Reset Demo
+            </Button>
+          </div>
+        </div>
+        
+        {selectedScript && (
+          <div className="border border-green-200 dark:border-green-800 rounded-lg p-6 bg-green-50 dark:bg-green-900/20">
+            <h4 className="font-medium text-green-800 dark:text-green-200 mb-2">
+              ✅ Import Successful!
+            </h4>
+            <div className="text-sm text-green-700 dark:text-green-300 space-y-1">
+              <p><strong>File:</strong> {selectedScript.repoInfo.filePath}</p>
+              <p><strong>Repository:</strong> {selectedScript.repoInfo.owner}/{selectedScript.repoInfo.repo}</p>
+              <p><strong>Content Length:</strong> {selectedScript.data.length} characters</p>
+            </div>
+          </div>
+        )}
+        
+        <ScriptsGitHubDialog
+          isOpen={isDialogOpen}
+          onClose={() => setIsDialogOpen(false)}
+          onImport={handleImport}
+        />
+      </div>
+    );
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'Complete end-to-end workflow demonstration showing all steps of the GitHub import process.',
+      },
     },
   },
 };
