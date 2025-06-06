@@ -1,878 +1,1359 @@
 /**
- * @file CORS Table Component Tests
- * @description Comprehensive Vitest unit tests for the CORS table component covering
- * table rendering, CORS operations, modal interactions, and error scenarios.
- * Implements comprehensive testing for virtualized table behavior, CORS deletion
- * confirmations, and responsive design patterns using React Testing Library and MSW mocking.
+ * Comprehensive Vitest unit tests for the CORS table component
  * 
- * Converts Angular CORS table component tests to Vitest with React Testing Library
- * per Section 7.1.2, replacing Angular Material table testing with custom table
- * component testing per UI component migration.
+ * Tests cover table rendering, virtualization, CORS operations, modal interactions,
+ * and error scenarios with React Testing Library and MSW mocking.
+ * 
+ * Key Testing Areas:
+ * - Virtualized table rendering with 1000+ entries per scaling requirements
+ * - Modal accessibility testing with keyboard navigation per WCAG 2.1 AA compliance
+ * - CORS operation testing with optimistic updates and rollback scenarios per Section 4.3.2
+ * - Responsive table testing across mobile and desktop breakpoints per UI requirements
+ * - Error state testing with comprehensive error recovery scenarios per Section 4.2
+ * 
+ * @fileoverview CORS table component tests
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+ / Vitest 2.1.0
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest'
-import { render, screen, waitFor, within, fireEvent } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { http, HttpResponse } from 'msw'
-import { setupServer } from 'msw/node'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act } from 'react'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { http, HttpResponse } from 'msw';
+import { server } from '../../../test/setup-tests';
+import { CorsTable } from './cors-table';
+import type { CorsConfig } from '../../../types/cors';
 
-// Import the component under test and its dependencies
-import { CorsTable } from './cors-table'
-import type { CorsConfigData } from '../../../types/cors'
+// ============================================================================
+// TEST SETUP AND UTILITIES
+// ============================================================================
 
-// Mock the virtualization library for table testing
-vi.mock('@tanstack/react-virtual', () => ({
-  useVirtualizer: vi.fn(() => ({
-    getVirtualItems: () => [],
-    getTotalSize: () => 0,
-    scrollToIndex: vi.fn(),
-    measure: vi.fn(),
-  })),
-}))
-
-// Mock the dialog component for modal testing
-vi.mock('../../../components/ui/dialog', () => ({
-  Dialog: ({ children, open, onOpenChange }: any) => open ? (
-    <div role="dialog" aria-labelledby="dialog-title" aria-modal="true">
-      <div onClick={() => onOpenChange?.(false)} data-testid="dialog-overlay" />
-      {children}
-    </div>
-  ) : null,
-  DialogContent: ({ children, ...props }: any) => (
-    <div {...props} data-testid="dialog-content">{children}</div>
-  ),
-  DialogHeader: ({ children }: any) => <div>{children}</div>,
-  DialogTitle: ({ children }: any) => <h2 id="dialog-title">{children}</h2>,
-  DialogDescription: ({ children }: any) => <p>{children}</p>,
-  DialogFooter: ({ children }: any) => <div>{children}</div>,
-}))
-
-// Mock the button component
-vi.mock('../../../components/ui/button', () => ({
-  Button: ({ children, onClick, variant, size, disabled, ...props }: any) => (
-    <button 
-      onClick={onClick} 
-      disabled={disabled}
-      data-variant={variant}
-      data-size={size}
-      {...props}
-    >
-      {children}
-    </button>
-  ),
-}))
-
-// Mock the hooks
-vi.mock('../../../hooks/use-cors', () => ({
-  useCors: vi.fn(),
-  useDeleteCors: vi.fn(),
-}))
-
-// Mock intersection observer for virtualized table testing
-const mockIntersectionObserver = vi.fn()
-mockIntersectionObserver.mockReturnValue({
-  observe: () => null,
-  unobserve: () => null,
-  disconnect: () => null
-})
-window.IntersectionObserver = mockIntersectionObserver
-
-// Mock resize observer for responsive testing
-const mockResizeObserver = vi.fn()
-mockResizeObserver.mockReturnValue({
-  observe: () => null,
-  unobserve: () => null,
-  disconnect: () => null
-})
-window.ResizeObserver = mockResizeObserver
-
-// Test data fixtures
-const mockCorsData: CorsConfigData[] = [
-  {
-    id: 1,
-    path: '/api/v2/*',
-    origin: '*',
-    method: ['GET', 'POST', 'PUT', 'DELETE'],
-    header: 'Content-Type,X-DreamFactory-API-Key',
-    maxAge: 3600,
-    description: 'Default CORS policy',
-    enabled: true,
-    supportsCredentials: false,
-    exposedHeader: null,
-    createdById: 1,
-    createdDate: '2024-01-01T00:00:00Z',
-    lastModifiedById: 1,
-    lastModifiedDate: '2024-01-01T00:00:00Z',
-  },
-  {
-    id: 2,
-    path: '/api/v2/db/*',
-    origin: 'https://example.com',
-    method: ['GET', 'POST'],
-    header: 'Content-Type',
-    maxAge: 7200,
-    description: 'Database API CORS',
-    enabled: false,
-    supportsCredentials: true,
-    exposedHeader: 'X-Total-Count',
-    createdById: 1,
-    createdDate: '2024-01-02T00:00:00Z',
-    lastModifiedById: 1,
-    lastModifiedDate: '2024-01-02T00:00:00Z',
-  },
-]
-
-// Generate large dataset for virtualization testing
-const generateLargeCorsDataset = (size: number): CorsConfigData[] => {
-  return Array.from({ length: size }, (_, index) => ({
-    id: index + 1,
-    path: `/api/v2/path-${index}/*`,
-    origin: index % 3 === 0 ? '*' : `https://example-${index}.com`,
-    method: ['GET', 'POST', 'PUT', 'DELETE'],
-    header: 'Content-Type,X-DreamFactory-API-Key',
-    maxAge: 3600 + index,
-    description: `CORS policy ${index + 1}`,
-    enabled: index % 2 === 0,
-    supportsCredentials: index % 4 === 0,
-    exposedHeader: index % 5 === 0 ? 'X-Total-Count' : null,
-    createdById: 1,
-    createdDate: `2024-01-${String(index % 28 + 1).padStart(2, '0')}T00:00:00Z`,
-    lastModifiedById: 1,
-    lastModifiedDate: `2024-01-${String(index % 28 + 1).padStart(2, '0')}T00:00:00Z`,
-  }))
-}
-
-// MSW handlers for API mocking
-const corsHandlers = [
-  // Get CORS policies
-  http.get('/api/v2/system/cors', ({ request }) => {
-    const url = new URL(request.url)
-    const limit = parseInt(url.searchParams.get('limit') || '25')
-    const offset = parseInt(url.searchParams.get('offset') || '0')
-    
-    let data = mockCorsData
-    
-    // Handle large dataset for virtualization testing
-    if (url.searchParams.get('test_large_dataset') === 'true') {
-      data = generateLargeCorsDataset(1000)
-    }
-    
-    const total = data.length
-    const paginatedData = data.slice(offset, offset + limit)
-    
-    return HttpResponse.json({
-      resource: paginatedData,
-      meta: {
-        count: total,
-        limit,
-        offset,
-      }
-    })
-  }),
-
-  // Delete CORS policy
-  http.delete('/api/v2/system/cors/:id', ({ params }) => {
-    const { id } = params
-    return HttpResponse.json({ id: parseInt(id as string) })
-  }),
-
-  // Error scenarios
-  http.get('/api/v2/system/cors/error/500', () => {
-    return HttpResponse.json(
-      { error: { message: 'Internal server error' } },
-      { status: 500 }
-    )
-  }),
-
-  http.get('/api/v2/system/cors/error/network', () => {
-    return HttpResponse.error()
-  }),
-]
-
-const server = setupServer(...corsHandlers)
-
-// Test utilities
-const createQueryClient = () => new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: false,
-      gcTime: 0,
+/**
+ * Test wrapper component that provides React Query context
+ */
+const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+        cacheTime: 0,
+        staleTime: 0,
+      },
+      mutations: {
+        retry: false,
+      },
     },
-    mutations: {
-      retry: false,
-    },
-  },
-})
+  });
 
-const renderWithProviders = (ui: React.ReactElement, options?: any) => {
-  const queryClient = createQueryClient()
-  
-  const Wrapper = ({ children }: { children: React.ReactNode }) => (
+  return (
     <QueryClientProvider client={queryClient}>
       {children}
     </QueryClientProvider>
-  )
+  );
+};
 
-  return {
-    ...render(ui, { wrapper: Wrapper, ...options }),
-    queryClient,
-  }
-}
+/**
+ * Custom render function with React Query provider
+ */
+const renderWithQueryClient = (ui: React.ReactElement, options = {}) => {
+  return render(ui, {
+    wrapper: TestWrapper,
+    ...options,
+  });
+};
 
-// Helper to simulate different viewport sizes for responsive testing
-const setViewportSize = (width: number, height: number) => {
+/**
+ * Generate mock CORS configuration data for testing
+ */
+const generateMockCorsConfig = (id: number, overrides: Partial<CorsConfig> = {}): CorsConfig => ({
+  id,
+  description: `CORS config ${id}`,
+  enabled: true,
+  path: `/api/v2/test${id}/*`,
+  origin: `https://app${id}.example.com`,
+  method: ['GET', 'POST', 'PUT', 'DELETE'],
+  header: 'Content-Type, Authorization, X-Requested-With',
+  exposedHeader: null,
+  maxAge: 3600,
+  supportsCredentials: false,
+  createdById: 1,
+  createdDate: '2024-01-01T00:00:00Z',
+  lastModifiedById: 1,
+  lastModifiedDate: '2024-01-01T00:00:00Z',
+  ...overrides,
+});
+
+/**
+ * Generate large dataset for virtualization testing
+ */
+const generateLargeCorsDataset = (count: number): CorsConfig[] => {
+  return Array.from({ length: count }, (_, index) => 
+    generateMockCorsConfig(index + 1, {
+      description: `Large dataset CORS config ${index + 1}`,
+      path: `/api/v2/large${index + 1}/*`,
+      origin: index % 2 === 0 ? 'https://app.example.com' : '*',
+      enabled: index % 3 !== 0, // Mix of enabled/disabled
+    })
+  );
+};
+
+/**
+ * Mock viewport resize for responsive testing
+ */
+const mockViewportResize = (width: number, height: number) => {
   Object.defineProperty(window, 'innerWidth', {
     writable: true,
     configurable: true,
     value: width,
-  })
+  });
   Object.defineProperty(window, 'innerHeight', {
     writable: true,
     configurable: true,
     value: height,
-  })
-  fireEvent(window, new Event('resize'))
-}
+  });
+  window.dispatchEvent(new Event('resize'));
+};
 
-describe('CorsTable Component', () => {
-  let mockUseCors: Mock
-  let mockUseDeleteCors: Mock
-  let user: ReturnType<typeof userEvent.setup>
+/**
+ * Mock IntersectionObserver for virtualization testing
+ */
+const mockIntersectionObserver = () => {
+  const mockObserver = vi.fn(() => ({
+    observe: vi.fn(),
+    disconnect: vi.fn(),
+    unobserve: vi.fn(),
+  }));
+  
+  Object.defineProperty(window, 'IntersectionObserver', {
+    writable: true,
+    configurable: true,
+    value: mockObserver,
+  });
+  
+  return mockObserver;
+};
+
+// ============================================================================
+// TEST SUITE: BASIC COMPONENT RENDERING
+// ============================================================================
+
+describe('CorsTable Component - Basic Rendering', () => {
+  let queryClient: QueryClient;
 
   beforeEach(() => {
-    server.listen({ onUnhandledRequest: 'error' })
-    user = userEvent.setup()
-    
-    // Setup mock hooks
-    const { useCors, useDeleteCors } = require('../../../hooks/use-cors')
-    mockUseCors = useCors as Mock
-    mockUseDeleteCors = useDeleteCors as Mock
-
-    // Default mock implementations
-    mockUseCors.mockReturnValue({
-      data: { resource: mockCorsData, meta: { count: mockCorsData.length } },
-      isLoading: false,
-      error: null,
-      refetch: vi.fn(),
-    })
-
-    mockUseDeleteCors.mockReturnValue({
-      mutate: vi.fn(),
-      isLoading: false,
-      error: null,
-    })
-  })
+    queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false, cacheTime: 0, staleTime: 0 },
+        mutations: { retry: false },
+      },
+    });
+    mockIntersectionObserver();
+  });
 
   afterEach(() => {
-    server.resetHandlers()
-    vi.clearAllMocks()
-  })
+    queryClient.clear();
+  });
 
-  describe('Table Rendering', () => {
-    it('renders CORS table with correct columns', () => {
-      renderWithProviders(<CorsTable />)
+  it('renders loading state initially', async () => {
+    renderWithQueryClient(<CorsTable />);
 
-      // Check table headers
-      expect(screen.getByText('Status')).toBeInTheDocument()
-      expect(screen.getByText('Path')).toBeInTheDocument()
-      expect(screen.getByText('Origin')).toBeInTheDocument()
-      expect(screen.getByText('Methods')).toBeInTheDocument()
-      expect(screen.getByText('Max Age')).toBeInTheDocument()
-      expect(screen.getByText('Description')).toBeInTheDocument()
-      expect(screen.getByText('Actions')).toBeInTheDocument()
-    })
+    // Check for loading spinner and message
+    expect(screen.getByText('Loading CORS configurations...')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toBeInTheDocument();
+    
+    // Verify spinner animation class
+    const spinner = screen.getByRole('status').querySelector('[class*="animate-spin"]');
+    expect(spinner).toBeInTheDocument();
+  });
 
-    it('displays CORS data correctly in table rows', () => {
-      renderWithProviders(<CorsTable />)
-
-      // Check first row data
-      expect(screen.getByText('/api/v2/*')).toBeInTheDocument()
-      expect(screen.getByText('*')).toBeInTheDocument()
-      expect(screen.getByText('Default CORS policy')).toBeInTheDocument()
-      expect(screen.getByText('3600')).toBeInTheDocument()
-
-      // Check second row data
-      expect(screen.getByText('/api/v2/db/*')).toBeInTheDocument()
-      expect(screen.getByText('https://example.com')).toBeInTheDocument()
-      expect(screen.getByText('Database API CORS')).toBeInTheDocument()
-      expect(screen.getByText('7200')).toBeInTheDocument()
-    })
-
-    it('shows enabled/disabled status correctly', () => {
-      renderWithProviders(<CorsTable />)
-
-      // Check status indicators
-      const enabledStatus = screen.getByText('Enabled')
-      const disabledStatus = screen.getByText('Disabled')
-
-      expect(enabledStatus).toBeInTheDocument()
-      expect(disabledStatus).toBeInTheDocument()
-    })
-
-    it('renders action buttons for each row', () => {
-      renderWithProviders(<CorsTable />)
-
-      // Check for edit and delete buttons
-      const editButtons = screen.getAllByLabelText(/edit cors policy/i)
-      const deleteButtons = screen.getAllByLabelText(/delete cors policy/i)
-
-      expect(editButtons).toHaveLength(mockCorsData.length)
-      expect(deleteButtons).toHaveLength(mockCorsData.length)
-    })
-  })
-
-  describe('Virtualized Table Testing for 1000+ CORS Entries', () => {
-    beforeEach(() => {
-      // Mock large dataset
-      mockUseCors.mockReturnValue({
-        data: { 
-          resource: generateLargeCorsDataset(1000), 
-          meta: { count: 1000 } 
-        },
-        isLoading: false,
-        error: null,
-        refetch: vi.fn(),
+  it('renders table header with all required columns', async () => {
+    // Mock successful API response
+    server.use(
+      http.get('/api/v2/system/cors', () => {
+        return HttpResponse.json({
+          resource: [generateMockCorsConfig(1)],
+          meta: { count: 1, total: 1 }
+        });
       })
-    })
+    );
 
-    it('handles large datasets with virtualization', async () => {
-      const { useVirtualizer } = await import('@tanstack/react-virtual')
-      const mockVirtualizer = useVirtualizer as Mock
+    renderWithQueryClient(<CorsTable />);
 
-      mockVirtualizer.mockReturnValue({
-        getVirtualItems: () => Array.from({ length: 10 }, (_, i) => ({
-          index: i,
-          start: i * 50,
-          size: 50,
-          end: (i + 1) * 50,
-          key: i,
-        })),
-        getTotalSize: () => 50000, // 1000 items * 50px each
-        scrollToIndex: vi.fn(),
-        measure: vi.fn(),
+    // Wait for data to load
+    await waitFor(() => {
+      expect(screen.queryByText('Loading CORS configurations...')).not.toBeInTheDocument();
+    });
+
+    // Check table header columns
+    expect(screen.getByText('Status')).toBeInTheDocument();
+    expect(screen.getByText('Path')).toBeInTheDocument();
+    expect(screen.getByText('Origin')).toBeInTheDocument();
+    expect(screen.getByText('Methods')).toBeInTheDocument();
+    expect(screen.getByText('Max Age')).toBeInTheDocument();
+    expect(screen.getByText('Actions')).toBeInTheDocument();
+
+    // Check select all checkbox
+    const selectAllCheckbox = screen.getByRole('checkbox', { name: /select all/i });
+    expect(selectAllCheckbox).toBeInTheDocument();
+    expect(selectAllCheckbox).not.toBeChecked();
+  });
+
+  it('renders empty state when no CORS configurations exist', async () => {
+    // Mock empty API response
+    server.use(
+      http.get('/api/v2/system/cors', () => {
+        return HttpResponse.json({
+          resource: [],
+          meta: { count: 0, total: 0 }
+        });
       })
+    );
 
-      renderWithProviders(<CorsTable />)
+    renderWithQueryClient(<CorsTable />);
 
-      // Verify virtualization is working
-      await waitFor(() => {
-        expect(mockVirtualizer).toHaveBeenCalled()
+    await waitFor(() => {
+      expect(screen.getByText('No CORS configurations')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('Get started by creating a new CORS policy.')).toBeInTheDocument();
+    
+    // Check for empty state icon
+    const emptyIcon = screen.getByRole('img', { hidden: true });
+    expect(emptyIcon).toBeInTheDocument();
+  });
+
+  it('displays total count in header', async () => {
+    const mockData = Array.from({ length: 25 }, (_, i) => generateMockCorsConfig(i + 1));
+    
+    server.use(
+      http.get('/api/v2/system/cors', () => {
+        return HttpResponse.json({
+          resource: mockData,
+          meta: { count: 25, total: 25 }
+        });
       })
+    );
 
-      // Should only render visible items, not all 1000
-      const tableRows = screen.getAllByRole('row')
-      expect(tableRows.length).toBeLessThan(50) // Much less than 1000
-    })
+    renderWithQueryClient(<CorsTable />);
 
-    it('maintains performance with large datasets', async () => {
-      const startTime = performance.now()
-      
-      renderWithProviders(<CorsTable />)
-      
-      await waitFor(() => {
-        expect(screen.getByRole('table')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('Manage Cross-Origin Resource Sharing policies (25 total)')).toBeInTheDocument();
+    });
+  });
+});
+
+// ============================================================================
+// TEST SUITE: VIRTUALIZED TABLE TESTING
+// ============================================================================
+
+describe('CorsTable Component - Virtualization', () => {
+  beforeEach(() => {
+    mockIntersectionObserver();
+  });
+
+  it('handles large datasets with virtualization (1000+ entries)', async () => {
+    const largeDataset = generateLargeCorsDataset(1500);
+    
+    server.use(
+      http.get('/api/v2/system/cors', () => {
+        return HttpResponse.json({
+          resource: largeDataset,
+          meta: { count: 1500, total: 1500 }
+        });
       })
-      
-      const endTime = performance.now()
-      const renderTime = endTime - startTime
+    );
 
-      // Should render within performance budget (under 100ms)
-      expect(renderTime).toBeLessThan(100)
-    })
+    renderWithQueryClient(<CorsTable />);
 
-    it('supports scrolling to specific CORS entries', async () => {
-      const { useVirtualizer } = await import('@tanstack/react-virtual')
-      const mockScrollToIndex = vi.fn()
-      
-      ;(useVirtualizer as Mock).mockReturnValue({
-        getVirtualItems: () => [],
-        getTotalSize: () => 50000,
-        scrollToIndex: mockScrollToIndex,
-        measure: vi.fn(),
+    await waitFor(() => {
+      expect(screen.getByText('Manage Cross-Origin Resource Sharing policies (1500 total)')).toBeInTheDocument();
+    });
+
+    // Verify only visible rows are rendered (virtualization working)
+    const visibleRows = screen.getAllByRole('row');
+    // Should have header row + limited visible rows due to virtualization
+    expect(visibleRows.length).toBeLessThan(50); // Much less than 1500
+    expect(visibleRows.length).toBeGreaterThan(1); // But more than just header
+
+    // Check that virtual container has correct height
+    const virtualContainer = document.querySelector('[style*="height"]');
+    expect(virtualContainer).toBeInTheDocument();
+  });
+
+  it('maintains scroll position during updates', async () => {
+    const largeDataset = generateLargeCorsDataset(500);
+    
+    server.use(
+      http.get('/api/v2/system/cors', () => {
+        return HttpResponse.json({
+          resource: largeDataset,
+          meta: { count: 500, total: 500 }
+        });
       })
+    );
 
-      renderWithProviders(<CorsTable searchIndex={500} />)
+    renderWithQueryClient(<CorsTable />);
 
-      await waitFor(() => {
-        expect(mockScrollToIndex).toHaveBeenCalledWith(500)
+    await waitFor(() => {
+      expect(screen.getByText('Manage Cross-Origin Resource Sharing policies (500 total)')).toBeInTheDocument();
+    });
+
+    // Simulate scrolling to a specific position
+    const scrollContainer = document.querySelector('[ref]');
+    if (scrollContainer) {
+      fireEvent.scroll(scrollContainer, { target: { scrollTop: 500 } });
+    }
+
+    // Trigger a refresh
+    const refreshButton = screen.getByRole('button', { name: /refresh/i });
+    fireEvent.click(refreshButton);
+
+    // Verify scroll position is maintained (virtualization should handle this)
+    await waitFor(() => {
+      expect(scrollContainer?.scrollTop).toBeGreaterThan(0);
+    });
+  });
+
+  it('renders rows outside viewport on demand', async () => {
+    const largeDataset = generateLargeCorsDataset(200);
+    
+    server.use(
+      http.get('/api/v2/system/cors', () => {
+        return HttpResponse.json({
+          resource: largeDataset,
+          meta: { count: 200, total: 200 }
+        });
       })
-    })
-  })
+    );
 
-  describe('Modal Accessibility Testing with Keyboard Navigation', () => {
-    it('opens delete confirmation modal with keyboard navigation', async () => {
-      renderWithProviders(<CorsTable />)
+    renderWithQueryClient(<CorsTable />);
 
-      const deleteButton = screen.getAllByLabelText(/delete cors policy/i)[0]
-      
-      // Focus and activate with keyboard
-      deleteButton.focus()
-      await user.keyboard('{Enter}')
+    await waitFor(() => {
+      expect(screen.getByText('Manage Cross-Origin Resource Sharing policies (200 total)')).toBeInTheDocument();
+    });
 
-      // Check modal is open and accessible
-      const dialog = screen.getByRole('dialog')
-      expect(dialog).toBeInTheDocument()
-      expect(dialog).toHaveAttribute('aria-modal', 'true')
-      expect(dialog).toHaveAttribute('aria-labelledby', 'dialog-title')
-    })
+    // Check that first few items are visible
+    expect(screen.getByText('/api/v2/large1/*')).toBeInTheDocument();
+    
+    // Items far down should not be in DOM initially
+    expect(screen.queryByText('/api/v2/large150/*')).not.toBeInTheDocument();
+    
+    // Simulate scrolling down
+    const scrollContainer = document.querySelector('[style*="height: 600px"]');
+    if (scrollContainer) {
+      fireEvent.scroll(scrollContainer, { target: { scrollTop: 3000 } });
+    }
 
-    it('supports WCAG 2.1 AA keyboard navigation in modal', async () => {
-      renderWithProviders(<CorsTable />)
+    // After scrolling, different items should be visible
+    await waitFor(() => {
+      // The exact item depends on virtualization logic, but should be different
+      const visiblePaths = screen.getAllByText(/\/api\/v2\/large\d+\/\*/);
+      expect(visiblePaths.length).toBeGreaterThan(0);
+    });
+  });
+});
 
-      // Open modal
-      const deleteButton = screen.getAllByLabelText(/delete cors policy/i)[0]
-      await user.click(deleteButton)
+// ============================================================================
+// TEST SUITE: SEARCH AND FILTERING
+// ============================================================================
 
-      const dialog = screen.getByRole('dialog')
-      expect(dialog).toBeInTheDocument()
+describe('CorsTable Component - Search and Filtering', () => {
+  const mockData = [
+    generateMockCorsConfig(1, {
+      path: '/api/v2/users/*',
+      origin: 'https://app.example.com',
+      description: 'User API CORS policy'
+    }),
+    generateMockCorsConfig(2, {
+      path: '/api/v2/products/*',
+      origin: 'https://shop.example.com',
+      description: 'Product API CORS policy'
+    }),
+    generateMockCorsConfig(3, {
+      path: '/api/v2/orders/*',
+      origin: '*',
+      description: 'Order API CORS policy'
+    }),
+  ];
 
-      // Test keyboard navigation within modal
-      const confirmButton = within(dialog).getByText('Delete')
-      const cancelButton = within(dialog).getByText('Cancel')
-
-      // Tab navigation should work
-      await user.keyboard('{Tab}')
-      expect(confirmButton).toHaveFocus()
-
-      await user.keyboard('{Tab}')
-      expect(cancelButton).toHaveFocus()
-
-      // Shift+Tab should reverse navigation
-      await user.keyboard('{Shift>}{Tab}{/Shift}')
-      expect(confirmButton).toHaveFocus()
-    })
-
-    it('closes modal with Escape key', async () => {
-      renderWithProviders(<CorsTable />)
-
-      // Open modal
-      const deleteButton = screen.getAllByLabelText(/delete cors policy/i)[0]
-      await user.click(deleteButton)
-
-      expect(screen.getByRole('dialog')).toBeInTheDocument()
-
-      // Close with Escape
-      await user.keyboard('{Escape}')
-
-      await waitFor(() => {
-        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  beforeEach(() => {
+    mockIntersectionObserver();
+    server.use(
+      http.get('/api/v2/system/cors', () => {
+        return HttpResponse.json({
+          resource: mockData,
+          meta: { count: 3, total: 3 }
+        });
       })
-    })
+    );
+  });
 
-    it('traps focus within modal', async () => {
-      renderWithProviders(<CorsTable />)
+  it('filters CORS configurations by path', async () => {
+    const user = userEvent.setup();
+    renderWithQueryClient(<CorsTable />);
 
-      // Open modal
-      const deleteButton = screen.getAllByLabelText(/delete cors policy/i)[0]
-      await user.click(deleteButton)
+    await waitFor(() => {
+      expect(screen.getByText('/api/v2/users/*')).toBeInTheDocument();
+    });
 
-      const dialog = screen.getByRole('dialog')
-      const confirmButton = within(dialog).getByText('Delete')
-      const cancelButton = within(dialog).getByText('Cancel')
+    // Search for "users"
+    const searchInput = screen.getByPlaceholderText('Search CORS policies...');
+    await user.type(searchInput, 'users');
 
-      // Focus should be trapped within modal
-      confirmButton.focus()
-      await user.keyboard('{Tab}')
-      expect(cancelButton).toHaveFocus()
+    // Should show only user-related config
+    expect(screen.getByText('/api/v2/users/*')).toBeInTheDocument();
+    expect(screen.queryByText('/api/v2/products/*')).not.toBeInTheDocument();
+    expect(screen.queryByText('/api/v2/orders/*')).not.toBeInTheDocument();
+  });
 
-      // Continue tabbing should cycle back
-      await user.keyboard('{Tab}')
-      expect(confirmButton).toHaveFocus()
-    })
-  })
+  it('filters CORS configurations by origin', async () => {
+    const user = userEvent.setup();
+    renderWithQueryClient(<CorsTable />);
 
-  describe('CORS Operation Testing with Optimistic Updates', () => {
-    it('performs optimistic deletion with success', async () => {
-      const mockMutate = vi.fn()
-      mockUseDeleteCors.mockReturnValue({
-        mutate: mockMutate,
-        isLoading: false,
-        error: null,
+    await waitFor(() => {
+      expect(screen.getByText('https://app.example.com')).toBeInTheDocument();
+    });
+
+    // Search for "shop"
+    const searchInput = screen.getByPlaceholderText('Search CORS policies...');
+    await user.type(searchInput, 'shop');
+
+    // Should show only shop-related config
+    expect(screen.getByText('https://shop.example.com')).toBeInTheDocument();
+    expect(screen.queryByText('https://app.example.com')).not.toBeInTheDocument();
+    expect(screen.queryByText('*')).not.toBeInTheDocument();
+  });
+
+  it('filters CORS configurations by description', async () => {
+    const user = userEvent.setup();
+    renderWithQueryClient(<CorsTable />);
+
+    await waitFor(() => {
+      expect(screen.getByText('User API CORS policy')).toBeInTheDocument();
+    });
+
+    // Search for "Product"
+    const searchInput = screen.getByPlaceholderText('Search CORS policies...');
+    await user.type(searchInput, 'Product');
+
+    // Should show only product-related config
+    expect(screen.getByText('Product API CORS policy')).toBeInTheDocument();
+    expect(screen.queryByText('User API CORS policy')).not.toBeInTheDocument();
+    expect(screen.queryByText('Order API CORS policy')).not.toBeInTheDocument();
+  });
+
+  it('shows no results message when search yields no matches', async () => {
+    const user = userEvent.setup();
+    renderWithQueryClient(<CorsTable />);
+
+    await waitFor(() => {
+      expect(screen.getByText('/api/v2/users/*')).toBeInTheDocument();
+    });
+
+    // Search for non-existent term
+    const searchInput = screen.getByPlaceholderText('Search CORS policies...');
+    await user.type(searchInput, 'nonexistent');
+
+    // Should show empty state with search message
+    expect(screen.getByText('No CORS configurations')).toBeInTheDocument();
+    expect(screen.getByText('No configurations match your search.')).toBeInTheDocument();
+  });
+
+  it('clears search and shows all results', async () => {
+    const user = userEvent.setup();
+    renderWithQueryClient(<CorsTable />);
+
+    await waitFor(() => {
+      expect(screen.getByText('/api/v2/users/*')).toBeInTheDocument();
+    });
+
+    // Search for "users"
+    const searchInput = screen.getByPlaceholderText('Search CORS policies...');
+    await user.type(searchInput, 'users');
+
+    // Verify filtering
+    expect(screen.getByText('/api/v2/users/*')).toBeInTheDocument();
+    expect(screen.queryByText('/api/v2/products/*')).not.toBeInTheDocument();
+
+    // Clear search
+    await user.clear(searchInput);
+
+    // Should show all results again
+    expect(screen.getByText('/api/v2/users/*')).toBeInTheDocument();
+    expect(screen.getByText('/api/v2/products/*')).toBeInTheDocument();
+    expect(screen.getByText('/api/v2/orders/*')).toBeInTheDocument();
+  });
+});
+
+// ============================================================================
+// TEST SUITE: ROW SELECTION AND BULK OPERATIONS
+// ============================================================================
+
+describe('CorsTable Component - Row Selection', () => {
+  const mockData = [
+    generateMockCorsConfig(1),
+    generateMockCorsConfig(2),
+    generateMockCorsConfig(3),
+  ];
+
+  beforeEach(() => {
+    mockIntersectionObserver();
+    server.use(
+      http.get('/api/v2/system/cors', () => {
+        return HttpResponse.json({
+          resource: mockData,
+          meta: { count: 3, total: 3 }
+        });
       })
+    );
+  });
 
-      renderWithProviders(<CorsTable />)
+  it('selects individual rows', async () => {
+    const user = userEvent.setup();
+    renderWithQueryClient(<CorsTable />);
 
-      // Initially shows both CORS entries
-      expect(screen.getByText('/api/v2/*')).toBeInTheDocument()
-      expect(screen.getByText('/api/v2/db/*')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('/api/v2/test1/*')).toBeInTheDocument();
+    });
 
-      // Delete first entry
-      const deleteButton = screen.getAllByLabelText(/delete cors policy/i)[0]
-      await user.click(deleteButton)
+    // Get all row checkboxes (excluding select all)
+    const rowCheckboxes = screen.getAllByRole('checkbox');
+    const firstRowCheckbox = rowCheckboxes[1]; // [0] is select all
 
-      const confirmButton = screen.getByText('Delete')
-      await user.click(confirmButton)
+    // Select first row
+    await user.click(firstRowCheckbox);
+    expect(firstRowCheckbox).toBeChecked();
 
-      // Verify deletion was called
-      expect(mockMutate).toHaveBeenCalledWith(1, expect.any(Object))
-    })
+    // Other rows should remain unselected
+    expect(rowCheckboxes[2]).not.toBeChecked();
+    expect(rowCheckboxes[3]).not.toBeChecked();
+  });
 
-    it('handles deletion with rollback on error', async () => {
-      const mockMutate = vi.fn()
-      mockUseDeleteCors.mockReturnValue({
-        mutate: mockMutate,
-        isLoading: false,
-        error: { message: 'Deletion failed' },
+  it('selects all rows with select all checkbox', async () => {
+    const user = userEvent.setup();
+    renderWithQueryClient(<CorsTable />);
+
+    await waitFor(() => {
+      expect(screen.getByText('/api/v2/test1/*')).toBeInTheDocument();
+    });
+
+    // Get select all checkbox
+    const selectAllCheckbox = screen.getAllByRole('checkbox')[0];
+
+    // Click select all
+    await user.click(selectAllCheckbox);
+
+    // All checkboxes should be checked
+    const allCheckboxes = screen.getAllByRole('checkbox');
+    allCheckboxes.forEach(checkbox => {
+      expect(checkbox).toBeChecked();
+    });
+  });
+
+  it('deselects all rows when select all is unchecked', async () => {
+    const user = userEvent.setup();
+    renderWithQueryClient(<CorsTable />);
+
+    await waitFor(() => {
+      expect(screen.getByText('/api/v2/test1/*')).toBeInTheDocument();
+    });
+
+    const selectAllCheckbox = screen.getAllByRole('checkbox')[0];
+
+    // Select all first
+    await user.click(selectAllCheckbox);
+    
+    // Then deselect all
+    await user.click(selectAllCheckbox);
+
+    // All checkboxes should be unchecked
+    const allCheckboxes = screen.getAllByRole('checkbox');
+    allCheckboxes.forEach(checkbox => {
+      expect(checkbox).not.toBeChecked();
+    });
+  });
+
+  it('updates select all state based on individual selections', async () => {
+    const user = userEvent.setup();
+    renderWithQueryClient(<CorsTable />);
+
+    await waitFor(() => {
+      expect(screen.getByText('/api/v2/test1/*')).toBeInTheDocument();
+    });
+
+    const allCheckboxes = screen.getAllByRole('checkbox');
+    const selectAllCheckbox = allCheckboxes[0];
+    const rowCheckboxes = allCheckboxes.slice(1);
+
+    // Select all individual rows manually
+    for (const checkbox of rowCheckboxes) {
+      await user.click(checkbox);
+    }
+
+    // Select all should become checked
+    expect(selectAllCheckbox).toBeChecked();
+
+    // Deselect one row
+    await user.click(rowCheckboxes[0]);
+
+    // Select all should become unchecked
+    expect(selectAllCheckbox).not.toBeChecked();
+  });
+});
+
+// ============================================================================
+// TEST SUITE: DELETE MODAL AND ACCESSIBILITY
+// ============================================================================
+
+describe('CorsTable Component - Delete Modal', () => {
+  const mockData = [generateMockCorsConfig(1, { path: '/api/v2/test/*' })];
+
+  beforeEach(() => {
+    mockIntersectionObserver();
+    server.use(
+      http.get('/api/v2/system/cors', () => {
+        return HttpResponse.json({
+          resource: mockData,
+          meta: { count: 1, total: 1 }
+        });
       })
+    );
+  });
 
-      renderWithProviders(<CorsTable />)
+  it('opens delete confirmation modal when delete button is clicked', async () => {
+    const user = userEvent.setup();
+    renderWithQueryClient(<CorsTable />);
 
-      // Attempt deletion
-      const deleteButton = screen.getAllByLabelText(/delete cors policy/i)[0]
-      await user.click(deleteButton)
+    await waitFor(() => {
+      expect(screen.getByText('/api/v2/test/*')).toBeInTheDocument();
+    });
 
-      const confirmButton = screen.getByText('Delete')
-      await user.click(confirmButton)
+    // Click delete button
+    const deleteButton = screen.getByRole('button', { name: /delete cors configuration/i });
+    await user.click(deleteButton);
 
-      // Should show error message
-      await waitFor(() => {
-        expect(screen.getByText(/deletion failed/i)).toBeInTheDocument()
+    // Modal should be open
+    expect(screen.getByText('Delete CORS Configuration')).toBeInTheDocument();
+    expect(screen.getByText(/Are you sure you want to delete the CORS configuration for/)).toBeInTheDocument();
+    expect(screen.getByText('/api/v2/test/*')).toBeInTheDocument();
+  });
+
+  it('closes modal when cancel is clicked', async () => {
+    const user = userEvent.setup();
+    renderWithQueryClient(<CorsTable />);
+
+    await waitFor(() => {
+      expect(screen.getByText('/api/v2/test/*')).toBeInTheDocument();
+    });
+
+    // Open modal
+    const deleteButton = screen.getByRole('button', { name: /delete cors configuration/i });
+    await user.click(deleteButton);
+
+    // Click cancel
+    const cancelButton = screen.getByRole('button', { name: /cancel/i });
+    await user.click(cancelButton);
+
+    // Modal should be closed
+    await waitFor(() => {
+      expect(screen.queryByText('Delete CORS Configuration')).not.toBeInTheDocument();
+    });
+  });
+
+  it('supports keyboard navigation in modal per WCAG 2.1 AA compliance', async () => {
+    const user = userEvent.setup();
+    renderWithQueryClient(<CorsTable />);
+
+    await waitFor(() => {
+      expect(screen.getByText('/api/v2/test/*')).toBeInTheDocument();
+    });
+
+    // Open modal
+    const deleteButton = screen.getByRole('button', { name: /delete cors configuration/i });
+    await user.click(deleteButton);
+
+    // Modal should be open and focused
+    const modal = screen.getByRole('dialog');
+    expect(modal).toBeInTheDocument();
+
+    // Test keyboard navigation
+    await user.keyboard('{Tab}');
+    expect(screen.getByRole('button', { name: /cancel/i })).toHaveFocus();
+
+    await user.keyboard('{Tab}');
+    expect(screen.getByRole('button', { name: /delete/i })).toHaveFocus();
+
+    // Test escape key
+    await user.keyboard('{Escape}');
+    
+    await waitFor(() => {
+      expect(screen.queryByText('Delete CORS Configuration')).not.toBeInTheDocument();
+    });
+  });
+
+  it('traps focus within modal', async () => {
+    const user = userEvent.setup();
+    renderWithQueryClient(<CorsTable />);
+
+    await waitFor(() => {
+      expect(screen.getByText('/api/v2/test/*')).toBeInTheDocument();
+    });
+
+    // Open modal
+    const deleteButton = screen.getByRole('button', { name: /delete cors configuration/i });
+    await user.click(deleteButton);
+
+    // Test forward focus trap
+    await user.keyboard('{Tab}'); // Cancel button
+    await user.keyboard('{Tab}'); // Delete button
+    await user.keyboard('{Tab}'); // Should cycle back to Cancel
+    
+    expect(screen.getByRole('button', { name: /cancel/i })).toHaveFocus();
+
+    // Test backward focus trap
+    await user.keyboard('{Shift>}{Tab}{/Shift}'); // Should go to Delete button
+    expect(screen.getByRole('button', { name: /delete/i })).toHaveFocus();
+  });
+
+  it('has proper ARIA attributes for accessibility', async () => {
+    const user = userEvent.setup();
+    renderWithQueryClient(<CorsTable />);
+
+    await waitFor(() => {
+      expect(screen.getByText('/api/v2/test/*')).toBeInTheDocument();
+    });
+
+    // Open modal
+    const deleteButton = screen.getByRole('button', { name: /delete cors configuration/i });
+    await user.click(deleteButton);
+
+    // Check modal ARIA attributes
+    const modal = screen.getByRole('dialog');
+    expect(modal).toHaveAttribute('aria-modal', 'true');
+    
+    const modalTitle = screen.getByText('Delete CORS Configuration');
+    expect(modalTitle).toBeInTheDocument();
+    
+    // Check for proper labeling
+    expect(modal).toHaveAccessibleName();
+  });
+});
+
+// ============================================================================
+// TEST SUITE: CORS OPERATIONS WITH REACT QUERY
+// ============================================================================
+
+describe('CorsTable Component - CORS Operations', () => {
+  const mockData = [generateMockCorsConfig(1, { path: '/api/v2/test/*' })];
+
+  beforeEach(() => {
+    mockIntersectionObserver();
+    server.use(
+      http.get('/api/v2/system/cors', () => {
+        return HttpResponse.json({
+          resource: mockData,
+          meta: { count: 1, total: 1 }
+        });
       })
+    );
+  });
 
-      // Original data should be restored (rollback)
-      expect(screen.getByText('/api/v2/*')).toBeInTheDocument()
-      expect(screen.getByText('/api/v2/db/*')).toBeInTheDocument()
-    })
-
-    it('shows loading state during operations', async () => {
-      mockUseDeleteCors.mockReturnValue({
-        mutate: vi.fn(),
-        isLoading: true,
-        error: null,
+  it('performs optimistic delete with success', async () => {
+    const user = userEvent.setup();
+    
+    // Mock successful delete
+    server.use(
+      http.delete('/api/v2/system/cors/1', () => {
+        return HttpResponse.json({ success: true, resource: mockData[0] });
       })
+    );
 
-      renderWithProviders(<CorsTable />)
+    renderWithQueryClient(<CorsTable />);
 
-      // Should show loading indicators
-      expect(screen.getByText(/deleting/i)).toBeInTheDocument()
-      
-      // Delete buttons should be disabled during loading
-      const deleteButtons = screen.getAllByLabelText(/delete cors policy/i)
-      deleteButtons.forEach(button => {
-        expect(button).toBeDisabled()
+    await waitFor(() => {
+      expect(screen.getByText('/api/v2/test/*')).toBeInTheDocument();
+    });
+
+    // Open delete modal
+    const deleteButton = screen.getByRole('button', { name: /delete cors configuration/i });
+    await user.click(deleteButton);
+
+    // Confirm delete
+    const confirmButton = screen.getByRole('button', { name: /^delete$/i });
+    await user.click(confirmButton);
+
+    // Row should disappear immediately (optimistic update)
+    await waitFor(() => {
+      expect(screen.queryByText('/api/v2/test/*')).not.toBeInTheDocument();
+    });
+
+    // Should show empty state
+    expect(screen.getByText('No CORS configurations')).toBeInTheDocument();
+  });
+
+  it('performs optimistic delete with rollback on error', async () => {
+    const user = userEvent.setup();
+    
+    // Mock failed delete
+    server.use(
+      http.delete('/api/v2/system/cors/1', () => {
+        return HttpResponse.json(
+          { error: 'Failed to delete CORS config: 500' },
+          { status: 500 }
+        );
       })
-    })
+    );
 
-    it('refreshes data after successful operations', async () => {
-      const mockRefetch = vi.fn()
-      mockUseCors.mockReturnValue({
-        data: { resource: mockCorsData, meta: { count: mockCorsData.length } },
-        isLoading: false,
-        error: null,
-        refetch: mockRefetch,
+    renderWithQueryClient(<CorsTable />);
+
+    await waitFor(() => {
+      expect(screen.getByText('/api/v2/test/*')).toBeInTheDocument();
+    });
+
+    // Open delete modal
+    const deleteButton = screen.getByRole('button', { name: /delete cors configuration/i });
+    await user.click(deleteButton);
+
+    // Confirm delete
+    const confirmButton = screen.getByRole('button', { name: /^delete$/i });
+    await user.click(confirmButton);
+
+    // Row should disappear initially (optimistic update)
+    await waitFor(() => {
+      expect(screen.queryByText('/api/v2/test/*')).not.toBeInTheDocument();
+    });
+
+    // Then rollback on error - row should reappear
+    await waitFor(() => {
+      expect(screen.getByText('/api/v2/test/*')).toBeInTheDocument();
+    }, { timeout: 3000 });
+  });
+
+  it('disables delete buttons while deletion is in progress', async () => {
+    const user = userEvent.setup();
+    
+    // Mock slow delete response
+    server.use(
+      http.delete('/api/v2/system/cors/1', async () => {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return HttpResponse.json({ success: true, resource: mockData[0] });
       })
+    );
 
-      const mockMutate = vi.fn((_, options) => {
-        // Simulate successful mutation
-        options.onSuccess?.()
+    renderWithQueryClient(<CorsTable />);
+
+    await waitFor(() => {
+      expect(screen.getByText('/api/v2/test/*')).toBeInTheDocument();
+    });
+
+    // Open delete modal
+    const deleteButton = screen.getByRole('button', { name: /delete cors configuration/i });
+    await user.click(deleteButton);
+
+    // Confirm delete
+    const confirmButton = screen.getByRole('button', { name: /^delete$/i });
+    await user.click(confirmButton);
+
+    // Modal should close and button should show loading state
+    await waitFor(() => {
+      expect(screen.queryByText('Delete CORS Configuration')).not.toBeInTheDocument();
+    });
+
+    // Delete button in table should be disabled
+    const tableDeleteButton = screen.getByRole('button', { name: /delete cors configuration/i });
+    expect(tableDeleteButton).toBeDisabled();
+  });
+
+  it('calls onEdit callback when edit button is clicked', async () => {
+    const user = userEvent.setup();
+    const mockOnEdit = vi.fn();
+
+    renderWithQueryClient(<CorsTable onEdit={mockOnEdit} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('/api/v2/test/*')).toBeInTheDocument();
+    });
+
+    // Click edit button
+    const editButton = screen.getByRole('button', { name: /edit cors configuration/i });
+    await user.click(editButton);
+
+    // Should call onEdit with the CORS config
+    expect(mockOnEdit).toHaveBeenCalledWith(expect.objectContaining({
+      id: 1,
+      path: '/api/v2/test/*'
+    }));
+  });
+
+  it('calls onRefresh callback when refresh button is clicked', async () => {
+    const user = userEvent.setup();
+    const mockOnRefresh = vi.fn();
+
+    renderWithQueryClient(<CorsTable onRefresh={mockOnRefresh} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('/api/v2/test/*')).toBeInTheDocument();
+    });
+
+    // Click refresh button
+    const refreshButton = screen.getByRole('button', { name: /refresh/i });
+    await user.click(refreshButton);
+
+    // Should call onRefresh
+    expect(mockOnRefresh).toHaveBeenCalled();
+  });
+});
+
+// ============================================================================
+// TEST SUITE: ERROR HANDLING AND RECOVERY
+// ============================================================================
+
+describe('CorsTable Component - Error Handling', () => {
+  beforeEach(() => {
+    mockIntersectionObserver();
+  });
+
+  it('displays error state when API request fails', async () => {
+    // Mock API error
+    server.use(
+      http.get('/api/v2/system/cors', () => {
+        return HttpResponse.json(
+          { error: 'Internal Server Error' },
+          { status: 500 }
+        );
       })
+    );
 
-      mockUseDeleteCors.mockReturnValue({
-        mutate: mockMutate,
-        isLoading: false,
-        error: null,
+    renderWithQueryClient(<CorsTable />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Error Loading Data')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('Failed to load CORS configurations')).toBeInTheDocument();
+    
+    // Check for error icon
+    const errorIcon = screen.getByRole('img', { hidden: true });
+    expect(errorIcon).toBeInTheDocument();
+    
+    // Check for retry button
+    const retryButton = screen.getByRole('button', { name: /try again/i });
+    expect(retryButton).toBeInTheDocument();
+  });
+
+  it('allows retry after error', async () => {
+    const user = userEvent.setup();
+    
+    // First request fails
+    server.use(
+      http.get('/api/v2/system/cors', () => {
+        return HttpResponse.json(
+          { error: 'Internal Server Error' },
+          { status: 500 }
+        );
       })
+    );
 
-      renderWithProviders(<CorsTable />)
+    renderWithQueryClient(<CorsTable />);
 
-      // Delete and confirm
-      const deleteButton = screen.getAllByLabelText(/delete cors policy/i)[0]
-      await user.click(deleteButton)
+    await waitFor(() => {
+      expect(screen.getByText('Error Loading Data')).toBeInTheDocument();
+    });
 
-      const confirmButton = screen.getByText('Delete')
-      await user.click(confirmButton)
-
-      // Should refetch data
-      await waitFor(() => {
-        expect(mockRefetch).toHaveBeenCalled()
+    // Mock successful retry
+    server.use(
+      http.get('/api/v2/system/cors', () => {
+        return HttpResponse.json({
+          resource: [generateMockCorsConfig(1)],
+          meta: { count: 1, total: 1 }
+        });
       })
-    })
-  })
+    );
 
-  describe('Responsive Design Testing Across Breakpoints', () => {
-    it('adapts table layout for mobile screens (< 768px)', async () => {
-      setViewportSize(375, 667) // iPhone SE
+    // Click retry button
+    const retryButton = screen.getByRole('button', { name: /try again/i });
+    await user.click(retryButton);
 
-      renderWithProviders(<CorsTable />)
+    // Should show loading then data
+    expect(screen.getByText('Loading CORS configurations...')).toBeInTheDocument();
 
-      // Mobile should show condensed view
-      await waitFor(() => {
-        const table = screen.getByRole('table')
-        expect(table).toHaveClass('mobile-layout')
+    await waitFor(() => {
+      expect(screen.getByText('/api/v2/test1/*')).toBeInTheDocument();
+    });
+  });
+
+  it('displays specific error message from API response', async () => {
+    // Mock API error with specific message
+    server.use(
+      http.get('/api/v2/system/cors', () => {
+        return HttpResponse.json(
+          { error: 'Authentication required' },
+          { status: 401 }
+        );
       })
+    );
 
-      // Some columns should be hidden on mobile
-      expect(screen.queryByText('Created Date')).not.toBeInTheDocument()
-      expect(screen.queryByText('Last Modified')).not.toBeInTheDocument()
-    })
+    renderWithQueryClient(<CorsTable />);
 
-    it('shows full table layout for tablet screens (768px - 1024px)', async () => {
-      setViewportSize(768, 1024) // iPad
+    await waitFor(() => {
+      expect(screen.getByText('Error Loading Data')).toBeInTheDocument();
+    });
 
-      renderWithProviders(<CorsTable />)
+    // Should show specific error message
+    expect(screen.getByText('HTTP error! status: 401')).toBeInTheDocument();
+  });
 
-      await waitFor(() => {
-        const table = screen.getByRole('table')
-        expect(table).toHaveClass('tablet-layout')
+  it('handles network errors gracefully', async () => {
+    // Mock network error
+    server.use(
+      http.get('/api/v2/system/cors', () => {
+        throw new Error('Network error');
       })
+    );
 
-      // Should show most columns but may hide some less important ones
-      expect(screen.getByText('Path')).toBeInTheDocument()
-      expect(screen.getByText('Origin')).toBeInTheDocument()
-      expect(screen.getByText('Description')).toBeInTheDocument()
-    })
+    renderWithQueryClient(<CorsTable />);
 
-    it('displays full table layout for desktop screens (> 1024px)', async () => {
-      setViewportSize(1920, 1080) // Desktop
+    await waitFor(() => {
+      expect(screen.getByText('Error Loading Data')).toBeInTheDocument();
+    });
 
-      renderWithProviders(<CorsTable />)
+    expect(screen.getByText('Failed to load CORS configurations')).toBeInTheDocument();
+  });
+});
 
-      await waitFor(() => {
-        const table = screen.getByRole('table')
-        expect(table).toHaveClass('desktop-layout')
+// ============================================================================
+// TEST SUITE: RESPONSIVE DESIGN TESTING
+// ============================================================================
+
+describe('CorsTable Component - Responsive Design', () => {
+  const mockData = [
+    generateMockCorsConfig(1),
+    generateMockCorsConfig(2),
+    generateMockCorsConfig(3),
+  ];
+
+  beforeEach(() => {
+    mockIntersectionObserver();
+    server.use(
+      http.get('/api/v2/system/cors', () => {
+        return HttpResponse.json({
+          resource: mockData,
+          meta: { count: 3, total: 3 }
+        });
       })
+    );
+  });
 
-      // Should show all columns
-      expect(screen.getByText('Status')).toBeInTheDocument()
-      expect(screen.getByText('Path')).toBeInTheDocument()
-      expect(screen.getByText('Origin')).toBeInTheDocument()
-      expect(screen.getByText('Methods')).toBeInTheDocument()
-      expect(screen.getByText('Max Age')).toBeInTheDocument()
-      expect(screen.getByText('Description')).toBeInTheDocument()
-      expect(screen.getByText('Actions')).toBeInTheDocument()
-    })
+  it('adapts layout for mobile viewport (320px)', async () => {
+    // Set mobile viewport
+    mockViewportResize(320, 568);
 
-    it('maintains accessibility across all breakpoints', async () => {
-      const breakpoints = [
-        { width: 375, height: 667 }, // Mobile
-        { width: 768, height: 1024 }, // Tablet
-        { width: 1920, height: 1080 }, // Desktop
-      ]
+    renderWithQueryClient(<CorsTable />);
 
-      for (const { width, height } of breakpoints) {
-        setViewportSize(width, height)
-        
-        const { unmount } = renderWithProviders(<CorsTable />)
+    await waitFor(() => {
+      expect(screen.getByText('/api/v2/test1/*')).toBeInTheDocument();
+    });
 
-        // Check accessibility attributes are maintained
-        const table = screen.getByRole('table')
-        expect(table).toHaveAttribute('aria-label')
+    // Check that header layout stacks vertically on mobile
+    const header = screen.getByText('CORS Configurations').closest('div');
+    expect(header).toHaveClass('flex-col', 'sm:flex-row');
 
-        // Check row accessibility
-        const rows = screen.getAllByRole('row')
-        rows.forEach(row => {
-          expect(row).toBeInTheDocument()
-        })
+    // Check that action buttons stack on mobile
+    const searchContainer = screen.getByPlaceholderText('Search CORS policies...').closest('div');
+    expect(searchContainer?.parentElement).toHaveClass('space-y-2', 'sm:space-y-0');
+  });
 
-        unmount()
-      }
-    })
-  })
+  it('adapts layout for tablet viewport (768px)', async () => {
+    // Set tablet viewport
+    mockViewportResize(768, 1024);
 
-  describe('Error State Testing with Recovery Scenarios', () => {
-    it('handles and displays server errors gracefully', async () => {
-      mockUseCors.mockReturnValue({
-        data: null,
-        isLoading: false,
-        error: { message: 'Internal server error', status: 500 },
-        refetch: vi.fn(),
+    renderWithQueryClient(<CorsTable />);
+
+    await waitFor(() => {
+      expect(screen.getByText('/api/v2/test1/*')).toBeInTheDocument();
+    });
+
+    // Verify responsive grid classes are applied
+    const gridContainer = document.querySelector('.grid-cols-12');
+    expect(gridContainer).toBeInTheDocument();
+  });
+
+  it('displays full layout for desktop viewport (1024px+)', async () => {
+    // Set desktop viewport
+    mockViewportResize(1024, 768);
+
+    renderWithQueryClient(<CorsTable />);
+
+    await waitFor(() => {
+      expect(screen.getByText('/api/v2/test1/*')).toBeInTheDocument();
+    });
+
+    // All columns should be visible on desktop
+    expect(screen.getByText('Status')).toBeInTheDocument();
+    expect(screen.getByText('Path')).toBeInTheDocument();
+    expect(screen.getByText('Origin')).toBeInTheDocument();
+    expect(screen.getByText('Methods')).toBeInTheDocument();
+    expect(screen.getByText('Max Age')).toBeInTheDocument();
+    expect(screen.getByText('Actions')).toBeInTheDocument();
+  });
+
+  it('maintains functionality across different viewport sizes', async () => {
+    const user = userEvent.setup();
+
+    // Start with mobile
+    mockViewportResize(320, 568);
+
+    renderWithQueryClient(<CorsTable />);
+
+    await waitFor(() => {
+      expect(screen.getByText('/api/v2/test1/*')).toBeInTheDocument();
+    });
+
+    // Test search functionality on mobile
+    const searchInput = screen.getByPlaceholderText('Search CORS policies...');
+    await user.type(searchInput, 'test1');
+
+    expect(screen.getByText('/api/v2/test1/*')).toBeInTheDocument();
+    expect(screen.queryByText('/api/v2/test2/*')).not.toBeInTheDocument();
+
+    // Switch to desktop
+    mockViewportResize(1024, 768);
+
+    // Functionality should still work
+    await user.clear(searchInput);
+    await user.type(searchInput, 'test2');
+
+    expect(screen.getByText('/api/v2/test2/*')).toBeInTheDocument();
+    expect(screen.queryByText('/api/v2/test1/*')).not.toBeInTheDocument();
+  });
+});
+
+// ============================================================================
+// TEST SUITE: DATA FORMATTING AND DISPLAY
+// ============================================================================
+
+describe('CorsTable Component - Data Formatting', () => {
+  beforeEach(() => {
+    mockIntersectionObserver();
+  });
+
+  it('formats CORS status correctly', async () => {
+    const mockData = [
+      generateMockCorsConfig(1, { enabled: true }),
+      generateMockCorsConfig(2, { enabled: false }),
+    ];
+
+    server.use(
+      http.get('/api/v2/system/cors', () => {
+        return HttpResponse.json({
+          resource: mockData,
+          meta: { count: 2, total: 2 }
+        });
       })
+    );
 
-      renderWithProviders(<CorsTable />)
+    renderWithQueryClient(<CorsTable />);
 
-      // Should show error state
-      expect(screen.getByText(/error loading cors policies/i)).toBeInTheDocument()
-      expect(screen.getByText(/internal server error/i)).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('Active')).toBeInTheDocument();
+      expect(screen.getByText('Inactive')).toBeInTheDocument();
+    });
 
-      // Should provide retry option
-      const retryButton = screen.getByText(/retry/i)
-      expect(retryButton).toBeInTheDocument()
-    })
+    // Check status icons
+    const activeIcon = screen.getByText('Active').parentElement?.querySelector('svg');
+    const inactiveIcon = screen.getByText('Inactive').parentElement?.querySelector('svg');
+    
+    expect(activeIcon).toBeInTheDocument();
+    expect(inactiveIcon).toBeInTheDocument();
+  });
 
-    it('provides error recovery through retry mechanism', async () => {
-      const mockRefetch = vi.fn()
-      mockUseCors.mockReturnValue({
-        data: null,
-        isLoading: false,
-        error: { message: 'Network error' },
-        refetch: mockRefetch,
+  it('formats HTTP methods correctly', async () => {
+    const mockData = [
+      generateMockCorsConfig(1, { method: ['GET', 'POST', 'PUT'] }),
+      generateMockCorsConfig(2, { method: [] }),
+    ];
+
+    server.use(
+      http.get('/api/v2/system/cors', () => {
+        return HttpResponse.json({
+          resource: mockData,
+          meta: { count: 2, total: 2 }
+        });
       })
+    );
 
-      renderWithProviders(<CorsTable />)
+    renderWithQueryClient(<CorsTable />);
 
-      // Click retry button
-      const retryButton = screen.getByText(/retry/i)
-      await user.click(retryButton)
+    await waitFor(() => {
+      expect(screen.getByText('GET, POST, PUT')).toBeInTheDocument();
+      expect(screen.getByText('ALL')).toBeInTheDocument();
+    });
+  });
 
-      // Should attempt to refetch
-      expect(mockRefetch).toHaveBeenCalled()
-    })
+  it('formats max age correctly', async () => {
+    const mockData = [
+      generateMockCorsConfig(1, { maxAge: 3600 }),
+      generateMockCorsConfig(2, { maxAge: 0 }),
+    ];
 
-    it('handles network errors with appropriate fallback', async () => {
-      mockUseCors.mockReturnValue({
-        data: null,
-        isLoading: false,
-        error: { message: 'Network error', name: 'NetworkError' },
-        refetch: vi.fn(),
+    server.use(
+      http.get('/api/v2/system/cors', () => {
+        return HttpResponse.json({
+          resource: mockData,
+          meta: { count: 2, total: 2 }
+        });
       })
+    );
 
-      renderWithProviders(<CorsTable />)
+    renderWithQueryClient(<CorsTable />);
 
-      // Should show network-specific error message
-      expect(screen.getByText(/network error/i)).toBeInTheDocument()
-      expect(screen.getByText(/check your connection/i)).toBeInTheDocument()
-    })
+    await waitFor(() => {
+      expect(screen.getByText('3600s')).toBeInTheDocument();
+      expect(screen.getByText('0s')).toBeInTheDocument();
+    });
+  });
 
-    it('shows empty state when no CORS policies exist', async () => {
-      mockUseCors.mockReturnValue({
-        data: { resource: [], meta: { count: 0 } },
-        isLoading: false,
-        error: null,
-        refetch: vi.fn(),
+  it('truncates long paths and descriptions', async () => {
+    const mockData = [
+      generateMockCorsConfig(1, { 
+        path: '/api/v2/very/long/path/that/should/be/truncated/in/the/display',
+        description: 'This is a very long description that should be truncated in the table display'
+      }),
+    ];
+
+    server.use(
+      http.get('/api/v2/system/cors', () => {
+        return HttpResponse.json({
+          resource: mockData,
+          meta: { count: 1, total: 1 }
+        });
       })
+    );
 
-      renderWithProviders(<CorsTable />)
+    renderWithQueryClient(<CorsTable />);
 
-      // Should show empty state
-      expect(screen.getByText(/no cors policies found/i)).toBeInTheDocument()
-      expect(screen.getByText(/create your first cors policy/i)).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('/api/v2/very/long/path/that/should/be/truncated/in/the/display')).toBeInTheDocument();
+    });
 
-      // Should show create button
-      const createButton = screen.getByText(/create cors policy/i)
-      expect(createButton).toBeInTheDocument()
-    })
+    // Check for truncate CSS class
+    const pathElement = screen.getByText('/api/v2/very/long/path/that/should/be/truncated/in/the/display');
+    expect(pathElement).toHaveClass('truncate');
 
-    it('recovers from errors and updates UI when data becomes available', async () => {
-      // Start with error state
-      mockUseCors.mockReturnValue({
-        data: null,
-        isLoading: false,
-        error: { message: 'Network error' },
-        refetch: vi.fn(),
+    const descriptionElement = screen.getByText('This is a very long description that should be truncated in the table display');
+    expect(descriptionElement).toHaveClass('truncate');
+  });
+});
+
+// ============================================================================
+// TEST SUITE: ACCESSIBILITY COMPLIANCE
+// ============================================================================
+
+describe('CorsTable Component - Accessibility Compliance', () => {
+  const mockData = [generateMockCorsConfig(1)];
+
+  beforeEach(() => {
+    mockIntersectionObserver();
+    server.use(
+      http.get('/api/v2/system/cors', () => {
+        return HttpResponse.json({
+          resource: mockData,
+          meta: { count: 1, total: 1 }
+        });
       })
+    );
+  });
 
-      const { rerender } = renderWithProviders(<CorsTable />)
+  it('has proper table semantics for screen readers', async () => {
+    renderWithQueryClient(<CorsTable />);
 
-      expect(screen.getByText(/error loading cors policies/i)).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('/api/v2/test1/*')).toBeInTheDocument();
+    });
 
-      // Simulate successful data fetch
-      mockUseCors.mockReturnValue({
-        data: { resource: mockCorsData, meta: { count: mockCorsData.length } },
-        isLoading: false,
-        error: null,
-        refetch: vi.fn(),
-      })
+    // Check for proper table structure
+    const table = screen.getByRole('table', { hidden: true });
+    expect(table).toBeInTheDocument();
 
-      rerender(<CorsTable />)
+    // Check for column headers
+    const columnHeaders = screen.getAllByRole('columnheader');
+    expect(columnHeaders.length).toBeGreaterThan(0);
 
-      // Should show data instead of error
-      await waitFor(() => {
-        expect(screen.queryByText(/error loading cors policies/i)).not.toBeInTheDocument()
-        expect(screen.getByText('/api/v2/*')).toBeInTheDocument()
-      })
-    })
-  })
+    // Check for row headers
+    const rows = screen.getAllByRole('row');
+    expect(rows.length).toBeGreaterThan(1); // Header + data rows
+  });
 
-  describe('React Query Cache Testing', () => {
-    it('utilizes cached data for faster subsequent renders', async () => {
-      const { queryClient } = renderWithProviders(<CorsTable />)
+  it('provides accessible button labels', async () => {
+    renderWithQueryClient(<CorsTable />);
 
-      // Simulate cache hit
-      const cacheKey = ['cors-policies']
-      queryClient.setQueryData(cacheKey, {
-        resource: mockCorsData,
-        meta: { count: mockCorsData.length }
-      })
+    await waitFor(() => {
+      expect(screen.getByText('/api/v2/test1/*')).toBeInTheDocument();
+    });
 
-      // Should render immediately from cache
-      expect(screen.getByText('/api/v2/*')).toBeInTheDocument()
-    })
+    // Check button accessibility
+    expect(screen.getByRole('button', { name: /edit cors configuration/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /delete cors configuration/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /refresh/i })).toBeInTheDocument();
+  });
 
-    it('invalidates cache after mutations', async () => {
-      const { queryClient } = renderWithProviders(<CorsTable />)
-      const mockInvalidateQueries = vi.spyOn(queryClient, 'invalidateQueries')
+  it('has proper form labels and descriptions', async () => {
+    renderWithQueryClient(<CorsTable />);
 
-      const mockMutate = vi.fn((_, options) => {
-        options.onSuccess?.()
-      })
+    await waitFor(() => {
+      expect(screen.getByText('/api/v2/test1/*')).toBeInTheDocument();
+    });
 
-      mockUseDeleteCors.mockReturnValue({
-        mutate: mockMutate,
-        isLoading: false,
-        error: null,
-      })
+    // Check search input accessibility
+    const searchInput = screen.getByPlaceholderText('Search CORS policies...');
+    expect(searchInput).toHaveAttribute('type', 'text');
+    expect(searchInput).toHaveAccessibleName();
+  });
 
-      // Perform deletion
-      const deleteButton = screen.getAllByLabelText(/delete cors policy/i)[0]
-      await user.click(deleteButton)
+  it('supports keyboard navigation throughout the table', async () => {
+    const user = userEvent.setup();
+    renderWithQueryClient(<CorsTable />);
 
-      const confirmButton = screen.getByText('Delete')
-      await user.click(confirmButton)
+    await waitFor(() => {
+      expect(screen.getByText('/api/v2/test1/*')).toBeInTheDocument();
+    });
 
-      // Cache should be invalidated
-      await waitFor(() => {
-        expect(mockInvalidateQueries).toHaveBeenCalledWith({
-          queryKey: ['cors-policies']
-        })
-      })
-    })
+    // Tab through interactive elements
+    await user.keyboard('{Tab}'); // Search input
+    expect(screen.getByPlaceholderText('Search CORS policies...')).toHaveFocus();
 
-    it('shows stale data while revalidating in background', async () => {
-      mockUseCors.mockReturnValue({
-        data: { resource: mockCorsData, meta: { count: mockCorsData.length } },
-        isLoading: false,
-        error: null,
-        refetch: vi.fn(),
-        isStale: true,
-        isFetching: true,
-      })
+    await user.keyboard('{Tab}'); // Refresh button
+    expect(screen.getByRole('button', { name: /refresh/i })).toHaveFocus();
 
-      renderWithProviders(<CorsTable />)
+    await user.keyboard('{Tab}'); // Select all checkbox
+    expect(screen.getAllByRole('checkbox')[0]).toHaveFocus();
 
-      // Should show data (even if stale)
-      expect(screen.getByText('/api/v2/*')).toBeInTheDocument()
+    await user.keyboard('{Tab}'); // First row checkbox
+    expect(screen.getAllByRole('checkbox')[1]).toHaveFocus();
 
-      // Should indicate background refresh
-      expect(screen.getByText(/updating/i)).toBeInTheDocument()
-    })
-  })
+    await user.keyboard('{Tab}'); // Edit button
+    expect(screen.getByRole('button', { name: /edit cors configuration/i })).toHaveFocus();
 
-  describe('Translation and Internationalization', () => {
-    it('supports localized table headers and labels', () => {
-      renderWithProviders(<CorsTable />)
+    await user.keyboard('{Tab}'); // Delete button
+    expect(screen.getByRole('button', { name: /delete cors configuration/i })).toHaveFocus();
+  });
 
-      // Headers should be translatable
-      expect(screen.getByText('Status')).toBeInTheDocument()
-      expect(screen.getByText('Path')).toBeInTheDocument()
-      expect(screen.getByText('Origin')).toBeInTheDocument()
-    })
+  it('has proper ARIA labels and roles', async () => {
+    renderWithQueryClient(<CorsTable />);
 
-    it('provides localized error messages', async () => {
-      mockUseCors.mockReturnValue({
-        data: null,
-        isLoading: false,
-        error: { message: 'Server error' },
-        refetch: vi.fn(),
-      })
+    await waitFor(() => {
+      expect(screen.getByText('/api/v2/test1/*')).toBeInTheDocument();
+    });
 
-      renderWithProviders(<CorsTable />)
+    // Check for loading state ARIA
+    expect(screen.queryByRole('status')).not.toBeInTheDocument(); // Should not be loading anymore
 
-      // Error messages should be localized
-      expect(screen.getByText(/error loading cors policies/i)).toBeInTheDocument()
-    })
+    // Check for proper button roles
+    const editButton = screen.getByRole('button', { name: /edit cors configuration/i });
+    expect(editButton).toHaveAttribute('title');
 
-    it('supports RTL languages in table layout', async () => {
-      document.dir = 'rtl'
-
-      renderWithProviders(<CorsTable />)
-
-      const table = screen.getByRole('table')
-      expect(table).toHaveClass('rtl-support')
-
-      // Cleanup
-      document.dir = 'ltr'
-    })
-  })
-})
+    const deleteButton = screen.getByRole('button', { name: /delete cors configuration/i });
+    expect(deleteButton).toHaveAttribute('title');
+  });
+});
