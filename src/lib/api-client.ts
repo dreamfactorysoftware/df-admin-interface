@@ -1,275 +1,299 @@
 /**
- * Core API client for DreamFactory admin interface.
+ * API Client for DreamFactory Admin Interface
  * 
- * Provides standardized HTTP client functionality with React Query integration,
- * authentication handling, and error management. Replaces Angular HttpClient
- * patterns with modern fetch-based implementations optimized for React 19
- * and Next.js 15.1+.
- * 
- * @fileoverview Core API client implementation
- * @version 1.0.0
- * @since React 19.0.0 / Next.js 15.1+
+ * Centralized HTTP client for all API interactions with DreamFactory backend.
+ * Provides type-safe methods for CRUD operations, authentication, and error handling.
+ * Implements modern fetch API with automatic retry, request/response interceptors,
+ * and comprehensive error handling.
  */
 
-import type { 
-  ApiRequestOptions, 
-  ApiResponse, 
-  ApiListResponse,
-  ApiResourceResponse,
-  ApiErrorResponse,
-  KeyValuePair 
-} from '../types/api';
-
-// ============================================================================
-// API Client Constants
-// ============================================================================
+import { notFound } from 'next/navigation';
 
 /**
- * Base URL for DreamFactory API endpoints
+ * API Response interface for typed responses
  */
-export const API_BASE_URL = '/api/v2';
-
-/**
- * System API endpoints
- */
-export const API_ENDPOINTS = {
-  SYSTEM_APP: `${API_BASE_URL}/system/app`,
-  SYSTEM_ADMIN: `${API_BASE_URL}/system/admin`,
-  SYSTEM_USER: `${API_BASE_URL}/system/user`,
-  SYSTEM_SERVICE: `${API_BASE_URL}/system/service`,
-  SYSTEM_ROLE: `${API_BASE_URL}/system/role`,
-  USER_SESSION: `${API_BASE_URL}/user/session`,
-  ADMIN_SESSION: `${API_BASE_URL}/system/admin/session`,
-} as const;
-
-// ============================================================================
-// API Client Implementation
-// ============================================================================
-
-/**
- * Build URL with query parameters
- */
-export function buildApiUrl(endpoint: string, params?: Record<string, any>): string {
-  const url = new URL(endpoint, window.location.origin);
-  
-  if (params) {
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        url.searchParams.append(key, String(value));
-      }
-    });
-  }
-  
-  return url.toString();
-}
-
-/**
- * Build request headers with authentication and options
- */
-export function buildApiHeaders(options: ApiRequestOptions = {}): Record<string, string> {
-  const headers: Record<string, string> = {};
-  
-  // Default headers
-  headers['Accept'] = 'application/json';
-  headers['Content-Type'] = 'application/json';
-  
-  // Cache control
-  if (options.includeCacheControl !== false) {
-    headers['Cache-Control'] = 'no-cache, private';
-  }
-  
-  // Loading indicator
-  if (options.showSpinner !== false) {
-    headers['show-loading'] = '';
-  }
-  
-  // Notification headers
-  if (options.snackbarSuccess) {
-    headers['snackbar-success'] = options.snackbarSuccess;
-  }
-  if (options.snackbarError) {
-    headers['snackbar-error'] = options.snackbarError;
-  }
-  
-  // Content type override
-  if (options.contentType) {
-    headers['Content-Type'] = options.contentType;
-  }
-  
-  // Additional headers
-  if (options.additionalHeaders) {
-    options.additionalHeaders.forEach((header: KeyValuePair) => {
-      headers[header.key] = header.value;
-    });
-  }
-  
-  return headers;
-}
-
-/**
- * Build query parameters from options
- */
-export function buildQueryParams(options: ApiRequestOptions = {}): Record<string, any> {
-  const params: Record<string, any> = {};
-  
-  if (options.filter) params.filter = options.filter;
-  if (options.sort) params.sort = options.sort;
-  if (options.fields) params.fields = options.fields;
-  if (options.related) params.related = options.related;
-  if (options.limit !== undefined) params.limit = options.limit;
-  if (options.offset !== undefined) params.offset = options.offset;
-  if (options.includeCount !== undefined) params.include_count = options.includeCount;
-  if (options.refresh) params.refresh = options.refresh;
-  
-  // Additional parameters
-  if (options.additionalParams) {
-    options.additionalParams.forEach((param: KeyValuePair) => {
-      params[param.key] = param.value;
-    });
-  }
-  
-  return params;
-}
-
-/**
- * Generic API request function
- */
-export async function apiRequest<T = any>(
-  endpoint: string,
-  options: ApiRequestOptions & {
-    method?: string;
-    body?: any;
-  } = {}
-): Promise<T> {
-  const { method = 'GET', body, ...requestOptions } = options;
-  
-  const headers = buildApiHeaders(requestOptions);
-  const params = buildQueryParams(requestOptions);
-  const url = buildApiUrl(endpoint, params);
-  
-  const fetchOptions: RequestInit = {
-    method,
-    headers,
-    credentials: 'include',
+interface ApiResponse<T = any> {
+  data?: T;
+  resource?: T;
+  success?: boolean;
+  message?: string;
+  error?: {
+    code: number;
+    message: string;
+    details?: any;
   };
-  
-  if (body && method !== 'GET' && method !== 'HEAD') {
-    fetchOptions.body = typeof body === 'string' ? body : JSON.stringify(body);
+}
+
+/**
+ * Request configuration options
+ */
+interface RequestConfig {
+  headers?: Record<string, string>;
+  timeout?: number;
+  retries?: number;
+  cache?: RequestCache;
+}
+
+/**
+ * API Client class with comprehensive HTTP operations
+ */
+class ApiClient {
+  private baseURL: string;
+  private defaultHeaders: Record<string, string>;
+
+  constructor() {
+    this.baseURL = process.env.NEXT_PUBLIC_API_BASE_URL || '/api/v2';
+    this.defaultHeaders = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
   }
-  
-  if (options.signal) {
-    fetchOptions.signal = options.signal;
+
+  /**
+   * Build full URL with base URL
+   */
+  private buildURL(endpoint: string): string {
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    return `${this.baseURL}${cleanEndpoint}`;
   }
-  
-  try {
-    const response = await fetch(url, fetchOptions);
-    
-    if (!response.ok) {
-      let errorData: ApiErrorResponse;
-      try {
-        errorData = await response.json();
-      } catch {
-        errorData = {
-          success: false,
-          error: {
-            code: response.status.toString(),
-            message: `HTTP ${response.status}: ${response.statusText}`,
-            status_code: response.status as any,
-          },
+
+  /**
+   * Get authentication headers from session storage or cookies
+   */
+  private getAuthHeaders(): Record<string, string> {
+    try {
+      // In a real implementation, this would get the token from secure storage
+      // For now, return empty headers
+      const token = typeof window !== 'undefined' 
+        ? localStorage.getItem('session_token') 
+        : null;
+      
+      if (token) {
+        return {
+          'X-DreamFactory-Session-Token': token,
+          'Authorization': `Bearer ${token}`
         };
       }
-      throw new Error(JSON.stringify(errorData));
+    } catch (error) {
+      console.warn('Failed to get auth headers:', error);
     }
     
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    if (error instanceof Error) {
-      throw error;
+    return {};
+  }
+
+  /**
+   * Execute HTTP request with retry logic and error handling
+   */
+  private async executeRequest<T>(
+    url: string,
+    options: RequestInit,
+    config: RequestConfig = {}
+  ): Promise<ApiResponse<T>> {
+    const { retries = 1, timeout = 10000 } = config;
+    let lastError: Error;
+
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+        const response = await fetch(url, {
+          ...options,
+          signal: controller.signal,
+          headers: {
+            ...this.defaultHeaders,
+            ...this.getAuthHeaders(),
+            ...config.headers,
+            ...options.headers,
+          },
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          if (response.status === 404) {
+            notFound();
+          }
+          
+          const errorData = await response.json().catch(() => null);
+          throw new Error(
+            errorData?.message || 
+            errorData?.error?.message || 
+            `HTTP ${response.status}: ${response.statusText}`
+          );
+        }
+
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const data = await response.json();
+          return data;
+        }
+
+        return { success: true } as ApiResponse<T>;
+      } catch (error) {
+        lastError = error as Error;
+        
+        if (attempt < retries) {
+          // Exponential backoff for retries
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+          continue;
+        }
+      }
     }
-    throw new Error('An unexpected error occurred');
+
+    throw lastError!;
+  }
+
+  /**
+   * GET request
+   */
+  async get<T>(endpoint: string, config?: RequestConfig): Promise<ApiResponse<T>> {
+    const url = this.buildURL(endpoint);
+    return this.executeRequest<T>(url, { method: 'GET' }, config);
+  }
+
+  /**
+   * POST request
+   */
+  async post<T>(
+    endpoint: string, 
+    data?: any, 
+    config?: RequestConfig
+  ): Promise<ApiResponse<T>> {
+    const url = this.buildURL(endpoint);
+    return this.executeRequest<T>(
+      url,
+      {
+        method: 'POST',
+        body: data ? JSON.stringify(data) : undefined,
+      },
+      config
+    );
+  }
+
+  /**
+   * PUT request
+   */
+  async put<T>(
+    endpoint: string, 
+    data?: any, 
+    config?: RequestConfig
+  ): Promise<ApiResponse<T>> {
+    const url = this.buildURL(endpoint);
+    return this.executeRequest<T>(
+      url,
+      {
+        method: 'PUT',
+        body: data ? JSON.stringify(data) : undefined,
+      },
+      config
+    );
+  }
+
+  /**
+   * PATCH request
+   */
+  async patch<T>(
+    endpoint: string, 
+    data?: any, 
+    config?: RequestConfig
+  ): Promise<ApiResponse<T>> {
+    const url = this.buildURL(endpoint);
+    return this.executeRequest<T>(
+      url,
+      {
+        method: 'PATCH',
+        body: data ? JSON.stringify(data) : undefined,
+      },
+      config
+    );
+  }
+
+  /**
+   * DELETE request
+   */
+  async delete<T>(
+    endpoint: string, 
+    config?: RequestConfig
+  ): Promise<ApiResponse<T>> {
+    const url = this.buildURL(endpoint);
+    return this.executeRequest<T>(url, { method: 'DELETE' }, config);
+  }
+
+  /**
+   * Upload file request
+   */
+  async upload<T>(
+    endpoint: string,
+    file: File,
+    config?: RequestConfig
+  ): Promise<ApiResponse<T>> {
+    const url = this.buildURL(endpoint);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    return this.executeRequest<T>(
+      url,
+      {
+        method: 'POST',
+        body: formData,
+        headers: {
+          // Don't set Content-Type for FormData - let browser set it with boundary
+        },
+      },
+      config
+    );
+  }
+
+  /**
+   * Download file request
+   */
+  async download(
+    endpoint: string,
+    filename?: string,
+    config?: RequestConfig
+  ): Promise<Blob> {
+    const url = this.buildURL(endpoint);
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        ...this.getAuthHeaders(),
+        ...config?.headers,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Download failed: ${response.statusText}`);
+    }
+
+    return response.blob();
+  }
+
+  /**
+   * Health check endpoint
+   */
+  async healthCheck(): Promise<{ status: 'ok' | 'error'; timestamp: string }> {
+    try {
+      const response = await this.get('/status');
+      return {
+        status: 'ok',
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        timestamp: new Date().toISOString()
+      };
+    }
   }
 }
 
-/**
- * GET request helper
- */
-export async function apiGet<T = any>(
-  endpoint: string, 
-  options: ApiRequestOptions = {}
-): Promise<T> {
-  return apiRequest<T>(endpoint, { ...options, method: 'GET' });
-}
+// Export singleton instance
+export const apiClient = new ApiClient();
 
-/**
- * POST request helper
- */
-export async function apiPost<T = any>(
-  endpoint: string,
-  data?: any,
-  options: ApiRequestOptions = {}
-): Promise<T> {
-  return apiRequest<T>(endpoint, { 
-    ...options, 
-    method: 'POST', 
-    body: data 
-  });
-}
+// Export class for testing
+export { ApiClient };
 
-/**
- * PUT request helper
- */
-export async function apiPut<T = any>(
-  endpoint: string,
-  data?: any,
-  options: ApiRequestOptions = {}
-): Promise<T> {
-  return apiRequest<T>(endpoint, { 
-    ...options, 
-    method: 'PUT', 
-    body: data 
-  });
-}
-
-/**
- * PATCH request helper
- */
-export async function apiPatch<T = any>(
-  endpoint: string,
-  data?: any,
-  options: ApiRequestOptions = {}
-): Promise<T> {
-  return apiRequest<T>(endpoint, { 
-    ...options, 
-    method: 'PATCH', 
-    body: data 
-  });
-}
-
-/**
- * DELETE request helper
- */
-export async function apiDelete<T = any>(
-  endpoint: string,
-  options: ApiRequestOptions = {}
-): Promise<T> {
-  return apiRequest<T>(endpoint, { ...options, method: 'DELETE' });
-}
-
-// ============================================================================
-// Default Export
-// ============================================================================
-
-export default {
-  API_BASE_URL,
-  API_ENDPOINTS,
-  buildApiUrl,
-  buildApiHeaders,
-  buildQueryParams,
-  apiRequest,
-  apiGet,
-  apiPost,
-  apiPut,
-  apiPatch,
-  apiDelete,
-};
+// Export types
+export type { ApiResponse, RequestConfig };
