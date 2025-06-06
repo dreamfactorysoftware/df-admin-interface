@@ -1,13 +1,34 @@
 /**
  * Theme Management Barrel Exports
  * 
- * Centralized export structure for all theme-related components, hooks, utilities,
- * and types. This barrel file provides clean import paths and supports tree-shaking
- * optimization for unused theme functionality.
+ * Centralized export hub for all theme management components, hooks, utilities, and types.
+ * Provides clean API surface for application-wide theme consumption with proper tree-shaking support.
  * 
- * @description Enables application-wide theme consumption with clean API surface
- * @supports React 19.0 stable with Next.js 15.1+ integration
- * @accessibility WCAG 2.1 AA compliant theme implementation
+ * This barrel file exports:
+ * - Core theme components (ThemeProvider, ThemeToggle)
+ * - React hooks for theme state management
+ * - Zustand store integration for performance optimization
+ * - Utility functions for theme operations and accessibility
+ * - TypeScript types for theme-related interfaces
+ * - Configuration constants and accessibility standards
+ * 
+ * @example
+ * ```tsx
+ * // Core theme components
+ * import { ThemeProvider, ThemeToggle } from '@/components/layout/theme';
+ * 
+ * // Theme hooks
+ * import { useTheme, useThemeUtils } from '@/components/layout/theme';
+ * 
+ * // Store-based theme management
+ * import { useThemeStore, useThemeMode } from '@/components/layout/theme';
+ * 
+ * // Utility functions
+ * import { detectSystemTheme, validateContrast } from '@/components/layout/theme';
+ * 
+ * // Type definitions
+ * import type { ThemeMode, ResolvedTheme } from '@/components/layout/theme';
+ * ```
  */
 
 // =============================================================================
@@ -15,248 +36,437 @@
 // =============================================================================
 
 /**
- * ThemeProvider - React context provider for application-wide theme management
+ * Theme Provider Component - React Context Provider for Theme State
  * 
- * Provides theme state management including light/dark/system preferences,
- * automatic system detection, persistent storage, and Tailwind CSS integration.
- * 
- * @example
- * ```tsx
- * import { ThemeProvider } from '@/components/layout/theme'
- * 
- * function App() {
- *   return (
- *     <ThemeProvider defaultTheme="system" storageKey="df-admin-theme">
- *       <YourApp />
- *     </ThemeProvider>
- *   )
- * }
- * ```
+ * Primary theme provider using React 19 context API for theme state management.
+ * Handles theme persistence, system preference detection, and Tailwind CSS integration.
  */
-export { ThemeProvider } from './theme-provider';
+export { 
+  ThemeProvider,
+  useTheme as useThemeContext,
+  useThemeUtils as useThemeContextUtils,
+  default as ThemeProviderDefault 
+} from './theme-provider';
 
 /**
- * ThemeToggle - Interactive component for switching between theme modes
+ * Theme Toggle Components - Interactive Theme Selection Controls
  * 
- * Accessible theme toggle using Headless UI Switch with WCAG 2.1 AA compliance.
- * Supports three-state selection: light, dark, and system preferences.
- * 
- * @example
- * ```tsx
- * import { ThemeToggle } from '@/components/layout/theme'
- * 
- * function Header() {
- *   return (
- *     <div className="flex items-center gap-4">
- *       <ThemeToggle />
- *     </div>
- *   )
- * }
- * ```
+ * Accessible theme toggle components with WCAG 2.1 AA compliance.
+ * Includes variants for different UI contexts (compact, labeled).
  */
-export { ThemeToggle } from './theme-toggle';
+export { 
+  ThemeToggle,
+  CompactThemeToggle,
+  LabeledThemeToggle,
+  default as ThemeToggleDefault 
+} from './theme-toggle';
 
 // =============================================================================
-// THEME HOOKS AND STATE MANAGEMENT
+// REACT HOOKS FOR THEME MANAGEMENT
 // =============================================================================
 
 /**
- * useTheme - Custom React hook for accessing theme context
+ * Primary Theme Hook - Complete Theme Management Interface
  * 
- * Provides typed access to theme state, actions, and resolved values.
- * Includes error handling for components using hook outside ThemeProvider.
- * 
- * @example
- * ```tsx
- * import { useTheme } from '@/components/layout/theme'
- * 
- * function MyComponent() {
- *   const { theme, resolvedTheme, setTheme, systemTheme } = useTheme()
- *   
- *   return (
- *     <div className={resolvedTheme === 'dark' ? 'dark-styles' : 'light-styles'}>
- *       Current theme: {theme}
- *     </div>
- *   )
- * }
- * ```
+ * Comprehensive hook providing theme state, actions, and utilities.
+ * Preferred hook for most theme-related operations.
  */
-export { useTheme } from './use-theme';
+export { 
+  useTheme,
+  isValidTheme,
+  getSystemTheme,
+  createThemeStorage,
+  default as useThemeDefault 
+} from './use-theme';
+
+// =============================================================================
+// ZUSTAND STORE INTEGRATION
+// =============================================================================
 
 /**
- * Theme Store Integration - Zustand store for advanced theme state management
+ * Performance-Optimized Theme Store
  * 
- * Provides global theme state with persistence middleware, complementing
- * React context provider with performance benefits for complex scenarios.
- * 
- * @example
- * ```tsx
- * import { useThemeStore, themeStore } from '@/components/layout/theme'
- * 
- * function AdvancedThemeComponent() {
- *   const { theme, setTheme } = useThemeStore()
- *   
- *   // Direct store access for non-React contexts
- *   const currentTheme = themeStore.getState().theme
- *   
- *   return <div>Advanced theme management</div>
- * }
- * ```
+ * Zustand-based theme store for high-performance scenarios and complex state management.
+ * Provides fine-grained selectors to prevent unnecessary re-renders.
  */
-export { useThemeStore, themeStore } from './theme-store';
+export { 
+  useThemeStore,
+  useThemeMode,
+  useSystemTheme,
+  useThemeTransitions,
+  useThemeAnalytics,
+  useResolvedTheme,
+  useThemePreference,
+  useIsSystemTheme,
+  useThemeClass,
+  useThemeInitialization,
+  isDarkTheme 
+} from './theme-store';
 
 // =============================================================================
 // THEME UTILITIES AND HELPERS
 // =============================================================================
 
 /**
- * Theme Utility Functions
- * 
- * Collection of utility functions for theme detection, validation,
- * CSS class management, and accessibility helpers.
- * 
- * @example
- * ```tsx
- * import { 
- *   detectSystemTheme, 
- *   validateTheme, 
- *   getThemeClasses,
- *   getAccessibleColors
- * } from '@/components/layout/theme'
- * 
- * const systemTheme = detectSystemTheme()
- * const isValid = validateTheme('dark')
- * const classes = getThemeClasses('dark', 'card')
- * const colors = getAccessibleColors('primary')
- * ```
+ * System Theme Detection and Validation
  */
 export {
   detectSystemTheme,
+  createSystemThemeListener,
   validateTheme,
   sanitizeTheme,
-  getThemeClasses,
-  applyThemeTransition,
-  getAccessibleColors,
-  validateContrast,
-  getContrastRatio,
+  resolveTheme,
+} from './theme-utils';
+
+/**
+ * Theme Storage Management
+ */
+export {
+  getStoredTheme,
+  setStoredTheme,
+  clearStoredTheme,
+} from './theme-utils';
+
+/**
+ * CSS Class and DOM Management
+ */
+export {
+  applyThemeClasses,
   updateMetaThemeColor,
-  createThemeMediaQuery,
-  toggleDocumentTheme
+  disableTransitions,
+  applyTheme,
+} from './theme-utils';
+
+/**
+ * Accessibility and WCAG Compliance Utilities
+ */
+export {
+  getContrastRatio,
+  validateContrast,
+  validateUIContrast,
+  getAccessibleColorPairs,
+  getFocusRingStyles,
+  validateTouchTarget,
+  createThemeAwareClasses,
+  announceThemeChange,
+} from './theme-utils';
+
+/**
+ * High-Level Theme Operations
+ */
+export {
+  setTheme as setThemeUtility,
+  initializeTheme,
+} from './theme-utils';
+
+/**
+ * Theme Configuration Constants
+ */
+export {
+  THEME_CONFIG,
+  THEME_COLORS,
+  ACCESSIBILITY_CONFIG,
 } from './theme-utils';
 
 // =============================================================================
-// THEME TYPES AND INTERFACES
+// TYPE DEFINITIONS AND INTERFACES
 // =============================================================================
 
 /**
- * Theme Type Definitions
+ * Core Theme Types
  * 
- * TypeScript definitions for theme values, context interfaces,
- * and utility function parameters ensuring type safety.
- * 
- * @example
- * ```tsx
- * import type { 
- *   Theme, 
- *   ThemeContextType, 
- *   ThemeProviderProps,
- *   ThemeUtilityOptions 
- * } from '@/components/layout/theme'
- * 
- * const theme: Theme = 'dark'
- * const context: ThemeContextType = { theme, resolvedTheme: 'dark', setTheme, systemTheme }
- * ```
+ * Essential type definitions for theme modes and resolved themes.
+ * Compatible across all theme management implementations.
+ */
+export type { ThemeMode, ResolvedTheme } from '@/types/theme';
+
+/**
+ * Theme Provider Types
+ */
+export type { 
+  ThemeProviderConfig,
+  ThemeContextState,
+  UseThemeReturn,
+  ThemeUtils,
+  ThemeStorage,
+  ThemeValidation,
+} from '@/types/theme';
+
+/**
+ * Theme Toggle Component Types
+ */
+export type { ThemeToggleProps } from './theme-toggle';
+
+/**
+ * Theme Store Types
+ */
+export type {
+  SystemThemeState,
+  ThemeTransitionState,
+  ThemeStoreState,
+} from './theme-store';
+
+/**
+ * Theme Utility Types
  */
 export type {
   Theme,
-  ThemeContextType,
-  ThemeProviderProps,
-  ThemeToggleProps,
-  ThemeStoreState,
-  ThemeStoreActions,
-  ThemeUtilityOptions,
-  AccessibleColorPair,
-  ContrastValidationOptions,
-  ThemeTransitionOptions
-} from './theme-provider';
-
-// Re-export additional types that might be defined in separate files
-export type {
-  ThemeValidationResult,
-  SystemThemeDetection,
-  ThemeClassConfiguration,
-  AccessibilityThemeOptions
+  ResolvedTheme as UtilResolvedTheme,
+  ThemeConfig,
+  AccessibilityConfig,
+  ThemeColors,
 } from './theme-utils';
 
 // =============================================================================
-// THEME CONSTANTS AND CONFIGURATIONS
+// CONVENIENCE EXPORTS AND ALIASES
 // =============================================================================
 
 /**
- * Theme Constants and Default Configurations
- * 
- * Predefined theme values, storage keys, CSS class mappings,
- * and accessibility configurations for consistent usage.
- * 
- * @example
- * ```tsx
- * import { 
- *   THEME_VALUES, 
- *   DEFAULT_THEME_CONFIG,
- *   THEME_STORAGE_KEY,
- *   THEME_CSS_CLASSES 
- * } from '@/components/layout/theme'
- * 
- * const isValidTheme = THEME_VALUES.includes(userTheme)
- * const config = { ...DEFAULT_THEME_CONFIG, enableSystem: true }
- * ```
+ * Most commonly used exports for quick access
+ * Reduces import complexity for standard use cases
  */
 export {
-  THEME_VALUES,
-  DEFAULT_THEME,
-  THEME_STORAGE_KEY,
-  THEME_CSS_CLASSES,
-  ACCESSIBILITY_COLORS,
-  CONTRAST_THRESHOLDS,
-  DEFAULT_THEME_CONFIG
-} from './theme-utils';
+  ThemeProvider as Provider,
+  ThemeToggle as Toggle,
+  useTheme as useThemeHook,
+  useResolvedTheme as useCurrentTheme,
+  useThemeMode as useThemeState,
+  detectSystemTheme as getSystemPreference,
+  validateTheme as isValidThemeMode,
+  applyTheme as applyThemeStyles,
+};
+
+/**
+ * Grouped exports for specific use cases
+ * Provides organized access to related functionality
+ */
+
+/**
+ * Core theme management bundle - most essential exports
+ */
+export const ThemeCore = {
+  Provider: ThemeProvider,
+  Toggle: ThemeToggle,
+  useTheme,
+  useResolvedTheme,
+  detectSystemTheme,
+  validateTheme,
+} as const;
+
+/**
+ * Accessibility utilities bundle
+ */
+export const ThemeAccessibility = {
+  getContrastRatio,
+  validateContrast,
+  validateUIContrast,
+  getAccessibleColorPairs,
+  getFocusRingStyles,
+  validateTouchTarget,
+  announceThemeChange,
+  ACCESSIBILITY_CONFIG,
+} as const;
+
+/**
+ * Advanced theme management bundle
+ */
+export const ThemeAdvanced = {
+  useThemeStore,
+  useThemeAnalytics,
+  useThemeInitialization,
+  createSystemThemeListener,
+  initializeTheme,
+  setTheme: setThemeUtility,
+} as const;
+
+/**
+ * Development and debugging utilities
+ */
+export const ThemeDebug = {
+  getSystemTheme,
+  createThemeStorage,
+  getStoredTheme,
+  clearStoredTheme,
+  disableTransitions,
+  THEME_CONFIG,
+} as const;
 
 // =============================================================================
-// BARREL EXPORT SUMMARY
+// DEFAULT EXPORT
 // =============================================================================
 
 /**
- * Complete Theme Management API
+ * Default export provides the most commonly used theme functionality
+ * Suitable for applications that need basic theme management
+ */
+const themeDefaults = {
+  // Core components
+  Provider: ThemeProvider,
+  Toggle: ThemeToggle,
+  
+  // Primary hooks
+  useTheme,
+  useResolvedTheme,
+  
+  // Essential utilities
+  detectSystemTheme,
+  validateTheme,
+  applyTheme,
+  
+  // Types (for re-export)
+  Core: ThemeCore,
+  Accessibility: ThemeAccessibility,
+  Advanced: ThemeAdvanced,
+  Debug: ThemeDebug,
+} as const;
+
+export default themeDefaults;
+
+// =============================================================================
+// JSDoc EXAMPLES FOR COMMON USAGE PATTERNS
+// =============================================================================
+
+/**
+ * @example Basic theme setup
+ * ```tsx
+ * import { ThemeProvider, ThemeToggle, useTheme } from '@/components/layout/theme';
  * 
- * This barrel export provides:
+ * function App() {
+ *   return (
+ *     <ThemeProvider defaultTheme="system">
+ *       <Header />
+ *       <Main />
+ *     </ThemeProvider>
+ *   );
+ * }
  * 
- * Components:
- * - ThemeProvider: Context provider for theme state management
- * - ThemeToggle: Interactive theme switching component
+ * function Header() {
+ *   return (
+ *     <header>
+ *       <h1>My App</h1>
+ *       <ThemeToggle showLabels />
+ *     </header>
+ *   );
+ * }
  * 
- * Hooks:
- * - useTheme: React hook for theme context access
- * - useThemeStore: Zustand store hook for advanced state management
+ * function Main() {
+ *   const { theme, resolvedTheme, setTheme } = useTheme();
+ *   
+ *   return (
+ *     <main className="bg-white dark:bg-gray-900">
+ *       <p>Current theme: {resolvedTheme}</p>
+ *       <button onClick={() => setTheme('dark')}>
+ *         Use dark theme
+ *       </button>
+ *     </main>
+ *   );
+ * }
+ * ```
+ */
+
+/**
+ * @example Performance-optimized theme usage
+ * ```tsx
+ * import { 
+ *   ThemeProvider, 
+ *   useResolvedTheme, 
+ *   useThemeMode 
+ * } from '@/components/layout/theme';
  * 
- * Utilities:
- * - detectSystemTheme: System preference detection
- * - validateTheme: Theme value validation
- * - getThemeClasses: CSS class management
- * - getAccessibleColors: WCAG compliance helpers
- * - Various accessibility and transition utilities
+ * function OptimizedComponent() {
+ *   // Only re-renders when resolved theme changes
+ *   const currentTheme = useResolvedTheme();
+ *   
+ *   return (
+ *     <div className={`theme-${currentTheme}`}>
+ *       Optimized for {currentTheme} theme
+ *     </div>
+ *   );
+ * }
  * 
- * Types:
- * - Theme: Union type for theme values
- * - ThemeContextType: Context interface definition
- * - Various component and utility interfaces
+ * function ThemeControls() {
+ *   // Only re-renders when theme mode or setTheme changes
+ *   const { theme, setTheme } = useThemeMode();
+ *   
+ *   return (
+ *     <select value={theme} onChange={(e) => setTheme(e.target.value)}>
+ *       <option value="light">Light</option>
+ *       <option value="dark">Dark</option>
+ *       <option value="system">System</option>
+ *     </select>
+ *   );
+ * }
+ * ```
+ */
+
+/**
+ * @example Accessibility-focused theme implementation
+ * ```tsx
+ * import { 
+ *   ThemeProvider,
+ *   ThemeToggle,
+ *   useTheme,
+ *   validateContrast,
+ *   getAccessibleColorPairs 
+ * } from '@/components/layout/theme';
  * 
- * Constants:
- * - THEME_VALUES: Supported theme options
- * - DEFAULT_THEME_CONFIG: Default configuration
- * - ACCESSIBILITY_COLORS: WCAG compliant color definitions
+ * function AccessibleComponent() {
+ *   const { resolvedTheme } = useTheme();
+ *   const colors = getAccessibleColorPairs(resolvedTheme);
+ *   
+ *   // Verify contrast meets WCAG AA standards
+ *   const isAccessible = validateContrast(
+ *     colors.text.primary,
+ *     colors.background.primary,
+ *     'AA'
+ *   );
+ *   
+ *   return (
+ *     <div 
+ *       style={{
+ *         color: colors.text.primary,
+ *         backgroundColor: colors.background.primary,
+ *       }}
+ *       aria-label={`Content in ${resolvedTheme} theme`}
+ *     >
+ *       <p>WCAG AA Compliant: {isAccessible ? 'Yes' : 'No'}</p>
+ *       <ThemeToggle 
+ *         ariaLabel="Change color theme"
+ *         showLabels 
+ *       />
+ *     </div>
+ *   );
+ * }
+ * ```
+ */
+
+/**
+ * @example Advanced theme store integration
+ * ```tsx
+ * import { 
+ *   useThemeStore,
+ *   useThemeAnalytics,
+ *   useThemeInitialization 
+ * } from '@/components/layout/theme';
  * 
- * @supports Tree-shaking optimization for unused exports
- * @ensures TypeScript type safety with proper declarations
- * @maintains Clean import paths for consuming components
- * @provides WCAG 2.1 AA accessibility compliance
+ * function AdvancedThemeComponent() {
+ *   const { initialize, cleanup } = useThemeInitialization();
+ *   const { getAnalytics } = useThemeAnalytics();
+ *   
+ *   React.useEffect(() => {
+ *     initialize();
+ *     return cleanup;
+ *   }, [initialize, cleanup]);
+ *   
+ *   const analytics = getAnalytics();
+ *   
+ *   return (
+ *     <div>
+ *       <p>Theme changes: {analytics.changeCount}</p>
+ *       <p>Prefers dark: {analytics.userPrefersDark ? 'Yes' : 'No'}</p>
+ *       <p>Uses system: {analytics.userPrefersSystem ? 'Yes' : 'No'}</p>
+ *     </div>
+ *   );
+ * }
+ * ```
  */
