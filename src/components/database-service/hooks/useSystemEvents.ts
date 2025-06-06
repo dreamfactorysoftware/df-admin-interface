@@ -1,284 +1,458 @@
 /**
- * System Events Custom React Hook
+ * useSystemEvents - Custom React hook for system events data fetching
  * 
- * Migrates Angular systemEventsResolver to React Query-powered custom hook for fetching
- * system event identifiers. Implements intelligent caching with background revalidation
- * and provides type-safe access to GenericListResponse<string> format with as_list
- * parameter configuration for consistent system event data throughout the application.
+ * Migrates from Angular systemEventsResolver to React Query-powered data fetching with
+ * intelligent caching for system event identifiers. Provides type-safe access to 
+ * GenericListResponse<string> format with as_list parameter configuration for 
+ * consistent system event data throughout the application.
  * 
- * Features:
- * - TanStack React Query integration for system events data fetching
- * - GenericListResponse<string> format support with as_list parameter
- * - Intelligent caching with background revalidation
- * - Error handling and retry strategies aligned with network error recovery patterns
- * - TypeScript 5.8+ compatibility with strict type safety
- * - Integration with database service constants and shared configuration
- * - Query key management for effective cache invalidation
+ * @fileoverview React Query hook for fetching system events with optimized caching
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+ / TypeScript 5.8+
  */
 
-import { useQuery, type UseQueryResult } from '@tanstack/react-query';
-import { DATABASE_SERVICE_REACT_QUERY_CONFIG, DATABASE_SERVICE_ENDPOINTS } from '../constants';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useMemo } from 'react';
+import { apiClient } from '../../../lib/api-client';
+import { DATABASE_SERVICE_REACT_QUERY_CONFIG } from '../constants';
+import type { GenericListResponse } from '../../../types/generic-http';
 
 // =============================================================================
-// TYPE DEFINITIONS
+// TYPES AND INTERFACES
 // =============================================================================
 
 /**
- * Generic HTTP response wrapper for DreamFactory API responses
- * Maintains compatibility with original Angular implementation
+ * System events query options for configuration and caching control
  */
-export interface GenericListResponse<T> {
-  resource: Array<T>;
-  meta: {
-    count: number;
-  };
-}
-
-/**
- * System events query configuration interface
- * Enables customization of query behavior while maintaining defaults
- */
-export interface SystemEventsQueryOptions {
-  /** Enable or disable the query execution */
+export interface UseSystemEventsOptions {
+  /** Enable/disable automatic query execution */
   enabled?: boolean;
-  /** Override default stale time for system events */
+  /** Manual cache refresh trigger */
+  refresh?: boolean;
+  /** Custom stale time override */
   staleTime?: number;
-  /** Override default cache time for system events */
+  /** Custom cache time override */
   cacheTime?: number;
-  /** Override default retry configuration */
-  retry?: number;
-  /** Enable background refetching */
-  refetchOnWindowFocus?: boolean;
-  /** Enable refetching on network reconnection */
-  refetchOnReconnect?: boolean;
+  /** Custom error retry count */
+  retryCount?: number;
 }
 
 /**
- * System events API request parameters
- * Matches original Angular resolver implementation with as_list parameter
+ * System events hook return interface with query state and utilities
  */
-export interface SystemEventsRequestParams {
-  /** Force list format response */
-  as_list: boolean;
+export interface UseSystemEventsReturn {
+  /** Array of system event identifiers */
+  events: string[];
+  /** Loading state indicator */
+  isLoading: boolean;
+  /** Error state with detailed information */
+  error: Error | null;
+  /** Manual refetch function */
+  refetch: () => void;
+  /** Cache invalidation utility */
+  invalidateCache: () => Promise<void>;
+  /** Data staleness indicator */
+  isStale: boolean;
+  /** Background revalidation state */
+  isRevalidating: boolean;
+  /** Query success state */
+  isSuccess: boolean;
+  /** Query error state */
+  isError: boolean;
 }
 
 // =============================================================================
-// QUERY KEY FACTORY
+// QUERY KEYS AND CACHE MANAGEMENT
 // =============================================================================
 
 /**
- * Query key factory for system events
- * Provides consistent query key generation for effective cache management
+ * Centralized query key factory for system events cache management
+ * Provides consistent cache keys across the application for optimal invalidation
  */
-const systemEventsKeys = {
+export const systemEventsQueryKeys = {
   /** Base key for all system events queries */
   all: ['system-events'] as const,
-  /** Key for system events list with as_list parameter */
-  list: () => [...systemEventsKeys.all, 'list'] as const,
-  /** Key for system events with specific parameters */
-  listWithParams: (params: SystemEventsRequestParams) => 
-    [...systemEventsKeys.list(), params] as const,
+  
+  /** System events list query */
+  list: () => [...systemEventsQueryKeys.all, 'list'] as const,
+  
+  /** System events list with specific options */
+  listWithOptions: (options?: UseSystemEventsOptions) => [
+    ...systemEventsQueryKeys.list(),
+    {
+      enabled: options?.enabled ?? true,
+      refresh: options?.refresh ?? false,
+    }
+  ] as const,
 } as const;
 
 // =============================================================================
-// API CLIENT FUNCTION
+// API CLIENT FUNCTIONS
 // =============================================================================
 
 /**
- * Fetches system events from DreamFactory Events Service
- * Replicates Angular resolver functionality with as_list parameter configuration
+ * Fetch system events from the server with as_list parameter configuration
+ * Replicates Angular systemEventsResolver functionality with React Query optimization
  * 
- * @param params - Request parameters including as_list configuration
  * @returns Promise resolving to GenericListResponse<string> with system event identifiers
- * @throws Error with detailed message for network or API failures
+ * @throws Error on network failures or API errors
  */
-const fetchSystemEvents = async (
-  params: SystemEventsRequestParams
-): Promise<GenericListResponse<string>> => {
+async function fetchSystemEvents(): Promise<GenericListResponse<string>> {
   try {
-    // Construct API endpoint for system events
-    const url = new URL(`${DATABASE_SERVICE_ENDPOINTS.BASE_URL}/system/event`, window.location.origin);
-    
-    // Add as_list parameter to match original resolver behavior
-    if (params.as_list) {
-      url.searchParams.set('as_list', 'true');
-    }
-
-    // Execute fetch request with proper error handling
-    const response = await fetch(url.toString(), {
-      method: 'GET',
+    // Use system/event endpoint with as_list parameter to match original resolver behavior
+    const response = await apiClient.get<GenericListResponse<string>>('/system/event', {
       headers: {
-        'Content-Type': 'application/json',
         'Accept': 'application/json',
+        'Content-Type': 'application/json',
       },
-      // Include credentials for session-based authentication
-      credentials: 'include',
+      cache: 'no-cache', // Ensure fresh data for system events
     });
 
-    // Handle HTTP error responses
-    if (!response.ok) {
-      const errorText = await response.text();
-      let errorMessage = `Failed to fetch system events: ${response.status} ${response.statusText}`;
-      
-      try {
-        const errorData = JSON.parse(errorText);
-        if (errorData.error?.message) {
-          errorMessage = `System events fetch failed: ${errorData.error.message}`;
-        }
-      } catch {
-        // Use generic error message if response isn't valid JSON
-        errorMessage += ` - ${errorText}`;
+    // Add as_list parameter via query parameters for GenericListResponse format
+    const params = new URLSearchParams({
+      as_list: 'true',
+    });
+
+    const enhancedResponse = await apiClient.get<GenericListResponse<string>>(
+      `/system/event?${params.toString()}`,
+      {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
       }
-      
-      throw new Error(errorMessage);
+    );
+
+    // Validate response structure matches GenericListResponse<string>
+    if (!enhancedResponse.resource || !Array.isArray(enhancedResponse.resource)) {
+      throw new Error('Invalid system events response format: expected GenericListResponse<string>');
     }
 
-    // Parse and validate response data
-    const data = await response.json();
-    
-    // Ensure response matches expected GenericListResponse format
-    if (!data || typeof data !== 'object') {
-      throw new Error('Invalid response format: expected object');
-    }
-    
-    if (!Array.isArray(data.resource)) {
-      throw new Error('Invalid response format: resource must be an array');
-    }
-    
-    if (!data.meta || typeof data.meta.count !== 'number') {
-      throw new Error('Invalid response format: meta.count must be a number');
+    // Ensure all resource items are strings
+    const validatedEvents = enhancedResponse.resource.filter(
+      (event): event is string => typeof event === 'string'
+    );
+
+    if (validatedEvents.length !== enhancedResponse.resource.length) {
+      console.warn('Some system events were filtered out due to invalid type (non-string)');
     }
 
-    return data as GenericListResponse<string>;
+    return {
+      ...enhancedResponse,
+      resource: validatedEvents,
+    };
   } catch (error) {
-    // Re-throw with enhanced error context for debugging
+    // Enhanced error handling with context
     if (error instanceof Error) {
-      throw new Error(`System events API error: ${error.message}`);
+      throw new Error(`Failed to fetch system events: ${error.message}`);
     }
-    throw new Error('Unknown error occurred while fetching system events');
+    throw new Error('Failed to fetch system events: Unknown error occurred');
   }
-};
+}
 
 // =============================================================================
 // CUSTOM HOOK IMPLEMENTATION
 // =============================================================================
 
 /**
- * Custom React hook for fetching system events using TanStack React Query
+ * useSystemEvents - System events data fetching and caching hook
  * 
- * Migrates Angular systemEventsResolver to React Query-powered implementation
- * with intelligent caching, background revalidation, and comprehensive error handling.
+ * Provides intelligent caching with background revalidation for system event identifiers.
+ * Implements the same functionality as Angular systemEventsResolver with enhanced 
+ * performance through React Query's intelligent caching and automatic background 
+ * synchronization patterns.
  * 
  * Features:
- * - Automatic caching with configurable stale/cache times
- * - Background revalidation for data consistency
- * - Retry strategies with exponential backoff
- * - TypeScript type safety with GenericListResponse<string>
- * - Integration with database service configuration
- * - Query key management for cache invalidation
+ * - Automatic background revalidation for data consistency
+ * - Intelligent caching with configurable stale time
+ * - Error handling with exponential backoff retry strategy
+ * - Type-safe access to GenericListResponse<string> format
+ * - Cache invalidation utilities for external updates
+ * - Optimistic loading states and error boundaries
  * 
- * @param options - Optional configuration to override default query behavior
- * @returns UseQueryResult with system events data, loading states, and error information
+ * @param options - Query configuration options
+ * @returns Hook result with system events data, loading state, and utilities
  * 
  * @example
  * ```typescript
  * // Basic usage with default configuration
- * const { data: systemEvents, isLoading, error } = useSystemEvents();
+ * const { events, isLoading, error } = useSystemEvents();
  * 
- * // With custom configuration
- * const { data: systemEvents, isLoading, error, refetch } = useSystemEvents({
+ * // With custom options
+ * const { events, refetch, invalidateCache } = useSystemEvents({
  *   enabled: true,
  *   staleTime: 10 * 60 * 1000, // 10 minutes
- *   refetchOnWindowFocus: false,
+ *   retryCount: 2
  * });
  * 
- * // Accessing system events data
- * if (systemEvents?.resource) {
- *   const eventNames = systemEvents.resource; // string[]
- *   const eventCount = systemEvents.meta.count; // number
- * }
+ * // Manual cache refresh
+ * const handleRefresh = () => {
+ *   refetch();
+ * };
  * ```
  */
-export const useSystemEvents = (
-  options: SystemEventsQueryOptions = {}
-): UseQueryResult<GenericListResponse<string>, Error> => {
-  // Extract configuration from database service constants
-  const defaultConfig = DATABASE_SERVICE_REACT_QUERY_CONFIG.queryConfigs.serviceList;
-  
-  // Merge user options with intelligent defaults
-  const queryOptions = {
-    enabled: options.enabled ?? true,
-    staleTime: options.staleTime ?? defaultConfig.staleTime,
-    cacheTime: options.cacheTime ?? defaultConfig.cacheTime,
-    retry: options.retry ?? DATABASE_SERVICE_REACT_QUERY_CONFIG.defaultOptions.queries.retry,
-    refetchOnWindowFocus: options.refetchOnWindowFocus ?? defaultConfig.refetchOnWindowFocus,
-    refetchOnReconnect: options.refetchOnReconnect ?? DATABASE_SERVICE_REACT_QUERY_CONFIG.defaultOptions.queries.refetchOnReconnect,
-    // Enhanced retry configuration with exponential backoff
-    retryDelay: DATABASE_SERVICE_REACT_QUERY_CONFIG.defaultOptions.queries.retryDelay,
-  };
+export function useSystemEvents(options: UseSystemEventsOptions = {}): UseSystemEventsReturn {
+  const queryClient = useQueryClient();
+  const { enabled = true, staleTime, cacheTime, retryCount } = options;
 
-  // System events request parameters matching original resolver
-  const requestParams: SystemEventsRequestParams = {
-    as_list: true,
-  };
+  // Memoize query key for optimal cache performance
+  const queryKey = useMemo(
+    () => systemEventsQueryKeys.listWithOptions(options),
+    [options.enabled, options.refresh]
+  );
 
-  return useQuery({
-    // Generate consistent query key for effective caching
-    queryKey: systemEventsKeys.listWithParams(requestParams),
-    
-    // Query function with error handling and type safety
-    queryFn: () => fetchSystemEvents(requestParams),
-    
-    // Apply configuration options
-    enabled: queryOptions.enabled,
-    staleTime: queryOptions.staleTime,
-    cacheTime: queryOptions.cacheTime,
-    retry: queryOptions.retry,
-    retryDelay: queryOptions.retryDelay,
-    refetchOnWindowFocus: queryOptions.refetchOnWindowFocus,
-    refetchOnReconnect: queryOptions.refetchOnReconnect,
-    
-    // Enhance error handling with structured error information
-    onError: (error: Error) => {
-      console.error('System events query failed:', {
-        message: error.message,
-        timestamp: new Date().toISOString(),
-        queryKey: systemEventsKeys.listWithParams(requestParams),
-        requestParams,
-      });
+  // Main system events query with intelligent caching configuration
+  const {
+    data,
+    isLoading,
+    error,
+    refetch,
+    isStale,
+    isValidating: isRevalidating,
+    isSuccess,
+    isError,
+  } = useQuery({
+    queryKey,
+    queryFn: fetchSystemEvents,
+    enabled,
+
+    // Intelligent caching configuration per Section 3.2.2 state management architecture
+    staleTime: staleTime ?? 5 * 60 * 1000, // 5 minutes default stale time
+    gcTime: cacheTime ?? 10 * 60 * 1000, // 10 minutes cache retention (was cacheTime in v4)
+
+    // Background synchronization settings per Section 4.4.5 network error recovery
+    refetchOnWindowFocus: true, // Refresh when user returns to tab
+    refetchOnReconnect: true, // Refresh on network reconnection
+    refetchInterval: 15 * 60 * 1000, // 15 minutes background refresh
+
+    // Error handling with exponential backoff retry strategy
+    retry: (failureCount, error) => {
+      // Custom retry logic aligned with Section 4.4.5.2 network error recovery patterns
+      const maxRetries = retryCount ?? 3;
+      
+      // Don't retry on 4xx client errors (except 408 timeout)
+      if (error && typeof error === 'object' && 'status' in error) {
+        const status = (error as any).status;
+        if (status >= 400 && status < 500 && status !== 408) {
+          return false;
+        }
+      }
+      
+      // Retry up to maxRetries times for network/server errors
+      return failureCount < maxRetries;
     },
-    
-    // Optional success callback for debugging and analytics
-    onSuccess: (data: GenericListResponse<string>) => {
-      console.debug('System events loaded successfully:', {
-        eventCount: data.meta.count,
-        resourceLength: data.resource.length,
-        timestamp: new Date().toISOString(),
-      });
+
+    retryDelay: (attemptIndex) => {
+      // Exponential backoff with jitter: base delay * 2^attempt + random jitter
+      const baseDelay = 1000; // 1 second base
+      const exponentialDelay = baseDelay * Math.pow(2, attemptIndex);
+      const jitter = Math.random() * 1000; // Up to 1 second jitter
+      return Math.min(exponentialDelay + jitter, 30000); // Cap at 30 seconds
+    },
+
+    // Performance optimization with data selection
+    select: useCallback((data: GenericListResponse<string>) => data, []),
+
+    // Enhanced error handling
+    throwOnError: false, // Handle errors gracefully in the hook
+
+    // Network mode configuration
+    networkMode: 'online', // Only fetch when online
+
+    // Meta information for debugging and monitoring
+    meta: {
+      component: 'useSystemEvents',
+      purpose: 'System events data fetching with intelligent caching',
+      migration: 'Angular systemEventsResolver -> React Query',
     },
   });
-};
+
+  // Cache invalidation helper for external cache management
+  const invalidateCache = useCallback(async () => {
+    try {
+      await queryClient.invalidateQueries({
+        queryKey: systemEventsQueryKeys.all,
+      });
+    } catch (error) {
+      console.error('Failed to invalidate system events cache:', error);
+      throw error;
+    }
+  }, [queryClient]);
+
+  // Manual refetch wrapper with error handling
+  const manualRefetch = useCallback(() => {
+    try {
+      refetch();
+    } catch (error) {
+      console.error('Failed to refetch system events:', error);
+    }
+  }, [refetch]);
+
+  // Return hook interface with comprehensive state and utilities
+  return {
+    events: data?.resource ?? [],
+    isLoading,
+    error: error as Error | null,
+    refetch: manualRefetch,
+    invalidateCache,
+    isStale,
+    isRevalidating,
+    isSuccess,
+    isError,
+  };
+}
 
 // =============================================================================
-// UTILITY EXPORTS
+// ADDITIONAL UTILITY HOOKS
 // =============================================================================
 
 /**
- * Export query key factory for use in cache invalidation
- * Enables other components to invalidate system events cache when needed
+ * useSystemEventsInvalidation - Hook for external cache invalidation
+ * 
+ * Provides utilities for invalidating system events cache from external components
+ * without direct access to the system events query. Useful for components that
+ * modify system configuration and need to refresh event data.
+ * 
+ * @returns Cache invalidation utilities
+ * 
+ * @example
+ * ```typescript
+ * // In a system configuration component
+ * const { invalidateSystemEvents, removeSystemEventsCache } = useSystemEventsInvalidation();
+ * 
+ * const handleConfigUpdate = async () => {
+ *   await updateSystemConfig();
+ *   await invalidateSystemEvents(); // Refresh events after config change
+ * };
+ * ```
  */
-export { systemEventsKeys };
+export function useSystemEventsInvalidation() {
+  const queryClient = useQueryClient();
+
+  const invalidateSystemEvents = useCallback(async () => {
+    try {
+      await queryClient.invalidateQueries({
+        queryKey: systemEventsQueryKeys.all,
+      });
+    } catch (error) {
+      console.error('Failed to invalidate system events cache:', error);
+      throw error;
+    }
+  }, [queryClient]);
+
+  const invalidateSystemEventsList = useCallback(
+    async (options?: UseSystemEventsOptions) => {
+      try {
+        await queryClient.invalidateQueries({
+          queryKey: systemEventsQueryKeys.listWithOptions(options),
+        });
+      } catch (error) {
+        console.error('Failed to invalidate system events list cache:', error);
+        throw error;
+      }
+    },
+    [queryClient]
+  );
+
+  const removeSystemEventsCache = useCallback(async () => {
+    try {
+      await queryClient.removeQueries({
+        queryKey: systemEventsQueryKeys.all,
+      });
+    } catch (error) {
+      console.error('Failed to remove system events cache:', error);
+      throw error;
+    }
+  }, [queryClient]);
+
+  return {
+    invalidateSystemEvents,
+    invalidateSystemEventsList,
+    removeSystemEventsCache,
+  };
+}
 
 /**
- * Export types for external usage
+ * useSystemEventsCache - Hook for programmatic cache management
+ * 
+ * Provides utilities for reading and manipulating system events cache data
+ * for advanced use cases like prefetching, cache warming, and optimistic updates.
+ * 
+ * @returns Cache management utilities
+ * 
+ * @example
+ * ```typescript
+ * // Advanced cache management
+ * const { getSystemEventsCache, setSystemEventsCache, prefetchSystemEvents } = useSystemEventsCache();
+ * 
+ * // Pre-warm cache
+ * useEffect(() => {
+ *   prefetchSystemEvents();
+ * }, [prefetchSystemEvents]);
+ * 
+ * // Read current cache
+ * const cachedEvents = getSystemEventsCache();
+ * ```
  */
-export type { 
-  SystemEventsQueryOptions, 
-  SystemEventsRequestParams,
-  GenericListResponse 
-};
+export function useSystemEventsCache() {
+  const queryClient = useQueryClient();
 
-/**
- * Default export for convenient importing
- */
+  const getSystemEventsCache = useCallback(
+    (options?: UseSystemEventsOptions) => {
+      return queryClient.getQueryData<GenericListResponse<string>>(
+        systemEventsQueryKeys.listWithOptions(options)
+      );
+    },
+    [queryClient]
+  );
+
+  const setSystemEventsCache = useCallback(
+    (options: UseSystemEventsOptions, data: GenericListResponse<string>) => {
+      queryClient.setQueryData(
+        systemEventsQueryKeys.listWithOptions(options),
+        data
+      );
+    },
+    [queryClient]
+  );
+
+  const prefetchSystemEvents = useCallback(
+    async (options: UseSystemEventsOptions = {}) => {
+      try {
+        await queryClient.prefetchQuery({
+          queryKey: systemEventsQueryKeys.listWithOptions(options),
+          queryFn: fetchSystemEvents,
+          staleTime: options.staleTime ?? 5 * 60 * 1000, // 5 minutes default
+        });
+      } catch (error) {
+        console.error('Failed to prefetch system events:', error);
+        throw error;
+      }
+    },
+    [queryClient]
+  );
+
+  return {
+    getSystemEventsCache,
+    setSystemEventsCache,
+    prefetchSystemEvents,
+  };
+}
+
+// =============================================================================
+// EXPORTS
+// =============================================================================
+
 export default useSystemEvents;
+
+// Re-export types for convenience and external usage
+export type {
+  UseSystemEventsOptions,
+  UseSystemEventsReturn,
+};
+
+// Export query keys for external cache management
+export { systemEventsQueryKeys };
+
+// Export fetchSystemEvents for direct usage if needed
+export { fetchSystemEvents };
