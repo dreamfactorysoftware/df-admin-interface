@@ -1,433 +1,751 @@
+'use client';
+
 /**
- * API Security Limits Edit Page
+ * API Rate Limit Edit Page Component for Next.js Dynamic Routing
  * 
- * Next.js dynamic page component for editing existing API rate limits using React Hook Form
- * with Zod schema validation, SWR for data fetching and optimistic updates, and Tailwind CSS
- * styling with Headless UI components. Replaces Angular df-limit-details component edit mode
- * with React/Next.js SSR-compatible implementation.
+ * Main Next.js page component for editing existing API rate limits using dynamic ID routing.
+ * Implements React Hook Form with Zod schema validation, SWR for data fetching and optimistic
+ * updates, and Tailwind CSS styling with Headless UI components. Replaces Angular df-limit-details
+ * component edit mode with React/Next.js SSR-compatible implementation featuring dynamic form
+ * controls, paywall enforcement, and authentication middleware integration.
  * 
  * Features:
- * - React Hook Form with Zod schema validators for real-time validation under 100ms
- * - SWR/React Query for intelligent caching with cache hit responses under 50ms
+ * - React Hook Form with Zod schema validators per React/Next.js Integration Requirements
+ * - SWR for intelligent caching and synchronization with cache hit responses under 50ms
  * - Next.js server components for initial page loads with SSR pages under 2 seconds
  * - Tailwind CSS 4.1+ with consistent theme injection across components
- * - WCAG 2.1 AA compliance maintained through Headless UI integration
+ * - WCAG 2.1 AA compliance through Headless UI integration per Section 0.1.2
  * - Next.js middleware for authentication and security rule evaluation
  * - Dynamic routing parameter extraction using Next.js app router conventions
- * - Comprehensive error handling with automatic fallback to list view
- * - Next.js metadata API integration for SEO optimization in edit workflows
+ * - Comprehensive error handling with automatic fallback to list view per Section 4.2
+ * - SEO optimization through Next.js metadata API integration per Next.js 15.1+ features
  * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
- * @since 2024-12-19
+ * @fileoverview Dynamic page component for API rate limit editing
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
+ * @see Technical Specification Section 0 - SUMMARY OF CHANGES
+ * @see Technical Specification Section 4.7.1.1 - routing migration strategy
  */
 
-import React, { Suspense } from 'react'
-import { Metadata } from 'next'
-import { notFound, redirect } from 'next/navigation'
-import dynamic from 'next/dynamic'
+import React, { Suspense, useEffect, useMemo, useCallback } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { Metadata } from 'next';
+import { ErrorBoundary } from 'react-error-boundary';
+import { 
+  ExclamationTriangleIcon,
+  ArrowLeftIcon,
+  PencilIcon,
+  TrashIcon,
+  CheckCircleIcon,
+  XCircleIcon 
+} from '@heroicons/react/24/outline';
 
-// Client component import for dynamic rendering
-const LimitEditClient = dynamic(() => import('./limit-edit-client'), {
-  loading: () => <LimitEditLoadingSkeleton />,
-  ssr: false
-})
+// Internal imports for limit management
+import { useLimitData } from '../../hooks/use-limits-data';
+import { useLimitMutations } from '../../hooks/use-limit-mutations';
+import { useLimitOptions } from '../../hooks/use-limit-options';
+import { LimitForm } from '../../components/limit-form';
+import { SecurityNav } from '../../components/security-nav';
 
-// =============================================================================
-// TYPES AND INTERFACES
-// =============================================================================
+// UI Component imports (implementing minimal versions for now)
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { Alert } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+
+// Utility imports
+import { cn } from '@/lib/utils';
+import { formatRelativeTime, formatDate } from '@/lib/date-utils';
+
+// Type imports
+import type { 
+  LimitTableRowData,
+  LimitConfiguration,
+  LimitFormProps 
+} from '../../types';
+import type { ApiErrorResponse } from '@/types/api';
+
+// ============================================================================
+// Page Component Interface and Types
+// ============================================================================
 
 /**
- * Page component props with Next.js routing parameters
+ * Route parameters for dynamic [id] routing
+ */
+interface LimitEditPageParams {
+  id: string;
+}
+
+/**
+ * Component props for the page
  */
 interface LimitEditPageProps {
-  params: {
-    id: string
-  }
-  searchParams?: {
-    [key: string]: string | string[] | undefined
-  }
+  params: LimitEditPageParams;
 }
 
 /**
- * Parsed limit ID with validation
+ * Error boundary fallback component props
  */
-interface ValidatedLimitId {
-  id: number
-  isValid: boolean
-  error?: string
+interface ErrorFallbackProps {
+  error: Error;
+  resetErrorBoundary: () => void;
 }
 
-// =============================================================================
-// SERVER-SIDE UTILITIES
-// =============================================================================
+// ============================================================================
+// Metadata Generation for SEO Optimization
+// ============================================================================
 
 /**
- * Validate and parse the limit ID parameter
- * 
- * @param idParam - The ID parameter from the URL
- * @returns Validated limit ID object
+ * Generate metadata for the limit edit page
+ * Implements Next.js metadata API for SEO optimization per Next.js 15.1+ features
  */
-function validateLimitId(idParam: string): ValidatedLimitId {
-  // Check if ID is numeric
-  const numericId = parseInt(idParam, 10)
+export async function generateMetadata({ params }: LimitEditPageProps): Promise<Metadata> {
+  const limitId = parseInt(params.id, 10);
   
-  if (isNaN(numericId)) {
+  // Basic metadata for all limit edit pages
+  const baseMetadata: Metadata = {
+    title: `Edit API Rate Limit - DreamFactory Admin`,
+    description: 'Configure and manage API rate limiting settings for enhanced security and performance control.',
+    keywords: [
+      'API rate limiting',
+      'DreamFactory admin',
+      'API security',
+      'rate limit configuration',
+      'API management'
+    ],
+    robots: {
+      index: false, // Internal admin pages should not be indexed
+      follow: false,
+    },
+    openGraph: {
+      title: 'Edit API Rate Limit - DreamFactory Admin',
+      description: 'Configure API rate limiting settings',
+      type: 'website',
+      siteName: 'DreamFactory Admin Interface',
+    },
+  };
+
+  // If limit ID is invalid, return base metadata
+  if (isNaN(limitId) || limitId <= 0) {
     return {
-      id: 0,
-      isValid: false,
-      error: 'Invalid limit ID format. ID must be a number.'
-    }
+      ...baseMetadata,
+      title: 'Invalid Rate Limit - DreamFactory Admin',
+      description: 'The requested rate limit could not be found.',
+    };
   }
-  
-  // Check if ID is positive
-  if (numericId <= 0) {
-    return {
-      id: numericId,
-      isValid: false,
-      error: 'Invalid limit ID. ID must be a positive number.'
-    }
-  }
-  
-  // Check reasonable bounds (assuming max 10 million limits)
-  if (numericId > 10000000) {
-    return {
-      id: numericId,
-      isValid: false,
-      error: 'Invalid limit ID. ID exceeds maximum allowed value.'
-    }
-  }
-  
+
+  // For valid IDs, add dynamic content
   return {
-    id: numericId,
-    isValid: true
-  }
+    ...baseMetadata,
+    title: `Edit Rate Limit #${limitId} - DreamFactory Admin`,
+    description: `Configure rate limiting settings for limit ID ${limitId}.`,
+    alternates: {
+      canonical: `/api-security/limits/${limitId}`,
+    },
+  };
 }
 
-/**
- * Server-side limit existence check (if available)
- * This would typically call the API server-side, but for now we'll validate client-side
- * 
- * @param limitId - The validated limit ID
- * @returns Whether the limit exists
- */
-async function checkLimitExists(limitId: number): Promise<boolean> {
-  // In a real implementation, this would make a server-side API call
-  // For now, we'll defer this check to the client component
-  // This maintains SSR performance while ensuring data accuracy
-  return true
-}
-
-// =============================================================================
-// LOADING SKELETON COMPONENT
-// =============================================================================
+// ============================================================================
+// Error Boundary Components
+// ============================================================================
 
 /**
- * Loading skeleton component for the limit edit page
- * Provides immediate visual feedback while the dynamic component loads
+ * Error fallback component for limit edit page errors
+ * Provides user-friendly error display with recovery options
  */
-function LimitEditLoadingSkeleton() {
+function LimitEditErrorFallback({ error, resetErrorBoundary }: ErrorFallbackProps) {
+  const router = useRouter();
+
+  const handleReturnToList = useCallback(() => {
+    router.push('/api-security/limits');
+  }, [router]);
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header skeleton */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="space-y-2">
-              <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-32 animate-pulse"></div>
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-64 animate-pulse"></div>
-            </div>
-            <div className="flex space-x-3">
-              <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-20 animate-pulse"></div>
-              <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-24 animate-pulse"></div>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* Navigation */}
+      <SecurityNav />
       
-      {/* Navigation skeleton */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="flex space-x-4 mb-6">
-          <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-32 animate-pulse"></div>
-          <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-24 animate-pulse"></div>
-        </div>
-        
-        {/* Form skeleton */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <div className="space-y-6">
-            {/* Form title */}
-            <div className="border-b border-gray-200 dark:border-gray-700 pb-4">
-              <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-48 animate-pulse mb-2"></div>
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-96 animate-pulse"></div>
-            </div>
+      {/* Error Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <Card className="max-w-2xl mx-auto">
+          <div className="text-center p-8">
+            <ExclamationTriangleIcon 
+              className="w-16 h-16 text-red-500 mx-auto mb-4" 
+              aria-hidden="true"
+            />
             
-            {/* Form fields */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {[...Array(6)].map((_, index) => (
-                <div key={index} className="space-y-2">
-                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24 animate-pulse"></div>
-                  <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-full animate-pulse"></div>
-                </div>
-              ))}
-            </div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+              Unable to Load Rate Limit
+            </h1>
             
-            {/* Form actions */}
-            <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200 dark:border-gray-700">
-              <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-20 animate-pulse"></div>
-              <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-32 animate-pulse"></div>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
+              {error.message || 'An unexpected error occurred while loading the rate limit details.'}
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Button
+                onClick={resetErrorBoundary}
+                variant="primary"
+                className="inline-flex items-center gap-2"
+              >
+                <CheckCircleIcon className="w-4 h-4" aria-hidden="true" />
+                Try Again
+              </Button>
+              
+              <Button
+                onClick={handleReturnToList}
+                variant="secondary"
+                className="inline-flex items-center gap-2"
+              >
+                <ArrowLeftIcon className="w-4 h-4" aria-hidden="true" />
+                Back to Rate Limits
+              </Button>
+            </div>
+
+            {/* Development error details */}
+            {process.env.NODE_ENV === 'development' && (
+              <details className="mt-6 text-left">
+                <summary className="cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Technical Details
+                </summary>
+                <pre className="mt-2 p-4 bg-gray-100 dark:bg-gray-800 rounded-md text-xs overflow-x-auto">
+                  {error.stack}
+                </pre>
+              </details>
+            )}
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Loading fallback component for Suspense boundaries
+ * Provides consistent loading states across the application
+ */
+function LimitEditLoadingFallback() {
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Navigation */}
+      <SecurityNav />
+      
+      {/* Loading Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="animate-pulse">
+          {/* Header skeleton */}
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-4">
+              <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded" />
+              <div className="space-y-2">
+                <div className="w-48 h-6 bg-gray-200 dark:bg-gray-700 rounded" />
+                <div className="w-32 h-4 bg-gray-200 dark:bg-gray-700 rounded" />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <div className="w-20 h-9 bg-gray-200 dark:bg-gray-700 rounded" />
+              <div className="w-16 h-9 bg-gray-200 dark:bg-gray-700 rounded" />
             </div>
           </div>
+
+          {/* Form skeleton */}
+          <Card>
+            <div className="p-6 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {Array.from({ length: 6 }).map((_, index) => (
+                  <div key={index} className="space-y-2">
+                    <div className="w-24 h-4 bg-gray-200 dark:bg-gray-700 rounded" />
+                    <div className="w-full h-9 bg-gray-200 dark:bg-gray-700 rounded" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Card>
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-// =============================================================================
-// METADATA GENERATION
-// =============================================================================
-
-/**
- * Generate dynamic metadata for the limit edit page
- * Provides SEO optimization for limit editing workflows
- * 
- * @param props - Page props with routing parameters
- * @returns Metadata object for Next.js
- */
-export async function generateMetadata(
-  { params }: LimitEditPageProps
-): Promise<Metadata> {
-  const validatedId = validateLimitId(params.id)
-  
-  if (!validatedId.isValid) {
-    return {
-      title: 'Invalid Limit ID | API Security | DreamFactory Admin',
-      description: 'The specified rate limit ID is invalid.',
-      robots: {
-        index: false,
-        follow: false
-      }
-    }
-  }
-  
-  // In a real implementation, we might fetch the limit name for the title
-  // For now, we'll use the ID in the title
-  const limitId = validatedId.id
-  
-  return {
-    title: `Edit Rate Limit #${limitId} | API Security | DreamFactory Admin`,
-    description: `Configure and manage rate limit settings for limit #${limitId}. Control API request rates, set user and service-specific limits, and monitor usage patterns.`,
-    keywords: [
-      'rate limiting',
-      'API security',
-      'request throttling',
-      'DreamFactory',
-      'admin interface',
-      'edit limit',
-      `limit ${limitId}`
-    ],
-    openGraph: {
-      title: `Edit Rate Limit #${limitId} | DreamFactory Admin`,
-      description: `Configure rate limit settings for limit #${limitId}`,
-      type: 'website',
-      siteName: 'DreamFactory Admin Interface'
-    },
-    twitter: {
-      card: 'summary',
-      title: `Edit Rate Limit #${limitId} | DreamFactory Admin`,
-      description: `Configure rate limit settings for limit #${limitId}`
-    },
-    robots: {
-      index: false, // Don't index admin pages
-      follow: false
-    }
-  }
-}
-
-// =============================================================================
-// MAIN PAGE COMPONENT
-// =============================================================================
+// ============================================================================
+// Main Page Component Implementation
+// ============================================================================
 
 /**
  * Main page component for editing API rate limits
  * 
- * Implements Next.js app router patterns with dynamic routing, SSR optimization,
- * and comprehensive error handling. Validates route parameters server-side before
- * rendering the client component for optimal performance and user experience.
- * 
- * @param props - Page props with routing parameters
- * @returns JSX element for the limit edit page
+ * Implements comprehensive limit editing workflow with dynamic routing,
+ * real-time validation, optimistic updates, and comprehensive error handling.
+ * Replaces Angular df-limit-details component with modern React patterns.
  */
-export default async function LimitEditPage({ 
-  params, 
-  searchParams 
-}: LimitEditPageProps) {
-  // ==========================================================================
-  // SERVER-SIDE VALIDATION
-  // ==========================================================================
-  
-  // Validate the limit ID parameter
-  const validatedId = validateLimitId(params.id)
-  
-  if (!validatedId.isValid) {
-    // Invalid ID format - redirect to limits list with error message
-    redirect(`/api-security/limits?error=invalid-id&message=${encodeURIComponent(validatedId.error || 'Invalid limit ID')}`)
+function LimitEditPageContent({ limitId }: { limitId: number }) {
+  const router = useRouter();
+
+  // =========================================================================
+  // Data Fetching with SWR
+  // =========================================================================
+
+  // Fetch individual limit data with comprehensive error handling
+  const {
+    limit,
+    loading: limitLoading,
+    error: limitError,
+    paywall,
+    operations: limitOperations,
+    validation: limitValidation,
+  } = useLimitData(limitId, {
+    enableRealtime: true, // Enable real-time updates for active editing
+    includeUsage: true,   // Include usage statistics for context
+  });
+
+  // Fetch dropdown options for form selects
+  const {
+    data: dropdownOptions,
+    loading: optionsLoading,
+    errors: optionsErrors,
+    isReady: optionsReady,
+  } = useLimitOptions({
+    fetchServices: true,
+    fetchUsers: true,
+    fetchRoles: true,
+  });
+
+  // Mutation hooks for limit operations
+  const {
+    updateLimit,
+    deleteLimit,
+    isUpdating,
+    isDeleting,
+    updateError,
+    deleteError,
+    resetUpdateError,
+    resetDeleteError,
+  } = useLimitMutations({
+    optimisticUpdate: {
+      enabled: true,
+      rollbackOnError: true,
+    },
+    successNotification: {
+      title: 'Success',
+      message: 'Rate limit updated successfully',
+      duration: 5000,
+    },
+    errorNotification: {
+      title: 'Error',
+      fallbackMessage: 'Failed to update rate limit',
+    },
+  });
+
+  // =========================================================================
+  // Error Handling and Validation
+  // =========================================================================
+
+  // Handle paywall enforcement
+  useEffect(() => {
+    if (paywall.isActive && !paywall.isLoading) {
+      router.push('/paywall?feature=limits&redirect=' + encodeURIComponent(window.location.pathname));
+    }
+  }, [paywall.isActive, paywall.isLoading, router]);
+
+  // Handle limit not found - redirect to list view per Section 4.2 error handling
+  useEffect(() => {
+    if (limitError && !limitLoading) {
+      // Check if it's a 404 error
+      if (limitError.error?.status_code === 404) {
+        router.push('/api-security/limits?error=limit-not-found');
+        return;
+      }
+
+      // For other errors, stay on page but show error state
+      console.error('Failed to load limit:', limitError);
+    }
+  }, [limitError, limitLoading, router]);
+
+  // =========================================================================
+  // Form Handlers
+  // =========================================================================
+
+  /**
+   * Handle form submission for limit updates
+   * Implements optimistic updates with automatic rollback on error
+   */
+  const handleLimitUpdate = useCallback(async (formData: LimitConfiguration) => {
+    if (!limit) return;
+
+    try {
+      await updateLimit({
+        id: limit.id,
+        data: formData,
+        testConnection: formData.service ? true : false, // Test connection for service limits
+      });
+
+      // Refresh limit data to get updated values
+      await limitOperations.refresh();
+      
+    } catch (error) {
+      console.error('Failed to update limit:', error);
+      // Error handling is managed by the mutation hook
+    }
+  }, [limit, updateLimit, limitOperations]);
+
+  /**
+   * Handle limit deletion with confirmation
+   * Implements safe deletion with user confirmation
+   */
+  const handleLimitDelete = useCallback(async () => {
+    if (!limit) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to delete the rate limit "${limit.name}"? This action cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await deleteLimit({ id: limit.id });
+      
+      // Redirect to list view after successful deletion
+      router.push('/api-security/limits?success=limit-deleted');
+      
+    } catch (error) {
+      console.error('Failed to delete limit:', error);
+      // Error handling is managed by the mutation hook
+    }
+  }, [limit, deleteLimit, router]);
+
+  /**
+   * Handle navigation back to list view
+   */
+  const handleBackToList = useCallback(() => {
+    router.push('/api-security/limits');
+  }, [router]);
+
+  // =========================================================================
+  // Computed Values and Memoization
+  // =========================================================================
+
+  // Check if page is in loading state
+  const isLoading = useMemo(() => {
+    return limitLoading || optionsLoading.isLoading || paywall.isLoading;
+  }, [limitLoading, optionsLoading.isLoading, paywall.isLoading]);
+
+  // Check if page has critical errors
+  const hasCriticalError = useMemo(() => {
+    return limitError && limitError.error?.status_code !== 404;
+  }, [limitError]);
+
+  // Check if form can be submitted
+  const canSubmit = useMemo(() => {
+    return !!(limit && optionsReady && !isUpdating && !isDeleting);
+  }, [limit, optionsReady, isUpdating, isDeleting]);
+
+  // Format limit metadata for display
+  const limitMetadata = useMemo(() => {
+    if (!limit) return null;
+
+    return {
+      createdAt: limit.createdAt ? formatDate(limit.createdAt) : 'Unknown',
+      updatedAt: limit.updatedAt ? formatRelativeTime(limit.updatedAt) : 'Never',
+      createdBy: limit.createdBy || 'System',
+      status: limit.active ? 'Active' : 'Inactive',
+    };
+  }, [limit]);
+
+  // =========================================================================
+  // Render Logic
+  // =========================================================================
+
+  // Show loading state during initial data fetch
+  if (isLoading) {
+    return <LimitEditLoadingFallback />;
   }
-  
-  const limitId = validatedId.id
-  
-  // Optional: Check if limit exists (server-side optimization)
-  // This would require API access from the server component
-  // For now, we'll let the client component handle existence checking
-  const limitExists = await checkLimitExists(limitId)
-  
-  if (!limitExists) {
-    // Limit doesn't exist - return 404
-    notFound()
+
+  // Show error state for critical errors
+  if (hasCriticalError) {
+    throw new Error(limitError?.error?.message || 'Failed to load rate limit');
   }
-  
-  // ==========================================================================
-  // SEARCH PARAMS PROCESSING
-  // ==========================================================================
-  
-  // Extract any additional parameters for the edit context
-  const editContext = {
-    returnUrl: searchParams?.return as string | undefined,
-    mode: searchParams?.mode as string | undefined,
-    highlight: searchParams?.highlight as string | undefined,
+
+  // Show not found state
+  if (!limit && !limitLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <SecurityNav />
+        
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <Card className="max-w-2xl mx-auto">
+            <div className="text-center p-8">
+              <XCircleIcon 
+                className="w-16 h-16 text-gray-400 mx-auto mb-4" 
+                aria-hidden="true"
+              />
+              
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+                Rate Limit Not Found
+              </h1>
+              
+              <p className="text-gray-600 dark:text-gray-400 mb-6">
+                The rate limit you're looking for doesn't exist or has been deleted.
+              </p>
+
+              <Button
+                onClick={handleBackToList}
+                variant="primary"
+                className="inline-flex items-center gap-2"
+              >
+                <ArrowLeftIcon className="w-4 h-4" aria-hidden="true" />
+                Back to Rate Limits
+              </Button>
+            </div>
+          </Card>
+        </div>
+      </div>
+    );
   }
-  
-  // ==========================================================================
-  // PAGE RENDERING
-  // ==========================================================================
-  
+
+  // Main page content
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* 
-        Suspense boundary for the client component
-        Provides loading state while dynamic component loads
-      */}
-      <Suspense fallback={<LimitEditLoadingSkeleton />}>
-        <LimitEditClient 
-          limitId={limitId}
-          editContext={editContext}
-        />
+      {/* Navigation */}
+      <SecurityNav />
+
+      {/* Page Header */}
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex items-center justify-between">
+            {/* Header Content */}
+            <div className="flex items-center gap-4 min-w-0">
+              <Button
+                onClick={handleBackToList}
+                variant="ghost"
+                size="sm"
+                className="flex-shrink-0"
+                aria-label="Back to rate limits list"
+              >
+                <ArrowLeftIcon className="w-5 h-5" />
+              </Button>
+              
+              <div className="min-w-0">
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 truncate">
+                  Edit Rate Limit: {limit?.name}
+                </h1>
+                
+                {limitMetadata && (
+                  <div className="flex items-center gap-4 mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    <span>ID: {limit?.id}</span>
+                    <span>•</span>
+                    <span>Status: {limitMetadata.status}</span>
+                    <span>•</span>
+                    <span>Updated: {limitMetadata.updatedAt}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Button
+                onClick={handleLimitDelete}
+                variant="destructive"
+                size="sm"
+                disabled={isDeleting || isUpdating}
+                className="inline-flex items-center gap-2"
+              >
+                <TrashIcon className="w-4 h-4" />
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Error Alerts */}
+        {updateError && (
+          <Alert
+            variant="error"
+            title="Update Failed"
+            message={updateError.error?.message || 'Failed to update rate limit'}
+            onDismiss={resetUpdateError}
+            className="mb-6"
+          />
+        )}
+
+        {deleteError && (
+          <Alert
+            variant="error"
+            title="Delete Failed"
+            message={deleteError.error?.message || 'Failed to delete rate limit'}
+            onDismiss={resetDeleteError}
+            className="mb-6"
+          />
+        )}
+
+        {optionsErrors.hasErrors && (
+          <Alert
+            variant="warning"
+            title="Loading Issues"
+            message="Some dropdown options failed to load. Form functionality may be limited."
+            className="mb-6"
+          />
+        )}
+
+        {/* Form Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Main Form */}
+          <div className="lg:col-span-3">
+            <Card>
+              <div className="p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <PencilIcon className="w-5 h-5 text-gray-500" aria-hidden="true" />
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                    Rate Limit Configuration
+                  </h2>
+                </div>
+
+                <LimitForm
+                  initialData={limit}
+                  dropdownOptions={dropdownOptions}
+                  onSubmit={handleLimitUpdate}
+                  onCancel={handleBackToList}
+                  isLoading={isUpdating}
+                  disabled={!canSubmit}
+                  showTestConnection={true}
+                  mode="edit"
+                />
+              </div>
+            </Card>
+          </div>
+
+          {/* Sidebar with metadata */}
+          <div className="lg:col-span-1">
+            <Card>
+              <div className="p-6">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                  Limit Details
+                </h3>
+                
+                {limitMetadata && (
+                  <div className="space-y-3 text-sm">
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400">Status:</span>
+                      <div className="mt-1">
+                        <span className={cn(
+                          'inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium',
+                          limit?.active
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                            : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
+                        )}>
+                          <div className={cn(
+                            'w-1.5 h-1.5 rounded-full',
+                            limit?.active ? 'bg-green-500' : 'bg-gray-500'
+                          )} />
+                          {limitMetadata.status}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400">Created:</span>
+                      <div className="mt-1 text-gray-900 dark:text-gray-100">
+                        {limitMetadata.createdAt}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        by {limitMetadata.createdBy}
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400">Last Updated:</span>
+                      <div className="mt-1 text-gray-900 dark:text-gray-100">
+                        {limitMetadata.updatedAt}
+                      </div>
+                    </div>
+
+                    {limit?.limitRate && (
+                      <div>
+                        <span className="text-gray-500 dark:text-gray-400">Rate:</span>
+                        <div className="mt-1 text-gray-900 dark:text-gray-100 font-mono text-xs">
+                          {limit.limitRate}
+                        </div>
+                      </div>
+                    )}
+
+                    {limit?.currentUsage !== undefined && (
+                      <div>
+                        <span className="text-gray-500 dark:text-gray-400">Usage:</span>
+                        <div className="mt-1 text-gray-900 dark:text-gray-100">
+                          {limit.currentUsage} requests
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {!limitValidation.isValid && (
+                  <Alert
+                    variant="warning"
+                    title="Data may be stale"
+                    message="The limit data might not be current. Try refreshing."
+                    className="mt-4"
+                  />
+                )}
+              </div>
+            </Card>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Main exported page component with error boundary and suspense
+ * 
+ * Implements comprehensive error handling, loading states, and parameter validation
+ * per React/Next.js Integration Requirements and Section 4.2 error handling patterns.
+ */
+export default function LimitEditPage({ params }: LimitEditPageProps) {
+  // Validate and parse the limit ID parameter
+  const limitId = useMemo(() => {
+    const id = parseInt(params.id, 10);
+    if (isNaN(id) || id <= 0) {
+      throw new Error(`Invalid limit ID: ${params.id}`);
+    }
+    return id;
+  }, [params.id]);
+
+  return (
+    <ErrorBoundary
+      FallbackComponent={LimitEditErrorFallback}
+      onError={(error, errorInfo) => {
+        // Log error for monitoring and debugging
+        console.error('Limit edit page error:', error, errorInfo);
+        
+        // In production, this would send to error monitoring service
+        if (typeof window !== 'undefined' && window.gtag) {
+          window.gtag('event', 'exception', {
+            description: error.message,
+            fatal: false,
+          });
+        }
+      }}
+      onReset={() => {
+        // Clear any cached error states when resetting
+        if (typeof window !== 'undefined') {
+          window.location.reload();
+        }
+      }}
+    >
+      <Suspense fallback={<LimitEditLoadingFallback />}>
+        <LimitEditPageContent limitId={limitId} />
       </Suspense>
-    </div>
-  )
+    </ErrorBoundary>
+  );
 }
 
-// =============================================================================
-// ROUTE SEGMENT CONFIG
-// =============================================================================
+// ============================================================================
+// Type Exports and Additional Utilities
+// ============================================================================
 
-/**
- * Route segment configuration for Next.js app router
- * Optimizes caching and rendering behavior for the edit page
- */
-export const dynamic = 'force-dynamic' // Always render server-side for fresh data
-export const revalidate = 0 // Don't cache this page
-export const runtime = 'nodejs' // Use Node.js runtime for server features
-
-// =============================================================================
-// ERROR BOUNDARY EXPORTS
-// =============================================================================
-
-/**
- * Export error boundary component for route-level error handling
- * Provides graceful fallback when the page component fails
- */
-export function ErrorBoundary({ error, reset }: { error: Error; reset: () => void }) {
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-      <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <div className="text-center">
-          <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900 mb-4">
-            <svg 
-              className="h-6 w-6 text-red-600 dark:text-red-400" 
-              fill="none" 
-              viewBox="0 0 24 24" 
-              stroke="currentColor"
-            >
-              <path 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                strokeWidth={2} 
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.962-.833-2.732 0L3.262 16.5c-.77.833.192 2.5 1.732 2.5z" 
-              />
-            </svg>
-          </div>
-          
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-            Unable to Load Limit Editor
-          </h2>
-          
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-            {error.message || 'An unexpected error occurred while loading the rate limit editor.'}
-          </p>
-          
-          <div className="flex flex-col sm:flex-row gap-3">
-            <button
-              onClick={reset}
-              className="flex-1 bg-primary-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-colors"
-            >
-              Try Again
-            </button>
-            
-            <a
-              href="/api-security/limits"
-              className="flex-1 bg-gray-100 text-gray-900 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600 text-center"
-            >
-              Back to Limits
-            </a>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/**
- * Not found boundary for invalid limit IDs
- * Provides user-friendly 404 page when limit doesn't exist
- */
-export function NotFound() {
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-      <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <div className="text-center">
-          <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-yellow-100 dark:bg-yellow-900 mb-4">
-            <svg 
-              className="h-6 w-6 text-yellow-600 dark:text-yellow-400" 
-              fill="none" 
-              viewBox="0 0 24 24" 
-              stroke="currentColor"
-            >
-              <path 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                strokeWidth={2} 
-                d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-3-8a8 8 0 100 16 8 8 0 000-16z" 
-              />
-            </svg>
-          </div>
-          
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-            Rate Limit Not Found
-          </h2>
-          
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-            The requested rate limit could not be found. It may have been deleted or the ID may be incorrect.
-          </p>
-          
-          <a
-            href="/api-security/limits"
-            className="w-full bg-primary-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-colors inline-block text-center"
-          >
-            View All Limits
-          </a>
-        </div>
-      </div>
-    </div>
-  )
-}
+export type { LimitEditPageProps, LimitEditPageParams };
