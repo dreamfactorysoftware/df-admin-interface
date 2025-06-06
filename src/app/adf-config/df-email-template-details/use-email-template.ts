@@ -1,697 +1,652 @@
-'use client';
-
 /**
- * Email Template Management Hook
+ * Custom React hook for email template CRUD operations with intelligent caching.
  * 
- * Custom React hook providing email template CRUD operations using SWR/React Query 
- * for intelligent caching and state management. Handles create, read, update operations 
- * for email templates with optimistic updates, error handling, and cache invalidation. 
- * Provides loading states, error states, and success callbacks while maintaining 
- * compatibility with the DreamFactory email templates API.
+ * Provides comprehensive email template management functionality using React Query
+ * for intelligent caching, optimistic updates, and automatic error recovery.
+ * Replaces Angular service injection patterns with modern React hooks architecture
+ * optimized for React 19 and Next.js 15.1+.
  * 
  * Features:
- * - SWR/React Query for intelligent caching and synchronization per React/Next.js Integration Requirements
- * - Cache hit responses under 50ms per React/Next.js Integration Requirements  
+ * - SWR/React Query for intelligent caching and synchronization
+ * - Cache hit responses under 50ms per React/Next.js Integration Requirements
  * - API responses under 2 seconds per React/Next.js Integration Requirements
- * - Optimistic updates with rollback capabilities per Section 4.3 state management workflows
- * - Comprehensive error handling and retry logic per Section 4.1 system workflows
- * - Convert Angular service injection to custom React hook per React/Next.js Integration Requirements
- * - Replace RxJS observables with React Query mutations and queries per React/Next.js Integration Requirements
- * - Implement cache invalidation strategies for related queries per Section 4.3 state management workflows
+ * - Optimistic updates with automatic rollback on errors
+ * - Comprehensive error handling and retry logic
+ * - Cache invalidation strategies for related queries
  * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
+ * @fileoverview Email template CRUD operations hook
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-import { 
-  useQuery, 
-  useMutation, 
-  useQueryClient, 
-  UseQueryOptions,
-  UseMutationOptions 
-} from '@tanstack/react-query';
-import { useCallback, useRef, useMemo } from 'react';
-import { apiClient } from '../../../lib/api-client';
-import { useNotification } from '../../../hooks/use-notification';
-import type {
-  EmailTemplate,
-  EmailTemplateRequest,
-  EmailTemplateListResponse,
-  EmailTemplateResponse,
-  EmailTemplateCreateResponse,
-  EmailTemplateUpdateResponse,
-  EmailTemplateQueryParams,
-  EmailTemplateHookConfig,
-  EmailTemplatePreview,
-  EmailTemplateTest,
-  EmailTemplateTestResult,
-  EmailTemplateOperationResult
-} from '../../../types/email-templates';
+import { useMutation, useQuery, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
+import { useCallback, useMemo } from 'react';
+import { apiGet, apiPost, apiPut, apiDelete, API_BASE_URL } from '../../../lib/api-client';
+
+// ============================================================================
+// Type Definitions
+// ============================================================================
 
 /**
- * API error interface for comprehensive error handling
+ * Email template entity interface
  */
-interface ApiError {
-  message: string;
-  status?: number;
-  code?: string;
-  details?: any;
-  context?: string;
+export interface EmailTemplate {
+  id: number;
+  name: string;
+  description?: string;
+  to?: string;
+  cc?: string;
+  bcc?: string;
+  subject?: string;
+  attachment?: string;
+  bodyText?: string;
+  bodyHtml?: string;
+  fromName?: string;
+  fromEmail?: string;
+  replyToName?: string;
+  replyToEmail?: string;
+  defaults?: any;
+  createdDate: string;
+  lastModifiedDate: string;
+  createdById?: number;
+  lastModifiedById?: number;
 }
 
 /**
- * Query keys for React Query cache management
+ * Email template payload for create/update operations
  */
-const EMAIL_TEMPLATE_QUERY_KEYS = {
-  all: ['email-templates'] as const,
-  lists: () => [...EMAIL_TEMPLATE_QUERY_KEYS.all, 'list'] as const,
-  list: (params?: EmailTemplateQueryParams) => [...EMAIL_TEMPLATE_QUERY_KEYS.lists(), params] as const,
-  details: () => [...EMAIL_TEMPLATE_QUERY_KEYS.all, 'detail'] as const,
-  detail: (id: number) => [...EMAIL_TEMPLATE_QUERY_KEYS.details(), id] as const,
-  preview: (id: number) => [...EMAIL_TEMPLATE_QUERY_KEYS.all, 'preview', id] as const,
-} as const;
-
-/**
- * Default configuration for React Query
- */
-const DEFAULT_CONFIG: EmailTemplateHookConfig = {
-  enableOptimisticUpdates: true,
-  enableCache: true,
-  cacheTime: 1000 * 60 * 5, // 5 minutes
-  staleTime: 1000 * 30, // 30 seconds for cache hit under 50ms requirement
-  retryCount: 3,
-  retryDelay: 1000
-};
-
-/**
- * Email template hook return interface
- */
-export interface UseEmailTemplateReturn {
-  // Query operations
-  emailTemplates: EmailTemplate[];
-  emailTemplate: EmailTemplate | undefined;
-  isLoading: boolean;
-  isError: boolean;
-  error: ApiError | null;
-  refetch: () => void;
-  
-  // Mutation operations
-  createTemplate: (data: EmailTemplateRequest) => Promise<EmailTemplateOperationResult>;
-  updateTemplate: (id: number, data: EmailTemplateRequest) => Promise<EmailTemplateOperationResult>;
-  deleteTemplate: (id: number) => Promise<EmailTemplateOperationResult>;
-  duplicateTemplate: (id: number, newName: string) => Promise<EmailTemplateOperationResult>;
-  
-  // Template operations
-  previewTemplate: (id: number, testData?: Record<string, any>) => Promise<EmailTemplatePreview>;
-  testTemplate: (test: EmailTemplateTest) => Promise<EmailTemplateTestResult>;
-  
-  // Loading states
-  isCreating: boolean;
-  isUpdating: boolean;
-  isDeleting: boolean;
-  isPreviewing: boolean;
-  isTesting: boolean;
-  
-  // Cache management
-  invalidateQueries: () => void;
-  refreshTemplate: (id: number) => void;
-  
-  // Optimistic update context
-  rollbackOptimisticUpdate: () => void;
+export interface EmailTemplatePayload {
+  name: string;
+  description?: string;
+  to?: string;
+  cc?: string;
+  bcc?: string;
+  subject?: string;
+  attachment?: string;
+  bodyHtml?: string;
+  fromName?: string;
+  fromEmail?: string;
+  replyToName?: string;
+  replyToEmail?: string;
 }
 
 /**
- * Email template management hook providing comprehensive CRUD operations
- * with intelligent caching, optimistic updates, and error handling.
- * 
- * @param templateId - Optional template ID for single template operations
- * @param queryParams - Optional query parameters for list operations
- * @param config - Optional configuration overrides
- * @returns Email template hook interface with all operations and state
- * 
- * @example
- * ```tsx
- * // List all templates
- * const { emailTemplates, isLoading, createTemplate } = useEmailTemplate();
- * 
- * // Get specific template
- * const { emailTemplate, updateTemplate } = useEmailTemplate(123);
- * 
- * // Create new template
- * const handleCreate = async () => {
- *   const result = await createTemplate({
- *     name: 'Welcome Email',
- *     subject: 'Welcome to our platform',
- *     body_html: '<h1>Welcome!</h1>',
- *     is_active: true
- *   });
- *   if (result.success) {
- *     console.log('Template created:', result.data);
- *   }
- * };
- * 
- * // Preview template
- * const { previewTemplate } = useEmailTemplate();
- * const preview = await previewTemplate(123, { user_name: 'John Doe' });
- * ```
+ * Email template list response from API
  */
-export function useEmailTemplate(
-  templateId?: number,
-  queryParams?: EmailTemplateQueryParams,
-  config: EmailTemplateHookConfig = {}
-): UseEmailTemplateReturn {
-  const queryClient = useQueryClient();
-  const notification = useNotification();
-  const finalConfig = { ...DEFAULT_CONFIG, ...config };
-  
-  // Optimistic update context for rollback
-  const optimisticUpdateContext = useRef<{
-    queryKey: string[];
-    previousData: any;
-  } | null>(null);
-
-  /**
-   * Calculate exponential backoff delay for retries
-   */
-  const calculateRetryDelay = useCallback((attemptIndex: number): number => {
-    return Math.min(finalConfig.retryDelay! * Math.pow(2, attemptIndex), 30000); // Max 30 seconds
-  }, [finalConfig.retryDelay]);
-
-  /**
-   * Optimistic update helper
-   */
-  const performOptimisticUpdate = useCallback((queryKey: string[], updater: (oldData: any) => any) => {
-    if (!finalConfig.enableOptimisticUpdates) return;
-
-    const previousData = queryClient.getQueryData(queryKey);
-    optimisticUpdateContext.current = { queryKey, previousData };
-    
-    queryClient.setQueryData(queryKey, updater);
-  }, [queryClient, finalConfig.enableOptimisticUpdates]);
-
-  /**
-   * Rollback optimistic update
-   */
-  const rollbackOptimisticUpdate = useCallback(() => {
-    if (optimisticUpdateContext.current) {
-      const { queryKey, previousData } = optimisticUpdateContext.current;
-      queryClient.setQueryData(queryKey, previousData);
-      optimisticUpdateContext.current = null;
-    }
-  }, [queryClient]);
-
-  /**
-   * Query for email templates list
-   */
-  const {
-    data: emailTemplatesData,
-    isLoading: isLoadingList,
-    isError: isErrorList,
-    error: errorList,
-    refetch: refetchList
-  } = useQuery({
-    queryKey: EMAIL_TEMPLATE_QUERY_KEYS.list(queryParams),
-    queryFn: async (): Promise<EmailTemplateListResponse> => {
-      const params = new URLSearchParams();
-      
-      if (queryParams?.filter) params.append('filter', queryParams.filter);
-      if (queryParams?.sort) params.append('sort', queryParams.sort);
-      if (queryParams?.fields) params.append('fields', queryParams.fields);
-      if (queryParams?.limit) params.append('limit', queryParams.limit.toString());
-      if (queryParams?.offset) params.append('offset', queryParams.offset.toString());
-      if (queryParams?.include_count) params.append('include_count', 'true');
-      if (queryParams?.include_inactive) params.append('include_inactive', 'true');
-
-      const url = `/system/email_template${params.toString() ? `?${params.toString()}` : ''}`;
-      
-      return apiClient.get(url);
-    },
-    staleTime: finalConfig.staleTime,
-    cacheTime: finalConfig.cacheTime,
-    enabled: finalConfig.enableCache,
-    retry: finalConfig.retryCount,
-    retryDelay: calculateRetryDelay,
-    onError: (error) => {
-      finalConfig.onError?.(error);
-    }
-  });
-
-  /**
-   * Query for single email template
-   */
-  const {
-    data: emailTemplateData,
-    isLoading: isLoadingTemplate,
-    isError: isErrorTemplate,
-    error: errorTemplate,
-    refetch: refetchTemplate
-  } = useQuery({
-    queryKey: EMAIL_TEMPLATE_QUERY_KEYS.detail(templateId!),
-    queryFn: async (): Promise<EmailTemplateResponse> => {
-      return apiClient.get(`/system/email_template/${templateId}`);
-    },
-    enabled: !!templateId && finalConfig.enableCache,
-    staleTime: finalConfig.staleTime,
-    cacheTime: finalConfig.cacheTime,
-    retry: finalConfig.retryCount,
-    retryDelay: calculateRetryDelay,
-    onError: (error) => {
-      finalConfig.onError?.(error);
-    }
-  });
-
-  /**
-   * Create email template mutation
-   */
-  const createMutation = useMutation({
-    mutationFn: async (data: EmailTemplateRequest): Promise<EmailTemplateCreateResponse> => {
-      return apiClient.post('/system/email_template', { resource: [data] });
-    },
-    onMutate: async (newTemplate) => {
-      // Cancel outgoing refetches
-      await queryClient.cancelQueries({ queryKey: EMAIL_TEMPLATE_QUERY_KEYS.lists() });
-
-      // Optimistic update
-      if (finalConfig.enableOptimisticUpdates) {
-        const queryKey = EMAIL_TEMPLATE_QUERY_KEYS.list(queryParams);
-        performOptimisticUpdate(queryKey, (old: EmailTemplateListResponse | undefined) => {
-          if (!old) return old;
-          
-          const optimisticTemplate: EmailTemplate = {
-            id: -1, // Temporary ID
-            ...newTemplate,
-            is_active: newTemplate.is_active ?? true,
-            created_date: new Date().toISOString(),
-            last_modified_date: new Date().toISOString()
-          };
-
-          return {
-            ...old,
-            resource: [...old.resource, optimisticTemplate],
-            meta: { count: old.meta.count + 1 }
-          };
-        });
-      }
-    },
-    onSuccess: (response, variables) => {
-      // Clear optimistic update context
-      optimisticUpdateContext.current = null;
-      
-      // Invalidate and refetch queries
-      queryClient.invalidateQueries({ queryKey: EMAIL_TEMPLATE_QUERY_KEYS.all });
-      
-      // Show success notification
-      notification.success(
-        `Email template "${variables.name}" created successfully`,
-        'Template Created'
-      );
-      
-      finalConfig.onSuccess?.(response);
-    },
-    onError: (error: ApiError, variables) => {
-      // Rollback optimistic update
-      rollbackOptimisticUpdate();
-      
-      // Show error notification
-      notification.error(
-        `Failed to create email template "${variables.name}": ${error.message}`,
-        'Creation Failed'
-      );
-      
-      finalConfig.onError?.(error);
-    },
-    retry: finalConfig.retryCount,
-    retryDelay: calculateRetryDelay
-  });
-
-  /**
-   * Update email template mutation
-   */
-  const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: EmailTemplateRequest }): Promise<EmailTemplateUpdateResponse> => {
-      return apiClient.post(`/system/email_template/${id}`, data);
-    },
-    onMutate: async ({ id, data }) => {
-      // Cancel outgoing refetches
-      await queryClient.cancelQueries({ queryKey: EMAIL_TEMPLATE_QUERY_KEYS.detail(id) });
-      await queryClient.cancelQueries({ queryKey: EMAIL_TEMPLATE_QUERY_KEYS.lists() });
-
-      // Optimistic update for detail view
-      if (finalConfig.enableOptimisticUpdates && templateId === id) {
-        const detailQueryKey = EMAIL_TEMPLATE_QUERY_KEYS.detail(id);
-        performOptimisticUpdate(detailQueryKey, (old: EmailTemplateResponse | undefined) => {
-          if (!old?.resource?.[0]) return old;
-          
-          return {
-            ...old,
-            resource: [{
-              ...old.resource[0],
-              ...data,
-              last_modified_date: new Date().toISOString()
-            }]
-          };
-        });
-
-        // Also update list view
-        const listQueryKey = EMAIL_TEMPLATE_QUERY_KEYS.list(queryParams);
-        performOptimisticUpdate(listQueryKey, (old: EmailTemplateListResponse | undefined) => {
-          if (!old) return old;
-          
-          return {
-            ...old,
-            resource: old.resource.map(template => 
-              template.id === id 
-                ? { ...template, ...data, last_modified_date: new Date().toISOString() }
-                : template
-            )
-          };
-        });
-      }
-    },
-    onSuccess: (response, { id, data }) => {
-      // Clear optimistic update context
-      optimisticUpdateContext.current = null;
-      
-      // Invalidate and refetch queries
-      queryClient.invalidateQueries({ queryKey: EMAIL_TEMPLATE_QUERY_KEYS.all });
-      
-      // Show success notification
-      notification.success(
-        `Email template "${data.name}" updated successfully`,
-        'Template Updated'
-      );
-      
-      finalConfig.onSuccess?.(response);
-    },
-    onError: (error: ApiError, { data }) => {
-      // Rollback optimistic update
-      rollbackOptimisticUpdate();
-      
-      // Show error notification
-      notification.error(
-        `Failed to update email template "${data.name}": ${error.message}`,
-        'Update Failed'
-      );
-      
-      finalConfig.onError?.(error);
-    },
-    retry: finalConfig.retryCount,
-    retryDelay: calculateRetryDelay
-  });
-
-  /**
-   * Delete email template mutation
-   */
-  const deleteMutation = useMutation({
-    mutationFn: async (id: number): Promise<void> => {
-      return apiClient.delete(`/system/email_template/${id}`);
-    },
-    onMutate: async (id) => {
-      // Cancel outgoing refetches
-      await queryClient.cancelQueries({ queryKey: EMAIL_TEMPLATE_QUERY_KEYS.lists() });
-
-      // Get template name for notification
-      const templateData = queryClient.getQueryData<EmailTemplateResponse>(
-        EMAIL_TEMPLATE_QUERY_KEYS.detail(id)
-      );
-      const templateName = templateData?.resource?.[0]?.name || 'template';
-
-      // Optimistic update
-      if (finalConfig.enableOptimisticUpdates) {
-        const listQueryKey = EMAIL_TEMPLATE_QUERY_KEYS.list(queryParams);
-        performOptimisticUpdate(listQueryKey, (old: EmailTemplateListResponse | undefined) => {
-          if (!old) return old;
-          
-          return {
-            ...old,
-            resource: old.resource.filter(template => template.id !== id),
-            meta: { count: Math.max(0, old.meta.count - 1) }
-          };
-        });
-      }
-
-      return { templateName };
-    },
-    onSuccess: (response, id, context) => {
-      // Clear optimistic update context
-      optimisticUpdateContext.current = null;
-      
-      // Remove from cache
-      queryClient.removeQueries({ queryKey: EMAIL_TEMPLATE_QUERY_KEYS.detail(id) });
-      queryClient.invalidateQueries({ queryKey: EMAIL_TEMPLATE_QUERY_KEYS.lists() });
-      
-      // Show success notification
-      notification.success(
-        `Email template "${context?.templateName}" deleted successfully`,
-        'Template Deleted'
-      );
-      
-      finalConfig.onSuccess?.(response);
-    },
-    onError: (error: ApiError, id, context) => {
-      // Rollback optimistic update
-      rollbackOptimisticUpdate();
-      
-      // Show error notification
-      notification.error(
-        `Failed to delete email template "${context?.templateName}": ${error.message}`,
-        'Deletion Failed'
-      );
-      
-      finalConfig.onError?.(error);
-    },
-    retry: finalConfig.retryCount,
-    retryDelay: calculateRetryDelay
-  });
-
-  /**
-   * Duplicate email template mutation
-   */
-  const duplicateMutation = useMutation({
-    mutationFn: async ({ id, newName }: { id: number; newName: string }): Promise<EmailTemplateCreateResponse> => {
-      // First get the template to duplicate
-      const templateResponse: EmailTemplateResponse = await apiClient.get(`/system/email_template/${id}`);
-      const originalTemplate = templateResponse.resource[0];
-      
-      if (!originalTemplate) {
-        throw new Error('Template not found');
-      }
-
-      // Create duplicate with new name
-      const duplicateData: EmailTemplateRequest = {
-        ...originalTemplate,
-        name: newName,
-        // Remove system fields
-        id: undefined as any,
-        created_date: undefined as any,
-        last_modified_date: undefined as any,
-        created_by_id: undefined,
-        last_modified_by_id: undefined
-      };
-
-      return apiClient.post('/system/email_template', { resource: [duplicateData] });
-    },
-    onSuccess: (response, { newName }) => {
-      // Invalidate and refetch queries
-      queryClient.invalidateQueries({ queryKey: EMAIL_TEMPLATE_QUERY_KEYS.all });
-      
-      // Show success notification
-      notification.success(
-        `Email template duplicated as "${newName}" successfully`,
-        'Template Duplicated'
-      );
-      
-      finalConfig.onSuccess?.(response);
-    },
-    onError: (error: ApiError, { newName }) => {
-      // Show error notification
-      notification.error(
-        `Failed to duplicate email template as "${newName}": ${error.message}`,
-        'Duplication Failed'
-      );
-      
-      finalConfig.onError?.(error);
-    },
-    retry: finalConfig.retryCount,
-    retryDelay: calculateRetryDelay
-  });
-
-  /**
-   * Preview email template mutation
-   */
-  const previewMutation = useMutation({
-    mutationFn: async ({ id, testData }: { id: number; testData?: Record<string, any> }): Promise<EmailTemplatePreview> => {
-      const body = testData ? { test_data: testData } : {};
-      return apiClient.post(`/system/email_template/${id}/preview`, body);
-    },
-    onError: (error: ApiError) => {
-      notification.error(
-        `Failed to preview template: ${error.message}`,
-        'Preview Failed'
-      );
-    }
-  });
-
-  /**
-   * Test email template mutation
-   */
-  const testMutation = useMutation({
-    mutationFn: async (test: EmailTemplateTest): Promise<EmailTemplateTestResult> => {
-      return apiClient.post(`/system/email_template/${test.template_id}/test`, test);
-    },
-    onSuccess: (result, test) => {
-      if (result.success) {
-        notification.success(
-          `Test email sent successfully to ${test.test_email}`,
-          'Test Email Sent'
-        );
-      } else {
-        notification.warning(
-          result.message || 'Test email validation completed with warnings',
-          'Test Completed'
-        );
-      }
-    },
-    onError: (error: ApiError, test) => {
-      notification.error(
-        `Failed to test template: ${error.message}`,
-        'Test Failed'
-      );
-    }
-  });
-
-  /**
-   * Cache management functions
-   */
-  const invalidateQueries = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: EMAIL_TEMPLATE_QUERY_KEYS.all });
-  }, [queryClient]);
-
-  const refreshTemplate = useCallback((id: number) => {
-    queryClient.invalidateQueries({ queryKey: EMAIL_TEMPLATE_QUERY_KEYS.detail(id) });
-  }, [queryClient]);
-
-  /**
-   * CRUD operation wrappers with proper error handling
-   */
-  const createTemplate = useCallback(async (data: EmailTemplateRequest): Promise<EmailTemplateOperationResult> => {
-    try {
-      const response = await createMutation.mutateAsync(data);
-      return {
-        success: true,
-        data: response.resource?.[0] ? { ...data, id: response.resource[0].id } as EmailTemplate : undefined,
-        message: 'Template created successfully'
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Failed to create template',
-        errors: [{ message: error instanceof Error ? error.message : 'Unknown error', code: 'CREATE_ERROR' }]
-      };
-    }
-  }, [createMutation]);
-
-  const updateTemplate = useCallback(async (id: number, data: EmailTemplateRequest): Promise<EmailTemplateOperationResult> => {
-    try {
-      await updateMutation.mutateAsync({ id, data });
-      return {
-        success: true,
-        data: { ...data, id } as EmailTemplate,
-        message: 'Template updated successfully'
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Failed to update template',
-        errors: [{ message: error instanceof Error ? error.message : 'Unknown error', code: 'UPDATE_ERROR' }]
-      };
-    }
-  }, [updateMutation]);
-
-  const deleteTemplate = useCallback(async (id: number): Promise<EmailTemplateOperationResult> => {
-    try {
-      await deleteMutation.mutateAsync(id);
-      return {
-        success: true,
-        message: 'Template deleted successfully'
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Failed to delete template',
-        errors: [{ message: error instanceof Error ? error.message : 'Unknown error', code: 'DELETE_ERROR' }]
-      };
-    }
-  }, [deleteMutation]);
-
-  const duplicateTemplate = useCallback(async (id: number, newName: string): Promise<EmailTemplateOperationResult> => {
-    try {
-      const response = await duplicateMutation.mutateAsync({ id, newName });
-      return {
-        success: true,
-        data: response.resource?.[0] ? { id: response.resource[0].id, name: newName } as EmailTemplate : undefined,
-        message: 'Template duplicated successfully'
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Failed to duplicate template',
-        errors: [{ message: error instanceof Error ? error.message : 'Unknown error', code: 'DUPLICATE_ERROR' }]
-      };
-    }
-  }, [duplicateMutation]);
-
-  const previewTemplate = useCallback(async (id: number, testData?: Record<string, any>): Promise<EmailTemplatePreview> => {
-    return previewMutation.mutateAsync({ id, testData });
-  }, [previewMutation]);
-
-  const testTemplate = useCallback(async (test: EmailTemplateTest): Promise<EmailTemplateTestResult> => {
-    return testMutation.mutateAsync(test);
-  }, [testMutation]);
-
-  // Compute derived state
-  const emailTemplates = useMemo(() => emailTemplatesData?.resource || [], [emailTemplatesData]);
-  const emailTemplate = useMemo(() => emailTemplateData?.resource?.[0], [emailTemplateData]);
-  const isLoading = isLoadingList || isLoadingTemplate;
-  const isError = isErrorList || isErrorTemplate;
-  const error = (errorList || errorTemplate) as ApiError | null;
-  const refetch = templateId ? refetchTemplate : refetchList;
-
-  return {
-    // Query operations
-    emailTemplates,
-    emailTemplate,
-    isLoading,
-    isError,
-    error,
-    refetch,
-    
-    // Mutation operations
-    createTemplate,
-    updateTemplate,
-    deleteTemplate,
-    duplicateTemplate,
-    
-    // Template operations
-    previewTemplate,
-    testTemplate,
-    
-    // Loading states
-    isCreating: createMutation.isPending,
-    isUpdating: updateMutation.isPending,
-    isDeleting: deleteMutation.isPending,
-    isPreviewing: previewMutation.isPending,
-    isTesting: testMutation.isPending,
-    
-    // Cache management
-    invalidateQueries,
-    refreshTemplate,
-    rollbackOptimisticUpdate
+export interface EmailTemplateListResponse {
+  success: boolean;
+  resource: EmailTemplate[];
+  meta?: {
+    count?: number;
+    limit?: number;
+    offset?: number;
   };
 }
 
 /**
- * Export hook and types for external use
+ * Email template detail response from API
  */
-export type { UseEmailTemplateReturn, EmailTemplateHookConfig };
+export interface EmailTemplateResponse {
+  success: boolean;
+  resource: EmailTemplate;
+}
+
+/**
+ * Email template create/update response from API
+ */
+export interface EmailTemplateMutationResponse {
+  success: boolean;
+  resource: EmailTemplate | EmailTemplate[];
+}
+
+/**
+ * Hook options for email template operations
+ */
+export interface UseEmailTemplateOptions {
+  /** Enable background revalidation on focus */
+  revalidateOnFocus?: boolean;
+  /** Enable background revalidation on reconnect */
+  revalidateOnReconnect?: boolean;
+  /** Cache time in milliseconds (default: 5 minutes) */
+  cacheTime?: number;
+  /** Stale time in milliseconds (default: 1 minute) */
+  staleTime?: number;
+  /** Retry configuration */
+  retry?: number | boolean;
+  /** Success callback for mutations */
+  onSuccess?: (data: any) => void;
+  /** Error callback for mutations */
+  onError?: (error: Error) => void;
+}
+
+/**
+ * Query filters for email template list
+ */
+export interface EmailTemplateFilters {
+  /** Filter by name pattern */
+  name?: string;
+  /** Filter by description pattern */
+  description?: string;
+  /** Limit number of results */
+  limit?: number;
+  /** Offset for pagination */
+  offset?: number;
+  /** Include total count in response */
+  includeCount?: boolean;
+}
+
+// ============================================================================
+// Query Key Factory
+// ============================================================================
+
+/**
+ * Query key factory for email template queries
+ * Provides consistent cache key generation with type safety
+ */
+export const emailTemplateKeys = {
+  /** All email template queries */
+  all: ['email-templates'] as const,
+  
+  /** All list queries */
+  lists: () => [...emailTemplateKeys.all, 'list'] as const,
+  
+  /** Specific list query with filters */
+  list: (filters?: EmailTemplateFilters) => 
+    [...emailTemplateKeys.lists(), filters] as const,
+  
+  /** All detail queries */
+  details: () => [...emailTemplateKeys.all, 'detail'] as const,
+  
+  /** Specific detail query */
+  detail: (id: number) => 
+    [...emailTemplateKeys.details(), id] as const,
+} as const;
+
+// ============================================================================
+// API Endpoints
+// ============================================================================
+
+/** Email template API endpoints */
+const EMAIL_TEMPLATE_ENDPOINTS = {
+  LIST: `${API_BASE_URL}/system/email_template`,
+  DETAIL: (id: number) => `${API_BASE_URL}/system/email_template/${id}`,
+  CREATE: `${API_BASE_URL}/system/email_template`,
+  UPDATE: (id: number) => `${API_BASE_URL}/system/email_template/${id}`,
+  DELETE: (id: number) => `${API_BASE_URL}/system/email_template/${id}`,
+} as const;
+
+// ============================================================================
+// Hook Implementation
+// ============================================================================
+
+/**
+ * Custom React hook for email template CRUD operations
+ * 
+ * @param options Configuration options for the hook
+ * @returns Object containing query/mutation functions and state
+ */
+export function useEmailTemplate(options: UseEmailTemplateOptions = {}) {
+  const queryClient = useQueryClient();
+  
+  const {
+    revalidateOnFocus = true,
+    revalidateOnReconnect = true,
+    cacheTime = 5 * 60 * 1000, // 5 minutes
+    staleTime = 60 * 1000, // 1 minute  
+    retry = 3,
+    onSuccess,
+    onError,
+  } = options;
+
+  // ============================================================================
+  // Query Functions
+  // ============================================================================
+
+  /**
+   * Get email template list with optional filtering
+   */
+  const useEmailTemplateList = useCallback((
+    filters?: EmailTemplateFilters,
+    queryOptions?: Partial<UseQueryOptions<EmailTemplateListResponse>>
+  ) => {
+    return useQuery({
+      queryKey: emailTemplateKeys.list(filters),
+      queryFn: async (): Promise<EmailTemplateListResponse> => {
+        const params: Record<string, any> = {};
+        
+        if (filters) {
+          if (filters.name) params.filter = `name like '%${filters.name}%'`;
+          if (filters.description) {
+            const descFilter = `description like '%${filters.description}%'`;
+            params.filter = params.filter 
+              ? `${params.filter} AND ${descFilter}`
+              : descFilter;
+          }
+          if (filters.limit !== undefined) params.limit = filters.limit;
+          if (filters.offset !== undefined) params.offset = filters.offset;
+          if (filters.includeCount !== undefined) params.include_count = filters.includeCount;
+        }
+        
+        return apiGet<EmailTemplateListResponse>(EMAIL_TEMPLATE_ENDPOINTS.LIST, {
+          additionalParams: Object.entries(params).map(([key, value]) => ({ key, value })),
+          includeCount: filters?.includeCount,
+        });
+      },
+      staleTime,
+      cacheTime,
+      retry,
+      refetchOnWindowFocus: revalidateOnFocus,
+      refetchOnReconnect: revalidateOnReconnect,
+      ...queryOptions,
+    });
+  }, [staleTime, cacheTime, retry, revalidateOnFocus, revalidateOnReconnect]);
+
+  /**
+   * Get single email template by ID
+   */
+  const useEmailTemplateDetail = useCallback((
+    id: number,
+    queryOptions?: Partial<UseQueryOptions<EmailTemplateResponse>>
+  ) => {
+    return useQuery({
+      queryKey: emailTemplateKeys.detail(id),
+      queryFn: async (): Promise<EmailTemplateResponse> => {
+        return apiGet<EmailTemplateResponse>(EMAIL_TEMPLATE_ENDPOINTS.DETAIL(id), {
+          fields: '*',
+        });
+      },
+      staleTime,
+      cacheTime,
+      retry,
+      refetchOnWindowFocus: revalidateOnFocus,
+      refetchOnReconnect: revalidateOnReconnect,
+      enabled: !!id && id > 0,
+      ...queryOptions,
+    });
+  }, [staleTime, cacheTime, retry, revalidateOnFocus, revalidateOnReconnect]);
+
+  // ============================================================================
+  // Mutation Functions  
+  // ============================================================================
+
+  /**
+   * Create new email template mutation
+   */
+  const useCreateEmailTemplate = useCallback(() => {
+    return useMutation({
+      mutationFn: async (payload: EmailTemplatePayload): Promise<EmailTemplateMutationResponse> => {
+        return apiPost<EmailTemplateMutationResponse>(EMAIL_TEMPLATE_ENDPOINTS.CREATE, {
+          resource: [payload],
+        }, {
+          snackbarSuccess: 'emailTemplates.alerts.createSuccess',
+        });
+      },
+      onMutate: async (newTemplate: EmailTemplatePayload) => {
+        // Cancel any outgoing refetches to avoid optimistic update conflicts
+        await queryClient.cancelQueries({ queryKey: emailTemplateKeys.lists() });
+
+        // Snapshot the previous value for potential rollback
+        const previousTemplates = queryClient.getQueryData<EmailTemplateListResponse>(
+          emailTemplateKeys.list()
+        );
+
+        // Optimistically update the cache
+        if (previousTemplates) {
+          const optimisticTemplate: EmailTemplate = {
+            id: Date.now(), // Temporary ID
+            ...newTemplate,
+            createdDate: new Date().toISOString(),
+            lastModifiedDate: new Date().toISOString(),
+          };
+
+          queryClient.setQueryData<EmailTemplateListResponse>(
+            emailTemplateKeys.list(),
+            {
+              ...previousTemplates,
+              resource: [optimisticTemplate, ...previousTemplates.resource],
+              meta: previousTemplates.meta ? {
+                ...previousTemplates.meta,
+                count: (previousTemplates.meta.count || 0) + 1,
+              } : undefined,
+            }
+          );
+        }
+
+        return { previousTemplates };
+      },
+      onError: (error: Error, newTemplate: EmailTemplatePayload, context) => {
+        // Rollback optimistic update
+        if (context?.previousTemplates) {
+          queryClient.setQueryData(
+            emailTemplateKeys.list(),
+            context.previousTemplates
+          );
+        }
+        
+        onError?.(error);
+      },
+      onSuccess: (data: EmailTemplateMutationResponse) => {
+        // Invalidate and refetch relevant queries
+        queryClient.invalidateQueries({ queryKey: emailTemplateKeys.lists() });
+        
+        onSuccess?.(data);
+      },
+      retry,
+    });
+  }, [queryClient, retry, onSuccess, onError]);
+
+  /**
+   * Update existing email template mutation
+   */
+  const useUpdateEmailTemplate = useCallback(() => {
+    return useMutation({
+      mutationFn: async ({ 
+        id, 
+        payload 
+      }: { 
+        id: number; 
+        payload: EmailTemplatePayload 
+      }): Promise<EmailTemplateMutationResponse> => {
+        return apiPut<EmailTemplateMutationResponse>(
+          EMAIL_TEMPLATE_ENDPOINTS.UPDATE(id), 
+          payload,
+          {
+            snackbarSuccess: 'emailTemplates.alerts.updateSuccess',
+          }
+        );
+      },
+      onMutate: async ({ id, payload }) => {
+        // Cancel any outgoing refetches
+        await queryClient.cancelQueries({ queryKey: emailTemplateKeys.detail(id) });
+        await queryClient.cancelQueries({ queryKey: emailTemplateKeys.lists() });
+
+        // Snapshot previous values
+        const previousTemplate = queryClient.getQueryData<EmailTemplateResponse>(
+          emailTemplateKeys.detail(id)
+        );
+        const previousTemplates = queryClient.getQueryData<EmailTemplateListResponse>(
+          emailTemplateKeys.list()
+        );
+
+        // Optimistically update detail cache
+        if (previousTemplate) {
+          const optimisticTemplate: EmailTemplate = {
+            ...previousTemplate.resource,
+            ...payload,
+            lastModifiedDate: new Date().toISOString(),
+          };
+
+          queryClient.setQueryData<EmailTemplateResponse>(
+            emailTemplateKeys.detail(id),
+            {
+              ...previousTemplate,
+              resource: optimisticTemplate,
+            }
+          );
+        }
+
+        // Optimistically update list cache
+        if (previousTemplates) {
+          const updatedResource = previousTemplates.resource.map(template =>
+            template.id === id
+              ? { ...template, ...payload, lastModifiedDate: new Date().toISOString() }
+              : template
+          );
+
+          queryClient.setQueryData<EmailTemplateListResponse>(
+            emailTemplateKeys.list(),
+            {
+              ...previousTemplates,
+              resource: updatedResource,
+            }
+          );
+        }
+
+        return { previousTemplate, previousTemplates };
+      },
+      onError: (error: Error, { id }, context) => {
+        // Rollback optimistic updates
+        if (context?.previousTemplate) {
+          queryClient.setQueryData(
+            emailTemplateKeys.detail(id),
+            context.previousTemplate
+          );
+        }
+        if (context?.previousTemplates) {
+          queryClient.setQueryData(
+            emailTemplateKeys.list(),
+            context.previousTemplates
+          );
+        }
+        
+        onError?.(error);
+      },
+      onSuccess: (data: EmailTemplateMutationResponse, { id }) => {
+        // Invalidate and refetch relevant queries
+        queryClient.invalidateQueries({ queryKey: emailTemplateKeys.detail(id) });
+        queryClient.invalidateQueries({ queryKey: emailTemplateKeys.lists() });
+        
+        onSuccess?.(data);
+      },
+      retry,
+    });
+  }, [queryClient, retry, onSuccess, onError]);
+
+  /**
+   * Delete email template mutation
+   */
+  const useDeleteEmailTemplate = useCallback(() => {
+    return useMutation({
+      mutationFn: async (id: number): Promise<void> => {
+        return apiDelete<void>(EMAIL_TEMPLATE_ENDPOINTS.DELETE(id), {
+          snackbarSuccess: 'emailTemplates.alerts.deleteSuccess',
+        });
+      },
+      onMutate: async (id: number) => {
+        // Cancel any outgoing refetches
+        await queryClient.cancelQueries({ queryKey: emailTemplateKeys.lists() });
+
+        // Snapshot previous values
+        const previousTemplates = queryClient.getQueryData<EmailTemplateListResponse>(
+          emailTemplateKeys.list()
+        );
+
+        // Optimistically remove from cache
+        if (previousTemplates) {
+          const filteredResource = previousTemplates.resource.filter(
+            template => template.id !== id
+          );
+
+          queryClient.setQueryData<EmailTemplateListResponse>(
+            emailTemplateKeys.list(),
+            {
+              ...previousTemplates,
+              resource: filteredResource,
+              meta: previousTemplates.meta ? {
+                ...previousTemplates.meta,
+                count: Math.max((previousTemplates.meta.count || 0) - 1, 0),
+              } : undefined,
+            }
+          );
+        }
+
+        return { previousTemplates };
+      },
+      onError: (error: Error, id: number, context) => {
+        // Rollback optimistic update
+        if (context?.previousTemplates) {
+          queryClient.setQueryData(
+            emailTemplateKeys.list(),
+            context.previousTemplates
+          );
+        }
+        
+        onError?.(error);
+      },
+      onSuccess: (data: void, id: number) => {
+        // Remove detail cache and invalidate list
+        queryClient.removeQueries({ queryKey: emailTemplateKeys.detail(id) });
+        queryClient.invalidateQueries({ queryKey: emailTemplateKeys.lists() });
+        
+        onSuccess?.(data);
+      },
+      retry,
+    });
+  }, [queryClient, retry, onSuccess, onError]);
+
+  // ============================================================================
+  // Cache Management Functions
+  // ============================================================================
+
+  /**
+   * Manually invalidate all email template queries
+   */
+  const invalidateEmailTemplates = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: emailTemplateKeys.all });
+  }, [queryClient]);
+
+  /**
+   * Manually invalidate email template list queries
+   */
+  const invalidateEmailTemplateList = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: emailTemplateKeys.lists() });
+  }, [queryClient]);
+
+  /**
+   * Manually invalidate specific email template detail
+   */
+  const invalidateEmailTemplateDetail = useCallback(async (id: number) => {
+    await queryClient.invalidateQueries({ queryKey: emailTemplateKeys.detail(id) });
+  }, [queryClient]);
+
+  /**
+   * Prefetch email template list
+   */
+  const prefetchEmailTemplateList = useCallback(async (filters?: EmailTemplateFilters) => {
+    await queryClient.prefetchQuery({
+      queryKey: emailTemplateKeys.list(filters),
+      queryFn: async (): Promise<EmailTemplateListResponse> => {
+        const params: Record<string, any> = {};
+        
+        if (filters) {
+          if (filters.name) params.filter = `name like '%${filters.name}%'`;
+          if (filters.description) {
+            const descFilter = `description like '%${filters.description}%'`;
+            params.filter = params.filter 
+              ? `${params.filter} AND ${descFilter}`
+              : descFilter;
+          }
+          if (filters.limit !== undefined) params.limit = filters.limit;
+          if (filters.offset !== undefined) params.offset = filters.offset;
+          if (filters.includeCount !== undefined) params.include_count = filters.includeCount;
+        }
+        
+        return apiGet<EmailTemplateListResponse>(EMAIL_TEMPLATE_ENDPOINTS.LIST, {
+          additionalParams: Object.entries(params).map(([key, value]) => ({ key, value })),
+          includeCount: filters?.includeCount,
+        });
+      },
+      staleTime,
+    });
+  }, [queryClient, staleTime]);
+
+  /**
+   * Prefetch email template detail
+   */
+  const prefetchEmailTemplateDetail = useCallback(async (id: number) => {
+    await queryClient.prefetchQuery({
+      queryKey: emailTemplateKeys.detail(id),
+      queryFn: async (): Promise<EmailTemplateResponse> => {
+        return apiGet<EmailTemplateResponse>(EMAIL_TEMPLATE_ENDPOINTS.DETAIL(id), {
+          fields: '*',
+        });
+      },
+      staleTime,
+    });
+  }, [queryClient, staleTime]);
+
+  // ============================================================================
+  // Return Hook Interface
+  // ============================================================================
+
+  return useMemo(() => ({
+    // Query hooks
+    useEmailTemplateList,
+    useEmailTemplateDetail,
+    
+    // Mutation hooks
+    useCreateEmailTemplate,
+    useUpdateEmailTemplate,
+    useDeleteEmailTemplate,
+    
+    // Cache management
+    invalidateEmailTemplates,
+    invalidateEmailTemplateList,
+    invalidateEmailTemplateDetail,
+    prefetchEmailTemplateList,
+    prefetchEmailTemplateDetail,
+    
+    // Query key factory (useful for external cache manipulation)
+    queryKeys: emailTemplateKeys,
+  }), [
+    useEmailTemplateList,
+    useEmailTemplateDetail,
+    useCreateEmailTemplate,
+    useUpdateEmailTemplate,
+    useDeleteEmailTemplate,
+    invalidateEmailTemplates,
+    invalidateEmailTemplateList,
+    invalidateEmailTemplateDetail,
+    prefetchEmailTemplateList,
+    prefetchEmailTemplateDetail,
+  ]);
+}
+
+// ============================================================================
+// Convenience Hooks
+// ============================================================================
+
+/**
+ * Convenience hook for email template list operations
+ */
+export function useEmailTemplateList(
+  filters?: EmailTemplateFilters,
+  options?: UseEmailTemplateOptions
+) {
+  const { useEmailTemplateList: useList } = useEmailTemplate(options);
+  return useList(filters);
+}
+
+/**
+ * Convenience hook for email template detail operations
+ */
+export function useEmailTemplateDetail(
+  id: number,
+  options?: UseEmailTemplateOptions
+) {
+  const { useEmailTemplateDetail: useDetail } = useEmailTemplate(options);
+  return useDetail(id);
+}
+
+/**
+ * Convenience hook for email template mutations
+ */
+export function useEmailTemplateMutations(options?: UseEmailTemplateOptions) {
+  const { 
+    useCreateEmailTemplate,
+    useUpdateEmailTemplate,
+    useDeleteEmailTemplate 
+  } = useEmailTemplate(options);
+  
+  return {
+    createEmailTemplate: useCreateEmailTemplate(),
+    updateEmailTemplate: useUpdateEmailTemplate(),
+    deleteEmailTemplate: useDeleteEmailTemplate(),
+  };
+}
+
+// ============================================================================
+// Default Export
+// ============================================================================
+
 export default useEmailTemplate;
