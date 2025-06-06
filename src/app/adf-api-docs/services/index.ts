@@ -1,488 +1,286 @@
 /**
- * API Documentation Services - Barrel Export
+ * @fileoverview Barrel export file for ADF API Docs services
+ * @description Exports useApiKeys hook and related types for clean module importing
  * 
- * Centralized export point for all API key management functionality within the
- * adf-api-docs services directory. Provides clean module importing for React hooks
- * and related types, following Next.js 15.1+ conventions and modern React patterns.
+ * Provides a centralized export point for all API key management functionality
+ * within the adf-api-docs services directory, enabling consistent imports
+ * across components while following Next.js 15.1+ conventions.
  * 
- * This module replaces the Angular ApiKeysService with React Query-powered hooks,
- * maintaining functional parity while leveraging modern data fetching patterns
- * for enhanced caching, background synchronization, and optimistic updates.
+ * @version 1.0.0
+ * @author DreamFactory Team
  * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
- * @since 2024
+ * Key Features:
+ * - Modern React/Next.js module organization standards
+ * - TypeScript 5.8+ enhanced template literal types and improved inference
+ * - Clean component imports following barrel export patterns
+ * - Enhanced developer experience with centralized type exports
+ * - React Query-powered API key management with intelligent caching
  */
 
-// ============================================================================
-// PRIMARY HOOK EXPORTS
-// ============================================================================
+// =============================================================================
+// CORE HOOK EXPORTS
+// =============================================================================
 
 /**
- * Main API keys management hook
- * 
- * Replaces Angular ApiKeysService with React Query-powered data fetching,
- * providing intelligent caching, background synchronization, and automatic
- * re-validation for API key management workflows.
+ * Export the primary useApiKeys hook for API key management
+ * Replaces Angular ApiKeysService with React Query-powered data fetching
  * 
  * Features:
- * - Real-time API key retrieval per service ID
- * - Intelligent caching with background refresh
- * - Optimistic updates for better UX
- * - Error handling with React Error Boundary integration
- * - Server-side rendering compatibility
- * 
- * @example
- * ```tsx
- * import { useApiKeys } from '@/app/adf-api-docs/services';
- * 
- * function ApiKeySelector({ serviceId }: { serviceId: number }) {
- *   const { 
- *     apiKeys, 
- *     isLoading, 
- *     error, 
- *     refetch,
- *     clearCache 
- *   } = useApiKeys(serviceId);
- * 
- *   if (isLoading) return <div>Loading API keys...</div>;
- *   if (error) return <div>Error: {error.message}</div>;
- * 
- *   return (
- *     <select>
- *       {apiKeys.map(key => (
- *         <option key={key.name} value={key.apiKey}>
- *           {key.name} - {key.apiKey.substring(0, 8)}...
- *         </option>
- *       ))}
- *     </select>
- *   );
- * }
- * ```
+ * - Service-specific API key retrieval with intelligent caching
+ * - React Query integration for background synchronization
+ * - Optimistic updates and error handling
+ * - Compatible with Next.js server components and SSR
  */
 export { useApiKeys } from './useApiKeys';
 
-// ============================================================================
-// TYPE DEFINITIONS EXPORTS
-// ============================================================================
+/**
+ * Export default hook for convenient importing
+ * Supports both named and default import patterns
+ */
+export { useApiKeys as default } from './useApiKeys';
+
+// =============================================================================
+// TYPE EXPORTS
+// =============================================================================
 
 /**
- * Core API key information interface
- * 
- * Represents a single API key entry with name and token information.
- * Migrated from Angular ApiKeyInfo type to maintain backward compatibility
- * while adding enhanced TypeScript 5.8+ template literal types.
- * 
- * @interface ApiKeyInfo
- * @property {string} name - Human-readable name for the API key
- * @property {string} apiKey - The actual API key token (typically 32-64 characters)
- * @property {number} [roleId] - Associated role ID for RBAC integration
- * @property {string} [description] - Optional description of the key's purpose
- * @property {Date} [createdAt] - Timestamp when the key was created
- * @property {Date} [expiresAt] - Optional expiration timestamp
- * @property {boolean} [isActive] - Whether the key is currently active
- * @property {string[]} [permissions] - Associated permissions for the key
- * 
- * @example
- * ```typescript
- * const apiKey: ApiKeyInfo = {
- *   name: 'Production API Access',
- *   apiKey: 'sk_live_abcd1234...',
- *   roleId: 1,
- *   description: 'Production environment access key',
- *   createdAt: new Date('2024-01-15'),
- *   isActive: true,
- *   permissions: ['read', 'write']
- * };
- * ```
+ * Core API key interface for type safety
+ * Maintains compatibility with existing DreamFactory API structure
  */
-export type { ApiKeyInfo } from './useApiKeys';
-
-/**
- * Service-specific API keys mapping interface
- * 
- * Maps service IDs to their associated API key collections, enabling
- * efficient caching and batch operations across multiple services.
- * 
- * @interface ServiceApiKeys
- * @property {Record<number, ApiKeyInfo[]>} keys - Service ID to API keys mapping
- * @property {Date} lastUpdated - Timestamp of last cache update
- * @property {number} cacheVersion - Version number for cache invalidation
- * 
- * @example
- * ```typescript
- * const serviceKeys: ServiceApiKeys = {
- *   keys: {
- *     1: [{ name: 'DB Key 1', apiKey: 'key1...' }],
- *     2: [{ name: 'DB Key 2', apiKey: 'key2...' }]
- *   },
- *   lastUpdated: new Date(),
- *   cacheVersion: 1
- * };
- * ```
- */
-export type { ServiceApiKeys } from './useApiKeys';
-
-/**
- * API key query configuration options
- * 
- * Enhanced configuration interface for React Query integration,
- * providing fine-grained control over caching, refetching, and
- * background synchronization behaviors.
- * 
- * @interface ApiKeyQueryOptions
- * @extends UseQueryOptions from @tanstack/react-query
- * 
- * @example
- * ```typescript
- * const options: ApiKeyQueryOptions = {
- *   enabled: serviceId > 0,
- *   staleTime: 5 * 60 * 1000, // 5 minutes
- *   cacheTime: 10 * 60 * 1000, // 10 minutes
- *   refetchOnWindowFocus: false,
- *   retry: 3
- * };
- * ```
- */
-export type { ApiKeyQueryOptions } from './useApiKeys';
-
-/**
- * API key mutation configuration for create/update/delete operations
- * 
- * Configuration interface for API key modification operations,
- * including optimistic updates and error handling strategies.
- * 
- * @interface ApiKeyMutationOptions
- * @extends UseMutationOptions from @tanstack/react-query
- */
-export type { ApiKeyMutationOptions } from './useApiKeys';
-
-/**
- * API key validation result interface
- * 
- * Result structure for API key validation operations, including
- * validation status, error details, and suggested actions.
- * 
- * @interface ApiKeyValidationResult
- * @property {boolean} isValid - Whether the API key is valid
- * @property {string} [error] - Error message if validation failed
- * @property {Date} [checkedAt] - Timestamp of validation check
- * @property {string[]} [warnings] - Non-blocking validation warnings
- */
-export type { ApiKeyValidationResult } from './useApiKeys';
-
-// ============================================================================
-// UTILITY FUNCTION EXPORTS
-// ============================================================================
-
-/**
- * API key query key factory
- * 
- * Standardized query key generation for React Query cache management.
- * Provides consistent cache key structure for efficient invalidation
- * and cache segmentation across different API key operations.
- * 
- * @example
- * ```typescript
- * import { apiKeyQueryKeys } from '@/app/adf-api-docs/services';
- * 
- * // Get query keys for service-specific API keys
- * const serviceKeys = apiKeyQueryKeys.service(serviceId);
- * 
- * // Get query keys for all API keys
- * const allKeys = apiKeyQueryKeys.all();
- * 
- * // Invalidate cache
- * await queryClient.invalidateQueries({ 
- *   queryKey: apiKeyQueryKeys.service(serviceId) 
- * });
- * ```
- */
-export { apiKeyQueryKeys } from './useApiKeys';
-
-/**
- * API key formatting utilities
- * 
- * Collection of utility functions for API key display, masking,
- * and validation to ensure consistent presentation across components.
- * 
- * @example
- * ```typescript
- * import { formatApiKey, maskApiKey, validateApiKeyFormat } from '@/app/adf-api-docs/services';
- * 
- * const masked = maskApiKey('sk_live_abcd1234efgh5678', 8); // "sk_live_abcd1234..."
- * const isValid = validateApiKeyFormat('sk_live_abcd1234efgh5678'); // true
- * const formatted = formatApiKey('sk_live_abcd1234efgh5678', 'preview'); // "sk_live_abcd1234"
- * ```
- */
-export { 
-  formatApiKey, 
-  maskApiKey, 
-  validateApiKeyFormat,
-  getApiKeyPreview 
-} from './useApiKeys';
-
-/**
- * API key cache management utilities
- * 
- * Advanced cache management functions for manual cache manipulation,
- * bulk operations, and cache optimization strategies.
- * 
- * @example
- * ```typescript
- * import { clearApiKeyCache, refreshAllApiKeys, bulkUpdateApiKeys } from '@/app/adf-api-docs/services';
- * 
- * // Clear cache for specific service
- * await clearApiKeyCache(serviceId);
- * 
- * // Refresh all cached API keys
- * await refreshAllApiKeys();
- * 
- * // Bulk update multiple service keys
- * await bulkUpdateApiKeys([
- *   { serviceId: 1, keys: [newKey1] },
- *   { serviceId: 2, keys: [newKey2] }
- * ]);
- * ```
- */
-export {
-  clearApiKeyCache,
-  refreshAllApiKeys,
-  bulkUpdateApiKeys,
-  optimisticUpdateApiKey
-} from './useApiKeys';
-
-// ============================================================================
-// REACT QUERY INTEGRATION EXPORTS
-// ============================================================================
-
-/**
- * Pre-configured React Query options for API key operations
- * 
- * Optimized default configurations for different API key query scenarios,
- * balancing performance, user experience, and data freshness requirements.
- * 
- * @example
- * ```typescript
- * import { defaultApiKeyQueryOptions, realtimeApiKeyOptions } from '@/app/adf-api-docs/services';
- * 
- * // Use default options for most cases
- * const { data } = useQuery({
- *   ...defaultApiKeyQueryOptions,
- *   queryKey: ['apiKeys', serviceId],
- *   queryFn: () => fetchApiKeys(serviceId)
- * });
- * 
- * // Use realtime options for critical updates
- * const { data } = useQuery({
- *   ...realtimeApiKeyOptions,
- *   queryKey: ['apiKeys', serviceId],
- *   queryFn: () => fetchApiKeys(serviceId)
- * });
- * ```
- */
-export {
-  defaultApiKeyQueryOptions,
-  realtimeApiKeyOptions,
-  backgroundApiKeyOptions,
-  cachedApiKeyOptions
-} from './useApiKeys';
-
-/**
- * API key mutation factories
- * 
- * Pre-configured mutation functions for common API key operations,
- * including optimistic updates, error handling, and cache invalidation.
- * 
- * @example
- * ```typescript
- * import { createApiKeyMutation, updateApiKeyMutation, deleteApiKeyMutation } from '@/app/adf-api-docs/services';
- * 
- * const createMutation = useMutation(createApiKeyMutation({
- *   onSuccess: (data, variables) => {
- *     // Handle successful creation
- *     toast.success(`API key "${data.name}" created successfully`);
- *   },
- *   onError: (error) => {
- *     // Handle creation error
- *     toast.error(`Failed to create API key: ${error.message}`);
- *   }
- * }));
- * ```
- */
-export {
-  createApiKeyMutation,
-  updateApiKeyMutation,
-  deleteApiKeyMutation,
-  validateApiKeyMutation
-} from './useApiKeys';
-
-// ============================================================================
-// CONSTANTS AND ENUMS
-// ============================================================================
-
-/**
- * API key operation types enumeration
- * 
- * Standardized operation types for API key management workflows,
- * enabling type-safe operation handling and consistent UI behavior.
- */
-export { ApiKeyOperation } from './useApiKeys';
-
-/**
- * Default configuration constants
- * 
- * Standard configuration values for API key management, including
- * cache durations, retry policies, and display preferences.
- */
-export {
-  API_KEY_CACHE_TIME,
-  API_KEY_STALE_TIME,
-  API_KEY_RETRY_COUNT,
-  API_KEY_PREVIEW_LENGTH,
-  DEFAULT_API_KEY_OPTIONS
-} from './useApiKeys';
-
-// ============================================================================
-// ERROR HANDLING EXPORTS
-// ============================================================================
-
-/**
- * API key specific error types and utilities
- * 
- * Specialized error handling for API key operations, including
- * user-friendly error messages and recovery suggestions.
- * 
- * @example
- * ```typescript
- * import { ApiKeyError, isApiKeyError, handleApiKeyError } from '@/app/adf-api-docs/services';
- * 
- * try {
- *   await createApiKey(newKeyData);
- * } catch (error) {
- *   if (isApiKeyError(error)) {
- *     handleApiKeyError(error, {
- *       onDuplicate: () => toast.error('API key name already exists'),
- *       onUnauthorized: () => router.push('/login'),
- *       onGeneral: (err) => toast.error(`Error: ${err.message}`)
- *     });
- *   }
- * }
- * ```
- */
-export type { ApiKeyError } from './useApiKeys';
-export { isApiKeyError, handleApiKeyError, formatApiKeyError } from './useApiKeys';
-
-// ============================================================================
-// DEFAULT EXPORT
-// ============================================================================
-
-/**
- * Default export containing all API key management functionality
- * 
- * Comprehensive object export for scenarios requiring namespace-style imports
- * or when all functionality needs to be imported under a single identifier.
- * 
- * @example
- * ```typescript
- * import ApiKeysServices from '@/app/adf-api-docs/services';
- * 
- * function Component() {
- *   const { apiKeys, isLoading } = ApiKeysServices.useApiKeys(serviceId);
- *   const maskedKey = ApiKeysServices.maskApiKey(apiKeys[0]?.apiKey);
- *   
- *   return <div>{maskedKey}</div>;
- * }
- * ```
- */
-const ApiKeysServices = {
-  // Hooks
-  useApiKeys,
+export interface ApiKeyInfo {
+  /** Human-readable name/label for the API key */
+  name: string;
   
-  // Utilities
-  formatApiKey,
-  maskApiKey,
-  validateApiKeyFormat,
-  getApiKeyPreview,
-  clearApiKeyCache,
-  refreshAllApiKeys,
-  bulkUpdateApiKeys,
-  optimisticUpdateApiKey,
+  /** The actual API key value */
+  apiKey: string;
   
-  // Query helpers
-  apiKeyQueryKeys,
-  defaultApiKeyQueryOptions,
-  realtimeApiKeyOptions,
-  backgroundApiKeyOptions,
-  cachedApiKeyOptions,
+  /** Optional API key identifier */
+  id?: number;
   
-  // Mutations
-  createApiKeyMutation,
-  updateApiKeyMutation,
-  deleteApiKeyMutation,
-  validateApiKeyMutation,
+  /** Associated role information */
+  role?: {
+    id: number;
+    name: string;
+  };
   
-  // Error handling
-  isApiKeyError,
-  handleApiKeyError,
-  formatApiKeyError
+  /** Service access permissions */
+  serviceAccess?: Array<{
+    serviceId: number;
+    serviceName: string;
+    component: string;
+  }>;
+  
+  /** Key metadata */
+  metadata?: {
+    createdAt?: string;
+    lastUsed?: string;
+    expiresAt?: string;
+  };
+}
+
+/**
+ * Service-specific API keys collection
+ * Organizes keys by service ID for efficient lookup
+ */
+export interface ServiceApiKeys {
+  /** Service identifier */
+  serviceId: number;
+  
+  /** Array of API keys for this service */
+  keys: ApiKeyInfo[];
+  
+  /** Cache timestamp for React Query optimization */
+  lastFetched?: Date;
+}
+
+/**
+ * API key hook configuration options
+ * Customizes hook behavior for different use cases
+ */
+export interface UseApiKeysOptions {
+  /** Service ID to fetch keys for (-1 for all services) */
+  serviceId?: number;
+  
+  /** Enable automatic refetching on window focus */
+  refetchOnWindowFocus?: boolean;
+  
+  /** Cache time in milliseconds (default: 5 minutes) */
+  cacheTime?: number;
+  
+  /** Stale time in milliseconds (default: 1 minute) */
+  staleTime?: number;
+  
+  /** Enable background refetching */
+  refetchInBackground?: boolean;
+  
+  /** Retry configuration */
+  retry?: boolean | number | ((failureCount: number, error: Error) => boolean);
+}
+
+/**
+ * API key hook return type
+ * Provides comprehensive state and actions for components
+ */
+export interface UseApiKeysReturn {
+  /** Current API keys data */
+  data: ApiKeyInfo[] | undefined;
+  
+  /** Loading state */
+  isLoading: boolean;
+  
+  /** Error state */
+  error: Error | null;
+  
+  /** Data fetching state */
+  isFetching: boolean;
+  
+  /** Stale data indicator */
+  isStale: boolean;
+  
+  /** Manual refetch function */
+  refetch: () => Promise<ApiKeyInfo[]>;
+  
+  /** Clear cache for this service */
+  invalidate: () => Promise<void>;
+  
+  /** Mutation functions for key management */
+  mutations: {
+    /** Create new API key */
+    createKey: (keyData: Partial<ApiKeyInfo>) => Promise<ApiKeyInfo>;
+    
+    /** Update existing API key */
+    updateKey: (keyId: number, keyData: Partial<ApiKeyInfo>) => Promise<ApiKeyInfo>;
+    
+    /** Delete API key */
+    deleteKey: (keyId: number) => Promise<void>;
+  };
+}
+
+/**
+ * Error types for API key operations
+ * Provides detailed error information for better UX
+ */
+export interface ApiKeyError extends Error {
+  /** HTTP status code */
+  status?: number;
+  
+  /** Error code from API */
+  code?: string;
+  
+  /** Detailed error context */
+  context?: {
+    serviceId?: number;
+    operation?: 'fetch' | 'create' | 'update' | 'delete';
+    timestamp?: Date;
+  };
+}
+
+// =============================================================================
+// UTILITY TYPE EXPORTS
+// =============================================================================
+
+/**
+ * Type guard for ApiKeyInfo validation
+ * Ensures type safety at runtime
+ */
+export type ApiKeyInfoGuard = (obj: any) => obj is ApiKeyInfo;
+
+/**
+ * Extract API key names type utility
+ * Useful for type-safe key selection
+ */
+export type ApiKeyNames<T extends readonly ApiKeyInfo[]> = T[number]['name'];
+
+/**
+ * Conditional API key type based on service context
+ * Enables context-specific typing
+ */
+export type ConditionalApiKey<T extends number> = T extends -1 
+  ? ApiKeyInfo[] 
+  : ServiceApiKeys;
+
+// =============================================================================
+// CONFIGURATION CONSTANTS
+// =============================================================================
+
+/**
+ * Default configuration for API key management
+ * Optimized for React Query performance requirements
+ */
+export const DEFAULT_API_KEYS_CONFIG: Required<UseApiKeysOptions> = {
+  serviceId: -1,
+  refetchOnWindowFocus: true,
+  cacheTime: 5 * 60 * 1000, // 5 minutes - meets cache performance requirements
+  staleTime: 1 * 60 * 1000,  // 1 minute - ensures fresh data
+  refetchInBackground: true,
+  retry: 3,
 } as const;
 
-export default ApiKeysServices;
-
-// ============================================================================
-// TYPE UTILITIES FOR EXTERNAL CONSUMPTION
-// ============================================================================
-
 /**
- * Type utility for extracting API key data from hook results
- * 
- * Helper type for components that need to work with API key data
- * without importing the full hook interface.
+ * Query key factory for React Query cache management
+ * Provides consistent cache key generation
  */
-export type ExtractApiKeyData<T> = T extends { apiKeys: infer U } ? U : never;
+export const apiKeysQueryKeys = {
+  /** Base key for all API key queries */
+  all: ['apiKeys'] as const,
+  
+  /** Service-specific keys */
+  byService: (serviceId: number) => ['apiKeys', 'service', serviceId] as const,
+  
+  /** Global keys (all services) */
+  global: () => ['apiKeys', 'global'] as const,
+  
+  /** Keys with filters */
+  filtered: (filters: Record<string, any>) => ['apiKeys', 'filtered', filters] as const,
+} as const;
+
+// =============================================================================
+// DEPRECATED EXPORTS (For Migration Compatibility)
+// =============================================================================
 
 /**
- * Type utility for API key hook options
- * 
- * Helper type for creating custom API key hook wrappers or
- * configuration objects that extend the base options.
+ * @deprecated Use ApiKeyInfo instead
+ * Maintained for backward compatibility during migration
  */
-export type ApiKeyHookOptions = Parameters<typeof useApiKeys>[1];
+export type LegacyApiKeyInfo = ApiKeyInfo;
 
 /**
- * Type utility for API key hook return type
- * 
- * Helper type for components that need to accept API key hook
- * results as props or work with the return value structure.
+ * @deprecated Use useApiKeys instead
+ * Maintained for smooth Angular to React migration
  */
-export type ApiKeyHookResult = ReturnType<typeof useApiKeys>;
+export type ApiKeysService = {
+  getApiKeysForService: (serviceId: number) => Promise<ApiKeyInfo[]>;
+  clearCache: () => void;
+};
 
-// ============================================================================
-// RE-EXPORTS FOR CONVENIENCE
-// ============================================================================
-
-/**
- * Re-export common React Query types for API key operations
- * 
- * Convenience re-exports to avoid additional imports when working
- * with React Query patterns in API key management contexts.
- */
-export type {
-  UseQueryResult,
-  UseMutationResult,
-  QueryKey,
-  MutationKey
-} from '@tanstack/react-query';
+// =============================================================================
+// TYPE EXPORT AGGREGATION
+// =============================================================================
 
 /**
- * Re-export SWR types for alternative data fetching patterns
- * 
- * Support for components that prefer SWR over React Query
- * for API key data fetching and caching.
+ * Comprehensive type export for external consumption
+ * Enables clean destructured imports
  */
 export type {
-  SWRResponse,
-  SWRConfiguration,
-  Key as SWRKey
-} from 'swr';
+  // Primary interfaces
+  ApiKeyInfo,
+  ServiceApiKeys,
+  UseApiKeysOptions,
+  UseApiKeysReturn,
+  ApiKeyError,
+  
+  // Utility types
+  ApiKeyInfoGuard,
+  ApiKeyNames,
+  ConditionalApiKey,
+  
+  // Legacy compatibility
+  LegacyApiKeyInfo,
+  ApiKeysService,
+};
+
+/**
+ * Re-export all types from useApiKeys module for convenience
+ * Ensures comprehensive type coverage without duplication
+ */
+export type * from './useApiKeys';
