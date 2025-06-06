@@ -1,496 +1,502 @@
 /**
  * Next.js Internationalization Configuration
  * 
- * This file replaces Angular's TranslateModule.forRoot configuration with Next.js-native
- * i18n patterns. It provides comprehensive locale support, automatic detection, server-side
- * rendering compatibility, and dynamic loading strategies for translation resources.
+ * This configuration file replaces Angular's TranslateModule.forRoot() setup
+ * with Next.js-native i18n patterns optimized for server-side rendering and
+ * middleware-based locale detection. The configuration enables automatic
+ * locale detection, dynamic resource loading, and seamless integration with
+ * Next.js middleware authentication flows.
  * 
- * @fileoverview Centralized i18n configuration for the DreamFactory Admin Interface
- * @version 1.0.0
- * @since Next.js 15.1 migration
+ * Key Features:
+ * - Server-side rendering compatibility for initial page loads
+ * - Automatic locale detection with fallback strategies
+ * - Dynamic loading strategy for translation resources
+ * - Integration with Next.js middleware for locale-based routing
+ * - Type-safe translation key validation
+ * 
+ * Performance optimizations:
+ * - Lazy loading of translation resources (per Section 8.2.4)
+ * - Server-side rendering support for sub-800ms TTFB targets
+ * - Intelligent caching with CDN compatibility
+ * - Optimized bundle size through dynamic imports
  */
 
-import { LocaleConfig, SupportedLocale, NamespaceConfig, LoadingStrategy } from './types';
+import type { 
+  RootTranslations, 
+  ModuleTranslations, 
+  TranslationNamespace,
+  TranslationProviderConfig,
+  TranslationVariables 
+} from './types';
 
-// =============================================================================
-// SUPPORTED LOCALES CONFIGURATION
-// =============================================================================
+// ============================================================================
+// LOCALE CONFIGURATION
+// ============================================================================
 
 /**
- * List of supported locales based on existing translation assets
- * Maintains compatibility with Angular ngx-translate structure
+ * Supported locales configuration
+ * Currently supporting English with infrastructure for future expansion
  */
-export const SUPPORTED_LOCALES: readonly SupportedLocale[] = [
-  'en', // English (default)
-  'fr', // French
-  'es', // Spanish  
-  'de', // German
-] as const;
+export const SUPPORTED_LOCALES = ['en'] as const;
+export type SupportedLocale = typeof SUPPORTED_LOCALES[number];
 
 /**
- * Default locale for the application
- * Falls back to this when no locale is detected or specified
+ * Default locale configuration
+ * Matches DreamFactory's default English interface
  */
 export const DEFAULT_LOCALE: SupportedLocale = 'en';
 
 /**
- * Locale for development and testing environments
- * Used when SUPPORTED_LOCALES detection fails
+ * Fallback locale when requested locale is unavailable
  */
-export const DEV_LOCALE: SupportedLocale = 'en';
-
-// =============================================================================
-// NAMESPACE CONFIGURATION
-// =============================================================================
+export const FALLBACK_LOCALE: SupportedLocale = 'en';
 
 /**
- * Translation namespace mapping based on existing Angular i18n structure
- * Each namespace corresponds to a feature module from the Angular implementation
+ * Locale detection configuration for Next.js middleware
+ * Enables automatic locale detection from browser headers and URL
  */
-export const NAMESPACE_CONFIG: Record<string, NamespaceConfig> = {
-  // Global/shared translations
-  common: {
-    path: 'en.json',
-    priority: 'high',
-    preload: true,
-    ssrEnabled: true,
-  },
+export const LOCALE_DETECTION_CONFIG = {
+  /**
+   * Enable automatic locale detection from Accept-Language header
+   * Integrates with Next.js middleware authentication flow per Section 4.7
+   */
+  detectFromHeaders: true,
   
-  // Admin feature namespaces
-  admins: {
-    path: 'admins',
-    priority: 'medium',
-    preload: false,
-    ssrEnabled: true,
-  },
+  /**
+   * Enable locale detection from URL path
+   * Supports /en/admin-settings, /en/api-connections patterns
+   */
+  detectFromPath: true,
   
-  // API Documentation
-  apiDocs: {
-    path: 'apiDocs',
-    priority: 'low',
-    preload: false,
-    ssrEnabled: false,
-  },
+  /**
+   * Enable locale detection from subdomain
+   * Future support for en.admin.dreamfactory.com patterns
+   */
+  detectFromSubdomain: false,
   
-  // Application Management
-  apps: {
-    path: 'apps',
-    priority: 'medium',
-    preload: false,
-    ssrEnabled: true,
-  },
+  /**
+   * Cookie name for storing user's preferred locale
+   * Persists across sessions for improved UX
+   */
+  cookieName: 'df-locale',
   
-  // Cache Management
-  cache: {
-    path: 'cache',
-    priority: 'low',
-    preload: false,
-    ssrEnabled: true,
-  },
-  
-  // CORS Configuration
-  cors: {
-    path: 'cors',
-    priority: 'low',
-    preload: false,
-    ssrEnabled: true,
-  },
-  
-  // Email Templates
-  emailTemplates: {
-    path: 'emailTemplates',
-    priority: 'low',
-    preload: false,
-    ssrEnabled: false,
-  },
-  
-  // File Management
-  files: {
-    path: 'files',
-    priority: 'medium',
-    preload: false,
-    ssrEnabled: false,
-  },
-  
-  // Home/Dashboard
-  home: {
-    path: 'home',
-    priority: 'high',
-    preload: true,
-    ssrEnabled: true,
-  },
-  
-  // Rate Limiting
-  limits: {
-    path: 'limits',
-    priority: 'medium',
-    preload: false,
-    ssrEnabled: true,
-  },
-  
-  // Role Management
-  roles: {
-    path: 'roles',
-    priority: 'medium',
-    preload: false,
-    ssrEnabled: true,
-  },
-  
-  // Scheduler Management
-  scheduler: {
-    path: 'scheduler',
-    priority: 'low',
-    preload: false,
-    ssrEnabled: true,
-  },
-  
-  // Database Schema Management
-  schema: {
-    path: 'schema',
-    priority: 'high',
-    preload: true,
-    ssrEnabled: true,
-  },
-  
-  // Script Management
-  scripts: {
-    path: 'scripts',
-    priority: 'low',
-    preload: false,
-    ssrEnabled: false,
-  },
-  
-  // Service Management
-  services: {
-    path: 'services',
-    priority: 'high',
-    preload: true,
-    ssrEnabled: true,
-  },
-  
-  // System Information
-  systemInfo: {
-    path: 'systemInfo',
-    priority: 'low',
-    preload: false,
-    ssrEnabled: true,
-  },
-  
-  // User Management
-  userManagement: {
-    path: 'userManagement',
-    priority: 'medium',
-    preload: true,
-    ssrEnabled: true,
-  },
-  
-  // User Administration
-  users: {
-    path: 'users',
-    priority: 'medium',
-    preload: false,
-    ssrEnabled: true,
-  },
-} as const;
-
-// =============================================================================
-// LOADING STRATEGY CONFIGURATION
-// =============================================================================
-
-/**
- * Dynamic loading strategy for translation resources
- * Optimizes performance through intelligent caching and preloading
- */
-export const LOADING_STRATEGY: LoadingStrategy = {
-  // Cache configuration
-  cacheStrategy: 'memory-first',
-  cacheTTL: 5 * 60 * 1000, // 5 minutes
-  maxCacheSize: 50, // Maximum number of cached translation sets
-  
-  // Loading configuration
-  batchSize: 3, // Load up to 3 namespaces simultaneously
-  retryAttempts: 3,
-  retryDelay: 1000, // 1 second base delay with exponential backoff
-  timeout: 10000, // 10 second timeout for translation loading
-  
-  // Preloading configuration
-  preloadOnIdle: true,
-  preloadDelay: 2000, // 2 seconds after page load
-  preloadNamespaces: ['common', 'home', 'services', 'schema'],
-  
-  // Development configuration
-  hotReload: process.env.NODE_ENV === 'development',
-  fallbackOnError: true,
-  debugMode: process.env.NODE_ENV === 'development',
-} as const;
-
-// =============================================================================
-// LOCALE DETECTION CONFIGURATION
-// =============================================================================
-
-/**
- * Locale detection and fallback configuration
- * Supports automatic detection from multiple sources with proper fallbacks
- */
-export const LOCALE_DETECTION = {
-  // Detection order (priority from high to low)
-  sources: [
-    'url-path',        // /en/dashboard, /fr/dashboard
-    'cookie',          // locale preference cookie
-    'header',          // Accept-Language header
-    'query-param',     // ?locale=en
-    'local-storage',   // Browser localStorage
-    'navigator',       // Browser navigator.language
-  ],
-  
-  // Cookie configuration
-  cookie: {
-    name: 'dreamfactory-locale',
-    domain: undefined, // Use current domain
-    httpOnly: false,   // Allow client-side access
+  /**
+   * Cookie configuration for locale persistence
+   */
+  cookieOptions: {
+    httpOnly: false, // Allow client-side access for dynamic switching
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax' as const,
     maxAge: 365 * 24 * 60 * 60, // 1 year
-  },
-  
-  // URL path configuration
-  urlPath: {
-    prefix: true,      // Use /en/, /fr/ prefixes
-    redirect: true,    // Redirect root to default locale
-    trailingSlash: false,
-  },
-  
-  // Fallback strategy
-  fallback: {
-    locale: DEFAULT_LOCALE,
-    strategy: 'closest-match', // en-US -> en, fr-CA -> fr
-    strict: false,     // Allow partial matches
-  },
-  
-  // Browser integration
-  browser: {
-    detectFromNavigator: true,
-    respectUserChoice: true, // Don't override explicit user selection
-    rememberChoice: true,    // Save to localStorage/cookie
+    path: '/',
   },
 } as const;
 
-// =============================================================================
+// ============================================================================
+// TRANSLATION LOADING CONFIGURATION
+// ============================================================================
+
+/**
+ * Translation resource loading configuration
+ * Optimized for server-side rendering and dynamic imports per Section 8.2.4
+ */
+export const TRANSLATION_LOADING_CONFIG = {
+  /**
+   * Base path for translation files
+   * Matches Next.js asset optimization strategy
+   */
+  basePath: '/assets/i18n',
+  
+  /**
+   * File extension for translation resources
+   */
+  fileExtension: '.json',
+  
+  /**
+   * Enable server-side preloading of critical translations
+   * Ensures SSR compatibility and sub-800ms TTFB targets
+   */
+  preloadOnServer: true,
+  
+  /**
+   * Enable client-side caching of translation resources
+   * Reduces subsequent load times and improves UX
+   */
+  enableClientCache: true,
+  
+  /**
+   * Cache strategy for translation resources
+   * Optimizes performance while ensuring fresh content
+   */
+  cacheStrategy: {
+    /**
+     * Memory cache for loaded translations
+     */
+    memory: true,
+    
+    /**
+     * Local storage persistence for offline support
+     */
+    localStorage: true,
+    
+    /**
+     * Maximum age for cached translations (in milliseconds)
+     */
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    
+    /**
+     * Enable cache invalidation on version changes
+     */
+    invalidateOnVersionChange: true,
+  },
+  
+  /**
+   * Dynamic loading strategy for feature-specific translations
+   * Reduces initial bundle size through code splitting
+   */
+  dynamicLoading: {
+    /**
+     * Enable lazy loading of module-specific translations
+     */
+    enabled: true,
+    
+    /**
+     * Preload strategy for critical modules
+     */
+    preloadCritical: ['common', 'nav', 'ui'],
+    
+    /**
+     * Load on demand for feature modules
+     */
+    loadOnDemand: [
+      'users', 'services', 'admins', 'apiDocs', 'cache', 'cors',
+      'emailTemplates', 'files', 'home', 'limits', 'roles',
+      'scheduler', 'schema', 'scripts', 'systemInfo', 'userManagement'
+    ],
+  },
+} as const;
+
+// ============================================================================
+// NEXT.JS MIDDLEWARE INTEGRATION
+// ============================================================================
+
+/**
+ * Middleware configuration for locale-based routing
+ * Integrates with Next.js middleware authentication flow per Section 4.7
+ */
+export const MIDDLEWARE_I18N_CONFIG = {
+  /**
+   * URL patterns that should include locale prefix
+   */
+  localeRoutes: [
+    '/',
+    '/admin-settings/:path*',
+    '/api-connections/:path*',
+    '/api-security/:path*',
+    '/system-settings/:path*',
+    '/profile/:path*',
+    '/debug/:path*',
+    '/adf-:path*',
+  ],
+  
+  /**
+   * URL patterns that should NOT include locale prefix
+   * API routes and static assets excluded from locale processing
+   */
+  excludeRoutes: [
+    '/api/:path*',
+    '/_next/:path*',
+    '/favicon.ico',
+    '/robots.txt',
+    '/manifest.json',
+    '/assets/:path*',
+  ],
+  
+  /**
+   * Redirect strategy for root path
+   */
+  redirectStrategy: {
+    /**
+     * Redirect root path to default locale
+     */
+    redirectRoot: true,
+    
+    /**
+     * Redirect unsupported locales to default
+     */
+    redirectUnsupported: true,
+    
+    /**
+     * HTTP status code for redirects
+     */
+    redirectStatus: 307, // Temporary redirect
+  },
+  
+  /**
+   * Header configuration for locale detection
+   */
+  headers: {
+    /**
+     * Accept-Language header parsing
+     */
+    acceptLanguage: {
+      enabled: true,
+      quality: true, // Parse quality values (q=0.9)
+    },
+    
+    /**
+     * Custom locale header support
+     */
+    customHeader: 'X-DF-Locale',
+  },
+} as const;
+
+// ============================================================================
+// TRANSLATION PROVIDER CONFIGURATION
+// ============================================================================
+
+/**
+ * Translation provider configuration for React context
+ * Enables type-safe translation access throughout the application
+ */
+export const TRANSLATION_PROVIDER_CONFIG: TranslationProviderConfig = {
+  /**
+   * Default locale for the application
+   */
+  defaultLocale: DEFAULT_LOCALE,
+  
+  /**
+   * Array of supported locales
+   */
+  supportedLocales: [...SUPPORTED_LOCALES],
+  
+  /**
+   * Base path for translation files
+   */
+  basePath: TRANSLATION_LOADING_CONFIG.basePath,
+  
+  /**
+   * Fallback locale when translation is missing
+   */
+  fallbackLocale: FALLBACK_LOCALE,
+  
+  /**
+   * Enable debug mode for missing translations in development
+   */
+  debug: process.env.NODE_ENV === 'development',
+  
+  /**
+   * Cache strategy for translation files
+   */
+  cacheStrategy: 'memory' as const,
+};
+
+// ============================================================================
 // SERVER-SIDE RENDERING CONFIGURATION
-// =============================================================================
+// ============================================================================
 
 /**
  * Server-side rendering configuration for i18n
- * Ensures proper locale handling during SSR and hydration
+ * Ensures translations are available during SSR per Section 8.2 requirements
  */
-export const SSR_CONFIG = {
-  // SSR enablement
+export const SSR_I18N_CONFIG = {
+  /**
+   * Enable server-side translation loading
+   */
   enabled: true,
   
-  // Preloaded namespaces for SSR
-  preloadNamespaces: ['common', 'home'],
+  /**
+   * Preload translations for SSR
+   * Critical for achieving sub-800ms TTFB targets
+   */
+  preloadTranslations: {
+    /**
+     * Always preload root translations on server
+     */
+    root: ['common', 'ui', 'nav'],
+    
+    /**
+     * Conditionally preload based on route
+     */
+    conditional: {
+      '/admin-settings': ['admins'],
+      '/api-connections': ['services'],
+      '/api-security': ['roles', 'limits'],
+      '/system-settings': ['systemInfo'],
+      '/adf-schema': ['schema'],
+      '/adf-users': ['users'],
+      '/adf-services': ['services'],
+    },
+  },
   
-  // Hydration configuration
+  /**
+   * Server-side translation hydration strategy
+   */
   hydration: {
-    checkMismatch: process.env.NODE_ENV === 'development',
-    fallbackOnMismatch: true,
-    suppressHydrationWarnings: process.env.NODE_ENV === 'production',
+    /**
+     * Include translations in initial page props
+     */
+    includeInProps: true,
+    
+    /**
+     * Optimize bundle size by including only used keys
+     */
+    optimizeKeys: true,
+    
+    /**
+     * Enable progressive hydration for large translation sets
+     */
+    progressive: true,
   },
   
-  // Performance optimization
-  performance: {
-    inlineTranslations: true,  // Inline critical translations
-    maxInlineSize: 5000,       // Max bytes to inline
-    streamingEnabled: true,    // Enable React 19 streaming
-  },
-  
-  // Error handling
+  /**
+   * Error handling for SSR translation loading
+   */
   errorHandling: {
-    fallbackLocale: DEFAULT_LOCALE,
-    suppressErrors: process.env.NODE_ENV === 'production',
-    logErrors: true,
+    /**
+     * Fallback to default locale on translation load failure
+     */
+    fallbackOnError: true,
+    
+    /**
+     * Log translation errors in development
+     */
+    logErrors: process.env.NODE_ENV === 'development',
+    
+    /**
+     * Continue rendering with empty translations on critical errors
+     */
+    continueOnCriticalError: true,
   },
 } as const;
 
-// =============================================================================
-// MIDDLEWARE INTEGRATION CONFIGURATION
-// =============================================================================
-
-/**
- * Next.js middleware integration configuration
- * Enables locale-based routing and authentication flow integration
- */
-export const MIDDLEWARE_CONFIG = {
-  // Route matching
-  matcher: [
-    // Match all paths except static files and API routes
-    '/((?!api|_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml).*)',
-  ],
-  
-  // Locale routing
-  routing: {
-    strategy: 'path-prefix',   // Use /en/, /fr/ path prefixes
-    defaultLocaleInPath: false, // Don't include /en/ for default locale
-    caseSensitive: false,
-    trailingSlash: false,
-  },
-  
-  // Authentication integration
-  auth: {
-    enableLocaleInAuthFlow: true,
-    preserveLocaleOnRedirect: true,
-    localeParamName: 'locale',
-    redirectLocaleRoutes: ['/login', '/register', '/forgot-password'],
-  },
-  
-  // Headers configuration
-  headers: {
-    setContentLanguage: true,
-    setVaryHeader: true,
-    cacheControl: 'public, max-age=300', // 5 minutes
-  },
-  
-  // Performance optimization
-  performance: {
-    cacheLocaleDetection: true,
-    cacheTimeout: 60000, // 1 minute
-    enableCompression: true,
-  },
-} as const;
-
-// =============================================================================
-// MAIN CONFIGURATION EXPORT
-// =============================================================================
-
-/**
- * Main internationalization configuration object
- * Consolidates all i18n settings for the Next.js application
- */
-export const I18N_CONFIG: LocaleConfig = {
-  // Core configuration
-  supportedLocales: SUPPORTED_LOCALES,
-  defaultLocale: DEFAULT_LOCALE,
-  fallbackLocale: DEFAULT_LOCALE,
-  
-  // Namespace and loading configuration
-  namespaces: NAMESPACE_CONFIG,
-  loading: LOADING_STRATEGY,
-  
-  // Detection and routing
-  detection: LOCALE_DETECTION,
-  ssr: SSR_CONFIG,
-  middleware: MIDDLEWARE_CONFIG,
-  
-  // Asset paths
-  assetPath: '/assets/i18n',
-  publicPath: '/assets/i18n',
-  
-  // Development configuration
-  development: {
-    strict: process.env.NODE_ENV === 'development',
-    showMissingKeys: process.env.NODE_ENV === 'development',
-    logLevel: process.env.NODE_ENV === 'development' ? 'debug' : 'error',
-    enableHMR: process.env.NODE_ENV === 'development',
-  },
-  
-  // Feature flags
-  features: {
-    pluralization: true,
-    interpolation: true,
-    formatting: true,
-    contextualTranslations: true,
-    rtlSupport: false, // Enable if Arabic/Hebrew support needed
-  },
-  
-  // Performance configuration
-  performance: {
-    enableCaching: true,
-    enableCompression: true,
-    enableTreeShaking: true,
-    bundleAnalysis: process.env.ANALYZE === 'true',
-  },
-} as const;
-
-// =============================================================================
+// ============================================================================
 // UTILITY FUNCTIONS
-// =============================================================================
+// ============================================================================
 
 /**
- * Get translation file path for a specific locale and namespace
- * @param locale - Target locale
- * @param namespace - Translation namespace
- * @returns Full path to translation file
+ * Generate translation file path for a given locale and namespace
+ * Supports both root and module-specific translations
  */
-export function getTranslationPath(locale: SupportedLocale, namespace: string): string {
-  const config = NAMESPACE_CONFIG[namespace];
-  if (!config) {
-    throw new Error(`Unknown namespace: ${namespace}`);
+export function getTranslationPath(locale: SupportedLocale, namespace?: TranslationNamespace): string {
+  const { basePath, fileExtension } = TRANSLATION_LOADING_CONFIG;
+  
+  if (namespace) {
+    return `${basePath}/${namespace}/${locale}${fileExtension}`;
   }
   
-  // Handle root-level translations (common/global)
-  if (config.path.endsWith('.json')) {
-    return `${I18N_CONFIG.assetPath}/${locale}.json`;
-  }
-  
-  // Handle namespaced translations
-  return `${I18N_CONFIG.assetPath}/${config.path}/${locale}.json`;
+  return `${basePath}/${locale}${fileExtension}`;
 }
 
 /**
- * Check if a locale is supported
- * @param locale - Locale to check
- * @returns True if locale is supported
+ * Validate if a locale is supported
  */
-export function isSupportedLocale(locale: string): locale is SupportedLocale {
+export function isValidLocale(locale: string): locale is SupportedLocale {
   return SUPPORTED_LOCALES.includes(locale as SupportedLocale);
 }
 
 /**
- * Get the closest supported locale for a given locale string
- * @param locale - Input locale (e.g., 'en-US', 'fr-CA')
- * @returns Closest supported locale or default locale
+ * Get locale from Next.js request headers
+ * Used in middleware for automatic locale detection
  */
-export function getClosestSupportedLocale(locale: string): SupportedLocale {
-  // Exact match
-  if (isSupportedLocale(locale)) {
-    return locale;
+export function extractLocaleFromHeaders(headers: Headers): SupportedLocale | null {
+  if (!LOCALE_DETECTION_CONFIG.detectFromHeaders) {
+    return null;
   }
   
-  // Language code match (en-US -> en)
-  const languageCode = locale.split('-')[0];
-  if (isSupportedLocale(languageCode)) {
-    return languageCode;
+  const acceptLanguage = headers.get('accept-language');
+  const customLocale = headers.get(MIDDLEWARE_I18N_CONFIG.headers.customHeader);
+  
+  // Check custom header first
+  if (customLocale && isValidLocale(customLocale)) {
+    return customLocale;
   }
   
-  // Fallback to default
-  return DEFAULT_LOCALE;
+  // Parse Accept-Language header
+  if (acceptLanguage) {
+    const locales = acceptLanguage
+      .split(',')
+      .map(lang => lang.split(';')[0].trim().toLowerCase())
+      .map(lang => lang.split('-')[0]) // Extract language part only
+      .find(lang => isValidLocale(lang));
+    
+    if (locales) {
+      return locales as SupportedLocale;
+    }
+  }
+  
+  return null;
 }
 
 /**
- * Get preloaded namespaces for a specific page or route
- * @param route - Current route/page identifier
- * @returns Array of namespace names to preload
+ * Get translation cache key for efficient caching
+ * Includes version information for cache invalidation
  */
-export function getPreloadNamespaces(route: string): string[] {
-  const baseNamespaces = ['common'];
+export function getTranslationCacheKey(
+  locale: SupportedLocale, 
+  namespace?: TranslationNamespace,
+  version?: string
+): string {
+  const versionSuffix = version ? `@${version}` : '';
+  const namespaceSuffix = namespace ? `::${namespace}` : '';
   
-  // Route-specific namespace mapping
-  const routeNamespaces: Record<string, string[]> = {
-    '/': ['home'],
-    '/home': ['home'],
-    '/api-connections': ['services'],
-    '/api-connections/database': ['services', 'schema'],
-    '/adf-schema': ['schema'],
-    '/adf-services': ['services'],
-    '/adf-users': ['users'],
-    '/adf-admins': ['admins'],
-    '/adf-roles': ['roles'],
-    '/system-settings': ['systemInfo'],
-  };
-  
-  const specificNamespaces = routeNamespaces[route] || [];
-  return [...baseNamespaces, ...specificNamespaces];
+  return `df-i18n::${locale}${namespaceSuffix}${versionSuffix}`;
 }
 
-// Export default configuration
-export default I18N_CONFIG;
+/**
+ * Configuration validation function
+ * Ensures all required configuration is properly set
+ */
+export function validateI18nConfig(): void {
+  if (SUPPORTED_LOCALES.length === 0) {
+    throw new Error('At least one locale must be supported');
+  }
+  
+  if (!SUPPORTED_LOCALES.includes(DEFAULT_LOCALE)) {
+    throw new Error('Default locale must be included in supported locales');
+  }
+  
+  if (!SUPPORTED_LOCALES.includes(FALLBACK_LOCALE)) {
+    throw new Error('Fallback locale must be included in supported locales');
+  }
+  
+  if (typeof window === 'undefined' && !SSR_I18N_CONFIG.enabled) {
+    console.warn('SSR is disabled but running in server context');
+  }
+}
+
+// ============================================================================
+// DEFAULT EXPORT
+// ============================================================================
+
+/**
+ * Main i18n configuration object
+ * Consolidates all configuration for easy importing
+ */
+const i18nConfig = {
+  // Core configuration
+  locales: SUPPORTED_LOCALES,
+  defaultLocale: DEFAULT_LOCALE,
+  fallbackLocale: FALLBACK_LOCALE,
+  
+  // Feature configurations
+  detection: LOCALE_DETECTION_CONFIG,
+  loading: TRANSLATION_LOADING_CONFIG,
+  middleware: MIDDLEWARE_I18N_CONFIG,
+  provider: TRANSLATION_PROVIDER_CONFIG,
+  ssr: SSR_I18N_CONFIG,
+  
+  // Utility functions
+  utils: {
+    getTranslationPath,
+    isValidLocale,
+    extractLocaleFromHeaders,
+    getTranslationCacheKey,
+    validateI18nConfig,
+  },
+} as const;
+
+export default i18nConfig;
+
+// Validate configuration on module load
+validateI18nConfig();
