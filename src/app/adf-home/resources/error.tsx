@@ -1,244 +1,226 @@
-/**
- * Resources Page Error Boundary Component
- * 
- * Next.js error boundary component for the DreamFactory Admin Console resources page.
- * Handles loading failures and provides user-friendly error messages with recovery options.
- * 
- * Features:
- * - Contextual error messages specific to resources page failures
- * - WCAG 2.1 AA compliant with accessible error messaging
- * - Error retry functionality using Next.js error boundary patterns
- * - Tailwind CSS styling replacing Angular Material components
- * - Responsive design with proper semantic HTML structure
- */
-
 'use client';
 
-import React, { useEffect } from 'react';
-import { AlertTriangle, RefreshCw, ExternalLink, Home } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useEffect } from 'react';
+import { AlertTriangle, RefreshCw, BookOpen, ExternalLink, Home } from 'lucide-react';
 
-// ============================================================================
-// ERROR BOUNDARY INTERFACES
-// ============================================================================
-
-interface ResourcesErrorProps {
+/**
+ * Error boundary component for the resources page that handles loading failures
+ * and provides user-friendly error messages with recovery options.
+ * 
+ * This component follows Next.js app router error.tsx conventions and implements
+ * WCAG 2.1 AA accessibility standards with proper contrast ratios, touch targets,
+ * and keyboard navigation support.
+ */
+export default function ResourcesError({
+  error,
+  reset,
+}: {
   error: Error & { digest?: string };
   reset: () => void;
-}
-
-interface ErrorDetails {
-  title: string;
-  description: string;
-  actionLabel: string;
-  icon: React.ComponentType<{ className?: string }>;
-}
-
-// ============================================================================
-// ERROR TYPE DETECTION
-// ============================================================================
-
-/**
- * Analyzes the error to determine the appropriate contextual messaging
- * for resources page specific failures
- */
-const getErrorDetails = (error: Error): ErrorDetails => {
-  const errorMessage = error.message.toLowerCase();
-  
-  // Network-related errors
-  if (errorMessage.includes('network') || errorMessage.includes('fetch') || errorMessage.includes('connection')) {
-    return {
-      title: 'Resources Unavailable',
-      description: 'Unable to load DreamFactory resources and documentation links. Please check your internet connection and try again.',
-      actionLabel: 'Retry Loading Resources',
-      icon: AlertTriangle,
-    };
-  }
-  
-  // Data parsing or content errors
-  if (errorMessage.includes('parse') || errorMessage.includes('json') || errorMessage.includes('syntax')) {
-    return {
-      title: 'Content Loading Error',
-      description: 'There was an issue loading the resources content. The resource data may be corrupted or unavailable.',
-      actionLabel: 'Reload Resources',
-      icon: ExternalLink,
-    };
-  }
-  
-  // Timeout or performance errors
-  if (errorMessage.includes('timeout') || errorMessage.includes('slow') || errorMessage.includes('performance')) {
-    return {
-      title: 'Loading Timeout',
-      description: 'The resources page is taking longer than expected to load. This may be due to network conditions or server response time.',
-      actionLabel: 'Try Again',
-      icon: RefreshCw,
-    };
-  }
-  
-  // Server errors
-  if (errorMessage.includes('server') || errorMessage.includes('5')) {
-    return {
-      title: 'Server Error',
-      description: 'The resources page could not be loaded due to a server error. Please try again in a few moments.',
-      actionLabel: 'Retry Loading',
-      icon: AlertTriangle,
-    };
-  }
-  
-  // Generic fallback for unknown errors
-  return {
-    title: 'Resources Loading Failed',
-    description: 'An unexpected error occurred while loading the DreamFactory resources page. Please try refreshing the page.',
-    actionLabel: 'Refresh Page',
-    icon: AlertTriangle,
-  };
-};
-
-// ============================================================================
-// MAIN ERROR BOUNDARY COMPONENT
-// ============================================================================
-
-/**
- * Error boundary component specifically designed for the resources page
- * Provides contextual error messages and recovery actions
- */
-export default function ResourcesError({ error, reset }: ResourcesErrorProps) {
-  const errorDetails = getErrorDetails(error);
-  const IconComponent = errorDetails.icon;
-
-  // Log error details for debugging and monitoring
+}) {
   useEffect(() => {
+    // Log error for monitoring and debugging
     console.error('Resources page error:', {
       message: error.message,
-      stack: error.stack,
       digest: error.digest,
+      stack: error.stack,
       timestamp: new Date().toISOString(),
-      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'Unknown',
     });
+
+    // Optional: Send error to monitoring service
+    // analytics.track('page_error', {
+    //   page: 'resources',
+    //   error: error.message,
+    //   digest: error.digest,
+    // });
   }, [error]);
 
-  // Handle retry with additional error recovery logic
-  const handleRetry = () => {
-    try {
-      // Clear any cached data that might be causing issues
-      if (typeof window !== 'undefined' && 'caches' in window) {
-        caches.delete('resources-cache').catch(console.warn);
-      }
-      
-      // Execute the Next.js reset function
-      reset();
-    } catch (retryError) {
-      console.error('Error during retry:', retryError);
-      // Fallback: reload the page if reset fails
-      if (typeof window !== 'undefined') {
-        window.location.reload();
-      }
+  // Determine error type and provide contextual messaging
+  const getErrorContext = () => {
+    const message = error.message.toLowerCase();
+    
+    if (message.includes('network') || message.includes('fetch')) {
+      return {
+        title: 'Network Connection Error',
+        description: 'Unable to load resources content due to a network connectivity issue. Please check your internet connection and try again.',
+        icon: AlertTriangle,
+        suggestions: [
+          'Check your internet connection',
+          'Verify network connectivity to DreamFactory services',
+          'Try refreshing the page'
+        ]
+      };
     }
+    
+    if (message.includes('timeout') || message.includes('slow')) {
+      return {
+        title: 'Resources Loading Timeout',
+        description: 'The resources content is taking longer than expected to load. This may be due to server performance issues.',
+        icon: AlertTriangle,
+        suggestions: [
+          'Wait a moment and try again',
+          'Check server performance status',
+          'Contact your system administrator if the issue persists'
+        ]
+      };
+    }
+    
+    if (message.includes('auth') || message.includes('unauthorized')) {
+      return {
+        title: 'Authentication Required',
+        description: 'Your session may have expired or you may not have permission to access these resources.',
+        icon: AlertTriangle,
+        suggestions: [
+          'Try logging in again',
+          'Contact your administrator for access permissions',
+          'Check if your session has expired'
+        ]
+      };
+    }
+    
+    // Default error context for resources page
+    return {
+      title: 'Resources Content Error',
+      description: 'Unable to load the resources and documentation content. This could be due to a temporary server issue or data loading problem.',
+      icon: BookOpen,
+      suggestions: [
+        'Try refreshing the page',
+        'Check if the documentation server is available',
+        'Contact support if the problem continues'
+      ]
+    };
   };
 
-  // Navigate back to home page as alternative recovery
-  const handleGoHome = () => {
-    if (typeof window !== 'undefined') {
-      window.location.href = '/';
-    }
-  };
+  const errorContext = getErrorContext();
+  const IconComponent = errorContext.icon;
 
   return (
     <div 
-      className="flex flex-col items-center justify-center min-h-[600px] p-8 bg-white dark:bg-gray-900"
+      className="flex flex-col items-center justify-center min-h-[500px] p-8 bg-white dark:bg-gray-900"
       data-testid="resources-error-boundary"
       role="alert"
       aria-live="assertive"
     >
       {/* Error Icon */}
-      <div className="flex items-center justify-center w-16 h-16 mb-6 bg-red-100 dark:bg-red-900/20 rounded-full">
+      <div className="flex items-center justify-center w-16 h-16 mb-6 rounded-full bg-red-100 dark:bg-red-900/20">
         <IconComponent 
           className="w-8 h-8 text-red-600 dark:text-red-400" 
           aria-hidden="true"
         />
       </div>
 
-      {/* Error Content */}
-      <div className="text-center max-w-md space-y-4">
-        {/* Error Title */}
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
-          {errorDetails.title}
-        </h1>
+      {/* Error Title */}
+      <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-4 text-center">
+        {errorContext.title}
+      </h1>
 
-        {/* Error Description */}
-        <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-          {errorDetails.description}
-        </p>
+      {/* Error Description */}
+      <p className="text-gray-600 dark:text-gray-400 text-center max-w-2xl mb-6 leading-relaxed">
+        {errorContext.description}
+      </p>
 
-        {/* Technical Error Details (for debugging) */}
-        {process.env.NODE_ENV === 'development' && (
-          <details className="mt-4 text-left">
-            <summary className="cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100">
-              Technical Details
-            </summary>
-            <div className="mt-2 p-3 bg-gray-100 dark:bg-gray-800 rounded-md">
-              <pre className="text-xs text-gray-800 dark:text-gray-200 whitespace-pre-wrap overflow-auto">
-                {error.message}
-                {error.stack && '\n\nStack trace:\n' + error.stack}
-                {error.digest && '\n\nError digest: ' + error.digest}
-              </pre>
+      {/* Error Details (for development) */}
+      {process.env.NODE_ENV === 'development' && (
+        <details className="mb-6 w-full max-w-2xl">
+          <summary className="cursor-pointer text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 mb-2">
+            Technical Details
+          </summary>
+          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-sm">
+            <div className="font-mono text-red-600 dark:text-red-400 mb-2">
+              {error.message}
             </div>
-          </details>
-        )}
+            {error.digest && (
+              <div className="text-gray-500 dark:text-gray-400">
+                Error ID: {error.digest}
+              </div>
+            )}
+          </div>
+        </details>
+      )}
+
+      {/* Suggestions List */}
+      <div className="mb-8 max-w-2xl">
+        <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-3">
+          What you can try:
+        </h2>
+        <ul className="space-y-2">
+          {errorContext.suggestions.map((suggestion, index) => (
+            <li 
+              key={index}
+              className="flex items-start text-gray-600 dark:text-gray-400"
+            >
+              <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full mt-2 mr-3 flex-shrink-0" />
+              {suggestion}
+            </li>
+          ))}
+        </ul>
       </div>
 
       {/* Action Buttons */}
-      <div className="flex flex-col sm:flex-row gap-3 mt-8">
-        {/* Primary Retry Button */}
-        <Button
-          onClick={handleRetry}
-          variant="default"
-          size="lg"
-          className="min-w-[160px]"
+      <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
+        {/* Retry Button */}
+        <button
+          onClick={reset}
+          className="inline-flex items-center justify-center px-6 py-3 bg-primary-600 text-white text-base font-medium rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-4 focus:ring-primary-200 dark:focus:ring-primary-800 transition-colors duration-200 min-h-[44px]"
           aria-describedby="retry-description"
         >
-          <RefreshCw className="w-4 h-4 mr-2" aria-hidden="true" />
-          {errorDetails.actionLabel}
-        </Button>
+          <RefreshCw className="w-5 h-5 mr-2" aria-hidden="true" />
+          Try Again
+        </button>
+        <span id="retry-description" className="sr-only">
+          Reload the resources page content
+        </span>
 
-        {/* Secondary Home Button */}
-        <Button
-          onClick={handleGoHome}
-          variant="outline"
-          size="lg"
-          className="min-w-[160px]"
+        {/* Go to Home Button */}
+        <button
+          onClick={() => window.location.href = '/'}
+          className="inline-flex items-center justify-center px-6 py-3 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-base font-medium rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-600 transition-colors duration-200 min-h-[44px]"
           aria-describedby="home-description"
         >
-          <Home className="w-4 h-4 mr-2" aria-hidden="true" />
-          Return to Dashboard
-        </Button>
+          <Home className="w-5 h-5 mr-2" aria-hidden="true" />
+          Go to Dashboard
+        </button>
+        <span id="home-description" className="sr-only">
+          Return to the main dashboard page
+        </span>
       </div>
 
-      {/* Screen Reader Descriptions */}
-      <div className="sr-only">
-        <div id="retry-description">
-          Attempts to reload the resources page and clear any cached data that may be causing the error
-        </div>
-        <div id="home-description">
-          Returns to the main dashboard page where you can navigate to other sections
-        </div>
+      {/* Additional Help Links */}
+      <div className="mt-8 flex flex-col sm:flex-row items-center gap-4 text-sm">
+        <a
+          href="/api-docs"
+          className="inline-flex items-center text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors duration-200"
+          aria-describedby="docs-description"
+        >
+          <BookOpen className="w-4 h-4 mr-1" aria-hidden="true" />
+          View API Documentation
+        </a>
+        <span id="docs-description" className="sr-only">
+          Access the API documentation and guides
+        </span>
+
+        <span className="hidden sm:block text-gray-300 dark:text-gray-600">•</span>
+
+        <a
+          href="https://wiki.dreamfactory.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors duration-200"
+          aria-describedby="help-description"
+        >
+          <ExternalLink className="w-4 h-4 mr-1" aria-hidden="true" />
+          Get Help & Support
+        </a>
+        <span id="help-description" className="sr-only">
+          Open DreamFactory support documentation in a new tab
+        </span>
       </div>
 
-      {/* Additional Help Information */}
-      <div className="mt-8 text-center">
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          If this problem persists, please contact your system administrator or check the{' '}
-          <a 
-            href="https://docs.dreamfactory.com" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 underline focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 rounded"
-            aria-label="DreamFactory documentation (opens in new tab)"
-          >
-            DreamFactory documentation
-          </a>
-          {' '}for troubleshooting guidance.
-        </p>
+      {/* Screen Reader Announcement */}
+      <div className="sr-only" aria-live="polite">
+        Resources page encountered an error: {errorContext.title}. 
+        {errorContext.description} 
+        You can try reloading the page or return to the dashboard.
       </div>
     </div>
   );
