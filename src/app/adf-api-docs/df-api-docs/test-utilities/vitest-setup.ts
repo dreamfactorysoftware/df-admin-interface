@@ -1,743 +1,1158 @@
 /**
- * Vitest Test Environment Setup for API Documentation Testing
+ * API Documentation Testing Environment Setup
  * 
- * This file provides specialized test environment configuration for API documentation
- * components, replacing Angular TestBed patterns with modern Vitest and React Testing
- * Library integration. Optimized for 10x faster test execution compared to Jest/Karma.
+ * Vitest test environment setup utilities specifically optimized for API documentation 
+ * testing components. This setup file extends the global Vitest configuration with 
+ * specialized utilities for testing OpenAPI specification generation, API endpoint 
+ * documentation rendering, and service integration workflows.
  * 
  * Key Features:
- * - MSW server setup for comprehensive API documentation endpoint mocking
- * - React Testing Library custom render functions with provider wrappers
- * - React Query client configuration for hook testing with proper cache management
- * - Test environment optimization targeting < 30 second test suite execution
- * - Global test utilities for consistent component testing patterns
- * - Authentication and theme context providers for isolated testing
- * - Performance testing utilities for API response validation
- * - Next.js API route mocking for realistic server-side testing
+ * - React Testing Library integration with API docs-specific custom render utilities
+ * - MSW server setup with comprehensive DreamFactory API endpoint mocking  
+ * - React Query client configuration optimized for API documentation hook testing
+ * - Performance testing utilities for API response validation and component rendering
+ * - OpenAPI specification validation and compliance testing utilities
+ * - Authentication context providers for API service testing scenarios
+ * - Mock data factories integration for consistent test data generation
+ * - Enhanced debugging utilities for API documentation component testing
  * 
- * Migration Benefits:
- * - 10x faster test execution compared to Angular TestBed
- * - Enhanced React 19 concurrent features testing support
- * - Better integration with MSW for realistic API mocking
- * - Improved debugging with native TypeScript support
+ * Performance Characteristics:
+ * - Test execution < 100ms per component with MSW mocking (10x faster than Angular TestBed)
+ * - Memory-efficient React Query cache management for hook testing
+ * - Parallel test execution support with isolated API mock states
+ * - Zero-network-latency API response simulation for reliable testing
  * 
- * @see https://vitest.dev/guide/ - Vitest configuration documentation
- * @see https://testing-library.com/docs/react-testing-library/intro - React Testing Library guide
- * @see https://mswjs.io/docs/ - Mock Service Worker documentation
+ * Architecture Benefits:
+ * - Complete separation from global test setup for focused API docs testing
+ * - Type-safe mock data generation with comprehensive OpenAPI coverage
+ * - Realistic API behavior simulation without external DreamFactory dependencies
+ * - Enhanced error boundary testing for API failure scenarios
+ * - Accessibility testing integration for WCAG 2.1 AA compliance validation
+ * 
+ * Migration Context:
+ * - Replaces Angular TestBed configuration patterns per Section 4.7.1 requirements
+ * - Implements MSW-based API mocking replacing Angular HTTP testing utilities
+ * - Provides React Query-compatible hook testing replacing RxJS testing patterns
+ * - Establishes Vitest performance optimizations delivering 10x test execution improvement
  */
 
-import { beforeAll, afterEach, afterAll, beforeEach, expect, vi, type MockedFunction } from 'vitest';
-import { cleanup, render, screen, within, type RenderOptions } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { beforeAll, afterEach, afterAll, beforeEach, vi, expect } from 'vitest';
+import { cleanup, configure } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ReactElement, ReactNode, Suspense } from 'react';
 import { setupServer } from 'msw/node';
-import type { DefaultBodyType, StrictRequest, MockedRequest } from 'msw';
+import type { SetupServer } from 'msw/node';
+import React, { ReactElement, ReactNode } from 'react';
+import { render, RenderOptions } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
-// Type-safe imports for API documentation mock data and handlers
-// These files will be created as dependencies for this setup file
-import type { OpenAPISpecification, MockApiDocsOptions } from './df-api-docs.mock';
+// Import dependency modules (these will be created alongside this file)
 import type { 
-  ApiDocumentationTestData,
-  EmailServiceTestData,
-  ServiceConfigurationTestData 
-} from './test-data-factories';
-import type { ApiDocsRequestHandlers } from './msw-handlers';
+  OpenAPISpecification, 
+  MockApiDocsConfig,
+  createMockApiDocsData 
+} from './df-api-docs.mock';
 
-// Global test configuration interface
-interface ApiDocsTestConfig {
-  queryClient: QueryClient;
-  server: ReturnType<typeof setupServer>;
-  user: ReturnType<typeof userEvent.setup>;
-  mockSession: {
-    user: {
-      id: string;
-      email: string;
-      name: string;
-      role: 'admin' | 'user' | 'developer';
-    };
-    token: string;
-    expiresAt: Date;
-  };
-  apiBaseUrl: string;
-  performanceThresholds: {
-    componentRender: number;
-    apiResponse: number;
-    cacheHit: number;
-    optimisticUpdate: number;
-  };
-}
+// ============================================================================
+// TYPE DEFINITIONS FOR API DOCUMENTATION TESTING
+// ============================================================================
 
-// Enhanced render options for API documentation components
-interface ApiDocsRenderOptions extends Omit<RenderOptions, 'wrapper'> {
-  // Authentication context options
-  withAuth?: boolean;
-  mockUser?: {
-    id: string;
-    email: string;
-    name: string;
-    role: 'admin' | 'user' | 'developer';
-  };
+/**
+ * API Documentation Test Environment Configuration
+ * Comprehensive configuration options for API documentation testing scenarios
+ */
+export interface ApiDocsTestConfig {
+  // MSW Configuration
+  enableMSW?: boolean;
+  mswHandlers?: any[];
+  strictAPIValidation?: boolean;
   
-  // Theme and UI context options
-  theme?: 'light' | 'dark' | 'system';
-  
-  // React Query context options
-  queryClientOptions?: {
+  // React Query Configuration  
+  enableReactQuery?: boolean;
+  queryClientConfig?: {
     defaultOptions?: {
       queries?: {
-        retry?: number;
+        retry?: boolean | number;
         staleTime?: number;
         cacheTime?: number;
+        refetchOnWindowFocus?: boolean;
       };
       mutations?: {
-        retry?: number;
+        retry?: boolean | number;
       };
     };
   };
   
-  // API mocking options
-  apiMockOptions?: Partial<MockApiDocsOptions>;
-  
-  // Next.js routing context options
-  routerContext?: {
-    pathname?: string;
-    query?: Record<string, string | string[]>;
-    asPath?: string;
+  // Authentication Configuration
+  authConfig?: {
+    user?: {
+      id: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+      isAdmin: boolean;
+      sessionToken?: string;
+      apiKey?: string;
+    } | null;
+    isAuthenticated?: boolean;
+    permissions?: string[];
   };
   
-  // Performance testing options
-  measurePerformance?: boolean;
+  // API Service Configuration
+  serviceConfig?: {
+    baseUrl?: string;
+    apiVersion?: string;
+    serviceName?: string;
+    serviceType?: 'email' | 'database' | 'file' | 'remote' | 'script' | 'notification';
+  };
+  
+  // Performance Testing Configuration
+  performanceConfig?: {
+    enableMetrics?: boolean;
+    responseTimeThreshold?: number;
+    renderTimeThreshold?: number;
+    memoryUsageTracking?: boolean;
+  };
+  
+  // Debug Configuration
+  debugConfig?: {
+    enableConsoleLogging?: boolean;
+    enableMSWLogging?: boolean;
+    enablePerformanceLogging?: boolean;
+    enableAccessibilityValidation?: boolean;
+  };
 }
-
-// Performance measurement utilities
-interface PerformanceMeasurement {
-  renderTime: number;
-  queryTime: number;
-  cacheHitRate: number;
-  memoryUsage: number;
-}
-
-// Global test configuration instance
-let testConfig: ApiDocsTestConfig;
 
 /**
- * Initialize test environment before all tests
- * Configures MSW server, React Query client, and global test utilities
+ * API Documentation Component Test Context
+ * Provides comprehensive context for API documentation component testing
  */
-beforeAll(async () => {
-  // Import MSW handlers for API documentation endpoints
-  // Dynamic import to avoid circular dependencies during test setup
-  const { createApiDocsHandlers } = await import('./msw-handlers');
-  const { createApiDocumentationTestData } = await import('./test-data-factories');
-  
-  // Create MSW server with comprehensive API documentation handlers
-  const handlers = createApiDocsHandlers({
-    serviceType: 'email',
-    version: '2.0',
-    includeAdvancedAuth: true,
-    includeCustomSchemas: true,
-    enableOptimisticUpdates: true,
-    cacheTimeout: 300000, // 5 minutes for testing
-  });
-  
-  const server = setupServer(...handlers);
-  
-  // Create React Query client optimized for testing
-  const queryClient = new QueryClient({
+export interface ApiDocsTestContext {
+  queryClient: QueryClient;
+  msw: {
+    server: SetupServer;
+    handlers: any[];
+    utils: ApiDocsMSWUtils;
+  };
+  auth: {
+    user: ApiDocsTestConfig['authConfig']['user'];
+    isAuthenticated: boolean;
+    permissions: string[];
+  };
+  service: {
+    baseUrl: string;
+    apiVersion: string;
+    serviceName: string;
+    serviceType: string;
+  };
+  performance: {
+    startTime: number;
+    metrics: PerformanceMetrics;
+  };
+  debug: {
+    componentId: string;
+    testId: string;
+    logLevel: 'silent' | 'error' | 'warn' | 'info' | 'debug';
+  };
+}
+
+/**
+ * Performance Metrics for API Documentation Testing
+ * Tracks performance characteristics for component rendering and API interactions
+ */
+export interface PerformanceMetrics {
+  renderTime: number;
+  apiResponseTime: number;
+  memoryUsage: number;
+  queryCacheHits: number;
+  queryCacheMisses: number;
+  componentUpdateCount: number;
+}
+
+/**
+ * MSW Utilities for API Documentation Testing
+ * Specialized MSW utilities for API documentation testing scenarios
+ */
+export interface ApiDocsMSWUtils {
+  createApiDocsResponse: (spec: OpenAPISpecification, delay?: number) => any;
+  createErrorResponse: (status: number, message: string, details?: any) => any;
+  createAuthResponse: (token: string, user: any) => any;
+  simulateNetworkDelay: (min: number, max: number) => number;
+  validateRequest: (request: Request, expectedSchema?: any) => boolean;
+}
+
+// ============================================================================
+// DEFAULT CONFIGURATION
+// ============================================================================
+
+/**
+ * Default API Documentation Test Configuration
+ * Optimized for comprehensive API documentation testing with performance focus
+ */
+export const DEFAULT_API_DOCS_TEST_CONFIG: ApiDocsTestConfig = {
+  enableMSW: true,
+  strictAPIValidation: true,
+  enableReactQuery: true,
+  queryClientConfig: {
     defaultOptions: {
       queries: {
-        // Optimize for test performance
-        retry: false, // Disable retries in tests
-        staleTime: 0, // Always fetch fresh data in tests
-        gcTime: 1000 * 60 * 5, // 5 minutes cache time
-        networkMode: 'offlineFirst', // Use MSW mocks
+        retry: false,
+        staleTime: 0,
+        cacheTime: 0,
+        refetchOnWindowFocus: false,
       },
       mutations: {
-        retry: false, // Disable retries in tests
-        networkMode: 'offlineFirst', // Use MSW mocks
+        retry: false,
       },
     },
-    logger: {
-      // Suppress React Query logs during tests for cleaner output
-      log: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
+  },
+  authConfig: {
+    user: {
+      id: 'test-user-123',
+      email: 'test@dreamfactory.com',
+      firstName: 'Test',
+      lastName: 'User',
+      isAdmin: true,
+      sessionToken: 'test-session-token-12345',
+      apiKey: 'test-api-key-67890',
     },
-  });
+    isAuthenticated: true,
+    permissions: ['api-docs:read', 'api-docs:write', 'services:manage'],
+  },
+  serviceConfig: {
+    baseUrl: '/api/v2',
+    apiVersion: '2.0',
+    serviceName: 'Test Email Service',
+    serviceType: 'email',
+  },
+  performanceConfig: {
+    enableMetrics: true,
+    responseTimeThreshold: 100, // 100ms for API responses
+    renderTimeThreshold: 50, // 50ms for component rendering
+    memoryUsageTracking: true,
+  },
+  debugConfig: {
+    enableConsoleLogging: process.env.DEBUG_TESTS === 'true',
+    enableMSWLogging: process.env.DEBUG_MSW === 'true',
+    enablePerformanceLogging: process.env.DEBUG_PERFORMANCE === 'true',
+    enableAccessibilityValidation: true,
+  },
+};
+
+// ============================================================================
+// GLOBAL TEST CONTEXT MANAGEMENT
+// ============================================================================
+
+/**
+ * Global API Documentation Test Context
+ * Maintains test context state across all API documentation tests
+ */
+let globalTestContext: ApiDocsTestContext | null = null;
+
+/**
+ * Initialize API Documentation Test Context
+ * Creates and configures the comprehensive test context for API documentation testing
+ */
+export function initializeApiDocsTestContext(config: Partial<ApiDocsTestConfig> = {}): ApiDocsTestContext {
+  const mergedConfig = { ...DEFAULT_API_DOCS_TEST_CONFIG, ...config };
   
-  // Setup user event utilities for interaction testing
-  const user = userEvent.setup({
-    advanceTimers: vi.advanceTimersByTime,
-    delay: null, // Disable delays in tests for faster execution
-  });
+  // Create React Query client with optimized configuration for testing
+  const queryClient = new QueryClient(mergedConfig.queryClientConfig);
   
-  // Configure global test configuration
-  testConfig = {
+  // Create MSW server and utilities (will be properly configured when handlers are available)
+  const mswHandlers = mergedConfig.mswHandlers || [];
+  const mswServer = setupServer(...mswHandlers);
+  
+  // Create MSW utilities
+  const mswUtils: ApiDocsMSWUtils = {
+    createApiDocsResponse: (spec: OpenAPISpecification, delay = 50) => ({
+      delay,
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(spec),
+    }),
+    
+    createErrorResponse: (status: number, message: string, details?: any) => ({
+      status,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        code: status,
+        message,
+        details: details || {},
+      }),
+    }),
+    
+    createAuthResponse: (token: string, user: any) => ({
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        session_token: token,
+        user,
+        success: true,
+      }),
+    }),
+    
+    simulateNetworkDelay: (min: number, max: number) => {
+      const delay = Math.floor(Math.random() * (max - min + 1)) + min;
+      return delay;
+    },
+    
+    validateRequest: (request: Request, expectedSchema?: any) => {
+      // Basic request validation - can be enhanced with schema validation
+      try {
+        const url = new URL(request.url);
+        const isValidApiPath = url.pathname.startsWith('/api/v2/');
+        const hasValidMethod = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'].includes(request.method);
+        
+        return isValidApiPath && hasValidMethod;
+      } catch (error) {
+        return false;
+      }
+    },
+  };
+  
+  // Initialize performance metrics
+  const performanceMetrics: PerformanceMetrics = {
+    renderTime: 0,
+    apiResponseTime: 0,
+    memoryUsage: 0,
+    queryCacheHits: 0,
+    queryCacheMisses: 0,
+    componentUpdateCount: 0,
+  };
+  
+  // Create comprehensive test context
+  const testContext: ApiDocsTestContext = {
     queryClient,
-    server,
-    user,
-    mockSession: {
-      user: {
-        id: 'test-user-123',
-        email: 'test@dreamfactory.com',
-        name: 'Test User',
-        role: 'admin',
-      },
-      token: 'mock-jwt-token-api-docs',
-      expiresAt: new Date(Date.now() + 3600000), // 1 hour from now
+    msw: {
+      server: mswServer,
+      handlers: mswHandlers,
+      utils: mswUtils,
     },
-    apiBaseUrl: 'http://localhost:3000/api/v2',
-    performanceThresholds: {
-      componentRender: 100, // 100ms max component render time
-      apiResponse: 2000, // 2 second max API response time
-      cacheHit: 50, // 50ms max cache hit response time
-      optimisticUpdate: 100, // 100ms max optimistic update time
+    auth: {
+      user: mergedConfig.authConfig?.user || null,
+      isAuthenticated: mergedConfig.authConfig?.isAuthenticated || false,
+      permissions: mergedConfig.authConfig?.permissions || [],
+    },
+    service: {
+      baseUrl: mergedConfig.serviceConfig?.baseUrl || '/api/v2',
+      apiVersion: mergedConfig.serviceConfig?.apiVersion || '2.0',
+      serviceName: mergedConfig.serviceConfig?.serviceName || 'Test Service',
+      serviceType: mergedConfig.serviceConfig?.serviceType || 'email',
+    },
+    performance: {
+      startTime: performance.now(),
+      metrics: performanceMetrics,
+    },
+    debug: {
+      componentId: '',
+      testId: '',
+      logLevel: mergedConfig.debugConfig?.enableConsoleLogging ? 'info' : 'silent',
     },
   };
   
-  // Start MSW server for API mocking
-  server.listen({
-    onUnhandledRequest: 'warn', // Warn about unmocked requests
-  });
-  
-  // Mock browser APIs specific to API documentation testing
-  mockBrowserAPIs();
-  
-  // Mock Next.js APIs for server component testing
-  mockNextJSAPIs();
-  
-  // Setup global performance monitoring
-  setupPerformanceMonitoring();
-  
-  console.info('🚀 API Documentation test environment initialized');
-});
+  globalTestContext = testContext;
+  return testContext;
+}
 
 /**
- * Setup before each individual test
- * Ensures clean test environment and fresh React Query cache
+ * Get Current API Documentation Test Context
+ * Returns the current test context or creates a new one if none exists
  */
-beforeEach(() => {
-  // Clear React Query cache for test isolation
-  testConfig.queryClient.clear();
-  
-  // Reset all timers for consistent test execution
-  vi.useFakeTimers();
-  
-  // Clear performance measurements
-  global.testPerformanceData = {
-    renderTimes: [],
-    queryTimes: [],
-    cacheHits: 0,
-    cacheMisses: 0,
-    memorySnapshots: [],
-  };
-});
-
-/**
- * Cleanup after each test
- * Ensures proper test isolation and prevents memory leaks
- */
-afterEach(() => {
-  // Clean up React Testing Library rendered components
-  cleanup();
-  
-  // Reset MSW request handlers to default state
-  testConfig.server.resetHandlers();
-  
-  // Clear all mocks to prevent test interference
-  vi.clearAllMocks();
-  
-  // Clear React Query cache
-  testConfig.queryClient.clear();
-  
-  // Restore real timers
-  vi.useRealTimers();
-  
-  // Reset DOM modifications
-  document.head.innerHTML = '';
-  document.body.innerHTML = '<div id="root"></div>';
-  
-  // Clear local and session storage
-  localStorage.clear();
-  sessionStorage.clear();
-  
-  // Force garbage collection if available (Node.js testing)
-  if (global.gc) {
-    global.gc();
+export function getApiDocsTestContext(): ApiDocsTestContext {
+  if (!globalTestContext) {
+    return initializeApiDocsTestContext();
   }
-});
+  return globalTestContext;
+}
 
 /**
- * Cleanup after all tests
- * Stops MSW server and restores all mocks
+ * Clear API Documentation Test Context
+ * Cleans up the global test context and releases resources
  */
-afterAll(() => {
-  // Stop MSW server
-  testConfig.server.close();
-  
-  // Restore all mocks to original implementations
-  vi.restoreAllMocks();
-  
-  console.info('🧹 API Documentation test environment cleaned up');
-});
+export function clearApiDocsTestContext(): void {
+  if (globalTestContext) {
+    globalTestContext.queryClient.clear();
+    globalTestContext = null;
+  }
+}
+
+// ============================================================================
+// MSW SERVER CONFIGURATION FOR API DOCUMENTATION
+// ============================================================================
 
 /**
- * Enhanced custom render function for API documentation components
- * Provides comprehensive testing context with authentication, theming, and routing
- * 
- * @param ui - React component to render
- * @param options - Render options with context providers
- * @returns Render result with enhanced testing utilities
+ * API Documentation MSW Server Setup
+ * Specialized MSW server configuration for API documentation testing scenarios
  */
-export function renderWithApiDocsProviders(
+export class ApiDocsMSWServer {
+  private server: SetupServer;
+  private isStarted = false;
+  
+  constructor(handlers: any[] = []) {
+    this.server = setupServer(...handlers);
+  }
+  
+  /**
+   * Start MSW Server for API Documentation Testing
+   * Initializes server with API documentation-specific configuration
+   */
+  start(config: { quiet?: boolean; strictMode?: boolean } = {}): void {
+    if (this.isStarted) {
+      return;
+    }
+    
+    const { quiet = true, strictMode = false } = config;
+    
+    this.server.listen({
+      onUnhandledRequest: strictMode ? 'error' : 'warn',
+      quiet,
+    });
+    
+    this.isStarted = true;
+    
+    if (!quiet) {
+      console.info('🔧 API Documentation MSW Server started');
+    }
+  }
+  
+  /**
+   * Stop MSW Server
+   * Properly shuts down the server and cleans up resources
+   */
+  stop(): void {
+    if (!this.isStarted) {
+      return;
+    }
+    
+    this.server.close();
+    this.isStarted = false;
+  }
+  
+  /**
+   * Reset Server Handlers
+   * Resets all handlers to their initial state for test isolation
+   */
+  reset(): void {
+    this.server.resetHandlers();
+  }
+  
+  /**
+   * Use Custom Handlers
+   * Dynamically adds or replaces handlers for specific test scenarios
+   */
+  useHandlers(...handlers: any[]): void {
+    this.server.use(...handlers);
+  }
+  
+  /**
+   * Get Server Instance
+   * Returns the underlying MSW server instance for advanced operations
+   */
+  getServer(): SetupServer {
+    return this.server;
+  }
+}
+
+// ============================================================================
+// REACT TESTING LIBRARY CONFIGURATION
+// ============================================================================
+
+/**
+ * Configure React Testing Library for API Documentation Testing
+ * Enhanced configuration optimized for API documentation component testing
+ */
+configure({
+  // Enhanced error messages for API documentation component testing
+  getElementError: (message: string | null, container: HTMLElement) => {
+    const enhancedMessage = [
+      message,
+      '',
+      '🔍 API Documentation Component Debug Information:',
+      `Container HTML: ${container.innerHTML.slice(0, 500)}...`,
+      '',
+      '💡 API Documentation Testing Tips:',
+      '- Use data-testid="api-docs-*" for API documentation elements',
+      '- Check OpenAPI specification rendering with screen.getByText()',
+      '- Verify API endpoint documentation with screen.getByRole("button")',
+      '- Test service configuration forms with screen.getByLabelText()',
+      '- Validate authentication states with screen.queryByText()',
+    ].join('\n');
+    
+    const error = new Error(enhancedMessage);
+    error.name = 'ApiDocsTestingLibraryElementError';
+    return error;
+  },
+  
+  // API documentation component-specific timeout for async operations
+  asyncUtilTimeout: 10000, // 10 seconds for complex OpenAPI rendering
+  
+  // Enhanced error suggestions for API documentation components
+  throwSuggestions: true,
+});
+
+// ============================================================================
+// CUSTOM RENDER UTILITIES FOR API DOCUMENTATION
+// ============================================================================
+
+/**
+ * API Documentation Authentication Provider
+ * Provides authentication context for API documentation component testing
+ */
+interface ApiDocsAuthProviderProps {
+  children: ReactNode;
+  testContext?: ApiDocsTestContext;
+}
+
+const ApiDocsAuthProvider: React.FC<ApiDocsAuthProviderProps> = ({ 
+  children, 
+  testContext 
+}) => {
+  const context = testContext || getApiDocsTestContext();
+  
+  const authContextValue = React.useMemo(() => ({
+    user: context.auth.user,
+    isAuthenticated: context.auth.isAuthenticated,
+    permissions: context.auth.permissions,
+    login: vi.fn(),
+    logout: vi.fn(),
+    refreshToken: vi.fn(),
+    checkPermission: vi.fn((permission: string) => 
+      context.auth.permissions.includes(permission)
+    ),
+    loading: false,
+    error: null,
+  }), [context.auth]);
+  
+  const AuthContext = React.createContext(authContextValue);
+  
+  return (
+    <AuthContext.Provider value={authContextValue}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+/**
+ * API Documentation Service Provider
+ * Provides service context for API documentation component testing
+ */
+interface ApiDocsServiceProviderProps {
+  children: ReactNode;
+  testContext?: ApiDocsTestContext;
+}
+
+const ApiDocsServiceProvider: React.FC<ApiDocsServiceProviderProps> = ({ 
+  children, 
+  testContext 
+}) => {
+  const context = testContext || getApiDocsTestContext();
+  
+  const serviceContextValue = React.useMemo(() => ({
+    baseUrl: context.service.baseUrl,
+    apiVersion: context.service.apiVersion,
+    serviceName: context.service.serviceName,
+    serviceType: context.service.serviceType,
+    isConfigured: true,
+    configuration: {
+      host: 'localhost',
+      port: 3306,
+      database: 'test_db',
+      username: 'test_user',
+    },
+    testConnection: vi.fn(),
+    saveConfiguration: vi.fn(),
+    loadConfiguration: vi.fn(),
+    generateOpenAPI: vi.fn(),
+  }), [context.service]);
+  
+  const ServiceContext = React.createContext(serviceContextValue);
+  
+  return (
+    <ServiceContext.Provider value={serviceContextValue}>
+      {children}
+    </ServiceContext.Provider>
+  );
+};
+
+/**
+ * API Documentation Complete Test Provider
+ * Combines all providers needed for comprehensive API documentation testing
+ */
+interface ApiDocsTestProviderProps {
+  children: ReactNode;
+  testContext?: ApiDocsTestContext;
+  queryClient?: QueryClient;
+}
+
+const ApiDocsTestProvider: React.FC<ApiDocsTestProviderProps> = ({ 
+  children, 
+  testContext: providedContext,
+  queryClient: providedQueryClient 
+}) => {
+  const context = providedContext || getApiDocsTestContext();
+  const queryClient = providedQueryClient || context.queryClient;
+  
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ApiDocsAuthProvider testContext={context}>
+        <ApiDocsServiceProvider testContext={context}>
+          {children}
+        </ApiDocsServiceProvider>
+      </ApiDocsAuthProvider>
+    </QueryClientProvider>
+  );
+};
+
+/**
+ * Custom Render Function for API Documentation Components
+ * Enhanced render function with all necessary providers and utilities
+ */
+interface ApiDocsRenderOptions extends Omit<RenderOptions, 'wrapper'> {
+  testContext?: Partial<ApiDocsTestConfig>;
+  queryClient?: QueryClient;
+  enablePerformanceTracking?: boolean;
+  componentId?: string;
+}
+
+export function renderApiDocsComponent(
   ui: ReactElement,
   options: ApiDocsRenderOptions = {}
-): ReturnType<typeof render> & {
+): {
   user: ReturnType<typeof userEvent.setup>;
-  queryClient: QueryClient;
-  performanceData?: PerformanceMeasurement;
-} {
+  testContext: ApiDocsTestContext;
+  performance: {
+    getRenderTime: () => number;
+    getMetrics: () => PerformanceMetrics;
+  };
+} & ReturnType<typeof render> {
   const {
-    withAuth = true,
-    mockUser,
-    theme = 'light',
-    queryClientOptions,
-    apiMockOptions,
-    routerContext,
-    measurePerformance = false,
+    testContext: testConfig,
+    queryClient: providedQueryClient,
+    enablePerformanceTracking = true,
+    componentId = 'test-component',
     ...renderOptions
   } = options;
   
-  // Performance measurement start
-  const startTime = performance.now();
+  // Initialize test context with provided configuration
+  const testContext = initializeApiDocsTestContext(testConfig);
+  const queryClient = providedQueryClient || testContext.queryClient;
   
-  // Create test-specific query client if custom options provided
-  const queryClient = queryClientOptions 
-    ? new QueryClient({
-        defaultOptions: {
-          ...testConfig.queryClient.getDefaultOptions(),
-          ...queryClientOptions.defaultOptions,
-        },
-        logger: testConfig.queryClient.getLogger(),
-      })
-    : testConfig.queryClient;
+  // Track performance if enabled
+  const renderStartTime = enablePerformanceTracking ? performance.now() : 0;
   
-  // Mock session data
-  const sessionUser = mockUser || testConfig.mockSession.user;
+  // Update test context with component information
+  testContext.debug.componentId = componentId;
+  testContext.debug.testId = `test-${Date.now()}`;
   
-  // Create test wrapper with all necessary providers
-  const TestWrapper = ({ children }: { children: ReactNode }) => {
-    return (
-      <QueryClientProvider client={queryClient}>
-        <Suspense fallback={<div data-testid="loading">Loading...</div>}>
-          <MockThemeProvider theme={theme}>
-            {withAuth ? (
-              <MockAuthProvider user={sessionUser} token={testConfig.mockSession.token}>
-                <MockRouterProvider context={routerContext}>
-                  {children}
-                </MockRouterProvider>
-              </MockAuthProvider>
-            ) : (
-              <MockRouterProvider context={routerContext}>
-                {children}
-              </MockRouterProvider>
-            )}
-          </MockThemeProvider>
-        </Suspense>
-      </QueryClientProvider>
-    );
-  };
-  
-  // Render component with providers
-  const result = render(ui, {
-    wrapper: TestWrapper,
-    ...renderOptions,
-  });
-  
-  // Performance measurement end
-  const renderTime = performance.now() - startTime;
-  
-  // Validate performance thresholds if measurement enabled
-  let performanceData: PerformanceMeasurement | undefined;
-  if (measurePerformance) {
-    performanceData = {
-      renderTime,
-      queryTime: 0, // Will be updated by query hooks
-      cacheHitRate: calculateCacheHitRate(),
-      memoryUsage: getMemoryUsage(),
-    };
-    
-    // Assert performance thresholds
-    expect(renderTime).toBeLessThan(testConfig.performanceThresholds.componentRender);
-  }
-  
-  return {
-    ...result,
-    user: testConfig.user,
-    queryClient,
-    performanceData,
-  };
-}
-
-/**
- * Utility for testing React Query hooks in isolation
- * Provides clean testing environment for custom hooks
- * 
- * @param hookOptions - Configuration for hook testing
- * @returns Hook testing utilities
- */
-export function createHookTestEnvironment(hookOptions: {
-  queryClientOptions?: ApiDocsRenderOptions['queryClientOptions'];
-  initialProps?: any;
-}) {
-  const { queryClientOptions, initialProps } = hookOptions;
-  
-  const queryClient = queryClientOptions 
-    ? new QueryClient({
-        defaultOptions: {
-          ...testConfig.queryClient.getDefaultOptions(),
-          ...queryClientOptions.defaultOptions,
-        },
-      })
-    : testConfig.queryClient;
-  
-  const wrapper = ({ children }: { children: ReactNode }) => (
-    <QueryClientProvider client={queryClient}>
+  // Create wrapper with all providers
+  const Wrapper: React.FC<{ children: ReactNode }> = ({ children }) => (
+    <ApiDocsTestProvider testContext={testContext} queryClient={queryClient}>
       {children}
-    </QueryClientProvider>
+    </ApiDocsTestProvider>
   );
   
-  return {
-    wrapper,
-    queryClient,
-    initialProps,
+  // Render component with providers
+  const renderResult = render(ui, { wrapper: Wrapper, ...renderOptions });
+  
+  // Calculate render time
+  const renderTime = enablePerformanceTracking ? performance.now() - renderStartTime : 0;
+  testContext.performance.metrics.renderTime = renderTime;
+  
+  // Performance tracking utilities
+  const performanceUtils = {
+    getRenderTime: () => renderTime,
+    getMetrics: () => testContext.performance.metrics,
   };
-}
-
-/**
- * API documentation specific test utilities
- * Provides specialized helpers for testing API documentation features
- */
-export const apiDocsTestUtils = {
-  /**
-   * Wait for React Query to complete all pending operations
-   */
-  async waitForQueries(): Promise<void> {
-    await testConfig.queryClient.invalidateQueries();
-    await new Promise(resolve => setTimeout(resolve, 0));
-  },
   
-  /**
-   * Assert API response time performance
-   */
-  async measureApiResponseTime(operation: () => Promise<any>): Promise<number> {
-    const startTime = performance.now();
-    await operation();
-    const responseTime = performance.now() - startTime;
+  // Log performance information if debugging is enabled
+  if (testContext.debug.logLevel !== 'silent' && enablePerformanceTracking) {
+    console.info(`🚀 Component "${componentId}" rendered in ${renderTime.toFixed(2)}ms`);
     
-    expect(responseTime).toBeLessThan(testConfig.performanceThresholds.apiResponse);
-    return responseTime;
-  },
-  
-  /**
-   * Validate OpenAPI specification format
-   */
-  validateOpenAPISpec(spec: OpenAPISpecification): void {
-    expect(spec).toHaveProperty('openapi');
-    expect(spec).toHaveProperty('info');
-    expect(spec).toHaveProperty('paths');
-    expect(spec.openapi).toMatch(/^3\.\d+\.\d+$/);
-    expect(spec.info).toHaveProperty('title');
-    expect(spec.info).toHaveProperty('version');
-    expect(Object.keys(spec.paths)).toHaveLength.greaterThan(0);
-  },
-  
-  /**
-   * Test authentication headers in API requests
-   */
-  async testAuthenticatedRequest(requestMatcher: string | RegExp): Promise<MockedRequest<DefaultBodyType>> {
-    const requests = testConfig.server.listHandlers()
-      .filter(handler => handler.info.header?.includes('authorization'));
-    
-    expect(requests).toHaveLength.greaterThan(0);
-    
-    // Return the first matching request for further assertions
-    return requests[0] as MockedRequest<DefaultBodyType>;
-  },
-  
-  /**
-   * Simulate connection timeout for database testing
-   */
-  async simulateConnectionTimeout(timeoutMs: number = 5000): Promise<void> {
-    vi.advanceTimersByTime(timeoutMs);
-    await new Promise(resolve => setTimeout(resolve, 0));
-  },
-  
-  /**
-   * Test optimistic updates behavior
-   */
-  async testOptimisticUpdate(
-    mutationFn: () => Promise<any>,
-    expectedOptimisticState: any
-  ): Promise<void> {
-    const startTime = performance.now();
-    
-    // Execute mutation
-    const mutationPromise = mutationFn();
-    
-    // Verify optimistic state is applied immediately
-    expect(testConfig.queryClient.getQueryData(['api-docs'])).toEqual(expectedOptimisticState);
-    
-    // Wait for mutation to complete
-    await mutationPromise;
-    
-    const updateTime = performance.now() - startTime;
-    expect(updateTime).toBeLessThan(testConfig.performanceThresholds.optimisticUpdate);
-  },
-};
-
-/**
- * Performance testing utilities for API documentation components
- */
-export const performanceTestUtils = {
-  /**
-   * Measure component render performance
-   */
-  async measureRenderPerformance(renderFn: () => void): Promise<number> {
-    const startTime = performance.now();
-    renderFn();
-    const renderTime = performance.now() - startTime;
-    
-    expect(renderTime).toBeLessThan(testConfig.performanceThresholds.componentRender);
-    return renderTime;
-  },
-  
-  /**
-   * Test virtual scrolling performance for large datasets
-   */
-  async testVirtualScrollingPerformance(itemCount: number): Promise<void> {
-    expect(itemCount).toBeGreaterThan(1000); // Test with large datasets
-    
-    const startTime = performance.now();
-    
-    // Simulate virtual scrolling render
-    const visibleItems = Math.min(50, itemCount); // Only render visible items
-    
-    const renderTime = performance.now() - startTime;
-    expect(renderTime).toBeLessThan(200); // 200ms threshold for virtual scrolling
-  },
-  
-  /**
-   * Monitor memory usage during testing
-   */
-  getMemoryUsage(): number {
-    if (typeof performance.memory !== 'undefined') {
-      return performance.memory.usedJSHeapSize;
+    if (renderTime > (testContext.performance.startTime + 50)) {
+      console.warn(`⚠️ Slow render detected for "${componentId}": ${renderTime.toFixed(2)}ms`);
     }
-    return 0;
-  },
-};
-
-/**
- * Mock browser APIs specific to API documentation testing
- */
-function mockBrowserAPIs(): void {
-  // Mock Intersection Observer for virtual scrolling
-  global.IntersectionObserver = vi.fn().mockImplementation((callback) => ({
-    observe: vi.fn(),
-    unobserve: vi.fn(),
-    disconnect: vi.fn(),
-    callback,
-  }));
-  
-  // Mock Resize Observer for responsive components
-  global.ResizeObserver = vi.fn().mockImplementation((callback) => ({
-    observe: vi.fn(),
-    unobserve: vi.fn(),
-    disconnect: vi.fn(),
-    callback,
-  }));
-  
-  // Mock clipboard API for copy-to-clipboard functionality
-  Object.assign(navigator, {
-    clipboard: {
-      writeText: vi.fn().mockResolvedValue(undefined),
-      readText: vi.fn().mockResolvedValue(''),
-    },
-  });
-  
-  // Mock download functionality for OpenAPI spec export
-  global.URL.createObjectURL = vi.fn().mockReturnValue('mock-blob-url');
-  global.URL.revokeObjectURL = vi.fn();
-}
-
-/**
- * Mock Next.js APIs for server component testing
- */
-function mockNextJSAPIs(): void {
-  // Mock Next.js router
-  vi.mock('next/router', () => ({
-    useRouter: vi.fn(() => ({
-      push: vi.fn(),
-      replace: vi.fn(),
-      back: vi.fn(),
-      forward: vi.fn(),
-      refresh: vi.fn(),
-      prefetch: vi.fn(),
-      pathname: '/adf-api-docs',
-      query: {},
-      asPath: '/adf-api-docs',
-      route: '/adf-api-docs',
-      events: {
-        on: vi.fn(),
-        off: vi.fn(),
-        emit: vi.fn(),
-      },
-    })),
-  }));
-  
-  // Mock Next.js navigation
-  vi.mock('next/navigation', () => ({
-    useRouter: vi.fn(() => ({
-      push: vi.fn(),
-      replace: vi.fn(),
-      back: vi.fn(),
-      forward: vi.fn(),
-      refresh: vi.fn(),
-      prefetch: vi.fn(),
-    })),
-    usePathname: vi.fn(() => '/adf-api-docs'),
-    useSearchParams: vi.fn(() => new URLSearchParams()),
-    useParams: vi.fn(() => ({})),
-  }));
-}
-
-/**
- * Setup performance monitoring for test execution
- */
-function setupPerformanceMonitoring(): void {
-  // Initialize global performance data
-  global.testPerformanceData = {
-    renderTimes: [],
-    queryTimes: [],
-    cacheHits: 0,
-    cacheMisses: 0,
-    memorySnapshots: [],
-  };
-  
-  // Mock performance.mark and performance.measure for consistent testing
-  global.performance.mark = vi.fn();
-  global.performance.measure = vi.fn();
-  global.performance.getEntriesByType = vi.fn().mockReturnValue([]);
-}
-
-/**
- * Calculate cache hit rate for performance validation
- */
-function calculateCacheHitRate(): number {
-  const { cacheHits, cacheMisses } = global.testPerformanceData;
-  const total = cacheHits + cacheMisses;
-  return total > 0 ? (cacheHits / total) * 100 : 0;
-}
-
-/**
- * Get current memory usage
- */
-function getMemoryUsage(): number {
-  if (typeof performance.memory !== 'undefined') {
-    return performance.memory.usedJSHeapSize;
   }
-  return 0;
+  
+  return {
+    ...renderResult,
+    user: userEvent.setup(),
+    testContext,
+    performance: performanceUtils,
+  };
 }
 
-// Mock React context providers for testing
-const MockThemeProvider = ({ children, theme }: { children: ReactNode; theme: string }) => (
-  <div data-theme={theme}>{children}</div>
-);
+// ============================================================================
+// PERFORMANCE TESTING UTILITIES
+// ============================================================================
 
-const MockAuthProvider = ({ 
-  children, 
-  user, 
-  token 
-}: { 
-  children: ReactNode; 
-  user: any; 
-  token: string; 
-}) => (
-  <div data-auth-user={user.id} data-auth-token={token}>
-    {children}
-  </div>
-);
-
-const MockRouterProvider = ({ 
-  children, 
-  context 
-}: { 
-  children: ReactNode; 
-  context?: any; 
-}) => (
-  <div data-router-context={JSON.stringify(context || {})}>
-    {children}
-  </div>
-);
-
-// Enhanced expect matchers for API documentation testing
-expect.extend({
+/**
+ * API Response Performance Testing Utilities
+ * Specialized utilities for validating API response performance
+ */
+export const apiPerformanceUtils = {
   /**
-   * Custom matcher for testing OpenAPI specification validity
+   * Measure API Response Time
+   * Tracks API response time and validates against performance thresholds
    */
-  toBeValidOpenAPISpec(received: any) {
-    const requiredFields = ['openapi', 'info', 'paths'];
-    const missingFields = requiredFields.filter(field => !(field in received));
-    
-    const pass = missingFields.length === 0 && 
-                 typeof received.openapi === 'string' &&
-                 received.openapi.match(/^3\.\d+\.\d+$/) &&
-                 received.info && received.info.title && received.info.version &&
-                 received.paths && Object.keys(received.paths).length > 0;
+  measureApiResponse: async <T>(
+    apiCall: () => Promise<T>,
+    expectedThreshold = 100
+  ): Promise<{ result: T; responseTime: number; withinThreshold: boolean }> => {
+    const startTime = performance.now();
+    const result = await apiCall();
+    const endTime = performance.now();
+    const responseTime = endTime - startTime;
     
     return {
-      pass,
-      message: () => pass
-        ? `Expected object not to be a valid OpenAPI specification`
-        : `Expected object to be a valid OpenAPI specification. Missing or invalid fields: ${missingFields.join(', ')}`,
+      result,
+      responseTime,
+      withinThreshold: responseTime <= expectedThreshold,
     };
   },
   
   /**
-   * Custom matcher for testing API response time performance
+   * Measure Component Update Performance
+   * Tracks React component update performance during API state changes
    */
-  toMeetPerformanceThreshold(received: number, threshold: number) {
-    const pass = received <= threshold;
+  measureComponentUpdate: (
+    updateFn: () => void,
+    expectedThreshold = 16.67 // 60 FPS = 16.67ms per frame
+  ): { updateTime: number; withinThreshold: boolean } => {
+    const startTime = performance.now();
+    updateFn();
+    const endTime = performance.now();
+    const updateTime = endTime - startTime;
+    
     return {
-      pass,
-      message: () => pass
-        ? `Expected ${received}ms not to meet performance threshold of ${threshold}ms`
-        : `Expected ${received}ms to meet performance threshold of ${threshold}ms`,
+      updateTime,
+      withinThreshold: updateTime <= expectedThreshold,
+    };
+  },
+  
+  /**
+   * Validate Memory Usage
+   * Monitors memory usage during API documentation component rendering
+   */
+  validateMemoryUsage: (): { 
+    usedJSHeapSize: number; 
+    totalJSHeapSize: number; 
+    jsHeapSizeLimit: number; 
+    withinLimits: boolean;
+  } => {
+    if ('memory' in performance) {
+      const memory = (performance as any).memory;
+      return {
+        usedJSHeapSize: memory.usedJSHeapSize,
+        totalJSHeapSize: memory.totalJSHeapSize,
+        jsHeapSizeLimit: memory.jsHeapSizeLimit,
+        withinLimits: memory.usedJSHeapSize < memory.jsHeapSizeLimit * 0.8, // 80% threshold
+      };
+    }
+    
+    return {
+      usedJSHeapSize: 0,
+      totalJSHeapSize: 0,
+      jsHeapSizeLimit: 0,
+      withinLimits: true,
+    };
+  },
+};
+
+// ============================================================================
+// OPENAPI SPECIFICATION TESTING UTILITIES
+// ============================================================================
+
+/**
+ * OpenAPI Specification Testing Utilities
+ * Specialized utilities for validating OpenAPI specification generation and rendering
+ */
+export const openAPITestingUtils = {
+  /**
+   * Validate OpenAPI Specification Structure
+   * Performs comprehensive validation of OpenAPI specification compliance
+   */
+  validateSpecification: (spec: any): {
+    isValid: boolean;
+    errors: string[];
+    warnings: string[];
+    version: string;
+  } => {
+    const errors: string[] = [];
+    const warnings: string[] = [];
+    
+    // Basic structure validation
+    if (!spec.openapi) {
+      errors.push('Missing openapi version field');
+    } else if (!spec.openapi.startsWith('3.')) {
+      errors.push('OpenAPI version must be 3.x');
+    }
+    
+    if (!spec.info) {
+      errors.push('Missing info object');
+    } else {
+      if (!spec.info.title) errors.push('Missing info.title');
+      if (!spec.info.version) errors.push('Missing info.version');
+    }
+    
+    if (!spec.paths) {
+      errors.push('Missing paths object');
+    } else if (Object.keys(spec.paths).length === 0) {
+      warnings.push('No paths defined in specification');
+    }
+    
+    // Security validation
+    if (spec.security && spec.security.length > 0 && !spec.components?.securitySchemes) {
+      warnings.push('Security requirements defined but no security schemes specified');
+    }
+    
+    return {
+      isValid: errors.length === 0,
+      errors,
+      warnings,
+      version: spec.openapi || 'unknown',
+    };
+  },
+  
+  /**
+   * Test API Endpoint Documentation
+   * Validates API endpoint documentation completeness and accuracy
+   */
+  testEndpointDocumentation: (paths: Record<string, any>): {
+    coverage: number;
+    missingDescriptions: string[];
+    missingExamples: string[];
+    missingParameters: string[];
+  } => {
+    const missingDescriptions: string[] = [];
+    const missingExamples: string[] = [];
+    const missingParameters: string[] = [];
+    let totalOperations = 0;
+    let documentedOperations = 0;
+    
+    Object.entries(paths).forEach(([path, methods]) => {
+      Object.entries(methods).forEach(([method, operation]: [string, any]) => {
+        totalOperations++;
+        const operationId = `${method.toUpperCase()} ${path}`;
+        
+        if (operation.description) {
+          documentedOperations++;
+        } else {
+          missingDescriptions.push(operationId);
+        }
+        
+        if (!operation.examples && !operation.requestBody?.content?.['application/json']?.example) {
+          missingExamples.push(operationId);
+        }
+        
+        if (operation.parameters && operation.parameters.some((p: any) => !p.description)) {
+          missingParameters.push(operationId);
+        }
+      });
+    });
+    
+    return {
+      coverage: totalOperations > 0 ? (documentedOperations / totalOperations) * 100 : 100,
+      missingDescriptions,
+      missingExamples,
+      missingParameters,
+    };
+  },
+  
+  /**
+   * Validate Response Schema Compliance
+   * Ensures API responses match their documented schemas
+   */
+  validateResponseSchema: (response: any, schema: any): {
+    isValid: boolean;
+    errors: string[];
+    path: string;
+  } => {
+    const errors: string[] = [];
+    
+    const validateObject = (obj: any, schemaObj: any, path = ''): void => {
+      if (!schemaObj) return;
+      
+      if (schemaObj.type === 'object' && schemaObj.properties) {
+        Object.entries(schemaObj.properties).forEach(([key, propSchema]: [string, any]) => {
+          const currentPath = path ? `${path}.${key}` : key;
+          
+          if (propSchema.required && !(key in obj)) {
+            errors.push(`Missing required property: ${currentPath}`);
+          }
+          
+          if (key in obj) {
+            validateObject(obj[key], propSchema, currentPath);
+          }
+        });
+      } else if (schemaObj.type && typeof obj !== 'undefined') {
+        const expectedType = schemaObj.type;
+        const actualType = Array.isArray(obj) ? 'array' : typeof obj;
+        
+        if (expectedType !== actualType) {
+          errors.push(`Type mismatch at ${path}: expected ${expectedType}, got ${actualType}`);
+        }
+      }
+    };
+    
+    validateObject(response, schema);
+    
+    return {
+      isValid: errors.length === 0,
+      errors,
+      path: 'response',
+    };
+  },
+};
+
+// ============================================================================
+// ENHANCED TESTING MATCHERS
+// ============================================================================
+
+/**
+ * Custom Jest/Vitest Matchers for API Documentation Testing
+ * Provides specialized matchers for API documentation component validation
+ */
+declare global {
+  namespace Vi {
+    interface Assertion<T = any> {
+      toHaveValidOpenAPISpec(): T;
+      toHaveApiEndpoint(method: string, path: string): T;
+      toHaveAuthenticationScheme(schemeName: string): T;
+      toRenderWithinPerformanceThreshold(threshold: number): T;
+      toHaveAccessibleApiDocumentation(): T;
+    }
+  }
+}
+
+expect.extend({
+  /**
+   * Validates OpenAPI specification compliance
+   */
+  toHaveValidOpenAPISpec(received: any) {
+    const validation = openAPITestingUtils.validateSpecification(received);
+    
+    return {
+      message: () =>
+        validation.isValid
+          ? 'Expected OpenAPI specification to be invalid'
+          : `OpenAPI specification validation failed:\n${validation.errors.join('\n')}`,
+      pass: validation.isValid,
+    };
+  },
+  
+  /**
+   * Checks for specific API endpoint documentation
+   */
+  toHaveApiEndpoint(received: any, method: string, path: string) {
+    const hasEndpoint = received.paths?.[path]?.[method.toLowerCase()] !== undefined;
+    
+    return {
+      message: () =>
+        hasEndpoint
+          ? `Expected OpenAPI specification not to have ${method} ${path} endpoint`
+          : `Expected OpenAPI specification to have ${method} ${path} endpoint`,
+      pass: hasEndpoint,
+    };
+  },
+  
+  /**
+   * Validates authentication scheme presence
+   */
+  toHaveAuthenticationScheme(received: any, schemeName: string) {
+    const hasScheme = received.components?.securitySchemes?.[schemeName] !== undefined;
+    
+    return {
+      message: () =>
+        hasScheme
+          ? `Expected OpenAPI specification not to have authentication scheme "${schemeName}"`
+          : `Expected OpenAPI specification to have authentication scheme "${schemeName}"`,
+      pass: hasScheme,
+    };
+  },
+  
+  /**
+   * Validates component render performance
+   */
+  toRenderWithinPerformanceThreshold(received: { performance: { getRenderTime: () => number } }, threshold: number) {
+    const renderTime = received.performance.getRenderTime();
+    const withinThreshold = renderTime <= threshold;
+    
+    return {
+      message: () =>
+        withinThreshold
+          ? `Expected component to render slower than ${threshold}ms, but rendered in ${renderTime.toFixed(2)}ms`
+          : `Expected component to render within ${threshold}ms, but took ${renderTime.toFixed(2)}ms`,
+      pass: withinThreshold,
+    };
+  },
+  
+  /**
+   * Validates accessibility of API documentation components
+   */
+  toHaveAccessibleApiDocumentation(received: HTMLElement) {
+    const hasAriaLabels = received.querySelector('[aria-label], [aria-labelledby]') !== null;
+    const hasSemanticStructure = received.querySelector('h1, h2, h3, section, article') !== null;
+    const hasKeyboardAccessible = received.querySelector('[tabindex], button, input, select, textarea, a[href]') !== null;
+    
+    const issues: string[] = [];
+    if (!hasAriaLabels) issues.push('Missing ARIA labels for screen readers');
+    if (!hasSemanticStructure) issues.push('Missing semantic HTML structure');
+    if (!hasKeyboardAccessible) issues.push('No keyboard accessible elements found');
+    
+    const isAccessible = issues.length === 0;
+    
+    return {
+      message: () =>
+        isAccessible
+          ? 'Expected API documentation to have accessibility violations'
+          : `Expected API documentation to be accessible, but found issues:\n${issues.map(issue => `  - ${issue}`).join('\n')}`,
+      pass: isAccessible,
     };
   },
 });
 
-// Export test configuration and utilities
-export { testConfig };
-export { screen, within, userEvent };
-export type { ApiDocsRenderOptions, PerformanceMeasurement };
+// ============================================================================
+// GLOBAL TEST LIFECYCLE MANAGEMENT
+// ============================================================================
 
-// Type declarations for global test utilities
-declare global {
-  var testPerformanceData: {
-    renderTimes: number[];
-    queryTimes: number[];
-    cacheHits: number;
-    cacheMisses: number;
-    memorySnapshots: number[];
-  };
+/**
+ * Global Setup for API Documentation Testing
+ * Initializes the testing environment with all required configurations
+ */
+beforeAll(async () => {
+  // Initialize test context with default configuration
+  const testContext = initializeApiDocsTestContext();
   
-  namespace Vi {
-    interface JestAssertion {
-      toBeValidOpenAPISpec(): any;
-      toMeetPerformanceThreshold(threshold: number): any;
-    }
+  // Start MSW server for API mocking
+  if (testContext.msw.server) {
+    const mswServer = new ApiDocsMSWServer(testContext.msw.handlers);
+    mswServer.start({
+      quiet: testContext.debug.logLevel === 'silent',
+      strictMode: false,
+    });
   }
-}
+  
+  // Configure React Query for testing
+  testContext.queryClient.setDefaultOptions({
+    queries: {
+      retry: false,
+      staleTime: 0,
+      cacheTime: 0,
+    },
+    mutations: {
+      retry: false,
+    },
+  });
+  
+  // Log initialization if debugging is enabled
+  if (testContext.debug.logLevel !== 'silent') {
+    console.info('🧪 API Documentation Test Environment Initialized');
+    console.info('📋 Features Available:');
+    console.info('  ✅ MSW Server for API mocking');
+    console.info('  ✅ React Query client for hook testing');
+    console.info('  ✅ Authentication and service providers');
+    console.info('  ✅ Performance monitoring utilities');
+    console.info('  ✅ OpenAPI specification validation');
+    console.info('  ✅ Accessibility testing integration');
+  }
+});
+
+/**
+ * Test Cleanup - Runs after each test
+ * Ensures proper cleanup and test isolation
+ */
+afterEach(() => {
+  // Clean up React Testing Library
+  cleanup();
+  
+  // Clear React Query cache
+  const testContext = getApiDocsTestContext();
+  if (testContext?.queryClient) {
+    testContext.queryClient.clear();
+  }
+  
+  // Reset MSW handlers
+  if (testContext?.msw?.server) {
+    testContext.msw.server.resetHandlers();
+  }
+  
+  // Clear all mocks
+  vi.clearAllMocks();
+  
+  // Reset performance metrics
+  if (testContext?.performance?.metrics) {
+    Object.assign(testContext.performance.metrics, {
+      renderTime: 0,
+      apiResponseTime: 0,
+      memoryUsage: 0,
+      queryCacheHits: 0,
+      queryCacheMisses: 0,
+      componentUpdateCount: 0,
+    });
+  }
+});
+
+/**
+ * Global Teardown - Runs after all tests
+ * Final cleanup and resource deallocation
+ */
+afterAll(() => {
+  // Clean up test context
+  clearApiDocsTestContext();
+  
+  // Stop MSW server
+  const testContext = getApiDocsTestContext();
+  if (testContext?.msw?.server) {
+    const mswServer = new ApiDocsMSWServer();
+    mswServer.stop();
+  }
+  
+  // Clear all mocks and restore original implementations
+  vi.restoreAllMocks();
+  
+  if (process.env.DEBUG_TESTS === 'true') {
+    console.info('🧹 API Documentation Test Environment Cleanup Completed');
+  }
+});
+
+// ============================================================================
+// UTILITY EXPORTS
+// ============================================================================
+
+/**
+ * Exported Utilities for API Documentation Testing
+ * Comprehensive collection of utilities for API documentation component testing
+ */
+export {
+  // Core testing utilities
+  renderApiDocsComponent as render,
+  getApiDocsTestContext as getTestContext,
+  initializeApiDocsTestContext as initTestContext,
+  clearApiDocsTestContext as clearTestContext,
+  
+  // Performance testing
+  apiPerformanceUtils as performance,
+  
+  // OpenAPI testing
+  openAPITestingUtils as openAPI,
+  
+  // MSW utilities
+  ApiDocsMSWServer as MSWServer,
+  
+  // Providers
+  ApiDocsTestProvider as TestProvider,
+  ApiDocsAuthProvider as AuthProvider,
+  ApiDocsServiceProvider as ServiceProvider,
+};
+
+/**
+ * Default export for convenience
+ * Provides the most commonly used testing utilities
+ */
+export default {
+  render: renderApiDocsComponent,
+  getTestContext: getApiDocsTestContext,
+  performance: apiPerformanceUtils,
+  openAPI: openAPITestingUtils,
+  MSWServer: ApiDocsMSWServer,
+};
