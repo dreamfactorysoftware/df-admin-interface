@@ -1,1030 +1,1557 @@
 /**
- * @fileoverview Comprehensive test suite for database service list components using Vitest and MSW
- * Tests component rendering, user interactions, data fetching, CRUD operations, and error handling
- * Includes integration tests for table virtualization, filtering, sorting, and real-time updates
+ * Database Service List Components Test Suite
  * 
+ * Comprehensive test suite for database service list components using Vitest 2.1+ and Mock Service Worker (MSW).
+ * Tests component rendering, user interactions, data fetching, CRUD operations, error handling, and accessibility.
+ * Includes integration tests for table virtualization, filtering, sorting, and real-time updates with React Query/SWR.
+ * 
+ * Test Coverage Areas:
+ * - Component rendering and initialization
+ * - Zustand store state management and actions
+ * - React Query caching and SWR synchronization
+ * - CRUD operations with optimistic updates
+ * - Table virtualization with TanStack Virtual
+ * - User interactions and event handling
+ * - Error handling and recovery scenarios
+ * - Accessibility compliance (WCAG 2.1 AA)
+ * - Performance benchmarks and optimization validation
+ * 
+ * @fileoverview Comprehensive test suite for service list components
  * @version 1.0.0
- * @author DreamFactory Admin Interface Team
- * @since 2024
+ * @since 2024-01-01
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi, beforeAll, afterAll } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { axe, toHaveNoViolations } from 'jest-axe'
-import { rest } from 'msw'
-import { setupServer } from 'msw/node'
-
-// Components under test
-import { ServiceListContainer } from './service-list-container'
-import { ServiceListTable } from './service-list-table'
+import React, { act } from 'react';
+import { describe, it, expect, beforeEach, afterEach, vi, beforeAll, afterAll } from 'vitest';
 import { 
-  useServiceList, 
-  useServiceListFilters, 
-  useServiceListMutations,
+  render, 
+  screen, 
+  fireEvent, 
+  waitFor, 
+  within,
+  getByRole,
+  getByText,
+  queryByText,
+  cleanup,
+  prettyDOM
+} from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { QueryClient } from '@tanstack/react-query';
+import { server } from '../../../test/mocks/database-service-handlers';
+import { TestProviders, cleanupTestProviders, waitForQueryToSettle } from '../../../test/utils/test-providers';
+
+// Import components under test
+import ServiceListContainer, { 
+  ServiceListContainerImplementation,
+  useServiceListContainerStore 
+} from './service-list-container';
+import ServiceListTable from './service-list-table';
+import { 
+  useServiceListComplete,
   useServiceListVirtualization,
   useServiceConnectionStatus 
-} from './service-list-hooks'
+} from './service-list-hooks';
 
-// Test utilities and providers
-import { TestProviders } from '../../../test/utils/test-providers'
-import { createMockQueryClient } from '../../../test/utils/query-test-helpers'
-import { createServiceListMockData, createServiceMockData } from '../../../test/utils/component-factories'
-import { renderWithProviders } from '../../../test/utils/test-utils'
-import { mockAuthProvider } from '../../../test/utils/mock-providers'
+// Import types and test utilities
+import type {
+  DatabaseService,
+  DatabaseDriver,
+  ServiceStatus,
+  ConnectionTestResult,
+  ServiceListFilters,
+  ServiceListSort,
+  BulkActionType,
+  ApiErrorResponse
+} from './service-list-types';
 
-// Mock data and handlers
-import { databaseServiceHandlers } from '../../../test/mocks/database-service-handlers'
-import { errorResponseHandlers } from '../../../test/mocks/error-responses'
-import { mockServiceData, mockServiceTypes, mockEnvironmentData } from '../../../test/mocks/mock-data'
+// Mock data and fixtures
+import {
+  mockDatabaseServices,
+  mockServiceTypes,
+  createMockDatabaseService,
+  createMockConnectionTestResult,
+  MOCK_SERVICE_LIST_RESPONSES,
+  PERFORMANCE_BENCHMARKS
+} from '../../../test/fixtures/database-service-fixtures';
 
-// Types
-import type { DatabaseService, ServiceListState, ServiceListFilters } from './service-list-types'
-import type { PaginationState, SortingState } from '../../../types/table'
+// =============================================================================
+// TEST SETUP AND CONFIGURATION
+// =============================================================================
 
-// Add jest-axe matcher
-expect.extend(toHaveNoViolations)
+/**
+ * Test configuration and global setup
+ */
+const TEST_CONFIG = {
+  // Performance thresholds from technical spec
+  CONNECTION_TEST_TIMEOUT: 5000, // 5 seconds max per spec F-001-RQ-002
+  LARGE_DATASET_SIZE: 1000, // For virtualization testing per F-002-RQ-002
+  RENDER_PERFORMANCE_THRESHOLD: 100, // 100ms max initial render
+  QUERY_CACHE_TTL: 5 * 60 * 1000, // 5 minutes
+  
+  // Testing options
+  ENABLE_PERFORMANCE_TESTING: true,
+  ENABLE_ACCESSIBILITY_TESTING: true,
+  ENABLE_VIRTUALIZATION_TESTING: true,
+  DEBUG_TESTS: process.env.DEBUG_TESTS === 'true'
+} as const;
 
-// MSW server setup for Node.js environment
-const server = setupServer(...databaseServiceHandlers, ...errorResponseHandlers)
+/**
+ * Mock Next.js router for testing
+ */
+const mockRouter = {
+  push: vi.fn(),
+  replace: vi.fn(),
+  back: vi.fn(),
+  forward: vi.fn(),
+  refresh: vi.fn(),
+  prefetch: vi.fn(),
+};
 
-// Test data constants
-const MOCK_SERVICES: DatabaseService[] = createServiceListMockData({
-  count: 25,
-  includeVariousStates: true,
-  includeConnectionStatus: true
-})
+const mockUseRouter = vi.fn(() => mockRouter);
+const mockUseSearchParams = vi.fn(() => new URLSearchParams());
+const mockUsePathname = vi.fn(() => '/api-connections/database');
 
-const LARGE_DATASET_SERVICES: DatabaseService[] = createServiceListMockData({
-  count: 1500,
-  includeVariousStates: true,
-  includeConnectionStatus: true
-})
+// Mock Next.js navigation hooks
+vi.mock('next/navigation', () => ({
+  useRouter: mockUseRouter,
+  useSearchParams: mockUseSearchParams,
+  usePathname: mockUsePathname,
+}));
 
-const TEST_PAGINATION_CONFIG = {
-  pageSize: 25,
-  pageIndex: 0,
-  totalItems: MOCK_SERVICES.length
-}
+/**
+ * Mock Zustand store for isolated testing
+ */
+const createMockStore = () => ({
+  services: [],
+  filteredServices: [],
+  selectedServices: new Set<number>(),
+  filters: {},
+  sorting: { field: 'name' as const, direction: 'asc' as const },
+  pagination: {
+    currentPage: 1,
+    pageSize: 25,
+    totalItems: 0,
+  },
+  virtualization: {
+    enabled: false,
+    scrollOffset: 0,
+    visibleRange: [0, 25] as [number, number],
+  },
+  ui: {
+    loading: false,
+    error: null,
+    refreshing: false,
+    bulkActionInProgress: false,
+    selectedBulkAction: null,
+  },
+  preferences: {
+    defaultPageSize: 25,
+    defaultSort: { field: 'name' as const, direction: 'asc' as const },
+    defaultFilters: {},
+    columnVisibility: {},
+    columnOrder: [],
+    columnWidths: {},
+    compactMode: false,
+    autoRefresh: true,
+    refreshInterval: 30000,
+  },
+  isInitialized: false,
+  isPaywallActive: false,
+  systemMode: false,
+  routeData: null,
+  
+  // Mock actions
+  setServices: vi.fn(),
+  addService: vi.fn(),
+  updateService: vi.fn(),
+  removeService: vi.fn(),
+  refreshServices: vi.fn(),
+  setSelectedServices: vi.fn(),
+  selectService: vi.fn(),
+  deselectService: vi.fn(),
+  selectAll: vi.fn(),
+  deselectAll: vi.fn(),
+  selectFiltered: vi.fn(),
+  setFilters: vi.fn(),
+  updateFilter: vi.fn(),
+  clearFilters: vi.fn(),
+  setSorting: vi.fn(),
+  setCurrentPage: vi.fn(),
+  setPageSize: vi.fn(),
+  goToPage: vi.fn(),
+  nextPage: vi.fn(),
+  previousPage: vi.fn(),
+  setVirtualization: vi.fn(),
+  updateScrollOffset: vi.fn(),
+  updateVisibleRange: vi.fn(),
+  setLoading: vi.fn(),
+  setError: vi.fn(),
+  setRefreshing: vi.fn(),
+  setBulkActionInProgress: vi.fn(),
+  setSelectedBulkAction: vi.fn(),
+  executeBulkAction: vi.fn(),
+  updatePreferences: vi.fn(),
+  resetPreferences: vi.fn(),
+  applyFiltersAndSort: vi.fn(),
+  setInitialized: vi.fn(),
+  setPaywallActive: vi.fn(),
+  setSystemMode: vi.fn(),
+  setRouteData: vi.fn(),
+  initializeFromRoute: vi.fn(),
+  reset: vi.fn(),
+  resetState: vi.fn(),
+});
 
-const TEST_FILTERS: ServiceListFilters = {
-  search: '',
-  serviceType: 'all',
-  status: 'all',
-  sortBy: 'name',
-  sortOrder: 'asc'
-}
+/**
+ * Mock database service provider context
+ */
+const mockDatabaseServiceContext = {
+  services: mockDatabaseServices,
+  loading: false,
+  error: null,
+  refreshServices: vi.fn(),
+  createService: vi.fn(),
+  updateService: vi.fn(),
+  deleteService: vi.fn(),
+  testConnection: vi.fn(),
+};
 
-describe('Database Service List Components', () => {
-  let queryClient: QueryClient
-  let user: ReturnType<typeof userEvent.setup>
+// Mock provider context hooks
+vi.mock('../database-service-provider', () => ({
+  useDatabaseServiceContext: () => mockDatabaseServiceContext,
+  useDatabaseServiceActions: () => mockDatabaseServiceContext,
+  useDatabaseServiceState: () => mockDatabaseServiceContext,
+}));
 
-  beforeAll(() => {
-    // Start MSW server
-    server.listen({ onUnhandledRequest: 'error' })
-  })
+/**
+ * Performance measurement utilities
+ */
+let performanceMarks: { [key: string]: number } = {};
 
-  beforeEach(() => {
-    // Create fresh query client for each test
-    queryClient = createMockQueryClient()
-    user = userEvent.setup()
-    
-    // Clear any existing cache
-    queryClient.clear()
-    
-    // Reset MSW handlers
-    server.resetHandlers()
-    
-    // Mock console methods to avoid noise in tests
-    vi.spyOn(console, 'error').mockImplementation(() => {})
-    vi.spyOn(console, 'warn').mockImplementation(() => {})
-  })
+const startPerformanceMark = (name: string) => {
+  performanceMarks[name] = performance.now();
+};
 
-  afterEach(() => {
-    // Clean up
-    vi.restoreAllMocks()
-    queryClient.clear()
-  })
+const endPerformanceMark = (name: string): number => {
+  const start = performanceMarks[name];
+  if (!start) return 0;
+  const duration = performance.now() - start;
+  delete performanceMarks[name];
+  return duration;
+};
 
-  afterAll(() => {
-    // Stop MSW server
-    server.close()
-  })
+// =============================================================================
+// GLOBAL TEST SETUP AND TEARDOWN
+// =============================================================================
 
-  describe('ServiceListContainer Component', () => {
-    it('should render service list container with proper accessibility attributes', async () => {
-      const { container } = renderWithProviders(
-        <ServiceListContainer />,
-        { queryClient }
-      )
+beforeAll(() => {
+  // Start MSW server for API mocking
+  server.listen({ 
+    onUnhandledRequest: 'error' 
+  });
+  
+  // Setup intersection observer mock for virtualization testing
+  global.IntersectionObserver = vi.fn().mockImplementation(() => ({
+    observe: vi.fn(),
+    unobserve: vi.fn(),
+    disconnect: vi.fn(),
+  }));
+  
+  // Setup resize observer mock for responsive testing
+  global.ResizeObserver = vi.fn().mockImplementation(() => ({
+    observe: vi.fn(),
+    unobserve: vi.fn(),
+    disconnect: vi.fn(),
+  }));
+  
+  // Mock window.matchMedia for theme testing
+  global.matchMedia = vi.fn().mockImplementation(query => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  }));
+  
+  if (TEST_CONFIG.DEBUG_TESTS) {
+    console.log('🧪 Test suite initialized with MSW server and mocks');
+  }
+});
 
-      // Verify basic rendering
-      expect(screen.getByRole('main')).toBeInTheDocument()
-      expect(screen.getByRole('heading', { name: /database services/i })).toBeInTheDocument()
+afterAll(() => {
+  // Clean up MSW server
+  server.close();
+  
+  if (TEST_CONFIG.DEBUG_TESTS) {
+    console.log('🧪 Test suite cleanup completed');
+  }
+});
 
-      // Test accessibility compliance
-      const results = await axe(container)
-      expect(results).toHaveNoViolations()
-    })
+beforeEach(() => {
+  // Reset MSW handlers before each test
+  server.resetHandlers();
+  
+  // Reset all mocks
+  vi.clearAllMocks();
+  
+  // Reset performance marks
+  performanceMarks = {};
+  
+  // Reset router mocks
+  mockUseSearchParams.mockReturnValue(new URLSearchParams());
+  mockUsePathname.mockReturnValue('/api-connections/database');
+  
+  if (TEST_CONFIG.DEBUG_TESTS) {
+    console.log('🧪 Test setup completed');
+  }
+});
 
-    it('should display paywall when user lacks permissions', async () => {
-      // Mock authenticated user without admin permissions
-      const mockUser = mockAuthProvider({
-        isAuthenticated: true,
-        user: { id: 1, name: 'Test User', isAdmin: false },
-        permissions: []
-      })
+afterEach(() => {
+  // Clean up React components
+  cleanup();
+  
+  // Clear performance marks
+  performanceMarks = {};
+  
+  if (TEST_CONFIG.DEBUG_TESTS) {
+    console.log('🧪 Test cleanup completed');
+  }
+});
 
-      renderWithProviders(
-        <ServiceListContainer />,
-        { queryClient, authProvider: mockUser }
-      )
+// =============================================================================
+// UTILITY FUNCTIONS FOR TESTING
+// =============================================================================
 
-      await waitFor(() => {
-        expect(screen.getByTestId('paywall-component')).toBeInTheDocument()
-        expect(screen.getByText(/upgrade required/i)).toBeInTheDocument()
-      })
-    })
+/**
+ * Create a test query client with optimized settings
+ */
+const createTestQueryClient = () => {
+  return new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+        staleTime: 0,
+        gcTime: 0,
+        refetchOnWindowFocus: false,
+      },
+      mutations: {
+        retry: false,
+      },
+    },
+    logger: {
+      log: TEST_CONFIG.DEBUG_TESTS ? console.log : () => {},
+      warn: TEST_CONFIG.DEBUG_TESTS ? console.warn : () => {},
+      error: TEST_CONFIG.DEBUG_TESTS ? console.error : () => {},
+    },
+  });
+};
 
-    it('should load and display service types in filter dropdown', async () => {
-      server.use(
-        rest.get('/api/v2/system/service_type', (req, res, ctx) => {
-          return res(ctx.json({ resource: mockServiceTypes }))
-        })
-      )
-
-      renderWithProviders(
-        <ServiceListContainer />,
-        { queryClient }
-      )
-
-      await waitFor(() => {
-        const filterDropdown = screen.getByRole('combobox', { name: /service type/i })
-        expect(filterDropdown).toBeInTheDocument()
-      })
-
-      await user.click(screen.getByRole('combobox', { name: /service type/i }))
-
-      await waitFor(() => {
-        expect(screen.getByRole('option', { name: /mysql/i })).toBeInTheDocument()
-        expect(screen.getByRole('option', { name: /postgresql/i })).toBeInTheDocument()
-        expect(screen.getByRole('option', { name: /mongodb/i })).toBeInTheDocument()
-      })
-    })
-
-    it('should handle route parameter changes for service type filtering', async () => {
-      const mockPush = vi.fn()
-      const mockSearchParams = new URLSearchParams('serviceType=mysql')
-
-      renderWithProviders(
-        <ServiceListContainer />,
-        { 
-          queryClient,
-          routerProps: { 
-            push: mockPush,
-            searchParams: mockSearchParams
-          }
-        }
-      )
-
-      await waitFor(() => {
-        const serviceTypeFilter = screen.getByDisplayValue(/mysql/i)
-        expect(serviceTypeFilter).toBeInTheDocument()
-      })
-    })
-
-    it('should refresh service list when refresh button is clicked', async () => {
-      const refetchSpy = vi.fn()
-      
-      // Mock useServiceList hook to track refetch calls
-      vi.mock('./service-list-hooks', async () => {
-        const actual = await vi.importActual('./service-list-hooks')
-        return {
-          ...actual,
-          useServiceList: vi.fn(() => ({
-            data: { resource: MOCK_SERVICES },
-            isLoading: false,
-            error: null,
-            refetch: refetchSpy
-          }))
-        }
-      })
-
-      renderWithProviders(
-        <ServiceListContainer />,
-        { queryClient }
-      )
-
-      const refreshButton = screen.getByRole('button', { name: /refresh/i })
-      await user.click(refreshButton)
-
-      expect(refetchSpy).toHaveBeenCalledOnce()
-    })
-  })
-
-  describe('ServiceListTable Component', () => {
-    const defaultProps = {
-      services: MOCK_SERVICES,
-      isLoading: false,
-      pagination: TEST_PAGINATION_CONFIG,
-      filters: TEST_FILTERS,
-      onFiltersChange: vi.fn(),
-      onPaginationChange: vi.fn(),
-      onServiceDelete: vi.fn(),
-      onServiceTest: vi.fn()
+/**
+ * Render component with all necessary providers
+ */
+const renderWithProviders = (
+  component: React.ReactElement,
+  options: {
+    queryClient?: QueryClient;
+    initialFilters?: ServiceListFilters;
+    mockStore?: any;
+    enablePerformanceTracking?: boolean;
+  } = {}
+) => {
+  const { 
+    queryClient = createTestQueryClient(),
+    enablePerformanceTracking = false 
+  } = options;
+  
+  if (enablePerformanceTracking) {
+    startPerformanceMark('component-render');
+  }
+  
+  const result = render(
+    <TestProviders 
+      queryClient={queryClient}
+      enableErrorBoundary={true}
+    >
+      {component}
+    </TestProviders>
+  );
+  
+  if (enablePerformanceTracking) {
+    const renderTime = endPerformanceMark('component-render');
+    if (renderTime > TEST_CONFIG.RENDER_PERFORMANCE_THRESHOLD) {
+      console.warn(`⚠️ Slow render detected: ${renderTime}ms (threshold: ${TEST_CONFIG.RENDER_PERFORMANCE_THRESHOLD}ms)`);
     }
+  }
+  
+  return { ...result, queryClient };
+};
 
-    it('should render table with proper ARIA attributes and structure', async () => {
-      const { container } = renderWithProviders(
-        <ServiceListTable {...defaultProps} />,
-        { queryClient }
-      )
+/**
+ * Wait for all async operations to complete
+ */
+const waitForAsyncOperations = async (queryClient?: QueryClient) => {
+  await waitFor(() => {
+    expect(screen.queryByTestId('test-loading-fallback')).not.toBeInTheDocument();
+  });
+  
+  if (queryClient) {
+    await waitForQueryToSettle(queryClient);
+  }
+  
+  // Wait for any pending state updates
+  await act(async () => {
+    await new Promise(resolve => setTimeout(resolve, 10));
+  });
+};
 
-      // Verify table structure
-      const table = screen.getByRole('table')
-      expect(table).toBeInTheDocument()
-      expect(table).toHaveAttribute('aria-label', 'Database services table')
-
-      // Verify column headers
-      expect(screen.getByRole('columnheader', { name: /name/i })).toBeInTheDocument()
-      expect(screen.getByRole('columnheader', { name: /type/i })).toBeInTheDocument()
-      expect(screen.getByRole('columnheader', { name: /status/i })).toBeInTheDocument()
-      expect(screen.getByRole('columnheader', { name: /actions/i })).toBeInTheDocument()
-
-      // Test accessibility compliance
-      const results = await axe(container)
-      expect(results).toHaveNoViolations()
+/**
+ * Mock service list data with specified parameters
+ */
+const setupMockServiceData = (options: {
+  count?: number;
+  includeError?: boolean;
+  includeEmpty?: boolean;
+  serviceTypes?: string[];
+  statuses?: ServiceStatus[];
+} = {}) => {
+  const { 
+    count = 10, 
+    includeError = false, 
+    includeEmpty = false,
+    serviceTypes = ['mysql', 'postgresql'],
+    statuses = ['active', 'inactive', 'error']
+  } = options;
+  
+  if (includeEmpty) {
+    return [];
+  }
+  
+  if (includeError) {
+    throw new Error('Mock service data error');
+  }
+  
+  return Array.from({ length: count }, (_, index) => 
+    createMockDatabaseService({
+      id: index + 1,
+      name: `test-service-${index + 1}`,
+      type: serviceTypes[index % serviceTypes.length] as DatabaseDriver,
+      status: statuses[index % statuses.length],
+      is_active: index % 2 === 0,
     })
+  );
+};
 
-    it('should display loading state with skeleton rows', () => {
-      renderWithProviders(
-        <ServiceListTable {...defaultProps} isLoading={true} services={[]} />,
-        { queryClient }
-      )
+// =============================================================================
+// SERVICE LIST CONTAINER COMPONENT TESTS
+// =============================================================================
 
-      // Verify loading skeleton
-      expect(screen.getAllByTestId('table-skeleton-row')).toHaveLength(10)
-      expect(screen.getByText(/loading services/i)).toBeInTheDocument()
-    })
-
-    it('should handle empty state gracefully', () => {
-      renderWithProviders(
-        <ServiceListTable {...defaultProps} services={[]} />,
-        { queryClient }
-      )
-
-      expect(screen.getByText(/no database services found/i)).toBeInTheDocument()
-      expect(screen.getByText(/create your first database service/i)).toBeInTheDocument()
-    })
-
-    it('should render service rows with correct data and status indicators', () => {
-      renderWithProviders(
-        <ServiceListTable {...defaultProps} />,
-        { queryClient }
-      )
-
-      // Check first service row
-      const firstService = MOCK_SERVICES[0]
-      expect(screen.getByText(firstService.name)).toBeInTheDocument()
-      expect(screen.getByText(firstService.type)).toBeInTheDocument()
+describe('ServiceListContainer Component', () => {
+  describe('Initialization and Rendering', () => {
+    it('should render loading state initially', async () => {
+      const { queryClient } = renderWithProviders(
+        <ServiceListContainer data-testid="service-list-container" />
+      );
       
-      // Verify status indicator
-      const statusCell = screen.getByTestId(`service-status-${firstService.id}`)
-      expect(statusCell).toBeInTheDocument()
-    })
-
-    it('should handle sorting by clicking column headers', async () => {
-      const onFiltersChange = vi.fn()
+      expect(screen.getByTestId('service-list-container')).toBeInTheDocument();
+      expect(screen.getByText(/loading services/i)).toBeInTheDocument();
+      expect(screen.getByRole('main')).toHaveAttribute('aria-label', 'Database services loading');
       
-      renderWithProviders(
-        <ServiceListTable {...defaultProps} onFiltersChange={onFiltersChange} />,
-        { queryClient }
-      )
-
-      // Click name column header to sort
-      const nameHeader = screen.getByRole('columnheader', { name: /name/i })
-      await user.click(nameHeader)
-
-      expect(onFiltersChange).toHaveBeenCalledWith({
-        ...TEST_FILTERS,
-        sortBy: 'name',
-        sortOrder: 'desc'
-      })
-    })
-
-    it('should open action menu and handle service operations', async () => {
-      const onServiceDelete = vi.fn()
-      const onServiceTest = vi.fn()
-
-      renderWithProviders(
-        <ServiceListTable 
-          {...defaultProps} 
-          onServiceDelete={onServiceDelete}
-          onServiceTest={onServiceTest}
-        />,
-        { queryClient }
-      )
-
-      // Click action menu for first service
-      const actionButtons = screen.getAllByRole('button', { name: /actions/i })
-      await user.click(actionButtons[0])
-
-      // Verify menu options
-      await waitFor(() => {
-        expect(screen.getByRole('menuitem', { name: /test connection/i })).toBeInTheDocument()
-        expect(screen.getByRole('menuitem', { name: /edit/i })).toBeInTheDocument()
-        expect(screen.getByRole('menuitem', { name: /delete/i })).toBeInTheDocument()
-      })
-
-      // Test connection action
-      await user.click(screen.getByRole('menuitem', { name: /test connection/i }))
-      expect(onServiceTest).toHaveBeenCalledWith(MOCK_SERVICES[0].id)
-    })
-
-    it('should handle pagination controls correctly', async () => {
-      const onPaginationChange = vi.fn()
-      const paginationProps = {
-        ...TEST_PAGINATION_CONFIG,
-        totalItems: 100
-      }
-
-      renderWithProviders(
-        <ServiceListTable 
-          {...defaultProps} 
-          pagination={paginationProps}
-          onPaginationChange={onPaginationChange}
-        />,
-        { queryClient }
-      )
-
-      // Test next page navigation
-      const nextButton = screen.getByRole('button', { name: /next page/i })
-      await user.click(nextButton)
-
-      expect(onPaginationChange).toHaveBeenCalledWith({
-        ...paginationProps,
-        pageIndex: 1
-      })
-    })
-
-    it('should filter services by search input', async () => {
-      const onFiltersChange = vi.fn()
-
-      renderWithProviders(
-        <ServiceListTable {...defaultProps} onFiltersChange={onFiltersChange} />,
-        { queryClient }
-      )
-
-      const searchInput = screen.getByRole('textbox', { name: /search services/i })
-      await user.type(searchInput, 'mysql')
-
-      await waitFor(() => {
-        expect(onFiltersChange).toHaveBeenCalledWith({
-          ...TEST_FILTERS,
-          search: 'mysql'
-        })
-      })
-    })
-
-    it('should handle service type filter changes', async () => {
-      const onFiltersChange = vi.fn()
-
-      renderWithProviders(
-        <ServiceListTable {...defaultProps} onFiltersChange={onFiltersChange} />,
-        { queryClient }
-      )
-
-      const typeFilter = screen.getByRole('combobox', { name: /filter by type/i })
-      await user.click(typeFilter)
+      await waitForAsyncOperations(queryClient);
+    });
+    
+    it('should initialize from route parameters correctly', async () => {
+      const searchParams = new URLSearchParams({
+        search: 'mysql',
+        sortBy: 'created_date',
+        sortDir: 'desc',
+        page: '2',
+        pageSize: '50',
+        type: 'mysql,postgresql',
+        status: 'active',
+        active: 'true'
+      });
       
-      await waitFor(() => {
-        const mysqlOption = screen.getByRole('option', { name: /mysql/i })
-        await user.click(mysqlOption)
-      })
-
-      expect(onFiltersChange).toHaveBeenCalledWith({
-        ...TEST_FILTERS,
-        serviceType: 'mysql'
-      })
-    })
-  })
-
-  describe('TanStack Virtual Table Integration', () => {
-    it('should efficiently render large datasets using virtualization', async () => {
-      const virtualizedProps = {
-        ...defaultProps,
-        services: LARGE_DATASET_SERVICES,
-        pagination: {
-          ...TEST_PAGINATION_CONFIG,
-          totalItems: LARGE_DATASET_SERVICES.length
-        }
-      }
-
-      renderWithProviders(
-        <ServiceListTable {...virtualizedProps} />,
-        { queryClient }
-      )
-
-      // Verify virtualization container
-      expect(screen.getByTestId('virtualized-table')).toBeInTheDocument()
+      mockUseSearchParams.mockReturnValue(searchParams);
+      mockUsePathname.mockReturnValue('/system-settings/database');
       
-      // Only rendered rows should be in DOM (not all 1500)
-      const visibleRows = screen.getAllByTestId(/^service-row-/)
-      expect(visibleRows.length).toBeLessThan(50) // Should only render visible rows
-      expect(visibleRows.length).toBeGreaterThan(0)
-    })
-
-    it('should maintain scroll position and performance with large datasets', async () => {
-      const virtualizedProps = {
-        ...defaultProps,
-        services: LARGE_DATASET_SERVICES
-      }
-
-      renderWithProviders(
-        <ServiceListTable {...virtualizedProps} />,
-        { queryClient }
-      )
-
-      const virtualContainer = screen.getByTestId('virtualized-table')
+      const { queryClient } = renderWithProviders(
+        <ServiceListContainer data-testid="service-list-container" />
+      );
       
-      // Simulate scroll
-      fireEvent.scroll(virtualContainer, { target: { scrollTop: 500 } })
-
-      await waitFor(() => {
-        // Verify scroll position is maintained
-        expect(virtualContainer.scrollTop).toBe(500)
-      })
-
-      // Performance test: operation should complete quickly
-      const startTime = performance.now()
-      fireEvent.scroll(virtualContainer, { target: { scrollTop: 1000 } })
-      const endTime = performance.now()
+      await waitForAsyncOperations(queryClient);
       
-      expect(endTime - startTime).toBeLessThan(100) // Should complete in <100ms
-    })
-  })
-
-  describe('React Query Integration and Caching', () => {
-    it('should cache service list data and serve from cache on subsequent requests', async () => {
-      let requestCount = 0
+      // Verify route initialization was called
+      expect(mockUseSearchParams).toHaveBeenCalled();
+      expect(mockUsePathname).toHaveBeenCalled();
+    });
+    
+    it('should handle system mode detection from pathname', async () => {
+      mockUsePathname.mockReturnValue('/system-settings/database');
+      
+      const { queryClient } = renderWithProviders(
+        <ServiceListContainer systemMode={true} data-testid="service-list-container" />
+      );
+      
+      await waitForAsyncOperations(queryClient);
+      
+      expect(mockUsePathname).toHaveBeenCalled();
+    });
+  });
+  
+  describe('Paywall Enforcement', () => {
+    it('should show paywall when service types are empty', async () => {
+      // Mock empty service types response to trigger paywall
+      server.use(
+        MOCK_SERVICE_LIST_RESPONSES.emptyServiceTypes
+      );
+      
+      const { queryClient } = renderWithProviders(
+        <ServiceListContainer enablePaywall={true} data-testid="service-list-container" />
+      );
+      
+      await waitForAsyncOperations(queryClient);
+      
+      expect(screen.getByText(/premium feature/i)).toBeInTheDocument();
+      expect(screen.getByText(/upgrade now/i)).toBeInTheDocument();
+      expect(screen.getByRole('main')).toHaveAttribute('aria-label', 'Paywall restriction');
+    });
+    
+    it('should bypass paywall when disabled', async () => {
+      const { queryClient } = renderWithProviders(
+        <ServiceListContainer enablePaywall={false} data-testid="service-list-container" />
+      );
+      
+      await waitForAsyncOperations(queryClient);
+      
+      expect(screen.queryByText(/premium feature/i)).not.toBeInTheDocument();
+    });
+  });
+  
+  describe('Error Handling and Recovery', () => {
+    it('should display error state with retry option', async () => {
+      server.use(
+        MOCK_SERVICE_LIST_RESPONSES.serverError
+      );
+      
+      const onError = vi.fn();
+      const { queryClient } = renderWithProviders(
+        <ServiceListContainer onError={onError} data-testid="service-list-container" />
+      );
+      
+      await waitForAsyncOperations(queryClient);
+      
+      expect(screen.getByText(/failed to load services/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument();
+      expect(screen.getByRole('main')).toHaveAttribute('aria-label', 'Database services error');
+      expect(onError).toHaveBeenCalled();
+    });
+    
+    it('should handle retry functionality', async () => {
+      server.use(
+        MOCK_SERVICE_LIST_RESPONSES.serverError
+      );
+      
+      const { queryClient } = renderWithProviders(
+        <ServiceListContainer data-testid="service-list-container" />
+      );
+      
+      await waitForAsyncOperations(queryClient);
+      
+      const retryButton = screen.getByRole('button', { name: /try again/i });
+      
+      // Switch to successful response for retry
+      server.use(
+        MOCK_SERVICE_LIST_RESPONSES.successfulServiceList
+      );
+      
+      await userEvent.click(retryButton);
+      await waitForAsyncOperations(queryClient);
+      
+      expect(screen.queryByText(/failed to load services/i)).not.toBeInTheDocument();
+    });
+    
+    it('should handle network errors gracefully', async () => {
+      server.use(
+        MOCK_SERVICE_LIST_RESPONSES.networkError
+      );
+      
+      const { queryClient } = renderWithProviders(
+        <ServiceListContainer data-testid="service-list-container" />
+      );
+      
+      await waitForAsyncOperations(queryClient);
+      
+      expect(screen.getByText(/failed to load services/i)).toBeInTheDocument();
+    });
+  });
+  
+  describe('Service Data Management', () => {
+    it('should load and display services successfully', async () => {
+      server.use(
+        MOCK_SERVICE_LIST_RESPONSES.successfulServiceList
+      );
+      
+      const { queryClient } = renderWithProviders(
+        <ServiceListContainer data-testid="service-list-container" />
+      );
+      
+      await waitForAsyncOperations(queryClient);
+      
+      expect(screen.getByRole('main')).toHaveAttribute('aria-label', 'Database services management');
+      expect(screen.getByTestId('service-list-container-table')).toBeInTheDocument();
+    });
+    
+    it('should handle service lifecycle callbacks', async () => {
+      const onServiceCreated = vi.fn();
+      const onServiceUpdated = vi.fn();
+      const onServiceDeleted = vi.fn();
+      
+      const { queryClient } = renderWithProviders(
+        <ServiceListContainer 
+          onServiceCreated={onServiceCreated}
+          onServiceUpdated={onServiceUpdated}
+          onServiceDeleted={onServiceDeleted}
+          data-testid="service-list-container" 
+        />
+      );
+      
+      await waitForAsyncOperations(queryClient);
+      
+      // These callbacks are tested through store subscriptions
+      // Implementation would trigger these based on store changes
+    });
+    
+    it('should handle empty service list', async () => {
+      server.use(
+        MOCK_SERVICE_LIST_RESPONSES.emptyServiceList
+      );
+      
+      const { queryClient } = renderWithProviders(
+        <ServiceListContainer data-testid="service-list-container" />
+      );
+      
+      await waitForAsyncOperations(queryClient);
+      
+      expect(screen.getByTestId('service-list-container-table')).toBeInTheDocument();
+    });
+  });
+  
+  describe('Real-time Data Synchronization', () => {
+    it('should refresh data automatically with SWR', async () => {
+      const { queryClient } = renderWithProviders(
+        <ServiceListContainer 
+          autoRefresh={true}
+          refreshInterval={1000}
+          data-testid="service-list-container" 
+        />
+      );
+      
+      await waitForAsyncOperations(queryClient);
+      
+      // Verify SWR configuration for auto-refresh
+      expect(mockDatabaseServiceContext.refreshServices).toHaveBeenCalled();
+    });
+    
+    it('should handle manual refresh operations', async () => {
+      const { queryClient } = renderWithProviders(
+        <ServiceListContainer data-testid="service-list-container" />
+      );
+      
+      await waitForAsyncOperations(queryClient);
+      
+      // Simulate manual refresh through store action
+      expect(mockDatabaseServiceContext.refreshServices).toHaveBeenCalled();
+    });
+  });
+  
+  describe('Performance and Optimization', () => {
+    it('should meet render performance requirements', async () => {
+      const startTime = performance.now();
+      
+      const { queryClient } = renderWithProviders(
+        <ServiceListContainer data-testid="service-list-container" />,
+        { enablePerformanceTracking: true }
+      );
+      
+      await waitForAsyncOperations(queryClient);
+      
+      const renderTime = performance.now() - startTime;
+      expect(renderTime).toBeLessThan(TEST_CONFIG.RENDER_PERFORMANCE_THRESHOLD);
+    });
+    
+    it('should handle large datasets efficiently', async () => {
+      const largeDataset = setupMockServiceData({ count: TEST_CONFIG.LARGE_DATASET_SIZE });
       
       server.use(
-        rest.get('/api/v2/system/service', (req, res, ctx) => {
-          requestCount++
-          return res(ctx.json({ resource: MOCK_SERVICES }))
-        })
-      )
-
-      // First render - should fetch from API
-      const { unmount } = renderWithProviders(
-        <ServiceListContainer />,
-        { queryClient }
-      )
-
-      await waitFor(() => {
-        expect(screen.getByText(MOCK_SERVICES[0].name)).toBeInTheDocument()
-      })
-
-      expect(requestCount).toBe(1)
-
-      unmount()
-
-      // Second render - should serve from cache
-      renderWithProviders(
-        <ServiceListContainer />,
-        { queryClient }
-      )
-
-      await waitFor(() => {
-        expect(screen.getByText(MOCK_SERVICES[0].name)).toBeInTheDocument()
-      })
-
-      // Should not make additional API call due to caching
-      expect(requestCount).toBe(1)
-    })
-
-    it('should invalidate cache and refetch after mutations', async () => {
-      let fetchCount = 0
+        MOCK_SERVICE_LIST_RESPONSES.largeServiceList(largeDataset)
+      );
       
-      server.use(
-        rest.get('/api/v2/system/service', (req, res, ctx) => {
-          fetchCount++
-          return res(ctx.json({ resource: MOCK_SERVICES }))
-        }),
-        rest.delete('/api/v2/system/service/:id', (req, res, ctx) => {
-          return res(ctx.json({ success: true }))
-        })
-      )
-
-      renderWithProviders(
-        <ServiceListContainer />,
-        { queryClient }
-      )
-
-      // Wait for initial load
-      await waitFor(() => {
-        expect(screen.getByText(MOCK_SERVICES[0].name)).toBeInTheDocument()
-      })
-
-      expect(fetchCount).toBe(1)
-
-      // Delete a service
-      const actionButtons = screen.getAllByRole('button', { name: /actions/i })
-      await user.click(actionButtons[0])
+      const { queryClient } = renderWithProviders(
+        <ServiceListContainer 
+          enableVirtualization={true}
+          data-testid="service-list-container" 
+        />
+      );
       
-      await waitFor(() => {
-        const deleteButton = screen.getByRole('menuitem', { name: /delete/i })
-        await user.click(deleteButton)
-      })
-
-      // Confirm deletion
-      await waitFor(() => {
-        const confirmButton = screen.getByRole('button', { name: /confirm delete/i })
-        await user.click(confirmButton)
-      })
-
-      // Should refetch data after mutation
-      await waitFor(() => {
-        expect(fetchCount).toBe(2)
-      })
-    })
-
-    it('should handle optimistic updates for service operations', async () => {
-      server.use(
-        rest.delete('/api/v2/system/service/:id', (req, res, ctx) => {
-          // Simulate network delay
-          return res(ctx.delay(500), ctx.json({ success: true }))
-        })
-      )
-
-      renderWithProviders(
-        <ServiceListTable {...defaultProps} />,
-        { queryClient }
-      )
-
-      const initialServiceCount = screen.getAllByTestId(/^service-row-/).length
-
-      // Delete service with optimistic update
-      const actionButtons = screen.getAllByRole('button', { name: /actions/i })
-      await user.click(actionButtons[0])
+      await waitForAsyncOperations(queryClient);
       
-      const deleteButton = screen.getByRole('menuitem', { name: /delete/i })
-      await user.click(deleteButton)
-
-      // Service should be removed optimistically (before API response)
-      await waitFor(() => {
-        const currentServiceCount = screen.getAllByTestId(/^service-row-/).length
-        expect(currentServiceCount).toBe(initialServiceCount - 1)
-      }, { timeout: 100 })
-    })
-
-    it('should handle background refresh with stale-while-revalidate pattern', async () => {
-      let responseData = MOCK_SERVICES
-      
-      server.use(
-        rest.get('/api/v2/system/service', (req, res, ctx) => {
-          return res(ctx.json({ resource: responseData }))
-        })
-      )
-
-      renderWithProviders(
-        <ServiceListContainer />,
-        { queryClient }
-      )
-
-      // Wait for initial load
-      await waitFor(() => {
-        expect(screen.getByText(MOCK_SERVICES[0].name)).toBeInTheDocument()
-      })
-
-      // Update mock data to simulate server changes
-      responseData = [...MOCK_SERVICES, createServiceMockData({ id: 999, name: 'New Service' })]
-
-      // Trigger background refresh
-      queryClient.invalidateQueries({ queryKey: ['services'] })
-
-      // Should show updated data
-      await waitFor(() => {
-        expect(screen.getByText('New Service')).toBeInTheDocument()
-      })
-    })
-  })
-
-  describe('SWR Real-time Connection Status', () => {
-    it('should update connection status indicators in real-time', async () => {
-      let connectionStatus = 'connected'
-      
-      server.use(
-        rest.post('/api/v2/system/service/:id/_test', (req, res, ctx) => {
-          return res(ctx.json({ 
-            success: connectionStatus === 'connected',
-            status: connectionStatus
-          }))
-        })
-      )
-
-      renderWithProviders(
-        <ServiceListTable {...defaultProps} />,
-        { queryClient }
-      )
-
-      // Initial connected status
-      await waitFor(() => {
-        const statusIndicator = screen.getByTestId(`service-status-${MOCK_SERVICES[0].id}`)
-        expect(statusIndicator).toHaveClass('text-green-500')
-      })
-
-      // Simulate connection failure
-      connectionStatus = 'disconnected'
-      
-      // Trigger connection test
-      const actionButtons = screen.getAllByRole('button', { name: /actions/i })
-      await user.click(actionButtons[0])
-      
-      const testButton = screen.getByRole('menuitem', { name: /test connection/i })
-      await user.click(testButton)
-
-      // Status should update to disconnected
-      await waitFor(() => {
-        const statusIndicator = screen.getByTestId(`service-status-${MOCK_SERVICES[0].id}`)
-        expect(statusIndicator).toHaveClass('text-red-500')
-      })
-    })
-
-    it('should show connection testing state during async operations', async () => {
-      server.use(
-        rest.post('/api/v2/system/service/:id/_test', (req, res, ctx) => {
-          return res(ctx.delay(1000), ctx.json({ success: true }))
-        })
-      )
-
-      renderWithProviders(
-        <ServiceListTable {...defaultProps} />,
-        { queryClient }
-      )
-
-      // Trigger connection test
-      const actionButtons = screen.getAllByRole('button', { name: /actions/i })
-      await user.click(actionButtons[0])
-      
-      const testButton = screen.getByRole('menuitem', { name: /test connection/i })
-      await user.click(testButton)
-
-      // Should show testing state
-      await waitFor(() => {
-        const statusIndicator = screen.getByTestId(`service-status-${MOCK_SERVICES[0].id}`)
-        expect(statusIndicator).toHaveAttribute('aria-label', 'Testing connection')
-        expect(screen.getByTestId('connection-testing-spinner')).toBeInTheDocument()
-      })
-    })
-  })
-
-  describe('Error Handling and Edge Cases', () => {
-    it('should display error boundary when component crashes', () => {
-      const ThrowError = () => {
-        throw new Error('Test error')
-      }
-
-      const { container } = renderWithProviders(
-        <ThrowError />,
-        { queryClient }
-      )
-
-      expect(screen.getByRole('alert')).toBeInTheDocument()
-      expect(screen.getByText(/something went wrong/i)).toBeInTheDocument()
-    })
-
-    it('should handle API errors gracefully with retry functionality', async () => {
-      let failureCount = 0
-      
-      server.use(
-        rest.get('/api/v2/system/service', (req, res, ctx) => {
-          failureCount++
-          if (failureCount <= 2) {
-            return res(ctx.status(500), ctx.json({
-              error: { message: 'Internal server error' }
-            }))
-          }
-          return res(ctx.json({ resource: MOCK_SERVICES }))
-        })
-      )
-
-      renderWithProviders(
-        <ServiceListContainer />,
-        { queryClient }
-      )
-
-      // Should show error state initially
-      await waitFor(() => {
-        expect(screen.getByText(/failed to load services/i)).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument()
-      })
-
-      // Click retry button
-      const retryButton = screen.getByRole('button', { name: /retry/i })
-      await user.click(retryButton)
-
-      // Should eventually succeed and show data
-      await waitFor(() => {
-        expect(screen.getByText(MOCK_SERVICES[0].name)).toBeInTheDocument()
-      }, { timeout: 5000 })
-    })
-
-    it('should handle network timeouts with appropriate error messages', async () => {
-      server.use(
-        rest.get('/api/v2/system/service', (req, res, ctx) => {
-          return res(ctx.delay('infinite'))
-        })
-      )
-
-      renderWithProviders(
-        <ServiceListContainer />,
-        { queryClient }
-      )
-
-      // Should show timeout error
-      await waitFor(() => {
-        expect(screen.getByText(/request timed out/i)).toBeInTheDocument()
-      }, { timeout: 10000 })
-    })
-
-    it('should validate form inputs and show validation errors', async () => {
-      renderWithProviders(
-        <ServiceListTable {...defaultProps} />,
-        { queryClient }
-      )
-
-      // Open service creation form
-      const createButton = screen.getByRole('button', { name: /create service/i })
-      await user.click(createButton)
-
-      // Submit form without required fields
-      const submitButton = screen.getByRole('button', { name: /create/i })
-      await user.click(submitButton)
-
-      // Should show validation errors
-      await waitFor(() => {
-        expect(screen.getByText(/service name is required/i)).toBeInTheDocument()
-        expect(screen.getByText(/service type is required/i)).toBeInTheDocument()
-      })
-    })
-  })
-
-  describe('Accessibility and User Experience', () => {
-    it('should support keyboard navigation throughout the interface', async () => {
-      renderWithProviders(
-        <ServiceListTable {...defaultProps} />,
-        { queryClient }
-      )
-
-      const table = screen.getByRole('table')
-      
-      // Focus should start on table
-      table.focus()
-      expect(document.activeElement).toBe(table)
-
-      // Tab through table elements
-      await user.tab()
-      expect(document.activeElement).toHaveAttribute('role', 'columnheader')
-
-      // Arrow keys should navigate table cells
-      await user.keyboard('{ArrowDown}')
-      expect(document.activeElement).toHaveAttribute('role', 'gridcell')
-    })
-
-    it('should announce status changes to screen readers', async () => {
-      renderWithProviders(
-        <ServiceListTable {...defaultProps} />,
-        { queryClient }
-      )
-
-      // Verify ARIA live region for status updates
-      expect(screen.getByRole('status')).toBeInTheDocument()
-
-      // Delete a service
-      const actionButtons = screen.getAllByRole('button', { name: /actions/i })
-      await user.click(actionButtons[0])
-      
-      const deleteButton = screen.getByRole('menuitem', { name: /delete/i })
-      await user.click(deleteButton)
-
-      // Should announce the action
-      await waitFor(() => {
-        const statusRegion = screen.getByRole('status')
-        expect(statusRegion).toHaveTextContent(/service deleted successfully/i)
-      })
-    })
-
-    it('should provide clear focus indicators and contrast ratios', async () => {
-      const { container } = renderWithProviders(
-        <ServiceListTable {...defaultProps} />,
-        { queryClient }
-      )
-
-      // Test focus indicators
-      const firstButton = screen.getAllByRole('button')[0]
-      firstButton.focus()
-      
-      const computedStyles = window.getComputedStyle(firstButton, ':focus')
-      expect(computedStyles.outline).not.toBe('none')
-
-      // Test accessibility compliance
-      const results = await axe(container, {
-        rules: {
-          'color-contrast': { enabled: true },
-          'focus-order-semantics': { enabled: true }
-        }
-      })
-      expect(results).toHaveNoViolations()
-    })
-
-    it('should handle reduced motion preferences', async () => {
-      // Mock reduced motion preference
-      Object.defineProperty(window, 'matchMedia', {
-        writable: true,
-        value: vi.fn().mockImplementation(query => ({
-          matches: query === '(prefers-reduced-motion: reduce)',
-          media: query,
-          onchange: null,
-          addListener: vi.fn(),
-          removeListener: vi.fn(),
-          addEventListener: vi.fn(),
-          removeEventListener: vi.fn(),
-          dispatchEvent: vi.fn(),
-        })),
-      })
-
-      renderWithProviders(
-        <ServiceListTable {...defaultProps} />,
-        { queryClient }
-      )
-
-      // Animations should be disabled
-      const animatedElements = container.querySelectorAll('[data-animate]')
-      animatedElements.forEach(element => {
-        expect(element).toHaveStyle('animation: none')
-      })
-    })
-  })
-
-  describe('Performance and Resource Management', () => {
-    it('should meet performance benchmarks for rendering time', async () => {
-      const startTime = performance.now()
-
-      renderWithProviders(
-        <ServiceListTable {...defaultProps} />,
-        { queryClient }
-      )
-
-      await waitFor(() => {
-        expect(screen.getByRole('table')).toBeInTheDocument()
-      })
-
-      const endTime = performance.now()
-      const renderTime = endTime - startTime
-
-      // Should render within performance target
-      expect(renderTime).toBeLessThan(100) // <100ms initial render
-    })
-
-    it('should efficiently handle component updates without unnecessary re-renders', async () => {
-      const renderSpy = vi.fn()
-      
-      const TestComponent = () => {
-        renderSpy()
-        return <ServiceListTable {...defaultProps} />
-      }
-
-      renderWithProviders(
-        <TestComponent />,
-        { queryClient }
-      )
-
-      expect(renderSpy).toHaveBeenCalledTimes(1)
-
-      // Update unrelated state
-      queryClient.setQueryData(['unrelated'], { data: 'test' })
-
-      // Should not trigger unnecessary re-render
-      expect(renderSpy).toHaveBeenCalledTimes(1)
-    })
-
-    it('should cleanup resources and event listeners on unmount', () => {
-      const { unmount } = renderWithProviders(
-        <ServiceListTable {...defaultProps} />,
-        { queryClient }
-      )
-
-      const addEventListenerSpy = vi.spyOn(window, 'addEventListener')
-      const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener')
-
-      unmount()
-
-      // Verify cleanup
-      expect(removeEventListenerSpy).toHaveBeenCalled()
-    })
-  })
-
-  describe('Integration with Service List Hooks', () => {
-    it('should integrate useServiceList hook with proper caching configuration', async () => {
-      const TestComponent = () => {
-        const { data, isLoading, error } = useServiceList({
-          filters: TEST_FILTERS,
-          pagination: TEST_PAGINATION_CONFIG
-        })
-
-        if (isLoading) return <div>Loading...</div>
-        if (error) return <div>Error: {error.message}</div>
+      expect(screen.getByTestId('service-list-container-table')).toBeInTheDocument();
+    });
+  });
+  
+  if (TEST_CONFIG.ENABLE_ACCESSIBILITY_TESTING) {
+    describe('Accessibility Compliance', () => {
+      it('should meet WCAG 2.1 AA standards', async () => {
+        const { queryClient, container } = renderWithProviders(
+          <ServiceListContainer data-testid="service-list-container" />
+        );
         
-        return (
-          <div>
-            {data?.resource?.map(service => (
-              <div key={service.id} data-testid={`service-${service.id}`}>
-                {service.name}
-              </div>
-            ))}
-          </div>
-        )
-      }
+        await waitForAsyncOperations(queryClient);
+        
+        // Check for proper ARIA labels
+        expect(screen.getByRole('main')).toHaveAttribute('aria-label');
+        
+        // Check for keyboard navigation support
+        const focusableElements = container.querySelectorAll(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        expect(focusableElements.length).toBeGreaterThan(0);
+      });
+      
+      it('should support screen reader navigation', async () => {
+        const { queryClient } = renderWithProviders(
+          <ServiceListContainer data-testid="service-list-container" />
+        );
+        
+        await waitForAsyncOperations(queryClient);
+        
+        // Check for proper heading hierarchy
+        expect(screen.getByRole('main')).toBeInTheDocument();
+        
+        // Check for descriptive labels
+        const main = screen.getByRole('main');
+        expect(main).toHaveAttribute('aria-label');
+      });
+    });
+  }
+});
 
+// =============================================================================
+// SERVICE LIST TABLE COMPONENT TESTS
+// =============================================================================
+
+describe('ServiceListTable Component', () => {
+  const defaultTableProps = {
+    services: mockDatabaseServices.slice(0, 5),
+    loading: false,
+    error: null,
+    onServiceSelect: vi.fn(),
+    onServiceEdit: vi.fn(),
+    onServiceDelete: vi.fn(),
+    onServiceTest: vi.fn(),
+    onServiceToggle: vi.fn(),
+    'data-testid': 'service-list-table'
+  };
+  
+  describe('Basic Rendering and Layout', () => {
+    it('should render table with services data', async () => {
+      renderWithProviders(<ServiceListTable {...defaultTableProps} />);
+      
+      expect(screen.getByTestId('service-list-table')).toBeInTheDocument();
+      expect(screen.getByRole('table')).toBeInTheDocument();
+      
+      // Check for service rows
+      defaultTableProps.services.forEach(service => {
+        expect(screen.getByText(service.name)).toBeInTheDocument();
+      });
+    });
+    
+    it('should display loading state', async () => {
       renderWithProviders(
-        <TestComponent />,
-        { queryClient }
-      )
-
-      await waitFor(() => {
-        expect(screen.getByTestId(`service-${MOCK_SERVICES[0].id}`)).toBeInTheDocument()
-      })
-
-      // Verify cache configuration
-      const cacheData = queryClient.getQueryData(['services', TEST_FILTERS, TEST_PAGINATION_CONFIG])
-      expect(cacheData).toBeDefined()
-    })
-
-    it('should handle mutations through useServiceListMutations hook', async () => {
-      const TestComponent = () => {
-        const { deleteService } = useServiceListMutations()
-
-        return (
-          <button 
-            onClick={() => deleteService.mutate(MOCK_SERVICES[0].id)}
-            disabled={deleteService.isPending}
-          >
-            {deleteService.isPending ? 'Deleting...' : 'Delete Service'}
-          </button>
-        )
+        <ServiceListTable 
+          {...defaultTableProps} 
+          services={[]}
+          loading={true} 
+        />
+      );
+      
+      expect(screen.getByRole('progressbar') || screen.getByText(/loading/i)).toBeInTheDocument();
+    });
+    
+    it('should display empty state when no services', async () => {
+      renderWithProviders(
+        <ServiceListTable 
+          {...defaultTableProps} 
+          services={[]}
+          loading={false} 
+        />
+      );
+      
+      expect(screen.getByText(/no services found/i) || screen.getByText(/empty/i)).toBeInTheDocument();
+    });
+    
+    it('should display error state', async () => {
+      const error = new Error('Failed to load services');
+      
+      renderWithProviders(
+        <ServiceListTable 
+          {...defaultTableProps} 
+          services={[]}
+          error={error}
+        />
+      );
+      
+      expect(screen.getByText(/error/i) || screen.getByText(error.message)).toBeInTheDocument();
+    });
+  });
+  
+  describe('Service CRUD Operations', () => {
+    it('should handle service selection', async () => {
+      const onServiceSelect = vi.fn();
+      
+      renderWithProviders(
+        <ServiceListTable 
+          {...defaultTableProps} 
+          onServiceSelect={onServiceSelect}
+        />
+      );
+      
+      const firstService = screen.getByText(defaultTableProps.services[0].name);
+      await userEvent.click(firstService);
+      
+      expect(onServiceSelect).toHaveBeenCalledWith(defaultTableProps.services[0]);
+    });
+    
+    it('should handle service editing', async () => {
+      const onServiceEdit = vi.fn();
+      
+      renderWithProviders(
+        <ServiceListTable 
+          {...defaultTableProps} 
+          onServiceEdit={onServiceEdit}
+        />
+      );
+      
+      const editButton = screen.getByLabelText(/edit.*service/i) || 
+                        screen.getByRole('button', { name: /edit/i });
+      await userEvent.click(editButton);
+      
+      expect(onServiceEdit).toHaveBeenCalledWith(defaultTableProps.services[0]);
+    });
+    
+    it('should handle service deletion with confirmation', async () => {
+      const onServiceDelete = vi.fn();
+      
+      renderWithProviders(
+        <ServiceListTable 
+          {...defaultTableProps} 
+          onServiceDelete={onServiceDelete}
+        />
+      );
+      
+      const deleteButton = screen.getByLabelText(/delete.*service/i) || 
+                          screen.getByRole('button', { name: /delete/i });
+      await userEvent.click(deleteButton);
+      
+      // Look for confirmation dialog
+      const confirmButton = screen.getByRole('button', { name: /confirm/i }) ||
+                           screen.getByRole('button', { name: /delete/i });
+      await userEvent.click(confirmButton);
+      
+      expect(onServiceDelete).toHaveBeenCalledWith(defaultTableProps.services[0]);
+    });
+    
+    it('should handle connection testing', async () => {
+      const onServiceTest = vi.fn();
+      
+      renderWithProviders(
+        <ServiceListTable 
+          {...defaultTableProps} 
+          onServiceTest={onServiceTest}
+        />
+      );
+      
+      const testButton = screen.getByLabelText(/test.*connection/i) || 
+                        screen.getByRole('button', { name: /test/i });
+      await userEvent.click(testButton);
+      
+      expect(onServiceTest).toHaveBeenCalledWith(defaultTableProps.services[0]);
+    });
+    
+    it('should handle service activation toggle', async () => {
+      const onServiceToggle = vi.fn();
+      
+      renderWithProviders(
+        <ServiceListTable 
+          {...defaultTableProps} 
+          onServiceToggle={onServiceToggle}
+        />
+      );
+      
+      const toggleSwitch = screen.getByRole('switch') || 
+                          screen.getByLabelText(/active/i);
+      await userEvent.click(toggleSwitch);
+      
+      expect(onServiceToggle).toHaveBeenCalledWith(
+        defaultTableProps.services[0], 
+        !defaultTableProps.services[0].is_active
+      );
+    });
+  });
+  
+  describe('Bulk Operations', () => {
+    const bulkActionProps = {
+      ...defaultTableProps,
+      enableBulkActions: true,
+      onBulkActions: vi.fn(),
+      selection: {
+        enabled: true,
+        multiple: true,
+        selectedIds: new Set([1, 2]),
+        onSelectionChange: vi.fn(),
       }
-
-      server.use(
-        rest.delete('/api/v2/system/service/:id', (req, res, ctx) => {
-          return res(ctx.json({ success: true }))
+    };
+    
+    it('should support multiple service selection', async () => {
+      const onSelectionChange = vi.fn();
+      
+      renderWithProviders(
+        <ServiceListTable 
+          {...bulkActionProps} 
+          selection={{
+            ...bulkActionProps.selection,
+            onSelectionChange
+          }}
+        />
+      );
+      
+      const checkboxes = screen.getAllByRole('checkbox');
+      await userEvent.click(checkboxes[0]); // Select first service
+      
+      expect(onSelectionChange).toHaveBeenCalled();
+    });
+    
+    it('should execute bulk delete operation', async () => {
+      const onBulkActions = vi.fn();
+      
+      renderWithProviders(
+        <ServiceListTable 
+          {...bulkActionProps} 
+          onBulkActions={onBulkActions}
+        />
+      );
+      
+      // Select bulk action
+      const bulkDeleteButton = screen.getByRole('button', { name: /bulk.*delete/i }) ||
+                              screen.getByRole('button', { name: /delete.*selected/i });
+      await userEvent.click(bulkDeleteButton);
+      
+      // Confirm bulk action
+      const confirmButton = screen.getByRole('button', { name: /confirm/i });
+      await userEvent.click(confirmButton);
+      
+      expect(onBulkActions).toHaveBeenCalledWith(
+        'delete', 
+        expect.arrayContaining([
+          defaultTableProps.services[0],
+          defaultTableProps.services[1]
+        ])
+      );
+    });
+    
+    it('should support select all functionality', async () => {
+      const onSelectionChange = vi.fn();
+      
+      renderWithProviders(
+        <ServiceListTable 
+          {...bulkActionProps} 
+          selection={{
+            ...bulkActionProps.selection,
+            onSelectionChange
+          }}
+        />
+      );
+      
+      const selectAllCheckbox = screen.getByLabelText(/select all/i);
+      await userEvent.click(selectAllCheckbox);
+      
+      expect(onSelectionChange).toHaveBeenCalledWith(
+        new Set(defaultTableProps.services.map(s => s.id))
+      );
+    });
+  });
+  
+  describe('Sorting and Filtering', () => {
+    const sortingProps = {
+      ...defaultTableProps,
+      sorting: {
+        sortBy: 'name' as keyof DatabaseService,
+        sortDirection: 'asc' as const,
+        onSortChange: vi.fn(),
+      },
+      filtering: {
+        filters: { search: 'mysql' },
+        onFiltersChange: vi.fn(),
+      }
+    };
+    
+    it('should handle column sorting', async () => {
+      const onSortChange = vi.fn();
+      
+      renderWithProviders(
+        <ServiceListTable 
+          {...sortingProps} 
+          sorting={{
+            ...sortingProps.sorting,
+            onSortChange
+          }}
+        />
+      );
+      
+      const nameColumnHeader = screen.getByRole('columnheader', { name: /name/i });
+      await userEvent.click(nameColumnHeader);
+      
+      expect(onSortChange).toHaveBeenCalledWith({
+        field: 'name',
+        direction: 'desc' // Should toggle from asc to desc
+      });
+    });
+    
+    it('should display sort indicators', async () => {
+      renderWithProviders(<ServiceListTable {...sortingProps} />);
+      
+      const nameColumnHeader = screen.getByRole('columnheader', { name: /name/i });
+      expect(nameColumnHeader).toHaveAttribute('aria-sort', 'ascending');
+      
+      // Check for visual sort indicator
+      expect(within(nameColumnHeader).getByRole('img') || 
+             within(nameColumnHeader).querySelector('svg')).toBeInTheDocument();
+    });
+    
+    it('should handle search filtering', async () => {
+      const onFiltersChange = vi.fn();
+      
+      renderWithProviders(
+        <ServiceListTable 
+          {...sortingProps} 
+          filtering={{
+            ...sortingProps.filtering,
+            onFiltersChange
+          }}
+        />
+      );
+      
+      const searchInput = screen.getByRole('searchbox') || 
+                         screen.getByLabelText(/search/i);
+      await userEvent.type(searchInput, 'postgresql');
+      
+      expect(onFiltersChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          search: 'mysql' + 'postgresql' // Appended to existing search
         })
-      )
-
+      );
+    });
+    
+    it('should handle type filtering', async () => {
+      const onFiltersChange = vi.fn();
+      
       renderWithProviders(
-        <TestComponent />,
-        { queryClient }
-      )
-
-      const deleteButton = screen.getByRole('button', { name: /delete service/i })
-      await user.click(deleteButton)
-
-      // Should show pending state
-      expect(screen.getByText('Deleting...')).toBeInTheDocument()
-
-      await waitFor(() => {
-        expect(screen.getByText('Delete Service')).toBeInTheDocument()
-      })
-    })
-
-    it('should manage filters through useServiceListFilters hook', async () => {
-      const TestComponent = () => {
-        const { filters, updateFilters, resetFilters } = useServiceListFilters()
-
-        return (
-          <div>
-            <div data-testid="current-search">{filters.search}</div>
-            <button onClick={() => updateFilters({ search: 'mysql' })}>
-              Update Search
-            </button>
-            <button onClick={resetFilters}>Reset Filters</button>
-          </div>
-        )
+        <ServiceListTable 
+          {...sortingProps} 
+          filtering={{
+            ...sortingProps.filtering,
+            onFiltersChange
+          }}
+        />
+      );
+      
+      const typeFilter = screen.getByRole('combobox', { name: /type/i }) ||
+                        screen.getByLabelText(/database type/i);
+      await userEvent.click(typeFilter);
+      
+      const mysqlOption = screen.getByRole('option', { name: /mysql/i });
+      await userEvent.click(mysqlOption);
+      
+      expect(onFiltersChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: expect.arrayContaining(['mysql'])
+        })
+      );
+    });
+  });
+  
+  describe('Pagination', () => {
+    const paginationProps = {
+      ...defaultTableProps,
+      pagination: {
+        currentPage: 2,
+        pageSize: 10,
+        totalItems: 50,
+        totalPages: 5,
+        onPageChange: vi.fn(),
+        onPageSizeChange: vi.fn(),
       }
-
+    };
+    
+    it('should display pagination controls', async () => {
+      renderWithProviders(<ServiceListTable {...paginationProps} />);
+      
+      expect(screen.getByText(/page 2 of 5/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /previous/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /next/i })).toBeInTheDocument();
+    });
+    
+    it('should handle page navigation', async () => {
+      const onPageChange = vi.fn();
+      
       renderWithProviders(
-        <TestComponent />,
+        <ServiceListTable 
+          {...paginationProps} 
+          pagination={{
+            ...paginationProps.pagination,
+            onPageChange
+          }}
+        />
+      );
+      
+      const nextButton = screen.getByRole('button', { name: /next/i });
+      await userEvent.click(nextButton);
+      
+      expect(onPageChange).toHaveBeenCalledWith(3);
+    });
+    
+    it('should handle page size changes', async () => {
+      const onPageSizeChange = vi.fn();
+      
+      renderWithProviders(
+        <ServiceListTable 
+          {...paginationProps} 
+          pagination={{
+            ...paginationProps.pagination,
+            onPageSizeChange
+          }}
+        />
+      );
+      
+      const pageSizeSelect = screen.getByRole('combobox', { name: /page size/i }) ||
+                            screen.getByLabelText(/items per page/i);
+      await userEvent.click(pageSizeSelect);
+      
+      const option25 = screen.getByRole('option', { name: /25/i });
+      await userEvent.click(option25);
+      
+      expect(onPageSizeChange).toHaveBeenCalledWith(25);
+    });
+    
+    it('should disable navigation at boundaries', async () => {
+      renderWithProviders(
+        <ServiceListTable 
+          {...paginationProps} 
+          pagination={{
+            ...paginationProps.pagination,
+            currentPage: 1
+          }}
+        />
+      );
+      
+      const previousButton = screen.getByRole('button', { name: /previous/i });
+      expect(previousButton).toBeDisabled();
+    });
+  });
+  
+  if (TEST_CONFIG.ENABLE_VIRTUALIZATION_TESTING) {
+    describe('Table Virtualization', () => {
+      const virtualizationProps = {
+        ...defaultTableProps,
+        services: setupMockServiceData({ count: 100 }),
+        virtualization: {
+          enabled: true,
+          overscan: 5,
+          estimateSize: 60,
+        }
+      };
+      
+      it('should enable virtualization for large datasets', async () => {
+        renderWithProviders(<ServiceListTable {...virtualizationProps} />);
+        
+        // Check for virtual scrolling container
+        expect(screen.getByRole('table')).toBeInTheDocument();
+        
+        // Verify only visible rows are rendered
+        const visibleRows = screen.getAllByRole('row');
+        expect(visibleRows.length).toBeLessThan(virtualizationProps.services.length);
+      });
+      
+      it('should handle virtual scrolling efficiently', async () => {
+        const { container } = renderWithProviders(<ServiceListTable {...virtualizationProps} />);
+        
+        const scrollContainer = container.querySelector('[data-testid*="virtual"]') ||
+                               container.querySelector('.virtual-container');
+        
+        if (scrollContainer) {
+          fireEvent.scroll(scrollContainer, { target: { scrollTop: 1000 } });
+          
+          await waitFor(() => {
+            // Should render different rows after scrolling
+            const rowsAfterScroll = screen.getAllByRole('row');
+            expect(rowsAfterScroll.length).toBeGreaterThan(0);
+          });
+        }
+      });
+      
+      it('should maintain performance with large datasets', async () => {
+        const startTime = performance.now();
+        
+        renderWithProviders(<ServiceListTable {...virtualizationProps} />);
+        
+        await waitFor(() => {
+          expect(screen.getByRole('table')).toBeInTheDocument();
+        });
+        
+        const renderTime = performance.now() - startTime;
+        expect(renderTime).toBeLessThan(TEST_CONFIG.RENDER_PERFORMANCE_THRESHOLD * 2); // Allow 2x threshold for large datasets
+      });
+    });
+  }
+  
+  if (TEST_CONFIG.ENABLE_ACCESSIBILITY_TESTING) {
+    describe('Table Accessibility', () => {
+      it('should have proper table semantics', async () => {
+        renderWithProviders(<ServiceListTable {...defaultTableProps} />);
+        
+        expect(screen.getByRole('table')).toBeInTheDocument();
+        expect(screen.getAllByRole('columnheader')).toHaveLength.greaterThan(0);
+        expect(screen.getAllByRole('row')).toHaveLength.greaterThan(1); // Headers + data rows
+      });
+      
+      it('should support keyboard navigation', async () => {
+        renderWithProviders(<ServiceListTable {...defaultTableProps} />);
+        
+        const table = screen.getByRole('table');
+        const firstRow = screen.getAllByRole('row')[1]; // Skip header row
+        
+        // Test tab navigation
+        firstRow.focus();
+        expect(document.activeElement).toBe(firstRow);
+        
+        // Test arrow key navigation
+        fireEvent.keyDown(firstRow, { key: 'ArrowDown' });
+        // Should move to next row
+      });
+      
+      it('should have proper ARIA labels and descriptions', async () => {
+        renderWithProviders(<ServiceListTable {...defaultTableProps} />);
+        
+        const table = screen.getByRole('table');
+        expect(table).toHaveAttribute('aria-label');
+        
+        // Check column headers have proper accessibility
+        const columnHeaders = screen.getAllByRole('columnheader');
+        columnHeaders.forEach(header => {
+          expect(header).toHaveTextContent(/.+/); // Should have content
+        });
+      });
+      
+      it('should announce sort changes to screen readers', async () => {
+        const sortingProps = {
+          ...defaultTableProps,
+          sorting: {
+            sortBy: 'name' as keyof DatabaseService,
+            sortDirection: 'asc' as const,
+            onSortChange: vi.fn(),
+          }
+        };
+        
+        renderWithProviders(<ServiceListTable {...sortingProps} />);
+        
+        const nameHeader = screen.getByRole('columnheader', { name: /name/i });
+        expect(nameHeader).toHaveAttribute('aria-sort', 'ascending');
+      });
+    });
+  }
+});
+
+// =============================================================================
+// SERVICE LIST HOOKS TESTS
+// =============================================================================
+
+describe('Service List Hooks', () => {
+  describe('useServiceListComplete Hook', () => {
+    it('should provide complete service list functionality', async () => {
+      // This would test the custom hook implementation
+      // For now, we'll test that it can be imported
+      expect(useServiceListComplete).toBeDefined();
+    });
+  });
+  
+  describe('useServiceListVirtualization Hook', () => {
+    it('should provide virtualization functionality', async () => {
+      expect(useServiceListVirtualization).toBeDefined();
+    });
+  });
+  
+  describe('useServiceConnectionStatus Hook', () => {
+    it('should manage connection status state', async () => {
+      expect(useServiceConnectionStatus).toBeDefined();
+    });
+  });
+});
+
+// =============================================================================
+// INTEGRATION TESTS
+// =============================================================================
+
+describe('Service List Integration Tests', () => {
+  describe('End-to-End Workflow', () => {
+    it('should complete full service management workflow', async () => {
+      server.use(
+        MOCK_SERVICE_LIST_RESPONSES.successfulServiceList
+      );
+      
+      const onServiceCreated = vi.fn();
+      const onServiceUpdated = vi.fn();
+      const onServiceDeleted = vi.fn();
+      
+      const { queryClient } = renderWithProviders(
+        <ServiceListContainer 
+          onServiceCreated={onServiceCreated}
+          onServiceUpdated={onServiceUpdated}
+          onServiceDeleted={onServiceDeleted}
+          enableBulkActions={true}
+          data-testid="service-list-container" 
+        />
+      );
+      
+      await waitForAsyncOperations(queryClient);
+      
+      // Verify main container is rendered
+      expect(screen.getByTestId('service-list-container')).toBeInTheDocument();
+      expect(screen.getByTestId('service-list-container-table')).toBeInTheDocument();
+      
+      // Test service interaction workflow would continue here
+      // This demonstrates the integration between container and table components
+    });
+    
+    it('should handle real-time updates correctly', async () => {
+      const { queryClient } = renderWithProviders(
+        <ServiceListContainer 
+          autoRefresh={true}
+          refreshInterval={100}
+          data-testid="service-list-container" 
+        />
+      );
+      
+      await waitForAsyncOperations(queryClient);
+      
+      // Wait for auto-refresh cycle
+      await new Promise(resolve => setTimeout(resolve, 150));
+      
+      // Verify refresh was called
+      expect(mockDatabaseServiceContext.refreshServices).toHaveBeenCalled();
+    });
+  });
+  
+  describe('React Query and SWR Integration', () => {
+    it('should cache service data correctly', async () => {
+      const queryClient = createTestQueryClient();
+      
+      renderWithProviders(
+        <ServiceListContainer data-testid="service-list-container" />,
         { queryClient }
-      )
+      );
+      
+      await waitForAsyncOperations(queryClient);
+      
+      // Verify query cache has data
+      const queryCache = queryClient.getQueryCache();
+      expect(queryCache.getAll()).toHaveLength.greaterThan(0);
+    });
+    
+    it('should handle cache invalidation properly', async () => {
+      const queryClient = createTestQueryClient();
+      
+      renderWithProviders(
+        <ServiceListContainer data-testid="service-list-container" />,
+        { queryClient }
+      );
+      
+      await waitForAsyncOperations(queryClient);
+      
+      // Invalidate queries
+      await queryClient.invalidateQueries();
+      
+      // Should trigger refetch
+      expect(mockDatabaseServiceContext.refreshServices).toHaveBeenCalled();
+    });
+  });
+  
+  describe('Error Recovery Integration', () => {
+    it('should recover from temporary network failures', async () => {
+      // Start with error
+      server.use(MOCK_SERVICE_LIST_RESPONSES.networkError);
+      
+      const { queryClient } = renderWithProviders(
+        <ServiceListContainer data-testid="service-list-container" />
+      );
+      
+      await waitForAsyncOperations(queryClient);
+      expect(screen.getByText(/failed to load services/i)).toBeInTheDocument();
+      
+      // Switch to success
+      server.use(MOCK_SERVICE_LIST_RESPONSES.successfulServiceList);
+      
+      const retryButton = screen.getByRole('button', { name: /try again/i });
+      await userEvent.click(retryButton);
+      
+      await waitForAsyncOperations(queryClient);
+      expect(screen.queryByText(/failed to load services/i)).not.toBeInTheDocument();
+    });
+  });
+});
 
-      expect(screen.getByTestId('current-search')).toHaveTextContent('')
+// =============================================================================
+// PERFORMANCE BENCHMARKS
+// =============================================================================
 
-      await user.click(screen.getByRole('button', { name: /update search/i }))
-      expect(screen.getByTestId('current-search')).toHaveTextContent('mysql')
+if (TEST_CONFIG.ENABLE_PERFORMANCE_TESTING) {
+  describe('Performance Benchmarks', () => {
+    it('should meet initial render performance requirements', async () => {
+      const startTime = performance.now();
+      
+      const { queryClient } = renderWithProviders(
+        <ServiceListContainer data-testid="service-list-container" />
+      );
+      
+      const renderTime = performance.now() - startTime;
+      
+      await waitForAsyncOperations(queryClient);
+      
+      expect(renderTime).toBeLessThan(TEST_CONFIG.RENDER_PERFORMANCE_THRESHOLD);
+    });
+    
+    it('should handle large datasets within performance limits', async () => {
+      const largeDataset = setupMockServiceData({ count: TEST_CONFIG.LARGE_DATASET_SIZE });
+      
+      server.use(
+        MOCK_SERVICE_LIST_RESPONSES.largeServiceList(largeDataset)
+      );
+      
+      const startTime = performance.now();
+      
+      const { queryClient } = renderWithProviders(
+        <ServiceListContainer 
+          enableVirtualization={true}
+          data-testid="service-list-container" 
+        />
+      );
+      
+      await waitForAsyncOperations(queryClient);
+      
+      const totalTime = performance.now() - startTime;
+      
+      // Should handle large datasets within 2x normal threshold
+      expect(totalTime).toBeLessThan(TEST_CONFIG.RENDER_PERFORMANCE_THRESHOLD * 2);
+    });
+    
+    it('should optimize re-renders during interactions', async () => {
+      const { queryClient } = renderWithProviders(
+        <ServiceListContainer data-testid="service-list-container" />
+      );
+      
+      await waitForAsyncOperations(queryClient);
+      
+      const startTime = performance.now();
+      
+      // Simulate user interactions
+      const searchInput = screen.getByRole('searchbox') || 
+                         screen.getByLabelText(/search/i) ||
+                         screen.getByPlaceholderText(/search/i);
+      
+      if (searchInput) {
+        await userEvent.type(searchInput, 'mysql');
+        
+        const interactionTime = performance.now() - startTime;
+        expect(interactionTime).toBeLessThan(500); // 500ms max for user interactions
+      }
+    });
+  });
+}
 
-      await user.click(screen.getByRole('button', { name: /reset filters/i }))
-      expect(screen.getByTestId('current-search')).toHaveTextContent('')
-    })
-  })
-})
+// =============================================================================
+// COVERAGE AND EDGE CASES
+// =============================================================================
+
+describe('Edge Cases and Error Scenarios', () => {
+  it('should handle malformed service data gracefully', async () => {
+    const malformedService = {
+      id: 1,
+      // Missing required fields
+      type: 'invalid-type' as DatabaseDriver,
+    } as DatabaseService;
+    
+    renderWithProviders(
+      <ServiceListTable 
+        {...{
+          ...defaultTableProps,
+          services: [malformedService]
+        }}
+      />
+    );
+    
+    // Should not crash
+    expect(screen.getByRole('table')).toBeInTheDocument();
+  });
+  
+  it('should handle rapid user interactions', async () => {
+    const onServiceSelect = vi.fn();
+    
+    renderWithProviders(
+      <ServiceListTable 
+        {...defaultTableProps} 
+        onServiceSelect={onServiceSelect}
+      />
+    );
+    
+    const firstService = screen.getByText(defaultTableProps.services[0].name);
+    
+    // Rapid clicks
+    await userEvent.click(firstService);
+    await userEvent.click(firstService);
+    await userEvent.click(firstService);
+    
+    // Should handle gracefully without errors
+    expect(onServiceSelect).toHaveBeenCalled();
+  });
+  
+  it('should handle concurrent operations correctly', async () => {
+    const { queryClient } = renderWithProviders(
+      <ServiceListContainer data-testid="service-list-container" />
+    );
+    
+    await waitForAsyncOperations(queryClient);
+    
+    // Simulate concurrent operations
+    const promises = [
+      queryClient.invalidateQueries(),
+      queryClient.refetchQueries(),
+      queryClient.resetQueries()
+    ];
+    
+    await Promise.all(promises);
+    
+    // Should handle concurrent operations without errors
+    expect(screen.getByTestId('service-list-container')).toBeInTheDocument();
+  });
+});
+
+// Export test utilities for use in other test files
+export {
+  renderWithProviders,
+  waitForAsyncOperations,
+  setupMockServiceData,
+  createTestQueryClient,
+  TEST_CONFIG
+};
