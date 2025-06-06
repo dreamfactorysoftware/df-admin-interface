@@ -1,6 +1,22 @@
+'use client';
+
+import React from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { cn } from '@/lib/utils';
+
+interface SecurityNavItem {
+  label: string;
+  href: string;
+  description: string;
+  icon?: React.ReactNode;
+}
+
+interface SecurityNavProps {
+  className?: string;
+}
+
 /**
- * Security Navigation Component
- * 
  * Navigation component for the API security section providing tab-based navigation
  * between limits and roles management features. Implements active route highlighting,
  * responsive design with Tailwind CSS, and accessibility features.
@@ -8,349 +24,257 @@
  * Features:
  * - Next.js Link components for client-side navigation
  * - Active route highlighting using usePathname hook
- * - Headless UI tab primitives for WCAG 2.1 AA compliance
- * - Responsive design patterns for mobile and desktop viewports
- * - Consistent theme injection with Tailwind CSS 4.1+
- * - Keyboard navigation support
- * 
- * @fileoverview Security section navigation with React/Next.js patterns
- * @version 1.0.0
+ * - WCAG 2.1 AA compliance with proper ARIA attributes
+ * - Responsive design for mobile and desktop viewports
+ * - Tailwind CSS 4.1+ styling with consistent theme injection
  */
+export function SecurityNav({ className }: SecurityNavProps) {
+  const pathname = usePathname();
 
-'use client';
-
-import React from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Tab } from '@headlessui/react';
-import { cva, type VariantProps } from 'class-variance-authority';
-import { cn } from '@/lib/utils';
-
-// ============================================================================
-// TYPES AND INTERFACES
-// ============================================================================
-
-/**
- * Navigation tab item interface
- */
-interface SecurityNavItem {
-  /** Tab label */
-  label: string;
-  /** Route path */
-  href: string;
-  /** Tab icon component */
-  icon?: React.ComponentType<{ className?: string }>;
-  /** Tab description for accessibility */
-  description?: string;
-  /** Disabled state */
-  disabled?: boolean;
-}
-
-/**
- * Security navigation component props
- */
-interface SecurityNavProps {
-  /** Additional CSS classes */
-  className?: string;
-  /** Navigation variant */
-  variant?: 'default' | 'pills' | 'underline';
-  /** Component size */
-  size?: 'sm' | 'md' | 'lg';
-  /** Orientation */
-  orientation?: 'horizontal' | 'vertical';
-  /** Test identifier */
-  'data-testid'?: string;
-}
-
-// ============================================================================
-// NAVIGATION CONFIGURATION
-// ============================================================================
-
-/**
- * Security navigation items configuration
- */
-const SECURITY_NAV_ITEMS: SecurityNavItem[] = [
-  {
-    label: 'Rate Limits',
-    href: '/api-security/limits',
-    description: 'Manage API rate limits and request throttling policies',
-    icon: ({ className }) => (
-      <svg 
-        className={className} 
-        fill="none" 
-        stroke="currentColor" 
-        viewBox="0 0 24 24"
-        aria-hidden="true"
-      >
-        <path 
-          strokeLinecap="round" 
-          strokeLinejoin="round" 
-          strokeWidth={2} 
-          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" 
-        />
-      </svg>
-    ),
-  },
-  {
-    label: 'Roles',
-    href: '/api-security/roles',
-    description: 'Configure role-based access control and permissions',
-    icon: ({ className }) => (
-      <svg 
-        className={className} 
-        fill="none" 
-        stroke="currentColor" 
-        viewBox="0 0 24 24"
-        aria-hidden="true"
-      >
-        <path 
-          strokeLinecap="round" 
-          strokeLinejoin="round" 
-          strokeWidth={2} 
-          d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" 
-        />
-      </svg>
-    ),
-  },
-];
-
-// ============================================================================
-// STYLING VARIANTS
-// ============================================================================
-
-/**
- * Navigation container variants using class-variance-authority
- */
-const navigationVariants = cva(
-  'flex w-full focus-within:ring-2 focus-within:ring-primary-500 focus-within:ring-offset-2 rounded-lg',
-  {
-    variants: {
-      variant: {
-        default: 'bg-gray-100 p-1 dark:bg-gray-800',
-        pills: 'space-x-2',
-        underline: 'border-b border-gray-200 dark:border-gray-700',
-      },
-      size: {
-        sm: 'text-sm',
-        md: 'text-base',
-        lg: 'text-lg',
-      },
-      orientation: {
-        horizontal: 'flex-row',
-        vertical: 'flex-col',
-      },
+  const navigationItems: SecurityNavItem[] = [
+    {
+      label: 'Overview',
+      href: '/api-security',
+      description: 'Security dashboard and statistics',
+      icon: (
+        <svg
+          className="w-5 h-5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-hidden="true"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+          />
+        </svg>
+      ),
     },
-    defaultVariants: {
-      variant: 'default',
-      size: 'md',
-      orientation: 'horizontal',
+    {
+      label: 'Rate Limits',
+      href: '/api-security/limits',
+      description: 'Manage API rate limiting configurations',
+      icon: (
+        <svg
+          className="w-5 h-5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-hidden="true"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+          />
+        </svg>
+      ),
     },
-  }
-);
-
-/**
- * Navigation tab variants
- */
-const tabVariants = cva(
-  'group relative flex items-center justify-center transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2',
-  {
-    variants: {
-      variant: {
-        default: 'flex-1 rounded-md px-4 py-2 font-medium text-sm',
-        pills: 'rounded-full px-4 py-2 font-medium text-sm',
-        underline: 'border-b-2 border-transparent px-4 py-3 font-medium text-sm',
-      },
-      size: {
-        sm: 'px-3 py-1.5 text-xs',
-        md: 'px-4 py-2 text-sm',
-        lg: 'px-6 py-3 text-base',
-      },
-      active: {
-        true: '',
-        false: '',
-      },
-      disabled: {
-        true: 'cursor-not-allowed opacity-50',
-        false: 'cursor-pointer',
-      },
+    {
+      label: 'Roles',
+      href: '/api-security/roles',
+      description: 'Configure role-based access control',
+      icon: (
+        <svg
+          className="w-5 h-5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-hidden="true"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"
+          />
+        </svg>
+      ),
     },
-    compoundVariants: [
-      // Default variant active state
-      {
-        variant: 'default',
-        active: true,
-        class: 'bg-white text-primary-700 shadow-sm dark:bg-gray-700 dark:text-primary-300',
-      },
-      {
-        variant: 'default',
-        active: false,
-        class: 'text-gray-700 hover:bg-white/50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700/50 dark:hover:text-gray-100',
-      },
-      // Pills variant active state
-      {
-        variant: 'pills',
-        active: true,
-        class: 'bg-primary-100 text-primary-700 dark:bg-primary-900 dark:text-primary-300',
-      },
-      {
-        variant: 'pills',
-        active: false,
-        class: 'text-gray-700 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-gray-100',
-      },
-      // Underline variant active state
-      {
-        variant: 'underline',
-        active: true,
-        class: 'border-primary-500 text-primary-600 dark:border-primary-400 dark:text-primary-400',
-      },
-      {
-        variant: 'underline',
-        active: false,
-        class: 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:text-gray-300',
-      },
-    ],
-    defaultVariants: {
-      variant: 'default',
-      size: 'md',
-      active: false,
-      disabled: false,
-    },
-  }
-);
+  ];
 
-// ============================================================================
-// COMPONENT IMPLEMENTATION
-// ============================================================================
+  /**
+   * Determines if a navigation item is currently active based on the current pathname
+   */
+  const isActive = (href: string): boolean => {
+    if (href === '/api-security') {
+      return pathname === '/api-security';
+    }
+    return pathname.startsWith(href);
+  };
 
-/**
- * Security Navigation Component
- * 
- * Provides tab-based navigation for the API security section with active
- * route highlighting and accessibility features.
- */
-const SecurityNav = React.forwardRef<HTMLDivElement, SecurityNavProps>(
-  ({ 
-    className, 
-    variant = 'default',
-    size = 'md',
-    orientation = 'horizontal',
-    'data-testid': testId,
-    ...props 
-  }, ref) => {
-    const pathname = usePathname();
+  return (
+    <nav
+      className={cn(
+        'flex flex-col sm:flex-row bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700',
+        'overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600',
+        className
+      )}
+      role="navigation"
+      aria-label="API Security Navigation"
+    >
+      <div className="flex flex-col sm:flex-row min-w-full sm:min-w-0">
+        {navigationItems.map((item) => {
+          const active = isActive(item.href);
+          
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                // Base styles
+                'relative flex items-center gap-3 px-4 py-3 sm:px-6 sm:py-4',
+                'text-sm font-medium transition-all duration-200',
+                'border-b-2 sm:border-b-2 sm:border-r border-transparent',
+                'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500',
+                'hover:bg-gray-50 dark:hover:bg-gray-800',
+                // Active state
+                active
+                  ? [
+                      'text-primary-600 dark:text-primary-400',
+                      'border-b-primary-500 dark:border-b-primary-400',
+                      'bg-primary-50 dark:bg-primary-900/20',
+                    ]
+                  : [
+                      'text-gray-600 dark:text-gray-300',
+                      'hover:text-gray-900 dark:hover:text-gray-100',
+                      'hover:border-b-gray-300 dark:hover:border-b-gray-600',
+                    ],
+                // Responsive adjustments
+                'flex-shrink-0 min-w-0'
+              )}
+              aria-current={active ? 'page' : undefined}
+              role="tab"
+              aria-selected={active}
+              tabIndex={0}
+            >
+              {/* Icon */}
+              <span
+                className={cn(
+                  'flex-shrink-0 transition-colors duration-200',
+                  active
+                    ? 'text-primary-600 dark:text-primary-400'
+                    : 'text-gray-400 dark:text-gray-500'
+                )}
+                aria-hidden="true"
+              >
+                {item.icon}
+              </span>
 
-    /**
-     * Determine if a tab is currently active based on the pathname
-     */
-    const isActiveTab = (href: string): boolean => {
-      if (href === '/api-security/limits') {
-        return pathname === '/api-security/limits' || pathname.startsWith('/api-security/limits/');
-      }
-      if (href === '/api-security/roles') {
-        return pathname === '/api-security/roles' || pathname.startsWith('/api-security/roles/');
-      }
-      return pathname === href;
-    };
-
-    /**
-     * Get the currently selected tab index for Headless UI
-     */
-    const selectedIndex = SECURITY_NAV_ITEMS.findIndex(item => isActiveTab(item.href));
-
-    return (
-      <div
-        ref={ref}
-        className={cn(navigationVariants({ variant, size, orientation }), className)}
-        data-testid={testId}
-        role="navigation"
-        aria-label="API security navigation"
-        {...props}
-      >
-        <Tab.Group selectedIndex={selectedIndex >= 0 ? selectedIndex : 0}>
-          <Tab.List 
-            className={cn(
-              'flex w-full',
-              orientation === 'vertical' ? 'flex-col space-y-1' : 'flex-row',
-              variant === 'pills' && orientation === 'horizontal' && 'space-x-2',
-              variant === 'default' && 'rounded-lg p-1',
-            )}
-          >
-            {SECURITY_NAV_ITEMS.map((item, index) => {
-              const isActive = isActiveTab(item.href);
-              
-              return (
-                <Tab
-                  key={item.href}
-                  className="outline-none"
-                  disabled={item.disabled}
-                >
-                  {({ selected, hover, focus }) => (
-                    <Link
-                      href={item.href}
-                      className={cn(
-                        tabVariants({
-                          variant,
-                          size,
-                          active: isActive,
-                          disabled: item.disabled,
-                        }),
-                        orientation === 'vertical' && 'w-full justify-start',
-                      )}
-                      aria-current={isActive ? 'page' : undefined}
-                      aria-describedby={item.description ? `${item.href.replace(/\//g, '-')}-desc` : undefined}
-                      tabIndex={-1} // Let Headless UI handle focus management
-                    >
-                      {/* Tab icon */}
-                      {item.icon && (
-                        <item.icon 
-                          className={cn(
-                            'flex-shrink-0',
-                            size === 'sm' ? 'h-3 w-3' : size === 'lg' ? 'h-5 w-5' : 'h-4 w-4',
-                            orientation === 'vertical' ? 'mr-3' : 'mr-2',
-                          )}
-                        />
-                      )}
-                      
-                      {/* Tab label */}
-                      <span className="font-medium">
-                        {item.label}
-                      </span>
-                      
-                      {/* Active indicator for underline variant */}
-                      {variant === 'underline' && isActive && (
-                        <span
-                          className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-500 dark:bg-primary-400"
-                          aria-hidden="true"
-                        />
-                      )}
-                      
-                      {/* Screen reader description */}
-                      {item.description && (
-                        <span
-                          id={`${item.href.replace(/\//g, '-')}-desc`}
-                          className="sr-only"
-                        >
-                          {item.description}
-                        </span>
-                      )}
-                    </Link>
+              {/* Label and description container */}
+              <div className="flex flex-col min-w-0">
+                <span className="font-medium truncate">
+                  {item.label}
+                </span>
+                <span
+                  className={cn(
+                    'text-xs truncate mt-0.5 transition-colors duration-200',
+                    active
+                      ? 'text-primary-500 dark:text-primary-300'
+                      : 'text-gray-500 dark:text-gray-400'
                   )}
-                </Tab>
-              );
-            })}
-          </Tab.List>
-        </Tab.Group>
+                >
+                  {item.description}
+                </span>
+              </div>
+
+              {/* Active indicator */}
+              {active && (
+                <div
+                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-500 dark:bg-primary-400 sm:hidden"
+                  aria-hidden="true"
+                />
+              )}
+            </Link>
+          );
+        })}
       </div>
-    );
-  }
-);
 
-SecurityNav.displayName = 'SecurityNav';
+      {/* Mobile scroll indicator */}
+      <div className="sm:hidden flex justify-center py-2 bg-gray-50 dark:bg-gray-800">
+        <div className="flex space-x-1">
+          {navigationItems.map((_, index) => (
+            <div
+              key={index}
+              className={cn(
+                'w-2 h-2 rounded-full transition-colors duration-200',
+                isActive(navigationItems[index].href)
+                  ? 'bg-primary-500'
+                  : 'bg-gray-300 dark:bg-gray-600'
+              )}
+              aria-hidden="true"
+            />
+          ))}
+        </div>
+      </div>
+    </nav>
+  );
+}
 
-// ============================================================================
-// EXPORTS
-// ============================================================================
+/**
+ * Compact version of the security navigation for use in smaller layouts
+ */
+export function SecurityNavCompact({ className }: SecurityNavProps) {
+  const pathname = usePathname();
+
+  const navigationItems = [
+    { label: 'Overview', href: '/api-security' },
+    { label: 'Limits', href: '/api-security/limits' },
+    { label: 'Roles', href: '/api-security/roles' },
+  ];
+
+  const isActive = (href: string): boolean => {
+    if (href === '/api-security') {
+      return pathname === '/api-security';
+    }
+    return pathname.startsWith(href);
+  };
+
+  return (
+    <nav
+      className={cn(
+        'flex bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden',
+        className
+      )}
+      role="navigation"
+      aria-label="API Security Navigation (Compact)"
+    >
+      {navigationItems.map((item, index) => {
+        const active = isActive(item.href);
+        
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={cn(
+              'flex-1 px-3 py-2 text-sm font-medium text-center transition-all duration-200',
+              'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500',
+              'border-r border-gray-200 dark:border-gray-700 last:border-r-0',
+              active
+                ? 'bg-primary-600 text-white dark:bg-primary-500'
+                : [
+                    'text-gray-600 dark:text-gray-300',
+                    'hover:bg-gray-50 dark:hover:bg-gray-800',
+                    'hover:text-gray-900 dark:hover:text-gray-100',
+                  ]
+            )}
+            aria-current={active ? 'page' : undefined}
+            role="tab"
+            aria-selected={active}
+          >
+            {item.label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
 
 export default SecurityNav;
-export { SecurityNav, navigationVariants, tabVariants };
-export type { SecurityNavProps, SecurityNavItem };
