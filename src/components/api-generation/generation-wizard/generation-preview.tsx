@@ -1,392 +1,157 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import dynamic from 'next/dynamic';
-import { useTranslation } from 'react-i18next';
-import { Download, Copy, AlertCircle, CheckCircle, Loader2, ArrowLeft, ArrowRight } from 'lucide-react';
-
-// Dynamic import for SwaggerUI to avoid SSR issues
-const SwaggerUI = dynamic(() => import('swagger-ui-react'), { 
-  ssr: false,
-  loading: () => (
-    <div className="flex items-center justify-center h-64">
-      <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-      <span className="ml-2 text-gray-600">Loading API Documentation...</span>
-    </div>
-  )
-});
-
-// Component imports (will be implemented)
-import { Button, IconButton } from '@/components/ui/button';
-import { Alert } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CodePreview } from '@/components/ui/code-preview';
-
-// Context and hooks
-import { useWizardContext } from './wizard-provider';
-import { useOpenApiPreview } from '@/hooks/use-openapi-preview';
-import { useNotifications } from '@/hooks/use-notifications';
-import { useTheme } from '@/hooks/use-theme';
-import { useApiKeys } from '@/hooks/use-api-keys';
-
-// Types
-import type { 
-  WizardStep, 
-  OpenApiSpec,
-  ApiEndpoint,
-  ValidationError,
-  PreviewConfiguration 
-} from './types';
-
-// Utils
-import { cn } from '@/lib/utils';
-import { downloadFile } from '@/lib/file-utils';
-import { validateConfiguration } from '@/lib/validation';
-
-interface GenerationPreviewProps {
-  className?: string;
-}
-
-interface ApiKeyInfo {
-  id: string;
-  name: string;
-  apiKey: string;
-  description?: string;
-}
-
-interface PreviewError {
-  field: string;
-  message: string;
-  code: string;
-}
-
 /**
- * GenerationPreview component provides real-time preview of generated OpenAPI specification
- * and endpoint documentation. This is the third step in the API generation wizard workflow.
+ * Generation Preview Component - Third Wizard Step
+ * 
+ * React component for the third wizard step providing real-time preview of generated OpenAPI 
+ * specification and endpoint documentation. Integrates with @swagger-ui/react for interactive 
+ * API preview and validation before final generation.
  * 
  * Features:
- * - Interactive OpenAPI specification preview using @swagger-ui/react
- * - Real-time preview generation via Next.js serverless functions
- * - Configuration validation and error handling
- * - API key management and testing
- * - Download functionality for API specifications
- * - Dark mode theme support
- * - Responsive design with Tailwind CSS
+ * - Real-time OpenAPI specification preview via Next.js serverless functions
+ * - Interactive Swagger UI integration with @swagger-ui/react
+ * - Configuration validation and error handling per Section 4.4.5 Error Handling Implementation
+ * - Dynamic preview regeneration based on endpoint configurations
+ * - Comprehensive error boundaries with fallback UI rendering
+ * - Performance optimization with intelligent caching via React Query
+ * 
+ * Requirements Satisfied:
+ * - F-003 REST API Endpoint Generation with real-time OpenAPI preview per Section 2.1 Feature Catalog
+ * - @swagger-ui/react integration for interactive API documentation preview per React/Next.js Integration Requirements
+ * - Next.js serverless functions for real-time preview generation per technical implementation requirements
+ * - Configuration validation and error handling before API generation per Section 4.4.5 Error Handling Implementation
+ * 
+ * @see Technical Specification Section 0 - SUMMARY OF CHANGES
+ * @see Technical Specification Section 2.1 - FEATURE CATALOG (F-003)
+ * @see Technical Specification Section 4.4 - TECHNICAL IMPLEMENTATION FLOWS
+ * @see React/Next.js Integration Requirements - @swagger-ui/react integration
  */
-export const GenerationPreview: React.FC<GenerationPreviewProps> = ({ 
-  className 
-}) => {
-  // Hooks
-  const { t } = useTranslation();
-  const { 
-    currentStep, 
-    wizardData, 
-    updateWizardData, 
-    nextStep, 
-    previousStep,
-    validateCurrentStep 
-  } = useWizardContext();
-  
-  const { showNotification } = useNotifications();
-  const { theme } = useTheme();
-  
-  // State
-  const [activeTab, setActiveTab] = useState<'preview' | 'raw' | 'endpoints'>('preview');
-  const [selectedApiKey, setSelectedApiKey] = useState<string>('');
-  const [validationErrors, setValidationErrors] = useState<PreviewError[]>([]);
-  const [isValidating, setIsValidating] = useState(false);
-  
-  // Refs
-  const swaggerContainerRef = useRef<HTMLDivElement>(null);
-  
-  // API Preview Hook - handles real-time OpenAPI generation
-  const {
-    openApiSpec,
-    isGenerating,
-    error: previewError,
-    regeneratePreview,
-    downloadSpec
-  } = useOpenApiPreview({
-    selectedTables: wizardData.selectedTables,
-    endpointConfiguration: wizardData.endpointConfiguration,
-    securityConfiguration: wizardData.securityConfiguration,
-    enabled: currentStep === WizardStep.PREVIEW
-  });
-  
-  // API Keys for testing
-  const { 
-    apiKeys, 
-    isLoading: isLoadingApiKeys 
-  } = useApiKeys(wizardData.serviceId);
-  
-  // Memoized configuration validation
-  const configurationValidation = useMemo(() => {
-    if (!wizardData.endpointConfiguration) return { isValid: false, errors: [] };
-    
-    return validateConfiguration({
-      selectedTables: wizardData.selectedTables,
-      endpointConfiguration: wizardData.endpointConfiguration,
-      securityConfiguration: wizardData.securityConfiguration
-    });
-  }, [wizardData]);
-  
-  // Extract endpoint information for endpoint tab
-  const extractedEndpoints = useMemo((): ApiEndpoint[] => {
-    if (!openApiSpec?.paths) return [];
-    
-    return Object.entries(openApiSpec.paths).flatMap(([path, methods]) =>
-      Object.entries(methods as Record<string, any>).map(([method, spec]) => ({
-        path,
-        method: method.toUpperCase(),
-        operationId: spec.operationId,
-        summary: spec.summary,
-        description: spec.description,
-        parameters: spec.parameters || [],
-        responses: spec.responses || {},
-        tags: spec.tags || []
-      }))
-    );
-  }, [openApiSpec]);
-  
-  // Validation effect
-  useEffect(() => {
-    if (currentStep === WizardStep.PREVIEW && !isGenerating) {
-      setIsValidating(true);
-      
-      const errors: PreviewError[] = [];
-      
-      // Validate selected tables
-      if (!wizardData.selectedTables?.length) {
-        errors.push({
-          field: 'selectedTables',
-          message: t('wizard.validation.noTablesSelected'),
-          code: 'MISSING_TABLES'
-        });
-      }
-      
-      // Validate endpoint configuration
-      if (!wizardData.endpointConfiguration) {
-        errors.push({
-          field: 'endpointConfiguration',
-          message: t('wizard.validation.noEndpointConfiguration'),
-          code: 'MISSING_ENDPOINT_CONFIG'
-        });
-      }
-      
-      // Add configuration validation errors
-      if (!configurationValidation.isValid) {
-        errors.push(...configurationValidation.errors.map(error => ({
-          field: error.field,
-          message: error.message,
-          code: error.code
-        })));
-      }
-      
-      setValidationErrors(errors);
-      setIsValidating(false);
-    }
-  }, [currentStep, wizardData, configurationValidation, isGenerating, t]);
-  
-  // Handle API key copy
-  const handleCopyApiKey = async (apiKey: string) => {
-    try {
-      await navigator.clipboard.writeText(apiKey);
-      showNotification({
-        type: 'success',
-        message: t('apiDocs.apiKeys.copied'),
-        duration: 3000
-      });
-    } catch (error) {
-      showNotification({
-        type: 'error',
-        message: t('apiDocs.apiKeys.copyFailed'),
-        duration: 5000
-      });
-    }
-  };
-  
-  // Handle download API specification
-  const handleDownloadSpec = async () => {
-    if (!openApiSpec) return;
-    
-    try {
-      await downloadFile(
-        JSON.stringify(openApiSpec, null, 2),
-        'api-specification.json',
-        'application/json'
-      );
-      
-      showNotification({
-        type: 'success',
-        message: t('wizard.preview.downloadSuccess'),
-        duration: 3000
-      });
-    } catch (error) {
-      showNotification({
-        type: 'error',
-        message: t('wizard.preview.downloadError'),
-        duration: 5000
-      });
-    }
-  };
-  
-  // Handle wizard navigation
-  const handleNext = async () => {
-    if (validationErrors.length > 0) {
-      showNotification({
-        type: 'error',
-        message: t('wizard.preview.validationErrors'),
-        duration: 5000
-      });
-      return;
-    }
-    
-    // Update wizard data with final preview data
-    updateWizardData({
-      openApiSpec,
-      selectedApiKey,
-      validationPassed: true
-    });
-    
-    await nextStep();
-  };
-  
-  const handlePrevious = () => {
-    previousStep();
-  };
-  
-  // Regenerate preview when configuration changes
-  const handleRegeneratePreview = () => {
-    regeneratePreview();
-  };
-  
-  // Swagger UI configuration
-  const swaggerConfig = useMemo(() => ({
-    spec: openApiSpec,
-    docExpansion: 'list' as const,
-    defaultModelsExpandDepth: 2,
-    defaultModelExpandDepth: 2,
-    displayRequestDuration: true,
-    tryItOutEnabled: true,
-    requestInterceptor: (req: any) => {
-      // Add authentication headers
-      if (selectedApiKey) {
-        req.headers['X-DreamFactory-API-Key'] = selectedApiKey;
-      }
-      
-      // Add session token from user context
-      const sessionToken = localStorage.getItem('df_session_token');
-      if (sessionToken) {
-        req.headers['X-DreamFactory-Session-Token'] = sessionToken;
-      }
-      
-      return req;
-    },
-    theme: theme === 'dark' ? 'dark' : 'light'
-  }), [openApiSpec, selectedApiKey, theme]);
-  
-  // Loading state
-  if (isGenerating || isValidating) {
-    return (
-      <div className="flex flex-col items-center justify-center h-96 space-y-4">
-        <Loader2 className="h-12 w-12 animate-spin text-blue-600" />
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-          {isGenerating ? t('wizard.preview.generating') : t('wizard.preview.validating')}
-        </h3>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          {t('wizard.preview.pleaseWait')}
-        </p>
+
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import dynamic from 'next/dynamic';
+import { AlertTriangle, CheckCircle, RefreshCw, Download, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+
+// Wizard context and types
+import { useWizard, useWizardNavigation, WIZARD_STEPS } from './wizard-provider';
+import type { 
+  OpenAPISpec, 
+  GenerationPreviewProps, 
+  EndpointConfiguration,
+  GenerationStatus 
+} from './types';
+
+// UI Components with Tailwind CSS styling
+import { Button } from '@/components/ui/button';
+import { Alert } from '@/components/ui/alert';
+import { Dialog } from '@/components/ui/dialog';
+import { Tabs, Tab } from '@/components/ui/tabs';
+
+// Dynamic import of SwaggerUI with SSR disabled for Next.js compatibility
+// This resolves the "Class extends value undefined" error in server components
+const SwaggerUI = dynamic(
+  () => import('swagger-ui-react'),
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center h-96 bg-gray-50 dark:bg-gray-900 rounded-lg">
+        <div className="text-center">
+          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-500" />
+          <p className="text-sm text-gray-600 dark:text-gray-400">Loading OpenAPI Preview...</p>
+        </div>
       </div>
-    );
+    )
   }
+);
+
+// Import Swagger UI CSS
+import 'swagger-ui-react/swagger-ui.css';
+
+/**
+ * Code Preview Component for raw OpenAPI JSON display
+ */
+const CodePreview: React.FC<{ spec: OpenAPISpec | null; isLoading: boolean }> = ({ spec, isLoading }) => {
+  const [copied, setCopied] = useState(false);
   
-  // Error state
-  if (previewError) {
+  const handleCopy = useCallback(async () => {
+    if (spec) {
+      await navigator.clipboard.writeText(JSON.stringify(spec, null, 2));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }, [spec]);
+
+  if (isLoading) {
     return (
-      <div className="space-y-6">
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <div>
-            <h4 className="font-semibold">{t('wizard.preview.error.title')}</h4>
-            <p className="mt-1">{previewError.message}</p>
-          </div>
-        </Alert>
-        
-        <div className="flex justify-between">
-          <Button 
-            variant="outline" 
-            onClick={handlePrevious}
-            className="flex items-center space-x-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span>{t('wizard.previous')}</span>
-          </Button>
-          
-          <Button 
-            onClick={handleRegeneratePreview}
-            className="flex items-center space-x-2"
-          >
-            <span>{t('wizard.preview.retry')}</span>
-          </Button>
+      <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-6 h-96 flex items-center justify-center">
+        <div className="text-center">
+          <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2 text-blue-500" />
+          <p className="text-sm text-gray-600 dark:text-gray-400">Generating specification...</p>
         </div>
       </div>
     );
   }
-  
+
   return (
-    <div className={cn("space-y-6", className)}>
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-            {t('wizard.preview.title')}
-          </h2>
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            {t('wizard.preview.description')}
-          </p>
-        </div>
-        
-        <div className="flex items-center space-x-2">
-          {/* Download Button */}
-          <Button
-            variant="outline"
-            onClick={handleDownloadSpec}
-            disabled={!openApiSpec}
-            className="flex items-center space-x-2"
-          >
-            <Download className="h-4 w-4" />
-            <span>{t('wizard.preview.download')}</span>
-          </Button>
-          
-          {/* Regenerate Button */}
-          <Button
-            variant="outline"
-            onClick={handleRegeneratePreview}
-            disabled={isGenerating}
-            className="flex items-center space-x-2"
-          >
-            {isGenerating ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <span>{t('wizard.preview.regenerate')}</span>
-            )}
-          </Button>
-        </div>
+    <div className="relative">
+      <div className="absolute top-2 right-2 z-10">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleCopy}
+          className="bg-white/90 dark:bg-gray-800/90 backdrop-blur"
+        >
+          {copied ? (
+            <>
+              <CheckCircle className="h-4 w-4 mr-1 text-green-500" />
+              Copied
+            </>
+          ) : (
+            'Copy JSON'
+          )}
+        </Button>
       </div>
-      
-      {/* Validation Errors */}
+      <pre className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 text-xs overflow-auto h-96 font-mono">
+        <code className="text-gray-800 dark:text-gray-200">
+          {spec ? JSON.stringify(spec, null, 2) : 'No specification generated'}
+        </code>
+      </pre>
+    </div>
+  );
+};
+
+/**
+ * Validation Summary Component
+ */
+const ValidationSummary: React.FC<{
+  isValid: boolean;
+  validationErrors: string[];
+  warnings: string[];
+}> = ({ isValid, validationErrors, warnings }) => {
+  if (isValid && warnings.length === 0) {
+    return (
+      <Alert variant="success" className="mb-6">
+        <CheckCircle className="h-4 w-4" />
+        <div>
+          <h4 className="font-medium">Configuration Valid</h4>
+          <p className="text-sm">Your API configuration is ready for generation.</p>
+        </div>
+      </Alert>
+    );
+  }
+
+  return (
+    <div className="space-y-4 mb-6">
       {validationErrors.length > 0 && (
         <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
+          <AlertTriangle className="h-4 w-4" />
           <div>
-            <h4 className="font-semibold">{t('wizard.preview.validationErrors')}</h4>
-            <ul className="mt-2 space-y-1">
+            <h4 className="font-medium">Configuration Errors</h4>
+            <ul className="text-sm mt-2 space-y-1">
               {validationErrors.map((error, index) => (
-                <li key={index} className="text-sm">
-                  {error.message}
+                <li key={index} className="flex items-start">
+                  <span className="text-red-500 mr-2">•</span>
+                  {error}
                 </li>
               ))}
             </ul>
@@ -394,234 +159,651 @@ export const GenerationPreview: React.FC<GenerationPreviewProps> = ({
         </Alert>
       )}
       
+      {warnings.length > 0 && (
+        <Alert variant="warning">
+          <AlertTriangle className="h-4 w-4" />
+          <div>
+            <h4 className="font-medium">Configuration Warnings</h4>
+            <ul className="text-sm mt-2 space-y-1">
+              {warnings.map((warning, index) => (
+                <li key={index} className="flex items-start">
+                  <span className="text-yellow-500 mr-2">•</span>
+                  {warning}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </Alert>
+      )}
+    </div>
+  );
+};
+
+/**
+ * Configuration Summary Component
+ */
+const ConfigurationSummary: React.FC<{
+  selectedTables: Map<string, any>;
+  endpointConfigurations: Map<string, EndpointConfiguration>;
+}> = ({ selectedTables, endpointConfigurations }) => {
+  const totalEndpoints = useMemo(() => {
+    let count = 0;
+    endpointConfigurations.forEach((config) => {
+      Object.values(config.httpMethods).forEach((enabled) => {
+        if (enabled) count++;
+      });
+    });
+    return count;
+  }, [endpointConfigurations]);
+
+  return (
+    <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 mb-6">
+      <h3 className="font-medium mb-3">Configuration Summary</h3>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+        <div>
+          <span className="text-gray-600 dark:text-gray-400">Tables Selected</span>
+          <p className="font-medium">{selectedTables.size}</p>
+        </div>
+        <div>
+          <span className="text-gray-600 dark:text-gray-400">Total Endpoints</span>
+          <p className="font-medium">{totalEndpoints}</p>
+        </div>
+        <div>
+          <span className="text-gray-600 dark:text-gray-400">GET Endpoints</span>
+          <p className="font-medium">
+            {Array.from(endpointConfigurations.values()).filter(c => c.httpMethods.GET).length}
+          </p>
+        </div>
+        <div>
+          <span className="text-gray-600 dark:text-gray-400">Write Operations</span>
+          <p className="font-medium">
+            {Array.from(endpointConfigurations.values()).filter(c => 
+              c.httpMethods.POST || c.httpMethods.PUT || c.httpMethods.PATCH || c.httpMethods.DELETE
+            ).length}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Main Generation Preview Component
+ */
+export const GenerationPreview: React.FC<GenerationPreviewProps> = ({
+  className = '',
+  'data-testid': testId = 'generation-preview'
+}) => {
+  // Wizard state management
+  const wizard = useWizard();
+  const navigation = useWizardNavigation();
+  const queryClient = useQueryClient();
+  
+  // Local state
+  const [activeTab, setActiveTab] = useState<'preview' | 'json' | 'validation'>('preview');
+  const [showGenerationDialog, setShowGenerationDialog] = useState(false);
+
+  // Extract wizard state
+  const {
+    serviceId,
+    serviceName,
+    selectedTables,
+    endpointConfigurations,
+    openApiPreview,
+    generationProgress,
+    isNavigationLocked
+  } = wizard;
+
+  // OpenAPI preview generation via Next.js serverless functions
+  const {
+    data: previewData,
+    isLoading: isGeneratingPreview,
+    error: previewError,
+    refetch: regeneratePreview
+  } = useQuery({
+    queryKey: ['openapi-preview', serviceId, Array.from(selectedTables.keys()), endpointConfigurations],
+    queryFn: async () => {
+      if (!serviceId || selectedTables.size === 0) {
+        throw new Error('Service ID and selected tables are required for preview generation');
+      }
+
+      // Construct preview request payload
+      const previewPayload = {
+        serviceId,
+        serviceName,
+        tables: Array.from(selectedTables.values()),
+        configurations: Object.fromEntries(endpointConfigurations),
+        timestamp: new Date().toISOString()
+      };
+
+      // Call Next.js API route for real-time preview generation
+      const response = await fetch(`/api/preview/openapi/${serviceId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache'
+        },
+        body: JSON.stringify(previewPayload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Preview generation failed: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      // Validate the returned OpenAPI specification
+      if (!result.specification || typeof result.specification !== 'object') {
+        throw new Error('Invalid OpenAPI specification returned from server');
+      }
+
+      return result;
+    },
+    enabled: Boolean(serviceId && selectedTables.size > 0),
+    staleTime: 30000, // 30 seconds
+    cacheTime: 60000, // 1 minute
+    refetchOnWindowFocus: false,
+    retry: (failureCount, error) => {
+      // Don't retry on validation errors
+      if (error?.message?.includes('Invalid') || error?.message?.includes('required')) {
+        return false;
+      }
+      return failureCount < 2;
+    },
+    onSuccess: (data) => {
+      // Update wizard state with generated preview
+      wizard.updateOpenApiPreview({
+        specification: data.specification,
+        isValid: true,
+        validationErrors: [],
+      });
+    },
+    onError: (error) => {
+      // Update wizard state with error
+      wizard.updateOpenApiPreview({
+        specification: null,
+        isValid: false,
+        validationErrors: [error.message],
+      });
+    }
+  });
+
+  // API generation mutation
+  const generateApiMutation = useMutation({
+    mutationFn: async () => {
+      if (!serviceId || selectedTables.size === 0) {
+        throw new Error('Service ID and selected tables are required for API generation');
+      }
+
+      const generationPayload = {
+        serviceId,
+        serviceName,
+        tables: Array.from(selectedTables.values()),
+        configurations: Object.fromEntries(endpointConfigurations),
+        generateDocumentation: true,
+        timestamp: new Date().toISOString()
+      };
+
+      const response = await fetch(`/api/generate/endpoints/${serviceId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(generationPayload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `API generation failed: ${response.statusText}`);
+      }
+
+      return response.json();
+    },
+    onMutate: () => {
+      wizard.startGeneration();
+    },
+    onSuccess: (data) => {
+      wizard.completeGeneration(data.endpoints || []);
+      wizard.markStepCompleted(WIZARD_STEPS.PREVIEW_AND_GENERATE);
+      
+      // Navigate to the next step (generation progress)
+      if (navigation.canGoNext) {
+        navigation.goToNextStep();
+      }
+    },
+    onError: (error) => {
+      wizard.setGenerationError(error.message);
+    }
+  });
+
+  // Configuration validation
+  const validationResult = useMemo(() => {
+    const errors: string[] = [];
+    const warnings: string[] = [];
+
+    // Validate service context
+    if (!serviceId || !serviceName) {
+      errors.push('Service information is missing. Please go back and select a valid database service.');
+    }
+
+    // Validate table selection
+    if (selectedTables.size === 0) {
+      errors.push('No tables selected. Please go back and select at least one table for API generation.');
+    }
+
+    // Validate endpoint configurations
+    if (endpointConfigurations.size === 0) {
+      errors.push('No endpoint configurations found. Please configure endpoints for your selected tables.');
+    }
+
+    // Validate each table has at least one HTTP method enabled
+    let tablesWithoutMethods = 0;
+    endpointConfigurations.forEach((config, tableName) => {
+      const hasEnabledMethods = Object.values(config.httpMethods).some(enabled => enabled);
+      if (!hasEnabledMethods) {
+        tablesWithoutMethods++;
+      }
+    });
+
+    if (tablesWithoutMethods > 0) {
+      errors.push(`${tablesWithoutMethods} table(s) have no HTTP methods enabled. Each table must have at least one endpoint type.`);
+    }
+
+    // Check for potential security issues
+    const tablesWithoutAuth = Array.from(endpointConfigurations.values()).filter(
+      config => config.securityRules.length === 0
+    ).length;
+
+    if (tablesWithoutAuth > 0) {
+      warnings.push(`${tablesWithoutAuth} table(s) have no security rules configured. Consider adding authentication requirements.`);
+    }
+
+    // Check for OpenAPI specification validity
+    if (openApiPreview.specification) {
+      if (!openApiPreview.specification.info?.title) {
+        warnings.push('OpenAPI specification is missing a title. This may affect documentation quality.');
+      }
+      
+      if (!openApiPreview.specification.info?.version) {
+        warnings.push('OpenAPI specification is missing a version. This may affect API versioning.');
+      }
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      warnings
+    };
+  }, [serviceId, serviceName, selectedTables, endpointConfigurations, openApiPreview.specification]);
+
+  // Download OpenAPI specification
+  const handleDownloadSpec = useCallback(() => {
+    if (openApiPreview.specification) {
+      const blob = new Blob([JSON.stringify(openApiPreview.specification, null, 2)], {
+        type: 'application/json'
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${serviceName || 'api'}-openapi-spec.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  }, [openApiPreview.specification, serviceName]);
+
+  // Handle manual regeneration
+  const handleRegeneratePreview = useCallback(() => {
+    regeneratePreview();
+  }, [regeneratePreview]);
+
+  // Handle API generation
+  const handleGenerateApi = useCallback(() => {
+    if (validationResult.isValid) {
+      setShowGenerationDialog(true);
+    }
+  }, [validationResult.isValid]);
+
+  const confirmGeneration = useCallback(() => {
+    setShowGenerationDialog(false);
+    generateApiMutation.mutate();
+  }, [generateApiMutation]);
+
+  // Update wizard state when step becomes active
+  useEffect(() => {
+    if (navigation.currentStep === WIZARD_STEPS.PREVIEW_AND_GENERATE) {
+      wizard.markStepCompleted(WIZARD_STEPS.PREVIEW_AND_GENERATE);
+    }
+  }, [navigation.currentStep, wizard]);
+
+  // Error boundary fallback
+  if (previewError && !isGeneratingPreview) {
+    return (
+      <div className={`space-y-6 ${className}`} data-testid={testId}>
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <div>
+            <h4 className="font-medium">Preview Generation Failed</h4>
+            <p className="text-sm mt-1">{previewError.message}</p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRegeneratePreview}
+              className="mt-3"
+              disabled={isGeneratingPreview}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isGeneratingPreview ? 'animate-spin' : ''}`} />
+              Retry Preview Generation
+            </Button>
+          </div>
+        </Alert>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`space-y-6 ${className}`} data-testid={testId}>
+      {/* Header */}
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+          API Preview & Generation
+        </h2>
+        <p className="text-gray-600 dark:text-gray-400 mt-2">
+          Review your OpenAPI specification and generate your REST API endpoints.
+        </p>
+      </div>
+
       {/* Configuration Summary */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <CheckCircle className="h-5 w-5 text-green-600" />
-            <span>{t('wizard.preview.configuration')}</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                {t('wizard.preview.selectedTables')}
-              </p>
-              <p className="text-lg font-semibold">
-                {wizardData.selectedTables?.length || 0}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                {t('wizard.preview.endpoints')}
-              </p>
-              <p className="text-lg font-semibold">
-                {extractedEndpoints.length}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                {t('wizard.preview.httpMethods')}
-              </p>
-              <div className="flex flex-wrap gap-1 mt-1">
-                {wizardData.endpointConfiguration?.enabledMethods?.map(method => (
-                  <Badge key={method} variant="secondary" className="text-xs">
-                    {method}
-                  </Badge>
-                ))}
-              </div>
+      <ConfigurationSummary
+        selectedTables={selectedTables}
+        endpointConfigurations={endpointConfigurations}
+      />
+
+      {/* Validation Summary */}
+      <ValidationSummary
+        isValid={validationResult.isValid}
+        validationErrors={validationResult.errors}
+        warnings={validationResult.warnings}
+      />
+
+      {/* Preview Content */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+        {/* Tab Navigation */}
+        <div className="border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between px-6 py-4">
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <Tab value="preview">Interactive Preview</Tab>
+              <Tab value="json">OpenAPI JSON</Tab>
+              <Tab value="validation">Validation Details</Tab>
+            </Tabs>
+            
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRegeneratePreview}
+                disabled={isGeneratingPreview}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${isGeneratingPreview ? 'animate-spin' : ''}`} />
+                Regenerate
+              </Button>
+              
+              {openApiPreview.specification && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDownloadSpec}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download
+                </Button>
+              )}
             </div>
           </div>
-        </CardContent>
-      </Card>
-      
-      {/* API Keys */}
-      {apiKeys && apiKeys.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('wizard.preview.apiKeys.title')}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                {t('wizard.preview.apiKeys.description')}
-              </p>
-              
-              <Select value={selectedApiKey} onValueChange={setSelectedApiKey}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder={t('wizard.preview.apiKeys.select')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {apiKeys.map((key: ApiKeyInfo) => (
-                    <SelectItem key={key.id} value={key.apiKey}>
-                      <div className="flex items-center justify-between w-full">
-                        <div>
-                          <span className="font-medium">{key.name}</span>
-                          <span className="ml-2 text-xs text-gray-500">
-                            {key.apiKey.slice(0, 8)}...
-                          </span>
-                        </div>
-                        <IconButton
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleCopyApiKey(key.apiKey);
-                          }}
-                          className="ml-2"
-                        >
-                          <Copy className="h-3 w-3" />
-                        </IconButton>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+        </div>
+
+        {/* Tab Content */}
+        <div className="p-6">
+          {activeTab === 'preview' && (
+            <div className="min-h-[600px]">
+              {isGeneratingPreview ? (
+                <div className="flex items-center justify-center h-96">
+                  <div className="text-center">
+                    <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-500" />
+                    <h3 className="text-lg font-medium mb-2">Generating OpenAPI Preview</h3>
+                    <p className="text-gray-600 dark:text-gray-400">
+                      Creating interactive documentation for your API endpoints...
+                    </p>
+                  </div>
+                </div>
+              ) : openApiPreview.specification ? (
+                <div className="swagger-ui-wrapper">
+                  <SwaggerUI
+                    spec={openApiPreview.specification}
+                    displayOperationId={true}
+                    displayRequestDuration={true}
+                    defaultModelsExpandDepth={1}
+                    defaultModelExpandDepth={1}
+                    docExpansion="list"
+                    filter={true}
+                    showExtensions={true}
+                    showCommonExtensions={true}
+                    tryItOutEnabled={true}
+                  />
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-96 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                  <div className="text-center">
+                    <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                    <h3 className="text-lg font-medium mb-2">No Preview Available</h3>
+                    <p className="text-gray-600 dark:text-gray-400 mb-4">
+                      Configure your endpoints and tables to generate a preview.
+                    </p>
+                    <Button
+                      variant="outline"
+                      onClick={handleRegeneratePreview}
+                      disabled={isGeneratingPreview}
+                    >
+                      Generate Preview
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
-          </CardContent>
-        </Card>
-      )}
-      
-      {/* API Preview Tabs */}
-      <Card className="min-h-[600px]">
-        <CardHeader>
-          <Tabs value={activeTab} onValueChange={setActiveTab as any}>
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="preview">
-                {t('wizard.preview.tabs.interactive')}
-              </TabsTrigger>
-              <TabsTrigger value="endpoints">
-                {t('wizard.preview.tabs.endpoints')}
-              </TabsTrigger>
-              <TabsTrigger value="raw">
-                {t('wizard.preview.tabs.specification')}
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </CardHeader>
-        
-        <CardContent className="p-0">
-          <Tabs value={activeTab} onValueChange={setActiveTab as any}>
-            {/* Interactive Swagger UI Preview */}
-            <TabsContent value="preview" className="mt-0">
-              <div 
-                ref={swaggerContainerRef}
-                className="w-full min-h-[500px] bg-white dark:bg-gray-900"
-              >
-                {openApiSpec ? (
-                  <SwaggerUI 
-                    {...swaggerConfig}
-                    presets={[
-                      // @ts-ignore - SwaggerUI types issue
-                      SwaggerUI.presets?.apis,
-                      SwaggerUI.presets?.standalone
-                    ]}
-                  />
-                ) : (
-                  <div className="flex items-center justify-center h-64">
-                    <p className="text-gray-500">{t('wizard.preview.noSpec')}</p>
-                  </div>
-                )}
-              </div>
-            </TabsContent>
-            
-            {/* Endpoints List */}
-            <TabsContent value="endpoints" className="mt-0">
-              <div className="p-6 space-y-4">
-                {extractedEndpoints.length > 0 ? (
-                  <div className="space-y-3">
-                    {extractedEndpoints.map((endpoint, index) => (
-                      <Card key={index} className="border">
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-3">
-                              <Badge 
-                                variant={endpoint.method === 'GET' ? 'default' : 
-                                       endpoint.method === 'POST' ? 'secondary' :
-                                       endpoint.method === 'PUT' ? 'outline' :
-                                       endpoint.method === 'DELETE' ? 'destructive' : 'default'}
-                                className="font-mono text-xs"
-                              >
-                                {endpoint.method}
-                              </Badge>
-                              <code className="text-sm font-mono bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
-                                {endpoint.path}
-                              </code>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              {endpoint.tags.map(tag => (
-                                <Badge key={tag} variant="outline" className="text-xs">
-                                  {tag}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-                          
-                          {endpoint.summary && (
-                            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                              {endpoint.summary}
-                            </p>
-                          )}
-                          
-                          {endpoint.description && endpoint.description !== endpoint.summary && (
-                            <p className="mt-1 text-xs text-gray-500">
-                              {endpoint.description}
-                            </p>
-                          )}
-                        </CardContent>
-                      </Card>
+          )}
+
+          {activeTab === 'json' && (
+            <CodePreview
+              spec={openApiPreview.specification}
+              isLoading={isGeneratingPreview}
+            />
+          )}
+
+          {activeTab === 'validation' && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Validation Report</h3>
+              
+              {validationResult.errors.length > 0 && (
+                <div>
+                  <h4 className="font-medium text-red-600 dark:text-red-400 mb-2">Errors</h4>
+                  <ul className="space-y-2">
+                    {validationResult.errors.map((error, index) => (
+                      <li key={index} className="flex items-start text-sm">
+                        <AlertTriangle className="h-4 w-4 text-red-500 mr-2 mt-0.5 flex-shrink-0" />
+                        {error}
+                      </li>
                     ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-12">
-                    <p className="text-gray-500">{t('wizard.preview.noEndpoints')}</p>
-                  </div>
-                )}
-              </div>
-            </TabsContent>
-            
-            {/* Raw OpenAPI Specification */}
-            <TabsContent value="raw" className="mt-0">
-              <div className="p-6">
-                {openApiSpec ? (
-                  <CodePreview 
-                    code={JSON.stringify(openApiSpec, null, 2)}
-                    language="json"
-                    showLineNumbers
-                    className="max-h-[500px]"
-                  />
-                ) : (
-                  <div className="text-center py-12">
-                    <p className="text-gray-500">{t('wizard.preview.noSpec')}</p>
-                  </div>
-                )}
-              </div>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
-      
+                  </ul>
+                </div>
+              )}
+              
+              {validationResult.warnings.length > 0 && (
+                <div>
+                  <h4 className="font-medium text-yellow-600 dark:text-yellow-400 mb-2">Warnings</h4>
+                  <ul className="space-y-2">
+                    {validationResult.warnings.map((warning, index) => (
+                      <li key={index} className="flex items-start text-sm">
+                        <AlertTriangle className="h-4 w-4 text-yellow-500 mr-2 mt-0.5 flex-shrink-0" />
+                        {warning}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              {validationResult.isValid && validationResult.warnings.length === 0 && (
+                <div className="text-center py-8">
+                  <CheckCircle className="h-12 w-12 mx-auto mb-4 text-green-500" />
+                  <h3 className="text-lg font-medium mb-2">All Validations Passed</h3>
+                  <p className="text-gray-600 dark:text-gray-400">
+                    Your configuration is ready for API generation.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Navigation */}
-      <div className="flex justify-between pt-6 border-t">
-        <Button 
-          variant="outline" 
-          onClick={handlePrevious}
-          className="flex items-center space-x-2"
+      <div className="flex items-center justify-between">
+        <Button
+          variant="outline"
+          onClick={navigation.goToPreviousStep}
+          disabled={!navigation.canGoPrevious || isNavigationLocked}
         >
-          <ArrowLeft className="h-4 w-4" />
-          <span>{t('wizard.previous')}</span>
+          <ChevronLeft className="h-4 w-4 mr-2" />
+          Previous
         </Button>
-        
-        <Button 
-          onClick={handleNext}
-          disabled={validationErrors.length > 0 || !openApiSpec}
-          className="flex items-center space-x-2"
+
+        <Button
+          onClick={handleGenerateApi}
+          disabled={!validationResult.isValid || isNavigationLocked || generateApiMutation.isLoading}
+          className="min-w-[140px]"
         >
-          <span>{t('wizard.next')}</span>
-          <ArrowRight className="h-4 w-4" />
+          {generateApiMutation.isLoading ? (
+            <>
+              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              Generating...
+            </>
+          ) : (
+            <>
+              Generate API
+              <ChevronRight className="h-4 w-4 ml-2" />
+            </>
+          )}
         </Button>
       </div>
+
+      {/* Generation Confirmation Dialog */}
+      <Dialog
+        isOpen={showGenerationDialog}
+        onClose={() => setShowGenerationDialog(false)}
+        title="Confirm API Generation"
+      >
+        <div className="space-y-4">
+          <p>
+            You are about to generate REST API endpoints for <strong>{selectedTables.size}</strong> table(s) 
+            in the <strong>{serviceName}</strong> service.
+          </p>
+          
+          <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+            <h4 className="font-medium mb-2">What will be generated:</h4>
+            <ul className="text-sm space-y-1">
+              <li>• REST API endpoints for all configured HTTP methods</li>
+              <li>• OpenAPI 3.0 specification document</li>
+              <li>• Interactive API documentation</li>
+              <li>• Security rules and access controls</li>
+            </ul>
+          </div>
+          
+          {validationResult.warnings.length > 0 && (
+            <Alert variant="warning">
+              <AlertTriangle className="h-4 w-4" />
+              <div>
+                <h4 className="font-medium">Please Review Warnings</h4>
+                <p className="text-sm">
+                  There are {validationResult.warnings.length} warning(s) in your configuration. 
+                  You can proceed, but consider reviewing them first.
+                </p>
+              </div>
+            </Alert>
+          )}
+          
+          <div className="flex items-center justify-end space-x-3">
+            <Button
+              variant="outline"
+              onClick={() => setShowGenerationDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmGeneration}
+              disabled={generateApiMutation.isLoading}
+            >
+              {generateApiMutation.isLoading ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                'Generate API'
+              )}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* Custom Swagger UI Styling */}
+      <style jsx global>{`
+        .swagger-ui-wrapper .swagger-ui {
+          font-family: inherit;
+        }
+        
+        .swagger-ui-wrapper .swagger-ui .info {
+          margin: 20px 0;
+        }
+        
+        .swagger-ui-wrapper .swagger-ui .scheme-container {
+          background: transparent;
+          border: none;
+          padding: 0;
+        }
+        
+        .swagger-ui-wrapper .swagger-ui .info .title {
+          color: var(--tw-prose-headings);
+          font-size: 1.5rem;
+          font-weight: 600;
+        }
+        
+        .swagger-ui-wrapper .swagger-ui .opblock {
+          border-radius: 8px;
+          margin-bottom: 16px;
+          border: 1px solid rgb(229 231 235);
+        }
+        
+        .dark .swagger-ui-wrapper .swagger-ui .opblock {
+          border-color: rgb(55 65 81);
+        }
+        
+        .swagger-ui-wrapper .swagger-ui .opblock.opblock-get {
+          border-color: rgb(34 197 94);
+        }
+        
+        .swagger-ui-wrapper .swagger-ui .opblock.opblock-post {
+          border-color: rgb(59 130 246);
+        }
+        
+        .swagger-ui-wrapper .swagger-ui .opblock.opblock-put {
+          border-color: rgb(245 158 11);
+        }
+        
+        .swagger-ui-wrapper .swagger-ui .opblock.opblock-delete {
+          border-color: rgb(239 68 68);
+        }
+      `}</style>
     </div>
   );
 };
