@@ -1,102 +1,358 @@
 /**
- * @fileoverview TypeScript type definitions for the ProfileDetails component
- * Provides comprehensive interfaces for component props, form data structure, 
- * validation schemas, and error handling with React Hook Form and Zod integration.
+ * ProfileDetails Component Type Definitions
  * 
+ * Comprehensive TypeScript type definitions for the ProfileDetails component
+ * supporting React Hook Form integration, Zod schema validation, theme management
+ * with Zustand, and WCAG 2.1 AA accessibility compliance.
+ * 
+ * Replaces Angular profileDetailsGroup with React Hook Form compatible types
+ * while maintaining exact functional parity with the original implementation.
+ * 
+ * @fileoverview TypeScript 5.8+ enhanced types for ProfileDetails component
  * @version 1.0.0
- * @requires TypeScript 5.8+
- * @requires React 19
- * @requires React Hook Form 7.57.0+
- * @requires Zod validation
  */
 
-import { ComponentType, ReactNode } from 'react';
-import { UseFormReturn, FieldErrors, FieldValues } from 'react-hook-form';
-import { z } from 'zod';
+import { ReactNode } from 'react';
+import { 
+  FieldErrors, 
+  UseFormReturn, 
+  SubmitHandler, 
+  SubmitErrorHandler,
+  FormFieldConfig,
+  EnhancedValidationState,
+  FormFieldError
+} from '../../../types/forms';
+import { 
+  BaseComponent, 
+  ComponentVariant, 
+  ComponentSize,
+  FormEventHandlers,
+  ValidationState
+} from '../../../types/ui';
+import { 
+  ThemeMode, 
+  ResolvedTheme, 
+  UseThemeReturn 
+} from '../../../types/theme';
 
 // ============================================================================
-// CORE COMPONENT INTERFACES
+// CORE PROFILE DETAILS TYPES
 // ============================================================================
 
 /**
- * ProfileDetailsProps interface defining the complete component API
- * Supports optional callbacks, validation configuration, and theme integration
+ * ProfileDetails form data structure matching Angular profileDetailsGroup
+ * Maintains exact field structure for seamless migration compatibility
  */
-export interface ProfileDetailsProps {
-  /** Initial form data - matches Angular profileDetailsGroup structure */
-  initialData?: Partial<ProfileDetailsFormData>;
+export interface ProfileDetailsFormData {
+  /** User's unique identifier - typically email or username */
+  username: string;
   
-  /** Form submission callback with typed data */
-  onSubmit?: (data: ProfileDetailsFormData) => Promise<void> | void;
+  /** User's email address for authentication and communication */
+  email: string;
   
-  /** Form validation callback for custom business rules */
-  onValidate?: (data: ProfileDetailsFormData) => ValidationErrors | null;
+  /** User's first name for personalization */
+  firstName: string;
   
-  /** Change handler for real-time form updates */
-  onChange?: (data: Partial<ProfileDetailsFormData>) => void;
+  /** User's last name for full identification */
+  lastName: string;
   
-  /** Cancel/reset callback */
-  onCancel?: () => void;
+  /** Display name shown in UI - computed from firstName + lastName or custom */
+  name: string;
   
-  /** Error callback for submission failures */
-  onError?: (error: Error | ValidationErrors) => void;
+  /** Optional phone number for contact purposes */
+  phone?: string;
   
-  /** Loading state indicator */
-  isLoading?: boolean;
+  /** Optional profile avatar URL or base64 image data */
+  avatar?: string;
   
-  /** Read-only mode flag */
-  readOnly?: boolean;
+  /** User's timezone for proper date/time display */
+  timezone?: string;
   
-  /** Form validation mode - defaults to 'onSubmit' */
-  validationMode?: 'onSubmit' | 'onBlur' | 'onChange' | 'onTouched' | 'all';
+  /** User's preferred language for internationalization */
+  locale?: string;
   
-  /** Re-validation mode after initial validation */
-  reValidateMode?: 'onSubmit' | 'onBlur' | 'onChange' | 'onTouched' | 'all';
+  /** User's role for authorization context */
+  role?: string;
   
-  /** Custom validation schema override */
-  validationSchema?: z.ZodSchema<ProfileDetailsFormData>;
+  /** Last login timestamp for security tracking */
+  lastLogin?: Date;
   
-  /** Field configuration for dynamic rendering */
-  fieldConfig?: Partial<Record<keyof ProfileDetailsFormData, FormFieldConfig>>;
+  /** Account status for administrative control */
+  isActive?: boolean;
   
-  /** Theme configuration */
-  theme?: ThemeAwareProps;
+  /** Email verification status */
+  isEmailVerified?: boolean;
   
-  /** Accessibility configuration */
-  accessibility?: AccessibilityProps;
-  
-  /** Custom CSS classes */
-  className?: string;
-  
-  /** Test identifier for testing frameworks */
-  'data-testid'?: string;
+  /** Optional user preferences object */
+  preferences?: UserPreferences;
 }
 
 /**
- * ProfileDetailsFormData type matching the Angular profileDetailsGroup structure
- * Provides complete compatibility with existing form validation and submission logic
+ * User preferences structure for customization options
  */
-export interface ProfileDetailsFormData {
-  /** User's login username - required field */
-  username: string;
+export interface UserPreferences {
+  /** Theme preference */
+  theme?: ThemeMode;
   
-  /** User's email address - required with validation */
-  email: string;
+  /** Dashboard layout preference */
+  dashboardLayout?: 'grid' | 'list' | 'compact';
   
-  /** User's first name - required field */
-  firstName: string;
+  /** Default database connection timeout */
+  defaultTimeout?: number;
   
-  /** User's last name - required field */
-  lastName: string;
+  /** Show advanced options by default */
+  showAdvancedOptions?: boolean;
   
-  /** User's display name (mapped from Angular 'name' field) */
-  name: string;
+  /** Email notification preferences */
+  notifications?: NotificationPreferences;
   
-  /** User's phone number - optional field */
-  phone?: string;
+  /** Accessibility preferences */
+  accessibility?: AccessibilityPreferences;
+}
+
+/**
+ * Email notification preferences
+ */
+export interface NotificationPreferences {
+  /** Service creation notifications */
+  serviceEvents?: boolean;
   
-  /** Additional user profile fields for extensibility */
-  [key: string]: string | undefined;
+  /** System maintenance notifications */
+  systemUpdates?: boolean;
+  
+  /** Security alert notifications */
+  securityAlerts?: boolean;
+  
+  /** API usage threshold notifications */
+  usageAlerts?: boolean;
+  
+  /** Weekly summary reports */
+  weeklySummary?: boolean;
+}
+
+/**
+ * Accessibility preferences for WCAG compliance
+ */
+export interface AccessibilityPreferences {
+  /** Reduced motion preference */
+  reduceMotion?: boolean;
+  
+  /** High contrast mode */
+  highContrast?: boolean;
+  
+  /** Larger text scaling */
+  largeText?: boolean;
+  
+  /** Screen reader optimizations */
+  screenReader?: boolean;
+  
+  /** Keyboard navigation only */
+  keyboardOnly?: boolean;
+  
+  /** Focus indicator enhancement */
+  enhancedFocus?: boolean;
+}
+
+// ============================================================================
+// COMPONENT PROPS AND CONFIGURATION
+// ============================================================================
+
+/**
+ * ProfileDetails component props with comprehensive configuration options
+ * Supports all React Hook Form patterns with Zod validation integration
+ */
+export interface ProfileDetailsProps extends BaseComponent {
+  /** Initial form data - defaults to empty profile */
+  initialData?: Partial<ProfileDetailsFormData>;
+  
+  /** Form submission handler with type safety */
+  onSubmit?: SubmitHandler<ProfileDetailsFormData>;
+  
+  /** Form error handler for validation failures */
+  onError?: SubmitErrorHandler<ProfileDetailsFormData>;
+  
+  /** Form data change callback for real-time updates */
+  onChange?: (data: Partial<ProfileDetailsFormData>) => void;
+  
+  /** Cancel/close callback */
+  onCancel?: () => void;
+  
+  /** Validation configuration options */
+  validation?: ProfileValidationConfig;
+  
+  /** Theme integration configuration */
+  theme?: ProfileThemeConfig;
+  
+  /** Accessibility configuration for WCAG 2.1 AA */
+  accessibility?: ProfileAccessibilityConfig;
+  
+  /** Field visibility and editing permissions */
+  permissions?: ProfilePermissions;
+  
+  /** Form layout and presentation options */
+  layout?: ProfileLayoutConfig;
+  
+  /** Loading state management */
+  loading?: boolean;
+  
+  /** Disabled state for read-only mode */
+  disabled?: boolean;
+  
+  /** Show avatar upload functionality */
+  showAvatar?: boolean;
+  
+  /** Show advanced user preferences */
+  showPreferences?: boolean;
+  
+  /** Custom field configurations for dynamic forms */
+  customFields?: FormFieldConfig<ProfileDetailsFormData>[];
+  
+  /** Form validation mode for React Hook Form */
+  validationMode?: 'onChange' | 'onBlur' | 'onSubmit' | 'onTouched' | 'all';
+  
+  /** Re-validation mode after successful validation */
+  reValidateMode?: 'onChange' | 'onBlur' | 'onSubmit';
+  
+  /** Success message display callback */
+  onSuccess?: (data: ProfileDetailsFormData) => void;
+  
+  /** Integration with external form instance */
+  formInstance?: UseFormReturn<ProfileDetailsFormData>;
+}
+
+/**
+ * Validation configuration for ProfileDetails form
+ * Integrates with Zod schema validation system
+ */
+export interface ProfileValidationConfig {
+  /** Real-time validation enabled */
+  realTime?: boolean;
+  
+  /** Validation debounce delay in milliseconds */
+  debounceMs?: number;
+  
+  /** Async validation for unique username/email checks */
+  asyncValidation?: {
+    /** Username uniqueness check */
+    checkUsername?: (username: string) => Promise<boolean>;
+    
+    /** Email uniqueness check */
+    checkEmail?: (email: string) => Promise<boolean>;
+    
+    /** Custom async validators */
+    custom?: Record<keyof ProfileDetailsFormData, (value: any) => Promise<boolean | string>>;
+  };
+  
+  /** Custom validation rules beyond Zod schema */
+  customRules?: ProfileCustomValidationRules;
+  
+  /** Password strength requirements (if password field enabled) */
+  passwordRules?: PasswordValidationRules;
+  
+  /** Email format validation configuration */
+  emailValidation?: EmailValidationConfig;
+  
+  /** Phone number validation configuration */
+  phoneValidation?: PhoneValidationConfig;
+}
+
+/**
+ * Custom validation rules for profile fields
+ */
+export interface ProfileCustomValidationRules {
+  /** Username validation rules */
+  username?: {
+    minLength?: number;
+    maxLength?: number;
+    pattern?: RegExp;
+    reservedWords?: string[];
+    customValidator?: (value: string) => boolean | string;
+  };
+  
+  /** Name validation rules */
+  name?: {
+    minLength?: number;
+    maxLength?: number;
+    pattern?: RegExp;
+    customValidator?: (value: string) => boolean | string;
+  };
+  
+  /** Cross-field validation */
+  crossField?: {
+    /** Validate display name matches first + last name pattern */
+    validateDisplayName?: boolean;
+    /** Custom cross-field validators */
+    custom?: (data: Partial<ProfileDetailsFormData>) => Record<string, string>;
+  };
+}
+
+/**
+ * Password validation rules for security compliance
+ */
+export interface PasswordValidationRules {
+  /** Minimum password length */
+  minLength?: number;
+  
+  /** Maximum password length */
+  maxLength?: number;
+  
+  /** Require uppercase letters */
+  requireUppercase?: boolean;
+  
+  /** Require lowercase letters */
+  requireLowercase?: boolean;
+  
+  /** Require numeric digits */
+  requireNumbers?: boolean;
+  
+  /** Require special characters */
+  requireSpecialChars?: boolean;
+  
+  /** Banned common passwords */
+  bannedPasswords?: string[];
+  
+  /** Custom password strength validator */
+  customValidator?: (password: string) => { score: number; feedback: string[] };
+}
+
+/**
+ * Email validation configuration
+ */
+export interface EmailValidationConfig {
+  /** Email format validation pattern */
+  pattern?: RegExp;
+  
+  /** Allowed email domains */
+  allowedDomains?: string[];
+  
+  /** Blocked email domains */
+  blockedDomains?: string[];
+  
+  /** Require email verification */
+  requireVerification?: boolean;
+  
+  /** Custom email validator */
+  customValidator?: (email: string) => boolean | string;
+}
+
+/**
+ * Phone number validation configuration
+ */
+export interface PhoneValidationConfig {
+  /** Phone number format pattern */
+  pattern?: RegExp;
+  
+  /** Allowed country codes */
+  allowedCountries?: string[];
+  
+  /** Default country for formatting */
+  defaultCountry?: string;
+  
+  /** International format required */
+  requireInternational?: boolean;
+  
+  /** Custom phone validator */
+  customValidator?: (phone: string) => boolean | string;
 }
 
 // ============================================================================
@@ -104,599 +360,732 @@ export interface ProfileDetailsFormData {
 // ============================================================================
 
 /**
- * ValidationErrors type for comprehensive form validation
- * Supports internationalized error messages and field-specific errors
+ * Comprehensive validation errors with internationalization support
+ * Extends base form validation with profile-specific error handling
  */
-export interface ValidationErrors {
-  /** Field-specific validation errors */
-  fieldErrors?: Partial<Record<keyof ProfileDetailsFormData, string | string[]>>;
-  
-  /** Global form-level validation errors */
-  formErrors?: string[];
-  
-  /** Server-side validation errors */
-  serverErrors?: string[];
-  
-  /** Network or system errors */
-  systemErrors?: string[];
-  
-  /** Validation error code for i18n lookup */
-  errorCode?: string;
-  
-  /** Detailed error context for debugging */
-  errorDetails?: Record<string, unknown>;
-}
-
-/**
- * Form field configuration interface for dynamic field rendering
- * Supports conditional display, validation, and accessibility features
- */
-export interface FormFieldConfig {
-  /** Field display label */
-  label: string;
-  
-  /** Field placeholder text */
-  placeholder?: string;
-  
-  /** Field help text or description */
-  helpText?: string;
-  
-  /** Whether field is required */
-  required?: boolean;
-  
-  /** Whether field is disabled */
-  disabled?: boolean;
-  
-  /** Whether field is read-only */
-  readOnly?: boolean;
-  
-  /** Whether field is hidden */
-  hidden?: boolean;
-  
-  /** Field input type */
-  type?: 'text' | 'email' | 'tel' | 'password' | 'url';
-  
-  /** Auto-complete attribute value */
-  autoComplete?: string;
-  
-  /** Maximum character length */
-  maxLength?: number;
-  
-  /** Minimum character length */
-  minLength?: number;
-  
-  /** Input pattern for validation */
-  pattern?: string;
-  
-  /** Custom validation function */
-  customValidator?: (value: string) => string | null;
-  
-  /** Conditional display logic */
-  conditional?: ConditionalLogic;
-  
-  /** Field accessibility configuration */
-  accessibility?: FieldAccessibilityConfig;
-  
-  /** Field-specific theme overrides */
-  theme?: FieldThemeConfig;
-}
-
-/**
- * Conditional field display logic
- */
-export interface ConditionalLogic {
-  /** Fields to watch for changes */
-  dependsOn: (keyof ProfileDetailsFormData)[];
-  
-  /** Condition evaluation function */
-  condition: (values: Partial<ProfileDetailsFormData>) => boolean;
-  
-  /** Action to take when condition is met */
-  action: 'show' | 'hide' | 'enable' | 'disable' | 'require';
-}
-
-// ============================================================================
-// THEME INTEGRATION
-// ============================================================================
-
-/**
- * ThemeAwareProps interface for consistent theme integration
- * Integrates with Zustand state management for global theme consistency
- */
-export interface ThemeAwareProps {
-  /** Theme variant */
-  variant?: 'default' | 'compact' | 'spacious' | 'minimal';
-  
-  /** Color scheme */
-  colorScheme?: 'light' | 'dark' | 'auto';
-  
-  /** Size configuration */
-  size?: 'sm' | 'md' | 'lg' | 'xl';
-  
-  /** Border style */
-  borderStyle?: 'none' | 'subtle' | 'normal' | 'bold';
-  
-  /** Corner radius */
-  borderRadius?: 'none' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
-  
-  /** Shadow intensity */
-  shadow?: 'none' | 'sm' | 'md' | 'lg' | 'xl';
-  
-  /** Animation preferences */
-  animations?: 'none' | 'reduced' | 'normal' | 'enhanced';
-  
-  /** Custom CSS variable overrides */
-  cssVariables?: Record<string, string>;
-  
-  /** Responsive breakpoint overrides */
-  responsive?: ResponsiveThemeConfig;
-}
-
-/**
- * Responsive theme configuration
- */
-export interface ResponsiveThemeConfig {
-  /** Mobile theme overrides */
-  mobile?: Partial<ThemeAwareProps>;
-  
-  /** Tablet theme overrides */
-  tablet?: Partial<ThemeAwareProps>;
-  
-  /** Desktop theme overrides */
-  desktop?: Partial<ThemeAwareProps>;
-}
-
-/**
- * Field-specific theme configuration
- */
-export interface FieldThemeConfig {
-  /** Input field styling */
-  input?: {
-    variant?: 'outline' | 'filled' | 'underline' | 'ghost';
-    focusColor?: string;
-    errorColor?: string;
-    backgroundColor?: string;
+export interface ProfileValidationErrors extends FieldErrors<ProfileDetailsFormData> {
+  /** Root-level form errors */
+  root?: FormFieldError & {
+    /** Error category for filtering */
+    category?: 'validation' | 'network' | 'permission' | 'system';
+    
+    /** Error severity for UI styling */
+    severity?: 'error' | 'warning' | 'info';
+    
+    /** Retry action available */
+    retryable?: boolean;
   };
   
-  /** Label styling */
-  label?: {
-    position?: 'top' | 'left' | 'floating';
-    weight?: 'normal' | 'medium' | 'semibold' | 'bold';
-    color?: string;
+  /** Field-specific validation states */
+  fieldStates?: Record<keyof ProfileDetailsFormData, EnhancedValidationState>;
+  
+  /** Async validation errors */
+  asyncErrors?: Record<keyof ProfileDetailsFormData, string>;
+  
+  /** Cross-field validation errors */
+  crossFieldErrors?: Record<string, string>;
+}
+
+/**
+ * Internationalized error messages for profile validation
+ * Supports multiple languages and contextual error descriptions
+ */
+export interface ProfileValidationMessages {
+  /** Required field errors */
+  required: {
+    username: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    name: string;
   };
   
-  /** Error message styling */
-  error?: {
-    position?: 'bottom' | 'inline' | 'tooltip';
-    animation?: 'none' | 'fade' | 'slide' | 'bounce';
+  /** Format validation errors */
+  format: {
+    email: string;
+    phone: string;
+    username: string;
+  };
+  
+  /** Length validation errors */
+  length: {
+    usernameMin: string;
+    usernameMax: string;
+    nameMin: string;
+    nameMax: string;
+    passwordMin: string;
+    passwordMax: string;
+  };
+  
+  /** Uniqueness validation errors */
+  uniqueness: {
+    username: string;
+    email: string;
+  };
+  
+  /** Custom validation errors */
+  custom: {
+    invalidCharacters: string;
+    reservedWord: string;
+    weakPassword: string;
+    blockedDomain: string;
+  };
+  
+  /** System errors */
+  system: {
+    networkError: string;
+    validationTimeout: string;
+    serverError: string;
+    permissionDenied: string;
+  };
+  
+  /** Success messages */
+  success: {
+    profileUpdated: string;
+    emailVerified: string;
+    passwordChanged: string;
   };
 }
 
 // ============================================================================
-// ACCESSIBILITY SUPPORT
+// THEME AND STYLING
 // ============================================================================
 
 /**
- * AccessibilityProps for WCAG 2.1 AA compliance
- * Ensures proper ARIA attributes and keyboard navigation support
+ * Theme-aware component props for ProfileDetails styling
+ * Integrates with Zustand theme state management
  */
-export interface AccessibilityProps {
-  /** Form accessibility label */
-  'aria-label'?: string;
+export interface ProfileThemeConfig {
+  /** Theme mode override */
+  mode?: ThemeMode;
   
-  /** Form accessibility description */
-  'aria-describedby'?: string;
+  /** Component variant for styling */
+  variant?: ComponentVariant;
   
-  /** Form accessibility labelled by */
-  'aria-labelledby'?: string;
+  /** Component size configuration */
+  size?: ComponentSize;
   
-  /** Live region for dynamic updates */
-  'aria-live'?: 'off' | 'polite' | 'assertive';
+  /** Custom CSS classes */
+  className?: string;
   
-  /** Form completion status */
-  'aria-busy'?: boolean;
+  /** Container styling options */
+  container?: {
+    /** Card-style container */
+    card?: boolean;
+    
+    /** Full-width layout */
+    fullWidth?: boolean;
+    
+    /** Compact spacing */
+    compact?: boolean;
+    
+    /** Custom padding */
+    padding?: ComponentSize;
+    
+    /** Border styling */
+    bordered?: boolean;
+    
+    /** Shadow styling */
+    shadow?: ComponentSize;
+  };
   
-  /** Form validity status */
-  'aria-invalid'?: boolean;
+  /** Form field styling */
+  fields?: {
+    /** Field size override */
+    size?: ComponentSize;
+    
+    /** Field variant override */
+    variant?: ComponentVariant;
+    
+    /** Label position */
+    labelPosition?: 'top' | 'left' | 'floating';
+    
+    /** Show field icons */
+    showIcons?: boolean;
+    
+    /** Custom field spacing */
+    spacing?: ComponentSize;
+  };
   
-  /** Required field indicator */
-  'aria-required'?: boolean;
-  
-  /** Auto-complete behavior */
-  autoComplete?: 'on' | 'off';
-  
-  /** Tab navigation configuration */
-  tabNavigation?: TabNavigationConfig;
-  
-  /** Screen reader optimization */
-  screenReader?: ScreenReaderConfig;
-  
-  /** Keyboard shortcuts */
-  keyboardShortcuts?: KeyboardShortcutConfig[];
-  
-  /** Focus management */
-  focusManagement?: FocusManagementConfig;
-  
-  /** Error announcement settings */
-  errorAnnouncement?: ErrorAnnouncementConfig;
+  /** Button styling configuration */
+  buttons?: {
+    /** Primary button variant */
+    primary?: ComponentVariant;
+    
+    /** Secondary button variant */
+    secondary?: ComponentVariant;
+    
+    /** Button size */
+    size?: ComponentSize;
+    
+    /** Button layout */
+    layout?: 'inline' | 'stacked' | 'split';
+  };
 }
 
 /**
- * Field-specific accessibility configuration
+ * Theme integration interface for Zustand state management
+ * Provides theme utilities and state management hooks
  */
-export interface FieldAccessibilityConfig {
-  /** Field accessibility label */
-  'aria-label'?: string;
+export interface ProfileThemeIntegration extends UseThemeReturn {
+  /** Get theme-appropriate field styling */
+  getFieldClasses: (fieldName: keyof ProfileDetailsFormData) => string;
   
-  /** Field accessibility description */
-  'aria-describedby'?: string;
+  /** Get theme-appropriate validation styling */
+  getValidationClasses: (hasError: boolean, isValid?: boolean) => string;
   
-  /** Field error announcement */
-  'aria-errormessage'?: string;
+  /** Get theme-appropriate button styling */
+  getButtonClasses: (variant: ComponentVariant, size?: ComponentSize) => string;
   
-  /** Field auto-complete type */
-  autoComplete?: string;
+  /** Get accessible color combinations */
+  getAccessibleColors: () => {
+    text: string;
+    background: string;
+    border: string;
+    focus: string;
+    error: string;
+    success: string;
+  };
   
-  /** Field tab index override */
-  tabIndex?: number;
-  
-  /** Field role override */
-  role?: string;
-}
-
-/**
- * Tab navigation configuration
- */
-export interface TabNavigationConfig {
-  /** Enable tab navigation */
-  enabled?: boolean;
-  
-  /** Skip to content link */
-  skipLinks?: boolean;
-  
-  /** Tab order override */
-  tabOrder?: number[];
-  
-  /** Trap focus within form */
-  trapFocus?: boolean;
-}
-
-/**
- * Screen reader optimization configuration
- */
-export interface ScreenReaderConfig {
-  /** Announce form changes */
-  announceChanges?: boolean;
-  
-  /** Announce validation errors */
-  announceErrors?: boolean;
-  
-  /** Announce successful submission */
-  announceSuccess?: boolean;
-  
-  /** Use semantic HTML structure */
-  semanticStructure?: boolean;
-  
-  /** Provide field descriptions */
-  fieldDescriptions?: boolean;
-}
-
-/**
- * Keyboard shortcut configuration
- */
-export interface KeyboardShortcutConfig {
-  /** Shortcut key combination */
-  keys: string[];
-  
-  /** Shortcut description */
-  description: string;
-  
-  /** Shortcut action */
-  action: () => void;
-  
-  /** Enable in read-only mode */
-  enableInReadOnly?: boolean;
-}
-
-/**
- * Focus management configuration
- */
-export interface FocusManagementConfig {
-  /** Auto-focus first field */
-  autoFocusFirst?: boolean;
-  
-  /** Focus first error on validation */
-  focusFirstError?: boolean;
-  
-  /** Return focus after modal close */
-  returnFocus?: boolean;
-  
-  /** Skip disabled fields */
-  skipDisabled?: boolean;
-}
-
-/**
- * Error announcement configuration
- */
-export interface ErrorAnnouncementConfig {
-  /** Announce immediately */
-  immediate?: boolean;
-  
-  /** Announcement delay in milliseconds */
-  delay?: number;
-  
-  /** Use alert role */
-  useAlert?: boolean;
-  
-  /** Include field context */
-  includeFieldContext?: boolean;
+  /** Check if current theme meets accessibility requirements */
+  isAccessible: () => boolean;
 }
 
 // ============================================================================
-// FORM STATE MANAGEMENT
+// ACCESSIBILITY AND COMPLIANCE
 // ============================================================================
 
 /**
- * Form submission state
+ * WCAG 2.1 AA accessibility configuration for ProfileDetails
+ * Ensures comprehensive accessibility compliance and keyboard navigation
  */
-export interface FormSubmissionState {
-  /** Whether form is currently submitting */
-  isSubmitting: boolean;
+export interface ProfileAccessibilityConfig {
+  /** ARIA landmark configuration */
+  landmarks?: {
+    /** Form landmark label */
+    form?: string;
+    
+    /** Error region label */
+    errors?: string;
+    
+    /** Success region label */
+    success?: string;
+    
+    /** Help region label */
+    help?: string;
+  };
   
-  /** Whether form has been submitted */
-  isSubmitted: boolean;
+  /** Screen reader optimizations */
+  screenReader?: {
+    /** Announce validation changes */
+    announceValidation?: boolean;
+    
+    /** Announce form progress */
+    announceProgress?: boolean;
+    
+    /** Live region politeness */
+    liveRegion?: 'off' | 'polite' | 'assertive';
+    
+    /** Custom announcements */
+    customAnnouncements?: Record<string, string>;
+  };
   
-  /** Whether submission was successful */
-  isSubmitSuccessful: boolean;
+  /** Keyboard navigation configuration */
+  keyboard?: {
+    /** Enable keyboard shortcuts */
+    shortcuts?: boolean;
+    
+    /** Tab order customization */
+    tabOrder?: (keyof ProfileDetailsFormData)[];
+    
+    /** Focus management strategy */
+    focusStrategy?: 'linear' | 'circular' | 'smart';
+    
+    /** Skip links for complex forms */
+    skipLinks?: boolean;
+  };
   
-  /** Number of submission attempts */
-  submitCount: number;
+  /** Focus management configuration */
+  focus?: {
+    /** Auto-focus first field */
+    autoFocusFirst?: boolean;
+    
+    /** Focus invalid field on submit */
+    focusOnError?: boolean;
+    
+    /** Enhanced focus indicators */
+    enhancedIndicators?: boolean;
+    
+    /** Focus trap for modal forms */
+    trapFocus?: boolean;
+  };
   
-  /** Submission timestamp */
-  submittedAt?: Date;
+  /** Color and contrast requirements */
+  contrast?: {
+    /** Minimum contrast ratio */
+    minimumRatio?: number;
+    
+    /** Enhanced contrast mode */
+    enhancedMode?: boolean;
+    
+    /** Error color contrast validation */
+    validateErrorColors?: boolean;
+  };
   
-  /** Last submission error */
-  lastError?: Error | ValidationErrors;
+  /** Touch target requirements */
+  touchTargets?: {
+    /** Minimum touch target size */
+    minimumSize?: number;
+    
+    /** Spacing between targets */
+    minimumSpacing?: number;
+    
+    /** Enhanced touch targets */
+    enhanced?: boolean;
+  };
+  
+  /** Text and content accessibility */
+  content?: {
+    /** Maximum line length for readability */
+    maxLineLength?: number;
+    
+    /** Minimum text size */
+    minTextSize?: number;
+    
+    /** Language specification */
+    language?: string;
+    
+    /** Reading level target */
+    readingLevel?: 'simple' | 'intermediate' | 'advanced';
+  };
 }
 
 /**
- * Form validation state
+ * ARIA attributes interface for ProfileDetails accessibility
+ * Provides comprehensive ARIA support for form elements and interactions
  */
-export interface FormValidationState {
-  /** Whether form is currently validating */
-  isValidating: boolean;
+export interface ProfileAriaAttributes {
+  /** Form-level ARIA attributes */
+  form?: {
+    'aria-label'?: string;
+    'aria-describedby'?: string;
+    'aria-labelledby'?: string;
+    'role'?: 'form' | 'dialog' | 'region';
+  };
   
-  /** Whether form is valid */
-  isValid: boolean;
+  /** Field-level ARIA attributes */
+  fields?: Partial<Record<keyof ProfileDetailsFormData, {
+    'aria-label'?: string;
+    'aria-describedby'?: string;
+    'aria-required'?: boolean;
+    'aria-invalid'?: boolean;
+    'aria-errormessage'?: string;
+    'aria-autocomplete'?: 'off' | 'on' | 'list' | 'both';
+    'role'?: string;
+  }>>;
   
-  /** Current validation errors */
-  errors: FieldErrors<ProfileDetailsFormData>;
+  /** Button ARIA attributes */
+  buttons?: {
+    submit?: {
+      'aria-label'?: string;
+      'aria-describedby'?: string;
+    };
+    cancel?: {
+      'aria-label'?: string;
+      'aria-describedby'?: string;
+    };
+    reset?: {
+      'aria-label'?: string;
+      'aria-describedby'?: string;
+    };
+  };
   
-  /** Touched fields */
-  touchedFields: Partial<Record<keyof ProfileDetailsFormData, boolean>>;
-  
-  /** Dirty fields (modified from initial values) */
-  dirtyFields: Partial<Record<keyof ProfileDetailsFormData, boolean>>;
-  
-  /** Whether form has been validated */
-  isValidated: boolean;
-}
-
-/**
- * Complete form state combining React Hook Form with custom state
- */
-export interface ProfileDetailsFormState extends FormSubmissionState, FormValidationState {
-  /** React Hook Form instance */
-  form: UseFormReturn<ProfileDetailsFormData>;
-  
-  /** Current form values */
-  values: ProfileDetailsFormData;
-  
-  /** Initial form values */
-  initialValues: ProfileDetailsFormData;
-  
-  /** Whether form has unsaved changes */
-  isDirty: boolean;
-  
-  /** Form reset function */
-  reset: (values?: Partial<ProfileDetailsFormData>) => void;
-  
-  /** Manual validation trigger */
-  validate: () => Promise<boolean>;
-  
-  /** Clear all errors */
-  clearErrors: () => void;
-  
-  /** Set specific field value */
-  setValue: <K extends keyof ProfileDetailsFormData>(
-    field: K,
-    value: ProfileDetailsFormData[K],
-    options?: { shouldValidate?: boolean; shouldDirty?: boolean }
-  ) => void;
-  
-  /** Get specific field value */
-  getValue: <K extends keyof ProfileDetailsFormData>(field: K) => ProfileDetailsFormData[K];
-  
-  /** Watch field changes */
-  watch: <K extends keyof ProfileDetailsFormData>(
-    field?: K | K[]
-  ) => K extends undefined ? ProfileDetailsFormData : ProfileDetailsFormData[K];
+  /** Status and feedback ARIA attributes */
+  status?: {
+    loading?: {
+      'aria-label'?: string;
+      'aria-live'?: 'off' | 'polite' | 'assertive';
+    };
+    error?: {
+      'aria-label'?: string;
+      'aria-live'?: 'off' | 'polite' | 'assertive';
+    };
+    success?: {
+      'aria-label'?: string;
+      'aria-live'?: 'off' | 'polite' | 'assertive';
+    };
+  };
 }
 
 // ============================================================================
-// UTILITY TYPES
+// LAYOUT AND PRESENTATION
 // ============================================================================
 
 /**
- * Form field names as union type for type safety
+ * ProfileDetails layout configuration for responsive design
+ * Supports multiple layout patterns and responsive breakpoints
  */
-export type ProfileDetailsFieldNames = keyof ProfileDetailsFormData;
+export interface ProfileLayoutConfig {
+  /** Layout type selection */
+  type?: 'single-column' | 'two-column' | 'tabbed' | 'accordion' | 'wizard';
+  
+  /** Grid configuration for multi-column layouts */
+  grid?: {
+    /** Desktop columns */
+    columns?: number;
+    
+    /** Mobile columns */
+    mobileColumns?: number;
+    
+    /** Tablet columns */
+    tabletColumns?: number;
+    
+    /** Column gap size */
+    gap?: ComponentSize;
+    
+    /** Row gap size */
+    rowGap?: ComponentSize;
+  };
+  
+  /** Section grouping configuration */
+  sections?: ProfileLayoutSection[];
+  
+  /** Responsive behavior */
+  responsive?: {
+    /** Breakpoint for mobile layout */
+    mobileBreakpoint?: number;
+    
+    /** Breakpoint for tablet layout */
+    tabletBreakpoint?: number;
+    
+    /** Stack fields on mobile */
+    stackOnMobile?: boolean;
+    
+    /** Hide optional fields on mobile */
+    hideOptionalOnMobile?: boolean;
+  };
+  
+  /** Field ordering and visibility */
+  fieldOrder?: (keyof ProfileDetailsFormData)[];
+  
+  /** Hidden fields */
+  hiddenFields?: (keyof ProfileDetailsFormData)[];
+  
+  /** Required field indicators */
+  showRequired?: boolean;
+  
+  /** Optional field indicators */
+  showOptional?: boolean;
+  
+  /** Field help text display */
+  showHelp?: 'always' | 'hover' | 'focus' | 'never';
+}
 
 /**
- * Form field values as union type
+ * Layout section configuration for grouped fields
  */
-export type ProfileDetailsFieldValues = ProfileDetailsFormData[ProfileDetailsFieldNames];
-
-/**
- * Partial form data for incremental updates
- */
-export type PartialProfileDetailsFormData = Partial<ProfileDetailsFormData>;
-
-/**
- * Required fields union type
- */
-export type RequiredProfileDetailsFields = 'username' | 'email' | 'firstName' | 'lastName' | 'name';
-
-/**
- * Optional fields union type
- */
-export type OptionalProfileDetailsFields = 'phone';
-
-/**
- * Form submit handler type
- */
-export type ProfileDetailsSubmitHandler = (data: ProfileDetailsFormData) => Promise<void> | void;
-
-/**
- * Form validation handler type
- */
-export type ProfileDetailsValidationHandler = (data: ProfileDetailsFormData) => ValidationErrors | null;
-
-/**
- * Form change handler type
- */
-export type ProfileDetailsChangeHandler = (data: Partial<ProfileDetailsFormData>) => void;
-
-/**
- * Zod schema type for profile details
- */
-export type ProfileDetailsSchema = z.ZodType<ProfileDetailsFormData>;
-
-/**
- * Theme mode type for enhanced TypeScript 5.8+ literal types
- */
-export type ThemeMode = `${string}-theme` | 'auto' | 'light' | 'dark';
-
-/**
- * Component size type with enhanced template literal types
- */
-export type ComponentSize = `${'xs' | 'sm' | 'md' | 'lg' | 'xl'}${'' | '-compact' | '-spacious'}`;
-
-/**
- * Accessibility role type
- */
-export type AccessibilityRole = 'form' | 'group' | 'region' | 'dialog' | 'alert' | 'status';
-
-/**
- * Form layout type
- */
-export type FormLayout = 'vertical' | 'horizontal' | 'inline' | 'grid' | 'card';
+export interface ProfileLayoutSection {
+  /** Section identifier */
+  id: string;
+  
+  /** Section title */
+  title: string;
+  
+  /** Section description */
+  description?: string;
+  
+  /** Fields in this section */
+  fields: (keyof ProfileDetailsFormData)[];
+  
+  /** Section order priority */
+  order: number;
+  
+  /** Collapsible section */
+  collapsible?: boolean;
+  
+  /** Initially collapsed */
+  defaultCollapsed?: boolean;
+  
+  /** Section icon */
+  icon?: ReactNode;
+  
+  /** Section variant styling */
+  variant?: ComponentVariant;
+  
+  /** Section visibility conditions */
+  conditions?: Array<{
+    field: keyof ProfileDetailsFormData;
+    operator: 'equals' | 'notEquals' | 'in' | 'notIn';
+    value: any;
+  }>;
+}
 
 // ============================================================================
-// DEFAULT CONFIGURATIONS
+// PERMISSIONS AND SECURITY
 // ============================================================================
 
 /**
- * Default form configuration
+ * Field-level permissions for ProfileDetails component
+ * Controls editing capabilities and field visibility based on user roles
  */
-export const DEFAULT_FORM_CONFIG: Required<Pick<ProfileDetailsProps, 'validationMode' | 'reValidateMode'>> = {
-  validationMode: 'onSubmit',
-  reValidateMode: 'onChange',
+export interface ProfilePermissions {
+  /** Read permissions for each field */
+  read?: Partial<Record<keyof ProfileDetailsFormData, boolean>>;
+  
+  /** Write permissions for each field */
+  write?: Partial<Record<keyof ProfileDetailsFormData, boolean>>;
+  
+  /** Role-based permissions */
+  roles?: Record<string, {
+    read: (keyof ProfileDetailsFormData)[];
+    write: (keyof ProfileDetailsFormData)[];
+  }>;
+  
+  /** Conditional permissions based on user context */
+  conditional?: Array<{
+    condition: (user: any) => boolean;
+    permissions: Partial<Record<keyof ProfileDetailsFormData, 'read' | 'write' | 'none'>>;
+  }>;
+  
+  /** Field-level security rules */
+  security?: {
+    /** Sensitive fields requiring additional confirmation */
+    sensitiveFields?: (keyof ProfileDetailsFormData)[];
+    
+    /** Fields requiring re-authentication */
+    reAuthFields?: (keyof ProfileDetailsFormData)[];
+    
+    /** Fields with audit logging */
+    auditedFields?: (keyof ProfileDetailsFormData)[];
+  };
+}
+
+// ============================================================================
+// UTILITY TYPES AND HELPERS
+// ============================================================================
+
+/**
+ * Form field configuration specifically for ProfileDetails
+ * Extends base FormFieldConfig with profile-specific enhancements
+ */
+export interface ProfileFormFieldConfig extends FormFieldConfig<ProfileDetailsFormData> {
+  /** Profile-specific field metadata */
+  profileMeta?: {
+    /** Field category for grouping */
+    category?: 'personal' | 'contact' | 'preferences' | 'security' | 'system';
+    
+    /** Field importance level */
+    importance?: 'required' | 'recommended' | 'optional';
+    
+    /** Field sensitivity level */
+    sensitivity?: 'public' | 'private' | 'confidential';
+    
+    /** Show in profile summary */
+    showInSummary?: boolean;
+    
+    /** Profile completion weight */
+    completionWeight?: number;
+  };
+  
+  /** Avatar-specific configuration */
+  avatar?: {
+    /** Allowed file types */
+    allowedTypes?: string[];
+    
+    /** Maximum file size */
+    maxSize?: number;
+    
+    /** Image dimensions */
+    dimensions?: {
+      width: number;
+      height: number;
+    };
+    
+    /** Image quality settings */
+    quality?: number;
+    
+    /** Crop options */
+    cropOptions?: {
+      aspectRatio?: number;
+      cropShape?: 'rect' | 'round';
+    };
+  };
+}
+
+/**
+ * ProfileDetails form state management interface
+ * Provides comprehensive state tracking and manipulation
+ */
+export interface ProfileFormState {
+  /** Current form data */
+  data: ProfileDetailsFormData;
+  
+  /** Original form data for comparison */
+  originalData: ProfileDetailsFormData;
+  
+  /** Form validation state */
+  validationState: ValidationState;
+  
+  /** Form submission state */
+  submissionState: {
+    isSubmitting: boolean;
+    isSubmitted: boolean;
+    submitCount: number;
+    lastSubmissionTime?: Date;
+  };
+  
+  /** Form dirty tracking */
+  dirtyFields: Set<keyof ProfileDetailsFormData>;
+  
+  /** Field interaction tracking */
+  touchedFields: Set<keyof ProfileDetailsFormData>;
+  
+  /** Form completion percentage */
+  completionPercentage: number;
+  
+  /** Profile validation score */
+  profileScore: {
+    total: number;
+    breakdown: Record<keyof ProfileDetailsFormData, number>;
+  };
+}
+
+/**
+ * ProfileDetails event handlers interface
+ * Comprehensive event handling for all profile interactions
+ */
+export interface ProfileEventHandlers extends FormEventHandlers {
+  /** Avatar upload handlers */
+  onAvatarUpload?: (file: File) => Promise<string>;
+  onAvatarRemove?: () => void;
+  onAvatarCrop?: (croppedImage: string) => void;
+  
+  /** Preference change handlers */
+  onThemeChange?: (theme: ThemeMode) => void;
+  onLocaleChange?: (locale: string) => void;
+  onTimezoneChange?: (timezone: string) => void;
+  
+  /** Security event handlers */
+  onPasswordChange?: (oldPassword: string, newPassword: string) => Promise<void>;
+  onEmailVerification?: (email: string) => Promise<void>;
+  onAccountDeactivation?: () => Promise<void>;
+  
+  /** Profile completion handlers */
+  onFieldComplete?: (field: keyof ProfileDetailsFormData, value: any) => void;
+  onSectionComplete?: (section: string) => void;
+  onProfileComplete?: () => void;
+  
+  /** Async validation handlers */
+  onAsyncValidationStart?: (field: keyof ProfileDetailsFormData) => void;
+  onAsyncValidationComplete?: (field: keyof ProfileDetailsFormData, result: boolean) => void;
+}
+
+/**
+ * TypeScript utility types for enhanced type safety
+ */
+export type ProfileFormFieldName = keyof ProfileDetailsFormData;
+export type ProfileFormFieldValue<K extends ProfileFormFieldName> = ProfileDetailsFormData[K];
+export type ProfileFormPartial = Partial<ProfileDetailsFormData>;
+export type ProfileFormRequired = Required<ProfileDetailsFormData>;
+
+/**
+ * Template literal types for enhanced validation (TypeScript 5.8+)
+ */
+export type ProfileValidationKey<T extends string> = `profile.validation.${T}`;
+export type ProfileErrorKey<T extends string> = `profile.error.${T}`;
+export type ProfileSuccessKey<T extends string> = `profile.success.${T}`;
+
+/**
+ * Conditional types for permission checking
+ */
+export type HasPermission<T extends ProfileFormFieldName> = T extends keyof ProfilePermissions['write'] 
+  ? ProfilePermissions['write'][T] extends true 
+    ? true 
+    : false 
+  : false;
+
+/**
+ * Branded types for enhanced type safety
+ */
+export type ProfileId = string & { readonly __brand: 'ProfileId' };
+export type Username = string & { readonly __brand: 'Username' };
+export type EmailAddress = string & { readonly __brand: 'EmailAddress' };
+
+// ============================================================================
+// EXPORT DECLARATIONS
+// ============================================================================
+
+/**
+ * Main ProfileDetails component type exports
+ * Provides comprehensive type coverage for all profile-related functionality
+ */
+export type {
+  // Core types
+  ProfileDetailsFormData,
+  ProfileDetailsProps,
+  ProfileValidationErrors,
+  
+  // Configuration types
+  ProfileValidationConfig,
+  ProfileThemeConfig,
+  ProfileAccessibilityConfig,
+  ProfileLayoutConfig,
+  ProfilePermissions,
+  
+  // Utility types
+  ProfileFormFieldConfig,
+  ProfileFormState,
+  ProfileEventHandlers,
+  
+  // Enhanced types
+  UserPreferences,
+  NotificationPreferences,
+  AccessibilityPreferences,
+  ProfileAriaAttributes,
+  ProfileLayoutSection,
+  
+  // Validation types
+  ProfileCustomValidationRules,
+  PasswordValidationRules,
+  EmailValidationConfig,
+  PhoneValidationConfig,
+  ProfileValidationMessages,
+  
+  // Theme integration
+  ProfileThemeIntegration,
+  
+  // Template literal types
+  ProfileValidationKey,
+  ProfileErrorKey,
+  ProfileSuccessKey,
+  
+  // Utility types
+  ProfileFormFieldName,
+  ProfileFormFieldValue,
+  ProfileFormPartial,
+  ProfileFormRequired,
+  HasPermission,
+  
+  // Branded types
+  ProfileId,
+  Username,
+  EmailAddress,
+};
+
+/**
+ * Default export with complete type definitions
+ * Provides single import for all ProfileDetails types
+ */
+export default {
+  ProfileDetailsFormData,
+  ProfileDetailsProps,
+  ProfileValidationErrors,
+  ProfileValidationConfig,
+  ProfileThemeConfig,
+  ProfileAccessibilityConfig,
+  ProfileLayoutConfig,
+  ProfilePermissions,
+  ProfileFormFieldConfig,
+  ProfileFormState,
+  ProfileEventHandlers,
 } as const;
-
-/**
- * Default theme configuration
- */
-export const DEFAULT_THEME_CONFIG: Required<ThemeAwareProps> = {
-  variant: 'default',
-  colorScheme: 'auto',
-  size: 'md',
-  borderStyle: 'normal',
-  borderRadius: 'md',
-  shadow: 'sm',
-  animations: 'normal',
-  cssVariables: {},
-  responsive: {},
-} as const;
-
-/**
- * Default accessibility configuration
- */
-export const DEFAULT_ACCESSIBILITY_CONFIG: Required<AccessibilityProps> = {
-  'aria-label': 'Profile Details Form',
-  'aria-describedby': '',
-  'aria-labelledby': '',
-  'aria-live': 'polite',
-  'aria-busy': false,
-  'aria-invalid': false,
-  'aria-required': false,
-  autoComplete: 'on',
-  tabNavigation: {
-    enabled: true,
-    skipLinks: true,
-    tabOrder: [],
-    trapFocus: false,
-  },
-  screenReader: {
-    announceChanges: true,
-    announceErrors: true,
-    announceSuccess: true,
-    semanticStructure: true,
-    fieldDescriptions: true,
-  },
-  keyboardShortcuts: [],
-  focusManagement: {
-    autoFocusFirst: false,
-    focusFirstError: true,
-    returnFocus: true,
-    skipDisabled: true,
-  },
-  errorAnnouncement: {
-    immediate: false,
-    delay: 100,
-    useAlert: true,
-    includeFieldContext: true,
-  },
-} as const;
-
-// ============================================================================
-// TYPE GUARDS AND UTILITIES
-// ============================================================================
-
-/**
- * Type guard to check if value is valid ProfileDetailsFormData
- */
-export function isProfileDetailsFormData(value: unknown): value is ProfileDetailsFormData {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    typeof (value as any).username === 'string' &&
-    typeof (value as any).email === 'string' &&
-    typeof (value as any).firstName === 'string' &&
-    typeof (value as any).lastName === 'string' &&
-    typeof (value as any).name === 'string'
-  );
-}
-
-/**
- * Type guard to check if value is ValidationErrors
- */
-export function isValidationErrors(value: unknown): value is ValidationErrors {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    (
-      'fieldErrors' in value ||
-      'formErrors' in value ||
-      'serverErrors' in value ||
-      'systemErrors' in value
-    )
-  );
-}
-
-/**
- * Type guard to check if error is a ValidationErrors object
- */
-export function isFormValidationError(error: Error | ValidationErrors): error is ValidationErrors {
-  return isValidationErrors(error);
-}
