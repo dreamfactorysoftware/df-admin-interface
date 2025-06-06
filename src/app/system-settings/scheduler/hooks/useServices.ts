@@ -1,218 +1,395 @@
+/**
+ * Services Hook for Scheduler Configuration
+ * 
+ * React Query hook that fetches available services for scheduler configuration dropdowns,
+ * replacing Angular ActivatedRoute data subscription patterns. Implements intelligent
+ * caching for service list data with background synchronization and provides filtered
+ * service options for scheduler task configuration workflows.
+ * 
+ * This hook replaces the Angular pattern of using ActivatedRoute.data.resource to fetch
+ * services and transforms it to React Query with optimized caching and background updates.
+ * 
+ * @fileoverview Scheduler services data fetching hook with React Query
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
+ */
+
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { useMemo } from 'react';
+import { apiClient } from '@/lib/api-client';
+import type { DatabaseService } from '@/components/database-service/types';
+import type { GenericListResponse, ApiErrorResponse } from '@/types/generic-http';
 
-// Types (these will be properly imported once available)
-interface Service {
-  id: number;
-  name: string;
-  label: string;
-  description: string;
-  isActive: boolean;
-  type: string;
-  mutable: boolean;
-  deletable: boolean;
-  createdDate: string;
-  lastModifiedDate: string;
-  createdById: number | null;
-  lastModifiedById: number | null;
-  config: any;
-  serviceDocByServiceId: number | null;
-  refresh: boolean;
-}
-
-interface GenericListResponse<T> {
-  resource: Array<T>;
-  meta: {
-    count: number;
-  };
-}
-
-interface ServiceFilterOptions {
-  search?: string;
-  includeSystem?: boolean;
-  includeUserCreated?: boolean;
-  activeOnly?: boolean;
-  types?: string[];
-}
-
-interface UseServicesOptions extends ServiceFilterOptions {
-  enabled?: boolean;
-}
-
-interface UseServicesResult {
-  services: Service[];
-  filteredServices: Service[];
-  isLoading: boolean;
-  isError: boolean;
-  error: Error | null;
-  refetch: () => void;
-  isRefetching: boolean;
-}
+// =============================================================================
+// TYPES AND INTERFACES
+// =============================================================================
 
 /**
- * React Query hook that fetches available services for scheduler configuration dropdowns.
- * Replaces Angular ActivatedRoute data subscription patterns with intelligent caching
- * and background synchronization.
- * 
- * Implements the following features:
- * - Intelligent caching with 600 second staleTime for relatively static service data
- * - Background revalidation for service list updates 
- * - Service filtering and search capabilities for large service lists
- * - Error handling with retry capabilities and user-friendly error messages
- * - TypeScript type safety for Service array responses
- * 
- * @param options - Configuration options for filtering and query behavior
- * @returns Object containing filtered services data, loading state, and error handling
- */
-export function useServices(options: UseServicesOptions = {}): UseServicesResult {
-  const {
-    search,
-    includeSystem = true,
-    includeUserCreated = true, 
-    activeOnly = true,
-    types,
-    enabled = true,
-  } = options;
-
-  // Fetch services data using React Query
-  const queryResult: UseQueryResult<GenericListResponse<Service>, Error> = useQuery({
-    queryKey: ['services', 'scheduler-dropdown', { includeSystem, includeUserCreated, activeOnly, types }],
-    queryFn: async (): Promise<GenericListResponse<Service>> => {
-      // Build filter string based on options
-      const filters: string[] = [];
-      
-      if (activeOnly) {
-        filters.push('(is_active = true)');
-      }
-      
-      if (!includeSystem && !includeUserCreated) {
-        // If neither system nor user services are included, return empty result
-        throw new Error('At least one of includeSystem or includeUserCreated must be true');
-      } else if (!includeSystem) {
-        filters.push('(created_by_id is not null)');
-      } else if (!includeUserCreated) {
-        filters.push('(created_by_id is null)');
-      }
-      
-      // Exclude api_docs service as per Angular implementation
-      filters.push('(name != "api_docs")');
-      
-      if (types && types.length > 0) {
-        filters.push(`(type in ("${types.join('","')}"))`);
-      }
-      
-      const filterString = filters.length > 0 ? filters.join(' and ') : '';
-      
-      // Build query parameters
-      const params = new URLSearchParams({
-        sort: 'name',
-        limit: '100', // Reasonable limit for scheduler dropdown
-        fields: 'id,name,label,description,type,is_active,created_by_id,last_modified_date',
-      });
-      
-      if (filterString) {
-        params.append('filter', filterString);
-      }
-      
-      // Make API request (this will use the actual API client once available)
-      const response = await fetch(`/api/v2/system/service?${params.toString()}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          // Authentication headers will be handled by middleware/interceptors
-        },
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: { message: 'Network error' } }));
-        throw new Error(errorData.error?.message || `HTTP ${response.status}: Failed to fetch services`);
-      }
-      
-      const data: GenericListResponse<Service> = await response.json();
-      return data;
-    },
-    enabled,
-    staleTime: 600 * 1000, // 10 minutes - services are relatively static
-    cacheTime: 900 * 1000, // 15 minutes - keep in cache longer than stale time
-    refetchOnWindowFocus: false, // Don't refetch on window focus for relatively static data
-    refetchOnMount: false, // Use cached data on mount if available and not stale
-    refetchOnReconnect: true, // Refetch when connection is restored
-    retry: (failureCount, error) => {
-      // Retry up to 3 times for network errors, but not for 4xx errors
-      if (failureCount >= 3) return false;
-      if (error.message.includes('4')) return false; // Don't retry 4xx errors
-      return true;
-    },
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
-  });
-
-  // Memoized filtered services based on search term
-  const filteredServices = useMemo(() => {
-    if (!queryResult.data?.resource) return [];
-    
-    let services = queryResult.data.resource;
-    
-    // Apply search filter if provided
-    if (search && search.trim()) {
-      const searchTerm = search.toLowerCase().trim();
-      services = services.filter((service) => 
-        service.name.toLowerCase().includes(searchTerm) ||
-        service.label.toLowerCase().includes(searchTerm) ||
-        (service.description && service.description.toLowerCase().includes(searchTerm))
-      );
-    }
-    
-    return services;
-  }, [queryResult.data?.resource, search]);
-
-  return {
-    services: queryResult.data?.resource || [],
-    filteredServices,
-    isLoading: queryResult.isLoading,
-    isError: queryResult.isError,
-    error: queryResult.error,
-    refetch: queryResult.refetch,
-    isRefetching: queryResult.isRefetching,
-  };
-}
-
-/**
- * Type definitions for dropdown consumption
+ * Service dropdown option interface for scheduler configuration
+ * Simplified structure optimized for dropdown components
  */
 export interface ServiceDropdownOption {
   id: number;
   name: string;
   label: string;
-  description?: string;
   type: string;
+  description?: string;
+  is_active: boolean;
 }
 
 /**
- * Helper hook that transforms services data into dropdown-friendly format
- * @param options - Service filter options
- * @returns Dropdown options with value/label pairs
+ * Services query filter options
  */
-export function useServiceDropdownOptions(options: UseServicesOptions = {}) {
-  const { filteredServices, ...rest } = useServices(options);
-  
-  const dropdownOptions = useMemo((): ServiceDropdownOption[] => {
-    return filteredServices.map((service) => ({
-      id: service.id,
-      name: service.name,
-      label: service.label || service.name,
-      description: service.description,
-      type: service.type,
-    }));
-  }, [filteredServices]);
-  
+export interface ServicesFilter {
+  /** Search term to filter services by name or label */
+  search?: string;
+  /** Filter by service types */
+  types?: string[];
+  /** Include only active services */
+  activeOnly?: boolean;
+  /** Include specific service statuses */
+  statuses?: string[];
+}
+
+/**
+ * Hook return interface with comprehensive service data and utilities
+ */
+export interface UseServicesReturn {
+  /** Array of all services */
+  services: DatabaseService[];
+  /** Filtered service options for dropdown consumption */
+  serviceOptions: ServiceDropdownOption[];
+  /** Loading state indicator */
+  isLoading: boolean;
+  /** Error state if service fetching fails */
+  error: ApiErrorResponse | null;
+  /** Manual refetch function */
+  refetch: () => void;
+  /** Background fetching indicator */
+  isFetching: boolean;
+  /** Success state indicator */
+  isSuccess: boolean;
+  /** Error state indicator */
+  isError: boolean;
+}
+
+/**
+ * Hook configuration options
+ */
+export interface UseServicesOptions {
+  /** Custom filter options */
+  filter?: ServicesFilter;
+  /** Enable/disable automatic refetching */
+  enabled?: boolean;
+  /** Custom stale time override (default: 600 seconds) */
+  staleTime?: number;
+  /** Custom refetch interval override */
+  refetchInterval?: number;
+}
+
+// =============================================================================
+// QUERY CONFIGURATION
+// =============================================================================
+
+/**
+ * React Query key factory for services
+ */
+export const servicesQueryKeys = {
+  all: ['scheduler-services'] as const,
+  lists: () => [...servicesQueryKeys.all, 'list'] as const,
+  list: (filter?: ServicesFilter) => [...servicesQueryKeys.lists(), filter] as const,
+} as const;
+
+/**
+ * Default query configuration optimized for service data
+ * Per React/Next.js Integration Requirements and Section 4.3.2
+ */
+const DEFAULT_QUERY_CONFIG = {
+  staleTime: 600_000, // 10 minutes - services are relatively static per requirements
+  cacheTime: 1_800_000, // 30 minutes - extended cache for better UX
+  refetchOnWindowFocus: true, // Background synchronization per Section 4.3.2
+  refetchOnReconnect: true, // Ensure fresh data after network recovery
+  refetchOnMount: false, // Use cached data if available and fresh
+  retry: 3, // Comprehensive retry strategy per Section 4.2
+  retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
+} as const;
+
+// =============================================================================
+// SERVICES FETCHER FUNCTION
+// =============================================================================
+
+/**
+ * Fetches services from the DreamFactory API
+ * Implements proper error handling and response transformation
+ */
+async function fetchServices(): Promise<DatabaseService[]> {
+  try {
+    const response = await apiClient.get<GenericListResponse<DatabaseService>>('/system/service');
+    
+    // Handle both resource and data response formats from DreamFactory API
+    const services = response.resource || response.data || [];
+    
+    if (!Array.isArray(services)) {
+      throw new Error('Invalid services response format: expected array');
+    }
+
+    return services;
+  } catch (error) {
+    // Enhanced error handling with specific error types
+    if (error instanceof Error) {
+      throw {
+        error: {
+          code: 500,
+          message: error.message || 'Failed to fetch services',
+          context: 'services-fetch',
+        }
+      } as ApiErrorResponse;
+    }
+    
+    throw {
+      error: {
+        code: 500,
+        message: 'Unknown error occurred while fetching services',
+        context: 'services-fetch-unknown',
+      }
+    } as ApiErrorResponse;
+  }
+}
+
+// =============================================================================
+// UTILITY FUNCTIONS
+// =============================================================================
+
+/**
+ * Transforms services to dropdown options with filtering
+ * Optimizes data structure for dropdown component consumption
+ */
+function transformToDropdownOptions(
+  services: DatabaseService[],
+  filter?: ServicesFilter
+): ServiceDropdownOption[] {
+  if (!services || !Array.isArray(services)) {
+    return [];
+  }
+
+  let filteredServices = [...services];
+
+  // Apply filters
+  if (filter) {
+    const { search, types, activeOnly, statuses } = filter;
+
+    // Search filter - case insensitive search across name, label, and description
+    if (search && search.trim()) {
+      const searchTerm = search.toLowerCase().trim();
+      filteredServices = filteredServices.filter(service => 
+        service.name?.toLowerCase().includes(searchTerm) ||
+        service.label?.toLowerCase().includes(searchTerm) ||
+        service.description?.toLowerCase().includes(searchTerm)
+      );
+    }
+
+    // Type filter
+    if (types && types.length > 0) {
+      filteredServices = filteredServices.filter(service => 
+        types.includes(service.type)
+      );
+    }
+
+    // Active only filter
+    if (activeOnly) {
+      filteredServices = filteredServices.filter(service => service.is_active);
+    }
+
+    // Status filter (if using extended status property)
+    if (statuses && statuses.length > 0) {
+      filteredServices = filteredServices.filter(service => 
+        service.status && statuses.includes(service.status)
+      );
+    }
+  }
+
+  // Transform to dropdown options
+  return filteredServices.map(service => ({
+    id: service.id,
+    name: service.name,
+    label: service.label || service.name,
+    type: service.type,
+    description: service.description,
+    is_active: service.is_active,
+  }));
+}
+
+// =============================================================================
+// MAIN HOOK IMPLEMENTATION
+// =============================================================================
+
+/**
+ * Services hook for scheduler configuration dropdowns
+ * 
+ * Replaces Angular ActivatedRoute data subscription patterns with React Query
+ * intelligent caching and background synchronization. Provides filtered service
+ * options optimized for dropdown consumption in scheduler task configuration.
+ * 
+ * Features:
+ * - Intelligent caching with 600-second staleTime per requirements
+ * - Background refetching for service list synchronization
+ * - Search and filter capabilities for large service lists
+ * - Retry logic with exponential backoff
+ * - TypeScript type safety matching existing Service interface
+ * 
+ * @param options Hook configuration options
+ * @returns Comprehensive service data and utilities
+ * 
+ * @example
+ * ```tsx
+ * // Basic usage for dropdown
+ * const { serviceOptions, isLoading, error } = useServices();
+ * 
+ * // With filtering for specific types
+ * const { serviceOptions } = useServices({
+ *   filter: { types: ['mysql', 'pgsql'], activeOnly: true }
+ * });
+ * 
+ * // With search functionality
+ * const [search, setSearch] = useState('');
+ * const { serviceOptions } = useServices({
+ *   filter: { search }
+ * });
+ * ```
+ */
+export function useServices(options: UseServicesOptions = {}): UseServicesReturn {
+  const {
+    filter,
+    enabled = true,
+    staleTime = DEFAULT_QUERY_CONFIG.staleTime,
+    refetchInterval,
+  } = options;
+
+  // React Query hook for service data fetching
+  const queryResult: UseQueryResult<DatabaseService[], ApiErrorResponse> = useQuery({
+    queryKey: servicesQueryKeys.list(filter),
+    queryFn: fetchServices,
+    enabled,
+    staleTime,
+    cacheTime: DEFAULT_QUERY_CONFIG.cacheTime,
+    refetchOnWindowFocus: DEFAULT_QUERY_CONFIG.refetchOnWindowFocus,
+    refetchOnReconnect: DEFAULT_QUERY_CONFIG.refetchOnReconnect,
+    refetchOnMount: DEFAULT_QUERY_CONFIG.refetchOnMount,
+    retry: DEFAULT_QUERY_CONFIG.retry,
+    retryDelay: DEFAULT_QUERY_CONFIG.retryDelay,
+    refetchInterval,
+    // Background refetching configuration per Section 4.3.2
+    refetchIntervalInBackground: true,
+    // Ensure stale data is served while refetching in background
+    keepPreviousData: true,
+    // Error handling configuration
+    useErrorBoundary: false, // Handle errors in component, not boundary
+    // Suspense configuration for future enhancement
+    suspense: false,
+  });
+
+  // Extract query result properties
+  const {
+    data: services = [],
+    isLoading,
+    error,
+    refetch,
+    isFetching,
+    isSuccess,
+    isError,
+  } = queryResult;
+
+  // Memoized service options transformation
+  // Recalculates only when services or filter changes
+  const serviceOptions = useMemo(() => {
+    return transformToDropdownOptions(services, filter);
+  }, [services, filter]);
+
+  // Return comprehensive hook interface
   return {
-    options: dropdownOptions,
-    filteredServices,
-    ...rest,
+    services,
+    serviceOptions,
+    isLoading,
+    error,
+    refetch,
+    isFetching,
+    isSuccess,
+    isError,
+  };
+}
+
+// =============================================================================
+// HOOK VARIANTS AND UTILITIES
+// =============================================================================
+
+/**
+ * Simplified hook variant for basic dropdown usage
+ * Pre-configured with common filtering options
+ * 
+ * @param search Optional search term
+ * @param activeOnly Filter to only active services (default: true)
+ * @returns Simplified return interface for dropdown consumption
+ */
+export function useServicesDropdown(
+  search?: string,
+  activeOnly: boolean = true
+) {
+  const { serviceOptions, isLoading, error } = useServices({
+    filter: {
+      search,
+      activeOnly,
+    },
+  });
+
+  return {
+    options: serviceOptions,
+    loading: isLoading,
+    error,
   };
 }
 
 /**
- * Default export for convenient importing
+ * Hook variant for specific service types
+ * Optimized for scheduler tasks that work with specific database types
+ * 
+ * @param types Array of service types to include
+ * @param search Optional search term
+ * @returns Filtered service options for specific types
  */
+export function useServicesByType(
+  types: string[],
+  search?: string
+) {
+  const { serviceOptions, isLoading, error, refetch } = useServices({
+    filter: {
+      types,
+      search,
+      activeOnly: true,
+    },
+  });
+
+  return {
+    services: serviceOptions,
+    isLoading,
+    error,
+    refetch,
+  };
+}
+
+// =============================================================================
+// EXPORTS
+// =============================================================================
+
+// Export main hook as default
 export default useServices;
+
+// Export types for external usage
+export type {
+  ServiceDropdownOption,
+  ServicesFilter,
+  UseServicesReturn,
+  UseServicesOptions,
+};
+
+// Export query keys for cache management
+export { servicesQueryKeys };
