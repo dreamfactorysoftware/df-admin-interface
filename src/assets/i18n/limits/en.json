@@ -1,248 +1,144 @@
 {
-  "$schema": "https://dreamfactory.com/schemas/i18n-v1.json",
-  "_metadata": {
-    "version": "1.0.0",
-    "locale": "en",
-    "direction": "ltr",
-    "lastModified": "2024-01-01T00:00:00.000Z",
-    "framework": "next.js",
-    "ssrOptimized": true
+  "title": "Rate Limits",
+  "subtitle": "Manage API rate limiting and throttling policies",
+  "labels": {
+    "name": "Limit Name",
+    "description": "Description",
+    "type": "Limit Type",
+    "period": "Limit Period",
+    "limit": "Limit Rate",
+    "active": "Active",
+    "service": "Service",
+    "endpoint": "Endpoint",
+    "verb": "Verb",
+    "user": "User",
+    "role": "Role",
+    "key": "API Key"
   },
-  "name": "Limit Name",
-  "description": "Description",
-  "limitType": "Limit Type",
-  "limitRate": "Limit Rate",
-  "limitPeriod": "Limit Period",
-  "role": "Role",
-  "service": "Service",
-  "endpoint": "Endpoint",
-  "user": "User",
-  "verb": "Verb",
-  "active": "Active",
-  "refresh": "Refresh",
-  "invalidForm": "Invalid Form Input",
-  "createSuccessMessage": "Limit successfully created",
-  "updateSuccessMessage": "Limit successfully updated",
-  "deleteSuccessMessage": "Limit successfully deleted",
-  "verbTooltip": "By default, all verbs will be limited unless a specific verb is selected for the limit type.",
-  "limitTypes": {
+  "types": {
     "instance": "Instance",
     "user": "User",
-    "eachUser": "Each User",
-    "service": "Service",
     "role": "Role",
+    "service": "Service",
+    "endpoint": "Endpoint",
+    "eachUser": "Each User",
     "serviceByUser": "Service by User",
     "serviceByEachUser": "Service by Each User",
-    "endpoint": "Endpoint",
     "endpointByUser": "Endpoint by User",
     "endpointByEachUser": "Endpoint by Each User"
   },
-  "limitPeriods": {
+  "periods": {
     "minute": "Minute",
     "hour": "Hour",
     "day": "Day",
     "week": "Week",
-    "30Days": "30 Days"
+    "month": "30 Days",
+    "year": "Year"
   },
-  "form": {
-    "validation": {
-      "name": {
-        "required": "Limit name is required",
-        "minLength": "Limit name must be at least 2 characters",
-        "maxLength": "Limit name cannot exceed 100 characters",
-        "pattern": "Limit name can only contain letters, numbers, spaces, hyphens, and underscores"
-      },
-      "description": {
-        "maxLength": "Description cannot exceed 500 characters"
-      },
-      "limitType": {
-        "required": "Limit type selection is required"
-      },
-      "limitRate": {
-        "required": "Limit rate is required",
-        "min": "Limit rate must be greater than 0",
-        "max": "Limit rate cannot exceed 999999999",
-        "pattern": "Limit rate must be a valid positive integer"
-      },
-      "limitPeriod": {
-        "required": "Limit period selection is required"
-      },
-      "role": {
-        "required": "Role selection is required when limit type requires it"
-      },
-      "service": {
-        "required": "Service selection is required when limit type requires it"
-      },
-      "endpoint": {
-        "required": "Endpoint selection is required when limit type requires it"
-      },
-      "user": {
-        "required": "User selection is required when limit type requires it"
-      }
-    },
-    "labels": {
-      "nameLabel": "Limit Name",
-      "namePlaceholder": "Enter descriptive limit name",
-      "descriptionLabel": "Description",
-      "descriptionPlaceholder": "Optional description for this limit",
-      "limitTypeLabel": "Limit Type",
-      "limitTypePlaceholder": "Select limit type",
-      "limitRateLabel": "Limit Rate",
-      "limitRatePlaceholder": "Number of requests",
-      "limitPeriodLabel": "Limit Period",
-      "limitPeriodPlaceholder": "Select time period",
-      "roleLabel": "Role",
-      "rolePlaceholder": "Select role",
-      "serviceLabel": "Service",
-      "servicePlaceholder": "Select service",
-      "endpointLabel": "Endpoint",
-      "endpointPlaceholder": "Select endpoint",
-      "userLabel": "User",
-      "userPlaceholder": "Select user",
-      "verbLabel": "HTTP Verb",
-      "verbPlaceholder": "Select HTTP verb (optional)",
-      "activeLabel": "Active",
-      "activePlaceholder": "Enable this limit"
-    },
-    "tooltips": {
-      "nameTooltip": "Unique identifier for this rate limit configuration",
-      "descriptionTooltip": "Optional description to help identify the purpose of this limit",
-      "limitTypeTooltip": "Determines the scope and enforcement level of the rate limit",
-      "limitRateTooltip": "Maximum number of requests allowed within the specified period",
-      "limitPeriodTooltip": "Time window for the rate limit enforcement",
-      "roleTooltip": "Apply limit to users with this specific role",
-      "serviceTooltip": "Apply limit to requests targeting this service",
-      "endpointTooltip": "Apply limit to requests targeting this specific endpoint",
-      "userTooltip": "Apply limit to this specific user account",
-      "verbTooltip": "Apply limit to specific HTTP methods (GET, POST, etc.)",
-      "activeTooltip": "Toggle to enable or disable this rate limit"
-    },
-    "actions": {
-      "save": "Save Limit",
-      "cancel": "Cancel",
-      "delete": "Delete Limit",
-      "test": "Test Configuration",
-      "reset": "Reset Form",
-      "duplicate": "Duplicate Limit"
-    }
+  "validation": {
+    "required": "This field is required",
+    "email": "Please enter a valid email address",
+    "minLength": "Minimum length is {{length}} characters",
+    "maxLength": "Maximum length is {{length}} characters",
+    "pattern": "Please enter a valid format",
+    "numeric": "Please enter a valid number",
+    "url": "Please enter a valid URL",
+    "custom": "Validation failed",
+    "limitValue": "Please enter a valid limit value",
+    "periodRequired": "Limit period is required",
+    "typeRequired": "Limit type is required"
   },
   "messages": {
-    "success": {
-      "created": "Rate limit successfully created",
-      "updated": "Rate limit successfully updated",
-      "deleted": "Rate limit successfully deleted",
-      "activated": "Rate limit activated",
-      "deactivated": "Rate limit deactivated",
-      "tested": "Rate limit configuration is valid"
+    "create": {
+      "success": "Limit successfully created",
+      "error": "Failed to create limit",
+      "pending": "Creating limit..."
     },
-    "error": {
-      "createFailed": "Failed to create rate limit",
-      "updateFailed": "Failed to update rate limit",
-      "deleteFailed": "Failed to delete rate limit",
-      "loadFailed": "Failed to load rate limit data",
-      "validationFailed": "Rate limit configuration validation failed",
-      "testFailed": "Rate limit configuration test failed",
-      "duplicateName": "A rate limit with this name already exists"
+    "update": {
+      "success": "Limit successfully updated",
+      "error": "Failed to update limit",
+      "pending": "Updating limit..."
     },
-    "warning": {
-      "highRateLimit": "This rate limit allows a very high number of requests",
-      "noVerbSelected": "No specific HTTP verb selected - limit applies to all verbs",
-      "overlappingLimit": "This limit may overlap with existing rate limits",
-      "deletePermanent": "Deleting this rate limit cannot be undone"
+    "delete": {
+      "success": "Limit successfully deleted",
+      "error": "Failed to delete limit",
+      "pending": "Deleting limit...",
+      "confirm": "Are you sure you want to delete this limit?"
     },
-    "info": {
-      "rateLimitScope": "This rate limit will apply to {{scope}} with {{rate}} requests per {{period}}",
-      "currentUsage": "Current usage: {{current}} of {{max}} requests",
-      "nextReset": "Rate limit resets in {{timeRemaining}}"
+    "fetch": {
+      "error": "Failed to load limits",
+      "pending": "Loading limits...",
+      "empty": "No limits found"
     }
   },
-  "table": {
-    "headers": {
-      "name": "Name",
-      "description": "Description",
-      "type": "Type",
-      "rate": "Rate",
-      "period": "Period",
-      "active": "Active",
-      "actions": "Actions"
-    },
-    "actions": {
-      "edit": "Edit",
-      "delete": "Delete",
-      "duplicate": "Duplicate",
-      "activate": "Activate",
-      "deactivate": "Deactivate",
-      "viewDetails": "View Details"
-    },
-    "filters": {
-      "all": "All Limits",
-      "active": "Active Only",
-      "inactive": "Inactive Only",
-      "byType": "Filter by Type",
-      "byPeriod": "Filter by Period"
-    },
-    "empty": {
-      "title": "No Rate Limits Configured",
-      "description": "Create your first rate limit to control API usage",
-      "action": "Create Rate Limit"
-    }
+  "tooltips": {
+    "verbTooltip": "By default, all verbs will be limited unless a specific verb is selected for the limit type.",
+    "limitType": "Choose how the rate limit should be applied - per instance, user, role, service, or endpoint",
+    "limitPeriod": "Select the time window for the rate limit calculation",
+    "limitRate": "Maximum number of requests allowed within the specified period"
   },
-  "wizard": {
-    "steps": {
-      "selectType": "Select Type",
-      "configure": "Configure",
-      "review": "Review",
-      "complete": "Complete"
-    },
-    "selectType": {
-      "title": "Choose Rate Limit Type",
-      "description": "Select the type of rate limit you want to create",
-      "typeDescriptions": {
-        "instance": "Apply limit to the entire DreamFactory instance",
-        "user": "Apply limit to a specific user account",
-        "eachUser": "Apply limit to each individual user",
-        "service": "Apply limit to a specific service",
-        "role": "Apply limit to users with a specific role",
-        "serviceByUser": "Apply per-user limit on a specific service",
-        "serviceByEachUser": "Apply individual user limits on a specific service",
-        "endpoint": "Apply limit to a specific API endpoint",
-        "endpointByUser": "Apply per-user limit on a specific endpoint",
-        "endpointByEachUser": "Apply individual user limits on a specific endpoint"
-      }
-    },
-    "configure": {
-      "title": "Configure Rate Limit",
-      "description": "Set the rate limit parameters and scope"
-    },
-    "review": {
-      "title": "Review Configuration",
-      "description": "Verify your rate limit configuration before saving",
-      "summary": {
-        "limitType": "Limit Type",
-        "limitRate": "Rate Limit",
-        "limitPeriod": "Time Period",
-        "scope": "Scope",
-        "status": "Status"
-      }
-    }
+  "placeholders": {
+    "limitName": "Enter limit name",
+    "limitDescription": "Enter limit description",
+    "selectType": "Select limit type",
+    "selectPeriod": "Select time period",
+    "selectService": "Select service",
+    "selectEndpoint": "Select endpoint",
+    "selectVerb": "Select HTTP verb",
+    "selectUser": "Select user",
+    "selectRole": "Select role"
   },
-  "help": {
+  "actions": {
+    "refresh": "Refresh",
+    "create": "Create Limit",
+    "edit": "Edit Limit",
+    "delete": "Delete Limit",
+    "save": "Save",
+    "cancel": "Cancel",
+    "test": "Test Limit",
+    "export": "Export Configuration"
+  },
+  "status": {
+    "active": "Active",
+    "inactive": "Inactive",
+    "exceeded": "Limit Exceeded",
+    "normal": "Normal"
+  },
+  "errors": {
+    "invalidForm": "Invalid Form Input",
+    "connectionFailed": "Failed to test limit configuration",
+    "duplicateName": "A limit with this name already exists",
+    "invalidRate": "Please enter a valid rate limit value"
+  },
+  
+  "_compatibility": {
+    "comment": "Backward compatibility section - preserves original Angular i18n key structure",
+    "limitType": "Limit Type",
+    "limitRate": "Limit Rate", 
+    "limitPeriod": "Limit Period",
+    "verbTooltip": "By default, all verbs will be limited unless a specific verb is selected for the limit type.",
+    "createSuccessMessage": "Limit successfully created",
+    "updateSuccessMessage": "Limit successfully updated",
+    "deleteSuccessMessage": "Limit successfully deleted",
+    "invalidForm": "Invalid Form Input",
     "limitTypes": {
-      "title": "Understanding Rate Limit Types",
-      "content": "Rate limit types determine how and where the limits are applied in your API infrastructure."
+      "instance": "Instance",
+      "user": "User",
+      "eachUser": "Each User",
+      "service": "Service", 
+      "role": "Role",
+      "serviceByUser": "Service by User",
+      "serviceByEachUser": "Service by Each User",
+      "endpoint": "Endpoint",
+      "endpointByUser": "Endpoint by User",
+      "endpointByEachUser": "Endpoint by Each User"
     },
-    "periods": {
-      "title": "Time Periods",
-      "content": "Choose the time window for rate limit enforcement based on your API usage patterns."
-    },
-    "bestPractices": {
-      "title": "Rate Limiting Best Practices",
-      "items": [
-        "Start with conservative limits and adjust based on usage patterns",
-        "Use different limits for different user roles or service tiers",
-        "Monitor rate limit hits to identify potential issues",
-        "Consider burst allowances for legitimate high-volume usage"
-      ]
+    "limitPeriods": {
+      "minute": "Minute",
+      "hour": "Hour", 
+      "day": "Day",
+      "week": "Week",
+      "30Days": "30 Days"
     }
   }
 }
