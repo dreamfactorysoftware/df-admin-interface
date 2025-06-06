@@ -1,470 +1,479 @@
 /**
- * Environment Configuration Library
+ * Environment configuration management for DreamFactory Admin Interface
  * 
- * Enhanced environment configuration for React/Next.js DreamFactory Admin Interface.
- * Provides centralized access to environment variables, configuration validation,
- * and license-related environment settings. Extends the base environment configuration
- * with license validation and platform-specific settings.
+ * This module provides environment configuration handling for the React/Next.js
+ * application, including platform license settings, API keys, and runtime
+ * configuration. Replaces Angular's environment service patterns with
+ * Next.js-compatible configuration management.
  * 
- * @fileoverview Environment configuration with license validation support for 
- * React Query-based license checking and platform configuration management.
- * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
+ * @fileoverview Environment configuration utilities
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-import { 
-  env as baseEnv, 
-  dreamFactoryConfig as baseDreamFactoryConfig,
-  validateEnvironment as baseValidateEnvironment,
-  isServerSide,
-  isClientSide,
-  type ClientEnvironmentVariables,
-  type ServerEnvironmentVariables
-} from '@/environments/env'
+import React from 'react';
 
-// =============================================================================
-// EXTENDED ENVIRONMENT TYPES
-// =============================================================================
-
-/**
- * Extended client environment variables including license configuration
- */
-interface ExtendedClientEnvironmentVariables extends ClientEnvironmentVariables {
-  /** Platform license type */
-  readonly NEXT_PUBLIC_PLATFORM_LICENSE?: string
-  /** License key for platform validation */
-  readonly NEXT_PUBLIC_LICENSE_KEY?: string
-  /** DreamFactory license key (alternative) */
-  readonly NEXT_PUBLIC_DF_LICENSE_KEY?: string
-  /** Enable license checking in development */
-  readonly NEXT_PUBLIC_ENABLE_LICENSE_CHECK?: string
-  /** License server URL override */
-  readonly NEXT_PUBLIC_LICENSE_SERVER_URL?: string
-  /** Platform edition identifier */
-  readonly NEXT_PUBLIC_PLATFORM_EDITION?: string
-  /** License validation endpoint override */
-  readonly NEXT_PUBLIC_LICENSE_ENDPOINT?: string
-}
-
-/**
- * Extended server environment variables for license validation
- */
-interface ExtendedServerEnvironmentVariables extends ServerEnvironmentVariables {
-  /** Server-side license key */
-  readonly LICENSE_KEY?: string
-  /** License server URL for backend validation */
-  readonly LICENSE_SERVER_URL?: string
-  /** License validation timeout */
-  readonly LICENSE_TIMEOUT?: string
-  /** License validation retry count */
-  readonly LICENSE_RETRY_COUNT?: string
-}
-
-/**
- * Complete extended environment variables type
- */
-type ExtendedEnvironmentVariables = ExtendedClientEnvironmentVariables & 
-  Partial<ExtendedServerEnvironmentVariables>
-
-// =============================================================================
-// LICENSE ENVIRONMENT CONFIGURATION
-// =============================================================================
-
-/**
- * License environment configuration interface
- */
-export interface LicenseEnvironment {
-  /** Platform license type */
-  license: string
-  /** License key (client or server) */
-  licenseKey?: string
-  /** Platform version */
-  version?: string
-  /** Environment type */
-  environment: 'development' | 'staging' | 'production'
-  /** License check enablement */
-  enableLicenseCheck: boolean
-  /** License server URL */
-  licenseServerUrl?: string
-  /** Platform edition */
-  edition?: string
-  /** Validation endpoint */
-  validationEndpoint?: string
-}
+// ============================================================================
+// Environment Types
+// ============================================================================
 
 /**
  * Platform configuration interface
  */
 export interface PlatformConfig {
-  /** License configuration */
-  license: LicenseEnvironment
-  /** Platform metadata */
+  /**
+   * License type identifier
+   * @example "ENTERPRISE" | "PROFESSIONAL" | "TRIAL" | "OPEN SOURCE"
+   */
+  license: string;
+  
+  /**
+   * License key for commercial versions
+   */
+  licenseKey?: string;
+  
+  /**
+   * Platform version information
+   */
+  version?: string;
+  
+  /**
+   * Build information
+   */
+  build?: string;
+  
+  /**
+   * Installation mode
+   */
+  mode?: string;
+  
+  /**
+   * Whether this is a trial installation
+   */
+  isTrial?: boolean;
+  
+  /**
+   * Instance identifier
+   */
+  instanceId?: string;
+}
+
+/**
+ * Server configuration interface
+ */
+export interface ServerConfig {
+  /**
+   * Operating system information
+   */
+  os?: string;
+  
+  /**
+   * Server version
+   */
+  version?: string;
+  
+  /**
+   * Host information
+   */
+  host?: string;
+  
+  /**
+   * Machine identifier
+   */
+  machine?: string;
+  
+  /**
+   * PHP configuration
+   */
+  php?: {
+    version?: string;
+    serverApi?: string;
+  };
+}
+
+/**
+ * Client configuration interface
+ */
+export interface ClientConfig {
+  /**
+   * User agent string
+   */
+  userAgent?: string;
+  
+  /**
+   * Client IP address
+   */
+  ipAddress?: string;
+  
+  /**
+   * Client locale
+   */
+  locale?: string;
+}
+
+/**
+ * Complete environment configuration interface
+ */
+export interface EnvironmentConfig {
+  /**
+   * Whether this is a production build
+   */
+  production: boolean;
+  
+  /**
+   * Platform configuration
+   */
+  platform?: PlatformConfig;
+  
+  /**
+   * Server configuration
+   */
+  server?: ServerConfig;
+  
+  /**
+   * Client configuration
+   */
+  client?: ClientConfig;
+  
+  /**
+   * API configuration
+   */
+  api?: {
+    /**
+     * Base URL for API calls
+     */
+    baseUrl?: string;
+    
+    /**
+     * API version
+     */
+    version?: string;
+    
+    /**
+     * Timeout configuration
+     */
+    timeout?: number;
+  };
+  
+  /**
+   * Feature flags
+   */
+  features?: {
+    [key: string]: boolean;
+  };
+  
+  /**
+   * Debug configuration
+   */
+  debug?: {
+    /**
+     * Enable debug logging
+     */
+    enabled?: boolean;
+    
+    /**
+     * Debug level
+     */
+    level?: 'error' | 'warn' | 'info' | 'debug';
+  };
+}
+
+// ============================================================================
+// Environment Management
+// ============================================================================
+
+/**
+ * Default environment configuration
+ */
+const defaultEnvironment: EnvironmentConfig = {
+  production: process.env.NODE_ENV === 'production',
   platform: {
-    name: string
-    version: string
-    edition: string
-    environment: string
-  }
-  /** Feature flags derived from license */
-  features: {
-    licenseValidation: boolean
-    advancedFeatures: boolean
-    enterpriseFeatures: boolean
-    developmentMode: boolean
-  }
-}
-
-// =============================================================================
-// EXTENDED ENVIRONMENT OBJECT
-// =============================================================================
-
-/**
- * Extended environment configuration with license support
- * Maintains compatibility with base environment while adding license functionality
- */
-export const env: ExtendedEnvironmentVariables = {
-  // Inherit base environment variables
-  ...baseEnv,
-  
-  // Extended client-side license variables
-  NEXT_PUBLIC_PLATFORM_LICENSE: process.env.NEXT_PUBLIC_PLATFORM_LICENSE || 'OPEN SOURCE',
-  NEXT_PUBLIC_LICENSE_KEY: process.env.NEXT_PUBLIC_LICENSE_KEY,
-  NEXT_PUBLIC_DF_LICENSE_KEY: process.env.NEXT_PUBLIC_DF_LICENSE_KEY,
-  NEXT_PUBLIC_ENABLE_LICENSE_CHECK: process.env.NEXT_PUBLIC_ENABLE_LICENSE_CHECK || 'false',
-  NEXT_PUBLIC_LICENSE_SERVER_URL: process.env.NEXT_PUBLIC_LICENSE_SERVER_URL,
-  NEXT_PUBLIC_PLATFORM_EDITION: process.env.NEXT_PUBLIC_PLATFORM_EDITION || 'community',
-  NEXT_PUBLIC_LICENSE_ENDPOINT: process.env.NEXT_PUBLIC_LICENSE_ENDPOINT,
-  
-  // Extended server-side license variables (server context only)
-  ...(isServerSide() ? {
-    LICENSE_KEY: process.env.LICENSE_KEY,
-    LICENSE_SERVER_URL: process.env.LICENSE_SERVER_URL,
-    LICENSE_TIMEOUT: process.env.LICENSE_TIMEOUT || '5000',
-    LICENSE_RETRY_COUNT: process.env.LICENSE_RETRY_COUNT || '2',
-  } : {}),
-} as const
-
-// =============================================================================
-// EXTENDED DREAMFACTORY CONFIGURATION
-// =============================================================================
+    license: 'OPEN SOURCE',
+    version: '1.0.0',
+    mode: 'development',
+    isTrial: false,
+  },
+  api: {
+    baseUrl: '/api/v2',
+    version: 'v2',
+    timeout: 30000,
+  },
+  features: {},
+  debug: {
+    enabled: process.env.NODE_ENV !== 'production',
+    level: 'info',
+  },
+};
 
 /**
- * Extended DreamFactory configuration with license endpoints
+ * Current environment configuration
+ * 
+ * This will be populated by the environment loading process
  */
-export const dreamFactoryConfig = {
-  // Inherit base configuration
-  ...baseDreamFactoryConfig,
-  
-  // Extended endpoints for license validation
-  endpoints: {
-    ...baseDreamFactoryConfig.endpoints,
+let currentEnvironment: EnvironmentConfig = { ...defaultEnvironment };
+
+/**
+ * Whether the environment has been initialized
+ */
+let environmentInitialized = false;
+
+// ============================================================================
+// Environment Loading Functions
+// ============================================================================
+
+/**
+ * Load environment configuration from various sources
+ * 
+ * This function aggregates configuration from:
+ * - Next.js environment variables
+ * - Runtime configuration API
+ * - Build-time configuration
+ * 
+ * @returns Promise resolving to complete environment configuration
+ */
+export async function loadEnvironment(): Promise<EnvironmentConfig> {
+  try {
+    // Start with default configuration
+    const environment: EnvironmentConfig = { ...defaultEnvironment };
     
-    // License-related endpoints
-    license: {
-      check: `${env.NEXT_PUBLIC_API_URL}/api/v2/system/license/check`,
-      validate: `${env.NEXT_PUBLIC_API_URL}/api/v2/system/license/validate`,
-      info: `${env.NEXT_PUBLIC_API_URL}/api/v2/system/license/info`,
-      features: `${env.NEXT_PUBLIC_API_URL}/api/v2/system/license/features`,
-    },
+    // Override with Next.js environment variables
+    if (process.env.NEXT_PUBLIC_PRODUCTION) {
+      environment.production = process.env.NEXT_PUBLIC_PRODUCTION === 'true';
+    }
     
-    // Custom license server endpoints (if configured)
-    ...(env.NEXT_PUBLIC_LICENSE_SERVER_URL ? {
-      licenseServer: {
-        check: `${env.NEXT_PUBLIC_LICENSE_SERVER_URL}/check`,
-        validate: `${env.NEXT_PUBLIC_LICENSE_SERVER_URL}/validate`,
-        info: `${env.NEXT_PUBLIC_LICENSE_SERVER_URL}/info`,
+    if (process.env.NEXT_PUBLIC_API_BASE_URL) {
+      environment.api = {
+        ...environment.api,
+        baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL,
+      };
+    }
+    
+    if (process.env.NEXT_PUBLIC_DEBUG_ENABLED) {
+      environment.debug = {
+        ...environment.debug,
+        enabled: process.env.NEXT_PUBLIC_DEBUG_ENABLED === 'true',
+      };
+    }
+    
+    // Load runtime configuration from API if available
+    try {
+      if (typeof window !== 'undefined') {
+        // Client-side: fetch from API
+        const response = await fetch('/api/v2/system/environment', {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Cache-Control': 'no-cache',
+          },
+          credentials: 'include',
+        });
+        
+        if (response.ok) {
+          const runtimeConfig = await response.json();
+          
+          // Merge runtime configuration
+          if (runtimeConfig.platform) {
+            environment.platform = {
+              ...environment.platform,
+              ...runtimeConfig.platform,
+            };
+          }
+          
+          if (runtimeConfig.server) {
+            environment.server = runtimeConfig.server;
+          }
+          
+          if (runtimeConfig.client) {
+            environment.client = runtimeConfig.client;
+          }
+          
+          if (runtimeConfig.features) {
+            environment.features = {
+              ...environment.features,
+              ...runtimeConfig.features,
+            };
+          }
+        }
       }
-    } : {}),
-  },
-  
-  // Extended default headers with license information
-  defaultHeaders: {
-    ...baseDreamFactoryConfig.defaultHeaders,
+    } catch (error) {
+      // Runtime configuration failed, but continue with defaults
+      console.warn('Failed to load runtime environment configuration:', error);
+    }
     
-    // Add license key headers if available
-    ...(env.NEXT_PUBLIC_LICENSE_KEY ? {
-      'X-DreamFactory-License-Key': env.NEXT_PUBLIC_LICENSE_KEY,
-    } : {}),
-    ...(env.NEXT_PUBLIC_DF_LICENSE_KEY ? {
-      'X-DF-License-Key': env.NEXT_PUBLIC_DF_LICENSE_KEY,
-    } : {}),
-  },
-  
-  // Extended features configuration
-  features: {
-    ...baseDreamFactoryConfig.features,
+    // Update current environment
+    currentEnvironment = environment;
+    environmentInitialized = true;
     
-    // License-related features
-    licenseValidation: env.NEXT_PUBLIC_PLATFORM_LICENSE !== 'OPEN SOURCE',
-    licenseCheckEnabled: env.NEXT_PUBLIC_ENABLE_LICENSE_CHECK === 'true',
-    hasLicenseKey: !!(env.NEXT_PUBLIC_LICENSE_KEY || env.NEXT_PUBLIC_DF_LICENSE_KEY),
-    isPlatformLicensed: env.NEXT_PUBLIC_PLATFORM_LICENSE !== 'OPEN SOURCE',
-  },
-} as const
-
-// =============================================================================
-// LICENSE ENVIRONMENT FUNCTIONS
-// =============================================================================
-
-/**
- * Extracts license environment configuration from environment variables
- * Implements environment-based conditional logic for license validation
- */
-export function getLicenseEnvironment(): LicenseEnvironment {
-  // Determine the appropriate license key
-  const licenseKey = env.NEXT_PUBLIC_LICENSE_KEY || 
-                    env.NEXT_PUBLIC_DF_LICENSE_KEY ||
-                    (isServerSide() ? env.LICENSE_KEY : undefined)
-  
-  // Determine license server URL
-  const licenseServerUrl = env.NEXT_PUBLIC_LICENSE_SERVER_URL ||
-                          (isServerSide() ? env.LICENSE_SERVER_URL : undefined)
-  
-  // Check if license validation should be enabled
-  const enableLicenseCheck = env.NEXT_PUBLIC_PLATFORM_LICENSE !== 'OPEN SOURCE' &&
-                            !!licenseKey &&
-                            (env.NODE_ENV !== 'development' || env.NEXT_PUBLIC_ENABLE_LICENSE_CHECK === 'true')
-  
-  return {
-    license: env.NEXT_PUBLIC_PLATFORM_LICENSE || 'OPEN SOURCE',
-    licenseKey,
-    version: env.NEXT_PUBLIC_VERSION,
-    environment: env.NODE_ENV as 'development' | 'staging' | 'production',
-    enableLicenseCheck,
-    licenseServerUrl,
-    edition: env.NEXT_PUBLIC_PLATFORM_EDITION,
-    validationEndpoint: env.NEXT_PUBLIC_LICENSE_ENDPOINT,
+    return environment;
+  } catch (error) {
+    console.error('Failed to load environment configuration:', error);
+    
+    // Return safe defaults on error
+    currentEnvironment = { ...defaultEnvironment };
+    environmentInitialized = true;
+    
+    return currentEnvironment;
   }
 }
 
 /**
- * Gets complete platform configuration including license information
+ * Get current environment configuration
+ * 
+ * Returns the current environment configuration. If not yet loaded,
+ * returns default configuration and triggers loading.
+ * 
+ * @returns Current environment configuration
  */
-export function getPlatformConfig(): PlatformConfig {
-  const licenseEnv = getLicenseEnvironment()
-  
-  return {
-    license: licenseEnv,
-    platform: {
-      name: env.NEXT_PUBLIC_APP_NAME || 'DreamFactory Admin Interface',
-      version: env.NEXT_PUBLIC_VERSION || '1.0.0',
-      edition: licenseEnv.edition || 'community',
-      environment: env.NODE_ENV,
-    },
-    features: {
-      licenseValidation: licenseEnv.enableLicenseCheck,
-      advancedFeatures: licenseEnv.license === 'PROFESSIONAL' || licenseEnv.license === 'ENTERPRISE',
-      enterpriseFeatures: licenseEnv.license === 'ENTERPRISE',
-      developmentMode: env.NODE_ENV === 'development',
-    },
+export function getEnvironment(): EnvironmentConfig {
+  // If not initialized, trigger loading but return defaults immediately
+  if (!environmentInitialized) {
+    loadEnvironment().catch(console.error);
+    return { ...defaultEnvironment };
   }
+  
+  return currentEnvironment;
 }
 
 /**
- * Determines if license checking should be performed
- * Implements conditional license checking logic based on environment and configuration
+ * Update environment configuration
+ * 
+ * @param updates - Partial environment configuration to merge
+ */
+export function updateEnvironment(updates: Partial<EnvironmentConfig>): void {
+  currentEnvironment = {
+    ...currentEnvironment,
+    ...updates,
+  };
+}
+
+/**
+ * Check if environment is production
+ * 
+ * @returns Whether the environment is production
+ */
+export function isProduction(): boolean {
+  return getEnvironment().production;
+}
+
+/**
+ * Check if environment is development
+ * 
+ * @returns Whether the environment is development
+ */
+export function isDevelopment(): boolean {
+  return !isProduction();
+}
+
+/**
+ * Get platform license information
+ * 
+ * @returns Platform license configuration
+ */
+export function getPlatformLicense(): PlatformConfig | undefined {
+  return getEnvironment().platform;
+}
+
+/**
+ * Check if license checking should be performed
+ * 
+ * @returns Whether license checking is enabled
  */
 export function shouldCheckLicense(): boolean {
-  const licenseEnv = getLicenseEnvironment()
+  const platform = getPlatformLicense();
   
-  // Always skip for open source
-  if (licenseEnv.license === 'OPEN SOURCE') {
-    return false
-  }
-  
-  // Skip if no license key
-  if (!licenseEnv.licenseKey || licenseEnv.licenseKey.trim() === '') {
-    return false
-  }
-  
-  // Check development mode setting
-  if (licenseEnv.environment === 'development' && !licenseEnv.enableLicenseCheck) {
-    return false
-  }
-  
-  return true
+  return Boolean(
+    platform?.license &&
+    platform.license !== 'OPEN SOURCE' &&
+    platform.licenseKey &&
+    platform.licenseKey.trim() !== ''
+  );
 }
 
 /**
- * Gets license key with fallback priority
+ * Get API configuration
+ * 
+ * @returns API configuration
  */
-export function getLicenseKey(): string | undefined {
-  return env.NEXT_PUBLIC_LICENSE_KEY || 
-         env.NEXT_PUBLIC_DF_LICENSE_KEY ||
-         (isServerSide() ? env.LICENSE_KEY : undefined)
+export function getApiConfig(): NonNullable<EnvironmentConfig['api']> {
+  const config = getEnvironment().api;
+  return {
+    baseUrl: '/api/v2',
+    version: 'v2',
+    timeout: 30000,
+    ...config,
+  };
 }
 
 /**
- * Gets license server URL with fallback
+ * Check if a feature is enabled
+ * 
+ * @param feature - Feature name to check
+ * @returns Whether the feature is enabled
  */
-export function getLicenseServerUrl(): string | undefined {
-  return env.NEXT_PUBLIC_LICENSE_SERVER_URL ||
-         (isServerSide() ? env.LICENSE_SERVER_URL : undefined) ||
-         `${env.NEXT_PUBLIC_API_URL}/api/v2/system`
+export function isFeatureEnabled(feature: string): boolean {
+  const features = getEnvironment().features || {};
+  return Boolean(features[feature]);
 }
 
-// =============================================================================
-// VALIDATION FUNCTIONS
-// =============================================================================
+/**
+ * Check if debug mode is enabled
+ * 
+ * @returns Whether debug mode is enabled
+ */
+export function isDebugEnabled(): boolean {
+  return getEnvironment().debug?.enabled ?? false;
+}
+
+// ============================================================================
+// React Hook for Environment
+// ============================================================================
 
 /**
- * Validates license-related environment variables
+ * React hook for accessing environment configuration
+ * 
+ * This hook provides reactive access to environment configuration
+ * and handles loading state.
  */
-function validateLicenseEnvironment(): void {
-  const licenseEnv = getLicenseEnvironment()
+export function useEnvironment() {
+  const [environment, setEnvironment] = React.useState<EnvironmentConfig>(getEnvironment);
+  const [loading, setLoading] = React.useState(!environmentInitialized);
+  const [error, setError] = React.useState<Error | null>(null);
   
-  // If license is not open source, validate license configuration
-  if (licenseEnv.license !== 'OPEN SOURCE') {
-    // Warn if no license key is provided
-    if (!licenseEnv.licenseKey) {
-      console.warn(
-        `⚠️  Platform license is set to '${licenseEnv.license}' but no license key provided. ` +
-        'Set NEXT_PUBLIC_LICENSE_KEY or NEXT_PUBLIC_DF_LICENSE_KEY environment variable.'
-      )
+  React.useEffect(() => {
+    if (!environmentInitialized) {
+      setLoading(true);
+      loadEnvironment()
+        .then((env) => {
+          setEnvironment(env);
+          setError(null);
+        })
+        .catch((err) => {
+          setError(err instanceof Error ? err : new Error('Failed to load environment'));
+          setEnvironment(getEnvironment());
+        })
+        .finally(() => {
+          setLoading(false);
+        });
     }
-    
-    // Validate license server URL format if provided
-    if (licenseEnv.licenseServerUrl) {
-      try {
-        new URL(licenseEnv.licenseServerUrl)
-      } catch {
-        console.warn(
-          `⚠️  Invalid license server URL format: ${licenseEnv.licenseServerUrl}. ` +
-          'Must be a valid URL format.'
-        )
-      }
-    }
-  }
+  }, []);
   
-  // Validate timeout and retry settings in server context
-  if (isServerSide()) {
-    const timeout = env.LICENSE_TIMEOUT
-    if (timeout && isNaN(parseInt(timeout, 10))) {
-      console.warn(`⚠️  Invalid LICENSE_TIMEOUT value: ${timeout}. Must be a number.`)
-    }
-    
-    const retryCount = env.LICENSE_RETRY_COUNT
-    if (retryCount && isNaN(parseInt(retryCount, 10))) {
-      console.warn(`⚠️  Invalid LICENSE_RETRY_COUNT value: ${retryCount}. Must be a number.`)
-    }
-  }
+  return { environment, loading, error };
 }
 
-/**
- * Extended environment validation including license configuration
- */
-export function validateEnvironment(): void {
-  // Run base environment validation
-  baseValidateEnvironment()
-  
-  // Run license-specific validation
-  validateLicenseEnvironment()
-}
+// ============================================================================
+// Default Export
+// ============================================================================
 
-// =============================================================================
-// UTILITY FUNCTIONS
-// =============================================================================
-
-/**
- * Checks if the platform is running in open source mode
- */
-export function isOpenSourceMode(): boolean {
-  return env.NEXT_PUBLIC_PLATFORM_LICENSE === 'OPEN SOURCE'
-}
-
-/**
- * Checks if the platform has a professional license
- */
-export function isProfessionalLicense(): boolean {
-  return env.NEXT_PUBLIC_PLATFORM_LICENSE === 'PROFESSIONAL'
-}
-
-/**
- * Checks if the platform has an enterprise license
- */
-export function isEnterpriseLicense(): boolean {
-  return env.NEXT_PUBLIC_PLATFORM_LICENSE === 'ENTERPRISE'
-}
-
-/**
- * Checks if advanced features should be available
- */
-export function hasAdvancedFeatures(): boolean {
-  return isProfessionalLicense() || isEnterpriseLicense()
-}
-
-/**
- * Checks if enterprise features should be available
- */
-export function hasEnterpriseFeatures(): boolean {
-  return isEnterpriseLicense()
-}
-
-/**
- * Gets license timeout value with fallback
- */
-export function getLicenseTimeout(): number {
-  if (isServerSide() && env.LICENSE_TIMEOUT) {
-    const timeout = parseInt(env.LICENSE_TIMEOUT, 10)
-    return isNaN(timeout) ? 5000 : timeout
-  }
-  return 5000 // Default 5 second timeout
-}
-
-/**
- * Gets license retry count with fallback
- */
-export function getLicenseRetryCount(): number {
-  if (isServerSide() && env.LICENSE_RETRY_COUNT) {
-    const retryCount = parseInt(env.LICENSE_RETRY_COUNT, 10)
-    return isNaN(retryCount) ? 2 : retryCount
-  }
-  return 2 // Default 2 retries
-}
-
-// =============================================================================
-// EXPORTS
-// =============================================================================
-
-// Re-export base environment utilities
-export {
-  isServerSide,
-  isClientSide,
-  runtimeInfo,
-} from '@/environments/env'
-
-// Export extended configuration
-export {
-  env,
-  dreamFactoryConfig,
-  validateEnvironment,
-}
-
-// Export license-specific functions
-export {
-  getLicenseEnvironment,
-  getPlatformConfig,
+export default {
+  loadEnvironment,
+  getEnvironment,
+  updateEnvironment,
+  isProduction,
+  isDevelopment,
+  getPlatformLicense,
   shouldCheckLicense,
-  getLicenseKey,
-  getLicenseServerUrl,
-  isOpenSourceMode,
-  isProfessionalLicense,
-  isEnterpriseLicense,
-  hasAdvancedFeatures,
-  hasEnterpriseFeatures,
-  getLicenseTimeout,
-  getLicenseRetryCount,
-}
-
-// Export types
-export type {
-  LicenseEnvironment,
-  PlatformConfig,
-  ExtendedClientEnvironmentVariables,
-  ExtendedServerEnvironmentVariables,
-  ExtendedEnvironmentVariables,
-}
-
-// Default export
-export default env
+  getApiConfig,
+  isFeatureEnabled,
+  isDebugEnabled,
+  useEnvironment,
+};
