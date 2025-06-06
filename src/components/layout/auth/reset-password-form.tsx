@@ -1,214 +1,291 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation } from '@tanstack/react-query';
 import { z } from 'zod';
+import { useMutation } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/use-auth';
 import { useSystemConfig } from '@/hooks/use-system-config';
-import { createPasswordResetSchema } from '@/lib/auth-schema';
-import { validatePassword } from '@/lib/password-validation';
-import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Alert } from '@/components/ui/alert';
-import { 
-  ResetPasswordRequest,
-  LoginCredentials,
-  PasswordResetResponse,
-  AuthResponse
-} from '@/types/auth';
+import type { ResetFormData, UpdatePasswordResponse } from '@/types/auth';
+
+// =============================================================================
+// TYPES AND INTERFACES
+// =============================================================================
 
 /**
- * Form data type for password reset operations
+ * Form workflow types supported by the reset password component
  */
-interface ResetFormData {
-  email: string;
-  username: string;
+type WorkflowType = 'reset' | 'register' | 'invite';
+
+/**
+ * Password reset form data interface
+ */
+interface PasswordResetFormData {
+  email?: string;
+  username?: string;
   code: string;
   newPassword: string;
   confirmPassword: string;
 }
 
 /**
- * Props for the ResetPasswordForm component
+ * Password reset API request interface
  */
-interface ResetPasswordFormProps {
-  /** Type of form: 'reset' for password reset, 'register' for registration confirmation, 'invite' for user invitation */
-  type?: 'reset' | 'register' | 'invite';
-  /** Called when form submission is successful */
-  onSuccess?: () => void;
-  /** Called when form submission fails */
-  onError?: (error: string) => void;
+interface PasswordResetRequest {
+  email?: string;
+  username?: string;
+  code: string;
+  newPassword: string;
+  admin?: boolean;
 }
 
+// =============================================================================
+// VALIDATION SCHEMAS
+// =============================================================================
+
 /**
- * Password reset form component supporting multiple workflows:
- * - Password reset completion
- * - Registration confirmation  
- * - User invitation acceptance
+ * Base form validation schema with common fields
+ */
+const baseSchema = z.object({
+  code: z.string().min(1, 'Confirmation code is required'),
+  newPassword: z
+    .string()
+    .min(8, 'Password must be at least 8 characters')
+    .regex(
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/,
+      'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'
+    ),
+  confirmPassword: z.string().min(1, 'Password confirmation is required'),
+});
+
+/**
+ * Email-based authentication schema
+ */
+const emailSchema = baseSchema.extend({
+  email: z.string().email('Invalid email address'),
+  username: z.string().optional(),
+});
+
+/**
+ * Username-based authentication schema
+ */
+const usernameSchema = baseSchema.extend({
+  username: z.string().min(1, 'Username is required'),
+  email: z.string().optional(),
+});
+
+/**
+ * Combined validation schema with password confirmation
+ */
+const createValidationSchema = (loginAttribute: string) => {
+  const schema = loginAttribute === 'email' ? emailSchema : usernameSchema;
+  
+  return schema.refine(
+    (data) => data.newPassword === data.confirmPassword,
+    {
+      message: 'Passwords do not match',
+      path: ['confirmPassword'],
+    }
+  );
+};
+
+// =============================================================================
+// API FUNCTIONS
+// =============================================================================
+
+/**
+ * Password reset API call
+ */
+async function resetPasswordAPI(data: PasswordResetRequest): Promise<UpdatePasswordResponse> {
+  const endpoint = data.admin ? '/api/auth/admin/password' : '/api/auth/user/password';
+  
+  const response = await fetch(endpoint, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      code: data.code,
+      new_password: data.newPassword,
+      ...(data.email && { email: data.email }),
+      ...(data.username && { username: data.username }),
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData?.message || 'Password reset failed');
+  }
+
+  return response.json();
+}
+
+// =============================================================================
+// COMPONENT PROPS
+// =============================================================================
+
+interface ResetPasswordFormProps {
+  /** CSS class name for styling */
+  className?: string;
+  /** Custom callback on successful password reset */
+  onSuccess?: (data: UpdatePasswordResponse) => void;
+  /** Custom callback on error */
+  onError?: (error: Error) => void;
+}
+
+// =============================================================================
+// MAIN COMPONENT
+// =============================================================================
+
+/**
+ * React password reset form component handling multiple authentication workflows
  * 
  * Features:
- * - URL parameter parsing for pre-population
- * - Real-time password confirmation validation
- * - Dynamic field rendering based on system login attribute
- * - Automatic login after successful password reset
- * - Comprehensive error handling and accessibility
+ * - Multi-purpose form supporting password reset, registration confirmation, and user invitation
+ * - URL parameter parsing for pre-populating email, username, and confirmation code fields
+ * - Dynamic field rendering based on system login attribute configuration (email vs username)
+ * - Password confirmation validation with real-time matching verification using Zod schema
+ * - Automatic user login after successful password reset with session establishment
+ * - React Query mutations for API operations with comprehensive error handling
+ * - Responsive form design with proper accessibility features and error messaging
+ * - Integration with Next.js router for navigation and parameter handling
+ * 
+ * @param props Component props
+ * @returns JSX element for the password reset form
  */
-export function ResetPasswordForm({ 
-  type = 'reset', 
+export function ResetPasswordForm({
+  className = '',
   onSuccess,
-  onError 
-}: ResetPasswordFormProps) {
+  onError,
+}: ResetPasswordFormProps): JSX.Element {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login } = useAuth();
-  const { systemConfig } = useSystemConfig();
-  
-  // Extract URL parameters for form pre-population
-  const urlParams = {
+  const { login, isLoading: authLoading } = useAuth();
+  const { environment } = useSystemConfig();
+
+  // Extract URL parameters
+  const urlParams = useMemo(() => ({
     email: searchParams.get('email') || '',
     username: searchParams.get('username') || '',
     code: searchParams.get('code') || '',
-    admin: searchParams.get('admin') || ''
-  };
-  
-  const isAdmin = urlParams.admin === '1';
-  const loginAttribute = systemConfig?.authentication?.loginAttribute || 'email';
-  
-  // Create dynamic schema based on login attribute and password requirements
-  const passwordResetSchema = React.useMemo(() => {
-    return createPasswordResetSchema(loginAttribute, {
-      requiresEmail: loginAttribute === 'email',
-      requiresUsername: loginAttribute === 'username',
-      passwordMinLength: 16,
-      requiresConfirmation: true
-    });
-  }, [loginAttribute]);
+    admin: searchParams.get('admin') === '1',
+    type: (searchParams.get('type') as WorkflowType) || 'reset',
+  }), [searchParams]);
 
-  type PasswordResetFormData = z.infer<typeof passwordResetSchema>;
+  // Get login attribute from system configuration
+  const loginAttribute = environment?.authentication?.loginAttribute || 'email';
 
+  // Create validation schema based on login attribute
+  const validationSchema = useMemo(
+    () => createValidationSchema(loginAttribute),
+    [loginAttribute]
+  );
+
+  // Initialize form with React Hook Form and Zod validation
   const form = useForm<PasswordResetFormData>({
-    resolver: zodResolver(passwordResetSchema),
+    resolver: zodResolver(validationSchema),
     defaultValues: {
       email: urlParams.email,
       username: urlParams.username,
       code: urlParams.code,
       newPassword: '',
-      confirmPassword: ''
+      confirmPassword: '',
     },
-    mode: 'onChange'
+    mode: 'onChange', // Real-time validation
   });
 
-  // Update form when URL parameters change
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isValid },
+    setError,
+    clearErrors,
+    watch,
+  } = form;
+
+  // Watch password fields for real-time confirmation validation
+  const newPassword = watch('newPassword');
+  const confirmPassword = watch('confirmPassword');
+
+  // Real-time password confirmation validation
   useEffect(() => {
-    form.setValue('email', urlParams.email);
-    form.setValue('username', urlParams.username);
-    form.setValue('code', urlParams.code);
-  }, [urlParams.email, urlParams.username, urlParams.code, form]);
-
-  // API mutation for password reset
-  const resetPasswordMutation = useMutation<
-    PasswordResetResponse,
-    Error,
-    ResetPasswordRequest
-  >({
-    mutationFn: async (data: ResetPasswordRequest) => {
-      const url = isAdmin ? '/api/v2/system/admin/password' : '/api/v2/user/password';
-      
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest'
-        },
-        body: JSON.stringify(data)
+    if (confirmPassword && newPassword !== confirmPassword) {
+      setError('confirmPassword', {
+        type: 'manual',
+        message: 'Passwords do not match',
       });
+    } else if (confirmPassword && newPassword === confirmPassword) {
+      clearErrors('confirmPassword');
+    }
+  }, [newPassword, confirmPassword, setError, clearErrors]);
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error?.message || 'Password reset failed');
+  // Password reset mutation
+  const resetPasswordMutation = useMutation({
+    mutationFn: async (data: PasswordResetFormData) => {
+      const requestData: PasswordResetRequest = {
+        code: data.code,
+        newPassword: data.newPassword,
+        admin: urlParams.admin,
+      };
+
+      // Add email or username based on login attribute
+      if (loginAttribute === 'email') {
+        requestData.email = data.email;
+      } else {
+        requestData.username = data.username;
       }
 
-      return response.json();
+      return resetPasswordAPI(requestData);
     },
-    onSuccess: async () => {
-      // Automatically log in the user after successful password reset
-      await performAutoLogin();
+    onSuccess: async (response) => {
+      try {
+        // Automatically log in user after successful password reset
+        const loginCredentials = {
+          password: form.getValues('newPassword'),
+          ...(loginAttribute === 'email' 
+            ? { email: form.getValues('email') }
+            : { username: form.getValues('username') }
+          ),
+        };
+
+        await login(loginCredentials);
+        
+        // Call custom success callback if provided
+        if (onSuccess) {
+          onSuccess(response);
+        }
+
+        // Navigate to dashboard
+        router.push('/');
+      } catch (loginError) {
+        console.error('Auto-login failed after password reset:', loginError);
+        // Navigate to login page if auto-login fails
+        router.push('/login?message=password_reset_success');
+      }
     },
-    onError: (error) => {
-      onError?.(error.message);
-    }
+    onError: (error: Error) => {
+      console.error('Password reset failed:', error);
+      
+      // Call custom error callback if provided
+      if (onError) {
+        onError(error);
+      }
+    },
   });
 
-  // API mutation for automatic login after password reset
-  const loginMutation = useMutation<AuthResponse, Error, LoginCredentials>({
-    mutationFn: async (credentials: LoginCredentials) => {
-      return await login(credentials);
-    },
-    onSuccess: () => {
-      onSuccess?.();
-      // Navigate to dashboard after successful login
-      router.push('/');
-    },
-    onError: (error) => {
-      // Even if auto-login fails, the password reset was successful
-      onError?.(`Password reset successful, but auto-login failed: ${error.message}`);
-      router.push('/login');
-    }
-  });
-
-  /**
-   * Performs automatic login after successful password reset
-   */
-  const performAutoLogin = async () => {
-    const formData = form.getValues();
-    const credentials: LoginCredentials = {
-      password: formData.newPassword
-    };
-
-    // Set login credential based on system login attribute
-    if (loginAttribute === 'email') {
-      credentials.email = formData.email;
-    } else {
-      credentials.username = formData.username;
-    }
-
-    loginMutation.mutate(credentials);
-  };
-
-  /**
-   * Handles form submission for password reset
-   */
-  const onSubmit = async (data: PasswordResetFormData) => {
-    // Additional password validation
-    const passwordValidation = validatePassword(data.newPassword);
-    if (!passwordValidation.isValid) {
-      form.setError('newPassword', {
-        type: 'manual',
-        message: passwordValidation.errors[0]
-      });
+  // Form submission handler
+  const onSubmit = (data: PasswordResetFormData) => {
+    if (!isValid) {
       return;
     }
-
-    // Prepare reset request data
-    const resetRequest: ResetPasswordRequest = {
-      email: data.email,
-      username: data.username,
-      code: data.code,
-      newPassword: data.newPassword
-    };
-
-    resetPasswordMutation.mutate(resetRequest);
+    resetPasswordMutation.mutate(data);
   };
 
-  /**
-   * Gets the appropriate form title based on the type
-   */
+  // Determine form title based on workflow type
   const getFormTitle = () => {
-    switch (type) {
+    switch (urlParams.type) {
       case 'register':
         return 'Registration Confirmation';
       case 'invite':
@@ -218,196 +295,189 @@ export function ResetPasswordForm({
     }
   };
 
-  /**
-   * Gets the appropriate submit button text based on the type
-   */
+  // Determine submit button text based on workflow type
   const getSubmitButtonText = () => {
-    switch (type) {
+    switch (urlParams.type) {
       case 'register':
+        return 'Confirm Registration';
       case 'invite':
-        return 'Confirm User';
+        return 'Accept Invitation';
       default:
         return 'Reset Password';
     }
   };
 
-  const isLoading = resetPasswordMutation.isPending || loginMutation.isPending;
-  const error = resetPasswordMutation.error || loginMutation.error;
+  // Check if form is loading
+  const isFormLoading = resetPasswordMutation.isPending || authLoading;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900 px-4 sm:px-6 lg:px-8">
-      <div className="w-full max-w-md space-y-8">
-        <div className="bg-white dark:bg-gray-800 shadow-xl rounded-lg p-8">
-          {/* Header */}
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-center text-gray-900 dark:text-white">
-              {getFormTitle()}
-            </h2>
-          </div>
+    <div className={`w-full max-w-md mx-auto ${className}`}>
+      <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg overflow-hidden">
+        {/* Header */}
+        <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+            {getFormTitle()}
+          </h2>
+        </div>
 
-          {/* Error Alert */}
-          {error && (
-            <Alert 
-              variant="destructive" 
-              className="mb-6"
-              onDismiss={() => {
-                resetPasswordMutation.reset();
-                loginMutation.reset();
-              }}
-            >
-              {error.message}
-            </Alert>
+        {/* Error Alert */}
+        {resetPasswordMutation.error && (
+          <div className="mx-6 mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-red-800 dark:text-red-200">
+                  {resetPasswordMutation.error?.message || 'An error occurred during password reset'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Form */}
+        <form onSubmit={handleSubmit(onSubmit)} className="px-6 py-6 space-y-6">
+          {/* Email Field (if using email authentication) */}
+          {loginAttribute === 'email' && (
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Email Address
+              </label>
+              <input
+                {...register('email')}
+                type="email"
+                id="email"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                placeholder="Enter your email address"
+                disabled={isFormLoading}
+              />
+              {errors.email && (
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                  {errors.email.message}
+                </p>
+              )}
+            </div>
           )}
 
-          {/* Form */}
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              {/* Email Field - shown when login attribute is email */}
-              {loginAttribute === 'email' && (
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email Address</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          type="email"
-                          placeholder="Enter your email address"
-                          autoComplete="email"
-                          disabled={isLoading}
-                          className="w-full"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+          {/* Username Field (if using username authentication) */}
+          {loginAttribute === 'username' && (
+            <div>
+              <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Username
+              </label>
+              <input
+                {...register('username')}
+                type="text"
+                id="username"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                placeholder="Enter your username"
+                disabled={isFormLoading}
+              />
+              {errors.username && (
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                  {errors.username.message}
+                </p>
               )}
+            </div>
+          )}
 
-              {/* Username Field - shown when login attribute is username */}
-              {loginAttribute === 'username' && (
-                <FormField
-                  control={form.control}
-                  name="username"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Username</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          type="text"
-                          placeholder="Enter your username"
-                          autoComplete="username"
-                          disabled={isLoading}
-                          className="w-full"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
-
-              {/* Confirmation Code Field */}
-              <FormField
-                control={form.control}
-                name="code"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Confirmation Code</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        type="text"
-                        placeholder="Enter confirmation code"
-                        disabled={isLoading}
-                        className="w-full"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* New Password Field */}
-              <FormField
-                control={form.control}
-                name="newPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      {type === 'reset' ? 'New Password' : 'Password'}
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        type="password"
-                        placeholder={`Enter your ${type === 'reset' ? 'new ' : ''}password`}
-                        autoComplete="new-password"
-                        disabled={isLoading}
-                        className="w-full"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                      Password must be at least 16 characters long
-                    </p>
-                  </FormItem>
-                )}
-              />
-
-              {/* Confirm Password Field */}
-              <FormField
-                control={form.control}
-                name="confirmPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      {type === 'reset' ? 'Confirm New Password' : 'Confirm Password'}
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        type="password"
-                        placeholder="Confirm your password"
-                        autoComplete="new-password"
-                        disabled={isLoading}
-                        className="w-full"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Submit Button */}
-              <Button
-                type="submit"
-                disabled={isLoading || !form.formState.isValid}
-                className="w-full"
-                size="lg"
-              >
-                {isLoading ? 'Processing...' : getSubmitButtonText()}
-              </Button>
-            </form>
-          </Form>
-
-          {/* Footer */}
-          <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Remember your password?{' '}
-              <button
-                type="button"
-                onClick={() => router.push('/login')}
-                className="font-medium text-primary-600 hover:text-primary-500 dark:text-primary-400 dark:hover:text-primary-300"
-                disabled={isLoading}
-              >
-                Sign in instead
-              </button>
-            </p>
+          {/* Confirmation Code Field */}
+          <div>
+            <label htmlFor="code" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Confirmation Code
+            </label>
+            <input
+              {...register('code')}
+              type="text"
+              id="code"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+              placeholder="Enter confirmation code"
+              disabled={isFormLoading}
+            />
+            {errors.code && (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                {errors.code.message}
+              </p>
+            )}
           </div>
+
+          {/* New Password Field */}
+          <div>
+            <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              {urlParams.type === 'reset' ? 'New Password' : 'Password'}
+            </label>
+            <input
+              {...register('newPassword')}
+              type="password"
+              id="newPassword"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+              placeholder="Enter your password"
+              disabled={isFormLoading}
+            />
+            {errors.newPassword && (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                {errors.newPassword.message}
+              </p>
+            )}
+          </div>
+
+          {/* Confirm Password Field */}
+          <div>
+            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              {urlParams.type === 'reset' ? 'Confirm New Password' : 'Confirm Password'}
+            </label>
+            <input
+              {...register('confirmPassword')}
+              type="password"
+              id="confirmPassword"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+              placeholder="Confirm your password"
+              disabled={isFormLoading}
+            />
+            {errors.confirmPassword && (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                {errors.confirmPassword.message}
+              </p>
+            )}
+          </div>
+
+          {/* Submit Button */}
+          <div>
+            <button
+              type="submit"
+              disabled={!isValid || isFormLoading}
+              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors duration-200"
+            >
+              {isFormLoading ? (
+                <div className="flex items-center">
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Processing...
+                </div>
+              ) : (
+                getSubmitButtonText()
+              )}
+            </button>
+          </div>
+        </form>
+
+        {/* Footer */}
+        <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600">
+          <p className="text-center text-sm text-gray-600 dark:text-gray-400">
+            Remember your password?{' '}
+            <button
+              type="button"
+              onClick={() => router.push('/login')}
+              className="text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+            >
+              Sign in
+            </button>
+          </p>
         </div>
       </div>
     </div>
