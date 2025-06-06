@@ -1,325 +1,438 @@
 {
-  "$schema": "https://json.schemastore.org/i18n-next.json",
-  "_metadata": {
-    "version": "1.0.0",
-    "locale": "en",
-    "direction": "ltr",
-    "lastModified": "2024-12-19T00:00:00.000Z",
-    "framework": "next.js",
-    "ssrOptimized": true
-  },
-  "requiredForLogin": "Required for login",
-  "resetPassword": "Reset Password",
-  "passwordReset": "Password Reset",
-  "login": "Login",
-  "forgotPassword": "Forgot Password",
-  "requestPasswordReset": "Request Password Reset",
-  "invitatonConfirmation": "Invitation Confirmation",
-  "registrationConfirmation": "Registration Confirmation",
-  "confirmUser": "Confirm User",
-  "register": "Register",
-  "registerSuccess": {
-    "header": "Registration Success",
-    "title": "Thanks For Registering!",
-    "message": "A confirmation email has been sent to the email address that you registered with. Upon confirmation you will be able to login to the application. Thanks!"
-  },
-  "oAuth": "OAuth Login",
-  "saml": "SAML 2.0 Login",
-  "controls": {
-    "username": {
-      "label": "Choose Username",
-      "altLabel": "Enter Username",
-      "optional": "(Optional, defaults to email address)",
-      "placeholder": "Enter your username",
-      "errors": {
-        "required": "Username is required",
-        "minLength": "Username must be at least 6 characters long",
-        "pattern": "Username must contain only letters, numbers, and underscores",
-        "maxLength": "Username cannot exceed 50 characters",
-        "unique": "This username is already taken",
-        "invalid": "Invalid username format"
-      },
-      "validation": {
-        "min": 6,
-        "max": 50,
-        "pattern": "^[a-zA-Z0-9_]+$"
-      }
+  "login": {
+    "title": "Login",
+    "subtitle": "Sign in to your DreamFactory account",
+    "fields": {
+      "email": "Email Address",
+      "username": "Username",
+      "password": "Password",
+      "rememberMe": "Remember me",
+      "service": "Authentication Service",
+      "twoFactorCode": "Two-Factor Code"
     },
-    "email": {
-      "label": "Enter Email",
-      "placeholder": "Enter your email address",
-      "errors": {
+    "actions": {
+      "signIn": "Sign In",
+      "forgotPassword": "Forgot Password?",
+      "createAccount": "Create Account"
+    },
+    "messages": {
+      "invalidCredentials": "Invalid email or password. Please try again.",
+      "accountLocked": "Account has been temporarily locked due to multiple failed login attempts. Please try again later.",
+      "sessionExpired": "Your session has expired. Please sign in again.",
+      "twoFactorRequired": "Please enter your two-factor authentication code",
+      "authServiceError": "Authentication service is temporarily unavailable. Please try again.",
+      "loginSuccess": "Login successful. Redirecting...",
+      "externalAuthFailed": "External authentication failed. Please try again or use your email and password."
+    },
+    "validation": {
+      "email": {
         "required": "Email is required",
         "invalid": "Invalid email format",
-        "unique": "This email address is already registered",
-        "domain": "Email domain is not allowed",
-        "disposable": "Disposable email addresses are not permitted"
-      },
-      "validation": {
-        "pattern": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
-      }
-    },
-    "firstName": {
-      "label": "Enter First Name",
-      "placeholder": "Enter your first name",
-      "errors": {
-        "required": "First name is required",
-        "minLength": "First name must be at least 1 character",
-        "maxLength": "First name cannot exceed 50 characters",
-        "pattern": "First name can only contain letters, spaces, and hyphens"
-      },
-      "validation": {
-        "min": 1,
-        "max": 50,
-        "pattern": "^[a-zA-Z\\s-]+$"
-      }
-    },
-    "lastName": {
-      "label": "Enter Last Name",
-      "placeholder": "Enter your last name",
-      "errors": {
-        "required": "Last name is required",
-        "minLength": "Last name must be at least 1 character",
-        "maxLength": "Last name cannot exceed 50 characters",
-        "pattern": "Last name can only contain letters, spaces, and hyphens"
-      },
-      "validation": {
-        "min": 1,
-        "max": 50,
-        "pattern": "^[a-zA-Z\\s-]+$"
-      }
-    },
-    "displayName": {
-      "label": "Enter Display Name",
-      "placeholder": "Enter your display name",
-      "errors": {
-        "required": "Display name is required",
-        "minLength": "Display name must be at least 1 character",
-        "maxLength": "Display name cannot exceed 100 characters"
-      },
-      "validation": {
-        "min": 1,
-        "max": 100
-      }
-    },
-    "oldPassword": {
-      "label": "Enter Old Password",
-      "placeholder": "Enter your current password",
-      "errors": {
-        "required": "Old password is required",
-        "incorrect": "Current password is incorrect"
-      }
-    },
-    "password": {
-      "label": "Enter Password",
-      "altLabel": "Confirm new password",
-      "placeholder": "Enter your password",
-      "errors": {
-        "required": "Password is required",
-        "length": "Password must be at least 16 characters long",
-        "minLength": "Password must be at least 16 characters long",
-        "maxLength": "Password cannot exceed 256 characters",
-        "uppercase": "Password must contain at least one uppercase letter",
-        "lowercase": "Password must contain at least one lowercase letter",
-        "number": "Password must contain at least one number",
-        "symbol": "Password must contain at least one special character",
-        "weak": "Password is too weak",
-        "common": "This password is commonly used and not secure"
-      },
-      "validation": {
-        "min": 16,
-        "max": 256,
-        "requirements": {
-          "uppercase": true,
-          "lowercase": true,
-          "number": true,
-          "symbol": true
-        }
-      },
-      "strength": {
-        "weak": "Weak",
-        "fair": "Fair",
-        "good": "Good",
-        "strong": "Strong"
-      }
-    },
-    "verifyPassword": {
-      "label": "Verify Password",
-      "altLabel": "Verify new password",
-      "placeholder": "Verify your password"
-    },
-    "confirmationCode": {
-      "label": "Enter confirmation code",
-      "placeholder": "Enter the 6-digit code",
-      "errors": {
-        "required": "Confirmation code is required",
-        "invalid": "Invalid confirmation code format",
-        "length": "Confirmation code must be 6 digits",
-        "expired": "Confirmation code has expired",
-        "incorrect": "Incorrect confirmation code"
-      },
-      "validation": {
-        "length": 6,
-        "pattern": "^[0-9]{6}$"
-      }
-    },
-    "confirmPassword": {
-      "label": "Confirm Password",
-      "altLabel": "Confirm new password",
-      "placeholder": "Confirm your password",
-      "errors": {
-        "required": "Confirm password is required",
-        "match": "Passwords do not match",
-        "mismatch": "Password confirmation does not match"
-      }
-    },
-    "services": {
-      "label": "Services"
-    },
-    "setSecurityQuestion": {
-      "label": "Set Security Question"
-    },
-    "setPassword": {
-      "label": "Set Password"
-    },
-    "securityQuestion": {
-      "label": "Security Question",
-      "placeholder": "Select a security question",
-      "errors": {
-        "required": "Security question is required"
-      }
-    },
-    "securityAnswer": {
-      "label": "Enter security answer",
-      "placeholder": "Enter your answer",
-      "errors": {
-        "required": "Security answer is required",
-        "minLength": "Security answer must be at least 3 characters",
-        "maxLength": "Security answer cannot exceed 100 characters"
-      },
-      "validation": {
-        "min": 3,
-        "max": 100
-      }
-    },
-    "phone": {
-      "label": "Enter telephone number",
-      "placeholder": "Enter your phone number",
-      "errors": {
-        "invalid": "Invalid phone number format",
-        "required": "Phone number is required"
-      },
-      "validation": {
-        "pattern": "^[+]?[1-9]\\d{1,14}$"
-      }
-    },
-    "currentPassword": {
-      "label": "Enter current password",
-      "placeholder": "Enter your current password",
-      "errors": {
-        "required": "Required if Changing Email",
-        "incorrect": "Current password is incorrect"
-      }
-    },
-    "sendInvite": {
-      "label": "Send Email Invite"
-    }
-  },
-  "formValidation": {
-    "realTimeValidation": {
-      "enabled": true,
-      "debounceMs": 100
-    },
-    "submitValidation": {
-      "preventInvalidSubmit": true,
-      "showSummary": true
-    },
-    "fieldValidation": {
-      "validateOnBlur": true,
-      "validateOnChange": true,
-      "showErrorsImmediately": false
-    }
-  },
-  "dynamicValidation": {
-    "loginMethod": {
-      "email": {
-        "identifier": "email",
-        "label": "Email Address",
-        "required": true,
-        "validation": "email"
+        "maxLength": "Email must be less than 254 characters"
       },
       "username": {
-        "identifier": "username", 
-        "label": "Username",
-        "required": true,
-        "validation": "username"
+        "required": "Username is required",
+        "minLength": "Username must be at least 3 characters long",
+        "maxLength": "Username must be less than 50 characters",
+        "pattern": "Username can only contain letters, numbers, dots, underscores, and hyphens"
       },
-      "both": {
-        "identifier": "email_or_username",
-        "label": "Email or Username",
-        "required": true,
-        "validation": "email_or_username"
+      "password": {
+        "required": "Password is required",
+        "maxLength": "Password must be less than 128 characters"
+      },
+      "twoFactorCode": {
+        "required": "Two-factor code is required",
+        "length": "Two-factor code must be 6 digits",
+        "pattern": "Two-factor code must contain only digits"
+      },
+      "service": {
+        "required": "Please select an authentication service"
       }
     },
-    "passwordPolicy": {
-      "configurable": true,
-      "minimumLength": 16,
-      "requireUppercase": true,
-      "requireLowercase": true,
-      "requireNumbers": true,
-      "requireSymbols": true
+    "providers": {
+      "oauth": "OAuth Login",
+      "saml": "SAML 2.0 Login",
+      "ldap": "LDAP Login",
+      "local": "Email & Password"
     }
   },
-  "alerts": {
-    "resetEmailSent": "A password reset email has been sent to the user's email address.",
-    "registrationSuccess": "Registration completed successfully. Please check your email for confirmation.",
-    "loginSuccess": "Welcome back! You have been successfully logged in.",
-    "logoutSuccess": "You have been successfully logged out.",
-    "passwordChangeSuccess": "Your password has been changed successfully.",
-    "profileUpdateSuccess": "Your profile has been updated successfully.",
-    "confirmationSuccess": "Your account has been confirmed successfully.",
-    "invitationSent": "Invitation has been sent successfully.",
-    "validationError": "Please correct the errors below and try again.",
-    "sessionExpired": "Your session has expired. Please log in again.",
-    "accountLocked": "Your account has been temporarily locked. Please try again later.",
-    "invalidCredentials": "Invalid email/username or password.",
-    "networkError": "Network error. Please check your connection and try again.",
-    "serverError": "Server error. Please try again later."
+  "register": {
+    "title": "Register",
+    "subtitle": "Create your DreamFactory account",
+    "fields": {
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "email": "Email Address",
+      "username": "Username",
+      "password": "Password",
+      "confirmPassword": "Confirm Password",
+      "displayName": "Display Name",
+      "acceptTerms": "I accept the Terms of Service",
+      "subscribeNewsletter": "Subscribe to newsletter"
+    },
+    "actions": {
+      "signUp": "Create Account",
+      "backToLogin": "Back to Login",
+      "resendVerification": "Resend Verification Email"
+    },
+    "messages": {
+      "passwordMismatch": "Passwords do not match",
+      "emailExists": "An account with this email address already exists",
+      "registrationSuccess": "Registration successful! Please check your email for verification instructions.",
+      "verificationSent": "A verification email has been sent to your email address",
+      "verificationRequired": "Please verify your email address before proceeding",
+      "registrationFailed": "Registration failed. Please try again.",
+      "termsRequired": "You must accept the Terms of Service to create an account"
+    },
+    "validation": {
+      "firstName": {
+        "required": "First name is required",
+        "maxLength": "First name must be less than 50 characters",
+        "pattern": "First name can only contain letters, spaces, apostrophes, and hyphens"
+      },
+      "lastName": {
+        "required": "Last name is required",
+        "maxLength": "Last name must be less than 50 characters",
+        "pattern": "Last name can only contain letters, spaces, apostrophes, and hyphens"
+      },
+      "email": {
+        "required": "Email is required",
+        "invalid": "Invalid email format",
+        "maxLength": "Email must be less than 254 characters"
+      },
+      "username": {
+        "required": "Username is required",
+        "minLength": "Username must be at least 3 characters long",
+        "maxLength": "Username must be less than 50 characters",
+        "pattern": "Username can only contain letters, numbers, dots, underscores, and hyphens"
+      },
+      "password": {
+        "required": "Password is required",
+        "minLength": "Password must be at least 16 characters long",
+        "maxLength": "Password must be less than 128 characters",
+        "pattern": "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character"
+      },
+      "confirmPassword": {
+        "required": "Password confirmation is required",
+        "match": "Passwords do not match"
+      },
+      "displayName": {
+        "required": "Display name is required",
+        "maxLength": "Display name must be less than 100 characters"
+      },
+      "acceptTerms": {
+        "required": "You must accept the Terms of Service"
+      }
+    },
+    "passwordStrength": {
+      "weak": "Weak",
+      "fair": "Fair", 
+      "good": "Good",
+      "strong": "Strong",
+      "veryStrong": "Very Strong",
+      "requirements": {
+        "length": "At least 16 characters",
+        "uppercase": "At least one uppercase letter",
+        "lowercase": "At least one lowercase letter",
+        "number": "At least one number",
+        "special": "At least one special character"
+      }
+    }
+  },
+  "forgotPassword": {
+    "title": "Forgot Password",
+    "subtitle": "Enter your email address to reset your password",
+    "fields": {
+      "email": "Email Address",
+      "username": "Username"
+    },
+    "actions": {
+      "sendReset": "Send Reset Link",
+      "backToLogin": "Back to Login",
+      "resendEmail": "Resend Email"
+    },
+    "messages": {
+      "emailSent": "A password reset email has been sent to your email address. Please check your inbox and follow the instructions.",
+      "emailNotFound": "No account found with this email address",
+      "resetLinkExpired": "The password reset link has expired. Please request a new one.",
+      "tooManyRequests": "Too many reset requests. Please wait before requesting another.",
+      "sendError": "Failed to send reset email. Please try again.",
+      "canResendIn": "You can request another email in {{seconds}} seconds"
+    },
+    "validation": {
+      "email": {
+        "required": "Email is required",
+        "invalid": "Invalid email format"
+      },
+      "username": {
+        "required": "Username is required",
+        "minLength": "Username must be at least 3 characters long"
+      }
+    }
+  },
+  "resetPassword": {
+    "title": "Reset Password",
+    "subtitle": "Enter your new password",
+    "fields": {
+      "code": "Reset Code",
+      "newPassword": "New Password",
+      "confirmPassword": "Confirm New Password",
+      "securityQuestion": "Security Question",
+      "securityAnswer": "Security Answer"
+    },
+    "actions": {
+      "resetPassword": "Reset Password",
+      "backToLogin": "Back to Login",
+      "requestNewCode": "Request New Code"
+    },
+    "messages": {
+      "resetSuccess": "Your password has been successfully reset. You can now log in with your new password.",
+      "tokenExpired": "The reset code has expired. Please request a new password reset.",
+      "invalidCode": "Invalid reset code. Please check the code and try again.",
+      "codeRequired": "Please enter the reset code from your email",
+      "securityQuestionRequired": "Please answer your security question",
+      "resetFailed": "Password reset failed. Please try again."
+    },
+    "validation": {
+      "code": {
+        "required": "Reset code is required",
+        "maxLength": "Reset code is invalid",
+        "pattern": "Reset code contains invalid characters"
+      },
+      "newPassword": {
+        "required": "New password is required",
+        "minLength": "Password must be at least 16 characters long",
+        "maxLength": "Password must be less than 128 characters",
+        "pattern": "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character"
+      },
+      "confirmPassword": {
+        "required": "Password confirmation is required",
+        "match": "Passwords do not match"
+      },
+      "securityAnswer": {
+        "required": "Security answer is required",
+        "minLength": "Security answer must be at least 3 characters long",
+        "maxLength": "Security answer must be less than 100 characters"
+      }
+    }
   },
   "profile": {
+    "title": "Profile",
+    "subtitle": "Manage your account settings",
     "tabs": {
       "details": "Details",
       "securityQuestion": "Security Question",
-      "password": "Password"
+      "password": "Password",
+      "twoFactor": "Two-Factor Authentication"
     },
-    "alerts": {
+    "fields": {
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "email": "Email Address",
+      "displayName": "Display Name",
+      "phone": "Phone Number",
+      "currentPassword": "Current Password",
+      "newPassword": "New Password",
+      "confirmPassword": "Confirm New Password",
+      "securityQuestion": "Security Question",
+      "securityAnswer": "Security Answer"
+    },
+    "actions": {
+      "updateProfile": "Update Profile",
+      "changePassword": "Change Password",
+      "setSecurityQuestion": "Set Security Question",
+      "enableTwoFactor": "Enable Two-Factor Authentication",
+      "disableTwoFactor": "Disable Two-Factor Authentication"
+    },
+    "messages": {
       "detailsUpdated": "Profile updated successfully",
-      "securtyQuestionUpdated": "Security question updated successfully",
-      "passwordUpdated": "Password updated successfully"
-    }
-  },
-  "accessibility": {
-    "formValidation": {
-      "errorAnnouncement": "Form contains {{count}} error(s). Please review and correct.",
-      "successAnnouncement": "Form submitted successfully.",
-      "fieldError": "Error in {{fieldName}}: {{errorMessage}}",
-      "requiredField": "Required field",
-      "optionalField": "Optional field"
+      "passwordUpdated": "Password updated successfully",
+      "securityQuestionUpdated": "Security question updated successfully",
+      "twoFactorEnabled": "Two-factor authentication has been enabled",
+      "twoFactorDisabled": "Two-factor authentication has been disabled",
+      "updateError": "Failed to update profile. Please try again.",
+      "currentPasswordRequired": "Current password is required to make changes"
     },
-    "passwordStrength": {
-      "announcement": "Password strength: {{strength}}",
-      "requirements": "Password must meet the following requirements:",
-      "satisfied": "✓ {{requirement}} satisfied",
-      "unsatisfied": "✗ {{requirement}} required"
+    "validation": {
+      "firstName": {
+        "required": "First name is required",
+        "maxLength": "First name must be less than 50 characters"
+      },
+      "lastName": {
+        "required": "Last name is required",
+        "maxLength": "Last name must be less than 50 characters"
+      },
+      "email": {
+        "required": "Email is required",
+        "invalid": "Invalid email format"
+      },
+      "displayName": {
+        "required": "Display name is required",
+        "maxLength": "Display name must be less than 100 characters"
+      },
+      "phone": {
+        "maxLength": "Phone number must be less than 20 characters",
+        "pattern": "Please enter a valid phone number"
+      },
+      "currentPassword": {
+        "required": "Current password is required"
+      },
+      "newPassword": {
+        "required": "New password is required",
+        "minLength": "Password must be at least 16 characters long",
+        "different": "New password must be different from current password"
+      },
+      "confirmPassword": {
+        "required": "Password confirmation is required",
+        "match": "Passwords do not match"
+      },
+      "securityQuestion": {
+        "required": "Security question is required",
+        "minLength": "Security question must be at least 10 characters long",
+        "maxLength": "Security question must be less than 200 characters"
+      },
+      "securityAnswer": {
+        "required": "Security answer is required",
+        "minLength": "Security answer must be at least 3 characters long",
+        "maxLength": "Security answer must be less than 100 characters"
+      }
     }
   },
-  "serverState": {
-    "loading": "Loading...",
-    "submitting": "Submitting...",
-    "validating": "Validating...",
-    "saving": "Saving...",
-    "error": "An error occurred",
-    "retry": "Retry",
-    "success": "Success"
+  "twoFactor": {
+    "title": "Two-Factor Authentication",
+    "subtitle": "Enhance your account security",
+    "setup": {
+      "title": "Set up Two-Factor Authentication",
+      "step1": "Scan the QR code with your authenticator app",
+      "step2": "Enter the verification code from your app",
+      "step3": "Save your backup codes in a secure location"
+    },
+    "fields": {
+      "verificationCode": "Verification Code",
+      "backupCode": "Backup Code"
+    },
+    "actions": {
+      "enable": "Enable Two-Factor Authentication",
+      "disable": "Disable Two-Factor Authentication",
+      "regenerateCodes": "Regenerate Backup Codes",
+      "downloadCodes": "Download Backup Codes"
+    },
+    "messages": {
+      "setupSuccess": "Two-factor authentication has been successfully enabled",
+      "disableSuccess": "Two-factor authentication has been disabled",
+      "invalidCode": "Invalid verification code. Please try again.",
+      "backupCodesGenerated": "New backup codes have been generated",
+      "codeRequired": "Please enter the verification code from your authenticator app"
+    },
+    "validation": {
+      "verificationCode": {
+        "required": "Verification code is required",
+        "length": "Verification code must be 6 digits",
+        "pattern": "Verification code must contain only digits"
+      }
+    }
+  },
+  "security": {
+    "title": "Security Settings",
+    "subtitle": "Manage your account security",
+    "sessions": {
+      "title": "Active Sessions",
+      "current": "Current Session",
+      "location": "Location",
+      "lastActive": "Last Active",
+      "device": "Device",
+      "revokeAll": "Revoke All Other Sessions",
+      "revoke": "Revoke Session"
+    },
+    "activity": {
+      "title": "Recent Activity",
+      "loginSuccess": "Successful login",
+      "loginFailed": "Failed login attempt",
+      "passwordChanged": "Password changed",
+      "profileUpdated": "Profile updated",
+      "twoFactorEnabled": "Two-factor authentication enabled",
+      "twoFactorDisabled": "Two-factor authentication disabled"
+    }
+  },
+  "verification": {
+    "title": "Email Verification",
+    "subtitle": "Verify your email address",
+    "messages": {
+      "verificationSent": "A verification email has been sent to {{email}}",
+      "verificationSuccess": "Your email address has been successfully verified",
+      "verificationFailed": "Email verification failed. The link may have expired.",
+      "alreadyVerified": "Your email address is already verified",
+      "resendSuccess": "Verification email has been resent"
+    },
+    "actions": {
+      "resendVerification": "Resend Verification Email",
+      "changeEmail": "Change Email Address",
+      "continueToLogin": "Continue to Login"
+    }
+  },
+  "invitation": {
+    "title": "Account Invitation",
+    "subtitle": "You've been invited to join DreamFactory",
+    "messages": {
+      "invitationValid": "Welcome! Please set up your account to get started.",
+      "invitationExpired": "This invitation link has expired. Please contact your administrator for a new invitation.",
+      "invitationUsed": "This invitation has already been used.",
+      "setupSuccess": "Your account has been successfully set up. You can now log in."
+    },
+    "fields": {
+      "invitationCode": "Invitation Code"
+    },
+    "actions": {
+      "acceptInvitation": "Accept Invitation",
+      "setupAccount": "Set Up Account"
+    }
+  },
+  "common": {
+    "labels": {
+      "requiredForLogin": "Required for login",
+      "optional": "(Optional)",
+      "defaultsToEmail": "(Optional, defaults to email address)",
+      "required": "Required",
+      "loading": "Loading...",
+      "submitting": "Submitting...",
+      "processing": "Processing...",
+      "saving": "Saving...",
+      "success": "Success",
+      "error": "Error",
+      "warning": "Warning"
+    },
+    "actions": {
+      "continue": "Continue",
+      "cancel": "Cancel",
+      "close": "Close",
+      "save": "Save",
+      "submit": "Submit",
+      "reset": "Reset",
+      "back": "Back",
+      "next": "Next",
+      "retry": "Retry",
+      "refresh": "Refresh"
+    },
+    "validation": {
+      "required": "This field is required",
+      "email": "Please enter a valid email address",
+      "minLength": "Must be at least {{min}} characters long",
+      "maxLength": "Must be less than {{max}} characters",
+      "pattern": "Invalid format",
+      "numeric": "Must be a number",
+      "url": "Must be a valid URL",
+      "custom": "Invalid value"
+    },
+    "errors": {
+      "network": "Network error. Please check your connection and try again.",
+      "server": "Server error. Please try again later.",
+      "timeout": "Request timeout. Please try again.",
+      "unauthorized": "You are not authorized to perform this action.",
+      "forbidden": "Access denied.",
+      "notFound": "The requested resource was not found.",
+      "conflict": "A conflict occurred. Please refresh the page and try again.",
+      "validation": "Please correct the errors below and try again.",
+      "unknown": "An unexpected error occurred. Please try again."
+    }
   }
 }
