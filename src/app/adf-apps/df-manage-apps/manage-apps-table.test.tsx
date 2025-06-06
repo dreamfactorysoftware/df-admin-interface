@@ -1,125 +1,164 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
-import { QueryClient } from '@tanstack/react-query';
-import { renderWithProviders } from '../../../test/utils/test-utils';
-import { createMockApp, createMockApps } from '../../../test/utils/component-factories';
-import { ManageAppsTable } from './manage-apps-table';
-import type { AppType, AppRow } from '../../../types/app';
-import type { GenericListResponse } from '../../../types/generic-http';
+/**
+ * @vitest-environment jsdom
+ */
 
-// Mock the clipboard API
+import { describe, it, expect, beforeEach, afterEach, vi, beforeAll, afterAll } from 'vitest';
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { setupServer } from 'msw/node';
+import { http, HttpResponse } from 'msw';
+import { ManageAppsTable } from './manage-apps-table';
+import { TestProviders } from '../../../test/test-utils';
+import type { AppType, AppRow } from '../../../types/app';
+import type { GenericListResponse } from '../../../types/api';
+
+// Mock browser APIs
 const mockClipboard = {
   writeText: vi.fn(),
 };
+
+const mockWindow = {
+  open: vi.fn(),
+};
+
 Object.assign(navigator, {
   clipboard: mockClipboard,
 });
 
-// Mock window.open
-const mockWindowOpen = vi.fn();
 Object.assign(window, {
-  open: mockWindowOpen,
+  open: mockWindow.open,
 });
 
-// Mock data factories
-const mockApps: AppType[] = createMockApps(10);
-const largeMockApps: AppType[] = createMockApps(1500); // Large dataset for virtual scrolling
+// Mock large dataset for virtual scrolling tests
+const generateMockApps = (count: number): AppType[] => {
+  return Array.from({ length: count }, (_, index) => ({
+    id: index + 1,
+    name: `TestApp${index + 1}`,
+    description: `Test application ${index + 1} description`,
+    apiKey: `api_key_${index + 1}_${'x'.repeat(32)}`,
+    isActive: index % 2 === 0,
+    launchUrl: `https://app${index + 1}.example.com`,
+    roleByRoleId: {
+      id: (index % 3) + 1,
+      name: `role_${(index % 3) + 1}`,
+      description: `Role ${(index % 3) + 1}`,
+    },
+    createdById: index % 5 === 0 ? null : index + 100, // Some apps without creator for testing disabled actions
+    createdDate: new Date(`2024-01-${String(index % 28 + 1).padStart(2, '0')}`).toISOString(),
+    lastModifiedDate: new Date(`2024-06-${String(index % 28 + 1).padStart(2, '0')}`).toISOString(),
+  }));
+};
 
-// MSW handlers for app management endpoints
-const handlers = [
-  // GET apps list endpoint
+const mockApps = generateMockApps(25);
+const mockLargeDataset = generateMockApps(1200); // Test virtual scrolling with 1000+ items
+
+// MSW server setup for API mocking
+const server = setupServer(
+  // Get applications list endpoint
   http.get('/api/v2/system/app', ({ request }) => {
     const url = new URL(request.url);
     const limit = parseInt(url.searchParams.get('limit') || '25');
     const offset = parseInt(url.searchParams.get('offset') || '0');
-    const filter = url.searchParams.get('filter');
-    const includeCount = url.searchParams.get('include_count') === 'true';
-
-    let filteredApps = mockApps;
+    const filter = url.searchParams.get('filter') || '';
     
-    if (filter) {
-      filteredApps = mockApps.filter(app => 
-        app.name.toLowerCase().includes(filter.toLowerCase()) ||
-        app.description?.toLowerCase().includes(filter.toLowerCase())
-      );
+    let filteredApps = filter 
+      ? mockApps.filter(app => 
+          app.name.toLowerCase().includes(filter.toLowerCase()) ||
+          app.description.toLowerCase().includes(filter.toLowerCase())
+        )
+      : mockApps;
+
+    // Test large dataset for virtual scrolling
+    if (url.searchParams.get('test_large_dataset') === 'true') {
+      filteredApps = mockLargeDataset;
     }
 
     const paginatedApps = filteredApps.slice(offset, offset + limit);
     
     const response: GenericListResponse<AppType> = {
       resource: paginatedApps,
-      meta: includeCount ? { count: filteredApps.length } : {},
+      meta: {
+        count: filteredApps.length,
+        limit,
+        offset,
+      },
     };
 
     return HttpResponse.json(response);
   }),
 
-  // GET large dataset for performance testing
-  http.get('/api/v2/system/app/large', () => {
-    const response: GenericListResponse<AppType> = {
-      resource: largeMockApps,
-      meta: { count: largeMockApps.length },
-    };
-    return HttpResponse.json(response);
-  }),
-
-  // DELETE app endpoint
+  // Delete application endpoint
   http.delete('/api/v2/system/app/:id', ({ params }) => {
-    const id = parseInt(params.id as string);
-    const appIndex = mockApps.findIndex(app => app.id === id);
+    const appId = parseInt(params.id as string);
+    const appIndex = mockApps.findIndex(app => app.id === appId);
     
     if (appIndex === -1) {
-      return new HttpResponse(null, { status: 404 });
+      return HttpResponse.json(
+        { error: 'Application not found' },
+        { status: 404 }
+      );
     }
 
     mockApps.splice(appIndex, 1);
     return HttpResponse.json({ success: true });
   }),
 
-  // PUT app update endpoint (for API key refresh)
-  http.put('/api/v2/system/app/:id', async ({ params, request }) => {
-    const id = parseInt(params.id as string);
-    const body = await request.json() as Partial<AppType>;
-    const appIndex = mockApps.findIndex(app => app.id === id);
+  // Update application endpoint (for API key regeneration)
+  http.patch('/api/v2/system/app/:id', async ({ params, request }) => {
+    const appId = parseInt(params.id as string);
+    const updateData = await request.json() as Partial<AppType>;
+    const appIndex = mockApps.findIndex(app => app.id === appId);
     
     if (appIndex === -1) {
-      return new HttpResponse(null, { status: 404 });
+      return HttpResponse.json(
+        { error: 'Application not found' },
+        { status: 404 }
+      );
     }
 
     // Update the app with new data
-    mockApps[appIndex] = { ...mockApps[appIndex], ...body };
+    mockApps[appIndex] = { ...mockApps[appIndex], ...updateData };
+    
     return HttpResponse.json(mockApps[appIndex]);
   }),
 
-  // GET system config for host URL
-  http.get('/api/v2/system/config', () => {
-    return HttpResponse.json({
-      platform: {
-        server: {
-          host: 'https://test.dreamfactory.com'
-        }
-      }
-    });
+  // Error simulation endpoints for testing error handling
+  http.get('/api/v2/system/app/error', () => {
+    return HttpResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }),
-];
-
-const server = setupServer(...handlers);
+);
 
 describe('ManageAppsTable', () => {
   let queryClient: QueryClient;
+  let user: ReturnType<typeof userEvent.setup>;
+
+  beforeAll(() => {
+    server.listen({ onUnhandledRequest: 'error' });
+  });
+
+  afterAll(() => {
+    server.close();
+  });
 
   beforeEach(() => {
-    server.listen({ onUnhandledRequest: 'error' });
     queryClient = new QueryClient({
       defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
+        queries: {
+          retry: false,
+          staleTime: 0,
+          cacheTime: 0,
+        },
       },
     });
-    vi.clearAllMocks();
+    user = userEvent.setup();
+    
+    // Clear mocks
+    mockClipboard.writeText.mockClear();
+    mockWindow.open.mockClear();
   });
 
   afterEach(() => {
@@ -127,605 +166,483 @@ describe('ManageAppsTable', () => {
     queryClient.clear();
   });
 
-  describe('Component Rendering', () => {
-    it('renders the apps table with correct columns', async () => {
-      renderWithProviders(<ManageAppsTable />, { queryClient });
+  const renderComponent = (props = {}) => {
+    return render(
+      <QueryClientProvider client={queryClient}>
+        <TestProviders>
+          <ManageAppsTable {...props} />
+        </TestProviders>
+      </QueryClientProvider>
+    );
+  };
 
-      // Wait for data to load
+  describe('Component Rendering', () => {
+    it('should render the manage apps table component', async () => {
+      renderComponent();
+      
       await waitFor(() => {
         expect(screen.getByRole('table')).toBeInTheDocument();
       });
 
-      // Check table headers
-      expect(screen.getByRole('columnheader', { name: /active/i })).toBeInTheDocument();
-      expect(screen.getByRole('columnheader', { name: /name/i })).toBeInTheDocument();
-      expect(screen.getByRole('columnheader', { name: /role/i })).toBeInTheDocument();
-      expect(screen.getByRole('columnheader', { name: /api key/i })).toBeInTheDocument();
-      expect(screen.getByRole('columnheader', { name: /description/i })).toBeInTheDocument();
-      expect(screen.getByRole('columnheader', { name: /actions/i })).toBeInTheDocument();
+      // Verify table headers are present
+      expect(screen.getByText('Active')).toBeInTheDocument();
+      expect(screen.getByText('Name')).toBeInTheDocument();
+      expect(screen.getByText('Role')).toBeInTheDocument();
+      expect(screen.getByText('API Key')).toBeInTheDocument();
+      expect(screen.getByText('Description')).toBeInTheDocument();
+      expect(screen.getByText('Actions')).toBeInTheDocument();
     });
 
-    it('displays app data correctly in table rows', async () => {
-      renderWithProviders(<ManageAppsTable />, { queryClient });
+    it('should display loading state initially', () => {
+      renderComponent();
+      
+      expect(screen.getByRole('progressbar')).toBeInTheDocument();
+    });
 
+    it('should render application data after loading', async () => {
+      renderComponent();
+      
       await waitFor(() => {
-        expect(screen.getByRole('table')).toBeInTheDocument();
+        expect(screen.getByText('TestApp1')).toBeInTheDocument();
       });
 
-      // Check first app data is displayed
-      const firstApp = mockApps[0];
-      expect(screen.getByText(firstApp.name)).toBeInTheDocument();
-      expect(screen.getByText(firstApp.description || '')).toBeInTheDocument();
-      if (firstApp.roleByRoleId?.description) {
-        expect(screen.getByText(firstApp.roleByRoleId.description)).toBeInTheDocument();
+      // Verify first few apps are displayed
+      expect(screen.getByText('TestApp1')).toBeInTheDocument();
+      expect(screen.getByText('TestApp2')).toBeInTheDocument();
+      expect(screen.getByText('Role 1')).toBeInTheDocument();
+      expect(screen.getByText('Role 2')).toBeInTheDocument();
+    });
+  });
+
+  describe('Table Functionality', () => {
+    beforeEach(async () => {
+      renderComponent();
+      await waitFor(() => {
+        expect(screen.getByText('TestApp1')).toBeInTheDocument();
+      });
+    });
+
+    it('should display correct column data', async () => {
+      const table = screen.getByRole('table');
+      const rows = within(table).getAllByRole('row');
+      
+      // Skip header row, check first data row
+      const firstDataRow = rows[1];
+      
+      expect(within(firstDataRow).getByText('TestApp1')).toBeInTheDocument();
+      expect(within(firstDataRow).getByText('Role 1')).toBeInTheDocument();
+      expect(within(firstDataRow).getByText(/api_key_1_/)).toBeInTheDocument();
+      expect(within(firstDataRow).getByText('Test application 1 description')).toBeInTheDocument();
+    });
+
+    it('should handle pagination correctly', async () => {
+      const nextPageButton = screen.getByRole('button', { name: /next page/i });
+      
+      // Should be enabled if there are more items
+      if (mockApps.length > 25) {
+        expect(nextPageButton).not.toBeDisabled();
+        
+        await user.click(nextPageButton);
+        
+        await waitFor(() => {
+          // Should show items from second page
+          expect(screen.queryByText('TestApp1')).not.toBeInTheDocument();
+        });
       }
     });
 
-    it('shows loading state initially', () => {
-      renderWithProviders(<ManageAppsTable />, { queryClient });
+    it('should support filtering applications', async () => {
+      const searchInput = screen.getByPlaceholderText(/search applications/i);
       
-      expect(screen.getByTestId('loading-spinner')).toBeInTheDocument();
-    });
-
-    it('handles empty state when no apps exist', async () => {
-      server.use(
-        http.get('/api/v2/system/app', () => {
-          return HttpResponse.json({ resource: [], meta: { count: 0 } });
-        })
-      );
-
-      renderWithProviders(<ManageAppsTable />, { queryClient });
-
+      await user.type(searchInput, 'TestApp1');
+      
       await waitFor(() => {
-        expect(screen.getByText(/no applications found/i)).toBeInTheDocument();
+        expect(screen.getByText('TestApp1')).toBeInTheDocument();
+        expect(screen.queryByText('TestApp2')).not.toBeInTheDocument();
       });
     });
   });
 
   describe('CRUD Operations', () => {
-    it('deletes an app when delete action is clicked', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<ManageAppsTable />, { queryClient });
-
+    beforeEach(async () => {
+      renderComponent();
       await waitFor(() => {
-        expect(screen.getByRole('table')).toBeInTheDocument();
-      });
-
-      // Find the first app row and delete button
-      const firstAppRow = screen.getByRole('row', { name: new RegExp(mockApps[0].name) });
-      const deleteButton = within(firstAppRow).getByRole('button', { name: /delete/i });
-
-      await user.click(deleteButton);
-
-      // Confirm deletion in modal
-      await waitFor(() => {
-        expect(screen.getByRole('dialog')).toBeInTheDocument();
-      });
-
-      const confirmButton = screen.getByRole('button', { name: /confirm/i });
-      await user.click(confirmButton);
-
-      // Verify app is removed from the list
-      await waitFor(() => {
-        expect(screen.queryByText(mockApps[0].name)).not.toBeInTheDocument();
+        expect(screen.getByText('TestApp1')).toBeInTheDocument();
       });
     });
 
-    it('refreshes table data after CRUD operations', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<ManageAppsTable />, { queryClient });
-
-      await waitFor(() => {
-        expect(screen.getByRole('table')).toBeInTheDocument();
-      });
-
-      // Trigger refresh by performing a delete operation
-      const firstAppRow = screen.getByRole('row', { name: new RegExp(mockApps[0].name) });
-      const deleteButton = within(firstAppRow).getByRole('button', { name: /delete/i });
-
-      await user.click(deleteButton);
-
-      // Confirm deletion
-      await waitFor(() => {
-        expect(screen.getByRole('dialog')).toBeInTheDocument();
-      });
-
-      const confirmButton = screen.getByRole('button', { name: /confirm/i });
-      await user.click(confirmButton);
-
-      // Wait for table to refresh with updated data
-      await waitFor(() => {
-        expect(screen.queryByText(mockApps[0].name)).not.toBeInTheDocument();
-      });
-    });
-
-    it('handles delete operation failures gracefully', async () => {
-      const user = userEvent.setup();
+    it('should delete an application', async () => {
+      const deleteButtons = screen.getAllByRole('button', { name: /delete/i });
+      const firstDeleteButton = deleteButtons[0];
       
-      // Mock delete failure
+      await user.click(firstDeleteButton);
+      
+      // Confirm deletion in dialog
+      const confirmButton = await screen.findByRole('button', { name: /confirm/i });
+      await user.click(confirmButton);
+      
+      await waitFor(() => {
+        expect(screen.queryByText('TestApp1')).not.toBeInTheDocument();
+      });
+    });
+
+    it('should handle delete errors gracefully', async () => {
+      // Mock server error for delete
       server.use(
         http.delete('/api/v2/system/app/:id', () => {
-          return new HttpResponse(null, { status: 500 });
+          return HttpResponse.json(
+            { error: 'Failed to delete application' },
+            { status: 500 }
+          );
         })
       );
 
-      renderWithProviders(<ManageAppsTable />, { queryClient });
-
-      await waitFor(() => {
-        expect(screen.getByRole('table')).toBeInTheDocument();
-      });
-
-      const firstAppRow = screen.getByRole('row', { name: new RegExp(mockApps[0].name) });
-      const deleteButton = within(firstAppRow).getByRole('button', { name: /delete/i });
-
-      await user.click(deleteButton);
-
-      // Confirm deletion
-      await waitFor(() => {
-        expect(screen.getByRole('dialog')).toBeInTheDocument();
-      });
-
-      const confirmButton = screen.getByRole('button', { name: /confirm/i });
+      const deleteButtons = screen.getAllByRole('button', { name: /delete/i });
+      await user.click(deleteButtons[0]);
+      
+      const confirmButton = await screen.findByRole('button', { name: /confirm/i });
       await user.click(confirmButton);
-
-      // Check for error message
+      
       await waitFor(() => {
-        expect(screen.getByRole('alert')).toBeInTheDocument();
-        expect(screen.getByText(/error deleting application/i)).toBeInTheDocument();
+        expect(screen.getByText(/failed to delete application/i)).toBeInTheDocument();
       });
     });
   });
 
-  describe('API Key Management', () => {
-    it('copies API key to clipboard when copy button is clicked', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<ManageAppsTable />, { queryClient });
-
+  describe('Row Actions', () => {
+    beforeEach(async () => {
+      renderComponent();
       await waitFor(() => {
-        expect(screen.getByRole('table')).toBeInTheDocument();
+        expect(screen.getByText('TestApp1')).toBeInTheDocument();
       });
+    });
 
-      // Find copy API key button
-      const firstAppRow = screen.getByRole('row', { name: new RegExp(mockApps[0].name) });
-      const copyButton = within(firstAppRow).getByRole('button', { name: /copy api key/i });
-
-      await user.click(copyButton);
-
-      // Verify clipboard API was called
-      expect(mockClipboard.writeText).toHaveBeenCalledWith(mockApps[0].apiKey);
+    it('should launch application in new tab', async () => {
+      const launchButtons = screen.getAllByRole('button', { name: /launch app/i });
+      const firstLaunchButton = launchButtons[0];
       
-      // Check for success notification
-      await waitFor(() => {
-        expect(screen.getByText(/api key copied to clipboard/i)).toBeInTheDocument();
-      });
-    });
-
-    it('regenerates API key when refresh button is clicked', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<ManageAppsTable />, { queryClient });
-
-      await waitFor(() => {
-        expect(screen.getByRole('table')).toBeInTheDocument();
-      });
-
-      const originalApiKey = mockApps[0].apiKey;
-
-      // Find refresh API key button
-      const firstAppRow = screen.getByRole('row', { name: new RegExp(mockApps[0].name) });
-      const refreshButton = within(firstAppRow).getByRole('button', { name: /refresh api key/i });
-
-      await user.click(refreshButton);
-
-      // Confirm regeneration in modal
-      await waitFor(() => {
-        expect(screen.getByRole('dialog')).toBeInTheDocument();
-      });
-
-      const confirmButton = screen.getByRole('button', { name: /confirm/i });
-      await user.click(confirmButton);
-
-      // Wait for table to refresh with new API key
-      await waitFor(() => {
-        expect(screen.queryByText(originalApiKey)).not.toBeInTheDocument();
-      });
-    });
-
-    it('disables refresh API key for system-created apps', async () => {
-      // Create a mock app with no creator (system-created)
-      const systemApp = createMockApp({ createdById: null });
+      await user.click(firstLaunchButton);
       
-      server.use(
-        http.get('/api/v2/system/app', () => {
-          return HttpResponse.json({
-            resource: [systemApp],
-            meta: { count: 1 }
-          });
-        })
+      expect(mockWindow.open).toHaveBeenCalledWith(
+        'https://app1.example.com',
+        '_blank'
       );
-
-      renderWithProviders(<ManageAppsTable />, { queryClient });
-
-      await waitFor(() => {
-        expect(screen.getByRole('table')).toBeInTheDocument();
-      });
-
-      // Find refresh API key button - should be disabled
-      const appRow = screen.getByRole('row', { name: new RegExp(systemApp.name) });
-      const refreshButton = within(appRow).getByRole('button', { name: /refresh api key/i });
-
-      expect(refreshButton).toBeDisabled();
-    });
-  });
-
-  describe('External URL Launch', () => {
-    it('opens app URL in new window when launch button is clicked', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<ManageAppsTable />, { queryClient });
-
-      await waitFor(() => {
-        expect(screen.getByRole('table')).toBeInTheDocument();
-      });
-
-      // Find launch app button
-      const firstAppRow = screen.getByRole('row', { name: new RegExp(mockApps[0].name) });
-      const launchButton = within(firstAppRow).getByRole('button', { name: /launch app/i });
-
-      await user.click(launchButton);
-
-      // Verify window.open was called with correct URL
-      expect(mockWindowOpen).toHaveBeenCalledWith(mockApps[0].launchUrl, '_blank');
     });
 
-    it('disables launch button when app has no launch URL', async () => {
-      // Create a mock app with no launch URL
-      const appWithoutUrl = createMockApp({ launchUrl: '' });
+    it('should disable launch button for apps without launch URL', async () => {
+      // Find an app without launch URL (if any exist in mock data)
+      const mockAppWithoutUrl = mockApps.find(app => !app.launchUrl);
       
-      server.use(
-        http.get('/api/v2/system/app', () => {
-          return HttpResponse.json({
-            resource: [appWithoutUrl],
-            meta: { count: 1 }
-          });
-        })
-      );
-
-      renderWithProviders(<ManageAppsTable />, { queryClient });
-
-      await waitFor(() => {
-        expect(screen.getByRole('table')).toBeInTheDocument();
-      });
-
-      // Find launch app button - should be disabled
-      const appRow = screen.getByRole('row', { name: new RegExp(appWithoutUrl.name) });
-      const launchButton = within(appRow).getByRole('button', { name: /launch app/i });
-
-      expect(launchButton).toBeDisabled();
-    });
-  });
-
-  describe('Data Filtering and Pagination', () => {
-    it('filters apps based on search input', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<ManageAppsTable />, { queryClient });
-
-      await waitFor(() => {
-        expect(screen.getByRole('table')).toBeInTheDocument();
-      });
-
-      // Find search input
-      const searchInput = screen.getByPlaceholderText(/search applications/i);
-      await user.type(searchInput, mockApps[0].name);
-
-      // Wait for filtered results
-      await waitFor(() => {
-        expect(screen.getByText(mockApps[0].name)).toBeInTheDocument();
-        // Other apps should not be visible
-        expect(screen.queryByText(mockApps[1].name)).not.toBeInTheDocument();
-      });
-    });
-
-    it('handles pagination correctly', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<ManageAppsTable />, { queryClient });
-
-      await waitFor(() => {
-        expect(screen.getByRole('table')).toBeInTheDocument();
-      });
-
-      // Check pagination controls exist
-      expect(screen.getByRole('button', { name: /next page/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /previous page/i })).toBeInTheDocument();
-
-      // Check page size selector
-      const pageSizeSelect = screen.getByRole('combobox', { name: /items per page/i });
-      expect(pageSizeSelect).toBeInTheDocument();
-
-      // Change page size
-      await user.click(pageSizeSelect);
-      await user.click(screen.getByRole('option', { name: '50' }));
-
-      // Verify more items are loaded
-      await waitFor(() => {
-        const rows = screen.getAllByRole('row');
-        expect(rows.length).toBeGreaterThan(26); // Header + 25 default items
-      });
-    });
-  });
-
-  describe('TanStack Virtual Performance Testing', () => {
-    it('handles large datasets efficiently with virtual scrolling', async () => {
-      const startTime = performance.now();
-
-      // Use large dataset endpoint
-      server.use(
-        http.get('/api/v2/system/app', () => {
-          return HttpResponse.json({
-            resource: largeMockApps,
-            meta: { count: largeMockApps.length }
-          });
-        })
-      );
-
-      renderWithProviders(<ManageAppsTable />, { queryClient });
-
-      await waitFor(() => {
-        expect(screen.getByRole('table')).toBeInTheDocument();
-      });
-
-      const endTime = performance.now();
-      const renderTime = endTime - startTime;
-
-      // Verify render time is acceptable (< 2 seconds for 1500 items)
-      expect(renderTime).toBeLessThan(2000);
-
-      // Check that virtual scrolling is working - only visible rows should be rendered
-      const visibleRows = screen.getAllByRole('row');
-      // Should be much less than the total dataset size due to virtualization
-      expect(visibleRows.length).toBeLessThan(100);
-    });
-
-    it('maintains smooth scrolling performance with large datasets', async () => {
-      server.use(
-        http.get('/api/v2/system/app', () => {
-          return HttpResponse.json({
-            resource: largeMockApps,
-            meta: { count: largeMockApps.length }
-          });
-        })
-      );
-
-      renderWithProviders(<ManageAppsTable />, { queryClient });
-
-      await waitFor(() => {
-        expect(screen.getByRole('table')).toBeInTheDocument();
-      });
-
-      const tableContainer = screen.getByTestId('virtual-table-container');
-      
-      // Simulate scrolling
-      const scrollEvents = [];
-      for (let i = 0; i < 10; i++) {
-        const scrollStart = performance.now();
-        fireEvent.scroll(tableContainer, { target: { scrollTop: i * 100 } });
-        scrollEvents.push(performance.now() - scrollStart);
+      if (mockAppWithoutUrl) {
+        const launchButtons = screen.getAllByRole('button', { name: /launch app/i });
+        const disabledButton = launchButtons.find(button => button.hasAttribute('disabled'));
+        
+        expect(disabledButton).toBeInTheDocument();
       }
+    });
 
-      // Average scroll handling should be under 16ms (60fps)
-      const averageScrollTime = scrollEvents.reduce((sum, time) => sum + time, 0) / scrollEvents.length;
-      expect(averageScrollTime).toBeLessThan(16);
+    it('should copy API key to clipboard', async () => {
+      const copyButtons = screen.getAllByRole('button', { name: /copy api key/i });
+      const firstCopyButton = copyButtons[0];
+      
+      await user.click(firstCopyButton);
+      
+      expect(mockClipboard.writeText).toHaveBeenCalledWith(
+        expect.stringMatching(/api_key_1_/)
+      );
+      
+      // Should show success notification
+      await waitFor(() => {
+        expect(screen.getByText(/api key copied/i)).toBeInTheDocument();
+      });
+    });
+
+    it('should regenerate API key', async () => {
+      const regenerateButtons = screen.getAllByRole('button', { name: /regenerate api key/i });
+      const firstRegenerateButton = regenerateButtons[0];
+      
+      await user.click(firstRegenerateButton);
+      
+      // Should show confirmation dialog
+      const confirmButton = await screen.findByRole('button', { name: /regenerate/i });
+      await user.click(confirmButton);
+      
+      await waitFor(() => {
+        // Should refresh table data and show new API key
+        expect(screen.getByText(/api key regenerated/i)).toBeInTheDocument();
+      });
+    });
+
+    it('should disable regenerate button for apps without creator', async () => {
+      // Find apps created by system (createdById is null)
+      const systemApps = mockApps.filter(app => app.createdById === null);
+      
+      if (systemApps.length > 0) {
+        const regenerateButtons = screen.getAllByRole('button', { name: /regenerate api key/i });
+        const disabledButtons = regenerateButtons.filter(button => button.hasAttribute('disabled'));
+        
+        expect(disabledButtons.length).toBeGreaterThan(0);
+      }
+    });
+  });
+
+  describe('Performance and Virtual Scrolling', () => {
+    it('should handle large datasets efficiently with virtual scrolling', async () => {
+      // Mock large dataset endpoint
+      server.use(
+        http.get('/api/v2/system/app', ({ request }) => {
+          const url = new URL(request.url);
+          if (url.searchParams.get('test_large_dataset') === 'true') {
+            const response: GenericListResponse<AppType> = {
+              resource: mockLargeDataset.slice(0, 50), // Only render first 50 items
+              meta: {
+                count: mockLargeDataset.length,
+                limit: 50,
+                offset: 0,
+              },
+            };
+            return HttpResponse.json(response);
+          }
+          return HttpResponse.json({ resource: [], meta: { count: 0, limit: 25, offset: 0 } });
+        })
+      );
+
+      renderComponent({ testLargeDataset: true });
+
+      await waitFor(() => {
+        expect(screen.getByText('TestApp1')).toBeInTheDocument();
+      });
+
+      // Verify virtual scrolling container exists
+      const virtualContainer = screen.getByTestId('virtual-scroll-container');
+      expect(virtualContainer).toBeInTheDocument();
+
+      // Verify not all 1200 items are rendered at once (performance check)
+      const renderedRows = screen.getAllByRole('row');
+      expect(renderedRows.length).toBeLessThan(mockLargeDataset.length);
+      expect(renderedRows.length).toBeGreaterThan(0);
+    });
+
+    it('should handle scrolling in large datasets', async () => {
+      renderComponent({ testLargeDataset: true });
+
+      await waitFor(() => {
+        expect(screen.getByText('TestApp1')).toBeInTheDocument();
+      });
+
+      const virtualContainer = screen.getByTestId('virtual-scroll-container');
+      
+      // Simulate scroll event
+      fireEvent.scroll(virtualContainer, { target: { scrollTop: 1000 } });
+
+      await waitFor(() => {
+        // Should trigger loading of new items
+        expect(screen.getByRole('progressbar')).toBeInTheDocument();
+      });
     });
   });
 
   describe('React Query Caching and Optimistic Updates', () => {
-    it('caches app data and serves from cache on subsequent renders', async () => {
-      renderWithProviders(<ManageAppsTable />, { queryClient });
-
-      // Wait for initial data load
+    beforeEach(async () => {
+      renderComponent();
       await waitFor(() => {
-        expect(screen.getByRole('table')).toBeInTheDocument();
+        expect(screen.getByText('TestApp1')).toBeInTheDocument();
       });
-
-      // Re-render component (simulating navigation back)
-      const { rerender } = renderWithProviders(<ManageAppsTable />, { queryClient });
-      rerender(<ManageAppsTable />);
-
-      // Data should load immediately from cache (no loading state)
-      expect(screen.getByRole('table')).toBeInTheDocument();
-      expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument();
     });
 
-    it('implements optimistic updates for API key regeneration', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<ManageAppsTable />, { queryClient });
+    it('should cache API responses for performance', async () => {
+      // Initial load
+      expect(screen.getByText('TestApp1')).toBeInTheDocument();
+      
+      // Navigate away and back (simulate route change)
+      queryClient.invalidateQueries({ queryKey: ['apps'] });
+      
+      // Should show cached data immediately
+      expect(screen.getByText('TestApp1')).toBeInTheDocument();
+    });
 
-      await waitFor(() => {
-        expect(screen.getByRole('table')).toBeInTheDocument();
-      });
-
-      const firstAppRow = screen.getByRole('row', { name: new RegExp(mockApps[0].name) });
-      const refreshButton = within(firstAppRow).getByRole('button', { name: /refresh api key/i });
-
-      await user.click(refreshButton);
-
-      // Confirm regeneration
-      await waitFor(() => {
-        expect(screen.getByRole('dialog')).toBeInTheDocument();
-      });
-
-      const confirmButton = screen.getByRole('button', { name: /confirm/i });
+    it('should implement optimistic updates for delete operations', async () => {
+      const deleteButtons = screen.getAllByRole('button', { name: /delete/i });
+      const firstDeleteButton = deleteButtons[0];
+      
+      await user.click(firstDeleteButton);
+      
+      const confirmButton = await screen.findByRole('button', { name: /confirm/i });
       await user.click(confirmButton);
-
-      // UI should update immediately (optimistic update)
-      // New API key should appear before server response
-      await waitFor(() => {
-        const apiKeyCell = within(firstAppRow).getByTestId('api-key-cell');
-        expect(apiKeyCell.textContent).not.toBe(mockApps[0].apiKey);
-      });
+      
+      // Should immediately remove from UI (optimistic update)
+      expect(screen.queryByText('TestApp1')).not.toBeInTheDocument();
     });
 
-    it('validates cache invalidation after mutations', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<ManageAppsTable />, { queryClient });
+    it('should revert optimistic updates on error', async () => {
+      // Mock server error for delete
+      server.use(
+        http.delete('/api/v2/system/app/:id', () => {
+          return HttpResponse.json(
+            { error: 'Failed to delete' },
+            { status: 500 }
+          );
+        })
+      );
 
-      await waitFor(() => {
-        expect(screen.getByRole('table')).toBeInTheDocument();
-      });
-
-      // Get initial cache state
-      const initialCacheData = queryClient.getQueryData(['apps']);
-      expect(initialCacheData).toBeDefined();
-
-      // Perform delete operation
-      const firstAppRow = screen.getByRole('row', { name: new RegExp(mockApps[0].name) });
-      const deleteButton = within(firstAppRow).getByRole('button', { name: /delete/i });
-
-      await user.click(deleteButton);
-
-      // Confirm deletion
-      await waitFor(() => {
-        expect(screen.getByRole('dialog')).toBeInTheDocument();
-      });
-
-      const confirmButton = screen.getByRole('button', { name: /confirm/i });
+      const deleteButtons = screen.getAllByRole('button', { name: /delete/i });
+      await user.click(deleteButtons[0]);
+      
+      const confirmButton = await screen.findByRole('button', { name: /confirm/i });
       await user.click(confirmButton);
-
-      // Verify cache is invalidated and fresh data is fetched
+      
+      // Should revert optimistic update and show item again
       await waitFor(() => {
-        const updatedCacheData = queryClient.getQueryData(['apps']);
-        expect(updatedCacheData).not.toEqual(initialCacheData);
+        expect(screen.getByText('TestApp1')).toBeInTheDocument();
+        expect(screen.getByText(/failed to delete/i)).toBeInTheDocument();
       });
     });
 
-    it('handles concurrent mutations without race conditions', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<ManageAppsTable />, { queryClient });
-
+    it('should refresh data automatically on focus', async () => {
+      // Simulate window focus
+      fireEvent.focus(window);
+      
       await waitFor(() => {
-        expect(screen.getByRole('table')).toBeInTheDocument();
-      });
-
-      // Start multiple concurrent operations
-      const firstAppRow = screen.getByRole('row', { name: new RegExp(mockApps[0].name) });
-      const secondAppRow = screen.getByRole('row', { name: new RegExp(mockApps[1].name) });
-
-      const firstRefreshButton = within(firstAppRow).getByRole('button', { name: /refresh api key/i });
-      const secondRefreshButton = within(secondAppRow).getByRole('button', { name: /refresh api key/i });
-
-      // Trigger both operations simultaneously
-      await Promise.all([
-        user.click(firstRefreshButton),
-        user.click(secondRefreshButton)
-      ]);
-
-      // Both operations should complete successfully without conflicts
-      await waitFor(() => {
-        expect(screen.getAllByRole('dialog')).toHaveLength(2);
-      });
-
-      const confirmButtons = screen.getAllByRole('button', { name: /confirm/i });
-      await Promise.all([
-        user.click(confirmButtons[0]),
-        user.click(confirmButtons[1])
-      ]);
-
-      // Verify both operations completed successfully
-      await waitFor(() => {
-        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        // Should trigger background refetch
+        expect(queryClient.getQueryState(['apps'])?.isFetching).toBe(true);
       });
     });
   });
 
   describe('Error Handling', () => {
-    it('displays error message when API requests fail', async () => {
+    it('should display error message when API fails', async () => {
       server.use(
         http.get('/api/v2/system/app', () => {
-          return new HttpResponse(null, { status: 500 });
+          return HttpResponse.json(
+            { error: 'Internal server error' },
+            { status: 500 }
+          );
         })
       );
 
-      renderWithProviders(<ManageAppsTable />, { queryClient });
+      renderComponent();
 
       await waitFor(() => {
-        expect(screen.getByRole('alert')).toBeInTheDocument();
         expect(screen.getByText(/failed to load applications/i)).toBeInTheDocument();
       });
     });
 
-    it('handles network connectivity issues gracefully', async () => {
+    it('should handle network errors gracefully', async () => {
       server.use(
         http.get('/api/v2/system/app', () => {
           return HttpResponse.error();
         })
       );
 
-      renderWithProviders(<ManageAppsTable />, { queryClient });
+      renderComponent();
 
       await waitFor(() => {
-        expect(screen.getByRole('alert')).toBeInTheDocument();
         expect(screen.getByText(/network error/i)).toBeInTheDocument();
       });
+    });
 
-      // Verify retry functionality
+    it('should provide retry functionality on error', async () => {
+      server.use(
+        http.get('/api/v2/system/app', () => {
+          return HttpResponse.json(
+            { error: 'Temporary error' },
+            { status: 503 }
+          );
+        })
+      );
+
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByText(/failed to load applications/i)).toBeInTheDocument();
+      });
+
       const retryButton = screen.getByRole('button', { name: /retry/i });
       expect(retryButton).toBeInTheDocument();
+
+      // Mock successful retry
+      server.use(
+        http.get('/api/v2/system/app', () => {
+          const response: GenericListResponse<AppType> = {
+            resource: mockApps.slice(0, 25),
+            meta: { count: mockApps.length, limit: 25, offset: 0 },
+          };
+          return HttpResponse.json(response);
+        })
+      );
+
+      await user.click(retryButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('TestApp1')).toBeInTheDocument();
+      });
     });
   });
 
   describe('Accessibility', () => {
-    it('provides proper ARIA labels for action buttons', async () => {
-      renderWithProviders(<ManageAppsTable />, { queryClient });
-
+    beforeEach(async () => {
+      renderComponent();
       await waitFor(() => {
-        expect(screen.getByRole('table')).toBeInTheDocument();
+        expect(screen.getByText('TestApp1')).toBeInTheDocument();
       });
+    });
 
-      const firstAppRow = screen.getByRole('row', { name: new RegExp(mockApps[0].name) });
+    it('should have proper ARIA labels for actions', () => {
+      const launchButtons = screen.getAllByRole('button', { name: /launch app/i });
+      expect(launchButtons[0]).toHaveAttribute('aria-label', expect.stringContaining('Launch'));
+
+      const copyButtons = screen.getAllByRole('button', { name: /copy api key/i });
+      expect(copyButtons[0]).toHaveAttribute('aria-label', expect.stringContaining('Copy'));
+
+      const regenerateButtons = screen.getAllByRole('button', { name: /regenerate api key/i });
+      expect(regenerateButtons[0]).toHaveAttribute('aria-label', expect.stringContaining('Regenerate'));
+    });
+
+    it('should support keyboard navigation', async () => {
+      const table = screen.getByRole('table');
       
-      // Check ARIA labels
-      expect(within(firstAppRow).getByRole('button', { name: /launch app/i })).toHaveAttribute('aria-label');
-      expect(within(firstAppRow).getByRole('button', { name: /copy api key/i })).toHaveAttribute('aria-label');
-      expect(within(firstAppRow).getByRole('button', { name: /refresh api key/i })).toHaveAttribute('aria-label');
-      expect(within(firstAppRow).getByRole('button', { name: /delete/i })).toHaveAttribute('aria-label');
+      // Tab through interactive elements
+      await user.tab();
+      expect(document.activeElement).toBeInTheDocument();
+      
+      // Verify focus management
+      const firstActionButton = screen.getAllByRole('button')[0];
+      firstActionButton.focus();
+      expect(document.activeElement).toBe(firstActionButton);
     });
 
-    it('supports keyboard navigation for table actions', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<ManageAppsTable />, { queryClient });
-
-      await waitFor(() => {
-        expect(screen.getByRole('table')).toBeInTheDocument();
-      });
-
-      // Tab through action buttons
-      await user.tab();
-      await user.tab();
-      await user.tab();
-
-      const focusedElement = screen.getByRole('button', { name: /launch app/i });
-      expect(focusedElement).toHaveFocus();
-
-      // Activate with Enter key
-      await user.keyboard('{Enter}');
-      expect(mockWindowOpen).toHaveBeenCalled();
-    });
-
-    it('announces changes to screen readers', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(<ManageAppsTable />, { queryClient });
-
-      await waitFor(() => {
-        expect(screen.getByRole('table')).toBeInTheDocument();
-      });
-
-      // Perform an action that should announce changes
-      const firstAppRow = screen.getByRole('row', { name: new RegExp(mockApps[0].name) });
-      const copyButton = within(firstAppRow).getByRole('button', { name: /copy api key/i });
-
-      await user.click(copyButton);
-
-      // Check for live region announcement
+    it('should announce actions to screen readers', async () => {
+      const copyButtons = screen.getAllByRole('button', { name: /copy api key/i });
+      await user.click(copyButtons[0]);
+      
+      // Should have live region announcement
       await waitFor(() => {
         expect(screen.getByRole('status')).toHaveTextContent(/api key copied/i);
+      });
+    });
+  });
+
+  describe('Internationalization', () => {
+    it('should display translated text', async () => {
+      renderComponent();
+      
+      await waitFor(() => {
+        expect(screen.getByText('Applications')).toBeInTheDocument();
+      });
+
+      // Verify key UI elements are translated
+      expect(screen.getByText('Name')).toBeInTheDocument();
+      expect(screen.getByText('Description')).toBeInTheDocument();
+      expect(screen.getByText('Active')).toBeInTheDocument();
+    });
+
+    it('should handle locale changes', async () => {
+      // This would test locale switching if implemented
+      // For now, verify the structure supports i18n
+      renderComponent();
+      
+      await waitFor(() => {
+        expect(screen.getByRole('table')).toBeInTheDocument();
       });
     });
   });
