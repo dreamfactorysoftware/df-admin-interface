@@ -1,779 +1,855 @@
-'use client';
-
 /**
- * DebugPanel Component
+ * Debug Panel Container Component for DreamFactory Admin Interface
  * 
  * Main debug panel container component that orchestrates the display of debug information,
- * development metrics, and interactive debug controls. Migrated from Angular to React with
- * enhanced debugging capabilities and Next.js integration.
- * 
- * Primary responsibilities:
- * - Provides comprehensive debugging interface during development
- * - Displays localStorage data, React Query cache status, and Next.js development metrics
- * - Enables application state inspection and interactive debug controls
- * - Implements security restrictions for development environment only
- * - Maintains user preferences for panel layout and visibility
- * 
- * Key transformations from Angular:
- * - Angular debug component template structure → React component composition
- * - Angular Material layout → Tailwind CSS responsive debug panel
- * - Angular services → React hooks and state management
- * - RxJS observables → React Query and useState patterns
- * - Angular environment checking → Next.js runtime environment detection
+ * development metrics, and interactive debug controls. Primary responsibility: providing a
+ * comprehensive debugging interface during development with sections for localStorage data,
+ * React Query cache status, Next.js development metrics, and application state inspection.
  * 
  * Features:
- * - Development-only rendering with production safety
- * - Collapsible panel sections with localStorage persistence
- * - Real-time metrics updates with configurable refresh intervals
- * - Dark mode support with theme consistency
- * - Keyboard shortcuts for quick access to debug functions
- * - Responsive design optimized for development workflows
- * - Integration with React DevTools and Next.js development tools
- * - WCAG 2.1 AA compliance for accessibility during development
+ * - Development-only component with enhanced debugging capabilities per Summary of Changes transformation requirements
+ * - React 19 component composition with TypeScript 5.8+ per React/Next.js Integration Requirements
+ * - Tailwind CSS 4.1+ styling with consistent theme injection per React/Next.js Integration Requirements
+ * - Integration with Next.js development tools per Summary of Changes debugging enhancement requirements
+ * - Collapsible panel sections with localStorage persistence for developer preferences
+ * - React Query devtools and cache inspection capabilities
+ * - Real-time debug information updates with configurable refresh intervals
+ * - Responsive design with mobile-friendly debug controls
  * 
- * Performance Considerations:
- * - Lazy loading of heavy debug components
- * - Memoized expensive calculations
- * - Debounced state updates for smooth user experience
- * - Virtual scrolling for large debug datasets
- * - Efficient React Query cache inspection
+ * Architecture:
+ * - Container component following React 19 server component patterns with client-side interactivity
+ * - Transforms Angular debug component template structure to React component composition
+ * - Implements development environment detection with conditional rendering for production safety
+ * - Uses Tailwind CSS responsive debug panel with dark mode support
+ * - Integrates with enhanced debugging requirements per Section 0 transformation scope
  * 
- * @component
- * @example
- * ```tsx
- * // Basic usage in development environment
- * <DebugPanel />
+ * Security:
+ * - Only renders in development environment to prevent security exposure
+ * - Implements proper development-only guards for production builds
+ * - Uses environment detection for conditional feature availability
  * 
- * // With custom configuration
- * <DebugPanel
- *   refreshInterval={3000}
- *   defaultCollapsed={true}
- *   enableKeyboardShortcuts={true}
- * />
- * ```
+ * @fileoverview Main debug panel orchestration component for DreamFactory Admin Interface refactoring
+ * @version 1.0.0
+ * @since React 19.0.0, Next.js 15.1+, TypeScript 5.8+
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+'use client';
+
+import React, { 
+  useState, 
+  useEffect, 
+  useCallback, 
+  useMemo,
+  Suspense,
+  Fragment 
+} from 'react';
 import { 
-  ChevronDownIcon, 
-  ChevronUpIcon, 
-  Cog6ToothIcon,
-  EyeIcon,
-  EyeSlashIcon,
-  ArrowPathIcon
-} from '@heroicons/react/24/outline';
+  Bug, 
+  Settings, 
+  Monitor, 
+  Database, 
+  ChevronDown, 
+  ChevronRight,
+  Minimize2,
+  Maximize2,
+  X,
+  AlertTriangle,
+  Info,
+  Zap,
+  Activity,
+  BarChart3,
+  Code,
+  HelpCircle,
+  RefreshCw,
+  Eye,
+  EyeOff
+} from 'lucide-react';
 
-// Import debug components
-import DebugInfoList from './DebugInfoList';
+// Import child debug components
+import { DebugInfoList } from './DebugInfoList';
 import DebugControls from './DebugControls';
-import DebugMetrics from './DebugMetrics';
+import { DebugMetrics } from './DebugMetrics';
 
-// ============================================================================
-// TYPES AND INTERFACES
-// ============================================================================
+// Import UI components and utilities
+import { cn } from '@/lib/utils';
+import { useLocalStorage } from '@/hooks/use-local-storage';
+import { useTheme } from '@/hooks/use-theme';
+
+// =============================================================================
+// INTERFACES AND TYPES
+// =============================================================================
+
+/**
+ * Debug panel section configuration
+ */
+interface DebugSection {
+  id: string;
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
+  description: string;
+  component: React.ComponentType<any>;
+  defaultExpanded: boolean;
+  enabled: boolean;
+  badge?: string | number;
+}
+
+/**
+ * Debug panel layout mode
+ */
+type DebugPanelMode = 'floating' | 'sidebar' | 'fullscreen' | 'minimized';
 
 /**
  * Debug panel configuration interface
- * Manages user preferences and panel behavior settings
  */
 interface DebugPanelConfig {
-  /** Whether panels should be collapsed by default */
-  defaultCollapsed: boolean;
-  /** Auto-refresh interval in milliseconds */
+  mode: DebugPanelMode;
+  expandedSections: Set<string>;
+  position: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
+  autoRefresh: boolean;
   refreshInterval: number;
-  /** Enable keyboard shortcuts for panel operations */
-  enableKeyboardShortcuts: boolean;
-  /** Maximum height for scrollable sections */
-  maxHeight: number;
-  /** Show advanced metrics and technical details */
-  showAdvancedMetrics: boolean;
-  /** Enable real-time updates for dynamic data */
-  enableRealTimeUpdates: boolean;
-  /** Theme preference for debug panel */
-  theme: 'auto' | 'light' | 'dark';
-  /** Position preference for floating panel */
-  position: 'bottom' | 'right' | 'fullscreen';
+  showWelcome: boolean;
 }
 
 /**
- * Panel section state interface
- * Tracks visibility and configuration for each debug section
+ * Debug panel props interface
  */
-interface PanelSectionState {
-  debugInfo: boolean;
-  debugControls: boolean;
-  debugMetrics: boolean;
-}
-
-/**
- * Component props interface
- * Allows customization of debug panel behavior and appearance
- */
-interface DebugPanelProps {
-  /** Custom CSS class name for styling */
+export interface DebugPanelProps {
+  /**
+   * Custom CSS class name for the debug panel
+   */
   className?: string;
-  /** Auto-refresh interval in milliseconds (default: 5000) */
-  refreshInterval?: number;
-  /** Whether panels should start collapsed (default: false) */
-  defaultCollapsed?: boolean;
-  /** Enable keyboard shortcuts (default: true) */
-  enableKeyboardShortcuts?: boolean;
-  /** Maximum height for panel sections (default: 600) */
-  maxHeight?: number;
-  /** Show advanced development metrics (default: true) */
-  showAdvancedMetrics?: boolean;
-  /** Callback when panel configuration changes */
-  onConfigChange?: (config: Partial<DebugPanelConfig>) => void;
-  /** Callback when panel visibility changes */
-  onVisibilityChange?: (visible: boolean) => void;
+  
+  /**
+   * Initial mode for the debug panel
+   */
+  initialMode?: DebugPanelMode;
+  
+  /**
+   * Position of the debug panel when in floating mode
+   */
+  initialPosition?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
+  
+  /**
+   * Whether to enable React Query devtools integration
+   */
+  enableQueryDevtools?: boolean;
+  
+  /**
+   * Whether to show detailed component render information
+   */
+  enableDetailedMetrics?: boolean;
+  
+  /**
+   * Custom sections to add to the debug panel
+   */
+  customSections?: DebugSection[];
+  
+  /**
+   * Callback when debug panel mode changes
+   */
+  onModeChange?: (mode: DebugPanelMode) => void;
+  
+  /**
+   * Maximum number of debug entries to display
+   */
+  maxDebugEntries?: number;
 }
 
-// ============================================================================
-// CONSTANTS AND CONFIGURATION
-// ============================================================================
-
-/** Storage key for persisting panel configuration */
-const STORAGE_KEY_CONFIG = 'debugPanel_config';
-
-/** Storage key for persisting panel section states */
-const STORAGE_KEY_SECTIONS = 'debugPanel_sections';
-
-/** Default configuration values */
-const DEFAULT_CONFIG: DebugPanelConfig = {
-  defaultCollapsed: false,
-  refreshInterval: 5000,
-  enableKeyboardShortcuts: true,
-  maxHeight: 600,
-  showAdvancedMetrics: true,
-  enableRealTimeUpdates: true,
-  theme: 'auto',
-  position: 'bottom'
-};
-
-/** Default panel section states */
-const DEFAULT_SECTIONS: PanelSectionState = {
-  debugInfo: true,
-  debugControls: true,
-  debugMetrics: true
-};
-
-/** Keyboard shortcuts configuration */
-const KEYBOARD_SHORTCUTS = {
-  togglePanel: ['ctrl+shift+d', 'cmd+shift+d'],
-  toggleInfo: ['ctrl+shift+i', 'cmd+shift+i'],
-  toggleControls: ['ctrl+shift+c', 'cmd+shift+c'],
-  toggleMetrics: ['ctrl+shift+m', 'cmd+shift+m'],
-  refresh: ['ctrl+shift+r', 'cmd+shift+r']
-} as const;
-
-// ============================================================================
-// UTILITY FUNCTIONS
-// ============================================================================
+// =============================================================================
+// TEMPORARY UI COMPONENTS (until ui components are available)
+// =============================================================================
 
 /**
- * Checks if the application is running in development environment
- * Uses Next.js runtime environment detection for security
+ * Temporary Card component until ui/card is implemented
  */
-const isDevelopment = (): boolean => {
-  return process.env.NODE_ENV === 'development';
+interface CardProps {
+  children: React.ReactNode;
+  className?: string;
+  title?: string;
+}
+
+const Card: React.FC<CardProps> = ({ children, className, title }) => (
+  <div className={cn(
+    "rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900",
+    className
+  )}>
+    {title && (
+      <h3 className="mb-3 text-lg font-semibold text-gray-900 dark:text-gray-100">
+        {title}
+      </h3>
+    )}
+    {children}
+  </div>
+);
+
+/**
+ * Temporary Button component
+ */
+interface ButtonProps {
+  children: React.ReactNode;
+  onClick?: () => void;
+  variant?: 'default' | 'outline' | 'ghost' | 'destructive';
+  size?: 'sm' | 'md' | 'lg';
+  className?: string;
+  disabled?: boolean;
+  loading?: boolean;
+  icon?: React.ReactNode;
+  ariaLabel?: string;
+  title?: string;
+}
+
+const Button: React.FC<ButtonProps> = ({
+  children,
+  onClick,
+  variant = 'default',
+  size = 'md',
+  className,
+  disabled = false,
+  loading = false,
+  icon,
+  ariaLabel,
+  title,
+}) => {
+  const baseClasses = "inline-flex items-center justify-center rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50";
+  
+  const variantClasses = {
+    default: "bg-blue-600 text-white hover:bg-blue-700",
+    outline: "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700",
+    ghost: "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800",
+    destructive: "bg-red-600 text-white hover:bg-red-700",
+  };
+  
+  const sizeClasses = {
+    sm: "h-8 px-3 text-sm",
+    md: "h-10 px-4 text-sm",
+    lg: "h-12 px-6 text-base",
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled || loading}
+      className={cn(baseClasses, variantClasses[variant], sizeClasses[size], className)}
+      aria-label={ariaLabel}
+      title={title}
+    >
+      {loading ? (
+        <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+      ) : icon ? (
+        <span className="mr-2">{icon}</span>
+      ) : null}
+      {children}
+    </button>
+  );
 };
 
 /**
- * Safely parses JSON from localStorage with fallback
+ * Temporary Badge component
  */
-const safeParseJSON = <T>(key: string, fallback: T): T => {
-  try {
-    const stored = localStorage.getItem(key);
-    return stored ? JSON.parse(stored) : fallback;
-  } catch (error) {
-    console.warn(`Failed to parse stored config for ${key}:`, error);
-    return fallback;
-  }
+interface BadgeProps {
+  children: React.ReactNode;
+  variant?: 'default' | 'success' | 'warning' | 'error' | 'info';
+  size?: 'sm' | 'md';
+  className?: string;
+}
+
+const Badge: React.FC<BadgeProps> = ({ 
+  children, 
+  variant = 'default', 
+  size = 'md',
+  className 
+}) => {
+  const baseClasses = "inline-flex items-center rounded-full font-medium";
+  
+  const variantClasses = {
+    default: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
+    success: "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400",
+    warning: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400",
+    error: "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400",
+    info: "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400",
+  };
+  
+  const sizeClasses = {
+    sm: "px-2 py-0.5 text-xs",
+    md: "px-2.5 py-1 text-sm",
+  };
+
+  return (
+    <span className={cn(baseClasses, variantClasses[variant], sizeClasses[size], className)}>
+      {children}
+    </span>
+  );
 };
 
-/**
- * Safely stores JSON to localStorage with error handling
- */
-const safeStoreJSON = (key: string, value: any): void => {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch (error) {
-    console.warn(`Failed to store config for ${key}:`, error);
-  }
-};
+// =============================================================================
+// CUSTOM HOOK FOR DEBUG INFO
+// =============================================================================
 
 /**
- * Debounce utility for performance optimization
+ * Custom hook for debug information management
+ * Temporary implementation until use-debug-info.ts is created
  */
-const debounce = <T extends (...args: any[]) => any>(
-  func: T,
-  wait: number
-): ((...args: Parameters<T>) => void) => {
-  let timeout: NodeJS.Timeout;
-  return (...args: Parameters<T>) => {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func(...args), wait);
+const useDebugInfo = () => {
+  const [debugEntries, setDebugEntries] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+
+  const refreshDebugInfo = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      // Simulate fetching debug information
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Get debug info from various sources
+      const newEntries = [];
+      
+      // LocalStorage debug data
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && (key.includes('debug') || key.includes('df_'))) {
+            newEntries.push({
+              source: 'localStorage',
+              key,
+              value: localStorage.getItem(key),
+              timestamp: Date.now(),
+            });
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to read localStorage for debug info:', error);
+      }
+      
+      // React Query cache info (if available)
+      if (typeof window !== 'undefined' && (window as any).queryClient) {
+        try {
+          const queryCache = (window as any).queryClient.getQueryCache();
+          const queries = queryCache.getAll();
+          newEntries.push({
+            source: 'reactQuery',
+            key: 'cache_status',
+            value: {
+              totalQueries: queries.length,
+              activeQueries: queries.filter((q: any) => q.state.status === 'success').length,
+              staleQueries: queries.filter((q: any) => q.isStale()).length,
+            },
+            timestamp: Date.now(),
+          });
+        } catch (error) {
+          console.warn('Failed to read React Query cache for debug info:', error);
+        }
+      }
+      
+      // Performance metrics
+      try {
+        const perfEntries = performance.getEntriesByType('navigation');
+        if (perfEntries.length > 0) {
+          const navEntry = perfEntries[0] as PerformanceNavigationTiming;
+          newEntries.push({
+            source: 'performance',
+            key: 'navigation_timing',
+            value: {
+              domContentLoaded: navEntry.domContentLoadedEventEnd - navEntry.domContentLoadedEventStart,
+              loadComplete: navEntry.loadEventEnd - navEntry.loadEventStart,
+              totalLoadTime: navEntry.loadEventEnd - navEntry.fetchStart,
+            },
+            timestamp: Date.now(),
+          });
+        }
+      } catch (error) {
+        console.warn('Failed to get performance metrics for debug info:', error);
+      }
+      
+      setDebugEntries(newEntries);
+      setLastUpdate(new Date());
+    } catch (error) {
+      console.error('Failed to refresh debug info:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Initial load
+  useEffect(() => {
+    refreshDebugInfo();
+  }, [refreshDebugInfo]);
+
+  return {
+    debugEntries,
+    isLoading,
+    lastUpdate,
+    refreshDebugInfo,
   };
 };
 
-// ============================================================================
+// =============================================================================
 // MAIN COMPONENT
-// ============================================================================
+// =============================================================================
 
-const DebugPanel: React.FC<DebugPanelProps> = ({
-  className = '',
-  refreshInterval = DEFAULT_CONFIG.refreshInterval,
-  defaultCollapsed = DEFAULT_CONFIG.defaultCollapsed,
-  enableKeyboardShortcuts = DEFAULT_CONFIG.enableKeyboardShortcuts,
-  maxHeight = DEFAULT_CONFIG.maxHeight,
-  showAdvancedMetrics = DEFAULT_CONFIG.showAdvancedMetrics,
-  onConfigChange,
-  onVisibilityChange
+/**
+ * Main Debug Panel Component
+ * 
+ * Comprehensive debugging interface that provides developers with essential
+ * debugging tools and information during development. Only renders in
+ * development environment for security.
+ */
+export const DebugPanel: React.FC<DebugPanelProps> = ({
+  className,
+  initialMode = 'floating',
+  initialPosition = 'bottom-right',
+  enableQueryDevtools = true,
+  enableDetailedMetrics = true,
+  customSections = [],
+  onModeChange,
+  maxDebugEntries = 1000,
 }) => {
-  // ============================================================================
-  // EARLY RETURN FOR PRODUCTION
-  // ============================================================================
+  // =============================================================================
+  // ENVIRONMENT AND DEVELOPMENT CHECK
+  // =============================================================================
   
-  // Security: Only render in development environment
-  if (!isDevelopment()) {
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  
+  // Don't render in production for security
+  if (!isDevelopment) {
     return null;
   }
 
-  // ============================================================================
+  // =============================================================================
   // STATE MANAGEMENT
-  // ============================================================================
+  // =============================================================================
 
-  // Panel configuration state with localStorage persistence
-  const [config, setConfig] = useState<DebugPanelConfig>(() => ({
-    ...DEFAULT_CONFIG,
-    defaultCollapsed,
-    refreshInterval,
-    enableKeyboardShortcuts,
-    maxHeight,
-    showAdvancedMetrics
-  }));
+  const { theme } = useTheme();
+  const { debugEntries, isLoading, lastUpdate, refreshDebugInfo } = useDebugInfo();
 
-  // Panel section visibility states with localStorage persistence
-  const [sectionStates, setSectionStates] = useState<PanelSectionState>(() =>
-    safeParseJSON(STORAGE_KEY_SECTIONS, DEFAULT_SECTIONS)
-  );
+  // Panel configuration with localStorage persistence
+  const [config, setConfig] = useLocalStorage<DebugPanelConfig>('debug-panel-config', {
+    defaultValue: {
+      mode: initialMode,
+      expandedSections: new Set(['info', 'controls']),
+      position: initialPosition,
+      autoRefresh: true,
+      refreshInterval: 5000,
+      showWelcome: true,
+    },
+    syncAcrossTabs: false,
+  });
 
-  // Overall panel visibility state
-  const [isPanelVisible, setIsPanelVisible] = useState<boolean>(true);
+  // Local state
+  const [isVisible, setIsVisible] = useState(true);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
-  // Configuration panel visibility
-  const [isConfigVisible, setIsConfigVisible] = useState<boolean>(false);
+  // =============================================================================
+  // DEBUG SECTIONS CONFIGURATION
+  // =============================================================================
 
-  // Last refresh timestamp for display
-  const [lastRefresh, setLastRefresh] = useState<number>(Date.now());
+  const defaultSections: DebugSection[] = useMemo(() => [
+    {
+      id: 'info',
+      title: 'Debug Information',
+      icon: Info,
+      description: 'Application debug entries and localStorage data',
+      component: DebugInfoList,
+      defaultExpanded: true,
+      enabled: true,
+      badge: debugEntries.length > 0 ? debugEntries.length : undefined,
+    },
+    {
+      id: 'controls',
+      title: 'Debug Controls',
+      icon: Settings,
+      description: 'Interactive debug actions and data management',
+      component: DebugControls,
+      defaultExpanded: true,
+      enabled: true,
+    },
+    {
+      id: 'metrics',
+      title: 'Performance Metrics',
+      icon: BarChart3,
+      description: 'Real-time performance monitoring and React Query cache status',
+      component: DebugMetrics,
+      defaultExpanded: false,
+      enabled: enableDetailedMetrics,
+    },
+    ...customSections,
+  ].filter(section => section.enabled), [debugEntries.length, enableDetailedMetrics, customSections]);
 
-  // Loading states for async operations
-  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  // =============================================================================
+  // EVENT HANDLERS
+  // =============================================================================
 
-  // ============================================================================
-  // INITIALIZATION AND PERSISTENCE
-  // ============================================================================
-
-  // Load persisted configuration on mount
-  useEffect(() => {
-    const storedConfig = safeParseJSON(STORAGE_KEY_CONFIG, {});
-    const mergedConfig = { ...config, ...storedConfig };
-    setConfig(mergedConfig);
-  }, []); // Run only once on mount
-
-  // Persist configuration changes to localStorage
-  useEffect(() => {
-    safeStoreJSON(STORAGE_KEY_CONFIG, config);
-    onConfigChange?.(config);
-  }, [config, onConfigChange]);
-
-  // Persist section states to localStorage
-  useEffect(() => {
-    safeStoreJSON(STORAGE_KEY_SECTIONS, sectionStates);
-  }, [sectionStates]);
-
-  // Notify parent of visibility changes
-  useEffect(() => {
-    onVisibilityChange?.(isPanelVisible);
-  }, [isPanelVisible, onVisibilityChange]);
-
-  // ============================================================================
-  // AUTO-REFRESH FUNCTIONALITY
-  // ============================================================================
-
-  // Debounced refresh function to prevent excessive updates
-  const debouncedRefresh = useMemo(
-    () => debounce(() => {
-      setLastRefresh(Date.now());
-      setIsRefreshing(false);
-    }, 300),
-    []
-  );
-
-  // Auto-refresh timer for real-time updates
-  useEffect(() => {
-    if (!config.enableRealTimeUpdates || !isPanelVisible) {
-      return;
+  /**
+   * Update configuration with localStorage persistence
+   */
+  const updateConfig = useCallback((updates: Partial<DebugPanelConfig>) => {
+    if (!config) return;
+    
+    const newConfig = { ...config, ...updates };
+    const result = setConfig(newConfig);
+    
+    if (!result.success) {
+      console.warn('Failed to update debug panel config:', result.error);
     }
+    
+    // Notify mode change
+    if (updates.mode && onModeChange) {
+      onModeChange(updates.mode);
+    }
+  }, [config, setConfig, onModeChange]);
+
+  /**
+   * Toggle section expansion
+   */
+  const toggleSection = useCallback((sectionId: string) => {
+    if (!config) return;
+    
+    const newExpanded = new Set(config.expandedSections);
+    if (newExpanded.has(sectionId)) {
+      newExpanded.delete(sectionId);
+    } else {
+      newExpanded.add(sectionId);
+    }
+    
+    updateConfig({ expandedSections: newExpanded });
+  }, [config, updateConfig]);
+
+  /**
+   * Change panel mode
+   */
+  const changeMode = useCallback((mode: DebugPanelMode) => {
+    updateConfig({ mode });
+  }, [updateConfig]);
+
+  /**
+   * Toggle panel visibility
+   */
+  const toggleVisibility = useCallback(() => {
+    setIsVisible(!isVisible);
+  }, [isVisible]);
+
+  /**
+   * Close panel completely
+   */
+  const closePanel = useCallback(() => {
+    setIsVisible(false);
+    updateConfig({ showWelcome: false });
+  }, [updateConfig]);
+
+  /**
+   * Handle manual refresh
+   */
+  const handleRefresh = useCallback(() => {
+    refreshDebugInfo();
+  }, [refreshDebugInfo]);
+
+  // =============================================================================
+  // AUTO-REFRESH EFFECT
+  // =============================================================================
+
+  useEffect(() => {
+    if (!config?.autoRefresh || !config.refreshInterval) return;
 
     const interval = setInterval(() => {
-      setIsRefreshing(true);
-      debouncedRefresh();
+      refreshDebugInfo();
     }, config.refreshInterval);
 
     return () => clearInterval(interval);
-  }, [config.enableRealTimeUpdates, config.refreshInterval, isPanelVisible, debouncedRefresh]);
+  }, [config?.autoRefresh, config?.refreshInterval, refreshDebugInfo]);
 
-  // ============================================================================
-  // EVENT HANDLERS
-  // ============================================================================
-
-  /**
-   * Toggles visibility of a specific panel section
-   */
-  const toggleSection = useCallback((section: keyof PanelSectionState) => {
-    setSectionStates(prev => ({
-      ...prev,
-      [section]: !prev[section]
-    }));
-  }, []);
-
-  /**
-   * Toggles overall panel visibility
-   */
-  const togglePanelVisibility = useCallback(() => {
-    setIsPanelVisible(prev => !prev);
-  }, []);
-
-  /**
-   * Toggles configuration panel visibility
-   */
-  const toggleConfigVisibility = useCallback(() => {
-    setIsConfigVisible(prev => !prev);
-  }, []);
-
-  /**
-   * Handles manual refresh request
-   */
-  const handleManualRefresh = useCallback(() => {
-    setIsRefreshing(true);
-    setLastRefresh(Date.now());
-    
-    // Trigger refresh in child components by updating timestamp
-    setTimeout(() => {
-      setIsRefreshing(false);
-    }, 500);
-  }, []);
-
-  /**
-   * Handles configuration updates with validation
-   */
-  const handleConfigUpdate = useCallback((updates: Partial<DebugPanelConfig>) => {
-    setConfig(prev => {
-      const newConfig = { ...prev, ...updates };
-      
-      // Validate refresh interval bounds
-      if (newConfig.refreshInterval < 1000) {
-        newConfig.refreshInterval = 1000;
-      } else if (newConfig.refreshInterval > 30000) {
-        newConfig.refreshInterval = 30000;
-      }
-      
-      // Validate max height bounds
-      if (newConfig.maxHeight < 200) {
-        newConfig.maxHeight = 200;
-      } else if (newConfig.maxHeight > 1200) {
-        newConfig.maxHeight = 1200;
-      }
-      
-      return newConfig;
-    });
-  }, []);
-
-  /**
-   * Collapses all sections at once
-   */
-  const collapseAllSections = useCallback(() => {
-    setSectionStates({
-      debugInfo: false,
-      debugControls: false,
-      debugMetrics: false
-    });
-  }, []);
-
-  /**
-   * Expands all sections at once
-   */
-  const expandAllSections = useCallback(() => {
-    setSectionStates({
-      debugInfo: true,
-      debugControls: true,
-      debugMetrics: true
-    });
-  }, []);
-
-  // ============================================================================
-  // KEYBOARD SHORTCUTS
-  // ============================================================================
-
-  useEffect(() => {
-    if (!config.enableKeyboardShortcuts) {
-      return;
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      const isCtrlOrCmd = event.ctrlKey || event.metaKey;
-      const isShift = event.shiftKey;
-      
-      if (!isCtrlOrCmd || !isShift) {
-        return;
-      }
-
-      // Prevent default browser behavior
-      event.preventDefault();
-
-      switch (event.key.toLowerCase()) {
-        case 'd':
-          togglePanelVisibility();
-          break;
-        case 'i':
-          toggleSection('debugInfo');
-          break;
-        case 'c':
-          toggleSection('debugControls');
-          break;
-        case 'm':
-          toggleSection('debugMetrics');
-          break;
-        case 'r':
-          handleManualRefresh();
-          break;
-        default:
-          // Allow default behavior for unhandled shortcuts
-          break;
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [
-    config.enableKeyboardShortcuts,
-    togglePanelVisibility,
-    toggleSection,
-    handleManualRefresh
-  ]);
-
-  // ============================================================================
-  // COMPUTED VALUES
-  // ============================================================================
-
-  const allSectionsCollapsed = useMemo(() => 
-    !sectionStates.debugInfo && !sectionStates.debugControls && !sectionStates.debugMetrics,
-    [sectionStates]
-  );
-
-  const allSectionsExpanded = useMemo(() =>
-    sectionStates.debugInfo && sectionStates.debugControls && sectionStates.debugMetrics,
-    [sectionStates]
-  );
-
-  // ============================================================================
+  // =============================================================================
   // RENDER HELPERS
-  // ============================================================================
+  // =============================================================================
 
   /**
-   * Renders a section header with toggle functionality
+   * Get position classes for floating mode
    */
-  const renderSectionHeader = (
-    title: string,
-    isVisible: boolean,
-    onToggle: () => void,
-    icon?: React.ReactNode
-  ) => (
-    <button
-      onClick={onToggle}
-      className="flex items-center justify-between w-full px-4 py-3 text-left bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 border-b border-gray-200 dark:border-gray-600"
-      aria-expanded={isVisible}
-      aria-label={`Toggle ${title} section`}
-    >
-      <div className="flex items-center gap-2">
-        {icon}
-        <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
-          {title}
-        </h3>
-      </div>
-      <div className="flex items-center gap-2">
-        {isVisible ? (
-          <ChevronUpIcon className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-        ) : (
-          <ChevronDownIcon className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+  const getPositionClasses = useCallback(() => {
+    if (!config) return '';
+    
+    switch (config.position) {
+      case 'bottom-right':
+        return 'bottom-4 right-4';
+      case 'bottom-left':
+        return 'bottom-4 left-4';
+      case 'top-right':
+        return 'top-4 right-4';
+      case 'top-left':
+        return 'top-4 left-4';
+      default:
+        return 'bottom-4 right-4';
+    }
+  }, [config]);
+
+  /**
+   * Get mode-specific classes
+   */
+  const getModeClasses = useCallback(() => {
+    if (!config) return '';
+    
+    switch (config.mode) {
+      case 'floating':
+        return `fixed ${getPositionClasses()} z-50 max-w-md w-80`;
+      case 'sidebar':
+        return 'fixed top-0 right-0 z-50 h-full w-96 border-l';
+      case 'fullscreen':
+        return 'fixed inset-0 z-50';
+      case 'minimized':
+        return `fixed ${getPositionClasses()} z-50`;
+      default:
+        return `fixed ${getPositionClasses()} z-50 max-w-md w-80`;
+    }
+  }, [config, getPositionClasses]);
+
+  /**
+   * Render section content
+   */
+  const renderSection = useCallback((section: DebugSection) => {
+    if (!config) return null;
+    
+    const isExpanded = config.expandedSections.has(section.id);
+    const IconComponent = section.icon;
+    const SectionComponent = section.component;
+
+    return (
+      <div key={section.id} className="border-b border-gray-200 dark:border-gray-700 last:border-b-0">
+        {/* Section Header */}
+        <button
+          onClick={() => toggleSection(section.id)}
+          className="flex w-full items-center justify-between p-4 text-left hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+          aria-expanded={isExpanded}
+          aria-controls={`debug-section-${section.id}`}
+        >
+          <div className="flex items-center gap-3">
+            <IconComponent className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+            <div>
+              <h3 className="font-medium text-gray-900 dark:text-gray-100">
+                {section.title}
+              </h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {section.description}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {section.badge && (
+              <Badge variant="info" size="sm">
+                {section.badge}
+              </Badge>
+            )}
+            {isExpanded ? (
+              <ChevronDown className="h-4 w-4 text-gray-400" />
+            ) : (
+              <ChevronRight className="h-4 w-4 text-gray-400" />
+            )}
+          </div>
+        </button>
+
+        {/* Section Content */}
+        {isExpanded && (
+          <div
+            id={`debug-section-${section.id}`}
+            className="border-t border-gray-200 dark:border-gray-700"
+          >
+            <Suspense
+              fallback={
+                <div className="flex items-center justify-center p-8">
+                  <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+                    Loading {section.title.toLowerCase()}...
+                  </div>
+                </div>
+              }
+            >
+              <SectionComponent
+                maxEntries={maxDebugEntries}
+                enableQueryDevtools={enableQueryDevtools}
+                enableDetailedMetrics={enableDetailedMetrics}
+              />
+            </Suspense>
+          </div>
         )}
       </div>
-    </button>
-  );
+    );
+  }, [config, toggleSection, maxDebugEntries, enableQueryDevtools, enableDetailedMetrics]);
 
   /**
-   * Renders the main panel header with controls
+   * Render minimized mode
    */
-  const renderPanelHeader = () => (
-    <div className="flex items-center justify-between px-4 py-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 rounded-t-lg">
+  const renderMinimized = useCallback(() => (
+    <Button
+      onClick={() => changeMode('floating')}
+      variant="default"
+      size="md"
+      className="!rounded-full !p-3 shadow-lg"
+      ariaLabel="Open debug panel"
+      title="Debug Panel - Click to expand"
+      icon={<Bug className="h-5 w-5" />}
+    >
+      <Badge variant="info" size="sm" className="ml-2">
+        DEV
+      </Badge>
+    </Button>
+  ), [changeMode]);
+
+  /**
+   * Render panel header
+   */
+  const renderHeader = useCallback(() => (
+    <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
       <div className="flex items-center gap-3">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-          Debug Panel
-        </h2>
-        <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-          <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-          <span>Development Mode</span>
+        <Bug className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            Debug Panel
+          </h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Development Tools
+          </p>
         </div>
+        <Badge variant="warning" size="sm">
+          DEV ONLY
+        </Badge>
       </div>
-      
-      <div className="flex items-center gap-2">
-        {/* Last refresh indicator */}
-        <div className="text-xs text-gray-500 dark:text-gray-400">
-          Updated: {new Date(lastRefresh).toLocaleTimeString()}
-        </div>
-        
-        {/* Refresh button */}
-        <button
-          onClick={handleManualRefresh}
-          disabled={isRefreshing}
-          className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-          aria-label="Refresh debug data"
-          title="Refresh debug data (Ctrl+Shift+R)"
-        >
-          <ArrowPathIcon 
-            className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} 
+
+      <div className="flex items-center gap-1">
+        {/* Refresh Button */}
+        <Button
+          onClick={handleRefresh}
+          variant="ghost"
+          size="sm"
+          className="!p-2"
+          loading={isLoading}
+          ariaLabel="Refresh debug information"
+          title="Refresh debug information"
+          icon={<RefreshCw className="h-4 w-4" />}
+        />
+
+        {/* Mode Switcher */}
+        <div className="hidden sm:flex items-center gap-1">
+          <Button
+            onClick={() => changeMode('floating')}
+            variant={config?.mode === 'floating' ? 'default' : 'ghost'}
+            size="sm"
+            className="!p-2"
+            ariaLabel="Floating mode"
+            title="Floating mode"
+            icon={<Monitor className="h-4 w-4" />}
           />
-        </button>
-        
-        {/* Panel controls */}
-        <div className="flex items-center gap-1">
-          <button
-            onClick={allSectionsExpanded ? collapseAllSections : expandAllSections}
-            className="px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-            title={allSectionsExpanded ? 'Collapse all sections' : 'Expand all sections'}
-          >
-            {allSectionsExpanded ? 'Collapse All' : 'Expand All'}
-          </button>
-          
-          <button
-            onClick={toggleConfigVisibility}
-            className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-            aria-label="Open configuration"
-            title="Panel configuration"
-          >
-            <Cog6ToothIcon className="h-4 w-4" />
-          </button>
-          
-          <button
-            onClick={togglePanelVisibility}
-            className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-            aria-label="Hide debug panel"
-            title="Hide panel (Ctrl+Shift+D)"
-          >
-            <EyeSlashIcon className="h-4 w-4" />
-          </button>
+          <Button
+            onClick={() => changeMode('sidebar')}
+            variant={config?.mode === 'sidebar' ? 'default' : 'ghost'}
+            size="sm"
+            className="!p-2"
+            ariaLabel="Sidebar mode"
+            title="Sidebar mode"
+            icon={<Maximize2 className="h-4 w-4" />}
+          />
         </div>
+
+        {/* Minimize/Close */}
+        <Button
+          onClick={() => changeMode('minimized')}
+          variant="ghost"
+          size="sm"
+          className="!p-2"
+          ariaLabel="Minimize panel"
+          title="Minimize panel"
+          icon={<Minimize2 className="h-4 w-4" />}
+        />
+        <Button
+          onClick={closePanel}
+          variant="ghost"
+          size="sm"
+          className="!p-2 text-red-600 hover:text-red-700"
+          ariaLabel="Close debug panel"
+          title="Close debug panel"
+          icon={<X className="h-4 w-4" />}
+        />
       </div>
     </div>
-  );
+  ), [config?.mode, isLoading, handleRefresh, changeMode, closePanel]);
 
-  /**
-   * Renders the configuration panel
-   */
-  const renderConfigPanel = () => (
-    <div className="absolute top-0 right-0 w-80 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 p-4">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
-          Debug Panel Configuration
-        </h3>
-        <button
-          onClick={toggleConfigVisibility}
-          className="p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded"
-        >
-          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-      
-      <div className="space-y-4">
-        {/* Refresh Interval */}
-        <div>
-          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Refresh Interval (ms)
-          </label>
-          <input
-            type="number"
-            min="1000"
-            max="30000"
-            step="1000"
-            value={config.refreshInterval}
-            onChange={(e) => handleConfigUpdate({ refreshInterval: parseInt(e.target.value) || 5000 })}
-            className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-          />
-        </div>
-        
-        {/* Max Height */}
-        <div>
-          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Max Section Height (px)
-          </label>
-          <input
-            type="number"
-            min="200"
-            max="1200"
-            step="50"
-            value={config.maxHeight}
-            onChange={(e) => handleConfigUpdate({ maxHeight: parseInt(e.target.value) || 600 })}
-            className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-          />
-        </div>
-        
-        {/* Toggles */}
-        <div className="space-y-2">
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={config.enableKeyboardShortcuts}
-              onChange={(e) => handleConfigUpdate({ enableKeyboardShortcuts: e.target.checked })}
-              className="rounded border-gray-300 dark:border-gray-600"
-            />
-            <span className="text-xs text-gray-700 dark:text-gray-300">Enable Keyboard Shortcuts</span>
-          </label>
-          
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={config.enableRealTimeUpdates}
-              onChange={(e) => handleConfigUpdate({ enableRealTimeUpdates: e.target.checked })}
-              className="rounded border-gray-300 dark:border-gray-600"
-            />
-            <span className="text-xs text-gray-700 dark:text-gray-300">Real-time Updates</span>
-          </label>
-          
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={config.showAdvancedMetrics}
-              onChange={(e) => handleConfigUpdate({ showAdvancedMetrics: e.target.checked })}
-              className="rounded border-gray-300 dark:border-gray-600"
-            />
-            <span className="text-xs text-gray-700 dark:text-gray-300">Advanced Metrics</span>
-          </label>
-        </div>
-      </div>
-      
-      {/* Keyboard shortcuts help */}
-      <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-        <h4 className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
-          Keyboard Shortcuts
-        </h4>
-        <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
-          <div>Ctrl+Shift+D: Toggle Panel</div>
-          <div>Ctrl+Shift+I: Toggle Info</div>
-          <div>Ctrl+Shift+C: Toggle Controls</div>
-          <div>Ctrl+Shift+M: Toggle Metrics</div>
-          <div>Ctrl+Shift+R: Refresh</div>
-        </div>
-      </div>
-    </div>
-  );
-
-  // ============================================================================
+  // =============================================================================
   // MAIN RENDER
-  // ============================================================================
+  // =============================================================================
 
-  // Render minimized panel when hidden
-  if (!isPanelVisible) {
+  // Don't render if not visible
+  if (!isVisible) {
+    return null;
+  }
+
+  // Render minimized mode
+  if (config?.mode === 'minimized') {
     return (
-      <div className={`fixed bottom-4 right-4 z-40 ${className}`}>
-        <button
-          onClick={togglePanelVisibility}
-          className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg hover:shadow-xl transition-shadow text-sm font-medium text-gray-900 dark:text-gray-100"
-          title="Show debug panel (Ctrl+Shift+D)"
-        >
-          <EyeIcon className="h-4 w-4" />
-          Debug Panel
-        </button>
+      <div className={cn(getModeClasses(), className)}>
+        {renderMinimized()}
       </div>
     );
   }
 
+  // Main panel render
   return (
-    <div className={`fixed bottom-0 left-0 right-0 z-40 ${className}`}>
-      <div className="relative bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 shadow-2xl">
-        {/* Panel Header */}
-        {renderPanelHeader()}
-        
-        {/* Panel Content */}
-        <div className="flex flex-col lg:flex-row divide-y lg:divide-y-0 lg:divide-x divide-gray-200 dark:divide-gray-700">
-          {/* Debug Information List Section */}
-          <div className="flex-1 min-w-0">
-            {renderSectionHeader(
-              'Debug Information',
-              sectionStates.debugInfo,
-              () => toggleSection('debugInfo'),
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            )}
-            {sectionStates.debugInfo && (
-              <div className="h-full overflow-hidden">
-                <DebugInfoList
-                  maxHeight={config.maxHeight}
-                  autoRefresh={config.enableRealTimeUpdates}
-                  refreshInterval={config.refreshInterval}
-                  showStats={true}
-                  enableExport={true}
-                  enableClearAll={true}
-                />
-              </div>
-            )}
+    <div
+      className={cn(
+        getModeClasses(),
+        "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-xl",
+        config?.mode === 'floating' && "rounded-lg",
+        className
+      )}
+      role="complementary"
+      aria-label="Debug Panel"
+    >
+      {/* Header */}
+      {renderHeader()}
+
+      {/* Content */}
+      <div className={cn(
+        "overflow-hidden",
+        config?.mode === 'floating' && "max-h-[80vh]",
+        config?.mode === 'sidebar' && "h-[calc(100vh-80px)]",
+        config?.mode === 'fullscreen' && "h-[calc(100vh-80px)]"
+      )}>
+        {defaultSections.length > 0 ? (
+          <div className="divide-y divide-gray-200 dark:divide-gray-700">
+            {defaultSections.map(renderSection)}
           </div>
-          
-          {/* Debug Controls Section */}
-          <div className="w-full lg:w-80 xl:w-96">
-            {renderSectionHeader(
-              'Debug Controls',
-              sectionStates.debugControls,
-              () => toggleSection('debugControls'),
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
-              </svg>
-            )}
-            {sectionStates.debugControls && (
-              <div style={{ maxHeight: config.maxHeight }} className="overflow-y-auto">
-                <DebugControls />
-              </div>
-            )}
+        ) : (
+          <div className="flex items-center justify-center p-8">
+            <div className="text-center">
+              <HelpCircle className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+                No Debug Sections Available
+              </h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Debug sections will appear here when enabled
+              </p>
+            </div>
           </div>
-          
-          {/* Debug Metrics Section */}
-          <div className="w-full lg:w-80 xl:w-96">
-            {renderSectionHeader(
-              'Development Metrics',
-              sectionStates.debugMetrics,
-              () => toggleSection('debugMetrics'),
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-            )}
-            {sectionStates.debugMetrics && (
-              <div style={{ maxHeight: config.maxHeight }} className="overflow-y-auto">
-                <DebugMetrics
-                  refreshInterval={config.refreshInterval}
-                />
-              </div>
-            )}
+        )}
+      </div>
+
+      {/* Footer with development notice */}
+      <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-2">
+        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-3 w-3" />
+            Development Environment Only
+          </div>
+          <div className="flex items-center gap-2">
+            <Activity className="h-3 w-3" />
+            Last update: {lastUpdate.toLocaleTimeString()}
           </div>
         </div>
-        
-        {/* Configuration Panel Overlay */}
-        {isConfigVisible && renderConfigPanel()}
       </div>
     </div>
   );
 };
+
+// =============================================================================
+// EXPORTS
+// =============================================================================
+
+DebugPanel.displayName = 'DebugPanel';
 
 export default DebugPanel;
