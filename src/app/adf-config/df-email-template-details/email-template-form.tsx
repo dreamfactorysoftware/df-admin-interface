@@ -5,1078 +5,741 @@
  * 
  * React form component implementing email template creation and editing functionality
  * using React Hook Form with comprehensive Zod validation. Renders all form fields
- * (name, description, recipients, subject, attachment, body, sender info, reply-to info)
  * with Headless UI components styled with Tailwind CSS. Provides real-time validation,
- * error display, and responsive design including dark mode support. Handles form
- * submission for both create and edit modes with proper error handling and success feedback.
+ * error display, and responsive design including dark mode support.
  * 
  * Features:
- * - React Hook Form with Zod schema validators per React/Next.js Integration Requirements
- * - Real-time validation under 100ms per performance requirements
+ * - React Hook Form with Zod schema validators for all user inputs
+ * - Real-time validation under 100ms per React/Next.js Integration Requirements
  * - Headless UI components for accessible form controls per Section 7.1 Core UI Technologies
  * - Tailwind CSS 4.1+ utility classes for styling per React/Next.js Integration Requirements
  * - WCAG 2.1 AA compliance for form accessibility per Section 7.1 Core UI Technologies
- * - Dark mode support using Tailwind dark mode utilities
- * - Responsive form layout with Tailwind CSS grid and breakpoint classes
+ * - Responsive form layout with dark mode support
+ * - Comprehensive error handling and success feedback
  * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
+ * @fileoverview Email template form component for DreamFactory Admin Interface
+ * @version 1.0.0
+ * @since React 19.0.0, Next.js 15.1+, TypeScript 5.8+
  */
 
-import React, { useEffect, useCallback, useMemo, useState, useRef } from 'react';
-import { useForm, Controller, FieldErrors } from 'react-hook-form';
+import React, { useCallback, useEffect, useMemo } from 'react';
+import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Switch } from '@headlessui/react';
-import {
-  ExclamationTriangleIcon,
-  InformationCircleIcon,
-  PlusIcon,
-  XMarkIcon,
-  EyeIcon,
-  EyeSlashIcon,
-  CheckCircleIcon,
-  DocumentTextIcon,
-  CodeBracketIcon
-} from '@heroicons/react/24/outline';
-import { useEmailTemplate } from './use-email-template';
-import { useBreakpoint } from '../../../hooks/use-breakpoint';
-import { useTheme } from '../../../hooks/use-theme';
-import type { 
-  EmailTemplate, 
-  EmailTemplateRequest,
-  EmailTemplateOperationResult 
-} from '../../../types/email-templates';
+import { Loader2, Save, X, AlertCircle, CheckCircle } from 'lucide-react';
+
+// Import hooks and utilities
+import { useEmailTemplate, type EmailTemplatePayload, type EmailTemplate } from './use-email-template';
+import { useTheme } from '@/hooks/use-theme';
+import { useBreakpoint } from '@/hooks/use-breakpoint';
+
+// Import UI components
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/input/textarea';
+
+// ============================================================================
+// VALIDATION SCHEMA
+// ============================================================================
 
 /**
- * Zod validation schema for email template form
- * Comprehensive validation following React/Next.js Integration Requirements
+ * Comprehensive Zod validation schema for email template form
+ * Implements real-time validation under 100ms per React/Next.js Integration Requirements
  */
 const emailTemplateSchema = z.object({
   name: z
     .string()
-    .min(1, 'Name is required')
-    .min(2, 'Name must be at least 2 characters')
-    .max(100, 'Name must not exceed 100 characters')
-    .regex(/^[a-zA-Z0-9\s\-_\.]+$/, 'Name contains invalid characters'),
-  
+    .min(1, 'Template name is required')
+    .max(255, 'Template name must be less than 255 characters')
+    .regex(/^[a-zA-Z0-9_\-\s]+$/, 'Template name can only contain letters, numbers, spaces, hyphens, and underscores'),
+
   description: z
     .string()
-    .max(500, 'Description must not exceed 500 characters')
+    .max(1000, 'Description must be less than 1000 characters')
     .optional(),
-  
+
   to: z
-    .array(z.string().email('Invalid email address'))
+    .string()
+    .max(500, 'To field must be less than 500 characters')
     .optional()
-    .default([]),
-  
+    .refine((val) => {
+      if (!val) return true;
+      // Validate email format(s) - supports multiple emails separated by commas or semicolons
+      const emails = val.split(/[,;]+/).map(email => email.trim()).filter(email => email.length > 0);
+      return emails.every(email => z.string().email().safeParse(email).success);
+    }, 'Please enter valid email addresses separated by commas or semicolons'),
+
   cc: z
-    .array(z.string().email('Invalid email address'))
+    .string()
+    .max(500, 'CC field must be less than 500 characters')
     .optional()
-    .default([]),
-  
+    .refine((val) => {
+      if (!val) return true;
+      const emails = val.split(/[,;]+/).map(email => email.trim()).filter(email => email.length > 0);
+      return emails.every(email => z.string().email().safeParse(email).success);
+    }, 'Please enter valid email addresses separated by commas or semicolons'),
+
   bcc: z
-    .array(z.string().email('Invalid email address'))
+    .string()
+    .max(500, 'BCC field must be less than 500 characters')
     .optional()
-    .default([]),
-  
+    .refine((val) => {
+      if (!val) return true;
+      const emails = val.split(/[,;]+/).map(email => email.trim()).filter(email => email.length > 0);
+      return emails.every(email => z.string().email().safeParse(email).success);
+    }, 'Please enter valid email addresses separated by commas or semicolons'),
+
   subject: z
     .string()
-    .min(1, 'Subject is required')
-    .min(3, 'Subject must be at least 3 characters')
-    .max(200, 'Subject must not exceed 200 characters'),
-  
-  body_text: z
-    .string()
-    .max(10000, 'Text body must not exceed 10,000 characters')
+    .max(255, 'Subject must be less than 255 characters')
     .optional(),
-  
-  body_html: z
+
+  attachment: z
     .string()
-    .max(50000, 'HTML body must not exceed 50,000 characters')
+    .max(500, 'Attachment path must be less than 500 characters')
     .optional(),
-  
-  from_name: z
+
+  bodyHtml: z
     .string()
-    .max(100, 'From name must not exceed 100 characters')
+    .max(10000, 'Email body must be less than 10,000 characters')
     .optional(),
-  
-  from_email: z
+
+  fromName: z
     .string()
-    .email('Invalid from email address')
+    .max(255, 'From name must be less than 255 characters')
+    .optional(),
+
+  fromEmail: z
+    .string()
+    .email('Please enter a valid email address')
+    .max(255, 'From email must be less than 255 characters')
     .optional()
     .or(z.literal('')),
-  
-  reply_to_name: z
+
+  replyToName: z
     .string()
-    .max(100, 'Reply-to name must not exceed 100 characters')
+    .max(255, 'Reply-to name must be less than 255 characters')
     .optional(),
-  
-  reply_to_email: z
+
+  replyToEmail: z
     .string()
-    .email('Invalid reply-to email address')
+    .email('Please enter a valid email address')
+    .max(255, 'Reply-to email must be less than 255 characters')
     .optional()
-    .or(z.literal('')),
-  
-  is_active: z
-    .boolean()
-    .default(true)
+    .or(z.literal(''))
 });
 
-/**
- * Form data type derived from Zod schema
- */
 type EmailTemplateFormData = z.infer<typeof emailTemplateSchema>;
 
+// ============================================================================
+// COMPONENT INTERFACES
+// ============================================================================
+
 /**
- * Props interface for the email template form component
+ * Props interface for EmailTemplateForm component
  */
-interface EmailTemplateFormProps {
-  /** Existing template data for edit mode */
-  template?: EmailTemplate;
-  /** Whether the form is in edit mode */
-  isEdit?: boolean;
-  /** Callback function called on successful form submission */
-  onSuccess?: (result: EmailTemplateOperationResult) => void;
-  /** Callback function called on form cancellation */
+export interface EmailTemplateFormProps {
+  /** Email template to edit (undefined for create mode) */
+  emailTemplate?: EmailTemplate;
+  
+  /** Callback when form is successfully submitted */
+  onSuccess?: (template: EmailTemplate) => void;
+  
+  /** Callback when form is cancelled */
   onCancel?: () => void;
+  
+  /** Whether the form is in edit mode */
+  isEditing?: boolean;
+  
   /** Additional CSS classes for the form container */
   className?: string;
-  /** Whether to show advanced options by default */
-  showAdvancedOptions?: boolean;
+  
+  /** Whether to show the cancel button */
+  showCancelButton?: boolean;
+  
+  /** Custom submit button text */
+  submitButtonText?: string;
+  
+  /** Whether form should auto-focus the first field */
+  autoFocus?: boolean;
 }
 
 /**
- * Input component with consistent styling and accessibility
+ * Form field component for consistent styling and accessibility
  */
-interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+interface FormFieldProps {
   label: string;
+  children: React.ReactNode;
   error?: string;
   required?: boolean;
-  helpText?: string;
-  icon?: React.ComponentType<{ className?: string }>;
+  description?: string;
+  className?: string;
 }
 
-const Input: React.FC<InputProps> = ({
+const FormField: React.FC<FormFieldProps> = ({
   label,
-  error,
-  required = false,
-  helpText,
-  icon: Icon,
-  className = '',
-  ...props
-}) => {
-  const { isDark } = useTheme();
-  const inputId = useRef(`input-${Math.random().toString(36).substr(2, 9)}`);
-
-  return (
-    <div className="space-y-2">
-      <label 
-        htmlFor={inputId.current}
-        className={`block text-sm font-medium transition-colors duration-200 ${
-          isDark 
-            ? 'text-gray-200' 
-            : 'text-gray-700'
-        } ${required ? "after:content-['*'] after:text-red-500 after:ml-1" : ''}`}
-      >
-        {label}
-      </label>
-      
-      <div className="relative">
-        {Icon && (
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Icon className={`h-5 w-5 ${isDark ? 'text-gray-400' : 'text-gray-400'}`} />
-          </div>
-        )}
-        
-        <input
-          {...props}
-          id={inputId.current}
-          className={`
-            w-full px-3 py-2 text-sm transition-colors duration-200 border rounded-md
-            focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
-            disabled:cursor-not-allowed disabled:opacity-50
-            ${Icon ? 'pl-10' : ''}
-            ${error 
-              ? `border-red-500 ${isDark ? 'bg-red-900/10' : 'bg-red-50'}` 
-              : isDark 
-                ? 'border-gray-600 bg-gray-800 text-gray-100 placeholder-gray-400' 
-                : 'border-gray-300 bg-white text-gray-900 placeholder-gray-500'
-            }
-            ${className}
-          `}
-          aria-invalid={error ? 'true' : 'false'}
-          aria-describedby={
-            error ? `${inputId.current}-error` : 
-            helpText ? `${inputId.current}-help` : undefined
-          }
-        />
-      </div>
-      
-      {error && (
-        <p 
-          id={`${inputId.current}-error`}
-          className="flex items-center gap-1 text-sm text-red-600 dark:text-red-400"
-          role="alert"
-        >
-          <ExclamationTriangleIcon className="h-4 w-4 flex-shrink-0" />
-          {error}
-        </p>
-      )}
-      
-      {helpText && !error && (
-        <p 
-          id={`${inputId.current}-help`}
-          className={`flex items-center gap-1 text-sm ${
-            isDark ? 'text-gray-400' : 'text-gray-500'
-          }`}
-        >
-          <InformationCircleIcon className="h-4 w-4 flex-shrink-0" />
-          {helpText}
-        </p>
-      )}
-    </div>
-  );
-};
-
-/**
- * Textarea component with consistent styling and accessibility
- */
-interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
-  label: string;
-  error?: string;
-  required?: boolean;
-  helpText?: string;
-}
-
-const Textarea: React.FC<TextareaProps> = ({
-  label,
-  error,
-  required = false,
-  helpText,
-  className = '',
-  ...props
-}) => {
-  const { isDark } = useTheme();
-  const textareaId = useRef(`textarea-${Math.random().toString(36).substr(2, 9)}`);
-
-  return (
-    <div className="space-y-2">
-      <label 
-        htmlFor={textareaId.current}
-        className={`block text-sm font-medium transition-colors duration-200 ${
-          isDark 
-            ? 'text-gray-200' 
-            : 'text-gray-700'
-        } ${required ? "after:content-['*'] after:text-red-500 after:ml-1" : ''}`}
-      >
-        {label}
-      </label>
-      
-      <textarea
-        {...props}
-        id={textareaId.current}
-        className={`
-          w-full px-3 py-2 text-sm transition-colors duration-200 border rounded-md
-          focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
-          disabled:cursor-not-allowed disabled:opacity-50 resize-vertical
-          ${error 
-            ? `border-red-500 ${isDark ? 'bg-red-900/10' : 'bg-red-50'}` 
-            : isDark 
-              ? 'border-gray-600 bg-gray-800 text-gray-100 placeholder-gray-400' 
-              : 'border-gray-300 bg-white text-gray-900 placeholder-gray-500'
-          }
-          ${className}
-        `}
-        aria-invalid={error ? 'true' : 'false'}
-        aria-describedby={
-          error ? `${textareaId.current}-error` : 
-          helpText ? `${textareaId.current}-help` : undefined
-        }
-      />
-      
-      {error && (
-        <p 
-          id={`${textareaId.current}-error`}
-          className="flex items-center gap-1 text-sm text-red-600 dark:text-red-400"
-          role="alert"
-        >
-          <ExclamationTriangleIcon className="h-4 w-4 flex-shrink-0" />
-          {error}
-        </p>
-      )}
-      
-      {helpText && !error && (
-        <p 
-          id={`${textareaId.current}-help`}
-          className={`flex items-center gap-1 text-sm ${
-            isDark ? 'text-gray-400' : 'text-gray-500'
-          }`}
-        >
-          <InformationCircleIcon className="h-4 w-4 flex-shrink-0" />
-          {helpText}
-        </p>
-      )}
-    </div>
-  );
-};
-
-/**
- * Button component with consistent styling and variants
- */
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
-  size?: 'sm' | 'md' | 'lg';
-  loading?: boolean;
-  icon?: React.ComponentType<{ className?: string }>;
-  iconPosition?: 'left' | 'right';
-}
-
-const Button: React.FC<ButtonProps> = ({
-  variant = 'primary',
-  size = 'md',
-  loading = false,
-  icon: Icon,
-  iconPosition = 'left',
   children,
-  className = '',
-  disabled,
-  ...props
-}) => {
-  const { isDark } = useTheme();
-
-  const baseClasses = 'inline-flex items-center justify-center font-medium rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
-  
-  const variantClasses = {
-    primary: `bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500 ${isDark ? 'focus:ring-offset-gray-800' : 'focus:ring-offset-white'}`,
-    secondary: `border ${isDark ? 'border-gray-600 bg-gray-700 text-gray-200 hover:bg-gray-600' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'} focus:ring-primary-500 ${isDark ? 'focus:ring-offset-gray-800' : 'focus:ring-offset-white'}`,
-    danger: `bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 ${isDark ? 'focus:ring-offset-gray-800' : 'focus:ring-offset-white'}`,
-    ghost: `text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 focus:ring-primary-500 ${isDark ? 'focus:ring-offset-gray-800' : 'focus:ring-offset-white'}`
-  };
-  
-  const sizeClasses = {
-    sm: 'px-3 py-1.5 text-sm',
-    md: 'px-4 py-2 text-sm',
-    lg: 'px-6 py-3 text-base'
-  };
-
-  return (
-    <button
-      {...props}
-      disabled={disabled || loading}
-      className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
-    >
-      {loading && (
-        <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-        </svg>
-      )}
-      {Icon && !loading && iconPosition === 'left' && (
-        <Icon className={`${children ? 'mr-2' : ''} h-4 w-4`} />
-      )}
-      {children}
-      {Icon && !loading && iconPosition === 'right' && (
-        <Icon className={`${children ? 'ml-2' : ''} h-4 w-4`} />
-      )}
-    </button>
-  );
-};
-
-/**
- * Email array input component for handling recipient arrays
- */
-interface EmailArrayInputProps {
-  label: string;
-  value: string[];
-  onChange: (emails: string[]) => void;
-  error?: string;
-  placeholder?: string;
-  helpText?: string;
-}
-
-const EmailArrayInput: React.FC<EmailArrayInputProps> = ({
-  label,
-  value,
-  onChange,
   error,
-  placeholder = 'Enter email address',
-  helpText
+  required = false,
+  description,
+  className = '',
 }) => {
-  const { isDark } = useTheme();
-  const [inputValue, setInputValue] = useState('');
-  const [inputError, setInputError] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const addEmail = useCallback(() => {
-    const email = inputValue.trim();
-    if (!email) return;
-
-    // Validate email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      setInputError('Invalid email address');
-      return;
-    }
-
-    // Check for duplicates
-    if (value.includes(email)) {
-      setInputError('Email already added');
-      return;
-    }
-
-    onChange([...value, email]);
-    setInputValue('');
-    setInputError(null);
-  }, [inputValue, value, onChange]);
-
-  const removeEmail = useCallback((index: number) => {
-    onChange(value.filter((_, i) => i !== index));
-  }, [value, onChange]);
-
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      addEmail();
-    } else if (e.key === 'Backspace' && !inputValue && value.length > 0) {
-      onChange(value.slice(0, -1));
-    }
-  }, [addEmail, inputValue, value, onChange]);
-
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setInputValue(e.target.value);
-    if (inputError) setInputError(null);
-  }, [inputError]);
-
+  const { resolvedTheme } = useTheme();
+  
   return (
-    <div className="space-y-2">
-      <label className={`block text-sm font-medium transition-colors duration-200 ${
-        isDark ? 'text-gray-200' : 'text-gray-700'
-      }`}>
-        {label}
-      </label>
-      
-      <div className={`
-        min-h-[2.5rem] p-2 border rounded-md transition-colors duration-200 focus-within:ring-2 focus-within:ring-primary-500 focus-within:border-transparent
-        ${error || inputError
-          ? `border-red-500 ${isDark ? 'bg-red-900/10' : 'bg-red-50'}`
-          : isDark 
-            ? 'border-gray-600 bg-gray-800' 
-            : 'border-gray-300 bg-white'
+    <div className={`space-y-2 ${className}`}>
+      <label className={`
+        block text-sm font-medium transition-colors duration-200
+        ${error 
+          ? 'text-error-600 dark:text-error-400' 
+          : 'text-gray-700 dark:text-gray-300'
         }
       `}>
-        <div className="flex flex-wrap gap-1 mb-2">
-          {value.map((email, index) => (
-            <span
-              key={index}
-              className={`
-                inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium
-                ${isDark ? 'bg-primary-900 text-primary-100' : 'bg-primary-100 text-primary-800'}
-              `}
-            >
-              {email}
-              <button
-                type="button"
-                onClick={() => removeEmail(index)}
-                className={`
-                  hover:bg-primary-200 dark:hover:bg-primary-800 rounded p-0.5 transition-colors duration-200
-                  focus:outline-none focus:ring-1 focus:ring-primary-500
-                `}
-                aria-label={`Remove ${email}`}
-              >
-                <XMarkIcon className="h-3 w-3" />
-              </button>
-            </span>
-          ))}
-        </div>
-        
-        <div className="flex gap-2">
-          <input
-            ref={inputRef}
-            type="email"
-            value={inputValue}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
-            placeholder={placeholder}
-            className={`
-              flex-1 border-0 bg-transparent text-sm focus:outline-none focus:ring-0 p-0
-              ${isDark ? 'text-gray-100 placeholder-gray-400' : 'text-gray-900 placeholder-gray-500'}
-            `}
-          />
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={addEmail}
-            disabled={!inputValue.trim()}
-            icon={PlusIcon}
-            className="flex-shrink-0"
-            aria-label="Add email"
-          />
-        </div>
-      </div>
+        {label}
+        {required && (
+          <span 
+            className="text-error-500 ml-1" 
+            aria-label="required"
+          >
+            *
+          </span>
+        )}
+      </label>
       
-      {(error || inputError) && (
-        <p className="flex items-center gap-1 text-sm text-red-600 dark:text-red-400" role="alert">
-          <ExclamationTriangleIcon className="h-4 w-4 flex-shrink-0" />
-          {error || inputError}
+      {description && (
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+          {description}
         </p>
       )}
       
-      {helpText && !error && !inputError && (
-        <p className={`flex items-center gap-1 text-sm ${
-          isDark ? 'text-gray-400' : 'text-gray-500'
-        }`}>
-          <InformationCircleIcon className="h-4 w-4 flex-shrink-0" />
-          {helpText}
-        </p>
+      {children}
+      
+      {error && (
+        <div 
+          className="flex items-center gap-1 text-sm text-error-600 dark:text-error-400"
+          role="alert"
+          aria-live="polite"
+        >
+          <AlertCircle className="h-4 w-4 flex-shrink-0" />
+          <span>{error}</span>
+        </div>
       )}
     </div>
   );
 };
 
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
+
 /**
- * Main email template form component
+ * Email Template Form Component
+ * 
+ * Handles both create and edit modes for email templates with comprehensive
+ * validation, accessibility features, and responsive design.
  */
 export const EmailTemplateForm: React.FC<EmailTemplateFormProps> = ({
-  template,
-  isEdit = false,
+  emailTemplate,
   onSuccess,
   onCancel,
+  isEditing = false,
   className = '',
-  showAdvancedOptions = false
+  showCancelButton = true,
+  submitButtonText,
+  autoFocus = true,
 }) => {
-  const { isDark } = useTheme();
+  // ============================================================================
+  // HOOKS AND STATE
+  // ============================================================================
+
+  const { resolvedTheme } = useTheme();
   const { isMobile, isTablet } = useBreakpoint();
-  const { createTemplate, updateTemplate, isCreating, isUpdating } = useEmailTemplate();
   
-  // Local state
-  const [showAdvanced, setShowAdvanced] = useState(showAdvancedOptions);
-  const [showHtmlPreview, setShowHtmlPreview] = useState(false);
-  const [bodyFormat, setBodyFormat] = useState<'text' | 'html'>('text');
+  // Email template mutations
+  const { useCreateEmailTemplate, useUpdateEmailTemplate } = useEmailTemplate({
+    onSuccess: (data) => {
+      if (data.success && data.resource) {
+        const template = Array.isArray(data.resource) ? data.resource[0] : data.resource;
+        onSuccess?.(template);
+      }
+    },
+    onError: (error) => {
+      console.error('Email template operation failed:', error);
+    },
+  });
+
+  const createMutation = useCreateEmailTemplate();
+  const updateMutation = useUpdateEmailTemplate();
 
   // Form setup with React Hook Form and Zod validation
   const {
-    control,
+    register,
     handleSubmit,
+    formState: { errors, isSubmitting, isDirty, isValid },
+    reset,
     watch,
     setValue,
-    getValues,
-    formState: { errors, isValid, isDirty, isSubmitting },
-    reset,
-    trigger
+    clearErrors,
   } = useForm<EmailTemplateFormData>({
     resolver: zodResolver(emailTemplateSchema),
-    mode: 'onChange', // Real-time validation under 100ms requirement
     defaultValues: {
-      name: template?.name || '',
-      description: template?.description || '',
-      to: template?.to || [],
-      cc: template?.cc || [],
-      bcc: template?.bcc || [],
-      subject: template?.subject || '',
-      body_text: template?.body_text || '',
-      body_html: template?.body_html || '',
-      from_name: template?.from_name || '',
-      from_email: template?.from_email || '',
-      reply_to_name: template?.reply_to_name || '',
-      reply_to_email: template?.reply_to_email || '',
-      is_active: template?.is_active ?? true
-    }
+      name: emailTemplate?.name || '',
+      description: emailTemplate?.description || '',
+      to: emailTemplate?.to || '',
+      cc: emailTemplate?.cc || '',
+      bcc: emailTemplate?.bcc || '',
+      subject: emailTemplate?.subject || '',
+      attachment: emailTemplate?.attachment || '',
+      bodyHtml: emailTemplate?.bodyHtml || '',
+      fromName: emailTemplate?.fromName || '',
+      fromEmail: emailTemplate?.fromEmail || '',
+      replyToName: emailTemplate?.replyToName || '',
+      replyToEmail: emailTemplate?.replyToEmail || '',
+    },
+    mode: 'onChange', // Enable real-time validation
   });
 
-  // Watch form values for real-time updates
+  // Watch form values for real-time validation
   const watchedValues = watch();
-  const isLoading = isCreating || isUpdating || isSubmitting;
 
-  // Reset form when template changes
-  useEffect(() => {
-    if (template) {
-      reset({
-        name: template.name,
-        description: template.description || '',
-        to: template.to || [],
-        cc: template.cc || [],
-        bcc: template.bcc || [],
-        subject: template.subject,
-        body_text: template.body_text || '',
-        body_html: template.body_html || '',
-        from_name: template.from_name || '',
-        from_email: template.from_email || '',
-        reply_to_name: template.reply_to_name || '',
-        reply_to_email: template.reply_to_email || '',
-        is_active: template.is_active
-      });
-    }
-  }, [template, reset]);
+  // ============================================================================
+  // COMPUTED VALUES
+  // ============================================================================
 
-  // Handle form submission
-  const onSubmit = useCallback(async (data: EmailTemplateFormData) => {
+  const isLoading = createMutation.isPending || updateMutation.isPending;
+  const hasErrors = Object.keys(errors).length > 0;
+  const canSubmit = isValid && isDirty && !isLoading;
+
+  // Responsive grid classes based on screen size
+  const gridClasses = useMemo(() => {
+    if (isMobile) return 'grid-cols-1';
+    if (isTablet) return 'grid-cols-1 sm:grid-cols-2';
+    return 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3';
+  }, [isMobile, isTablet]);
+
+  // Dynamic submit button text
+  const buttonText = useMemo(() => {
+    if (isLoading) return isEditing ? 'Updating...' : 'Creating...';
+    if (submitButtonText) return submitButtonText;
+    return isEditing ? 'Update Template' : 'Create Template';
+  }, [isLoading, isEditing, submitButtonText]);
+
+  // ============================================================================
+  // EVENT HANDLERS
+  // ============================================================================
+
+  /**
+   * Handle form submission with proper error handling
+   */
+  const onSubmit: SubmitHandler<EmailTemplateFormData> = useCallback(async (data) => {
     try {
-      const templateData: EmailTemplateRequest = {
-        ...data,
-        // Filter out empty strings and arrays
-        to: data.to?.filter(email => email.trim()) || [],
-        cc: data.cc?.filter(email => email.trim()) || [],
-        bcc: data.bcc?.filter(email => email.trim()) || [],
-        from_email: data.from_email?.trim() || undefined,
-        reply_to_email: data.reply_to_email?.trim() || undefined
+      // Prepare payload
+      const payload: EmailTemplatePayload = {
+        name: data.name,
+        description: data.description || undefined,
+        to: data.to || undefined,
+        cc: data.cc || undefined,
+        bcc: data.bcc || undefined,
+        subject: data.subject || undefined,
+        attachment: data.attachment || undefined,
+        bodyHtml: data.bodyHtml || undefined,
+        fromName: data.fromName || undefined,
+        fromEmail: data.fromEmail || undefined,
+        replyToName: data.replyToName || undefined,
+        replyToEmail: data.replyToEmail || undefined,
       };
 
-      let result: EmailTemplateOperationResult;
-      
-      if (isEdit && template?.id) {
-        result = await updateTemplate(template.id, templateData);
+      if (isEditing && emailTemplate?.id) {
+        // Update existing template
+        await updateMutation.mutateAsync({
+          id: emailTemplate.id,
+          payload,
+        });
       } else {
-        result = await createTemplate(templateData);
-      }
-
-      if (result.success) {
-        onSuccess?.(result);
+        // Create new template
+        await createMutation.mutateAsync(payload);
       }
     } catch (error) {
       console.error('Form submission error:', error);
     }
-  }, [isEdit, template?.id, createTemplate, updateTemplate, onSuccess]);
+  }, [isEditing, emailTemplate?.id, createMutation, updateMutation]);
 
-  // Handle form reset
+  /**
+   * Handle form cancellation
+   */
+  const handleCancel = useCallback(() => {
+    if (isDirty) {
+      const confirmCancel = window.confirm(
+        'You have unsaved changes. Are you sure you want to cancel?'
+      );
+      if (!confirmCancel) return;
+    }
+    
+    reset();
+    onCancel?.();
+  }, [isDirty, reset, onCancel]);
+
+  /**
+   * Handle form reset
+   */
   const handleReset = useCallback(() => {
-    if (template) {
+    reset();
+    clearErrors();
+  }, [reset, clearErrors]);
+
+  // ============================================================================
+  // EFFECTS
+  // ============================================================================
+
+  /**
+   * Reset form when emailTemplate prop changes
+   */
+  useEffect(() => {
+    if (emailTemplate) {
       reset({
-        name: template.name,
-        description: template.description || '',
-        to: template.to || [],
-        cc: template.cc || [],
-        bcc: template.bcc || [],
-        subject: template.subject,
-        body_text: template.body_text || '',
-        body_html: template.body_html || '',
-        from_name: template.from_name || '',
-        from_email: template.from_email || '',
-        reply_to_name: template.reply_to_name || '',
-        reply_to_email: template.reply_to_email || '',
-        is_active: template.is_active
-      });
-    } else {
-      reset({
-        name: '',
-        description: '',
-        to: [],
-        cc: [],
-        bcc: [],
-        subject: '',
-        body_text: '',
-        body_html: '',
-        from_name: '',
-        from_email: '',
-        reply_to_name: '',
-        reply_to_email: '',
-        is_active: true
+        name: emailTemplate.name || '',
+        description: emailTemplate.description || '',
+        to: emailTemplate.to || '',
+        cc: emailTemplate.cc || '',
+        bcc: emailTemplate.bcc || '',
+        subject: emailTemplate.subject || '',
+        attachment: emailTemplate.attachment || '',
+        bodyHtml: emailTemplate.bodyHtml || '',
+        fromName: emailTemplate.fromName || '',
+        fromEmail: emailTemplate.fromEmail || '',
+        replyToName: emailTemplate.replyToName || '',
+        replyToEmail: emailTemplate.replyToEmail || '',
       });
     }
-  }, [template, reset]);
+  }, [emailTemplate, reset]);
 
-  // Determine responsive layout classes
-  const containerClasses = useMemo(() => {
-    if (isMobile) return 'space-y-6';
-    if (isTablet) return 'grid grid-cols-1 gap-6';
-    return 'grid grid-cols-12 gap-6';
-  }, [isMobile, isTablet]);
-
-  const leftColumnClasses = useMemo(() => {
-    if (isMobile || isTablet) return '';
-    return 'col-span-8 space-y-6';
-  }, [isMobile, isTablet]);
-
-  const rightColumnClasses = useMemo(() => {
-    if (isMobile || isTablet) return '';
-    return 'col-span-4 space-y-6';
-  }, [isMobile, isTablet]);
+  // ============================================================================
+  // RENDER
+  // ============================================================================
 
   return (
-    <div className={`${className}`}>
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-8" noValidate>
-        {/* Form Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h2 className={`text-xl font-semibold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
-              {isEdit ? 'Edit Email Template' : 'Create Email Template'}
-            </h2>
-            <p className={`mt-1 text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-              {isEdit 
-                ? 'Update the template configuration and content below.'
-                : 'Configure your email template settings and content below.'
-              }
-            </p>
-          </div>
+    <div className={`w-full max-w-6xl mx-auto ${className}`}>
+      {/* Form Header */}
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+          {isEditing ? 'Edit Email Template' : 'Create Email Template'}
+        </h2>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          {isEditing 
+            ? 'Update the email template configuration below.'
+            : 'Configure your email template settings below.'
+          }
+        </p>
+      </div>
+
+      {/* Form */}
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-8">
+        {/* Basic Information Section */}
+        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+            Basic Information
+          </h3>
           
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              icon={showAdvanced ? EyeSlashIcon : EyeIcon}
+          <div className={`grid gap-6 ${gridClasses}`}>
+            {/* Template Name */}
+            <FormField
+              label="Template Name"
+              error={errors.name?.message}
+              required
+              description="A unique name to identify this email template"
+              className="md:col-span-2"
             >
-              {showAdvanced ? 'Hide' : 'Show'} Advanced
-            </Button>
+              <Input
+                {...register('name')}
+                type="text"
+                placeholder="e.g., Welcome Email, Password Reset"
+                disabled={isLoading}
+                autoFocus={autoFocus}
+                aria-describedby="name-description"
+                className="w-full"
+              />
+            </FormField>
+
+            {/* Description */}
+            <FormField
+              label="Description"
+              error={errors.description?.message}
+              description="Optional description of what this template is used for"
+              className="md:col-span-full"
+            >
+              <Textarea
+                {...register('description')}
+                placeholder="Describe the purpose and usage of this email template..."
+                disabled={isLoading}
+                rows={3}
+                maxLength={1000}
+                showCharacterCount
+                aria-describedby="description-description"
+              />
+            </FormField>
           </div>
         </div>
 
-        {/* Main Form Content */}
-        <div className={containerClasses}>
-          {/* Left Column - Main Content */}
-          <div className={leftColumnClasses || 'space-y-6'}>
-            {/* Basic Information */}
-            <div className={`p-6 rounded-lg border ${
-              isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-            }`}>
-              <h3 className={`text-lg font-medium mb-4 ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
-                Basic Information
-              </h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Controller
-                  name="name"
-                  control={control}
-                  render={({ field }) => (
-                    <Input
-                      {...field}
-                      label="Template Name"
-                      required
-                      error={errors.name?.message}
-                      placeholder="Enter template name"
-                      helpText="Unique identifier for this email template"
-                    />
-                  )}
-                />
-                
-                <Controller
-                  name="is_active"
-                  control={control}
-                  render={({ field: { value, onChange } }) => (
-                    <div className="space-y-2">
-                      <label className={`block text-sm font-medium ${
-                        isDark ? 'text-gray-200' : 'text-gray-700'
-                      }`}>
-                        Status
-                      </label>
-                      <div className="flex items-center gap-3">
-                        <Switch
-                          checked={value}
-                          onChange={onChange}
-                          className={`${
-                            value ? 'bg-primary-600' : isDark ? 'bg-gray-600' : 'bg-gray-200'
-                          } relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${
-                            isDark ? 'focus:ring-offset-gray-800' : 'focus:ring-offset-white'
-                          }`}
-                        >
-                          <span
-                            className={`${
-                              value ? 'translate-x-6' : 'translate-x-1'
-                            } inline-block h-4 w-4 transform rounded-full bg-white transition-transform`}
-                          />
-                        </Switch>
-                        <span className={`text-sm ${
-                          isDark ? 'text-gray-300' : 'text-gray-700'
-                        }`}>
-                          {value ? 'Active' : 'Inactive'}
-                        </span>
-                      </div>
-                      <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                        Only active templates can be used for sending emails
-                      </p>
-                    </div>
-                  )}
-                />
-              </div>
-              
-              <div className="mt-4">
-                <Controller
-                  name="description"
-                  control={control}
-                  render={({ field }) => (
-                    <Textarea
-                      {...field}
-                      label="Description"
-                      error={errors.description?.message}
-                      placeholder="Optional description of this template"
-                      rows={3}
-                      helpText="Brief description of the template purpose and usage"
-                    />
-                  )}
-                />
-              </div>
-            </div>
+        {/* Recipients Section */}
+        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+            Recipients
+          </h3>
+          
+          <div className={`grid gap-6 ${gridClasses}`}>
+            {/* To Field */}
+            <FormField
+              label="To"
+              error={errors.to?.message}
+              description="Primary recipients (separated by commas or semicolons)"
+            >
+              <Input
+                {...register('to')}
+                type="email"
+                placeholder="user@example.com, admin@company.com"
+                disabled={isLoading}
+                aria-describedby="to-description"
+              />
+            </FormField>
 
-            {/* Email Content */}
-            <div className={`p-6 rounded-lg border ${
-              isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-            }`}>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className={`text-lg font-medium ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
-                  Email Content
-                </h3>
-                
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setBodyFormat('text')}
-                    className={`px-3 py-1 text-xs font-medium rounded transition-colors duration-200 ${
-                      bodyFormat === 'text'
-                        ? 'bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-100'
-                        : isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    <DocumentTextIcon className="h-4 w-4 inline mr-1" />
-                    Text
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setBodyFormat('html')}
-                    className={`px-3 py-1 text-xs font-medium rounded transition-colors duration-200 ${
-                      bodyFormat === 'html'
-                        ? 'bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-100'
-                        : isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    <CodeBracketIcon className="h-4 w-4 inline mr-1" />
-                    HTML
-                  </button>
-                </div>
-              </div>
-              
-              <div className="space-y-4">
-                <Controller
-                  name="subject"
-                  control={control}
-                  render={({ field }) => (
-                    <Input
-                      {...field}
-                      label="Subject Line"
-                      required
-                      error={errors.subject?.message}
-                      placeholder="Enter email subject"
-                      helpText="Subject line for the email (supports template variables)"
-                    />
-                  )}
-                />
+            {/* CC Field */}
+            <FormField
+              label="CC"
+              error={errors.cc?.message}
+              description="Carbon copy recipients"
+            >
+              <Input
+                {...register('cc')}
+                type="email"
+                placeholder="manager@company.com"
+                disabled={isLoading}
+                aria-describedby="cc-description"
+              />
+            </FormField>
 
-                {bodyFormat === 'text' ? (
-                  <Controller
-                    name="body_text"
-                    control={control}
-                    render={({ field }) => (
-                      <Textarea
-                        {...field}
-                        label="Text Body"
-                        error={errors.body_text?.message}
-                        placeholder="Enter plain text email content"
-                        rows={8}
-                        helpText="Plain text version of the email content"
-                      />
-                    )}
-                  />
-                ) : (
-                  <Controller
-                    name="body_html"
-                    control={control}
-                    render={({ field }) => (
-                      <Textarea
-                        {...field}
-                        label="HTML Body"
-                        error={errors.body_html?.message}
-                        placeholder="<html><body>Enter HTML email content</body></html>"
-                        rows={12}
-                        helpText="HTML version of the email content"
-                        className="font-mono text-xs"
-                      />
-                    )}
-                  />
-                )}
-              </div>
-            </div>
+            {/* BCC Field */}
+            <FormField
+              label="BCC"
+              error={errors.bcc?.message}
+              description="Blind carbon copy recipients"
+            >
+              <Input
+                {...register('bcc')}
+                type="email"
+                placeholder="archive@company.com"
+                disabled={isLoading}
+                aria-describedby="bcc-description"
+              />
+            </FormField>
           </div>
+        </div>
 
-          {/* Right Column - Configuration */}
-          <div className={rightColumnClasses || 'space-y-6'}>
-            {/* Recipients */}
-            <div className={`p-6 rounded-lg border ${
-              isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-            }`}>
-              <h3 className={`text-lg font-medium mb-4 ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
-                Recipients
-              </h3>
-              
-              <div className="space-y-4">
-                <Controller
-                  name="to"
-                  control={control}
-                  render={({ field: { value, onChange } }) => (
-                    <EmailArrayInput
-                      label="To"
-                      value={value || []}
-                      onChange={onChange}
-                      error={errors.to?.message}
-                      placeholder="recipient@example.com"
-                      helpText="Primary recipients (optional - can be set when sending)"
-                    />
-                  )}
-                />
+        {/* Email Content Section */}
+        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+            Email Content
+          </h3>
+          
+          <div className="space-y-6">
+            {/* Subject */}
+            <FormField
+              label="Subject"
+              error={errors.subject?.message}
+              description="Email subject line"
+            >
+              <Input
+                {...register('subject')}
+                type="text"
+                placeholder="Welcome to DreamFactory!"
+                disabled={isLoading}
+                aria-describedby="subject-description"
+              />
+            </FormField>
 
-                {showAdvanced && (
-                  <>
-                    <Controller
-                      name="cc"
-                      control={control}
-                      render={({ field: { value, onChange } }) => (
-                        <EmailArrayInput
-                          label="CC"
-                          value={value || []}
-                          onChange={onChange}
-                          error={errors.cc?.message}
-                          placeholder="cc@example.com"
-                          helpText="Carbon copy recipients"
-                        />
-                      )}
-                    />
+            {/* Email Body */}
+            <FormField
+              label="Email Body (HTML)"
+              error={errors.bodyHtml?.message}
+              description="The HTML content of the email"
+            >
+              <Textarea
+                {...register('bodyHtml')}
+                placeholder="<h1>Welcome!</h1><p>Thank you for signing up...</p>"
+                disabled={isLoading}
+                rows={8}
+                maxLength={10000}
+                showCharacterCount
+                aria-describedby="body-description"
+              />
+            </FormField>
 
-                    <Controller
-                      name="bcc"
-                      control={control}
-                      render={({ field: { value, onChange } }) => (
-                        <EmailArrayInput
-                          label="BCC"
-                          value={value || []}
-                          onChange={onChange}
-                          error={errors.bcc?.message}
-                          placeholder="bcc@example.com"
-                          helpText="Blind carbon copy recipients"
-                        />
-                      )}
-                    />
-                  </>
-                )}
-              </div>
-            </div>
+            {/* Attachment */}
+            <FormField
+              label="Attachment"
+              error={errors.attachment?.message}
+              description="Path to file attachment (optional)"
+            >
+              <Input
+                {...register('attachment')}
+                type="text"
+                placeholder="/storage/documents/welcome-guide.pdf"
+                disabled={isLoading}
+                aria-describedby="attachment-description"
+              />
+            </FormField>
+          </div>
+        </div>
 
-            {/* Sender Information */}
-            {showAdvanced && (
-              <div className={`p-6 rounded-lg border ${
-                isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-              }`}>
-                <h3 className={`text-lg font-medium mb-4 ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
-                  Sender Information
-                </h3>
-                
-                <div className="space-y-4">
-                  <Controller
-                    name="from_name"
-                    control={control}
-                    render={({ field }) => (
-                      <Input
-                        {...field}
-                        label="From Name"
-                        error={errors.from_name?.message}
-                        placeholder="Your Name"
-                        helpText="Display name for the sender"
-                      />
-                    )}
-                  />
+        {/* Sender Information Section */}
+        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+            Sender Information
+          </h3>
+          
+          <div className={`grid gap-6 ${gridClasses}`}>
+            {/* From Name */}
+            <FormField
+              label="From Name"
+              error={errors.fromName?.message}
+              description="Display name for the sender"
+            >
+              <Input
+                {...register('fromName')}
+                type="text"
+                placeholder="DreamFactory Team"
+                disabled={isLoading}
+                aria-describedby="from-name-description"
+              />
+            </FormField>
 
-                  <Controller
-                    name="from_email"
-                    control={control}
-                    render={({ field }) => (
-                      <Input
-                        {...field}
-                        type="email"
-                        label="From Email"
-                        error={errors.from_email?.message}
-                        placeholder="noreply@example.com"
-                        helpText="Email address for the sender"
-                      />
-                    )}
-                  />
+            {/* From Email */}
+            <FormField
+              label="From Email"
+              error={errors.fromEmail?.message}
+              description="Email address for the sender"
+            >
+              <Input
+                {...register('fromEmail')}
+                type="email"
+                placeholder="noreply@dreamfactory.com"
+                disabled={isLoading}
+                aria-describedby="from-email-description"
+              />
+            </FormField>
 
-                  <Controller
-                    name="reply_to_name"
-                    control={control}
-                    render={({ field }) => (
-                      <Input
-                        {...field}
-                        label="Reply-To Name"
-                        error={errors.reply_to_name?.message}
-                        placeholder="Support Team"
-                        helpText="Display name for reply-to address"
-                      />
-                    )}
-                  />
+            {/* Reply-To Name */}
+            <FormField
+              label="Reply-To Name"
+              error={errors.replyToName?.message}
+              description="Display name for replies (optional)"
+            >
+              <Input
+                {...register('replyToName')}
+                type="text"
+                placeholder="Support Team"
+                disabled={isLoading}
+                aria-describedby="reply-to-name-description"
+              />
+            </FormField>
 
-                  <Controller
-                    name="reply_to_email"
-                    control={control}
-                    render={({ field }) => (
-                      <Input
-                        {...field}
-                        type="email"
-                        label="Reply-To Email"
-                        error={errors.reply_to_email?.message}
-                        placeholder="support@example.com"
-                        helpText="Email address for replies"
-                      />
-                    )}
-                  />
-                </div>
-              </div>
-            )}
+            {/* Reply-To Email */}
+            <FormField
+              label="Reply-To Email"
+              error={errors.replyToEmail?.message}
+              description="Email address for replies (optional)"
+            >
+              <Input
+                {...register('replyToEmail')}
+                type="email"
+                placeholder="support@dreamfactory.com"
+                disabled={isLoading}
+                aria-describedby="reply-to-email-description"
+              />
+            </FormField>
           </div>
         </div>
 
         {/* Form Actions */}
-        <div className={`flex flex-col sm:flex-row sm:justify-between gap-4 pt-6 border-t ${
-          isDark ? 'border-gray-700' : 'border-gray-200'
-        }`}>
-          <div className="flex items-center gap-2">
-            {isDirty && (
-              <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
-                <ExclamationTriangleIcon className="h-4 w-4" />
-                Unsaved changes
-              </div>
-            )}
-          </div>
-          
-          <div className="flex items-center gap-3">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={onCancel}
-              disabled={isLoading}
-            >
-              Cancel
-            </Button>
-            
+        <div className="flex flex-col sm:flex-row gap-3 justify-end pt-6 border-t border-gray-200 dark:border-gray-700">
+          {/* Reset Button */}
+          {isDirty && (
             <Button
               type="button"
               variant="ghost"
               onClick={handleReset}
-              disabled={isLoading || !isDirty}
+              disabled={isLoading}
+              className="order-3 sm:order-1"
             >
-              Reset
+              Reset Form
             </Button>
-            
+          )}
+
+          {/* Cancel Button */}
+          {showCancelButton && (
             <Button
-              type="submit"
-              loading={isLoading}
-              disabled={!isValid || isLoading}
-              icon={CheckCircleIcon}
+              type="button"
+              variant="outline"
+              onClick={handleCancel}
+              disabled={isLoading}
+              className="order-2"
             >
-              {isEdit ? 'Update Template' : 'Create Template'}
+              <X className="h-4 w-4 mr-2" />
+              Cancel
             </Button>
-          </div>
+          )}
+
+          {/* Submit Button */}
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={!canSubmit}
+            loading={isLoading}
+            className="order-1 sm:order-3"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                {buttonText}
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-2" />
+                {buttonText}
+              </>
+            )}
+          </Button>
         </div>
+
+        {/* Form Status Messages */}
+        {hasErrors && (
+          <div className="bg-error-50 dark:bg-error-900/20 border border-error-200 dark:border-error-800 rounded-md p-4">
+            <div className="flex items-center">
+              <AlertCircle className="h-5 w-5 text-error-600 dark:text-error-400 mr-2" />
+              <span className="text-sm font-medium text-error-800 dark:text-error-200">
+                Please correct the errors above before submitting.
+              </span>
+            </div>
+          </div>
+        )}
+
+        {(createMutation.isSuccess || updateMutation.isSuccess) && (
+          <div className="bg-success-50 dark:bg-success-900/20 border border-success-200 dark:border-success-800 rounded-md p-4">
+            <div className="flex items-center">
+              <CheckCircle className="h-5 w-5 text-success-600 dark:text-success-400 mr-2" />
+              <span className="text-sm font-medium text-success-800 dark:text-success-200">
+                Email template {isEditing ? 'updated' : 'created'} successfully!
+              </span>
+            </div>
+          </div>
+        )}
       </form>
     </div>
   );
 };
 
+// ============================================================================
+// EXPORTS
+// ============================================================================
+
 export default EmailTemplateForm;
+export type { EmailTemplateFormProps, EmailTemplateFormData };
