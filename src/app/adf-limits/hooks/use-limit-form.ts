@@ -1,1080 +1,900 @@
 /**
- * Dynamic Limit Form Hook for React/Next.js Admin Interface
+ * Limit Form Management Hook for DreamFactory React/Next.js Admin Interface
  * 
- * Provides comprehensive form state management with React Hook Form integration, dynamic field
- * control based on limit type selections, real-time validation under 100ms, and type-safe 
- * form handling that replaces Angular reactive forms patterns.
+ * Custom React hook managing dynamic form state and control enabling/disabling logic 
+ * based on limit type selections, replacing Angular reactive forms patterns. Implements 
+ * React Hook Form integration with conditional field management, real-time validation 
+ * under 100ms, and type-specific form control logic for comprehensive limit configuration workflows.
  * 
  * Features:
- * - React Hook Form with dynamic field management per React/Next.js Integration Requirements
- * - Real-time validation under 100ms per performance specifications
- * - Conditional field rendering based on limit type selection (serviceId, roleId, userId, endpoint)
- * - Type-safe form state management with comprehensive error handling
- * - Form control enabling/disabling logic replacing Angular FormBuilder patterns
- * - Dynamic form field management replacing Angular FormGroup.addControl/removeControl
- * - State management for conditional field visibility per existing Angular functionality
+ * - React Hook Form integration with dynamic field management per React/Next.js Integration Requirements
+ * - Real-time validation under 100ms per performance standards
+ * - Dynamic form control management per existing Angular reactive form patterns
+ * - Type-safe form state management per Section 5.2 Component Details
+ * - Conditional field rendering based on limit type selection per existing Angular functionality
+ * - Convert Angular FormBuilder patterns to React Hook Form useFieldArray
+ * - State management for conditional field visibility (serviceId, roleId, userId, endpoint)
  * 
- * Replaces Angular reactive forms with modern React patterns while maintaining
- * all existing functionality and business logic requirements.
+ * Replaces Angular FormBuilder and reactive forms with React Hook Form while maintaining
+ * all existing functionality including dynamic field enabling/disabling, conditional validation,
+ * and type-specific form control logic with enterprise-grade performance characteristics.
  * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
- * @since 2024-12-19
+ * @fileoverview Comprehensive limit form management hook with React Hook Form integration
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-import { useCallback, useMemo, useEffect, useState, useRef } from 'react'
-import { useRouter } from 'next/navigation'
-import { toast } from 'sonner'
-
-// Form and validation dependencies
-import { 
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useForm, useFieldArray, useWatch } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import type { 
   UseFormReturn, 
-  FieldPath, 
-  PathValue,
-  useWatch
-} from 'react-hook-form'
-
-// Type imports from dependency files
-import {
+  FieldErrors, 
+  SubmitHandler, 
+  SubmitErrorHandler,
+  Control,
+  UseFormSetValue,
+  UseFormGetValues,
+  UseFormTrigger,
+  UseFormReset,
+  Path
+} from 'react-hook-form';
+import type { 
   LimitType,
-  LimitCounter,
-  CreateLimitFormData,
-  EditLimitFormData,
-  LimitTableRowData,
-  CreateLimitFormState,
-  EditLimitFormState,
-  UseLimitFormReturn,
-  ValidationPerformanceMetrics
-} from '../types'
+  LimitConfiguration,
+  LimitFormState,
+  LimitFormInstance,
+  LimitFormProps,
+  LimitConfigurationSchema,
+  UseLimitFormReturn
+} from '../types';
+import { useLimitValidation } from './use-limit-validation';
+import type { 
+  FormFieldError,
+  EnhancedValidationState,
+  FormFieldConfig,
+  EnhancedFormInstance
+} from '../../../types/forms';
 
-// Validation hook import
-import useLimitValidation from './use-limit-validation'
-
-// Form utilities and types
-import {
-  FormConfig,
-  RealtimeValidationConfig,
-  FormPerformanceConfig,
-  FormAccessibilityConfig,
-  FieldErrors
-} from '@/types/forms'
-
-// =============================================================================
-// HOOK CONFIGURATION TYPES
-// =============================================================================
+// ============================================================================
+// Form Configuration and State Management
+// ============================================================================
 
 /**
- * Configuration options for useLimitForm hook
- * 
- * Provides comprehensive configuration for form behavior, validation,
- * and integration with business logic requirements.
+ * Field visibility configuration based on limit type
+ * Implements Angular form control enabling/disabling logic
  */
-interface UseLimitFormConfig {
-  /** Form mode - create or edit */
-  mode: 'create' | 'edit'
-  /** Initial form data for editing existing limits */
-  initialData?: Partial<LimitTableRowData>
-  /** Enable real-time validation (default: true) */
-  enableRealtimeValidation?: boolean
-  /** Custom validation configuration */
-  validationConfig?: Partial<RealtimeValidationConfig>
-  /** Performance optimization settings */
-  performanceConfig?: Partial<FormPerformanceConfig>
-  /** Accessibility configuration */
-  accessibilityConfig?: Partial<FormAccessibilityConfig>
-  /** Form submission handler */
-  onSubmit?: (data: CreateLimitFormData | EditLimitFormData) => Promise<void>
-  /** Form submission success handler */
-  onSuccess?: (data: CreateLimitFormData | EditLimitFormData) => void
-  /** Form submission error handler */
-  onError?: (error: any) => void
-  /** Form cancellation handler */
-  onCancel?: () => void
-  /** Auto-save configuration */
-  autoSave?: AutoSaveConfig
-  /** Debug mode for development */
-  debugMode?: boolean
-}
-
-/**
- * Auto-save configuration for form persistence
- */
-interface AutoSaveConfig {
-  /** Enable auto-save functionality */
-  enabled: boolean
-  /** Auto-save interval in milliseconds */
-  intervalMs: number
-  /** Storage key for persistence */
-  storageKey: string
-  /** Storage type */
-  storageType: 'localStorage' | 'sessionStorage'
-}
-
-/**
- * Dynamic form field configuration based on limit type
- * 
- * Defines which fields should be visible, required, disabled, or hidden
- * based on the current limit type selection.
- */
-interface DynamicFieldConfig {
-  /** Fields that are visible for this limit type */
-  visibleFields: Set<string>
-  /** Fields that are required for this limit type */
-  requiredFields: Set<string>
-  /** Fields that are disabled for this limit type */
-  disabledFields: Set<string>
-  /** Fields that should be cleared when this limit type is selected */
-  fieldsToReset: Set<string>
-  /** Field default values for this limit type */
-  defaultValues: Partial<CreateLimitFormData | EditLimitFormData>
-}
-
-/**
- * Form field visibility state management
- * 
- * Tracks the visibility and state of conditional fields based on
- * limit type selection and business logic requirements.
- */
-interface FieldVisibilityState {
-  /** Service field visibility and configuration */
+interface LimitFormFieldVisibility {
+  /** Service field visibility and requirements */
   service: {
-    visible: boolean
-    required: boolean
-    disabled: boolean
-  }
-  /** Role field visibility and configuration */
-  role: {
-    visible: boolean
-    required: boolean
-    disabled: boolean
-  }
-  /** User field visibility and configuration */
+    visible: boolean;
+    required: boolean;
+    disabled: boolean;
+  };
+  /** User field visibility and requirements */
   user: {
-    visible: boolean
-    required: boolean
-    disabled: boolean
-  }
-  /** Endpoint field visibility and configuration */
+    visible: boolean;
+    required: boolean;
+    disabled: boolean;
+  };
+  /** Role field visibility and requirements */
+  role: {
+    visible: boolean;
+    required: boolean;
+    disabled: boolean;
+  };
+  /** Endpoint field visibility for specific limits */
   endpoint: {
-    visible: boolean
-    required: boolean
-    disabled: boolean
-  }
-  /** Active field configuration */
-  active: {
-    visible: boolean
-    disabled: boolean
-  }
-  /** Metadata field configuration */
-  metadata: {
-    visible: boolean
-    disabled: boolean
-  }
+    visible: boolean;
+    required: boolean;
+    disabled: boolean;
+  };
+  /** Period configuration visibility */
+  period: {
+    visible: boolean;
+    required: boolean;
+    disabled: boolean;
+  };
+  /** Advanced options visibility */
+  advancedOptions: {
+    visible: boolean;
+    disabled: boolean;
+  };
 }
 
 /**
- * Form submission state management
- * 
- * Tracks form submission progress, errors, and success states
- * for comprehensive user feedback and error handling.
+ * Default form values for different limit types
+ * Replaces Angular FormBuilder default value patterns
  */
-interface FormSubmissionState {
-  /** Form submission in progress */
-  isSubmitting: boolean
-  /** Submission attempt count */
-  submitCount: number
-  /** Last submission error */
-  lastError: any | null
-  /** Submission success timestamp */
-  lastSuccessTime: Date | null
-  /** Form has been successfully submitted */
-  hasBeenSubmitted: boolean
-  /** Submission performance metrics */
-  submissionMetrics: SubmissionMetrics
-}
+const getDefaultFormValues = (limitType?: LimitType): Partial<LimitConfiguration> => {
+  const baseDefaults: Partial<LimitConfiguration> = {
+    name: '',
+    limitType: limitType || 'api.calls_per_period',
+    limitCounter: 'api.calls_made',
+    rateValue: 100,
+    period: {
+      value: 1,
+      unit: 'hour'
+    },
+    active: true,
+    service: null,
+    user: null,
+    role: null,
+    description: ''
+  };
+
+  // Type-specific defaults
+  switch (limitType) {
+    case 'service.calls_per_period':
+    case 'db.calls_per_period':
+      return {
+        ...baseDefaults,
+        limitCounter: limitType.includes('service') ? 'service.calls_made' : 'db.calls_made',
+        rateValue: 1000,
+        period: { value: 1, unit: 'hour' }
+      };
+    
+    case 'user.calls_per_period':
+      return {
+        ...baseDefaults,
+        limitCounter: 'user.calls_made',
+        rateValue: 50,
+        period: { value: 1, unit: 'minute' }
+      };
+    
+    case 'api.calls_per_minute':
+      return {
+        ...baseDefaults,
+        rateValue: 60,
+        period: { value: 1, unit: 'minute' }
+      };
+    
+    case 'api.calls_per_hour':
+      return {
+        ...baseDefaults,
+        rateValue: 3600,
+        period: { value: 1, unit: 'hour' }
+      };
+    
+    case 'api.calls_per_day':
+      return {
+        ...baseDefaults,
+        rateValue: 86400,
+        period: { value: 1, unit: 'day' }
+      };
+    
+    default:
+      return baseDefaults;
+  }
+};
 
 /**
- * Submission performance metrics
+ * Calculate field visibility based on limit type
+ * Implements Angular renderCorrectHiddenFields logic
  */
-interface SubmissionMetrics {
-  /** Average submission time in milliseconds */
-  averageSubmissionTime: number
-  /** Last submission time */
-  lastSubmissionTime: number
-  /** Failed submission count */
-  failedSubmissionCount: number
-  /** Total submission attempts */
-  totalSubmissionAttempts: number
-}
+const calculateFieldVisibility = (limitType?: LimitType): LimitFormFieldVisibility => {
+  // Default visibility (all fields hidden)
+  const defaultVisibility: LimitFormFieldVisibility = {
+    service: { visible: false, required: false, disabled: false },
+    user: { visible: false, required: false, disabled: false },
+    role: { visible: false, required: false, disabled: false },
+    endpoint: { visible: false, required: false, disabled: false },
+    period: { visible: true, required: true, disabled: false },
+    advancedOptions: { visible: true, disabled: false }
+  };
 
-// =============================================================================
-// FIELD CONFIGURATION UTILITIES
-// =============================================================================
-
-/**
- * Gets dynamic field configuration based on limit type
- * 
- * Implements the business logic for field visibility, requirements,
- * and state management based on limit type selection.
- */
-const getDynamicFieldConfig = (limitType: LimitType): DynamicFieldConfig => {
-  // Base configuration with common fields always visible
-  const baseFields = new Set(['name', 'limitType', 'limitRate', 'limitCounter', 'active'])
-  const baseRequired = new Set(['name', 'limitType', 'limitRate', 'limitCounter'])
-
-  // Type-specific configurations mapping Angular reactive form patterns
-  const typeConfigurations: Record<LimitType, Partial<DynamicFieldConfig>> = {
-    [LimitType.USER]: {
-      visibleFields: new Set([...baseFields, 'user', 'endpoint', 'metadata']),
-      requiredFields: new Set([...baseRequired, 'user']),
-      disabledFields: new Set(),
-      fieldsToReset: new Set(['service', 'role']),
-      defaultValues: {
-        service: null,
-        role: null,
-        active: true
-      }
-    },
-    [LimitType.SERVICE]: {
-      visibleFields: new Set([...baseFields, 'service', 'endpoint', 'metadata']),
-      requiredFields: new Set([...baseRequired, 'service']),
-      disabledFields: new Set(),
-      fieldsToReset: new Set(['user', 'role']),
-      defaultValues: {
-        user: null,
-        role: null,
-        active: true
-      }
-    },
-    [LimitType.ROLE]: {
-      visibleFields: new Set([...baseFields, 'role', 'endpoint', 'metadata']),
-      requiredFields: new Set([...baseRequired, 'role']),
-      disabledFields: new Set(),
-      fieldsToReset: new Set(['user', 'service']),
-      defaultValues: {
-        user: null,
-        service: null,
-        active: true
-      }
-    },
-    [LimitType.ENDPOINT]: {
-      visibleFields: new Set([...baseFields, 'endpoint', 'service', 'role', 'user', 'metadata']),
-      requiredFields: new Set([...baseRequired, 'endpoint']),
-      disabledFields: new Set(),
-      fieldsToReset: new Set(),
-      defaultValues: {
-        active: true
-      }
-    },
-    [LimitType.GLOBAL]: {
-      visibleFields: new Set([...baseFields, 'metadata']),
-      requiredFields: baseRequired,
-      disabledFields: new Set(['user', 'service', 'role', 'endpoint']),
-      fieldsToReset: new Set(['user', 'service', 'role', 'endpoint']),
-      defaultValues: {
-        user: null,
-        service: null,
-        role: null,
-        endpoint: '',
-        active: true
-      }
-    },
-    [LimitType.IP]: {
-      visibleFields: new Set([...baseFields, 'metadata']),
-      requiredFields: baseRequired,
-      disabledFields: new Set(['user', 'service', 'role', 'endpoint']),
-      fieldsToReset: new Set(['user', 'service', 'role', 'endpoint']),
-      defaultValues: {
-        user: null,
-        service: null,
-        role: null,
-        endpoint: '',
-        active: true
-      }
-    },
-    [LimitType.CUSTOM]: {
-      visibleFields: new Set([...baseFields, 'user', 'service', 'role', 'endpoint', 'metadata']),
-      requiredFields: baseRequired,
-      disabledFields: new Set(),
-      fieldsToReset: new Set(),
-      defaultValues: {
-        active: true
-      }
-    }
+  if (!limitType) {
+    return defaultVisibility;
   }
 
-  const config = typeConfigurations[limitType]
+  // Service-specific limits require service selection
+  if (limitType.includes('service.calls_per_') || limitType.includes('db.calls_per_')) {
+    defaultVisibility.service = { visible: true, required: true, disabled: false };
+    defaultVisibility.user = { visible: true, required: false, disabled: false };
+    defaultVisibility.role = { visible: true, required: false, disabled: false };
+  }
   
-  return {
-    visibleFields: config?.visibleFields || baseFields,
-    requiredFields: config?.requiredFields || baseRequired,
-    disabledFields: config?.disabledFields || new Set(),
-    fieldsToReset: config?.fieldsToReset || new Set(),
-    defaultValues: config?.defaultValues || { active: true }
+  // User-specific limits require user selection
+  else if (limitType.includes('user.calls_per_')) {
+    defaultVisibility.user = { visible: true, required: true, disabled: false };
+    defaultVisibility.service = { visible: true, required: false, disabled: false };
+    defaultVisibility.role = { visible: true, required: false, disabled: false };
   }
+  
+  // API limits can have optional associations
+  else if (limitType.includes('api.calls_per_')) {
+    defaultVisibility.service = { visible: true, required: false, disabled: false };
+    defaultVisibility.user = { visible: true, required: false, disabled: false };
+    defaultVisibility.role = { visible: true, required: false, disabled: false };
+    
+    // Show endpoint configuration for granular API limits
+    defaultVisibility.endpoint = { visible: true, required: false, disabled: false };
+  }
+
+  // Period configuration visibility based on limit type
+  if (limitType === 'api.calls_per_minute' || 
+      limitType === 'api.calls_per_hour' || 
+      limitType === 'api.calls_per_day') {
+    // Fixed period types don't allow period customization
+    defaultVisibility.period = { visible: false, required: false, disabled: true };
+  }
+
+  return defaultVisibility;
+};
+
+/**
+ * Form performance metrics tracking
+ * Ensures real-time validation under 100ms requirement compliance
+ */
+interface LimitFormMetrics {
+  /** Form field update performance */
+  fieldUpdateTime: number;
+  /** Validation performance metrics */
+  validationTime: number;
+  /** Form submission time */
+  submissionTime: number;
+  /** Total form interactions */
+  totalInteractions: number;
+  /** Last interaction timestamp */
+  lastInteraction: Date | null;
 }
 
+// ============================================================================
+// Options and Configuration Interfaces
+// ============================================================================
+
 /**
- * Calculates field visibility state based on limit type and business rules
- * 
- * Implements conditional field rendering logic that replaces Angular
- * form control enabling/disabling patterns.
+ * Configuration options for the limit form hook
  */
-const calculateFieldVisibilityState = (
-  limitType: LimitType,
-  fieldConfig: DynamicFieldConfig
-): FieldVisibilityState => {
-  return {
-    service: {
-      visible: fieldConfig.visibleFields.has('service'),
-      required: fieldConfig.requiredFields.has('service'),
-      disabled: fieldConfig.disabledFields.has('service')
-    },
-    role: {
-      visible: fieldConfig.visibleFields.has('role'),
-      required: fieldConfig.requiredFields.has('role'),
-      disabled: fieldConfig.disabledFields.has('role')
-    },
-    user: {
-      visible: fieldConfig.visibleFields.has('user'),
-      required: fieldConfig.requiredFields.has('user'),
-      disabled: fieldConfig.disabledFields.has('user')
-    },
-    endpoint: {
-      visible: fieldConfig.visibleFields.has('endpoint'),
-      required: fieldConfig.requiredFields.has('endpoint'),
-      disabled: fieldConfig.disabledFields.has('endpoint')
-    },
-    active: {
-      visible: fieldConfig.visibleFields.has('active'),
-      disabled: fieldConfig.disabledFields.has('active')
-    },
-    metadata: {
-      visible: fieldConfig.visibleFields.has('metadata'),
-      disabled: fieldConfig.disabledFields.has('metadata')
-    }
-  }
+export interface UseLimitFormOptions {
+  /** Initial form data for editing mode */
+  initialData?: Partial<LimitConfiguration>;
+  /** Form mode (create or edit) */
+  mode?: 'create' | 'edit';
+  /** Enable real-time validation */
+  enableRealtimeValidation?: boolean;
+  /** Validation debounce delay in milliseconds */
+  validationDebounceMs?: number;
+  /** Enable performance monitoring */
+  enableMetrics?: boolean;
+  /** Custom validation functions */
+  customValidation?: {
+    name?: (name: string) => Promise<string | undefined>;
+    rateValue?: (value: number, type: LimitType) => Promise<string | undefined>;
+    service?: (serviceId: number | null, type: LimitType) => Promise<string | undefined>;
+    user?: (userId: number | null, type: LimitType) => Promise<string | undefined>;
+  };
+  /** Form submission handlers */
+  onSubmit?: SubmitHandler<LimitConfiguration>;
+  onError?: SubmitErrorHandler<LimitConfiguration>;
+  /** State change callbacks */
+  onStateChange?: (state: LimitFormState) => void;
+  onFieldVisibilityChange?: (visibility: LimitFormFieldVisibility) => void;
 }
 
-// =============================================================================
-// PERFORMANCE MONITORING UTILITIES
-// =============================================================================
+// ============================================================================
+// Main Hook Implementation
+// ============================================================================
 
 /**
- * Creates initial performance metrics tracking state
- */
-const createInitialMetrics = (): ValidationPerformanceMetrics => ({
-  averageValidationTime: 0,
-  maxValidationTime: 0,
-  validationCount: 0,
-  slowValidationCount: 0,
-  realtimeComplianceRate: 100,
-  lastValidationTime: new Date()
-})
-
-/**
- * Creates initial submission state
- */
-const createInitialSubmissionState = (): FormSubmissionState => ({
-  isSubmitting: false,
-  submitCount: 0,
-  lastError: null,
-  lastSuccessTime: null,
-  hasBeenSubmitted: false,
-  submissionMetrics: {
-    averageSubmissionTime: 0,
-    lastSubmissionTime: 0,
-    failedSubmissionCount: 0,
-    totalSubmissionAttempts: 0
-  }
-})
-
-// =============================================================================
-// AUTO-SAVE IMPLEMENTATION
-// =============================================================================
-
-/**
- * Auto-save hook for form persistence
+ * Comprehensive limit form management hook with React Hook Form integration
  * 
- * Provides automatic form data persistence to prevent data loss
- * during form completion with configurable intervals and storage.
- */
-const useAutoSave = <T extends CreateLimitFormData | EditLimitFormData>(
-  config: AutoSaveConfig,
-  formValues: T,
-  isValid: boolean
-) => {
-  const timeoutRef = useRef<NodeJS.Timeout>()
-
-  const saveToStorage = useCallback((data: T) => {
-    if (!config.enabled || !isValid) return
-
-    try {
-      const storage = config.storageType === 'localStorage' 
-        ? localStorage 
-        : sessionStorage
-      
-      storage.setItem(config.storageKey, JSON.stringify({
-        data,
-        timestamp: Date.now(),
-        version: '1.0.0'
-      }))
-    } catch (error) {
-      console.warn('Auto-save failed:', error)
-    }
-  }, [config, isValid])
-
-  const loadFromStorage = useCallback((): T | null => {
-    if (!config.enabled) return null
-
-    try {
-      const storage = config.storageType === 'localStorage' 
-        ? localStorage 
-        : sessionStorage
-      
-      const saved = storage.getItem(config.storageKey)
-      if (!saved) return null
-
-      const parsed = JSON.parse(saved)
-      // Check if saved data is not too old (24 hours)
-      if (Date.now() - parsed.timestamp > 24 * 60 * 60 * 1000) {
-        storage.removeItem(config.storageKey)
-        return null
-      }
-
-      return parsed.data
-    } catch (error) {
-      console.warn('Auto-load failed:', error)
-      return null
-    }
-  }, [config])
-
-  const clearStorage = useCallback(() => {
-    if (!config.enabled) return
-
-    try {
-      const storage = config.storageType === 'localStorage' 
-        ? localStorage 
-        : sessionStorage
-      
-      storage.removeItem(config.storageKey)
-    } catch (error) {
-      console.warn('Auto-save clear failed:', error)
-    }
-  }, [config])
-
-  // Auto-save effect
-  useEffect(() => {
-    if (!config.enabled) return
-
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current)
-    }
-
-    timeoutRef.current = setTimeout(() => {
-      saveToStorage(formValues)
-    }, config.intervalMs)
-
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current)
-      }
-    }
-  }, [formValues, config.intervalMs, saveToStorage])
-
-  return {
-    loadFromStorage,
-    clearStorage,
-    saveToStorage
-  }
-}
-
-// =============================================================================
-// MAIN HOOK IMPLEMENTATION
-// =============================================================================
-
-/**
- * Comprehensive limit form hook with dynamic field management
+ * Provides dynamic form state management, conditional field visibility, real-time validation,
+ * and type-safe form handling for limit configuration workflows. Replaces Angular reactive
+ * forms patterns with modern React Hook Form implementation.
  * 
- * Provides complete form state management replacing Angular reactive forms
- * with React Hook Form integration, dynamic field control, real-time validation,
- * and type-safe form handling for limit configuration workflows.
+ * @param options - Configuration options for form behavior and validation
+ * @returns Complete form management interface with validation and state control
  */
-export function useLimitForm<T extends CreateLimitFormData | EditLimitFormData>(
-  config: UseLimitFormConfig
-): UseLimitFormReturn<T> {
+export function useLimitForm(
+  options: UseLimitFormOptions = {}
+): UseLimitFormReturn {
   const {
-    mode,
     initialData,
+    mode = 'create',
     enableRealtimeValidation = true,
-    validationConfig = {
-      enabled: true,
-      debounceMs: 50,
-      mode: 'onChange',
-      reValidateMode: 'onChange',
-      showValidationIndicators: true
-    },
-    performanceConfig = {
-      uncontrolled: true,
-      optimizeForLargeForms: false,
-      fieldLevelSubscription: true,
-      lazyValidation: false
-    },
-    accessibilityConfig = {
-      screenReaderSupport: true,
-      announceValidationErrors: true,
-      keyboardNavigation: true,
-      ariaLiveRegion: 'polite',
-      focusManagement: {
-        focusFirstError: true,
-        focusNextOnSuccess: false,
-        focusConditionalFields: true
-      }
-    },
+    validationDebounceMs = 100,
+    enableMetrics = true,
+    customValidation = {},
     onSubmit,
-    onSuccess,
     onError,
-    onCancel,
-    autoSave = {
-      enabled: false,
-      intervalMs: 30000,
-      storageKey: `limit-form-${mode}`,
-      storageType: 'sessionStorage'
-    },
-    debugMode = false
-  } = config
+    onStateChange,
+    onFieldVisibilityChange
+  } = options;
 
-  const router = useRouter()
+  // =========================================================================
+  // State Management and Refs
+  // =========================================================================
 
-  // Performance tracking state
-  const [submissionState, setSubmissionState] = useState<FormSubmissionState>(
-    createInitialSubmissionState
-  )
+  // Form performance tracking
+  const metricsRef = useRef<LimitFormMetrics>({
+    fieldUpdateTime: 0,
+    validationTime: 0,
+    submissionTime: 0,
+    totalInteractions: 0,
+    lastInteraction: null
+  });
 
-  // Form validation and state management using validation hook
+  // Form submission state
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
+  const [isTouched, setIsTouched] = useState(false);
+
+  // Field state management
+  const [fieldStates, setFieldStates] = useState<Record<string, EnhancedValidationState>>({});
+  
+  // Dependent data loading states
+  const [dependentDataLoading, setDependentDataLoading] = useState({
+    users: false,
+    services: false,
+    roles: false
+  });
+
+  // Field options data
+  const [fieldOptions, setFieldOptions] = useState({
+    users: [] as Array<{ id: number; name: string; email: string }>,
+    services: [] as Array<{ id: number; name: string; type: string }>,
+    roles: [] as Array<{ id: number; name: string; description?: string }>
+  });
+
+  // Connection test state for service limits
+  const [connectionTest, setConnectionTest] = useState<{
+    isRunning: boolean;
+    success: boolean | null;
+    error: string | null;
+    lastTested: Date | null;
+  }>({
+    isRunning: false,
+    success: null,
+    error: null,
+    lastTested: null
+  });
+
+  // =========================================================================
+  // Validation Hook Integration
+  // =========================================================================
+
   const {
-    form,
-    validationSchema,
-    values,
-    errors,
-    isValidating,
-    isValid,
-    isDirty,
-    validateField,
-    validateForm,
-    getFieldError,
-    clearFieldError,
-    resetForm,
-    metrics: validationMetrics,
-    context: validationContext,
-    updateContext
-  } = useLimitValidation<T>({
-    mode,
-    initialData,
-    realtimeConfig: validationConfig,
-    performanceConfig: {
-      trackPerformance: true,
-      targetTime: 100,
-      warningThreshold: 80,
-      maxValidationTime: 200,
-      enableCaching: true,
-      cacheTtl: 5000
-    },
-    debugMode
-  })
+    createValidationSchema,
+    validateBusinessRules,
+    validators,
+    validationMetrics,
+    validateFullConfiguration
+  } = useLimitValidation({
+    enableMetrics,
+    debounceMs: validationDebounceMs,
+    customValidators: customValidation,
+    enableBusinessRules: true
+  });
 
-  // Watch form values for dynamic field management
-  const watchedLimitType = useWatch({
-    control: form.control,
-    name: 'limitType' as any
-  }) as LimitType
+  // =========================================================================
+  // React Hook Form Setup
+  // =========================================================================
 
-  // Auto-save functionality
-  const { loadFromStorage, clearStorage, saveToStorage } = useAutoSave(
-    autoSave,
-    values,
-    isValid
-  )
+  // Watch for limit type to determine field visibility
+  const [limitType, setLimitType] = useState<LimitType | undefined>(
+    initialData?.limitType || 'api.calls_per_period'
+  );
 
-  // Calculate dynamic field configuration based on limit type
-  const fieldConfig = useMemo(() => {
-    const limitType = watchedLimitType || LimitType.ENDPOINT
-    return getDynamicFieldConfig(limitType)
-  }, [watchedLimitType])
-
-  // Calculate field visibility state
+  // Calculate field visibility based on current limit type
   const fieldVisibility = useMemo(() => {
-    const limitType = watchedLimitType || LimitType.ENDPOINT
-    return calculateFieldVisibilityState(limitType, fieldConfig)
-  }, [watchedLimitType, fieldConfig])
+    const visibility = calculateFieldVisibility(limitType);
+    if (onFieldVisibilityChange) {
+      onFieldVisibilityChange(visibility);
+    }
+    return visibility;
+  }, [limitType, onFieldVisibilityChange]);
 
-  // Handle limit type change with field management
-  const handleLimitTypeChange = useCallback((newLimitType: LimitType) => {
-    const startTime = performance.now()
+  // Dynamic validation schema based on limit type
+  const validationSchema = useMemo(() => {
+    return createValidationSchema(limitType);
+  }, [limitType, createValidationSchema]);
 
+  // Form default values with type-specific defaults
+  const defaultValues = useMemo(() => {
+    return {
+      ...getDefaultFormValues(limitType),
+      ...initialData
+    };
+  }, [limitType, initialData]);
+
+  // React Hook Form initialization
+  const form = useForm<LimitConfiguration>({
+    resolver: zodResolver(validationSchema),
+    defaultValues,
+    mode: enableRealtimeValidation ? 'onChange' : 'onSubmit',
+    reValidateMode: 'onChange',
+    shouldFocusError: true,
+    shouldUseNativeValidation: false
+  });
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    getValues,
+    watch,
+    trigger,
+    reset,
+    clearErrors,
+    setError,
+    control,
+    formState: { errors, isValid, dirtyFields, touchedFields }
+  } = form;
+
+  // Watch for limit type changes to update field visibility
+  const watchedLimitType = watch('limitType');
+  useEffect(() => {
+    if (watchedLimitType !== limitType) {
+      setLimitType(watchedLimitType);
+    }
+  }, [watchedLimitType, limitType]);
+
+  // =========================================================================
+  // Dynamic Field Management
+  // =========================================================================
+
+  /**
+   * Update field visibility and validation based on limit type
+   * Implements Angular addControl/removeControl pattern replacement
+   */
+  const updateFieldConfiguration = useCallback(async (newLimitType: LimitType) => {
+    const startTime = performance.now();
+    
     try {
-      // Get new field configuration
-      const newFieldConfig = getDynamicFieldConfig(newLimitType)
+      // Update form default values for new limit type
+      const newDefaults = getDefaultFormValues(newLimitType);
+      const currentValues = getValues();
       
-      // Reset fields that should be cleared for the new type
-      newFieldConfig.fieldsToReset.forEach(fieldName => {
-        form.setValue(fieldName as any, null, { 
-          shouldValidate: true,
-          shouldDirty: true,
-          shouldTouch: true
-        })
-      })
-
-      // Apply default values for the new type
-      Object.entries(newFieldConfig.defaultValues).forEach(([fieldName, value]) => {
-        if (fieldName !== 'limitType') {
-          form.setValue(fieldName as any, value, {
-            shouldValidate: false,
+      // Preserve user-entered values, apply new defaults for empty fields
+      Object.entries(newDefaults).forEach(([key, defaultValue]) => {
+        const currentValue = currentValues[key as keyof LimitConfiguration];
+        if (currentValue === undefined || currentValue === null || currentValue === '') {
+          setValue(key as Path<LimitConfiguration>, defaultValue as any, {
+            shouldValidate: enableRealtimeValidation,
             shouldDirty: false,
             shouldTouch: false
-          })
+          });
         }
-      })
+      });
 
-      // Update validation context with new limit type
-      updateContext({
-        limitType: newLimitType,
-        currentValues: { ...values, limitType: newLimitType }
-      })
-
-      // Clear errors for fields that are no longer visible
-      Object.keys(errors).forEach(fieldName => {
-        if (!newFieldConfig.visibleFields.has(fieldName)) {
-          clearFieldError(fieldName as any)
-        }
-      })
-
-      // Performance tracking
-      const changeTime = performance.now() - startTime
-      if (debugMode) {
-        console.log(`Limit type change completed in ${changeTime}ms`)
+      // Clear conditional field values that are no longer visible
+      const newVisibility = calculateFieldVisibility(newLimitType);
+      
+      if (!newVisibility.service.visible && currentValues.service !== null) {
+        setValue('service', null, { shouldValidate: true });
+      }
+      
+      if (!newVisibility.user.visible && currentValues.user !== null) {
+        setValue('user', null, { shouldValidate: true });
+      }
+      
+      if (!newVisibility.role.visible && currentValues.role !== null) {
+        setValue('role', null, { shouldValidate: true });
       }
 
-      // Show user feedback for successful type change
-      if (changeTime < 100) {
-        toast.success(`Limit type changed to ${newLimitType}`, {
-          duration: 2000,
-          position: 'top-right'
-        })
+      // Trigger validation for affected fields
+      if (enableRealtimeValidation) {
+        await trigger();
       }
 
+      if (enableMetrics) {
+        const duration = performance.now() - startTime;
+        metricsRef.current.fieldUpdateTime = duration;
+        metricsRef.current.totalInteractions++;
+        metricsRef.current.lastInteraction = new Date();
+      }
     } catch (error) {
-      console.error('Error handling limit type change:', error)
-      toast.error('Failed to update form fields', {
-        duration: 3000,
-        position: 'top-right'
-      })
+      console.error('Error updating field configuration:', error);
     }
-  }, [form, values, errors, updateContext, clearFieldError, debugMode])
+  }, [setValue, getValues, trigger, enableRealtimeValidation, enableMetrics]);
 
-  // Watch for limit type changes
+  // Update field configuration when limit type changes
   useEffect(() => {
-    if (watchedLimitType && watchedLimitType !== validationContext.limitType) {
-      handleLimitTypeChange(watchedLimitType)
+    if (limitType) {
+      updateFieldConfiguration(limitType);
     }
-  }, [watchedLimitType, validationContext.limitType, handleLimitTypeChange])
+  }, [limitType, updateFieldConfiguration]);
 
-  // Form submission handler with comprehensive error handling
-  const handleSubmit = useCallback(async (data: T) => {
-    const submissionStartTime = performance.now()
+  // =========================================================================
+  // Validation Integration
+  // =========================================================================
+
+  /**
+   * Enhanced field validation with performance tracking
+   */
+  const validateField = useCallback(async (
+    fieldName: Path<LimitConfiguration>,
+    value?: any
+  ): Promise<string | undefined> => {
+    if (!enableRealtimeValidation) {
+      return undefined;
+    }
+
+    const startTime = performance.now();
     
-    setSubmissionState(prev => ({
+    try {
+      // Use form's built-in validation first
+      const isFieldValid = await trigger(fieldName);
+      
+      if (!isFieldValid && errors[fieldName]) {
+        const duration = performance.now() - startTime;
+        if (enableMetrics) {
+          metricsRef.current.validationTime = duration;
+        }
+        return errors[fieldName]?.message;
+      }
+
+      // Apply custom validation if available
+      const customValidator = customValidation[fieldName as keyof typeof customValidation];
+      if (customValidator) {
+        const customError = await customValidator(value || getValues(fieldName));
+        if (customError) {
+          setError(fieldName, { 
+            type: 'custom', 
+            message: customError 
+          });
+          return customError;
+        }
+      }
+
+      const duration = performance.now() - startTime;
+      if (enableMetrics) {
+        metricsRef.current.validationTime = duration;
+      }
+
+      return undefined;
+    } catch (error) {
+      console.error(`Validation error for field ${fieldName}:`, error);
+      return 'Validation error occurred';
+    }
+  }, [enableRealtimeValidation, trigger, errors, customValidation, getValues, setError, enableMetrics]);
+
+  // =========================================================================
+  // Service Connection Testing
+  // =========================================================================
+
+  /**
+   * Test database service connection for service-based limits
+   */
+  const testServiceConnection = useCallback(async (serviceId: number): Promise<boolean> => {
+    if (!serviceId || serviceId <= 0) {
+      return false;
+    }
+
+    setConnectionTest(prev => ({
       ...prev,
-      isSubmitting: true,
-      submitCount: prev.submitCount + 1,
-      lastError: null
-    }))
+      isRunning: true,
+      error: null
+    }));
 
     try {
-      // Pre-submission validation
-      const isFormValid = await validateForm()
-      if (!isFormValid) {
-        throw new Error('Form validation failed')
-      }
-
-      // Call external submission handler if provided
-      if (onSubmit) {
-        await onSubmit(data)
-      }
-
-      // Track successful submission
-      const submissionTime = performance.now() - submissionStartTime
-      
-      setSubmissionState(prev => ({
-        ...prev,
-        isSubmitting: false,
-        lastSuccessTime: new Date(),
-        hasBeenSubmitted: true,
-        submissionMetrics: {
-          ...prev.submissionMetrics,
-          averageSubmissionTime: prev.submissionMetrics.totalSubmissionAttempts === 0
-            ? submissionTime
-            : (prev.submissionMetrics.averageSubmissionTime * prev.submissionMetrics.totalSubmissionAttempts + submissionTime) 
-              / (prev.submissionMetrics.totalSubmissionAttempts + 1),
-          lastSubmissionTime: submissionTime,
-          totalSubmissionAttempts: prev.submissionMetrics.totalSubmissionAttempts + 1
+      // Simulate connection test (replace with actual API call)
+      const response = await fetch(`/api/v2/system/service/${serviceId}/test`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
         }
-      }))
+      });
 
-      // Clear auto-saved data on successful submission
-      clearStorage()
+      const result = await response.json();
+      const success = response.ok && result.success;
 
-      // Call success handler
-      if (onSuccess) {
-        onSuccess(data)
-      }
+      setConnectionTest({
+        isRunning: false,
+        success,
+        error: success ? null : result.message || 'Connection test failed',
+        lastTested: new Date()
+      });
 
-      // Show success notification
-      toast.success(
-        mode === 'create' ? 'Limit created successfully' : 'Limit updated successfully',
-        {
-          duration: 3000,
-          position: 'top-right'
-        }
-      )
-
-      // Performance logging
-      if (debugMode) {
-        console.log(`Form submission completed in ${submissionTime}ms`)
-      }
-
+      return success;
     } catch (error) {
-      // Track failed submission
-      const submissionTime = performance.now() - submissionStartTime
+      const errorMessage = error instanceof Error ? error.message : 'Connection test failed';
       
-      setSubmissionState(prev => ({
-        ...prev,
-        isSubmitting: false,
-        lastError: error,
-        submissionMetrics: {
-          ...prev.submissionMetrics,
-          failedSubmissionCount: prev.submissionMetrics.failedSubmissionCount + 1,
-          totalSubmissionAttempts: prev.submissionMetrics.totalSubmissionAttempts + 1,
-          lastSubmissionTime: submissionTime
-        }
-      }))
+      setConnectionTest({
+        isRunning: false,
+        success: false,
+        error: errorMessage,
+        lastTested: new Date()
+      });
 
-      // Call error handler
-      if (onError) {
-        onError(error)
-      } else {
-        // Default error handling
-        console.error('Form submission error:', error)
-        toast.error(
-          error instanceof Error ? error.message : 'Failed to save limit configuration',
-          {
-            duration: 5000,
-            position: 'top-right'
-          }
-        )
+      return false;
+    }
+  }, []);
+
+  // =========================================================================
+  // Form Submission and Actions
+  // =========================================================================
+
+  /**
+   * Enhanced form submission with business logic validation
+   */
+  const submitForm = useCallback(async (data: LimitConfiguration): Promise<void> => {
+    const startTime = performance.now();
+    setIsSubmitting(true);
+
+    try {
+      // Validate business rules before submission
+      const businessErrors = validateBusinessRules(data);
+      if (businessErrors.length > 0) {
+        // Set business rule errors on form
+        businessErrors.forEach((error, index) => {
+          setError(`root.businessRule${index}` as Path<LimitConfiguration>, {
+            type: 'businessRule',
+            message: error
+          });
+        });
+        return;
       }
+
+      // Full configuration validation
+      const configErrors = await validateFullConfiguration(data);
+      if (configErrors.length > 0) {
+        configErrors.forEach((error, index) => {
+          setError(`root.configError${index}` as Path<LimitConfiguration>, {
+            type: 'configuration',
+            message: error
+          });
+        });
+        return;
+      }
+
+      // Execute submission handler
+      if (onSubmit) {
+        await onSubmit(data);
+      }
+
+      if (enableMetrics) {
+        const duration = performance.now() - startTime;
+        metricsRef.current.submissionTime = duration;
+      }
+    } catch (error) {
+      console.error('Form submission error:', error);
+      
+      if (onError) {
+        onError(errors, data);
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [validateBusinessRules, validateFullConfiguration, onSubmit, onError, errors, setError, enableMetrics]);
+
+  /**
+   * Reset form to template based on limit type
+   */
+  const resetToTemplate = useCallback((template: 'user' | 'service' | 'role' | 'global'): void => {
+    const templateLimitType: LimitType = (() => {
+      switch (template) {
+        case 'user': return 'user.calls_per_period';
+        case 'service': return 'service.calls_per_period';
+        case 'role': return 'api.calls_per_period';
+        case 'global': return 'api.calls_per_period';
+        default: return 'api.calls_per_period';
+      }
+    })();
+
+    const templateDefaults = getDefaultFormValues(templateLimitType);
+    reset(templateDefaults);
+    setLimitType(templateLimitType);
+  }, [reset]);
+
+  /**
+   * Check for conflicting limits
+   */
+  const checkForConflicts = useCallback(async (): Promise<string[]> => {
+    const currentData = getValues();
+    const conflicts: string[] = [];
+
+    try {
+      // Check for existing limits with same parameters
+      const response = await fetch('/api/limits/check-conflicts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(currentData)
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.conflicts && Array.isArray(result.conflicts)) {
+          conflicts.push(...result.conflicts);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking for conflicts:', error);
+      conflicts.push('Unable to check for conflicting limits');
+    }
+
+    return conflicts;
+  }, [getValues]);
+
+  /**
+   * Preview rate string generation
+   */
+  const previewRateString = useCallback((): string => {
+    const data = getValues();
+    
+    if (!data.rateValue || !data.period) {
+      return '';
+    }
+
+    const { rateValue, period } = data;
+    const pluralUnit = period.value === 1 ? period.unit : `${period.unit}s`;
+    return `${rateValue} per ${period.value > 1 ? `${period.value} ` : ''}${pluralUnit}`;
+  }, [getValues]);
+
+  // =========================================================================
+  // Form State Synchronization
+  // =========================================================================
+
+  // Update derived form state
+  useEffect(() => {
+    const newIsDirty = Object.keys(dirtyFields).length > 0;
+    const newIsTouched = Object.keys(touchedFields).length > 0;
+
+    if (newIsDirty !== isDirty) {
+      setIsDirty(newIsDirty);
+    }
+
+    if (newIsTouched !== isTouched) {
+      setIsTouched(newIsTouched);
+    }
+  }, [dirtyFields, touchedFields, isDirty, isTouched]);
+
+  // Notify state changes
+  useEffect(() => {
+    if (onStateChange) {
+      const currentState: LimitFormState = {
+        data: getValues(),
+        isSubmitting,
+        isValidating: false, // TODO: Track validation state
+        isDirty,
+        isTouched,
+        isValid,
+        errors: errors as Record<string, FormFieldError>,
+        fieldStates,
+        mode,
+        dependentDataLoading,
+        fieldOptions,
+        connectionTest
+      };
+
+      onStateChange(currentState);
     }
   }, [
-    validateForm,
-    onSubmit,
-    onSuccess,
-    onError,
-    clearStorage,
-    mode,
-    debugMode
-  ])
+    getValues, 
+    isSubmitting, 
+    isDirty, 
+    isTouched, 
+    isValid, 
+    errors, 
+    fieldStates, 
+    mode, 
+    dependentDataLoading, 
+    fieldOptions, 
+    connectionTest,
+    onStateChange
+  ]);
 
-  // Form cancellation handler
-  const handleCancel = useCallback(() => {
-    // Clear auto-saved data
-    clearStorage()
-    
-    // Reset form to initial state
-    resetForm()
-    
-    // Call external cancel handler
-    if (onCancel) {
-      onCancel()
-    } else {
-      // Default cancellation behavior - navigate back
-      router.back()
-    }
+  // =========================================================================
+  // Enhanced Form Instance
+  // =========================================================================
 
-    toast.info('Form cancelled', {
-      duration: 2000,
-      position: 'top-right'
-    })
-  }, [clearStorage, resetForm, onCancel, router])
-
-  // Enhanced field value setter with validation and state management
-  const setFieldValue = useCallback(<K extends keyof T>(
-    fieldName: K,
-    value: T[K],
-    options: {
-      shouldValidate?: boolean
-      shouldDirty?: boolean
-      shouldTouch?: boolean
-    } = {}
-  ) => {
-    const {
-      shouldValidate = true,
-      shouldDirty = true,
-      shouldTouch = true
-    } = options
-
-    form.setValue(fieldName as any, value, {
-      shouldValidate,
-      shouldDirty,
-      shouldTouch
-    })
-
-    // Special handling for limit type changes
-    if (fieldName === 'limitType' && value !== watchedLimitType) {
-      handleLimitTypeChange(value as LimitType)
-    }
-  }, [form, watchedLimitType, handleLimitTypeChange])
-
-  // Check if field is visible based on current configuration
-  const isFieldVisible = useCallback((fieldName: keyof T): boolean => {
-    const fieldNameStr = String(fieldName)
-    return fieldConfig.visibleFields.has(fieldNameStr)
-  }, [fieldConfig])
-
-  // Check if field is required based on current configuration
-  const isFieldRequired = useCallback((fieldName: keyof T): boolean => {
-    const fieldNameStr = String(fieldName)
-    return fieldConfig.requiredFields.has(fieldNameStr)
-  }, [fieldConfig])
-
-  // Check if field is disabled based on current configuration
-  const isFieldDisabled = useCallback((fieldName: keyof T): boolean => {
-    const fieldNameStr = String(fieldName)
-    return fieldConfig.disabledFields.has(fieldNameStr)
-  }, [fieldConfig])
-
-  // Load auto-saved data on mount
-  useEffect(() => {
-    if (autoSave.enabled && mode === 'create' && !initialData) {
-      const savedData = loadFromStorage()
-      if (savedData) {
-        Object.entries(savedData).forEach(([fieldName, value]) => {
-          form.setValue(fieldName as any, value, {
-            shouldValidate: false,
-            shouldDirty: false,
-            shouldTouch: false
-          })
-        })
-        
-        toast.info('Restored previously saved form data', {
-          duration: 3000,
-          position: 'top-right'
-        })
+  const enhancedFormInstance: LimitFormInstance = useMemo(() => ({
+    ...form,
+    schema: validationSchema,
+    fieldConfigs: new Map(), // TODO: Implement field configs
+    generateField: () => null, // TODO: Implement field generation
+    isFieldVisible: (fieldName) => {
+      // Determine field visibility based on current field visibility state
+      switch (fieldName) {
+        case 'service': return fieldVisibility.service.visible;
+        case 'user': return fieldVisibility.user.visible;
+        case 'role': return fieldVisibility.role.visible;
+        default: return true;
       }
-    }
-  }, [autoSave.enabled, mode, initialData, loadFromStorage, form])
+    },
+    getFieldValidationState: (fieldName) => {
+      return fieldStates[fieldName] || {
+        isValid: true,
+        isDirty: false,
+        isTouched: false,
+        error: null
+      };
+    },
+    validateAsync: async (fieldName) => {
+      if (fieldName) {
+        const error = await validateField(fieldName);
+        return !error;
+      } else {
+        return trigger();
+      }
+    },
+    submitAsync: submitForm,
+    resetWithSchema: (newSchema, newDefaults) => {
+      reset(newDefaults);
+    },
+    testServiceConnection,
+    validateAgainstUsage: async () => true, // TODO: Implement usage validation
+    previewRateString,
+    checkForConflicts,
+    resetToTemplate
+  }), [
+    form, 
+    validationSchema, 
+    fieldVisibility, 
+    fieldStates, 
+    validateField, 
+    trigger, 
+    submitForm, 
+    reset, 
+    testServiceConnection, 
+    previewRateString, 
+    checkForConflicts, 
+    resetToTemplate
+  ]);
 
-  // Performance monitoring and warnings
-  useEffect(() => {
-    const { realtimeComplianceRate, averageValidationTime } = validationMetrics
-    
-    if (realtimeComplianceRate < 90 && validationMetrics.validationCount > 10) {
-      console.warn(
-        `Validation performance below target: ${realtimeComplianceRate}% compliance, ` +
-        `average time: ${averageValidationTime}ms`
-      )
-    }
-  }, [validationMetrics])
+  // =========================================================================
+  // Return Interface
+  // =========================================================================
 
-  // Return comprehensive form state and methods
   return {
-    // Core form instance and state
-    form,
-    validationSchema,
-    values,
-    errors,
-    
-    // Form state indicators
-    isSubmitting: submissionState.isSubmitting,
-    isValidating,
-    isValid,
-    isDirty,
-    
-    // Form interaction methods
-    handleSubmit: form.handleSubmit(handleSubmit),
-    handleReset: resetForm,
-    handleCancel,
-    
-    // Field management methods
-    setFieldValue,
-    getFieldError,
-    clearFieldError,
-    validateField,
-    
-    // Dynamic field state queries
-    isFieldVisible,
-    isFieldRequired,
-    isFieldDisabled,
-    
-    // Field visibility configuration
-    fieldVisibility,
-    
-    // Current form configuration
-    fieldConfig,
-    
-    // Performance metrics
-    validationMetrics,
-    
-    // Submission state
-    submissionState,
-    
-    // Auto-save methods
-    autoSave: {
-      save: () => saveToStorage(values),
-      load: loadFromStorage,
-      clear: clearStorage
+    // Form instance
+    form: enhancedFormInstance,
+
+    // Form state
+    state: {
+      data: getValues(),
+      isSubmitting,
+      isValidating: false, // TODO: Implement validation tracking
+      isDirty,
+      isTouched,
+      isValid,
+      errors: errors as Record<string, FormFieldError>,
+      fieldStates,
+      mode,
+      dependentDataLoading,
+      fieldOptions,
+      connectionTest
+    },
+
+    // Form actions
+    actions: {
+      submit: handleSubmit(submitForm),
+      reset: () => reset(),
+      resetToTemplate,
+      validateField,
+      clearErrors: () => clearErrors()
+    },
+
+    // Dependent data (placeholder - TODO: Implement data fetching)
+    dependentData: {
+      users: { data: fieldOptions.users, loading: dependentDataLoading.users, error: null },
+      services: { data: fieldOptions.services, loading: dependentDataLoading.services, error: null },
+      roles: { data: fieldOptions.roles, loading: dependentDataLoading.roles, error: null }
+    },
+
+    // Helper functions
+    helpers: {
+      previewRateString,
+      testServiceConnection,
+      checkForConflicts
     }
-  } as UseLimitFormReturn<T>
-}
-
-// =============================================================================
-// CONVENIENCE HOOKS FOR SPECIFIC MODES
-// =============================================================================
-
-/**
- * Convenience hook for creating new limits
- * 
- * Pre-configured for create mode with optimized defaults
- * and streamlined API for limit creation workflows.
- */
-export function useCreateLimitForm(
-  config: Omit<UseLimitFormConfig, 'mode' | 'initialData'> & {
-    initialData?: Partial<CreateLimitFormData>
-  }
-) {
-  return useLimitForm<CreateLimitFormData>({
-    ...config,
-    mode: 'create',
-    initialData: config.initialData || {
-      limitType: LimitType.ENDPOINT,
-      limitCounter: LimitCounter.REQUEST,
-      active: true
-    }
-  })
+  };
 }
 
 /**
- * Convenience hook for editing existing limits
- * 
- * Pre-configured for edit mode with validation for existing
- * limit data and optimized update workflows.
+ * Export utility functions for external use
  */
-export function useEditLimitForm(
-  limitData: LimitTableRowData,
-  config: Omit<UseLimitFormConfig, 'mode' | 'initialData'>
-) {
-  return useLimitForm<EditLimitFormData>({
-    ...config,
-    mode: 'edit',
-    initialData: {
-      id: limitData.id,
-      name: limitData.name,
-      limitType: limitData.limitType,
-      limitRate: limitData.limitRate,
-      limitCounter: limitData.limitCounter,
-      user: limitData.user,
-      service: limitData.service,
-      role: limitData.role,
-      active: limitData.active,
-      metadata: limitData.metadata
-    }
-  })
-}
-
-// =============================================================================
-// UTILITY FUNCTIONS FOR EXTERNAL USE
-// =============================================================================
+export {
+  calculateFieldVisibility,
+  getDefaultFormValues
+};
 
 /**
- * Utility function to validate limit rate format
- * 
- * Provides standalone validation for rate limit strings
- * compatible with DreamFactory rate limiting formats.
+ * Export types for external consumption
  */
-export const validateLimitRateFormat = (rate: string): boolean => {
-  const rateRegex = /^\d+\/(second|minute|hour|day)$/
-  return rateRegex.test(rate)
-}
-
-/**
- * Utility function to get suggested rate limits based on limit type
- * 
- * Provides intelligent default suggestions for rate limits
- * based on limit type and common usage patterns.
- */
-export const getSuggestedRateLimits = (limitType: LimitType): string[] => {
-  const suggestions: Record<LimitType, string[]> = {
-    [LimitType.USER]: ['100/minute', '1000/hour', '10000/day'],
-    [LimitType.SERVICE]: ['1000/minute', '10000/hour', '100000/day'],
-    [LimitType.ROLE]: ['500/minute', '5000/hour', '50000/day'],
-    [LimitType.ENDPOINT]: ['50/minute', '500/hour', '5000/day'],
-    [LimitType.GLOBAL]: ['10000/minute', '100000/hour', '1000000/day'],
-    [LimitType.IP]: ['20/minute', '200/hour', '2000/day'],
-    [LimitType.CUSTOM]: ['100/minute', '1000/hour', '10000/day']
-  }
-
-  return suggestions[limitType] || suggestions[LimitType.ENDPOINT]
-}
-
-/**
- * Utility function to get compatible counter types for limit types
- * 
- * Provides recommended counter types based on limit type
- * and performance characteristics.
- */
-export const getCompatibleCounterTypes = (limitType: LimitType): LimitCounter[] => {
-  const compatibility: Record<LimitType, LimitCounter[]> = {
-    [LimitType.USER]: [
-      LimitCounter.REQUEST,
-      LimitCounter.SLIDING_WINDOW,
-      LimitCounter.TOKEN_BUCKET
-    ],
-    [LimitType.SERVICE]: [
-      LimitCounter.REQUEST,
-      LimitCounter.FIXED_WINDOW,
-      LimitCounter.SLIDING_WINDOW
-    ],
-    [LimitType.ROLE]: [
-      LimitCounter.REQUEST,
-      LimitCounter.SLIDING_WINDOW,
-      LimitCounter.TOKEN_BUCKET
-    ],
-    [LimitType.ENDPOINT]: [
-      LimitCounter.REQUEST,
-      LimitCounter.LEAKY_BUCKET,
-      LimitCounter.TOKEN_BUCKET
-    ],
-    [LimitType.GLOBAL]: [
-      LimitCounter.FIXED_WINDOW,
-      LimitCounter.SLIDING_WINDOW,
-      LimitCounter.BANDWIDTH
-    ],
-    [LimitType.IP]: [
-      LimitCounter.SLIDING_WINDOW,
-      LimitCounter.LEAKY_BUCKET,
-      LimitCounter.TOKEN_BUCKET
-    ],
-    [LimitType.CUSTOM]: [
-      LimitCounter.REQUEST,
-      LimitCounter.SLIDING_WINDOW,
-      LimitCounter.TOKEN_BUCKET,
-      LimitCounter.LEAKY_BUCKET
-    ]
-  }
-
-  return compatibility[limitType] || [LimitCounter.REQUEST]
-}
-
-/**
- * Default export for the main hook
- */
-export default useLimitForm
+export type {
+  UseLimitFormOptions,
+  LimitFormFieldVisibility,
+  LimitFormMetrics
+};
