@@ -1,162 +1,233 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "_metadata": {
-    "version": "1.0.0",
-    "locale": "fr",
-    "direction": "ltr",
-    "lastModified": "2024-01-01T00:00:00.000Z",
-    "framework": "Next.js 15.1 + React 19",
-    "ssrOptimized": true
-  },
-  "scriptName": "Nom du Script",
-  "scriptMethod": "Méthode du Script",
-  "scriptType": "Type de Script",
-  "scriptLocation": "Emplacement du Script",
-  "tableName": "Nom de la Table",
-  "active": "Actif",
-  "importScriptFile": "Importer un fichier de script",
-  "fromDesktop": "Depuis le Bureau",
-  "fromGitHub": "Depuis GitHub",
-  "selectFile": "Sélectionner un Fichier",
-  "linkToService": "Lier à un service",
-  "service": "Service",
-  "repository": "Dépôt",
-  "branch": "Branche/Tag",
-  "path": "Chemin",
-  "viewLatest": "Voir la Dernière Version",
-  "deleteCache": "Supprimer le Cache",
-  "runtimes": {
-    "javascript": "JavaScript",
+  "title": "Gestion des Scripts",
+  "subtitle": "Gérer les scripts côté serveur pour la logique métier personnalisée",
+  "types": {
     "php": "PHP",
+    "javascript": "JavaScript",
     "python": "Python",
-    "python3": "Python3",
+    "python3": "Python 3",
     "nodejs": "Node.js"
   },
-  "form": {
-    "validation": {
-      "scriptName": {
-        "required": "Le nom du script est requis",
-        "minLength": "Le nom du script doit contenir au moins 2 caractères",
-        "maxLength": "Le nom du script doit contenir moins de 50 caractères",
-        "pattern": "Le nom du script ne peut contenir que des lettres, des chiffres, des traits de soulignement et des tirets"
-      },
-      "scriptType": {
-        "required": "Veuillez sélectionner un type de script"
-      },
-      "scriptMethod": {
-        "required": "La méthode du script est requise"
-      },
-      "repository": {
-        "required": "L'URL du dépôt est requise",
-        "url": "Veuillez saisir une URL de dépôt valide"
-      },
-      "branch": {
-        "required": "La branche ou le tag est requis"
-      },
-      "path": {
-        "required": "Le chemin du script est requis"
-      },
-      "file": {
-        "required": "Veuillez sélectionner un fichier de script",
-        "fileType": "Seuls les fichiers .js, .php, .py et .txt sont autorisés"
-      }
-    },
-    "labels": {
-      "scriptName": "Nom du Script",
-      "scriptType": "Type d'Exécution",
-      "scriptMethod": "Méthode",
-      "repository": "Dépôt GitHub",
-      "branch": "Branche/Tag",
-      "path": "Chemin du Fichier",
-      "active": "Script Actif"
-    },
-    "placeholders": {
-      "scriptName": "Saisir le nom du script",
-      "repository": "https://github.com/nom-utilisateur/depot",
-      "branch": "main",
-      "path": "chemin/vers/script.js"
+  "labels": {
+    "name": "Nom du Script",
+    "type": "Type de Script",
+    "language": "Langage de Script",
+    "description": "Description",
+    "content": "Contenu du Script",
+    "active": "Actif",
+    "storage": "Type de Stockage",
+    "github": "Dépôt GitHub",
+    "local": "Stockage Local",
+    "scriptMethod": "Méthode de Script",
+    "scriptLocation": "Emplacement du Script",
+    "tableName": "Nom de la Table",
+    "service": "Service",
+    "repository": "Dépôt",
+    "branch": "Branche/Tag",
+    "path": "Chemin"
+  },
+  "placeholders": {
+    "enterScriptName": "Saisir le nom du script",
+    "enterDescription": "Saisir la description",
+    "selectLanguage": "Sélectionner le langage de programmation",
+    "selectStorage": "Sélectionner le type de stockage",
+    "enterRepository": "Saisir l'URL du dépôt",
+    "enterBranch": "Saisir la branche ou le tag",
+    "enterPath": "Saisir le chemin du fichier"
+  },
+  "editor": {
+    "loading": "Chargement du contenu du script...",
+    "saving": "Sauvegarde du script...",
+    "saved": "Script sauvegardé avec succès",
+    "error": "Erreur lors du chargement du script",
+    "syntax": "Erreur de syntaxe détectée",
+    "fullscreen": "Activer le mode plein écran",
+    "exitFullscreen": "Quitter le mode plein écran",
+    "lineNumbers": "Afficher les numéros de ligne",
+    "wordWrap": "Activer le retour à la ligne",
+    "themes": {
+      "dark": "Thème sombre",
+      "light": "Thème clair",
+      "auto": "Thème automatique"
     }
   },
-  "notifications": {
-    "success": {
-      "create": "Script créé avec succès",
-      "update": "Script mis à jour avec succès",
-      "delete": "Script supprimé avec succès",
-      "fetchScript": "Fichier de script récupéré avec succès",
-      "fetchCache": "Dernière version du script récupérée depuis la source avec succès",
-      "deleteCache": "Cache du script vidé avec succès"
-    },
-    "error": {
-      "create": "Échec de la création du script",
-      "update": "Échec de la mise à jour du script",
-      "delete": "Échec de la suppression du script",
-      "fetchScript": "Échec de la récupération du fichier de script",
-      "fetchCache": "Échec de la récupération de la dernière version du script depuis la source",
-      "deleteCache": "Échec du vidage du cache du script",
-      "networkError": "Erreur réseau survenue lors du traitement du script",
-      "serverError": "Erreur serveur survenue lors du traitement du script"
-    }
-  },
-  "errors": {
-    "githubImport": "Erreur : Format de fichier invalide. Seuls les formats de fichier js, php, py, txt sont autorisés",
-    "fileUpload": "Erreur lors du téléchargement du fichier. Veuillez réessayer.",
-    "connectionFailed": "Échec de la connexion au dépôt GitHub",
-    "invalidRepository": "URL de dépôt invalide ou accès refusé",
-    "fileNotFound": "Fichier de script introuvable dans le dépôt",
-    "unsupportedRuntime": "Type d'exécution de script non pris en charge"
-  },
-  "errorBoundary": {
-    "title": "Erreur de Gestion des Scripts",
-    "description": "Une erreur est survenue dans le composant de gestion des scripts. Veuillez actualiser la page ou contacter le support si le problème persiste.",
-    "action": "Recharger le Composant",
-    "fallback": "Impossible de charger l'interface de gestion des scripts"
-  },
-  "toast": {
-    "success": {
-      "title": "Succès",
-      "createMessage": "Le script a été créé avec succès",
-      "updateMessage": "Le script a été mis à jour avec succès",
-      "deleteMessage": "Le script a été supprimé avec succès",
-      "cacheRefreshMessage": "Le cache du script a été actualisé",
-      "cacheClearMessage": "Le cache du script a été vidé"
-    },
-    "error": {
-      "title": "Erreur",
-      "genericMessage": "Une erreur est survenue lors du traitement du script",
-      "validationMessage": "Veuillez corriger les erreurs du formulaire et réessayer",
-      "networkMessage": "Erreur réseau - veuillez vérifier votre connexion",
-      "serverMessage": "Erreur serveur - veuillez réessayer plus tard"
-    },
-    "loading": {
-      "title": "Traitement en cours",
-      "createMessage": "Création du script...",
-      "updateMessage": "Mise à jour du script...",
-      "deleteMessage": "Suppression du script...",
-      "fetchMessage": "Récupération du script..."
+  "github": {
+    "repository": "URL du Dépôt",
+    "branch": "Branche/Tag",
+    "path": "Chemin du Fichier",
+    "token": "Jeton d'Accès",
+    "sync": "Synchroniser depuis GitHub",
+    "lastSync": "Dernière synchronisation",
+    "syncStatus": {
+      "syncing": "Synchronisation en cours...",
+      "success": "Synchronisation terminée",
+      "error": "Échec de la synchronisation",
+      "never": "Jamais synchronisé"
     }
   },
   "actions": {
     "create": "Créer un Script",
-    "update": "Mettre à Jour le Script",
+    "edit": "Modifier le Script",
     "delete": "Supprimer le Script",
-    "save": "Enregistrer le Script",
+    "duplicate": "Dupliquer le Script",
+    "test": "Tester le Script",
+    "save": "Sauvegarder le Script",
     "cancel": "Annuler",
+    "import": "Importer un Script",
+    "export": "Exporter le Script",
+    "refresh": "Actualiser",
     "viewLatest": "Voir la Dernière Version",
-    "refreshCache": "Actualiser le Cache",
-    "clearCache": "Vider le Cache",
-    "uploadFile": "Télécharger un Fichier",
-    "selectFromGitHub": "Sélectionner depuis GitHub"
+    "deleteCache": "Vider le Cache",
+    "linkToService": "Lier au Service"
   },
-  "states": {
-    "loading": "Chargement des scripts...",
-    "empty": "Aucun script trouvé",
-    "error": "Échec du chargement des scripts"
+  "import": {
+    "title": "Importer un Script",
+    "fromDesktop": "Depuis l'Ordinateur",
+    "fromGitHub": "Depuis GitHub",
+    "selectFile": "Sélectionner un Fichier",
+    "dragDrop": "Glissez-déposez les fichiers ici ou cliquez pour parcourir",
+    "allowedFormats": "Formats autorisés : .js, .php, .py, .txt",
+    "maxSize": "Taille maximale du fichier : 10MB"
   },
-  "accessibility": {
-    "scriptNameInput": "Saisir le nom de votre script",
-    "scriptTypeSelect": "Sélectionner le type d'exécution pour votre script",
-    "repositoryInput": "Saisir l'URL du dépôt GitHub",
-    "fileUploadButton": "Cliquer pour télécharger un fichier de script depuis votre appareil",
-    "deleteScriptButton": "Supprimer définitivement ce script"
+  "validation": {
+    "required": "Ce champ est obligatoire",
+    "email": "Veuillez saisir une adresse e-mail valide",
+    "minLength": "Doit contenir au moins {{min}} caractères",
+    "maxLength": "Doit contenir au maximum {{max}} caractères",
+    "pattern": "Format invalide",
+    "numeric": "Doit être un nombre valide",
+    "url": "Doit être une URL valide",
+    "custom": "Valeur invalide",
+    "scriptName": {
+      "required": "Le nom du script est obligatoire",
+      "minLength": "Le nom du script doit contenir au moins 2 caractères",
+      "maxLength": "Le nom du script doit contenir moins de 100 caractères",
+      "pattern": "Le nom du script ne peut contenir que des lettres, des chiffres, des tirets et des traits de soulignement"
+    },
+    "scriptType": {
+      "required": "Veuillez sélectionner un type de script"
+    },
+    "content": {
+      "required": "Le contenu du script ne peut pas être vide",
+      "syntax": "Le script contient des erreurs de syntaxe"
+    },
+    "github": {
+      "repository": "Veuillez saisir une URL de dépôt GitHub valide",
+      "branch": "Le nom de la branche est obligatoire",
+      "path": "Le chemin du fichier est obligatoire",
+      "token": "Le jeton d'accès est requis pour les dépôts privés"
+    }
+  },
+  "messages": {
+    "create": {
+      "success": "Script créé avec succès",
+      "error": "Échec de la création du script",
+      "pending": "Création du script en cours..."
+    },
+    "update": {
+      "success": "Script mis à jour avec succès",
+      "error": "Échec de la mise à jour du script",
+      "pending": "Mise à jour du script en cours..."
+    },
+    "delete": {
+      "success": "Script supprimé avec succès",
+      "error": "Échec de la suppression du script",
+      "pending": "Suppression du script en cours...",
+      "confirm": "Êtes-vous sûr de vouloir supprimer ce script ?"
+    },
+    "fetch": {
+      "error": "Échec du chargement du script",
+      "pending": "Chargement du script en cours...",
+      "empty": "Aucun script trouvé"
+    },
+    "import": {
+      "success": "Fichier de script importé avec succès",
+      "error": "Échec de l'importation du fichier de script",
+      "pending": "Importation du script en cours..."
+    },
+    "sync": {
+      "success": "Dernière version du script récupérée avec succès depuis la source",
+      "error": "Échec de la synchronisation du script depuis le dépôt",
+      "pending": "Synchronisation du script en cours..."
+    },
+    "cache": {
+      "success": "Script supprimé du cache avec succès",
+      "error": "Échec de la suppression du cache du script",
+      "pending": "Suppression du cache en cours..."
+    },
+    "test": {
+      "success": "Script exécuté avec succès",
+      "error": "Échec de l'exécution du script",
+      "pending": "Test du script en cours..."
+    }
+  },
+  "dialogs": {
+    "delete": {
+      "title": "Supprimer le Script",
+      "message": "Êtes-vous sûr de vouloir supprimer \"{{name}}\" ?",
+      "warning": "Cette action ne peut pas être annulée. Toutes les données associées seront définitivement supprimées.",
+      "confirm": "Supprimer le Script",
+      "cancel": "Annuler"
+    },
+    "unsavedChanges": {
+      "title": "Modifications Non Sauvegardées",
+      "message": "Vous avez des modifications non sauvegardées. Voulez-vous les sauvegarder avant de quitter ?",
+      "save": "Sauvegarder les Modifications",
+      "discard": "Ignorer les Modifications",
+      "cancel": "Annuler"
+    },
+    "syntax": {
+      "title": "Erreur de Syntaxe",
+      "message": "Le script contient des erreurs de syntaxe qui peuvent empêcher son exécution correcte.",
+      "saveAnyway": "Sauvegarder Quand Même",
+      "fixErrors": "Corriger les Erreurs",
+      "cancel": "Annuler"
+    }
+  },
+  "status": {
+    "active": "Actif",
+    "inactive": "Inactif",
+    "draft": "Brouillon",
+    "error": "Erreur",
+    "syncing": "Synchronisation",
+    "cached": "En Cache"
+  },
+  "filters": {
+    "all": "Tous les Scripts",
+    "active": "Scripts Actifs",
+    "inactive": "Scripts Inactifs",
+    "byType": "Filtrer par Type",
+    "byStatus": "Filtrer par Statut"
+  },
+  "search": {
+    "placeholder": "Rechercher des scripts par nom ou description...",
+    "noResults": "Aucun script trouvé correspondant à votre recherche",
+    "resultsCount": "{{count}} script(s) trouvé(s)"
+  },
+  "errors": {
+    "githubImport": "Format de fichier invalide. Seuls les fichiers .js, .php, .py, .txt sont autorisés",
+    "connectionFailed": "Échec de la connexion au dépôt",
+    "invalidFormat": "Format de script invalide",
+    "fileNotFound": "Fichier de script introuvable dans le dépôt",
+    "accessDenied": "Accès refusé. Veuillez vérifier vos permissions",
+    "quotaExceeded": "Quota de stockage dépassé",
+    "networkError": "Erreur de connexion réseau",
+    "serverError": "Erreur du serveur",
+    "validationFailed": "Échec de la validation du script",
+    "compilationError": "Erreur de compilation du script",
+    "executionTimeout": "Délai d'exécution du script dépassé",
+    "memoryLimit": "Le script a dépassé la limite de mémoire",
+    "permissionDenied": "Permission refusée",
+    "resourceNotFound": "Ressource introuvable",
+    "conflictError": "Conflit avec un script existant",
+    "rateLimitExceeded": "Limite de taux dépassée. Veuillez réessayer plus tard"
+  },
+  "info": {
+    "empty": "Aucun script n'a encore été créé",
+    "emptySearch": "Aucun script ne correspond à vos filtres actuels",
+    "createFirst": "Créez votre premier script pour commencer",
+    "githubIntegration": "Connectez-vous à GitHub pour synchroniser automatiquement les scripts",
+    "syntaxHighlighting": "Coloration syntaxique disponible pour tous les langages pris en charge",
+    "autoSave": "Les modifications sont automatiquement sauvegardées pendant que vous tapez"
   }
 }
