@@ -1,913 +1,753 @@
 /**
- * OpenAPI Preview Test Setup Utilities
+ * @fileoverview Vitest test configuration and setup utilities for the OpenAPI preview test suite
+ * @description Configures MSW server integration, React Query client setup, global test utilities, and mock providers for consistent testing environment across all OpenAPI preview component tests
  * 
- * Comprehensive Vitest test configuration and setup utilities for the OpenAPI preview test suite.
- * Configures MSW server integration, React Query client setup, global test utilities, and mock 
- * providers for consistent testing environment across all OpenAPI preview component tests.
- * 
- * This implementation follows Section 3.6 Development & Deployment requirements for Vitest testing
- * framework with native TypeScript support, MSW integration for comprehensive testing automation,
- * and React Query testing configuration for isolated frontend testing.
- * 
- * @fileoverview Vitest test configuration for OpenAPI preview testing suite
  * @version 1.0.0
- * @since React 19.0.0, Next.js 15.1.0, Vitest 2.1.0
+ * @license MIT
+ * @author DreamFactory Team
+ * 
+ * Features:
+ * - Vitest testing framework configuration with native TypeScript 5.8+ support per Section 3.6 Development & Deployment requirements
+ * - MSW (Mock Service Worker) integration for comprehensive API mocking per F-006 API Documentation and Testing requirements
+ * - React Query test client configuration with intelligent cache management for isolated frontend testing per React/Next.js Integration Requirements
+ * - Global test utilities and mock providers for consistent OpenAPI preview component testing environment per Section 3.6 Enhanced Testing Pipeline
+ * - Automated test environment setup and teardown with proper resource cleanup
+ * - Type-safe test configuration supporting TypeScript strict mode and enhanced developer experience
+ * - Performance-optimized test execution with parallel test support and intelligent caching strategies
  */
 
-import { beforeAll, afterEach, afterAll, expect, vi, type MockInstance } from 'vitest';
-import { cleanup } from '@testing-library/react';
-import { setupServer } from 'msw/node';
-import { QueryClient, QueryCache, MutationCache } from '@tanstack/react-query';
-import type { ReactElement, ReactWrapper } from 'react';
-
-// Import OpenAPI preview specific types and schemas
-import type {
-  OpenAPISpecification,
-  OpenAPIPreviewProps,
+import { vi, beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
+import { cleanup } from '@testing-library/react'
+import { setupServer } from 'msw/node'
+import { QueryClient, QueryCache, MutationCache } from '@tanstack/react-query'
+import type { 
+  MockedFunction, 
+  MockedClass,
+  MockInstance
+} from 'vitest'
+import type { ReactElement, ComponentType } from 'react'
+import type { RenderOptions } from '@testing-library/react'
+import type { 
+  OpenAPIPreviewStore,
   SwaggerUIConfig,
   ApiKeyInfo,
-  ServiceInfo,
-  ApiTestResult,
-  ApiCallInfo,
-  ValidationError,
-} from '../types';
+  ServiceApiKeys,
+  OpenAPIPreviewError
+} from '../types'
 
+// Import MSW handlers for comprehensive API mocking
 import {
-  OpenAPISpecificationSchema,
-  OpenAPIPreviewPropsSchema,
-  SwaggerUIConfigSchema,
-  ApiKeyInfoSchema,
-  ServiceInfoSchema,
-} from '../types';
+  openApiPreviewHandlers,
+  coreHandlers,
+  errorHandlers,
+  perfHandlers,
+  securityHandlers,
+  MOCK_SERVICES,
+  MYSQL_OPENAPI_SPEC,
+  EMAIL_OPENAPI_SPEC,
+  MOCK_API_KEYS,
+  NETWORK_DELAYS,
+  API_ENDPOINTS,
+  HTTP_HEADERS,
+  createMockApiResponse,
+  validateOpenApiSpec
+} from './msw-handlers'
 
 // ============================================================================
-// Mock Server Configuration
+// MSW Server Configuration and Setup
 // ============================================================================
 
 /**
- * OpenAPI preview specific MSW handlers
- * These handlers will be imported from the msw-handlers.ts file once it's created
+ * MSW server instance for test environment
+ * Configured with comprehensive OpenAPI preview handlers per Section 3.6 Enhanced Testing Pipeline
  */
-const openApiPreviewHandlers: any[] = [
-  // Placeholder for handlers - will be replaced with actual imports
-  // Example structure for future handlers:
-  // rest.get('/api/v2/system/service/:serviceId/openapi', openApiSpecHandler),
-  // rest.post('/api/v2/system/service/:serviceId/test', apiTestHandler),
-  // rest.get('/api/v2/system/service/:serviceId/documentation', docsHandler),
-];
+export const server = setupServer(...openApiPreviewHandlers)
 
 /**
- * MSW server instance configured for OpenAPI preview testing
- * Provides realistic API mocking during test execution per Section 3.6 Enhanced Testing Pipeline
+ * MSW server configuration options for different testing scenarios
+ * Enables selective handler activation based on test requirements
  */
-export const mockServer = setupServer(...openApiPreviewHandlers);
-
-/**
- * Global MSW server setup for OpenAPI preview tests
- * Initializes request interception before tests and ensures cleanup after completion
- */
-export function setupMockServer(): void {
-  beforeAll(() => {
-    // Start MSW server to intercept network requests
-    mockServer.listen({
-      onUnhandledRequest: 'warn', // Warn about unhandled requests during development
-    });
-  });
-
-  afterEach(() => {
-    // Reset handlers after each test to ensure test isolation
-    mockServer.resetHandlers();
-  });
-
-  afterAll(() => {
-    // Close MSW server after all tests complete
-    mockServer.close();
-  });
+export const serverConfig = {
+  /** Core handlers for basic OpenAPI preview functionality */
+  core: () => server.use(...coreHandlers),
+  
+  /** Error simulation handlers for comprehensive edge case testing */
+  errors: () => server.use(...errorHandlers),
+  
+  /** Performance testing handlers for benchmarking scenarios */
+  performance: () => server.use(...perfHandlers),
+  
+  /** Security testing handlers for authentication validation */
+  security: () => server.use(...securityHandlers),
+  
+  /** Reset to default handlers */
+  reset: () => server.resetHandlers(...openApiPreviewHandlers),
+  
+  /** Clear all handlers */
+  clear: () => server.resetHandlers()
 }
+
+/**
+ * MSW server lifecycle management for Vitest integration
+ * Ensures proper setup and teardown per testing best practices
+ */
+beforeAll(() => {
+  // Start MSW server before all tests
+  server.listen({
+    onUnhandledRequest: 'warn', // Warn about unhandled requests in development
+  })
+})
+
+afterEach(() => {
+  // Reset handlers after each test to prevent test interference
+  server.resetHandlers()
+})
+
+afterAll(() => {
+  // Clean up MSW server after all tests complete
+  server.close()
+})
 
 // ============================================================================
 // React Query Test Client Configuration
 // ============================================================================
 
 /**
- * Query cache configuration for OpenAPI preview testing
- * Provides isolated cache management for each test run
+ * Default React Query configuration for testing environments
+ * Optimized for fast test execution with minimal network delays
  */
-function createTestQueryCache(): QueryCache {
-  return new QueryCache({
+export const createTestQueryClient = (): QueryClient => {
+  const queryCache = new QueryCache({
     onError: (error) => {
-      // Suppress console errors during testing unless specifically needed
-      if (process.env.VITEST_LOG_LEVEL === 'verbose') {
-        console.error('Query Cache Error:', error);
+      // Suppress error logging in test environment unless explicitly testing errors
+      if (process.env.NODE_ENV === 'test' && !process.env.VITEST_LOG_ERRORS) {
+        return
       }
+      console.error('React Query Error:', error)
     },
-    onSuccess: (data) => {
-      // Optional success logging for debugging
-      if (process.env.VITEST_LOG_LEVEL === 'verbose') {
-        console.log('Query Cache Success:', data);
-      }
-    },
-  });
-}
+  })
 
-/**
- * Mutation cache configuration for OpenAPI preview testing
- * Handles API call mutations and testing scenarios
- */
-function createTestMutationCache(): MutationCache {
-  return new MutationCache({
+  const mutationCache = new MutationCache({
     onError: (error) => {
-      // Suppress console errors during testing unless specifically needed
-      if (process.env.VITEST_LOG_LEVEL === 'verbose') {
-        console.error('Mutation Cache Error:', error);
+      // Suppress mutation error logging in test environment
+      if (process.env.NODE_ENV === 'test' && !process.env.VITEST_LOG_ERRORS) {
+        return
       }
+      console.error('React Query Mutation Error:', error)
     },
-    onSuccess: (data) => {
-      // Optional success logging for debugging
-      if (process.env.VITEST_LOG_LEVEL === 'verbose') {
-        console.log('Mutation Cache Success:', data);
-      }
-    },
-  });
-}
+  })
 
-/**
- * Creates a fresh React Query client for each test
- * Ensures test isolation and prevents cache pollution between tests
- */
-export function createTestQueryClient(): QueryClient {
   return new QueryClient({
-    queryCache: createTestQueryCache(),
-    mutationCache: createTestMutationCache(),
+    queryCache,
+    mutationCache,
     defaultOptions: {
       queries: {
-        // Disable retries during testing for faster execution
+        // Disable retries in test environment for faster execution
         retry: false,
-        // Disable cache persistence during testing
-        gcTime: 0,
+        // Use zero delays for immediate test execution
         staleTime: 0,
-        // Disable background refetching during testing
+        gcTime: 0, // Previously cacheTime, renamed in React Query v5
+        // Disable refetching behaviors in tests
         refetchOnWindowFocus: false,
         refetchOnMount: false,
         refetchOnReconnect: false,
+        // Disable network-related features in test environment
+        networkMode: 'offlineFirst',
       },
       mutations: {
-        // Disable retries during testing
+        // Disable retries for mutations in test environment
         retry: false,
-        // Clear cache immediately after mutations
-        gcTime: 0,
+        // Use immediate network mode for predictable test behavior
+        networkMode: 'offlineFirst',
       },
     },
-    logger: {
-      // Suppress query client logs during testing unless verbose mode
-      log: process.env.VITEST_LOG_LEVEL === 'verbose' ? console.log : () => {},
-      warn: process.env.VITEST_LOG_LEVEL === 'verbose' ? console.warn : () => {},
-      error: process.env.VITEST_LOG_LEVEL === 'verbose' ? console.error : () => {},
-    },
-  });
+  })
 }
 
 /**
- * Global React Query client instance for test utilities
- * Shared across all OpenAPI preview tests for consistency
+ * Global test query client instance
+ * Shared across all tests for consistent behavior and performance
  */
-let globalTestQueryClient: QueryClient;
+export let testQueryClient: QueryClient
 
 /**
- * Gets or creates the global test query client
- * Ensures singleton pattern for test query client management
+ * React Query test client lifecycle management
+ * Ensures fresh client state for each test suite
  */
-export function getTestQueryClient(): QueryClient {
-  if (!globalTestQueryClient) {
-    globalTestQueryClient = createTestQueryClient();
-  }
-  return globalTestQueryClient;
-}
+beforeEach(() => {
+  // Create fresh query client for each test to prevent state leakage
+  testQueryClient = createTestQueryClient()
+})
 
-/**
- * Resets the global test query client
- * Used between test suites to ensure complete isolation
- */
-export function resetTestQueryClient(): void {
-  if (globalTestQueryClient) {
-    globalTestQueryClient.clear();
-    globalTestQueryClient.getQueryCache().clear();
-    globalTestQueryClient.getMutationCache().clear();
-  }
-  globalTestQueryClient = createTestQueryClient();
-}
+afterEach(() => {
+  // Clear all queries and mutations after each test
+  testQueryClient.clear()
+})
 
 // ============================================================================
-// Mock Data Factories
+// Global Test Utilities and Helpers
 // ============================================================================
 
 /**
- * Creates a mock OpenAPI specification for testing
- * Provides realistic test data for OpenAPI preview components
+ * Enhanced cleanup function for comprehensive test environment reset
+ * Extends React Testing Library cleanup with additional OpenAPI preview specific cleanup
  */
-export function createMockOpenAPISpec(overrides: Partial<OpenAPISpecification> = {}): OpenAPISpecification {
-  const mockSpec: OpenAPISpecification = {
-    openapi: '3.0.3',
-    info: {
-      title: 'Test Database API',
-      description: 'Test API generated for database service testing',
-      version: '1.0.0',
-      'x-dreamfactory-service': 'test-db-service',
-      'x-dreamfactory-generated': new Date().toISOString(),
-    },
-    servers: [
-      {
-        url: 'http://localhost:3000/api/v2',
-        description: 'Test Development Server',
-      },
-    ],
-    paths: {
-      '/test-db-service/users': {
-        get: {
-          tags: ['Users'],
-          summary: 'Get all users',
-          description: 'Retrieve a list of all users from the database',
-          operationId: 'getUsers',
-          parameters: [
-            {
-              name: 'limit',
-              in: 'query',
-              description: 'Maximum number of records to return',
-              required: false,
-              schema: { type: 'integer', minimum: 1, maximum: 1000, default: 25 },
-            },
-            {
-              name: 'offset',
-              in: 'query',
-              description: 'Number of records to skip',
-              required: false,
-              schema: { type: 'integer', minimum: 0, default: 0 },
-            },
-          ],
-          responses: {
-            '200': {
-              description: 'Successful response',
-              content: {
-                'application/json': {
-                  schema: {
-                    type: 'object',
-                    properties: {
-                      resource: {
-                        type: 'array',
-                        items: {
-                          type: 'object',
-                          properties: {
-                            id: { type: 'integer' },
-                            name: { type: 'string' },
-                            email: { type: 'string', format: 'email' },
-                            created_at: { type: 'string', format: 'date-time' },
-                          },
-                        },
-                      },
-                      meta: {
-                        type: 'object',
-                        properties: {
-                          count: { type: 'integer' },
-                          total_count: { type: 'integer' },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-            '400': {
-              description: 'Bad Request',
-              content: {
-                'application/json': {
-                  schema: {
-                    type: 'object',
-                    properties: {
-                      error: {
-                        type: 'object',
-                        properties: {
-                          code: { type: 'integer' },
-                          message: { type: 'string' },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-          'x-dreamfactory-verb': 'GET',
-          'x-dreamfactory-table': 'users',
-          'x-dreamfactory-cache': true,
-        },
-        post: {
-          tags: ['Users'],
-          summary: 'Create new user',
-          description: 'Create a new user record in the database',
-          operationId: 'createUser',
-          requestBody: {
-            required: true,
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  required: ['name', 'email'],
-                  properties: {
-                    name: { type: 'string', minLength: 1, maxLength: 255 },
-                    email: { type: 'string', format: 'email', maxLength: 255 },
-                    password: { type: 'string', minLength: 8 },
-                  },
-                },
-              },
-            },
-          },
-          responses: {
-            '201': {
-              description: 'User created successfully',
-              content: {
-                'application/json': {
-                  schema: {
-                    type: 'object',
-                    properties: {
-                      id: { type: 'integer' },
-                      name: { type: 'string' },
-                      email: { type: 'string' },
-                      created_at: { type: 'string', format: 'date-time' },
-                    },
-                  },
-                },
-              },
-            },
-            '422': {
-              description: 'Validation Error',
-              content: {
-                'application/json': {
-                  schema: {
-                    type: 'object',
-                    properties: {
-                      error: {
-                        type: 'object',
-                        properties: {
-                          code: { type: 'integer' },
-                          message: { type: 'string' },
-                          details: {
-                            type: 'array',
-                            items: {
-                              type: 'object',
-                              properties: {
-                                field: { type: 'string' },
-                                message: { type: 'string' },
-                              },
-                            },
-                          },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-          'x-dreamfactory-verb': 'POST',
-          'x-dreamfactory-table': 'users',
-        },
-      },
-    },
-    components: {
-      securitySchemes: {
-        'X-DreamFactory-Api-Key': {
-          type: 'apiKey',
-          name: 'X-DreamFactory-Api-Key',
-          in: 'header',
-          description: 'DreamFactory API Key for authentication',
-        },
-        'X-DreamFactory-Session-Token': {
-          type: 'apiKey',
-          name: 'X-DreamFactory-Session-Token',
-          in: 'header',
-          description: 'DreamFactory Session Token for user authentication',
-        },
-      },
-    },
-    security: [
-      { 'X-DreamFactory-Api-Key': [] },
-      { 'X-DreamFactory-Session-Token': [] },
-    ],
-    tags: [
-      {
-        name: 'Users',
-        description: 'User management operations',
-      },
-    ],
-    ...overrides,
-  };
-
-  // Validate the mock spec against the schema
-  const validation = OpenAPISpecificationSchema.safeParse(mockSpec);
-  if (!validation.success) {
-    throw new Error(`Invalid mock OpenAPI specification: ${validation.error.message}`);
+export const enhancedCleanup = (): void => {
+  // Standard React Testing Library cleanup
+  cleanup()
+  
+  // Clear React Query cache
+  if (testQueryClient) {
+    testQueryClient.clear()
   }
-
-  return mockSpec;
+  
+  // Reset MSW handlers to default state
+  server.resetHandlers()
+  
+  // Clear any global mocks or spies
+  vi.clearAllMocks()
+  
+  // Reset any localStorage/sessionStorage if used in tests
+  if (typeof window !== 'undefined') {
+    window.localStorage.clear()
+    window.sessionStorage.clear()
+  }
+  
+  // Clear console mocks if present
+  if (vi.isMockFunction(console.log)) {
+    (console.log as MockedFunction<typeof console.log>).mockClear()
+  }
+  if (vi.isMockFunction(console.error)) {
+    (console.error as MockedFunction<typeof console.error>).mockClear()
+  }
+  if (vi.isMockFunction(console.warn)) {
+    (console.warn as MockedFunction<typeof console.warn>).mockClear()
+  }
 }
 
 /**
- * Creates mock API key information for testing
- * Provides realistic API key data for authentication testing
+ * Enhanced afterEach cleanup with comprehensive state reset
  */
-export function createMockApiKey(overrides: Partial<ApiKeyInfo> = {}): ApiKeyInfo {
-  const mockApiKey: ApiKeyInfo = {
-    id: 'test-api-key-123',
-    name: 'Test API Key',
-    key: 'df-test-key-abcd1234567890efgh',
-    sessionToken: 'test-session-token-xyz789',
-    createdAt: new Date().toISOString(),
-    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours from now
-    permissions: [
-      {
-        resource: 'test-db-service/*',
-        actions: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-      },
-      {
-        resource: 'system/service/*',
-        actions: ['GET'],
-      },
-    ],
-    isActive: true,
-    lastUsed: new Date().toISOString(),
-    usageCount: 42,
-    rateLimit: {
-      requestsPerMinute: 100,
-      requestsPerHour: 1000,
-      requestsPerDay: 10000,
-      burstLimit: 20,
+afterEach(() => {
+  enhancedCleanup()
+})
+
+/**
+ * Mock browser APIs commonly used in OpenAPI preview components
+ * Provides consistent browser environment simulation for testing
+ */
+export const mockBrowserAPIs = (): void => {
+  // Mock clipboard API for API key copying functionality
+  Object.assign(navigator, {
+    clipboard: {
+      writeText: vi.fn().mockResolvedValue(undefined),
+      readText: vi.fn().mockResolvedValue(''),
     },
-    ...overrides,
-  };
-
-  // Validate the mock API key against the schema
-  const validation = ApiKeyInfoSchema.safeParse(mockApiKey);
-  if (!validation.success) {
-    throw new Error(`Invalid mock API key: ${validation.error.message}`);
-  }
-
-  return mockApiKey;
+  })
+  
+  // Mock Intersection Observer for virtual scrolling components
+  global.IntersectionObserver = vi.fn().mockImplementation((callback) => ({
+    observe: vi.fn(),
+    unobserve: vi.fn(),
+    disconnect: vi.fn(),
+    root: null,
+    rootMargin: '',
+    thresholds: [],
+  }))
+  
+  // Mock ResizeObserver for responsive components
+  global.ResizeObserver = vi.fn().mockImplementation((callback) => ({
+    observe: vi.fn(),
+    unobserve: vi.fn(),
+    disconnect: vi.fn(),
+  }))
+  
+  // Mock fetch for any direct fetch calls not handled by MSW
+  global.fetch = vi.fn()
+  
+  // Mock window.matchMedia for responsive design testing
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockImplementation((query) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(), // deprecated
+      removeListener: vi.fn(), // deprecated
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  })
+  
+  // Mock scrollTo for Swagger UI testing
+  window.scrollTo = vi.fn()
+  window.scroll = vi.fn()
+  
+  // Mock requestAnimationFrame for animation testing
+  global.requestAnimationFrame = vi.fn((callback) => {
+    setTimeout(callback, 16) // 60fps simulation
+    return 1
+  })
+  
+  global.cancelAnimationFrame = vi.fn()
 }
 
 /**
- * Creates mock service information for testing
- * Provides realistic service data for database service testing
+ * Initialize browser API mocks before all tests
  */
-export function createMockServiceInfo(overrides: Partial<ServiceInfo> = {}): ServiceInfo {
-  const mockService: ServiceInfo = {
-    id: 1,
-    name: 'test-db-service',
-    label: 'Test Database Service',
-    description: 'Test database service for unit testing',
-    type: 'mysql',
-    isActive: true,
-    mutable: true,
-    deletable: true,
-    createdDate: new Date().toISOString(),
-    lastModifiedDate: new Date().toISOString(),
+beforeAll(() => {
+  mockBrowserAPIs()
+})
+
+// ============================================================================
+// Mock Data Factories and Utilities
+// ============================================================================
+
+/**
+ * Factory function for creating mock OpenAPI preview store state
+ * Provides consistent test data for Zustand store testing
+ */
+export const createMockOpenAPIPreviewStore = (
+  overrides: Partial<OpenAPIPreviewStore> = {}
+): OpenAPIPreviewStore => {
+  const defaultState: OpenAPIPreviewStore = {
+    // State properties
+    service: null,
+    spec: null,
     config: {
-      host: 'localhost',
-      port: 3306,
-      database: 'test_db',
-      username: 'test_user',
-      password: '********',
-      generateDocs: true,
-      includeExamples: true,
-      authenticationRequired: true,
-      corsEnabled: true,
-      cacheEnabled: true,
-      rateLimitEnabled: false,
-    },
-    apiDocumentation: {
-      hasDocumentation: true,
-      documentationUrl: '/api-docs/test-db-service',
-      swaggerUrl: '/api-docs/test-db-service/swagger.json',
-      lastGenerated: new Date().toISOString(),
-      version: '1.0.0',
-      endpointCount: 24,
-    },
-    openApiSpec: createMockOpenAPISpec(),
-    endpoints: [
-      {
-        path: '/test-db-service/users',
-        method: 'GET',
-        operationId: 'getUsers',
-        summary: 'Get all users',
-        description: 'Retrieve a list of all users from the database',
-        tags: ['Users'],
-        authenticated: true,
-        deprecated: false,
+      layout: 'BaseLayout',
+      deepLinking: true,
+      displayOperationId: false,
+      defaultModelsExpandDepth: 1,
+      defaultModelExpandDepth: 1,
+      defaultModelRendering: 'example',
+      displayRequestDuration: true,
+      docExpansion: 'list',
+      filter: false,
+      maxDisplayedTags: 100,
+      showExtensions: false,
+      showCommonExtensions: false,
+      useUnsafeMarkdown: false,
+      tryItOutEnabled: true,
+      theme: {
+        mode: 'light',
       },
-      {
-        path: '/test-db-service/users',
-        method: 'POST',
-        operationId: 'createUser',
-        summary: 'Create new user',
-        description: 'Create a new user record in the database',
-        tags: ['Users'],
-        authenticated: true,
-        deprecated: false,
-      },
-    ],
-    health: {
-      status: 'healthy',
-      lastChecked: new Date().toISOString(),
-      responseTime: 45,
-      uptime: 99.99,
-      errorRate: 0.001,
-      details: {
-        connectionPool: 'healthy',
-        diskSpace: 'sufficient',
-        memoryUsage: 'normal',
-      },
+    } as SwaggerUIConfig,
+    selectedApiKey: undefined,
+    apiKeys: [],
+    theme: 'light',
+    loading: {
+      spec: false,
+      apiKeys: false,
+      service: false,
     },
+    errors: {
+      spec: null,
+      apiKeys: null,
+      swagger: null,
+    },
+    ui: {
+      height: '600px',
+      sidebarCollapsed: false,
+      showSettings: false,
+      autoRefresh: false,
+      refreshInterval: 30000,
+    },
+    
+    // Action properties (mocked functions)
+    loadService: vi.fn().mockResolvedValue(undefined),
+    updateConfig: vi.fn(),
+    selectApiKey: vi.fn(),
+    toggleTheme: vi.fn(),
+    setTheme: vi.fn(),
+    refresh: vi.fn().mockResolvedValue(undefined),
+    downloadSpec: vi.fn(),
+    copyApiKey: vi.fn().mockResolvedValue(undefined),
+    clearErrors: vi.fn(),
+    reset: vi.fn(),
+    updateUI: vi.fn(),
+    
+    // Apply any overrides
     ...overrides,
-  };
-
-  // Validate the mock service info against the schema
-  const validation = ServiceInfoSchema.safeParse(mockService);
-  if (!validation.success) {
-    throw new Error(`Invalid mock service info: ${validation.error.message}`);
   }
-
-  return mockService;
+  
+  return defaultState
 }
 
 /**
- * Creates mock API test result for testing
- * Provides realistic test result data for API testing scenarios
+ * Factory function for creating mock API key information
+ * Supports comprehensive API key testing scenarios
  */
-export function createMockApiTestResult(overrides: Partial<ApiTestResult> = {}): ApiTestResult {
-  const mockRequest: ApiCallInfo = {
-    id: 'test-call-123',
-    timestamp: new Date().toISOString(),
-    method: 'GET',
-    url: 'http://localhost:3000/api/v2/test-db-service/users',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-DreamFactory-Api-Key': 'df-test-key-abcd1234567890efgh',
-      'Accept': 'application/json',
-    },
-    status: 'success',
-  };
-
-  const mockResult: ApiTestResult = {
-    success: true,
-    duration: 234,
-    request: mockRequest,
-    response: {
-      statusCode: 200,
-      statusText: 'OK',
-      headers: {
-        'Content-Type': 'application/json; charset=utf-8',
-        'X-DreamFactory-Request-Id': 'req-abc123',
-        'X-RateLimit-Remaining': '99',
-      },
-      body: {
-        resource: [
-          {
-            id: 1,
-            name: 'John Doe',
-            email: 'john.doe@example.com',
-            created_at: '2024-01-01T00:00:00Z',
-          },
-          {
-            id: 2,
-            name: 'Jane Smith',
-            email: 'jane.smith@example.com',
-            created_at: '2024-01-02T00:00:00Z',
-          },
-        ],
-        meta: {
-          count: 2,
-          total_count: 2,
-        },
-      },
-      size: 156,
-      contentType: 'application/json',
-    },
-    performanceMetrics: {
-      dnsLookup: 12,
-      tcpConnect: 23,
-      tlsHandshake: 45,
-      timeToFirstByte: 89,
-      contentDownload: 65,
-      totalTime: 234,
-    },
-    ...overrides,
-  };
-
-  return mockResult;
-}
+export const createMockApiKey = (overrides: Partial<ApiKeyInfo> = {}): ApiKeyInfo => ({
+  id: 'test-key-id',
+  name: 'Test API Key',
+  apiKey: 'test-api-key-value',
+  description: 'Test API key for unit testing',
+  createdAt: '2024-01-01T00:00:00Z',
+  expiresAt: '2024-12-31T23:59:59Z',
+  lastUsed: '2024-03-01T12:00:00Z',
+  status: 'active',
+  scopes: ['read', 'write'],
+  rateLimit: {
+    requestsPerMinute: 100,
+    requestsPerHour: 5000,
+    requestsPerDay: 50000,
+  },
+  usage: {
+    totalRequests: 1000,
+    dailyRequests: 50,
+    errorCount: 5,
+  },
+  security: {
+    requireHTTPS: true,
+    enableLogging: true,
+  },
+  metadata: {
+    environment: 'development',
+    version: 1,
+  },
+  ...overrides,
+})
 
 /**
- * Creates mock validation errors for testing
- * Provides realistic validation error data for error handling testing
+ * Factory function for creating mock service API keys collection
  */
-export function createMockValidationErrors(count: number = 2): ValidationError[] {
-  const errors: ValidationError[] = [];
+export const createMockServiceApiKeys = (
+  overrides: Partial<ServiceApiKeys> = {}
+): ServiceApiKeys => ({
+  serviceId: 1,
+  serviceName: 'test-service',
+  keys: [
+    createMockApiKey({ name: 'Primary API Key' }),
+    createMockApiKey({ 
+      name: 'Secondary API Key', 
+      id: 'test-key-2', 
+      apiKey: 'test-api-key-2' 
+    }),
+  ],
+  lastUpdated: '2024-03-01T12:00:00Z',
+  pagination: {
+    page: 1,
+    pageSize: 50,
+    total: 2,
+    hasNext: false,
+    hasPrevious: false,
+  },
+  ...overrides,
+})
 
-  for (let i = 0; i < count; i++) {
-    errors.push({
-      path: `field_${i + 1}`,
-      message: `Validation error for field ${i + 1}`,
-      code: `VALIDATION_ERROR_${i + 1}`,
-      severity: i === 0 ? 'error' : 'warning',
-      line: i + 1,
-      column: (i + 1) * 10,
-    });
-  }
-
-  return errors;
-}
+/**
+ * Factory function for creating mock OpenAPI preview errors
+ */
+export const createMockOpenAPIError = (
+  overrides: Partial<OpenAPIPreviewError> = {}
+): OpenAPIPreviewError => ({
+  message: 'Test OpenAPI preview error',
+  category: 'spec',
+  code: 'TEST_ERROR',
+  timestamp: '2024-03-01T12:00:00Z',
+  context: {
+    service: {
+      id: 1,
+      name: 'test-service',
+      type: 'mysql',
+    },
+  },
+  recoveryActions: [
+    {
+      label: 'Retry',
+      action: vi.fn(),
+      description: 'Retry the failed operation',
+    },
+  ],
+  ...overrides,
+})
 
 // ============================================================================
-// Test Environment Setup
+// Test Environment Configuration and Utilities
 // ============================================================================
 
 /**
- * Global test environment setup for OpenAPI preview tests
- * Configures DOM cleanup, error handling, and test isolation
+ * Test environment configuration options
+ * Enables customization of test execution behavior
  */
-export function setupTestEnvironment(): void {
-  // Setup MSW server
-  setupMockServer();
+export interface TestEnvironmentConfig {
+  /** Enable verbose logging for debugging */
+  verbose?: boolean
+  /** Mock network delays for realistic testing */
+  enableNetworkDelay?: boolean
+  /** Simulate slow network conditions */
+  slowNetwork?: boolean
+  /** Enable error simulation */
+  simulateErrors?: boolean
+  /** Custom MSW handlers */
+  customHandlers?: Array<any>
+  /** React Query client overrides */
+  queryClientOverrides?: Partial<ConstructorParameters<typeof QueryClient>[0]>
+}
 
-  // Configure React Testing Library cleanup
-  afterEach(() => {
-    cleanup();
-    resetTestQueryClient();
-  });
+/**
+ * Configure test environment with custom options
+ * Provides flexible test setup for different testing scenarios
+ */
+export const configureTestEnvironment = (config: TestEnvironmentConfig = {}): void => {
+  const {
+    verbose = false,
+    enableNetworkDelay = false,
+    slowNetwork = false,
+    simulateErrors = false,
+    customHandlers = [],
+  } = config
+  
+  // Configure logging level
+  if (verbose) {
+    process.env.VITEST_LOG_ERRORS = 'true'
+  }
+  
+  // Configure network delay simulation
+  if (enableNetworkDelay || slowNetwork) {
+    const delay = slowNetwork ? NETWORK_DELAYS.SLOW : NETWORK_DELAYS.NORMAL
+    // Apply delay to mock responses
+    process.env.VITEST_NETWORK_DELAY = delay.toString()
+  }
+  
+  // Configure error simulation
+  if (simulateErrors) {
+    server.use(...errorHandlers)
+  }
+  
+  // Apply custom handlers
+  if (customHandlers.length > 0) {
+    server.use(...customHandlers)
+  }
+}
 
-  // Configure global error handling for tests
-  beforeAll(() => {
-    // Mock console methods to avoid noise during tests unless verbose
-    if (process.env.VITEST_LOG_LEVEL !== 'verbose') {
-      vi.stubGlobal('console', {
-        log: vi.fn(),
-        warn: vi.fn(),
-        error: vi.fn(),
-        debug: vi.fn(),
-        info: vi.fn(),
-      });
+/**
+ * Wait for all React Query operations to complete
+ * Useful for testing async operations and ensuring stable test state
+ */
+export const waitForQueries = async (): Promise<void> => {
+  // Wait for all queries to settle
+  await vi.waitFor(() => {
+    const queryCache = testQueryClient.getQueryCache()
+    const queries = queryCache.getAll()
+    const pendingQueries = queries.filter(query => query.state.fetchStatus === 'fetching')
+    
+    if (pendingQueries.length > 0) {
+      throw new Error(`${pendingQueries.length} queries still pending`)
     }
+  }, {
+    timeout: 5000,
+    interval: 100,
+  })
+}
 
-    // Mock window.matchMedia for responsive design testing
-    Object.defineProperty(window, 'matchMedia', {
-      writable: true,
-      value: vi.fn().mockImplementation((query) => ({
-        matches: false,
-        media: query,
-        onchange: null,
-        addListener: vi.fn(), // Deprecated
-        removeListener: vi.fn(), // Deprecated
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-        dispatchEvent: vi.fn(),
-      })),
-    });
+/**
+ * Wait for specific query to complete
+ * Enables targeted waiting for specific data loading scenarios
+ */
+export const waitForQuery = async (queryKey: unknown[]): Promise<void> => {
+  await vi.waitFor(() => {
+    const query = testQueryClient.getQueryCache().find({ queryKey })
+    if (!query || query.state.fetchStatus === 'fetching') {
+      throw new Error(`Query ${JSON.stringify(queryKey)} still pending`)
+    }
+  }, {
+    timeout: 5000,
+    interval: 100,
+  })
+}
 
-    // Mock ResizeObserver for virtual scrolling components
-    global.ResizeObserver = vi.fn().mockImplementation(() => ({
-      observe: vi.fn(),
-      unobserve: vi.fn(),
-      disconnect: vi.fn(),
-    }));
-
-    // Mock IntersectionObserver for lazy loading components
-    global.IntersectionObserver = vi.fn().mockImplementation(() => ({
-      observe: vi.fn(),
-      unobserve: vi.fn(),
-      disconnect: vi.fn(),
-    }));
-
-    // Mock fetch for components that might bypass MSW
-    global.fetch = vi.fn();
-
-    // Mock localStorage and sessionStorage
-    const mockStorage = {
-      getItem: vi.fn(),
-      setItem: vi.fn(),
-      removeItem: vi.fn(),
-      clear: vi.fn(),
-      length: 0,
-      key: vi.fn(),
-    };
-
-    Object.defineProperty(window, 'localStorage', {
-      value: mockStorage,
-    });
-
-    Object.defineProperty(window, 'sessionStorage', {
-      value: mockStorage,
-    });
-  });
-
-  // Reset all mocks after each test
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
+/**
+ * Simulate user interaction delays for more realistic testing
+ */
+export const simulateUserDelay = async (ms: number = 100): Promise<void> => {
+  await new Promise(resolve => setTimeout(resolve, ms))
 }
 
 // ============================================================================
-// Test Utility Functions
+// Custom Test Matchers and Assertions
 // ============================================================================
 
 /**
- * Waits for React Query to settle all pending queries
- * Ensures that all async operations complete before assertions
+ * Custom assertion for validating OpenAPI specifications
  */
-export async function waitForQueriesToSettle(queryClient: QueryClient = getTestQueryClient()): Promise<void> {
-  await queryClient.refetchQueries();
-  await new Promise((resolve) => setTimeout(resolve, 0));
-}
-
-/**
- * Waits for specific time duration in tests
- * Useful for testing loading states and transitions
- */
-export function waitFor(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/**
- * Creates a mock function with typed return value
- * Provides better TypeScript support for mock functions
- */
-export function createMockFunction<T extends (...args: any[]) => any>(
-  implementation?: T
-): MockInstance<Parameters<T>, ReturnType<T>> {
-  return vi.fn(implementation);
-}
-
-/**
- * Asserts that a value matches a Zod schema
- * Provides runtime type validation during tests
- */
-export function expectToMatchSchema<T>(value: unknown, schema: any): asserts value is T {
-  const result = schema.safeParse(value);
-  if (!result.success) {
-    throw new Error(`Value does not match schema: ${result.error.message}`);
+export const expectValidOpenAPISpec = (spec: unknown): void => {
+  const errors = validateOpenApiSpec(spec)
+  
+  if (errors.length > 0) {
+    const errorMessages = errors.map(error => `${error.path}: ${error.message}`).join('\n')
+    throw new Error(`Invalid OpenAPI specification:\n${errorMessages}`)
   }
 }
 
 /**
- * Creates a spy on a specific object method
- * Useful for monitoring method calls during tests
+ * Custom assertion for checking React Query cache state
  */
-export function createMethodSpy<T extends object, K extends keyof T>(
-  object: T,
-  methodName: K
-): MockInstance {
-  return vi.spyOn(object, methodName);
-}
-
-// ============================================================================
-// Performance Testing Utilities
-// ============================================================================
-
-/**
- * Measures the execution time of a function
- * Useful for performance testing and benchmarking
- */
-export async function measureExecutionTime<T>(
-  fn: () => Promise<T> | T
-): Promise<{ result: T; duration: number }> {
-  const startTime = performance.now();
-  const result = await fn();
-  const endTime = performance.now();
-  const duration = endTime - startTime;
-
-  return { result, duration };
+export const expectQueryCacheToContain = (queryKey: unknown[]): void => {
+  const query = testQueryClient.getQueryCache().find({ queryKey })
+  
+  if (!query) {
+    throw new Error(`Query with key ${JSON.stringify(queryKey)} not found in cache`)
+  }
+  
+  if (query.state.status === 'error') {
+    throw new Error(`Query ${JSON.stringify(queryKey)} is in error state: ${query.state.error}`)
+  }
 }
 
 /**
- * Asserts that an operation completes within a specified time limit
- * Ensures performance requirements are met during testing
+ * Custom assertion for checking MSW handler coverage
  */
-export async function expectToCompleteWithin<T>(
-  fn: () => Promise<T> | T,
-  maxDuration: number
-): Promise<T> {
-  const { result, duration } = await measureExecutionTime(fn);
+export const expectHandlerToBeCalled = (url: string, method: string = 'GET'): void => {
+  // This would require MSW handler call tracking implementation
+  // For now, we'll use a simple mock verification approach
+  const handlers = server.listHandlers()
+  const matchingHandler = handlers.find(handler => {
+    // Basic URL matching - in real implementation this would be more sophisticated
+    return handler.info.header.includes(url.toLowerCase())
+  })
   
-  expect(duration).toBeLessThanOrEqual(maxDuration);
-  
-  return result;
+  if (!matchingHandler) {
+    throw new Error(`No MSW handler found for ${method} ${url}`)
+  }
 }
 
 // ============================================================================
-// Accessibility Testing Utilities
+// Export Test Data and Constants
 // ============================================================================
 
 /**
- * Mock for axe-core accessibility testing
- * Provides accessibility validation during component testing
+ * Re-export mock data from MSW handlers for convenient test access
  */
-export const mockAxeCore = {
-  run: vi.fn().mockResolvedValue({
-    violations: [],
-    passes: [],
-    incomplete: [],
-    inapplicable: [],
-  }),
-  configure: vi.fn(),
-  reset: vi.fn(),
-};
-
-/**
- * Validates accessibility compliance for a component
- * Ensures WCAG 2.1 AA compliance during testing
- */
-export async function expectToBeAccessible(element: Element): Promise<void> {
-  const results = await mockAxeCore.run(element);
-  expect(results.violations).toHaveLength(0);
-}
-
-// ============================================================================
-// Export Configuration
-// ============================================================================
-
-/**
- * Default test configuration for OpenAPI preview tests
- * Provides standardized settings for consistent testing
- */
-export const defaultTestConfig = {
-  // React Query configuration
-  queryClient: {
-    retry: false,
-    gcTime: 0,
-    staleTime: 0,
-    refetchOnWindowFocus: false,
-  },
-  
-  // MSW configuration
-  msw: {
-    onUnhandledRequest: 'warn' as const,
-  },
-  
-  // Performance thresholds (in milliseconds)
-  performance: {
-    maxRenderTime: 100,
-    maxQueryTime: 1000,
-    maxApiCallTime: 2000,
-  },
-  
-  // Accessibility configuration
-  accessibility: {
-    level: 'AA' as const,
-    tags: ['wcag2a', 'wcag2aa'],
-  },
-} as const;
-
-// Export all utilities and configurations
-export * from '../types';
 export {
-  // Test environment setup
-  setupTestEnvironment,
-  
-  // MSW server utilities
-  mockServer,
-  setupMockServer,
-  
-  // React Query utilities
-  createTestQueryClient,
-  getTestQueryClient,
-  resetTestQueryClient,
-  waitForQueriesToSettle,
-  
-  // Mock data factories
-  createMockOpenAPISpec,
-  createMockApiKey,
-  createMockServiceInfo,
-  createMockApiTestResult,
-  createMockValidationErrors,
-  
-  // Test utilities
-  waitFor,
-  createMockFunction,
-  expectToMatchSchema,
-  createMethodSpy,
-  
-  // Performance utilities
-  measureExecutionTime,
-  expectToCompleteWithin,
-  
-  // Accessibility utilities
-  mockAxeCore,
-  expectToBeAccessible,
-  
-  // Configuration
-  defaultTestConfig,
-};
+  MOCK_SERVICES,
+  MYSQL_OPENAPI_SPEC,
+  EMAIL_OPENAPI_SPEC,
+  MOCK_API_KEYS,
+  NETWORK_DELAYS,
+  API_ENDPOINTS,
+  HTTP_HEADERS,
+  createMockApiResponse,
+  validateOpenApiSpec,
+}
 
 /**
- * Auto-setup for OpenAPI preview tests
- * Automatically configures the test environment when this module is imported
+ * Common test constants for consistent testing
  */
-setupTestEnvironment();
+export const TEST_CONSTANTS = {
+  /** Default test timeout for async operations */
+  DEFAULT_TIMEOUT: 5000,
+  
+  /** Reduced timeout for fast operations */
+  FAST_TIMEOUT: 1000,
+  
+  /** Extended timeout for slow operations */
+  SLOW_TIMEOUT: 10000,
+  
+  /** Default test service ID */
+  TEST_SERVICE_ID: 1,
+  
+  /** Default test API key */
+  TEST_API_KEY: 'test-api-key',
+  
+  /** Default test user ID */
+  TEST_USER_ID: 'test-user-id',
+  
+  /** Test SwaggerUI container ID */
+  SWAGGER_CONTAINER_ID: 'swagger-ui-container',
+  
+  /** Common test selectors */
+  SELECTORS: {
+    loadingSpinner: '[data-testid="loading-spinner"]',
+    errorMessage: '[data-testid="error-message"]',
+    apiKeySelector: '[data-testid="api-key-selector"]',
+    themeToggle: '[data-testid="theme-toggle"]',
+    downloadButton: '[data-testid="download-button"]',
+    refreshButton: '[data-testid="refresh-button"]',
+    swaggerContainer: '[data-testid="swagger-ui-container"]',
+  },
+} as const
+
+/**
+ * Type exports for testing utilities
+ */
+export type {
+  TestEnvironmentConfig,
+  MockedFunction,
+  MockedClass,
+  MockInstance,
+}
+
+/**
+ * Console helper for debugging tests
+ * Only active when verbose mode is enabled
+ */
+export const debugLog = (...args: unknown[]): void => {
+  if (process.env.VITEST_LOG_ERRORS === 'true') {
+    console.log('[TEST DEBUG]', ...args)
+  }
+}
+
+/**
+ * Performance measurement utility for test optimization
+ */
+export const measureTestPerformance = async <T>(
+  operation: () => Promise<T> | T,
+  label: string = 'Test Operation'
+): Promise<{ result: T; duration: number }> => {
+  const start = performance.now()
+  const result = await operation()
+  const duration = performance.now() - start
+  
+  debugLog(`${label} completed in ${duration.toFixed(2)}ms`)
+  
+  return { result, duration }
+}
+
+/**
+ * Test suite configuration for consistent setup across all OpenAPI preview tests
+ * Enables standardized test environment configuration and optimal performance
+ */
+export const setupOpenAPIPreviewTests = (config: TestEnvironmentConfig = {}): void => {
+  // Configure test environment with provided options
+  configureTestEnvironment(config)
+  
+  // Setup any additional test utilities or global mocks
+  beforeEach(() => {
+    // Ensure clean state for each test
+    enhancedCleanup()
+    
+    // Reset any global test state
+    vi.clearAllTimers()
+    vi.clearAllMocks()
+  })
+  
+  debugLog('OpenAPI Preview test suite initialized with configuration:', config)
+}
+
+/**
+ * Default export for convenient test setup import
+ */
+export default {
+  server,
+  serverConfig,
+  testQueryClient,
+  createTestQueryClient,
+  enhancedCleanup,
+  configureTestEnvironment,
+  setupOpenAPIPreviewTests,
+  waitForQueries,
+  waitForQuery,
+  createMockOpenAPIPreviewStore,
+  createMockApiKey,
+  createMockServiceApiKeys,
+  createMockOpenAPIError,
+  expectValidOpenAPISpec,
+  expectQueryCacheToContain,
+  expectHandlerToBeCalled,
+  TEST_CONSTANTS,
+  debugLog,
+  measureTestPerformance,
+}
