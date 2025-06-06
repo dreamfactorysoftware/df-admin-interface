@@ -76,7 +76,7 @@
     </div>
   </div>
 
-  <mat-accordion>
+  <mat-accordion *ngIf="curlCommands.length > 0">
     <mat-expansion-panel #curlCommandsPanel>
       <mat-expansion-panel-header>
         <mat-panel-title>
@@ -108,9 +108,6 @@
             </mat-card-actions>
           </mat-card>
         </div>
-        <p *ngIf="!curlCommands || curlCommands.length === 0">
-          {{ 'apiBasicCurlCommands.noCommands' | transloco }}
-        </p>
       </ng-template>
     </mat-expansion-panel>
   </mat-accordion>

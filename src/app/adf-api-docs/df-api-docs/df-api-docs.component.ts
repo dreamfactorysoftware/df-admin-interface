@@ -329,9 +329,6 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
         const sessionToken = this.userDataService.token
           ? this.userDataService.token
           : 'YOUR_SESSION_TOKEN';
-
-        console.log(`${BASE_URL}/${this.serviceName}${endpoint}`);
-          
         const command = `curl -X 'GET' '${window.location.origin}${BASE_URL}/${this.serviceName}${endpoint}' -H 'accept: application/json' -H '${SESSION_TOKEN_HEADER}: ${sessionToken}'`;
         this.curlCommands.push({ text: command });
       });
