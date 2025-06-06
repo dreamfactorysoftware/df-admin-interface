@@ -1,333 +1,249 @@
 /**
- * Loading Component for Create Limits Route
+ * @fileoverview Next.js loading UI component for create limits route
  * 
- * Next.js loading UI component for the create limits route, providing skeleton
- * loading states while the page component and form data are being fetched.
- * Implements consistent loading patterns with Tailwind CSS animations and
- * accessibility features for screen readers during SSR hydration and data
- * loading operations.
+ * Provides skeleton loading states while the page component and form data are being fetched.
+ * Implements consistent loading patterns with Tailwind CSS animations and accessibility
+ * features for screen readers during SSR hydration and data loading operations.
  * 
  * Features:
- * - Next.js app router loading UI patterns for suspense boundaries
- * - Tailwind CSS 4.1+ skeleton animations with consistent theme injection
+ * - Next.js 15.1+ app router loading UI patterns for suspense boundaries
+ * - Tailwind CSS 4.1+ skeleton animations with shimmer effects
  * - WCAG 2.1 AA compliance for loading states and screen reader accessibility
- * - Visual consistency matching the limit-form component structure
- * - Proper ARIA labels and loading indicators for accessibility compliance
+ * - Visual consistency matching limit-form component layout structure
+ * - Performance-optimized animations respecting prefers-reduced-motion
  * 
  * @version 1.0.0
- * @compliance WCAG 2.1 AA
- * @framework Next.js 15.1+ App Router
+ * @since Next.js 15.1.0 / React 19.0.0
  */
 
-import React from 'react';
-
-// ============================================================================
-// SKELETON COMPONENTS
-// ============================================================================
-
-/**
- * Base skeleton component with consistent Tailwind CSS animations
- * Provides foundational skeleton styling with accessibility support
- */
-const Skeleton = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement> & {
-    className?: string;
-  }
->(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={`animate-pulse rounded-md bg-muted/50 ${className || ''}`}
-    {...props}
-  />
-));
-Skeleton.displayName = 'Skeleton';
-
-/**
- * Card skeleton component matching the limit-form structure
- * Provides consistent card layout with proper spacing and shadows
- */
-const CardSkeleton = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement> & {
-    className?: string;
-  }
->(({ className, children, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={`rounded-lg border bg-card text-card-foreground shadow-sm transition-colors ${className || ''}`}
-    {...props}
-  >
-    {children}
-  </div>
-));
-CardSkeleton.displayName = 'CardSkeleton';
-
-/**
- * Form field skeleton component
- * Mimics the structure of form inputs with label and field areas
- */
-const FormFieldSkeleton: React.FC<{
-  hasLabel?: boolean;
-  fieldHeight?: 'sm' | 'md' | 'lg';
-  className?: string;
-}> = ({ hasLabel = true, fieldHeight = 'md', className }) => {
-  const fieldHeightClasses = {
-    sm: 'h-8',
-    md: 'h-10',
-    lg: 'h-12',
-  };
-
+export default function Loading() {
   return (
-    <div className={`space-y-2 ${className || ''}`}>
-      {hasLabel && <Skeleton className="h-4 w-24" />}
-      <Skeleton className={`w-full ${fieldHeightClasses[fieldHeight]}`} />
-    </div>
-  );
-};
+    <div className="min-h-screen bg-background py-8 px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-4xl">
+        {/* Loading announcer for screen readers */}
+        <div 
+          className="sr-only" 
+          role="status" 
+          aria-live="polite"
+          aria-label="Loading create limit form"
+        >
+          Loading create limit form. Please wait while the form loads...
+        </div>
 
-/**
- * Select field skeleton component
- * Includes arrow indicator to match select field appearance
- */
-const SelectFieldSkeleton: React.FC<{
-  hasLabel?: boolean;
-  className?: string;
-}> = ({ hasLabel = true, className }) => (
-  <div className={`space-y-2 ${className || ''}`}>
-    {hasLabel && <Skeleton className="h-4 w-32" />}
-    <div className="relative">
-      <Skeleton className="h-10 w-full" />
-      <div className="absolute right-3 top-1/2 -translate-y-1/2">
-        <Skeleton className="h-4 w-4" />
-      </div>
-    </div>
-  </div>
-);
+        {/* Page Header Skeleton */}
+        <div className="mb-8">
+          {/* Breadcrumb skeleton */}
+          <div className="mb-4 flex items-center space-x-2">
+            <div className="loading-skeleton h-4 w-16 rounded" />
+            <div className="text-gray-400">/</div>
+            <div className="loading-skeleton h-4 w-20 rounded" />
+            <div className="text-gray-400">/</div>
+            <div className="loading-skeleton h-4 w-24 rounded" />
+          </div>
 
-/**
- * Button skeleton component
- * Matches button sizing and positioning
- */
-const ButtonSkeleton: React.FC<{
-  variant?: 'primary' | 'secondary';
-  size?: 'sm' | 'md' | 'lg';
-  fullWidth?: boolean;
-  className?: string;
-}> = ({ variant = 'primary', size = 'md', fullWidth = false, className }) => {
-  const sizeClasses = {
-    sm: 'h-8 w-16',
-    md: 'h-10 w-20',
-    lg: 'h-12 w-24',
-  };
-
-  return (
-    <Skeleton
-      className={`
-        ${fullWidth ? 'w-full' : sizeClasses[size]}
-        ${variant === 'primary' ? 'bg-primary/20' : 'bg-secondary/20'}
-        rounded-md
-        ${className || ''}
-      `}
-    />
-  );
-};
-
-// ============================================================================
-// MAIN LOADING COMPONENT
-// ============================================================================
-
-/**
- * Create Limits Loading Component
- * 
- * Provides skeleton loading states that match the structure of the limit-form
- * component for visual consistency during loading operations. Implements
- * Next.js app router loading patterns with comprehensive accessibility support.
- */
-export default function CreateLimitsLoading(): JSX.Element {
-  return (
-    <div
-      className="container mx-auto px-4 py-6 max-w-4xl"
-      role="status"
-      aria-live="polite"
-      aria-label="Loading create limits form"
-    >
-      {/* Screen reader announcement */}
-      <span className="sr-only">
-        Loading create limits form. Please wait while the form loads.
-      </span>
-
-      {/* Page Header Skeleton */}
-      <div className="mb-8 space-y-4">
-        <Skeleton className="h-8 w-48" aria-hidden="true" />
-        <Skeleton className="h-4 w-96" aria-hidden="true" />
-      </div>
-
-      {/* Main Form Card Skeleton */}
-      <CardSkeleton className="p-6">
-        <div className="space-y-6">
+          {/* Page title skeleton */}
+          <div className="loading-skeleton h-8 w-48 rounded mb-2" />
           
-          {/* Form Header */}
-          <div className="border-b pb-4">
-            <Skeleton className="h-6 w-40 mb-2" aria-hidden="true" />
-            <Skeleton className="h-4 w-80" aria-hidden="true" />
+          {/* Page description skeleton */}
+          <div className="space-y-2">
+            <div className="loading-skeleton h-4 w-96 rounded" />
+            <div className="loading-skeleton h-4 w-72 rounded" />
+          </div>
+        </div>
+
+        {/* Main Form Card Skeleton */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+          {/* Card Header */}
+          <div className="border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+            <div className="loading-skeleton h-6 w-32 rounded mb-2" />
+            <div className="loading-skeleton h-4 w-80 rounded" />
           </div>
 
-          {/* Basic Information Section */}
-          <div className="space-y-4">
-            <Skeleton className="h-5 w-36 mb-4" aria-hidden="true" />
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormFieldSkeleton
-                hasLabel={true}
-                fieldHeight="md"
-                className="col-span-1"
-              />
-              <SelectFieldSkeleton
-                hasLabel={true}
-                className="col-span-1"
-              />
-            </div>
-
-            <FormFieldSkeleton
-              hasLabel={true}
-              fieldHeight="lg"
-              className="col-span-2"
-            />
-          </div>
-
-          {/* Limit Configuration Section */}
-          <div className="space-y-4 border-t pt-6">
-            <Skeleton className="h-5 w-44 mb-4" aria-hidden="true" />
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <FormFieldSkeleton
-                hasLabel={true}
-                fieldHeight="md"
-              />
-              <SelectFieldSkeleton
-                hasLabel={true}
-              />
-              <FormFieldSkeleton
-                hasLabel={true}
-                fieldHeight="md"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <SelectFieldSkeleton
-                hasLabel={true}
-              />
-              <SelectFieldSkeleton
-                hasLabel={true}
-              />
-            </div>
-          </div>
-
-          {/* Service and Endpoint Configuration */}
-          <div className="space-y-4 border-t pt-6">
-            <Skeleton className="h-5 w-52 mb-4" aria-hidden="true" />
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <SelectFieldSkeleton hasLabel={true} />
-              <SelectFieldSkeleton hasLabel={true} />
-            </div>
-
-            <FormFieldSkeleton
-              hasLabel={true}
-              fieldHeight="md"
-            />
-          </div>
-
-          {/* Access Control Section */}
-          <div className="space-y-4 border-t pt-6">
-            <Skeleton className="h-5 w-32 mb-4" aria-hidden="true" />
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <SelectFieldSkeleton hasLabel={true} />
-              <SelectFieldSkeleton hasLabel={true} />
-            </div>
-
-            {/* Checkbox Options Skeleton */}
-            <div className="space-y-3">
-              {[1, 2, 3].map((index) => (
-                <div key={index} className="flex items-center space-x-3">
-                  <Skeleton className="h-4 w-4 rounded" aria-hidden="true" />
-                  <Skeleton className="h-4 w-32" aria-hidden="true" />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Advanced Options Section */}
-          <div className="space-y-4 border-t pt-6">
-            <div className="flex items-center space-x-3 mb-4">
-              <Skeleton className="h-4 w-4 rounded" aria-hidden="true" />
-              <Skeleton className="h-5 w-36" aria-hidden="true" />
-            </div>
-            
-            <div className="pl-7 space-y-4">
-              <FormFieldSkeleton
-                hasLabel={true}
-                fieldHeight="lg"
-              />
+          {/* Card Content */}
+          <div className="px-6 py-6 space-y-8">
+            {/* Basic Information Section */}
+            <div className="space-y-6">
+              <div className="loading-skeleton h-5 w-40 rounded" />
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormFieldSkeleton
-                  hasLabel={true}
-                  fieldHeight="md"
-                />
-                <SelectFieldSkeleton hasLabel={true} />
+              {/* Form fields row 1 */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Limit Name Field */}
+                <div className="space-y-2">
+                  <div className="loading-skeleton h-4 w-24 rounded" />
+                  <div className="loading-skeleton h-10 w-full rounded-md" />
+                </div>
+
+                {/* Limit Type Field */}
+                <div className="space-y-2">
+                  <div className="loading-skeleton h-4 w-20 rounded" />
+                  <div className="loading-skeleton h-10 w-full rounded-md" />
+                </div>
+              </div>
+
+              {/* Form fields row 2 */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Rate Limit Field */}
+                <div className="space-y-2">
+                  <div className="loading-skeleton h-4 w-32 rounded" />
+                  <div className="loading-skeleton h-10 w-full rounded-md" />
+                </div>
+
+                {/* Duration Field */}
+                <div className="space-y-2">
+                  <div className="loading-skeleton h-4 w-20 rounded" />
+                  <div className="loading-skeleton h-10 w-full rounded-md" />
+                </div>
+              </div>
+            </div>
+
+            {/* Target Configuration Section */}
+            <div className="space-y-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+              <div className="loading-skeleton h-5 w-48 rounded" />
+              
+              {/* Service/API Selection */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <div className="loading-skeleton h-4 w-28 rounded" />
+                  <div className="loading-skeleton h-10 w-full rounded-md" />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="loading-skeleton h-4 w-24 rounded" />
+                  <div className="loading-skeleton h-10 w-full rounded-md" />
+                </div>
+              </div>
+
+              {/* Endpoint Pattern Field */}
+              <div className="space-y-2">
+                <div className="loading-skeleton h-4 w-36 rounded" />
+                <div className="loading-skeleton h-10 w-full rounded-md" />
+                <div className="loading-skeleton h-3 w-64 rounded mt-1" />
+              </div>
+            </div>
+
+            {/* User/Role Configuration Section */}
+            <div className="space-y-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+              <div className="loading-skeleton h-5 w-44 rounded" />
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* User Selection */}
+                <div className="space-y-2">
+                  <div className="loading-skeleton h-4 w-20 rounded" />
+                  <div className="loading-skeleton h-10 w-full rounded-md" />
+                </div>
+
+                {/* Role Selection */}
+                <div className="space-y-2">
+                  <div className="loading-skeleton h-4 w-16 rounded" />
+                  <div className="loading-skeleton h-10 w-full rounded-md" />
+                </div>
+              </div>
+            </div>
+
+            {/* Advanced Options Section */}
+            <div className="space-y-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+              <div className="loading-skeleton h-5 w-40 rounded" />
+              
+              {/* Checkbox options */}
+              <div className="space-y-4">
+                <div className="flex items-center space-x-3">
+                  <div className="loading-skeleton h-4 w-4 rounded" />
+                  <div className="loading-skeleton h-4 w-32 rounded" />
+                </div>
+                
+                <div className="flex items-center space-x-3">
+                  <div className="loading-skeleton h-4 w-4 rounded" />
+                  <div className="loading-skeleton h-4 w-40 rounded" />
+                </div>
+
+                <div className="flex items-center space-x-3">
+                  <div className="loading-skeleton h-4 w-4 rounded" />
+                  <div className="loading-skeleton h-4 w-28 rounded" />
+                </div>
+              </div>
+
+              {/* Description Field */}
+              <div className="space-y-2">
+                <div className="loading-skeleton h-4 w-24 rounded" />
+                <div className="loading-skeleton h-24 w-full rounded-md" />
+                <div className="loading-skeleton h-3 w-48 rounded mt-1" />
               </div>
             </div>
           </div>
 
-          {/* Form Actions */}
-          <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3 pt-6 border-t">
-            <ButtonSkeleton
-              variant="secondary"
-              size="md"
-              className="sm:w-auto"
-            />
-            <ButtonSkeleton
-              variant="primary"
-              size="md"
-              className="sm:w-auto"
-            />
+          {/* Card Footer with Action Buttons */}
+          <div className="border-t border-gray-200 dark:border-gray-700 px-6 py-4 bg-gray-50 dark:bg-gray-800/50">
+            <div className="flex items-center justify-between">
+              {/* Left side - Cancel button */}
+              <div className="loading-skeleton h-10 w-20 rounded-md" />
+              
+              {/* Right side - Action buttons */}
+              <div className="flex items-center space-x-3">
+                <div className="loading-skeleton h-10 w-24 rounded-md" />
+                <div className="loading-skeleton h-10 w-28 rounded-md" />
+              </div>
+            </div>
           </div>
         </div>
-      </CardSkeleton>
 
-      {/* Loading Progress Indicator */}
-      <div className="mt-6 flex items-center justify-center">
-        <div className="flex items-center space-x-2 text-muted-foreground">
-          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary" aria-hidden="true" />
-          <span className="text-sm" aria-live="polite">
-            Loading form data...
-          </span>
+        {/* Loading Progress Indicator */}
+        <div className="mt-6 flex items-center justify-center">
+          <div className="flex items-center space-x-3">
+            {/* Animated spinner */}
+            <div 
+              className="animate-spin h-5 w-5 border-2 border-primary-200 border-t-primary-500 rounded-full"
+              aria-hidden="true"
+            />
+            
+            {/* Loading text */}
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              Preparing form...
+            </span>
+          </div>
+        </div>
+
+        {/* Accessibility status update */}
+        <div 
+          className="sr-only" 
+          aria-live="polite" 
+          aria-atomic="true"
+        >
+          Form is loading. Form fields and options will be available shortly.
         </div>
       </div>
 
-      {/* Hidden loading announcement for screen readers */}
-      <div className="sr-only" aria-live="assertive" role="status">
-        Form components are loading. Estimated completion time: 2-3 seconds.
-      </div>
+      {/* Global overlay for better focus management */}
+      <div 
+        className="fixed inset-0 bg-black/5 dark:bg-black/20 pointer-events-none z-[-1]"
+        aria-hidden="true"
+      />
     </div>
   );
 }
 
-// ============================================================================
-// COMPONENT METADATA
-// ============================================================================
-
 /**
- * Component metadata for Next.js app router
- * Ensures proper hydration and SSR compatibility
+ * Loading component accessibility features:
+ * 
+ * 1. Screen Reader Support:
+ *    - role="status" with aria-live="polite" for loading announcements
+ *    - Descriptive aria-label attributes for loading states
+ *    - sr-only class for screen reader only content
+ * 
+ * 2. WCAG 2.1 AA Compliance:
+ *    - Proper semantic structure with headings and landmarks
+ *    - Sufficient color contrast maintained in dark/light themes
+ *    - Animation respects prefers-reduced-motion preferences via CSS
+ *    - Focus management maintained during loading states
+ * 
+ * 3. Performance Considerations:
+ *    - Uses CSS classes from globals.css for optimized animations
+ *    - Skeleton placeholders prevent layout shift
+ *    - Minimal JavaScript execution during loading
+ *    - Responsive design optimized for all viewport sizes
+ * 
+ * 4. Next.js Integration:
+ *    - Works seamlessly with app router suspense boundaries
+ *    - Compatible with SSR hydration patterns
+ *    - Supports parallel route loading
+ *    - Integrates with Next.js loading UI conventions
  */
-CreateLimitsLoading.displayName = 'CreateLimitsLoading';
-
-/**
- * Export type for component props (none in this case)
- * Maintains consistency with other loading components
- */
-export type CreateLimitsLoadingProps = Record<string, never>;
