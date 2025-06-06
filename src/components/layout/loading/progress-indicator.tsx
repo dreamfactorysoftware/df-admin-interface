@@ -1,566 +1,523 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
-import { CheckCircle, XCircle, AlertCircle, Loader2, Clock } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { CheckCircle, AlertCircle, Loader2, Clock, PlayCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /**
- * Progress mode types for different operation scenarios
+ * Progress step definition for multi-step workflows
+ */
+export interface ProgressStep {
+  id: string;
+  title: string;
+  description?: string;
+  icon?: React.ComponentType<{ className?: string }>;
+  duration?: number; // Expected duration in milliseconds
+}
+
+/**
+ * Progress state for individual steps
+ */
+export type ProgressStepStatus = 'pending' | 'active' | 'completed' | 'error' | 'skipped';
+
+/**
+ * Progress mode types
  */
 export type ProgressMode = 'determinate' | 'indeterminate';
 
 /**
- * Step status for multi-step workflows
- */
-export type StepStatus = 'pending' | 'running' | 'completed' | 'error' | 'warning';
-
-/**
- * Progress variant for different visual styles
- */
-export type ProgressVariant = 'default' | 'compact' | 'detailed';
-
-/**
- * Individual step in a multi-step workflow
- */
-export interface ProgressStep {
-  /** Unique identifier for the step */
-  id: string;
-  /** Display label for the step */
-  label: string;
-  /** Optional description for additional context */
-  description?: string;
-  /** Current status of the step */
-  status: StepStatus;
-  /** Progress percentage for this step (0-100) */
-  progress?: number;
-  /** Estimated duration in milliseconds */
-  estimatedDuration?: number;
-  /** Actual start time */
-  startTime?: Date;
-  /** Completion time */
-  completionTime?: Date;
-  /** Error message if status is 'error' */
-  errorMessage?: string;
-  /** Warning message if status is 'warning' */
-  warningMessage?: string;
-}
-
-/**
- * Animation configuration for progress transitions
- */
-export interface ProgressAnimation {
-  /** Enable smooth transitions */
-  enabled: boolean;
-  /** Transition duration in milliseconds */
-  duration: number;
-  /** Easing function */
-  easing: 'linear' | 'ease-in' | 'ease-out' | 'ease-in-out';
-  /** Enable completion celebration */
-  celebrateCompletion: boolean;
-}
-
-/**
- * Props for the ProgressIndicator component
+ * Progress indicator component props
  */
 export interface ProgressIndicatorProps {
-  /** Array of steps for multi-step workflows */
+  /** List of steps in the workflow */
   steps: ProgressStep[];
-  /** Current overall progress (0-100) */
-  progress: number;
-  /** Progress mode */
-  mode: ProgressMode;
-  /** Visual variant */
-  variant?: ProgressVariant;
-  /** Show step labels */
-  showLabels?: boolean;
-  /** Show progress percentage */
+  /** Current active step index */
+  currentStep: number;
+  /** Progress mode - determinate shows percentage, indeterminate shows spinner */
+  mode?: ProgressMode;
+  /** Progress percentage (0-100) for determinate mode */
+  progress?: number;
+  /** Status for each step */
+  stepStatuses?: Record<string, ProgressStepStatus>;
+  /** Whether to show step descriptions */
+  showDescriptions?: boolean;
+  /** Whether to show step icons */
+  showIcons?: boolean;
+  /** Whether to show progress percentage */
   showPercentage?: boolean;
-  /** Show estimated time remaining */
+  /** Whether to show estimated time remaining */
   showTimeRemaining?: boolean;
-  /** Animation configuration */
-  animation?: Partial<ProgressAnimation>;
-  /** Loading state for indeterminate operations */
-  isLoading?: boolean;
-  /** Error state */
-  hasError?: boolean;
-  /** Overall error message */
-  errorMessage?: string;
-  /** Success state */
-  isComplete?: boolean;
-  /** Completion message */
-  completionMessage?: string;
-  /** Callback when a step is clicked */
-  onStepClick?: (step: ProgressStep) => void;
-  /** Callback when process is cancelled */
-  onCancel?: () => void;
-  /** Callback when process is retried */
-  onRetry?: () => void;
-  /** Additional CSS classes */
+  /** Custom class name */
   className?: string;
-  /** ARIA label for screen readers */
-  ariaLabel?: string;
-  /** ARIA describedby for additional context */
-  ariaDescribedBy?: string;
-  /** Enable keyboard navigation */
-  enableKeyboardNavigation?: boolean;
-  /** Auto-announce progress updates */
-  announceUpdates?: boolean;
+  /** Callback when step is clicked (for navigation) */
+  onStepClick?: (stepIndex: number, step: ProgressStep) => void;
+  /** Whether steps are clickable for navigation */
+  allowNavigation?: boolean;
+  /** Size variant */
+  size?: 'sm' | 'md' | 'lg';
+  /** Orientation */
+  orientation?: 'horizontal' | 'vertical';
+  /** Whether to animate progress changes */
+  animated?: boolean;
+  /** Custom colors for different states */
+  colors?: {
+    pending?: string;
+    active?: string;
+    completed?: string;
+    error?: string;
+  };
+  /** Accessibility label for the progress indicator */
+  'aria-label'?: string;
+  /** Test ID for testing */
+  'data-testid'?: string;
 }
 
 /**
- * Default animation configuration
+ * Individual step indicator component
  */
-const defaultAnimation: ProgressAnimation = {
-  enabled: true,
-  duration: 300,
-  easing: 'ease-out',
-  celebrateCompletion: true,
+interface StepIndicatorProps {
+  step: ProgressStep;
+  index: number;
+  status: ProgressStepStatus;
+  isLast: boolean;
+  onClick?: () => void;
+  showDescription: boolean;
+  showIcon: boolean;
+  size: 'sm' | 'md' | 'lg';
+  orientation: 'horizontal' | 'vertical';
+  allowNavigation: boolean;
+  colors: Required<ProgressIndicatorProps['colors']>;
+  animated: boolean;
+}
+
+/**
+ * Step indicator component for individual workflow steps
+ */
+const StepIndicator: React.FC<StepIndicatorProps> = ({
+  step,
+  index,
+  status,
+  isLast,
+  onClick,
+  showDescription,
+  showIcon,
+  size,
+  orientation,
+  allowNavigation,
+  colors,
+  animated,
+}) => {
+  const sizeClasses = {
+    sm: {
+      circle: 'h-6 w-6',
+      icon: 'h-3 w-3',
+      title: 'text-xs font-medium',
+      description: 'text-xs',
+      connector: 'h-0.5',
+    },
+    md: {
+      circle: 'h-8 w-8',
+      icon: 'h-4 w-4',
+      title: 'text-sm font-medium',
+      description: 'text-sm',
+      connector: 'h-0.5',
+    },
+    lg: {
+      circle: 'h-10 w-10',
+      icon: 'h-5 w-5',
+      title: 'text-base font-medium',
+      description: 'text-base',
+      connector: 'h-0.5',
+    },
+  };
+
+  const statusConfig = {
+    pending: {
+      circle: `bg-gray-200 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 ${colors.pending}`,
+      icon: null,
+      text: 'text-gray-500 dark:text-gray-400',
+    },
+    active: {
+      circle: `bg-primary-100 dark:bg-primary-900/30 border-2 border-primary-600 ${colors.active}`,
+      icon: status === 'active' ? Loader2 : PlayCircle,
+      text: 'text-primary-700 dark:text-primary-300',
+    },
+    completed: {
+      circle: `bg-green-100 dark:bg-green-900/30 border-2 border-green-600 ${colors.completed}`,
+      icon: CheckCircle,
+      text: 'text-green-700 dark:text-green-300',
+    },
+    error: {
+      circle: `bg-red-100 dark:bg-red-900/30 border-2 border-red-600 ${colors.error}`,
+      icon: AlertCircle,
+      text: 'text-red-700 dark:text-red-300',
+    },
+    skipped: {
+      circle: 'bg-gray-100 dark:bg-gray-800 border-2 border-gray-400 dark:border-gray-500',
+      icon: null,
+      text: 'text-gray-400 dark:text-gray-500',
+    },
+  };
+
+  const config = statusConfig[status];
+  const StatusIcon = showIcon && (step.icon || config.icon);
+  const isClickable = allowNavigation && onClick && (status === 'completed' || status === 'active');
+
+  const stepContent = (
+    <div
+      className={cn(
+        'flex items-center',
+        orientation === 'horizontal' ? 'flex-col' : 'flex-row',
+        isClickable && 'cursor-pointer hover:opacity-80',
+        'transition-all duration-200',
+        animated && 'transform hover:scale-105'
+      )}
+      onClick={isClickable ? onClick : undefined}
+      role={isClickable ? 'button' : 'listitem'}
+      tabIndex={isClickable ? 0 : -1}
+      onKeyDown={
+        isClickable
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onClick?.();
+              }
+            }
+          : undefined
+      }
+      aria-label={`Step ${index + 1}: ${step.title}${
+        step.description ? ` - ${step.description}` : ''
+      }. Status: ${status}`}
+      data-testid={`step-indicator-${step.id}`}
+    >
+      {/* Step Circle */}
+      <div
+        className={cn(
+          'relative flex items-center justify-center rounded-full transition-all duration-300',
+          sizeClasses[size].circle,
+          config.circle,
+          animated && status === 'active' && 'animate-pulse'
+        )}
+        aria-hidden="true"
+      >
+        {StatusIcon && (
+          <StatusIcon
+            className={cn(
+              sizeClasses[size].icon,
+              config.text,
+              status === 'active' && animated && 'animate-spin'
+            )}
+          />
+        )}
+        {!StatusIcon && (
+          <span className={cn('font-semibold', config.text, sizeClasses[size].icon)}>
+            {index + 1}
+          </span>
+        )}
+      </div>
+
+      {/* Step Text */}
+      <div
+        className={cn(
+          'text-center',
+          orientation === 'horizontal' ? 'mt-2' : 'ml-3 text-left',
+          config.text
+        )}
+      >
+        <div className={sizeClasses[size].title}>{step.title}</div>
+        {showDescription && step.description && (
+          <div className={cn(sizeClasses[size].description, 'opacity-75 mt-1')}>
+            {step.description}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  if (orientation === 'horizontal') {
+    return (
+      <div className="flex flex-col items-center relative">
+        {stepContent}
+        {/* Connector Line */}
+        {!isLast && (
+          <div
+            className={cn(
+              'absolute top-1/2 left-full transform -translate-y-1/2',
+              'ml-2 w-8 bg-gray-300 dark:bg-gray-600',
+              sizeClasses[size].connector,
+              status === 'completed' && 'bg-green-500',
+              animated && 'transition-colors duration-300'
+            )}
+            aria-hidden="true"
+          />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-start relative">
+      {stepContent}
+      {/* Connector Line */}
+      {!isLast && (
+        <div
+          className={cn(
+            'absolute left-4 top-8 w-0.5 h-8 bg-gray-300 dark:bg-gray-600',
+            status === 'completed' && 'bg-green-500',
+            animated && 'transition-colors duration-300'
+          )}
+          aria-hidden="true"
+        />
+      )}
+    </div>
+  );
 };
 
 /**
- * ProgressIndicator Component
+ * Progress bar component for determinate progress
+ */
+interface ProgressBarProps {
+  progress: number;
+  animated: boolean;
+  showPercentage: boolean;
+  className?: string;
+}
+
+const ProgressBar: React.FC<ProgressBarProps> = ({
+  progress,
+  animated,
+  showPercentage,
+  className,
+}) => {
+  const clampedProgress = Math.max(0, Math.min(100, progress));
+
+  return (
+    <div className={cn('w-full', className)}>
+      <div className="flex justify-between items-center mb-2">
+        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Progress</span>
+        {showPercentage && (
+          <span className="text-sm text-gray-600 dark:text-gray-400">{clampedProgress}%</span>
+        )}
+      </div>
+      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+        <div
+          className={cn(
+            'h-2 rounded-full bg-gradient-to-r from-primary-500 to-primary-600',
+            animated && 'transition-all duration-500 ease-out'
+          )}
+          style={{ width: `${clampedProgress}%` }}
+          role="progressbar"
+          aria-valuenow={clampedProgress}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={`Progress: ${clampedProgress}%`}
+        />
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Progress Indicator Component
  * 
- * A comprehensive progress indicator component for multi-step workflows like database
- * service creation, API generation, and schema discovery. Provides visual feedback
- * for operations with known duration and step progression.
+ * A comprehensive progress indicator for multi-step workflows like database service creation,
+ * API generation, and schema discovery. Supports both determinate and indeterminate progress
+ * modes with step-by-step visual feedback.
  * 
  * Features:
- * - Multi-step workflow support with visual step indicators
+ * - Multi-step workflow visualization
  * - Determinate and indeterminate progress modes
- * - Real-time progress tracking with React Query integration
- * - WCAG 2.1 AA accessibility compliance
- * - Customizable animations and completion celebrations
- * - Error handling and retry mechanisms
- * - Keyboard navigation support
- * - Screen reader announcements
+ * - Step navigation and status tracking
+ * - Customizable appearance and animations
+ * - Full accessibility support
+ * - Integration with React Query mutations
+ * 
+ * @param props - Progress indicator configuration
+ * @returns JSX.Element
  */
-export function ProgressIndicator({
+export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
   steps,
-  progress,
-  mode,
-  variant = 'default',
-  showLabels = true,
+  currentStep,
+  mode = 'determinate',
+  progress = 0,
+  stepStatuses = {},
+  showDescriptions = true,
+  showIcons = true,
   showPercentage = true,
   showTimeRemaining = false,
-  animation = {},
-  isLoading = false,
-  hasError = false,
-  errorMessage,
-  isComplete = false,
-  completionMessage,
-  onStepClick,
-  onCancel,
-  onRetry,
   className,
-  ariaLabel = 'Progress indicator',
-  ariaDescribedBy,
-  enableKeyboardNavigation = true,
-  announceUpdates = true,
-  ...props
-}: ProgressIndicatorProps) {
-  const [focusedStepIndex, setFocusedStepIndex] = useState<number>(-1);
-  const [lastAnnouncedProgress, setLastAnnouncedProgress] = useState<number>(0);
-  const [celebrating, setCelebrating] = useState<boolean>(false);
+  onStepClick,
+  allowNavigation = false,
+  size = 'md',
+  orientation = 'horizontal',
+  animated = true,
+  colors = {},
+  'aria-label': ariaLabel,
+  'data-testid': dataTestId,
+}) => {
+  const [startTime] = useState(Date.now());
+  const [estimatedTimeRemaining, setEstimatedTimeRemaining] = useState<number | null>(null);
 
-  // Merge animation configuration with defaults
-  const animationConfig = { ...defaultAnimation, ...animation };
-
-  // Calculate overall status based on steps
-  const overallStatus = React.useMemo(() => {
-    if (hasError) return 'error';
-    if (isComplete) return 'completed';
-    if (isLoading && mode === 'indeterminate') return 'running';
-    
-    const hasErrorStep = steps.some(step => step.status === 'error');
-    const hasRunningStep = steps.some(step => step.status === 'running');
-    const allCompleted = steps.length > 0 && steps.every(step => step.status === 'completed');
-    
-    if (hasErrorStep) return 'error';
-    if (hasRunningStep) return 'running';
-    if (allCompleted) return 'completed';
-    return 'pending';
-  }, [steps, hasError, isComplete, isLoading, mode]);
-
-  // Calculate estimated time remaining
-  const estimatedTimeRemaining = React.useMemo(() => {
-    if (!showTimeRemaining || mode === 'indeterminate') return null;
-    
-    const runningStep = steps.find(step => step.status === 'running');
-    if (!runningStep?.estimatedDuration) return null;
-    
-    const elapsed = runningStep.startTime 
-      ? Date.now() - runningStep.startTime.getTime()
-      : 0;
-    
-    const remaining = Math.max(0, runningStep.estimatedDuration - elapsed);
-    return Math.ceil(remaining / 1000); // Convert to seconds
-  }, [steps, showTimeRemaining, mode]);
-
-  // Announce progress updates to screen readers
-  const announceProgress = useCallback((currentProgress: number, stepName?: string) => {
-    if (!announceUpdates) return;
-    
-    // Only announce significant progress changes (every 10%) or step changes
-    const progressDiff = Math.abs(currentProgress - lastAnnouncedProgress);
-    if (progressDiff < 10 && !stepName) return;
-    
-    const announcement = stepName 
-      ? `Step ${stepName} completed. Overall progress: ${currentProgress}%`
-      : `Progress: ${currentProgress}%`;
-    
-    // Create live region for screen reader announcement
-    const liveRegion = document.createElement('div');
-    liveRegion.setAttribute('aria-live', 'polite');
-    liveRegion.setAttribute('aria-atomic', 'true');
-    liveRegion.className = 'sr-only';
-    liveRegion.textContent = announcement;
-    
-    document.body.appendChild(liveRegion);
-    setTimeout(() => {
-      if (document.body.contains(liveRegion)) {
-        document.body.removeChild(liveRegion);
-      }
-    }, 1000);
-    
-    setLastAnnouncedProgress(currentProgress);
-  }, [announceUpdates, lastAnnouncedProgress]);
-
-  // Handle completion celebration
-  useEffect(() => {
-    if (isComplete && animationConfig.celebrateCompletion && !celebrating) {
-      setCelebrating(true);
-      announceProgress(100, 'All steps completed');
-      
-      // Reset celebration state after animation
-      const timeout = setTimeout(() => {
-        setCelebrating(false);
-      }, animationConfig.duration * 2);
-      
-      return () => clearTimeout(timeout);
-    }
-  }, [isComplete, animationConfig, celebrating, announceProgress]);
-
-  // Handle keyboard navigation
-  const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
-    if (!enableKeyboardNavigation) return;
-    
-    switch (event.key) {
-      case 'ArrowRight':
-      case 'ArrowDown':
-        event.preventDefault();
-        setFocusedStepIndex(prev => 
-          prev < steps.length - 1 ? prev + 1 : prev
-        );
-        break;
-      case 'ArrowLeft':
-      case 'ArrowUp':
-        event.preventDefault();
-        setFocusedStepIndex(prev => prev > 0 ? prev - 1 : prev);
-        break;
-      case 'Enter':
-      case ' ':
-        event.preventDefault();
-        if (focusedStepIndex >= 0 && onStepClick) {
-          onStepClick(steps[focusedStepIndex]);
-        }
-        break;
-      case 'Escape':
-        event.preventDefault();
-        setFocusedStepIndex(-1);
-        break;
-    }
-  }, [enableKeyboardNavigation, focusedStepIndex, onStepClick, steps]);
-
-  // Base container styles
-  const containerStyles = cn(
-    'w-full space-y-4',
-    'focus-within:outline-none',
-    className
-  );
-
-  // Progress bar styles
-  const progressBarStyles = cn(
-    'relative w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden',
-    'transition-all duration-300 ease-out',
-    animationConfig.enabled && 'animate-pulse',
-    hasError && 'bg-red-100 dark:bg-red-900',
-    isComplete && celebrating && 'animate-pulse'
-  );
-
-  // Progress fill styles
-  const progressFillStyles = cn(
-    'h-full transition-all ease-out rounded-full',
-    `duration-[${animationConfig.duration}ms]`,
-    overallStatus === 'running' && 'bg-primary-500',
-    overallStatus === 'completed' && 'bg-success-500',
-    overallStatus === 'error' && 'bg-error-500',
-    overallStatus === 'pending' && 'bg-gray-400',
-    celebrating && 'animate-pulse'
-  );
-
-  // Step status icon mapping
-  const getStatusIcon = (status: StepStatus) => {
-    const iconProps = { 
-      className: 'w-4 h-4',
-      'aria-hidden': true 
-    };
-    
-    switch (status) {
-      case 'completed':
-        return <CheckCircle {...iconProps} className={cn(iconProps.className, 'text-success-500')} />;
-      case 'error':
-        return <XCircle {...iconProps} className={cn(iconProps.className, 'text-error-500')} />;
-      case 'warning':
-        return <AlertCircle {...iconProps} className={cn(iconProps.className, 'text-warning-500')} />;
-      case 'running':
-        return <Loader2 {...iconProps} className={cn(iconProps.className, 'text-primary-500 animate-spin')} />;
-      case 'pending':
-      default:
-        return <Clock {...iconProps} className={cn(iconProps.className, 'text-gray-400')} />;
-    }
+  // Default color configuration
+  const defaultColors = {
+    pending: '',
+    active: '',
+    completed: '',
+    error: '',
+    ...colors,
   };
 
-  // Render step indicators
-  const renderSteps = () => {
-    if (variant === 'compact') {
-      return (
-        <div className="flex items-center justify-between">
-          {steps.map((step, index) => (
-            <div
-              key={step.id}
-              className={cn(
-                'flex items-center space-x-2 cursor-pointer',
-                focusedStepIndex === index && 'ring-2 ring-primary-500 ring-offset-2 rounded-md p-1',
-                onStepClick && 'hover:bg-gray-50 dark:hover:bg-gray-800 rounded-md p-1'
-              )}
-              onClick={() => onStepClick?.(step)}
-              onKeyDown={handleKeyDown}
-              tabIndex={enableKeyboardNavigation ? 0 : -1}
-              role="button"
-              aria-label={`Step ${index + 1}: ${step.label}. Status: ${step.status}`}
-            >
-              {getStatusIcon(step.status)}
-              {showLabels && (
-                <span className={cn(
-                  'text-sm font-medium',
-                  step.status === 'completed' && 'text-success-600',
-                  step.status === 'error' && 'text-error-600',
-                  step.status === 'warning' && 'text-warning-600',
-                  step.status === 'running' && 'text-primary-600',
-                  step.status === 'pending' && 'text-gray-500'
-                )}>
-                  {step.label}
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
-      );
-    }
+  // Calculate step statuses based on current step and provided statuses
+  const calculatedStatuses = useMemo(() => {
+    const statuses: Record<string, ProgressStepStatus> = {};
+    
+    steps.forEach((step, index) => {
+      if (stepStatuses[step.id]) {
+        statuses[step.id] = stepStatuses[step.id];
+      } else if (index < currentStep) {
+        statuses[step.id] = 'completed';
+      } else if (index === currentStep) {
+        statuses[step.id] = 'active';
+      } else {
+        statuses[step.id] = 'pending';
+      }
+    });
+    
+    return statuses;
+  }, [steps, currentStep, stepStatuses]);
 
-    return (
-      <div className="space-y-3">
-        {steps.map((step, index) => (
-          <div
-            key={step.id}
-            className={cn(
-              'flex items-start space-x-3 p-3 rounded-lg transition-all duration-200',
-              'border border-gray-200 dark:border-gray-700',
-              focusedStepIndex === index && 'ring-2 ring-primary-500 ring-offset-2',
-              onStepClick && 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800',
-              step.status === 'completed' && 'bg-success-50 dark:bg-success-900/20 border-success-200 dark:border-success-800',
-              step.status === 'error' && 'bg-error-50 dark:bg-error-900/20 border-error-200 dark:border-error-800',
-              step.status === 'warning' && 'bg-warning-50 dark:bg-warning-900/20 border-warning-200 dark:border-warning-800',
-              step.status === 'running' && 'bg-primary-50 dark:bg-primary-900/20 border-primary-200 dark:border-primary-800'
-            )}
-            onClick={() => onStepClick?.(step)}
-            onKeyDown={handleKeyDown}
-            tabIndex={enableKeyboardNavigation ? 0 : -1}
-            role="button"
-            aria-label={`Step ${index + 1}: ${step.label}. Status: ${step.status}. ${step.description || ''}`}
-            aria-describedby={step.errorMessage || step.warningMessage ? `step-${step.id}-message` : undefined}
-          >
-            <div className="flex-shrink-0 mt-0.5">
-              {getStatusIcon(step.status)}
-            </div>
-            
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between">
-                <h4 className={cn(
-                  'text-sm font-medium',
-                  step.status === 'completed' && 'text-success-800 dark:text-success-200',
-                  step.status === 'error' && 'text-error-800 dark:text-error-200',
-                  step.status === 'warning' && 'text-warning-800 dark:text-warning-200',
-                  step.status === 'running' && 'text-primary-800 dark:text-primary-200',
-                  step.status === 'pending' && 'text-gray-700 dark:text-gray-300'
-                )}>
-                  {step.label}
-                </h4>
-                
-                {step.progress !== undefined && (
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                    {step.progress}%
-                  </span>
-                )}
-              </div>
-              
-              {step.description && (
-                <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
-                  {step.description}
-                </p>
-              )}
-              
-              {(step.errorMessage || step.warningMessage) && (
-                <p
-                  id={`step-${step.id}-message`}
-                  className={cn(
-                    'mt-1 text-xs',
-                    step.errorMessage && 'text-error-600 dark:text-error-400',
-                    step.warningMessage && 'text-warning-600 dark:text-warning-400'
-                  )}
-                >
-                  {step.errorMessage || step.warningMessage}
-                </p>
-              )}
-              
-              {step.status === 'running' && step.progress !== undefined && (
-                <div className="mt-2">
-                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
-                    <div
-                      className="bg-primary-500 h-1.5 rounded-full transition-all duration-300"
-                      style={{ width: `${step.progress}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-    );
+  // Calculate estimated time remaining based on progress and elapsed time
+  useEffect(() => {
+    if (showTimeRemaining && mode === 'determinate' && progress > 0) {
+      const elapsed = Date.now() - startTime;
+      const estimated = (elapsed / progress) * (100 - progress);
+      setEstimatedTimeRemaining(estimated);
+    }
+  }, [progress, showTimeRemaining, mode, startTime]);
+
+  // Handle step click for navigation
+  const handleStepClick = useCallback(
+    (stepIndex: number, step: ProgressStep) => {
+      if (allowNavigation && onStepClick) {
+        onStepClick(stepIndex, step);
+      }
+    },
+    [allowNavigation, onStepClick]
+  );
+
+  // Calculate overall progress based on completed steps
+  const overallProgress = useMemo(() => {
+    if (mode === 'indeterminate') return 0;
+    if (progress !== undefined) return progress;
+    
+    const completedSteps = steps.filter((step) => calculatedStatuses[step.id] === 'completed').length;
+    return (completedSteps / steps.length) * 100;
+  }, [mode, progress, steps, calculatedStatuses]);
+
+  // Format time remaining for display
+  const formatTimeRemaining = (ms: number): string => {
+    const seconds = Math.ceil(ms / 1000);
+    if (seconds < 60) return `${seconds}s`;
+    const minutes = Math.ceil(seconds / 60);
+    return `${minutes}m`;
   };
 
   return (
     <div
-      className={containerStyles}
+      className={cn(
+        'w-full space-y-6',
+        className
+      )}
       role="progressbar"
-      aria-label={ariaLabel}
-      aria-describedby={ariaDescribedBy}
-      aria-valuenow={mode === 'determinate' ? progress : undefined}
+      aria-label={ariaLabel || `Progress indicator with ${steps.length} steps`}
+      aria-valuenow={mode === 'determinate' ? overallProgress : undefined}
       aria-valuemin={0}
       aria-valuemax={100}
-      aria-valuetext={mode === 'determinate' ? `${progress}% complete` : 'Loading...'}
-      onKeyDown={handleKeyDown}
-      {...props}
+      data-testid={dataTestId || 'progress-indicator'}
     >
-      {/* Main progress bar */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            {isLoading && mode === 'indeterminate' && (
-              <Loader2 className="w-4 h-4 text-primary-500 animate-spin" aria-hidden="true" />
-            )}
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              {isComplete 
-                ? completionMessage || 'Complete'
-                : hasError 
-                ? 'Error'
-                : `Step ${steps.findIndex(s => s.status === 'running') + 1} of ${steps.length}`
-              }
-            </span>
-          </div>
-          
-          <div className="flex items-center space-x-3">
-            {showPercentage && mode === 'determinate' && (
-              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                {progress}%
-              </span>
-            )}
-            
-            {estimatedTimeRemaining && (
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                ~{estimatedTimeRemaining}s remaining
-              </span>
-            )}
-          </div>
+      {/* Progress Bar (for determinate mode) */}
+      {mode === 'determinate' && (
+        <ProgressBar
+          progress={overallProgress}
+          animated={animated}
+          showPercentage={showPercentage}
+          className="mb-4"
+        />
+      )}
+
+      {/* Time Remaining Display */}
+      {showTimeRemaining && estimatedTimeRemaining && mode === 'determinate' && (
+        <div className="flex items-center justify-center text-sm text-gray-600 dark:text-gray-400 mb-4">
+          <Clock className="h-4 w-4 mr-2" />
+          <span>Estimated time remaining: {formatTimeRemaining(estimatedTimeRemaining)}</span>
         </div>
-        
-        <div className={progressBarStyles}>
-          {mode === 'determinate' ? (
-            <div
-              className={progressFillStyles}
-              style={{ width: `${progress}%` }}
-            />
-          ) : (
-            <div className={cn(
-              progressFillStyles,
-              'w-1/3 animate-pulse'
-            )}>
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
+      )}
+
+      {/* Steps Display */}
+      <div
+        className={cn(
+          'flex',
+          orientation === 'horizontal' 
+            ? 'flex-row justify-between items-start space-x-4' 
+            : 'flex-col space-y-4'
+        )}
+        role="list"
+        aria-label="Workflow steps"
+      >
+        {steps.map((step, index) => (
+          <StepIndicator
+            key={step.id}
+            step={step}
+            index={index}
+            status={calculatedStatuses[step.id]}
+            isLast={index === steps.length - 1}
+            onClick={() => handleStepClick(index, step)}
+            showDescription={showDescriptions}
+            showIcon={showIcons}
+            size={size}
+            orientation={orientation}
+            allowNavigation={allowNavigation}
+            colors={defaultColors}
+            animated={animated}
+          />
+        ))}
+      </div>
+
+      {/* Current Step Information */}
+      {currentStep < steps.length && (
+        <div className="text-center mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <div className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+            Current Step: {steps[currentStep]?.title}
+          </div>
+          {steps[currentStep]?.description && (
+            <div className="text-xs text-gray-600 dark:text-gray-400">
+              {steps[currentStep].description}
+            </div>
+          )}
+          {mode === 'indeterminate' && (
+            <div className="flex items-center justify-center mt-2">
+              <Loader2 className="h-4 w-4 animate-spin mr-2 text-primary-600" />
+              <span className="text-xs text-gray-600 dark:text-gray-400">Processing...</span>
             </div>
           )}
         </div>
+      )}
+
+      {/* Screen Reader Status Updates */}
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {mode === 'determinate' && showPercentage && (
+          `Progress: ${Math.round(overallProgress)}% complete. `
+        )}
+        {currentStep < steps.length && (
+          `Currently on step ${currentStep + 1} of ${steps.length}: ${steps[currentStep]?.title}. `
+        )}
+        {calculatedStatuses[steps[currentStep]?.id] === 'error' && (
+          'Error encountered in current step. '
+        )}
+        {currentStep >= steps.length && 'All steps completed successfully.'}
       </div>
-
-      {/* Step indicators */}
-      {steps.length > 0 && (
-        <div className="mt-4">
-          {renderSteps()}
-        </div>
-      )}
-
-      {/* Error message */}
-      {hasError && errorMessage && (
-        <div className="mt-3 p-3 bg-error-50 dark:bg-error-900/20 border border-error-200 dark:border-error-800 rounded-md">
-          <div className="flex items-start space-x-2">
-            <XCircle className="w-4 h-4 text-error-500 flex-shrink-0 mt-0.5" aria-hidden="true" />
-            <p className="text-sm text-error-800 dark:text-error-200">
-              {errorMessage}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Action buttons */}
-      {(onCancel || onRetry) && (
-        <div className="mt-4 flex items-center justify-end space-x-3">
-          {onCancel && (
-            <button
-              type="button"
-              onClick={onCancel}
-              className={cn(
-                'px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300',
-                'bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600',
-                'rounded-md hover:bg-gray-50 dark:hover:bg-gray-700',
-                'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
-                'transition-colors duration-200'
-              )}
-              aria-label="Cancel operation"
-            >
-              Cancel
-            </button>
-          )}
-          
-          {onRetry && hasError && (
-            <button
-              type="button"
-              onClick={onRetry}
-              className={cn(
-                'px-3 py-1.5 text-sm font-medium text-white',
-                'bg-primary-600 hover:bg-primary-700 active:bg-primary-800',
-                'border border-primary-600 hover:border-primary-700',
-                'rounded-md transition-colors duration-200',
-                'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2'
-              )}
-              aria-label="Retry operation"
-            >
-              Retry
-            </button>
-          )}
-        </div>
-      )}
     </div>
   );
-}
+};
 
 export default ProgressIndicator;
