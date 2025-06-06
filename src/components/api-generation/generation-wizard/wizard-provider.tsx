@@ -1,630 +1,620 @@
+/**
+ * @fileoverview Wizard Provider Component for API Generation Wizard
+ * 
+ * React context provider component that manages global wizard state, step navigation,
+ * and shared functionality across all generation wizard components. Implements Zustand
+ * store integration for wizard state management and provides context for multi-step
+ * API generation workflow.
+ * 
+ * Supports F-003 REST API Endpoint Generation per Section 2.1 Feature Catalog with
+ * React/Next.js Integration Requirements compliance. Replaces Angular service-based
+ * state management with React Context API and Zustand store per Section 4.3 State
+ * Management Workflows.
+ * 
+ * @module WizardProvider
+ * @version 1.0.0
+ */
+
 'use client';
 
-import React, { createContext, useContext, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useCallback, ReactNode } from 'react';
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { produce } from 'immer';
 
-// Types for the wizard state management
-interface DatabaseTable {
-  id: string;
-  name: string;
-  label?: string;
-  description?: string;
-  fields: DatabaseField[];
-  relationships: Relationship[];
-  selected: boolean;
+// Internal imports
+import { apiClient } from '../../../lib/api-client';
+import { 
+  WizardState, 
+  WizardActions, 
+  WizardStep, 
+  GenerationStatus, 
+  DatabaseTable, 
+  EndpointConfiguration,
+  OpenAPISpec,
+  GenerationResult,
+  WizardProviderProps,
+  TableSelectionFormData,
+  EndpointConfigurationFormData,
+  HTTPMethod
+} from './types';
+import { 
+  WIZARD_STEPS,
+  WIZARD_STEP_CONFIG,
+  WIZARD_QUERY_KEYS,
+  REACT_QUERY_CONFIG,
+  WIZARD_MUTATION_CONFIG,
+  DEFAULT_ENABLED_METHODS,
+  DEFAULT_ENDPOINT_CONFIG,
+  VALIDATION_MESSAGES
+} from './constants';
+
+// ============================================================================
+// ZUSTAND STORE DEFINITION
+// ============================================================================
+
+/**
+ * Zustand store interface for wizard state management
+ * Replaces Angular service-based patterns with React state management
+ */
+interface WizardStore extends WizardState, WizardActions {
+  // Internal actions for store management
+  _setLoading: (loading: boolean) => void;
+  _setError: (error?: string) => void;
+  _setGenerationStatus: (status: GenerationStatus) => void;
+  _updateValidationErrors: (stepKey: string, errors: string[]) => void;
+  _clearValidationErrors: () => void;
 }
 
-interface DatabaseField {
-  id: string;
-  name: string;
-  type: string;
-  nullable: boolean;
-  primaryKey: boolean;
-  foreignKey?: {
-    table: string;
-    field: string;
-  };
-}
+/**
+ * Default wizard state configuration
+ */
+const defaultState: WizardState = {
+  currentStep: WizardStep.TABLE_SELECTION,
+  loading: false,
+  error: undefined,
+  generationStatus: GenerationStatus.IDLE,
+  serviceName: '',
+  availableTables: [],
+  selectedTables: [],
+  endpointConfigurations: [],
+  generatedSpec: undefined,
+  generationProgress: 0,
+  generationResult: undefined,
+  validationErrors: {}
+};
 
-interface Relationship {
-  id: string;
-  type: 'one-to-many' | 'many-to-one' | 'many-to-many' | 'one-to-one';
-  fromTable: string;
-  toTable: string;
-  fromField: string;
-  toField: string;
-}
-
-interface EndpointConfiguration {
-  httpMethods: {
-    GET: boolean;
-    POST: boolean;
-    PUT: boolean;
-    PATCH: boolean;
-    DELETE: boolean;
-  };
-  enablePagination: boolean;
-  enableFiltering: boolean;
-  enableSorting: boolean;
-  maxPageSize: number;
-  customFields: string[];
-  securityRules: SecurityRule[];
-}
-
-interface SecurityRule {
-  id: string;
-  method: string;
-  roles: string[];
-  conditions: string;
-  enabled: boolean;
-}
-
-interface GenerationProgress {
-  currentStep: number;
-  completedSteps: number[];
-  isGenerating: boolean;
-  error: string | null;
-  generatedEndpoints: string[];
-}
-
-interface OpenAPIPreview {
-  specification: Record<string, any> | null;
-  isValid: boolean;
-  validationErrors: string[];
-  lastUpdated: Date | null;
-}
-
-// Wizard step definitions
-export const WIZARD_STEPS = {
-  TABLE_SELECTION: 0,
-  ENDPOINT_CONFIGURATION: 1,
-  SECURITY_CONFIGURATION: 2,
-  PREVIEW_AND_GENERATE: 3,
-} as const;
-
-export type WizardStep = typeof WIZARD_STEPS[keyof typeof WIZARD_STEPS];
-
-// Zustand store for wizard state management
-interface WizardState {
-  // Navigation state
-  currentStep: WizardStep;
-  completedSteps: Set<WizardStep>;
-  isNavigationLocked: boolean;
-  
-  // Database service context
-  serviceId: string | null;
-  serviceName: string | null;
-  databaseType: string | null;
-  
-  // Table selection state
-  availableTables: DatabaseTable[];
-  selectedTables: Map<string, DatabaseTable>;
-  tableSearchQuery: string;
-  
-  // Endpoint configuration state
-  endpointConfigurations: Map<string, EndpointConfiguration>;
-  globalConfiguration: Partial<EndpointConfiguration>;
-  
-  // Generation progress state
-  generationProgress: GenerationProgress;
-  
-  // OpenAPI preview state
-  openApiPreview: OpenAPIPreview;
-  
-  // Actions for navigation
-  setCurrentStep: (step: WizardStep) => void;
-  goToNextStep: () => void;
-  goToPreviousStep: () => void;
-  markStepCompleted: (step: WizardStep) => void;
-  resetWizard: () => void;
-  
-  // Actions for service context
-  setServiceContext: (serviceId: string, serviceName: string, databaseType: string) => void;
-  
-  // Actions for table management
-  setAvailableTables: (tables: DatabaseTable[]) => void;
-  toggleTableSelection: (tableId: string) => void;
-  selectAllTables: () => void;
-  deselectAllTables: () => void;
-  setTableSearchQuery: (query: string) => void;
-  getFilteredTables: () => DatabaseTable[];
-  
-  // Actions for endpoint configuration
-  updateEndpointConfiguration: (tableId: string, config: Partial<EndpointConfiguration>) => void;
-  updateGlobalConfiguration: (config: Partial<EndpointConfiguration>) => void;
-  applyGlobalConfigToSelected: () => void;
-  
-  // Actions for generation process
-  startGeneration: () => void;
-  updateGenerationProgress: (progress: Partial<GenerationProgress>) => void;
-  completeGeneration: (endpoints: string[]) => void;
-  setGenerationError: (error: string) => void;
-  
-  // Actions for OpenAPI preview
-  updateOpenApiPreview: (preview: Partial<OpenAPIPreview>) => void;
-  validateOpenApiPreview: () => void;
-}
-
-const createWizardStore = () => create<WizardState>()(
+/**
+ * Create Zustand store with subscribeWithSelector middleware for reactive updates
+ * Implements state management per Section 5.2 Component Details
+ */
+const useWizardStore = create<WizardStore>()(
   subscribeWithSelector((set, get) => ({
-    // Initial navigation state
-    currentStep: WIZARD_STEPS.TABLE_SELECTION,
-    completedSteps: new Set<WizardStep>(),
-    isNavigationLocked: false,
-    
-    // Initial service context
-    serviceId: null,
-    serviceName: null,
-    databaseType: null,
-    
-    // Initial table state
-    availableTables: [],
-    selectedTables: new Map<string, DatabaseTable>(),
-    tableSearchQuery: '',
-    
-    // Initial endpoint configuration state
-    endpointConfigurations: new Map<string, EndpointConfiguration>(),
-    globalConfiguration: {
-      httpMethods: {
-        GET: true,
-        POST: true,
-        PUT: true,
-        PATCH: false,
-        DELETE: false,
-      },
-      enablePagination: true,
-      enableFiltering: true,
-      enableSorting: true,
-      maxPageSize: 100,
-      customFields: [],
-      securityRules: [],
-    },
-    
-    // Initial generation progress state
-    generationProgress: {
-      currentStep: 0,
-      completedSteps: [],
-      isGenerating: false,
-      error: null,
-      generatedEndpoints: [],
-    },
-    
-    // Initial OpenAPI preview state
-    openApiPreview: {
-      specification: null,
-      isValid: false,
-      validationErrors: [],
-      lastUpdated: null,
-    },
-    
-    // Navigation actions
-    setCurrentStep: (step: WizardStep) => {
-      set((state) => {
-        if (state.isNavigationLocked) return state;
-        return { currentStep: step };
-      });
-    },
-    
-    goToNextStep: () => {
-      set((state) => {
-        if (state.isNavigationLocked) return state;
-        const nextStep = state.currentStep + 1;
-        if (nextStep <= WIZARD_STEPS.PREVIEW_AND_GENERATE) {
-          return { currentStep: nextStep as WizardStep };
-        }
-        return state;
-      });
-    },
-    
-    goToPreviousStep: () => {
-      set((state) => {
-        if (state.isNavigationLocked) return state;
-        const previousStep = state.currentStep - 1;
-        if (previousStep >= WIZARD_STEPS.TABLE_SELECTION) {
-          return { currentStep: previousStep as WizardStep };
-        }
-        return state;
-      });
-    },
-    
-    markStepCompleted: (step: WizardStep) => {
-      set((state) => ({
-        completedSteps: new Set([...state.completedSteps, step]),
-      }));
-    },
-    
-    resetWizard: () => {
-      set({
-        currentStep: WIZARD_STEPS.TABLE_SELECTION,
-        completedSteps: new Set<WizardStep>(),
-        isNavigationLocked: false,
-        selectedTables: new Map<string, DatabaseTable>(),
-        tableSearchQuery: '',
-        endpointConfigurations: new Map<string, EndpointConfiguration>(),
-        generationProgress: {
-          currentStep: 0,
-          completedSteps: [],
-          isGenerating: false,
-          error: null,
-          generatedEndpoints: [],
-        },
-        openApiPreview: {
-          specification: null,
-          isValid: false,
-          validationErrors: [],
-          lastUpdated: null,
-        },
-      });
-    },
-    
-    // Service context actions
-    setServiceContext: (serviceId: string, serviceName: string, databaseType: string) => {
-      set({
-        serviceId,
-        serviceName,
-        databaseType,
-      });
-    },
-    
-    // Table management actions
-    setAvailableTables: (tables: DatabaseTable[]) => {
-      set({ availableTables: tables });
-    },
-    
-    toggleTableSelection: (tableId: string) => {
-      set((state) => {
-        const newSelectedTables = new Map(state.selectedTables);
-        const table = state.availableTables.find(t => t.id === tableId);
-        
-        if (table) {
-          if (newSelectedTables.has(tableId)) {
-            newSelectedTables.delete(tableId);
-          } else {
-            newSelectedTables.set(tableId, { ...table, selected: true });
-          }
-        }
-        
-        return { selectedTables: newSelectedTables };
-      });
-    },
-    
-    selectAllTables: () => {
-      set((state) => {
-        const newSelectedTables = new Map<string, DatabaseTable>();
-        state.availableTables.forEach(table => {
-          newSelectedTables.set(table.id, { ...table, selected: true });
-        });
-        return { selectedTables: newSelectedTables };
-      });
-    },
-    
-    deselectAllTables: () => {
-      set({ selectedTables: new Map<string, DatabaseTable>() });
-    },
-    
-    setTableSearchQuery: (query: string) => {
-      set({ tableSearchQuery: query });
-    },
-    
-    getFilteredTables: () => {
+    ...defaultState,
+
+    // ========================================================================
+    // NAVIGATION ACTIONS
+    // ========================================================================
+
+    nextStep: async (): Promise<boolean> => {
       const state = get();
-      if (!state.tableSearchQuery.trim()) {
-        return state.availableTables;
-      }
+      const currentStepConfig = WIZARD_STEP_CONFIG[state.currentStep];
       
-      const query = state.tableSearchQuery.toLowerCase();
-      return state.availableTables.filter(table => 
-        table.name.toLowerCase().includes(query) ||
-        (table.label && table.label.toLowerCase().includes(query)) ||
-        (table.description && table.description.toLowerCase().includes(query))
-      );
+      try {
+        // Validate current step before proceeding
+        const isValid = await get().validateCurrentStep();
+        if (!isValid) {
+          return false;
+        }
+
+        // Move to next step if available
+        if (currentStepConfig.nextStep) {
+          set({ currentStep: currentStepConfig.nextStep });
+          return true;
+        }
+
+        return false;
+      } catch (error) {
+        console.error('Failed to proceed to next step:', error);
+        set({ error: `Navigation error: ${error instanceof Error ? error.message : 'Unknown error'}` });
+        return false;
+      }
     },
-    
-    // Endpoint configuration actions
-    updateEndpointConfiguration: (tableId: string, config: Partial<EndpointConfiguration>) => {
-      set((state) => {
-        const newConfigurations = new Map(state.endpointConfigurations);
-        const currentConfig = newConfigurations.get(tableId) || {
-          httpMethods: { GET: true, POST: true, PUT: true, PATCH: false, DELETE: false },
-          enablePagination: true,
-          enableFiltering: true,
-          enableSorting: true,
-          maxPageSize: 100,
-          customFields: [],
-          securityRules: [],
-        };
-        
-        newConfigurations.set(tableId, { ...currentConfig, ...config });
-        return { endpointConfigurations: newConfigurations };
-      });
-    },
-    
-    updateGlobalConfiguration: (config: Partial<EndpointConfiguration>) => {
-      set((state) => ({
-        globalConfiguration: { ...state.globalConfiguration, ...config },
-      }));
-    },
-    
-    applyGlobalConfigToSelected: () => {
-      set((state) => {
-        const newConfigurations = new Map(state.endpointConfigurations);
-        
-        state.selectedTables.forEach((table, tableId) => {
-          newConfigurations.set(tableId, {
-            ...state.globalConfiguration,
-            httpMethods: { ...state.globalConfiguration.httpMethods },
-            customFields: [...(state.globalConfiguration.customFields || [])],
-            securityRules: [...(state.globalConfiguration.securityRules || [])],
-          } as EndpointConfiguration);
+
+    previousStep: (): void => {
+      const state = get();
+      const currentStepConfig = WIZARD_STEP_CONFIG[state.currentStep];
+      
+      if (currentStepConfig.prevStep) {
+        set({ 
+          currentStep: currentStepConfig.prevStep,
+          error: undefined // Clear any errors when going back
         });
-        
-        return { endpointConfigurations: newConfigurations };
+      }
+    },
+
+    goToStep: (step: WizardStep): void => {
+      set({ 
+        currentStep: step,
+        error: undefined // Clear errors when manually navigating
       });
     },
-    
-    // Generation process actions
-    startGeneration: () => {
-      set((state) => ({
-        isNavigationLocked: true,
-        generationProgress: {
-          ...state.generationProgress,
-          isGenerating: true,
-          error: null,
-          currentStep: 0,
-          completedSteps: [],
-        },
-      }));
-    },
-    
-    updateGenerationProgress: (progress: Partial<GenerationProgress>) => {
-      set((state) => ({
-        generationProgress: { ...state.generationProgress, ...progress },
-      }));
-    },
-    
-    completeGeneration: (endpoints: string[]) => {
-      set((state) => ({
-        isNavigationLocked: false,
-        generationProgress: {
-          ...state.generationProgress,
-          isGenerating: false,
-          generatedEndpoints: endpoints,
-          currentStep: 100,
-        },
-      }));
-    },
-    
-    setGenerationError: (error: string) => {
-      set((state) => ({
-        isNavigationLocked: false,
-        generationProgress: {
-          ...state.generationProgress,
-          isGenerating: false,
-          error,
-        },
-      }));
-    },
-    
-    // OpenAPI preview actions
-    updateOpenApiPreview: (preview: Partial<OpenAPIPreview>) => {
-      set((state) => ({
-        openApiPreview: {
-          ...state.openApiPreview,
-          ...preview,
-          lastUpdated: new Date(),
-        },
-      }));
-    },
-    
-    validateOpenApiPreview: () => {
-      set((state) => {
-        const { specification } = state.openApiPreview;
-        
-        if (!specification) {
-          return {
-            openApiPreview: {
-              ...state.openApiPreview,
-              isValid: false,
-              validationErrors: ['No OpenAPI specification generated'],
-            },
-          };
-        }
-        
-        // Basic OpenAPI validation
-        const errors: string[] = [];
-        
-        if (!specification.openapi) {
-          errors.push('Missing OpenAPI version');
-        }
-        
-        if (!specification.info) {
-          errors.push('Missing info section');
-        }
-        
-        if (!specification.paths || Object.keys(specification.paths).length === 0) {
-          errors.push('No API paths defined');
-        }
-        
-        return {
-          openApiPreview: {
-            ...state.openApiPreview,
-            isValid: errors.length === 0,
-            validationErrors: errors,
-          },
-        };
+
+    // ========================================================================
+    // STATE MANAGEMENT ACTIONS
+    // ========================================================================
+
+    reset: (): void => {
+      set({
+        ...defaultState,
+        serviceName: get().serviceName // Preserve service name
       });
     },
+
+    updateState: (updates: Partial<WizardState>): void => {
+      set(produce((state: WizardStore) => {
+        Object.assign(state, updates);
+      }));
+    },
+
+    // ========================================================================
+    // VALIDATION ACTIONS
+    // ========================================================================
+
+    validateCurrentStep: async (): Promise<boolean> => {
+      const state = get();
+      
+      try {
+        set({ _setLoading: true } as any);
+        get()._clearValidationErrors();
+
+        switch (state.currentStep) {
+          case WizardStep.TABLE_SELECTION:
+            return get()._validateTableSelection();
+          
+          case WizardStep.ENDPOINT_CONFIGURATION:
+            return get()._validateEndpointConfiguration();
+          
+          case WizardStep.GENERATION_PREVIEW:
+            return get()._validateGenerationPreview();
+          
+          case WizardStep.GENERATION_PROGRESS:
+            return true; // Progress step doesn't require validation
+          
+          default:
+            return true;
+        }
+      } catch (error) {
+        console.error('Step validation failed:', error);
+        get()._setError(`Validation error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        return false;
+      } finally {
+        get()._setLoading(false);
+      }
+    },
+
+    // ========================================================================
+    // INTERNAL ACTIONS
+    // ========================================================================
+
+    _setLoading: (loading: boolean): void => {
+      set({ loading });
+    },
+
+    _setError: (error?: string): void => {
+      set({ error });
+    },
+
+    _setGenerationStatus: (status: GenerationStatus): void => {
+      set({ generationStatus: status });
+    },
+
+    _updateValidationErrors: (stepKey: string, errors: string[]): void => {
+      set(produce((state: WizardStore) => {
+        state.validationErrors[stepKey] = errors;
+      }));
+    },
+
+    _clearValidationErrors: (): void => {
+      set({ validationErrors: {} });
+    },
+
+    // ========================================================================
+    // VALIDATION HELPERS
+    // ========================================================================
+
+    _validateTableSelection(): boolean {
+      const state = get();
+      const errors: string[] = [];
+
+      if (state.selectedTables.length === 0) {
+        errors.push(VALIDATION_MESSAGES.tableSelection.required);
+      }
+
+      if (state.selectedTables.length > 50) {
+        errors.push(VALIDATION_MESSAGES.tableSelection.tooMany);
+      }
+
+      if (errors.length > 0) {
+        get()._updateValidationErrors('tableSelection', errors);
+        return false;
+      }
+
+      return true;
+    },
+
+    _validateEndpointConfiguration(): boolean {
+      const state = get();
+      const errors: string[] = [];
+
+      // Validate that each selected table has at least one HTTP method enabled
+      for (const table of state.selectedTables) {
+        const config = state.endpointConfigurations.find(c => c.tableName === table.name);
+        
+        if (!config) {
+          errors.push(`Configuration missing for table: ${table.name}`);
+          continue;
+        }
+
+        if (config.enabledMethods.length === 0) {
+          errors.push(`At least one HTTP method must be enabled for table: ${table.name}`);
+        }
+
+        // Validate that at least one read operation is enabled
+        const hasReadOperation = config.enabledMethods.includes(HTTPMethod.GET);
+        if (!hasReadOperation) {
+          errors.push(`At least one read operation (GET) must be enabled for table: ${table.name}`);
+        }
+      }
+
+      if (errors.length > 0) {
+        get()._updateValidationErrors('endpointConfiguration', errors);
+        return false;
+      }
+
+      return true;
+    },
+
+    _validateGenerationPreview(): boolean {
+      const state = get();
+      
+      if (!state.generatedSpec) {
+        get()._updateValidationErrors('generationPreview', ['OpenAPI specification must be generated before proceeding']);
+        return false;
+      }
+
+      return true;
+    }
   }))
 );
 
-// React Context for the wizard provider
-interface WizardContextType {
-  store: ReturnType<typeof createWizardStore>;
-  // Query client for React Query integration
-  queryClient: any;
+// ============================================================================
+// REACT CONTEXT DEFINITION
+// ============================================================================
+
+/**
+ * Context interface for wizard provider
+ */
+interface WizardContextValue {
+  // Wizard state
+  state: WizardState;
+  actions: WizardActions;
+  
+  // React Query data and mutations
+  tablesQuery: ReturnType<typeof useQuery>;
+  generatePreviewMutation: ReturnType<typeof useMutation>;
+  generateApiMutation: ReturnType<typeof useMutation>;
+  
+  // Convenience methods
+  isLoading: boolean;
+  canProceed: boolean;
+  canGoBack: boolean;
+  currentStepConfig: typeof WIZARD_STEP_CONFIG[WizardStep];
 }
 
-const WizardContext = createContext<WizardContextType | null>(null);
+/**
+ * React context for wizard state and actions
+ */
+const WizardContext = createContext<WizardContextValue | null>(null);
 
-// Custom hook to use the wizard context
-export const useWizard = () => {
+// ============================================================================
+// CUSTOM HOOK FOR WIZARD ACCESS
+// ============================================================================
+
+/**
+ * Custom hook to access wizard context
+ * Provides type-safe access to wizard state and actions
+ */
+export const useWizard = (): WizardContextValue => {
   const context = useContext(WizardContext);
+  
   if (!context) {
     throw new Error('useWizard must be used within a WizardProvider');
   }
-  return context.store();
+  
+  return context;
 };
 
-// Custom hook for wizard navigation
-export const useWizardNavigation = () => {
-  const wizard = useWizard();
+// ============================================================================
+// API FUNCTIONS
+// ============================================================================
+
+/**
+ * Fetch available tables for a database service
+ */
+const fetchTables = async (serviceName: string): Promise<DatabaseTable[]> => {
+  const response = await apiClient.get<{ resource: any[] }>(`/${serviceName}/_schema`);
   
-  const canGoNext = () => {
-    const { currentStep, selectedTables, completedSteps } = wizard;
-    
-    switch (currentStep) {
-      case WIZARD_STEPS.TABLE_SELECTION:
-        return selectedTables.size > 0;
-      case WIZARD_STEPS.ENDPOINT_CONFIGURATION:
-        return completedSteps.has(WIZARD_STEPS.ENDPOINT_CONFIGURATION);
-      case WIZARD_STEPS.SECURITY_CONFIGURATION:
-        return completedSteps.has(WIZARD_STEPS.SECURITY_CONFIGURATION);
-      default:
-        return false;
-    }
-  };
-  
-  const canGoPrevious = () => {
-    return wizard.currentStep > WIZARD_STEPS.TABLE_SELECTION && !wizard.isNavigationLocked;
-  };
-  
-  return {
-    canGoNext: canGoNext(),
-    canGoPrevious: canGoPrevious(),
-    currentStep: wizard.currentStep,
-    goToNextStep: wizard.goToNextStep,
-    goToPreviousStep: wizard.goToPreviousStep,
-    setCurrentStep: wizard.setCurrentStep,
-    markStepCompleted: wizard.markStepCompleted,
-  };
+  if (!response.resource) {
+    throw new Error('Failed to fetch database schema');
+  }
+
+  // Transform API response to DatabaseTable format
+  return response.resource.map((table: any) => ({
+    name: table.name,
+    label: table.label || table.name,
+    description: table.description || '',
+    schema: table.schema,
+    rowCount: table.row_count,
+    fields: table.field || [],
+    primaryKey: table.primary_key || [],
+    foreignKeys: table.foreign_key || [],
+    selected: false,
+    expanded: false,
+    hasExistingAPI: false
+  }));
 };
 
-// Custom hook for OpenAPI preview with React Query integration
-export const useOpenAPIPreview = () => {
-  const wizard = useWizard();
-  const queryClient = useContext(WizardContext)?.queryClient;
+/**
+ * Generate OpenAPI specification preview
+ */
+const generatePreview = async (data: { 
+  serviceName: string; 
+  configurations: EndpointConfiguration[] 
+}): Promise<OpenAPISpec> => {
+  const response = await apiClient.post<OpenAPISpec>(
+    `/api/preview/${data.serviceName}`,
+    { configurations: data.configurations }
+  );
   
-  // React Query for real-time OpenAPI preview generation
-  const { data: previewData, isLoading, error, refetch } = useQuery({
-    queryKey: ['openapi-preview', wizard.serviceId, Array.from(wizard.selectedTables.keys())],
-    queryFn: async () => {
-      if (!wizard.serviceId || wizard.selectedTables.size === 0) {
-        return null;
-      }
-      
-      // Construct preview request payload
-      const previewPayload = {
-        serviceId: wizard.serviceId,
-        tables: Array.from(wizard.selectedTables.values()),
-        configurations: Object.fromEntries(wizard.endpointConfigurations),
-        globalConfiguration: wizard.globalConfiguration,
-      };
-      
-      // Call Next.js API route for preview generation
-      const response = await fetch(`/api/preview/openapi/${wizard.serviceId}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(previewPayload),
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Preview generation failed: ${response.statusText}`);
-      }
-      
-      return response.json();
-    },
-    enabled: Boolean(wizard.serviceId && wizard.selectedTables.size > 0),
-    staleTime: 30000, // 30 seconds
-    cacheTime: 60000, // 1 minute
-    refetchOnWindowFocus: false,
-  });
-  
-  // Update wizard state when preview data changes
-  useEffect(() => {
-    if (previewData) {
-      wizard.updateOpenApiPreview({
-        specification: previewData,
-      });
-      wizard.validateOpenApiPreview();
-    }
-  }, [previewData, wizard]);
-  
-  // Update wizard state on error
-  useEffect(() => {
-    if (error) {
-      wizard.updateOpenApiPreview({
-        specification: null,
-        isValid: false,
-        validationErrors: [error.message],
-      });
-    }
-  }, [error, wizard]);
-  
-  return {
-    preview: wizard.openApiPreview,
-    isGenerating: isLoading,
-    regeneratePreview: refetch,
-    error: error?.message,
-  };
+  if (!response.data) {
+    throw new Error('Failed to generate OpenAPI preview');
+  }
+
+  return response.data;
 };
 
-// Main provider component
-interface WizardProviderProps {
-  children: ReactNode;
-  serviceId?: string;
-  serviceName?: string;
-  databaseType?: string;
-}
+/**
+ * Generate actual API endpoints
+ */
+const generateApi = async (data: {
+  serviceName: string;
+  configurations: EndpointConfiguration[];
+  openApiSpec: OpenAPISpec;
+}): Promise<GenerationResult> => {
+  const response = await apiClient.post<GenerationResult>(
+    `/api/v2/system/service/${data.serviceName}/generate`,
+    {
+      configurations: data.configurations,
+      openApiSpec: data.openApiSpec
+    }
+  );
 
+  if (!response.data) {
+    throw new Error('Failed to generate API endpoints');
+  }
+
+  return response.data;
+};
+
+// ============================================================================
+// WIZARD PROVIDER COMPONENT
+// ============================================================================
+
+/**
+ * Wizard Provider Component
+ * 
+ * Provides wizard state management and React Query integration for the
+ * API generation wizard workflow. Implements Zustand store integration
+ * and context-based state sharing across all wizard components.
+ * 
+ * @param props - WizardProviderProps including children, serviceName, and initial state
+ */
 export const WizardProvider: React.FC<WizardProviderProps> = ({
   children,
-  serviceId,
   serviceName,
-  databaseType,
+  initialState
 }) => {
-  const store = createWizardStore();
   const queryClient = useQueryClient();
   
-  // Initialize service context if provided
+  // Access Zustand store
+  const state = useWizardStore((state) => ({
+    currentStep: state.currentStep,
+    loading: state.loading,
+    error: state.error,
+    generationStatus: state.generationStatus,
+    serviceName: state.serviceName,
+    availableTables: state.availableTables,
+    selectedTables: state.selectedTables,
+    endpointConfigurations: state.endpointConfigurations,
+    generatedSpec: state.generatedSpec,
+    generationProgress: state.generationProgress,
+    generationResult: state.generationResult,
+    validationErrors: state.validationErrors
+  }));
+
+  const actions = useWizardStore((state) => ({
+    nextStep: state.nextStep,
+    previousStep: state.previousStep,
+    goToStep: state.goToStep,
+    reset: state.reset,
+    updateState: state.updateState,
+    validateCurrentStep: state.validateCurrentStep
+  }));
+
+  // Initialize store with service name and initial state
   useEffect(() => {
-    if (serviceId && serviceName && databaseType) {
-      store.getState().setServiceContext(serviceId, serviceName, databaseType);
+    useWizardStore.getState().updateState({
+      serviceName,
+      ...initialState
+    });
+  }, [serviceName, initialState]);
+
+  // ========================================================================
+  // REACT QUERY HOOKS
+  // ========================================================================
+
+  /**
+   * Query for available database tables
+   * Uses React Query intelligent caching per Section 3.2.4
+   */
+  const tablesQuery = useQuery({
+    queryKey: WIZARD_QUERY_KEYS.TABLES(serviceName),
+    queryFn: () => fetchTables(serviceName),
+    enabled: !!serviceName,
+    staleTime: REACT_QUERY_CONFIG.staleTime,
+    cacheTime: REACT_QUERY_CONFIG.cacheTime,
+    refetchOnWindowFocus: REACT_QUERY_CONFIG.refetchOnWindowFocus,
+    retry: REACT_QUERY_CONFIG.retry,
+    retryDelay: REACT_QUERY_CONFIG.retryDelay,
+    onSuccess: (tables) => {
+      useWizardStore.getState().updateState({ availableTables: tables });
+    },
+    onError: (error) => {
+      console.error('Failed to fetch tables:', error);
+      useWizardStore.getState()._setError(`Failed to load database tables: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-  }, [serviceId, serviceName, databaseType, store]);
-  
-  // Subscribe to wizard state changes for debugging in development
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      const unsubscribe = store.subscribe(
-        (state) => state.currentStep,
-        (currentStep, previousStep) => {
-          console.log('Wizard step changed:', { previousStep, currentStep });
-        }
-      );
+  });
+
+  /**
+   * Mutation for generating OpenAPI preview
+   * Supports real-time preview capabilities for F-003 requirements
+   */
+  const generatePreviewMutation = useMutation({
+    mutationFn: generatePreview,
+    ...WIZARD_MUTATION_CONFIG,
+    onMutate: () => {
+      useWizardStore.getState()._setGenerationStatus(GenerationStatus.VALIDATING);
+    },
+    onSuccess: (spec) => {
+      useWizardStore.getState().updateState({
+        generatedSpec: spec,
+        generationStatus: GenerationStatus.CONFIGURING
+      });
+    },
+    onError: (error) => {
+      console.error('Preview generation failed:', error);
+      useWizardStore.getState()._setError(`Preview generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      useWizardStore.getState()._setGenerationStatus(GenerationStatus.ERROR);
+    }
+  });
+
+  /**
+   * Mutation for final API generation
+   */
+  const generateApiMutation = useMutation({
+    mutationFn: generateApi,
+    ...WIZARD_MUTATION_CONFIG,
+    onMutate: () => {
+      useWizardStore.getState()._setGenerationStatus(GenerationStatus.GENERATING);
+      useWizardStore.getState().updateState({ generationProgress: 0 });
+    },
+    onSuccess: (result) => {
+      useWizardStore.getState().updateState({
+        generationResult: result,
+        generationStatus: GenerationStatus.COMPLETED,
+        generationProgress: 100
+      });
       
-      return unsubscribe;
+      // Invalidate related queries
+      queryClient.invalidateQueries({ queryKey: ['services'] });
+      queryClient.invalidateQueries({ queryKey: ['api-docs'] });
+    },
+    onError: (error) => {
+      console.error('API generation failed:', error);
+      useWizardStore.getState()._setError(`API generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      useWizardStore.getState()._setGenerationStatus(GenerationStatus.ERROR);
     }
-  }, [store]);
-  
-  const contextValue: WizardContextType = {
-    store,
-    queryClient,
-  };
-  
+  });
+
+  // ========================================================================
+  // COMPUTED VALUES
+  // ========================================================================
+
+  const currentStepConfig = useMemo(() => 
+    WIZARD_STEP_CONFIG[state.currentStep], 
+    [state.currentStep]
+  );
+
+  const isLoading = useMemo(() => 
+    state.loading || tablesQuery.isLoading || generatePreviewMutation.isLoading || generateApiMutation.isLoading,
+    [state.loading, tablesQuery.isLoading, generatePreviewMutation.isLoading, generateApiMutation.isLoading]
+  );
+
+  const canProceed = useMemo(() => {
+    if (isLoading) return false;
+    
+    switch (state.currentStep) {
+      case WizardStep.TABLE_SELECTION:
+        return state.selectedTables.length > 0;
+      case WizardStep.ENDPOINT_CONFIGURATION:
+        return state.endpointConfigurations.length > 0;
+      case WizardStep.GENERATION_PREVIEW:
+        return !!state.generatedSpec;
+      case WizardStep.GENERATION_PROGRESS:
+        return state.generationStatus === GenerationStatus.COMPLETED;
+      default:
+        return true;
+    }
+  }, [state.currentStep, state.selectedTables, state.endpointConfigurations, state.generatedSpec, state.generationStatus, isLoading]);
+
+  const canGoBack = useMemo(() => 
+    !!currentStepConfig.prevStep && !isLoading,
+    [currentStepConfig.prevStep, isLoading]
+  );
+
+  // ========================================================================
+  // CONTEXT VALUE
+  // ========================================================================
+
+  const contextValue: WizardContextValue = useMemo(() => ({
+    state,
+    actions,
+    tablesQuery,
+    generatePreviewMutation,
+    generateApiMutation,
+    isLoading,
+    canProceed,
+    canGoBack,
+    currentStepConfig
+  }), [
+    state, 
+    actions, 
+    tablesQuery, 
+    generatePreviewMutation, 
+    generateApiMutation, 
+    isLoading, 
+    canProceed, 
+    canGoBack, 
+    currentStepConfig
+  ]);
+
+  // ========================================================================
+  // ERROR BOUNDARY INTEGRATION
+  // ========================================================================
+
+  useEffect(() => {
+    if (state.error) {
+      console.error('Wizard error:', state.error);
+      // Could integrate with error reporting service here
+    }
+  }, [state.error]);
+
+  // ========================================================================
+  // RENDER
+  // ========================================================================
+
   return (
     <WizardContext.Provider value={contextValue}>
       {children}
@@ -632,18 +622,105 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({
   );
 };
 
-// Export wizard step constants for use in components
-export { WIZARD_STEPS };
+// ============================================================================
+// ADDITIONAL HOOKS FOR SPECIFIC WIZARD FUNCTIONALITY
+// ============================================================================
 
-// Export types for use in components
-export type {
-  WizardStep,
-  DatabaseTable,
-  DatabaseField,
-  Relationship,
-  EndpointConfiguration,
-  SecurityRule,
-  GenerationProgress,
-  OpenAPIPreview,
-  WizardState,
+/**
+ * Hook for table selection step functionality
+ */
+export const useTableSelection = () => {
+  const { state, actions } = useWizard();
+  
+  const selectTable = useCallback((table: DatabaseTable) => {
+    const updatedTables = state.selectedTables.some(t => t.name === table.name)
+      ? state.selectedTables.filter(t => t.name !== table.name)
+      : [...state.selectedTables, { ...table, selected: true }];
+    
+    actions.updateState({ selectedTables: updatedTables });
+  }, [state.selectedTables, actions]);
+
+  const selectAllTables = useCallback((tables: DatabaseTable[]) => {
+    const allSelected = tables.map(table => ({ ...table, selected: true }));
+    actions.updateState({ selectedTables: allSelected });
+  }, [actions]);
+
+  const clearSelection = useCallback(() => {
+    actions.updateState({ selectedTables: [] });
+  }, [actions]);
+
+  return {
+    availableTables: state.availableTables,
+    selectedTables: state.selectedTables,
+    selectTable,
+    selectAllTables,
+    clearSelection
+  };
 };
+
+/**
+ * Hook for endpoint configuration step functionality
+ */
+export const useEndpointConfiguration = () => {
+  const { state, actions } = useWizard();
+
+  const updateConfiguration = useCallback((tableName: string, config: Partial<EndpointConfiguration>) => {
+    const configurations = [...state.endpointConfigurations];
+    const existingIndex = configurations.findIndex(c => c.tableName === tableName);
+    
+    if (existingIndex >= 0) {
+      configurations[existingIndex] = { ...configurations[existingIndex], ...config };
+    } else {
+      // Create default configuration for new table
+      const defaultConfig: EndpointConfiguration = {
+        tableName,
+        basePath: `/${tableName.toLowerCase()}`,
+        enabledMethods: [...DEFAULT_ENABLED_METHODS],
+        methodConfigurations: {},
+        security: {
+          requireAuth: false,
+          requiredRoles: [],
+          apiKeyPermissions: []
+        },
+        customParameters: [],
+        enabled: true,
+        ...config
+      };
+      configurations.push(defaultConfig);
+    }
+    
+    actions.updateState({ endpointConfigurations: configurations });
+  }, [state.endpointConfigurations, actions]);
+
+  return {
+    configurations: state.endpointConfigurations,
+    selectedTables: state.selectedTables,
+    updateConfiguration
+  };
+};
+
+/**
+ * Hook for generation preview step functionality
+ */
+export const useGenerationPreview = () => {
+  const { state, generatePreviewMutation } = useWizard();
+
+  const generatePreview = useCallback(() => {
+    if (state.serviceName && state.endpointConfigurations.length > 0) {
+      generatePreviewMutation.mutate({
+        serviceName: state.serviceName,
+        configurations: state.endpointConfigurations
+      });
+    }
+  }, [state.serviceName, state.endpointConfigurations, generatePreviewMutation]);
+
+  return {
+    generatedSpec: state.generatedSpec,
+    configurations: state.endpointConfigurations,
+    generatePreview,
+    isGenerating: generatePreviewMutation.isLoading
+  };
+};
+
+// Export types for external use
+export type { WizardContextValue };
