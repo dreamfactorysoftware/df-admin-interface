@@ -1,281 +1,419 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 import { apiClient } from '@/lib/api-client';
 import { useSystemConfig } from '@/hooks/use-system-config';
-import type { LicenseInfo, LicenseType, PaywallCheckResult } from '@/types/license';
+import type { 
+  LicenseInfo,
+  LicenseType,
+  LicenseFeature,
+  LicenseCheckResponse,
+  LicenseStatus,
+  FeatureAvailability,
+  PaywallResult,
+  LicenseError,
+  LicenseCheckConfig,
+  UseLicenseReturn
+} from '@/types/license';
+
+// License service constants
+const LICENSE_ENDPOINTS = {
+  SUBSCRIPTION_DATA: 'https://updates.dreamfactory.com/check',
+} as const;
+
+const LICENSE_HEADERS = {
+  LICENSE_KEY: 'X-DreamFactory-License-Key',
+} as const;
+
+// Feature configuration based on original Angular paywall service
+const LOCKED_FEATURES = {
+  OPEN_SOURCE: [
+    'event-scripts',
+    'rate-limiting', 
+    'scheduler',
+    'reporting'
+  ] as LicenseFeature[],
+  SILVER: [
+    'rate-limiting',
+    'scheduler', 
+    'reporting'
+  ] as LicenseFeature[],
+  GOLD: [] as LicenseFeature[]
+} as const;
+
+// Default configuration
+const DEFAULT_CONFIG: Required<LicenseCheckConfig> = {
+  cacheTTL: 5 * 60 * 1000, // 5 minutes
+  backgroundRevalidation: true,
+  retryConfig: {
+    attempts: 2,
+    delayMs: 1000
+  }
+} as const;
+
+// Query keys for React Query cache management
+const LICENSE_QUERY_KEYS = {
+  licenseCheck: (licenseKey: string) => ['license', 'check', licenseKey] as const,
+  licenseInfo: ['license', 'info'] as const,
+  paywall: (resource?: string | string[]) => ['license', 'paywall', resource] as const,
+} as const;
 
 /**
- * License management hook that handles license validation, feature checking, and license status monitoring.
- * Replaces Angular DfLicenseCheckService with React Query caching for license data and proper license state management.
+ * Custom React hook for comprehensive license management and feature gating
+ * 
+ * Replaces Angular DfLicenseCheckService and DfPaywallService with modern React Query
+ * caching, intelligent background synchronization, and seamless system integration.
  * 
  * Features:
- * - License type detection (OPEN SOURCE vs commercial)
+ * - License type detection with system configuration integration
  * - Feature gating logic based on license type and route-based paywall rules
  * - License validation caching using React Query with configurable TTL
  * - Integration with system configuration service for license data retrieval
  * - Commercial feature locking with user-friendly upgrade prompts
+ * - Automatic background refetching and error recovery
+ * - Type-safe feature availability checking
+ * - Route-based paywall enforcement
+ * 
+ * @param config - Optional configuration for license checking behavior
+ * @returns Comprehensive license management interface
  */
-export function useLicense() {
+export function useLicense(config: LicenseCheckConfig = {}): UseLicenseReturn {
   const queryClient = useQueryClient();
-  const { data: systemConfig, isLoading: isSystemConfigLoading } = useSystemConfig();
-
-  // Define feature locking rules based on license types
-  const licenseFeatureRules = useMemo(() => ({
-    openSource: [
-      'event-scripts',
-      'rate-limiting', 
-      'scheduler',
-      'reporting'
-    ],
-    silver: [
-      'rate-limiting',
-      'scheduler', 
-      'reporting'
-    ],
-    gold: [] // No restrictions for gold licenses
-  }), []);
+  const { environment, system, isLoading: systemLoading, error: systemError } = useSystemConfig();
+  
+  // Merge configuration with defaults
+  const licenseConfig = useMemo(() => ({
+    ...DEFAULT_CONFIG,
+    ...config
+  }), [config]);
 
   /**
-   * Fetch license information from the subscription service
+   * Extract license information from system configuration
    */
-  const fetchLicenseInfo = useCallback(async (licenseKey: string): Promise<LicenseInfo> => {
-    const response = await apiClient.get<LicenseInfo>('https://updates.dreamfactory.com/check', {
-      headers: {
-        'X-DreamFactory-License-Key': licenseKey
-      }
-    });
+  const licenseInfo = useMemo((): LicenseInfo | null => {
+    if (!environment?.platform) return null;
+
+    const { platform } = environment;
     
-    // Transform snake_case to camelCase for consistency with React patterns
+    // Determine license type from platform configuration
+    let licenseType: LicenseType = 'OPEN_SOURCE';
+    if (platform.license) {
+      const license = platform.license.toUpperCase();
+      if (license.includes('GOLD')) {
+        licenseType = 'GOLD';
+      } else if (license.includes('SILVER')) {
+        licenseType = 'SILVER';
+      }
+    }
+
     return {
-      disableUi: response.disable_ui || response.disableUi,
-      msg: response.msg,
-      renewalDate: response.renewal_date || response.renewalDate,
-      statusCode: response.status_code || response.statusCode
+      type: licenseType,
+      key: platform.licenseKey || false,
+      status: 'unknown' as LicenseStatus,
+      isTrial: platform.isTrial || false,
+      isHosted: platform.isHosted || false,
+      version: platform.version
     };
+  }, [environment]);
+
+  /**
+   * Validate license key against DreamFactory licensing server
+   */
+  const validateLicenseKey = useCallback(async (licenseKey: string): Promise<LicenseCheckResponse> => {
+    try {
+      const response = await apiClient.get<LicenseCheckResponse>(
+        LICENSE_ENDPOINTS.SUBSCRIPTION_DATA,
+        {
+          headers: {
+            [LICENSE_HEADERS.LICENSE_KEY]: licenseKey,
+          },
+          // Don't use default retry for license validation
+          retries: 0
+        }
+      );
+
+      // Transform snake_case to camelCase (matching original Angular service)
+      const transformedResponse: LicenseCheckResponse = {
+        disableUi: response.disable_ui || response.disableUi || '',
+        msg: response.msg || '',
+        renewalDate: response.renewal_date || response.renewalDate || '',
+        statusCode: response.status_code || response.statusCode || ''
+      };
+
+      return transformedResponse;
+    } catch (error) {
+      // Transform error to match original behavior
+      throw new Error(`License validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }, []);
 
   /**
-   * Determine license type from system configuration and license validation
+   * License validation query with intelligent caching
    */
-  const determineLicenseType = useCallback((): LicenseType => {
-    if (!systemConfig?.license) {
-      return 'open-source';
-    }
-
-    // Check if it's a commercial license based on system configuration
-    const licenseInfo = systemConfig.license;
-    
-    // License type determination logic
-    if (licenseInfo.type === 'GOLD' || licenseInfo.edition === 'GOLD') {
-      return 'gold';
-    } else if (licenseInfo.type === 'SILVER' || licenseInfo.edition === 'SILVER') {
-      return 'silver';
-    } else {
-      return 'open-source';
-    }
-  }, [systemConfig]);
-
-  /**
-   * License validation query with React Query caching
-   */
-  const licenseQuery = useQuery({
-    queryKey: ['license-validation', systemConfig?.license?.key],
+  const licenseValidationQuery = useQuery({
+    queryKey: LICENSE_QUERY_KEYS.licenseCheck(
+      typeof licenseInfo?.key === 'string' ? licenseInfo.key : ''
+    ),
     queryFn: () => {
-      const licenseKey = systemConfig?.license?.key;
-      if (!licenseKey) {
-        throw new Error('No license key available');
+      if (!licenseInfo?.key || typeof licenseInfo.key !== 'string') {
+        return Promise.resolve(null);
       }
-      return fetchLicenseInfo(licenseKey);
+      return validateLicenseKey(licenseInfo.key);
     },
-    enabled: !!systemConfig?.license?.key,
-    staleTime: 15 * 60 * 1000, // 15 minutes - configurable TTL for license caching
-    cacheTime: 30 * 60 * 1000, // 30 minutes cache retention
-    retry: (failureCount, error) => {
-      // Only retry on network errors, not on license validation failures
-      return failureCount < 2 && !error.message.includes('license');
-    },
-    refetchOnWindowFocus: false, // Prevent unnecessary refetches
-    refetchInterval: 60 * 60 * 1000, // Background refetch every hour
-    onError: (error) => {
-      console.warn('License validation failed:', error);
-      // Fallback to open source mode on license validation failure
-    }
+    enabled: !!(licenseInfo?.key && typeof licenseInfo.key === 'string'),
+    staleTime: licenseConfig.cacheTTL,
+    cacheTime: licenseConfig.cacheTTL * 2,
+    retry: licenseConfig.retryConfig.attempts,
+    retryDelay: (attemptIndex) => licenseConfig.retryConfig.delayMs * Math.pow(2, attemptIndex),
+    refetchOnWindowFocus: licenseConfig.backgroundRevalidation,
+    refetchOnReconnect: true,
+    keepPreviousData: true,
+    select: (data) => data,
   });
 
   /**
-   * Manual license validation mutation
+   * Combined license information with validation status
    */
-  const validateLicenseMutation = useMutation({
-    mutationFn: (licenseKey: string) => fetchLicenseInfo(licenseKey),
-    onSuccess: (data) => {
-      // Update the license query cache
-      queryClient.setQueryData(['license-validation', systemConfig?.license?.key], data);
-    },
-    onError: (error) => {
-      console.error('Manual license validation failed:', error);
-    }
-  });
+  const enrichedLicenseInfo = useMemo((): LicenseInfo | null => {
+    if (!licenseInfo) return null;
 
-  /**
-   * Check if a specific feature is locked based on current license type
-   */
-  const isFeatureLocked = useCallback((route: string): boolean => {
-    const licenseType = determineLicenseType();
+    let status: LicenseStatus = 'unknown';
     
-    if (licenseType === 'gold') {
-      return false; // Gold licenses have no restrictions
-    }
-
-    const lockedFeatures = licenseType === 'silver' 
-      ? licenseFeatureRules.silver 
-      : licenseFeatureRules.openSource;
-
-    return lockedFeatures.some(feature => route.includes(feature));
-  }, [determineLicenseType, licenseFeatureRules]);
-
-  /**
-   * Check feature availability with paywall enforcement
-   */
-  const checkFeatureAvailability = useCallback((route: string): PaywallCheckResult => {
-    const licenseType = determineLicenseType();
-    const isLocked = isFeatureLocked(route);
-    
-    if (!isLocked) {
-      return {
-        hasAccess: true,
-        licenseType,
-        blockedFeature: null,
-        upgradeRequired: false
-      };
+    if (licenseValidationQuery.isLoading) {
+      status = 'checking';
+    } else if (licenseValidationQuery.error) {
+      status = 'invalid';
+    } else if (licenseValidationQuery.data) {
+      const response = licenseValidationQuery.data;
+      // Determine status from response
+      if (response.statusCode === '200' || response.statusCode === 'ok') {
+        status = 'valid';
+      } else if (response.statusCode === '402' || response.disableUi === 'true') {
+        status = 'expired';
+      } else {
+        status = 'invalid';
+      }
+    } else if (licenseInfo.type === 'OPEN_SOURCE') {
+      status = 'valid'; // Open source is always valid
     }
 
     return {
-      hasAccess: false,
-      licenseType,
-      blockedFeature: route,
-      upgradeRequired: true,
-      upgradeMessage: licenseType === 'open-source' 
-        ? 'This feature requires a commercial license. Upgrade to Silver or Gold to access this functionality.'
-        : 'This feature requires a Gold license. Upgrade your license to access this functionality.'
+      ...licenseInfo,
+      status,
+      checkResponse: licenseValidationQuery.data || undefined
     };
-  }, [determineLicenseType, isFeatureLocked]);
+  }, [licenseInfo, licenseValidationQuery.data, licenseValidationQuery.isLoading, licenseValidationQuery.error]);
 
   /**
-   * Activate paywall check for specific resources
+   * Check if a specific feature is available based on license type
    */
-  const activatePaywall = useCallback(async (resource?: string | string[]): Promise<boolean> => {
-    if (!resource) {
-      return false;
+  const isFeatureAvailable = useCallback((feature: LicenseFeature): FeatureAvailability => {
+    if (!enrichedLicenseInfo) {
+      return {
+        isAvailable: false,
+        requiresUpgrade: true,
+        minimumTier: 'GOLD',
+        reason: 'License information not available'
+      };
     }
 
-    const resources = Array.isArray(resource) ? resource : [resource];
+    const { type } = enrichedLicenseInfo;
+    const lockedFeatures = LOCKED_FEATURES[type] || [];
+    const isLocked = lockedFeatures.includes(feature);
+
+    if (!isLocked) {
+      return {
+        isAvailable: true,
+        requiresUpgrade: false,
+        minimumTier: type
+      };
+    }
+
+    // Determine minimum tier required
+    let minimumTier: LicenseType = 'GOLD';
+    if (!LOCKED_FEATURES.SILVER.includes(feature)) {
+      minimumTier = 'SILVER';
+    }
+
+    return {
+      isAvailable: false,
+      requiresUpgrade: true,
+      minimumTier,
+      reason: `This feature requires ${minimumTier} license`
+    };
+  }, [enrichedLicenseInfo]);
+
+  /**
+   * Check if a route/feature should be locked (original paywall service logic)
+   */
+  const isFeatureLocked = useCallback((route: string): boolean => {
+    if (!enrichedLicenseInfo) return true;
+
+    const { type } = enrichedLicenseInfo;
     
-    try {
-      // Check against system configuration resources
-      if (!systemConfig?.resource || systemConfig.resource.length === 0) {
-        // If no system resources are cached, this indicates paywall should be active
-        return true;
+    // GOLD license has access to everything
+    if (type === 'GOLD') return false;
+    
+    // Check route against locked features for license type
+    const lockedFeatures = LOCKED_FEATURES[type] || [];
+    return lockedFeatures.some(feature => route.includes(feature));
+  }, [enrichedLicenseInfo]);
+
+  /**
+   * Paywall activation with system resource checking
+   */
+  const paywallMutation = useMutation({
+    mutationFn: async (resources?: string | string[]): Promise<PaywallResult> => {
+      if (!resources) {
+        return {
+          shouldShowPaywall: false,
+          availableResources: []
+        };
       }
 
-      // Check if any of the requested resources are available in system config
-      const hasAccess = systemConfig.resource.some(r => 
-        resources.includes(r.name)
+      const resourceList = Array.isArray(resources) ? resources : [resources];
+      
+      // Get current system data or fetch fresh data
+      let systemData = system;
+      if (!systemData?.resource || systemData.resource.length === 0) {
+        try {
+          // This would trigger a refetch of system data
+          await queryClient.invalidateQueries({ queryKey: ['system', 'config'] });
+          systemData = system; // Will be updated after invalidation
+        } catch (error) {
+          console.error('Failed to fetch system data for paywall check:', error);
+          return {
+            shouldShowPaywall: false,
+            availableResources: [],
+            resource: Array.isArray(resources) ? resources[0] : resources
+          };
+        }
+      }
+
+      if (!systemData?.resource) {
+        return {
+          shouldShowPaywall: false,
+          availableResources: [],
+          resource: Array.isArray(resources) ? resources[0] : resources
+        };
+      }
+
+      const availableResources = systemData.resource.map(r => r.name);
+      const hasRequiredResource = systemData.resource.some(r => 
+        resourceList.includes(r.name)
       );
 
-      return !hasAccess; // Return true if paywall should be active (no access)
-    } catch (error) {
-      console.error('Paywall activation check failed:', error);
-      return false; // Default to allowing access on error
-    }
-  }, [systemConfig]);
+      return {
+        shouldShowPaywall: !hasRequiredResource,
+        resource: Array.isArray(resources) ? resources[0] : resources,
+        availableResources
+      };
+    },
+    // Cache paywall results briefly
+    cacheTime: 60000, // 1 minute
+  });
 
   /**
-   * Get user-friendly upgrade prompt based on current license
+   * Activate paywall for specific resources
    */
-  const getUpgradePrompt = useCallback(() => {
-    const licenseType = determineLicenseType();
-    
-    const prompts = {
-      'open-source': {
-        title: 'Commercial License Required',
-        message: 'This feature is available with Silver or Gold licenses.',
-        action: 'Upgrade to Commercial License',
-        benefits: [
-          'Access to premium features',
-          'Advanced API management',
-          'Priority support',
-          'Enterprise capabilities'
-        ]
-      },
-      'silver': {
-        title: 'Gold License Required',
-        message: 'This feature is available with Gold licenses.',
-        action: 'Upgrade to Gold License',
-        benefits: [
-          'Full feature access',
-          'Advanced enterprise features',
-          'Premium support',
-          'Custom integrations'
-        ]
-      },
-      'gold': {
-        title: 'Feature Available',
-        message: 'You have access to all features.',
-        action: null,
-        benefits: []
-      }
-    };
-
-    return prompts[licenseType];
-  }, [determineLicenseType]);
+  const activatePaywall = useCallback(async (resource?: string | string[]): Promise<PaywallResult> => {
+    return paywallMutation.mutateAsync(resource);
+  }, [paywallMutation]);
 
   /**
-   * Force refresh license data
+   * Manual license validation
    */
-  const refreshLicense = useCallback(() => {
-    queryClient.invalidateQueries(['license-validation']);
-    if (systemConfig?.license?.key) {
-      validateLicenseMutation.mutate(systemConfig.license.key);
-    }
-  }, [queryClient, validateLicenseMutation, systemConfig]);
+  const validateLicense = useCallback(async (licenseKey: string): Promise<LicenseCheckResponse> => {
+    return validateLicenseKey(licenseKey);
+  }, [validateLicenseKey]);
 
-  // Current license information
-  const licenseInfo = licenseQuery.data;
-  const licenseType = determineLicenseType();
-  const isCommercialLicense = licenseType !== 'open-source';
-  
+  /**
+   * Refresh license information
+   */
+  const refresh = useCallback(async (): Promise<void> => {
+    await Promise.all([
+      licenseValidationQuery.refetch(),
+      queryClient.invalidateQueries({ queryKey: ['system'] })
+    ]);
+  }, [licenseValidationQuery, queryClient]);
+
+  /**
+   * Clear license cache
+   */
+  const clearCache = useCallback((): void => {
+    queryClient.removeQueries({ queryKey: ['license'] });
+  }, [queryClient]);
+
+  /**
+   * Error handling with proper typing
+   */
+  const licenseError = useMemo((): LicenseError | null => {
+    if (systemError) {
+      return {
+        type: 'network',
+        message: 'Failed to load system configuration',
+        details: systemError,
+        recoverable: true
+      };
+    }
+
+    if (licenseValidationQuery.error) {
+      const error = licenseValidationQuery.error;
+      return {
+        type: 'validation',
+        message: error instanceof Error ? error.message : 'License validation failed',
+        details: error,
+        recoverable: true
+      };
+    }
+
+    return null;
+  }, [systemError, licenseValidationQuery.error]);
+
+  /**
+   * Combined loading state
+   */
+  const isLoading = systemLoading || licenseValidationQuery.isLoading;
+
+  /**
+   * Combined fetching state
+   */
+  const isFetching = licenseValidationQuery.isFetching || paywallMutation.isLoading;
+
   return {
-    // License data
-    licenseInfo,
-    licenseType,
-    isCommercialLicense,
-    
-    // Query states
-    isLoading: licenseQuery.isLoading || isSystemConfigLoading,
-    isError: licenseQuery.isError,
-    error: licenseQuery.error,
-    isValidating: validateLicenseMutation.isLoading,
-    
-    // Feature gating functions
+    license: enrichedLicenseInfo,
+    isLoading,
+    error: licenseError,
+    isFetching,
+    isFeatureAvailable,
     isFeatureLocked,
-    checkFeatureAvailability,
     activatePaywall,
-    
-    // Upgrade and user experience
-    getUpgradePrompt,
-    
-    // Actions
-    refreshLicense,
-    validateLicense: validateLicenseMutation.mutate,
-    
-    // License status helpers
-    isLicenseValid: licenseInfo?.statusCode === '200' || licenseInfo?.statusCode === 'success',
-    licenseMessage: licenseInfo?.msg,
-    renewalDate: licenseInfo?.renewalDate,
-    shouldDisableUi: licenseInfo?.disableUi === 'true' || licenseInfo?.disableUi === true
+    validateLicense,
+    refresh,
+    clearCache
   };
 }
 
-export type UseLicenseReturn = ReturnType<typeof useLicense>;
+/**
+ * Helper hook for simple feature availability checking
+ */
+export function useFeatureGate(feature: LicenseFeature) {
+  const { isFeatureAvailable } = useLicense();
+  return isFeatureAvailable(feature);
+}
+
+/**
+ * Helper hook for route-based paywall checking
+ */
+export function useRoutePaywall(route: string) {
+  const { isFeatureLocked, license } = useLicense();
+  
+  return useMemo(() => ({
+    isLocked: isFeatureLocked(route),
+    licenseType: license?.type,
+    requiresUpgrade: isFeatureLocked(route)
+  }), [isFeatureLocked, route, license?.type]);
+}
+
+export default useLicense;
