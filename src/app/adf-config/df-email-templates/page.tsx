@@ -1,380 +1,462 @@
 /**
  * Email Templates Configuration Page
  * 
- * Next.js page component for the email templates configuration route implementing 
- * React server component architecture with client-side interactivity. Provides the 
- * main container UI that renders the email templates table with proper authentication,
- * theming, and internationalization support.
+ * Next.js page component implementing React server component architecture with
+ * client-side interactivity for comprehensive email template management. This
+ * component serves as the main container for the email templates interface,
+ * replacing Angular component architecture with modern React patterns optimized
+ * for server-side rendering and enhanced performance.
  * 
- * This component transforms the Angular email templates container to a Next.js 
- * app router page following React/Next.js Integration Requirements with SSR 
- * capability under 2 seconds per performance specifications.
+ * Key Features:
+ * - React server component with SSR capability for sub-2-second page loads
+ * - Client-side data fetching with React Query intelligent caching
+ * - Comprehensive error boundaries and loading states for production reliability
+ * - Authentication validation through Next.js middleware integration
+ * - Responsive Tailwind CSS layout with dark mode support
+ * - WCAG 2.1 AA accessibility compliance with proper ARIA implementation
+ * - Suspense boundaries for optimal loading experience
  * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration
- * @since 2024-12-19
+ * Performance Requirements:
+ * - SSR pages under 2 seconds per React/Next.js Integration Requirements
+ * - Cache hit responses under 50ms for optimal user experience
+ * - Real-time validation under 100ms for form interactions
+ * 
+ * Security Features:
+ * - Next.js middleware authentication flow validation
+ * - Role-based access control enforcement at page level
+ * - Secure session management with automatic token refresh
+ * 
+ * @fileoverview Next.js email templates configuration page
+ * @version 1.0.0
+ * @since Next.js 15.1+ / React 19.0.0
  */
 
-import React, { Suspense } from 'react';
-import { Metadata } from 'next';
-import { redirect } from 'next/navigation';
-import { headers } from 'next/headers';
-import dynamic from 'next/dynamic';
+import type { Metadata } from 'next';
+import { Suspense } from 'react';
+import { notFound } from 'next/navigation';
 
-// Dynamic imports for client components to optimize initial page load
-const EmailTemplatesTable = dynamic(
-  () => import('./email-templates-table'),
-  {
-    loading: () => <EmailTemplatesTableSkeleton />,
-    ssr: false // Client component with React Query
-  }
-);
+// Core UI Components
+import { EmailTemplatesTable } from './email-templates-table';
 
-// Error boundary for graceful error handling
-const ErrorBoundary = dynamic(
-  () => import('@/components/ui/error-boundary'),
-  { 
-    loading: () => <ErrorFallback />,
-    ssr: false 
-  }
-);
+// Error Boundary and Loading Components
+import { ErrorBoundary } from '../../../components/ui/error-boundary';
+import { LoadingSpinner } from '../../../components/ui/loading-spinner';
+import { PageHeader } from '../../../components/ui/page-header';
+
+// Authentication and Security
+import { validatePageAccess } from '../../../lib/auth/page-access';
+
+// Types
+import type { PageProps } from '../../../types/page';
+
+// ============================================================================
+// PAGE METADATA CONFIGURATION
+// ============================================================================
 
 /**
- * Page metadata for SEO and social sharing optimization
- * Implements Next.js 15.1 metadata API for enhanced SSR performance
+ * Metadata configuration for SEO and page identification
+ * Optimized for admin interface context with security considerations
  */
 export const metadata: Metadata = {
-  title: 'Email Templates | DreamFactory Admin',
-  description: 'Manage and configure email templates for your DreamFactory instance. Create, edit, and customize email templates for user notifications, password resets, and system communications.',
-  keywords: ['email templates', 'configuration', 'dreamfactory', 'admin', 'notifications'],
-  openGraph: {
-    title: 'Email Templates Configuration',
-    description: 'Configure email templates for your DreamFactory instance',
-    type: 'website',
-  },
+  title: 'Email Templates - Configuration',
+  description: 'Manage email templates for automated notifications, user communications, and system-generated messages. Configure template content, variables, and delivery settings.',
+  keywords: [
+    'email templates',
+    'email configuration',
+    'notification templates',
+    'automated emails',
+    'DreamFactory admin',
+    'template management',
+  ],
   robots: {
-    index: false, // Admin interface should not be indexed
+    index: false,    // Admin pages should not be indexed
     follow: false,
+    nocache: true,
+    noarchive: true,
+  },
+  openGraph: {
+    title: 'Email Templates Configuration - DreamFactory Admin',
+    description: 'Manage and configure email templates for your DreamFactory instance.',
+    type: 'website',
   },
 };
 
+// ============================================================================
+// SERVER-SIDE ACCESS VALIDATION
+// ============================================================================
+
 /**
- * Server-side authentication validation
- * Leverages Next.js middleware for session validation with <100ms processing time
- * per React/Next.js Integration Requirements
+ * Validates user permissions for email templates management
+ * Implements server-side authorization before component rendering
+ * 
+ * @returns Authorization result with user context
+ * @throws notFound() if user lacks required permissions
  */
-async function validateAuthentication(): Promise<boolean> {
+async function validateEmailTemplatesAccess() {
   try {
-    const headersList = headers();
-    const userSession = headersList.get('x-user-session');
-    const userPermissions = headersList.get('x-user-permissions');
-    
-    // Validate session exists and has admin permissions
-    if (!userSession) {
-      return false;
+    const accessResult = await validatePageAccess({
+      requiredPermissions: [
+        'system.email_template.read',
+        'system.config.read',
+      ],
+      optionalPermissions: [
+        'system.email_template.write',
+        'system.email_template.delete',
+      ],
+      redirectUnauthenticated: '/login',
+      redirectUnauthorized: '/unauthorized',
+    });
+
+    if (!accessResult.hasAccess) {
+      notFound();
     }
-    
-    // Check if user has email template management permissions
-    const permissions = userPermissions ? JSON.parse(userPermissions) : [];
-    const hasEmailTemplateAccess = permissions.includes('admin') || 
-                                 permissions.includes('email_template_management') ||
-                                 permissions.includes('system_config');
-    
-    return hasEmailTemplateAccess;
+
+    return accessResult;
   } catch (error) {
-    console.error('Authentication validation error:', error);
-    return false;
+    console.error('Email templates access validation failed:', error);
+    notFound();
   }
 }
 
+// ============================================================================
+// LOADING COMPONENTS
+// ============================================================================
+
 /**
- * Loading skeleton component for email templates table
- * Provides immediate visual feedback during SSR and component loading
+ * Page-level loading component with skeleton UI
+ * Provides immediate visual feedback during SSR and data loading
  */
-function EmailTemplatesTableSkeleton() {
+function EmailTemplatesPageSkeleton() {
   return (
-    <div className="animate-pulse" role="status" aria-label="Loading email templates">
-      {/* Header skeleton */}
-      <div className="border-b border-gray-200 pb-5 sm:flex sm:items-center sm:justify-between">
-        <div className="h-6 bg-gray-200 rounded w-48"></div>
-        <div className="mt-3 flex sm:ml-4 sm:mt-0 space-x-3">
-          <div className="h-9 bg-gray-200 rounded w-20"></div>
-          <div className="h-9 bg-gray-300 rounded w-32"></div>
+    <div className="space-y-6 animate-pulse">
+      {/* Header Skeleton */}
+      <div className="border-b border-gray-200 dark:border-gray-700 pb-6">
+        <div className="h-8 w-64 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
+        <div className="h-4 w-96 bg-gray-200 dark:bg-gray-700 rounded" />
+      </div>
+
+      {/* Table Controls Skeleton */}
+      <div className="flex items-center justify-between">
+        <div className="h-10 w-80 bg-gray-200 dark:bg-gray-700 rounded" />
+        <div className="flex space-x-3">
+          <div className="h-10 w-24 bg-gray-200 dark:bg-gray-700 rounded" />
+          <div className="h-10 w-32 bg-gray-200 dark:bg-gray-700 rounded" />
         </div>
       </div>
-      
-      {/* Search bar skeleton */}
-      <div className="mt-6 flex items-center justify-between">
-        <div className="h-10 bg-gray-200 rounded w-80"></div>
-        <div className="h-4 bg-gray-200 rounded w-32"></div>
-      </div>
-      
-      {/* Table skeleton */}
-      <div className="mt-6 flow-root">
-        <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
-          <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
-            <div className="space-y-3">
-              {/* Table header */}
-              <div className="grid grid-cols-3 gap-4 px-6 py-3">
-                <div className="h-4 bg-gray-200 rounded w-16"></div>
-                <div className="h-4 bg-gray-200 rounded w-24"></div>
-                <div className="h-4 bg-gray-200 rounded w-16"></div>
-              </div>
-              
-              {/* Table rows */}
-              {[...Array(5)].map((_, index) => (
-                <div key={index} className="grid grid-cols-3 gap-4 px-6 py-4 border-t border-gray-200">
-                  <div className="h-4 bg-gray-100 rounded w-32"></div>
-                  <div className="h-4 bg-gray-100 rounded w-48"></div>
-                  <div className="h-8 bg-gray-100 rounded w-8 ml-auto"></div>
-                </div>
-              ))}
-            </div>
+
+      {/* Table Skeleton */}
+      <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+        {/* Table Header */}
+        <div className="bg-gray-50 dark:bg-gray-800 px-6 py-3 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex space-x-4">
+            <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded" />
+            <div className="h-4 w-48 bg-gray-200 dark:bg-gray-700 rounded" />
+            <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded ml-auto" />
           </div>
         </div>
+
+        {/* Table Rows */}
+        {[...Array(8)].map((_, index) => (
+          <div 
+            key={index}
+            className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 last:border-b-0"
+          >
+            <div className="flex items-center space-x-4">
+              <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded" />
+              <div className="h-4 w-48 bg-gray-200 dark:bg-gray-700 rounded" />
+              <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded ml-auto" />
+            </div>
+          </div>
+        ))}
       </div>
-      
-      {/* Pagination skeleton */}
-      <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6">
-        <div className="h-4 bg-gray-200 rounded w-48"></div>
+
+      {/* Pagination Skeleton */}
+      <div className="flex items-center justify-between">
+        <div className="h-4 w-48 bg-gray-200 dark:bg-gray-700 rounded" />
         <div className="flex space-x-2">
-          <div className="h-8 bg-gray-200 rounded w-8"></div>
-          <div className="h-8 bg-gray-200 rounded w-16"></div>
-          <div className="h-8 bg-gray-200 rounded w-8"></div>
+          <div className="h-8 w-20 bg-gray-200 dark:bg-gray-700 rounded" />
+          <div className="h-8 w-16 bg-gray-200 dark:bg-gray-700 rounded" />
+          <div className="h-8 w-16 bg-gray-200 dark:bg-gray-700 rounded" />
         </div>
       </div>
-      
-      <span className="sr-only">Loading email templates...</span>
     </div>
   );
 }
 
 /**
- * Error fallback component for graceful error handling
- * Provides user-friendly error messages with recovery options
+ * Critical error component for server-side failures
+ * Provides user-friendly error messaging with recovery options
  */
-function ErrorFallback() {
+function EmailTemplatesErrorFallback({ 
+  error, 
+  reset 
+}: { 
+  error: Error; 
+  reset: () => void; 
+}) {
   return (
-    <div className="rounded-md bg-red-50 p-4" role="alert">
-      <div className="flex">
-        <div className="flex-shrink-0">
+    <div 
+      className="min-h-[60vh] flex items-center justify-center p-6"
+      role="alert"
+      aria-labelledby="error-title"
+      aria-describedby="error-description"
+    >
+      <div className="max-w-lg w-full bg-white dark:bg-gray-800 border border-red-200 dark:border-red-800 rounded-lg shadow-lg p-8 text-center">
+        {/* Error Icon */}
+        <div className="w-16 h-16 mx-auto mb-4 text-red-500 dark:text-red-400">
           <svg 
-            className="h-5 w-5 text-red-400" 
-            viewBox="0 0 20 20" 
-            fill="currentColor"
+            className="w-full h-full" 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
             aria-hidden="true"
           >
             <path 
-              fillRule="evenodd" 
-              d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" 
-              clipRule="evenodd" 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              strokeWidth={2} 
+              d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" 
             />
           </svg>
         </div>
-        <div className="ml-3">
-          <h3 className="text-sm font-medium text-red-800">
-            Unable to load email templates
-          </h3>
-          <div className="mt-2 text-sm text-red-700">
-            <p>
-              There was an error loading the email templates configuration. 
-              Please check your connection and try again.
+        
+        {/* Error Content */}
+        <h1 
+          id="error-title"
+          className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2"
+        >
+          Unable to load email templates
+        </h1>
+        
+        <p 
+          id="error-description"
+          className="text-gray-600 dark:text-gray-400 mb-6"
+        >
+          We encountered an error while loading the email templates configuration.
+          This might be a temporary issue with the server connection.
+        </p>
+        
+        {/* Development Error Details */}
+        {process.env.NODE_ENV === 'development' && (
+          <details className="mb-6 text-left">
+            <summary className="cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Error Details (Development)
+            </summary>
+            <pre className="text-xs bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 p-4 rounded overflow-auto text-red-700 dark:text-red-300">
+              {error.message}
+              {error.stack && (
+                <>
+                  {'\n\n'}
+                  {error.stack}
+                </>
+              )}
+            </pre>
+          </details>
+        )}
+        
+        {/* Recovery Actions */}
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <button
+            onClick={reset}
+            className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+          >
+            Try again
+          </button>
+          
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+          >
+            Refresh page
+          </button>
+          
+          <a
+            href="/adf-config"
+            className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 inline-block text-center"
+          >
+            Back to Config
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// MAIN PAGE COMPONENT
+// ============================================================================
+
+/**
+ * Email Templates Configuration Page Component
+ * 
+ * React server component providing the main container for email template
+ * management functionality. Implements comprehensive error handling, loading
+ * states, and accessibility features while maintaining optimal performance
+ * through server-side rendering and client-side caching strategies.
+ * 
+ * Architecture Features:
+ * - Server-side authentication and permission validation
+ * - Comprehensive error boundaries with graceful degradation
+ * - Progressive loading with skeleton UI patterns
+ * - Responsive layout with dark mode support
+ * - WCAG 2.1 AA accessibility compliance
+ * - SEO optimization for admin interface context
+ * 
+ * Performance Optimizations:
+ * - React server component for faster initial loads
+ * - Suspense boundaries for non-blocking UI updates
+ * - Intelligent caching through React Query integration
+ * - Minimal client-side JavaScript for optimal performance
+ * 
+ * @param props - Page props including search params and route parameters
+ * @returns Complete email templates configuration page
+ */
+export default async function EmailTemplatesPage({ 
+  searchParams 
+}: PageProps) {
+  // Server-side authentication and permission validation
+  const accessResult = await validateEmailTemplatesAccess();
+  
+  // Extract search parameters for filtering and pagination
+  const currentPage = Number(searchParams?.page) || 1;
+  const searchQuery = searchParams?.search as string || '';
+  const sortBy = searchParams?.sort as string || '';
+  
+  return (
+    <div className="flex-1 space-y-6 p-6 lg:p-8">
+      {/* Page Header */}
+      <PageHeader
+        title="Email Templates"
+        description="Manage email templates for automated notifications, user communications, and system-generated messages. Configure template content, variables, and delivery settings."
+        breadcrumb={[
+          { label: 'Configuration', href: '/adf-config' },
+          { label: 'Email Templates', href: '/adf-config/df-email-templates' },
+        ]}
+        className="border-b border-gray-200 dark:border-gray-700 pb-6"
+      />
+
+      {/* Main Content with Error Boundary */}
+      <ErrorBoundary fallback={EmailTemplatesErrorFallback}>
+        <main 
+          className="space-y-6"
+          role="main"
+          aria-labelledby="email-templates-title"
+          aria-describedby="email-templates-description"
+        >
+          {/* Screen Reader Content */}
+          <div className="sr-only">
+            <h1 id="email-templates-title">
+              Email Templates Configuration
+            </h1>
+            <p id="email-templates-description">
+              This page allows you to manage email templates for your DreamFactory instance.
+              You can create, edit, and delete email templates, as well as configure their
+              content and variables for automated notifications and user communications.
             </p>
           </div>
-          <div className="mt-4">
-            <button
-              type="button"
-              className="rounded-md bg-red-50 px-2 py-1.5 text-sm font-medium text-red-800 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2 focus:ring-offset-red-50"
-              onClick={() => window.location.reload()}
-            >
-              Try again
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
-/**
- * Breadcrumb navigation component for better UX
- * Provides clear navigation context within the admin interface
- */
-function Breadcrumbs() {
-  return (
-    <nav className="flex" aria-label="Breadcrumb">
-      <ol role="list" className="flex items-center space-x-4">
-        <li>
-          <div className="flex items-center">
-            <a 
-              href="/adf-home" 
-              className="text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors duration-200"
-              aria-label="Go to dashboard home"
-            >
-              Dashboard
-            </a>
-          </div>
-        </li>
-        <li>
-          <div className="flex items-center">
-            <svg
-              className="h-5 w-5 flex-shrink-0 text-gray-300"
-              fill="currentColor"
-              viewBox="0 0 20 20"
-              aria-hidden="true"
-            >
-              <path d="m5.555 17.776 4-16 .894.448-4 16-.894-.448z" />
-            </svg>
-            <a 
-              href="/adf-config" 
-              className="ml-4 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors duration-200"
-              aria-label="Go to configuration section"
-            >
-              Configuration
-            </a>
-          </div>
-        </li>
-        <li>
-          <div className="flex items-center">
-            <svg
-              className="h-5 w-5 flex-shrink-0 text-gray-300"
-              fill="currentColor"
-              viewBox="0 0 20 20"
-              aria-hidden="true"
-            >
-              <path d="m5.555 17.776 4-16 .894.448-4 16-.894-.448z" />
-            </svg>
-            <span 
-              className="ml-4 text-sm font-medium text-gray-900"
-              aria-current="page"
-            >
-              Email Templates
-            </span>
-          </div>
-        </li>
-      </ol>
-    </nav>
-  );
-}
+          {/* Email Templates Table with Suspense */}
+          <Suspense fallback={<EmailTemplatesPageSkeleton />}>
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+              <EmailTemplatesTable
+                className="w-full"
+                aria-label="Email templates management table"
+                // Pass server-side search params for SSR optimization
+                initialPage={currentPage}
+                initialSearch={searchQuery}
+                initialSort={sortBy}
+                // Pass user permissions for conditional UI
+                canCreate={accessResult.permissions.includes('system.email_template.write')}
+                canEdit={accessResult.permissions.includes('system.email_template.write')}
+                canDelete={accessResult.permissions.includes('system.email_template.delete')}
+              />
+            </div>
+          </Suspense>
 
-/**
- * Page header component with actions
- * Provides consistent page title and contextual actions
- */
-function PageHeader() {
-  return (
-    <div className="md:flex md:items-center md:justify-between">
-      <div className="min-w-0 flex-1">
-        <h1 className="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">
-          Email Templates
-        </h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Manage and configure email templates for user notifications, password resets, and system communications.
-        </p>
-      </div>
-    </div>
-  );
-}
+          {/* Accessibility Live Region for Dynamic Updates */}
+          <div 
+            id="email-templates-announcements"
+            aria-live="polite" 
+            aria-atomic="true" 
+            className="sr-only"
+          />
 
-/**
- * Main Email Templates Page Component
- * 
- * React Server Component implementing Next.js 15.1 app router architecture
- * with optimal performance and SER capabilities. Transforms Angular email
- * templates container to modern React patterns with Tailwind CSS styling.
- * 
- * Features:
- * - Server-side rendering with <2 second load times
- * - Authentication validation via Next.js middleware  
- * - Suspense boundaries for progressive loading
- * - Error boundaries for graceful error handling
- * - Accessible design with WCAG 2.1 AA compliance
- * - SEO optimization with proper metadata
- */
-export default async function EmailTemplatesPage() {
-  // Server-side authentication check with redirect handling
-  const isAuthenticated = await validateAuthentication();
-  
-  if (!isAuthenticated) {
-    // Redirect to login with return URL for seamless UX
-    redirect('/login?returnUrl=/adf-config/df-email-templates');
-  }
-
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Skip navigation link for accessibility */}
-      <a 
-        href="#main-content" 
-        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-primary-600 text-white px-4 py-2 rounded-md z-50"
-      >
-        Skip to main content
-      </a>
-      
-      {/* Main content container */}
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        {/* Page padding and structure */}
-        <div className="py-6">
-          {/* Breadcrumb navigation */}
-          <div className="mb-6">
-            <Breadcrumbs />
-          </div>
-          
-          {/* Page header */}
-          <div className="mb-8">
-            <PageHeader />
-          </div>
-          
-          {/* Main content area */}
-          <main id="main-content" className="space-y-6">
-            {/* Email templates table with error boundary and suspense */}
-            <div className="bg-white shadow rounded-lg">
-              <div className="px-4 py-5 sm:p-6">
-                <Suspense fallback={<EmailTemplatesTableSkeleton />}>
-                  <ErrorBoundary fallback={<ErrorFallback />}>
-                    <EmailTemplatesTable />
-                  </ErrorBoundary>
-                </Suspense>
+          {/* Help Text for Users */}
+          <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg 
+                  className="h-5 w-5 text-blue-400" 
+                  viewBox="0 0 20 20" 
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path 
+                    fillRule="evenodd" 
+                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" 
+                    clipRule="evenodd" 
+                  />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                  Email Template Tips
+                </h3>
+                <div className="mt-2 text-sm text-blue-700 dark:text-blue-300">
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>
+                      Use template variables like <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">{'{{username}}'}</code> and <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">{'{{app_name}}'}</code> for dynamic content
+                    </li>
+                    <li>
+                      Test your templates before deploying to ensure proper variable substitution
+                    </li>
+                    <li>
+                      Include both HTML and plain text versions for maximum email client compatibility
+                    </li>
+                    <li>
+                      Consider email accessibility with proper alt text for images and semantic HTML structure
+                    </li>
+                  </ul>
+                </div>
               </div>
             </div>
-          </main>
-        </div>
-      </div>
-      
-      {/* Page analytics and performance monitoring hook */}
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `
-            // Page load performance tracking
-            if (typeof window !== 'undefined' && window.performance) {
-              window.addEventListener('load', function() {
-                const navTiming = performance.getEntriesByType('navigation')[0];
-                if (navTiming && navTiming.loadEventEnd > 0) {
-                  const loadTime = navTiming.loadEventEnd - navTiming.fetchStart;
-                  console.log('Email Templates Page Load Time:', loadTime + 'ms');
+          </div>
+        </main>
+      </ErrorBoundary>
+
+      {/* Performance Monitoring - Development Only */}
+      {process.env.NODE_ENV === 'development' && (
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              // Monitor email templates page load performance
+              if (typeof window !== 'undefined' && window.performance) {
+                window.addEventListener('load', () => {
+                  const loadTime = performance.now();
+                  console.log('Email Templates Page Load Time:', Math.round(loadTime), 'ms');
                   
-                  // Track if we meet <2s SSR requirement
+                  // Ensure SSR requirement of under 2 seconds is met
                   if (loadTime > 2000) {
-                    console.warn('Page load time exceeds 2s requirement:', loadTime + 'ms');
+                    console.warn('Email Templates page load exceeded 2-second SSR requirement');
                   }
-                }
-              });
-            }
-          `,
-        }}
-      />
+                });
+              }
+            `
+          }}
+        />
+      )}
     </div>
   );
 }
 
-/**
- * Static generation configuration for optimal performance
- * Disables static generation for admin pages requiring authentication
- */
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+// ============================================================================
+// EXPORT CONFIGURATION
+// ============================================================================
 
 /**
- * Runtime configuration for enhanced security
- * Ensures proper handling of sensitive admin functionality
+ * Next.js dynamic route configuration
+ * Optimizes page generation for performance and security
  */
-export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic'; // Always server-render for security
+export const revalidate = 0; // No static generation for admin pages
+export const runtime = 'nodejs'; // Use Node.js runtime for server-side features
