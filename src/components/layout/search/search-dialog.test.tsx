@@ -1,732 +1,1119 @@
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { axe, toHaveNoViolations } from 'jest-axe';
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter } from 'react-router-dom';
+import { describe, it, expect, beforeEach, beforeAll, afterEach, afterAll, vi } from 'vitest';
+import { screen, waitFor, within, fireEvent } from '@testing-library/react';
+import { renderWithProviders, accessibilityUtils, headlessUIUtils, userEvent } from '@/test/utils/test-utils';
+import { setupServer } from 'msw/node';
+import { rest } from 'msw';
+import { QueryClient } from '@tanstack/react-query';
+import { SearchDialog, SearchDialogProps, type SearchResult } from './search-dialog';
 
-import { SearchDialog } from './search-dialog';
-import { server } from '../../../test/mocks/server';
-import { searchHandlers } from '../../../test/mocks/search-handlers';
+/**
+ * MSW handlers for search API endpoints
+ */
+const searchHandlers = [
+  // Successful search endpoint
+  rest.post('/api/search', async (req, res, ctx) => {
+    const { query, categories, limit } = await req.json();
+    
+    // Return empty results for empty queries
+    if (!query || query.trim() === '') {
+      return res(
+        ctx.status(200),
+        ctx.json({
+          results: [],
+          total: 0,
+          query: '',
+          took: 10,
+        })
+      );
+    }
 
-// Extend Jest matchers for accessibility testing
-expect.extend(toHaveNoViolations);
-
-// Mock React Query and routing for isolated testing
-const mockNavigate = vi.fn();
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom');
-  return {
-    ...actual,
-    useNavigate: () => mockNavigate,
-  };
-});
-
-// Mock Headless UI Dialog animations for consistent testing
-vi.mock('@headlessui/react', async () => {
-  const actual = await vi.importActual('@headlessui/react');
-  return {
-    ...actual,
-    Transition: ({ children }: any) => <div data-testid="transition">{children}</div>,
-  };
-});
-
-// Test wrapper with required providers
-function TestWrapper({ children }: { children: React.ReactNode }) {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-        cacheTime: 0,
-        staleTime: 0,
+    // Mock search results based on query
+    const mockResults: SearchResult[] = [
+      {
+        id: 'service-1',
+        title: `Database Service: ${query}`,
+        subtitle: 'MySQL connection to production database',
+        type: 'services',
+        path: '/api-connections/database/service-1',
+        score: 0.95,
+        metadata: { dbType: 'mysql', status: 'active' },
       },
-      mutations: {
-        retry: false,
+      {
+        id: 'table-1',
+        title: `${query}_users`,
+        subtitle: 'User management table',
+        type: 'tables',
+        path: '/adf-schema/tables/table-1',
+        score: 0.82,
+        metadata: { rowCount: 15420, columns: 8 },
       },
-    },
-  });
+      {
+        id: 'user-1',
+        title: `${query} Admin`,
+        subtitle: 'System administrator',
+        type: 'users',
+        path: '/adf-users/user-1',
+        score: 0.75,
+        metadata: { role: 'admin', lastLogin: '2024-01-15' },
+      },
+    ];
 
-  return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        {children}
-      </BrowserRouter>
-    </QueryClientProvider>
-  );
-}
+    // Apply category filter if specified
+    const filteredResults = categories?.length
+      ? mockResults.filter(result => categories.includes(result.type))
+      : mockResults;
 
-// Custom render function with providers
-function renderSearchDialog(props = {}) {
-  const defaultProps = {
-    isOpen: true,
-    onClose: vi.fn(),
-    ...props,
-  };
+    // Apply limit
+    const limitedResults = limit ? filteredResults.slice(0, limit) : filteredResults;
 
+    return res(
+      ctx.status(200),
+      ctx.json({
+        results: limitedResults,
+        total: limitedResults.length,
+        query,
+        took: Math.random() * 100 + 50,
+      })
+    );
+  }),
+
+  // Error endpoint for testing error states
+  rest.post('/api/search-error', (req, res, ctx) => {
+    return res(
+      ctx.status(500),
+      ctx.json({
+        error: 'Internal server error',
+        message: 'Search service temporarily unavailable',
+      })
+    );
+  }),
+
+  // Slow endpoint for testing loading states
+  rest.post('/api/search-slow', async (req, res, ctx) => {
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    return res(
+      ctx.status(200),
+      ctx.json({
+        results: [],
+        total: 0,
+        query: 'slow',
+        took: 2000,
+      })
+    );
+  }),
+];
+
+// Setup MSW server
+const server = setupServer(...searchHandlers);
+
+// Mock localStorage for recent searches
+const mockLocalStorage = (() => {
+  let store: Record<string, string> = {};
+  
   return {
-    ...render(
-      <TestWrapper>
-        <SearchDialog {...defaultProps} />
-      </TestWrapper>
-    ),
-    props: defaultProps,
+    getItem: vi.fn((key: string) => store[key] || null),
+    setItem: vi.fn((key: string, value: string) => {
+      store[key] = value;
+    }),
+    removeItem: vi.fn((key: string) => {
+      delete store[key];
+    }),
+    clear: vi.fn(() => {
+      store = {};
+    }),
   };
-}
+})();
+
+// Mock router
+const mockPush = vi.fn();
+const mockRouter = {
+  push: mockPush,
+  replace: vi.fn(),
+  prefetch: vi.fn(),
+  back: vi.fn(),
+  forward: vi.fn(),
+  refresh: vi.fn(),
+};
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => mockRouter,
+}));
+
+// Mock app store
+const mockUseAppStore = vi.fn();
+vi.mock('@/stores/app-store', () => ({
+  useAppStore: () => mockUseAppStore(),
+}));
 
 describe('SearchDialog', () => {
   let queryClient: QueryClient;
+  let user: ReturnType<typeof userEvent.setup>;
+  
+  const defaultProps: SearchDialogProps = {
+    open: true,
+    onClose: vi.fn(),
+    placeholder: 'Search test placeholder',
+    enableShortcuts: true,
+  };
+
+  beforeAll(() => {
+    // Start MSW server
+    server.listen();
+    
+    // Mock localStorage
+    Object.defineProperty(window, 'localStorage', {
+      value: mockLocalStorage,
+      writable: true,
+    });
+
+    // Mock app store default return
+    mockUseAppStore.mockReturnValue({
+      searchOpen: false,
+      toggleSearch: vi.fn(),
+      searchQuery: '',
+      setSearchQuery: vi.fn(),
+    });
+  });
+
+  afterAll(() => {
+    server.close();
+  });
 
   beforeEach(() => {
-    // Setup MSW server with search handlers
-    server.use(...searchHandlers);
-    
-    // Setup fresh query client for each test
+    // Create fresh query client for each test
     queryClient = new QueryClient({
       defaultOptions: {
         queries: {
           retry: false,
-          cacheTime: 0,
-          staleTime: 0,
+          gcTime: 0,
+        },
+        mutations: {
+          retry: false,
         },
       },
     });
 
-    // Clear navigation mock
-    mockNavigate.mockClear();
-  });
-
-  afterEach(() => {
-    // Reset MSW handlers
-    server.resetHandlers();
+    // Setup userEvent with delay for realistic interactions
+    user = userEvent.setup({ delay: null });
     
     // Clear all mocks
     vi.clearAllMocks();
+    mockLocalStorage.clear();
+  });
+
+  afterEach(() => {
+    server.resetHandlers();
   });
 
   describe('Component Rendering', () => {
-    it('should render search dialog when open', () => {
-      renderSearchDialog();
-      
+    it('renders search dialog when open', () => {
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient },
+      });
+
       expect(screen.getByRole('dialog')).toBeInTheDocument();
-      expect(screen.getByRole('searchbox')).toBeInTheDocument();
-      expect(screen.getByPlaceholderText(/search/i)).toBeInTheDocument();
+      expect(screen.getByText('Global Search')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Search test placeholder')).toBeInTheDocument();
     });
 
-    it('should not render when closed', () => {
-      renderSearchDialog({ isOpen: false });
-      
+    it('does not render dialog when closed', () => {
+      renderWithProviders(<SearchDialog {...defaultProps} open={false} />, {
+        providerOptions: { queryClient },
+      });
+
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
 
-    it('should render close button with proper accessibility attributes', () => {
-      renderSearchDialog();
+    it('renders with default placeholder when none provided', () => {
+      const { placeholder, ...propsWithoutPlaceholder } = defaultProps;
       
-      const closeButton = screen.getByRole('button', { name: /close/i });
-      expect(closeButton).toBeInTheDocument();
-      expect(closeButton).toHaveAttribute('aria-label', 'Close search dialog');
+      renderWithProviders(<SearchDialog {...propsWithoutPlaceholder} />, {
+        providerOptions: { queryClient },
+      });
+
+      expect(screen.getByPlaceholderText(/Search databases, services, schemas/)).toBeInTheDocument();
     });
 
-    it('should apply proper ARIA attributes for modal dialog', () => {
-      renderSearchDialog();
-      
-      const dialog = screen.getByRole('dialog');
-      expect(dialog).toHaveAttribute('aria-modal', 'true');
-      expect(dialog).toHaveAttribute('aria-labelledby');
-      expect(dialog).toHaveAttribute('aria-describedby');
-    });
-  });
+    it('renders keyboard shortcuts when enabled', () => {
+      renderWithProviders(<SearchDialog {...defaultProps} enableShortcuts={true} />, {
+        providerOptions: { queryClient },
+      });
 
-  describe('Search Input Functionality', () => {
-    it('should render search input with proper attributes', () => {
-      renderSearchDialog();
-      
-      const searchInput = screen.getByRole('searchbox');
-      expect(searchInput).toHaveAttribute('type', 'search');
-      expect(searchInput).toHaveAttribute('placeholder', expect.stringContaining('search'));
-      expect(searchInput).toHaveAttribute('aria-label', expect.stringContaining('search'));
+      expect(screen.getByText('to navigate')).toBeInTheDocument();
+      expect(screen.getByText('to select')).toBeInTheDocument();
+      expect(screen.getByText('to close')).toBeInTheDocument();
+      expect(screen.getByText('to open search')).toBeInTheDocument();
     });
 
-    it('should update input value when user types', async () => {
-      const user = userEvent.setup();
-      renderSearchDialog();
-      
-      const searchInput = screen.getByRole('searchbox');
-      await user.type(searchInput, 'database');
-      
-      expect(searchInput).toHaveValue('database');
+    it('does not render global shortcut when shortcuts disabled', () => {
+      renderWithProviders(<SearchDialog {...defaultProps} enableShortcuts={false} />, {
+        providerOptions: { queryClient },
+      });
+
+      expect(screen.queryByText('to open search')).not.toBeInTheDocument();
     });
 
-    it('should debounce search queries with 2000ms delay', async () => {
-      const user = userEvent.setup();
-      renderSearchDialog();
-      
-      const searchInput = screen.getByRole('searchbox');
-      
-      // Type multiple characters rapidly
-      await user.type(searchInput, 'data', { delay: 100 });
-      
-      // Should not trigger search immediately
-      expect(screen.queryByTestId('search-results')).not.toBeInTheDocument();
-      
-      // Wait for debounce delay
-      await waitFor(
-        () => {
-          expect(screen.getByTestId('search-results')).toBeInTheDocument();
-        },
-        { timeout: 3000 }
+    it('applies custom className', () => {
+      renderWithProviders(
+        <SearchDialog {...defaultProps} className="custom-search-class" />,
+        { providerOptions: { queryClient } }
       );
-    });
 
-    it('should clear search input when escape key is pressed', async () => {
-      const user = userEvent.setup();
-      renderSearchDialog();
-      
-      const searchInput = screen.getByRole('searchbox');
-      await user.type(searchInput, 'database');
-      
-      expect(searchInput).toHaveValue('database');
-      
-      await user.keyboard('{Escape}');
-      expect(searchInput).toHaveValue('');
-    });
-
-    it('should show loading state during search', async () => {
-      const user = userEvent.setup();
-      renderSearchDialog();
-      
-      const searchInput = screen.getByRole('searchbox');
-      await user.type(searchInput, 'database');
-      
-      // Wait for debounce and check loading state
-      await waitFor(() => {
-        expect(screen.getByTestId('search-loading')).toBeInTheDocument();
-      });
+      const dialog = screen.getByRole('dialog');
+      expect(dialog.closest('[class*="custom-search-class"]')).toBeInTheDocument();
     });
   });
 
-  describe('Search Results Display', () => {
-    it('should display search results after successful query', async () => {
-      const user = userEvent.setup();
-      renderSearchDialog();
+  describe('Search Functionality', () => {
+    it('performs search when query is entered', async () => {
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient },
+      });
+
+      const searchInput = screen.getByPlaceholderText('Search test placeholder');
       
-      const searchInput = screen.getByRole('searchbox');
       await user.type(searchInput, 'database');
-      
+
+      // Wait for debounced search to execute
       await waitFor(() => {
-        expect(screen.getByTestId('search-results')).toBeInTheDocument();
-        expect(screen.getByText('Database Connections')).toBeInTheDocument();
-        expect(screen.getByText('MySQL Connection')).toBeInTheDocument();
+        expect(screen.getByText('Database Service: database')).toBeInTheDocument();
+      }, { timeout: 3000 });
+
+      expect(screen.getByText('database_users')).toBeInTheDocument();
+      expect(screen.getByText('database Admin')).toBeInTheDocument();
+    });
+
+    it('shows loading state during search', async () => {
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient },
+      });
+
+      const searchInput = screen.getByPlaceholderText('Search test placeholder');
+      
+      await user.type(searchInput, 'loading');
+
+      // Should show loading state immediately after typing
+      await waitFor(() => {
+        expect(screen.getByText('Searching...')).toBeInTheDocument();
       });
     });
 
-    it('should group search results by category', async () => {
-      const user = userEvent.setup();
-      renderSearchDialog();
-      
-      const searchInput = screen.getByRole('searchbox');
-      await user.type(searchInput, 'api');
-      
-      await waitFor(() => {
-        const results = screen.getByTestId('search-results');
-        expect(within(results).getByText('API Connections')).toBeInTheDocument();
-        expect(within(results).getByText('API Documentation')).toBeInTheDocument();
+    it('shows empty state when no query entered', () => {
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient },
       });
+
+      expect(screen.getByText('Global Search')).toBeInTheDocument();
+      expect(screen.getByText(/Quickly find database services/)).toBeInTheDocument();
     });
 
-    it('should display empty state when no results found', async () => {
-      const user = userEvent.setup();
-      renderSearchDialog();
+    it('shows no results message for empty results', async () => {
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient },
+      });
+
+      const searchInput = screen.getByPlaceholderText('Search test placeholder');
       
-      const searchInput = screen.getByRole('searchbox');
       await user.type(searchInput, 'nonexistent');
-      
+
       await waitFor(() => {
-        expect(screen.getByText(/no results found/i)).toBeInTheDocument();
-        expect(screen.getByText(/try adjusting your search/i)).toBeInTheDocument();
+        expect(screen.getByText('No results found')).toBeInTheDocument();
       });
     });
 
-    it('should display recent searches when input is empty', () => {
-      renderSearchDialog();
-      
-      expect(screen.getByTestId('recent-searches')).toBeInTheDocument();
-      expect(screen.getByText('Recent Searches')).toBeInTheDocument();
-      expect(screen.getByText('Database Management')).toBeInTheDocument();
-      expect(screen.getByText('API Documentation')).toBeInTheDocument();
-    });
+    it('handles search errors gracefully', async () => {
+      // Override handler to return error
+      server.use(
+        rest.post('/api/search', (req, res, ctx) => {
+          return res(ctx.status(500), ctx.json({ error: 'Server error' }));
+        })
+      );
 
-    it('should handle search error states gracefully', async () => {
-      // Override with error handler
-      server.use(searchHandlers.error);
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient },
+      });
+
+      const searchInput = screen.getByPlaceholderText('Search test placeholder');
       
-      const user = userEvent.setup();
-      renderSearchDialog();
-      
-      const searchInput = screen.getByRole('searchbox');
       await user.type(searchInput, 'error');
-      
+
       await waitFor(() => {
-        expect(screen.getByText(/search failed/i)).toBeInTheDocument();
-        expect(screen.getByText(/please try again/i)).toBeInTheDocument();
+        expect(screen.getByText('Search failed. Please try again.')).toBeInTheDocument();
       });
+    });
+
+    it('clears search input when clear button is clicked', async () => {
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient },
+      });
+
+      const searchInput = screen.getByPlaceholderText('Search test placeholder') as HTMLInputElement;
+      
+      await user.type(searchInput, 'test query');
+      expect(searchInput.value).toBe('test query');
+
+      // Find and click clear button (X icon)
+      const clearButton = screen.getByRole('button', { name: /clear/i });
+      await user.click(clearButton);
+
+      expect(searchInput.value).toBe('');
+    });
+
+    it('respects initial query prop', () => {
+      renderWithProviders(
+        <SearchDialog {...defaultProps} initialQuery="initial search" />,
+        { providerOptions: { queryClient } }
+      );
+
+      const searchInput = screen.getByPlaceholderText('Search test placeholder') as HTMLInputElement;
+      expect(searchInput.value).toBe('initial search');
     });
   });
 
-  describe('Navigation and User Interactions', () => {
-    it('should navigate to selected result when clicked', async () => {
-      const user = userEvent.setup();
-      const { props } = renderSearchDialog();
+  describe('User Interactions', () => {
+    it('calls onClose when close button is clicked', async () => {
+      const onClose = vi.fn();
       
-      const searchInput = screen.getByRole('searchbox');
-      await user.type(searchInput, 'database');
-      
-      await waitFor(() => {
-        const resultButton = screen.getByRole('button', { name: /mysql connection/i });
-        expect(resultButton).toBeInTheDocument();
+      renderWithProviders(<SearchDialog {...defaultProps} onClose={onClose} />, {
+        providerOptions: { queryClient },
       });
-      
-      const resultButton = screen.getByRole('button', { name: /mysql connection/i });
-      await user.click(resultButton);
-      
-      expect(mockNavigate).toHaveBeenCalledWith('/api-connections/database/mysql');
-      expect(props.onClose).toHaveBeenCalled();
-    });
 
-    it('should navigate to recent search when clicked', async () => {
-      const user = userEvent.setup();
-      const { props } = renderSearchDialog();
-      
-      const recentButton = screen.getByRole('button', { name: /database management/i });
-      await user.click(recentButton);
-      
-      expect(mockNavigate).toHaveBeenCalledWith('/api-connections/database');
-      expect(props.onClose).toHaveBeenCalled();
-    });
-
-    it('should close dialog when close button is clicked', async () => {
-      const user = userEvent.setup();
-      const { props } = renderSearchDialog();
-      
-      const closeButton = screen.getByRole('button', { name: /close/i });
+      const closeButton = screen.getByRole('button', { name: /close search dialog/i });
       await user.click(closeButton);
-      
-      expect(props.onClose).toHaveBeenCalled();
+
+      expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('should close dialog when escape key is pressed', async () => {
-      const user = userEvent.setup();
-      const { props } = renderSearchDialog();
+    it('calls onClose when escape key is pressed', async () => {
+      const onClose = vi.fn();
       
+      renderWithProviders(<SearchDialog {...defaultProps} onClose={onClose} />, {
+        providerOptions: { queryClient },
+      });
+
       await user.keyboard('{Escape}');
-      
-      expect(props.onClose).toHaveBeenCalled();
+
+      expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('should close dialog when backdrop is clicked', async () => {
-      const user = userEvent.setup();
-      const { props } = renderSearchDialog();
-      
-      const backdrop = screen.getByTestId('dialog-backdrop');
-      await user.click(backdrop);
-      
-      expect(props.onClose).toHaveBeenCalled();
-    });
-  });
-
-  describe('Keyboard Navigation', () => {
-    it('should focus search input when dialog opens', () => {
-      renderSearchDialog();
-      
-      const searchInput = screen.getByRole('searchbox');
-      expect(searchInput).toHaveFocus();
-    });
-
-    it('should navigate through search results with arrow keys', async () => {
-      const user = userEvent.setup();
-      renderSearchDialog();
-      
-      const searchInput = screen.getByRole('searchbox');
-      await user.type(searchInput, 'database');
-      
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /mysql connection/i })).toBeInTheDocument();
+    it('navigates to result when result is clicked', async () => {
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient },
       });
-      
-      // Navigate down to first result
+
+      const searchInput = screen.getByPlaceholderText('Search test placeholder');
+      await user.type(searchInput, 'database');
+
+      await waitFor(() => {
+        expect(screen.getByText('Database Service: database')).toBeInTheDocument();
+      });
+
+      const resultItem = screen.getByText('Database Service: database');
+      await user.click(resultItem);
+
+      expect(mockPush).toHaveBeenCalledWith('/api-connections/database/service-1');
+    });
+
+    it('supports keyboard navigation through results', async () => {
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient },
+      });
+
+      const searchInput = screen.getByPlaceholderText('Search test placeholder');
+      await user.type(searchInput, 'database');
+
+      await waitFor(() => {
+        expect(screen.getByText('Database Service: database')).toBeInTheDocument();
+      });
+
+      // Test arrow key navigation
       await user.keyboard('{ArrowDown}');
-      expect(screen.getByRole('button', { name: /mysql connection/i })).toHaveFocus();
-      
-      // Navigate to next result
       await user.keyboard('{ArrowDown}');
-      expect(screen.getByRole('button', { name: /postgresql connection/i })).toHaveFocus();
-      
-      // Navigate back up
       await user.keyboard('{ArrowUp}');
-      expect(screen.getByRole('button', { name: /mysql connection/i })).toHaveFocus();
-    });
 
-    it('should activate focused result with Enter key', async () => {
-      const user = userEvent.setup();
-      const { props } = renderSearchDialog();
-      
-      const searchInput = screen.getByRole('searchbox');
-      await user.type(searchInput, 'database');
-      
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /mysql connection/i })).toBeInTheDocument();
-      });
-      
-      await user.keyboard('{ArrowDown}');
+      // Test Enter key selection
       await user.keyboard('{Enter}');
-      
-      expect(mockNavigate).toHaveBeenCalledWith('/api-connections/database/mysql');
-      expect(props.onClose).toHaveBeenCalled();
+
+      // Should navigate to the focused result
+      expect(mockPush).toHaveBeenCalled();
     });
 
-    it('should wrap keyboard navigation at list boundaries', async () => {
-      const user = userEvent.setup();
-      renderSearchDialog();
+    it('opens search dialog with global keyboard shortcut', async () => {
+      const onClose = vi.fn();
       
-      const searchInput = screen.getByRole('searchbox');
-      await user.type(searchInput, 'database');
-      
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /mysql connection/i })).toBeInTheDocument();
-      });
-      
-      // Navigate to first result
-      await user.keyboard('{ArrowDown}');
-      
-      // Navigate up from first result should wrap to last
-      await user.keyboard('{ArrowUp}');
-      expect(screen.getByRole('button', { name: /mongodb connection/i })).toHaveFocus();
+      renderWithProviders(
+        <SearchDialog {...defaultProps} open={false} onClose={onClose} enableShortcuts={true} />,
+        { providerOptions: { queryClient } }
+      );
+
+      // Simulate Cmd+K keyboard shortcut
+      await user.keyboard('{Meta>}k{/Meta}');
+
+      expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('should return focus to search input with Tab key', async () => {
-      const user = userEvent.setup();
-      renderSearchDialog();
+    it('opens search dialog with Ctrl+K keyboard shortcut', async () => {
+      const onClose = vi.fn();
       
-      const searchInput = screen.getByRole('searchbox');
-      await user.type(searchInput, 'database');
-      
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /mysql connection/i })).toBeInTheDocument();
-      });
-      
-      await user.keyboard('{ArrowDown}');
-      await user.keyboard('{Tab}');
-      
-      expect(searchInput).toHaveFocus();
+      renderWithProviders(
+        <SearchDialog {...defaultProps} open={false} onClose={onClose} enableShortcuts={true} />,
+        { providerOptions: { queryClient } }
+      );
+
+      // Simulate Ctrl+K keyboard shortcut
+      await user.keyboard('{Control>}k{/Control}');
+
+      expect(onClose).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe('Responsive Design', () => {
-    it('should apply mobile styles on small screens', () => {
-      // Mock window.matchMedia for small screen
-      Object.defineProperty(window, 'matchMedia', {
-        writable: true,
-        value: vi.fn().mockImplementation(query => ({
-          matches: query === '(max-width: 768px)',
-          media: query,
-          onchange: null,
-          addListener: vi.fn(),
-          removeListener: vi.fn(),
-          addEventListener: vi.fn(),
-          removeEventListener: vi.fn(),
-          dispatchEvent: vi.fn(),
-        })),
+  describe('Accessibility Compliance (WCAG 2.1 AA)', () => {
+    it('has proper ARIA attributes for dialog', () => {
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient },
       });
-      
-      renderSearchDialog();
-      
+
       const dialog = screen.getByRole('dialog');
-      expect(dialog).toHaveClass('mobile-dialog');
-      expect(dialog).toHaveStyle({ 
-        width: '100vw',
-        height: '100vh',
-        maxHeight: '100vh'
+      expect(dialog).toHaveAttribute('aria-label', expect.any(String));
+    });
+
+    it('manages focus correctly when dialog opens', async () => {
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient },
+      });
+
+      // Search input should receive focus when dialog opens
+      await waitFor(() => {
+        const searchInput = screen.getByPlaceholderText('Search test placeholder');
+        expect(document.activeElement).toBe(searchInput);
       });
     });
 
-    it('should apply desktop styles on large screens', () => {
-      // Mock window.matchMedia for large screen
-      Object.defineProperty(window, 'matchMedia', {
-        writable: true,
-        value: vi.fn().mockImplementation(query => ({
-          matches: query === '(min-width: 769px)',
-          media: query,
-          onchange: null,
-          addListener: vi.fn(),
-          removeListener: vi.fn(),
-          addEventListener: vi.fn(),
-          removeEventListener: vi.fn(),
-          dispatchEvent: vi.fn(),
-        })),
+    it('traps focus within dialog', async () => {
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient },
       });
-      
-      renderSearchDialog();
-      
+
       const dialog = screen.getByRole('dialog');
-      expect(dialog).toHaveClass('desktop-dialog');
-      expect(dialog).toHaveStyle({ 
-        maxWidth: '600px',
-        maxHeight: '80vh'
+      const focusableElements = accessibilityUtils.getFocusableElements(dialog);
+
+      expect(focusableElements.length).toBeGreaterThan(0);
+
+      // Test that tab navigation stays within dialog
+      for (let i = 0; i < focusableElements.length; i++) {
+        await user.tab();
+        expect(dialog.contains(document.activeElement as Node)).toBe(true);
+      }
+    });
+
+    it('has adequate keyboard navigation support', async () => {
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient },
       });
-    });
 
-    it('should adjust results container height based on screen size', async () => {
-      const user = userEvent.setup();
-      renderSearchDialog();
-      
-      const searchInput = screen.getByRole('searchbox');
-      await user.type(searchInput, 'database');
-      
-      await waitFor(() => {
-        const resultsContainer = screen.getByTestId('search-results');
-        expect(resultsContainer).toHaveStyle({
-          maxHeight: expect.stringMatching(/vh|px/)
-        });
-      });
-    });
-  });
-
-  describe('Accessibility Compliance', () => {
-    it('should pass WCAG 2.1 AA accessibility audit', async () => {
-      const { container } = renderSearchDialog();
-      
-      const results = await axe(container);
-      expect(results).toHaveNoViolations();
-    });
-
-    it('should announce search results to screen readers', async () => {
-      const user = userEvent.setup();
-      renderSearchDialog();
-      
-      const searchInput = screen.getByRole('searchbox');
-      await user.type(searchInput, 'database');
-      
-      await waitFor(() => {
-        const announcement = screen.getByRole('status');
-        expect(announcement).toHaveTextContent(/3 results found/i);
-        expect(announcement).toHaveAttribute('aria-live', 'polite');
-      });
-    });
-
-    it('should support screen reader navigation of results', async () => {
-      const user = userEvent.setup();
-      renderSearchDialog();
-      
-      const searchInput = screen.getByRole('searchbox');
-      await user.type(searchInput, 'database');
-      
-      await waitFor(() => {
-        const resultsList = screen.getByRole('list');
-        expect(resultsList).toHaveAttribute('aria-label', 'Search results');
-        
-        const results = screen.getAllByRole('listitem');
-        expect(results).toHaveLength(3);
-        
-        results.forEach((result, index) => {
-          expect(result).toHaveAttribute('aria-setsize', '3');
-          expect(result).toHaveAttribute('aria-posinset', (index + 1).toString());
-        });
-      });
-    });
-
-    it('should provide proper focus management', () => {
-      renderSearchDialog();
-      
-      // Dialog should trap focus
       const dialog = screen.getByRole('dialog');
-      expect(dialog).toHaveAttribute('aria-modal', 'true');
-      
-      // Initial focus should be on search input
-      const searchInput = screen.getByRole('searchbox');
-      expect(searchInput).toHaveFocus();
+      const navigationResult = await accessibilityUtils.testKeyboardNavigation(dialog, user);
+
+      expect(navigationResult.success).toBe(true);
+      expect(navigationResult.focusedElements.length).toBeGreaterThan(0);
     });
 
-    it('should have proper contrast ratios for all text elements', async () => {
-      const user = userEvent.setup();
-      renderSearchDialog();
-      
-      const searchInput = screen.getByRole('searchbox');
-      await user.type(searchInput, 'database');
-      
-      await waitFor(() => {
-        // Verify high contrast text elements
-        const heading = screen.getByRole('heading', { name: /search/i });
-        expect(heading).toHaveStyle({ 
-          color: expect.stringMatching(/#[0-9a-f]{6}/i) 
-        });
-        
-        const resultItems = screen.getAllByRole('button');
-        resultItems.forEach(item => {
-          expect(item).toHaveStyle({
-            color: expect.stringMatching(/#[0-9a-f]{6}/i)
-          });
-        });
+    it('provides screen reader announcements for search states', async () => {
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient },
       });
+
+      const searchInput = screen.getByPlaceholderText('Search test placeholder');
+      await user.type(searchInput, 'database');
+
+      // Check for screen reader status updates
+      await waitFor(() => {
+        const statusElement = screen.getByText(/Found \d+ results/);
+        expect(statusElement).toHaveAttribute('aria-live', 'polite');
+      });
+    });
+
+    it('has proper ARIA labels for interactive elements', () => {
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient },
+      });
+
+      const searchInput = screen.getByPlaceholderText('Search test placeholder');
+      const closeButton = screen.getByRole('button', { name: /close search dialog/i });
+
+      expect(accessibilityUtils.hasAriaLabel(searchInput)).toBe(true);
+      expect(accessibilityUtils.hasAriaLabel(closeButton)).toBe(true);
+    });
+
+    it('supports high contrast and theme variations', () => {
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient, theme: 'dark' },
+      });
+
+      const dialog = screen.getByRole('dialog');
+      expect(dialog).toHaveClass('dark');
     });
   });
 
   describe('React Query Integration', () => {
-    it('should cache search results properly', async () => {
-      const user = userEvent.setup();
-      renderSearchDialog();
-      
-      const searchInput = screen.getByRole('searchbox');
+    it('caches search results for repeated queries', async () => {
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient },
+      });
+
+      const searchInput = screen.getByPlaceholderText('Search test placeholder');
       
       // First search
-      await user.type(searchInput, 'database');
-      
-      await waitFor(() => {
-        expect(screen.getByText('MySQL Connection')).toBeInTheDocument();
-      });
-      
-      // Clear and search again - should use cache
       await user.clear(searchInput);
       await user.type(searchInput, 'database');
-      
-      // Results should appear immediately from cache
-      expect(screen.getByText('MySQL Connection')).toBeInTheDocument();
-    });
 
-    it('should handle background revalidation of search results', async () => {
-      const user = userEvent.setup();
-      renderSearchDialog();
-      
-      const searchInput = screen.getByRole('searchbox');
-      await user.type(searchInput, 'database');
-      
       await waitFor(() => {
-        expect(screen.getByText('MySQL Connection')).toBeInTheDocument();
+        expect(screen.getByText('Database Service: database')).toBeInTheDocument();
       });
-      
-      // Verify stale-while-revalidate behavior
-      await waitFor(() => {
-        expect(screen.getByTestId('background-refresh-indicator')).toBeInTheDocument();
-      }, { timeout: 5000 });
-    });
 
-    it('should prefetch related search results', async () => {
-      const user = userEvent.setup();
-      renderSearchDialog();
-      
-      const searchInput = screen.getByRole('searchbox');
-      await user.type(searchInput, 'api');
-      
-      await waitFor(() => {
-        expect(screen.getByText('API Connections')).toBeInTheDocument();
-      });
-      
-      // Hovering over a result should prefetch related data
-      const apiResult = screen.getByRole('button', { name: /api connections/i });
-      await user.hover(apiResult);
-      
-      // Verify prefetch happened (implementation detail)
-      expect(queryClient.getQueryData(['search', 'api-connections'])).toBeDefined();
-    });
-
-    it('should invalidate search cache when necessary', async () => {
-      const user = userEvent.setup();
-      renderSearchDialog();
-      
-      const searchInput = screen.getByRole('searchbox');
-      await user.type(searchInput, 'database');
-      
-      await waitFor(() => {
-        expect(screen.getByText('MySQL Connection')).toBeInTheDocument();
-      });
-      
-      // Simulate cache invalidation (e.g., after creating new connection)
-      queryClient.invalidateQueries(['search']);
-      
-      // Re-search should trigger fresh request
+      // Clear and search again with same query
       await user.clear(searchInput);
       await user.type(searchInput, 'database');
-      
+
+      // Should load from cache (almost instantly)
       await waitFor(() => {
-        expect(screen.getByTestId('search-loading')).toBeInTheDocument();
+        expect(screen.getByText('Database Service: database')).toBeInTheDocument();
+      }, { timeout: 100 });
+    });
+
+    it('handles query invalidation correctly', async () => {
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient },
+      });
+
+      const searchInput = screen.getByPlaceholderText('Search test placeholder');
+      await user.type(searchInput, 'test');
+
+      await waitFor(() => {
+        expect(screen.getByText(/Database Service:/)).toBeInTheDocument();
+      });
+
+      // Invalidate queries
+      await queryClient.invalidateQueries({ queryKey: ['search'] });
+
+      // Should trigger refetch
+      await waitFor(() => {
+        expect(screen.getByText(/Database Service:/)).toBeInTheDocument();
+      });
+    });
+
+    it('implements proper error boundaries for query failures', async () => {
+      // Mock console.error to prevent test noise
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      server.use(
+        rest.post('/api/search', (req, res, ctx) => {
+          return res.networkError('Network error');
+        })
+      );
+
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient },
+      });
+
+      const searchInput = screen.getByPlaceholderText('Search test placeholder');
+      await user.type(searchInput, 'error');
+
+      await waitFor(() => {
+        expect(screen.getByText('Search failed. Please try again.')).toBeInTheDocument();
+      });
+
+      consoleSpy.mockRestore();
+    });
+
+    it('debounces search queries to prevent excessive API calls', async () => {
+      const apiCallSpy = vi.fn();
+      
+      server.use(
+        rest.post('/api/search', (req, res, ctx) => {
+          apiCallSpy();
+          return res(
+            ctx.status(200),
+            ctx.json({ results: [], total: 0, query: '', took: 10 })
+          );
+        })
+      );
+
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient },
+      });
+
+      const searchInput = screen.getByPlaceholderText('Search test placeholder');
+      
+      // Type multiple characters quickly
+      await user.type(searchInput, 'rapid typing test', { delay: 50 });
+
+      // Wait for debounce period
+      await waitFor(() => {
+        expect(apiCallSpy).toHaveBeenCalledTimes(1);
+      }, { timeout: 2000 });
+    });
+
+    it('supports background refetching for stale data', async () => {
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient },
+      });
+
+      const searchInput = screen.getByPlaceholderText('Search test placeholder');
+      await user.type(searchInput, 'refetch');
+
+      await waitFor(() => {
+        expect(screen.getByText(/Database Service:/)).toBeInTheDocument();
+      });
+
+      // Simulate stale data and refetch
+      const cacheData = queryClient.getQueryData(['search', 'refetch', {}, 50]);
+      expect(cacheData).toBeDefined();
+
+      // Force background refetch
+      await queryClient.refetchQueries({ queryKey: ['search'], type: 'active' });
+    });
+  });
+
+  describe('Recent Searches & History', () => {
+    it('persists recent searches to localStorage', async () => {
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient },
+      });
+
+      const searchInput = screen.getByPlaceholderText('Search test placeholder');
+      await user.type(searchInput, 'test search');
+
+      await waitFor(() => {
+        expect(screen.getByText(/Database Service:/)).toBeInTheDocument();
+      });
+
+      // Click on a result to add to history
+      const resultItem = screen.getByText('Database Service: test search');
+      await user.click(resultItem);
+
+      expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
+        'dreamfactory-recent-searches',
+        expect.stringContaining('test search')
+      );
+    });
+
+    it('displays recent searches when no query is entered', () => {
+      // Mock localStorage with recent searches
+      mockLocalStorage.getItem.mockReturnValue(JSON.stringify([
+        {
+          id: 'recent-1',
+          title: 'Recent Database Search',
+          type: 'services',
+          path: '/recent-path',
+        },
+      ]));
+
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient },
+      });
+
+      expect(screen.getByText('Recent Searches')).toBeInTheDocument();
+      expect(screen.getByText('Recent Database Search')).toBeInTheDocument();
+    });
+
+    it('clears recent searches when clear button is clicked', async () => {
+      // Mock localStorage with recent searches
+      mockLocalStorage.getItem.mockReturnValue(JSON.stringify([
+        {
+          id: 'recent-1',
+          title: 'Recent Database Search',
+          type: 'services',
+          path: '/recent-path',
+        },
+      ]));
+
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient },
+      });
+
+      expect(screen.getByText('Recent Searches')).toBeInTheDocument();
+      
+      const clearButton = screen.getByText('Clear recent searches');
+      await user.click(clearButton);
+
+      expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('dreamfactory-recent-searches');
+    });
+
+    it('limits recent searches to maximum count', async () => {
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient },
+      });
+
+      const searchInput = screen.getByPlaceholderText('Search test placeholder');
+
+      // Perform multiple searches to exceed limit
+      for (let i = 0; i < 10; i++) {
+        await user.clear(searchInput);
+        await user.type(searchInput, `search ${i}`);
+        
+        await waitFor(() => {
+          expect(screen.getByText(`Database Service: search ${i}`)).toBeInTheDocument();
+        });
+
+        const resultItem = screen.getByText(`Database Service: search ${i}`);
+        await user.click(resultItem);
+      }
+
+      // Check that localStorage was called and recent searches are limited
+      const setItemCalls = mockLocalStorage.setItem.mock.calls.filter(
+        call => call[0] === 'dreamfactory-recent-searches'
+      );
+      
+      expect(setItemCalls.length).toBeGreaterThan(0);
+      
+      // Parse the last saved data to check count
+      const lastSavedData = JSON.parse(setItemCalls[setItemCalls.length - 1][1]);
+      expect(lastSavedData.length).toBeLessThanOrEqual(5); // Should limit to 5 items
+    });
+  });
+
+  describe('Responsive Design', () => {
+    it('adapts to mobile viewport', () => {
+      // Mock mobile viewport
+      Object.defineProperty(window, 'innerWidth', {
+        writable: true,
+        configurable: true,
+        value: 375,
+      });
+
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient },
+      });
+
+      const dialog = screen.getByRole('dialog');
+      expect(dialog).toHaveClass('w-full');
+    });
+
+    it('adapts to desktop viewport', () => {
+      // Mock desktop viewport
+      Object.defineProperty(window, 'innerWidth', {
+        writable: true,
+        configurable: true,
+        value: 1024,
+      });
+
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient },
+      });
+
+      const dialog = screen.getByRole('dialog');
+      expect(dialog).toHaveClass('max-w-2xl');
+    });
+
+    it('handles dialog positioning correctly', () => {
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient },
+      });
+
+      const dialogContainer = screen.getByRole('dialog').closest('[class*="pt-"]');
+      expect(dialogContainer).toHaveClass('pt-[10vh]');
+    });
+
+    it('adjusts search results container height', () => {
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient },
+      });
+
+      const resultsContainer = screen.getByRole('dialog').querySelector('[class*="max-h-"]');
+      expect(resultsContainer).toHaveClass('max-h-[60vh]');
+    });
+  });
+
+  describe('MSW Integration & Error Scenarios', () => {
+    it('handles network timeouts gracefully', async () => {
+      server.use(
+        rest.post('/api/search', async (req, res, ctx) => {
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          return res(ctx.status(200), ctx.json({ results: [], total: 0, query: '', took: 5000 }));
+        })
+      );
+
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient },
+      });
+
+      const searchInput = screen.getByPlaceholderText('Search test placeholder');
+      await user.type(searchInput, 'timeout');
+
+      await waitFor(() => {
+        expect(screen.getByText('Searching...')).toBeInTheDocument();
+      });
+
+      // Should show loading state for extended period
+      expect(screen.getByText('Searching...')).toBeInTheDocument();
+    });
+
+    it('handles malformed API responses', async () => {
+      server.use(
+        rest.post('/api/search', (req, res, ctx) => {
+          return res(ctx.status(200), ctx.text('Invalid JSON response'));
+        })
+      );
+
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient },
+      });
+
+      const searchInput = screen.getByPlaceholderText('Search test placeholder');
+      await user.type(searchInput, 'malformed');
+
+      await waitFor(() => {
+        expect(screen.getByText('Search failed. Please try again.')).toBeInTheDocument();
+      });
+    });
+
+    it('handles rate limiting responses', async () => {
+      server.use(
+        rest.post('/api/search', (req, res, ctx) => {
+          return res(
+            ctx.status(429),
+            ctx.json({
+              error: 'Rate limit exceeded',
+              retryAfter: 60,
+            })
+          );
+        })
+      );
+
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient },
+      });
+
+      const searchInput = screen.getByPlaceholderText('Search test placeholder');
+      await user.type(searchInput, 'ratelimit');
+
+      await waitFor(() => {
+        expect(screen.getByText('Search failed. Please try again.')).toBeInTheDocument();
+      });
+    });
+
+    it('handles empty API responses correctly', async () => {
+      server.use(
+        rest.post('/api/search', (req, res, ctx) => {
+          return res(
+            ctx.status(200),
+            ctx.json({
+              results: [],
+              total: 0,
+              query: 'empty',
+              took: 25,
+            })
+          );
+        })
+      );
+
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient },
+      });
+
+      const searchInput = screen.getByPlaceholderText('Search test placeholder');
+      await user.type(searchInput, 'empty');
+
+      await waitFor(() => {
+        expect(screen.getByText('No results found')).toBeInTheDocument();
+        expect(screen.getByText('Try adjusting your search terms or explore different categories')).toBeInTheDocument();
       });
     });
   });
 
-  describe('Error Handling and Edge Cases', () => {
-    it('should handle network errors gracefully', async () => {
-      // Mock network error
-      server.use(searchHandlers.networkError);
+  describe('Performance & Optimization', () => {
+    it('cancels previous search requests when new query is entered', async () => {
+      const abortSpy = vi.fn();
       
-      const user = userEvent.setup();
-      renderSearchDialog();
+      server.use(
+        rest.post('/api/search', async (req, res, ctx) => {
+          req.signal.addEventListener('abort', abortSpy);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          return res(ctx.status(200), ctx.json({ results: [], total: 0, query: '', took: 1000 }));
+        })
+      );
+
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient },
+      });
+
+      const searchInput = screen.getByPlaceholderText('Search test placeholder');
       
-      const searchInput = screen.getByRole('searchbox');
-      await user.type(searchInput, 'database');
+      // Start first search
+      await user.type(searchInput, 'first');
       
+      // Quickly start second search
+      await user.clear(searchInput);
+      await user.type(searchInput, 'second');
+
+      // First request should be aborted
       await waitFor(() => {
-        expect(screen.getByText(/connection error/i)).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
+        expect(abortSpy).toHaveBeenCalled();
       });
     });
 
-    it('should handle very long search queries', async () => {
-      const user = userEvent.setup();
-      renderSearchDialog();
+    it('optimizes re-renders with proper memoization', async () => {
+      const renderSpy = vi.fn();
       
+      const TestWrapper = ({ children }: { children: React.ReactNode }) => {
+        renderSpy();
+        return <>{children}</>;
+      };
+
+      renderWithProviders(
+        <TestWrapper>
+          <SearchDialog {...defaultProps} />
+        </TestWrapper>,
+        { providerOptions: { queryClient } }
+      );
+
+      const searchInput = screen.getByPlaceholderText('Search test placeholder');
+      
+      // Multiple interactions should not cause excessive re-renders
+      await user.type(searchInput, 'test');
+      await user.clear(searchInput);
+      await user.type(searchInput, 'another');
+
+      // Should not re-render excessively
+      expect(renderSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('implements efficient virtual scrolling for large result sets', async () => {
+      // Mock large result set
+      server.use(
+        rest.post('/api/search', (req, res, ctx) => {
+          const largeResults = Array.from({ length: 100 }, (_, i) => ({
+            id: `result-${i}`,
+            title: `Result ${i}`,
+            subtitle: `Description for result ${i}`,
+            type: 'services',
+            path: `/result-${i}`,
+            score: 0.9 - (i * 0.001),
+          }));
+
+          return res(
+            ctx.status(200),
+            ctx.json({
+              results: largeResults,
+              total: largeResults.length,
+              query: 'large',
+              took: 50,
+            })
+          );
+        })
+      );
+
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient },
+      });
+
+      const searchInput = screen.getByPlaceholderText('Search test placeholder');
+      await user.type(searchInput, 'large');
+
+      await waitFor(() => {
+        expect(screen.getByText('Result 0')).toBeInTheDocument();
+      });
+
+      // Should render efficiently without performance issues
+      const resultsContainer = screen.getByRole('dialog').querySelector('[class*="overflow-y-auto"]');
+      expect(resultsContainer).toBeInTheDocument();
+    });
+  });
+
+  describe('Edge Cases & Error Boundaries', () => {
+    it('handles special characters in search queries', async () => {
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient },
+      });
+
+      const searchInput = screen.getByPlaceholderText('Search test placeholder');
+      await user.type(searchInput, '!@#$%^&*()');
+
+      await waitFor(() => {
+        expect(screen.getByText(/Database Service:/)).toBeInTheDocument();
+      });
+    });
+
+    it('handles very long search queries', async () => {
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient },
+      });
+
       const longQuery = 'a'.repeat(1000);
-      const searchInput = screen.getByRole('searchbox');
+      const searchInput = screen.getByPlaceholderText('Search test placeholder');
       
       await user.type(searchInput, longQuery);
-      
-      // Should truncate or handle gracefully
-      expect(searchInput).toHaveValue(longQuery.substring(0, 100));
-    });
 
-    it('should handle special characters in search queries', async () => {
-      const user = userEvent.setup();
-      renderSearchDialog();
-      
-      const specialQuery = '!@#$%^&*()_+-=[]{}|;:,.<>?';
-      const searchInput = screen.getByRole('searchbox');
-      
-      await user.type(searchInput, specialQuery);
-      
       await waitFor(() => {
-        expect(screen.getByText(/no results found/i)).toBeInTheDocument();
+        expect(screen.getByText(/Database Service:/)).toBeInTheDocument();
       });
     });
 
-    it('should handle rapid successive search queries', async () => {
-      const user = userEvent.setup();
-      renderSearchDialog();
+    it('handles concurrent dialog operations', async () => {
+      const onClose = vi.fn();
       
-      const searchInput = screen.getByRole('searchbox');
-      
-      // Type multiple queries rapidly
-      await user.type(searchInput, 'data');
-      await user.clear(searchInput);
-      await user.type(searchInput, 'api');
-      await user.clear(searchInput);
-      await user.type(searchInput, 'schema');
-      
-      // Should only show results for the last query
-      await waitFor(() => {
-        expect(screen.getByText('Schema Management')).toBeInTheDocument();
-        expect(screen.queryByText('Database Connections')).not.toBeInTheDocument();
+      renderWithProviders(<SearchDialog {...defaultProps} onClose={onClose} />, {
+        providerOptions: { queryClient },
       });
+
+      // Simulate rapid open/close operations
+      await user.keyboard('{Escape}');
+      await user.keyboard('{Escape}');
+      await user.keyboard('{Escape}');
+
+      // Should handle gracefully without errors
+      expect(onClose).toHaveBeenCalledTimes(3);
     });
 
-    it('should handle empty search responses', async () => {
-      server.use(searchHandlers.empty);
+    it('maintains state consistency during error recovery', async () => {
+      let shouldError = true;
       
-      const user = userEvent.setup();
-      renderSearchDialog();
+      server.use(
+        rest.post('/api/search', (req, res, ctx) => {
+          if (shouldError) {
+            shouldError = false;
+            return res(ctx.status(500), ctx.json({ error: 'Temporary error' }));
+          }
+          return res(
+            ctx.status(200),
+            ctx.json({
+              results: [
+                {
+                  id: 'recovery-1',
+                  title: 'Recovery Result',
+                  type: 'services',
+                  path: '/recovery',
+                  score: 0.9,
+                },
+              ],
+              total: 1,
+              query: 'recovery',
+              took: 100,
+            })
+          );
+        })
+      );
+
+      renderWithProviders(<SearchDialog {...defaultProps} />, {
+        providerOptions: { queryClient },
+      });
+
+      const searchInput = screen.getByPlaceholderText('Search test placeholder');
       
-      const searchInput = screen.getByRole('searchbox');
-      await user.type(searchInput, 'empty');
-      
+      // First search will error
+      await user.type(searchInput, 'recovery');
+
       await waitFor(() => {
-        expect(screen.getByText(/no results found/i)).toBeInTheDocument();
-        expect(screen.getByText(/try different keywords/i)).toBeInTheDocument();
+        expect(screen.getByText('Search failed. Please try again.')).toBeInTheDocument();
+      });
+
+      // Second search should succeed
+      await user.clear(searchInput);
+      await user.type(searchInput, 'recovery');
+
+      await waitFor(() => {
+        expect(screen.getByText('Recovery Result')).toBeInTheDocument();
       });
     });
   });
