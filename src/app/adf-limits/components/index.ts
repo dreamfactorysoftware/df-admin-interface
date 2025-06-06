@@ -1,308 +1,176 @@
 /**
- * Export Barrel for ADF Limits React Components
+ * ADF Limits Components Export Barrel
  * 
- * Provides centralized imports for limit-form, limits-table, and limit-paywall components
- * with comprehensive type re-exports and enhanced tree-shaking optimization for Next.js 15.1+.
+ * Centralized export module for all React components and types related to API rate 
+ * limit management in the DreamFactory admin interface. Provides clean import patterns
+ * and supports Next.js 15.1+ tree-shaking optimization for enhanced build performance.
  * 
- * Enables clean component importing patterns and maintains consistent module structure
- * for the React 19.0.0/Next.js application architecture with TypeScript 5.8+ support.
+ * This barrel export enables consistent component importing throughout the React
+ * application while maintaining TypeScript 5.8+ type inference and ES6 module standards.
  * 
- * @author DreamFactory Admin Interface Team
- * @version React 19/Next.js 15.1 Migration  
- * @since 2024-12-19
+ * @fileoverview Export barrel for adf-limits React components and types
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-// =============================================================================
-// COMPONENT EXPORTS - React 19.0.0 Standards
-// =============================================================================
+// ============================================================================
+// Component Exports
+// ============================================================================
 
 /**
- * LimitForm - React Hook Form component for creating and editing API rate limits
- * 
- * Implements React Hook Form with Zod schema validation, real-time validation under 100ms,
- * and Headless UI components with Tailwind CSS styling per React/Next.js Integration Requirements.
+ * Main form component for creating and editing API rate limits
+ * Supports React Hook Form with Zod validation, dynamic field rendering,
+ * and comprehensive accessibility features
  */
-export { default as LimitForm } from './limit-form'
-export type { LimitFormProps } from './limit-form'
+export { LimitForm } from './limit-form';
 
 /**
- * LimitsTable - React table component for displaying and managing API rate limits
- * 
- * Implements Headless UI table with TanStack React Query for intelligent caching,
- * cache hit responses under 50ms, and comprehensive CRUD operations with accessibility features.
+ * Table component for displaying and managing API rate limits
+ * Features Headless UI table with sorting, filtering, pagination,
+ * and TanStack Virtual for large dataset optimization
  */
-export { default as LimitsTable } from './limits-table'
-export type { LimitsTableProps } from './limits-table'
+export { LimitsTable } from './limits-table';
 
 /**
- * LimitPaywall - React paywall component for premium feature access control
- * 
- * Implements conditional rendering based on subscription status with Next.js middleware
- * authentication patterns and Zustand state management for seamless access control.
+ * Paywall component for premium feature access control
+ * Implements conditional rendering based on subscription status
+ * with Next.js middleware integration for seamless access control
  */
-export { default as LimitPaywall } from './limit-paywall'
-export type { LimitPaywallProps } from './limit-paywall'
+export { LimitPaywall } from './limit-paywall';
 
-// =============================================================================
-// TYPE RE-EXPORTS - TypeScript 5.8+ Enhanced Type Inference
-// =============================================================================
+// ============================================================================
+// Component Props Type Exports
+// ============================================================================
 
 /**
- * Core data types for rate limit management
- * Exported for enhanced type inference and tree-shaking optimization
+ * Re-export component props interfaces for external usage
+ * Enables proper TypeScript inference when using components
  */
 export type {
-  // Core data interfaces
-  LimitTableRowData,
-  LimitTableRowData as Limit,
-  LimitMetadata,
-  AlertConfiguration,
-  
-  // Enum types for limit configuration
-  LimitType,
-  LimitCounter,
-  
-  // Form data interfaces for React Hook Form integration
-  CreateLimitFormData,
-  CreateLimitFormData as CreateLimitForm,
-  EditLimitFormData,
-  EditLimitFormData as EditLimitForm,
-  
-  // Form state management types
-  CreateLimitFormState,
-  CreateLimitFormState as CreateFormState,
-  EditLimitFormState,
-  EditLimitFormState as EditFormState,
-  ValidationPerformanceMetrics,
-  
-  // React Query types for server state management
-  LimitsListQueryResult,
-  LimitsListQueryResult as LimitsListQuery,
-  LimitDetailQueryResult,
-  LimitDetailQueryResult as LimitDetailQuery,
-  CreateLimitMutationResult,
-  CreateLimitMutationResult as CreateLimitMutation,
-  UpdateLimitMutationResult,
-  UpdateLimitMutationResult as UpdateLimitMutation,
-  DeleteLimitMutationResult,
-  DeleteLimitMutationResult as DeleteLimitMutation,
-  ToggleLimitMutationResult,
-  ToggleLimitMutationResult as ToggleLimitMutation,
-  
-  // Query and mutation function types
-  LimitsListQueryFn,
-  LimitDetailQueryFn,
-  CreateLimitMutationFn,
-  UpdateLimitMutationFn,
-  DeleteLimitMutationFn,
-  
-  // React Query configuration types
-  LimitsListQueryConfig,
-  LimitDetailQueryConfig,
-  CreateLimitMutationConfig,
-  UpdateLimitMutationConfig,
-  
-  // Component prop types for external usage
-  LimitsListProps,
   LimitFormProps,
+  LimitListTableProps,
   LimitDetailProps,
-  
-  // Hook return types
-  UseLimitsListReturn,
-  UseLimitsListReturn as LimitsListHook,
+  LimitWizardProps
+} from '../types';
+
+// ============================================================================
+// Core Data Type Exports
+// ============================================================================
+
+/**
+ * Core limit data structures for component integration
+ * Essential types for working with limit management components
+ */
+export type {
+  LimitTableRowData,
+  LimitConfiguration,
+  LimitUsageStats,
+  LimitType,
+  LimitCounterType,
+  LimitPeriodUnit
+} from '../types';
+
+// ============================================================================
+// Form State and Hook Type Exports
+// ============================================================================
+
+/**
+ * Form-related types for React Hook Form integration
+ * Supports advanced form state management and validation
+ */
+export type {
+  LimitFormState,
+  LimitFormInstance,
+  LimitFormData,
   UseLimitFormReturn,
-  UseLimitFormReturn as LimitFormHook,
-  
-  // Table and UI configuration types
-  LimitsTableColumn,
-  BulkAction,
-  LimitDetailSection,
-  QueryPerformanceMetrics,
-  
-  // Cache invalidation types
-  LimitsCacheInvalidationFilters
-} from '../types'
+  UseLimitsReturn
+} from '../types';
 
-// =============================================================================
-// ENUM RE-EXPORTS - Direct enum exports for runtime usage
-// =============================================================================
+// ============================================================================
+// React Query Integration Type Exports
+// ============================================================================
 
 /**
- * LimitType enum - Rate limit types supported by DreamFactory
- * Direct export for runtime usage and type guards
+ * React Query types for data fetching and mutation operations
+ * Optimized for intelligent caching and real-time synchronization
  */
-export { LimitType } from '../types'
+export type {
+  LimitSwrOptions,
+  LimitMutationOptions,
+  CreateLimitMutationVariables,
+  UpdateLimitMutationVariables,
+  DeleteLimitMutationVariables,
+  BulkLimitMutationVariables,
+  LimitListQuery,
+  LimitDetailQuery,
+  LimitUsageQuery,
+  CreateLimitMutation,
+  UpdateLimitMutation,
+  DeleteLimitMutation,
+  BulkLimitMutation
+} from '../types';
+
+// ============================================================================
+// Validation Schema Exports
+// ============================================================================
 
 /**
- * LimitCounter enum - Rate limit counter types for tracking consumption
- * Direct export for runtime usage and form options
- */
-export { LimitCounter } from '../types'
-
-// =============================================================================
-// VALIDATION SCHEMA RE-EXPORTS - Zod schemas for React Hook Form
-// =============================================================================
-
-/**
- * Zod validation schemas for React Hook Form integration
- * Real-time validation under 100ms per React/Next.js Integration Requirements
+ * Zod validation schemas for runtime type checking
+ * Provides comprehensive form validation and data validation
  */
 export {
-  LimitTypeSchema,
-  LimitCounterSchema,
-  LimitTableRowDataSchema,
-  CreateLimitFormSchema,
-  EditLimitFormSchema,
-  LimitMetadataSchema
-} from '../types'
+  LimitTypeValidation,
+  LimitCounterValidation,
+  PeriodUnitValidation,
+  LimitFormValidation,
+  LimitDataValidation,
+  UsageStatsValidation
+} from '../types';
 
-// =============================================================================
-// QUERY KEY UTILITIES - React Query cache management
-// =============================================================================
-
-/**
- * Query key patterns for React Query cache management
- * Enables consistent cache key generation and invalidation for optimal performance
- */
-export { LIMITS_QUERY_KEYS } from '../types'
-
-// =============================================================================
-// COMPONENT COLLECTION EXPORTS - Batch exports for convenience
-// =============================================================================
+// ============================================================================
+// Utility Function Exports
+// ============================================================================
 
 /**
- * All limit management components as a collection
- * Useful for dynamic imports and feature-based routing
+ * Utility functions for limit data manipulation and validation
+ * Type-safe helper functions for common limit operations
  */
-export const LimitComponents = {
-  LimitForm: () => import('./limit-form'),
-  LimitsTable: () => import('./limits-table'),
-  LimitPaywall: () => import('./limit-paywall')
-} as const
+export {
+  isUserLimit,
+  isServiceLimit,
+  isRoleLimit,
+  isGlobalLimit,
+  extractRateValue,
+  extractRatePeriod,
+  formatRateString
+} from '../types';
+
+// ============================================================================
+// Type Aliases for Convenience
+// ============================================================================
 
 /**
- * Component metadata for dynamic rendering and feature detection
+ * Convenient type aliases for common use cases
+ * Simplifies import statements for frequently used types
  */
-export const ComponentMetadata = {
-  LimitForm: {
-    name: 'LimitForm',
-    description: 'React form component for creating and editing API rate limits',
-    version: '1.0.0',
-    dependencies: ['react-hook-form', 'zod', '@headlessui/react'],
-    features: ['real-time-validation', 'form-persistence', 'accessibility']
-  },
-  LimitsTable: {
-    name: 'LimitsTable', 
-    description: 'React table component for displaying and managing API rate limits',
-    version: '1.0.0',
-    dependencies: ['@tanstack/react-query', '@headlessui/react', '@tanstack/react-virtual'],
-    features: ['intelligent-caching', 'virtualization', 'sorting', 'filtering', 'pagination']
-  },
-  LimitPaywall: {
-    name: 'LimitPaywall',
-    description: 'React paywall component for premium feature access control', 
-    version: '1.0.0',
-    dependencies: ['zustand', '@headlessui/react'],
-    features: ['conditional-rendering', 'subscription-integration', 'middleware-auth']
-  }
-} as const
+export type {
+  LimitsList,
+  LimitsListResponse,
+  LimitResponse,
+  LimitError,
+  LimitTableData
+} from '../types';
 
-// =============================================================================
-// MODULE INFORMATION - Enhanced debugging and development support
-// =============================================================================
+// ============================================================================
+// Default Export for Component Bundle
+// ============================================================================
 
 /**
- * Module information for debugging and development tooling
- * Supports Next.js 15.1+ dev tools integration and build optimization
+ * Default export containing all components for bulk import scenarios
+ * Useful for dynamic imports and code splitting optimization
  */
-export const ModuleInfo = {
-  name: '@/app/adf-limits/components',
-  version: '1.0.0',
-  description: 'React components for API rate limit management in DreamFactory Admin Interface',
-  framework: 'React 19.0.0',
-  platform: 'Next.js 15.1+',
-  typescript: '5.8+',
-  styling: 'Tailwind CSS 4.1+',
-  stateManagement: ['@tanstack/react-query', 'zustand', 'react-hook-form'],
-  testing: ['vitest', '@testing-library/react', 'msw'],
-  accessibility: 'WCAG 2.1 AA',
-  performance: {
-    validation: 'under 100ms',
-    cacheHits: 'under 50ms',
-    treeshaking: 'optimized',
-    bundleSize: 'minimized'
-  },
-  exports: {
-    components: ['LimitForm', 'LimitsTable', 'LimitPaywall'],
-    types: 'comprehensive',
-    schemas: 'zod-validated',
-    utils: 'query-keys'
-  }
-} as const
-
-/**
- * Type-only export for the module information
- * Enables TypeScript consumers to access metadata without runtime cost
- */
-export type LimitsModuleInfo = typeof ModuleInfo
-
-// =============================================================================
-// FEATURE FLAGS - Runtime feature detection
-// =============================================================================
-
-/**
- * Feature flags for conditional functionality and A/B testing
- * Supports gradual rollout of new features and performance optimizations
- */
-export const FeatureFlags = {
-  /** Enable experimental virtual scrolling for large datasets */
-  ENABLE_VIRTUALIZATION: true,
-  /** Enable optimistic updates for mutations */
-  ENABLE_OPTIMISTIC_UPDATES: true,
-  /** Enable real-time validation performance monitoring */
-  ENABLE_VALIDATION_METRICS: true,
-  /** Enable advanced filtering and search capabilities */
-  ENABLE_ADVANCED_FILTERING: true,
-  /** Enable accessibility enhancements beyond WCAG 2.1 AA */
-  ENABLE_ENHANCED_A11Y: true,
-  /** Enable dark mode theme support */
-  ENABLE_DARK_MODE: true,
-  /** Enable offline capability with cache-first strategies */
-  ENABLE_OFFLINE_MODE: false,
-  /** Enable experimental query prefetching */
-  ENABLE_QUERY_PREFETCHING: true
-} as const
-
-/**
- * Type-only export for feature flags
- * Enables compile-time feature detection and tree-shaking
- */
-export type LimitsFeatureFlags = typeof FeatureFlags
-
-// =============================================================================
-// DEFAULT EXPORTS COLLECTION - Legacy compatibility
-// =============================================================================
-
-/**
- * Default export object for legacy import patterns
- * Maintains backward compatibility while encouraging named imports
- * 
- * @deprecated Use named imports for better tree-shaking: import { LimitForm } from '@/app/adf-limits/components'
- */
-const LimitsComponentsDefault = {
-  LimitForm: () => import('./limit-form'),
-  LimitsTable: () => import('./limits-table'), 
-  LimitPaywall: () => import('./limit-paywall'),
-  
-  // Type exports (runtime accessible)
-  LimitType,
-  LimitCounter,
-  LIMITS_QUERY_KEYS,
-  
-  // Metadata exports
-  ModuleInfo,
-  FeatureFlags,
-  ComponentMetadata
-} as const
-
-export default LimitsComponentsDefault
+export default {
+  LimitForm: () => import('./limit-form').then(m => m.LimitForm),
+  LimitsTable: () => import('./limits-table').then(m => m.LimitsTable),
+  LimitPaywall: () => import('./limit-paywall').then(m => m.LimitPaywall)
+} as const;
