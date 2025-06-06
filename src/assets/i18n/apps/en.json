@@ -1,22 +1,169 @@
 {
-  "$schema": "../../schemas/translation-schema.json",
-  "_metadata": {
-    "version": "1.0.0",
-    "locale": "en",
-    "direction": "ltr",
-    "lastModified": "2024-01-01T00:00:00.000Z",
-    "framework": "next.js",
-    "ssrOptimized": true
+  "title": "Manage Applications",
+  "subtitle": "Create and manage applications for your DreamFactory instance",
+  "labels": {
+    "name": "Application Name",
+    "description": "Description",
+    "url": "URL to Application",
+    "active": "Active",
+    "storage": "Storage Service",
+    "path": "Path to Application",
+    "type": "App Location",
+    "defaultRole": "Assign a Default Role",
+    "apiKey": "API Key",
+    "users": "Users"
   },
-  "manageApplications": "Manage Applications",
-  "manage": "Manage",
-  "import": "Import",
-  "search": "Search",
-  "deleteApp": "Delete app",
-  "deleteSelectedApps": "Delete selected apps",
-  "launchApp": "Launch app",
-  "createSuccess": "App created successfully",
-  "updateSuccess": "App successfully updated",
+  "types": {
+    "none": "No Storage Required - remote device, client, or desktop.",
+    "file": "On a provisioned file storage service.",
+    "url": "On a remote URL.",
+    "repo": "On this web server."
+  },
+  "storage": {
+    "local": "Local File Storage",
+    "github": "GitHub Repository",
+    "gitlab": "GitLab Repository",
+    "bitbucket": "Bitbucket Repository"
+  },
+  "actions": {
+    "launch": "Launch app",
+    "preview": "Preview",
+    "download": "Download",
+    "regenerateKey": "Refresh API Key",
+    "manage": "Manage",
+    "import": "Import",
+    "search": "Search",
+    "delete": "Delete app",
+    "deleteSelected": "Delete selected apps",
+    "copy": "Copy"
+  },
+  "validation": {
+    "required": "Application name required",
+    "email": "Invalid email format",
+    "minLength": "Minimum length not met",
+    "maxLength": "Maximum length exceeded",
+    "pattern": "Invalid format",
+    "numeric": "Must be a number",
+    "url": "Invalid URL format",
+    "urlFormat": "Invalid URL format",
+    "pathRequired": "Path is required",
+    "storageRequired": "Storage service is required",
+    "custom": "Custom validation error"
+  },
+  "messages": {
+    "create": {
+      "success": "App created successfully",
+      "error": "Failed to create app",
+      "pending": "Creating app..."
+    },
+    "update": {
+      "success": "App successfully updated",
+      "error": "Failed to update app",
+      "pending": "Updating app..."
+    },
+    "delete": {
+      "success": "App deleted successfully",
+      "error": "Failed to delete app",
+      "pending": "Deleting app...",
+      "confirm": "Are you sure you want to delete this app?"
+    },
+    "fetch": {
+      "error": "Failed to load apps",
+      "pending": "Loading apps...",
+      "empty": "No apps found"
+    }
+  },
+  "forms": {
+    "create": {
+      "title": "Create Application",
+      "applicationName": {
+        "label": "Application Name",
+        "tooltip": "The display name or label for your app, seen by users of the app in the LaunchPad UI.",
+        "placeholder": "Enter application name",
+        "error": "Application name required"
+      },
+      "description": {
+        "label": "Description",
+        "tooltip": "The app description, seen by users of the app in the LaunchPad UI.",
+        "placeholder": "Enter description"
+      },
+      "defaultRole": {
+        "label": "Assign a Default Role",
+        "tooltip": "Unauthenticated or guest users of the app will have this role.",
+        "filter": "Default Role Filter",
+        "options": {
+          "noRole": "-- No available filtered roles --"
+        }
+      },
+      "active": "Active",
+      "apiKey": {
+        "label": "The API key for this app is",
+        "copy": "Copy API Key",
+        "refresh": "Refresh API Key"
+      },
+      "appLocation": {
+        "label": "App Location",
+        "tooltip": "Select File Storage if you want to store your app code on your DreamFactory instance or some other remote file storage. Select Native for native apps or running the app from code on your local machine (CORS required). Select URL to specify a URL for your app.",
+        "options": {
+          "noStorage": "No Storage Required - remote device, client, or desktop.",
+          "fileStorage": {
+            "label": "On a provisioned file storage service.",
+            "storageService": {
+              "label": "Storage Service",
+              "tooltip": "Where to store the files for your app.",
+              "options": {
+                "file": "Local File Storage",
+                "log": "Local Log Storage"
+              }
+            },
+            "storageFolder": {
+              "label": "Storage Folder",
+              "tooltip": "The folder on the selected storage service.",
+              "placeholder": "Enter Storage Container"
+            },
+            "launchPath": {
+              "label": "Launch Path",
+              "tooltip": "The is the file to load when your app is run. Default is index.html.",
+              "placeholder": "Enter default path and file to launch."
+            }
+          },
+          "webServer": {
+            "label": "On this web server.",
+            "pathToApp": {
+              "label": "Path to Application",
+              "tooltip": "The is the file to load when your app is run. Default is index.html."
+            }
+          },
+          "remoteUrl": {
+            "label": "On a remote URL.",
+            "url": {
+              "label": "URL to Application",
+              "tooltip": "Applications can consist of only a URL. This could be an app on some other server or a web site URL."
+            }
+          },
+          "urlPath": {
+            "label": "The URL for this app is:",
+            "copy": "Copy URL"
+          }
+        }
+      }
+    },
+    "import": {
+      "title": "Import Application",
+      "subtitle": "Select App Package File",
+      "description": "Select one of the sample apps below, enter the URL for a package file, or browse for a local package file. Click 'Import' to add the app to your DreamFactory instance.",
+      "url": {
+        "label": "Package URL",
+        "placeholder": "Enter URL to package file"
+      },
+      "storageService": "Storage Service (optional)",
+      "storageFolder": "Storage Folder (optional)",
+      "files": "Files",
+      "logs": "Logs",
+      "error": "File or File URL Required",
+      "optionsPrefix": "Address Book for "
+    }
+  },
   "sampleApps": {
     "label": "Sample Apps",
     "options": {
@@ -31,215 +178,5 @@
       "ReactJS": "ReactJS",
       "dotnet": ".NET"
     }
-  },
-  "createApp": {
-    "applicationName": {
-      "label": "Application Name",
-      "tooltip": "The display name or label for your app, seen by users of the app in the LaunchPad UI.",
-      "error": "Application name required",
-      "validation": {
-        "required": "Application name is required",
-        "minLength": "Application name must be at least 2 characters",
-        "maxLength": "Application name cannot exceed 100 characters",
-        "pattern": "Application name must contain only alphanumeric characters, spaces, and hyphens"
-      }
-    },
-    "defaultRoleFilter": "Default Role Filter",
-    "description": {
-      "label": "Description",
-      "tooltip": "The app description, seen by users of the app in the LaunchPad UI.",
-      "validation": {
-        "maxLength": "Description cannot exceed 500 characters"
-      }
-    },
-    "defaultRole": {
-      "label": "Assign a Default Role",
-      "tooltip": "Unauthenticated or guest users of the app will have this role.",
-      "options": {
-        "noRole": "-- No available filtered roles --"
-      },
-      "validation": {
-        "required": "Please select a default role"
-      }
-    },
-    "active": "Active",
-    "apiKey": {
-      "label": "The API key for this app is",
-      "copy": "Copy API Key",
-      "refresh": "Refresh API Key",
-      "validation": {
-        "required": "API key is required",
-        "pattern": "Invalid API key format"
-      }
-    },
-    "appLocation": {
-      "label": "App Location",
-      "tooltip": "Select File Storage if you want to store your app code on your DreamFactory instance or some other remote file storage. Select Native for native apps or running the app from code on your local machine (CORS required). Select URL to specify a URL for your app.",
-      "options": {
-        "noStorage": "No Storage Required - remote device, client, or desktop.",
-        "fileStorage": {
-          "label": "On a provisioned file storage service.",
-          "storageService": {
-            "label": "Storage Service",
-            "tooltip": "Where to store the files for your app.",
-            "options": {
-              "file": "Local File Storage",
-              "log": "Local Log Storage"
-            },
-            "validation": {
-              "required": "Please select a storage service"
-            }
-          },
-          "storageFolder": {
-            "label": "Storage Folder",
-            "tooltip": "The folder on the selected storage service.",
-            "placeholder": "Enter Storage Container",
-            "validation": {
-              "required": "Storage folder is required",
-              "pattern": "Storage folder must be a valid path"
-            }
-          },
-          "launchPath": {
-            "label": "Launch Path",
-            "tooltip": "The is the file to load when your app is run. Default is index.html.",
-            "placeholder": "Enter default path and file to launch.",
-            "validation": {
-              "required": "Launch path is required",
-              "pattern": "Launch path must be a valid file path"
-            }
-          }
-        },
-        "webServer": {
-          "label": "On this web server.",
-          "pathToApp": {
-            "label": "Path to Application",
-            "tooltip": "The is the file to load when your app is run. Default is index.html.",
-            "validation": {
-              "required": "Application path is required",
-              "pattern": "Application path must be a valid file path"
-            }
-          }
-        },
-        "remoteUrl": {
-          "label": "On a remote URL.",
-          "url": {
-            "label": "URL to Application",
-            "tooltip": "Applications can consist of only a URL. This could be an app on some other server or a web site URL.",
-            "validation": {
-              "required": "Application URL is required",
-              "url": "Please enter a valid URL",
-              "pattern": "URL must start with http:// or https://"
-            }
-          }
-        },
-        "urlPath": {
-          "label": "The URL for this app is:",
-          "copy": "Copy URL"
-        }
-      },
-      "validation": {
-        "required": "Please select an app location type"
-      }
-    },
-    "validation": {
-      "general": {
-        "invalidForm": "Please correct the errors below before submitting",
-        "networkError": "Network error occurred. Please try again.",
-        "serverError": "Server error occurred. Please contact support if the problem persists."
-      }
-    }
-  },
-  "importApp": {
-    "title": "Import Application",
-    "subtitle": "Select App Package File",
-    "description": "Select one of the sample apps below, enter the URL for a package file, or browse for a local package file. Click 'Import' to add the app to your DreamFactory instance.",
-    "url": {
-      "label": "Package URL",
-      "placeholder": "Enter URL to package file",
-      "validation": {
-        "required": "Package URL is required",
-        "url": "Please enter a valid URL",
-        "pattern": "URL must point to a valid package file"
-      }
-    },
-    "optionsPrefix": "Address Book for ",
-    "storageService": "Storage Service (optional)",
-    "storageFolder": "Storage Folder (optional)",
-    "files": "Files",
-    "logs": "Logs",
-    "error": "File or File URL Required",
-    "validation": {
-      "fileRequired": "Please select a file or enter a URL",
-      "invalidFileType": "Invalid file type. Please select a valid package file.",
-      "fileSizeExceeded": "File size exceeds maximum limit of 10MB",
-      "uploadFailed": "File upload failed. Please try again."
-    }
-  },
-  "forms": {
-    "common": {
-      "validation": {
-        "required": "This field is required",
-        "email": "Please enter a valid email address",
-        "url": "Please enter a valid URL",
-        "minLength": "Must be at least {{min}} characters",
-        "maxLength": "Cannot exceed {{max}} characters",
-        "pattern": "Invalid format",
-        "min": "Value must be at least {{min}}",
-        "max": "Value cannot exceed {{max}}",
-        "custom": "Invalid value"
-      },
-      "actions": {
-        "save": "Save",
-        "cancel": "Cancel",
-        "submit": "Submit",
-        "reset": "Reset",
-        "clear": "Clear"
-      },
-      "states": {
-        "loading": "Loading...",
-        "saving": "Saving...",
-        "submitting": "Submitting...",
-        "validating": "Validating..."
-      }
-    }
-  },
-  "alerts": {
-    "success": {
-      "appCreated": "Application created successfully",
-      "appUpdated": "Application updated successfully",
-      "appDeleted": "Application deleted successfully",
-      "appImported": "Application imported successfully",
-      "apiKeyCopied": "API key copied to clipboard",
-      "urlCopied": "URL copied to clipboard"
-    },
-    "error": {
-      "appCreateFailed": "Failed to create application",
-      "appUpdateFailed": "Failed to update application",
-      "appDeleteFailed": "Failed to delete application",
-      "appImportFailed": "Failed to import application",
-      "apiKeyRefreshFailed": "Failed to refresh API key",
-      "copyFailed": "Failed to copy to clipboard",
-      "loadFailed": "Failed to load application data"
-    },
-    "warning": {
-      "unsavedChanges": "You have unsaved changes that will be lost",
-      "deleteConfirmation": "Are you sure you want to delete this application?",
-      "apiKeyRefresh": "Refreshing the API key will invalidate the current key"
-    },
-    "info": {
-      "noAppsFound": "No applications found",
-      "selectFile": "Please select a file to import",
-      "processingImport": "Processing application import..."
-    }
-  },
-  "accessibility": {
-    "appListTable": "Application list table",
-    "editApp": "Edit application {{name}}",
-    "deleteApp": "Delete application {{name}}",
-    "launchApp": "Launch application {{name}}",
-    "copyApiKey": "Copy API key for application {{name}}",
-    "copyUrl": "Copy URL for application {{name}}",
-    "selectFile": "Select file for import",
-    "browseFiles": "Browse files for import"
   }
 }
