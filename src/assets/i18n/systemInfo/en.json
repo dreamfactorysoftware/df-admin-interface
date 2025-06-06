@@ -1,14 +1,42 @@
 {
-  "$schema": "https://raw.githubusercontent.com/dreamfactorysoftware/df-admin-interface/main/src/assets/i18n/schema.json",
-  "_metadata": {
-    "version": "1.0.0",
-    "locale": "en",
-    "direction": "ltr",
-    "lastModified": "2024-01-01T00:00:00.000Z",
-    "framework": "next.js",
-    "ssrOptimized": true
+  "title": "System Information",
+  "subtitle": "Displays current system information.",
+  "sections": {
+    "general": {
+      "title": "General Information", 
+      "version": "Version",
+      "buildDate": "Build Date",
+      "environment": "Environment",
+      "timezone": "Timezone",
+      "locale": "Locale"
+    },
+    "database": {
+      "title": "System Database",
+      "driver": "Cache Driver",
+      "version": "Version",
+      "host": "Host",
+      "status": "Status"
+    },
+    "server": {
+      "title": "Server",
+      "phpVersion": "Server API",
+      "webServer": "Web Server",
+      "memoryLimit": "Memory Limit",
+      "diskSpace": "Disk Space"
+    },
+    "license": {
+      "title": "License Information",
+      "type": "License Level",
+      "expiresAt": "Subscription Expiration Date",
+      "features": "License Key",
+      "status": "Subscription Status"
+    }
   },
-  "subheading": "Displays current system information.",
+  "actions": {
+    "refresh": "Refresh",
+    "downloadLogs": "Download Logs",
+    "checkUpdates": "Check Updates"
+  },
   "instance": {
     "instance": "Instance",
     "licenseLevel": "License Level",
@@ -37,6 +65,7 @@
     "heading": "Client",
     "userAgent": "User Agent",
     "ipAddress": "IP Address",
-    "locale": "Locale"
-  }
+    "Locale": "Locale"
+  },
+  "subheading": "Displays current system information."
 }
