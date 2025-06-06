@@ -1,177 +1,274 @@
-import { useQuery } from '@tanstack/react-query';
-import { GenericListResponse } from '@/types/generic-http';
-import { Service } from '@/types/service';
+/**
+ * @fileoverview React Query hook for component access list fetching
+ * @description Replaces Angular accessListService patterns with modern React Query implementation
+ * 
+ * This hook provides conditional fetching of component access lists based on selected service,
+ * implementing intelligent caching and automatic refetching when service changes.
+ * Supports scheduler task configuration workflows with comprehensive error handling.
+ * 
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
+ * 
+ * Features:
+ * - React Query useQuery for component access list fetching per Section 4.3.2
+ * - Conditional fetching enabled only when valid service ID is provided
+ * - Intelligent caching with staleTime: 300 seconds per React/Next.js Integration Requirements
+ * - Automatic refetching when service dependency changes per dependency management
+ * - Comprehensive error handling for access denied and service not found scenarios
+ * - TypeScript type safety matching GenericListResponse<string> from Angular implementation
+ */
+
+import { useQuery } from '@tanstack/react-query'
+import { apiClient } from '@/lib/api-client'
+import type { GenericListResponse } from '@/types/generic-http'
+import type { Service } from '@/types/services'
+
+// =============================================================================
+// TYPES AND INTERFACES
+// =============================================================================
 
 /**
- * Hook configuration interface for component access list fetching
+ * Component access list hook parameters
  */
-interface UseComponentAccessListConfig {
-  /**
-   * The service ID to fetch component access list for
-   */
-  serviceId?: number | null;
-  
-  /**
-   * Optional service list to find the service name
-   * If not provided, fetching will be disabled
-   */
-  services?: Service[];
-  
-  /**
-   * Whether to enable the query (defaults to true when serviceId is valid)
-   */
-  enabled?: boolean;
+export interface UseComponentAccessListParams {
+  /** Service ID to fetch component access list for */
+  serviceId?: number | string | null
+  /** Available services list for service name resolution */
+  services: Service[]
+  /** Optional additional request configuration */
+  options?: {
+    /** Override default stale time (default: 300 seconds) */
+    staleTime?: number
+    /** Enable/disable background refetching (default: true) */
+    refetchOnWindowFocus?: boolean
+    /** Enable/disable automatic retries (default: true) */
+    retry?: boolean | number
+  }
 }
 
 /**
- * Component access list response type
+ * Component access list hook return type
  */
-type ComponentAccessListResponse = GenericListResponse<string>;
+export interface UseComponentAccessListReturn {
+  /** Component access list data */
+  data: string[] | undefined
+  /** Loading state */
+  isLoading: boolean
+  /** Error state */
+  error: Error | null
+  /** Refetch function */
+  refetch: () => void
+  /** Query invalidation function */
+  invalidate: () => void
+  /** Whether the query is currently fetching */
+  isFetching: boolean
+  /** Whether the query is stale */
+  isStale: boolean
+}
 
 /**
- * React Query hook that fetches component access lists based on selected service,
- * replacing Angular accessListService patterns. Implements conditional fetching 
- * based on service selection with intelligent caching and automatic refetching 
- * when service changes.
+ * Error types for component access list operations
+ */
+export class ComponentAccessListError extends Error {
+  constructor(
+    message: string,
+    public code: 'SERVICE_NOT_FOUND' | 'ACCESS_DENIED' | 'NETWORK_ERROR' | 'UNKNOWN_ERROR',
+    public serviceId?: number | string
+  ) {
+    super(message)
+    this.name = 'ComponentAccessListError'
+  }
+}
+
+// =============================================================================
+// HOOK IMPLEMENTATION
+// =============================================================================
+
+/**
+ * React Query hook for fetching component access lists based on selected service
  * 
- * @param config - Configuration object containing serviceId and services
- * @returns React Query result with component access list data
+ * Replaces Angular accessListService.get() subscription patterns with modern React Query
+ * implementation. Provides conditional fetching, intelligent caching, and automatic
+ * refetching when service selection changes.
+ * 
+ * @param params Hook parameters including serviceId and services list
+ * @returns Hook return object with data, loading, error states and utility functions
  * 
  * @example
- * ```tsx
- * const { data, error, isLoading } = useComponentAccessList({
+ * ```typescript
+ * const { data: componentOptions, isLoading, error } = useComponentAccessList({
  *   serviceId: selectedServiceId,
- *   services: servicesData
- * });
+ *   services: userServicesDropdownOptions
+ * })
  * 
- * // Use the component options in a dropdown
- * const componentOptions = data?.resource || [];
+ * // Use in form select
+ * <select>
+ *   {componentOptions?.map(component => (
+ *     <option key={component} value={component}>{component}</option>
+ *   ))}
+ * </select>
  * ```
  */
-export function useComponentAccessList({
-  serviceId,
-  services = [],
-  enabled = true,
-}: UseComponentAccessListConfig = {}) {
-  // Find the service by ID to get the service name
-  const selectedService = services.find(service => service.id === serviceId);
+export function useComponentAccessList(
+  params: UseComponentAccessListParams
+): UseComponentAccessListReturn {
+  const { serviceId, services, options = {} } = params
   
-  // Determine if query should be enabled
-  const shouldFetch = Boolean(
-    enabled && 
-    serviceId && 
-    selectedService?.name && 
-    services.length > 0
-  );
+  // Extract options with defaults
+  const {
+    staleTime = 300 * 1000, // 300 seconds as per Section 5.2
+    refetchOnWindowFocus = true,
+    retry = true
+  } = options
 
-  return useQuery<ComponentAccessListResponse, Error>({
-    queryKey: ['component-access-list', serviceId, selectedService?.name],
-    
-    queryFn: async (): Promise<ComponentAccessListResponse> => {
-      if (!selectedService?.name) {
-        throw new Error('Service not found or service name unavailable');
+  // Find the selected service from the services list
+  const selectedService = serviceId 
+    ? services.find(service => service.id === Number(serviceId))
+    : undefined
+
+  // Query key for React Query cache management
+  const queryKey = ['componentAccessList', serviceId, selectedService?.name]
+
+  // React Query implementation
+  const query = useQuery({
+    queryKey,
+    queryFn: async (): Promise<string[]> => {
+      // Validate service selection
+      if (!serviceId) {
+        throw new ComponentAccessListError(
+          'Service ID is required to fetch component access list',
+          'SERVICE_NOT_FOUND'
+        )
       }
 
-      // Use native fetch for API call following Next.js patterns
-      const url = new URL(`/api/v2/${selectedService.name}`, window.location.origin);
-      url.searchParams.set('as_access_list', 'true');
-
-      const response = await fetch(url.toString(), {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          // Session token will be handled by middleware/interceptors
-        },
-        credentials: 'include', // Include cookies for authentication
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error('Authentication required - please log in again');
-        }
-        if (response.status === 403) {
-          throw new Error(`Access denied to service "${selectedService.name}" - insufficient permissions`);
-        }
-        if (response.status === 404) {
-          throw new Error(`Service "${selectedService.name}" not found or unavailable`);
-        }
-        
-        // Try to get error message from response
-        let errorMessage = `Failed to fetch component access list for service "${selectedService.name}"`;
-        try {
-          const errorData = await response.json();
-          if (errorData.error?.message) {
-            errorMessage = errorData.error.message;
-          }
-        } catch {
-          // Use default message if parsing fails
-        }
-        
-        throw new Error(errorMessage);
+      if (!selectedService) {
+        throw new ComponentAccessListError(
+          `Service with ID ${serviceId} not found in available services`,
+          'SERVICE_NOT_FOUND',
+          serviceId
+        )
       }
 
-      const data: ComponentAccessListResponse = await response.json();
-      return data;
+      try {
+        // Call DreamFactory API with service name and as_access_list parameter
+        // Replicates Angular: this.accessListService.get<GenericListResponse<string>>(service.name, { additionalParams: [{ key: 'as_access_list', value: true }] })
+        const endpoint = `${selectedService.name}?as_access_list=true`
+        const response = await apiClient.get<GenericListResponse<string>>(endpoint)
+
+        // Handle API response structure
+        if (response.resource) {
+          return response.resource
+        } else if (response.data && Array.isArray(response.data)) {
+          return response.data
+        } else {
+          throw new ComponentAccessListError(
+            'Invalid response format from component access list API',
+            'UNKNOWN_ERROR',
+            serviceId
+          )
+        }
+      } catch (error: any) {
+        // Enhanced error handling for specific scenarios per Section 4.2
+        if (error instanceof ComponentAccessListError) {
+          throw error
+        }
+
+        // Map HTTP errors to specific error types
+        if (error.message?.includes('403') || error.message?.includes('Forbidden')) {
+          throw new ComponentAccessListError(
+            `Access denied to service '${selectedService.name}'. Please check your permissions.`,
+            'ACCESS_DENIED',
+            serviceId
+          )
+        }
+
+        if (error.message?.includes('404') || error.message?.includes('Not Found')) {
+          throw new ComponentAccessListError(
+            `Service '${selectedService.name}' not found or not accessible.`,
+            'SERVICE_NOT_FOUND',
+            serviceId
+          )
+        }
+
+        if (error.message?.includes('fetch') || error.message?.includes('network')) {
+          throw new ComponentAccessListError(
+            'Network error occurred while fetching component access list. Please try again.',
+            'NETWORK_ERROR',
+            serviceId
+          )
+        }
+
+        // Generic error fallback
+        throw new ComponentAccessListError(
+          `Failed to fetch component access list for service '${selectedService.name}': ${error.message}`,
+          'UNKNOWN_ERROR',
+          serviceId
+        )
+      }
     },
-
-    // Conditional fetching - only enabled when valid service is selected
-    enabled: shouldFetch,
-    
-    // Intelligent caching with 300 seconds stale time as specified
-    staleTime: 300 * 1000, // 5 minutes
-    
-    // Cache for 15 minutes to prevent frequent refetching
-    gcTime: 900 * 1000, // 15 minutes (formerly cacheTime)
-    
-    // Background refetching for real-time updates
-    refetchOnWindowFocus: false, // Disable aggressive refetching
-    refetchOnReconnect: true,
-    
-    // Retry configuration for network errors
-    retry: (failureCount, error) => {
-      // Don't retry on authentication/authorization errors
-      if (error.message.includes('Authentication required') || 
-          error.message.includes('Access denied')) {
-        return false;
-      }
-      
-      // Retry up to 3 times for other errors
-      return failureCount < 3;
-    },
-    
-    // Retry delay with exponential backoff
+    // Conditional fetching - only enabled when valid service ID is provided per React Query patterns
+    enabled: Boolean(serviceId && selectedService),
+    // Intelligent caching configuration per Section 5.2
+    staleTime,
+    // Cache time for inactive queries (15 minutes)
+    gcTime: 15 * 60 * 1000,
+    // Background refetching configuration
+    refetchOnWindowFocus,
+    // Retry configuration with exponential backoff
+    retry: typeof retry === 'boolean' ? (retry ? 3 : false) : retry,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-    
-    // Error handling
-    throwOnError: false, // Let components handle errors gracefully
-    
-    // Meta information for debugging
-    meta: {
-      description: 'Fetches component access list for scheduler task configuration',
-      serviceId,
-      serviceName: selectedService?.name,
-    },
-  });
+    // React Query error handling
+    throwOnError: false,
+    // Refetch interval for real-time updates (disabled by default)
+    refetchInterval: false,
+    // Refetch on mount if data is stale
+    refetchOnMount: 'stale'
+  })
+
+  // Utility function to invalidate the query
+  const invalidate = async () => {
+    const queryClient = query.queryClient
+    if (queryClient) {
+      await queryClient.invalidateQueries({ queryKey })
+    }
+  }
+
+  // Return normalized interface matching React patterns
+  return {
+    data: query.data,
+    isLoading: query.isLoading,
+    error: query.error as Error | null,
+    refetch: query.refetch,
+    invalidate,
+    isFetching: query.isFetching,
+    isStale: query.isStale
+  }
 }
 
-/**
- * Type guard to check if the hook result has valid data
- */
-export function hasComponentAccessData(
-  result: ReturnType<typeof useComponentAccessList>
-): result is ReturnType<typeof useComponentAccessList> & { 
-  data: ComponentAccessListResponse 
-} {
-  return Boolean(result.data?.resource);
-}
+// =============================================================================
+// UTILITY FUNCTIONS
+// =============================================================================
 
 /**
- * Utility function to extract component options array from the hook result
+ * Helper function to create component access list query key
+ * Useful for manual cache manipulation or invalidation
  */
-export function getComponentOptions(
-  result: ReturnType<typeof useComponentAccessList>
+export function createComponentAccessListQueryKey(
+  serviceId?: number | string | null,
+  serviceName?: string
 ): string[] {
-  return result.data?.resource || [];
+  return ['componentAccessList', serviceId, serviceName]
 }
 
-export default useComponentAccessList;
+/**
+ * Helper function to validate service ID parameter
+ */
+export function isValidServiceId(serviceId: unknown): serviceId is number | string {
+  return (typeof serviceId === 'number' && serviceId > 0) || 
+         (typeof serviceId === 'string' && serviceId.trim() !== '' && !isNaN(Number(serviceId)))
+}
+
+/**
+ * Default export for convenient importing
+ */
+export default useComponentAccessList
