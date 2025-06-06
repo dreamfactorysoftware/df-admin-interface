@@ -1,157 +1,233 @@
 /**
- * @fileoverview Barrel export file for scheduler component modules
+ * Scheduler Components Barrel Export
  * 
- * This file provides centralized imports for all scheduler component modules,
- * enabling clean imports throughout the application while supporting tree-shaking
- * for optimal bundle size. All components follow React 19 patterns with TypeScript
- * integration and Tailwind CSS styling.
+ * Centralized export file for all scheduler-related React components following
+ * TypeScript module organization best practices. Provides clean imports and
+ * supports tree-shaking for optimal bundle size.
  * 
- * @example
- * ```typescript
- * import { SchedulerTable, SchedulerForm } from '@/app/system-settings/scheduler/components'
- * ```
+ * @fileoverview System settings scheduler components module exports
+ * @module SystemSettings/Scheduler/Components
  */
 
+// =============================================================================
+// COMPONENT EXPORTS (Alphabetical Order)
+// =============================================================================
+
 /**
- * Confirmation dialog component that handles scheduler task deletion with user confirmation.
- * Implements Headless UI Dialog for accessibility, shows task details in confirmation message,
- * and provides cancel/confirm actions with loading states during deletion operations.
+ * SchedulerDeleteDialog - Confirmation dialog for scheduler task deletion
  * 
- * @component
+ * Features:
+ * - Displays task details in confirmation message
+ * - Implements Headless UI Dialog for accessibility (WCAG 2.1 AA)
+ * - React Query integration for optimistic updates
+ * - Proper loading states and error handling
+ * - Auto-closes on successful deletion with notifications
+ * 
  * @example
  * ```tsx
+ * import { SchedulerDeleteDialog } from '@/app/system-settings/scheduler/components';
+ * 
  * <SchedulerDeleteDialog
- *   isOpen={showDialog}
+ *   isOpen={isDeleteModalOpen}
+ *   onClose={() => setIsDeleteModalOpen(false)}
  *   task={selectedTask}
- *   onClose={() => setShowDialog(false)}
- *   onConfirm={handleDelete}
  * />
  * ```
  */
-export { default as SchedulerDeleteDialog } from './SchedulerDeleteDialog'
-export type { SchedulerDeleteDialogProps } from './SchedulerDeleteDialog'
+export { default as SchedulerDeleteDialog } from './SchedulerDeleteDialog';
 
 /**
- * React form component for creating and editing scheduler tasks.
- * Implements React Hook Form with Zod validation, tabbed interface with Basic and Log tabs,
- * and comprehensive form fields for task configuration including service selection,
- * HTTP method, frequency, and JSON payload editing with ACE editor integration.
+ * SchedulerForm - Comprehensive form component for scheduler task creation and editing
  * 
- * @component
+ * Features:
+ * - React Hook Form with Zod validation
+ * - Tabbed interface (Basic configuration, Execution logs)
+ * - Service and component selection with dynamic loading
+ * - HTTP method selection with conditional payload field
+ * - Frequency configuration with validation
+ * - Real-time JSON payload validation with ACE editor
+ * - Next.js navigation integration
+ * 
  * @example
  * ```tsx
+ * import { SchedulerForm } from '@/app/system-settings/scheduler/components';
+ * 
  * <SchedulerForm
- *   mode="create"
- *   onSubmit={handleSubmit}
- *   onCancel={handleCancel}
- *   initialData={defaultValues}
+ *   taskId={taskId}
+ *   onSubmit={(data) => console.log('Form submitted:', data)}
+ *   onCancel={() => router.back()}
  * />
  * ```
  */
-export { default as SchedulerForm } from './SchedulerForm'
-export type { SchedulerFormProps } from './SchedulerForm'
+export { default as SchedulerForm } from './SchedulerForm';
 
 /**
- * React component that provides an intuitive interface for selecting scheduler task execution frequency.
- * Implements dropdown selection for common frequencies (hourly, daily, weekly, monthly)
- * and custom cron expression input with validation and preview of next execution times.
+ * SchedulerFrequencyPicker - Advanced frequency selection component with cron support
  * 
- * @component
+ * Features:
+ * - Predefined frequency options (5min, 15min, 30min, hourly, daily, weekly, monthly)
+ * - Custom cron expression input with real-time validation
+ * - Next execution times preview (shows upcoming 3 executions)
+ * - React Hook Form integration with proper error handling
+ * - Searchable dropdown with Headless UI Combobox
+ * - Accessibility compliant with ARIA labels and keyboard navigation
+ * 
  * @example
  * ```tsx
+ * import { SchedulerFrequencyPicker } from '@/app/system-settings/scheduler/components';
+ * 
  * <SchedulerFrequencyPicker
- *   value={frequency}
- *   onChange={setFrequency}
- *   disabled={false}
- *   showPreview={true}
+ *   name="frequency"
+ *   control={control}
+ *   label="Execution Frequency"
+ *   required={true}
  * />
  * ```
  */
-export { default as SchedulerFrequencyPicker } from './SchedulerFrequencyPicker'
-export type { SchedulerFrequencyPickerProps } from './SchedulerFrequencyPicker'
+export { default as SchedulerFrequencyPicker } from './SchedulerFrequencyPicker';
 
 /**
- * React component that provides service and component selection for scheduler tasks.
- * Implements cascading dropdowns where component options update based on selected service,
- * integrates with React Query for service data fetching, and includes search functionality
- * for large service lists with accessibility support.
+ * SchedulerServiceSelector - Dual combobox component for service and component selection
  * 
- * @component
+ * Features:
+ * - Two-stage selection: Service first, then available components
+ * - React Query integration for service and component data
+ * - Search/filter functionality for both services and components
+ * - Loading states and error handling for API calls
+ * - Access level badges and tooltips for component information
+ * - Real-time validation with React Hook Form
+ * - Automatic component reset when service changes
+ * 
  * @example
  * ```tsx
+ * import { SchedulerServiceSelector } from '@/app/system-settings/scheduler/components';
+ * 
  * <SchedulerServiceSelector
- *   serviceValue={selectedService}
- *   componentValue={selectedComponent}
- *   onServiceChange={setSelectedService}
- *   onComponentChange={setSelectedComponent}
+ *   name="service-selector"
+ *   control={control}
+ *   serviceFieldName="serviceId"
+ *   componentFieldName="component"
+ *   required={true}
  * />
  * ```
  */
-export { default as SchedulerServiceSelector } from './SchedulerServiceSelector'
-export type { SchedulerServiceSelectorProps } from './SchedulerServiceSelector'
+export { default as SchedulerServiceSelector } from './SchedulerServiceSelector';
 
 /**
- * React component that displays visual status indicators for scheduler tasks.
- * Shows active/inactive status with color-coded badges, provides tooltip information
- * for status details, and includes accessibility features for screen readers
- * with smooth transition animations.
+ * SchedulerStatusIndicator - Visual status indicator for scheduler task states
  * 
- * @component
+ * Features:
+ * - Color-coded badges for active/inactive states
+ * - Dynamic icons (CheckIcon for active, XMarkIcon for inactive)
+ * - Configurable sizes (sm, md, lg) using class-variance-authority
+ * - Tooltip support with status details
+ * - Loading state with pulse animation
+ * - Accessibility support with proper ARIA labels
+ * - Dark mode compatible styling
+ * 
  * @example
  * ```tsx
+ * import { SchedulerStatusIndicator } from '@/app/system-settings/scheduler/components';
+ * 
  * <SchedulerStatusIndicator
- *   status="active"
- *   message="Task running normally"
+ *   status={task.isActive}
+ *   size="md"
  *   showTooltip={true}
+ *   statusMessage="Task will execute every 5 minutes"
  * />
  * ```
  */
-export { default as SchedulerStatusIndicator } from './SchedulerStatusIndicator'
-export type { SchedulerStatusIndicatorProps } from './SchedulerStatusIndicator'
+export { default as SchedulerStatusIndicator } from './SchedulerStatusIndicator';
 
 /**
- * React table component that displays scheduler tasks in a sortable, filterable table.
- * Implements TanStack Virtual for performance with large datasets, integrates with
- * React Query for data fetching and caching, and provides CRUD action buttons
- * with accessibility compliance (WCAG 2.1 AA).
+ * SchedulerTable - High-performance data table for scheduler task management
  * 
- * @component
+ * Features:
+ * - TanStack Table with virtual scrolling for 1000+ tasks
+ * - TanStack Virtual for optimal performance with large datasets
+ * - React Query for data fetching, caching, and real-time updates
+ * - Global search across task names and descriptions
+ * - Column sorting, filtering, and pagination
+ * - Inline actions (view, edit, delete) with proper accessibility
+ * - Responsive design with Tailwind CSS
+ * - Confirmation dialogs for destructive actions
+ * - Loading and error states with retry functionality
+ * 
  * @example
  * ```tsx
- * <SchedulerTable
- *   onEdit={handleEdit}
- *   onDelete={handleDelete}
- *   onView={handleView}
- *   searchQuery={searchTerm}
- * />
+ * import { SchedulerTable } from '@/app/system-settings/scheduler/components';
+ * 
+ * <SchedulerTable />
  * ```
  */
-export { default as SchedulerTable } from './SchedulerTable'
-export type { SchedulerTableProps } from './SchedulerTable'
+export { default as SchedulerTable } from './SchedulerTable';
+
+// =============================================================================
+// TYPE EXPORTS (Alphabetical Order)
+// =============================================================================
 
 /**
- * Re-export all component types for external consumption
- * Enables importing component prop interfaces for type-safe component usage
- * 
- * @example
- * ```typescript
- * import type { SchedulerFormProps, SchedulerTableProps } from '@/app/system-settings/scheduler/components'
- * ```
+ * Type definitions for SchedulerDeleteDialog component props and related interfaces
  */
 export type {
-  SchedulerDeleteDialogProps,
-  SchedulerFormProps,
-  SchedulerFrequencyPickerProps,
-  SchedulerServiceSelectorProps,
-  SchedulerStatusIndicatorProps,
-  SchedulerTableProps,
-} from './types'
+  SchedulerTask,
+  SchedulerDeleteDialogProps
+} from './SchedulerDeleteDialog';
 
-// Type-only exports for enhanced tree-shaking
-// These exports ensure that TypeScript types don't affect runtime bundle size
-export type * from './SchedulerDeleteDialog'
-export type * from './SchedulerForm'
-export type * from './SchedulerFrequencyPicker'
-export type * from './SchedulerServiceSelector'
-export type * from './SchedulerStatusIndicator'
-export type * from './SchedulerTable'
+/**
+ * Type definitions for SchedulerFrequencyPicker component and utility functions
+ */
+export type {
+  SchedulerFrequencyPickerProps
+} from './SchedulerFrequencyPicker';
+
+/**
+ * Type definitions and enums for SchedulerStatusIndicator component
+ */
+export type {
+  SchedulerStatusIndicatorProps
+} from './SchedulerStatusIndicator';
+
+// =============================================================================
+// UTILITY EXPORTS (Alphabetical Order)
+// =============================================================================
+
+/**
+ * Utility constants and functions from SchedulerFrequencyPicker for external use
+ * 
+ * - FREQUENCY_OPTIONS: Predefined frequency options array
+ * - cronSchema: Zod schema for cron expression validation
+ * - getNextExecutionTimes: Function to calculate next execution times from cron
+ */
+export {
+  FREQUENCY_OPTIONS,
+  cronSchema,
+  getNextExecutionTimes
+} from './SchedulerFrequencyPicker';
+
+/**
+ * Scheduler task status enum for type-safe status handling across components
+ */
+export {
+  SchedulerTaskStatus
+} from './SchedulerStatusIndicator';
+
+// =============================================================================
+// RE-EXPORTS FOR COMPONENT VARIANTS
+// =============================================================================
+
+/**
+ * Named export of SchedulerStatusIndicator component for consistent importing
+ * (in addition to default export for flexibility)
+ */
+export {
+  SchedulerStatusIndicator
+} from './SchedulerStatusIndicator';
+
+/**
+ * Named export of SchedulerServiceSelector component for consistent importing
+ * (in addition to default export for flexibility)
+ */
+export {
+  SchedulerServiceSelector
+} from './SchedulerServiceSelector';
