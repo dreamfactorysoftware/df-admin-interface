@@ -1,485 +1,698 @@
 /**
- * Select Component Type Definitions
+ * Select Component Type Definitions for DreamFactory Admin Interface
  * 
- * Comprehensive TypeScript interfaces for React 19 select component variants
- * supporting complex value types, form integration, and accessibility requirements.
- * Migrated from Angular reactive forms to React Hook Form with enhanced type safety.
+ * Comprehensive TypeScript type definitions for all select component variants including
+ * SelectOption, SelectProps, AutocompleteProps, and MultiSelectProps interfaces.
  * 
- * @fileoverview Select component type definitions for DreamFactory Admin Interface
- * @version 1.0.0
- * @since React 19.0.0 / Next.js 15.1+
+ * Provides typing for React 19/Next.js 15.1 compatibility with strict type safety,
+ * React Hook Form integration, and WCAG 2.1 AA accessibility compliance.
+ * 
+ * Migrated from Angular Material Select to Headless UI-based React components
+ * with support for complex value transformations and database-specific options.
  */
 
-import { type ReactNode, type ComponentPropsWithoutRef } from 'react';
-import { type FieldPath, type FieldValues, type UseFormRegister, type RegisterOptions } from 'react-hook-form';
-import { type VariantProps } from 'class-variance-authority';
+import { ReactNode, ComponentType, KeyboardEvent, FocusEvent } from 'react';
 import { 
-  type BaseComponentProps, 
-  type FormComponentProps, 
-  type ControlledProps, 
-  type ThemeProps,
-  type FocusProps,
-  type ColorVariant,
-  type SizeVariant,
-  type StateVariant
+  BaseComponent, 
+  ComponentVariant, 
+  ComponentSize, 
+  FormFieldComponent,
+  LoadingState,
+  ComponentState,
+  ComponentIntent 
 } from '../../../types/ui';
 
-/**
- * Complex value types supported by select components
- * Supports Angular migration patterns including bitmask operations
- */
-export type SelectValue = string | number | boolean | string[] | number[] | null | undefined;
+// ============================================================================
+// CORE SELECT TYPES
+// ============================================================================
 
 /**
- * Bitmask value transformation utilities for complex database field types
- * Maintains compatibility with Angular reactive forms bitmask handling
+ * Base select option interface with enhanced metadata
+ * Supports complex data structures from DreamFactory database schemas
  */
-export interface BitmaskValue {
-  /** Raw bitmask integer value */
-  value: number;
-  /** Array of selected bit positions */
-  selectedBits: number[];
-  /** Human-readable labels for each bit */
-  labels: Record<number, string>;
-}
-
-/**
- * Value transformation functions for complex data types
- * Enables seamless migration from Angular form value transforms
- */
-export interface ValueTransform<TInput = any, TOutput = any> {
-  /** Transform display value to form value */
-  toFormValue: (displayValue: TInput) => TOutput;
-  /** Transform form value to display value */
-  toDisplayValue: (formValue: TOutput) => TInput;
-  /** Validate transformed value */
-  validate?: (value: TOutput) => boolean;
-}
-
-/**
- * Enhanced option interface with comprehensive metadata support
- * Extends Angular Material select option with additional properties
- */
-export interface SelectOption<T = SelectValue> {
-  /** Option value - supports complex types from database schemas */
+export interface SelectOption<T = string | number> {
+  /** Unique identifier for the option */
   value: T;
-  /** Display label for the option */
+  
+  /** Display text for the option */
   label: string;
-  /** Optional detailed description shown in tooltips or subtext */
+  
+  /** Optional description for additional context */
   description?: string;
-  /** Icon component or icon name for visual enhancement */
-  icon?: ReactNode | string;
-  /** Disabled state for individual options */
+  
+  /** Icon component for visual enhancement */
+  icon?: ComponentType<{ className?: string; size?: ComponentSize }>;
+  
+  /** Whether the option is disabled */
   disabled?: boolean;
-  /** Group identifier for option grouping */
+  
+  /** Group identifier for option categorization */
   group?: string;
-  /** Additional metadata for complex options (e.g., database field info) */
-  metadata?: Record<string, any>;
-  /** Custom CSS classes for option styling */
-  className?: string;
-  /** Search keywords for filtering (in addition to label) */
-  searchKeywords?: string[];
-  /** Sort order within group */
-  sortOrder?: number;
+  
+  /** Additional metadata for complex option types */
+  metadata?: OptionMetadata;
+  
+  /** Custom rendering data */
+  data?: Record<string, any>;
+  
+  // WCAG 2.1 AA Accessibility
+  'aria-label'?: string;
+  'aria-description'?: string;
+  'aria-selected'?: boolean;
 }
 
 /**
- * Option group interface for organized option display
- * Supports hierarchical data structures common in database schemas
+ * Extended metadata for complex option types
+ * Supports database service types and configuration options
  */
-export interface OptionGroup<T = SelectValue> {
-  /** Group identifier */
-  id: string;
-  /** Group display label */
-  label: string;
-  /** Group description */
-  description?: string;
-  /** Options within this group */
-  options: SelectOption<T>[];
-  /** Disabled state for entire group */
-  disabled?: boolean;
-  /** Collapsible group state */
-  collapsible?: boolean;
-  /** Default collapsed state */
-  defaultCollapsed?: boolean;
+export interface OptionMetadata {
+  /** Database service type for service options */
+  serviceType?: 'mysql' | 'postgresql' | 'mongodb' | 'sqlserver' | 'oracle' | 'snowflake' | 'sqlite';
+  
+  /** Color coding for visual categorization */
+  color?: string;
+  
+  /** Badge text for status indicators */
+  badge?: string | number;
+  
+  /** Tooltip content */
+  tooltip?: string;
+  
+  /** Sort priority for option ordering */
+  sortPriority?: number;
+  
+  /** Whether option represents a new/create action */
+  isCreateAction?: boolean;
+  
+  /** External link for additional information */
+  externalLink?: string;
 }
 
 /**
- * Loading state interface for async operations
- * Supports DreamFactory API integration patterns
+ * Value transformation types for Angular migration compatibility
+ * Supports bitmask, array, and string conversions from existing Angular forms
  */
-export interface SelectLoadingState {
-  /** Is component currently loading */
-  isLoading: boolean;
-  /** Loading progress percentage (0-100) */
-  progress?: number;
-  /** Loading message to display */
-  message?: string;
-  /** Loading state type */
-  type?: 'initial' | 'search' | 'refresh' | 'lazy';
+export type ValueTransformType = 'string' | 'number' | 'array' | 'bitmask' | 'json' | 'custom';
+
+export interface ValueTransformation<T = any> {
+  /** Type of transformation to apply */
+  type: ValueTransformType;
+  
+  /** Transform function for outbound values (to API) */
+  toValue?: (displayValue: any) => T;
+  
+  /** Transform function for inbound values (from API) */
+  fromValue?: (apiValue: T) => any;
+  
+  /** Bitmask configuration for flag-based values */
+  bitmask?: BitmaskConfig;
+  
+  /** Custom transformation function */
+  custom?: {
+    encode: (value: any) => T;
+    decode: (value: T) => any;
+    validate?: (value: any) => boolean;
+  };
+}
+
+export interface BitmaskConfig {
+  /** Mapping of option values to bit positions */
+  mapping: Record<string | number, number>;
+  
+  /** Maximum bit value supported */
+  maxBits?: number;
+  
+  /** Whether to use string representation */
+  useStringValues?: boolean;
+}
+
+// ============================================================================
+// LOADING AND ERROR STATES
+// ============================================================================
+
+/**
+ * Enhanced loading state for async select operations
+ */
+export interface SelectLoadingState extends LoadingState {
+  /** Whether options are being loaded */
+  loadingOptions?: boolean;
+  
+  /** Whether search results are loading */
+  loadingSearch?: boolean;
+  
+  /** Whether validation is in progress */
+  validating?: boolean;
+  
+  /** Debounce delay for search operations */
+  searchDebounce?: number;
+  
+  /** Progress indicator for large datasets */
+  loadProgress?: {
+    loaded: number;
+    total: number;
+    percentage: number;
+  };
 }
 
 /**
- * Error state interface for validation and API errors
- * Integrates with React Hook Form error handling
+ * Error state configuration for select components
  */
 export interface SelectErrorState {
+  /** Whether component is in error state */
+  hasError: boolean;
+  
   /** Error message to display */
-  message: string;
-  /** Error type for different handling */
-  type?: 'validation' | 'network' | 'permission' | 'data';
-  /** Field-specific errors for complex selects */
-  fieldErrors?: Record<string, string>;
+  message?: string;
+  
+  /** Error type classification */
+  type?: 'validation' | 'network' | 'permission' | 'data' | 'timeout';
+  
+  /** Whether error is recoverable */
+  recoverable?: boolean;
+  
   /** Retry function for recoverable errors */
   onRetry?: () => void;
+  
+  /** Additional error details */
+  details?: Record<string, any>;
 }
 
+// ============================================================================
+// THEME VARIANTS
+// ============================================================================
+
 /**
- * Theme variant configuration for consistent styling
- * Uses class-variance-authority for dynamic class composition
+ * Select-specific theme variants for consistent styling
+ * Integrates with class-variance-authority for dynamic Tailwind CSS composition
  */
 export interface SelectThemeVariants {
-  /** Visual style variant */
-  variant?: ColorVariant;
-  /** Size variant */
-  size?: SizeVariant;
-  /** Component state */
-  state?: StateVariant;
-  /** Border style */
+  /** Visual variant for different contexts */
+  variant?: ComponentVariant;
+  
+  /** Size configuration */
+  size?: ComponentSize;
+  
+  /** Current state for dynamic styling */
+  state?: ComponentState;
+  
+  /** Intent for semantic coloring */
+  intent?: ComponentIntent;
+  
+  /** Border style configuration */
   border?: 'none' | 'subtle' | 'default' | 'strong';
+  
   /** Background style */
   background?: 'transparent' | 'subtle' | 'default' | 'strong';
+  
+  /** Corner radius configuration */
+  radius?: 'none' | 'sm' | 'md' | 'lg' | 'full';
 }
 
 /**
- * Base select component props extending form and UI patterns
- * Provides foundation for all select variants
+ * Dynamic styling configuration for select states
  */
-export interface BaseSelectProps<T = SelectValue, TFieldValues extends FieldValues = FieldValues> 
-  extends Omit<BaseComponentProps<HTMLSelectElement>, 'onChange' | 'value'>,
-          FormComponentProps,
-          ControlledProps<T>,
-          ThemeProps,
-          FocusProps {
+export interface SelectStyleConfig {
+  /** Base container styles */
+  container?: string;
   
-  /** Select options - can be flat array or grouped */
-  options: SelectOption<T>[] | OptionGroup<T>[];
-  /** Placeholder text when no value selected */
-  placeholder?: string;
-  /** Allow clearing selection */
+  /** Trigger button styles */
+  trigger?: string;
+  
+  /** Dropdown menu styles */
+  dropdown?: string;
+  
+  /** Individual option styles */
+  option?: string;
+  
+  /** Selected option styles */
+  selectedOption?: string;
+  
+  /** Group header styles */
+  groupHeader?: string;
+  
+  /** Loading indicator styles */
+  loading?: string;
+  
+  /** Error state styles */
+  error?: string;
+  
+  /** Focus ring styles for accessibility */
+  focusRing?: string;
+}
+
+// ============================================================================
+// BASE SELECT PROPS
+// ============================================================================
+
+/**
+ * Core select component properties
+ * Extends BaseComponent and FormFieldComponent for consistency
+ */
+export interface SelectProps<T = any> extends FormFieldComponent {
+  /** Array of available options */
+  options: SelectOption<T>[];
+  
+  /** Currently selected value(s) */
+  value?: T | T[];
+  
+  /** Change handler for value updates */
+  onChange: (value: T | T[] | null) => void;
+  
+  /** Blur event handler */
+  onBlur?: (event: FocusEvent<HTMLElement>) => void;
+  
+  /** Focus event handler */
+  onFocus?: (event: FocusEvent<HTMLElement>) => void;
+  
+  /** Whether multiple selection is allowed */
+  multiple?: boolean;
+  
+  /** Whether the field can be cleared */
   clearable?: boolean;
-  /** Show search/filter capability */
-  searchable?: boolean;
-  /** Custom empty state content */
-  emptyStateContent?: ReactNode;
-  /** Custom loading content */
-  loadingContent?: ReactNode;
+  
+  /** Placeholder text when no selection */
+  placeholder?: string;
+  
   /** Loading state configuration */
-  loadingState?: SelectLoadingState;
+  loading?: boolean | SelectLoadingState;
+  
   /** Error state configuration */
-  errorState?: SelectErrorState;
-  /** Theme variants for styling */
-  themeVariants?: SelectThemeVariants;
+  error?: string | SelectErrorState;
   
-  /** React Hook Form integration */
-  register?: UseFormRegister<TFieldValues>;
-  /** Field name for form registration */
-  name?: FieldPath<TFieldValues>;
-  /** Validation rules for React Hook Form */
-  rules?: RegisterOptions<TFieldValues>;
+  /** Theme and styling variants */
+  variants?: SelectThemeVariants;
   
-  /** Value transformation utilities */
-  valueTransform?: ValueTransform<T>;
-  /** Custom option renderer */
-  renderOption?: (option: SelectOption<T>, isSelected: boolean) => ReactNode;
-  /** Custom value renderer for selected state */
-  renderValue?: (value: T, option?: SelectOption<T>) => ReactNode;
-  /** Custom group header renderer */
-  renderGroup?: (group: OptionGroup<T>) => ReactNode;
+  /** Custom style overrides */
+  styles?: SelectStyleConfig;
   
-  /** Accessibility enhancements */
+  /** Value transformation configuration */
+  transform?: ValueTransformation<T>;
+  
+  /** Whether to close dropdown on selection */
+  closeOnSelect?: boolean;
+  
+  /** Maximum height for dropdown menu */
+  maxDropdownHeight?: string | number;
+  
+  /** Virtualization settings for large option lists */
+  virtualized?: {
+    enabled: boolean;
+    itemHeight: number;
+    overscan?: number;
+  };
+  
+  // React Hook Form Integration
+  /** React Hook Form register function */
+  register?: any;
+  
+  /** React Hook Form control object */
+  control?: any;
+  
+  /** Form validation rules */
+  rules?: Record<string, any>;
+  
+  // Accessibility enhancements
+  'aria-label'?: string;
   'aria-describedby'?: string;
+  'aria-labelledby'?: string;
+  'aria-required'?: boolean;
   'aria-invalid'?: boolean;
-  /** Announcement for screen readers on selection change */
-  announceSelection?: (option: SelectOption<T>) => string;
+  'aria-expanded'?: boolean;
+  'aria-haspopup'?: boolean;
+  
+  /** Screen reader announcements */
+  announcements?: {
+    selection?: (option: SelectOption<T>) => string;
+    deselection?: (option: SelectOption<T>) => string;
+    cleared?: string;
+    opened?: string;
+    closed?: string;
+  };
 }
 
-/**
- * Standard select component props for single selection
- * Maintains compatibility with Angular Material select patterns
- */
-export interface SelectProps<T = SelectValue, TFieldValues extends FieldValues = FieldValues> 
-  extends BaseSelectProps<T, TFieldValues> {
-  
-  /** Single value selection */
-  value?: T;
-  /** Default value for uncontrolled usage */
-  defaultValue?: T;
-  /** Change handler with option metadata */
-  onChange?: (value: T, option?: SelectOption<T>) => void;
-  /** Validation on change */
-  validateOnChange?: boolean;
-  /** Auto-submit form on selection */
-  autoSubmit?: boolean;
-}
+// ============================================================================
+// AUTOCOMPLETE PROPS
+// ============================================================================
 
 /**
- * Autocomplete/Combobox props with search capabilities
- * Supports async data loading and server-side search
+ * Autocomplete/searchable select component properties
+ * Extends SelectProps with search-specific functionality
  */
-export interface AutocompleteProps<T = SelectValue, TFieldValues extends FieldValues = FieldValues> 
-  extends BaseSelectProps<T, TFieldValues> {
+export interface AutocompleteProps<T = any> extends Omit<SelectProps<T>, 'options'> {
+  /** Whether search functionality is enabled */
+  searchable?: boolean;
   
-  /** Current search query */
-  searchQuery?: string;
+  /** Static options for local filtering */
+  options?: SelectOption<T>[];
+  
+  /** Async function for fetching options based on search term */
+  asyncOptions?: (searchTerm: string) => Promise<SelectOption<T>[]>;
+  
+  /** Search input change handler */
+  onSearch?: (searchTerm: string) => void;
+  
+  /** Current search term */
+  searchTerm?: string;
+  
+  /** Minimum characters required before search */
+  minSearchLength?: number;
+  
+  /** Debounce delay for search requests (ms) */
+  searchDebounce?: number;
+  
+  /** Whether to show create option for new values */
+  allowCreate?: boolean;
+  
+  /** Custom create option renderer */
+  createOptionRenderer?: (searchTerm: string) => ReactNode;
+  
+  /** Handler for creating new options */
+  onCreateOption?: (value: string) => void | Promise<void>;
+  
+  /** Whether to highlight search terms in results */
+  highlightMatch?: boolean;
+  
+  /** Custom search filter function for local options */
+  filterFunction?: (option: SelectOption<T>, searchTerm: string) => boolean;
+  
+  /** Empty state when no search results */
+  emptySearchText?: string;
+  
+  /** Loading text during search */
+  searchingText?: string;
+  
+  /** Error handling for failed searches */
+  onSearchError?: (error: Error) => void;
+  
+  /** Whether to clear search on selection */
+  clearSearchOnSelect?: boolean;
+  
   /** Search input placeholder */
   searchPlaceholder?: string;
-  /** Minimum characters before search triggers */
-  minSearchLength?: number;
-  /** Search debounce delay in milliseconds */
-  searchDebounce?: number;
-  /** Allow custom input values not in options */
-  allowCustomValue?: boolean;
-  /** Create new option from search input */
-  onCreateOption?: (searchValue: string) => SelectOption<T> | Promise<SelectOption<T>>;
   
-  /** Search handler - can be sync or async */
-  onSearch?: (query: string) => void | Promise<void>;
-  /** Async options loading */
-  asyncOptions?: (query: string) => Promise<SelectOption<T>[]>;
-  /** Show recent selections */
-  showRecentSelections?: boolean;
-  /** Maximum recent selections to show */
-  maxRecentSelections?: number;
-  
-  /** Highlight matching text in options */
-  highlightMatches?: boolean;
-  /** Custom search filter function */
-  filterOptions?: (options: SelectOption<T>[], query: string) => SelectOption<T>[];
-  /** Search result announcement for screen readers */
-  announceSearchResults?: (count: number, query: string) => string;
+  /** Whether search is case sensitive */
+  caseSensitive?: boolean;
 }
 
+// ============================================================================
+// MULTI-SELECT PROPS
+// ============================================================================
+
 /**
- * Multi-select component props for multiple selection
- * Supports complex multi-value patterns from database operations
+ * Multi-select component properties
+ * Extends SelectProps with multiple selection features
  */
-export interface MultiSelectProps<T = SelectValue, TFieldValues extends FieldValues = FieldValues> 
-  extends BaseSelectProps<T[], TFieldValues> {
-  
-  /** Multiple selected values */
+export interface MultiSelectProps<T = any> extends Omit<SelectProps<T>, 'value' | 'onChange' | 'multiple'> {
+  /** Array of selected values */
   value?: T[];
-  /** Default selected values */
-  defaultValue?: T[];
-  /** Change handler with all selected options */
-  onChange?: (values: T[], options: SelectOption<T>[]) => void;
+  
+  /** Change handler for multi-select values */
+  onChange: (values: T[]) => void;
   
   /** Maximum number of selections allowed */
   maxSelections?: number;
-  /** Minimum number of selections required */
-  minSelections?: number;
-  /** Select all / deselect all functionality */
-  selectAllOption?: boolean;
-  /** Custom select all option label */
-  selectAllLabel?: string;
   
-  /** How to display selected values */
-  valueDisplay?: 'chips' | 'count' | 'list' | 'custom';
-  /** Custom chip/tag renderer for selected values */
-  chipRenderer?: (value: T, option: SelectOption<T>, onRemove: () => void) => ReactNode;
-  /** Maximum chips to display before showing count */
-  maxChipsDisplay?: number;
-  /** Chip removal handler */
-  onChipRemove?: (value: T, option: SelectOption<T>) => void;
+  /** Custom chip/tag renderer for selected items */
+  chipRenderer?: (option: SelectOption<T>, onRemove: () => void) => ReactNode;
   
-  /** Close dropdown after each selection */
-  closeOnSelect?: boolean;
-  /** Order selected values */
-  orderSelected?: 'selection' | 'original' | 'alphabetical';
-  /** Selection announcement for screen readers */
-  announceSelectionCount?: (count: number, total: number) => string;
+  /** Whether chips can be removed */
+  removable?: boolean;
+  
+  /** Whether to show "Select All" option */
+  showSelectAll?: boolean;
+  
+  /** Text for "Select All" option */
+  selectAllText?: string;
+  
+  /** Text for "Clear All" action */
+  clearAllText?: string;
+  
+  /** Whether to show selection count */
+  showSelectionCount?: boolean;
+  
+  /** Format function for selection count display */
+  selectionCountFormatter?: (count: number, total: number) => string;
+  
+  /** Whether to close dropdown after each selection */
+  closeOnMultiSelect?: boolean;
+  
+  /** Chip/tag size configuration */
+  chipSize?: ComponentSize;
+  
+  /** Chip/tag variant configuration */
+  chipVariant?: ComponentVariant;
+  
+  /** Maximum number of chips to display before showing count */
+  maxChipsDisplayed?: number;
+  
+  /** Custom overflow indicator when chips exceed max display */
+  overflowRenderer?: (hiddenCount: number) => ReactNode;
+  
+  /** Whether chips can be reordered */
+  sortable?: boolean;
+  
+  /** Handler for chip reordering */
+  onReorder?: (newOrder: T[]) => void;
+  
+  /** Validation for selection limits */
+  onMaxSelectionsReached?: () => void;
+  
+  /** Group selection behavior */
+  groupSelection?: {
+    enabled: boolean;
+    selectGroupText?: string;
+    deselectGroupText?: string;
+  };
+}
+
+// ============================================================================
+// SPECIALIZED SELECT TYPES
+// ============================================================================
+
+/**
+ * Database service select properties
+ * Specialized for DreamFactory database service configuration
+ */
+export interface DatabaseServiceSelectProps extends SelectProps<string> {
+  /** Available database service types */
+  serviceTypes?: ('mysql' | 'postgresql' | 'mongodb' | 'sqlserver' | 'oracle' | 'snowflake' | 'sqlite')[];
+  
+  /** Whether to show service type icons */
+  showServiceIcons?: boolean;
+  
+  /** Custom service type colors */
+  serviceColors?: Record<string, string>;
+  
+  /** Whether to group by service category */
+  groupByCategory?: boolean;
+  
+  /** Handler for service type selection */
+  onServiceTypeChange?: (serviceType: string) => void;
+  
+  /** Whether to show connection status */
+  showConnectionStatus?: boolean;
+  
+  /** Connection status data */
+  connectionStatus?: Record<string, 'connected' | 'disconnected' | 'error'>;
 }
 
 /**
- * Advanced select props for complex database field configurations
- * Supports bitmask operations and complex value transformations
+ * Schema field select properties
+ * Specialized for database schema field selection
  */
-export interface AdvancedSelectProps<T = SelectValue, TFieldValues extends FieldValues = FieldValues> 
-  extends BaseSelectProps<T, TFieldValues> {
+export interface SchemaFieldSelectProps extends SelectProps<string> {
+  /** Available field types */
+  fieldTypes?: string[];
   
-  /** Bitmask mode for flag-style selections */
-  bitmaskMode?: boolean;
-  /** Bitmask configuration */
-  bitmaskConfig?: {
-    /** Available bit positions and labels */
-    bitLabels: Record<number, string>;
-    /** Maximum bit position */
-    maxBits?: number;
-    /** Display format for bitmask value */
-    displayFormat?: 'binary' | 'decimal' | 'hex' | 'labels';
-  };
+  /** Whether to show field type icons */
+  showFieldTypeIcons?: boolean;
   
-  /** Hierarchical/tree selection support */
-  hierarchical?: boolean;
-  /** Parent-child relationships */
-  hierarchy?: {
-    /** Parent option selection behavior */
-    parentSelection?: 'cascade' | 'independent' | 'disabled';
-    /** Child option display */
-    childDisplay?: 'indented' | 'grouped' | 'flat';
-    /** Maximum nesting levels */
-    maxDepth?: number;
-  };
+  /** Whether to group by data type category */
+  groupByDataType?: boolean;
   
-  /** Advanced validation */
-  customValidation?: {
-    /** Custom validation function */
-    validate: (value: T) => boolean | string;
-    /** Validation message */
-    message?: string;
-    /** Async validation */
+  /** Field metadata for enhanced display */
+  fieldMetadata?: Record<string, {
+    type: string;
+    nullable: boolean;
+    primaryKey: boolean;
+    foreignKey: boolean;
+    length?: number;
+    precision?: number;
+    scale?: number;
+  }>;
+  
+  /** Custom field type renderer */
+  fieldTypeRenderer?: (fieldType: string, metadata?: any) => ReactNode;
+}
+
+/**
+ * API endpoint method select properties
+ * Specialized for HTTP method selection in API generation
+ */
+export interface ApiMethodSelectProps extends MultiSelectProps<string> {
+  /** Available HTTP methods */
+  methods?: ('GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS')[];
+  
+  /** Whether to show method colors */
+  showMethodColors?: boolean;
+  
+  /** Custom method colors */
+  methodColors?: Record<string, string>;
+  
+  /** Default selected methods */
+  defaultMethods?: string[];
+  
+  /** Whether certain methods are required */
+  requiredMethods?: string[];
+  
+  /** Handler for method selection validation */
+  onMethodValidation?: (methods: string[]) => boolean;
+}
+
+// ============================================================================
+// EVENT HANDLERS
+// ============================================================================
+
+/**
+ * Comprehensive event handlers for select interactions
+ */
+export interface SelectEventHandlers<T = any> {
+  /** Option selection handler */
+  onSelect?: (option: SelectOption<T>, event?: MouseEvent | KeyboardEvent) => void;
+  
+  /** Option deselection handler */
+  onDeselect?: (option: SelectOption<T>, event?: MouseEvent | KeyboardEvent) => void;
+  
+  /** Dropdown open handler */
+  onOpen?: () => void;
+  
+  /** Dropdown close handler */
+  onClose?: () => void;
+  
+  /** Search term change handler */
+  onSearchChange?: (searchTerm: string) => void;
+  
+  /** Clear all selections handler */
+  onClearAll?: () => void;
+  
+  /** Option creation handler */
+  onCreate?: (inputValue: string) => void | Promise<void>;
+  
+  /** Keyboard navigation handler */
+  onKeyDown?: (event: KeyboardEvent<HTMLElement>) => void;
+  
+  /** Mouse interaction handlers */
+  onMouseEnter?: (option: SelectOption<T>) => void;
+  onMouseLeave?: (option: SelectOption<T>) => void;
+  
+  /** Focus management handlers */
+  onFocusChange?: (focused: boolean) => void;
+  onOptionFocus?: (option: SelectOption<T>) => void;
+  
+  /** Error handling */
+  onError?: (error: Error, context: string) => void;
+  
+  /** Loading state changes */
+  onLoadingChange?: (loading: boolean) => void;
+}
+
+// ============================================================================
+// UTILITY TYPES
+// ============================================================================
+
+/**
+ * Select component configuration aggregating all properties
+ */
+export interface SelectConfig<T = any> 
+  extends SelectProps<T>, 
+          Partial<AutocompleteProps<T>>, 
+          Partial<MultiSelectProps<T>>,
+          SelectEventHandlers<T> {
+  /** Component type identification */
+  componentType: 'select' | 'autocomplete' | 'multi-select' | 'database-service' | 'schema-field' | 'api-method';
+  
+  /** Feature flags for conditional functionality */
+  features?: {
+    search?: boolean;
+    multiSelect?: boolean;
     async?: boolean;
-  };
-  
-  /** Performance optimizations for large datasets */
-  performance?: {
-    /** Virtual scrolling for large option lists */
-    virtualScrolling?: boolean;
-    /** Lazy loading of option groups */
-    lazyLoading?: boolean;
-    /** Option caching strategy */
-    caching?: 'none' | 'memory' | 'session' | 'persistent';
+    virtualization?: boolean;
+    creation?: boolean;
+    grouping?: boolean;
+    sorting?: boolean;
   };
 }
 
 /**
- * Select component configuration for form builders
- * Enables dynamic form generation from database schemas
+ * Select option group definition
  */
-export interface SelectFieldConfig<T = SelectValue> {
-  /** Field type identifier */
-  type: 'select' | 'autocomplete' | 'multiselect' | 'advanced';
-  /** Field schema information */
-  schema?: {
-    /** Database field type */
-    dbType?: string;
-    /** Foreign key relationship */
-    foreignKey?: {
-      table: string;
-      column: string;
-      displayColumn?: string;
-    };
-    /** Enum values for constrained fields */
-    enumValues?: string[];
-    /** Validation constraints */
-    constraints?: {
-      required?: boolean;
-      minLength?: number;
-      maxLength?: number;
-      pattern?: string;
-    };
-  };
+export interface SelectOptionGroup<T = any> {
+  /** Group identifier */
+  id: string;
   
-  /** Default configuration for this field type */
-  defaultProps?: Partial<SelectProps<T> | AutocompleteProps<T> | MultiSelectProps<T> | AdvancedSelectProps<T>>;
-  /** Dynamic option loading configuration */
-  optionLoader?: {
-    /** API endpoint for options */
-    endpoint?: string;
-    /** Query parameters */
-    params?: Record<string, any>;
-    /** Dependency fields that trigger reload */
-    dependencies?: string[];
-    /** Cache duration in seconds */
-    cacheDuration?: number;
-  };
+  /** Group display label */
+  label: string;
+  
+  /** Group description */
+  description?: string;
+  
+  /** Options in this group */
+  options: SelectOption<T>[];
+  
+  /** Whether group is collapsible */
+  collapsible?: boolean;
+  
+  /** Whether group is initially collapsed */
+  collapsed?: boolean;
+  
+  /** Group-level metadata */
+  metadata?: Record<string, any>;
+  
+  /** Custom group header renderer */
+  headerRenderer?: () => ReactNode;
 }
 
 /**
- * Export utility types for component variants
+ * Virtual scrolling configuration for large option lists
  */
-export type SelectVariantProps = VariantProps<any>;
+export interface VirtualScrollConfig {
+  /** Enable virtual scrolling */
+  enabled: boolean;
+  
+  /** Height of each option item */
+  itemHeight: number;
+  
+  /** Number of items to render outside visible area */
+  overscan?: number;
+  
+  /** Maximum height of the dropdown */
+  maxHeight?: number;
+  
+  /** Scroll behavior configuration */
+  scrollBehavior?: 'auto' | 'smooth';
+  
+  /** Dynamic height calculation */
+  dynamicHeight?: boolean;
+  
+  /** Threshold for enabling virtualization */
+  threshold?: number;
+}
 
-/**
- * Union type for all select component props
- */
-export type AnySelectProps<T = SelectValue, TFieldValues extends FieldValues = FieldValues> = 
-  | SelectProps<T, TFieldValues>
-  | AutocompleteProps<T, TFieldValues>
-  | MultiSelectProps<T, TFieldValues>
-  | AdvancedSelectProps<T, TFieldValues>;
+// ============================================================================
+// TYPE EXPORTS
+// ============================================================================
 
-/**
- * Type guard functions for component variant detection
- */
-export const isMultiSelect = <T = SelectValue>(props: AnySelectProps<T>): props is MultiSelectProps<T> => {
-  return Array.isArray((props as MultiSelectProps<T>).value);
-};
-
-export const isAutocomplete = <T = SelectValue>(props: AnySelectProps<T>): props is AutocompleteProps<T> => {
-  return (props as AutocompleteProps<T>).searchable === true || 
-         'onSearch' in props || 
-         'asyncOptions' in props;
-};
-
-export const isAdvancedSelect = <T = SelectValue>(props: AnySelectProps<T>): props is AdvancedSelectProps<T> => {
-  return 'bitmaskMode' in props || 'hierarchical' in props || 'customValidation' in props;
-};
-
-/**
- * Default configurations for different select types
- */
-export const DEFAULT_SELECT_CONFIG: Record<string, Partial<AnySelectProps>> = {
-  basic: {
-    size: 'md',
-    variant: 'outline',
-    clearable: false,
-    searchable: false,
-  },
-  database: {
-    size: 'md',
-    variant: 'outline',
-    clearable: true,
-    searchable: true,
-    loadingState: { isLoading: false, type: 'initial' },
-  },
-  multiSelect: {
-    size: 'md',
-    variant: 'outline',
-    clearable: true,
-    searchable: true,
-    valueDisplay: 'chips',
-    maxChipsDisplay: 3,
-    closeOnSelect: false,
-  },
-  autocomplete: {
-    size: 'md',
-    variant: 'outline',
-    clearable: true,
-    searchable: true,
-    minSearchLength: 2,
-    searchDebounce: 300,
-    highlightMatches: true,
-  },
-};
-
-/**
- * Type exports for external usage
- */
 export type {
-  SelectValue,
-  BitmaskValue,
-  ValueTransform,
-  SelectOption,
-  OptionGroup,
-  SelectLoadingState,
-  SelectErrorState,
-  SelectThemeVariants,
-  BaseSelectProps,
-  SelectProps,
-  AutocompleteProps,
-  MultiSelectProps,
-  AdvancedSelectProps,
-  SelectFieldConfig,
-  AnySelectProps,
+  // Re-export for convenience
+  ReactNode,
+  ComponentType,
+  KeyboardEvent,
+  FocusEvent,
+  BaseComponent,
+  ComponentVariant,
+  ComponentSize,
+  FormFieldComponent,
+  LoadingState,
+  ComponentState,
+  ComponentIntent
 };
