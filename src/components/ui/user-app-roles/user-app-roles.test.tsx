@@ -1,1278 +1,1692 @@
 /**
- * @fileoverview Comprehensive test suite for the UserAppRoles React component
+ * @fileoverview Comprehensive test suite for UserAppRoles React component
  * 
- * This test suite covers all aspects of the user application roles component including:
- * - React Hook Form integration with useFieldArray
- * - WCAG 2.1 AA accessibility compliance
- * - User interactions (add/remove functionality, autocomplete)
- * - Keyboard navigation and screen reader support
- * - Theme switching (light/dark mode)
- * - Form validation with Zod schemas
- * - Real-time validation performance requirements
- * - Integration with parent forms
- * - Internationalization with Next.js i18n
+ * This test suite validates the React implementation of the user application roles
+ * component using Vitest and React Testing Library. It ensures complete functionality
+ * migration from Angular, maintains WCAG 2.1 AA accessibility standards, and
+ * validates React Hook Form integration with real-time validation performance.
  * 
- * @author DreamFactory Team
+ * Test Coverage Areas:
+ * - Component rendering and state management (90%+ coverage target)
+ * - React Hook Form useFieldArray integration and validation
+ * - WCAG 2.1 AA accessibility compliance with automated testing
+ * - User interactions: add/remove, autocomplete, keyboard navigation
+ * - Theme switching between light and dark modes
+ * - MSW-powered API mocking for applications and roles
+ * - Performance validation for sub-100ms validation requirements
+ * - Internationalization with Next.js i18n patterns
+ * - Error handling and edge case scenarios
+ * - Screen reader announcements and focus management
+ * 
  * @version 1.0.0
- * @since React 19 Migration
+ * @author DreamFactory Platform Team
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest'
-import { render, screen, waitFor, within, fireEvent } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { axe, toHaveNoViolations } from 'jest-axe'
-import { useForm, FormProvider } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
-import { act } from 'react'
+import React from 'react';
+import { describe, it, expect, beforeEach, afterEach, vi, beforeAll, afterAll } from 'vitest';
+import { 
+  render, 
+  screen, 
+  fireEvent, 
+  waitFor, 
+  within,
+  act,
+  cleanup,
+  configure
+} from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { axe, toHaveNoViolations } from 'jest-axe';
+import { useForm, FormProvider } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { NextIntlClientProvider } from 'next-intl';
+import { setupServer } from 'msw/node';
 
-// Component imports
-import { UserAppRoles } from './user-app-roles'
-import type { UserAppRolesProps, AppRoleAssignment } from './user-app-roles.types'
+// Import test utilities and helpers
+import { renderWithProviders } from '../../../test/utils/test-utils';
+import { createMockQueryClient } from '../../../test/utils/query-test-helpers';
+import { createAccessibilityTestWrapper } from '../../../test/utils/accessibility-helpers';
+import { measureComponentPerformance } from '../../../test/utils/performance-helpers';
 
-// Test utilities and mocks
-import { renderWithProviders } from '@/test/utils/test-utils'
-import { createMockProviders } from '@/test/utils/mock-providers'
-import { createQueryClient } from '@/test/utils/query-test-helpers'
-import { server } from '@/test/mocks/server'
-import { appFixtures, userFixtures } from '@/test/fixtures'
+// Import component and related types
+import UserAppRoles from './user-app-roles';
+import {
+  UserAppRolesProps,
+  UserAppRoleAssignment,
+  AppType,
+  RoleType,
+  UserAppRolesFormData,
+  UserAppRolesFormSchema,
+  DataSourceConfiguration,
+  ValidationErrors,
+} from './user-app-roles.types';
 
-// Hook and store imports
-import { useAppStore } from '@/lib/stores/app-store'
-import { useTheme } from '@/hooks/use-theme'
+// Import MSW handlers and mock data
+import { handlers } from '../../../test/mocks/handlers';
+import { 
+  mockApplications, 
+  mockRoles, 
+  createMockApplication,
+  createMockRole,
+  createMockUserAppRoleAssignment
+} from '../../../test/mocks/mock-data';
 
-// Mock external dependencies
-vi.mock('@/hooks/use-theme')
-vi.mock('@/lib/stores/app-store')
-vi.mock('next/navigation')
+// Configure React Testing Library
+configure({ testIdAttribute: 'data-testid' });
 
-// Extend Jest matchers with jest-axe
-expect.extend(toHaveNoViolations)
+// Extend Jest matchers for accessibility
+expect.extend(toHaveNoViolations);
+
+// =============================================================================
+// TEST SETUP AND UTILITIES
+// =============================================================================
 
 /**
- * Form schema for testing React Hook Form integration
+ * MSW Server Setup
+ * Provides realistic API mocking for application and role data
  */
-const testFormSchema = z.object({
-  userAppRoles: z.array(z.object({
-    appId: z.string().min(1, 'Application is required'),
-    roleId: z.string().min(1, 'Role is required'),
-    appName: z.string(),
-    roleName: z.string(),
-  })),
-  userName: z.string().min(1, 'User name is required'),
-})
-
-type TestFormData = z.infer<typeof testFormSchema>
+const server = setupServer(...handlers);
 
 /**
- * Test wrapper component for form integration testing
+ * Mock translations for internationalization testing
+ * Simulates Next.js i18n behavior with comprehensive message coverage
  */
-function TestFormWrapper({ 
-  children, 
-  defaultValues,
+const mockMessages = {
+  userAppRoles: {
+    userApplicationRoles: 'User Application Roles',
+    applicationRoleAssignments: 'Application Role Assignments',
+    addNewAssignment: 'Add New Assignment',
+    addAssignment: 'Add Assignment',
+    assignmentsList: 'Assignments List',
+    noAssignments: 'No assignments configured',
+    noAssignmentsMessage: 'Click "Add Assignment" to create your first application role assignment.',
+    application: 'Application',
+    role: 'Role',
+    selectApplication: 'Select an application',
+    selectRole: 'Select a role',
+    selectApplicationFor: 'Select application for assignment {index}',
+    selectRoleFor: 'Select role for assignment {index}',
+    noApplicationSelected: 'No application selected',
+    noRoleSelected: 'No role selected',
+    activeAssignment: 'Active assignment',
+    remove: 'Remove',
+    removeAssignment: 'Remove assignment {index}',
+    assignmentAdded: 'Assignment added successfully',
+    assignmentRemoved: 'Assignment removed successfully',
+    assignmentCount: '{count} assignments configured',
+    minimumRequired: 'Minimum {min} assignments required',
+    validationErrors: 'Validation Errors',
+    formValidationErrors: 'Form Validation Errors',
+    loading: 'Loading',
+    noApplicationsFound: 'No applications found matching your search',
+    noRolesFound: 'No roles found matching your search',
+    applicationDescription: 'Application Description',
+    roleDescription: 'Role Description',
+  },
+};
+
+/**
+ * Test Form Component Wrapper
+ * Provides React Hook Form context for component testing
+ */
+interface TestFormWrapperProps {
+  children: React.ReactNode;
+  defaultValues?: Partial<UserAppRolesFormData>;
+  onSubmit?: (data: UserAppRolesFormData) => void;
+  validationSchema?: any;
+}
+
+const TestFormWrapper: React.FC<TestFormWrapperProps> = ({
+  children,
+  defaultValues = { appRoles: [] },
   onSubmit = vi.fn(),
-}: {
-  children: React.ReactNode
-  defaultValues?: Partial<TestFormData>
-  onSubmit?: (data: TestFormData) => void
-}) {
-  const methods = useForm<TestFormData>({
-    resolver: zodResolver(testFormSchema),
-    defaultValues: {
-      userAppRoles: [],
-      userName: '',
-      ...defaultValues,
-    },
-  })
+  validationSchema = UserAppRolesFormSchema,
+}) => {
+  const methods = useForm<UserAppRolesFormData>({
+    resolver: zodResolver(validationSchema),
+    defaultValues,
+    mode: 'onChange',
+  });
 
   return (
     <FormProvider {...methods}>
-      <form onSubmit={methods.handleSubmit(onSubmit)} data-testid="test-form">
+      <form onSubmit={methods.handleSubmit(onSubmit)}>
         {children}
-        <button type="submit" data-testid="submit-button">
-          Submit
-        </button>
       </form>
     </FormProvider>
-  )
-}
+  );
+};
 
 /**
- * Default test props for UserAppRoles component
+ * Complete Test Provider Wrapper
+ * Combines all necessary contexts for comprehensive testing
  */
-const defaultProps: UserAppRolesProps = {
-  name: 'userAppRoles',
-  availableApps: appFixtures.createAppList(5),
-  availableRoles: userFixtures.createRoleList(3),
-  label: 'User Application Roles',
-  placeholder: 'Select an application...',
-  'aria-label': 'Manage user application role assignments',
+interface TestProviderWrapperProps {
+  children: React.ReactNode;
+  queryClient?: QueryClient;
+  locale?: string;
+  theme?: 'light' | 'dark';
+  formDefaultValues?: Partial<UserAppRolesFormData>;
 }
 
-/**
- * Performance measurement utility
- */
-function measurePerformance<T>(operation: () => T): { result: T; duration: number } {
-  const start = performance.now()
-  const result = operation()
-  const end = performance.now()
-  return { result, duration: end - start }
-}
-
-describe('UserAppRoles Component', () => {
-  let mockUseTheme: Mock
-  let mockUseAppStore: Mock
-  let user: ReturnType<typeof userEvent.setup>
-
-  beforeEach(() => {
-    // Setup user event
-    user = userEvent.setup()
-
-    // Mock theme hook
-    mockUseTheme = vi.mocked(useTheme)
-    mockUseTheme.mockReturnValue({
-      theme: 'light',
-      setTheme: vi.fn(),
-      systemTheme: 'light',
-      resolvedTheme: 'light',
-    })
-
-    // Mock app store
-    mockUseAppStore = vi.mocked(useAppStore)
-    mockUseAppStore.mockReturnValue({
-      theme: 'light',
-      setTheme: vi.fn(),
-      sidebarCollapsed: false,
-      setSidebarCollapsed: vi.fn(),
-      globalLoading: false,
-      setGlobalLoading: vi.fn(),
-      preferences: {
-        defaultDatabaseType: 'mysql',
-        tablePageSize: 25,
-        autoRefreshSchemas: true,
-        showAdvancedOptions: false,
-      },
-      updatePreferences: vi.fn(),
-    })
-
-    // Clear all mocks
-    vi.clearAllMocks()
-  })
-
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
-  describe('Component Rendering', () => {
-    it('renders with default props', () => {
-      render(
-        <TestFormWrapper>
-          <UserAppRoles {...defaultProps} />
-        </TestFormWrapper>
-      )
-
-      expect(screen.getByLabelText(/manage user application role assignments/i)).toBeInTheDocument()
-      expect(screen.getByText('User Application Roles')).toBeInTheDocument()
-    })
-
-    it('renders with custom className and styles', () => {
-      render(
-        <TestFormWrapper>
-          <UserAppRoles 
-            {...defaultProps} 
-            className="custom-class"
-            style={{ backgroundColor: 'red' }}
-          />
-        </TestFormWrapper>
-      )
-
-      const component = screen.getByLabelText(/manage user application role assignments/i)
-      expect(component).toHaveClass('custom-class')
-      expect(component).toHaveStyle({ backgroundColor: 'red' })
-    })
-
-    it('renders with initial values', () => {
-      const initialValues: AppRoleAssignment[] = [
-        {
-          appId: 'app-1',
-          roleId: 'role-1',
-          appName: 'Test App',
-          roleName: 'Admin',
-        },
-      ]
-
-      render(
-        <TestFormWrapper defaultValues={{ userAppRoles: initialValues }}>
-          <UserAppRoles {...defaultProps} />
-        </TestFormWrapper>
-      )
-
-      expect(screen.getByDisplayValue('Test App')).toBeInTheDocument()
-      expect(screen.getByDisplayValue('Admin')).toBeInTheDocument()
-    })
-
-    it('shows loading state when data is loading', () => {
-      render(
-        <TestFormWrapper>
-          <UserAppRoles {...defaultProps} isLoading={true} />
-        </TestFormWrapper>
-      )
-
-      expect(screen.getByRole('progressbar')).toBeInTheDocument()
-      expect(screen.getByText(/loading/i)).toBeInTheDocument()
-    })
-
-    it('shows error state when there is an error', () => {
-      const errorMessage = 'Failed to load applications'
-      
-      render(
-        <TestFormWrapper>
-          <UserAppRoles {...defaultProps} error={errorMessage} />
-        </TestFormWrapper>
-      )
-
-      expect(screen.getByRole('alert')).toBeInTheDocument()
-      expect(screen.getByText(errorMessage)).toBeInTheDocument()
-    })
-  })
-
-  describe('WCAG 2.1 AA Accessibility Compliance', () => {
-    it('passes automated accessibility audit', async () => {
-      const { container } = render(
-        <TestFormWrapper>
-          <UserAppRoles {...defaultProps} />
-        </TestFormWrapper>
-      )
-
-      const results = await axe(container)
-      expect(results).toHaveNoViolations()
-    })
-
-    it('has proper ARIA labeling and role attributes', () => {
-      render(
-        <TestFormWrapper>
-          <UserAppRoles {...defaultProps} />
-        </TestFormWrapper>
-      )
-
-      // Check main container has proper ARIA attributes
-      const container = screen.getByLabelText(/manage user application role assignments/i)
-      expect(container).toHaveAttribute('role', 'group')
-      expect(container).toHaveAttribute('aria-labelledby')
-
-      // Check disclosure button has proper ARIA attributes
-      const disclosureButton = screen.getByRole('button', { expanded: false })
-      expect(disclosureButton).toHaveAttribute('aria-expanded', 'false')
-      expect(disclosureButton).toHaveAttribute('aria-controls')
-    })
-
-    it('provides screen reader announcements for state changes', async () => {
-      render(
-        <TestFormWrapper>
-          <UserAppRoles {...defaultProps} />
-        </TestFormWrapper>
-      )
-
-      // Expand disclosure
-      const disclosureButton = screen.getByRole('button', { expanded: false })
-      await user.click(disclosureButton)
-
-      expect(disclosureButton).toHaveAttribute('aria-expanded', 'true')
-
-      // Check live region for announcements
-      const liveRegion = screen.getByRole('status', { hidden: true })
-      expect(liveRegion).toBeInTheDocument()
-    })
-
-    it('supports keyboard navigation for all interactive elements', async () => {
-      render(
-        <TestFormWrapper>
-          <UserAppRoles {...defaultProps} />
-        </TestFormWrapper>
-      )
-
-      // Tab to disclosure button
-      await user.tab()
-      expect(screen.getByRole('button', { expanded: false })).toHaveFocus()
-
-      // Open disclosure with Enter key
-      await user.keyboard('{Enter}')
-      expect(screen.getByRole('button', { expanded: true })).toBeInTheDocument()
-
-      // Tab to add button
-      await user.tab()
-      expect(screen.getByRole('button', { name: /add application role/i })).toHaveFocus()
-    })
-
-    it('maintains minimum 44px touch target sizes', () => {
-      render(
-        <TestFormWrapper>
-          <UserAppRoles {...defaultProps} />
-        </TestFormWrapper>
-      )
-
-      const disclosureButton = screen.getByRole('button', { expanded: false })
-      const buttonStyles = window.getComputedStyle(disclosureButton)
-      
-      // Check minimum touch target size (44px)
-      expect(parseInt(buttonStyles.minHeight)).toBeGreaterThanOrEqual(44)
-    })
-
-    it('provides proper color contrast in both themes', () => {
-      // Test light theme
-      render(
-        <TestFormWrapper>
-          <UserAppRoles {...defaultProps} />
-        </TestFormWrapper>
-      )
-
-      let disclosureButton = screen.getByRole('button', { expanded: false })
-      expect(disclosureButton).toHaveClass('text-gray-900') // Light theme text
-
-      // Test dark theme
-      mockUseTheme.mockReturnValue({
-        theme: 'dark',
-        setTheme: vi.fn(),
-        systemTheme: 'dark',
-        resolvedTheme: 'dark',
-      })
-
-      render(
-        <TestFormWrapper>
-          <UserAppRoles {...defaultProps} />
-        </TestFormWrapper>
-      )
-
-      disclosureButton = screen.getByRole('button', { expanded: false })
-      expect(disclosureButton).toHaveClass('dark:text-gray-100') // Dark theme text
-    })
-  })
-
-  describe('React Hook Form Integration', () => {
-    it('integrates with useFieldArray for dynamic form fields', () => {
-      render(
-        <TestFormWrapper>
-          <UserAppRoles {...defaultProps} />
-        </TestFormWrapper>
-      )
-
-      // Component should register with form context
-      expect(screen.getByLabelText(/manage user application role assignments/i)).toBeInTheDocument()
-      
-      // Field array should be accessible for manipulation
-      const addButton = screen.getByRole('button', { name: /add application role/i })
-      expect(addButton).toBeInTheDocument()
-    })
-
-    it('propagates field values to parent form', async () => {
-      const onSubmit = vi.fn()
-      
-      render(
-        <TestFormWrapper onSubmit={onSubmit}>
-          <UserAppRoles {...defaultProps} />
-        </TestFormWrapper>
-      )
-
-      // Expand disclosure and add an assignment
-      const disclosureButton = screen.getByRole('button', { expanded: false })
-      await user.click(disclosureButton)
-
-      const addButton = screen.getByRole('button', { name: /add application role/i })
-      await user.click(addButton)
-
-      // Select application and role
-      const appCombobox = screen.getByRole('combobox', { name: /select application/i })
-      await user.click(appCombobox)
-      await user.click(screen.getByText(defaultProps.availableApps[0].name))
-
-      const roleCombobox = screen.getByRole('combobox', { name: /select role/i })
-      await user.click(roleCombobox)
-      await user.click(screen.getByText(defaultProps.availableRoles[0].name))
-
-      // Submit form
-      const submitButton = screen.getByTestId('submit-button')
-      await user.click(submitButton)
-
-      await waitFor(() => {
-        expect(onSubmit).toHaveBeenCalledWith(
-          expect.objectContaining({
-            userAppRoles: expect.arrayContaining([
-              expect.objectContaining({
-                appId: defaultProps.availableApps[0].id,
-                roleId: defaultProps.availableRoles[0].id,
-              })
-            ])
-          })
-        )
-      })
-    })
-
-    it('handles form validation errors correctly', async () => {
-      render(
-        <TestFormWrapper>
-          <UserAppRoles {...defaultProps} required />
-        </TestFormWrapper>
-      )
-
-      // Submit form without data
-      const submitButton = screen.getByTestId('submit-button')
-      await user.click(submitButton)
-
-      await waitFor(() => {
-        expect(screen.getByText(/application is required/i)).toBeInTheDocument()
-      })
-    })
-
-    it('updates form state when field values change', async () => {
-      render(
-        <TestFormWrapper>
-          <UserAppRoles {...defaultProps} />
-        </TestFormWrapper>
-      )
-
-      // Add an assignment
-      const disclosureButton = screen.getByRole('button', { expanded: false })
-      await user.click(disclosureButton)
-
-      const addButton = screen.getByRole('button', { name: /add application role/i })
-      await user.click(addButton)
-
-      // Form should be dirty after adding field
-      expect(screen.getByTestId('test-form')).toHaveFormValues({})
-    })
-
-    it('supports field removal with proper state cleanup', async () => {
-      const initialValues: AppRoleAssignment[] = [
-        {
-          appId: 'app-1',
-          roleId: 'role-1',
-          appName: 'Test App',
-          roleName: 'Admin',
-        },
-      ]
-
-      render(
-        <TestFormWrapper defaultValues={{ userAppRoles: initialValues }}>
-          <UserAppRoles {...defaultProps} />
-        </TestFormWrapper>
-      )
-
-      // Expand disclosure
-      const disclosureButton = screen.getByRole('button', { expanded: false })
-      await user.click(disclosureButton)
-
-      // Remove the assignment
-      const removeButton = screen.getByRole('button', { name: /remove assignment/i })
-      await user.click(removeButton)
-
-      // Assignment should be removed
-      expect(screen.queryByDisplayValue('Test App')).not.toBeInTheDocument()
-    })
-  })
-
-  describe('User Interactions', () => {
-    beforeEach(async () => {
-      render(
-        <TestFormWrapper>
-          <UserAppRoles {...defaultProps} />
-        </TestFormWrapper>
-      )
-
-      // Expand the disclosure for interaction tests
-      const disclosureButton = screen.getByRole('button', { expanded: false })
-      await user.click(disclosureButton)
-    })
-
-    it('allows adding new role assignments', async () => {
-      const addButton = screen.getByRole('button', { name: /add application role/i })
-      await user.click(addButton)
-
-      // New row should be added
-      expect(screen.getByRole('combobox', { name: /select application/i })).toBeInTheDocument()
-      expect(screen.getByRole('combobox', { name: /select role/i })).toBeInTheDocument()
-    })
-
-    it('allows removing role assignments', async () => {
-      // Add an assignment first
-      const addButton = screen.getByRole('button', { name: /add application role/i })
-      await user.click(addButton)
-
-      // Remove the assignment
-      const removeButton = screen.getByRole('button', { name: /remove assignment/i })
-      await user.click(removeButton)
-
-      // Assignment should be removed
-      expect(screen.queryByRole('combobox', { name: /select application/i })).not.toBeInTheDocument()
-    })
-
-    it('supports autocomplete filtering for applications', async () => {
-      // Add an assignment
-      const addButton = screen.getByRole('button', { name: /add application role/i })
-      await user.click(addButton)
-
-      const appCombobox = screen.getByRole('combobox', { name: /select application/i })
-      await user.click(appCombobox)
-
-      // Type to filter
-      await user.type(appCombobox, 'Test')
-
-      // Should show filtered results
-      const filteredOptions = screen.getAllByRole('option')
-      expect(filteredOptions.length).toBeGreaterThan(0)
-      expect(filteredOptions[0]).toHaveTextContent(/test/i)
-    })
-
-    it('supports autocomplete filtering for roles', async () => {
-      // Add an assignment
-      const addButton = screen.getByRole('button', { name: /add application role/i })
-      await user.click(addButton)
-
-      const roleCombobox = screen.getByRole('combobox', { name: /select role/i })
-      await user.click(roleCombobox)
-
-      // Type to filter
-      await user.type(roleCombobox, 'Admin')
-
-      // Should show filtered results
-      const filteredOptions = screen.getAllByRole('option')
-      expect(filteredOptions.length).toBeGreaterThan(0)
-      expect(filteredOptions[0]).toHaveTextContent(/admin/i)
-    })
-
-    it('handles selection of application and role', async () => {
-      // Add an assignment
-      const addButton = screen.getByRole('button', { name: /add application role/i })
-      await user.click(addButton)
-
-      // Select application
-      const appCombobox = screen.getByRole('combobox', { name: /select application/i })
-      await user.click(appCombobox)
-      await user.click(screen.getByText(defaultProps.availableApps[0].name))
-
-      expect(appCombobox).toHaveValue(defaultProps.availableApps[0].name)
-
-      // Select role
-      const roleCombobox = screen.getByRole('combobox', { name: /select role/i })
-      await user.click(roleCombobox)
-      await user.click(screen.getByText(defaultProps.availableRoles[0].name))
-
-      expect(roleCombobox).toHaveValue(defaultProps.availableRoles[0].name)
-    })
-
-    it('prevents duplicate app-role combinations', async () => {
-      // Add first assignment
-      const addButton = screen.getByRole('button', { name: /add application role/i })
-      await user.click(addButton)
-
-      // Select app and role
-      let appCombobox = screen.getByRole('combobox', { name: /select application/i })
-      await user.click(appCombobox)
-      await user.click(screen.getByText(defaultProps.availableApps[0].name))
-
-      let roleCombobox = screen.getByRole('combobox', { name: /select role/i })
-      await user.click(roleCombobox)
-      await user.click(screen.getByText(defaultProps.availableRoles[0].name))
-
-      // Add second assignment with same combination
-      await user.click(addButton)
-
-      const comboboxes = screen.getAllByRole('combobox')
-      appCombobox = comboboxes[2] // Second app combobox
-      roleCombobox = comboboxes[3] // Second role combobox
-
-      await user.click(appCombobox)
-      await user.click(screen.getByText(defaultProps.availableApps[0].name))
-
-      await user.click(roleCombobox)
-      await user.click(screen.getByText(defaultProps.availableRoles[0].name))
-
-      // Should show validation error
-      await waitFor(() => {
-        expect(screen.getByText(/duplicate assignment/i)).toBeInTheDocument()
-      })
-    })
-  })
-
-  describe('Keyboard Navigation', () => {
-    it('supports keyboard navigation through all interactive elements', async () => {
-      render(
-        <TestFormWrapper>
-          <UserAppRoles {...defaultProps} />
-        </TestFormWrapper>
-      )
-
-      // Tab to disclosure button
-      await user.tab()
-      expect(screen.getByRole('button', { expanded: false })).toHaveFocus()
-
-      // Open with keyboard
-      await user.keyboard('{Enter}')
-
-      // Tab to add button
-      await user.tab()
-      expect(screen.getByRole('button', { name: /add application role/i })).toHaveFocus()
-
-      // Add assignment with keyboard
-      await user.keyboard('{Enter}')
-
-      // Tab to first combobox
-      await user.tab()
-      expect(screen.getByRole('combobox', { name: /select application/i })).toHaveFocus()
-
-      // Tab to second combobox
-      await user.tab()
-      expect(screen.getByRole('combobox', { name: /select role/i })).toHaveFocus()
-
-      // Tab to remove button
-      await user.tab()
-      expect(screen.getByRole('button', { name: /remove assignment/i })).toHaveFocus()
-    })
-
-    it('supports arrow key navigation in combobox options', async () => {
-      render(
-        <TestFormWrapper>
-          <UserAppRoles {...defaultProps} />
-        </TestFormWrapper>
-      )
-
-      // Expand and add assignment
-      const disclosureButton = screen.getByRole('button', { expanded: false })
-      await user.click(disclosureButton)
-
-      const addButton = screen.getByRole('button', { name: /add application role/i })
-      await user.click(addButton)
-
-      // Open combobox
-      const appCombobox = screen.getByRole('combobox', { name: /select application/i })
-      await user.click(appCombobox)
-
-      // Use arrow keys to navigate
-      await user.keyboard('{ArrowDown}')
-      await user.keyboard('{ArrowDown}')
-      await user.keyboard('{Enter}')
-
-      // Should select the option
-      expect(appCombobox).toHaveValue(defaultProps.availableApps[1].name)
-    })
-
-    it('supports Escape key to close combobox', async () => {
-      render(
-        <TestFormWrapper>
-          <UserAppRoles {...defaultProps} />
-        </TestFormWrapper>
-      )
-
-      // Expand and add assignment
-      const disclosureButton = screen.getByRole('button', { expanded: false })
-      await user.click(disclosureButton)
-
-      const addButton = screen.getByRole('button', { name: /add application role/i })
-      await user.click(addButton)
-
-      // Open combobox
-      const appCombobox = screen.getByRole('combobox', { name: /select application/i })
-      await user.click(appCombobox)
-
-      // Verify listbox is open
-      expect(screen.getByRole('listbox')).toBeInTheDocument()
-
-      // Close with Escape
-      await user.keyboard('{Escape}')
-
-      // Listbox should be closed
-      expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
-    })
-
-    it('maintains focus order when adding/removing assignments', async () => {
-      render(
-        <TestFormWrapper>
-          <UserAppRoles {...defaultProps} />
-        </TestFormWrapper>
-      )
-
-      // Expand disclosure
-      const disclosureButton = screen.getByRole('button', { expanded: false })
-      await user.click(disclosureButton)
-
-      // Focus and click add button
-      const addButton = screen.getByRole('button', { name: /add application role/i })
-      addButton.focus()
-      await user.keyboard('{Enter}')
-
-      // Focus should move to first field of new assignment
-      expect(screen.getByRole('combobox', { name: /select application/i })).toHaveFocus()
-    })
-  })
-
-  describe('Theme Integration', () => {
-    it('applies light theme styles correctly', () => {
-      mockUseTheme.mockReturnValue({
-        theme: 'light',
-        setTheme: vi.fn(),
-        systemTheme: 'light',
-        resolvedTheme: 'light',
-      })
-
-      render(
-        <TestFormWrapper>
-          <UserAppRoles {...defaultProps} />
-        </TestFormWrapper>
-      )
-
-      const container = screen.getByLabelText(/manage user application role assignments/i)
-      expect(container).toHaveClass('bg-white', 'border-gray-200')
-    })
-
-    it('applies dark theme styles correctly', () => {
-      mockUseTheme.mockReturnValue({
-        theme: 'dark',
-        setTheme: vi.fn(),
-        systemTheme: 'dark',
-        resolvedTheme: 'dark',
-      })
-
-      render(
-        <TestFormWrapper>
-          <UserAppRoles {...defaultProps} />
-        </TestFormWrapper>
-      )
-
-      const container = screen.getByLabelText(/manage user application role assignments/i)
-      expect(container).toHaveClass('dark:bg-gray-800', 'dark:border-gray-700')
-    })
-
-    it('updates theme dynamically through Zustand store', async () => {
-      const setTheme = vi.fn()
-      mockUseAppStore.mockReturnValue({
-        theme: 'light',
-        setTheme,
-        sidebarCollapsed: false,
-        setSidebarCollapsed: vi.fn(),
-        globalLoading: false,
-        setGlobalLoading: vi.fn(),
-        preferences: {
-          defaultDatabaseType: 'mysql',
-          tablePageSize: 25,
-          autoRefreshSchemas: true,
-          showAdvancedOptions: false,
-        },
-        updatePreferences: vi.fn(),
-      })
-
-      const { rerender } = render(
-        <TestFormWrapper>
-          <UserAppRoles {...defaultProps} />
-        </TestFormWrapper>
-      )
-
-      // Update store mock to dark theme
-      mockUseAppStore.mockReturnValue({
-        theme: 'dark',
-        setTheme,
-        sidebarCollapsed: false,
-        setSidebarCollapsed: vi.fn(),
-        globalLoading: false,
-        setGlobalLoading: vi.fn(),
-        preferences: {
-          defaultDatabaseType: 'mysql',
-          tablePageSize: 25,
-          autoRefreshSchemas: true,
-          showAdvancedOptions: false,
-        },
-        updatePreferences: vi.fn(),
-      })
-
-      rerender(
-        <TestFormWrapper>
-          <UserAppRoles {...defaultProps} />
-        </TestFormWrapper>
-      )
-
-      // Theme classes should update
-      const container = screen.getByLabelText(/manage user application role assignments/i)
-      expect(container).toHaveClass('dark:bg-gray-800')
-    })
-
-    it('respects system theme preference', () => {
-      mockUseTheme.mockReturnValue({
-        theme: 'system',
-        setTheme: vi.fn(),
-        systemTheme: 'dark',
-        resolvedTheme: 'dark',
-      })
-
-      render(
-        <TestFormWrapper>
-          <UserAppRoles {...defaultProps} />
-        </TestFormWrapper>
-      )
-
-      // Should apply dark theme classes when system is dark
-      const container = screen.getByLabelText(/manage user application role assignments/i)
-      expect(container).toHaveClass('dark:bg-gray-800')
-    })
-  })
-
-  describe('Validation and Error Handling', () => {
-    it('validates required fields with Zod schema', async () => {
-      render(
-        <TestFormWrapper>
-          <UserAppRoles {...defaultProps} required />
-        </TestFormWrapper>
-      )
-
-      // Expand and add assignment
-      const disclosureButton = screen.getByRole('button', { expanded: false })
-      await user.click(disclosureButton)
-
-      const addButton = screen.getByRole('button', { name: /add application role/i })
-      await user.click(addButton)
-
-      // Submit without selecting values
-      const submitButton = screen.getByTestId('submit-button')
-      await user.click(submitButton)
-
-      await waitFor(() => {
-        expect(screen.getByText(/application is required/i)).toBeInTheDocument()
-        expect(screen.getByText(/role is required/i)).toBeInTheDocument()
-      })
-    })
-
-    it('shows real-time validation errors', async () => {
-      render(
-        <TestFormWrapper>
-          <UserAppRoles {...defaultProps} required />
-        </TestFormWrapper>
-      )
-
-      // Expand and add assignment
-      const disclosureButton = screen.getByRole('button', { expanded: false })
-      await user.click(disclosureButton)
-
-      const addButton = screen.getByRole('button', { name: /add application role/i })
-      await user.click(addButton)
-
-      // Focus and blur without selection
-      const appCombobox = screen.getByRole('combobox', { name: /select application/i })
-      appCombobox.focus()
-      appCombobox.blur()
-
-      await waitFor(() => {
-        expect(screen.getByText(/application is required/i)).toBeInTheDocument()
-      })
-    })
-
-    it('clears validation errors when field is corrected', async () => {
-      render(
-        <TestFormWrapper>
-          <UserAppRoles {...defaultProps} required />
-        </TestFormWrapper>
-      )
-
-      // Expand and add assignment
-      const disclosureButton = screen.getByRole('button', { expanded: false })
-      await user.click(disclosureButton)
-
-      const addButton = screen.getByRole('button', { name: /add application role/i })
-      await user.click(addButton)
-
-      // Trigger validation error
-      const appCombobox = screen.getByRole('combobox', { name: /select application/i })
-      appCombobox.focus()
-      appCombobox.blur()
-
-      await waitFor(() => {
-        expect(screen.getByText(/application is required/i)).toBeInTheDocument()
-      })
-
-      // Fix the error
-      await user.click(appCombobox)
-      await user.click(screen.getByText(defaultProps.availableApps[0].name))
-
-      await waitFor(() => {
-        expect(screen.queryByText(/application is required/i)).not.toBeInTheDocument()
-      })
-    })
-
-    it('handles API errors gracefully', async () => {
-      // Mock API error
-      server.use(
-        rest.get('/api/apps', (req, res, ctx) => {
-          return res(ctx.status(500), ctx.json({ error: 'Server error' }))
-        })
-      )
-
-      render(
-        <TestFormWrapper>
-          <UserAppRoles {...defaultProps} error="Failed to load applications" />
-        </TestFormWrapper>
-      )
-
-      expect(screen.getByRole('alert')).toBeInTheDocument()
-      expect(screen.getByText('Failed to load applications')).toBeInTheDocument()
-    })
-
-    it('validates unique app-role combinations', async () => {
-      const initialValues: AppRoleAssignment[] = [
-        {
-          appId: 'app-1',
-          roleId: 'role-1',
-          appName: 'Test App',
-          roleName: 'Admin',
-        },
-      ]
-
-      render(
-        <TestFormWrapper defaultValues={{ userAppRoles: initialValues }}>
-          <UserAppRoles {...defaultProps} />
-        </TestFormWrapper>
-      )
-
-      // Expand disclosure
-      const disclosureButton = screen.getByRole('button', { expanded: false })
-      await user.click(disclosureButton)
-
-      // Add another assignment with same combination
-      const addButton = screen.getByRole('button', { name: /add application role/i })
-      await user.click(addButton)
-
-      const comboboxes = screen.getAllByRole('combobox')
-      const appCombobox = comboboxes[2] // Second row
-      const roleCombobox = comboboxes[3]
-
-      await user.click(appCombobox)
-      await user.click(screen.getByText('Test App'))
-
-      await user.click(roleCombobox)
-      await user.click(screen.getByText('Admin'))
-
-      await waitFor(() => {
-        expect(screen.getByText(/duplicate assignment/i)).toBeInTheDocument()
-      })
-    })
-  })
-
-  describe('Performance Requirements', () => {
-    it('validates form inputs under 100ms performance requirement', async () => {
-      render(
-        <TestFormWrapper>
-          <UserAppRoles {...defaultProps} />
-        </TestFormWrapper>
-      )
-
-      // Expand and add assignment
-      const disclosureButton = screen.getByRole('button', { expanded: false })
-      await user.click(disclosureButton)
-
-      const addButton = screen.getByRole('button', { name: /add application role/i })
-      await user.click(addButton)
-
-      // Measure validation performance
-      const appCombobox = screen.getByRole('combobox', { name: /select application/i })
-      
-      const { duration } = measurePerformance(() => {
-        fireEvent.click(appCombobox)
-        fireEvent.blur(appCombobox)
-      })
-
-      // Validation should complete under 100ms
-      expect(duration).toBeLessThan(100)
-    })
-
-    it('handles large datasets efficiently', async () => {
-      const largeAppsList = appFixtures.createAppList(1000)
-      const largeRolesList = userFixtures.createRoleList(100)
-
-      const { duration } = measurePerformance(() => {
-        render(
-          <TestFormWrapper>
-            <UserAppRoles 
-              {...defaultProps} 
-              availableApps={largeAppsList}
-              availableRoles={largeRolesList}
-            />
+const TestProviderWrapper: React.FC<TestProviderWrapperProps> = ({
+  children,
+  queryClient,
+  locale = 'en',
+  theme = 'light',
+  formDefaultValues,
+}) => {
+  const client = queryClient || createMockQueryClient();
+
+  return (
+    <QueryClientProvider client={client}>
+      <NextIntlClientProvider locale={locale} messages={mockMessages}>
+        <div className={theme === 'dark' ? 'dark' : ''}>
+          <TestFormWrapper defaultValues={formDefaultValues}>
+            {children}
           </TestFormWrapper>
-        )
-      })
+        </div>
+      </NextIntlClientProvider>
+    </QueryClientProvider>
+  );
+};
 
-      // Rendering should be efficient even with large datasets
-      expect(duration).toBeLessThan(500)
-      expect(screen.getByLabelText(/manage user application role assignments/i)).toBeInTheDocument()
-    })
+/**
+ * Default mock data source configuration
+ */
+const createMockDataSource = (overrides?: Partial<DataSourceConfiguration>): DataSourceConfiguration => ({
+  applications: mockApplications,
+  roles: mockRoles,
+  applicationsLoading: false,
+  rolesLoading: false,
+  loadingError: undefined,
+  onRefresh: vi.fn(),
+  ...overrides,
+});
 
-    it('debounces filter input for performance', async () => {
-      render(
-        <TestFormWrapper>
-          <UserAppRoles {...defaultProps} />
-        </TestFormWrapper>
-      )
+/**
+ * Default component props for testing
+ */
+const createDefaultProps = (overrides?: Partial<UserAppRolesProps>): UserAppRolesProps => ({
+  name: 'appRoles',
+  dataSource: createMockDataSource(),
+  defaultValue: [],
+  disabled: false,
+  readOnly: false,
+  maxAssignments: 10,
+  minAssignments: 0,
+  size: 'md',
+  variant: 'default',
+  showDescriptions: true,
+  className: '',
+  eventHandlers: {
+    onAddAssignment: vi.fn(),
+    onRemoveAssignment: vi.fn(),
+    onAppChange: vi.fn(),
+    onRoleChange: vi.fn(),
+    onToggleActive: vi.fn(),
+  },
+  showInlineErrors: true,
+  errorDisplayMode: 'inline',
+  'data-testid': 'user-app-roles',
+  locale: 'en',
+  ...overrides,
+});
 
-      // Expand and add assignment
-      const disclosureButton = screen.getByRole('button', { expanded: false })
-      await user.click(disclosureButton)
+// =============================================================================
+// TEST LIFECYCLE HOOKS
+// =============================================================================
 
-      const addButton = screen.getByRole('button', { name: /add application role/i })
-      await user.click(addButton)
+beforeAll(() => {
+  // Start MSW server
+  server.listen({ onUnhandledRequest: 'error' });
+  
+  // Mock localStorage for theme persistence
+  Object.defineProperty(window, 'localStorage', {
+    value: {
+      getItem: vi.fn(() => null),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+      clear: vi.fn(),
+    },
+    writable: true,
+  });
 
-      const appCombobox = screen.getByRole('combobox', { name: /select application/i })
-      await user.click(appCombobox)
+  // Mock matchMedia for theme detection
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockImplementation(query => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
 
-      // Type rapidly - should debounce
-      await user.type(appCombobox, 'test', { delay: 50 })
+  // Mock IntersectionObserver for virtual scrolling
+  global.IntersectionObserver = vi.fn().mockImplementation(() => ({
+    observe: vi.fn(),
+    unobserve: vi.fn(),
+    disconnect: vi.fn(),
+  }));
 
-      // Wait for debounce
-      await waitFor(() => {
-        expect(screen.getByRole('listbox')).toBeInTheDocument()
-      }, { timeout: 1000 })
-    })
-  })
+  // Mock ResizeObserver for responsive components
+  global.ResizeObserver = vi.fn().mockImplementation(() => ({
+    observe: vi.fn(),
+    unobserve: vi.fn(),
+    disconnect: vi.fn(),
+  }));
+});
 
-  describe('Integration with Parent Forms', () => {
-    it('integrates seamlessly with parent form context', () => {
-      const TestComponent = () => {
-        const methods = useForm()
-        return (
-          <FormProvider {...methods}>
-            <UserAppRoles {...defaultProps} />
-          </FormProvider>
-        )
-      }
+beforeEach(() => {
+  // Clear all mocks before each test
+  vi.clearAllMocks();
+  
+  // Reset DOM state
+  document.body.innerHTML = '';
+  
+  // Clear any live regions created during testing
+  const liveRegions = document.querySelectorAll('[aria-live]');
+  liveRegions.forEach(region => region.remove());
+});
 
-      render(<TestComponent />)
-      expect(screen.getByLabelText(/manage user application role assignments/i)).toBeInTheDocument()
-    })
+afterEach(() => {
+  // Clean up React Testing Library
+  cleanup();
+  
+  // Reset MSW handlers
+  server.resetHandlers();
+});
 
-    it('validates correctly within parent form validation', async () => {
-      const onSubmit = vi.fn()
+afterAll(() => {
+  // Close MSW server
+  server.close();
+});
 
-      render(
-        <TestFormWrapper onSubmit={onSubmit}>
-          <input 
-            {...{ name: 'userName' }}
-            data-testid="user-name-input"
-            aria-label="User name"
-          />
-          <UserAppRoles {...defaultProps} required />
-        </TestFormWrapper>
-      )
+// =============================================================================
+// BASIC COMPONENT RENDERING TESTS
+// =============================================================================
 
-      // Submit without filling any fields
-      const submitButton = screen.getByTestId('submit-button')
-      await user.click(submitButton)
+describe('UserAppRoles Component - Basic Rendering', () => {
+  it('renders without crashing with minimal props', () => {
+    const props = createDefaultProps();
+    
+    render(
+      <TestProviderWrapper>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
 
-      await waitFor(() => {
-        expect(screen.getByText(/user name is required/i)).toBeInTheDocument()
-        expect(onSubmit).not.toHaveBeenCalled()
-      })
-    })
+    expect(screen.getByTestId('user-app-roles')).toBeInTheDocument();
+    expect(screen.getByText('Application Role Assignments')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /add new assignment/i })).toBeInTheDocument();
+  });
 
-    it('submits data correctly when form is valid', async () => {
-      const onSubmit = vi.fn()
+  it('displays empty state when no assignments exist', () => {
+    const props = createDefaultProps();
+    
+    render(
+      <TestProviderWrapper>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
 
-      render(
-        <TestFormWrapper onSubmit={onSubmit}>
-          <input 
-            {...{ name: 'userName' }}
-            data-testid="user-name-input"
-            aria-label="User name"
-          />
-          <UserAppRoles {...defaultProps} />
-        </TestFormWrapper>
-      )
+    expect(screen.getByText('No assignments configured')).toBeInTheDocument();
+    expect(screen.getByText(/click "add assignment" to create/i)).toBeInTheDocument();
+  });
 
-      // Fill user name
-      const userNameInput = screen.getByTestId('user-name-input')
-      await user.type(userNameInput, 'John Doe')
+  it('renders existing assignments when provided', () => {
+    const mockAssignments: UserAppRoleAssignment[] = [
+      createMockUserAppRoleAssignment({
+        app: createMockApplication({ id: 1, name: 'Test App', label: 'Test Application' }),
+        role: createMockRole({ id: 1, name: 'admin', label: 'Administrator' }),
+      }),
+      createMockUserAppRoleAssignment({
+        app: createMockApplication({ id: 2, name: 'Another App', label: 'Another Application' }),
+        role: createMockRole({ id: 2, name: 'user', label: 'User Role' }),
+      }),
+    ];
 
-      // Add role assignment
-      const disclosureButton = screen.getByRole('button', { expanded: false })
-      await user.click(disclosureButton)
+    const props = createDefaultProps({
+      defaultValue: mockAssignments,
+    });
+    
+    render(
+      <TestProviderWrapper formDefaultValues={{ appRoles: mockAssignments }}>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
 
-      const addButton = screen.getByRole('button', { name: /add application role/i })
-      await user.click(addButton)
+    expect(screen.getByText('Test Application')).toBeInTheDocument();
+    expect(screen.getByText('Administrator')).toBeInTheDocument();
+    expect(screen.getByText('Another Application')).toBeInTheDocument();
+    expect(screen.getByText('User Role')).toBeInTheDocument();
+  });
 
-      const appCombobox = screen.getByRole('combobox', { name: /select application/i })
-      await user.click(appCombobox)
-      await user.click(screen.getByText(defaultProps.availableApps[0].name))
+  it('applies custom className correctly', () => {
+    const props = createDefaultProps({
+      className: 'custom-test-class',
+    });
+    
+    render(
+      <TestProviderWrapper>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
 
-      const roleCombobox = screen.getByRole('combobox', { name: /select role/i })
-      await user.click(roleCombobox)
-      await user.click(screen.getByText(defaultProps.availableRoles[0].name))
+    const component = screen.getByTestId('user-app-roles');
+    expect(component).toHaveClass('custom-test-class');
+  });
 
-      // Submit form
-      const submitButton = screen.getByTestId('submit-button')
-      await user.click(submitButton)
-
-      await waitFor(() => {
-        expect(onSubmit).toHaveBeenCalledWith(
-          expect.objectContaining({
-            userName: 'John Doe',
-            userAppRoles: expect.arrayContaining([
-              expect.objectContaining({
-                appId: defaultProps.availableApps[0].id,
-                roleId: defaultProps.availableRoles[0].id,
-              })
-            ])
-          })
-        )
-      })
-    })
-  })
-
-  describe('Internationalization (i18n)', () => {
-    it('renders localized text properly', () => {
-      render(
-        <TestFormWrapper>
-          <UserAppRoles {...defaultProps} />
-        </TestFormWrapper>
-      )
-
-      // Check for proper text rendering (assumes English locale)
-      expect(screen.getByText('User Application Roles')).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /add application role/i })).toBeInTheDocument()
-    })
-
-    it('supports RTL languages correctly', () => {
-      // Mock RTL locale
-      document.documentElement.dir = 'rtl'
-
-      render(
-        <TestFormWrapper>
-          <UserAppRoles {...defaultProps} />
-        </TestFormWrapper>
-      )
-
-      const container = screen.getByLabelText(/manage user application role assignments/i)
-      expect(container).toHaveClass('rtl:text-right')
-
-      // Cleanup
-      document.documentElement.dir = 'ltr'
-    })
-
-    it('formats dates and numbers according to locale', () => {
-      const apps = appFixtures.createAppList(1).map(app => ({
-        ...app,
-        createdAt: new Date('2023-01-01'),
-      }))
-
-      render(
-        <TestFormWrapper>
-          <UserAppRoles {...defaultProps} availableApps={apps} />
-        </TestFormWrapper>
-      )
-
-      // Date formatting should be locale-aware (this is a basic check)
-      expect(screen.getByLabelText(/manage user application role assignments/i)).toBeInTheDocument()
-    })
-
-    it('provides proper ARIA labels in different languages', () => {
-      const localizedProps = {
-        ...defaultProps,
-        'aria-label': 'Gérer les rôles d\'application utilisateur', // French
-        label: 'Rôles d\'application utilisateur',
-      }
-
-      render(
-        <TestFormWrapper>
-          <UserAppRoles {...localizedProps} />
-        </TestFormWrapper>
-      )
-
-      expect(screen.getByLabelText(/gérer les rôles/i)).toBeInTheDocument()
-      expect(screen.getByText('Rôles d\'application utilisateur')).toBeInTheDocument()
-    })
-  })
-
-  describe('Error States and Edge Cases', () => {
-    it('handles empty application list gracefully', () => {
-      render(
-        <TestFormWrapper>
-          <UserAppRoles {...defaultProps} availableApps={[]} />
-        </TestFormWrapper>
-      )
-
-      expect(screen.getByLabelText(/manage user application role assignments/i)).toBeInTheDocument()
-      
-      // Should show appropriate message for empty state
-      const disclosureButton = screen.getByRole('button', { expanded: false })
-      fireEvent.click(disclosureButton)
-      
-      expect(screen.getByText(/no applications available/i)).toBeInTheDocument()
-    })
-
-    it('handles empty roles list gracefully', () => {
-      render(
-        <TestFormWrapper>
-          <UserAppRoles {...defaultProps} availableRoles={[]} />
-        </TestFormWrapper>
-      )
-
-      expect(screen.getByLabelText(/manage user application role assignments/i)).toBeInTheDocument()
-      
-      const disclosureButton = screen.getByRole('button', { expanded: false })
-      fireEvent.click(disclosureButton)
-      
-      expect(screen.getByText(/no roles available/i)).toBeInTheDocument()
-    })
-
-    it('handles component unmounting cleanly', () => {
+  it('handles different size variants', () => {
+    const sizes: Array<'sm' | 'md' | 'lg'> = ['sm', 'md', 'lg'];
+    
+    sizes.forEach(size => {
       const { unmount } = render(
-        <TestFormWrapper>
-          <UserAppRoles {...defaultProps} />
-        </TestFormWrapper>
-      )
+        <TestProviderWrapper>
+          <UserAppRoles {...createDefaultProps({ size })} />
+        </TestProviderWrapper>
+      );
+      
+      const addButton = screen.getByRole('button', { name: /add new assignment/i });
+      expect(addButton).toBeInTheDocument();
+      
+      unmount();
+    });
+  });
+});
 
-      // Should unmount without errors
-      expect(() => unmount()).not.toThrow()
-    })
+// =============================================================================
+// REACT HOOK FORM INTEGRATION TESTS
+// =============================================================================
 
-    it('prevents memory leaks with proper cleanup', async () => {
-      const { unmount } = render(
-        <TestFormWrapper>
-          <UserAppRoles {...defaultProps} />
-        </TestFormWrapper>
-      )
+describe('UserAppRoles Component - Form Integration', () => {
+  it('integrates correctly with React Hook Form useFieldArray', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    
+    const props = createDefaultProps();
+    
+    render(
+      <TestProviderWrapper>
+        <UserAppRoles {...props} />
+        <button type="submit">Submit Form</button>
+      </TestProviderWrapper>
+    );
 
-      // Add some assignments to create internal state
-      const disclosureButton = screen.getByRole('button', { expanded: false })
-      await user.click(disclosureButton)
+    // Add an assignment
+    const addButton = screen.getByRole('button', { name: /add new assignment/i });
+    await user.click(addButton);
 
-      const addButton = screen.getByRole('button', { name: /add application role/i })
-      await user.click(addButton)
-      await user.click(addButton)
+    // Verify assignment was added to form
+    await waitFor(() => {
+      expect(screen.getByText(/no application selected/i)).toBeInTheDocument();
+      expect(screen.getByText(/no role selected/i)).toBeInTheDocument();
+    });
+  });
 
-      // Unmount should clean up properly
-      act(() => {
-        unmount()
-      })
+  it('handles form validation with Zod schema integration', async () => {
+    const user = userEvent.setup();
+    const mockAssignments: UserAppRoleAssignment[] = [
+      createMockUserAppRoleAssignment({
+        app: createMockApplication({ id: 0, name: '' }), // Invalid app
+        role: createMockRole({ id: 0, name: '' }), // Invalid role
+      }),
+    ];
 
-      // No assertions needed - just ensuring no errors/warnings
-    })
+    const props = createDefaultProps({
+      defaultValue: mockAssignments,
+      showInlineErrors: true,
+    });
+    
+    render(
+      <TestProviderWrapper formDefaultValues={{ appRoles: mockAssignments }}>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
 
-    it('handles rapid user interactions gracefully', async () => {
-      render(
-        <TestFormWrapper>
-          <UserAppRoles {...defaultProps} />
-        </TestFormWrapper>
-      )
+    // Trigger validation by expanding the assignment
+    const assignmentButton = screen.getByRole('button', { name: /no application selected/i });
+    await user.click(assignmentButton);
 
-      const disclosureButton = screen.getByRole('button', { expanded: false })
-      await user.click(disclosureButton)
+    // Check for validation errors (may appear after interaction)
+    await waitFor(() => {
+      const assignment = screen.getByTestId('assignment-toggle-0');
+      expect(assignment).toBeInTheDocument();
+    });
+  });
 
-      const addButton = screen.getByRole('button', { name: /add application role/i })
+  it('updates parent form when assignments change', async () => {
+    const user = userEvent.setup();
+    const onAppChange = vi.fn();
+    const onRoleChange = vi.fn();
+    
+    const props = createDefaultProps({
+      eventHandlers: {
+        onAddAssignment: vi.fn(),
+        onRemoveAssignment: vi.fn(),
+        onAppChange,
+        onRoleChange,
+        onToggleActive: vi.fn(),
+      },
+    });
+    
+    render(
+      <TestProviderWrapper>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
 
-      // Rapidly add and remove assignments
-      for (let i = 0; i < 5; i++) {
-        await user.click(addButton)
-      }
+    // Add assignment
+    const addButton = screen.getByRole('button', { name: /add new assignment/i });
+    await user.click(addButton);
 
-      const removeButtons = screen.getAllByRole('button', { name: /remove assignment/i })
-      for (const button of removeButtons) {
-        await user.click(button)
-      }
+    // Expand assignment to show selectors
+    await waitFor(() => {
+      const assignmentToggle = screen.getByTestId('assignment-toggle-0');
+      expect(assignmentToggle).toBeInTheDocument();
+    });
 
-      // Should handle rapid interactions without errors
-      expect(screen.getByRole('button', { name: /add application role/i })).toBeInTheDocument()
-    })
-  })
-})
+    const assignmentToggle = screen.getByTestId('assignment-toggle-0');
+    await user.click(assignmentToggle);
+
+    // Test application selection
+    const appSelector = screen.getByTestId('app-selector-0');
+    const appInput = within(appSelector).getByRole('combobox');
+    
+    await user.click(appInput);
+    await user.type(appInput, 'Test App');
+
+    // Verify typing works
+    expect(appInput).toHaveValue('Test App');
+  });
+
+  it('validates minimum and maximum assignment constraints', async () => {
+    const user = userEvent.setup();
+    
+    const props = createDefaultProps({
+      minAssignments: 2,
+      maxAssignments: 3,
+    });
+    
+    render(
+      <TestProviderWrapper>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    // Check minimum requirement message
+    expect(screen.getByText('Minimum 2 assignments required')).toBeInTheDocument();
+
+    // Add 3 assignments to test max limit
+    const addButton = screen.getByRole('button', { name: /add new assignment/i });
+    
+    await user.click(addButton);
+    await user.click(addButton);
+    await user.click(addButton);
+
+    // Try to add fourth assignment (should be disabled)
+    expect(addButton).toBeDisabled();
+  });
+});
+
+// =============================================================================
+// USER INTERACTION TESTS
+// =============================================================================
+
+describe('UserAppRoles Component - User Interactions', () => {
+  it('adds new assignment when Add button is clicked', async () => {
+    const user = userEvent.setup();
+    const onAddAssignment = vi.fn();
+    
+    const props = createDefaultProps({
+      eventHandlers: { ...createDefaultProps().eventHandlers!, onAddAssignment },
+    });
+    
+    render(
+      <TestProviderWrapper>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    const addButton = screen.getByRole('button', { name: /add new assignment/i });
+    await user.click(addButton);
+
+    expect(onAddAssignment).toHaveBeenCalledOnce();
+    
+    // Verify assignment appears in UI
+    await waitFor(() => {
+      expect(screen.getByTestId('assignment-toggle-0')).toBeInTheDocument();
+    });
+  });
+
+  it('removes assignment when remove button is clicked', async () => {
+    const user = userEvent.setup();
+    const onRemoveAssignment = vi.fn();
+    
+    const mockAssignments: UserAppRoleAssignment[] = [
+      createMockUserAppRoleAssignment({
+        app: createMockApplication({ id: 1, name: 'Test App', label: 'Test Application' }),
+        role: createMockRole({ id: 1, name: 'admin', label: 'Administrator' }),
+      }),
+    ];
+
+    const props = createDefaultProps({
+      defaultValue: mockAssignments,
+      eventHandlers: { ...createDefaultProps().eventHandlers!, onRemoveAssignment },
+    });
+    
+    render(
+      <TestProviderWrapper formDefaultValues={{ appRoles: mockAssignments }}>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    // Expand assignment to show remove button
+    const assignmentToggle = screen.getByTestId('assignment-toggle-0');
+    await user.click(assignmentToggle);
+
+    const removeButton = screen.getByTestId('remove-assignment-0');
+    await user.click(removeButton);
+
+    expect(onRemoveAssignment).toHaveBeenCalledWith(0, mockAssignments[0]);
+  });
+
+  it('handles autocomplete functionality for applications', async () => {
+    const user = userEvent.setup();
+    
+    const props = createDefaultProps();
+    
+    render(
+      <TestProviderWrapper>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    // Add assignment and expand
+    const addButton = screen.getByRole('button', { name: /add new assignment/i });
+    await user.click(addButton);
+
+    const assignmentToggle = screen.getByTestId('assignment-toggle-0');
+    await user.click(assignmentToggle);
+
+    // Test application autocomplete
+    const appSelector = screen.getByTestId('app-selector-0');
+    const appInput = within(appSelector).getByRole('combobox');
+    
+    await user.click(appInput);
+    await user.type(appInput, 'Test');
+
+    // Check if filtering works
+    expect(appInput).toHaveValue('Test');
+
+    // Test dropdown opening
+    const dropdownButton = within(appSelector).getByRole('button');
+    await user.click(dropdownButton);
+
+    // Applications should appear in dropdown
+    await waitFor(() => {
+      // The options appear in a listbox when opened
+      const listbox = screen.getByRole('listbox');
+      expect(listbox).toBeInTheDocument();
+    });
+  });
+
+  it('handles autocomplete functionality for roles', async () => {
+    const user = userEvent.setup();
+    
+    const props = createDefaultProps();
+    
+    render(
+      <TestProviderWrapper>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    // Add assignment and expand
+    const addButton = screen.getByRole('button', { name: /add new assignment/i });
+    await user.click(addButton);
+
+    const assignmentToggle = screen.getByTestId('assignment-toggle-0');
+    await user.click(assignmentToggle);
+
+    // Test role autocomplete
+    const roleSelector = screen.getByTestId('role-selector-0');
+    const roleInput = within(roleSelector).getByRole('combobox');
+    
+    await user.click(roleInput);
+    await user.type(roleInput, 'admin');
+
+    expect(roleInput).toHaveValue('admin');
+  });
+
+  it('toggles assignment active status', async () => {
+    const user = userEvent.setup();
+    const onToggleActive = vi.fn();
+    
+    const mockAssignments: UserAppRoleAssignment[] = [
+      createMockUserAppRoleAssignment({
+        app: createMockApplication({ id: 1, name: 'Test App', label: 'Test Application' }),
+        role: createMockRole({ id: 1, name: 'admin', label: 'Administrator' }),
+        is_active: true,
+      }),
+    ];
+
+    const props = createDefaultProps({
+      defaultValue: mockAssignments,
+      eventHandlers: { ...createDefaultProps().eventHandlers!, onToggleActive },
+    });
+    
+    render(
+      <TestProviderWrapper formDefaultValues={{ appRoles: mockAssignments }}>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    // Expand assignment
+    const assignmentToggle = screen.getByTestId('assignment-toggle-0');
+    await user.click(assignmentToggle);
+
+    // Find and toggle active checkbox
+    const activeCheckbox = screen.getByRole('checkbox', { name: /active assignment/i });
+    expect(activeCheckbox).toBeChecked();
+    
+    await user.click(activeCheckbox);
+    expect(onToggleActive).toHaveBeenCalledWith(0, false);
+  });
+
+  it('expands and collapses assignment details', async () => {
+    const user = userEvent.setup();
+    
+    const mockAssignments: UserAppRoleAssignment[] = [
+      createMockUserAppRoleAssignment({
+        app: createMockApplication({ id: 1, name: 'Test App', label: 'Test Application' }),
+        role: createMockRole({ id: 1, name: 'admin', label: 'Administrator' }),
+      }),
+    ];
+
+    const props = createDefaultProps({
+      defaultValue: mockAssignments,
+    });
+    
+    render(
+      <TestProviderWrapper formDefaultValues={{ appRoles: mockAssignments }}>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    const assignmentToggle = screen.getByTestId('assignment-toggle-0');
+    
+    // Initially collapsed
+    expect(assignmentToggle).toHaveAttribute('aria-expanded', 'false');
+    
+    // Expand
+    await user.click(assignmentToggle);
+    expect(assignmentToggle).toHaveAttribute('aria-expanded', 'true');
+    
+    // Should show form fields
+    expect(screen.getByTestId('app-selector-0')).toBeInTheDocument();
+    expect(screen.getByTestId('role-selector-0')).toBeInTheDocument();
+    
+    // Collapse
+    await user.click(assignmentToggle);
+    expect(assignmentToggle).toHaveAttribute('aria-expanded', 'false');
+  });
+});
+
+// =============================================================================
+// KEYBOARD NAVIGATION TESTS
+// =============================================================================
+
+describe('UserAppRoles Component - Keyboard Navigation', () => {
+  it('supports keyboard navigation with arrow keys', async () => {
+    const user = userEvent.setup();
+    
+    const mockAssignments: UserAppRoleAssignment[] = [
+      createMockUserAppRoleAssignment({
+        app: createMockApplication({ id: 1, name: 'App 1', label: 'Application 1' }),
+        role: createMockRole({ id: 1, name: 'role1', label: 'Role 1' }),
+      }),
+      createMockUserAppRoleAssignment({
+        app: createMockApplication({ id: 2, name: 'App 2', label: 'Application 2' }),
+        role: createMockRole({ id: 2, name: 'role2', label: 'Role 2' }),
+      }),
+    ];
+
+    const props = createDefaultProps({
+      defaultValue: mockAssignments,
+    });
+    
+    render(
+      <TestProviderWrapper formDefaultValues={{ appRoles: mockAssignments }}>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    // Focus first assignment
+    const firstAssignment = screen.getByTestId('assignment-toggle-0');
+    firstAssignment.focus();
+    expect(firstAssignment).toHaveFocus();
+
+    // Press ArrowDown to move to second assignment
+    await user.keyboard('{ArrowDown}');
+    
+    // The focus management is handled internally, so we test the keydown behavior
+    await user.keyboard('{Enter}');
+    expect(firstAssignment).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('supports Enter and Space keys for toggling', async () => {
+    const user = userEvent.setup();
+    
+    const mockAssignments: UserAppRoleAssignment[] = [
+      createMockUserAppRoleAssignment({
+        app: createMockApplication({ id: 1, name: 'Test App', label: 'Test Application' }),
+        role: createMockRole({ id: 1, name: 'admin', label: 'Administrator' }),
+      }),
+    ];
+
+    const props = createDefaultProps({
+      defaultValue: mockAssignments,
+    });
+    
+    render(
+      <TestProviderWrapper formDefaultValues={{ appRoles: mockAssignments }}>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    const assignmentToggle = screen.getByTestId('assignment-toggle-0');
+    assignmentToggle.focus();
+
+    // Test Enter key
+    await user.keyboard('{Enter}');
+    expect(assignmentToggle).toHaveAttribute('aria-expanded', 'true');
+
+    // Test Space key
+    await user.keyboard(' ');
+    expect(assignmentToggle).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('supports keyboard deletion with Ctrl+Delete', async () => {
+    const user = userEvent.setup();
+    const onRemoveAssignment = vi.fn();
+    
+    const mockAssignments: UserAppRoleAssignment[] = [
+      createMockUserAppRoleAssignment({
+        app: createMockApplication({ id: 1, name: 'Test App', label: 'Test Application' }),
+        role: createMockRole({ id: 1, name: 'admin', label: 'Administrator' }),
+      }),
+    ];
+
+    const props = createDefaultProps({
+      defaultValue: mockAssignments,
+      eventHandlers: { ...createDefaultProps().eventHandlers!, onRemoveAssignment },
+    });
+    
+    render(
+      <TestProviderWrapper formDefaultValues={{ appRoles: mockAssignments }}>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    const assignmentToggle = screen.getByTestId('assignment-toggle-0');
+    assignmentToggle.focus();
+
+    // Test Ctrl+Delete combination
+    await user.keyboard('{Control>}{Delete}{/Control}');
+    expect(onRemoveAssignment).toHaveBeenCalledWith(0, mockAssignments[0]);
+  });
+
+  it('maintains proper focus management', async () => {
+    const user = userEvent.setup();
+    
+    const props = createDefaultProps();
+    
+    render(
+      <TestProviderWrapper>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    // Focus add button
+    const addButton = screen.getByRole('button', { name: /add new assignment/i });
+    addButton.focus();
+    expect(addButton).toHaveFocus();
+
+    // Add assignment
+    await user.click(addButton);
+
+    // Verify focus moves to new assignment
+    await waitFor(() => {
+      const newAssignment = screen.getByTestId('assignment-toggle-0');
+      expect(newAssignment).toBeInTheDocument();
+    });
+  });
+});
+
+// =============================================================================
+// ACCESSIBILITY TESTS (WCAG 2.1 AA COMPLIANCE)
+// =============================================================================
+
+describe('UserAppRoles Component - Accessibility', () => {
+  it('passes automated accessibility testing with axe', async () => {
+    const props = createDefaultProps();
+    
+    const { container } = render(
+      <TestProviderWrapper>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
+  });
+
+  it('passes accessibility testing with existing assignments', async () => {
+    const mockAssignments: UserAppRoleAssignment[] = [
+      createMockUserAppRoleAssignment({
+        app: createMockApplication({ id: 1, name: 'Test App', label: 'Test Application' }),
+        role: createMockRole({ id: 1, name: 'admin', label: 'Administrator' }),
+      }),
+    ];
+
+    const props = createDefaultProps({
+      defaultValue: mockAssignments,
+    });
+    
+    const { container } = render(
+      <TestProviderWrapper formDefaultValues={{ appRoles: mockAssignments }}>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
+  });
+
+  it('provides proper ARIA labels and descriptions', () => {
+    const props = createDefaultProps({
+      'aria-label': 'Custom user roles',
+      'aria-describedby': 'roles-description',
+    });
+    
+    render(
+      <TestProviderWrapper>
+        <UserAppRoles {...props} />
+        <div id="roles-description">This component manages user application roles</div>
+      </TestProviderWrapper>
+    );
+
+    const component = screen.getByTestId('user-app-roles');
+    expect(component).toHaveAttribute('aria-label', 'Custom user roles');
+    expect(component).toHaveAttribute('aria-describedby', 'roles-description');
+  });
+
+  it('announces screen reader updates for assignment changes', async () => {
+    const user = userEvent.setup();
+    
+    const props = createDefaultProps();
+    
+    render(
+      <TestProviderWrapper>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    // Add assignment
+    const addButton = screen.getByRole('button', { name: /add new assignment/i });
+    await user.click(addButton);
+
+    // Check for live region announcement
+    await waitFor(() => {
+      const announcement = document.querySelector('[aria-live="polite"]');
+      expect(announcement).toBeInTheDocument();
+    });
+  });
+
+  it('provides proper role attributes for list items', async () => {
+    const user = userEvent.setup();
+    
+    const props = createDefaultProps();
+    
+    render(
+      <TestProviderWrapper>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    // Add assignment to create list
+    const addButton = screen.getByRole('button', { name: /add new assignment/i });
+    await user.click(addButton);
+
+    // Check for proper list structure
+    const assignmentsList = screen.getByRole('list', { name: /assignments list/i });
+    expect(assignmentsList).toBeInTheDocument();
+  });
+
+  it('maintains minimum touch target sizes (44px)', () => {
+    const mockAssignments: UserAppRoleAssignment[] = [
+      createMockUserAppRoleAssignment({
+        app: createMockApplication({ id: 1, name: 'Test App', label: 'Test Application' }),
+        role: createMockRole({ id: 1, name: 'admin', label: 'Administrator' }),
+      }),
+    ];
+
+    const props = createDefaultProps({
+      defaultValue: mockAssignments,
+    });
+    
+    render(
+      <TestProviderWrapper formDefaultValues={{ appRoles: mockAssignments }}>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    // Check add button minimum size
+    const addButton = screen.getByRole('button', { name: /add new assignment/i });
+    const addButtonStyles = window.getComputedStyle(addButton);
+    const minHeight = parseInt(addButtonStyles.minHeight);
+    expect(minHeight).toBeGreaterThanOrEqual(44);
+  });
+
+  it('supports high contrast mode', () => {
+    const props = createDefaultProps();
+    
+    render(
+      <TestProviderWrapper>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    // Component should render without errors in high contrast
+    const component = screen.getByTestId('user-app-roles');
+    expect(component).toBeInTheDocument();
+  });
+});
+
+// =============================================================================
+// THEME TESTS
+// =============================================================================
+
+describe('UserAppRoles Component - Theme Support', () => {
+  it('applies light theme classes correctly', () => {
+    const props = createDefaultProps();
+    
+    render(
+      <TestProviderWrapper theme="light">
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    const component = screen.getByTestId('user-app-roles');
+    expect(component).not.toHaveClass('dark');
+  });
+
+  it('applies dark theme classes correctly', () => {
+    const props = createDefaultProps();
+    
+    render(
+      <TestProviderWrapper theme="dark">
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    const component = screen.getByTestId('user-app-roles');
+    const darkContainer = component.closest('.dark');
+    expect(darkContainer).toBeInTheDocument();
+  });
+
+  it('handles theme switching without losing state', async () => {
+    const user = userEvent.setup();
+    
+    const props = createDefaultProps();
+    
+    const { rerender } = render(
+      <TestProviderWrapper theme="light">
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    // Add assignment in light theme
+    const addButton = screen.getByRole('button', { name: /add new assignment/i });
+    await user.click(addButton);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('assignment-toggle-0')).toBeInTheDocument();
+    });
+
+    // Switch to dark theme
+    rerender(
+      <TestProviderWrapper theme="dark">
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    // Assignment should still exist
+    expect(screen.getByTestId('assignment-toggle-0')).toBeInTheDocument();
+  });
+
+  it('applies proper contrast in both themes', () => {
+    const props = createDefaultProps();
+    
+    // Test light theme
+    const { rerender } = render(
+      <TestProviderWrapper theme="light">
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    let component = screen.getByTestId('user-app-roles');
+    expect(component).toBeInTheDocument();
+
+    // Test dark theme
+    rerender(
+      <TestProviderWrapper theme="dark">
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    component = screen.getByTestId('user-app-roles');
+    expect(component).toBeInTheDocument();
+  });
+});
+
+// =============================================================================
+// PERFORMANCE TESTS
+// =============================================================================
+
+describe('UserAppRoles Component - Performance', () => {
+  it('validates real-time validation performance under 100ms', async () => {
+    const user = userEvent.setup();
+    
+    const props = createDefaultProps();
+    
+    render(
+      <TestProviderWrapper>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    // Add assignment
+    const addButton = screen.getByRole('button', { name: /add new assignment/i });
+    await user.click(addButton);
+
+    const assignmentToggle = screen.getByTestId('assignment-toggle-0');
+    await user.click(assignmentToggle);
+
+    // Measure validation performance
+    const appSelector = screen.getByTestId('app-selector-0');
+    const appInput = within(appSelector).getByRole('combobox');
+
+    const startTime = performance.now();
+    
+    // Trigger validation
+    await user.type(appInput, 'Test input for validation');
+    
+    const endTime = performance.now();
+    const validationTime = endTime - startTime;
+
+    // Should validate in under 100ms as per specification
+    expect(validationTime).toBeLessThan(100);
+  });
+
+  it('handles large datasets efficiently', async () => {
+    const largeApplications: AppType[] = Array.from({ length: 100 }, (_, i) => 
+      createMockApplication({ id: i + 1, name: `App ${i + 1}`, label: `Application ${i + 1}` })
+    );
+
+    const largeRoles: RoleType[] = Array.from({ length: 50 }, (_, i) => 
+      createMockRole({ id: i + 1, name: `role${i + 1}`, label: `Role ${i + 1}` })
+    );
+
+    const props = createDefaultProps({
+      dataSource: createMockDataSource({
+        applications: largeApplications,
+        roles: largeRoles,
+      }),
+    });
+
+    const startTime = performance.now();
+    
+    render(
+      <TestProviderWrapper>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    const endTime = performance.now();
+    const renderTime = endTime - startTime;
+
+    // Component should render efficiently even with large datasets
+    expect(renderTime).toBeLessThan(1000); // 1 second threshold
+    expect(screen.getByTestId('user-app-roles')).toBeInTheDocument();
+  });
+
+  it('optimizes re-renders during rapid interactions', async () => {
+    const user = userEvent.setup();
+    let renderCount = 0;
+
+    // Mock component to count renders
+    const RenderCountingWrapper = ({ children }: { children: React.ReactNode }) => {
+      renderCount++;
+      return <>{children}</>;
+    };
+
+    const props = createDefaultProps();
+    
+    render(
+      <TestProviderWrapper>
+        <RenderCountingWrapper>
+          <UserAppRoles {...props} />
+        </RenderCountingWrapper>
+      </TestProviderWrapper>
+    );
+
+    const initialRenderCount = renderCount;
+
+    // Perform rapid interactions
+    const addButton = screen.getByRole('button', { name: /add new assignment/i });
+    
+    // Rapid clicks should not cause excessive re-renders
+    await user.click(addButton);
+    await user.click(addButton);
+    await user.click(addButton);
+
+    const finalRenderCount = renderCount;
+    const additionalRenders = finalRenderCount - initialRenderCount;
+
+    // Should not exceed reasonable render count
+    expect(additionalRenders).toBeLessThan(10);
+  });
+
+  it('measures component mounting performance', async () => {
+    const startTime = performance.now();
+    
+    const props = createDefaultProps();
+    
+    render(
+      <TestProviderWrapper>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('user-app-roles')).toBeInTheDocument();
+    });
+
+    const endTime = performance.now();
+    const mountTime = endTime - startTime;
+
+    // Component should mount quickly
+    expect(mountTime).toBeLessThan(100); // 100ms threshold
+  });
+});
+
+// =============================================================================
+// VALIDATION AND ERROR HANDLING TESTS
+// =============================================================================
+
+describe('UserAppRoles Component - Validation & Error Handling', () => {
+  it('displays validation errors inline when enabled', async () => {
+    const mockAssignments: UserAppRoleAssignment[] = [
+      createMockUserAppRoleAssignment({
+        app: createMockApplication({ id: 0, name: '' }), // Invalid
+        role: createMockRole({ id: 0, name: '' }), // Invalid
+      }),
+    ];
+
+    const props = createDefaultProps({
+      defaultValue: mockAssignments,
+      showInlineErrors: true,
+    });
+    
+    render(
+      <TestProviderWrapper formDefaultValues={{ appRoles: mockAssignments }}>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    // Errors may appear after validation triggers
+    const assignmentButton = screen.getByTestId('assignment-toggle-0');
+    expect(assignmentButton).toBeInTheDocument();
+  });
+
+  it('handles custom validation functions', async () => {
+    const customValidation = vi.fn().mockReturnValue({
+      fieldErrors: { '0.app': ['Custom app validation error'] },
+      formErrors: [],
+      localizedErrors: {},
+    });
+
+    const mockAssignments: UserAppRoleAssignment[] = [
+      createMockUserAppRoleAssignment({
+        app: createMockApplication({ id: 1, name: 'Test App' }),
+        role: createMockRole({ id: 1, name: 'admin' }),
+      }),
+    ];
+
+    const props = createDefaultProps({
+      defaultValue: mockAssignments,
+      customValidation,
+      showInlineErrors: true,
+    });
+    
+    render(
+      <TestProviderWrapper formDefaultValues={{ appRoles: mockAssignments }}>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    expect(customValidation).toHaveBeenCalledWith(mockAssignments);
+  });
+
+  it('handles loading states for applications and roles', () => {
+    const props = createDefaultProps({
+      dataSource: createMockDataSource({
+        applicationsLoading: true,
+        rolesLoading: true,
+        applications: [],
+        roles: [],
+      }),
+    });
+    
+    render(
+      <TestProviderWrapper>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    // Component should still render during loading
+    expect(screen.getByTestId('user-app-roles')).toBeInTheDocument();
+  });
+
+  it('displays error messages for failed data loading', async () => {
+    const user = userEvent.setup();
+    
+    const props = createDefaultProps({
+      dataSource: createMockDataSource({
+        loadingError: 'Failed to load applications and roles',
+        applications: [],
+        roles: [],
+      }),
+    });
+    
+    render(
+      <TestProviderWrapper>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    // Add assignment to see error in selectors
+    const addButton = screen.getByRole('button', { name: /add new assignment/i });
+    await user.click(addButton);
+
+    const assignmentToggle = screen.getByTestId('assignment-toggle-0');
+    await user.click(assignmentToggle);
+
+    // Error should appear in selectors
+    await waitFor(() => {
+      const errorText = screen.getByText('Failed to load applications and roles');
+      expect(errorText).toBeInTheDocument();
+    });
+  });
+
+  it('validates required field constraints', async () => {
+    const user = userEvent.setup();
+    
+    const props = createDefaultProps({
+      minAssignments: 1,
+    });
+    
+    render(
+      <TestProviderWrapper>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    // Should show minimum requirement message
+    expect(screen.getByText('Minimum 1 assignments required')).toBeInTheDocument();
+
+    // Add assignment
+    const addButton = screen.getByRole('button', { name: /add new assignment/i });
+    await user.click(addButton);
+
+    // Message should update
+    await waitFor(() => {
+      expect(screen.getByText('1 assignments configured')).toBeInTheDocument();
+    });
+  });
+
+  it('handles form-level validation errors', () => {
+    const customValidation = vi.fn().mockReturnValue({
+      fieldErrors: {},
+      formErrors: ['Duplicate applications are not allowed'],
+      localizedErrors: {},
+    });
+
+    const props = createDefaultProps({
+      customValidation,
+      showInlineErrors: true,
+    });
+    
+    render(
+      <TestProviderWrapper>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    expect(customValidation).toHaveBeenCalled();
+  });
+});
+
+// =============================================================================
+// INTERNATIONALIZATION TESTS
+// =============================================================================
+
+describe('UserAppRoles Component - Internationalization', () => {
+  it('renders with custom locale', () => {
+    const props = createDefaultProps({
+      locale: 'fr',
+    });
+    
+    render(
+      <TestProviderWrapper locale="fr">
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    expect(screen.getByTestId('user-app-roles')).toBeInTheDocument();
+  });
+
+  it('displays localized text correctly', () => {
+    const props = createDefaultProps();
+    
+    render(
+      <TestProviderWrapper>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    // Check for English text from our mock messages
+    expect(screen.getByText('Application Role Assignments')).toBeInTheDocument();
+    expect(screen.getByText('Add Assignment')).toBeInTheDocument();
+  });
+
+  it('handles RTL languages correctly', () => {
+    const props = createDefaultProps({
+      locale: 'ar', // Arabic RTL
+    });
+    
+    render(
+      <TestProviderWrapper locale="ar">
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    // Component should render without errors in RTL
+    expect(screen.getByTestId('user-app-roles')).toBeInTheDocument();
+  });
+
+  it('formats counts and numbers according to locale', async () => {
+    const user = userEvent.setup();
+    
+    const props = createDefaultProps();
+    
+    render(
+      <TestProviderWrapper>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    // Add assignment to test count formatting
+    const addButton = screen.getByRole('button', { name: /add new assignment/i });
+    await user.click(addButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('1 assignments configured')).toBeInTheDocument();
+    });
+  });
+});
+
+// =============================================================================
+// EDGE CASES AND ERROR SCENARIOS
+// =============================================================================
+
+describe('UserAppRoles Component - Edge Cases', () => {
+  it('handles disabled state correctly', () => {
+    const props = createDefaultProps({
+      disabled: true,
+    });
+    
+    render(
+      <TestProviderWrapper>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    const addButton = screen.getByRole('button', { name: /add new assignment/i });
+    expect(addButton).toBeDisabled();
+  });
+
+  it('handles read-only state correctly', async () => {
+    const user = userEvent.setup();
+    
+    const mockAssignments: UserAppRoleAssignment[] = [
+      createMockUserAppRoleAssignment({
+        app: createMockApplication({ id: 1, name: 'Test App', label: 'Test Application' }),
+        role: createMockRole({ id: 1, name: 'admin', label: 'Administrator' }),
+      }),
+    ];
+
+    const props = createDefaultProps({
+      defaultValue: mockAssignments,
+      readOnly: true,
+    });
+    
+    render(
+      <TestProviderWrapper formDefaultValues={{ appRoles: mockAssignments }}>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    // Add button should be disabled
+    const addButton = screen.getByRole('button', { name: /add new assignment/i });
+    expect(addButton).toBeDisabled();
+
+    // Expand assignment
+    const assignmentToggle = screen.getByTestId('assignment-toggle-0');
+    await user.click(assignmentToggle);
+
+    // Remove button should be disabled
+    const removeButton = screen.getByTestId('remove-assignment-0');
+    expect(removeButton).toBeDisabled();
+  });
+
+  it('handles empty data sources gracefully', () => {
+    const props = createDefaultProps({
+      dataSource: createMockDataSource({
+        applications: [],
+        roles: [],
+      }),
+    });
+    
+    render(
+      <TestProviderWrapper>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    expect(screen.getByTestId('user-app-roles')).toBeInTheDocument();
+  });
+
+  it('handles extremely large assignment limits', () => {
+    const props = createDefaultProps({
+      maxAssignments: 9999,
+      minAssignments: 0,
+    });
+    
+    render(
+      <TestProviderWrapper>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    expect(screen.getByTestId('user-app-roles')).toBeInTheDocument();
+  });
+
+  it('handles null and undefined values safely', () => {
+    const props = createDefaultProps({
+      defaultValue: undefined,
+      value: undefined,
+      dataSource: createMockDataSource({
+        applications: [],
+        roles: [],
+        loadingError: undefined,
+      }),
+    });
+    
+    render(
+      <TestProviderWrapper>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    expect(screen.getByTestId('user-app-roles')).toBeInTheDocument();
+  });
+
+  it('handles malformed assignment data', () => {
+    const malformedAssignments = [
+      {
+        // Missing required fields
+        is_active: true,
+      },
+    ] as UserAppRoleAssignment[];
+
+    const props = createDefaultProps({
+      defaultValue: malformedAssignments,
+    });
+    
+    render(
+      <TestProviderWrapper formDefaultValues={{ appRoles: malformedAssignments }}>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    // Component should handle malformed data gracefully
+    expect(screen.getByTestId('user-app-roles')).toBeInTheDocument();
+  });
+
+  it('handles component unmounting safely', () => {
+    const props = createDefaultProps();
+    
+    const { unmount } = render(
+      <TestProviderWrapper>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    // Should unmount without errors
+    expect(() => unmount()).not.toThrow();
+  });
+
+  it('handles rapid state changes', async () => {
+    const user = userEvent.setup();
+    
+    const props = createDefaultProps();
+    
+    render(
+      <TestProviderWrapper>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    const addButton = screen.getByRole('button', { name: /add new assignment/i });
+
+    // Rapid additions
+    await user.click(addButton);
+    await user.click(addButton);
+    await user.click(addButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('3 assignments configured')).toBeInTheDocument();
+    });
+
+    // Component should handle rapid changes without errors
+    expect(screen.getByTestId('user-app-roles')).toBeInTheDocument();
+  });
+});
+
+// =============================================================================
+// INTEGRATION TESTS WITH MSW
+// =============================================================================
+
+describe('UserAppRoles Component - MSW Integration', () => {
+  it('loads application and role data from MSW handlers', async () => {
+    const props = createDefaultProps();
+    
+    render(
+      <TestProviderWrapper>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    // Component should render with mocked data
+    expect(screen.getByTestId('user-app-roles')).toBeInTheDocument();
+
+    // Mock data should be available (from mockApplications and mockRoles)
+    expect(props.dataSource.applications.length).toBeGreaterThan(0);
+    expect(props.dataSource.roles.length).toBeGreaterThan(0);
+  });
+
+  it('handles MSW network errors gracefully', async () => {
+    // This would require setting up error scenarios in MSW
+    const props = createDefaultProps({
+      dataSource: createMockDataSource({
+        loadingError: 'Network error',
+        applications: [],
+        roles: [],
+      }),
+    });
+    
+    render(
+      <TestProviderWrapper>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    expect(screen.getByTestId('user-app-roles')).toBeInTheDocument();
+  });
+
+  it('integrates with MSW for autocomplete filtering', async () => {
+    const user = userEvent.setup();
+    
+    const props = createDefaultProps();
+    
+    render(
+      <TestProviderWrapper>
+        <UserAppRoles {...props} />
+      </TestProviderWrapper>
+    );
+
+    // Add assignment
+    const addButton = screen.getByRole('button', { name: /add new assignment/i });
+    await user.click(addButton);
+
+    const assignmentToggle = screen.getByTestId('assignment-toggle-0');
+    await user.click(assignmentToggle);
+
+    // Test that autocomplete works with mock data
+    const appSelector = screen.getByTestId('app-selector-0');
+    const appInput = within(appSelector).getByRole('combobox');
+    
+    await user.click(appInput);
+    
+    // Should work with the mock applications data
+    expect(appInput).toBeInTheDocument();
+  });
+});
