@@ -1,562 +1,551 @@
 'use client';
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import SwaggerUI from '@swagger-ui/react';
-import '@swagger-ui/react/swagger-ui-css';
-import { Copy, Download, ArrowLeft, FileText } from 'lucide-react';
+import { toast } from 'sonner';
+import { z } from 'zod';
 
-// Types based on Angular implementation
-interface ApiKeyInfo {
-  name: string;
-  apiKey: string;
-}
+// UI Components
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
 
-interface ServiceResponse {
-  resource: Array<{
-    id: number;
-    name: string;
-    [key: string]: any;
-  }>;
-}
+// Hooks and Services
+import { useApiKeys } from '@/hooks/use-api-keys';
+import { useTheme } from '@/hooks/use-theme';
+import { apiClient } from '@/lib/api-client';
 
-interface OpenAPISpec {
-  paths: Record<string, any>;
-  [key: string]: any;
-}
+// Types
+import type { ApiDocsData, ApiKeyInfo, ServiceInfo } from '@/types/api-docs';
 
-// Mock hooks implementations - these will be replaced by actual hooks
-const useApiKeys = (serviceId: number): { data: ApiKeyInfo[]; isLoading: boolean; error: Error | null } => {
-  return useQuery({
-    queryKey: ['api-keys', serviceId],
-    queryFn: async () => {
-      if (serviceId === -1) return [];
-      
-      // Mock implementation - replace with actual API call
-      const response = await fetch(`/api/system/service/${serviceId}/api-keys`);
-      if (!response.ok) throw new Error('Failed to fetch API keys');
-      return response.json();
-    },
-    enabled: serviceId !== -1,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
-  });
-};
+// Utilities
+import { downloadFile } from '@/utils/file-download';
 
-const useTheme = () => {
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  
-  useEffect(() => {
-    // Check system preference and localStorage
-    const savedTheme = localStorage.getItem('theme');
-    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    
-    setIsDarkMode(savedTheme === 'dark' || (savedTheme === 'system' && systemPrefersDark));
-  }, []);
-  
-  return { isDarkMode };
-};
-
-const useToast = () => ({
-  toast: useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
-    // Mock implementation - replace with actual toast hook
-    console.log(`Toast ${type}: ${message}`);
-  }, [])
-});
-
-const useApiClient = () => ({
-  get: useCallback(async (url: string, config?: RequestInit) => {
-    const token = document.cookie
-      .split('; ')
-      .find(row => row.startsWith('session_token='))
-      ?.split('=')[1];
-    
-    const response = await fetch(url, {
-      ...config,
-      headers: {
-        'Content-Type': 'application/json',
-        'X-DreamFactory-Session-Token': token || '',
-        'X-DreamFactory-API-Key': process.env.NEXT_PUBLIC_DF_API_DOCS_API_KEY || '',
-        ...config?.headers,
-      },
-    });
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    return response.json();
-  }, [])
-});
-
-// File download utility
-const downloadApiDoc = (data: any, filename: string = 'api-spec.json') => {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = window.URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.download = filename;
-  anchor.href = url;
-  anchor.click();
-  window.URL.revokeObjectURL(url);
-};
-
-// Case transformation utilities
-const mapCamelToSnake = (obj: any): any => {
-  if (Array.isArray(obj)) {
-    return obj.map(mapCamelToSnake);
-  } else if (obj !== null && typeof obj === 'object') {
-    return Object.keys(obj).reduce((result, key) => {
-      const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
-      result[snakeKey] = mapCamelToSnake(obj[key]);
-      return result;
-    }, {} as any);
-  }
-  return obj;
-};
-
-const mapSnakeToCamel = (obj: any): any => {
-  if (Array.isArray(obj)) {
-    return obj.map(mapSnakeToCamel);
-  } else if (obj !== null && typeof obj === 'object') {
-    return Object.keys(obj).reduce((result, key) => {
-      const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
-      result[camelKey] = mapSnakeToCamel(obj[key]);
-      return result;
-    }, {} as any);
-  }
-  return obj;
-};
+// Validation Schema
+const serviceNameSchema = z.string().min(1, 'Service name is required');
 
 /**
- * API Documentation Page Component
- * 
- * Main Next.js page component for displaying Swagger UI documentation with React 19 integration.
- * Replaces Angular df-api-docs.component.ts with enhanced server-side rendering capabilities,
- * @swagger-ui/react integration, and modern React patterns.
+ * Main Next.js page component for API documentation viewing and interaction.
+ * Serves as the primary route for displaying Swagger UI documentation with React 19 integration.
  * 
  * Features:
- * - Interactive Swagger UI for API documentation viewing
- * - API key management and copying functionality
- * - Dark/light theme support with system preference detection
- * - File download capabilities for OpenAPI specifications
- * - Real-time API specification fetching with intelligent caching
- * - Enhanced error handling and loading states
+ * - @swagger-ui/react integration for interactive API documentation
+ * - React Query for intelligent caching and synchronization 
+ * - Next.js server components for initial page loads
+ * - Tailwind CSS styling with dark mode support
+ * - Real-time validation and error handling
+ * - API key management with clipboard functionality
+ * - OpenAPI specification download capabilities
  */
 export default function ApiDocsPage() {
-  const params = useParams();
   const router = useRouter();
-  const { isDarkMode } = useTheme();
-  const { toast } = useToast();
-  const apiClient = useApiClient();
+  const params = useParams();
+  const { theme, isDarkMode } = useTheme();
   
   // State management
-  const [currentServiceId, setCurrentServiceId] = useState<number>(-1);
-  const [apiDocJson, setApiDocJson] = useState<OpenAPISpec | null>(null);
+  const [currentServiceId, setCurrentServiceId] = useState<number | null>(null);
   const [selectedApiKey, setSelectedApiKey] = useState<string>('');
+  const [swaggerConfig, setSwaggerConfig] = useState<any>(null);
   
-  // Extract service name from route parameters
-  const serviceName = Array.isArray(params.name) ? params.name[0] : params.name;
-  
-  // Fetch service ID by name
-  const { data: serviceData, isLoading: serviceLoading } = useQuery({
-    queryKey: ['service-by-name', serviceName],
-    queryFn: async () => {
-      if (!serviceName) return null;
-      const response = await apiClient.get(`/api/v2/system/service?filter=name=${serviceName}`);
-      return response as ServiceResponse;
-    },
-    enabled: !!serviceName,
-    staleTime: 2 * 60 * 1000, // 2 minutes
-  });
-  
-  // Fetch API documentation data
-  const { data: apiDocData, isLoading: docLoading, error: docError } = useQuery({
-    queryKey: ['api-docs', serviceName],
-    queryFn: async () => {
-      if (!serviceName) return null;
-      // This would come from route data in Angular - simulate API call
-      const response = await apiClient.get(`/api/v2/${serviceName}/_schema`);
-      return response as OpenAPISpec;
+  // Refs for SwaggerUI integration
+  const swaggerRef = useRef<HTMLDivElement>(null);
+
+  // Extract and validate service name from route parameters
+  const serviceName = React.useMemo(() => {
+    try {
+      const rawName = Array.isArray(params?.name) ? params.name[0] : params?.name;
+      return serviceNameSchema.parse(rawName);
+    } catch (error) {
+      console.error('Invalid service name parameter:', error);
+      return null;
+    }
+  }, [params?.name]);
+
+  // Fetch service information based on service name
+  const {
+    data: serviceInfo,
+    isLoading: isLoadingService,
+    error: serviceError,
+    refetch: refetchService
+  } = useQuery({
+    queryKey: ['service-info', serviceName],
+    queryFn: async (): Promise<ServiceInfo> => {
+      if (!serviceName) {
+        throw new Error('Service name is required');
+      }
+      
+      const response = await apiClient.get(`/system/service`, {
+        params: { filter: `name=${serviceName}` }
+      });
+      
+      if (!response.data?.resource?.[0]) {
+        throw new Error(`Service '${serviceName}' not found`);
+      }
+      
+      return response.data.resource[0];
     },
     enabled: !!serviceName,
     staleTime: 5 * 60 * 1000, // 5 minutes
-  });
-  
-  // Fetch API keys for the current service
-  const { data: apiKeys = [], isLoading: keysLoading } = useApiKeys(currentServiceId);
-  
-  // Update current service ID when service data changes
-  useEffect(() => {
-    if (serviceData?.resource?.[0]?.id) {
-      const serviceId = serviceData.resource[0].id;
-      setCurrentServiceId(serviceId);
-      // Store in localStorage for persistence
-      localStorage.setItem('current-service-id', serviceId.toString());
+    gcTime: 10 * 60 * 1000, // 10 minutes
+    retry: (failureCount, error) => {
+      // Don't retry for 404 errors
+      if (error.message.includes('not found')) return false;
+      return failureCount < 3;
     }
-  }, [serviceData]);
-  
-  // Process API documentation data
-  useEffect(() => {
-    if (apiDocData) {
-      let processedData = apiDocData;
-      
-      // Apply case transformation based on service type
-      if (
-        processedData.paths['/']?.get &&
-        processedData.paths['/']?.get.operationId &&
-        processedData.paths['/']?.get.operationId === 'getSoapResources'
-      ) {
-        processedData = { ...processedData, paths: mapSnakeToCamel(processedData.paths) };
-      } else {
-        processedData = { ...processedData, paths: mapCamelToSnake(processedData.paths) };
+  });
+
+  // Fetch OpenAPI specification for the service
+  const {
+    data: apiDocsData,
+    isLoading: isLoadingDocs,
+    error: docsError,
+    refetch: refetchDocs
+  } = useQuery({
+    queryKey: ['api-docs', serviceName],
+    queryFn: async (): Promise<ApiDocsData> => {
+      if (!serviceName) {
+        throw new Error('Service name is required');
       }
       
-      setApiDocJson(processedData);
+      const response = await apiClient.get(`/api/v2/${serviceName}/_doc`);
+      
+      if (!response.data) {
+        throw new Error('API documentation not available');
+      }
+      
+      // Transform keys from snake_case to camelCase for consistency
+      const transformedData = transformApiDocKeys(response.data);
+      
+      return {
+        ...transformedData,
+        servers: transformedData.servers || [{
+          url: `/api/v2/${serviceName}`,
+          description: `${serviceName} API Server`
+        }]
+      };
+    },
+    enabled: !!serviceName,
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    gcTime: 30 * 60 * 1000, // 30 minutes
+    retry: 2
+  });
+
+  // Fetch API keys for the current service
+  const {
+    data: apiKeys = [],
+    isLoading: isLoadingKeys,
+    error: keysError
+  } = useApiKeys(currentServiceId);
+
+  // Update current service ID when service info changes
+  useEffect(() => {
+    if (serviceInfo?.id) {
+      setCurrentServiceId(serviceInfo.id);
     }
-  }, [apiDocData]);
-  
-  // Handle navigation back to service list
-  const handleGoBack = useCallback(() => {
-    // Clear current service from localStorage
-    localStorage.removeItem('current-service-id');
-    setCurrentServiceId(-1);
-    router.back();
+  }, [serviceInfo?.id]);
+
+  // Configure SwaggerUI when data is available
+  useEffect(() => {
+    if (apiDocsData && !isLoadingDocs) {
+      const config = {
+        spec: apiDocsData,
+        dom_id: '#swagger-ui-container',
+        deepLinking: true,
+        presets: [
+          SwaggerUI.presets.apis,
+          SwaggerUI.presets.standalone
+        ],
+        plugins: [
+          SwaggerUI.plugins.DownloadUrl
+        ],
+        layout: 'StandaloneLayout',
+        requestInterceptor: (request: any) => {
+          // Add authentication headers
+          const headers = { ...request.headers };
+          
+          // Add session token if available
+          const sessionToken = getSessionToken();
+          if (sessionToken) {
+            headers['X-DreamFactory-Session-Token'] = sessionToken;
+          }
+          
+          // Add API key if selected
+          if (selectedApiKey) {
+            headers['X-DreamFactory-API-Key'] = selectedApiKey;
+          }
+          
+          return {
+            ...request,
+            headers
+          };
+        },
+        responseInterceptor: (response: any) => {
+          // Log responses for debugging in development
+          if (process.env.NODE_ENV === 'development') {
+            console.log('Swagger UI Response:', response);
+          }
+          return response;
+        },
+        onComplete: () => {
+          console.log('SwaggerUI loaded successfully');
+        },
+        onFailure: (error: any) => {
+          console.error('SwaggerUI failed to load:', error);
+          toast.error('Failed to load API documentation');
+        }
+      };
+      
+      setSwaggerConfig(config);
+    }
+  }, [apiDocsData, isLoadingDocs, selectedApiKey]);
+
+  // Apply theme changes to SwaggerUI
+  useEffect(() => {
+    if (swaggerRef.current) {
+      const container = swaggerRef.current;
+      
+      if (isDarkMode) {
+        container.classList.add('swagger-ui-dark');
+        container.classList.remove('swagger-ui-light');
+      } else {
+        container.classList.add('swagger-ui-light');
+        container.classList.remove('swagger-ui-dark');
+      }
+    }
+  }, [isDarkMode]);
+
+  // Navigation handlers
+  const handleGoBackToList = React.useCallback(() => {
+    // Clear current service selection and navigate back
+    setCurrentServiceId(null);
+    setSelectedApiKey('');
+    router.push('/adf-api-docs');
   }, [router]);
-  
-  // Handle API specification download
-  const handleDownloadApiDoc = useCallback(() => {
-    if (apiDocJson) {
-      downloadApiDoc(apiDocJson, `${serviceName || 'api'}-spec.json`);
-      toast('API specification downloaded successfully');
+
+  // File download handler
+  const handleDownloadApiDoc = React.useCallback(async () => {
+    if (!apiDocsData) {
+      toast.error('No API documentation available to download');
+      return;
     }
-  }, [apiDocJson, serviceName, toast]);
-  
-  // Handle API key copy to clipboard
-  const handleCopyApiKey = useCallback(async (apiKey: string, keyName: string) => {
+
+    try {
+      const filename = `${serviceName || 'api'}-spec.json`;
+      const content = JSON.stringify(apiDocsData, null, 2);
+      
+      await downloadFile(content, filename, 'application/json');
+      
+      toast.success(`API specification downloaded: ${filename}`);
+    } catch (error) {
+      console.error('Failed to download API documentation:', error);
+      toast.error('Failed to download API documentation');
+    }
+  }, [apiDocsData, serviceName]);
+
+  // API key clipboard handler
+  const handleCopyApiKey = React.useCallback(async (apiKey: string) => {
     try {
       await navigator.clipboard.writeText(apiKey);
-      toast(`API Key "${keyName}" copied to clipboard`);
+      toast.success('API key copied to clipboard');
     } catch (error) {
       console.error('Failed to copy API key:', error);
-      toast('Failed to copy API key', 'error');
+      toast.error('Failed to copy API key to clipboard');
     }
-  }, [toast]);
-  
-  // Swagger UI request interceptor
-  const requestInterceptor = useCallback((req: any) => {
-    // Get session token from cookie
-    const token = document.cookie
-      .split('; ')
-      .find(row => row.startsWith('session_token='))
-      ?.split('=')[1];
-    
-    // Add authentication headers
-    if (token) {
-      req.headers['X-DreamFactory-Session-Token'] = token;
-    }
-    
-    if (process.env.NEXT_PUBLIC_DF_API_DOCS_API_KEY) {
-      req.headers['X-DreamFactory-API-Key'] = process.env.NEXT_PUBLIC_DF_API_DOCS_API_KEY;
-    }
-    
-    // Add selected API key if available
-    if (selectedApiKey) {
-      req.headers['X-DreamFactory-API-Key'] = selectedApiKey;
-    }
-    
-    // Parse and decode URL parameters
-    try {
-      const url = new URL(req.url);
-      const params = new URLSearchParams(url.search);
-      
-      // Decode all parameters
-      params.forEach((value, key) => {
-        params.set(key, decodeURIComponent(value));
-      });
-      
-      // Update the URL with decoded parameters
-      url.search = params.toString();
-      req.url = url.toString();
-    } catch (error) {
-      console.warn('Failed to process URL parameters:', error);
-    }
-    
-    return req;
-  }, [selectedApiKey]);
-  
+  }, []);
+
+  // Handle API key selection
+  const handleApiKeySelect = React.useCallback((keyValue: string) => {
+    setSelectedApiKey(keyValue);
+    toast.info('API key selected for authentication');
+  }, []);
+
   // Loading state
-  if (serviceLoading || docLoading) {
+  if (isLoadingService || isLoadingDocs) {
     return (
-      <div className={`min-h-screen p-6 transition-colors duration-200 ${
-        isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'
-      }`}>
-        <div className="max-w-7xl mx-auto">
-          <div className="animate-pulse">
-            <div className="flex justify-between items-center mb-6">
-              <div className="h-8 bg-gray-300 rounded w-24"></div>
-              <div className="h-8 bg-gray-300 rounded w-32"></div>
-            </div>
-            <div className="h-96 bg-gray-300 rounded mb-4"></div>
-          </div>
-        </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <LoadingSpinner size="lg" />
+        <span className="ml-3 text-lg text-gray-600 dark:text-gray-300">
+          Loading API documentation...
+        </span>
       </div>
     );
   }
-  
+
   // Error state
-  if (docError) {
+  if (serviceError || docsError) {
+    const error = serviceError || docsError;
     return (
-      <div className={`min-h-screen p-6 transition-colors duration-200 ${
-        isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'
-      }`}>
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center py-12">
-            <FileText className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Failed to Load API Documentation</h2>
-            <p className="text-gray-500 mb-4">
-              {docError.message || 'Unable to load API documentation for this service.'}
-            </p>
-            <button
-              onClick={handleGoBack}
-              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Go Back
-            </button>
+      <div className="flex flex-col items-center justify-center min-h-screen space-y-4">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-red-600 dark:text-red-400 mb-2">
+            Failed to Load API Documentation
+          </h2>
+          <p className="text-gray-600 dark:text-gray-300 mb-4">
+            {error?.message || 'An unexpected error occurred'}
+          </p>
+          <div className="space-x-3">
+            <Button onClick={() => refetchService()} variant="outline">
+              Retry Service
+            </Button>
+            <Button onClick={() => refetchDocs()} variant="outline">
+              Retry Documentation
+            </Button>
+            <Button onClick={handleGoBackToList} variant="secondary">
+              Back to List
+            </Button>
           </div>
         </div>
       </div>
     );
   }
-  
-  return (
-    <div className={`min-h-screen transition-colors duration-200 ${
-      isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'
-    }`}>
-      <div className="max-w-7xl mx-auto p-6">
-        {/* Header Controls */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-          <button
-            onClick={handleGoBack}
-            className={`inline-flex items-center px-4 py-2 rounded-md font-medium transition-colors ${
-              isDarkMode
-                ? 'bg-gray-800 hover:bg-gray-700 text-white border border-gray-700'
-                : 'bg-white hover:bg-gray-50 text-gray-700 border border-gray-300'
-            }`}
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Go Back
-          </button>
-          
-          <button
-            onClick={handleDownloadApiDoc}
-            disabled={!apiDocJson}
-            className={`inline-flex items-center px-4 py-2 rounded-md font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-              isDarkMode
-                ? 'bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-700'
-                : 'bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-400'
-            }`}
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Download API Spec
-          </button>
-        </div>
-        
-        {/* API Keys Section */}
-        {apiKeys.length > 0 && (
-          <div className="mb-6">
-            <div className={`p-4 rounded-lg border ${
-              isDarkMode
-                ? 'bg-gray-800 border-gray-700'
-                : 'bg-white border-gray-200'
-            }`}>
-              <label className="block text-sm font-medium mb-3">
-                API Keys for Testing
-              </label>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {apiKeys.map((keyInfo, index) => (
-                  <div
-                    key={index}
-                    className={`flex items-center justify-between p-3 rounded-md border ${
-                      isDarkMode
-                        ? 'bg-gray-700 border-gray-600'
-                        : 'bg-gray-50 border-gray-200'
-                    }`}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm truncate">
-                        {keyInfo.name}
-                      </div>
-                      <div className={`text-xs font-mono truncate ${
-                        isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                      }`}>
-                        {keyInfo.apiKey.slice(0, 8)}...
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleCopyApiKey(keyInfo.apiKey, keyInfo.name)}
-                      className={`ml-2 p-1.5 rounded-md transition-colors ${
-                        isDarkMode
-                          ? 'hover:bg-gray-600 text-gray-300 hover:text-white'
-                          : 'hover:bg-gray-200 text-gray-500 hover:text-gray-700'
-                      }`}
-                      title="Copy API Key"
-                    >
-                      <Copy className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-        
-        {/* API Keys Loading State */}
-        {keysLoading && (
-          <div className={`mb-6 p-4 rounded-lg border ${
-            isDarkMode
-              ? 'bg-gray-800 border-gray-700'
-              : 'bg-white border-gray-200'
-          }`}>
-            <div className="animate-pulse">
-              <div className="h-4 bg-gray-300 rounded w-32 mb-3"></div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-16 bg-gray-300 rounded"></div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-        
-        {/* Swagger UI Container */}
-        <div className={`rounded-lg border overflow-hidden ${
-          isDarkMode
-            ? 'bg-gray-800 border-gray-700'
-            : 'bg-white border-gray-200'
-        }`}>
-          {apiDocJson ? (
-            <div className={`swagger-ui-container ${isDarkMode ? 'swagger-ui-dark' : ''}`}>
-              <SwaggerUI
-                spec={apiDocJson}
-                requestInterceptor={requestInterceptor}
-                docExpansion="list"
-                defaultModelExpandDepth={2}
-                showMutatedRequest={true}
-                tryItOutEnabled={true}
-                filter={true}
-                layout="BaseLayout"
-                deepLinking={true}
-                displayOperationId={false}
-                defaultModelsExpandDepth={1}
-                displayRequestDuration={true}
-                persistAuthorization={true}
-                withCredentials={true}
-              />
-            </div>
-          ) : (
-            <div className="p-8 text-center">
-              <FileText className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <p className="text-gray-500">No API documentation available</p>
-            </div>
-          )}
+
+  // Service not found
+  if (!serviceInfo) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen space-y-4">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-2">
+            Service Not Found
+          </h2>
+          <p className="text-gray-600 dark:text-gray-300 mb-4">
+            The service '{serviceName}' could not be found.
+          </p>
+          <Button onClick={handleGoBackToList} variant="primary">
+            Back to Service List
+          </Button>
         </div>
       </div>
-      
-      {/* Custom Swagger UI Styles */}
-      <style jsx global>{`
-        .swagger-ui-container {
-          font-family: inherit;
-        }
-        
-        .swagger-ui .topbar {
-          display: none;
-        }
-        
-        .swagger-ui .info {
-          margin: 20px 0;
-        }
-        
-        ${isDarkMode ? `
-          .swagger-ui {
-            color: #e5e7eb;
-          }
-          
-          .swagger-ui .scheme-container {
-            background: #374151;
-            border: 1px solid #4b5563;
-          }
-          
-          .swagger-ui .opblock {
-            background: #374151;
-            border: 1px solid #4b5563;
-          }
-          
-          .swagger-ui .opblock.opblock-post {
-            background: #1e3a8a;
-            border-color: #3b82f6;
-          }
-          
-          .swagger-ui .opblock.opblock-get {
-            background: #065f46;
-            border-color: #10b981;
-          }
-          
-          .swagger-ui .opblock.opblock-put {
-            background: #92400e;
-            border-color: #f59e0b;
-          }
-          
-          .swagger-ui .opblock.opblock-delete {
-            background: #991b1b;
-            border-color: #ef4444;
-          }
-          
-          .swagger-ui .btn {
-            background: #4b5563;
-            color: #e5e7eb;
-            border: 1px solid #6b7280;
-          }
-          
-          .swagger-ui .btn:hover {
-            background: #6b7280;
-          }
-          
-          .swagger-ui .response-col_status {
-            color: #e5e7eb;
-          }
-          
-          .swagger-ui .parameter__name {
-            color: #e5e7eb;
-          }
-          
-          .swagger-ui .parameter__type {
-            color: #9ca3af;
-          }
-          
-          .swagger-ui .model {
-            background: #374151;
-            border: 1px solid #4b5563;
-          }
-          
-          .swagger-ui .model-box {
-            background: #374151;
-          }
-          
-          .swagger-ui input, 
-          .swagger-ui select, 
-          .swagger-ui textarea {
-            background: #374151;
-            color: #e5e7eb;
-            border: 1px solid #4b5563;
-          }
-          
-          .swagger-ui .response-content-type {
-            color: #e5e7eb;
-          }
-        ` : ''}
-      `}</style>
+    );
+  }
+
+  return (
+    <ErrorBoundary fallback={<ApiDocsErrorFallback onRetry={refetchDocs} onGoBack={handleGoBackToList} />}>
+      <div className="container mx-auto px-4 py-6 space-y-6">
+        {/* Header Controls */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center space-x-3">
+            <Button 
+              onClick={handleGoBackToList}
+              variant="outline"
+              size="sm"
+              className="flex items-center space-x-2"
+            >
+              <svg 
+                className="w-4 h-4" 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  strokeWidth={2} 
+                  d="M10 19l-7-7m0 0l7-7m-7 7h18" 
+                />
+              </svg>
+              <span>Back to List</span>
+            </Button>
+            
+            <Button 
+              onClick={handleDownloadApiDoc}
+              variant="secondary"
+              size="sm"
+              disabled={!apiDocsData}
+              className="flex items-center space-x-2"
+            >
+              <svg 
+                className="w-4 h-4" 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  strokeWidth={2} 
+                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" 
+                />
+              </svg>
+              <span>Download API Spec</span>
+            </Button>
+          </div>
+
+          {/* Service Information */}
+          <div className="text-right">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+              {serviceInfo.label || serviceInfo.name}
+            </h1>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              API Documentation
+            </p>
+          </div>
+        </div>
+
+        {/* API Key Selection */}
+        {apiKeys.length > 0 && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">
+              API Authentication
+            </h3>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <div className="flex-1">
+                <Select value={selectedApiKey} onValueChange={handleApiKeySelect}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select an API key for testing..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {apiKeys.map((key: ApiKeyInfo) => (
+                      <SelectItem key={key.apiKey} value={key.apiKey}>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{key.name}</span>
+                          <span className="text-xs text-gray-500 font-mono">
+                            {key.apiKey.substring(0, 8)}...
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {selectedApiKey && (
+                <Button
+                  onClick={() => handleCopyApiKey(selectedApiKey)}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center space-x-2"
+                >
+                  <svg 
+                    className="w-4 h-4" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round" 
+                      strokeWidth={2} 
+                      d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" 
+                    />
+                  </svg>
+                  <span>Copy Key</span>
+                </Button>
+              )}
+            </div>
+            
+            {isLoadingKeys && (
+              <div className="mt-2 flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+                <LoadingSpinner size="sm" />
+                <span>Loading API keys...</span>
+              </div>
+            )}
+            
+            {keysError && (
+              <div className="mt-2 text-sm text-red-600 dark:text-red-400">
+                Failed to load API keys: {keysError.message}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* SwaggerUI Container */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div 
+            ref={swaggerRef}
+            className={`swagger-ui-container ${isDarkMode ? 'swagger-ui-dark' : 'swagger-ui-light'}`}
+          >
+            {swaggerConfig && apiDocsData ? (
+              <SwaggerUI {...swaggerConfig} />
+            ) : (
+              <div className="flex items-center justify-center p-12">
+                <LoadingSpinner size="lg" />
+                <span className="ml-3 text-lg text-gray-600 dark:text-gray-300">
+                  Initializing SwaggerUI...
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </ErrorBoundary>
+  );
+}
+
+/**
+ * Error fallback component for API docs failures
+ */
+function ApiDocsErrorFallback({ 
+  onRetry, 
+  onGoBack 
+}: { 
+  onRetry: () => void; 
+  onGoBack: () => void; 
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen space-y-4">
+      <div className="text-center">
+        <h2 className="text-2xl font-bold text-red-600 dark:text-red-400 mb-2">
+          API Documentation Error
+        </h2>
+        <p className="text-gray-600 dark:text-gray-300 mb-6">
+          Something went wrong while loading the API documentation.
+        </p>
+        <div className="space-x-3">
+          <Button onClick={onRetry} variant="primary">
+            Try Again
+          </Button>
+          <Button onClick={onGoBack} variant="outline">
+            Back to List
+          </Button>
+        </div>
+      </div>
     </div>
   );
+}
+
+/**
+ * Utility function to get session token from storage or context
+ * This would typically come from your authentication system
+ */
+function getSessionToken(): string | null {
+  try {
+    // This would be replaced with your actual session management
+    // For example, from a React Context, localStorage, or cookies
+    return localStorage.getItem('df-session-token') || 
+           sessionStorage.getItem('df-session-token');
+  } catch (error) {
+    console.warn('Failed to get session token:', error);
+    return null;
+  }
+}
+
+/**
+ * Transform API documentation keys from snake_case to camelCase
+ * for consistency with React/TypeScript conventions
+ */
+function transformApiDocKeys(data: any): any {
+  if (data === null || data === undefined) {
+    return data;
+  }
+  
+  if (Array.isArray(data)) {
+    return data.map(transformApiDocKeys);
+  }
+  
+  if (typeof data === 'object') {
+    const transformed: any = {};
+    
+    for (const [key, value] of Object.entries(data)) {
+      // Convert snake_case to camelCase
+      const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+      transformed[camelKey] = transformApiDocKeys(value);
+    }
+    
+    return transformed;
+  }
+  
+  return data;
 }
