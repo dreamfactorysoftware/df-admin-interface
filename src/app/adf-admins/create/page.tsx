@@ -1,83 +1,135 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useForm, FormProvider } from 'react-hook-form';
+/**
+ * Admin Creation Page Component
+ * 
+ * Next.js page component for creating new administrator accounts implementing 
+ * React Hook Form with Zod validation, SWR data fetching, and comprehensive 
+ * admin profile creation workflow. Replaces Angular DfAdminDetailsComponent 
+ * create functionality with React 19 server components, form validation, role 
+ * assignment, invitation dispatch capabilities, and admin-specific features 
+ * like access restrictions and lookup key management.
+ * 
+ * Features:
+ * - React Hook Form with Zod schema validators for real-time validation (<100ms)
+ * - SWR-backed data fetching for intelligent caching and synchronization
+ * - Comprehensive admin profile creation workflow with all admin-specific controls
+ * - Email invitation vs password setting options
+ * - Access tab restrictions and isRestrictedAdmin flag management
+ * - Lookup keys and app roles management
+ * - WCAG 2.1 AA compliant form design with Tailwind CSS and Headless UI
+ * - Proper error handling and user feedback
+ */
+
+import React, { useState, useEffect, useCallback } from 'react';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useRouter } from 'next/navigation';
 import { z } from 'zod';
-import useSWR from 'swr';
 
-// UI Components
+// Type imports - these will be provided by the dependency files
+import type { AdminProfile, UserProfileType } from '@/types/user';
+import type { AppType } from '@/types/app';
+import type { RoleType } from '@/types/role';
+
+// Component imports - these will be provided by the dependency files
 import { Button } from '@/components/ui/button';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { RadioGroup } from '@/components/ui/radio-group';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
-// Admin-specific components
+// Admin-specific component imports
 import { AdminForm } from '@/components/admins/admin-form';
 import { ProfileDetailsSection } from '@/components/admins/profile-details-section';
 import { AppRolesSection } from '@/components/admins/app-roles-section';
 import { LookupKeysSection } from '@/components/admins/lookup-keys-section';
 import { AccessRestrictionsSection } from '@/components/admins/access-restrictions-section';
 
-// Hooks and services
+// Hook imports
 import { useAdmins } from '@/hooks/use-admins';
 import { useApps } from '@/hooks/use-apps';
 import { useRoles } from '@/hooks/use-roles';
-import { apiClient } from '@/lib/api-client';
-import { adminSchema } from '@/lib/validations/admin';
 
-// Types
-import type { AdminProfile, UserProfile } from '@/types/admin';
-import type { App } from '@/types/app';
-import type { Role } from '@/types/role';
+// Utility imports
+import { cn } from '@/lib/utils';
 
-// Admin creation form schema with comprehensive validation
-const createAdminSchema = z.object({
-  // Profile details
+// Constants
+const USER_TYPE: UserProfileType = 'admins';
+
+/**
+ * Access tab definitions for admin restrictions
+ */
+const ACCESS_TABS = [
+  { key: 'apps', label: 'Apps', description: 'Application management access' },
+  { key: 'users', label: 'Users', description: 'User management access' },
+  { key: 'services', label: 'Services', description: 'Service configuration access' },
+  { key: 'apidocs', label: 'API Docs', description: 'API documentation access' },
+  { key: 'schema', label: 'Schema', description: 'Database schema management access' },
+  { key: 'files', label: 'Files', description: 'File management access' },
+  { key: 'scripts', label: 'Scripts', description: 'Event scripts management access' },
+  { key: 'config', label: 'Config', description: 'System configuration access' },
+  { key: 'packages', label: 'Package Manager', description: 'Package management access' },
+  { key: 'limits', label: 'Limits', description: 'Rate limiting configuration access' },
+  { key: 'scheduler', label: 'Scheduler', description: 'Task scheduler access' },
+] as const;
+
+/**
+ * Zod schema for admin creation form validation
+ * Implements comprehensive validation with real-time feedback under 100ms
+ */
+const AdminCreateSchema = z.object({
+  // Profile details section
   profileDetails: z.object({
-    name: z.string().min(1, 'Name is required'),
-    email: z.string().email('Valid email is required'),
-    username: z.string().min(3, 'Username must be at least 3 characters'),
-    firstName: z.string().optional(),
-    lastName: z.string().optional(),
+    username: z.string()
+      .min(3, 'Username must be at least 3 characters')
+      .max(50, 'Username must not exceed 50 characters')
+      .regex(/^[a-zA-Z0-9_-]+$/, 'Username can only contain letters, numbers, hyphens, and underscores'),
+    email: z.string()
+      .email('Invalid email format')
+      .max(255, 'Email must not exceed 255 characters'),
+    firstName: z.string().max(100, 'First name must not exceed 100 characters').optional(),
+    lastName: z.string().max(100, 'Last name must not exceed 100 characters').optional(),
+    name: z.string()
+      .min(1, 'Display name is required')
+      .max(100, 'Display name must not exceed 100 characters'),
     phone: z.string().optional(),
   }),
   
   // Admin status
   isActive: z.boolean().default(true),
   
-  // Password or invite selection
-  passwordOption: z.enum(['password', 'invite'], {
-    required_error: 'Please select password or invite option',
+  // Password vs invitation options
+  authMethod: z.enum(['invite', 'password'], {
+    required_error: 'Please select an authentication method',
   }),
   
-  // Conditional password fields
+  // Password fields (conditional)
   password: z.string().optional(),
   confirmPassword: z.string().optional(),
   
-  // Access control
+  // Access restrictions
   accessByTabs: z.array(z.string()).default([]),
   isRestrictedAdmin: z.boolean().default(false),
   
   // Lookup keys
   lookupKeys: z.array(z.object({
     name: z.string().min(1, 'Key name is required'),
-    value: z.string(),
+    value: z.string().min(1, 'Key value is required'),
     private: z.boolean().default(false),
+    description: z.string().optional(),
   })).default([]),
   
-  // App roles (for users)
+  // App roles (for users only, but keeping structure consistent)
   appRoles: z.array(z.object({
     appId: z.number(),
     roleId: z.number(),
   })).default([]),
 }).refine((data) => {
-  // Validate password confirmation when password option is selected
-  if (data.passwordOption === 'password') {
+  // Validate password fields when password method is selected
+  if (data.authMethod === 'password') {
     if (!data.password || data.password.length < 8) {
       return false;
     }
@@ -89,500 +141,619 @@ const createAdminSchema = z.object({
 }, {
   message: 'Password validation failed',
   path: ['password'],
+}).refine((data) => {
+  // Validate password requirements
+  if (data.authMethod === 'password' && data.password) {
+    const hasUpperCase = /[A-Z]/.test(data.password);
+    const hasLowerCase = /[a-z]/.test(data.password);
+    const hasNumbers = /\d/.test(data.password);
+    return hasUpperCase && hasLowerCase && hasNumbers;
+  }
+  return true;
+}, {
+  message: 'Password must contain at least one uppercase letter, one lowercase letter, and one number',
+  path: ['password'],
 });
 
-type CreateAdminFormData = z.infer<typeof createAdminSchema>;
+type AdminCreateFormData = z.infer<typeof AdminCreateSchema>;
 
-// Available admin tabs for access control
-const ADMIN_TABS = [
-  { id: 'apps', label: 'Apps', control: 'apps' },
-  { id: 'users', label: 'Users', control: 'users' },
-  { id: 'services', label: 'Services', control: 'services' },
-  { id: 'apidocs', label: 'API Docs', control: 'apidocs' },
-  { id: 'schema', label: 'Schema', control: 'schema/data' },
-  { id: 'files', label: 'Files', control: 'files' },
-  { id: 'scripts', label: 'Scripts', control: 'scripts' },
-  { id: 'config', label: 'Config', control: 'config' },
-  { id: 'packages', label: 'Package Manager', control: 'packages' },
-  { id: 'limits', label: 'Limits', control: 'limits' },
-  { id: 'scheduler', label: 'Scheduler', control: 'scheduler' },
-];
-
-export default function CreateAdminPage() {
+/**
+ * Admin Creation Page Component
+ */
+export default function AdminCreatePage() {
   const router = useRouter();
-  const [alert, setAlert] = useState<{ type: 'error' | 'success' | 'warning'; message: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [allTabsSelected, setAllTabsSelected] = useState(true);
 
-  // Data fetching hooks
+  // Data fetching hooks using SWR for intelligent caching
   const { createAdmin } = useAdmins();
-  const { data: apps } = useApps();
-  const { data: roles } = useRoles();
+  const { data: apps, isLoading: appsLoading } = useApps();
+  const { data: roles, isLoading: rolesLoading } = useRoles();
 
-  // Form initialization with React Hook Form and Zod validation
-  const form = useForm<CreateAdminFormData>({
-    resolver: zodResolver(createAdminSchema),
+  // Form setup with React Hook Form and Zod validation
+  const form = useForm<AdminCreateFormData>({
+    resolver: zodResolver(AdminCreateSchema),
     defaultValues: {
       profileDetails: {
-        name: '',
-        email: '',
         username: '',
+        email: '',
         firstName: '',
         lastName: '',
+        name: '',
         phone: '',
       },
       isActive: true,
-      passwordOption: 'invite',
-      accessByTabs: ADMIN_TABS.map(tab => tab.control), // All tabs selected by default
+      authMethod: 'invite',
+      password: '',
+      confirmPassword: '',
+      accessByTabs: ACCESS_TABS.map(tab => tab.key), // All tabs selected by default
       isRestrictedAdmin: false,
       lookupKeys: [],
       appRoles: [],
     },
-    mode: 'onChange', // Real-time validation under 100ms per requirements
+    mode: 'onChange', // Real-time validation
   });
 
-  const { watch, setValue, getValues } = form;
-  const passwordOption = watch('passwordOption');
-  const accessByTabs = watch('accessByTabs');
+  // Field arrays for dynamic sections
+  const { fields: lookupKeyFields, append: appendLookupKey, remove: removeLookupKey } = useFieldArray({
+    control: form.control,
+    name: 'lookupKeys',
+  });
 
-  // Handle access tab selection changes
-  const handleTabToggle = (tabControl: string, checked: boolean) => {
-    const currentTabs = getValues('accessByTabs');
+  const { fields: appRoleFields, append: appendAppRole, remove: removeAppRole } = useFieldArray({
+    control: form.control,
+    name: 'appRoles',
+  });
+
+  // Watch form values for conditional logic
+  const authMethod = form.watch('authMethod');
+  const accessByTabs = form.watch('accessByTabs');
+
+  // Update restricted admin flag based on tab selections
+  useEffect(() => {
+    const isRestricted = accessByTabs.length < ACCESS_TABS.length;
+    form.setValue('isRestrictedAdmin', isRestricted);
+    setAllTabsSelected(accessByTabs.length === ACCESS_TABS.length);
+  }, [accessByTabs, form]);
+
+  /**
+   * Handle select all tabs toggle
+   */
+  const handleSelectAllTabs = useCallback((checked: boolean) => {
     if (checked) {
-      setValue('accessByTabs', [...currentTabs, tabControl]);
+      form.setValue('accessByTabs', ACCESS_TABS.map(tab => tab.key));
     } else {
-      setValue('accessByTabs', currentTabs.filter(tab => tab !== tabControl));
+      form.setValue('accessByTabs', []);
     }
-    
-    // Update restricted admin status
-    const allTabControls = ADMIN_TABS.map(tab => tab.control);
-    const isRestricted = currentTabs.length < allTabControls.length;
-    setValue('isRestrictedAdmin', isRestricted);
-  };
+  }, [form]);
 
-  // Handle select all tabs
-  const handleSelectAllTabs = (checked: boolean) => {
+  /**
+   * Handle individual tab selection
+   */
+  const handleTabSelection = useCallback((tabKey: string, checked: boolean) => {
+    const currentTabs = form.getValues('accessByTabs');
     if (checked) {
-      setValue('accessByTabs', ADMIN_TABS.map(tab => tab.control));
-      setValue('isRestrictedAdmin', false);
+      form.setValue('accessByTabs', [...currentTabs, tabKey]);
     } else {
-      setValue('accessByTabs', []);
-      setValue('isRestrictedAdmin', true);
+      form.setValue('accessByTabs', currentTabs.filter(tab => tab !== tabKey));
     }
-  };
+  }, [form]);
 
-  // Handle form submission
-  const onSubmit = async (data: CreateAdminFormData) => {
+  /**
+   * Add new lookup key
+   */
+  const handleAddLookupKey = useCallback(() => {
+    appendLookupKey({
+      name: '',
+      value: '',
+      private: false,
+      description: '',
+    });
+  }, [appendLookupKey]);
+
+  /**
+   * Form submission handler
+   */
+  const onSubmit = async (data: AdminCreateFormData) => {
     try {
       setIsSubmitting(true);
-      setAlert(null);
+      setSubmitError(null);
 
-      // Build admin profile data matching Angular implementation
+      // Prepare admin profile data
       const adminData: Partial<AdminProfile> = {
         ...data.profileDetails,
-        isActive: data.isActive,
-        accessByTabs: data.accessByTabs,
+        is_active: data.isActive,
+        accessibleTabs: data.accessByTabs,
         isRestrictedAdmin: data.isRestrictedAdmin,
-        lookupByUserId: data.lookupKeys.map(key => ({
+        lookup_by_user_id: data.lookupKeys.map(key => ({
           name: key.name,
           value: key.value,
           private: key.private,
-          id: 0, // Will be assigned by backend
-          description: '',
-          userId: 0, // Will be assigned by backend
+          description: key.description,
         })),
       };
 
-      // Add password if password option is selected
-      if (data.passwordOption === 'password' && data.password) {
+      // Add password if not using invitation
+      if (data.authMethod === 'password' && data.password) {
         adminData.password = data.password;
       }
 
-      // Determine if sending invite
-      const sendInvite = data.passwordOption === 'invite';
+      // Create admin with appropriate options
+      const sendInvite = data.authMethod === 'invite';
+      const response = await createAdmin(adminData, { sendInvite });
 
-      // Create admin with proper error handling
-      const response = await createAdmin({
-        resource: [adminData],
-      }, {
-        additionalParams: [{ key: 'send_invite', value: sendInvite }],
-      });
-
-      // Success feedback
-      setAlert({
-        type: 'success',
-        message: 'Administrator created successfully!',
-      });
-
-      // Navigate to admin detail view matching Angular navigation pattern
-      setTimeout(() => {
-        router.push(`/admin-settings/admins/${response.resource[0].id}`);
-      }, 1000);
-
-    } catch (error: any) {
-      console.error('Admin creation failed:', error);
-      
-      // Parse error message similar to Angular parseError utility
-      let errorMessage = 'Failed to create administrator';
-      if (error?.response?.data?.error?.context?.resource?.[0]?.message) {
-        errorMessage = error.response.data.error.context.resource[0].message;
-      } else if (error?.response?.data?.error?.message) {
-        errorMessage = error.response.data.error.message;
-      } else if (error?.message) {
-        errorMessage = error.message;
+      // Navigate to admin details page on success
+      if (response && response.id) {
+        router.push(`/adf-admins/${response.id}`);
+      } else {
+        router.push('/adf-admins');
       }
 
-      setAlert({
-        type: 'error',
-        message: errorMessage,
-      });
+    } catch (error) {
+      console.error('Admin creation failed:', error);
+      
+      // Enhanced error handling matching Angular parseError pattern
+      let errorMessage = 'Failed to create admin account';
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'object' && error !== null) {
+        // Handle API error responses
+        const apiError = error as any;
+        if (apiError.error?.error?.context?.resource?.[0]?.message) {
+          errorMessage = apiError.error.error.context.resource[0].message;
+        } else if (apiError.error?.error?.message) {
+          errorMessage = apiError.error.error.message;
+        } else if (apiError.message) {
+          errorMessage = apiError.message;
+        }
+      }
+      
+      setSubmitError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Check if all tabs are selected
-  const allTabsSelected = accessByTabs.length === ADMIN_TABS.length;
-
-  return (
-    <div className="container mx-auto px-4 py-6 max-w-4xl">
-      {/* Page Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-          Create Administrator
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-2">
-          Create a new administrator account with role-based access controls
-        </p>
-      </div>
-
-      {/* Alert Messages */}
-      {alert && (
-        <div className={`
-          p-4 mb-6 rounded-lg border
-          ${alert.type === 'error' ? 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-200' : ''}
-          ${alert.type === 'success' ? 'bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-200' : ''}
-          ${alert.type === 'warning' ? 'bg-yellow-50 border-yellow-200 text-yellow-800 dark:bg-yellow-900/20 dark:border-yellow-800 dark:text-yellow-200' : ''}
-        `}>
-          <div className="flex justify-between items-center">
-            <span>{alert.message}</span>
-            <button
-              onClick={() => setAlert(null)}
-              className="text-current hover:opacity-70"
-              aria-label="Dismiss alert"
-            >
-              ×
-            </button>
+  // Loading state for dependent data
+  if (appsLoading || rolesLoading) {
+    return (
+      <div className="container mx-auto py-8">
+        <div className="max-w-4xl mx-auto">
+          <div className="animate-pulse">
+            <div className="h-8 bg-gray-200 rounded w-1/3 mb-6"></div>
+            <div className="space-y-4">
+              <div className="h-10 bg-gray-200 rounded"></div>
+              <div className="h-10 bg-gray-200 rounded"></div>
+              <div className="h-10 bg-gray-200 rounded"></div>
+            </div>
           </div>
         </div>
-      )}
+      </div>
+    );
+  }
 
-      {/* Main Form */}
-      <FormProvider {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-          
-          {/* Profile Details Section */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-              Profile Details
-            </h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="profileDetails.name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Display Name *</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Enter display name" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+  return (
+    <div className="container mx-auto py-8">
+      <div className="max-w-4xl mx-auto">
+        {/* Page Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+            Create Administrator
+          </h1>
+          <p className="mt-2 text-gray-600 dark:text-gray-400">
+            Create a new administrator account with comprehensive access controls and role management.
+          </p>
+        </div>
 
-              <FormField
-                control={form.control}
-                name="profileDetails.email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email *</FormLabel>
-                    <FormControl>
-                      <Input {...field} type="email" placeholder="Enter email address" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="profileDetails.username"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Username *</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Enter username" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="profileDetails.firstName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>First Name</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Enter first name" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="profileDetails.lastName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Last Name</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Enter last name" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="profileDetails.phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Phone</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Enter phone number" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+        {/* Error Alert */}
+        {submitError && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">
+                  Error creating administrator
+                </h3>
+                <div className="mt-2 text-sm text-red-700">
+                  <p>{submitError}</p>
+                </div>
+              </div>
             </div>
           </div>
+        )}
 
-          {/* Status and Authentication Section */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-              Account Settings
-            </h2>
+        {/* Main Form */}
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+            {/* Profile Details Section */}
+            <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-6">
+                Profile Details
+              </h2>
+              
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="profileDetails.username"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Username</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter username" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            {/* Active Status */}
-            <div className="mb-6">
-              <FormField
-                control={form.control}
-                name="isActive"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base">Active</FormLabel>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">
-                        Enable or disable this administrator account
+                <FormField
+                  control={form.control}
+                  name="profileDetails.email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input type="email" placeholder="Enter email" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="profileDetails.firstName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>First Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter first name" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="profileDetails.lastName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Last Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter last name" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="profileDetails.name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Display Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter display name" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="profileDetails.phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone</FormLabel>
+                      <FormControl>
+                        <Input type="tel" placeholder="Enter phone number" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+
+            {/* Account Settings Section */}
+            <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-6">
+                Account Settings
+              </h2>
+
+              {/* Active Status */}
+              <div className="space-y-6">
+                <FormField
+                  control={form.control}
+                  name="isActive"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                      <div className="space-y-0.5">
+                        <FormLabel className="text-base">
+                          Active Account
+                        </FormLabel>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                          Enable this account for immediate access
+                        </div>
                       </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                {/* Authentication Method */}
+                <FormField
+                  control={form.control}
+                  name="authMethod"
+                  render={({ field }) => (
+                    <FormItem className="space-y-3">
+                      <FormLabel>Authentication Method</FormLabel>
+                      <FormControl>
+                        <RadioGroup
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                          className="flex flex-col space-y-2"
+                        >
+                          <FormItem className="flex items-center space-x-3 space-y-0">
+                            <FormControl>
+                              <RadioGroupItem value="invite" />
+                            </FormControl>
+                            <FormLabel className="font-normal">
+                              Send invitation email
+                            </FormLabel>
+                          </FormItem>
+                          <FormItem className="flex items-center space-x-3 space-y-0">
+                            <FormControl>
+                              <RadioGroupItem value="password" />
+                            </FormControl>
+                            <FormLabel className="font-normal">
+                              Set password now
+                            </FormLabel>
+                          </FormItem>
+                        </RadioGroup>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Password Fields (conditional) */}
+                {authMethod === 'password' && (
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <FormField
+                      control={form.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Password</FormLabel>
+                          <FormControl>
+                            <Input type="password" placeholder="Enter password" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="confirmPassword"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Confirm Password</FormLabel>
+                          <FormControl>
+                            <Input type="password" placeholder="Confirm password" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Access Restrictions Section */}
+            <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-6">
+                Access Restrictions
+              </h2>
+
+              {!allTabsSelected && (
+                <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
                     </div>
-                    <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-            </div>
+                    <div className="ml-3">
+                      <p className="text-sm text-yellow-700">
+                        This administrator will have restricted access. They will automatically be assigned a restricted role.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
-            {/* Password vs Invite Selection */}
-            <div className="mb-6">
-              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
-                <p className="text-blue-800 dark:text-blue-200 text-sm">
-                  Choose whether to set a password directly or send an invitation email to the administrator.
-                </p>
-              </div>
-
-              <FormField
-                control={form.control}
-                name="passwordOption"
-                render={({ field }) => (
-                  <FormItem className="space-y-3">
-                    <FormLabel>Authentication Setup</FormLabel>
-                    <FormControl>
-                      <RadioGroup
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        className="flex flex-col space-y-2"
-                      >
-                        <div className="flex items-center space-x-2">
-                          <input
-                            type="radio"
-                            id="invite"
-                            value="invite"
-                            checked={field.value === 'invite'}
-                            onChange={() => field.onChange('invite')}
-                            className="w-4 h-4 text-blue-600"
-                          />
-                          <label htmlFor="invite" className="text-sm font-medium">
-                            Send Invitation Email
-                          </label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <input
-                            type="radio"
-                            id="password"
-                            value="password"
-                            checked={field.value === 'password'}
-                            onChange={() => field.onChange('password')}
-                            className="w-4 h-4 text-blue-600"
-                          />
-                          <label htmlFor="password" className="text-sm font-medium">
-                            Set Password Directly
-                          </label>
-                        </div>
-                      </RadioGroup>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            {/* Password Fields (conditional) */}
-            {passwordOption === 'password' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Password *</FormLabel>
-                      <FormControl>
-                        <Input {...field} type="password" placeholder="Enter password" />
-                      </FormControl>
-                      <FormMessage />
-                      <div className="text-xs text-gray-600 dark:text-gray-400">
-                        Minimum 8 characters required
-                      </div>
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="confirmPassword"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Confirm Password *</FormLabel>
-                      <FormControl>
-                        <Input {...field} type="password" placeholder="Confirm password" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            )}
-          </div>
-
-          {/* Access Restrictions Section */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-              Access Restrictions
-            </h2>
-
-            {!allTabsSelected && (
-              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-4">
-                <p className="text-yellow-800 dark:text-yellow-200 text-sm">
-                  <strong>Restricted Administrator:</strong> This administrator will have limited access to certain areas.
-                  A role will be automatically created for this administrator.
-                </p>
-              </div>
-            )}
-
-            {/* Select All Toggle */}
-            <div className="mb-4">
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="select-all"
-                  checked={allTabsSelected}
-                  onChange={(e) => handleSelectAllTabs(e.target.checked)}
-                  className="w-4 h-4 text-blue-600"
-                />
-                <label htmlFor="select-all" className="text-sm font-medium">
-                  Select All
-                </label>
-              </div>
-            </div>
-
-            {/* Individual Tab Controls */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-              {ADMIN_TABS.map((tab) => (
-                <div key={tab.id} className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id={tab.id}
-                    checked={accessByTabs.includes(tab.control)}
-                    onChange={(e) => handleTabToggle(tab.control, e.target.checked)}
-                    className="w-4 h-4 text-blue-600"
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="select-all-tabs"
+                    checked={allTabsSelected}
+                    onCheckedChange={handleSelectAllTabs}
                   />
-                  <label htmlFor={tab.id} className="text-sm">
-                    {tab.label}
+                  <label htmlFor="select-all-tabs" className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                    Select All
                   </label>
                 </div>
-              ))}
-            </div>
-          </div>
 
-          {/* Lookup Keys Section */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-              Lookup Keys
-            </h2>
-            <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
-              Add custom lookup keys for this administrator. These can be used for additional configuration or metadata.
-            </p>
-            
-            <LookupKeysSection />
-          </div>
-
-          {/* Form Actions */}
-          <div className="flex justify-end space-x-4 pt-6 border-t border-gray-200 dark:border-gray-700">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => router.push('/admin-settings/admins')}
-              disabled={isSubmitting}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={isSubmitting || !form.formState.isValid}
-              className="min-w-[120px]"
-            >
-              {isSubmitting ? (
-                <div className="flex items-center space-x-2">
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  <span>Creating...</span>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {ACCESS_TABS.map((tab) => (
+                    <div key={tab.key} className="flex items-start space-x-2">
+                      <Checkbox
+                        id={`tab-${tab.key}`}
+                        checked={accessByTabs.includes(tab.key)}
+                        onCheckedChange={(checked) => handleTabSelection(tab.key, checked as boolean)}
+                      />
+                      <div className="grid gap-1.5 leading-none">
+                        <label
+                          htmlFor={`tab-${tab.key}`}
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        >
+                          {tab.label}
+                        </label>
+                        <p className="text-xs text-muted-foreground">
+                          {tab.description}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
+              </div>
+            </div>
+
+            {/* Lookup Keys Section */}
+            <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                  Lookup Keys
+                </h2>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleAddLookupKey}
+                >
+                  Add Lookup Key
+                </Button>
+              </div>
+
+              {lookupKeyFields.length === 0 ? (
+                <p className="text-gray-600 dark:text-gray-400 text-sm">
+                  No lookup keys configured. Lookup keys provide additional metadata for the administrator.
+                </p>
               ) : (
-                'Create Administrator'
+                <div className="space-y-4">
+                  {lookupKeyFields.map((field, index) => (
+                    <div key={field.id} className="grid grid-cols-1 gap-4 sm:grid-cols-4 p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+                      <FormField
+                        control={form.control}
+                        name={`lookupKeys.${index}.name`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Key Name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Key name" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name={`lookupKeys.${index}.value`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Value</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Key value" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name={`lookupKeys.${index}.description`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Description</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Optional description" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <div className="flex items-end justify-between space-x-2">
+                        <FormField
+                          control={form.control}
+                          name={`lookupKeys.${index}.private`}
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                              <div className="space-y-1 leading-none">
+                                <FormLabel>Private</FormLabel>
+                              </div>
+                            </FormItem>
+                          )}
+                        />
+
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => removeLookupKey(index)}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
-            </Button>
-          </div>
-        </form>
-      </FormProvider>
+            </div>
+
+            {/* Form Actions */}
+            <div className="flex items-center justify-end space-x-4 pt-6 border-t border-gray-200 dark:border-gray-700">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => router.push('/adf-admins')}
+                disabled={isSubmitting}
+              >
+                Cancel
+              </Button>
+              
+              <Button
+                type="submit"
+                disabled={isSubmitting}
+                className="min-w-[120px]"
+              >
+                {isSubmitting ? (
+                  <div className="flex items-center space-x-2">
+                    <div className="w-4 h-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin"></div>
+                    <span>Creating...</span>
+                  </div>
+                ) : (
+                  'Create Administrator'
+                )}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </div>
     </div>
   );
 }
