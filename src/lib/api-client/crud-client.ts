@@ -2,1292 +2,1089 @@
  * CRUD Operations Client for DreamFactory Admin Interface
  * 
  * Provides standardized create, read, update, delete functionality with intelligent
- * caching integration using React Query patterns. This client replaces the Angular
- * DfBaseCrudService with modern React/TypeScript patterns while maintaining full
- * compatibility with DreamFactory API endpoints.
+ * caching integration using TanStack React Query patterns. Replaces Angular
+ * DfBaseCrudService with modern React/Next.js optimized implementation.
  * 
- * Features:
+ * Key Features:
  * - Type-safe CRUD operations with comprehensive TypeScript support
- * - React Query compatible mutations and queries with optimistic updates
  * - Pagination, filtering, and sorting for large dataset management
- * - File operations with progress tracking and validation
- * - Request configuration management with headers, cache control, notifications
+ * - File operations including import, export, upload, and download with progress tracking
+ * - Request configuration management with headers, cache control, and notifications
  * - Integration with existing DreamFactory API endpoints and response formats
+ * - React Query mutation patterns for optimistic updates and cache invalidation
  * - Specialized endpoints for event scripts, GitHub releases, and bulk operations
  * 
- * @author DreamFactory Admin Interface Team
+ * @module CrudClient
  * @version 1.0.0
+ * @author DreamFactory Admin Interface Team
  */
 
-import {
-  RequestConfig,
+import { BaseApiClient, RequestConfigBuilder } from './base-client';
+import type {
+  ApiRequestConfig,
+  ApiResponse,
   ListResponse,
   CreateResponse,
   UpdateResponse,
   DeleteResponse,
   BulkResponse,
-  SuccessResponse,
-  ErrorResponse,
-  PaginationConfig,
-  FilterConfig,
+  RequestParams,
   FileUploadConfig,
   FileDownloadConfig,
-  FileUploadProgress,
-  FileMetadata,
-  DirectoryListing,
-  ConnectionTestResult,
-  SchemaDiscoveryResult,
-  EndpointGenerationResult,
+  FileOperationResult,
+  ProgressEvent,
   HttpMethod,
-  ContentType,
-  KeyValuePair,
-  UIConfig,
-  CacheConfig,
-  ReactQueryConfig,
-  SWRConfig,
-  AuthHeaders,
 } from './types';
+import type {
+  KeyValuePair,
+  RequestOptions,
+  GenericListResponse,
+  GenericCreateResponse,
+  GenericUpdateResponse,
+  Meta,
+} from '@/types/generic-http';
 
 // =============================================================================
-// CORE CRUD CLIENT CLASS
+// CRUD OPERATION INTERFACES AND TYPES
 // =============================================================================
 
 /**
- * CRUD operations client with React Query compatibility
- * 
- * This class provides a comprehensive interface for all CRUD operations
- * throughout the DreamFactory Admin Interface, supporting both simple
- * data operations and complex workflows like schema discovery and API generation.
+ * Standard pagination options for list operations
+ */
+export interface PaginationOptions {
+  /** Number of records per page */
+  limit?: number;
+  /** Starting record offset */
+  offset?: number;
+  /** Include total count in response */
+  includeCount?: boolean;
+}
+
+/**
+ * Filtering options for data queries
+ */
+export interface FilterOptions {
+  /** SQL-like filter expression */
+  filter?: string;
+  /** Field selection */
+  fields?: string;
+  /** Related resource inclusion */
+  related?: string;
+  /** Sort order specification */
+  sort?: string;
+}
+
+/**
+ * Complete query options combining pagination and filtering
+ */
+export interface QueryOptions extends PaginationOptions, FilterOptions {
+  /** Custom query parameters */
+  params?: KeyValuePair[];
+  /** Additional request headers */
+  headers?: KeyValuePair[];
+  /** Cache control options */
+  cacheControl?: CacheControlOptions;
+  /** Notification options */
+  notifications?: NotificationOptions;
+}
+
+/**
+ * Cache control configuration for requests
+ */
+export interface CacheControlOptions {
+  /** Force fresh data fetch */
+  refresh?: boolean;
+  /** Include cache control headers */
+  includeCacheControl?: boolean;
+  /** Custom cache TTL */
+  ttl?: number;
+  /** Cache tags for invalidation */
+  tags?: string[];
+}
+
+/**
+ * Notification configuration for CRUD operations
+ */
+export interface NotificationOptions {
+  /** Show loading spinner */
+  showSpinner?: boolean;
+  /** Success message override */
+  successMessage?: string;
+  /** Error message override */
+  errorMessage?: string;
+  /** Suppress all notifications */
+  suppressNotifications?: boolean;
+}
+
+/**
+ * File import/export configuration
+ */
+export interface FileImportExportOptions {
+  /** Target table or resource */
+  resource?: string;
+  /** Import/export format */
+  format?: 'csv' | 'json' | 'xml' | 'xlsx';
+  /** Field mapping configuration */
+  fieldMapping?: Record<string, string>;
+  /** Validation rules */
+  validation?: ValidationConfig;
+  /** Progress tracking */
+  onProgress?: (progress: ProgressEvent) => void;
+}
+
+/**
+ * Validation configuration for imports
+ */
+export interface ValidationConfig {
+  /** Required fields */
+  required?: string[];
+  /** Field type validation */
+  types?: Record<string, 'string' | 'number' | 'boolean' | 'date'>;
+  /** Custom validation rules */
+  custom?: Record<string, (value: any) => boolean | string>;
+}
+
+/**
+ * Bulk operation configuration
+ */
+export interface BulkOperationOptions {
+  /** Operation type */
+  operation: 'create' | 'update' | 'delete' | 'upsert';
+  /** Batch size for processing */
+  batchSize?: number;
+  /** Continue on error */
+  continueOnError?: boolean;
+  /** Progress tracking */
+  onProgress?: (progress: BulkOperationProgress) => void;
+}
+
+/**
+ * Bulk operation progress tracking
+ */
+export interface BulkOperationProgress {
+  /** Total items to process */
+  total: number;
+  /** Items processed */
+  processed: number;
+  /** Successful operations */
+  successful: number;
+  /** Failed operations */
+  failed: number;
+  /** Current batch number */
+  currentBatch: number;
+  /** Total batches */
+  totalBatches: number;
+  /** Processing rate per second */
+  rate?: number;
+  /** Estimated time remaining */
+  estimatedTimeRemaining?: number;
+}
+
+/**
+ * Event script operation configuration
+ */
+export interface EventScriptOptions {
+  /** Script type */
+  type?: 'pre' | 'post' | 'process';
+  /** Event trigger */
+  event?: string;
+  /** Service context */
+  service?: string;
+  /** Script engine */
+  engine?: 'php' | 'python' | 'nodejs' | 'v8js';
+}
+
+/**
+ * GitHub integration options
+ */
+export interface GitHubOptions {
+  /** Repository owner */
+  owner?: string;
+  /** Repository name */
+  repo?: string;
+  /** Branch or tag */
+  ref?: string;
+  /** File path in repository */
+  path?: string;
+  /** Authentication token */
+  token?: string;
+}
+
+// =============================================================================
+// CRUD CLIENT IMPLEMENTATION
+// =============================================================================
+
+/**
+ * Comprehensive CRUD operations client with React Query integration
  */
 export class CrudClient {
-  private baseUrl: string;
-  private defaultHeaders: AuthHeaders;
-  private defaultTimeout: number;
-  private abortControllers: Map<string, AbortController>;
-
-  constructor(config: {
-    baseUrl: string;
-    defaultHeaders?: AuthHeaders;
-    defaultTimeout?: number;
-  }) {
-    this.baseUrl = config.baseUrl.replace(/\/$/, ''); // Remove trailing slash
-    this.defaultHeaders = config.defaultHeaders || {};
-    this.defaultTimeout = config.defaultTimeout || 30000; // 30 seconds
-    this.abortControllers = new Map();
+  private baseClient: BaseApiClient;
+  private defaultOptions: Partial<QueryOptions>;
+  
+  /**
+   * Initialize CRUD client with base API client
+   */
+  constructor(
+    baseClient: BaseApiClient,
+    defaultOptions: Partial<QueryOptions> = {}
+  ) {
+    this.baseClient = baseClient;
+    this.defaultOptions = {
+      limit: 50,
+      offset: 0,
+      includeCount: true,
+      showSpinner: true,
+      ...defaultOptions,
+    };
   }
-
+  
   // =============================================================================
   // CORE CRUD OPERATIONS
   // =============================================================================
-
+  
   /**
-   * Retrieve a paginated list of resources with filtering and sorting
-   * 
-   * Supports React Query caching patterns and SWR revalidation strategies.
-   * Optimized for large datasets with intelligent pagination and virtual scrolling support.
-   * 
-   * @param endpoint - API endpoint path (e.g., '/api/v2/database/_table')
-   * @param config - Request configuration with pagination, filtering, and caching options
-   * @returns Promise resolving to paginated list response
+   * Retrieve all records with pagination, filtering, and sorting
    */
-  async getAll<T>(
+  async getAll<T = any>(
     endpoint: string,
-    config: RequestConfig & PaginationConfig & FilterConfig = {}
+    options: QueryOptions = {}
   ): Promise<ListResponse<T>> {
-    const {
-      limit = 25,
-      offset = 0,
-      includeCount = true,
-      filter,
-      fields,
-      related,
-      sort,
-      additionalParams = [],
-      ...requestConfig
-    } = config;
-
-    // Build query parameters for pagination and filtering
-    const queryParams = new URLSearchParams();
+    const mergedOptions = { ...this.defaultOptions, ...options };
+    const config = this.buildRequestConfig('GET', mergedOptions);
     
-    // Pagination parameters
-    queryParams.set('limit', limit.toString());
-    queryParams.set('offset', offset.toString());
-    if (includeCount) {
-      queryParams.set('include_count', 'true');
-    }
-
-    // Filtering and field selection
-    if (filter) queryParams.set('filter', filter);
-    if (fields) queryParams.set('fields', fields);
-    if (related) queryParams.set('related', related);
-    if (sort) queryParams.set('order', sort);
-
-    // Additional custom parameters
-    additionalParams.forEach(({ key, value }) => {
-      queryParams.set(key, value.toString());
-    });
-
-    const url = `${this.baseUrl}${endpoint}?${queryParams.toString()}`;
+    // Build query parameters
+    const queryParams: KeyValuePair[] = [];
     
-    try {
-      const response = await this.executeRequest<ListResponse<T>>(url, {
-        method: 'GET',
-        ...requestConfig,
-      });
-
-      // Ensure response has proper structure for React Query caching
-      return {
-        resource: response.resource || [],
-        meta: {
-          count: response.meta?.count || response.resource?.length || 0,
-          limit: response.meta?.limit || limit,
-          offset: response.meta?.offset || offset,
-          total: response.meta?.total,
-        },
-      };
-    } catch (error) {
-      this.handleUINotification(error, requestConfig);
-      throw error;
+    if (mergedOptions.limit !== undefined) {
+      queryParams.push({ key: 'limit', value: mergedOptions.limit });
     }
+    
+    if (mergedOptions.offset !== undefined) {
+      queryParams.push({ key: 'offset', value: mergedOptions.offset });
+    }
+    
+    if (mergedOptions.includeCount) {
+      queryParams.push({ key: 'include_count', value: 'true' });
+    }
+    
+    if (mergedOptions.filter) {
+      queryParams.push({ key: 'filter', value: mergedOptions.filter });
+    }
+    
+    if (mergedOptions.fields) {
+      queryParams.push({ key: 'fields', value: mergedOptions.fields });
+    }
+    
+    if (mergedOptions.related) {
+      queryParams.push({ key: 'related', value: mergedOptions.related });
+    }
+    
+    if (mergedOptions.sort) {
+      queryParams.push({ key: 'order', value: mergedOptions.sort });
+    }
+    
+    // Add custom parameters
+    if (mergedOptions.params) {
+      queryParams.push(...mergedOptions.params);
+    }
+    
+    // Execute request
+    const requestConfig = this.baseClient
+      .createRequest()
+      .method('GET')
+      .params(queryParams)
+      .headers(mergedOptions.headers || [])
+      .loading(mergedOptions.showSpinner ?? true)
+      .build();
+    
+    if (mergedOptions.successMessage) {
+      requestConfig.snackbarSuccess = mergedOptions.successMessage;
+    }
+    
+    if (mergedOptions.errorMessage) {
+      requestConfig.snackbarError = mergedOptions.errorMessage;
+    }
+    
+    if (mergedOptions.suppressNotifications) {
+      requestConfig.suppressNotifications = true;
+    }
+    
+    return this.baseClient.request<ListResponse<T>>(endpoint, requestConfig);
   }
-
+  
   /**
-   * Retrieve a single resource by ID
-   * 
-   * Supports React Query single resource caching with automatic invalidation.
-   * Includes related resource loading and field selection optimization.
-   * 
-   * @param endpoint - API endpoint path
-   * @param id - Resource identifier
-   * @param config - Request configuration with field selection and caching options
-   * @returns Promise resolving to single resource
+   * Retrieve single record by ID
    */
-  async get<T>(
+  async get<T = any>(
     endpoint: string,
     id: string | number,
-    config: RequestConfig & FilterConfig = {}
-  ): Promise<T> {
-    const { fields, related, additionalParams = [], ...requestConfig } = config;
-
-    // Build query parameters for field selection
-    const queryParams = new URLSearchParams();
-    if (fields) queryParams.set('fields', fields);
-    if (related) queryParams.set('related', related);
-
-    // Additional custom parameters
-    additionalParams.forEach(({ key, value }) => {
-      queryParams.set(key, value.toString());
-    });
-
-    const queryString = queryParams.toString();
-    const url = `${this.baseUrl}${endpoint}/${id}${queryString ? `?${queryString}` : ''}`;
-
-    try {
-      return await this.executeRequest<T>(url, {
-        method: 'GET',
-        ...requestConfig,
-      });
-    } catch (error) {
-      this.handleUINotification(error, requestConfig);
-      throw error;
+    options: Partial<QueryOptions> = {}
+  ): Promise<ApiResponse<T>> {
+    const mergedOptions = { ...this.defaultOptions, ...options };
+    const resourceUrl = `${endpoint}/${id}`;
+    
+    // Build query parameters for field selection and relations
+    const queryParams: KeyValuePair[] = [];
+    
+    if (mergedOptions.fields) {
+      queryParams.push({ key: 'fields', value: mergedOptions.fields });
     }
+    
+    if (mergedOptions.related) {
+      queryParams.push({ key: 'related', value: mergedOptions.related });
+    }
+    
+    if (mergedOptions.params) {
+      queryParams.push(...mergedOptions.params);
+    }
+    
+    const requestConfig = this.baseClient
+      .createRequest()
+      .method('GET')
+      .params(queryParams)
+      .headers(mergedOptions.headers || [])
+      .loading(mergedOptions.showSpinner ?? true)
+      .build();
+    
+    if (mergedOptions.successMessage) {
+      requestConfig.snackbarSuccess = mergedOptions.successMessage;
+    }
+    
+    if (mergedOptions.errorMessage) {
+      requestConfig.snackbarError = mergedOptions.errorMessage;
+    }
+    
+    if (mergedOptions.suppressNotifications) {
+      requestConfig.suppressNotifications = true;
+    }
+    
+    return this.baseClient.request<T>(resourceUrl, requestConfig);
   }
-
+  
   /**
-   * Create a new resource
-   * 
-   * Supports React Query optimistic updates and automatic cache invalidation.
-   * Includes comprehensive validation and error handling with rollback capabilities.
-   * 
-   * @param endpoint - API endpoint path
-   * @param data - Resource data to create
-   * @param config - Request configuration with validation and notification options
-   * @returns Promise resolving to creation response with new resource ID
+   * Create new record
    */
-  async create<T, R = CreateResponse>(
+  async create<T = any>(
     endpoint: string,
     data: Partial<T>,
-    config: RequestConfig = {}
-  ): Promise<R> {
-    try {
-      const response = await this.executeRequest<R>(
-        `${this.baseUrl}${endpoint}`,
-        {
-          method: 'POST',
-          body: JSON.stringify(data),
-          contentType: 'application/json',
-          ...config,
-        }
-      );
-
-      // Show success notification if configured
-      if (config.snackbarSuccess && !config.suppressNotifications) {
-        this.showSuccessNotification(config.snackbarSuccess);
-      }
-
-      return response;
-    } catch (error) {
-      this.handleUINotification(error, config);
-      throw error;
+    options: Partial<QueryOptions> = {}
+  ): Promise<CreateResponse<T>> {
+    const mergedOptions = { ...this.defaultOptions, ...options };
+    
+    const requestConfig = this.baseClient
+      .createRequest()
+      .method('POST')
+      .params(mergedOptions.params || [])
+      .headers(mergedOptions.headers || [])
+      .loading(mergedOptions.showSpinner ?? true)
+      .successMessage(mergedOptions.successMessage || 'Record created successfully')
+      .build();
+    
+    if (mergedOptions.errorMessage) {
+      requestConfig.snackbarError = mergedOptions.errorMessage;
     }
-  }
-
-  /**
-   * Update an existing resource (full replacement)
-   * 
-   * Implements React Query optimistic updates with automatic rollback on failure.
-   * Supports concurrent update detection and conflict resolution.
-   * 
-   * @param endpoint - API endpoint path
-   * @param id - Resource identifier
-   * @param data - Complete resource data for replacement
-   * @param config - Request configuration with optimistic update options
-   * @returns Promise resolving to update response
-   */
-  async update<T, R = UpdateResponse>(
-    endpoint: string,
-    id: string | number,
-    data: Partial<T>,
-    config: RequestConfig = {}
-  ): Promise<R> {
-    try {
-      const response = await this.executeRequest<R>(
-        `${this.baseUrl}${endpoint}/${id}`,
-        {
-          method: 'PUT',
-          body: JSON.stringify(data),
-          contentType: 'application/json',
-          ...config,
-        }
-      );
-
-      // Show success notification if configured
-      if (config.snackbarSuccess && !config.suppressNotifications) {
-        this.showSuccessNotification(config.snackbarSuccess);
-      }
-
-      return response;
-    } catch (error) {
-      this.handleUINotification(error, config);
-      throw error;
+    
+    if (mergedOptions.suppressNotifications) {
+      requestConfig.suppressNotifications = true;
     }
+    
+    return this.baseClient.request<CreateResponse<T>>(endpoint, requestConfig, data);
   }
-
+  
   /**
-   * Partially update an existing resource
-   * 
-   * Optimized for minimal data transfer with precise field updates.
-   * Supports React Query selective cache updates for improved performance.
-   * 
-   * @param endpoint - API endpoint path
-   * @param id - Resource identifier
-   * @param data - Partial resource data for selective update
-   * @param config - Request configuration with selective update options
-   * @returns Promise resolving to patch response
+   * Update existing record (full replacement)
    */
-  async patch<T, R = UpdateResponse>(
+  async update<T = any>(
     endpoint: string,
     id: string | number,
     data: Partial<T>,
-    config: RequestConfig = {}
-  ): Promise<R> {
-    try {
-      const response = await this.executeRequest<R>(
-        `${this.baseUrl}${endpoint}/${id}`,
-        {
-          method: 'PATCH',
-          body: JSON.stringify(data),
-          contentType: 'application/json',
-          ...config,
-        }
-      );
-
-      // Show success notification if configured
-      if (config.snackbarSuccess && !config.suppressNotifications) {
-        this.showSuccessNotification(config.snackbarSuccess);
-      }
-
-      return response;
-    } catch (error) {
-      this.handleUINotification(error, config);
-      throw error;
+    options: Partial<QueryOptions> = {}
+  ): Promise<UpdateResponse<T>> {
+    const mergedOptions = { ...this.defaultOptions, ...options };
+    const resourceUrl = `${endpoint}/${id}`;
+    
+    const requestConfig = this.baseClient
+      .createRequest()
+      .method('PUT')
+      .params(mergedOptions.params || [])
+      .headers(mergedOptions.headers || [])
+      .loading(mergedOptions.showSpinner ?? true)
+      .successMessage(mergedOptions.successMessage || 'Record updated successfully')
+      .build();
+    
+    if (mergedOptions.errorMessage) {
+      requestConfig.snackbarError = mergedOptions.errorMessage;
     }
+    
+    if (mergedOptions.suppressNotifications) {
+      requestConfig.suppressNotifications = true;
+    }
+    
+    return this.baseClient.request<UpdateResponse<T>>(resourceUrl, requestConfig, data);
   }
-
+  
   /**
-   * Delete a resource
-   * 
-   * Supports React Query optimistic deletion with automatic cache cleanup.
-   * Includes soft delete detection and cascade delete handling.
-   * 
-   * @param endpoint - API endpoint path
-   * @param id - Resource identifier
-   * @param config - Request configuration with deletion options
-   * @returns Promise resolving to deletion response
+   * Partial update of existing record
    */
-  async delete<R = DeleteResponse>(
+  async patch<T = any>(
     endpoint: string,
     id: string | number,
-    config: RequestConfig = {}
-  ): Promise<R> {
-    try {
-      const response = await this.executeRequest<R>(
-        `${this.baseUrl}${endpoint}/${id}`,
-        {
-          method: 'DELETE',
-          ...config,
-        }
-      );
-
-      // Show success notification if configured
-      if (config.snackbarSuccess && !config.suppressNotifications) {
-        this.showSuccessNotification(config.snackbarSuccess);
-      }
-
-      return response;
-    } catch (error) {
-      this.handleUINotification(error, config);
-      throw error;
+    data: Partial<T>,
+    options: Partial<QueryOptions> = {}
+  ): Promise<UpdateResponse<T>> {
+    const mergedOptions = { ...this.defaultOptions, ...options };
+    const resourceUrl = `${endpoint}/${id}`;
+    
+    const requestConfig = this.baseClient
+      .createRequest()
+      .method('PATCH')
+      .params(mergedOptions.params || [])
+      .headers(mergedOptions.headers || [])
+      .loading(mergedOptions.showSpinner ?? true)
+      .successMessage(mergedOptions.successMessage || 'Record updated successfully')
+      .build();
+    
+    if (mergedOptions.errorMessage) {
+      requestConfig.snackbarError = mergedOptions.errorMessage;
     }
+    
+    if (mergedOptions.suppressNotifications) {
+      requestConfig.suppressNotifications = true;
+    }
+    
+    return this.baseClient.request<UpdateResponse<T>>(resourceUrl, requestConfig, data);
   }
-
+  
+  /**
+   * Delete record by ID
+   */
+  async delete(
+    endpoint: string,
+    id: string | number,
+    options: Partial<QueryOptions> = {}
+  ): Promise<DeleteResponse> {
+    const mergedOptions = { ...this.defaultOptions, ...options };
+    const resourceUrl = `${endpoint}/${id}`;
+    
+    const requestConfig = this.baseClient
+      .createRequest()
+      .method('DELETE')
+      .params(mergedOptions.params || [])
+      .headers(mergedOptions.headers || [])
+      .loading(mergedOptions.showSpinner ?? true)
+      .successMessage(mergedOptions.successMessage || 'Record deleted successfully')
+      .build();
+    
+    if (mergedOptions.errorMessage) {
+      requestConfig.snackbarError = mergedOptions.errorMessage;
+    }
+    
+    if (mergedOptions.suppressNotifications) {
+      requestConfig.suppressNotifications = true;
+    }
+    
+    return this.baseClient.request<DeleteResponse>(resourceUrl, requestConfig);
+  }
+  
   // =============================================================================
   // BULK OPERATIONS
   // =============================================================================
-
+  
   /**
-   * Perform bulk operations on multiple resources
-   * 
-   * Optimized for large dataset operations with progress tracking and
-   * partial failure handling. Supports batch processing with configurable chunk sizes.
-   * 
-   * @param endpoint - API endpoint path
-   * @param operation - Bulk operation type ('create', 'update', 'delete')
-   * @param data - Array of resources or resource IDs for bulk operation
-   * @param config - Request configuration with bulk operation options
-   * @returns Promise resolving to bulk operation response with detailed results
+   * Create multiple records in bulk
    */
-  async bulk<T>(
+  async bulkCreate<T = any>(
     endpoint: string,
-    operation: 'create' | 'update' | 'delete',
-    data: Partial<T>[] | string[] | number[],
-    config: RequestConfig = {}
+    data: Partial<T>[],
+    options: BulkOperationOptions & Partial<QueryOptions> = {}
   ): Promise<BulkResponse<T>> {
-    const bulkEndpoint = `${this.baseUrl}${endpoint}`;
-    const method = operation === 'delete' ? 'DELETE' : 'POST';
-
-    // Prepare bulk operation payload
-    const payload = {
-      resource: Array.isArray(data) ? data : [data],
-      operation: operation,
-    };
-
-    try {
-      const response = await this.executeRequest<BulkResponse<T>>(
-        bulkEndpoint,
-        {
-          method,
-          body: JSON.stringify(payload),
-          contentType: 'application/json',
-          timeout: config.timeout || 60000, // Extended timeout for bulk operations
-          ...config,
-        }
-      );
-
-      // Show success notification with operation summary
-      if (config.snackbarSuccess && !config.suppressNotifications) {
-        const successCount = (response.created?.length || 0) + 
-                            (response.updated?.length || 0) + 
-                            (response.deleted?.length || 0);
-        this.showSuccessNotification(
-          `${config.snackbarSuccess}: ${successCount} items processed`
-        );
-      }
-
-      return response;
-    } catch (error) {
-      this.handleUINotification(error, config);
-      throw error;
+    const mergedOptions = { ...this.defaultOptions, ...options };
+    
+    // Process in batches if specified
+    if (options.batchSize && data.length > options.batchSize) {
+      return this.processBulkOperation(endpoint, data, 'create', options);
     }
+    
+    const requestConfig = this.baseClient
+      .createRequest()
+      .method('POST')
+      .params(mergedOptions.params || [])
+      .headers(mergedOptions.headers || [])
+      .loading(mergedOptions.showSpinner ?? true)
+      .successMessage(mergedOptions.successMessage || `${data.length} records created successfully`)
+      .build();
+    
+    if (mergedOptions.errorMessage) {
+      requestConfig.snackbarError = mergedOptions.errorMessage;
+    }
+    
+    if (mergedOptions.suppressNotifications) {
+      requestConfig.suppressNotifications = true;
+    }
+    
+    const payload = { resource: data };
+    return this.baseClient.request<BulkResponse<T>>(endpoint, requestConfig, payload);
   }
-
+  
+  /**
+   * Update multiple records in bulk
+   */
+  async bulkUpdate<T = any>(
+    endpoint: string,
+    data: (Partial<T> & { id: string | number })[],
+    options: BulkOperationOptions & Partial<QueryOptions> = {}
+  ): Promise<BulkResponse<T>> {
+    const mergedOptions = { ...this.defaultOptions, ...options };
+    
+    // Process in batches if specified
+    if (options.batchSize && data.length > options.batchSize) {
+      return this.processBulkOperation(endpoint, data, 'update', options);
+    }
+    
+    const requestConfig = this.baseClient
+      .createRequest()
+      .method('PATCH')
+      .params(mergedOptions.params || [])
+      .headers(mergedOptions.headers || [])
+      .loading(mergedOptions.showSpinner ?? true)
+      .successMessage(mergedOptions.successMessage || `${data.length} records updated successfully`)
+      .build();
+    
+    if (mergedOptions.errorMessage) {
+      requestConfig.snackbarError = mergedOptions.errorMessage;
+    }
+    
+    if (mergedOptions.suppressNotifications) {
+      requestConfig.suppressNotifications = true;
+    }
+    
+    const payload = { resource: data };
+    return this.baseClient.request<BulkResponse<T>>(endpoint, requestConfig, payload);
+  }
+  
+  /**
+   * Delete multiple records in bulk
+   */
+  async bulkDelete(
+    endpoint: string,
+    ids: (string | number)[],
+    options: BulkOperationOptions & Partial<QueryOptions> = {}
+  ): Promise<BulkResponse<{ id: string | number }>> {
+    const mergedOptions = { ...this.defaultOptions, ...options };
+    
+    const requestConfig = this.baseClient
+      .createRequest()
+      .method('DELETE')
+      .param('ids', ids.join(','))
+      .params(mergedOptions.params || [])
+      .headers(mergedOptions.headers || [])
+      .loading(mergedOptions.showSpinner ?? true)
+      .successMessage(mergedOptions.successMessage || `${ids.length} records deleted successfully`)
+      .build();
+    
+    if (mergedOptions.errorMessage) {
+      requestConfig.snackbarError = mergedOptions.errorMessage;
+    }
+    
+    if (mergedOptions.suppressNotifications) {
+      requestConfig.suppressNotifications = true;
+    }
+    
+    return this.baseClient.request<BulkResponse<{ id: string | number }>>(endpoint, requestConfig);
+  }
+  
+  /**
+   * Process bulk operations in batches with progress tracking
+   */
+  private async processBulkOperation<T>(
+    endpoint: string,
+    data: any[],
+    operation: 'create' | 'update' | 'delete',
+    options: BulkOperationOptions & Partial<QueryOptions>
+  ): Promise<BulkResponse<T>> {
+    const batchSize = options.batchSize || 50;
+    const totalBatches = Math.ceil(data.length / batchSize);
+    const results: T[] = [];
+    const errors: any[] = [];
+    
+    let processed = 0;
+    let successful = 0;
+    let failed = 0;
+    
+    for (let i = 0; i < totalBatches; i++) {
+      const start = i * batchSize;
+      const end = Math.min(start + batchSize, data.length);
+      const batch = data.slice(start, end);
+      
+      try {
+        let batchResult: BulkResponse<T>;
+        
+        switch (operation) {
+          case 'create':
+            batchResult = await this.bulkCreate(endpoint, batch, { ...options, batchSize: undefined });
+            break;
+          case 'update':
+            batchResult = await this.bulkUpdate(endpoint, batch, { ...options, batchSize: undefined });
+            break;
+          default:
+            throw new Error(`Unsupported bulk operation: ${operation}`);
+        }
+        
+        if (batchResult.data) {
+          results.push(...batchResult.data);
+          successful += batchResult.data.length;
+        }
+        
+        if (batchResult.meta?.errors) {
+          errors.push(...batchResult.meta.errors);
+          failed += batchResult.meta.errors.length;
+        }
+        
+      } catch (error) {
+        if (options.continueOnError) {
+          errors.push({ batch: i, error });
+          failed += batch.length;
+        } else {
+          throw error;
+        }
+      }
+      
+      processed += batch.length;
+      
+      // Report progress
+      if (options.onProgress) {
+        const startTime = Date.now();
+        const rate = processed / ((Date.now() - startTime) / 1000);
+        const remaining = data.length - processed;
+        const estimatedTimeRemaining = remaining / rate;
+        
+        options.onProgress({
+          total: data.length,
+          processed,
+          successful,
+          failed,
+          currentBatch: i + 1,
+          totalBatches,
+          rate,
+          estimatedTimeRemaining,
+        });
+      }
+    }
+    
+    return {
+      data: results,
+      meta: {
+        successCount: successful,
+        errorCount: failed,
+        errors: errors.length > 0 ? errors : undefined,
+      },
+      status: {
+        code: 200,
+        text: 'OK',
+        success: true,
+      },
+      headers: {},
+      config: {},
+    } as BulkResponse<T>;
+  }
+  
   // =============================================================================
   // FILE OPERATIONS
   // =============================================================================
-
+  
   /**
-   * Upload files with progress tracking
-   * 
-   * Supports chunked uploads for large files, progress callbacks,
-   * and comprehensive error handling with retry capabilities.
-   * 
-   * @param endpoint - Upload endpoint path
-   * @param files - Files to upload (single File or FileList)
-   * @param config - Upload configuration with progress tracking
-   * @returns Promise resolving to upload response
+   * Import data from file
    */
-  async uploadFiles<T = SuccessResponse>(
+  async importFile(
     endpoint: string,
-    files: File | File[] | FileList,
-    config: RequestConfig & FileUploadConfig = {}
-  ): Promise<T> {
-    const {
-      multiple = false,
-      maxSize,
-      accept = [],
-      chunkSize = 1024 * 1024, // 1MB chunks
-      onProgress,
-      onSuccess,
-      onError,
-      ...requestConfig
-    } = config;
-
-    // Convert FileList to Array if needed
-    const fileArray = files instanceof FileList ? Array.from(files) : 
-                     Array.isArray(files) ? files : [files];
-
-    // Validate file constraints
-    for (const file of fileArray) {
-      if (maxSize && file.size > maxSize) {
-        const error = new Error(`File ${file.name} exceeds maximum size of ${maxSize} bytes`);
-        onError?.(error);
-        throw error;
-      }
-
-      if (accept.length > 0 && !accept.some(type => file.type.includes(type))) {
-        const error = new Error(`File ${file.name} type ${file.type} not accepted`);
-        onError?.(error);
-        throw error;
-      }
+    file: File,
+    options: FileImportExportOptions & Partial<QueryOptions> = {}
+  ): Promise<FileOperationResult> {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    if (options.resource) {
+      formData.append('resource', options.resource);
     }
-
-    if (!multiple && fileArray.length > 1) {
-      const error = new Error('Multiple files not allowed');
-      onError?.(error);
-      throw error;
+    
+    if (options.format) {
+      formData.append('format', options.format);
     }
-
-    try {
-      // Prepare FormData for upload
-      const formData = new FormData();
-      fileArray.forEach((file, index) => {
-        formData.append(multiple ? `files[${index}]` : 'file', file);
-      });
-
-      // Create XMLHttpRequest for progress tracking
-      const response = await this.uploadWithProgress<T>(
-        `${this.baseUrl}${endpoint}`,
-        formData,
-        {
-          ...requestConfig,
-          onProgress: (progress) => {
-            onProgress?.(progress);
-          },
-        }
-      );
-
-      onSuccess?.(response);
-      return response;
-    } catch (error) {
-      onError?.(error as Error);
-      this.handleUINotification(error, requestConfig);
-      throw error;
+    
+    if (options.fieldMapping) {
+      formData.append('field_mapping', JSON.stringify(options.fieldMapping));
     }
+    
+    const uploadConfig: FileUploadConfig = {
+      fieldName: 'file',
+      progress: {
+        enabled: true,
+        onProgress: options.onProgress,
+      },
+    };
+    
+    const result = await this.baseClient.uploadFile(
+      `${endpoint}/import`,
+      file,
+      uploadConfig
+    );
+    
+    return {
+      success: true,
+      data: result,
+      file: {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        lastModified: file.lastModified,
+      },
+    };
   }
-
+  
   /**
-   * Download files with progress tracking
-   * 
-   * Supports streaming downloads, progress callbacks, and automatic
-   * browser download triggering with custom filenames.
-   * 
-   * @param endpoint - Download endpoint path
-   * @param config - Download configuration with progress tracking
-   * @returns Promise resolving to download completion
+   * Export data to file
+   */
+  async exportFile(
+    endpoint: string,
+    options: FileImportExportOptions & Partial<QueryOptions> = {}
+  ): Promise<FileOperationResult> {
+    const queryParams: KeyValuePair[] = [];
+    
+    if (options.format) {
+      queryParams.push({ key: 'format', value: options.format });
+    }
+    
+    if (options.fields) {
+      queryParams.push({ key: 'fields', value: options.fields });
+    }
+    
+    if (options.filter) {
+      queryParams.push({ key: 'filter', value: options.filter });
+    }
+    
+    const requestConfig = this.baseClient
+      .createRequest()
+      .method('GET')
+      .params(queryParams)
+      .loading(options.showSpinner ?? true)
+      .successMessage('Export completed successfully')
+      .build();
+    
+    const blob = await this.baseClient.downloadBlob(`${endpoint}/export`, requestConfig);
+    
+    // Trigger download
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `export_${endpoint.replace(/\//g, '_')}_${Date.now()}.${options.format || 'csv'}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    return {
+      success: true,
+      data: blob,
+      url,
+      file: {
+        name: link.download,
+        size: blob.size,
+        type: blob.type,
+        lastModified: Date.now(),
+      },
+    };
+  }
+  
+  /**
+   * Upload file to server
+   */
+  async uploadFile(
+    endpoint: string,
+    file: File,
+    options: Partial<QueryOptions> & { 
+      fieldName?: string;
+      onProgress?: (progress: ProgressEvent) => void;
+    } = {}
+  ): Promise<FileOperationResult> {
+    const uploadConfig: FileUploadConfig = {
+      fieldName: options.fieldName || 'file',
+      progress: {
+        enabled: true,
+        onProgress: options.onProgress,
+      },
+    };
+    
+    const result = await this.baseClient.uploadFile(endpoint, file, uploadConfig);
+    
+    return {
+      success: true,
+      data: result,
+      file: {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        lastModified: file.lastModified,
+      },
+    };
+  }
+  
+  /**
+   * Download file from server
    */
   async downloadFile(
     endpoint: string,
-    config: RequestConfig & FileDownloadConfig = {}
-  ): Promise<void> {
-    const {
-      asAttachment = true,
-      filename,
-      onProgress,
-      ...requestConfig
-    } = config;
-
-    try {
-      const response = await this.executeStreamRequest(
-        `${this.baseUrl}${endpoint}`,
-        {
-          method: 'GET',
-          ...requestConfig,
-        }
-      );
-
-      // Get filename from response headers or config
-      const contentDisposition = response.headers.get('content-disposition');
-      const responseFilename = contentDisposition?.match(/filename="(.+)"/)?.[1];
-      const finalFilename = filename || responseFilename || 'download';
-
-      // Stream download with progress tracking
-      const contentLength = response.headers.get('content-length');
-      const total = contentLength ? parseInt(contentLength, 10) : 0;
-      let loaded = 0;
-
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error('Response body not readable');
-      }
-
-      const chunks: Uint8Array[] = [];
-      
-      while (true) {
-        const { done, value } = await reader.read();
-        
-        if (done) break;
-        
-        chunks.push(value);
-        loaded += value.length;
-
-        // Report progress
-        if (onProgress && total > 0) {
-          onProgress({
-            loaded,
-            total,
-            percentage: Math.round((loaded / total) * 100),
-          });
-        }
-      }
-
-      // Create blob and trigger download
-      const blob = new Blob(chunks);
-      const url = URL.createObjectURL(blob);
-      
-      if (asAttachment) {
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = finalFilename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      }
-      
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      this.handleUINotification(error, requestConfig);
-      throw error;
-    }
+    filename?: string,
+    options: Partial<QueryOptions> = {}
+  ): Promise<FileOperationResult> {
+    const requestConfig = this.baseClient
+      .createRequest()
+      .method('GET')
+      .loading(options.showSpinner ?? true)
+      .build();
+    
+    const blob = await this.baseClient.downloadBlob(endpoint, requestConfig);
+    
+    // Trigger download
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename || `download_${Date.now()}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    return {
+      success: true,
+      data: blob,
+      url,
+      file: {
+        name: link.download,
+        size: blob.size,
+        type: blob.type,
+        lastModified: Date.now(),
+      },
+    };
   }
-
-  /**
-   * Import data from file
-   * 
-   * Supports various file formats (CSV, JSON, XML) with validation,
-   * progress tracking, and error reporting for failed imports.
-   * 
-   * @param endpoint - Import endpoint path
-   * @param file - File containing data to import
-   * @param config - Import configuration with validation options
-   * @returns Promise resolving to import results
-   */
-  async importFromFile<T>(
-    endpoint: string,
-    file: File,
-    config: RequestConfig & {
-      format?: 'csv' | 'json' | 'xml';
-      validateOnly?: boolean;
-      skipErrors?: boolean;
-      onProgress?: (progress: FileUploadProgress) => void;
-    } = {}
-  ): Promise<BulkResponse<T>> {
-    const {
-      format = 'csv',
-      validateOnly = false,
-      skipErrors = false,
-      onProgress,
-      ...requestConfig
-    } = config;
-
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('format', format);
-      formData.append('validate_only', validateOnly.toString());
-      formData.append('skip_errors', skipErrors.toString());
-
-      return await this.uploadWithProgress<BulkResponse<T>>(
-        `${this.baseUrl}${endpoint}/_import`,
-        formData,
-        {
-          ...requestConfig,
-          onProgress,
-        }
-      );
-    } catch (error) {
-      this.handleUINotification(error, requestConfig);
-      throw error;
-    }
-  }
-
-  /**
-   * Export data to file
-   * 
-   * Supports various export formats with filtering, field selection,
-   * and automatic download triggering.
-   * 
-   * @param endpoint - Export endpoint path
-   * @param config - Export configuration with format and filtering options
-   * @returns Promise resolving to export completion
-   */
-  async exportToFile(
-    endpoint: string,
-    config: RequestConfig & FilterConfig & {
-      format?: 'csv' | 'json' | 'xml';
-      filename?: string;
-    } = {}
-  ): Promise<void> {
-    const {
-      format = 'csv',
-      filename,
-      filter,
-      fields,
-      sort,
-      ...requestConfig
-    } = config;
-
-    // Build export parameters
-    const queryParams = new URLSearchParams();
-    queryParams.set('format', format);
-    if (filter) queryParams.set('filter', filter);
-    if (fields) queryParams.set('fields', fields);
-    if (sort) queryParams.set('order', sort);
-
-    const exportEndpoint = `${this.baseUrl}${endpoint}/_export?${queryParams.toString()}`;
-
-    return this.downloadFile(exportEndpoint, {
-      ...requestConfig,
-      filename: filename || `export_${Date.now()}.${format}`,
-    });
-  }
-
+  
   // =============================================================================
   // SPECIALIZED OPERATIONS
   // =============================================================================
-
+  
   /**
-   * Test database connection
-   * 
-   * Validates database connection parameters with timeout and
-   * comprehensive error reporting for troubleshooting.
-   * 
-   * @param connectionData - Database connection configuration
-   * @param config - Request configuration for connection testing
-   * @returns Promise resolving to connection test results
+   * Event script operations
    */
-  async testConnection(
-    connectionData: Record<string, any>,
-    config: RequestConfig = {}
-  ): Promise<ConnectionTestResult> {
-    try {
-      const response = await this.executeRequest<ConnectionTestResult>(
-        `${this.baseUrl}/api/v2/system/service`,
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            ...connectionData,
-            test_connection: true,
-          }),
-          contentType: 'application/json',
-          timeout: config.timeout || 30000, // 30 second timeout for connection tests
-          ...config,
-        }
-      );
-
-      return response;
-    } catch (error) {
-      this.handleUINotification(error, config);
-      throw error;
+  async getEventScripts(
+    options: EventScriptOptions & Partial<QueryOptions> = {}
+  ): Promise<ListResponse<any>> {
+    const queryParams: KeyValuePair[] = [];
+    
+    if (options.type) {
+      queryParams.push({ key: 'type', value: options.type });
+    }
+    
+    if (options.event) {
+      queryParams.push({ key: 'event', value: options.event });
+    }
+    
+    if (options.service) {
+      queryParams.push({ key: 'service', value: options.service });
+    }
+    
+    return this.getAll('/system/event_script', { ...options, params: queryParams });
+  }
+  
+  /**
+   * Create or update event script
+   */
+  async saveEventScript(
+    scriptData: any,
+    options: EventScriptOptions & Partial<QueryOptions> = {}
+  ): Promise<CreateResponse<any> | UpdateResponse<any>> {
+    if (scriptData.id) {
+      return this.update('/system/event_script', scriptData.id, scriptData, options);
+    } else {
+      return this.create('/system/event_script', scriptData, options);
     }
   }
-
+  
   /**
-   * Discover database schema
-   * 
-   * Retrieves comprehensive database schema information with caching
-   * and progressive loading for large schemas.
-   * 
-   * @param serviceId - Database service identifier
-   * @param config - Request configuration with schema discovery options
-   * @returns Promise resolving to schema discovery results
-   */
-  async discoverSchema(
-    serviceId: string,
-    config: RequestConfig & {
-      includeRelationships?: boolean;
-      tableFilter?: string;
-    } = {}
-  ): Promise<SchemaDiscoveryResult> {
-    const {
-      includeRelationships = true,
-      tableFilter,
-      ...requestConfig
-    } = config;
-
-    const queryParams = new URLSearchParams();
-    if (includeRelationships) {
-      queryParams.set('include_relationships', 'true');
-    }
-    if (tableFilter) {
-      queryParams.set('filter', tableFilter);
-    }
-
-    try {
-      const response = await this.executeRequest<SchemaDiscoveryResult>(
-        `${this.baseUrl}/api/v2/${serviceId}/_schema?${queryParams.toString()}`,
-        {
-          method: 'GET',
-          timeout: config.timeout || 60000, // Extended timeout for schema discovery
-          ...requestConfig,
-        }
-      );
-
-      return response;
-    } catch (error) {
-      this.handleUINotification(error, requestConfig);
-      throw error;
-    }
-  }
-
-  /**
-   * Generate API endpoints
-   * 
-   * Creates RESTful API endpoints for database tables with comprehensive
-   * configuration options and OpenAPI specification generation.
-   * 
-   * @param serviceId - Database service identifier
-   * @param generationConfig - API generation configuration
-   * @param config - Request configuration for API generation
-   * @returns Promise resolving to endpoint generation results
-   */
-  async generateEndpoints(
-    serviceId: string,
-    generationConfig: {
-      tables: string[];
-      methods: HttpMethod[];
-      security?: Record<string, any>;
-      openApi?: boolean;
-    },
-    config: RequestConfig = {}
-  ): Promise<EndpointGenerationResult> {
-    try {
-      const response = await this.executeRequest<EndpointGenerationResult>(
-        `${this.baseUrl}/api/v2/system/api_generation`,
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            service_id: serviceId,
-            ...generationConfig,
-          }),
-          contentType: 'application/json',
-          timeout: config.timeout || 45000, // Extended timeout for API generation
-          ...config,
-        }
-      );
-
-      // Show success notification with generation summary
-      if (config.snackbarSuccess && !config.suppressNotifications) {
-        this.showSuccessNotification(
-          `${config.snackbarSuccess}: Generated ${response.endpoints.length} endpoints`
-        );
-      }
-
-      return response;
-    } catch (error) {
-      this.handleUINotification(error, config);
-      throw error;
-    }
-  }
-
-  /**
-   * Manage event scripts
-   * 
-   * Specialized operations for event script CRUD with syntax validation
-   * and GitHub integration capabilities.
-   * 
-   * @param action - Script action ('list', 'get', 'create', 'update', 'delete')
-   * @param scriptData - Script data for create/update operations
-   * @param config - Request configuration with script-specific options
-   * @returns Promise resolving to script operation results
-   */
-  async manageEventScript<T = any>(
-    action: 'list' | 'get' | 'create' | 'update' | 'delete',
-    scriptData?: {
-      name?: string;
-      content?: string;
-      language?: 'php' | 'python' | 'nodejs';
-      events?: string[];
-    },
-    config: RequestConfig = {}
-  ): Promise<T> {
-    let endpoint = '/api/v2/system/script';
-    let method: HttpMethod = 'GET';
-    let body: string | undefined;
-
-    switch (action) {
-      case 'list':
-        // Default endpoint and method
-        break;
-      case 'get':
-        if (!scriptData?.name) {
-          throw new Error('Script name required for get operation');
-        }
-        endpoint += `/${scriptData.name}`;
-        break;
-      case 'create':
-        method = 'POST';
-        body = JSON.stringify(scriptData);
-        break;
-      case 'update':
-        if (!scriptData?.name) {
-          throw new Error('Script name required for update operation');
-        }
-        endpoint += `/${scriptData.name}`;
-        method = 'PUT';
-        body = JSON.stringify(scriptData);
-        break;
-      case 'delete':
-        if (!scriptData?.name) {
-          throw new Error('Script name required for delete operation');
-        }
-        endpoint += `/${scriptData.name}`;
-        method = 'DELETE';
-        break;
-    }
-
-    try {
-      return await this.executeRequest<T>(`${this.baseUrl}${endpoint}`, {
-        method,
-        body,
-        contentType: body ? 'application/json' : undefined,
-        ...config,
-      });
-    } catch (error) {
-      this.handleUINotification(error, config);
-      throw error;
-    }
-  }
-
-  /**
-   * Fetch GitHub releases
-   * 
-   * Retrieves available GitHub releases for script templates and
-   * example code with caching and version comparison.
-   * 
-   * @param repository - GitHub repository identifier
-   * @param config - Request configuration with GitHub API options
-   * @returns Promise resolving to GitHub releases list
+   * GitHub repository operations
    */
   async getGitHubReleases(
-    repository: string,
-    config: RequestConfig = {}
-  ): Promise<Array<{
-    tag_name: string;
-    name: string;
-    published_at: string;
-    assets: Array<{
-      name: string;
-      download_url: string;
-      size: number;
-    }>;
-  }>> {
-    try {
-      return await this.executeRequest(
-        `https://api.github.com/repos/${repository}/releases`,
-        {
-          method: 'GET',
-          timeout: config.timeout || 10000, // Shorter timeout for external API
-          ...config,
-        }
-      );
-    } catch (error) {
-      this.handleUINotification(error, config);
-      throw error;
+    options: GitHubOptions & Partial<QueryOptions> = {}
+  ): Promise<ListResponse<any>> {
+    const { owner, repo, ...queryOptions } = options;
+    
+    if (!owner || !repo) {
+      throw new Error('GitHub owner and repo are required');
     }
+    
+    const endpoint = `/github/releases/${owner}/${repo}`;
+    return this.getAll(endpoint, queryOptions);
   }
-
-  // =============================================================================
-  // REQUEST EXECUTION HELPERS
-  // =============================================================================
-
+  
   /**
-   * Execute HTTP request with comprehensive error handling
-   * 
-   * Core request execution method with retry logic, timeout handling,
-   * and Response object processing for all CRUD operations.
+   * Download file from GitHub repository
    */
-  private async executeRequest<T>(
-    url: string,
-    config: RequestConfig
-  ): Promise<T> {
-    const {
-      method = 'GET',
-      contentType = 'application/json',
-      timeout = this.defaultTimeout,
-      retryAttempts = 0,
-      retryDelay = 1000,
-      additionalHeaders = [],
-      signal,
-      showSpinner = false,
-      ...requestOptions
-    } = config;
-
-    // Build headers
-    const headers: Record<string, string> = {
-      ...this.defaultHeaders,
-      'Content-Type': contentType,
-    };
-
-    // Add additional headers
-    additionalHeaders.forEach(({ key, value }) => {
-      headers[key] = value.toString();
-    });
-
-    // Create abort controller for timeout
-    const controller = new AbortController();
-    const requestId = `${method}-${url}-${Date.now()}`;
-    this.abortControllers.set(requestId, controller);
-
-    // Combine signals
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
-    if (signal) {
-      signal.addEventListener('abort', () => controller.abort());
+  async downloadFromGitHub(
+    options: GitHubOptions & { 
+      path: string;
+      filename?: string;
+    } & Partial<QueryOptions>
+  ): Promise<FileOperationResult> {
+    const { owner, repo, path, ref, filename, ...queryOptions } = options;
+    
+    if (!owner || !repo || !path) {
+      throw new Error('GitHub owner, repo, and path are required');
     }
-
-    // Show spinner if requested
-    if (showSpinner) {
-      this.showLoadingSpinner(true);
+    
+    const queryParams: KeyValuePair[] = [];
+    
+    if (ref) {
+      queryParams.push({ key: 'ref', value: ref });
     }
-
-    try {
-      let lastError: Error;
-      
-      for (let attempt = 0; attempt <= retryAttempts; attempt++) {
-        try {
-          const response = await fetch(url, {
-            method,
-            headers,
-            body: requestOptions.body,
-            signal: controller.signal,
-          });
-
-          // Clear timeout and spinner
-          clearTimeout(timeoutId);
-          if (showSpinner) {
-            this.showLoadingSpinner(false);
-          }
-
-          if (!response.ok) {
-            const errorData = await this.parseErrorResponse(response);
-            throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
-          }
-
-          // Handle empty responses
-          if (response.status === 204 || response.headers.get('content-length') === '0') {
-            return {} as T;
-          }
-
-          const data = await response.json();
-          return data;
-        } catch (error) {
-          lastError = error as Error;
-          
-          // Don't retry on abort
-          if (controller.signal.aborted) {
-            throw new Error('Request timeout or cancelled');
-          }
-
-          // Wait before retry
-          if (attempt < retryAttempts) {
-            await new Promise(resolve => setTimeout(resolve, retryDelay * (attempt + 1)));
-          }
-        }
-      }
-
-      throw lastError!;
-    } finally {
-      clearTimeout(timeoutId);
-      this.abortControllers.delete(requestId);
-      if (showSpinner) {
-        this.showLoadingSpinner(false);
-      }
-    }
+    
+    const endpoint = `/github/file/${owner}/${repo}/${path}`;
+    return this.downloadFile(endpoint, filename, { ...queryOptions, params: queryParams });
   }
-
-  /**
-   * Execute streaming request for file downloads
-   * 
-   * Specialized request handler for streaming responses with
-   * progress tracking capabilities.
-   */
-  private async executeStreamRequest(
-    url: string,
-    config: RequestConfig
-  ): Promise<Response> {
-    const {
-      method = 'GET',
-      timeout = this.defaultTimeout,
-      additionalHeaders = [],
-      signal,
-    } = config;
-
-    // Build headers
-    const headers: Record<string, string> = {
-      ...this.defaultHeaders,
-    };
-
-    // Add additional headers
-    additionalHeaders.forEach(({ key, value }) => {
-      headers[key] = value.toString();
-    });
-
-    // Create abort controller
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-    if (signal) {
-      signal.addEventListener('abort', () => controller.abort());
-    }
-
-    try {
-      const response = await fetch(url, {
-        method,
-        headers,
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        const errorData = await this.parseErrorResponse(response);
-        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      return response;
-    } catch (error) {
-      clearTimeout(timeoutId);
-      if (controller.signal.aborted) {
-        throw new Error('Request timeout or cancelled');
-      }
-      throw error;
-    }
-  }
-
-  /**
-   * Upload with progress tracking
-   * 
-   * Specialized upload handler with XMLHttpRequest for progress callbacks
-   * and comprehensive error handling.
-   */
-  private async uploadWithProgress<T>(
-    url: string,
-    formData: FormData,
-    config: RequestConfig & {
-      onProgress?: (progress: FileUploadProgress) => void;
-    }
-  ): Promise<T> {
-    const {
-      timeout = this.defaultTimeout,
-      additionalHeaders = [],
-      onProgress,
-    } = config;
-
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-
-      // Set timeout
-      xhr.timeout = timeout;
-
-      // Progress tracking
-      if (onProgress) {
-        xhr.upload.addEventListener('progress', (event) => {
-          if (event.lengthComputable) {
-            onProgress({
-              loaded: event.loaded,
-              total: event.total,
-              percentage: Math.round((event.loaded / event.total) * 100),
-            });
-          }
-        });
-      }
-
-      // Success handler
-      xhr.addEventListener('load', () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          try {
-            const response = xhr.responseText ? JSON.parse(xhr.responseText) : {};
-            resolve(response);
-          } catch (error) {
-            reject(new Error('Invalid JSON response'));
-          }
-        } else {
-          reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText}`));
-        }
-      });
-
-      // Error handlers
-      xhr.addEventListener('error', () => {
-        reject(new Error('Network error during upload'));
-      });
-
-      xhr.addEventListener('timeout', () => {
-        reject(new Error('Upload timeout'));
-      });
-
-      xhr.addEventListener('abort', () => {
-        reject(new Error('Upload cancelled'));
-      });
-
-      // Open request and set headers
-      xhr.open('POST', url);
-
-      // Add default headers (except Content-Type for FormData)
-      Object.entries(this.defaultHeaders).forEach(([key, value]) => {
-        if (key.toLowerCase() !== 'content-type') {
-          xhr.setRequestHeader(key, value);
-        }
-      });
-
-      // Add additional headers
-      additionalHeaders.forEach(({ key, value }) => {
-        if (key.toLowerCase() !== 'content-type') {
-          xhr.setRequestHeader(key, value.toString());
-        }
-      });
-
-      // Send request
-      xhr.send(formData);
-    });
-  }
-
+  
   // =============================================================================
   // UTILITY METHODS
   // =============================================================================
-
+  
   /**
-   * Parse error response from API
-   * 
-   * Standardized error parsing that handles DreamFactory error formats
-   * and provides meaningful error messages for user feedback.
+   * Build request configuration from options
    */
-  private async parseErrorResponse(response: Response): Promise<ErrorResponse['error']> {
-    try {
-      const errorData = await response.json();
-      
-      // Handle DreamFactory error format
-      if (errorData.error) {
-        return errorData.error;
+  private buildRequestConfig(
+    method: HttpMethod,
+    options: QueryOptions
+  ): ApiRequestConfig {
+    const config: ApiRequestConfig = {
+      method,
+      params: this.buildRequestParams(options),
+      headers: this.buildRequestHeaders(options),
+    };
+    
+    // Add cache control
+    if (options.cacheControl) {
+      if (options.cacheControl.refresh) {
+        config.headers = {
+          ...config.headers,
+          'Cache-Control': 'no-cache',
+        };
       }
-
-      // Handle generic error format
+      
+      if (options.cacheControl.includeCacheControl) {
+        config.headers = {
+          ...config.headers,
+          'Cache-Control': `max-age=${options.cacheControl.ttl || 300}`,
+        };
+      }
+    }
+    
+    return config;
+  }
+  
+  /**
+   * Build request parameters from options
+   */
+  private buildRequestParams(options: QueryOptions): RequestParams {
+    const params: RequestParams = {};
+    
+    if (options.limit !== undefined) {
+      params.limit = options.limit;
+    }
+    
+    if (options.offset !== undefined) {
+      params.offset = options.offset;
+    }
+    
+    if (options.includeCount) {
+      params.includeCount = options.includeCount;
+    }
+    
+    if (options.filter) {
+      params.filter = options.filter;
+    }
+    
+    if (options.fields) {
+      params.fields = options.fields;
+    }
+    
+    if (options.related) {
+      params.related = options.related;
+    }
+    
+    if (options.sort) {
+      params.sort = options.sort;
+    }
+    
+    // Add custom parameters
+    if (options.params) {
+      options.params.forEach(({ key, value }) => {
+        params[key] = value;
+      });
+    }
+    
+    return params;
+  }
+  
+  /**
+   * Build request headers from options
+   */
+  private buildRequestHeaders(options: QueryOptions): Record<string, string> {
+    const headers: Record<string, string> = {};
+    
+    if (options.headers) {
+      options.headers.forEach(({ key, value }) => {
+        headers[key] = String(value);
+      });
+    }
+    
+    return headers;
+  }
+  
+  /**
+   * Create query options from legacy request options
+   */
+  static fromLegacyOptions(legacyOptions: RequestOptions): QueryOptions {
+    return {
+      limit: legacyOptions.limit,
+      offset: legacyOptions.offset,
+      includeCount: legacyOptions.includeCount,
+      filter: legacyOptions.filter,
+      fields: legacyOptions.fields,
+      related: legacyOptions.related,
+      sort: legacyOptions.sort,
+      params: legacyOptions.additionalParams,
+      headers: legacyOptions.additionalHeaders,
+      notifications: {
+        showSpinner: legacyOptions.showSpinner,
+        successMessage: legacyOptions.snackbarSuccess,
+        errorMessage: legacyOptions.snackbarError,
+      },
+      cacheControl: {
+        refresh: legacyOptions.refresh,
+        includeCacheControl: legacyOptions.includeCacheControl,
+      },
+    };
+  }
+  
+  /**
+   * Convert to legacy response format for compatibility
+   */
+  static toLegacyResponse<T>(response: ApiResponse<T>): GenericListResponse<T> | T {
+    if (Array.isArray(response.data)) {
       return {
-        code: response.status.toString(),
-        message: errorData.message || response.statusText,
-        status_code: response.status,
-        context: errorData.context || errorData.details || null,
-      };
-    } catch {
-      // Fallback for non-JSON error responses
-      return {
-        code: response.status.toString(),
-        message: response.statusText || 'Unknown error occurred',
-        status_code: response.status,
-        context: null,
+        resource: response.data,
+        meta: {
+          count: response.meta?.pagination?.total || response.data.length,
+        },
       };
     }
-  }
-
-  /**
-   * Handle UI notifications for errors and success messages
-   * 
-   * Integrates with the application's notification system to provide
-   * user feedback for all CRUD operations.
-   */
-  private handleUINotification(error: any, config: RequestConfig): void {
-    if (config.suppressNotifications) return;
-
-    const errorMessage = config.snackbarError || 
-                        error?.message || 
-                        'An unexpected error occurred';
-
-    this.showErrorNotification(errorMessage);
-  }
-
-  /**
-   * Show loading spinner
-   * 
-   * Placeholder for integration with application loading state management.
-   * This should be connected to your global loading state (Zustand store).
-   */
-  private showLoadingSpinner(show: boolean): void {
-    // TODO: Integrate with global loading state management
-    // Example: useAppStore.getState().setLoading(show);
-    console.log(`Loading spinner: ${show ? 'shown' : 'hidden'}`);
-  }
-
-  /**
-   * Show success notification
-   * 
-   * Placeholder for integration with application notification system.
-   * This should be connected to your snackbar/toast component.
-   */
-  private showSuccessNotification(message: string): void {
-    // TODO: Integrate with notification system
-    // Example: useNotificationStore.getState().showSuccess(message);
-    console.log(`Success: ${message}`);
-  }
-
-  /**
-   * Show error notification
-   * 
-   * Placeholder for integration with application notification system.
-   * This should be connected to your snackbar/toast component.
-   */
-  private showErrorNotification(message: string): void {
-    // TODO: Integrate with notification system
-    // Example: useNotificationStore.getState().showError(message);
-    console.error(`Error: ${message}`);
-  }
-
-  /**
-   * Cancel all pending requests
-   * 
-   * Utility method for component cleanup and navigation scenarios
-   * to prevent memory leaks and unnecessary network activity.
-   */
-  public cancelAllRequests(): void {
-    this.abortControllers.forEach(controller => {
-      controller.abort();
-    });
-    this.abortControllers.clear();
-  }
-
-  /**
-   * Build query parameters from object
-   * 
-   * Utility method for consistent query string construction
-   * throughout all CRUD operations.
-   */
-  public buildQueryParams(params: Record<string, any>): string {
-    const queryParams = new URLSearchParams();
     
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        queryParams.set(key, value.toString());
-      }
-    });
-
-    return queryParams.toString();
+    return response.data;
   }
 }
 
@@ -1296,62 +1093,50 @@ export class CrudClient {
 // =============================================================================
 
 /**
- * Create a new CRUD client instance with environment-specific configuration
- * 
- * Factory function that creates properly configured CRUD client instances
- * for different environments (development, staging, production).
+ * Create CRUD client instance with base API client
  */
-export function createCrudClient(config: {
-  baseUrl: string;
-  sessionToken?: string;
-  apiKey?: string;
-  timeout?: number;
-}): CrudClient {
-  const { baseUrl, sessionToken, apiKey, timeout } = config;
-
-  // Build default headers based on available authentication
-  const defaultHeaders: AuthHeaders = {};
-  
-  if (sessionToken) {
-    defaultHeaders['X-DreamFactory-Session-Token'] = sessionToken;
-  }
-  
-  if (apiKey) {
-    defaultHeaders['X-DreamFactory-API-Key'] = apiKey;
-  }
-
-  return new CrudClient({
-    baseUrl,
-    defaultHeaders,
-    defaultTimeout: timeout,
-  });
+export function createCrudClient(
+  baseClient: BaseApiClient,
+  defaultOptions?: Partial<QueryOptions>
+): CrudClient {
+  return new CrudClient(baseClient, defaultOptions);
 }
 
 /**
- * Default CRUD client instance for application-wide use
- * 
- * This should be configured during application initialization
- * with environment-specific settings.
+ * Create CRUD client with default configuration
  */
-export const defaultCrudClient = new CrudClient({
-  baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000',
-  defaultHeaders: {},
-  defaultTimeout: 30000,
-});
+export function createDefaultCrudClient(
+  baseUrl: string = '',
+  apiKey: string = ''
+): CrudClient {
+  const baseClient = new BaseApiClient(baseUrl);
+  return new CrudClient(baseClient);
+}
 
-// Re-export types for convenience
-export type {
-  RequestConfig,
-  ListResponse,
-  CreateResponse,
-  UpdateResponse,
-  DeleteResponse,
-  BulkResponse,
-  PaginationConfig,
-  FilterConfig,
-  FileUploadConfig,
-  FileDownloadConfig,
-  ConnectionTestResult,
-  SchemaDiscoveryResult,
-  EndpointGenerationResult,
+// =============================================================================
+// EXPORTS
+// =============================================================================
+
+export {
+  // Main class
+  CrudClient,
+  
+  // Factory functions
+  createCrudClient,
+  createDefaultCrudClient,
+  
+  // Type exports
+  type PaginationOptions,
+  type FilterOptions,
+  type QueryOptions,
+  type CacheControlOptions,
+  type NotificationOptions,
+  type FileImportExportOptions,
+  type ValidationConfig,
+  type BulkOperationOptions,
+  type BulkOperationProgress,
+  type EventScriptOptions,
+  type GitHubOptions,
 };
+
+export default CrudClient;
