@@ -1,1098 +1,787 @@
 /**
  * Generic MSW CRUD Handlers for DreamFactory API Endpoints
  * 
- * Comprehensive Mock Service Worker handlers that replicate DfBaseCrudService behavior
- * for all DreamFactory entity endpoints. Provides realistic API response patterns for:
- * - Generic CRUD operations (GET, POST, PUT, PATCH, DELETE)
- * - Pagination, filtering, and sorting with full parameter support
- * - Bulk operations with comma-separated ID handling
- * - File upload/download operations with FormData and blob support
- * - Authentication and authorization validation
- * - Error handling matching DreamFactory patterns
+ * Provides comprehensive Mock Service Worker handlers for CRUD operations that support
+ * all DreamFactory entity endpoints. These handlers replicate the behavior of DfBaseCrudService
+ * and provide realistic API responses for development and testing scenarios.
  * 
- * These handlers enable comprehensive frontend testing without requiring a live backend,
- * supporting the React/Next.js migration with accurate API contract compatibility.
+ * Features:
+ * - Generic CRUD operation support for all HTTP methods (GET, POST, PUT, PATCH, DELETE)
+ * - Pagination support with limit, offset, and include_count parameters
+ * - Filtering and sorting capabilities matching DfBaseCrudService.getOptions() behavior
+ * - Bulk operation support with comma-separated IDs for efficient data management
+ * - File upload and import operations with FormData support
+ * - JSON download and blob file download response mocking
+ * - Authentication and authorization validation
+ * - Comprehensive error handling with DreamFactory-compliant error responses
+ * 
+ * Usage:
+ * - Import specific handlers for targeted mocking
+ * - Use generic handlers as base for custom endpoint implementations
+ * - Apply to any DreamFactory service endpoint (/api/v2/{service}/{resource})
  */
 
-import { http, HttpResponse } from 'msw';
-import type { RequestHandler } from 'msw';
+import { http, HttpResponse, type HttpHandler } from 'msw';
 import { 
-  mockData,
-  mockDatabaseServices,
-  mockUsers,
-  mockRoles,
-  mockAdmins,
-  mockSchemaTables,
-  mockOpenApiSpecs,
-  mockSystemConfig,
-} from './mock-data';
-import {
-  validateAuthHeaders,
   extractQueryParams,
-  createPaginationMeta,
-  paginateData,
+  applyPagination,
   applyFilter,
   applySort,
-  createJsonResponse,
-  createErrorResponse,
-  extractServiceName,
-  extractResourcePath,
-  isSystemApiPath,
-  isServiceApiPath,
-  logRequest,
-  simulateNetworkDelay,
+  validateAuthHeaders,
   processRequestBody,
-  processResponseBody,
-  type QueryParams,
-  type AuthContext,
+  createListResponse,
+  createJsonResponse,
+  createBlobResponse,
+  extractIdFromPath,
+  validateRequiredFields,
+  formDataToObject,
+  simulateNetworkDelay,
+  logRequest,
+  applyCaseTransformation,
+  type QueryParamsResult,
+  type AuthValidationResult,
+  type PaginationMeta,
 } from './utils';
 import {
-  createUnauthorizedError,
+  createAuthenticationRequiredError,
   createForbiddenError,
   createNotFoundError,
   createValidationError,
-  createBadRequestError,
-  createServerError,
-  createServiceNotFoundError,
-  createRecordNotFoundError,
+  createInternalServerError,
+  createResourceNotFoundError,
   createInvalidParameterError,
-  createMultipleFieldValidationErrors,
-  errorScenarios,
+  createFormValidationError,
+  createDatabaseConnectionError,
+  type FieldErrors,
 } from './error-responses';
+import { mockData } from './mock-data';
 
 // ============================================================================
-// TYPES AND INTERFACES
+// TYPES & INTERFACES
 // ============================================================================
 
 /**
- * Generic resource structure for CRUD operations
- * Supports any DreamFactory entity with common fields
+ * Generic resource entity with common DreamFactory fields
  */
 export interface GenericResource {
-  id?: number | string;
-  name?: string;
-  label?: string;
-  description?: string;
+  id?: string | number;
   created_date?: string;
   last_modified_date?: string;
   created_by_id?: number;
   last_modified_by_id?: number;
-  is_active?: boolean;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**
- * DreamFactory API response structure with metadata
+ * CRUD operation context for handlers
  */
-export interface DreamFactoryResponse<T> {
-  resource: T[];
-  meta?: {
-    count: number;
-    total?: number;
-    limit?: number;
-    offset?: number;
-    next?: string;
-    hasMore?: boolean;
-  };
+export interface CrudContext {
+  serviceName: string;
+  resourceName: string;
+  resourceId?: string | string[];
+  operation: 'create' | 'read' | 'update' | 'delete' | 'list';
+  auth: AuthValidationResult;
+  queryParams: QueryParamsResult;
+  requestBody?: unknown;
 }
 
 /**
- * Bulk operation request structure
+ * Generic data store for mock data by resource type
  */
-export interface BulkOperationRequest {
-  resource: GenericResource[];
-  [key: string]: any;
+export interface ResourceDataStore {
+  [resourceType: string]: GenericResource[];
 }
 
 /**
- * File upload operation structure
+ * File upload result interface
  */
-export interface FileUploadRequest {
-  files: File[];
-  metadata?: Record<string, any>;
-  options?: {
-    overwrite?: boolean;
-    extract?: boolean;
-    clean?: boolean;
-  };
+export interface FileUploadResult {
+  filename: string;
+  size: number;
+  type: string;
+  url: string;
+  success: boolean;
+  message?: string;
 }
 
 /**
- * Configuration for mock data sources
- * Maps API endpoints to their corresponding mock data
+ * Bulk operation result interface
  */
-interface MockDataMapping {
-  [key: string]: {
-    data: GenericResource[];
-    totalCount?: number;
-    idField?: string;
-    searchFields?: string[];
-    requiredFields?: string[];
-    uniqueFields?: string[];
-  };
+export interface BulkOperationResult {
+  success: number;
+  failed: number;
+  errors: Array<{
+    id: string | number;
+    error: string;
+  }>;
+  results: GenericResource[];
+}
+
+/**
+ * Download response configuration
+ */
+export interface DownloadConfig {
+  filename: string;
+  contentType: string;
+  data: string | Uint8Array;
+  headers?: Record<string, string>;
 }
 
 // ============================================================================
-// MOCK DATA MAPPING CONFIGURATION
+// MOCK DATA STORES
 // ============================================================================
 
 /**
- * Centralized mapping of API endpoints to mock data sources
- * Enables dynamic CRUD operations across all entity types
+ * In-memory data store for generic resources
+ * Organized by resource type for easy lookup and manipulation
  */
-const mockDataMapping: MockDataMapping = {
-  // System endpoints
-  'system/service': {
-    data: mockDatabaseServices,
-    totalCount: mockDatabaseServices.length,
-    idField: 'id',
-    searchFields: ['name', 'label', 'description', 'type'],
-    requiredFields: ['name', 'type'],
-    uniqueFields: ['name'],
-  },
-  'system/user': {
-    data: mockUsers,
-    totalCount: mockUsers.length,
-    idField: 'id',
-    searchFields: ['email', 'first_name', 'last_name', 'username'],
-    requiredFields: ['email', 'first_name', 'last_name'],
-    uniqueFields: ['email', 'username'],
-  },
-  'system/admin': {
-    data: mockAdmins,
-    totalCount: mockAdmins.length,
-    idField: 'id',
-    searchFields: ['email', 'first_name', 'last_name', 'username'],
-    requiredFields: ['email', 'first_name', 'last_name'],
-    uniqueFields: ['email', 'username'],
-  },
-  'system/role': {
-    data: mockRoles,
-    totalCount: mockRoles.length,
-    idField: 'id',
-    searchFields: ['name', 'label', 'description'],
-    requiredFields: ['name'],
-    uniqueFields: ['name'],
-  },
-  'system/config': {
-    data: [mockSystemConfig],
-    totalCount: 1,
-    idField: 'id',
-    searchFields: ['platform.name', 'environment.app_name'],
-    requiredFields: [],
-    uniqueFields: [],
-  },
-  
-  // Service-specific endpoints (dynamic based on service name)
-  '_schema': {
-    data: [],  // Will be populated dynamically based on service
-    totalCount: 0,
-    idField: 'name',
-    searchFields: ['name', 'label', 'description'],
-    requiredFields: ['name'],
-    uniqueFields: ['name'],
-  },
-  '_table': {
-    data: mockSchemaTables,
-    totalCount: mockSchemaTables.length,
-    idField: 'name',
-    searchFields: ['name', 'label', 'description', 'schema'],
-    requiredFields: ['name'],
-    uniqueFields: ['name'],
-  },
+const mockDataStore: ResourceDataStore = {
+  // Database services
+  services: mockData.databaseServices.map(service => ({
+    id: service.id,
+    name: service.name,
+    label: service.label,
+    description: service.description,
+    type: service.type,
+    is_active: service.is_active,
+    created_date: service.created_date,
+    last_modified_date: service.last_modified_date,
+    created_by_id: service.created_by_id,
+    last_modified_by_id: service.last_modified_by_id,
+    ...service,
+  })),
 
-  // File service endpoints
-  'files': {
-    data: [],
-    totalCount: 0,
-    idField: 'path',
-    searchFields: ['path', 'name', 'type'],
-    requiredFields: ['path'],
-    uniqueFields: ['path'],
-  },
+  // Users and authentication
+  users: mockData.users.map(user => ({
+    id: user.id,
+    email: user.email,
+    first_name: user.first_name,
+    last_name: user.last_name,
+    username: user.username,
+    is_active: user.is_active,
+    is_verified: user.is_verified,
+    role_id: user.role_id,
+    created_date: user.created_date,
+    last_modified_date: user.last_modified_date,
+    last_login_date: user.last_login_date,
+    ...user,
+  })),
+
+  // System administrators
+  admins: mockData.admins.map(admin => ({
+    id: admin.id,
+    email: admin.email,
+    first_name: admin.first_name,
+    last_name: admin.last_name,
+    username: admin.username,
+    is_active: admin.is_active,
+    is_verified: admin.is_verified,
+    role_id: admin.role_id,
+    created_date: admin.created_date,
+    last_modified_date: admin.last_modified_date,
+    is_sys_admin: admin.is_sys_admin,
+    ...admin,
+  })),
+
+  // User roles
+  roles: mockData.roles.map(role => ({
+    id: role.id,
+    name: role.name,
+    label: role.label,
+    description: role.description,
+    is_active: role.is_active,
+    created_date: role.created_date,
+    last_modified_date: role.last_modified_date,
+    permissions: role.permissions,
+    ...role,
+  })),
+
+  // Schema tables (for schema discovery)
+  tables: mockData.schemaTables.map(table => ({
+    id: table.name,
+    name: table.name,
+    label: table.label,
+    description: table.description,
+    schema: table.schema,
+    rowCount: table.rowCount,
+    estimatedSize: table.estimatedSize,
+    lastModified: table.lastModified,
+    apiEnabled: table.apiEnabled,
+    ...table,
+  })),
+
+  // Sample data for generic testing
+  test_entities: Array.from({ length: 100 }, (_, index) => ({
+    id: index + 1,
+    name: `Test Entity ${index + 1}`,
+    description: `Description for test entity ${index + 1}`,
+    status: index % 3 === 0 ? 'active' : index % 3 === 1 ? 'inactive' : 'pending',
+    created_date: new Date(Date.now() - Math.random() * 10000000000).toISOString(),
+    last_modified_date: new Date(Date.now() - Math.random() * 1000000000).toISOString(),
+    created_by_id: Math.floor(Math.random() * 3) + 1,
+    last_modified_by_id: Math.floor(Math.random() * 3) + 1,
+    category: ['category-a', 'category-b', 'category-c'][index % 3],
+    priority: Math.floor(Math.random() * 5) + 1,
+    tags: [`tag-${index % 5}`, `tag-${(index + 1) % 5}`],
+  })),
 };
 
-// ============================================================================
-// UTILITY FUNCTIONS FOR CRUD OPERATIONS
-// ============================================================================
-
 /**
- * Resolves the appropriate mock data source for a given API path
- * Handles both system endpoints and service-specific endpoints
- * 
- * @param path - API path (e.g., "/api/v2/system/service" or "/api/v2/mysql/_schema")
- * @returns Mock data configuration or null if not found
+ * Gets the next available ID for a resource type
  */
-function resolveMockDataSource(path: string): MockDataMapping[string] | null {
-  // Handle system API endpoints
-  if (isSystemApiPath(path)) {
-    const systemMatch = path.match(/\/(?:system\/)?api\/v2\/system\/(.+?)(?:\/|$)/);
-    if (systemMatch) {
-      const entityType = systemMatch[1].split('/')[0]; // Get first part for nested endpoints
-      return mockDataMapping[`system/${entityType}`] || null;
-    }
-    return null;
-  }
-
-  // Handle service API endpoints
-  if (isServiceApiPath(path)) {
-    const serviceName = extractServiceName(path);
-    const resourcePath = extractResourcePath(path);
-    
-    if (!serviceName || !resourcePath) return null;
-
-    // Special handling for schema endpoints
-    if (resourcePath.startsWith('/_schema')) {
-      const schemaData = mockDataMapping['_schema'];
-      // Dynamically populate schema data based on service
-      return {
-        ...schemaData,
-        data: mockSchemaTables,
-        totalCount: mockSchemaTables.length,
-      };
-    }
-
-    // Handle table-specific endpoints
-    if (resourcePath.includes('/_table')) {
-      return mockDataMapping['_table'];
-    }
-
-    // For other service endpoints, try to match known patterns
-    const resourceType = resourcePath.split('/')[1] || resourcePath.substring(1);
-    return mockDataMapping[resourceType] || null;
-  }
-
-  return null;
+function getNextId(resourceType: string): number {
+  const resources = mockDataStore[resourceType] || [];
+  const numericIds = resources
+    .map(r => typeof r.id === 'number' ? r.id : parseInt(String(r.id), 10))
+    .filter(id => !isNaN(id));
+  
+  return numericIds.length > 0 ? Math.max(...numericIds) + 1 : 1;
 }
 
 /**
- * Validates and processes query parameters for CRUD operations
- * Supports DreamFactory's query parameter patterns including pagination,
- * filtering, sorting, and field selection
- * 
- * @param url - Request URL with query parameters
- * @returns Processed query parameters object
+ * Adds timestamp fields to a resource
  */
-function processQueryParameters(url: string): QueryParams {
-  const params = extractQueryParams(url);
+function addTimestamps(resource: GenericResource, isUpdate: boolean = false): GenericResource {
+  const now = new Date().toISOString();
   
-  // Normalize pagination parameters
-  const limit = params.limit && !isNaN(params.limit) ? Math.min(Math.max(1, params.limit), 1000) : 25;
-  const offset = params.offset && !isNaN(params.offset) ? Math.max(0, params.offset) : 0;
-  
-  // Process field selection
-  let fields: string[] | undefined;
-  if (params.fields && typeof params.fields === 'string') {
-    fields = params.fields.split(',').map(f => f.trim()).filter(Boolean);
+  if (!isUpdate) {
+    resource.created_date = now;
+    resource.created_by_id = 1; // Default to admin user
   }
   
-  // Process ordering
-  let order: string | undefined;
-  if (params.order && typeof params.order === 'string') {
-    // Support both "field ASC" and "field,DESC" formats
-    order = params.order.replace(/,/g, ' ');
-  }
-
-  return {
-    limit,
-    offset,
-    include_count: params.include_count === true || params.include_count === 'true',
-    filter: params.filter || undefined,
-    fields,
-    order,
-    // Pass through any additional parameters
-    ...params,
-  };
-}
-
-/**
- * Applies field selection to data, returning only requested fields
- * 
- * @param data - Source data array
- * @param fields - Array of field names to include
- * @returns Data with only selected fields
- */
-function applyFieldSelection<T extends Record<string, any>>(data: T[], fields?: string[]): T[] {
-  if (!fields || fields.length === 0) return data;
+  resource.last_modified_date = now;
+  resource.last_modified_by_id = 1; // Default to admin user
   
-  return data.map(item => {
-    const filtered: Record<string, any> = {};
-    fields.forEach(field => {
-      if (field in item) {
-        filtered[field] = item[field];
-      }
-    });
-    return filtered as T;
-  });
-}
-
-/**
- * Validates required fields for create/update operations
- * 
- * @param data - Data to validate
- * @param requiredFields - Array of required field names
- * @returns Validation result with errors if any
- */
-function validateRequiredFields(
-  data: Record<string, any>, 
-  requiredFields: string[]
-): { valid: boolean; errors: Array<{ field: string; message: string }> } {
-  const errors: Array<{ field: string; message: string }> = [];
-  
-  requiredFields.forEach(field => {
-    if (!(field in data) || data[field] === null || data[field] === undefined || data[field] === '') {
-      errors.push({
-        field,
-        message: `${field} is required`,
-      });
-    }
-  });
-  
-  return {
-    valid: errors.length === 0,
-    errors,
-  };
-}
-
-/**
- * Validates unique field constraints for create/update operations
- * 
- * @param data - Data to validate
- * @param uniqueFields - Array of unique field names
- * @param existingData - Existing data to check against
- * @param excludeId - ID to exclude from uniqueness check (for updates)
- * @returns Validation result with errors if any
- */
-function validateUniqueFields(
-  data: Record<string, any>,
-  uniqueFields: string[],
-  existingData: GenericResource[],
-  excludeId?: string | number
-): { valid: boolean; errors: Array<{ field: string; message: string }> } {
-  const errors: Array<{ field: string; message: string }> = [];
-  
-  uniqueFields.forEach(field => {
-    if (field in data) {
-      const existingItem = existingData.find(item => 
-        item[field] === data[field] && 
-        (excludeId === undefined || item.id !== excludeId)
-      );
-      
-      if (existingItem) {
-        errors.push({
-          field,
-          message: `${field} '${data[field]}' already exists`,
-        });
-      }
-    }
-  });
-  
-  return {
-    valid: errors.length === 0,
-    errors,
-  };
-}
-
-/**
- * Generates a new ID for created resources
- * 
- * @param existingData - Existing data to determine next ID
- * @param idField - Name of the ID field
- * @returns New unique ID
- */
-function generateNewId(existingData: GenericResource[], idField: string = 'id'): number {
-  const maxId = existingData.reduce((max, item) => {
-    const id = Number(item[idField]);
-    return isNaN(id) ? max : Math.max(max, id);
-  }, 0);
-  
-  return maxId + 1;
-}
-
-/**
- * Creates a timestamp in ISO format
- * 
- * @returns Current timestamp string
- */
-function createTimestamp(): string {
-  return new Date().toISOString();
+  return resource;
 }
 
 // ============================================================================
-// AUTHENTICATION AND AUTHORIZATION HELPERS
+// CORE CRUD OPERATIONS
 // ============================================================================
 
 /**
- * Validates request authentication and authorization
- * 
- * @param request - MSW request object
- * @param requireAuth - Whether authentication is required
- * @returns Authorization context and validation result
+ * Generic GET handler for listing resources with pagination, filtering, and sorting
  */
-function validateRequestAuth(
-  request: Request, 
-  requireAuth: boolean = true
-): { authContext: AuthContext; errorResponse?: HttpResponse } {
-  const authValidation = validateAuthHeaders(request);
-  
-  if (requireAuth && !authValidation.isValid) {
-    if (!authValidation.hasApiKey) {
-      return {
-        authContext: authValidation,
-        errorResponse: createUnauthorizedError('Missing API key - X-DreamFactory-API-Key header required'),
-      };
-    }
-    if (!authValidation.isSessionTokenValid) {
-      return {
-        authContext: authValidation,
-        errorResponse: createUnauthorizedError('Invalid session token'),
-      };
-    }
-  }
+export async function handleList(context: CrudContext): Promise<HttpResponse> {
+  const { serviceName, resourceName, auth, queryParams } = context;
 
-  return {
-    authContext: authValidation,
-  };
-}
-
-/**
- * Checks if the authenticated user has permission for the requested operation
- * 
- * @param authContext - Authentication context
- * @param operation - Operation being performed ('read', 'create', 'update', 'delete')
- * @param resource - Resource being accessed
- * @returns True if authorized, false otherwise
- */
-function checkResourcePermission(
-  authContext: AuthContext,
-  operation: 'read' | 'create' | 'update' | 'delete',
-  resource: string
-): boolean {
-  // In a real implementation, this would check user roles and permissions
-  // For testing purposes, we'll allow most operations for authenticated users
-  if (!authContext.isAuthenticated) {
-    return operation === 'read'; // Allow anonymous read for some resources
-  }
-  
-  // System administrators have full access
-  if (authContext.sessionToken && authContext.sessionToken.includes('admin')) {
-    return true;
-  }
-  
-  // Basic permission checks based on resource type
-  if (resource.includes('system/admin') && operation !== 'read') {
-    return false; // Only admins can modify admin records
-  }
-  
-  return true; // Allow other operations for authenticated users
-}
-
-// ============================================================================
-// CORE CRUD OPERATION HANDLERS
-// ============================================================================
-
-/**
- * Generic GET handler for retrieving resources
- * Supports pagination, filtering, sorting, and field selection
- * 
- * @param path - API path
- * @param request - MSW request object
- * @returns HTTP response with resource data
- */
-async function handleGetRequest(path: string, request: Request): Promise<HttpResponse> {
+  // Simulate network delay
   await simulateNetworkDelay();
-  logRequest(request, 'GET');
 
   // Validate authentication
-  const { authContext, errorResponse } = validateRequestAuth(request, false);
-  if (errorResponse) return errorResponse;
-
-  // Check authorization
-  if (!checkResourcePermission(authContext, 'read', path)) {
-    return createForbiddenError('Insufficient permissions to read this resource');
+  if (!auth.isValid) {
+    return createAuthenticationRequiredError('API key required for resource access');
   }
 
-  // Resolve mock data source
-  const dataSource = resolveMockDataSource(path);
-  if (!dataSource) {
-    return createServiceNotFoundError(extractServiceName(path) || 'unknown');
-  }
+  // Get resources from data store
+  let resources = mockDataStore[resourceName] || [];
 
-  // Process query parameters
-  const queryParams = processQueryParameters(request.url);
-  
-  // Extract ID from path for single resource requests
-  const idMatch = path.match(/\/(\d+|[a-f0-9-]+)$/);
-  const resourceId = idMatch ? idMatch[1] : null;
-
-  // Handle single resource request
-  if (resourceId) {
-    const resource = dataSource.data.find(item => 
-      String(item[dataSource.idField || 'id']) === resourceId
-    );
-    
-    if (!resource) {
-      return createRecordNotFoundError(resourceId, extractServiceName(path));
-    }
-
-    // Apply field selection if requested
-    const selectedData = applyFieldSelection([resource], queryParams.fields);
-    
-    return createJsonResponse(selectedData[0]);
-  }
-
-  // Handle list request with filtering, sorting, and pagination
-  let filteredData = [...dataSource.data];
-
-  // Apply text-based filtering
+  // Apply filtering
   if (queryParams.filter) {
-    filteredData = applyFilter(filteredData, queryParams.filter);
+    resources = applyFilter(resources, queryParams.filter);
   }
 
   // Apply sorting
   if (queryParams.order) {
-    filteredData = applySort(filteredData, queryParams.order);
+    resources = applySort(resources, queryParams.order);
   }
-
-  // Calculate pagination metadata
-  const totalCount = filteredData.length;
-  const meta = createPaginationMeta(totalCount, queryParams.limit, queryParams.offset);
-
-  // Apply pagination
-  const paginatedData = paginateData(filteredData, queryParams.limit, queryParams.offset);
 
   // Apply field selection
-  const selectedData = applyFieldSelection(paginatedData, queryParams.fields);
-
-  // Build response
-  const response: DreamFactoryResponse<GenericResource> = {
-    resource: selectedData,
-  };
-
-  // Include metadata if requested or if using pagination
-  if (queryParams.include_count || queryParams.limit || queryParams.offset) {
-    response.meta = meta;
+  if (queryParams.fields) {
+    const fields = queryParams.fields.split(',').map(f => f.trim());
+    resources = resources.map(resource => {
+      const filteredResource: GenericResource = {};
+      fields.forEach(field => {
+        if (resource.hasOwnProperty(field)) {
+          filteredResource[field] = resource[field];
+        }
+      });
+      return filteredResource;
+    });
   }
 
-  return createJsonResponse(response);
+  // Apply pagination
+  const limit = Math.min(queryParams.limit || 25, 1000); // Cap at 1000
+  const offset = queryParams.offset || 0;
+  const { data: paginatedData, meta } = applyPagination(resources, limit, offset);
+
+  // Include total count if requested
+  if (queryParams.include_count) {
+    meta.total = resources.length;
+  }
+
+  return createListResponse(paginatedData, meta);
 }
 
 /**
- * Generic POST handler for creating resources
- * Supports both single resource and bulk creation
- * 
- * @param path - API path
- * @param request - MSW request object
- * @returns HTTP response with created resource data
+ * Generic GET handler for retrieving a single resource by ID
  */
-async function handlePostRequest(path: string, request: Request): Promise<HttpResponse> {
+export async function handleGet(context: CrudContext): Promise<HttpResponse> {
+  const { serviceName, resourceName, resourceId, auth, queryParams } = context;
+
+  // Simulate network delay
   await simulateNetworkDelay();
-  logRequest(request, 'POST');
 
   // Validate authentication
-  const { authContext, errorResponse } = validateRequestAuth(request, true);
-  if (errorResponse) return errorResponse;
-
-  // Check authorization
-  if (!checkResourcePermission(authContext, 'create', path)) {
-    return createForbiddenError('Insufficient permissions to create resources');
+  if (!auth.isValid) {
+    return createAuthenticationRequiredError('API key required for resource access');
   }
 
-  // Resolve mock data source
-  const dataSource = resolveMockDataSource(path);
-  if (!dataSource) {
-    return createServiceNotFoundError(extractServiceName(path) || 'unknown');
+  // Validate resource ID
+  if (!resourceId || Array.isArray(resourceId)) {
+    return createInvalidParameterError('id', 'Single resource ID is required');
   }
 
-  // Handle file upload requests
-  const contentType = request.headers.get('Content-Type') || '';
-  if (contentType.includes('multipart/form-data')) {
-    return handleFileUpload(path, request, dataSource);
+  // Find resource in data store
+  const resources = mockDataStore[resourceName] || [];
+  const resource = resources.find(r => String(r.id) === String(resourceId));
+
+  if (!resource) {
+    return createResourceNotFoundError(resourceName, resourceId);
   }
 
-  // Process request body
-  const requestBody = await processRequestBody(request);
-  if (!requestBody) {
-    return createBadRequestError('Invalid request body');
+  // Apply field selection
+  let result = resource;
+  if (queryParams.fields) {
+    const fields = queryParams.fields.split(',').map(f => f.trim());
+    result = {};
+    fields.forEach(field => {
+      if (resource.hasOwnProperty(field)) {
+        result[field] = resource[field];
+      }
+    });
   }
 
-  // Determine if this is a bulk operation
-  const isBulkOperation = 'resource' in requestBody && Array.isArray(requestBody.resource);
-  const resources = isBulkOperation ? requestBody.resource : [requestBody];
+  return createJsonResponse(result);
+}
 
-  // Validate each resource
-  const validationErrors: Array<{ field: string; message: string }> = [];
-  const createdResources: GenericResource[] = [];
+/**
+ * Generic POST handler for creating new resources
+ */
+export async function handleCreate(context: CrudContext): Promise<HttpResponse> {
+  const { serviceName, resourceName, auth, requestBody } = context;
 
-  for (let i = 0; i < resources.length; i++) {
-    const resource = resources[i];
-    
-    // Validate required fields
-    const requiredValidation = validateRequiredFields(resource, dataSource.requiredFields || []);
-    if (!requiredValidation.valid) {
-      validationErrors.push(...requiredValidation.errors.map(error => ({
-        field: isBulkOperation ? `resource[${i}].${error.field}` : error.field,
-        message: error.message,
-      })));
-      continue;
-    }
+  // Simulate network delay
+  await simulateNetworkDelay();
 
-    // Validate unique fields
-    const uniqueValidation = validateUniqueFields(
-      resource, 
-      dataSource.uniqueFields || [], 
-      [...dataSource.data, ...createdResources]
-    );
-    if (!uniqueValidation.valid) {
-      validationErrors.push(...uniqueValidation.errors.map(error => ({
-        field: isBulkOperation ? `resource[${i}].${error.field}` : error.field,
-        message: error.message,
-      })));
-      continue;
-    }
-
-    // Create new resource with generated ID and timestamps
-    const newResource: GenericResource = {
-      ...resource,
-      [dataSource.idField || 'id']: generateNewId(dataSource.data, dataSource.idField),
-      created_date: createTimestamp(),
-      last_modified_date: createTimestamp(),
-      created_by_id: 1, // Mock user ID
-      last_modified_by_id: 1,
-    };
-
-    createdResources.push(newResource);
-    dataSource.data.push(newResource);
+  // Validate authentication
+  if (!auth.isValid) {
+    return createAuthenticationRequiredError('API key required for resource creation');
   }
 
-  // Return validation errors if any
-  if (validationErrors.length > 0) {
-    return createMultipleFieldValidationErrors(validationErrors);
+  // Validate request body
+  if (!requestBody || (typeof requestBody !== 'object')) {
+    return createValidationError('Request body is required for resource creation');
   }
 
-  // Return created resources
-  const response = isBulkOperation ? 
-    { resource: createdResources } : 
-    createdResources[0];
+  const body = requestBody as Record<string, unknown>;
 
-  return createJsonResponse(response, { status: 201 });
+  // Handle bulk creation (array of resources)
+  if (body.resource && Array.isArray(body.resource)) {
+    return handleBulkCreate(context, body.resource);
+  }
+
+  // Handle single resource creation
+  const resourceData = body.resource || body;
+  
+  // Validate required fields (basic validation)
+  const requiredFields = ['name']; // Most DreamFactory resources require a name
+  const validation = validateRequiredFields(resourceData as Record<string, unknown>, requiredFields);
+  
+  if (!validation.isValid && resourceName !== 'test_entities') {
+    const fieldErrors: FieldErrors = {};
+    validation.missingFields.forEach(field => {
+      fieldErrors[field] = [`${field} is required`];
+    });
+    return createFormValidationError(fieldErrors);
+  }
+
+  // Create new resource
+  const newResource: GenericResource = {
+    ...resourceData,
+    id: getNextId(resourceName),
+  };
+
+  // Add timestamps
+  addTimestamps(newResource);
+
+  // Add to data store
+  if (!mockDataStore[resourceName]) {
+    mockDataStore[resourceName] = [];
+  }
+  mockDataStore[resourceName].push(newResource);
+
+  return createJsonResponse(newResource, 201);
 }
 
 /**
  * Generic PUT/PATCH handler for updating resources
- * Supports both single resource and bulk updates
- * 
- * @param path - API path
- * @param request - MSW request object
- * @returns HTTP response with updated resource data
  */
-async function handlePutPatchRequest(path: string, request: Request): Promise<HttpResponse> {
+export async function handleUpdate(context: CrudContext): Promise<HttpResponse> {
+  const { serviceName, resourceName, resourceId, auth, requestBody } = context;
+
+  // Simulate network delay
   await simulateNetworkDelay();
-  logRequest(request, request.method);
 
   // Validate authentication
-  const { authContext, errorResponse } = validateRequestAuth(request, true);
-  if (errorResponse) return errorResponse;
-
-  // Check authorization
-  if (!checkResourcePermission(authContext, 'update', path)) {
-    return createForbiddenError('Insufficient permissions to update resources');
+  if (!auth.isValid) {
+    return createAuthenticationRequiredError('API key required for resource updates');
   }
 
-  // Resolve mock data source
-  const dataSource = resolveMockDataSource(path);
-  if (!dataSource) {
-    return createServiceNotFoundError(extractServiceName(path) || 'unknown');
+  // Validate resource ID
+  if (!resourceId || Array.isArray(resourceId)) {
+    return createInvalidParameterError('id', 'Single resource ID is required for updates');
   }
 
-  // Extract ID from path for single resource updates
-  const idMatch = path.match(/\/(\d+|[a-f0-9-]+)$/);
-  const resourceId = idMatch ? idMatch[1] : null;
-
-  // Process request body
-  const requestBody = await processRequestBody(request);
-  if (!requestBody) {
-    return createBadRequestError('Invalid request body');
+  // Validate request body
+  if (!requestBody || (typeof requestBody !== 'object')) {
+    return createValidationError('Request body is required for resource updates');
   }
 
-  // Handle single resource update
-  if (resourceId) {
-    const existingResourceIndex = dataSource.data.findIndex(item => 
-      String(item[dataSource.idField || 'id']) === resourceId
-    );
-    
-    if (existingResourceIndex === -1) {
-      return createRecordNotFoundError(resourceId, extractServiceName(path));
-    }
+  // Find resource in data store
+  const resources = mockDataStore[resourceName] || [];
+  const resourceIndex = resources.findIndex(r => String(r.id) === String(resourceId));
 
-    const existingResource = dataSource.data[existingResourceIndex];
-    
-    // Validate unique fields (excluding current resource)
-    const uniqueValidation = validateUniqueFields(
-      requestBody, 
-      dataSource.uniqueFields || [], 
-      dataSource.data,
-      existingResource[dataSource.idField || 'id']
-    );
-    
-    if (!uniqueValidation.valid) {
-      return createMultipleFieldValidationErrors(uniqueValidation.errors);
-    }
-
-    // Update resource
-    const updatedResource: GenericResource = {
-      ...existingResource,
-      ...requestBody,
-      [dataSource.idField || 'id']: existingResource[dataSource.idField || 'id'], // Preserve ID
-      created_date: existingResource.created_date, // Preserve creation date
-      last_modified_date: createTimestamp(),
-      last_modified_by_id: 1, // Mock user ID
-    };
-
-    dataSource.data[existingResourceIndex] = updatedResource;
-    
-    return createJsonResponse(updatedResource);
+  if (resourceIndex === -1) {
+    return createResourceNotFoundError(resourceName, resourceId);
   }
 
-  // Handle bulk updates (if resource array is provided)
-  const isBulkOperation = 'resource' in requestBody && Array.isArray(requestBody.resource);
-  if (isBulkOperation) {
-    const validationErrors: Array<{ field: string; message: string }> = [];
-    const updatedResources: GenericResource[] = [];
+  // Update resource
+  const updateData = requestBody as Record<string, unknown>;
+  const updatedResource = {
+    ...resources[resourceIndex],
+    ...updateData,
+    id: resources[resourceIndex].id, // Preserve original ID
+  };
 
-    for (let i = 0; i < requestBody.resource.length; i++) {
-      const resource = requestBody.resource[i];
-      const resourceIdValue = resource[dataSource.idField || 'id'];
-      
-      if (!resourceIdValue) {
-        validationErrors.push({
-          field: `resource[${i}].${dataSource.idField || 'id'}`,
-          message: 'ID is required for updates',
-        });
-        continue;
-      }
+  // Add timestamps
+  addTimestamps(updatedResource, true);
 
-      const existingResourceIndex = dataSource.data.findIndex(item => 
-        String(item[dataSource.idField || 'id']) === String(resourceIdValue)
-      );
-      
-      if (existingResourceIndex === -1) {
-        validationErrors.push({
-          field: `resource[${i}].${dataSource.idField || 'id'}`,
-          message: `Resource with ID '${resourceIdValue}' not found`,
-        });
-        continue;
-      }
+  // Update in data store
+  mockDataStore[resourceName][resourceIndex] = updatedResource;
 
-      const existingResource = dataSource.data[existingResourceIndex];
-      
-      // Update resource
-      const updatedResource: GenericResource = {
-        ...existingResource,
-        ...resource,
-        [dataSource.idField || 'id']: existingResource[dataSource.idField || 'id'],
-        created_date: existingResource.created_date,
-        last_modified_date: createTimestamp(),
-        last_modified_by_id: 1,
-      };
-
-      dataSource.data[existingResourceIndex] = updatedResource;
-      updatedResources.push(updatedResource);
-    }
-
-    if (validationErrors.length > 0) {
-      return createMultipleFieldValidationErrors(validationErrors);
-    }
-
-    return createJsonResponse({ resource: updatedResources });
-  }
-
-  return createBadRequestError('Invalid update request - resource ID required');
+  return createJsonResponse(updatedResource);
 }
 
 /**
  * Generic DELETE handler for removing resources
- * Supports both single resource and bulk deletion
- * 
- * @param path - API path
- * @param request - MSW request object
- * @returns HTTP response confirming deletion
  */
-async function handleDeleteRequest(path: string, request: Request): Promise<HttpResponse> {
+export async function handleDelete(context: CrudContext): Promise<HttpResponse> {
+  const { serviceName, resourceName, resourceId, auth } = context;
+
+  // Simulate network delay
   await simulateNetworkDelay();
-  logRequest(request, 'DELETE');
 
   // Validate authentication
-  const { authContext, errorResponse } = validateRequestAuth(request, true);
-  if (errorResponse) return errorResponse;
-
-  // Check authorization
-  if (!checkResourcePermission(authContext, 'delete', path)) {
-    return createForbiddenError('Insufficient permissions to delete resources');
+  if (!auth.isValid) {
+    return createAuthenticationRequiredError('API key required for resource deletion');
   }
 
-  // Resolve mock data source
-  const dataSource = resolveMockDataSource(path);
-  if (!dataSource) {
-    return createServiceNotFoundError(extractServiceName(path) || 'unknown');
+  // Validate resource ID
+  if (!resourceId) {
+    return createInvalidParameterError('id', 'Resource ID is required for deletion');
   }
 
-  // Process query parameters for bulk deletion
-  const queryParams = processQueryParameters(request.url);
-  
-  // Extract ID from path for single resource deletion
-  const idMatch = path.match(/\/(\d+|[a-f0-9-]+)$/);
-  const resourceId = idMatch ? idMatch[1] : null;
-
-  // Handle bulk deletion via query parameter (e.g., ?ids=1,2,3)
-  if (queryParams.ids && typeof queryParams.ids === 'string') {
-    const idsToDelete = queryParams.ids.split(',').map(id => id.trim());
-    const deletedResources: GenericResource[] = [];
-    const notFoundIds: string[] = [];
-
-    idsToDelete.forEach(id => {
-      const resourceIndex = dataSource.data.findIndex(item => 
-        String(item[dataSource.idField || 'id']) === id
-      );
-      
-      if (resourceIndex !== -1) {
-        const deletedResource = dataSource.data.splice(resourceIndex, 1)[0];
-        deletedResources.push(deletedResource);
-      } else {
-        notFoundIds.push(id);
-      }
-    });
-
-    if (notFoundIds.length > 0) {
-      return createNotFoundError(`Resources not found: ${notFoundIds.join(', ')}`);
-    }
-
-    return createJsonResponse({ 
-      resource: deletedResources.map(r => ({ 
-        [dataSource.idField || 'id']: r[dataSource.idField || 'id'] 
-      }))
-    });
+  // Handle bulk deletion (comma-separated IDs)
+  if (Array.isArray(resourceId)) {
+    return handleBulkDelete(context, resourceId);
   }
 
   // Handle single resource deletion
-  if (resourceId) {
-    const resourceIndex = dataSource.data.findIndex(item => 
-      String(item[dataSource.idField || 'id']) === resourceId
-    );
-    
-    if (resourceIndex === -1) {
-      return createRecordNotFoundError(resourceId, extractServiceName(path));
+  const resources = mockDataStore[resourceName] || [];
+  const resourceIndex = resources.findIndex(r => String(r.id) === String(resourceId));
+
+  if (resourceIndex === -1) {
+    return createResourceNotFoundError(resourceName, resourceId);
+  }
+
+  // Remove from data store
+  const deletedResource = mockDataStore[resourceName].splice(resourceIndex, 1)[0];
+
+  return createJsonResponse({ id: deletedResource.id });
+}
+
+// ============================================================================
+// BULK OPERATIONS
+// ============================================================================
+
+/**
+ * Handles bulk creation of multiple resources
+ */
+async function handleBulkCreate(context: CrudContext, resources: unknown[]): Promise<HttpResponse> {
+  const { resourceName } = context;
+  const results: GenericResource[] = [];
+  const errors: Array<{ id: string | number; error: string }> = [];
+
+  for (let i = 0; i < resources.length; i++) {
+    try {
+      const resourceData = resources[i] as Record<string, unknown>;
+      
+      // Create new resource
+      const newResource: GenericResource = {
+        ...resourceData,
+        id: getNextId(resourceName),
+      };
+
+      // Add timestamps
+      addTimestamps(newResource);
+
+      // Add to data store
+      if (!mockDataStore[resourceName]) {
+        mockDataStore[resourceName] = [];
+      }
+      mockDataStore[resourceName].push(newResource);
+      results.push(newResource);
+
+    } catch (error) {
+      errors.push({
+        id: i,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
     }
-
-    const deletedResource = dataSource.data.splice(resourceIndex, 1)[0];
-    
-    return createJsonResponse({ 
-      [dataSource.idField || 'id']: deletedResource[dataSource.idField || 'id'] 
-    });
   }
 
-  return createBadRequestError('Invalid delete request - resource ID or ids parameter required');
-}
+  const bulkResult: BulkOperationResult = {
+    success: results.length,
+    failed: errors.length,
+    errors,
+    results,
+  };
 
-// ============================================================================
-// FILE OPERATION HANDLERS
-// ============================================================================
-
-/**
- * Handles file upload operations with FormData support
- * 
- * @param path - API path
- * @param request - MSW request object
- * @param dataSource - Mock data source configuration
- * @returns HTTP response with upload results
- */
-async function handleFileUpload(
-  path: string, 
-  request: Request, 
-  dataSource: MockDataMapping[string]
-): Promise<HttpResponse> {
-  try {
-    // In a real implementation, this would process the FormData
-    // For mocking purposes, we'll simulate successful file uploads
-    const mockFiles = [
-      {
-        name: 'uploaded_file.csv',
-        path: '/uploads/uploaded_file.csv',
-        size: 1024,
-        type: 'text/csv',
-        uploaded_at: createTimestamp(),
-      },
-      {
-        name: 'data_import.json',
-        path: '/uploads/data_import.json',
-        size: 2048,
-        type: 'application/json',
-        uploaded_at: createTimestamp(),
-      },
-    ];
-
-    // Simulate processing uploaded files
-    await simulateNetworkDelay(1000); // Longer delay for file operations
-
-    return createJsonResponse({
-      resource: mockFiles,
-      meta: {
-        count: mockFiles.length,
-        total: mockFiles.length,
-      },
-    }, { status: 201 });
-
-  } catch (error) {
-    return createServerError('File upload failed');
-  }
+  return createJsonResponse({ resource: results, meta: bulkResult });
 }
 
 /**
- * Handles file download operations
- * 
- * @param path - API path
- * @param request - MSW request object
- * @returns HTTP response with file data
+ * Handles bulk deletion of multiple resources
  */
-async function handleFileDownload(path: string, request: Request): Promise<HttpResponse> {
+async function handleBulkDelete(context: CrudContext, resourceIds: string[]): Promise<HttpResponse> {
+  const { resourceName } = context;
+  const results: { id: string | number }[] = [];
+  const errors: Array<{ id: string | number; error: string }> = [];
+
+  for (const resourceId of resourceIds) {
+    try {
+      const resources = mockDataStore[resourceName] || [];
+      const resourceIndex = resources.findIndex(r => String(r.id) === String(resourceId));
+
+      if (resourceIndex === -1) {
+        errors.push({
+          id: resourceId,
+          error: `Resource with ID '${resourceId}' not found`,
+        });
+        continue;
+      }
+
+      // Remove from data store
+      const deletedResource = mockDataStore[resourceName].splice(resourceIndex, 1)[0];
+      results.push({ id: deletedResource.id });
+
+    } catch (error) {
+      errors.push({
+        id: resourceId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
+  const bulkResult: BulkOperationResult = {
+    success: results.length,
+    failed: errors.length,
+    errors,
+    results: results as GenericResource[],
+  };
+
+  return createJsonResponse({ resource: results, meta: bulkResult });
+}
+
+// ============================================================================
+// FILE OPERATIONS
+// ============================================================================
+
+/**
+ * Handles file upload operations
+ */
+export async function handleFileUpload(context: CrudContext): Promise<HttpResponse> {
+  const { serviceName, resourceName, auth, requestBody } = context;
+
+  // Simulate network delay for file processing
   await simulateNetworkDelay(500);
-  
-  // Extract file type from query parameters
-  const queryParams = processQueryParameters(request.url);
-  const format = queryParams.format || 'json';
 
-  // Generate mock file content based on format
-  if (format === 'csv') {
-    const csvContent = 'id,name,email,created_date\n1,John Doe,john@example.com,2024-01-01\n2,Jane Smith,jane@example.com,2024-01-02';
-    
-    return new HttpResponse(csvContent, {
-      status: 200,
-      headers: {
-        'Content-Type': 'text/csv',
-        'Content-Disposition': 'attachment; filename="export.csv"',
-      },
-    });
+  // Validate authentication
+  if (!auth.isValid) {
+    return createAuthenticationRequiredError('API key required for file uploads');
   }
 
-  if (format === 'xlsx') {
-    // Mock Excel file content (binary)
-    const mockExcelData = new Uint8Array([0x50, 0x4B, 0x03, 0x04]); // ZIP header for XLSX
-    
-    return new HttpResponse(mockExcelData, {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': 'attachment; filename="export.xlsx"',
-      },
-    });
+  // Process FormData
+  if (!(requestBody instanceof FormData)) {
+    return createValidationError('File upload requires multipart/form-data');
   }
 
-  // Default to JSON export
-  const jsonData = {
-    resource: mockDatabaseServices.slice(0, 5), // Sample data
-    exported_at: createTimestamp(),
-    format: 'json',
-  };
+  const formData = formDataToObject(requestBody);
+  const files: FileUploadResult[] = [];
 
-  return HttpResponse.json(jsonData, {
-    status: 200,
-    headers: {
-      'Content-Disposition': 'attachment; filename="export.json"',
-    },
-  });
-}
-
-// ============================================================================
-// SPECIALIZED ENDPOINT HANDLERS
-// ============================================================================
-
-/**
- * Handles database connection testing
- * 
- * @param request - MSW request object
- * @returns HTTP response with connection test results
- */
-async function handleConnectionTest(request: Request): Promise<HttpResponse> {
-  await simulateNetworkDelay(2000); // Simulate connection time
-  
-  const requestBody = await processRequestBody(request);
-  if (!requestBody) {
-    return createBadRequestError('Connection configuration required');
+  // Process uploaded files
+  for (const [key, value] of Object.entries(formData)) {
+    if (value instanceof File) {
+      const result: FileUploadResult = {
+        filename: value.name,
+        size: value.size,
+        type: value.type,
+        url: `/uploads/${resourceName}/${Date.now()}_${value.name}`,
+        success: true,
+        message: 'File uploaded successfully',
+      };
+      files.push(result);
+    }
   }
 
-  // Simulate different connection outcomes based on host
-  const host = requestBody.host || '';
-  
-  if (host.includes('invalid') || host.includes('error')) {
-    return createJsonResponse({
-      success: false,
-      message: 'Connection failed',
-      details: 'Unable to connect to database server',
-      test_duration: 5000,
-      timestamp: createTimestamp(),
-      error_code: 'CONNECTION_FAILED',
-    }, { status: 400 });
+  if (files.length === 0) {
+    return createValidationError('No files were uploaded');
   }
 
-  if (host.includes('timeout')) {
-    return createJsonResponse({
-      success: false,
-      message: 'Connection timeout',
-      details: 'Database server did not respond within the timeout period',
-      test_duration: 30000,
-      timestamp: createTimestamp(),
-      error_code: 'CONNECTION_TIMEOUT',
-    }, { status: 408 });
-  }
-
-  // Default successful connection
   return createJsonResponse({
-    success: true,
-    message: 'Connection successful',
-    details: `Successfully connected to ${host} in 1.2 seconds`,
-    test_duration: 1200,
-    timestamp: createTimestamp(),
+    resource: files.length === 1 ? files[0] : files,
+    meta: {
+      total_files: files.length,
+      total_size: files.reduce((sum, file) => sum + file.size, 0),
+    },
   });
 }
 
 /**
- * Handles schema discovery operations
- * 
- * @param serviceName - Database service name
- * @param request - MSW request object
- * @returns HTTP response with schema data
+ * Handles file import operations (CSV, JSON, etc.)
  */
-async function handleSchemaDiscovery(serviceName: string, request: Request): Promise<HttpResponse> {
-  await simulateNetworkDelay(3000); // Simulate schema discovery time
+export async function handleFileImport(context: CrudContext): Promise<HttpResponse> {
+  const { serviceName, resourceName, auth, requestBody } = context;
+
+  // Simulate network delay for file processing
+  await simulateNetworkDelay(1000);
+
+  // Validate authentication
+  if (!auth.isValid) {
+    return createAuthenticationRequiredError('API key required for file imports');
+  }
+
+  // Process FormData
+  if (!(requestBody instanceof FormData)) {
+    return createValidationError('File import requires multipart/form-data');
+  }
+
+  const formData = formDataToObject(requestBody);
   
-  // Return mock schema data for the service
-  const schemaData = {
-    resource: mockSchemaTables,
-    meta: {
-      service_name: serviceName,
-      discovered_at: createTimestamp(),
-      total_tables: mockSchemaTables.length,
-      total_fields: mockSchemaTables.reduce((sum, table) => sum + table.fields.length, 0),
-    },
+  // Mock import processing
+  const importResults = {
+    total_records: Math.floor(Math.random() * 1000) + 100,
+    imported_records: Math.floor(Math.random() * 900) + 90,
+    failed_records: Math.floor(Math.random() * 10),
+    processing_time: Math.floor(Math.random() * 5000) + 1000,
+    import_id: `import_${Date.now()}`,
+    status: 'completed',
   };
 
-  return createJsonResponse(schemaData);
+  return createJsonResponse({
+    resource: importResults,
+    meta: {
+      success_rate: ((importResults.imported_records / importResults.total_records) * 100).toFixed(2),
+    },
+  });
 }
 
 /**
- * Handles OpenAPI specification generation
- * 
- * @param serviceName - Database service name
- * @param request - MSW request object
- * @returns HTTP response with OpenAPI spec
+ * Handles JSON data export downloads
  */
-async function handleOpenApiGeneration(serviceName: string, request: Request): Promise<HttpResponse> {
-  await simulateNetworkDelay(1500);
-  
-  // Return mock OpenAPI specification
-  const openApiSpec = mockOpenApiSpecs[serviceName] || mockOpenApiSpecs.mysql_production;
-  
-  return createJsonResponse(openApiSpec);
+export async function handleJsonDownload(context: CrudContext): Promise<HttpResponse> {
+  const { serviceName, resourceName, auth, queryParams } = context;
+
+  // Simulate processing delay
+  await simulateNetworkDelay(300);
+
+  // Validate authentication
+  if (!auth.isValid) {
+    return createAuthenticationRequiredError('API key required for data export');
+  }
+
+  // Get resources for export
+  let resources = mockDataStore[resourceName] || [];
+
+  // Apply filtering and sorting for export
+  if (queryParams.filter) {
+    resources = applyFilter(resources, queryParams.filter);
+  }
+
+  if (queryParams.order) {
+    resources = applySort(resources, queryParams.order);
+  }
+
+  // Apply field selection
+  if (queryParams.fields) {
+    const fields = queryParams.fields.split(',').map(f => f.trim());
+    resources = resources.map(resource => {
+      const filteredResource: GenericResource = {};
+      fields.forEach(field => {
+        if (resource.hasOwnProperty(field)) {
+          filteredResource[field] = resource[field];
+        }
+      });
+      return filteredResource;
+    });
+  }
+
+  // Create JSON export
+  const exportData = {
+    export_info: {
+      timestamp: new Date().toISOString(),
+      service: serviceName,
+      resource: resourceName,
+      total_records: resources.length,
+      exported_by: auth.userId || 'anonymous',
+    },
+    data: resources,
+  };
+
+  const filename = `${resourceName}_export_${new Date().toISOString().split('T')[0]}.json`;
+  const jsonData = JSON.stringify(exportData, null, 2);
+
+  return createBlobResponse(jsonData, 'application/json', filename);
+}
+
+/**
+ * Handles blob file downloads (Excel, CSV, etc.)
+ */
+export async function handleBlobDownload(context: CrudContext): Promise<HttpResponse> {
+  const { serviceName, resourceName, auth, queryParams } = context;
+
+  // Simulate processing delay
+  await simulateNetworkDelay(500);
+
+  // Validate authentication
+  if (!auth.isValid) {
+    return createAuthenticationRequiredError('API key required for file downloads');
+  }
+
+  const format = queryParams.format || 'csv';
+  const filename = `${resourceName}_export_${new Date().toISOString().split('T')[0]}.${format}`;
+
+  // Mock file data based on format
+  let fileData: string;
+  let contentType: string;
+
+  switch (format) {
+    case 'csv':
+      fileData = 'id,name,created_date\n1,"Test Item 1","2024-01-01T00:00:00Z"\n2,"Test Item 2","2024-01-02T00:00:00Z"';
+      contentType = 'text/csv';
+      break;
+    case 'xlsx':
+      // Mock Excel binary data (would be actual binary in real implementation)
+      fileData = 'PK\x03\x04...'; // Mock Excel file header
+      contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      break;
+    default:
+      fileData = 'Unsupported format';
+      contentType = 'text/plain';
+  }
+
+  return createBlobResponse(fileData, contentType, filename);
 }
 
 // ============================================================================
@@ -1100,119 +789,339 @@ async function handleOpenApiGeneration(serviceName: string, request: Request): P
 // ============================================================================
 
 /**
- * Creates a comprehensive CRUD handler for any DreamFactory API endpoint
- * Automatically routes to appropriate operation handler based on HTTP method
- * 
- * @param pathPattern - URL pattern to match (supports wildcards)
- * @returns MSW RequestHandler for the specified pattern
+ * Creates MSW handlers for a specific service and resource type
  */
-export function createCrudHandler(pathPattern: string): RequestHandler {
-  return http.all(pathPattern, async ({ request }) => {
-    const method = request.method.toUpperCase();
-    const path = new URL(request.url).pathname;
+export function createCrudHandlers(
+  serviceName: string,
+  resourceName: string,
+  basePath?: string
+): HttpHandler[] {
+  const baseUrl = basePath || `/api/v2/${serviceName}/${resourceName}`;
 
-    try {
-      // Special handling for specific endpoints
-      if (path.includes('/test')) {
-        return handleConnectionTest(request);
+  return [
+    // List resources (GET /api/v2/{service}/{resource})
+    http.get(baseUrl, async ({ request }) => {
+      logRequest(request, { operation: 'list', service: serviceName, resource: resourceName });
+
+      const auth = validateAuthHeaders(request);
+      const queryParams = extractQueryParams(request);
+
+      const context: CrudContext = {
+        serviceName,
+        resourceName,
+        operation: 'list',
+        auth,
+        queryParams,
+      };
+
+      return handleList(context);
+    }),
+
+    // Get single resource (GET /api/v2/{service}/{resource}/{id})
+    http.get(`${baseUrl}/:id`, async ({ request, params }) => {
+      logRequest(request, { operation: 'get', service: serviceName, resource: resourceName });
+
+      const auth = validateAuthHeaders(request);
+      const queryParams = extractQueryParams(request);
+      const resourceId = extractIdFromPath(request.url, `${baseUrl}/:id`);
+
+      const context: CrudContext = {
+        serviceName,
+        resourceName,
+        resourceId: resourceId || params.id as string,
+        operation: 'read',
+        auth,
+        queryParams,
+      };
+
+      return handleGet(context);
+    }),
+
+    // Create resource (POST /api/v2/{service}/{resource})
+    http.post(baseUrl, async ({ request }) => {
+      logRequest(request, { operation: 'create', service: serviceName, resource: resourceName });
+
+      const auth = validateAuthHeaders(request);
+      const queryParams = extractQueryParams(request);
+      const requestBody = await processRequestBody(request);
+
+      // Apply case transformation
+      const { transformedRequestBody, transformResponse } = applyCaseTransformation(request, requestBody);
+
+      const context: CrudContext = {
+        serviceName,
+        resourceName,
+        operation: 'create',
+        auth,
+        queryParams,
+        requestBody: transformedRequestBody,
+      };
+
+      const response = await handleCreate(context);
+      
+      // Transform response if needed
+      if (response.headers.get('content-type')?.includes('application/json')) {
+        const responseBody = await response.json();
+        const transformedBody = transformResponse(responseBody);
+        return createJsonResponse(transformedBody, response.status);
       }
 
-      if (path.includes('/_schema')) {
-        const serviceName = extractServiceName(path);
-        if (serviceName) {
-          return handleSchemaDiscovery(serviceName, request);
-        }
+      return response;
+    }),
+
+    // Update resource (PUT /api/v2/{service}/{resource}/{id})
+    http.put(`${baseUrl}/:id`, async ({ request, params }) => {
+      logRequest(request, { operation: 'update', service: serviceName, resource: resourceName });
+
+      const auth = validateAuthHeaders(request);
+      const queryParams = extractQueryParams(request);
+      const requestBody = await processRequestBody(request);
+      const resourceId = extractIdFromPath(request.url, `${baseUrl}/:id`);
+
+      // Apply case transformation
+      const { transformedRequestBody, transformResponse } = applyCaseTransformation(request, requestBody);
+
+      const context: CrudContext = {
+        serviceName,
+        resourceName,
+        resourceId: resourceId || params.id as string,
+        operation: 'update',
+        auth,
+        queryParams,
+        requestBody: transformedRequestBody,
+      };
+
+      const response = await handleUpdate(context);
+      
+      // Transform response if needed
+      if (response.headers.get('content-type')?.includes('application/json')) {
+        const responseBody = await response.json();
+        const transformedBody = transformResponse(responseBody);
+        return createJsonResponse(transformedBody, response.status);
       }
 
-      if (path.includes('/_openapi') || path.includes('/swagger')) {
-        const serviceName = extractServiceName(path);
-        if (serviceName) {
-          return handleOpenApiGeneration(serviceName, request);
-        }
+      return response;
+    }),
+
+    // Patch resource (PATCH /api/v2/{service}/{resource}/{id})
+    http.patch(`${baseUrl}/:id`, async ({ request, params }) => {
+      logRequest(request, { operation: 'patch', service: serviceName, resource: resourceName });
+
+      const auth = validateAuthHeaders(request);
+      const queryParams = extractQueryParams(request);
+      const requestBody = await processRequestBody(request);
+      const resourceId = extractIdFromPath(request.url, `${baseUrl}/:id`);
+
+      // Apply case transformation
+      const { transformedRequestBody, transformResponse } = applyCaseTransformation(request, requestBody);
+
+      const context: CrudContext = {
+        serviceName,
+        resourceName,
+        resourceId: resourceId || params.id as string,
+        operation: 'update',
+        auth,
+        queryParams,
+        requestBody: transformedRequestBody,
+      };
+
+      const response = await handleUpdate(context);
+      
+      // Transform response if needed
+      if (response.headers.get('content-type')?.includes('application/json')) {
+        const responseBody = await response.json();
+        const transformedBody = transformResponse(responseBody);
+        return createJsonResponse(transformedBody, response.status);
       }
 
-      if (path.includes('/download') || path.includes('/export')) {
-        return handleFileDownload(path, request);
+      return response;
+    }),
+
+    // Delete resource (DELETE /api/v2/{service}/{resource}/{id})
+    http.delete(`${baseUrl}/:id`, async ({ request, params }) => {
+      logRequest(request, { operation: 'delete', service: serviceName, resource: resourceName });
+
+      const auth = validateAuthHeaders(request);
+      const queryParams = extractQueryParams(request);
+      const resourceId = extractIdFromPath(request.url, `${baseUrl}/:id`);
+
+      // Handle comma-separated IDs for bulk deletion
+      let ids: string | string[] = resourceId || params.id as string;
+      if (typeof ids === 'string' && ids.includes(',')) {
+        ids = ids.split(',').map(id => id.trim());
       }
 
-      // Route to appropriate CRUD handler
-      switch (method) {
-        case 'GET':
-          return handleGetRequest(path, request);
-        
-        case 'POST':
-          return handlePostRequest(path, request);
-        
-        case 'PUT':
-        case 'PATCH':
-          return handlePutPatchRequest(path, request);
-        
-        case 'DELETE':
-          return handleDeleteRequest(path, request);
-        
-        default:
-          return createErrorResponse(405, `Method ${method} not allowed`);
-      }
+      const context: CrudContext = {
+        serviceName,
+        resourceName,
+        resourceId: ids,
+        operation: 'delete',
+        auth,
+        queryParams,
+      };
 
-    } catch (error) {
-      console.error('CRUD handler error:', error);
-      return createServerError('Internal server error during request processing');
-    }
-  });
+      return handleDelete(context);
+    }),
+
+    // File upload (POST /api/v2/{service}/{resource}/upload)
+    http.post(`${baseUrl}/upload`, async ({ request }) => {
+      logRequest(request, { operation: 'upload', service: serviceName, resource: resourceName });
+
+      const auth = validateAuthHeaders(request);
+      const queryParams = extractQueryParams(request);
+      const requestBody = await processRequestBody(request);
+
+      const context: CrudContext = {
+        serviceName,
+        resourceName,
+        operation: 'create',
+        auth,
+        queryParams,
+        requestBody,
+      };
+
+      return handleFileUpload(context);
+    }),
+
+    // File import (POST /api/v2/{service}/{resource}/import)
+    http.post(`${baseUrl}/import`, async ({ request }) => {
+      logRequest(request, { operation: 'import', service: serviceName, resource: resourceName });
+
+      const auth = validateAuthHeaders(request);
+      const queryParams = extractQueryParams(request);
+      const requestBody = await processRequestBody(request);
+
+      const context: CrudContext = {
+        serviceName,
+        resourceName,
+        operation: 'create',
+        auth,
+        queryParams,
+        requestBody,
+      };
+
+      return handleFileImport(context);
+    }),
+
+    // JSON export (GET /api/v2/{service}/{resource}/export)
+    http.get(`${baseUrl}/export`, async ({ request }) => {
+      logRequest(request, { operation: 'export', service: serviceName, resource: resourceName });
+
+      const auth = validateAuthHeaders(request);
+      const queryParams = extractQueryParams(request);
+
+      const context: CrudContext = {
+        serviceName,
+        resourceName,
+        operation: 'read',
+        auth,
+        queryParams,
+      };
+
+      return handleJsonDownload(context);
+    }),
+
+    // File download (GET /api/v2/{service}/{resource}/download)
+    http.get(`${baseUrl}/download`, async ({ request }) => {
+      logRequest(request, { operation: 'download', service: serviceName, resource: resourceName });
+
+      const auth = validateAuthHeaders(request);
+      const queryParams = extractQueryParams(request);
+
+      const context: CrudContext = {
+        serviceName,
+        resourceName,
+        operation: 'read',
+        auth,
+        queryParams,
+      };
+
+      return handleBlobDownload(context);
+    }),
+  ];
 }
 
 // ============================================================================
-// EXPORTED HANDLERS
+// PREDEFINED HANDLERS FOR COMMON DREAMFACTORY SERVICES
 // ============================================================================
 
 /**
- * Pre-configured CRUD handlers for common DreamFactory API patterns
- * These handlers provide comprehensive CRUD support for all entity types
+ * System service handlers for user management, roles, etc.
  */
-export const crudHandlers: RequestHandler[] = [
-  // System API endpoints
-  createCrudHandler('/api/v2/system/*'),
-  createCrudHandler('/system/api/v2/*'),
-  
-  // Service API endpoints (supports all database services)
-  createCrudHandler('/api/v2/:service/*'),
-  createCrudHandler('/api/v2/:service'),
-  
-  // File service endpoints
-  createCrudHandler('/api/v2/files/*'),
-  
-  // Specialized endpoints
-  http.post('/api/v2/system/service/test', ({ request }) => handleConnectionTest(request)),
-  http.get('/api/v2/:service/_schema', ({ request, params }) => {
-    const serviceName = params.service as string;
-    return handleSchemaDiscovery(serviceName, request);
-  }),
-  http.get('/api/v2/:service/_openapi', ({ request, params }) => {
-    const serviceName = params.service as string;
-    return handleOpenApiGeneration(serviceName, request);
-  }),
+export const systemServiceHandlers = [
+  ...createCrudHandlers('system', 'user'),
+  ...createCrudHandlers('system', 'admin'),
+  ...createCrudHandlers('system', 'role'),
+  ...createCrudHandlers('system', 'service'),
+  ...createCrudHandlers('system', 'config'),
+  ...createCrudHandlers('system', 'event'),
+  ...createCrudHandlers('system', 'lookup'),
+  ...createCrudHandlers('system', 'app'),
 ];
 
 /**
- * Utility functions for creating custom CRUD scenarios in tests
+ * Database service handlers for tables, fields, relationships
  */
-export const crudUtilities = {
-  createCrudHandler,
-  resolveMockDataSource,
-  processQueryParameters,
-  validateRequestAuth,
-  validateRequiredFields,
-  validateUniqueFields,
-  generateNewId,
-  createTimestamp,
-  handleConnectionTest,
-  handleSchemaDiscovery,
-  handleOpenApiGeneration,
+export const databaseServiceHandlers = [
+  ...createCrudHandlers('db', 'table'),
+  ...createCrudHandlers('db', 'field'),
+  ...createCrudHandlers('db', 'relationship'),
+  ...createCrudHandlers('db', 'procedure'),
+  ...createCrudHandlers('db', 'function'),
+  ...createCrudHandlers('db', 'view'),
+];
+
+/**
+ * Generic test handlers for development and testing
+ */
+export const testServiceHandlers = [
+  ...createCrudHandlers('test', 'entities'),
+  ...createCrudHandlers('test', 'users'),
+  ...createCrudHandlers('test', 'products'),
+  ...createCrudHandlers('test', 'orders'),
+];
+
+/**
+ * All predefined CRUD handlers
+ */
+export const allCrudHandlers: HttpHandler[] = [
+  ...systemServiceHandlers,
+  ...databaseServiceHandlers,
+  ...testServiceHandlers,
+];
+
+// ============================================================================
+// UTILITY EXPORTS
+// ============================================================================
+
+/**
+ * Export main handler functions for custom implementations
+ */
+export {
+  handleList,
+  handleGet,
+  handleCreate,
+  handleUpdate,
+  handleDelete,
   handleFileUpload,
-  handleFileDownload,
+  handleFileImport,
+  handleJsonDownload,
+  handleBlobDownload,
 };
 
 /**
- * Export all handlers as default for easy importing
+ * Export mock data store for direct manipulation in tests
  */
-export default crudHandlers;
+export { mockDataStore };
+
+/**
+ * Export types for external usage
+ */
+export type {
+  GenericResource,
+  CrudContext,
+  ResourceDataStore,
+  FileUploadResult,
+  BulkOperationResult,
+  DownloadConfig,
+};
