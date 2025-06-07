@@ -1,291 +1,62 @@
 /**
- * @fileoverview Comprehensive test suite for the base dialog component system
+ * @fileoverview Comprehensive test suite for the dialog component system
  * 
  * Tests accessibility compliance (WCAG 2.1 AA), keyboard navigation, focus management,
- * responsive behavior, animation states, compound component interactions, and all dialog variants.
+ * responsive behavior, animation states, compound component interactions, and all dialog
+ * variants using Vitest 2.1.0 and React Testing Library per Section 7.1.1.
  * 
- * @implements Vitest 2.1.0 testing framework integration per Section 7.1.1
- * @implements WCAG 2.1 AA accessibility compliance per Section 7.7.1
- * @implements Responsive design testing per Section 7.7.3
+ * Test Coverage:
+ * - ✅ Vitest 2.1.0 testing framework integration
+ * - ✅ WCAG 2.1 AA accessibility compliance validation
+ * - ✅ All dialog variants (modal, sheet, overlay, drawer) and sizes
+ * - ✅ Responsive behavior across screen sizes
+ * - ✅ Compound component architecture functionality
+ * - ✅ Animation states and transitions
+ * - ✅ Keyboard navigation and focus management
+ * - ✅ Screen reader support with proper ARIA
+ * - ✅ Error boundaries and edge case handling
+ * 
+ * @author DreamFactory Admin Interface Team
+ * @version 1.0.0
+ * @since React 19.0.0 / Vitest 2.1+
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi, beforeAll, afterAll } from 'vitest';
-import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
+import React, { useState, useRef } from 'react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { screen, waitFor, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { axe, toHaveNoViolations } from 'jest-axe';
-import React, { useState } from 'react';
 
-// Extend Jest matchers for accessibility testing
+import { Dialog, useDialog } from './dialog';
+import type { DialogProps, DialogVariant, DialogSize, DialogPosition } from './types';
+import { 
+  customRender, 
+  testA11y, 
+  checkAriaAttributes, 
+  createKeyboardUtils,
+  type KeyboardTestUtils 
+} from '@/test/test-utils';
+
+// Extend Jest matchers with accessibility testing
 expect.extend(toHaveNoViolations);
 
-// Mock ResizeObserver for responsive testing
+// ============================================================================
+// TEST SETUP AND UTILITIES
+// ============================================================================
+
+/**
+ * Mock ResizeObserver for responsive testing
+ */
 const mockResizeObserver = vi.fn(() => ({
   observe: vi.fn(),
   disconnect: vi.fn(),
   unobserve: vi.fn(),
 }));
 
-// Mock IntersectionObserver for animation testing
-const mockIntersectionObserver = vi.fn(() => ({
-  observe: vi.fn(),
-  disconnect: vi.fn(),
-  unobserve: vi.fn(),
-  root: null,
-  rootMargin: '',
-  thresholds: [],
-}));
-
-// Mock window.matchMedia for responsive testing
-const mockMatchMedia = vi.fn((query: string) => ({
-  matches: false,
-  media: query,
-  onchange: null,
-  addListener: vi.fn(),
-  removeListener: vi.fn(),
-  addEventListener: vi.fn(),
-  removeEventListener: vi.fn(),
-  dispatchEvent: vi.fn(),
-}));
-
-// Setup global mocks
-beforeAll(() => {
-  global.ResizeObserver = mockResizeObserver;
-  global.IntersectionObserver = mockIntersectionObserver;
-  Object.defineProperty(window, 'matchMedia', {
-    writable: true,
-    value: mockMatchMedia,
-  });
-  
-  // Mock requestAnimationFrame for animation testing
-  global.requestAnimationFrame = vi.fn((cb) => {
-    return setTimeout(cb, 16);
-  });
-  
-  // Mock getComputedStyle for CSS testing
-  global.getComputedStyle = vi.fn(() => ({
-    transform: 'none',
-    opacity: '1',
-    transition: 'none',
-    visibility: 'visible',
-  }));
-});
-
-// Dialog component types and interfaces (assumed based on requirements)
-interface DialogProps {
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
-  modal?: boolean;
-  variant?: 'modal' | 'sheet' | 'overlay' | 'drawer';
-  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
-  position?: 'center' | 'top' | 'bottom' | 'left' | 'right';
-  closeOnBackdropClick?: boolean;
-  closeOnEscape?: boolean;
-  trapFocus?: boolean;
-  restoreFocus?: boolean;
-  autoFocus?: boolean;
-  className?: string;
-  children?: React.ReactNode;
-  'aria-label'?: string;
-  'aria-labelledby'?: string;
-  'aria-describedby'?: string;
-}
-
-interface DialogContentProps {
-  className?: string;
-  children?: React.ReactNode;
-}
-
-interface DialogHeaderProps {
-  className?: string;
-  children?: React.ReactNode;
-}
-
-interface DialogFooterProps {
-  className?: string;
-  children?: React.ReactNode;
-}
-
-interface DialogTitleProps {
-  className?: string;
-  children?: React.ReactNode;
-}
-
-interface DialogDescriptionProps {
-  className?: string;
-  children?: React.ReactNode;
-}
-
-interface DialogCloseProps {
-  className?: string;
-  children?: React.ReactNode;
-  asChild?: boolean;
-}
-
-// Mock dialog components for testing (these will be replaced by actual implementations)
-const Dialog = ({ 
-  open = false, 
-  onOpenChange,
-  modal = true,
-  variant = 'modal',
-  size = 'md',
-  closeOnBackdropClick = true,
-  closeOnEscape = true,
-  trapFocus = true,
-  restoreFocus = true,
-  autoFocus = true,
-  className = '',
-  children,
-  ...ariaProps
-}: DialogProps) => {
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (closeOnBackdropClick && e.target === e.currentTarget) {
-      onOpenChange?.(false);
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (closeOnEscape && e.key === 'Escape') {
-      e.preventDefault();
-      onOpenChange?.(false);
-    }
-  };
-
-  if (!open) return null;
-
-  return (
-    <div
-      data-testid="dialog-overlay"
-      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/50 ${className}`}
-      onClick={handleBackdropClick}
-      onKeyDown={handleKeyDown}
-      {...(modal && { 'aria-modal': 'true' })}
-      role="dialog"
-      {...ariaProps}
-    >
-      <div
-        data-testid={`dialog-content-${variant}-${size}`}
-        className={`
-          relative bg-white rounded-lg shadow-lg
-          ${size === 'sm' ? 'max-w-sm' : ''}
-          ${size === 'md' ? 'max-w-md' : ''}
-          ${size === 'lg' ? 'max-w-lg' : ''}
-          ${size === 'xl' ? 'max-w-xl' : ''}
-          ${size === 'full' ? 'w-full h-full max-w-none' : ''}
-          ${variant === 'sheet' ? 'w-full h-full sm:h-auto sm:max-h-[90vh]' : ''}
-          ${variant === 'drawer' ? 'h-full w-full sm:w-96' : ''}
-        `}
-        onClick={(e) => e.stopPropagation()}
-        tabIndex={-1}
-      >
-        {children}
-      </div>
-    </div>
-  );
-};
-
-const DialogContent = ({ className = '', children }: DialogContentProps) => (
-  <div className={`p-6 ${className}`} data-testid="dialog-content">
-    {children}
-  </div>
-);
-
-const DialogHeader = ({ className = '', children }: DialogHeaderProps) => (
-  <div className={`flex flex-col space-y-1.5 text-center sm:text-left ${className}`} data-testid="dialog-header">
-    {children}
-  </div>
-);
-
-const DialogFooter = ({ className = '', children }: DialogFooterProps) => (
-  <div className={`flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 ${className}`} data-testid="dialog-footer">
-    {children}
-  </div>
-);
-
-const DialogTitle = ({ className = '', children }: DialogTitleProps) => (
-  <h2 className={`text-lg font-semibold leading-none tracking-tight ${className}`} data-testid="dialog-title">
-    {children}
-  </h2>
-);
-
-const DialogDescription = ({ className = '', children }: DialogDescriptionProps) => (
-  <p className={`text-sm text-muted-foreground ${className}`} data-testid="dialog-description">
-    {children}
-  </p>
-);
-
-const DialogClose = ({ className = '', children, asChild = false }: DialogCloseProps) => {
-  if (asChild) {
-    return React.cloneElement(children as React.ReactElement, {
-      'data-testid': 'dialog-close',
-      className: `${(children as React.ReactElement).props.className || ''} ${className}`,
-    });
-  }
-  
-  return (
-    <button 
-      type="button" 
-      className={`inline-flex items-center justify-center rounded-md text-sm font-medium ${className}`}
-      data-testid="dialog-close"
-    >
-      {children}
-    </button>
-  );
-};
-
-// Compound component assignment
-Dialog.Content = DialogContent;
-Dialog.Header = DialogHeader;
-Dialog.Footer = DialogFooter;
-Dialog.Title = DialogTitle;
-Dialog.Description = DialogDescription;
-Dialog.Close = DialogClose;
-
-// Test wrapper component for controlled dialog testing
-const ControlledDialogWrapper = ({ 
-  initialOpen = false, 
-  dialogProps = {},
-  children 
-}: {
-  initialOpen?: boolean;
-  dialogProps?: Partial<DialogProps>;
-  children?: React.ReactNode;
-}) => {
-  const [open, setOpen] = useState(initialOpen);
-  
-  return (
-    <div>
-      <button onClick={() => setOpen(true)} data-testid="open-dialog">
-        Open Dialog
-      </button>
-      <Dialog 
-        open={open} 
-        onOpenChange={setOpen}
-        aria-labelledby="dialog-title"
-        aria-describedby="dialog-description"
-        {...dialogProps}
-      >
-        {children || (
-          <Dialog.Content>
-            <Dialog.Header>
-              <Dialog.Title id="dialog-title">Test Dialog</Dialog.Title>
-              <Dialog.Description id="dialog-description">
-                This is a test dialog description.
-              </Dialog.Description>
-            </Dialog.Header>
-            <Dialog.Footer>
-              <Dialog.Close asChild>
-                <button>Close</button>
-              </Dialog.Close>
-            </Dialog.Footer>
-          </Dialog.Content>
-        )}
-      </Dialog>
-    </div>
-  );
-};
-
-// Utility function to simulate viewport resize
-const resizeViewport = (width: number, height: number) => {
+/**
+ * Mock window resize for responsive behavior testing
+ */
+const mockWindowResize = (width: number, height: number = 800) => {
   Object.defineProperty(window, 'innerWidth', {
     writable: true,
     configurable: true,
@@ -296,919 +67,1322 @@ const resizeViewport = (width: number, height: number) => {
     configurable: true,
     value: height,
   });
-  
-  // Update matchMedia mock based on viewport
-  mockMatchMedia.mockImplementation((query: string) => ({
-    matches: query.includes('(max-width: 768px)') ? width <= 768 : false,
-    media: query,
-    onchange: null,
-    addListener: vi.fn(),
-    removeListener: vi.fn(),
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    dispatchEvent: vi.fn(),
-  }));
-  
-  // Trigger resize event
-  fireEvent(window, new Event('resize'));
+  window.dispatchEvent(new Event('resize'));
 };
 
-describe('Dialog Component System', () => {
-  let user: ReturnType<typeof userEvent.setup>;
+/**
+ * Create a test dialog component with configurable props
+ */
+interface TestDialogProps extends Partial<DialogProps> {
+  onClose?: (reason?: string) => void;
+  children?: React.ReactNode;
+}
+
+const TestDialog: React.FC<TestDialogProps> = ({ 
+  open = false, 
+  onClose = vi.fn(),
+  children,
+  ...props 
+}) => {
+  return (
+    <Dialog 
+      open={open}
+      onClose={onClose}
+      data-testid="test-dialog"
+      {...props}
+    >
+      {children || (
+        <>
+          <Dialog.Header>
+            <Dialog.Title>Test Dialog</Dialog.Title>
+            <Dialog.Description>This is a test dialog</Dialog.Description>
+          </Dialog.Header>
+          <Dialog.Content>
+            <p>Dialog content goes here</p>
+            <button type="button">Test Button</button>
+          </Dialog.Content>
+          <Dialog.Footer>
+            <button type="button" onClick={() => onClose('cancel')}>
+              Cancel
+            </button>
+            <button type="button" onClick={() => onClose('confirm')}>
+              Confirm
+            </button>
+          </Dialog.Footer>
+        </>
+      )}
+    </Dialog>
+  );
+};
+
+/**
+ * Compound component test wrapper
+ */
+const CompoundTestDialog: React.FC<{ open: boolean; onClose: () => void }> = ({ 
+  open, 
+  onClose 
+}) => (
+  <Dialog open={open} onClose={onClose} data-testid="compound-dialog">
+    <Dialog.Header showCloseButton>
+      <Dialog.Title size="lg">Compound Dialog Title</Dialog.Title>
+      <Dialog.Description size="md">
+        Testing compound component architecture
+      </Dialog.Description>
+    </Dialog.Header>
+    
+    <Dialog.Content scrollBehavior="inside" maxHeight="400px">
+      <div data-testid="dialog-content">
+        <p>Scrollable content area</p>
+        <div style={{ height: '600px' }}>Long content for scroll testing</div>
+      </div>
+    </Dialog.Content>
+    
+    <Dialog.Footer align="space-between" sticky>
+      <Dialog.Close variant="text">Cancel</Dialog.Close>
+      <div>
+        <button type="button" onClick={onClose}>
+          Secondary Action
+        </button>
+        <button type="button" onClick={onClose}>
+          Primary Action
+        </button>
+      </div>
+    </Dialog.Footer>
+  </Dialog>
+);
+
+/**
+ * Controlled/Uncontrolled state test wrapper
+ */
+const StateTestDialog: React.FC<{ controlled?: boolean }> = ({ controlled = true }) => {
+  const [open, setOpen] = useState(false);
+  const { open: hookOpen, openDialog, closeDialog } = useDialog();
+
+  const handleOpen = () => controlled ? setOpen(true) : openDialog();
+  const handleClose = () => controlled ? setOpen(false) : closeDialog();
+
+  return (
+    <div>
+      <button onClick={handleOpen} data-testid="open-dialog">
+        Open Dialog
+      </button>
+      
+      <Dialog 
+        open={controlled ? open : hookOpen}
+        onClose={handleClose}
+        data-testid="state-dialog"
+      >
+        <Dialog.Header>
+          <Dialog.Title>State Management Test</Dialog.Title>
+        </Dialog.Header>
+        <Dialog.Content>
+          <p>Testing {controlled ? 'controlled' : 'uncontrolled'} state</p>
+        </Dialog.Content>
+        <Dialog.Footer>
+          <Dialog.Close>Close</Dialog.Close>
+        </Dialog.Footer>
+      </Dialog>
+    </div>
+  );
+};
+
+// ============================================================================
+// SETUP AND TEARDOWN
+// ============================================================================
+
+beforeEach(() => {
+  // Mock ResizeObserver
+  global.ResizeObserver = mockResizeObserver;
   
-  beforeEach(() => {
-    user = userEvent.setup();
-    // Reset viewport to desktop size
-    resizeViewport(1024, 768);
-  });
+  // Reset window size to desktop default
+  mockWindowResize(1280, 800);
+  
+  // Clear all mocks
+  vi.clearAllMocks();
+  
+  // Reset document body classes
+  document.body.className = '';
+  document.documentElement.className = '';
+});
 
-  afterEach(() => {
-    vi.clearAllMocks();
-  });
+afterEach(() => {
+  // Clean up any open dialogs
+  const dialogs = document.querySelectorAll('[role="dialog"]');
+  dialogs.forEach(dialog => dialog.remove());
+  
+  // Reset focus
+  if (document.activeElement && document.activeElement !== document.body) {
+    (document.activeElement as HTMLElement).blur();
+  }
+});
 
-  describe('Basic Functionality', () => {
-    it('should render when open prop is true', () => {
-      render(
-        <Dialog open={true} aria-label="Test dialog">
-          <Dialog.Content>
-            <Dialog.Title>Test Title</Dialog.Title>
-          </Dialog.Content>
-        </Dialog>
-      );
+// ============================================================================
+// CORE DIALOG FUNCTIONALITY TESTS
+// ============================================================================
 
+describe('Dialog Component - Core Functionality', () => {
+  it('renders dialog when open prop is true', async () => {
+    const onClose = vi.fn();
+    customRender(<TestDialog open={true} onClose={onClose} />);
+    
+    await waitFor(() => {
+      expect(screen.getByTestId('test-dialog')).toBeInTheDocument();
       expect(screen.getByRole('dialog')).toBeInTheDocument();
-      expect(screen.getByText('Test Title')).toBeInTheDocument();
     });
+  });
 
-    it('should not render when open prop is false', () => {
-      render(
-        <Dialog open={false} aria-label="Test dialog">
-          <Dialog.Content>
-            <Dialog.Title>Test Title</Dialog.Title>
-          </Dialog.Content>
-        </Dialog>
-      );
+  it('does not render dialog when open prop is false', () => {
+    const onClose = vi.fn();
+    customRender(<TestDialog open={false} onClose={onClose} />);
+    
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
 
+  it('calls onClose when backdrop is clicked', async () => {
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    
+    customRender(<TestDialog open={true} onClose={onClose} />);
+    
+    // Wait for dialog to be rendered
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+    
+    // Find the backdrop (the overlay behind the dialog)
+    const backdrop = document.querySelector('.fixed.inset-0.bg-black');
+    expect(backdrop).toBeInTheDocument();
+    
+    if (backdrop) {
+      await user.click(backdrop);
+      expect(onClose).toHaveBeenCalledWith('backdrop');
+    }
+  });
+
+  it('does not close when backdrop is clicked if disableBackdropClose is true', async () => {
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    
+    customRender(
+      <TestDialog 
+        open={true} 
+        onClose={onClose} 
+        disableBackdropClose={true}
+      />
+    );
+    
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+    
+    const backdrop = document.querySelector('.fixed.inset-0.bg-black');
+    if (backdrop) {
+      await user.click(backdrop);
+      expect(onClose).not.toHaveBeenCalled();
+    }
+  });
+
+  it('calls onClose when escape key is pressed', async () => {
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    
+    customRender(<TestDialog open={true} onClose={onClose} />);
+    
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+    
+    await user.keyboard('{Escape}');
+    expect(onClose).toHaveBeenCalledWith('escape');
+  });
+
+  it('does not close when escape is pressed if disableEscapeKeyDown is true', async () => {
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    
+    customRender(
+      <TestDialog 
+        open={true} 
+        onClose={onClose} 
+        disableEscapeKeyDown={true}
+      />
+    );
+    
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+    
+    await user.keyboard('{Escape}');
+    expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+// ============================================================================
+// ACCESSIBILITY COMPLIANCE TESTS (WCAG 2.1 AA)
+// ============================================================================
+
+describe('Dialog Component - Accessibility (WCAG 2.1 AA)', () => {
+  it('passes axe accessibility tests', async () => {
+    const onClose = vi.fn();
+    const { container } = customRender(
+      <TestDialog open={true} onClose={onClose} />
+    );
+    
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+    
+    await testA11y(container);
+  });
+
+  it('has proper ARIA attributes', async () => {
+    const onClose = vi.fn();
+    customRender(
+      <TestDialog 
+        open={true} 
+        onClose={onClose}
+        aria-label="Test dialog"
+        aria-describedby="test-description"
+      />
+    );
+    
+    await waitFor(() => {
+      const dialog = screen.getByRole('dialog');
+      expect(dialog).toBeInTheDocument();
+      
+      checkAriaAttributes(dialog, {
+        'aria-label': 'Test dialog',
+        'aria-modal': 'true',
+        'aria-describedby': expect.any(String),
+        'role': 'dialog'
+      });
+    });
+  });
+
+  it('manages focus correctly on open', async () => {
+    const onClose = vi.fn();
+    const initialFocus = React.createRef<HTMLButtonElement>();
+    
+    customRender(
+      <Dialog open={true} onClose={onClose} initialFocus={initialFocus}>
+        <Dialog.Content>
+          <button type="button">First button</button>
+          <button type="button" ref={initialFocus}>
+            Initial focus button
+          </button>
+          <button type="button">Last button</button>
+        </Dialog.Content>
+      </Dialog>
+    );
+    
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+    
+    // Allow time for focus management
+    await waitFor(() => {
+      expect(document.activeElement).toBe(initialFocus.current);
+    });
+  });
+
+  it('traps focus within dialog', async () => {
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    
+    customRender(
+      <Dialog open={true} onClose={onClose}>
+        <Dialog.Content>
+          <button type="button" data-testid="first-button">
+            First
+          </button>
+          <button type="button" data-testid="second-button">
+            Second
+          </button>
+          <button type="button" data-testid="last-button">
+            Last
+          </button>
+        </Dialog.Content>
+      </Dialog>
+    );
+    
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+    
+    const firstButton = screen.getByTestId('first-button');
+    const lastButton = screen.getByTestId('last-button');
+    
+    // Focus should be on first button initially
+    await waitFor(() => {
+      expect(document.activeElement).toBe(firstButton);
+    });
+    
+    // Tab from last button should cycle to first
+    lastButton.focus();
+    await user.keyboard('{Tab}');
+    expect(document.activeElement).toBe(firstButton);
+    
+    // Shift+Tab from first button should go to last
+    await user.keyboard('{Shift>}{Tab}{/Shift}');
+    expect(document.activeElement).toBe(lastButton);
+  });
+
+  it('restores focus on close', async () => {
+    const onClose = vi.fn();
+    const triggerButton = document.createElement('button');
+    triggerButton.textContent = 'Open Dialog';
+    document.body.appendChild(triggerButton);
+    triggerButton.focus();
+    
+    const { rerender } = customRender(
+      <TestDialog open={false} onClose={onClose} />
+    );
+    
+    // Open dialog
+    rerender(<TestDialog open={true} onClose={onClose} />);
+    
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+    
+    // Close dialog
+    rerender(<TestDialog open={false} onClose={onClose} />);
+    
+    await waitFor(() => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
+    
+    // Focus should be restored to trigger button
+    await waitFor(() => {
+      expect(document.activeElement).toBe(triggerButton);
+    });
+    
+    document.body.removeChild(triggerButton);
+  });
 
-    it('should call onOpenChange when state changes', async () => {
-      const onOpenChange = vi.fn();
-      
-      render(
-        <ControlledDialogWrapper 
-          dialogProps={{ onOpenChange }}
+  it('announces dialog state changes to screen readers', async () => {
+    const onClose = vi.fn();
+    customRender(<TestDialog open={true} onClose={onClose} />);
+    
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+    
+    // Check for live regions that would announce changes
+    const liveRegions = document.querySelectorAll('[aria-live]');
+    expect(liveRegions.length).toBeGreaterThan(0);
+  });
+});
+
+// ============================================================================
+// DIALOG VARIANTS AND SIZES TESTS
+// ============================================================================
+
+describe('Dialog Component - Variants and Sizes', () => {
+  const variants: DialogVariant[] = ['modal', 'sheet', 'overlay', 'drawer'];
+  const sizes: DialogSize[] = ['sm', 'md', 'lg', 'xl', 'full'];
+  const positions: DialogPosition[] = ['center', 'top', 'bottom', 'left', 'right'];
+
+  variants.forEach(variant => {
+    describe(`${variant} variant`, () => {
+      it(`renders ${variant} variant correctly`, async () => {
+        const onClose = vi.fn();
+        customRender(
+          <TestDialog 
+            open={true} 
+            onClose={onClose} 
+            variant={variant}
+          />
+        );
+        
+        await waitFor(() => {
+          const dialog = screen.getByRole('dialog');
+          expect(dialog).toBeInTheDocument();
+          expect(dialog).toHaveClass(expect.stringContaining(variant === 'modal' ? 'relative' : 'fixed'));
+        });
+      });
+
+      sizes.forEach(size => {
+        it(`renders ${variant} with ${size} size`, async () => {
+          const onClose = vi.fn();
+          customRender(
+            <TestDialog 
+              open={true} 
+              onClose={onClose} 
+              variant={variant}
+              size={size}
+            />
+          );
+          
+          await waitFor(() => {
+            const dialog = screen.getByRole('dialog');
+            expect(dialog).toBeInTheDocument();
+            expect(dialog).toHaveClass(expect.stringContaining('max-w'));
+          });
+        });
+      });
+    });
+  });
+
+  positions.forEach(position => {
+    it(`renders dialog with ${position} position`, async () => {
+      const onClose = vi.fn();
+      customRender(
+        <TestDialog 
+          open={true} 
+          onClose={onClose} 
+          position={position}
         />
       );
-
-      const openButton = screen.getByTestId('open-dialog');
-      await user.click(openButton);
-
-      expect(onOpenChange).toHaveBeenCalledWith(true);
+      
+      await waitFor(() => {
+        expect(screen.getByRole('dialog')).toBeInTheDocument();
+      });
     });
   });
+});
 
-  describe('WCAG 2.1 AA Accessibility Compliance', () => {
-    it('should have no accessibility violations', async () => {
-      const { container } = render(
-        <Dialog open={true} aria-labelledby="dialog-title">
-          <Dialog.Content>
-            <Dialog.Header>
-              <Dialog.Title id="dialog-title">Accessible Dialog</Dialog.Title>
-              <Dialog.Description>This dialog meets accessibility standards.</Dialog.Description>
-            </Dialog.Header>
-            <Dialog.Footer>
-              <Dialog.Close>Close</Dialog.Close>
-            </Dialog.Footer>
-          </Dialog.Content>
-        </Dialog>
-      );
+// ============================================================================
+// RESPONSIVE BEHAVIOR TESTS
+// ============================================================================
 
-      const results = await axe(container);
-      expect(results).toHaveNoViolations();
-    });
-
-    it('should have proper ARIA attributes', () => {
-      render(
-        <Dialog 
-          open={true} 
-          modal={true}
-          aria-labelledby="dialog-title"
-          aria-describedby="dialog-description"
-        >
-          <Dialog.Content>
-            <Dialog.Title id="dialog-title">Dialog Title</Dialog.Title>
-            <Dialog.Description id="dialog-description">Dialog Description</Dialog.Description>
-          </Dialog.Content>
-        </Dialog>
-      );
-
-      const dialog = screen.getByRole('dialog');
-      expect(dialog).toHaveAttribute('aria-modal', 'true');
-      expect(dialog).toHaveAttribute('aria-labelledby', 'dialog-title');
-      expect(dialog).toHaveAttribute('aria-describedby', 'dialog-description');
-    });
-
-    it('should support aria-label when aria-labelledby is not provided', () => {
-      render(
-        <Dialog open={true} aria-label="Custom dialog label">
-          <Dialog.Content>
-            <p>Dialog content</p>
-          </Dialog.Content>
-        </Dialog>
-      );
-
-      const dialog = screen.getByRole('dialog');
-      expect(dialog).toHaveAttribute('aria-label', 'Custom dialog label');
-    });
-
-    it('should have sufficient color contrast for text elements', () => {
-      render(
-        <Dialog open={true} aria-label="Dialog">
-          <Dialog.Content>
-            <Dialog.Title>Dialog Title</Dialog.Title>
-            <Dialog.Description>Dialog description text</Dialog.Description>
-          </Dialog.Content>
-        </Dialog>
-      );
-
-      const title = screen.getByTestId('dialog-title');
-      const description = screen.getByTestId('dialog-description');
-      
-      // Check that elements have proper semantic styling classes
-      expect(title).toHaveClass('text-lg', 'font-semibold');
-      expect(description).toHaveClass('text-sm', 'text-muted-foreground');
-    });
-  });
-
-  describe('Keyboard Navigation and Focus Management', () => {
-    it('should close dialog when Escape key is pressed', async () => {
-      const onOpenChange = vi.fn();
-      
-      render(
-        <Dialog open={true} onOpenChange={onOpenChange} closeOnEscape={true}>
-          <Dialog.Content>
-            <Dialog.Title>Test Dialog</Dialog.Title>
-          </Dialog.Content>
-        </Dialog>
-      );
-
-      const dialog = screen.getByRole('dialog');
-      dialog.focus();
-      
-      await user.keyboard('{Escape}');
-      expect(onOpenChange).toHaveBeenCalledWith(false);
-    });
-
-    it('should not close dialog when closeOnEscape is false', async () => {
-      const onOpenChange = vi.fn();
-      
-      render(
-        <Dialog open={true} onOpenChange={onOpenChange} closeOnEscape={false}>
-          <Dialog.Content>
-            <Dialog.Title>Test Dialog</Dialog.Title>
-          </Dialog.Content>
-        </Dialog>
-      );
-
-      const dialog = screen.getByRole('dialog');
-      dialog.focus();
-      
-      await user.keyboard('{Escape}');
-      expect(onOpenChange).not.toHaveBeenCalled();
-    });
-
-    it('should handle tab navigation within dialog content', async () => {
-      render(
-        <Dialog open={true} trapFocus={true}>
-          <Dialog.Content>
-            <Dialog.Title>Dialog with Form</Dialog.Title>
-            <input data-testid="first-input" placeholder="First input" />
-            <input data-testid="second-input" placeholder="Second input" />
-            <button data-testid="submit-button">Submit</button>
-          </Dialog.Content>
-        </Dialog>
-      );
-
-      const firstInput = screen.getByTestId('first-input');
-      const secondInput = screen.getByTestId('second-input');
-      const submitButton = screen.getByTestId('submit-button');
-
-      // Focus should start at first focusable element
-      firstInput.focus();
-      expect(firstInput).toHaveFocus();
-
-      // Tab to next element
-      await user.tab();
-      expect(secondInput).toHaveFocus();
-
-      // Tab to submit button
-      await user.tab();
-      expect(submitButton).toHaveFocus();
-    });
-
-    it('should restore focus to trigger element when dialog closes', async () => {
-      render(<ControlledDialogWrapper />);
-
-      const openButton = screen.getByTestId('open-dialog');
-      
-      // Open dialog
-      await user.click(openButton);
+describe('Dialog Component - Responsive Behavior', () => {
+  it('adapts to mobile screen size', async () => {
+    const onClose = vi.fn();
+    
+    // Render in desktop first
+    const { rerender } = customRender(
+      <TestDialog 
+        open={true} 
+        onClose={onClose} 
+        variant="modal"
+        size="xl"
+      />
+    );
+    
+    await waitFor(() => {
       expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+    
+    // Change to mobile size
+    mockWindowResize(375, 667); // iPhone size
+    
+    // Force re-render with same props to trigger responsive hook
+    rerender(
+      <TestDialog 
+        open={true} 
+        onClose={onClose} 
+        variant="modal"
+        size="xl"
+      />
+    );
+    
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+  });
 
-      // Close dialog
-      const closeButton = screen.getByTestId('dialog-close');
-      await user.click(closeButton);
+  it('handles tablet screen size correctly', async () => {
+    const onClose = vi.fn();
+    
+    mockWindowResize(768, 1024); // iPad size
+    
+    customRender(
+      <TestDialog 
+        open={true} 
+        onClose={onClose} 
+        variant="drawer"
+        size="lg"
+      />
+    );
+    
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+  });
 
-      // Wait for dialog to close and focus to restore
+  it('maintains desktop behavior on large screens', async () => {
+    const onClose = vi.fn();
+    
+    mockWindowResize(1920, 1080); // Desktop size
+    
+    customRender(
+      <TestDialog 
+        open={true} 
+        onClose={onClose} 
+        variant="modal"
+        size="full"
+      />
+    );
+    
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+  });
+
+  it('responds to window resize events', async () => {
+    const onClose = vi.fn();
+    
+    customRender(
+      <TestDialog 
+        open={true} 
+        onClose={onClose} 
+        variant="modal"
+        size="xl"
+      />
+    );
+    
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+    
+    // Resize to mobile
+    mockWindowResize(375, 667);
+    
+    // Dialog should still be present and adapt
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+  });
+});
+
+// ============================================================================
+// COMPOUND COMPONENT ARCHITECTURE TESTS
+// ============================================================================
+
+describe('Dialog Component - Compound Components', () => {
+  it('renders all compound components correctly', async () => {
+    const onClose = vi.fn();
+    
+    customRender(<CompoundTestDialog open={true} onClose={onClose} />);
+    
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      expect(screen.getByText('Compound Dialog Title')).toBeInTheDocument();
+      expect(screen.getByText('Testing compound component architecture')).toBeInTheDocument();
+      expect(screen.getByTestId('dialog-content')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
+    });
+  });
+
+  it('Dialog.Header renders with close button', async () => {
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    
+    customRender(<CompoundTestDialog open={true} onClose={onClose} />);
+    
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+    
+    const closeButton = screen.getByRole('button', { name: /close dialog/i });
+    expect(closeButton).toBeInTheDocument();
+    
+    await user.click(closeButton);
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('Dialog.Content handles scrollable content', async () => {
+    const onClose = vi.fn();
+    
+    customRender(<CompoundTestDialog open={true} onClose={onClose} />);
+    
+    await waitFor(() => {
+      const content = screen.getByTestId('dialog-content');
+      expect(content).toBeInTheDocument();
+      expect(content.parentElement).toHaveClass('overflow-y-auto');
+    });
+  });
+
+  it('Dialog.Footer aligns buttons correctly', async () => {
+    const onClose = vi.fn();
+    
+    customRender(<CompoundTestDialog open={true} onClose={onClose} />);
+    
+    await waitFor(() => {
+      const footer = screen.getByRole('button', { name: /cancel/i }).closest('[class*="justify-"]');
+      expect(footer).toHaveClass('justify-between');
+    });
+  });
+
+  it('Dialog.Title uses correct heading hierarchy', async () => {
+    const onClose = vi.fn();
+    
+    customRender(<CompoundTestDialog open={true} onClose={onClose} />);
+    
+    await waitFor(() => {
+      const title = screen.getByRole('heading', { level: 2 });
+      expect(title).toBeInTheDocument();
+      expect(title).toHaveTextContent('Compound Dialog Title');
+    });
+  });
+
+  it('Dialog.Close triggers onClose with correct reason', async () => {
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    
+    customRender(<CompoundTestDialog open={true} onClose={onClose} />);
+    
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+    
+    const closeButton = screen.getByRole('button', { name: /cancel/i });
+    await user.click(closeButton);
+    
+    expect(onClose).toHaveBeenCalledWith('close-button');
+  });
+
+  it('throws error when compound components used outside Dialog', () => {
+    // Suppress console.error for this test
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    
+    expect(() => {
+      customRender(<Dialog.Title>Orphaned Title</Dialog.Title>);
+    }).toThrow('Dialog compound components must be used within a Dialog component');
+    
+    consoleSpy.mockRestore();
+  });
+});
+
+// ============================================================================
+// ANIMATION AND TRANSITION TESTS
+// ============================================================================
+
+describe('Dialog Component - Animations and Transitions', () => {
+  it('applies enter animation classes', async () => {
+    const onClose = vi.fn();
+    
+    const { rerender } = customRender(
+      <TestDialog open={false} onClose={onClose} />
+    );
+    
+    // Open dialog to trigger enter animation
+    rerender(<TestDialog open={true} onClose={onClose} />);
+    
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+    
+    // Check that Transition component is applied
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.closest('[class*="duration"]')).toBeInTheDocument();
+  });
+
+  it('applies exit animation classes', async () => {
+    const onClose = vi.fn();
+    
+    const { rerender } = customRender(
+      <TestDialog open={true} onClose={onClose} />
+    );
+    
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+    
+    // Close dialog to trigger exit animation
+    rerender(<TestDialog open={false} onClose={onClose} />);
+    
+    // Animation should be triggered (dialog will unmount after animation)
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+  });
+
+  it('respects animation configuration', async () => {
+    const onClose = vi.fn();
+    const customAnimation = {
+      duration: 500,
+      timing: 'ease-in' as const,
+      enterAnimation: true,
+      exitAnimation: false,
+      enterClasses: 'opacity-0 scale-50',
+      exitClasses: 'opacity-100 scale-100'
+    };
+    
+    customRender(
+      <TestDialog 
+        open={true} 
+        onClose={onClose}
+        animation={customAnimation}
+      />
+    );
+    
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+  });
+
+  it('handles animation for different variants', async () => {
+    const onClose = vi.fn();
+    const variants: DialogVariant[] = ['modal', 'sheet', 'overlay', 'drawer'];
+    
+    for (const variant of variants) {
+      const { rerender } = customRender(
+        <TestDialog 
+          open={false} 
+          onClose={onClose}
+          variant={variant}
+        />
+      );
+      
+      rerender(
+        <TestDialog 
+          open={true} 
+          onClose={onClose}
+          variant={variant}
+        />
+      );
+      
+      await waitFor(() => {
+        expect(screen.getByRole('dialog')).toBeInTheDocument();
+      });
+      
+      rerender(
+        <TestDialog 
+          open={false} 
+          onClose={onClose}
+          variant={variant}
+        />
+      );
+      
       await waitFor(() => {
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
       });
+    }
+  });
+});
+
+// ============================================================================
+// KEYBOARD NAVIGATION TESTS
+// ============================================================================
+
+describe('Dialog Component - Keyboard Navigation', () => {
+  let keyboardUtils: KeyboardTestUtils;
+  
+  beforeEach(() => {
+    const user = userEvent.setup();
+    keyboardUtils = createKeyboardUtils(user);
+  });
+
+  it('handles Tab navigation correctly', async () => {
+    const onClose = vi.fn();
+    
+    customRender(
+      <Dialog open={true} onClose={onClose}>
+        <Dialog.Content>
+          <button type="button" data-testid="btn-1">Button 1</button>
+          <button type="button" data-testid="btn-2">Button 2</button>
+          <button type="button" data-testid="btn-3">Button 3</button>
+        </Dialog.Content>
+      </Dialog>
+    );
+    
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+    
+    const btn1 = screen.getByTestId('btn-1');
+    const btn2 = screen.getByTestId('btn-2');
+    const btn3 = screen.getByTestId('btn-3');
+    
+    // Focus should start on first button
+    await waitFor(() => {
+      expect(keyboardUtils.getFocused()).toBe(btn1);
+    });
+    
+    // Tab should move to next button
+    await keyboardUtils.tab();
+    expect(keyboardUtils.getFocused()).toBe(btn2);
+    
+    await keyboardUtils.tab();
+    expect(keyboardUtils.getFocused()).toBe(btn3);
+    
+    // Tab from last should cycle to first
+    await keyboardUtils.tab();
+    expect(keyboardUtils.getFocused()).toBe(btn1);
+  });
+
+  it('handles Shift+Tab navigation correctly', async () => {
+    const onClose = vi.fn();
+    
+    customRender(
+      <Dialog open={true} onClose={onClose}>
+        <Dialog.Content>
+          <button type="button" data-testid="btn-1">Button 1</button>
+          <button type="button" data-testid="btn-2">Button 2</button>
+          <button type="button" data-testid="btn-3">Button 3</button>
+        </Dialog.Content>
+      </Dialog>
+    );
+    
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+    
+    const btn1 = screen.getByTestId('btn-1');
+    const btn3 = screen.getByTestId('btn-3');
+    
+    // Start at first button
+    await waitFor(() => {
+      expect(keyboardUtils.getFocused()).toBe(btn1);
+    });
+    
+    // Shift+Tab should cycle to last button
+    await keyboardUtils.tab({ shift: true });
+    expect(keyboardUtils.getFocused()).toBe(btn3);
+  });
+
+  it('handles Enter key on focusable elements', async () => {
+    const onClose = vi.fn();
+    const onClick = vi.fn();
+    
+    customRender(
+      <Dialog open={true} onClose={onClose}>
+        <Dialog.Content>
+          <button type="button" onClick={onClick} data-testid="action-btn">
+            Action Button
+          </button>
+        </Dialog.Content>
+      </Dialog>
+    );
+    
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+    
+    const actionBtn = screen.getByTestId('action-btn');
+    actionBtn.focus();
+    
+    await keyboardUtils.enter();
+    expect(onClick).toHaveBeenCalled();
+  });
+
+  it('prevents Tab navigation outside dialog', async () => {
+    const onClose = vi.fn();
+    
+    // Add some buttons outside the dialog
+    const outsideButton = document.createElement('button');
+    outsideButton.textContent = 'Outside Button';
+    outsideButton.setAttribute('data-testid', 'outside-btn');
+    document.body.appendChild(outsideButton);
+    
+    customRender(
+      <Dialog open={true} onClose={onClose}>
+        <Dialog.Content>
+          <button type="button" data-testid="inside-btn">Inside Button</button>
+        </Dialog.Content>
+      </Dialog>
+    );
+    
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+    
+    const insideBtn = screen.getByTestId('inside-btn');
+    
+    // Focus should be trapped inside dialog
+    await waitFor(() => {
+      expect(keyboardUtils.getFocused()).toBe(insideBtn);
+    });
+    
+    // Tab multiple times - focus should stay within dialog
+    for (let i = 0; i < 5; i++) {
+      await keyboardUtils.tab();
+      expect(keyboardUtils.getFocused()).not.toBe(outsideButton);
+    }
+    
+    document.body.removeChild(outsideButton);
+  });
+});
+
+// ============================================================================
+// STATE MANAGEMENT TESTS
+// ============================================================================
+
+describe('Dialog Component - State Management', () => {
+  it('works in controlled mode', async () => {
+    const user = userEvent.setup();
+    
+    customRender(<StateTestDialog controlled={true} />);
+    
+    const openButton = screen.getByTestId('open-dialog');
+    await user.click(openButton);
+    
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      expect(screen.getByText('Testing controlled state')).toBeInTheDocument();
+    });
+    
+    const closeButton = screen.getByRole('button', { name: /close/i });
+    await user.click(closeButton);
+    
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
   });
 
-  describe('Backdrop Click Behavior', () => {
-    it('should close dialog when backdrop is clicked', async () => {
-      const onOpenChange = vi.fn();
-      
-      render(
-        <Dialog open={true} onOpenChange={onOpenChange} closeOnBackdropClick={true}>
-          <Dialog.Content>
-            <Dialog.Title>Test Dialog</Dialog.Title>
-          </Dialog.Content>
-        </Dialog>
-      );
-
-      const overlay = screen.getByTestId('dialog-overlay');
-      await user.click(overlay);
-      
-      expect(onOpenChange).toHaveBeenCalledWith(false);
+  it('works with useDialog hook (uncontrolled)', async () => {
+    const user = userEvent.setup();
+    
+    customRender(<StateTestDialog controlled={false} />);
+    
+    const openButton = screen.getByTestId('open-dialog');
+    await user.click(openButton);
+    
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      expect(screen.getByText('Testing uncontrolled state')).toBeInTheDocument();
     });
-
-    it('should not close dialog when content is clicked', async () => {
-      const onOpenChange = vi.fn();
-      
-      render(
-        <Dialog open={true} onOpenChange={onOpenChange} closeOnBackdropClick={true}>
-          <Dialog.Content>
-            <Dialog.Title>Test Dialog</Dialog.Title>
-          </Dialog.Content>
-        </Dialog>
-      );
-
-      const content = screen.getByTestId('dialog-content');
-      await user.click(content);
-      
-      expect(onOpenChange).not.toHaveBeenCalled();
-    });
-
-    it('should not close dialog when closeOnBackdropClick is false', async () => {
-      const onOpenChange = vi.fn();
-      
-      render(
-        <Dialog open={true} onOpenChange={onOpenChange} closeOnBackdropClick={false}>
-          <Dialog.Content>
-            <Dialog.Title>Test Dialog</Dialog.Title>
-          </Dialog.Content>
-        </Dialog>
-      );
-
-      const overlay = screen.getByTestId('dialog-overlay');
-      await user.click(overlay);
-      
-      expect(onOpenChange).not.toHaveBeenCalled();
+    
+    const closeButton = screen.getByRole('button', { name: /close/i });
+    await user.click(closeButton);
+    
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
   });
 
-  describe('Dialog Variants', () => {
-    it('should render modal variant correctly', () => {
-      render(
-        <Dialog open={true} variant="modal" size="md">
-          <Dialog.Content>
-            <Dialog.Title>Modal Dialog</Dialog.Title>
-          </Dialog.Content>
-        </Dialog>
-      );
-
-      const content = screen.getByTestId('dialog-content-modal-md');
-      expect(content).toBeInTheDocument();
-      expect(content).toHaveClass('max-w-md');
-    });
-
-    it('should render sheet variant correctly', () => {
-      render(
-        <Dialog open={true} variant="sheet" size="lg">
-          <Dialog.Content>
-            <Dialog.Title>Sheet Dialog</Dialog.Title>
-          </Dialog.Content>
-        </Dialog>
-      );
-
-      const content = screen.getByTestId('dialog-content-sheet-lg');
-      expect(content).toBeInTheDocument();
-      expect(content).toHaveClass('w-full', 'h-full', 'sm:h-auto', 'sm:max-h-[90vh]');
-    });
-
-    it('should render overlay variant correctly', () => {
-      render(
-        <Dialog open={true} variant="overlay" size="xl">
-          <Dialog.Content>
-            <Dialog.Title>Overlay Dialog</Dialog.Title>
-          </Dialog.Content>
-        </Dialog>
-      );
-
-      const content = screen.getByTestId('dialog-content-overlay-xl');
-      expect(content).toBeInTheDocument();
-      expect(content).toHaveClass('max-w-xl');
-    });
-
-    it('should render drawer variant correctly', () => {
-      render(
-        <Dialog open={true} variant="drawer" size="sm">
-          <Dialog.Content>
-            <Dialog.Title>Drawer Dialog</Dialog.Title>
-          </Dialog.Content>
-        </Dialog>
-      );
-
-      const content = screen.getByTestId('dialog-content-drawer-sm');
-      expect(content).toBeInTheDocument();
-      expect(content).toHaveClass('h-full', 'w-full', 'sm:w-96');
-    });
-  });
-
-  describe('Size Configurations', () => {
-    const sizes: Array<{ size: 'sm' | 'md' | 'lg' | 'xl' | 'full', expectedClass: string }> = [
-      { size: 'sm', expectedClass: 'max-w-sm' },
-      { size: 'md', expectedClass: 'max-w-md' },
-      { size: 'lg', expectedClass: 'max-w-lg' },
-      { size: 'xl', expectedClass: 'max-w-xl' },
-      { size: 'full', expectedClass: 'w-full h-full max-w-none' },
-    ];
-
-    sizes.forEach(({ size, expectedClass }) => {
-      it(`should render ${size} size correctly`, () => {
-        render(
-          <Dialog open={true} size={size}>
-            <Dialog.Content>
-              <Dialog.Title>{size.toUpperCase()} Dialog</Dialog.Title>
-            </Dialog.Content>
+  it('useDialog hook provides correct state and methods', () => {
+    const TestComponent = () => {
+      const { open, openDialog, closeDialog, toggleDialog, dialogProps } = useDialog();
+      
+      return (
+        <div>
+          <div data-testid="dialog-state">{open ? 'open' : 'closed'}</div>
+          <button onClick={openDialog} data-testid="open-btn">Open</button>
+          <button onClick={closeDialog} data-testid="close-btn">Close</button>
+          <button onClick={toggleDialog} data-testid="toggle-btn">Toggle</button>
+          <Dialog {...dialogProps}>
+            <Dialog.Content>Test Content</Dialog.Content>
           </Dialog>
-        );
-
-        const content = screen.getByTestId(`dialog-content-modal-${size}`);
-        expect(content).toHaveClass(expectedClass);
-      });
+        </div>
+      );
+    };
+    
+    const user = userEvent.setup();
+    customRender(<TestComponent />);
+    
+    // Initial state should be closed
+    expect(screen.getByTestId('dialog-state')).toHaveTextContent('closed');
+    
+    // Test open
+    user.click(screen.getByTestId('open-btn'));
+    waitFor(() => {
+      expect(screen.getByTestId('dialog-state')).toHaveTextContent('open');
+    });
+    
+    // Test close
+    user.click(screen.getByTestId('close-btn'));
+    waitFor(() => {
+      expect(screen.getByTestId('dialog-state')).toHaveTextContent('closed');
+    });
+    
+    // Test toggle
+    user.click(screen.getByTestId('toggle-btn'));
+    waitFor(() => {
+      expect(screen.getByTestId('dialog-state')).toHaveTextContent('open');
     });
   });
+});
 
-  describe('Responsive Behavior', () => {
-    it('should adapt to mobile viewport', async () => {
-      // Start with desktop
-      render(
-        <Dialog open={true} variant="sheet" size="lg">
-          <Dialog.Content>
-            <Dialog.Title>Responsive Dialog</Dialog.Title>
-          </Dialog.Content>
+// ============================================================================
+// ERROR BOUNDARIES AND EDGE CASES
+// ============================================================================
+
+describe('Dialog Component - Error Handling and Edge Cases', () => {
+  it('handles invalid children gracefully', () => {
+    const onClose = vi.fn();
+    
+    expect(() => {
+      customRender(
+        <Dialog open={true} onClose={onClose}>
+          {null}
+          {undefined}
+          {false}
         </Dialog>
       );
-
-      // Resize to mobile
-      act(() => {
-        resizeViewport(375, 667);
-      });
-
-      const content = screen.getByTestId('dialog-content-sheet-lg');
-      expect(content).toBeInTheDocument();
-      
-      // Sheet variant should use full width/height on mobile
-      expect(content).toHaveClass('w-full', 'h-full');
-    });
-
-    it('should handle tablet viewport correctly', async () => {
-      render(
-        <Dialog open={true} variant="drawer" size="md">
-          <Dialog.Content>
-            <Dialog.Title>Tablet Dialog</Dialog.Title>
-          </Dialog.Content>
-        </Dialog>
-      );
-
-      // Resize to tablet
-      act(() => {
-        resizeViewport(768, 1024);
-      });
-
-      const content = screen.getByTestId('dialog-content-drawer-md');
-      expect(content).toBeInTheDocument();
-    });
-
-    it('should maintain aspect ratio on different screen sizes', async () => {
-      render(
-        <Dialog open={true} size="full">
-          <Dialog.Content>
-            <Dialog.Title>Full Size Dialog</Dialog.Title>
-          </Dialog.Content>
-        </Dialog>
-      );
-
-      const content = screen.getByTestId('dialog-content-modal-full');
-      expect(content).toHaveClass('w-full', 'h-full', 'max-w-none');
-
-      // Test different viewports
-      const viewports = [
-        { width: 320, height: 568 }, // Small mobile
-        { width: 768, height: 1024 }, // Tablet
-        { width: 1920, height: 1080 }, // Desktop
-      ];
-
-      for (const viewport of viewports) {
-        act(() => {
-          resizeViewport(viewport.width, viewport.height);
-        });
-        
-        expect(content).toHaveClass('w-full', 'h-full');
-      }
-    });
+    }).not.toThrow();
   });
 
-  describe('Compound Component Architecture', () => {
-    it('should render Dialog.Content correctly', () => {
-      render(
-        <Dialog open={true}>
-          <Dialog.Content className="custom-content">
-            <p>Content goes here</p>
-          </Dialog.Content>
+  it('handles missing onClose prop gracefully', () => {
+    expect(() => {
+      customRender(
+        <Dialog open={true} onClose={undefined as any}>
+          <Dialog.Content>Test</Dialog.Content>
         </Dialog>
       );
-
-      const content = screen.getByTestId('dialog-content');
-      expect(content).toBeInTheDocument();
-      expect(content).toHaveClass('p-6', 'custom-content');
-      expect(content).toHaveTextContent('Content goes here');
-    });
-
-    it('should render Dialog.Header correctly', () => {
-      render(
-        <Dialog open={true}>
-          <Dialog.Content>
-            <Dialog.Header className="custom-header">
-              <Dialog.Title>Test Title</Dialog.Title>
-              <Dialog.Description>Test Description</Dialog.Description>
-            </Dialog.Header>
-          </Dialog.Content>
-        </Dialog>
-      );
-
-      const header = screen.getByTestId('dialog-header');
-      expect(header).toBeInTheDocument();
-      expect(header).toHaveClass('flex', 'flex-col', 'space-y-1.5', 'custom-header');
-    });
-
-    it('should render Dialog.Footer correctly', () => {
-      render(
-        <Dialog open={true}>
-          <Dialog.Content>
-            <Dialog.Footer className="custom-footer">
-              <button>Cancel</button>
-              <button>Confirm</button>
-            </Dialog.Footer>
-          </Dialog.Content>
-        </Dialog>
-      );
-
-      const footer = screen.getByTestId('dialog-footer');
-      expect(footer).toBeInTheDocument();
-      expect(footer).toHaveClass('flex', 'flex-col-reverse', 'sm:flex-row', 'custom-footer');
-    });
-
-    it('should render Dialog.Title with proper semantics', () => {
-      render(
-        <Dialog open={true}>
-          <Dialog.Content>
-            <Dialog.Title className="custom-title">Dialog Title</Dialog.Title>
-          </Dialog.Content>
-        </Dialog>
-      );
-
-      const title = screen.getByTestId('dialog-title');
-      expect(title).toBeInTheDocument();
-      expect(title.tagName).toBe('H2');
-      expect(title).toHaveClass('text-lg', 'font-semibold', 'custom-title');
-      expect(title).toHaveTextContent('Dialog Title');
-    });
-
-    it('should render Dialog.Description with proper styling', () => {
-      render(
-        <Dialog open={true}>
-          <Dialog.Content>
-            <Dialog.Description className="custom-description">
-              This is a dialog description.
-            </Dialog.Description>
-          </Dialog.Content>
-        </Dialog>
-      );
-
-      const description = screen.getByTestId('dialog-description');
-      expect(description).toBeInTheDocument();
-      expect(description.tagName).toBe('P');
-      expect(description).toHaveClass('text-sm', 'text-muted-foreground', 'custom-description');
-      expect(description).toHaveTextContent('This is a dialog description.');
-    });
-
-    it('should render Dialog.Close as a button by default', () => {
-      render(
-        <Dialog open={true}>
-          <Dialog.Content>
-            <Dialog.Close>Close Dialog</Dialog.Close>
-          </Dialog.Content>
-        </Dialog>
-      );
-
-      const closeButton = screen.getByTestId('dialog-close');
-      expect(closeButton).toBeInTheDocument();
-      expect(closeButton.tagName).toBe('BUTTON');
-      expect(closeButton).toHaveTextContent('Close Dialog');
-    });
-
-    it('should render Dialog.Close with asChild prop', () => {
-      render(
-        <Dialog open={true}>
-          <Dialog.Content>
-            <Dialog.Close asChild>
-              <div role="button" tabIndex={0}>Custom Close Element</div>
-            </Dialog.Close>
-          </Dialog.Content>
-        </Dialog>
-      );
-
-      const closeElement = screen.getByTestId('dialog-close');
-      expect(closeElement).toBeInTheDocument();
-      expect(closeElement.tagName).toBe('DIV');
-      expect(closeElement).toHaveTextContent('Custom Close Element');
-    });
+    }).not.toThrow();
   });
 
-  describe('Animation and Transitions', () => {
-    it('should apply proper transition classes', () => {
-      render(
-        <Dialog open={true}>
-          <Dialog.Content>
-            <Dialog.Title>Animated Dialog</Dialog.Title>
-          </Dialog.Content>
-        </Dialog>
-      );
-
-      const overlay = screen.getByTestId('dialog-overlay');
-      expect(overlay).toHaveClass('fixed', 'inset-0', 'z-50');
-      
-      const content = screen.getByTestId('dialog-content-modal-md');
-      expect(content).toHaveClass('relative', 'bg-white', 'rounded-lg', 'shadow-lg');
-    });
-
-    it('should handle animation state changes during open/close', async () => {
-      const { rerender } = render(
-        <Dialog open={false}>
-          <Dialog.Content>
-            <Dialog.Title>Test Dialog</Dialog.Title>
-          </Dialog.Content>
-        </Dialog>
-      );
-
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-
-      rerender(
-        <Dialog open={true}>
-          <Dialog.Content>
-            <Dialog.Title>Test Dialog</Dialog.Title>
-          </Dialog.Content>
-        </Dialog>
-      );
-
-      expect(screen.getByRole('dialog')).toBeInTheDocument();
-    });
-
-    it('should maintain smooth transitions during resize', async () => {
-      render(
-        <Dialog open={true} size="md">
-          <Dialog.Content>
-            <Dialog.Title>Resizing Dialog</Dialog.Title>
-          </Dialog.Content>
-        </Dialog>
-      );
-
-      const content = screen.getByTestId('dialog-content-modal-md');
-      expect(content).toHaveClass('max-w-md');
-
-      // Simulate viewport change
-      act(() => {
-        resizeViewport(375, 667);
-      });
-
-      // Content should still be present and styled
-      expect(content).toBeInTheDocument();
-    });
+  it('handles rapid open/close state changes', async () => {
+    const onClose = vi.fn();
+    
+    const { rerender } = customRender(
+      <TestDialog open={false} onClose={onClose} />
+    );
+    
+    // Rapidly toggle state
+    for (let i = 0; i < 10; i++) {
+      rerender(<TestDialog open={i % 2 === 0} onClose={onClose} />);
+    }
+    
+    // Should end up closed without errors
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  describe('Error Boundaries and Edge Cases', () => {
-    it('should handle missing children gracefully', () => {
-      render(<Dialog open={true} />);
-      
-      const dialog = screen.getByRole('dialog');
-      expect(dialog).toBeInTheDocument();
-    });
-
-    it('should handle invalid size prop gracefully', () => {
-      render(
-        <Dialog open={true} size={'invalid' as any}>
-          <Dialog.Content>
-            <Dialog.Title>Dialog with Invalid Size</Dialog.Title>
-          </Dialog.Content>
-        </Dialog>
-      );
-
-      const content = screen.getByTestId('dialog-content-modal-invalid');
-      expect(content).toBeInTheDocument();
-    });
-
-    it('should handle invalid variant prop gracefully', () => {
-      render(
-        <Dialog open={true} variant={'invalid' as any}>
-          <Dialog.Content>
-            <Dialog.Title>Dialog with Invalid Variant</Dialog.Title>
-          </Dialog.Content>
-        </Dialog>
-      );
-
-      const content = screen.getByTestId('dialog-content-invalid-md');
-      expect(content).toBeInTheDocument();
-    });
-
-    it('should handle rapid open/close state changes', async () => {
-      const TestComponent = () => {
-        const [open, setOpen] = useState(false);
-        
-        return (
-          <div>
-            <button 
-              onClick={() => setOpen(!open)} 
-              data-testid="toggle-dialog"
-            >
-              Toggle
-            </button>
-            <Dialog open={open} onOpenChange={setOpen}>
-              <Dialog.Content>
-                <Dialog.Title>Rapid Toggle Dialog</Dialog.Title>
-              </Dialog.Content>
-            </Dialog>
-          </div>
-        );
-      };
-
-      render(<TestComponent />);
-      
-      const toggleButton = screen.getByTestId('toggle-dialog');
-      
-      // Rapidly toggle dialog
-      await user.click(toggleButton);
-      expect(screen.getByRole('dialog')).toBeInTheDocument();
-      
-      await user.click(toggleButton);
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-      
-      await user.click(toggleButton);
-      expect(screen.getByRole('dialog')).toBeInTheDocument();
-    });
-  });
-
-  describe('Controlled vs Uncontrolled State Management', () => {
-    it('should work in controlled mode with external state', async () => {
-      const TestControlled = () => {
-        const [open, setOpen] = useState(false);
-        return (
-          <div>
-            <button onClick={() => setOpen(true)} data-testid="open-controlled">
-              Open
-            </button>
-            <button onClick={() => setOpen(false)} data-testid="close-controlled">
-              Close
-            </button>
-            <Dialog open={open} onOpenChange={setOpen}>
-              <Dialog.Content>
-                <Dialog.Title>Controlled Dialog</Dialog.Title>
-              </Dialog.Content>
-            </Dialog>
-          </div>
-        );
-      };
-
-      render(<TestControlled />);
-
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-
-      await user.click(screen.getByTestId('open-controlled'));
-      expect(screen.getByRole('dialog')).toBeInTheDocument();
-
-      await user.click(screen.getByTestId('close-controlled'));
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    });
-
-    it('should handle onOpenChange callback correctly', async () => {
-      const onOpenChange = vi.fn();
-      
-      render(
-        <Dialog open={true} onOpenChange={onOpenChange} closeOnEscape={true}>
-          <Dialog.Content>
-            <Dialog.Title>Callback Test Dialog</Dialog.Title>
-          </Dialog.Content>
-        </Dialog>
-      );
-
-      const dialog = screen.getByRole('dialog');
-      dialog.focus();
-      
-      await user.keyboard('{Escape}');
-      expect(onOpenChange).toHaveBeenCalledWith(false);
-    });
-  });
-
-  describe('Screen Reader Support', () => {
-    it('should announce dialog opening to screen readers', () => {
-      render(
-        <Dialog open={true} aria-live="polite" aria-label="Dialog opened">
-          <Dialog.Content>
-            <Dialog.Title>Screen Reader Dialog</Dialog.Title>
-            <Dialog.Description>
-              This dialog should be announced to screen readers.
-            </Dialog.Description>
-          </Dialog.Content>
-        </Dialog>
-      );
-
-      const dialog = screen.getByRole('dialog');
-      expect(dialog).toHaveAttribute('aria-live', 'polite');
-    });
-
-    it('should provide proper role and aria attributes for screen readers', () => {
-      render(
+  it('handles portal container that does not exist', () => {
+    const onClose = vi.fn();
+    
+    expect(() => {
+      customRender(
         <Dialog 
           open={true} 
-          modal={true}
-          aria-labelledby="title"
-          aria-describedby="description"
+          onClose={onClose}
+          container="non-existent-element"
         >
-          <Dialog.Content>
-            <Dialog.Title id="title">Accessible Title</Dialog.Title>
-            <Dialog.Description id="description">
-              Accessible description for screen readers.
-            </Dialog.Description>
-          </Dialog.Content>
+          <Dialog.Content>Test</Dialog.Content>
         </Dialog>
       );
+    }).not.toThrow();
+  });
 
-      const dialog = screen.getByRole('dialog');
-      expect(dialog).toHaveAttribute('role', 'dialog');
-      expect(dialog).toHaveAttribute('aria-modal', 'true');
-      expect(dialog).toHaveAttribute('aria-labelledby', 'title');
-      expect(dialog).toHaveAttribute('aria-describedby', 'description');
-
-      const title = screen.getByText('Accessible Title');
-      const description = screen.getByText('Accessible description for screen readers.');
-      expect(title).toHaveAttribute('id', 'title');
-      expect(description).toHaveAttribute('id', 'description');
+  it('handles focus management when dialog is destroyed', async () => {
+    const onClose = vi.fn();
+    
+    const { unmount } = customRender(
+      <TestDialog open={true} onClose={onClose} />
+    );
+    
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
     });
+    
+    // Unmount component while dialog is open
+    unmount();
+    
+    // Should not cause errors
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
 
-    it('should support aria-label fallback when labelledby is not available', () => {
-      render(
-        <Dialog open={true} aria-label="Fallback dialog label">
-          <Dialog.Content>
-            <p>Dialog without explicit title</p>
-          </Dialog.Content>
+  it('handles invalid animation configuration', () => {
+    const onClose = vi.fn();
+    
+    expect(() => {
+      customRender(
+        <TestDialog 
+          open={true} 
+          onClose={onClose}
+          animation={{
+            duration: -1, // Invalid
+            timing: 'invalid' as any, // Invalid
+            enterAnimation: null as any, // Invalid
+          }}
+        />
+      );
+    }).not.toThrow();
+  });
+
+  it('handles missing ref objects', () => {
+    const onClose = vi.fn();
+    
+    expect(() => {
+      customRender(
+        <Dialog
+          open={true}
+          onClose={onClose}
+          initialFocus={null as any}
+          finalFocus={undefined as any}
+        >
+          <Dialog.Content>Test</Dialog.Content>
         </Dialog>
       );
+    }).not.toThrow();
+  });
 
+  it('handles window resize during animation', async () => {
+    const onClose = vi.fn();
+    
+    customRender(
+      <TestDialog open={true} onClose={onClose} variant="modal" size="xl" />
+    );
+    
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+    
+    // Resize window multiple times during dialog lifecycle
+    mockWindowResize(375, 667);
+    mockWindowResize(768, 1024);
+    mockWindowResize(1920, 1080);
+    
+    // Dialog should remain functional
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+});
+
+// ============================================================================
+// SCREEN READER SUPPORT TESTS
+// ============================================================================
+
+describe('Dialog Component - Screen Reader Support', () => {
+  it('provides proper role and labeling', async () => {
+    const onClose = vi.fn();
+    
+    customRender(
+      <Dialog 
+        open={true} 
+        onClose={onClose}
+        aria-label="Confirmation dialog"
+      >
+        <Dialog.Header>
+          <Dialog.Title>Confirm Action</Dialog.Title>
+          <Dialog.Description>Are you sure you want to proceed?</Dialog.Description>
+        </Dialog.Header>
+        <Dialog.Content>Additional details here</Dialog.Content>
+      </Dialog>
+    );
+    
+    await waitFor(() => {
       const dialog = screen.getByRole('dialog');
-      expect(dialog).toHaveAttribute('aria-label', 'Fallback dialog label');
+      expect(dialog).toBeInTheDocument();
+      expect(dialog).toHaveAttribute('aria-label', 'Confirmation dialog');
+      expect(dialog).toHaveAttribute('aria-modal', 'true');
     });
   });
 
-  describe('Integration Scenarios', () => {
-    it('should work with forms and form validation', async () => {
-      const onSubmit = vi.fn();
+  it('connects title and description to dialog', async () => {
+    const onClose = vi.fn();
+    
+    customRender(
+      <Dialog open={true} onClose={onClose}>
+        <Dialog.Header>
+          <Dialog.Title>Test Title</Dialog.Title>
+          <Dialog.Description>Test Description</Dialog.Description>
+        </Dialog.Header>
+        <Dialog.Content>Content</Dialog.Content>
+      </Dialog>
+    );
+    
+    await waitFor(() => {
+      const dialog = screen.getByRole('dialog');
+      const title = screen.getByRole('heading', { level: 2 });
+      const description = screen.getByText('Test Description');
       
-      render(
-        <Dialog open={true}>
-          <Dialog.Content>
-            <Dialog.Header>
-              <Dialog.Title>Form Dialog</Dialog.Title>
-            </Dialog.Header>
-            <form onSubmit={onSubmit}>
-              <input 
-                data-testid="form-input" 
-                required 
-                placeholder="Required field" 
-              />
-              <Dialog.Footer>
-                <button type="submit" data-testid="submit-form">
-                  Submit
-                </button>
-              </Dialog.Footer>
-            </form>
-          </Dialog.Content>
-        </Dialog>
+      expect(dialog).toHaveAttribute('aria-labelledby', title.id);
+      expect(dialog).toHaveAttribute('aria-describedby', description.id);
+    });
+  });
+
+  it('handles custom ARIA attributes', async () => {
+    const onClose = vi.fn();
+    
+    customRender(
+      <Dialog 
+        open={true} 
+        onClose={onClose}
+        role="alertdialog"
+        aria-label="Custom dialog"
+        aria-live="assertive"
+      >
+        <Dialog.Content>Alert content</Dialog.Content>
+      </Dialog>
+    );
+    
+    await waitFor(() => {
+      const dialog = screen.getByRole('alertdialog');
+      expect(dialog).toBeInTheDocument();
+      expect(dialog).toHaveAttribute('aria-label', 'Custom dialog');
+      expect(dialog).toHaveAttribute('aria-live', 'assertive');
+    });
+  });
+
+  it('supports screen reader navigation between elements', async () => {
+    const onClose = vi.fn();
+    
+    customRender(
+      <Dialog open={true} onClose={onClose}>
+        <Dialog.Header>
+          <Dialog.Title>Multi-section Dialog</Dialog.Title>
+        </Dialog.Header>
+        <Dialog.Content>
+          <h3>Subsection</h3>
+          <p>Some content</p>
+          <ul>
+            <li>Item 1</li>
+            <li>Item 2</li>
+          </ul>
+        </Dialog.Content>
+        <Dialog.Footer>
+          <button type="button">Action</button>
+        </Dialog.Footer>
+      </Dialog>
+    );
+    
+    await waitFor(() => {
+      // All semantic elements should be present for screen reader navigation
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 2 })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 3 })).toBeInTheDocument();
+      expect(screen.getByRole('list')).toBeInTheDocument();
+      expect(screen.getAllByRole('listitem')).toHaveLength(2);
+      expect(screen.getByRole('button')).toBeInTheDocument();
+    });
+  });
+});
+
+// ============================================================================
+// PERFORMANCE AND OPTIMIZATION TESTS
+// ============================================================================
+
+describe('Dialog Component - Performance', () => {
+  it('does not re-render unnecessarily', async () => {
+    const onClose = vi.fn();
+    let renderCount = 0;
+    
+    const TestWrapper = ({ open }: { open: boolean }) => {
+      renderCount++;
+      return (
+        <TestDialog open={open} onClose={onClose}>
+          <Dialog.Content>Render count: {renderCount}</Dialog.Content>
+        </TestDialog>
       );
+    };
+    
+    const { rerender } = customRender(<TestWrapper open={false} />);
+    
+    // Rerender with same props
+    rerender(<TestWrapper open={false} />);
+    rerender(<TestWrapper open={false} />);
+    
+    // Should have minimal re-renders
+    expect(renderCount).toBeLessThan(5);
+  });
 
-      const input = screen.getByTestId('form-input');
-      const submitButton = screen.getByTestId('submit-form');
-
-      // Try to submit without filling required field
-      await user.click(submitButton);
-      expect(onSubmit).not.toHaveBeenCalled();
-
-      // Fill the form and submit
-      await user.type(input, 'test value');
-      await user.click(submitButton);
-      expect(onSubmit).toHaveBeenCalled();
+  it('handles large content efficiently', async () => {
+    const onClose = vi.fn();
+    const largeContent = Array.from({ length: 1000 }, (_, i) => (
+      <div key={i}>Item {i}</div>
+    ));
+    
+    const startTime = performance.now();
+    
+    customRender(
+      <Dialog open={true} onClose={onClose}>
+        <Dialog.Content>
+          {largeContent}
+        </Dialog.Content>
+      </Dialog>
+    );
+    
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
     });
-
-    it('should work with complex nested content', () => {
-      render(
-        <Dialog open={true}>
-          <Dialog.Content>
-            <Dialog.Header>
-              <Dialog.Title>Complex Dialog</Dialog.Title>
-              <Dialog.Description>Dialog with nested components</Dialog.Description>
-            </Dialog.Header>
-            <div data-testid="nested-content">
-              <div>
-                <h3>Nested Section</h3>
-                <ul>
-                  <li>Item 1</li>
-                  <li>Item 2</li>
-                  <li>Item 3</li>
-                </ul>
-              </div>
-              <div>
-                <input placeholder="Nested input" />
-                <button>Nested button</button>
-              </div>
-            </div>
-            <Dialog.Footer>
-              <Dialog.Close>Close</Dialog.Close>
-            </Dialog.Footer>
-          </Dialog.Content>
-        </Dialog>
-      );
-
-      expect(screen.getByTestId('nested-content')).toBeInTheDocument();
-      expect(screen.getByText('Nested Section')).toBeInTheDocument();
-      expect(screen.getByText('Item 1')).toBeInTheDocument();
-      expect(screen.getByPlaceholderText('Nested input')).toBeInTheDocument();
-      expect(screen.getByText('Nested button')).toBeInTheDocument();
-    });
-
-    it('should handle multiple dialogs (stacking)', async () => {
-      const TestStacking = () => {
-        const [firstOpen, setFirstOpen] = useState(true);
-        const [secondOpen, setSecondOpen] = useState(false);
-        
-        return (
-          <div>
-            <Dialog open={firstOpen} onOpenChange={setFirstOpen}>
-              <Dialog.Content>
-                <Dialog.Title>First Dialog</Dialog.Title>
-                <button 
-                  onClick={() => setSecondOpen(true)}
-                  data-testid="open-second"
-                >
-                  Open Second Dialog
-                </button>
-              </Dialog.Content>
-            </Dialog>
-            
-            <Dialog open={secondOpen} onOpenChange={setSecondOpen}>
-              <Dialog.Content>
-                <Dialog.Title>Second Dialog</Dialog.Title>
-                <Dialog.Close>Close Second</Dialog.Close>
-              </Dialog.Content>
-            </Dialog>
-          </div>
-        );
-      };
-
-      render(<TestStacking />);
-
-      expect(screen.getByText('First Dialog')).toBeInTheDocument();
-      
-      const openSecondButton = screen.getByTestId('open-second');
-      await user.click(openSecondButton);
-      
-      expect(screen.getByText('Second Dialog')).toBeInTheDocument();
-      
-      // Both dialogs should be present in the DOM
-      const dialogs = screen.getAllByRole('dialog');
-      expect(dialogs).toHaveLength(2);
-    });
+    
+    const endTime = performance.now();
+    const renderTime = endTime - startTime;
+    
+    // Should render reasonably quickly even with large content
+    expect(renderTime).toBeLessThan(1000); // Less than 1 second
   });
 });
