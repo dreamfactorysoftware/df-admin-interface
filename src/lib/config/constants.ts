@@ -1,27 +1,16 @@
 /**
- * Centralized Application Constants
- * 
- * Consolidates constants from multiple Angular files into a unified module
- * compatible with React 19/Next.js 15.1 architecture. Maintains exact
- * compatibility with existing business logic while providing framework-agnostic
- * constant definitions for component and service consumption.
- * 
- * Migration Source: Consolidates the following Angular constant files:
- * - src/app/shared/constants/languages.ts
- * - src/app/shared/constants/scripts.ts  
- * - src/app/shared/constants/http-headers.ts
- * - src/app/shared/constants/serviceGroups.ts
- * - src/app/shared/constants/services.ts
- * - src/app/shared/constants/supported-extensions.ts
+ * Centralized application constants migrated from Angular shared constants.
+ * Maintains compatibility with existing business logic while providing 
+ * Next.js-compatible module exports for component and service consumption.
  */
 
-// =============================================================================
-// LANGUAGE CONFIGURATION
-// =============================================================================
+// ============================================================================
+// LANGUAGE CONSTANTS
+// ============================================================================
 
 /**
- * Supported application languages for internationalization
- * Maintains compatibility with existing translation infrastructure
+ * Supported languages configuration
+ * Migrated from: src/app/shared/constants/languages.ts
  */
 export const SUPPORTED_LANGUAGES = [
   {
@@ -34,18 +23,16 @@ export const SUPPORTED_LANGUAGES = [
   // },
 ] as const;
 
-/**
- * Default fallback language for the application
- */
 export const DEFAULT_LANGUAGE = 'en' as const;
 
-// =============================================================================
-// SCRIPT TYPES AND ACE EDITOR MODES
-// =============================================================================
+// ============================================================================
+// SCRIPT TYPE CONSTANTS
+// ============================================================================
 
 /**
- * Ace Editor modes for syntax highlighting
- * Framework-agnostic enum compatible with React components
+ * Script types for code editor and execution
+ * Migrated from: src/app/shared/constants/scripts.ts
+ * Note: Removed Angular transloco dependency, using static labels
  */
 export enum AceEditorMode {
   JSON = 'json',
@@ -58,86 +45,46 @@ export enum AceEditorMode {
   JAVASCRIPT = 'javascript',
 }
 
-/**
- * Script type definitions for code editor components
- * Note: Labels are provided as keys for i18n translation lookup
- * React components should translate these keys at runtime
- */
 export const SCRIPT_TYPES = [
   {
-    labelKey: 'scriptTypes.nodejs', // Translate at runtime
+    label: 'Node.js',
     value: AceEditorMode.NODEJS,
     extension: 'js',
   },
   {
-    labelKey: 'scriptTypes.php', // Translate at runtime
+    label: 'PHP',
     value: AceEditorMode.PHP,
     extension: 'php',
   },
   {
-    labelKey: 'scriptTypes.python', // Translate at runtime
+    label: 'Python',
     value: AceEditorMode.PYTHON,
     extension: 'py',
   },
   {
-    labelKey: 'scriptTypes.python3', // Translate at runtime
+    label: 'Python 3',
     value: AceEditorMode.PYTHON3,
     extension: 'py',
   },
 ] as const;
 
-// =============================================================================
-// HTTP HEADERS AND REQUEST OPTIONS
-// =============================================================================
+// ============================================================================
+// EXPORT FORMAT CONSTANTS
+// ============================================================================
 
 /**
- * DreamFactory HTTP headers for authentication and session management
- * Compatible with Next.js fetch API and middleware patterns
+ * Supported export file formats
+ * Migrated from: src/app/shared/constants/supported-extensions.ts
  */
-export const HTTP_HEADERS = {
-  SESSION_TOKEN: 'X-DreamFactory-Session-Token',
-  API_KEY: 'X-DreamFactory-API-Key',
-  LICENSE_KEY: 'X-DreamFactory-License-Key',
-  SHOW_LOADING: 'show-loading',
-} as const;
+export const EXPORT_TYPES = ['csv', 'json', 'xml'] as const;
+
+// ============================================================================
+// ROUTE CONSTANTS
+// ============================================================================
 
 /**
- * Pre-configured header objects for common request patterns
- * Optimized for Next.js fetch API usage
- */
-export const REQUEST_OPTIONS = {
-  WITH_LOADING: {
-    headers: {
-      [HTTP_HEADERS.SHOW_LOADING]: '',
-    },
-  },
-  LOGIN_FALSE: {
-    headers: {
-      [HTTP_HEADERS.SHOW_LOADING]: '',
-    },
-    // Note: URL params should be handled by Next.js API client implementation
-    params: {
-      login: false,
-    },
-  },
-  RESET_TRUE: {
-    headers: {
-      [HTTP_HEADERS.SHOW_LOADING]: '',
-    },
-    // Note: URL params should be handled by Next.js API client implementation  
-    params: {
-      reset: true,
-    },
-  },
-} as const;
-
-// =============================================================================
-// ROUTES ENUM
-// =============================================================================
-
-/**
- * Application routes enum for consistent navigation and service grouping
- * Compatible with Next.js app router file-based routing
+ * Application route definitions
+ * Migrated from: src/app/shared/types/routes.ts
  */
 export enum ROUTES {
   IMPORT = 'import',
@@ -198,14 +145,13 @@ export enum ROUTES {
   LICENSE_EXPIRED = 'license-expired',
 }
 
-// =============================================================================
-// SERVICE GROUPS AND CATEGORIES
-// =============================================================================
+// ============================================================================
+// SERVICE GROUP CONSTANTS
+// ============================================================================
 
 /**
- * Service group mappings for DreamFactory service categorization
- * Maps route types to human-readable service group labels
- * Maintains compatibility with existing service registration logic
+ * Service grouping for DreamFactory service types
+ * Migrated from: src/app/shared/constants/serviceGroups.ts
  */
 export const SERVICE_GROUPS = {
   [ROUTES.DATABASE]: ['Database', 'Big Data'],
@@ -224,26 +170,13 @@ export const SERVICE_GROUPS = {
   [ROUTES.LOGS]: ['Log'],
 } as const;
 
-// =============================================================================
+// ============================================================================
 // SERVICE TYPE DEFINITIONS
-// =============================================================================
+// ============================================================================
 
 /**
- * Service type interface for DreamFactory service configuration
- * Maintains compatibility with existing service registration APIs
- */
-export interface ServiceType {
-  name: string;
-  label: string;
-  description: string;
-  group: string;
-  class?: string;
-  configSchema: Array<ConfigSchema>;
-}
-
-/**
- * Configuration schema interface for service setup forms
- * Compatible with React Hook Form and Zod validation patterns
+ * Service type interface for DreamFactory services
+ * Migrated from: src/app/shared/types/service.ts
  */
 export interface ConfigSchema {
   name: string;
@@ -298,17 +231,65 @@ export interface ConfigSchema {
   legend?: string;
 }
 
-/**
- * Label type for configuration schema
- */
 interface LabelType {
   label: string;
   type: string;
 }
 
+export interface ServiceType {
+  name: string;
+  label: string;
+  description: string;
+  group: string;
+  class?: string;
+  configSchema: Array<ConfigSchema>;
+}
+
+export interface Service {
+  id: number;
+  name: string;
+  label: string;
+  description: string;
+  isActive: boolean;
+  type: string;
+  mutable: boolean;
+  deletable: boolean;
+  createdDate: string;
+  lastModifiedDate: string;
+  createdById: number | null;
+  lastModifiedById: number | null;
+  config: any;
+  serviceDocByServiceId: number | null;
+  refresh: boolean;
+}
+
+export interface ServiceRow {
+  id: number;
+  name: string;
+  label: string;
+  description: string;
+  type: string;
+  scripting: string;
+  active: boolean;
+  deletable: boolean;
+}
+
+export interface LdapService {
+  name: string;
+  label: string;
+}
+
+export interface AuthService {
+  iconClass: string;
+  label: string;
+  name: string;
+  type: string;
+  path: string;
+}
+
 /**
  * Silver tier service definitions
- * Maintains exact compatibility with existing service configuration
+ * Migrated from: src/app/shared/constants/services.ts
  */
 export const SILVER_SERVICES: Array<ServiceType> = [
   {
@@ -495,8 +476,8 @@ export const SILVER_SERVICES: Array<ServiceType> = [
 ] as const;
 
 /**
- * Gold tier service definitions  
- * Premium service integrations for enterprise deployments
+ * Gold tier service definitions
+ * Migrated from: src/app/shared/constants/services.ts
  */
 export const GOLD_SERVICES: Array<ServiceType> = [
   {
@@ -553,96 +534,144 @@ export const GOLD_SERVICES: Array<ServiceType> = [
   },
 ] as const;
 
-// =============================================================================
-// FILE EXPORT AND DATA FORMATS
-// =============================================================================
+// ============================================================================
+// HTTP HEADER CONSTANTS
+// ============================================================================
 
 /**
- * Supported file export formats for data export functionality
- * Compatible with Next.js API routes and file streaming
+ * DreamFactory API header constants
+ * Migrated from: src/app/shared/constants/http-headers.ts
+ * Compatible with Next.js fetch API and middleware patterns
  */
-export const EXPORT_TYPES = ['csv', 'json', 'xml'] as const;
-
-// =============================================================================
-// API ENDPOINTS AND BASE URLS
-// =============================================================================
-
-/**
- * Base API URL for DreamFactory v2 endpoints
- * Compatible with Next.js environment configuration
- */
-export const BASE_URL = '/api/v2' as const;
+export const SESSION_TOKEN_HEADER = 'X-DreamFactory-Session-Token' as const;
+export const API_KEY_HEADER = 'X-DreamFactory-API-Key' as const;
+export const LICENSE_KEY_HEADER = 'X-DreamFactory-License-Key' as const;
 
 /**
- * API endpoint URLs for DreamFactory services
- * Supports both internal v2 service paths and external endpoints
+ * HTTP headers for Next.js fetch API usage
+ * Replaces Angular HTTP interceptor patterns
  */
-export const URLS = {
-  // Internal DreamFactory v2 API endpoints
-  SYSTEM: '/api/v2/system',
-  USER_SESSION: '/api/v2/user/session',
-  ADMIN_PASSWORD: '/api/v2/system/admin/password',
-  ADMIN_SESSION: '/api/v2/system/admin/session',
-  ADMIN_PROFILE: '/api/v2/system/admin/profile',
-  USER_PROFILE: '/api/v2/user/profile',
-  USER_PASSWORD: '/api/v2/user/password',
-  REGISTER: '/api/v2/user/register',
-  USER_CUSTOM: '/api/v2/user/custom',
-  
-  // External service endpoints
-  GITHUB_REPOS: 'https://api.github.com/repos',
-  DREAMFACTORY_SUBSCRIPTION: 'https://updates.dreamfactory.com/check',
-  CALENDLY_WIDGET: 'https://assets.calendly.com/assets/external/widget.js',
+export const SHOW_LOADING_HEADER = {
+  'show-loading': '',
 } as const;
 
-// =============================================================================
-// TYPE EXPORTS FOR EXTERNAL CONSUMPTION
-// =============================================================================
+/**
+ * HTTP options for specific request types
+ * Compatible with fetch API Request initialization
+ */
+export const HTTP_OPTION_LOGIN_FALSE = {
+  headers: SHOW_LOADING_HEADER,
+  params: {
+    login: false,
+  },
+} as const;
+
+export const HTTP_OPTION_RESET_TRUE = {
+  headers: SHOW_LOADING_HEADER,
+  params: {
+    reset: true,
+  },
+} as const;
+
+// ============================================================================
+// DATABASE TYPE CONSTANTS
+// ============================================================================
 
 /**
- * Type definitions for constants to enable type-safe usage
+ * Supported database types for connection configuration
+ * Derived from service definitions for consistent database support
  */
-export type SupportedLanguage = typeof SUPPORTED_LANGUAGES[number];
-export type ScriptTypeConfig = typeof SCRIPT_TYPES[number];
-export type HttpHeaderKey = keyof typeof HTTP_HEADERS;
-export type RequestOptionKey = keyof typeof REQUEST_OPTIONS;
-export type ServiceGroupMapping = typeof SERVICE_GROUPS;
+export const DATABASE_TYPES = [
+  'mysql',
+  'mariadb',
+  'postgresql',
+  'sqlsrv',
+  'oracle',
+  'ibmdb2',
+  'informix',
+  'sqlanywhere',
+  'mongodb',
+  'snowflake',
+  'salesforce_db',
+  'memsql',
+  'apache_hive',
+  'databricks',
+  'dremio',
+  'hana',
+] as const;
+
+/**
+ * Database connection timeout defaults (in milliseconds)
+ */
+export const CONNECTION_TIMEOUT = 5000 as const;
+export const VALIDATION_TIMEOUT = 3000 as const;
+
+// ============================================================================
+// COMMON PATTERNS
+// ============================================================================
+
+/**
+ * HTTP status codes for API responses
+ */
+export const HTTP_STATUS = {
+  OK: 200,
+  CREATED: 201,
+  ACCEPTED: 202,
+  NO_CONTENT: 204,
+  BAD_REQUEST: 400,
+  UNAUTHORIZED: 401,
+  FORBIDDEN: 403,
+  NOT_FOUND: 404,
+  METHOD_NOT_ALLOWED: 405,
+  CONFLICT: 409,
+  UNPROCESSABLE_ENTITY: 422,
+  INTERNAL_SERVER_ERROR: 500,
+  BAD_GATEWAY: 502,
+  SERVICE_UNAVAILABLE: 503,
+  GATEWAY_TIMEOUT: 504,
+} as const;
+
+/**
+ * Common HTTP methods for API requests
+ */
+export const HTTP_METHODS = {
+  GET: 'GET',
+  POST: 'POST',
+  PUT: 'PUT',
+  PATCH: 'PATCH',
+  DELETE: 'DELETE',
+  OPTIONS: 'OPTIONS',
+} as const;
+
+/**
+ * Request content types
+ */
+export const CONTENT_TYPES = {
+  JSON: 'application/json',
+  FORM_DATA: 'multipart/form-data',
+  URL_ENCODED: 'application/x-www-form-urlencoded',
+  TEXT: 'text/plain',
+  XML: 'application/xml',
+  CSV: 'text/csv',
+} as const;
+
+// ============================================================================
+// TYPE EXPORTS
+// ============================================================================
+
+/**
+ * Type aliases for better type inference and documentation
+ */
+export type SupportedLanguage = typeof SUPPORTED_LANGUAGES[number]['code'];
+export type ExportType = typeof EXPORT_TYPES[number];
+export type DatabaseType = typeof DATABASE_TYPES[number];
+export type HttpMethod = keyof typeof HTTP_METHODS;
+export type HttpStatus = typeof HTTP_STATUS[keyof typeof HTTP_STATUS];
+export type ContentType = typeof CONTENT_TYPES[keyof typeof CONTENT_TYPES];
+
+/**
+ * Service tier type unions for type safety
+ */
 export type SilverServiceType = typeof SILVER_SERVICES[number];
 export type GoldServiceType = typeof GOLD_SERVICES[number];
 export type AllServiceTypes = SilverServiceType | GoldServiceType;
-export type ExportFormat = typeof EXPORT_TYPES[number];
-export type ApiEndpoint = keyof typeof URLS;
-
-/**
- * Helper type for service lookup by name
- */
-export type ServiceByName<T extends string> = AllServiceTypes extends infer U
-  ? U extends ServiceType
-    ? U['name'] extends T
-      ? U
-      : never
-    : never
-  : never;
-
-/**
- * Helper function to get all services (Silver + Gold)
- */
-export const getAllServices = (): Array<ServiceType> => [
-  ...SILVER_SERVICES,
-  ...GOLD_SERVICES,
-];
-
-/**
- * Helper function to get services by group
- */
-export const getServicesByGroup = (group: string): Array<ServiceType> => {
-  const allServices = getAllServices();
-  return allServices.filter(service => service.group === group);
-};
-
-/**
- * Helper function to get service groups for a route
- */
-export const getServiceGroupsForRoute = (route: ROUTES): readonly string[] => {
-  return SERVICE_GROUPS[route] || [];
-};
