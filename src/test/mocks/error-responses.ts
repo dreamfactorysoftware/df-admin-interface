@@ -1,82 +1,170 @@
 /**
  * DreamFactory API Error Response Generators
  * 
- * Utility functions for generating consistent DreamFactory API error responses
- * that match the backend error format exactly. Provides reusable error response
- * generators for different HTTP status codes and comprehensive error scenarios
- * to support thorough testing of error handling throughout the application.
+ * Utility functions for generating consistent DreamFactory API error responses that match
+ * the backend error format. Provides reusable error response generators for different HTTP
+ * status codes and error scenarios to enable comprehensive error handling testing.
  * 
- * This module replicates the error response structure from the Angular implementation
- * while providing enhanced testing capabilities for the React/Next.js migration.
+ * This module provides:
+ * - Standardized error response generators matching DreamFactory API error format
+ * - Status-specific error responses (400, 401, 403, 404, 422, 500)
+ * - Error response structure with code, message, status_code, and context fields
+ * - Validation error responses for form field errors
+ * - Error scenario testing utilities for comprehensive error handling validation
+ * 
+ * Error Format:
+ * The DreamFactory API returns errors in a consistent structure:
+ * {
+ *   "error": {
+ *     "code": "ERROR_CODE",
+ *     "message": "Human readable error message",
+ *     "status_code": 400,
+ *     "context": {
+ *       "field_errors": { "field": ["Error message"] },
+ *       "additional_context": "value"
+ *     }
+ *   }
+ * }
  */
 
 import { HttpResponse } from 'msw';
 
+// ============================================================================
+// TYPES & INTERFACES
+// ============================================================================
+
 /**
- * DreamFactory API Error Response Structure
- * Matches the GenericErrorResponse interface from the Angular implementation
+ * DreamFactory API error structure
  */
 export interface DreamFactoryError {
   error: {
-    code: number | string;
+    code: string;
     message: string;
     status_code: number;
-    context: 
-      | string 
-      | null 
-      | { 
-          error?: Array<any>; 
-          resource?: Array<DreamFactoryError>;
-          [key: string]: any;
-        };
+    context?: Record<string, unknown>;
   };
 }
 
 /**
- * Validation Error Structure for Form Field Testing
- * Used for 422 Unprocessable Entity responses with field-specific errors
+ * Field-specific validation errors
  */
-export interface ValidationError {
-  field: string;
-  message: string;
-  code?: string;
-  value?: any;
+export interface FieldErrors {
+  [fieldName: string]: string[];
 }
 
 /**
- * Field Error Context for Comprehensive Form Validation Testing
+ * Validation error context structure
  */
-export interface FieldErrorContext {
-  error: ValidationError[];
-  resource: DreamFactoryError[];
+export interface ValidationErrorContext {
+  field_errors?: FieldErrors;
+  invalid_fields?: string[];
+  validation_rules?: Record<string, unknown>;
+  [key: string]: unknown;
 }
 
 /**
- * Core Error Response Generator
- * Creates the base DreamFactory error response structure
+ * Authentication error context
+ */
+export interface AuthErrorContext {
+  session_expired?: boolean;
+  invalid_token?: boolean;
+  missing_credentials?: boolean;
+  required_role?: string;
+  user_id?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Server error context
+ */
+export interface ServerErrorContext {
+  error_id?: string;
+  timestamp?: string;
+  request_id?: string;
+  service?: string;
+  operation?: string;
+  [key: string]: unknown;
+}
+
+// ============================================================================
+// ERROR CODE CONSTANTS
+// ============================================================================
+
+/**
+ * Standard DreamFactory error codes by category
+ */
+export const ERROR_CODES = {
+  // 4xx Client Errors
+  BAD_REQUEST: 'BAD_REQUEST',
+  VALIDATION_ERROR: 'VALIDATION_ERROR',
+  MISSING_REQUIRED_FIELD: 'MISSING_REQUIRED_FIELD',
+  INVALID_DATA_FORMAT: 'INVALID_DATA_FORMAT',
+  INVALID_PARAMETER: 'INVALID_PARAMETER',
+  
+  // Authentication & Authorization (401/403)
+  AUTHENTICATION_REQUIRED: 'AUTHENTICATION_REQUIRED',
+  INVALID_CREDENTIALS: 'INVALID_CREDENTIALS',
+  SESSION_EXPIRED: 'SESSION_EXPIRED',
+  INVALID_TOKEN: 'INVALID_TOKEN',
+  FORBIDDEN: 'FORBIDDEN',
+  INSUFFICIENT_PERMISSIONS: 'INSUFFICIENT_PERMISSIONS',
+  ROLE_REQUIRED: 'ROLE_REQUIRED',
+  
+  // Not Found (404)
+  NOT_FOUND: 'NOT_FOUND',
+  RESOURCE_NOT_FOUND: 'RESOURCE_NOT_FOUND',
+  ENDPOINT_NOT_FOUND: 'ENDPOINT_NOT_FOUND',
+  SERVICE_NOT_FOUND: 'SERVICE_NOT_FOUND',
+  
+  // Server Errors (5xx)
+  INTERNAL_SERVER_ERROR: 'INTERNAL_SERVER_ERROR',
+  SERVICE_UNAVAILABLE: 'SERVICE_UNAVAILABLE',
+  DATABASE_ERROR: 'DATABASE_ERROR',
+  CONNECTION_FAILED: 'CONNECTION_FAILED',
+  TIMEOUT_ERROR: 'TIMEOUT_ERROR',
+  
+  // Database-specific errors
+  DATABASE_CONNECTION_FAILED: 'DATABASE_CONNECTION_FAILED',
+  SQL_ERROR: 'SQL_ERROR',
+  SCHEMA_NOT_FOUND: 'SCHEMA_NOT_FOUND',
+  TABLE_NOT_FOUND: 'TABLE_NOT_FOUND',
+  INVALID_QUERY: 'INVALID_QUERY',
+  
+  // Service-specific errors
+  SERVICE_CONFIGURATION_ERROR: 'SERVICE_CONFIGURATION_ERROR',
+  API_GENERATION_FAILED: 'API_GENERATION_FAILED',
+  OPENAPI_GENERATION_ERROR: 'OPENAPI_GENERATION_ERROR',
+} as const;
+
+// ============================================================================
+// CORE ERROR RESPONSE GENERATORS
+// ============================================================================
+
+/**
+ * Creates a DreamFactory-formatted error response
  * 
+ * @param code - Error code from ERROR_CODES
+ * @param message - Human readable error message
  * @param statusCode - HTTP status code
- * @param message - Error message
- * @param context - Additional error context (optional)
- * @param code - Error code (defaults to status code)
- * @returns HttpResponse with DreamFactory error format
+ * @param context - Additional error context
+ * @returns MSW HttpResponse with DreamFactory error format
  */
 export function createDreamFactoryError(
-  statusCode: number,
+  code: string,
   message: string,
-  context: any = null,
-  code?: number | string
+  statusCode: number,
+  context?: Record<string, unknown>
 ): HttpResponse {
   const errorResponse: DreamFactoryError = {
     error: {
-      code: code || statusCode,
+      code,
       message,
       status_code: statusCode,
-      context,
+      ...(context && { context }),
     },
   };
 
-  return HttpResponse.json(errorResponse, { 
+  return HttpResponse.json(errorResponse, {
     status: statusCode,
     headers: {
       'Content-Type': 'application/json',
@@ -85,750 +173,779 @@ export function createDreamFactoryError(
 }
 
 /**
- * 400 Bad Request Error Generators
- * For malformed requests, invalid parameters, and client-side errors
+ * Generates a unique error ID for tracking
+ * @returns Unique error identifier
  */
+function generateErrorId(): string {
+  return `error_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
 
 /**
- * Generic bad request error
+ * Gets current ISO timestamp for error context
+ * @returns ISO timestamp string
+ */
+function getCurrentTimestamp(): string {
+  return new Date().toISOString();
+}
+
+// ============================================================================
+// 400 BAD REQUEST ERRORS
+// ============================================================================
+
+/**
+ * Creates a generic bad request error (400)
  */
 export function createBadRequestError(
-  message: string = 'Bad request - invalid parameters or malformed request',
-  context?: any
+  message: string = 'Bad request',
+  context?: Record<string, unknown>
 ): HttpResponse {
-  return createDreamFactoryError(400, message, context, 'BAD_REQUEST');
-}
-
-/**
- * Invalid JSON payload error
- */
-export function createInvalidJsonError(
-  details?: string
-): HttpResponse {
-  return createBadRequestError(
-    `Invalid JSON payload${details ? `: ${details}` : ''}`,
-    { parsing_error: details || 'Malformed JSON structure' }
+  return createDreamFactoryError(
+    ERROR_CODES.BAD_REQUEST,
+    message,
+    400,
+    context
   );
 }
 
 /**
- * Missing required parameter error
- */
-export function createMissingParameterError(
-  parameterName: string,
-  parameterType: 'query' | 'body' | 'header' | 'path' = 'body'
-): HttpResponse {
-  return createBadRequestError(
-    `Missing required ${parameterType} parameter: ${parameterName}`,
-    { 
-      parameter: parameterName, 
-      type: parameterType,
-      expected: 'required',
-    }
-  );
-}
-
-/**
- * Invalid parameter value error
- */
-export function createInvalidParameterError(
-  parameterName: string,
-  expectedType: string,
-  actualValue?: any
-): HttpResponse {
-  return createBadRequestError(
-    `Invalid value for parameter '${parameterName}'. Expected ${expectedType}`,
-    {
-      parameter: parameterName,
-      expected_type: expectedType,
-      provided_value: actualValue,
-    }
-  );
-}
-
-/**
- * 401 Unauthorized Error Generators
- * For authentication failures and invalid credentials
- */
-
-/**
- * Generic unauthorized error
- */
-export function createUnauthorizedError(
-  message: string = 'Unauthorized access - authentication required'
-): HttpResponse {
-  return createDreamFactoryError(401, message, null, 'UNAUTHORIZED');
-}
-
-/**
- * Invalid credentials error
- */
-export function createInvalidCredentialsError(
-  details?: string
-): HttpResponse {
-  return createUnauthorizedError(
-    `Invalid credentials${details ? `: ${details}` : ''}`,
-  );
-}
-
-/**
- * Expired session token error
- */
-export function createExpiredSessionError(): HttpResponse {
-  return createUnauthorizedError(
-    'Session token has expired - please login again'
-  );
-}
-
-/**
- * Missing API key error
- */
-export function createMissingApiKeyError(): HttpResponse {
-  return createUnauthorizedError(
-    'Missing API key - X-DreamFactory-API-Key header required'
-  );
-}
-
-/**
- * Invalid API key error
- */
-export function createInvalidApiKeyError(): HttpResponse {
-  return createUnauthorizedError(
-    'Invalid API key - please check your application credentials'
-  );
-}
-
-/**
- * Missing session token error
- */
-export function createMissingSessionTokenError(): HttpResponse {
-  return createUnauthorizedError(
-    'Missing session token - X-DreamFactory-Session-Token header required'
-  );
-}
-
-/**
- * Invalid session token error
- */
-export function createInvalidSessionTokenError(): HttpResponse {
-  return createUnauthorizedError(
-    'Invalid session token - please login again'
-  );
-}
-
-/**
- * 403 Forbidden Error Generators
- * For authorization failures and access control violations
- */
-
-/**
- * Generic forbidden error
- */
-export function createForbiddenError(
-  message: string = 'Access denied - insufficient permissions'
-): HttpResponse {
-  return createDreamFactoryError(403, message, null, 'FORBIDDEN');
-}
-
-/**
- * Insufficient permissions error
- */
-export function createInsufficientPermissionsError(
-  resource?: string,
-  action?: string
-): HttpResponse {
-  const resourceText = resource ? ` to ${resource}` : '';
-  const actionText = action ? ` for ${action} operation` : '';
-  
-  return createForbiddenError(
-    `Insufficient permissions${resourceText}${actionText}`,
-  );
-}
-
-/**
- * Role-based access denied error
- */
-export function createRoleAccessDeniedError(
-  requiredRole: string,
-  currentRole?: string
-): HttpResponse {
-  return createForbiddenError(
-    `Access denied - ${requiredRole} role required${currentRole ? ` (current: ${currentRole})` : ''}`,
-  );
-}
-
-/**
- * Service access denied error
- */
-export function createServiceAccessDeniedError(
-  serviceName: string
-): HttpResponse {
-  return createForbiddenError(
-    `Access denied to service: ${serviceName}`,
-  );
-}
-
-/**
- * Database access denied error
- */
-export function createDatabaseAccessDeniedError(
-  databaseName: string,
-  operation?: string
-): HttpResponse {
-  const operationText = operation ? ` for ${operation} operation` : '';
-  
-  return createForbiddenError(
-    `Access denied to database '${databaseName}'${operationText}`,
-  );
-}
-
-/**
- * 404 Not Found Error Generators
- * For missing resources and invalid endpoints
- */
-
-/**
- * Generic not found error
- */
-export function createNotFoundError(
-  message: string = 'Resource not found'
-): HttpResponse {
-  return createDreamFactoryError(404, message, null, 'NOT_FOUND');
-}
-
-/**
- * Service not found error
- */
-export function createServiceNotFoundError(
-  serviceName: string
-): HttpResponse {
-  return createNotFoundError(
-    `Service '${serviceName}' not found or is not accessible`,
-  );
-}
-
-/**
- * Endpoint not found error
- */
-export function createEndpointNotFoundError(
-  endpoint: string
-): HttpResponse {
-  return createNotFoundError(
-    `Endpoint '${endpoint}' not found`,
-  );
-}
-
-/**
- * Database not found error
- */
-export function createDatabaseNotFoundError(
-  databaseName: string
-): HttpResponse {
-  return createNotFoundError(
-    `Database '${databaseName}' not found or is not accessible`,
-  );
-}
-
-/**
- * Table not found error
- */
-export function createTableNotFoundError(
-  tableName: string,
-  serviceName?: string
-): HttpResponse {
-  const serviceText = serviceName ? ` in service '${serviceName}'` : '';
-  
-  return createNotFoundError(
-    `Table '${tableName}' not found${serviceText}`,
-  );
-}
-
-/**
- * Record not found error
- */
-export function createRecordNotFoundError(
-  recordId: string | number,
-  tableName?: string
-): HttpResponse {
-  const tableText = tableName ? ` in table '${tableName}'` : '';
-  
-  return createNotFoundError(
-    `Record with ID '${recordId}' not found${tableText}`,
-  );
-}
-
-/**
- * 422 Unprocessable Entity Error Generators
- * For validation errors and form field testing
- */
-
-/**
- * Generic validation error
+ * Creates a validation error response (400)
  */
 export function createValidationError(
   message: string = 'Validation failed',
-  fieldErrors?: ValidationError[]
+  fieldErrors?: FieldErrors,
+  additionalContext?: Record<string, unknown>
 ): HttpResponse {
-  const context: FieldErrorContext | null = fieldErrors ? {
-    error: fieldErrors,
-    resource: [],
-  } : null;
+  const context: ValidationErrorContext = {
+    ...additionalContext,
+  };
 
-  return createDreamFactoryError(422, message, context, 'VALIDATION_ERROR');
+  if (fieldErrors) {
+    context.field_errors = fieldErrors;
+    context.invalid_fields = Object.keys(fieldErrors);
+  }
+
+  return createDreamFactoryError(
+    ERROR_CODES.VALIDATION_ERROR,
+    message,
+    400,
+    context
+  );
 }
 
 /**
- * Single field validation error
+ * Creates a missing required field error (400)
  */
-export function createFieldValidationError(
-  field: string,
-  message: string,
-  code?: string,
-  value?: any
+export function createMissingFieldError(
+  fieldName: string,
+  message?: string
 ): HttpResponse {
-  const fieldError: ValidationError = {
-    field,
-    message,
-    code,
-    value,
+  const defaultMessage = `Required field '${fieldName}' is missing`;
+  const fieldErrors: FieldErrors = {
+    [fieldName]: [message || `${fieldName} is required`],
   };
 
   return createValidationError(
-    `Validation failed for field: ${field}`,
-    [fieldError]
+    message || defaultMessage,
+    fieldErrors,
+    { missing_field: fieldName }
   );
 }
 
 /**
- * Multiple field validation errors
+ * Creates an invalid data format error (400)
  */
-export function createMultipleFieldValidationErrors(
-  errors: Array<{ field: string; message: string; code?: string; value?: any }>
+export function createInvalidDataFormatError(
+  fieldName: string,
+  expectedFormat: string,
+  receivedValue?: unknown
 ): HttpResponse {
-  const fieldErrors: ValidationError[] = errors.map(error => ({
-    field: error.field,
-    message: error.message,
-    code: error.code,
-    value: error.value,
-  }));
+  const message = `Invalid data format for field '${fieldName}'. Expected: ${expectedFormat}`;
+  const fieldErrors: FieldErrors = {
+    [fieldName]: [`Invalid format. Expected: ${expectedFormat}`],
+  };
 
-  return createValidationError(
-    `Validation failed for ${errors.length} field${errors.length > 1 ? 's' : ''}`,
-    fieldErrors
+  const context: ValidationErrorContext = {
+    field_errors: fieldErrors,
+    expected_format: expectedFormat,
+    ...(receivedValue !== undefined && { received_value: receivedValue }),
+  };
+
+  return createDreamFactoryError(
+    ERROR_CODES.INVALID_DATA_FORMAT,
+    message,
+    400,
+    context
   );
 }
 
 /**
- * Database connection validation errors
+ * Creates an invalid parameter error (400)
  */
-export function createConnectionValidationError(
-  connectionErrors: Array<{ field: string; message: string }>
+export function createInvalidParameterError(
+  parameterName: string,
+  message?: string,
+  allowedValues?: string[]
 ): HttpResponse {
-  return createMultipleFieldValidationErrors(
-    connectionErrors.map(error => ({
-      ...error,
-      code: 'CONNECTION_VALIDATION',
-    }))
+  const defaultMessage = `Invalid parameter: ${parameterName}`;
+  const context: Record<string, unknown> = {
+    parameter: parameterName,
+  };
+
+  if (allowedValues) {
+    context.allowed_values = allowedValues;
+  }
+
+  return createDreamFactoryError(
+    ERROR_CODES.INVALID_PARAMETER,
+    message || defaultMessage,
+    400,
+    context
+  );
+}
+
+// ============================================================================
+// 401 AUTHENTICATION ERRORS
+// ============================================================================
+
+/**
+ * Creates an authentication required error (401)
+ */
+export function createAuthenticationRequiredError(
+  message: string = 'Authentication required',
+  context?: AuthErrorContext
+): HttpResponse {
+  return createDreamFactoryError(
+    ERROR_CODES.AUTHENTICATION_REQUIRED,
+    message,
+    401,
+    context
   );
 }
 
 /**
- * Schema validation errors
+ * Creates an invalid credentials error (401)
+ */
+export function createInvalidCredentialsError(
+  message: string = 'Invalid credentials provided',
+  context?: AuthErrorContext
+): HttpResponse {
+  return createDreamFactoryError(
+    ERROR_CODES.INVALID_CREDENTIALS,
+    message,
+    401,
+    context
+  );
+}
+
+/**
+ * Creates a session expired error (401)
+ */
+export function createSessionExpiredError(
+  message: string = 'Session has expired',
+  sessionId?: string
+): HttpResponse {
+  const context: AuthErrorContext = {
+    session_expired: true,
+    ...(sessionId && { session_id: sessionId }),
+  };
+
+  return createDreamFactoryError(
+    ERROR_CODES.SESSION_EXPIRED,
+    message,
+    401,
+    context
+  );
+}
+
+/**
+ * Creates an invalid token error (401)
+ */
+export function createInvalidTokenError(
+  message: string = 'Invalid or malformed token',
+  tokenType: string = 'session_token'
+): HttpResponse {
+  const context: AuthErrorContext = {
+    invalid_token: true,
+    token_type: tokenType,
+  };
+
+  return createDreamFactoryError(
+    ERROR_CODES.INVALID_TOKEN,
+    message,
+    401,
+    context
+  );
+}
+
+/**
+ * Creates a missing API key error (401)
+ */
+export function createMissingApiKeyError(
+  message: string = 'API key is required'
+): HttpResponse {
+  const context: AuthErrorContext = {
+    missing_credentials: true,
+    required_header: 'X-DreamFactory-API-Key',
+  };
+
+  return createDreamFactoryError(
+    ERROR_CODES.AUTHENTICATION_REQUIRED,
+    message,
+    401,
+    context
+  );
+}
+
+// ============================================================================
+// 403 AUTHORIZATION ERRORS
+// ============================================================================
+
+/**
+ * Creates a forbidden access error (403)
+ */
+export function createForbiddenError(
+  message: string = 'Access forbidden',
+  context?: AuthErrorContext
+): HttpResponse {
+  return createDreamFactoryError(
+    ERROR_CODES.FORBIDDEN,
+    message,
+    403,
+    context
+  );
+}
+
+/**
+ * Creates an insufficient permissions error (403)
+ */
+export function createInsufficientPermissionsError(
+  requiredRole: string,
+  userRole?: string,
+  message?: string
+): HttpResponse {
+  const defaultMessage = `Insufficient permissions. Required role: ${requiredRole}`;
+  const context: AuthErrorContext = {
+    required_role: requiredRole,
+    ...(userRole && { user_role: userRole }),
+  };
+
+  return createDreamFactoryError(
+    ERROR_CODES.INSUFFICIENT_PERMISSIONS,
+    message || defaultMessage,
+    403,
+    context
+  );
+}
+
+/**
+ * Creates a role required error (403)
+ */
+export function createRoleRequiredError(
+  requiredRole: string,
+  operation: string,
+  message?: string
+): HttpResponse {
+  const defaultMessage = `Role '${requiredRole}' required for operation: ${operation}`;
+  const context: AuthErrorContext = {
+    required_role: requiredRole,
+    operation,
+  };
+
+  return createDreamFactoryError(
+    ERROR_CODES.ROLE_REQUIRED,
+    message || defaultMessage,
+    403,
+    context
+  );
+}
+
+// ============================================================================
+// 404 NOT FOUND ERRORS
+// ============================================================================
+
+/**
+ * Creates a generic not found error (404)
+ */
+export function createNotFoundError(
+  message: string = 'Resource not found',
+  context?: Record<string, unknown>
+): HttpResponse {
+  return createDreamFactoryError(
+    ERROR_CODES.NOT_FOUND,
+    message,
+    404,
+    context
+  );
+}
+
+/**
+ * Creates a resource not found error (404)
+ */
+export function createResourceNotFoundError(
+  resourceType: string,
+  resourceId: string | number,
+  message?: string
+): HttpResponse {
+  const defaultMessage = `${resourceType} with ID '${resourceId}' not found`;
+  const context = {
+    resource_type: resourceType,
+    resource_id: resourceId.toString(),
+  };
+
+  return createDreamFactoryError(
+    ERROR_CODES.RESOURCE_NOT_FOUND,
+    message || defaultMessage,
+    404,
+    context
+  );
+}
+
+/**
+ * Creates a service not found error (404)
+ */
+export function createServiceNotFoundError(
+  serviceName: string,
+  message?: string
+): HttpResponse {
+  const defaultMessage = `Service '${serviceName}' not found`;
+  const context = {
+    service_name: serviceName,
+    available_services: [], // Could be populated with actual service list
+  };
+
+  return createDreamFactoryError(
+    ERROR_CODES.SERVICE_NOT_FOUND,
+    message || defaultMessage,
+    404,
+    context
+  );
+}
+
+/**
+ * Creates an endpoint not found error (404)
+ */
+export function createEndpointNotFoundError(
+  endpoint: string,
+  method: string,
+  message?: string
+): HttpResponse {
+  const defaultMessage = `Endpoint '${method} ${endpoint}' not found`;
+  const context = {
+    endpoint,
+    method,
+  };
+
+  return createDreamFactoryError(
+    ERROR_CODES.ENDPOINT_NOT_FOUND,
+    message || defaultMessage,
+    404,
+    context
+  );
+}
+
+// ============================================================================
+// 422 UNPROCESSABLE ENTITY ERRORS
+// ============================================================================
+
+/**
+ * Creates a comprehensive validation error with field-specific errors (422)
+ * This is commonly used for form validation failures
+ */
+export function createFormValidationError(
+  fieldErrors: FieldErrors,
+  message: string = 'Validation failed'
+): HttpResponse {
+  const context: ValidationErrorContext = {
+    field_errors: fieldErrors,
+    invalid_fields: Object.keys(fieldErrors),
+    total_errors: Object.values(fieldErrors).reduce((sum, errors) => sum + errors.length, 0),
+  };
+
+  return createDreamFactoryError(
+    ERROR_CODES.VALIDATION_ERROR,
+    message,
+    422,
+    context
+  );
+}
+
+/**
+ * Creates a database connection validation error (422)
+ */
+export function createDatabaseConnectionValidationError(
+  fieldErrors: FieldErrors,
+  testConnectionError?: string
+): HttpResponse {
+  const context: ValidationErrorContext = {
+    field_errors: fieldErrors,
+    invalid_fields: Object.keys(fieldErrors),
+    ...(testConnectionError && { connection_test_error: testConnectionError }),
+  };
+
+  return createDreamFactoryError(
+    ERROR_CODES.DATABASE_CONNECTION_FAILED,
+    'Database connection validation failed',
+    422,
+    context
+  );
+}
+
+/**
+ * Creates a schema validation error (422)
  */
 export function createSchemaValidationError(
-  schemaErrors: Array<{ field: string; message: string }>
+  schemaErrors: string[],
+  tableName?: string
 ): HttpResponse {
-  return createMultipleFieldValidationErrors(
-    schemaErrors.map(error => ({
-      ...error,
-      code: 'SCHEMA_VALIDATION',
-    }))
+  const context = {
+    schema_errors: schemaErrors,
+    ...(tableName && { table_name: tableName }),
+  };
+
+  return createDreamFactoryError(
+    ERROR_CODES.INVALID_QUERY,
+    'Schema validation failed',
+    422,
+    context
+  );
+}
+
+// ============================================================================
+// 500 SERVER ERRORS
+// ============================================================================
+
+/**
+ * Creates a generic internal server error (500)
+ */
+export function createInternalServerError(
+  message: string = 'Internal server error',
+  context?: ServerErrorContext
+): HttpResponse {
+  const errorContext: ServerErrorContext = {
+    error_id: generateErrorId(),
+    timestamp: getCurrentTimestamp(),
+    ...context,
+  };
+
+  return createDreamFactoryError(
+    ERROR_CODES.INTERNAL_SERVER_ERROR,
+    message,
+    500,
+    errorContext
   );
 }
 
 /**
- * Common form validation error scenarios
- */
-export const formValidationErrors = {
-  /**
-   * Required field validation errors
-   */
-  requiredField: (fieldName: string) =>
-    createFieldValidationError(fieldName, `${fieldName} is required`, 'REQUIRED'),
-
-  /**
-   * Email format validation error
-   */
-  invalidEmail: (email: string) =>
-    createFieldValidationError('email', 'Invalid email format', 'INVALID_FORMAT', email),
-
-  /**
-   * Password strength validation error
-   */
-  weakPassword: () =>
-    createFieldValidationError(
-      'password',
-      'Password must be at least 8 characters with uppercase, lowercase, and numbers',
-      'WEAK_PASSWORD'
-    ),
-
-  /**
-   * Duplicate value validation error
-   */
-  duplicateValue: (fieldName: string, value: any) =>
-    createFieldValidationError(
-      fieldName,
-      `${fieldName} '${value}' already exists`,
-      'DUPLICATE_VALUE',
-      value
-    ),
-
-  /**
-   * Invalid length validation error
-   */
-  invalidLength: (fieldName: string, minLength?: number, maxLength?: number) => {
-    let message = `${fieldName} length is invalid`;
-    if (minLength && maxLength) {
-      message += ` (must be between ${minLength} and ${maxLength} characters)`;
-    } else if (minLength) {
-      message += ` (must be at least ${minLength} characters)`;
-    } else if (maxLength) {
-      message += ` (must be no more than ${maxLength} characters)`;
-    }
-    
-    return createFieldValidationError(fieldName, message, 'INVALID_LENGTH');
-  },
-
-  /**
-   * Invalid format validation error
-   */
-  invalidFormat: (fieldName: string, expectedFormat: string) =>
-    createFieldValidationError(
-      fieldName,
-      `${fieldName} format is invalid (expected: ${expectedFormat})`,
-      'INVALID_FORMAT'
-    ),
-};
-
-/**
- * 500 Internal Server Error Generators
- * For server-side errors and system failures
- */
-
-/**
- * Generic server error
- */
-export function createServerError(
-  message: string = 'Internal server error',
-  details?: any
-): HttpResponse {
-  return createDreamFactoryError(500, message, details, 'INTERNAL_ERROR');
-}
-
-/**
- * Database connection error
+ * Creates a database connection error (500)
  */
 export function createDatabaseConnectionError(
-  databaseName?: string,
-  details?: string
+  databaseType: string,
+  connectionDetails?: string,
+  message?: string
 ): HttpResponse {
-  const dbText = databaseName ? ` to database '${databaseName}'` : '';
-  
-  return createServerError(
-    `Failed to connect${dbText}${details ? `: ${details}` : ''}`,
-    { 
-      connection_failed: true,
-      database: databaseName,
-      details,
-    }
+  const defaultMessage = `Failed to connect to ${databaseType} database`;
+  const context: ServerErrorContext = {
+    error_id: generateErrorId(),
+    timestamp: getCurrentTimestamp(),
+    database_type: databaseType,
+    ...(connectionDetails && { connection_details: connectionDetails }),
+  };
+
+  return createDreamFactoryError(
+    ERROR_CODES.DATABASE_CONNECTION_FAILED,
+    message || defaultMessage,
+    500,
+    context
   );
 }
 
 /**
- * Database timeout error
- */
-export function createDatabaseTimeoutError(
-  operation?: string,
-  timeout?: number
-): HttpResponse {
-  const operationText = operation ? ` during ${operation}` : '';
-  const timeoutText = timeout ? ` (timeout: ${timeout}ms)` : '';
-  
-  return createServerError(
-    `Database operation timed out${operationText}${timeoutText}`,
-    {
-      timeout: true,
-      operation,
-      timeout_ms: timeout,
-    }
-  );
-}
-
-/**
- * Service unavailable error
+ * Creates a service unavailable error (503)
  */
 export function createServiceUnavailableError(
-  serviceName?: string
+  serviceName: string,
+  retryAfter?: number,
+  message?: string
 ): HttpResponse {
-  const serviceText = serviceName ? ` '${serviceName}'` : '';
-  
-  return createServerError(
-    `Service${serviceText} is temporarily unavailable`,
-    {
-      service_unavailable: true,
-      service: serviceName,
-    }
+  const defaultMessage = `Service '${serviceName}' is temporarily unavailable`;
+  const context: ServerErrorContext = {
+    error_id: generateErrorId(),
+    timestamp: getCurrentTimestamp(),
+    service: serviceName,
+    ...(retryAfter && { retry_after: retryAfter }),
+  };
+
+  const response = createDreamFactoryError(
+    ERROR_CODES.SERVICE_UNAVAILABLE,
+    message || defaultMessage,
+    503,
+    context
+  );
+
+  // Add Retry-After header if specified
+  if (retryAfter) {
+    response.headers.set('Retry-After', retryAfter.toString());
+  }
+
+  return response;
+}
+
+/**
+ * Creates a timeout error (500)
+ */
+export function createTimeoutError(
+  operation: string,
+  timeoutDuration: number,
+  message?: string
+): HttpResponse {
+  const defaultMessage = `Operation '${operation}' timed out after ${timeoutDuration}ms`;
+  const context: ServerErrorContext = {
+    error_id: generateErrorId(),
+    timestamp: getCurrentTimestamp(),
+    operation,
+    timeout_duration: timeoutDuration,
+  };
+
+  return createDreamFactoryError(
+    ERROR_CODES.TIMEOUT_ERROR,
+    message || defaultMessage,
+    500,
+    context
+  );
+}
+
+// ============================================================================
+// DATABASE-SPECIFIC ERRORS
+// ============================================================================
+
+/**
+ * Creates a SQL execution error (500)
+ */
+export function createSqlError(
+  sqlError: string,
+  query?: string,
+  message?: string
+): HttpResponse {
+  const defaultMessage = 'SQL execution failed';
+  const context: ServerErrorContext = {
+    error_id: generateErrorId(),
+    timestamp: getCurrentTimestamp(),
+    sql_error: sqlError,
+    ...(query && { query }),
+  };
+
+  return createDreamFactoryError(
+    ERROR_CODES.SQL_ERROR,
+    message || defaultMessage,
+    500,
+    context
   );
 }
 
 /**
- * Configuration error
+ * Creates a schema not found error (404)
  */
-export function createConfigurationError(
-  configType: string,
-  details?: string
+export function createSchemaNotFoundError(
+  schemaName: string,
+  serviceName: string,
+  message?: string
 ): HttpResponse {
-  return createServerError(
-    `Configuration error in ${configType}${details ? `: ${details}` : ''}`,
-    {
-      configuration_error: true,
-      config_type: configType,
-      details,
-    }
+  const defaultMessage = `Schema '${schemaName}' not found in service '${serviceName}'`;
+  const context = {
+    schema_name: schemaName,
+    service_name: serviceName,
+  };
+
+  return createDreamFactoryError(
+    ERROR_CODES.SCHEMA_NOT_FOUND,
+    message || defaultMessage,
+    404,
+    context
   );
 }
 
 /**
- * Network-related Error Generators
- * For connection and network-specific scenarios
+ * Creates a table not found error (404)
  */
-
-/**
- * Network timeout error
- */
-export function createNetworkTimeoutError(
-  timeout: number = 30000
+export function createTableNotFoundError(
+  tableName: string,
+  schemaName?: string,
+  serviceName?: string,
+  message?: string
 ): HttpResponse {
-  return createServerError(
-    `Network timeout after ${timeout}ms`,
-    {
-      network_timeout: true,
-      timeout_ms: timeout,
-    }
+  const defaultMessage = `Table '${tableName}' not found`;
+  const context: Record<string, unknown> = {
+    table_name: tableName,
+    ...(schemaName && { schema_name: schemaName }),
+    ...(serviceName && { service_name: serviceName }),
+  };
+
+  return createDreamFactoryError(
+    ERROR_CODES.TABLE_NOT_FOUND,
+    message || defaultMessage,
+    404,
+    context
   );
 }
 
+// ============================================================================
+// CONVENIENCE ERROR GENERATORS FOR COMMON SCENARIOS
+// ============================================================================
+
 /**
- * Connection refused error
+ * Creates form validation errors for database service creation
  */
-export function createConnectionRefusedError(
-  host?: string,
-  port?: number
-): HttpResponse {
-  const locationText = host && port ? ` to ${host}:${port}` : '';
-  
-  return createServerError(
-    `Connection refused${locationText}`,
-    {
-      connection_refused: true,
-      host,
-      port,
-    }
-  );
+export function createDatabaseServiceValidationErrors(): HttpResponse {
+  const fieldErrors: FieldErrors = {
+    name: ['Service name is required', 'Service name must be unique'],
+    type: ['Database type is required'],
+    host: ['Host is required', 'Invalid host format'],
+    port: ['Port must be a valid number between 1 and 65535'],
+    username: ['Username is required'],
+    password: ['Password is required', 'Password must be at least 8 characters'],
+    database: ['Database name is required'],
+  };
+
+  return createFormValidationError(fieldErrors, 'Database service validation failed');
 }
 
 /**
- * DNS resolution error
+ * Creates API generation validation errors
  */
-export function createDnsError(
-  hostname?: string
-): HttpResponse {
-  const hostText = hostname ? ` for '${hostname}'` : '';
-  
-  return createServerError(
-    `DNS resolution failed${hostText}`,
-    {
-      dns_error: true,
-      hostname,
-    }
-  );
+export function createApiGenerationValidationErrors(): HttpResponse {
+  const fieldErrors: FieldErrors = {
+    service_name: ['Service name is required'],
+    tables: ['At least one table must be selected'],
+    endpoints: ['At least one endpoint type must be selected'],
+    authentication: ['Authentication method is required'],
+  };
+
+  return createFormValidationError(fieldErrors, 'API generation validation failed');
 }
 
 /**
- * SSL/TLS certificate error
+ * Creates authentication form validation errors
  */
-export function createSslError(
-  details?: string
-): HttpResponse {
-  return createServerError(
-    `SSL/TLS certificate error${details ? `: ${details}` : ''}`,
-    {
-      ssl_error: true,
-      details,
-    }
-  );
+export function createAuthenticationValidationErrors(): HttpResponse {
+  const fieldErrors: FieldErrors = {
+    email: ['Email is required', 'Invalid email format'],
+    password: ['Password is required', 'Password must be at least 8 characters'],
+  };
+
+  return createFormValidationError(fieldErrors, 'Authentication validation failed');
 }
 
 /**
- * Error Scenario Testing Utilities
- * For comprehensive error handling validation
+ * Creates user management validation errors
  */
+export function createUserValidationErrors(): HttpResponse {
+  const fieldErrors: FieldErrors = {
+    name: ['Name is required'],
+    email: ['Email is required', 'Email must be unique'],
+    first_name: ['First name is required'],
+    last_name: ['Last name is required'],
+    password: ['Password is required', 'Password must contain uppercase, lowercase, number and special character'],
+    confirm_password: ['Password confirmation is required', 'Passwords do not match'],
+  };
+
+  return createFormValidationError(fieldErrors, 'User validation failed');
+}
+
+// ============================================================================
+// ERROR TESTING UTILITIES
+// ============================================================================
 
 /**
- * Generates a random error response for stress testing
+ * Generates a random error response for testing error handling robustness
  */
 export function createRandomError(): HttpResponse {
   const errorTypes = [
-    () => createBadRequestError('Random bad request for testing'),
-    () => createUnauthorizedError('Random unauthorized error for testing'),
-    () => createForbiddenError('Random forbidden error for testing'),
-    () => createNotFoundError('Random not found error for testing'),
-    () => createValidationError('Random validation error for testing'),
-    () => createServerError('Random server error for testing'),
+    () => createBadRequestError('Random bad request error'),
+    () => createValidationError('Random validation error'),
+    () => createAuthenticationRequiredError('Random auth error'),
+    () => createForbiddenError('Random forbidden error'),
+    () => createNotFoundError('Random not found error'),
+    () => createInternalServerError('Random server error'),
   ];
 
-  const randomType = errorTypes[Math.floor(Math.random() * errorTypes.length)];
-  return randomType();
+  const randomErrorGenerator = errorTypes[Math.floor(Math.random() * errorTypes.length)];
+  return randomErrorGenerator();
 }
 
 /**
- * Creates an error response based on a given scenario
+ * Creates an error response based on a test scenario name
+ * Useful for systematic error scenario testing
  */
-export function createErrorScenario(
-  scenario: 'network_timeout' | 'connection_refused' | 'invalid_credentials' | 
-          'insufficient_permissions' | 'service_not_found' | 'validation_failed' |
-          'database_error' | 'configuration_error',
-  context?: any
-): HttpResponse {
-  switch (scenario) {
-    case 'network_timeout':
-      return createNetworkTimeoutError(context?.timeout);
-    
-    case 'connection_refused':
-      return createConnectionRefusedError(context?.host, context?.port);
-    
-    case 'invalid_credentials':
-      return createInvalidCredentialsError(context?.details);
-    
-    case 'insufficient_permissions':
-      return createInsufficientPermissionsError(context?.resource, context?.action);
-    
-    case 'service_not_found':
-      return createServiceNotFoundError(context?.serviceName || 'unknown');
-    
-    case 'validation_failed':
-      return createValidationError(context?.message, context?.fieldErrors);
-    
-    case 'database_error':
-      return createDatabaseConnectionError(context?.databaseName, context?.details);
-    
-    case 'configuration_error':
-      return createConfigurationError(context?.configType || 'system', context?.details);
-    
-    default:
-      return createServerError('Unknown error scenario');
+export function createErrorByScenario(scenario: string): HttpResponse {
+  const scenarios: Record<string, () => HttpResponse> = {
+    'missing-api-key': () => createMissingApiKeyError(),
+    'invalid-credentials': () => createInvalidCredentialsError(),
+    'session-expired': () => createSessionExpiredError(),
+    'insufficient-permissions': () => createInsufficientPermissionsError('admin', 'user'),
+    'service-not-found': () => createServiceNotFoundError('test-service'),
+    'database-connection-failed': () => createDatabaseConnectionError('MySQL'),
+    'validation-failed': () => createDatabaseServiceValidationErrors(),
+    'server-error': () => createInternalServerError(),
+    'timeout': () => createTimeoutError('database-connection', 30000),
+    'service-unavailable': () => createServiceUnavailableError('api-service', 60),
+  };
+
+  const errorGenerator = scenarios[scenario];
+  if (!errorGenerator) {
+    return createBadRequestError(`Unknown error scenario: ${scenario}`);
   }
+
+  return errorGenerator();
 }
 
 /**
- * Bulk error response generators for testing multiple error conditions
+ * Creates a collection of all possible error responses for comprehensive testing
+ * Useful for testing error handling across all scenarios
  */
-export const errorScenarios = {
-  // Authentication errors
-  auth: {
-    missingApiKey: () => createMissingApiKeyError(),
-    invalidApiKey: () => createInvalidApiKeyError(),
-    missingSession: () => createMissingSessionTokenError(),
-    invalidSession: () => createInvalidSessionTokenError(),
-    expiredSession: () => createExpiredSessionError(),
-    invalidCredentials: () => createInvalidCredentialsError(),
-  },
+export function getAllErrorScenarios(): Record<string, HttpResponse> {
+  return {
+    // 400 errors
+    'bad-request': createBadRequestError(),
+    'validation-error': createValidationError(),
+    'missing-field': createMissingFieldError('required_field'),
+    'invalid-format': createInvalidDataFormatError('email', 'email address'),
+    'invalid-parameter': createInvalidParameterError('sort_order', undefined, ['asc', 'desc']),
 
-  // Authorization errors
-  authorization: {
-    insufficientPermissions: () => createInsufficientPermissionsError(),
-    roleAccessDenied: (role: string) => createRoleAccessDeniedError(role),
-    serviceAccessDenied: (service: string) => createServiceAccessDeniedError(service),
-    databaseAccessDenied: (database: string) => createDatabaseAccessDeniedError(database),
-  },
+    // 401 errors
+    'auth-required': createAuthenticationRequiredError(),
+    'invalid-credentials': createInvalidCredentialsError(),
+    'session-expired': createSessionExpiredError(),
+    'invalid-token': createInvalidTokenError(),
+    'missing-api-key': createMissingApiKeyError(),
 
-  // Validation errors
-  validation: {
-    requiredField: (field: string) => formValidationErrors.requiredField(field),
-    invalidEmail: (email: string) => formValidationErrors.invalidEmail(email),
-    weakPassword: () => formValidationErrors.weakPassword(),
-    duplicateValue: (field: string, value: any) => formValidationErrors.duplicateValue(field, value),
-    multipleFields: (errors: Array<{ field: string; message: string }>) =>
-      createMultipleFieldValidationErrors(errors),
-  },
+    // 403 errors
+    'forbidden': createForbiddenError(),
+    'insufficient-permissions': createInsufficientPermissionsError('admin'),
+    'role-required': createRoleRequiredError('admin', 'delete-user'),
 
-  // Resource errors
-  resources: {
-    serviceNotFound: (service: string) => createServiceNotFoundError(service),
-    databaseNotFound: (database: string) => createDatabaseNotFoundError(database),
-    tableNotFound: (table: string, service?: string) => createTableNotFoundError(table, service),
-    recordNotFound: (id: string | number, table?: string) => createRecordNotFoundError(id, table),
-    endpointNotFound: (endpoint: string) => createEndpointNotFoundError(endpoint),
-  },
+    // 404 errors
+    'not-found': createNotFoundError(),
+    'resource-not-found': createResourceNotFoundError('User', '123'),
+    'service-not-found': createServiceNotFoundError('test-service'),
+    'endpoint-not-found': createEndpointNotFoundError('/api/v2/test', 'GET'),
+    'schema-not-found': createSchemaNotFoundError('test_schema', 'mysql-service'),
+    'table-not-found': createTableNotFoundError('users', 'public', 'postgresql-service'),
 
-  // System errors
-  system: {
-    databaseConnection: (database?: string, details?: string) =>
-      createDatabaseConnectionError(database, details),
-    databaseTimeout: (operation?: string, timeout?: number) =>
-      createDatabaseTimeoutError(operation, timeout),
-    serviceUnavailable: (service?: string) => createServiceUnavailableError(service),
-    configuration: (configType: string, details?: string) =>
-      createConfigurationError(configType, details),
-  },
+    // 422 errors
+    'form-validation': createFormValidationError({
+      name: ['Name is required'],
+      email: ['Invalid email format'],
+    }),
+    'database-validation': createDatabaseConnectionValidationErrors(),
+    'api-generation-validation': createApiGenerationValidationErrors(),
 
-  // Network errors
-  network: {
-    timeout: (timeout?: number) => createNetworkTimeoutError(timeout),
-    connectionRefused: (host?: string, port?: number) => createConnectionRefusedError(host, port),
-    dnsError: (hostname?: string) => createDnsError(hostname),
-    sslError: (details?: string) => createSslError(details),
-  },
-};
+    // 500 errors
+    'server-error': createInternalServerError(),
+    'database-connection-error': createDatabaseConnectionError('PostgreSQL'),
+    'sql-error': createSqlError('Table does not exist'),
+    'timeout-error': createTimeoutError('schema-discovery', 30000),
 
-/**
- * Export all error generators for easy importing
- * Provides a comprehensive testing toolkit for error scenario validation
- */
-export default {
-  // Core generators
-  createDreamFactoryError,
-  
-  // Status-specific generators
-  createBadRequestError,
-  createUnauthorizedError,
-  createForbiddenError,
-  createNotFoundError,
-  createValidationError,
-  createServerError,
-  
-  // Validation generators
-  createFieldValidationError,
-  createMultipleFieldValidationErrors,
-  formValidationErrors,
-  
-  // Scenario generators
-  createErrorScenario,
-  createRandomError,
-  errorScenarios,
-  
-  // Network generators
-  createNetworkTimeoutError,
-  createConnectionRefusedError,
-  createDnsError,
-  createSslError,
-  
-  // Database generators
-  createDatabaseConnectionError,
-  createDatabaseTimeoutError,
-  
-  // Service generators
-  createServiceNotFoundError,
-  createServiceUnavailableError,
-  createConfigurationError,
-};
+    // 503 errors
+    'service-unavailable': createServiceUnavailableError('database-service', 60),
+  };
+}
