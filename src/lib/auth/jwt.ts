@@ -1,664 +1,1061 @@
 /**
  * JWT Token Handling Utilities
  * 
- * Comprehensive JWT token management system for DreamFactory Admin Interface.
- * Provides secure token validation, parsing, expiration checking, and automatic
- * refresh capabilities with Next.js middleware integration.
+ * Comprehensive JWT token management for DreamFactory Admin Interface with
+ * Next.js 15.1 middleware integration, automatic refresh capabilities, and
+ * enterprise-grade security validation. Provides secure token lifecycle
+ * management including creation, validation, refresh, and revocation.
  * 
- * Key Features:
- * - JWT signature verification with comprehensive security checks
- * - Token parsing and payload extraction with type safety
+ * Key features:
+ * - JWT token validation with signature verification
+ * - Token parsing and payload extraction with proper error handling
  * - Automatic token refresh with exponential backoff and retry strategies
- * - Token expiration detection with configurable refresh intervals
+ * - Token expiration detection with configurable refresh timing
  * - Integration with Next.js middleware for server-side processing
- * - Secure token lifecycle management and authentication state synchronization
+ * - Secure token storage patterns compatible with SSR
+ * - Comprehensive token integrity and authentication state management
+ * 
+ * Performance targets:
+ * - Token validation under 10ms
+ * - Refresh operations under 500ms
+ * - Middleware processing under 100ms
  */
 
+import { jwtVerify, SignJWT, JWTPayload as JoseJWTPayload } from 'jose';
 import { 
-  JWT_CONFIG, 
-  SESSION_CONFIG, 
-  TOKEN_EXPIRATION,
-  TOKEN_KEYS,
-  VALIDATION_PATTERNS,
-  getAuthConfig
+  JWTPayload, 
+  UserSession, 
+  AuthError, 
+  AuthErrorCode,
+  MiddlewareAuthContext,
+  MiddlewareAuthResult 
+} from '@/types/auth';
+import {
+  TOKEN_CONFIG,
+  SESSION_CONFIG,
+  REFRESH_CONFIG,
+  AUTH_ERROR_CODES,
+  VALIDATION_MESSAGES,
+  COOKIE_CONFIG,
+  ENV_CONFIG
 } from './constants';
 
 // =============================================================================
-// TYPES AND INTERFACES
+// JWT CONFIGURATION AND CONSTANTS
 // =============================================================================
 
 /**
- * JWT token payload structure
+ * JWT secret key for token signing and verification
+ * Uses Next.js runtime environment variable with fallback for development
  */
-export interface JWTPayload {
-  // Standard JWT claims
-  sub: string;           // User ID (subject)
-  iss: string;           // Issuer
-  aud: string;           // Audience
-  exp: number;           // Expiration time (Unix timestamp)
-  iat: number;           // Issued at time (Unix timestamp)
-  nbf?: number;          // Not before time (Unix timestamp)
-  jti?: string;          // JWT ID
-  
-  // DreamFactory specific claims
-  email: string;         // User email
-  roles: string[];       // User roles
-  permissions: string[]; // User permissions
-  sid: string;           // Session ID
-  session_id?: string;   // Alternative session ID field
-  name?: string;         // User display name
-  first_name?: string;   // User first name
-  last_name?: string;    // User last name
-  
-  // Additional metadata
-  type?: 'access' | 'refresh';
-  scope?: string;
-  tenant_id?: string;
-  api_version?: string;
-}
+const JWT_SECRET = new TextEncoder().encode(
+  process.env.JWT_SECRET || 'dreamfactory-admin-dev-secret-key-32-chars'
+);
 
 /**
- * JWT validation result
+ * JWT algorithm configuration for secure token operations
+ * Uses HS256 for symmetric key signing with HMAC SHA-256
  */
-export interface JWTValidationResult {
+const JWT_ALGORITHM = 'HS256';
+
+/**
+ * Token refresh configuration with intelligent timing
+ * Optimizes refresh timing to prevent token expiration while minimizing requests
+ */
+const REFRESH_TIMING = {
+  /** Buffer time before expiration to trigger refresh (5 minutes) */
+  BUFFER_TIME: REFRESH_CONFIG.REFRESH_BUFFER_TIME,
+  /** Maximum retry attempts for failed refresh operations */
+  MAX_RETRIES: REFRESH_CONFIG.MAX_REFRESH_RETRIES,
+  /** Base retry delay in milliseconds */
+  RETRY_DELAY: REFRESH_CONFIG.RETRY_DELAY,
+  /** Exponential backoff multiplier */
+  BACKOFF_MULTIPLIER: REFRESH_CONFIG.BACKOFF_MULTIPLIER,
+  /** Maximum backoff delay to prevent excessive waiting */
+  MAX_BACKOFF_DELAY: REFRESH_CONFIG.MAX_BACKOFF_DELAY,
+} as const;
+
+// =============================================================================
+// JWT TOKEN VALIDATION UTILITIES
+// =============================================================================
+
+/**
+ * Validates JWT token signature and structure with comprehensive security checks
+ * 
+ * Performs complete token validation including signature verification, expiration
+ * checking, and payload structure validation. Integrates with Next.js middleware
+ * for optimal performance in edge environments.
+ * 
+ * @param token - JWT token string to validate
+ * @returns Promise resolving to validation result with payload or error details
+ * 
+ * @example
+ * ```typescript
+ * const result = await validateToken(sessionToken);
+ * if (result.isValid) {
+ *   const { user, permissions } = result.payload;
+ *   // Use validated token data
+ * } else {
+ *   handleAuthError(result.error);
+ * }
+ * ```
+ */
+export async function validateToken(token: string): Promise<{
   isValid: boolean;
   payload?: JWTPayload;
-  error?: JWTValidationError;
-  isExpired?: boolean;
-  needsRefresh?: boolean;
-  timeToExpiry?: number; // Milliseconds until expiration
-}
-
-/**
- * JWT validation error types
- */
-export enum JWTValidationError {
-  INVALID_FORMAT = 'INVALID_FORMAT',
-  INVALID_SIGNATURE = 'INVALID_SIGNATURE',
-  TOKEN_EXPIRED = 'TOKEN_EXPIRED',
-  TOKEN_NOT_ACTIVE = 'TOKEN_NOT_ACTIVE',
-  INVALID_ISSUER = 'INVALID_ISSUER',
-  INVALID_AUDIENCE = 'INVALID_AUDIENCE',
-  MISSING_CLAIMS = 'MISSING_CLAIMS',
-  INVALID_TYPE = 'INVALID_TYPE',
-  MALFORMED_PAYLOAD = 'MALFORMED_PAYLOAD',
-  VERIFICATION_FAILED = 'VERIFICATION_FAILED'
-}
-
-/**
- * Token refresh configuration
- */
-export interface TokenRefreshConfig {
-  endpoint: string;
-  retryAttempts: number;
-  retryDelay: number;
-  exponentialBackoff: boolean;
-  timeoutMs: number;
-}
-
-/**
- * Token refresh result
- */
-export interface TokenRefreshResult {
-  success: boolean;
-  accessToken?: string;
-  refreshToken?: string;
-  expiresIn?: number;
-  error?: string;
-  retryAfter?: number; // Seconds to wait before retry
-}
-
-/**
- * Token security validation options
- */
-export interface TokenSecurityOptions {
-  verifySignature: boolean;
-  checkExpiration: boolean;
-  checkNotBefore: boolean;
-  validateIssuer: boolean;
-  validateAudience: boolean;
-  allowClockSkew: number; // Seconds of clock skew tolerance
-  requiredClaims: string[];
-}
-
-// =============================================================================
-// JWT VALIDATION AND PARSING
-// =============================================================================
-
-/**
- * Validates JWT token format using regex pattern
- */
-export function isValidJWTFormat(token: string): boolean {
-  if (!token || typeof token !== 'string') {
-    return false;
-  }
-  
-  return VALIDATION_PATTERNS.JWT_TOKEN.test(token.trim());
-}
-
-/**
- * Parses JWT token and extracts payload without verification
- * Used for initial inspection and expiration checking
- */
-export function parseJWTPayload(token: string): JWTPayload | null {
+  error?: AuthError;
+  expiresAt?: Date;
+}> {
   try {
-    if (!isValidJWTFormat(token)) {
-      return null;
-    }
-    
-    const parts = token.split('.');
-    if (parts.length !== 3) {
-      return null;
-    }
-    
-    // Decode base64url payload
-    const payload = parts[1];
-    const decoded = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
-    const parsed = JSON.parse(decoded) as JWTPayload;
-    
-    // Validate required claims exist
-    if (!parsed.sub || !parsed.exp || !parsed.iat) {
-      return null;
-    }
-    
-    return parsed;
-  } catch (error) {
-    console.error('Failed to parse JWT payload:', error);
-    return null;
-  }
-}
-
-/**
- * Checks if JWT token is expired
- */
-export function isTokenExpired(token: string, clockSkewSeconds: number = 30): boolean {
-  const payload = parseJWTPayload(token);
-  if (!payload || !payload.exp) {
-    return true; // Treat invalid tokens as expired
-  }
-  
-  const now = Math.floor(Date.now() / 1000);
-  const expiry = payload.exp;
-  
-  // Account for clock skew
-  return now >= (expiry + clockSkewSeconds);
-}
-
-/**
- * Checks if token needs refresh based on configured threshold
- */
-export function needsTokenRefresh(token: string): boolean {
-  const payload = parseJWTPayload(token);
-  if (!payload || !payload.exp) {
-    return true;
-  }
-  
-  const now = Math.floor(Date.now() / 1000);
-  const expiry = payload.exp;
-  const refreshThreshold = SESSION_CONFIG.REFRESH.THRESHOLD / 1000; // Convert to seconds
-  
-  return (expiry - now) <= refreshThreshold;
-}
-
-/**
- * Gets time remaining until token expiration
- */
-export function getTimeToExpiry(token: string): number | null {
-  const payload = parseJWTPayload(token);
-  if (!payload || !payload.exp) {
-    return null;
-  }
-  
-  const now = Math.floor(Date.now() / 1000);
-  const expiry = payload.exp;
-  const secondsRemaining = expiry - now;
-  
-  return secondsRemaining > 0 ? secondsRemaining * 1000 : 0; // Return milliseconds
-}
-
-/**
- * Comprehensive JWT token validation with security checks
- */
-export function validateJWTToken(
-  token: string, 
-  options: Partial<TokenSecurityOptions> = {}
-): JWTValidationResult {
-  const defaultOptions: TokenSecurityOptions = {
-    verifySignature: false, // Server-side verification required
-    checkExpiration: true,
-    checkNotBefore: true,
-    validateIssuer: true,
-    validateAudience: true,
-    allowClockSkew: 30, // 30 seconds
-    requiredClaims: ['sub', 'exp', 'iat', 'email']
-  };
-  
-  const config = { ...defaultOptions, ...options };
-  
-  try {
-    // Format validation
-    if (!isValidJWTFormat(token)) {
+    // Input validation
+    if (!token || typeof token !== 'string') {
       return {
         isValid: false,
-        error: JWTValidationError.INVALID_FORMAT
+        error: createAuthError(
+          AUTH_ERROR_CODES.TOKEN_INVALID,
+          'Token is required and must be a string',
+          { context: 'validateToken' }
+        )
       };
     }
+
+    // Remove Bearer prefix if present
+    const cleanToken = token.replace(/^Bearer\s+/i, '').trim();
     
-    // Parse payload
-    const payload = parseJWTPayload(token);
-    if (!payload) {
+    if (!cleanToken) {
       return {
         isValid: false,
-        error: JWTValidationError.MALFORMED_PAYLOAD
+        error: createAuthError(
+          AUTH_ERROR_CODES.TOKEN_INVALID,
+          'Token cannot be empty after cleaning',
+          { context: 'validateToken' }
+        )
       };
     }
+
+    // Verify JWT signature and extract payload
+    const { payload: josePayload } = await jwtVerify(cleanToken, JWT_SECRET, {
+      algorithms: [JWT_ALGORITHM],
+      issuer: TOKEN_CONFIG.JWT_ISSUER,
+      audience: TOKEN_CONFIG.JWT_AUDIENCE,
+    });
+
+    // Validate payload structure and convert to application format
+    const validatedPayload = await validatePayloadStructure(josePayload);
     
+    // Additional expiration validation with buffer time
     const now = Math.floor(Date.now() / 1000);
+    const expiration = validatedPayload.exp;
     
-    // Check expiration
-    if (config.checkExpiration && payload.exp) {
-      const isExpired = now >= (payload.exp + config.allowClockSkew);
-      if (isExpired) {
-        return {
-          isValid: false,
-          payload,
-          error: JWTValidationError.TOKEN_EXPIRED,
-          isExpired: true,
-          timeToExpiry: 0
-        };
-      }
-    }
-    
-    // Check not before
-    if (config.checkNotBefore && payload.nbf) {
-      const isNotYetActive = now < (payload.nbf - config.allowClockSkew);
-      if (isNotYetActive) {
-        return {
-          isValid: false,
-          payload,
-          error: JWTValidationError.TOKEN_NOT_ACTIVE
-        };
-      }
-    }
-    
-    // Validate issuer
-    if (config.validateIssuer && payload.iss !== JWT_CONFIG.ISSUER) {
+    if (expiration <= now) {
       return {
         isValid: false,
-        payload,
-        error: JWTValidationError.INVALID_ISSUER
+        error: createAuthError(
+          AUTH_ERROR_CODES.TOKEN_EXPIRED,
+          'Token has expired',
+          { 
+            context: 'validateToken',
+            expiredAt: new Date(expiration * 1000).toISOString(),
+            currentTime: new Date(now * 1000).toISOString()
+          }
+        )
       };
     }
-    
-    // Validate audience
-    if (config.validateAudience && payload.aud !== JWT_CONFIG.AUDIENCE) {
-      return {
-        isValid: false,
-        payload,
-        error: JWTValidationError.INVALID_AUDIENCE
-      };
-    }
-    
-    // Check required claims
-    for (const claim of config.requiredClaims) {
-      if (!(claim in payload) || !payload[claim as keyof JWTPayload]) {
-        return {
-          isValid: false,
-          payload,
-          error: JWTValidationError.MISSING_CLAIMS
-        };
-      }
-    }
-    
-    // Calculate time to expiry and refresh need
-    const timeToExpiry = getTimeToExpiry(token);
-    const needsRefresh = needsTokenRefresh(token);
-    
+
     return {
       isValid: true,
-      payload,
-      isExpired: false,
-      needsRefresh,
-      timeToExpiry: timeToExpiry || 0
+      payload: validatedPayload,
+      expiresAt: new Date(expiration * 1000)
     };
-    
+
   } catch (error) {
-    console.error('JWT validation error:', error);
+    // Handle specific JWT verification errors
+    if (error instanceof Error) {
+      if (error.message.includes('expired')) {
+        return {
+          isValid: false,
+          error: createAuthError(
+            AUTH_ERROR_CODES.TOKEN_EXPIRED,
+            'JWT token has expired',
+            { context: 'validateToken', originalError: error.message }
+          )
+        };
+      }
+      
+      if (error.message.includes('signature')) {
+        return {
+          isValid: false,
+          error: createAuthError(
+            AUTH_ERROR_CODES.TOKEN_INVALID,
+            'JWT signature verification failed',
+            { context: 'validateToken', originalError: error.message }
+          )
+        };
+      }
+    }
+
     return {
       isValid: false,
-      error: JWTValidationError.VERIFICATION_FAILED
+      error: createAuthError(
+        AUTH_ERROR_CODES.TOKEN_INVALID,
+        'JWT validation failed',
+        { 
+          context: 'validateToken',
+          originalError: error instanceof Error ? error.message : 'Unknown error'
+        }
+      )
     };
   }
 }
 
+/**
+ * Validates JWT payload structure and converts to application format
+ * 
+ * Ensures the JWT payload contains all required fields with proper types
+ * and converts Jose JWT payload to application-specific JWTPayload interface.
+ * 
+ * @param payload - Raw JWT payload from jose library
+ * @returns Validated and typed JWT payload
+ * @throws Error if payload structure is invalid
+ */
+async function validatePayloadStructure(payload: JoseJWTPayload): Promise<JWTPayload> {
+  // Validate required JWT claims
+  if (typeof payload.sub !== 'string') {
+    throw new Error('JWT payload missing or invalid subject (sub) claim');
+  }
+  
+  if (typeof payload.iat !== 'number') {
+    throw new Error('JWT payload missing or invalid issued at (iat) claim');
+  }
+  
+  if (typeof payload.exp !== 'number') {
+    throw new Error('JWT payload missing or invalid expiration (exp) claim');
+  }
+
+  // Validate user data structure
+  if (!payload.user || typeof payload.user !== 'object') {
+    throw new Error('JWT payload missing or invalid user data');
+  }
+
+  const userData = payload.user as any;
+  
+  // Validate required user fields
+  const requiredUserFields = ['id', 'email', 'firstName', 'lastName', 'roleId'];
+  for (const field of requiredUserFields) {
+    if (userData[field] === undefined || userData[field] === null) {
+      throw new Error(`JWT payload user data missing required field: ${field}`);
+    }
+  }
+
+  // Validate user ID is a number
+  if (typeof userData.id !== 'number' || !Number.isInteger(userData.id)) {
+    throw new Error('JWT payload user ID must be a valid integer');
+  }
+
+  // Validate email format
+  if (typeof userData.email !== 'string' || !userData.email.includes('@')) {
+    throw new Error('JWT payload user email must be a valid email string');
+  }
+
+  // Validate role ID is a number
+  if (typeof userData.roleId !== 'number' || !Number.isInteger(userData.roleId)) {
+    throw new Error('JWT payload user roleId must be a valid integer');
+  }
+
+  // Validate session ID
+  if (typeof payload.sessionId !== 'string' || !payload.sessionId.trim()) {
+    throw new Error('JWT payload missing or invalid sessionId');
+  }
+
+  // Convert to application JWTPayload format
+  const validatedPayload: JWTPayload = {
+    sub: payload.sub,
+    iat: payload.iat,
+    exp: payload.exp,
+    iss: payload.iss as string | undefined,
+    user: {
+      id: userData.id,
+      email: userData.email,
+      firstName: userData.firstName,
+      lastName: userData.lastName,
+      roleId: userData.roleId,
+      isRootAdmin: Boolean(userData.isRootAdmin),
+      isSysAdmin: Boolean(userData.isSysAdmin),
+    },
+    permissions: Array.isArray(payload.permissions) ? payload.permissions : [],
+    sessionId: payload.sessionId as string,
+  };
+
+  return validatedPayload;
+}
+
 // =============================================================================
-// TOKEN REFRESH MANAGEMENT
+// TOKEN PARSING AND EXTRACTION UTILITIES
 // =============================================================================
 
 /**
- * Manages token refresh attempts with exponential backoff
+ * Safely parses JWT token and extracts payload without signature verification
+ * 
+ * Useful for extracting token information for display purposes or preliminary
+ * validation before performing full signature verification. Should not be used
+ * for security-critical operations without subsequent validation.
+ * 
+ * @param token - JWT token string to parse
+ * @returns Parsed token data or error information
+ * 
+ * @example
+ * ```typescript
+ * const parsed = parseTokenPayload(token);
+ * if (parsed.success) {
+ *   const expirationTime = new Date(parsed.payload.exp * 1000);
+ *   console.log('Token expires at:', expirationTime);
+ * }
+ * ```
  */
-export class TokenRefreshManager {
-  private refreshPromise: Promise<TokenRefreshResult> | null = null;
-  private retryCount = 0;
-  private lastRefreshAttempt = 0;
-  private config: TokenRefreshConfig;
-  
-  constructor(config: Partial<TokenRefreshConfig> = {}) {
-    this.config = {
-      endpoint: '/api/v2/user/refresh',
-      retryAttempts: SESSION_CONFIG.REFRESH.RETRY_ATTEMPTS,
-      retryDelay: SESSION_CONFIG.REFRESH.RETRY_DELAY,
-      exponentialBackoff: true,
-      timeoutMs: 10000, // 10 seconds
-      ...config
-    };
-  }
-  
-  /**
-   * Refreshes access token with retry logic and exponential backoff
-   */
-  async refreshToken(refreshToken: string): Promise<TokenRefreshResult> {
-    // Return existing promise if refresh is already in progress
-    if (this.refreshPromise) {
-      return this.refreshPromise;
+export function parseTokenPayload(token: string): {
+  success: boolean;
+  payload?: JWTPayload;
+  error?: AuthError;
+} {
+  try {
+    if (!token || typeof token !== 'string') {
+      return {
+        success: false,
+        error: createAuthError(
+          AUTH_ERROR_CODES.TOKEN_INVALID,
+          'Token is required and must be a string',
+          { context: 'parseTokenPayload' }
+        )
+      };
     }
+
+    // Remove Bearer prefix if present
+    const cleanToken = token.replace(/^Bearer\s+/i, '').trim();
     
-    this.refreshPromise = this.executeRefresh(refreshToken);
-    
+    // Split JWT into parts
+    const parts = cleanToken.split('.');
+    if (parts.length !== 3) {
+      return {
+        success: false,
+        error: createAuthError(
+          AUTH_ERROR_CODES.TOKEN_INVALID,
+          'Invalid JWT format - must have three parts separated by dots',
+          { context: 'parseTokenPayload' }
+        )
+      };
+    }
+
+    // Decode payload (second part)
     try {
-      const result = await this.refreshPromise;
-      this.refreshPromise = null;
-      
-      if (result.success) {
-        this.retryCount = 0;
-        this.lastRefreshAttempt = Date.now();
+      const payloadBase64 = parts[1];
+      // Add padding if necessary
+      const paddedPayload = payloadBase64 + '='.repeat((4 - payloadBase64.length % 4) % 4);
+      const decodedPayload = atob(paddedPayload);
+      const payload = JSON.parse(decodedPayload);
+
+      // Basic payload validation
+      if (!payload || typeof payload !== 'object') {
+        throw new Error('Payload is not a valid object');
       }
-      
-      return result;
-    } catch (error) {
-      this.refreshPromise = null;
-      throw error;
-    }
-  }
-  
-  /**
-   * Executes the actual token refresh with retry logic
-   */
-  private async executeRefresh(refreshToken: string): Promise<TokenRefreshResult> {
-    for (let attempt = 0; attempt <= this.config.retryAttempts; attempt++) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), this.config.timeoutMs);
-        
-        const response = await fetch(this.config.endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${refreshToken}`
-          },
-          body: JSON.stringify({
-            refresh_token: refreshToken
-          }),
-          signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          
-          // Don't retry on authentication errors
-          if (response.status === 401 || response.status === 403) {
-            return {
-              success: false,
-              error: errorData.message || 'Authentication failed'
-            };
+
+      // Convert to application format with basic validation
+      const jwtPayload: JWTPayload = {
+        sub: payload.sub || '',
+        iat: payload.iat || 0,
+        exp: payload.exp || 0,
+        iss: payload.iss,
+        user: payload.user || {
+          id: 0,
+          email: '',
+          firstName: '',
+          lastName: '',
+          roleId: 0,
+          isRootAdmin: false,
+          isSysAdmin: false,
+        },
+        permissions: Array.isArray(payload.permissions) ? payload.permissions : [],
+        sessionId: payload.sessionId || '',
+      };
+
+      return {
+        success: true,
+        payload: jwtPayload
+      };
+
+    } catch (decodeError) {
+      return {
+        success: false,
+        error: createAuthError(
+          AUTH_ERROR_CODES.TOKEN_INVALID,
+          'Failed to decode JWT payload',
+          { 
+            context: 'parseTokenPayload',
+            originalError: decodeError instanceof Error ? decodeError.message : 'Unknown decode error'
           }
-          
-          throw new Error(`HTTP ${response.status}: ${errorData.message || 'Unknown error'}`);
-        }
-        
-        const data = await response.json();
-        
-        return {
-          success: true,
-          accessToken: data.session_token || data.access_token,
-          refreshToken: data.refresh_token,
-          expiresIn: data.expires_in || TOKEN_EXPIRATION.ACCESS_TOKEN
-        };
-        
-      } catch (error) {
-        const isLastAttempt = attempt === this.config.retryAttempts;
-        
-        if (isLastAttempt) {
-          return {
-            success: false,
-            error: error instanceof Error ? error.message : 'Unknown refresh error'
-          };
-        }
-        
-        // Calculate delay for next attempt
-        const baseDelay = this.config.retryDelay;
-        const delay = this.config.exponentialBackoff 
-          ? baseDelay * Math.pow(2, attempt)
-          : baseDelay;
-        
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
+        )
+      };
     }
-    
+
+  } catch (error) {
     return {
       success: false,
-      error: 'Max refresh attempts exceeded'
+      error: createAuthError(
+        AUTH_ERROR_CODES.TOKEN_INVALID,
+        'Failed to parse JWT token',
+        { 
+          context: 'parseTokenPayload',
+          originalError: error instanceof Error ? error.message : 'Unknown error'
+        }
+      )
     };
   }
-  
-  /**
-   * Checks if refresh is currently in progress
-   */
-  isRefreshing(): boolean {
-    return this.refreshPromise !== null;
+}
+
+/**
+ * Extracts token from various sources (headers, cookies) for middleware processing
+ * 
+ * Supports multiple token sources to accommodate different authentication patterns
+ * including Authorization headers, custom headers, and HTTP-only cookies.
+ * 
+ * @param context - Middleware authentication context with headers and request data
+ * @returns Extracted token string or null if not found
+ * 
+ * @example
+ * ```typescript
+ * // In Next.js middleware
+ * const token = extractTokenFromRequest({
+ *   headers: req.headers,
+ *   pathname: req.nextUrl.pathname
+ * });
+ * ```
+ */
+export function extractTokenFromRequest(context: MiddlewareAuthContext): string | null {
+  const { headers } = context;
+
+  // Try Authorization header first
+  const authHeader = headers[TOKEN_CONFIG.AUTHORIZATION_HEADER.toLowerCase()];
+  if (authHeader && typeof authHeader === 'string') {
+    const match = authHeader.match(/^Bearer\s+(.+)$/i);
+    if (match && match[1]) {
+      return match[1];
+    }
   }
-  
-  /**
-   * Gets the last refresh attempt timestamp
-   */
-  getLastRefreshAttempt(): number {
-    return this.lastRefreshAttempt;
+
+  // Try custom session token header
+  const sessionHeader = headers[TOKEN_CONFIG.SESSION_TOKEN_KEY.toLowerCase()];
+  if (sessionHeader && typeof sessionHeader === 'string') {
+    return sessionHeader;
   }
-  
-  /**
-   * Resets the refresh manager state
-   */
-  reset(): void {
-    this.refreshPromise = null;
-    this.retryCount = 0;
-    this.lastRefreshAttempt = 0;
+
+  // Try legacy token header
+  const legacyHeader = headers[TOKEN_CONFIG.LEGACY_TOKEN_KEY.toLowerCase()];
+  if (legacyHeader && typeof legacyHeader === 'string') {
+    return legacyHeader;
+  }
+
+  // Try cookie-based token (would be extracted by middleware from cookies)
+  if (context.sessionToken && typeof context.sessionToken === 'string') {
+    return context.sessionToken;
+  }
+
+  return null;
+}
+
+// =============================================================================
+// TOKEN EXPIRATION AND REFRESH UTILITIES
+// =============================================================================
+
+/**
+ * Checks if token is expired or approaching expiration
+ * 
+ * Evaluates token expiration status with configurable buffer time to enable
+ * proactive token refresh before actual expiration occurs.
+ * 
+ * @param token - JWT token to check
+ * @param bufferTimeMs - Buffer time in milliseconds before expiration (default: 5 minutes)
+ * @returns Token expiration status with detailed timing information
+ * 
+ * @example
+ * ```typescript
+ * const expirationStatus = await checkTokenExpiration(token);
+ * if (expirationStatus.needsRefresh) {
+ *   await refreshAuthToken();
+ * }
+ * ```
+ */
+export async function checkTokenExpiration(
+  token: string,
+  bufferTimeMs: number = REFRESH_TIMING.BUFFER_TIME
+): Promise<{
+  isExpired: boolean;
+  needsRefresh: boolean;
+  expiresAt?: Date;
+  timeUntilExpiry?: number;
+  error?: AuthError;
+}> {
+  try {
+    // Parse token to get expiration without full validation
+    const parseResult = parseTokenPayload(token);
+    
+    if (!parseResult.success || !parseResult.payload) {
+      return {
+        isExpired: true,
+        needsRefresh: true,
+        error: parseResult.error || createAuthError(
+          AUTH_ERROR_CODES.TOKEN_INVALID,
+          'Failed to parse token for expiration check'
+        )
+      };
+    }
+
+    const now = Date.now();
+    const expirationTime = parseResult.payload.exp * 1000; // Convert to milliseconds
+    const timeUntilExpiry = expirationTime - now;
+    
+    const isExpired = timeUntilExpiry <= 0;
+    const needsRefresh = timeUntilExpiry <= bufferTimeMs && timeUntilExpiry > 0;
+
+    return {
+      isExpired,
+      needsRefresh,
+      expiresAt: new Date(expirationTime),
+      timeUntilExpiry: Math.max(0, timeUntilExpiry),
+    };
+
+  } catch (error) {
+    return {
+      isExpired: true,
+      needsRefresh: true,
+      error: createAuthError(
+        AUTH_ERROR_CODES.TOKEN_INVALID,
+        'Failed to check token expiration',
+        { 
+          context: 'checkTokenExpiration',
+          originalError: error instanceof Error ? error.message : 'Unknown error'
+        }
+      )
+    };
+  }
+}
+
+/**
+ * Automatically refreshes JWT token with exponential backoff retry strategy
+ * 
+ * Implements intelligent token refresh with retry logic, exponential backoff,
+ * and comprehensive error handling. Integrates with DreamFactory API endpoints
+ * for seamless token renewal.
+ * 
+ * @param currentToken - Current JWT token to refresh
+ * @param retryCount - Current retry attempt (used for exponential backoff)
+ * @returns Promise resolving to refresh result with new token or error
+ * 
+ * @example
+ * ```typescript
+ * const refreshResult = await refreshToken(currentToken);
+ * if (refreshResult.success) {
+ *   updateStoredToken(refreshResult.newToken);
+ * } else {
+ *   handleRefreshFailure(refreshResult.error);
+ * }
+ * ```
+ */
+export async function refreshToken(
+  currentToken: string,
+  retryCount: number = 0
+): Promise<{
+  success: boolean;
+  newToken?: string;
+  expiresAt?: Date;
+  error?: AuthError;
+}> {
+  try {
+    // Validate current token format before attempting refresh
+    const parseResult = parseTokenPayload(currentToken);
+    if (!parseResult.success) {
+      return {
+        success: false,
+        error: createAuthError(
+          AUTH_ERROR_CODES.TOKEN_INVALID,
+          'Cannot refresh invalid token',
+          { context: 'refreshToken' }
+        )
+      };
+    }
+
+    // Calculate retry delay with exponential backoff
+    if (retryCount > 0) {
+      const delay = Math.min(
+        REFRESH_TIMING.RETRY_DELAY * Math.pow(REFRESH_TIMING.BACKOFF_MULTIPLIER, retryCount - 1),
+        REFRESH_TIMING.MAX_BACKOFF_DELAY
+      );
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+
+    // Prepare refresh request
+    const refreshUrl = `${process.env.NEXT_PUBLIC_API_URL || ''}/api/v2/user/session`;
+    const requestHeaders: HeadersInit = {
+      'Content-Type': 'application/json',
+      [TOKEN_CONFIG.AUTHORIZATION_HEADER]: `${TOKEN_CONFIG.BEARER_PREFIX} ${currentToken}`,
+    };
+
+    // Add API key if available
+    if (process.env.NEXT_PUBLIC_API_KEY) {
+      requestHeaders[TOKEN_CONFIG.API_KEY_HEADER] = process.env.NEXT_PUBLIC_API_KEY;
+    }
+
+    // Perform refresh request
+    const response = await fetch(refreshUrl, {
+      method: 'PUT',
+      headers: requestHeaders,
+      body: JSON.stringify({ session_token: currentToken }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      
+      if (response.status === 401) {
+        return {
+          success: false,
+          error: createAuthError(
+            AUTH_ERROR_CODES.TOKEN_EXPIRED,
+            'Token refresh failed - authentication required',
+            { 
+              context: 'refreshToken',
+              statusCode: response.status,
+              serverError: errorData
+            }
+          )
+        };
+      }
+
+      // Retry on server errors if we haven't exceeded max retries
+      if (response.status >= 500 && retryCount < REFRESH_TIMING.MAX_RETRIES) {
+        return refreshToken(currentToken, retryCount + 1);
+      }
+
+      return {
+        success: false,
+        error: createAuthError(
+          AUTH_ERROR_CODES.REFRESH_FAILED,
+          `Token refresh failed with status ${response.status}`,
+          { 
+            context: 'refreshToken',
+            statusCode: response.status,
+            serverError: errorData
+          }
+        )
+      };
+    }
+
+    // Parse refresh response
+    const refreshData = await response.json();
+    const newToken = refreshData.session_token || refreshData.sessionToken;
+    
+    if (!newToken) {
+      return {
+        success: false,
+        error: createAuthError(
+          AUTH_ERROR_CODES.REFRESH_FAILED,
+          'No token returned from refresh endpoint',
+          { context: 'refreshToken', response: refreshData }
+        )
+      };
+    }
+
+    // Validate new token
+    const validationResult = await validateToken(newToken);
+    if (!validationResult.isValid) {
+      return {
+        success: false,
+        error: createAuthError(
+          AUTH_ERROR_CODES.REFRESH_FAILED,
+          'Refreshed token is invalid',
+          { context: 'refreshToken', validationError: validationResult.error }
+        )
+      };
+    }
+
+    return {
+      success: true,
+      newToken,
+      expiresAt: validationResult.expiresAt,
+    };
+
+  } catch (error) {
+    // Retry on network errors if we haven't exceeded max retries
+    if (retryCount < REFRESH_TIMING.MAX_RETRIES) {
+      return refreshToken(currentToken, retryCount + 1);
+    }
+
+    return {
+      success: false,
+      error: createAuthError(
+        AUTH_ERROR_CODES.NETWORK_ERROR,
+        'Token refresh failed due to network error',
+        { 
+          context: 'refreshToken',
+          retryCount,
+          originalError: error instanceof Error ? error.message : 'Unknown error'
+        }
+      )
+    };
   }
 }
 
 // =============================================================================
-// TOKEN LIFECYCLE MANAGEMENT
+// NEXT.JS MIDDLEWARE INTEGRATION UTILITIES
 // =============================================================================
 
 /**
- * Comprehensive token lifecycle manager for authentication state
+ * Processes authentication in Next.js middleware with comprehensive validation
+ * 
+ * Performs complete authentication flow including token extraction, validation,
+ * refresh handling, and authorization checks. Optimized for edge runtime
+ * performance with minimal latency overhead.
+ * 
+ * @param context - Middleware authentication context
+ * @returns Promise resolving to middleware authentication result
+ * 
+ * @example
+ * ```typescript
+ * // In middleware.ts
+ * export async function middleware(request: NextRequest) {
+ *   const authResult = await processMiddlewareAuth({
+ *     headers: Object.fromEntries(request.headers.entries()),
+ *     pathname: request.nextUrl.pathname,
+ *     userAgent: request.headers.get('user-agent') || undefined,
+ *   });
+ *   
+ *   if (!authResult.isAuthenticated) {
+ *     return NextResponse.redirect(new URL('/login', request.url));
+ *   }
+ *   
+ *   return NextResponse.next();
+ * }
+ * ```
  */
-export class JWTLifecycleManager {
-  private refreshManager: TokenRefreshManager;
-  private validationTimer: NodeJS.Timeout | null = null;
-  private refreshTimer: NodeJS.Timeout | null = null;
-  
-  constructor(refreshConfig?: Partial<TokenRefreshConfig>) {
-    this.refreshManager = new TokenRefreshManager(refreshConfig);
-  }
-  
-  /**
-   * Validates token and schedules automatic refresh if needed
-   */
-  async validateAndScheduleRefresh(
-    accessToken: string, 
-    refreshToken: string,
-    onTokenRefresh?: (tokens: { accessToken: string; refreshToken: string }) => void
-  ): Promise<JWTValidationResult> {
-    const validationResult = validateJWTToken(accessToken);
+export async function processMiddlewareAuth(
+  context: MiddlewareAuthContext
+): Promise<MiddlewareAuthResult> {
+  try {
+    // Extract token from request
+    const token = extractTokenFromRequest(context);
+    
+    if (!token) {
+      return {
+        isAuthenticated: false,
+        isAuthorized: false,
+        redirectTo: '/login',
+        error: createAuthError(
+          AUTH_ERROR_CODES.UNAUTHORIZED,
+          'No authentication token found',
+          { context: 'processMiddlewareAuth' }
+        )
+      };
+    }
+
+    // Check token expiration first for performance
+    const expirationStatus = await checkTokenExpiration(token);
+    
+    if (expirationStatus.isExpired) {
+      return {
+        isAuthenticated: false,
+        isAuthorized: false,
+        redirectTo: '/login',
+        error: expirationStatus.error || createAuthError(
+          AUTH_ERROR_CODES.TOKEN_EXPIRED,
+          'Authentication token has expired',
+          { context: 'processMiddlewareAuth' }
+        )
+      };
+    }
+
+    // Attempt token refresh if needed
+    let currentToken = token;
+    if (expirationStatus.needsRefresh) {
+      const refreshResult = await refreshToken(token);
+      
+      if (refreshResult.success && refreshResult.newToken) {
+        currentToken = refreshResult.newToken;
+      } else {
+        // Continue with current token if refresh fails but token is still valid
+        console.warn('Token refresh failed but token is still valid:', refreshResult.error);
+      }
+    }
+
+    // Validate token with signature verification
+    const validationResult = await validateToken(currentToken);
     
     if (!validationResult.isValid) {
-      return validationResult;
+      return {
+        isAuthenticated: false,
+        isAuthorized: false,
+        redirectTo: '/login',
+        error: validationResult.error || createAuthError(
+          AUTH_ERROR_CODES.TOKEN_INVALID,
+          'Token validation failed',
+          { context: 'processMiddlewareAuth' }
+        )
+      };
     }
-    
-    // Schedule refresh if token needs it
-    if (validationResult.needsRefresh && refreshToken) {
-      this.scheduleTokenRefresh(refreshToken, onTokenRefresh);
+
+    // Convert JWT payload to user session
+    const userSession = convertPayloadToUserSession(validationResult.payload!);
+
+    // Basic route authorization (can be extended with more complex logic)
+    const isAuthorized = checkRouteAuthorization(context.pathname, userSession);
+
+    const result: MiddlewareAuthResult = {
+      isAuthenticated: true,
+      isAuthorized,
+      user: userSession,
+    };
+
+    // Add updated token if refresh occurred
+    if (currentToken !== token) {
+      result.updatedToken = currentToken;
+      result.headers = {
+        'Set-Cookie': `${COOKIE_CONFIG.SESSION_COOKIE_NAME}=${currentToken}; Path=${COOKIE_CONFIG.COOKIE_PATH}; HttpOnly; SameSite=Strict${COOKIE_CONFIG.SECURITY_SETTINGS.secure ? '; Secure' : ''}`
+      };
     }
-    
-    // Schedule validation timer for periodic checks
-    this.scheduleValidationCheck(accessToken, refreshToken, onTokenRefresh);
-    
-    return validationResult;
-  }
-  
-  /**
-   * Schedules automatic token refresh
-   */
-  private scheduleTokenRefresh(
-    refreshToken: string,
-    onTokenRefresh?: (tokens: { accessToken: string; refreshToken: string }) => void
-  ): void {
-    if (this.refreshTimer) {
-      clearTimeout(this.refreshTimer);
+
+    // Redirect to forbidden page if not authorized
+    if (!isAuthorized) {
+      result.redirectTo = '/403';
+      result.error = createAuthError(
+        AUTH_ERROR_CODES.FORBIDDEN,
+        'Insufficient permissions for requested resource',
+        { context: 'processMiddlewareAuth', pathname: context.pathname }
+      );
     }
-    
-    // Refresh immediately if needed
-    this.refreshTimer = setTimeout(async () => {
-      try {
-        const result = await this.refreshManager.refreshToken(refreshToken);
-        
-        if (result.success && result.accessToken && onTokenRefresh) {
-          onTokenRefresh({
-            accessToken: result.accessToken,
-            refreshToken: result.refreshToken || refreshToken
-          });
+
+    return result;
+
+  } catch (error) {
+    return {
+      isAuthenticated: false,
+      isAuthorized: false,
+      redirectTo: '/login',
+      error: createAuthError(
+        AUTH_ERROR_CODES.SERVER_ERROR,
+        'Authentication processing failed',
+        { 
+          context: 'processMiddlewareAuth',
+          originalError: error instanceof Error ? error.message : 'Unknown error'
         }
-      } catch (error) {
-        console.error('Scheduled token refresh failed:', error);
-      }
-    }, 100); // Minimal delay for immediate refresh
-  }
-  
-  /**
-   * Schedules periodic validation checks
-   */
-  private scheduleValidationCheck(
-    accessToken: string,
-    refreshToken: string,
-    onTokenRefresh?: (tokens: { accessToken: string; refreshToken: string }) => void
-  ): void {
-    if (this.validationTimer) {
-      clearTimeout(this.validationTimer);
-    }
-    
-    this.validationTimer = setTimeout(() => {
-      this.validateAndScheduleRefresh(accessToken, refreshToken, onTokenRefresh);
-    }, SESSION_CONFIG.VALIDATION.INTERVAL);
-  }
-  
-  /**
-   * Manually triggers token refresh
-   */
-  async refreshTokens(refreshToken: string): Promise<TokenRefreshResult> {
-    return this.refreshManager.refreshToken(refreshToken);
-  }
-  
-  /**
-   * Cleans up timers and resets state
-   */
-  cleanup(): void {
-    if (this.validationTimer) {
-      clearTimeout(this.validationTimer);
-      this.validationTimer = null;
-    }
-    
-    if (this.refreshTimer) {
-      clearTimeout(this.refreshTimer);
-      this.refreshTimer = null;
-    }
-    
-    this.refreshManager.reset();
-  }
-  
-  /**
-   * Checks if refresh is currently in progress
-   */
-  isRefreshing(): boolean {
-    return this.refreshManager.isRefreshing();
+      )
+    };
   }
 }
 
-// =============================================================================
-// NEXT.JS MIDDLEWARE INTEGRATION
-// =============================================================================
-
 /**
- * Extracts JWT token from various sources in middleware context
+ * Converts JWT payload to user session object
+ * 
+ * Transforms validated JWT payload into complete user session data structure
+ * compatible with application authentication state management.
+ * 
+ * @param payload - Validated JWT payload
+ * @returns Complete user session object
  */
-export function extractTokenFromRequest(request: {
-  headers: { get(name: string): string | null };
-  cookies?: { get(name: string): { value: string } | undefined };
-}): { accessToken?: string; refreshToken?: string } {
-  let accessToken: string | undefined;
-  let refreshToken: string | undefined;
+function convertPayloadToUserSession(payload: JWTPayload): UserSession {
+  const expirationDate = new Date(payload.exp * 1000);
   
-  // Check Authorization header
-  const authHeader = request.headers.get('Authorization');
-  if (authHeader?.startsWith('Bearer ')) {
-    accessToken = authHeader.substring(7);
-  }
-  
-  // Check X-DreamFactory-Session-Token header
-  const sessionHeader = request.headers.get('X-DreamFactory-Session-Token');
-  if (sessionHeader && !accessToken) {
-    accessToken = sessionHeader;
-  }
-  
-  // Check cookies if available
-  if (request.cookies) {
-    const sessionCookie = request.cookies.get('df_session');
-    const refreshCookie = request.cookies.get('df_refresh');
-    
-    if (sessionCookie?.value && !accessToken) {
-      accessToken = sessionCookie.value;
-    }
-    
-    if (refreshCookie?.value) {
-      refreshToken = refreshCookie.value;
-    }
-  }
-  
-  return { accessToken, refreshToken };
-}
-
-/**
- * Validates token for middleware usage with enhanced security
- */
-export function validateTokenForMiddleware(
-  token: string,
-  strictValidation: boolean = true
-): JWTValidationResult {
-  const options: Partial<TokenSecurityOptions> = {
-    verifySignature: false, // Signature verification happens server-side
-    checkExpiration: true,
-    checkNotBefore: true,
-    validateIssuer: strictValidation,
-    validateAudience: strictValidation,
-    allowClockSkew: 30,
-    requiredClaims: strictValidation 
-      ? ['sub', 'exp', 'iat', 'email', 'roles']
-      : ['sub', 'exp', 'iat']
+  return {
+    id: payload.user.id,
+    email: payload.user.email,
+    firstName: payload.user.firstName,
+    lastName: payload.user.lastName,
+    name: `${payload.user.firstName} ${payload.user.lastName}`.trim(),
+    host: process.env.NEXT_PUBLIC_API_URL || '',
+    sessionId: payload.sessionId,
+    sessionToken: '', // Will be set by calling code
+    tokenExpiryDate: expirationDate,
+    lastLoginDate: new Date(payload.iat * 1000).toISOString(),
+    isRootAdmin: payload.user.isRootAdmin,
+    isSysAdmin: payload.user.isSysAdmin,
+    roleId: payload.user.roleId,
+    role_id: payload.user.roleId, // Legacy compatibility
   };
-  
-  return validateJWTToken(token, options);
+}
+
+/**
+ * Checks route authorization based on user permissions
+ * 
+ * Performs basic route-level authorization checks based on user session data.
+ * Can be extended to support more complex permission evaluation logic.
+ * 
+ * @param pathname - Request pathname to check
+ * @param user - User session data
+ * @returns Boolean indicating if user is authorized for the route
+ */
+function checkRouteAuthorization(pathname: string, user: UserSession): boolean {
+  // Admin routes require admin privileges
+  if (pathname.startsWith('/admin-settings') || pathname.startsWith('/adf-admins')) {
+    return user.isRootAdmin || user.isSysAdmin;
+  }
+
+  // System settings require system admin privileges
+  if (pathname.startsWith('/system-settings') || pathname.startsWith('/adf-config')) {
+    return user.isSysAdmin;
+  }
+
+  // All other protected routes require authentication (already verified)
+  return true;
+}
+
+// =============================================================================
+// TOKEN LIFECYCLE MANAGEMENT UTILITIES
+// =============================================================================
+
+/**
+ * Creates a new JWT token with user session data
+ * 
+ * Generates signed JWT token with complete user session information,
+ * appropriate expiration timing, and security claims for authentication.
+ * 
+ * @param userSession - User session data to encode in token
+ * @param expirationSeconds - Token expiration time in seconds (optional)
+ * @returns Promise resolving to signed JWT token
+ * 
+ * @example
+ * ```typescript
+ * const token = await createToken(userSession, SESSION_CONFIG.DEFAULT_SESSION_DURATION);
+ * // Store token securely for authentication
+ * ```
+ */
+export async function createToken(
+  userSession: UserSession,
+  expirationSeconds: number = SESSION_CONFIG.DEFAULT_SESSION_DURATION
+): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  const exp = now + expirationSeconds;
+
+  const payload: JoseJWTPayload = {
+    sub: userSession.id.toString(),
+    iat: now,
+    exp: exp,
+    iss: TOKEN_CONFIG.JWT_ISSUER,
+    aud: TOKEN_CONFIG.JWT_AUDIENCE,
+    user: {
+      id: userSession.id,
+      email: userSession.email,
+      firstName: userSession.firstName,
+      lastName: userSession.lastName,
+      roleId: userSession.roleId,
+      isRootAdmin: userSession.isRootAdmin,
+      isSysAdmin: userSession.isSysAdmin,
+    },
+    sessionId: userSession.sessionId,
+    permissions: [], // Can be populated from user role data
+  };
+
+  return await new SignJWT(payload)
+    .setProtectedHeader({ alg: JWT_ALGORITHM })
+    .sign(JWT_SECRET);
+}
+
+/**
+ * Revokes JWT token by adding to blacklist (if implemented)
+ * 
+ * Placeholder for token revocation functionality. In a complete implementation,
+ * this would add the token to a blacklist or mark it as revoked in storage.
+ * 
+ * @param token - JWT token to revoke
+ * @returns Promise indicating revocation success
+ */
+export async function revokeToken(token: string): Promise<{
+  success: boolean;
+  error?: AuthError;
+}> {
+  try {
+    // Parse token to get its ID/data for blacklisting
+    const parseResult = parseTokenPayload(token);
+    
+    if (!parseResult.success) {
+      return {
+        success: false,
+        error: createAuthError(
+          AUTH_ERROR_CODES.TOKEN_INVALID,
+          'Cannot revoke invalid token',
+          { context: 'revokeToken' }
+        )
+      };
+    }
+
+    // TODO: Implement actual token blacklisting
+    // This could involve:
+    // - Adding token ID to Redis blacklist
+    // - Storing revocation in database
+    // - Notifying other services about revocation
+    
+    console.warn('Token revocation not fully implemented - token parsing successful');
+    
+    return { success: true };
+
+  } catch (error) {
+    return {
+      success: false,
+      error: createAuthError(
+        AUTH_ERROR_CODES.SERVER_ERROR,
+        'Token revocation failed',
+        { 
+          context: 'revokeToken',
+          originalError: error instanceof Error ? error.message : 'Unknown error'
+        }
+      )
+    };
+  }
+}
+
+/**
+ * Checks if a token has been revoked (if blacklist is implemented)
+ * 
+ * Placeholder for checking token revocation status. In a complete implementation,
+ * this would check against a blacklist or revocation storage system.
+ * 
+ * @param token - JWT token to check
+ * @returns Promise indicating if token is revoked
+ */
+export async function isTokenRevoked(token: string): Promise<{
+  isRevoked: boolean;
+  error?: AuthError;
+}> {
+  try {
+    // Parse token to get its ID for blacklist checking
+    const parseResult = parseTokenPayload(token);
+    
+    if (!parseResult.success) {
+      return {
+        isRevoked: true, // Consider invalid tokens as revoked
+        error: createAuthError(
+          AUTH_ERROR_CODES.TOKEN_INVALID,
+          'Invalid token considered revoked',
+          { context: 'isTokenRevoked' }
+        )
+      };
+    }
+
+    // TODO: Implement actual blacklist checking
+    // This could involve:
+    // - Checking Redis blacklist
+    // - Querying revocation database
+    // - Checking with external revocation service
+    
+    return { isRevoked: false };
+
+  } catch (error) {
+    return {
+      isRevoked: true, // Fail safe - consider token revoked on error
+      error: createAuthError(
+        AUTH_ERROR_CODES.SERVER_ERROR,
+        'Token revocation check failed',
+        { 
+          context: 'isTokenRevoked',
+          originalError: error instanceof Error ? error.message : 'Unknown error'
+        }
+      )
+    };
+  }
 }
 
 // =============================================================================
@@ -666,88 +1063,101 @@ export function validateTokenForMiddleware(
 // =============================================================================
 
 /**
- * Creates a mock JWT token for development/testing
+ * Creates standardized authentication error object
+ * 
+ * Generates consistent authentication error objects with proper typing,
+ * context information, and debugging details for comprehensive error handling.
+ * 
+ * @param code - Standardized error code
+ * @param message - Human-readable error message
+ * @param context - Additional error context and debugging information
+ * @returns Properly formatted authentication error
  */
-export function createMockJWT(payload: Partial<JWTPayload> = {}): string {
-  const now = Math.floor(Date.now() / 1000);
-  const authConfig = getAuthConfig();
-  
-  const defaultPayload: JWTPayload = {
-    sub: 'mock-user-id',
-    iss: JWT_CONFIG.ISSUER,
-    aud: JWT_CONFIG.AUDIENCE,
-    exp: now + authConfig.TOKEN_EXPIRY,
-    iat: now,
-    email: 'mock@example.com',
-    roles: ['user'],
-    permissions: ['read'],
-    sid: 'mock-session-id',
-    ...payload
+function createAuthError(
+  code: string,
+  message: string,
+  context?: Record<string, any>
+): AuthError {
+  return {
+    code,
+    message,
+    timestamp: new Date().toISOString(),
+    requestId: `jwt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    context,
   };
-  
-  // Create mock JWT structure (header.payload.signature)
-  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-  const encodedPayload = btoa(JSON.stringify(defaultPayload));
-  const signature = btoa('mock-signature');
-  
-  return `${header}.${encodedPayload}.${signature}`;
 }
 
 /**
- * Formats JWT validation error for user display
+ * Validates JWT token format without signature verification
+ * 
+ * Performs basic format validation to ensure token has proper JWT structure
+ * before attempting more expensive signature verification operations.
+ * 
+ * @param token - Token string to validate
+ * @returns Boolean indicating if token format is valid
  */
-export function formatJWTError(error: JWTValidationError): string {
-  const errorMessages: Record<JWTValidationError, string> = {
-    [JWTValidationError.INVALID_FORMAT]: 'Invalid token format',
-    [JWTValidationError.INVALID_SIGNATURE]: 'Invalid token signature',
-    [JWTValidationError.TOKEN_EXPIRED]: 'Session has expired. Please log in again.',
-    [JWTValidationError.TOKEN_NOT_ACTIVE]: 'Token is not yet active',
-    [JWTValidationError.INVALID_ISSUER]: 'Invalid token issuer',
-    [JWTValidationError.INVALID_AUDIENCE]: 'Invalid token audience',
-    [JWTValidationError.MISSING_CLAIMS]: 'Required token claims are missing',
-    [JWTValidationError.INVALID_TYPE]: 'Invalid token type',
-    [JWTValidationError.MALFORMED_PAYLOAD]: 'Malformed token payload',
-    [JWTValidationError.VERIFICATION_FAILED]: 'Token verification failed'
-  };
+export function isValidTokenFormat(token: string): boolean {
+  if (!token || typeof token !== 'string') {
+    return false;
+  }
+
+  const cleanToken = token.replace(/^Bearer\s+/i, '').trim();
+  const parts = cleanToken.split('.');
   
-  return errorMessages[error] || 'Unknown token error';
+  return parts.length === 3 && parts.every(part => part.length > 0);
 }
 
 /**
- * Checks if error indicates need for re-authentication
+ * Gets token expiration time without full validation
+ * 
+ * Quickly extracts expiration timestamp from JWT token for timing calculations
+ * without performing expensive signature verification.
+ * 
+ * @param token - JWT token to check
+ * @returns Expiration Date object or null if invalid
  */
-export function shouldForceReauth(error: JWTValidationError): boolean {
-  const reAuthErrors = [
-    JWTValidationError.TOKEN_EXPIRED,
-    JWTValidationError.INVALID_SIGNATURE,
-    JWTValidationError.INVALID_FORMAT,
-    JWTValidationError.VERIFICATION_FAILED
-  ];
+export function getTokenExpiration(token: string): Date | null {
+  const parseResult = parseTokenPayload(token);
   
-  return reAuthErrors.includes(error);
+  if (parseResult.success && parseResult.payload) {
+    return new Date(parseResult.payload.exp * 1000);
+  }
+  
+  return null;
+}
+
+/**
+ * Calculates time until token expiration
+ * 
+ * Determines how much time remains before token expires, useful for
+ * scheduling refresh operations and user notifications.
+ * 
+ * @param token - JWT token to check
+ * @returns Time until expiration in milliseconds, or null if invalid
+ */
+export function getTimeUntilExpiration(token: string): number | null {
+  const expiration = getTokenExpiration(token);
+  
+  if (expiration) {
+    return Math.max(0, expiration.getTime() - Date.now());
+  }
+  
+  return null;
 }
 
 // =============================================================================
 // EXPORTS
 // =============================================================================
 
-// Create global instances for application use
-export const globalTokenRefreshManager = new TokenRefreshManager();
-export const globalJWTLifecycleManager = new JWTLifecycleManager();
+export type {
+  JWTPayload,
+  MiddlewareAuthContext,
+  MiddlewareAuthResult,
+} from '@/types/auth';
 
-// Default export with commonly used functions
-export default {
-  validate: validateJWTToken,
-  parse: parseJWTPayload,
-  isExpired: isTokenExpired,
-  needsRefresh: needsTokenRefresh,
-  getTimeToExpiry,
-  extractFromRequest: extractTokenFromRequest,
-  validateForMiddleware: validateTokenForMiddleware,
-  formatError: formatJWTError,
-  shouldForceReauth,
-  createMock: createMockJWT,
-  TokenRefreshManager,
-  JWTLifecycleManager,
-  JWTValidationError
-};
+export {
+  AUTH_ERROR_CODES,
+  TOKEN_CONFIG,
+  SESSION_CONFIG,
+  REFRESH_CONFIG,
+} from './constants';
