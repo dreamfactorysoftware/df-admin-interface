@@ -1,373 +1,619 @@
 /**
- * LicenseExpired Component
+ * LicenseExpired Component for DreamFactory Admin Interface
  * 
- * React 19 license expiration notice component migrated from Angular df-license-expired.
- * Displays a full-screen centered notification when the DreamFactory subscription has expired,
- * using internationalization for header and subheader messages. Implements WCAG 2.1 AA 
- * accessibility with proper semantic HTML, ARIA attributes, and keyboard navigation.
+ * React 19 component replacing Angular df-license-expired. Displays a full-screen
+ * centered notification when the DreamFactory subscription has expired, using
+ * Next.js i18n for translation support and Tailwind CSS for responsive design.
  * 
- * Features:
- * - WCAG 2.1 AA compliant with proper semantic HTML structure
- * - Responsive design with Tailwind CSS utility classes
- * - Dark/light theme support with proper color contrast ratios
- * - Internationalization support maintaining Angular translation keys
- * - TypeScript 5.8+ strict typing with React 19 forwardRef
- * - Keyboard navigation and screen reader support
+ * Implements WCAG 2.1 AA accessibility compliance with proper semantic HTML,
+ * ARIA attributes, and keyboard navigation. Supports both light and dark themes
+ * with appropriate color contrast ratios per accessibility requirements.
  * 
- * @fileoverview License expiration notice component for DreamFactory Admin Interface
- * @version 1.0.0
+ * @fileoverview License expiration notice component
+ * @version 2.0.0
+ * @since React 19 migration
  */
 
 'use client';
 
-import React, { forwardRef, useEffect, useState } from 'react';
-import { cn } from '@/lib/utils';
-import type { LicenseExpiredProps } from './types';
+import React, { forwardRef, useEffect } from 'react';
+import { LicenseExpiredProps } from './types';
+import { BaseComponent } from '@/types/ui';
+
+// ============================================================================
+// TEMPORARY INTERFACE FOR useTranslation HOOK
+// ============================================================================
 
 /**
- * Simple translation hook placeholder - can be replaced with actual i18n implementation
- * Maintains compatibility with Angular Transloco translation keys
+ * Temporary interface for Next.js i18n translation hook
+ * Following Next.js internationalization patterns until the actual hook is implemented
  */
-function useTranslations() {
-  // This will be replaced with the actual Next.js i18n implementation
-  // For now, providing fallback translations that match the Angular keys
-  const translations = {
-    'licenseExpired.header': 'License Expired',
-    'licenseExpired.subHeader': 'Your DreamFactory license has expired. Please contact support to renew your subscription.',
-  };
-
-  return (key: string) => translations[key as keyof typeof translations] || key;
+interface UseTranslationResult {
+  t: (key: string, options?: Record<string, any>) => string;
+  locale: string;
+  isLoading: boolean;
 }
 
 /**
- * LicenseExpired Component
- * 
- * Displays a centered notice when the DreamFactory license has expired.
- * Maintains exact functionality from Angular implementation while adding
- * React 19 features and WCAG 2.1 AA accessibility compliance.
+ * Temporary implementation of useTranslation hook
+ * This will be replaced with the actual Next.js i18n implementation
  */
-export const LicenseExpired = forwardRef<HTMLDivElement, LicenseExpiredProps>(
+const useTranslation = (namespace?: string): UseTranslationResult => {
+  // Fallback translations matching Angular Transloco keys
+  const translations: Record<string, string> = {
+    'licenseExpired.header': 'Your DreamFactory subscription has expired.',
+    'licenseExpired.subHeader': 'Please contact dspsales@dreamfactory.com to renew your subscription.',
+  };
+
+  return {
+    t: (key: string, options?: Record<string, any>) => {
+      const translation = translations[key] || key;
+      
+      // Handle interpolation if options are provided
+      if (options) {
+        return Object.keys(options).reduce((result, optionKey) => {
+          return result.replace(new RegExp(`{{${optionKey}}}`, 'g'), String(options[optionKey]));
+        }, translation);
+      }
+      
+      return translation;
+    },
+    locale: 'en',
+    isLoading: false,
+  };
+};
+
+// ============================================================================
+// COMPONENT STYLING CONFIGURATION
+// ============================================================================
+
+/**
+ * Tailwind CSS classes for license expired component
+ * Replaces SCSS .notice-container flexbox layout with utility classes
+ */
+const componentStyles = {
+  // Main container replacing .notice-container with full-screen centering
+  container: [
+    // Layout - Full screen flex container
+    'flex',
+    'flex-col',
+    'h-full',
+    'min-h-screen',
+    'w-full',
+    
+    // Centering content
+    'justify-center',
+    'items-center',
+    
+    // Padding for mobile safety
+    'px-4',
+    'py-8',
+    'sm:px-6',
+    'md:px-8',
+    'lg:px-12',
+    
+    // Background with theme support
+    'bg-white',
+    'dark:bg-gray-950',
+    
+    // Smooth transitions
+    'transition-colors',
+    'duration-300',
+    
+    // Focus management for accessibility
+    'focus-within:outline-none',
+  ].join(' '),
+  
+  // Article wrapper for semantic HTML
+  article: [
+    // Layout
+    'flex',
+    'flex-col',
+    'items-center',
+    'justify-center',
+    'max-w-2xl',
+    'w-full',
+    'text-center',
+    
+    // Spacing
+    'space-y-6',
+    'sm:space-y-8',
+    
+    // Background and borders for card-like appearance
+    'bg-white',
+    'dark:bg-gray-900',
+    'border',
+    'border-gray-200',
+    'dark:border-gray-800',
+    'rounded-xl',
+    'shadow-lg',
+    'dark:shadow-2xl',
+    
+    // Padding
+    'p-8',
+    'sm:p-12',
+    'lg:p-16',
+    
+    // Responsive design
+    'mx-auto',
+    
+    // Animation
+    'animate-fade-in',
+    
+    // Hover effects for interactivity
+    'hover:shadow-xl',
+    'dark:hover:shadow-3xl',
+    
+    // Transitions
+    'transition-all',
+    'duration-300',
+  ].join(' '),
+  
+  // Warning icon container
+  iconContainer: [
+    // Layout
+    'flex',
+    'items-center',
+    'justify-center',
+    'w-20',
+    'h-20',
+    'sm:w-24',
+    'sm:h-24',
+    'mx-auto',
+    'mb-6',
+    
+    // Background with warning colors
+    'bg-red-100',
+    'dark:bg-red-900/30',
+    'border-2',
+    'border-red-200',
+    'dark:border-red-800',
+    'rounded-full',
+    
+    // Animation
+    'animate-pulse-slow',
+    
+    // Accessibility - proper contrast
+    'ring-2',
+    'ring-red-500/20',
+    'dark:ring-red-400/30',
+  ].join(' '),
+  
+  // Primary header styles (h1)
+  header: [
+    // Typography
+    'text-2xl',
+    'sm:text-3xl',
+    'lg:text-4xl',
+    'font-bold',
+    'leading-tight',
+    
+    // Colors with proper contrast for accessibility
+    'text-red-700',
+    'dark:text-red-400',
+    
+    // Spacing
+    'mb-4',
+    
+    // Responsive design
+    'text-center',
+    
+    // Accessibility - large text threshold met (24px)
+    'lg:text-4xl', // 36px
+    
+    // Animation
+    'fade-in',
+  ].join(' '),
+  
+  // Subheader styles (h2)
+  subheader: [
+    // Typography
+    'text-base',
+    'sm:text-lg',
+    'lg:text-xl',
+    'font-medium',
+    'leading-relaxed',
+    
+    // Colors with proper contrast
+    'text-gray-700',
+    'dark:text-gray-300',
+    
+    // Spacing
+    'mb-8',
+    
+    // Responsive design
+    'text-center',
+    'max-w-lg',
+    'mx-auto',
+    
+    // Line height for readability
+    'leading-7',
+    'sm:leading-8',
+  ].join(' '),
+  
+  // Contact information highlighting
+  contactInfo: [
+    // Typography
+    'font-semibold',
+    'text-blue-600',
+    'dark:text-blue-400',
+    
+    // Interactive states
+    'hover:text-blue-700',
+    'dark:hover:text-blue-300',
+    'focus:text-blue-800',
+    'dark:focus:text-blue-200',
+    
+    // Underline for links
+    'underline',
+    'decoration-2',
+    'underline-offset-2',
+    
+    // Transitions
+    'transition-colors',
+    'duration-200',
+  ].join(' '),
+};
+
+// ============================================================================
+// WARNING ICON COMPONENT
+// ============================================================================
+
+/**
+ * Warning icon SVG component with accessibility features
+ * Provides visual indication of license expiration status
+ */
+const WarningIcon: React.FC<{ className?: string }> = ({ className = '' }) => (
+  <svg
+    className={`w-10 h-10 sm:w-12 sm:h-12 text-red-500 dark:text-red-400 ${className}`}
+    fill="currentColor"
+    viewBox="0 0 24 24"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+    role="img"
+  >
+    <path
+      fillRule="evenodd"
+      d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003zM12 8.25a.75.75 0 01.75.75v3.75a.75.75 0 01-1.5 0V9a.75.75 0 01.75-.75zm0 8.25a.75.75 0 100-1.5.75.75 0 000 1.5z"
+      clipRule="evenodd"
+    />
+  </svg>
+);
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
+
+/**
+ * LicenseExpired component with comprehensive accessibility and theming support
+ * 
+ * Replaces Angular df-license-expired component with React 19 implementation
+ * using Next.js i18n, Tailwind CSS, and WCAG 2.1 AA compliance.
+ */
+const LicenseExpired = forwardRef<HTMLElement, LicenseExpiredProps>(
   (
     {
-      className,
-      variant = 'expired',
-      size = 'default',
+      // Core configuration
       theme = 'system',
+      severity = 'critical',
+      context = 'subscription-lapsed',
+      displayMode = 'modal',
+      
+      // Content configuration
+      title,
+      message,
+      
+      // Visual configuration
+      size = 'md',
+      variant = 'error',
+      showIcon = true,
+      animated = true,
+      
+      // Behavior configuration
       dismissible = false,
-      showCloseButton = false,
-      position = 'center',
-      licenseInfo,
-      actions = [],
-      content,
-      onDismiss,
-      onMount,
-      onUnmount,
+      
+      // Accessibility configuration
+      role = 'alert',
+      'aria-live': ariaLive = 'assertive',
+      'aria-atomic': ariaAtomic = true,
+      'aria-label': ariaLabel,
+      'aria-describedby': ariaDescribedBy,
+      announceToScreenReader = true,
+      screenReaderText,
+      
+      // Styling
+      className = '',
+      classNames = {},
+      
+      // Testing and development
       'data-testid': testId = 'license-expired',
-      ...props
+      debug = false,
+      
+      // Standard HTML attributes
+      id,
+      ...rest
     },
     ref
   ) => {
-    const t = useTranslations();
-    const [mounted, setMounted] = useState(false);
-    const [dismissed, setDismissed] = useState(false);
-
-    // Handle component mount lifecycle
+    // ========================================================================
+    // HOOKS AND STATE
+    // ========================================================================
+    
+    const { t } = useTranslation();
+    
+    // ========================================================================
+    // COMPUTED VALUES
+    // ========================================================================
+    
+    // Determine display texts from props or translations
+    const displayTitle = title || t('licenseExpired.header');
+    const displayMessage = message || t('licenseExpired.subHeader');
+    
+    // Generate screen reader announcement
+    const screenReaderAnnouncement = screenReaderText || 
+      `${displayTitle} ${displayMessage}`;
+    
+    // Generate unique IDs for accessibility
+    const headerId = `${testId}-header`;
+    const messageId = `${testId}-message`;
+    const announcementId = `${testId}-announcement`;
+    
+    // ========================================================================
+    // ACCESSIBILITY EFFECTS
+    // ========================================================================
+    
+    /**
+     * Announce license expiration to screen readers on component mount
+     * Follows WCAG 2.1 guidelines for critical notifications
+     */
     useEffect(() => {
-      setMounted(true);
-      onMount?.();
-      
-      // Announce to screen readers when component mounts
-      const announcement = document.createElement('div');
-      announcement.setAttribute('aria-live', 'assertive');
-      announcement.setAttribute('aria-atomic', 'true');
-      announcement.className = 'sr-only';
-      announcement.textContent = `${t('licenseExpired.header')}: ${t('licenseExpired.subHeader')}`;
-      document.body.appendChild(announcement);
-      
-      // Clean up announcement after screen reader has time to read it
-      const cleanup = setTimeout(() => {
-        if (document.body.contains(announcement)) {
-          document.body.removeChild(announcement);
-        }
-      }, 1000);
-
-      return () => {
-        clearTimeout(cleanup);
-        if (document.body.contains(announcement)) {
-          document.body.removeChild(announcement);
-        }
-        onUnmount?.();
-      };
-    }, [t, onMount, onUnmount]);
-
-    // Handle dismissal
-    const handleDismiss = () => {
-      if (dismissible && onDismiss) {
-        setDismissed(true);
-        onDismiss();
+      if (announceToScreenReader && screenReaderAnnouncement) {
+        // Create temporary element for screen reader announcement
+        const announcement = document.createElement('div');
+        announcement.setAttribute('aria-live', ariaLive);
+        announcement.setAttribute('aria-atomic', 'true');
+        announcement.setAttribute('class', 'sr-only');
+        announcement.textContent = screenReaderAnnouncement;
+        
+        document.body.appendChild(announcement);
+        
+        // Remove after announcement
+        const cleanup = setTimeout(() => {
+          if (document.body.contains(announcement)) {
+            document.body.removeChild(announcement);
+          }
+        }, 1000);
+        
+        return () => {
+          clearTimeout(cleanup);
+          if (document.body.contains(announcement)) {
+            document.body.removeChild(announcement);
+          }
+        };
       }
-    };
-
-    // Handle keyboard navigation
-    const handleKeyDown = (event: React.KeyboardEvent) => {
-      // Allow escape key to dismiss if dismissible
-      if (event.key === 'Escape' && dismissible) {
-        handleDismiss();
+    }, [announceToScreenReader, screenReaderAnnouncement, ariaLive]);
+    
+    /**
+     * Log debug information in development mode
+     */
+    useEffect(() => {
+      if (debug && process.env.NODE_ENV === 'development') {
+        console.group('🔒 LicenseExpired Component Debug');
+        console.log('Props:', {
+          theme,
+          severity,
+          context,
+          displayMode,
+          title: displayTitle,
+          message: displayMessage,
+        });
+        console.log('Accessibility:', {
+          role,
+          ariaLive,
+          ariaAtomic,
+          ariaLabel,
+          ariaDescribedBy,
+          announceToScreenReader,
+        });
+        console.groupEnd();
       }
-      
-      // Focus management for actions
-      if (event.key === 'Tab' && actions.length > 0) {
-        // Let browser handle default tab behavior for now
-        // More complex focus management can be added if needed
-      }
-    };
-
-    // Don't render if dismissed or not mounted (prevents hydration mismatch)
-    if (!mounted || dismissed) {
-      return null;
-    }
-
-    // Base container classes with accessibility and responsive design
-    const containerClasses = cn(
-      // Layout: Flexbox with centering
-      'flex flex-col items-center justify-center',
-      
-      // Sizing: Full viewport height by default, responsive adjustments
-      position === 'center' && 'min-h-screen',
-      position === 'banner' && 'py-8',
-      position === 'top' && 'pt-16 pb-8',
-      position === 'bottom' && 'pt-8 pb-16',
-      
-      // Spacing: Responsive padding
-      'px-4 sm:px-6 lg:px-8',
-      
-      // Background: Theme-aware with proper contrast
-      'bg-white dark:bg-gray-900',
-      
-      // Text: Default text styling
-      'text-gray-900 dark:text-gray-100',
-      
-      // Size variants
-      size === 'compact' && 'py-4',
-      size === 'default' && 'py-8',
-      size === 'expanded' && 'py-12',
-      
-      // Focus management
-      'focus-within:outline-none',
-      
-      // Custom className override
-      className
-    );
-
-    // Header styling with WCAG compliance
-    const headerClasses = cn(
-      // Typography: Large, bold text
-      'text-2xl sm:text-3xl lg:text-4xl font-bold',
-      
-      // Spacing: Bottom margin
-      'mb-4',
-      
-      // Text alignment
-      'text-center',
-      
-      // Color: High contrast for accessibility
-      'text-gray-900 dark:text-white',
-      
-      // Responsive adjustments
-      'max-w-4xl mx-auto'
-    );
-
-    // Subheader styling with proper contrast
-    const subHeaderClasses = cn(
-      // Typography: Medium text, readable line height
-      'text-lg sm:text-xl',
-      'leading-relaxed',
-      
-      // Spacing: Centered with max width
-      'text-center max-w-2xl mx-auto',
-      
-      // Color: Slightly muted but still accessible contrast
-      'text-gray-700 dark:text-gray-300',
-      
-      // Bottom margin for actions
-      actions.length > 0 && 'mb-8'
-    );
-
-    // Actions container styling
-    const actionsClasses = cn(
-      'flex flex-col sm:flex-row gap-4 justify-center items-center',
-      'mt-8'
-    );
-
+    }, [
+      debug,
+      theme,
+      severity,
+      context,
+      displayMode,
+      displayTitle,
+      displayMessage,
+      role,
+      ariaLive,
+      ariaAtomic,
+      ariaLabel,
+      ariaDescribedBy,
+      announceToScreenReader,
+    ]);
+    
+    // ========================================================================
+    // COMPONENT RENDER
+    // ========================================================================
+    
     return (
       <main
         ref={ref}
-        className={containerClasses}
-        role="main"
-        aria-labelledby="license-expired-heading"
-        aria-describedby="license-expired-description"
+        id={id}
+        className={`${componentStyles.container} ${classNames.container || ''} ${className}`}
+        role={role}
+        aria-live={ariaLive}
+        aria-atomic={ariaAtomic}
+        aria-label={ariaLabel || `License expiration notice: ${displayTitle}`}
+        aria-describedby={ariaDescribedBy || `${headerId} ${messageId}`}
         data-testid={testId}
-        onKeyDown={handleKeyDown}
-        {...props}
+        data-theme={theme}
+        data-severity={severity}
+        data-context={context}
+        data-display-mode={displayMode}
+        {...rest}
       >
-        {/* Main content article for semantic structure */}
-        <article className="text-center max-w-4xl mx-auto">
-          {/* Primary heading with proper semantic level */}
-          <h1
-            id="license-expired-heading"
-            className={headerClasses}
-          >
-            {content?.title || t('licenseExpired.header')}
-          </h1>
-
-          {/* Descriptive subheading */}
-          <h2
-            id="license-expired-description"
-            className={subHeaderClasses}
-          >
-            {content?.description || t('licenseExpired.subHeader')}
-          </h2>
-
-          {/* Custom content if provided */}
-          {content?.customMessage && (
-            <div className="mt-6 text-center">
-              {content.customMessage}
-            </div>
-          )}
-
-          {/* License information if provided */}
-          {licenseInfo && (
-            <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                License: {licenseInfo.planName} - Status: {licenseInfo.status}
-              </p>
-              {licenseInfo.expirationDate && (
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Expired: {licenseInfo.expirationDate.toLocaleDateString()}
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Action buttons if provided */}
-          {actions.length > 0 && (
-            <div className={actionsClasses} role="group" aria-label="License actions">
-              {actions.map((action) => (
-                <button
-                  key={action.id}
-                  type="button"
-                  className={cn(
-                    // Base button styling
-                    'inline-flex items-center justify-center',
-                    'px-6 py-3 text-base font-medium rounded-md',
-                    'transition-colors duration-200',
-                    
-                    // WCAG compliance: minimum touch target size
-                    'min-h-[44px] min-w-[44px]',
-                    
-                    // Focus styling for accessibility
-                    'focus:outline-none focus:ring-2 focus:ring-offset-2',
-                    'focus:ring-primary-500 dark:focus:ring-primary-400',
-                    
-                    // Action type styling
-                    action.type === 'primary' && [
-                      'bg-primary-600 text-white',
-                      'hover:bg-primary-700 active:bg-primary-800',
-                      'border border-transparent'
-                    ],
-                    action.type === 'secondary' && [
-                      'bg-gray-100 text-gray-900 dark:bg-gray-700 dark:text-gray-100',
-                      'hover:bg-gray-200 dark:hover:bg-gray-600',
-                      'border border-gray-300 dark:border-gray-600'
-                    ],
-                    action.type === 'outline' && [
-                      'bg-transparent text-primary-600 dark:text-primary-400',
-                      'hover:bg-primary-50 dark:hover:bg-gray-800',
-                      'border-2 border-primary-600 dark:border-primary-400'
-                    ],
-                    action.type === 'ghost' && [
-                      'bg-transparent text-gray-700 dark:text-gray-300',
-                      'hover:bg-gray-100 dark:hover:bg-gray-800',
-                      'border border-transparent'
-                    ],
-                    
-                    // Disabled state
-                    action.disabled && 'opacity-50 pointer-events-none cursor-not-allowed'
-                  )}
-                  onClick={action.onClick}
-                  disabled={action.disabled || action.loading}
-                  aria-label={action.ariaLabel || action.label}
-                >
-                  {/* Icon if provided */}
-                  {action.icon && (
-                    <span className="mr-2" aria-hidden="true">
-                      {action.icon}
-                    </span>
-                  )}
-                  
-                  {/* Button text */}
-                  {action.loading ? 'Loading...' : action.label}
-                  
-                  {/* Loading indicator if needed */}
-                  {action.loading && (
-                    <span
-                      className="ml-2 w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"
-                      aria-hidden="true"
-                    />
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Dismiss button if dismissible */}
-          {dismissible && showCloseButton && (
-            <button
-              type="button"
-              className={cn(
-                'absolute top-4 right-4 p-2 rounded-md',
-                'text-gray-400 hover:text-gray-600',
-                'dark:text-gray-500 dark:hover:text-gray-300',
-                'focus:outline-none focus:ring-2 focus:ring-primary-500',
-                'transition-colors duration-200'
-              )}
-              onClick={handleDismiss}
-              aria-label="Dismiss license notice"
+        {/* Screen reader only announcement element */}
+        <div
+          id={announcementId}
+          className="sr-only"
+          aria-live={ariaLive}
+          aria-atomic={ariaAtomic}
+        >
+          {screenReaderAnnouncement}
+        </div>
+        
+        {/* Main content article */}
+        <article
+          className={`${componentStyles.article} ${classNames.content || ''}`}
+          aria-labelledby={headerId}
+          aria-describedby={messageId}
+        >
+          {/* Warning icon */}
+          {showIcon && (
+            <div
+              className={`${componentStyles.iconContainer} ${classNames.icon || ''}`}
+              aria-hidden="true"
+              role="presentation"
             >
-              <span className="sr-only">Close</span>
-              {/* Simple X icon using CSS */}
-              <span
-                className="block w-6 h-6 relative"
-                aria-hidden="true"
-              >
-                <span className="absolute inset-0 w-6 h-0.5 bg-current transform rotate-45 top-3" />
-                <span className="absolute inset-0 w-6 h-0.5 bg-current transform -rotate-45 top-3" />
-              </span>
-            </button>
+              <WarningIcon />
+            </div>
           )}
-
-          {/* Custom footer content */}
-          {content?.footer && (
-            <footer className="mt-8 text-center">
-              {content.footer}
-            </footer>
-          )}
-        </article>
-
-        {/* Skip link for keyboard users */}
-        {actions.length > 0 && (
-          <a
-            href="#license-expired-actions"
-            className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-primary-600 text-white px-4 py-2 rounded-md z-50"
+          
+          {/* Primary header */}
+          <h1
+            id={headerId}
+            className={`${componentStyles.header} ${classNames.title || ''}`}
+            role="heading"
+            aria-level={1}
           >
-            Skip to license actions
-          </a>
-        )}
+            {displayTitle}
+          </h1>
+          
+          {/* Subheader with enhanced contact information */}
+          <h2
+            id={messageId}
+            className={`${componentStyles.subheader} ${classNames.message || ''}`}
+            role="heading"
+            aria-level={2}
+          >
+            {/* Parse and enhance the message to highlight contact information */}
+            {displayMessage.includes('dspsales@dreamfactory.com') ? (
+              <>
+                {displayMessage.split('dspsales@dreamfactory.com')[0]}
+                <a
+                  href="mailto:dspsales@dreamfactory.com"
+                  className={componentStyles.contactInfo}
+                  aria-label="Contact DreamFactory sales team via email"
+                  role="link"
+                  rel="noopener noreferrer"
+                >
+                  dspsales@dreamfactory.com
+                </a>
+                {displayMessage.split('dspsales@dreamfactory.com')[1]}
+              </>
+            ) : (
+              displayMessage
+            )}
+          </h2>
+          
+          {/* Additional help text or actions could be added here */}
+          
+          {/* Focus trap end marker for screen readers */}
+          <div
+            className="sr-only"
+            tabIndex={0}
+            aria-label="End of license expiration notice"
+          />
+        </article>
       </main>
     );
   }
 );
 
+// ============================================================================
+// COMPONENT CONFIGURATION
+// ============================================================================
+
 LicenseExpired.displayName = 'LicenseExpired';
 
+// ============================================================================
+// EXPORTS
+// ============================================================================
+
 export default LicenseExpired;
+export { LicenseExpired };
+export type { LicenseExpiredProps };
+
+/**
+ * Default props configuration for the license expired component
+ * Provides sensible defaults while maintaining flexibility
+ */
+export const defaultLicenseExpiredProps: Partial<LicenseExpiredProps> = {
+  theme: 'system',
+  severity: 'critical',
+  context: 'subscription-lapsed',
+  displayMode: 'modal',
+  size: 'md',
+  variant: 'error',
+  showIcon: true,
+  animated: true,
+  dismissible: false,
+  role: 'alert',
+  'aria-live': 'assertive',
+  'aria-atomic': true,
+  announceToScreenReader: true,
+  'data-testid': 'license-expired',
+  debug: false,
+};
+
+/**
+ * Component metadata for development and documentation
+ */
+export const LicenseExpiredMetadata = {
+  name: 'LicenseExpired',
+  version: '2.0.0',
+  description: 'License expiration notice component for DreamFactory Admin Interface',
+  framework: 'React 19',
+  styling: 'Tailwind CSS 4.1+',
+  accessibility: 'WCAG 2.1 AA compliant',
+  i18n: 'Next.js internationalization',
+  migration: {
+    from: 'Angular df-license-expired component',
+    translationKeys: ['licenseExpired.header', 'licenseExpired.subHeader'],
+    maintainedFeatures: [
+      'Full-screen centered layout',
+      'Internationalization support',
+      'Header and subheader display',
+      'Responsive design',
+    ],
+    enhancedFeatures: [
+      'WCAG 2.1 AA accessibility compliance',
+      'Dark mode support',
+      'TypeScript type safety',
+      'Screen reader announcements',
+      'Semantic HTML structure',
+      'Enhanced contact information highlighting',
+      'Comprehensive testing attributes',
+    ],
+  },
+  dependencies: {
+    react: '^19.0.0',
+    'next': '^15.1.0',
+    'tailwindcss': '^4.1.0',
+    'typescript': '^5.8.0',
+  },
+  browserSupport: [
+    'Chrome >= 90',
+    'Firefox >= 88',
+    'Safari >= 14',
+    'Edge >= 90',
+  ],
+  testingSupport: {
+    framework: 'Vitest',
+    utilities: '@testing-library/react',
+    mocking: 'Mock Service Worker (MSW)',
+    coverage: '90%+ target',
+  },
+};
