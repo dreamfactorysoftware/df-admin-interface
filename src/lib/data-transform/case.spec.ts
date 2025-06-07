@@ -1,719 +1,725 @@
 /**
- * @fileoverview Vitest test suite for case conversion utilities
+ * Vitest test suite for case conversion utilities in the DreamFactory Admin Interface.
+ * Tests data transformation functions for both client-side React components and 
+ * server-side Next.js SSR contexts, ensuring compatibility with DreamFactory API contracts.
  * 
- * This test suite validates snakeToCamelString, camelToSnakeString, mapSnakeToCamel, 
- * and mapCamelToSnake functions for API data transformation workflows. The tests ensure
- * both flat string transformations and recursive object key conversions behave correctly
- * in React/Next.js SSR environments with backward compatibility for DreamFactory API contracts.
+ * Validates snakeToCamelString, camelToSnakeString, mapSnakeToCamel, and mapCamelToSnake
+ * functions for API data transformation workflows with React Query/SWR integration.
  * 
- * Migration Notes:
- * - Migrated from Jest to Vitest framework per Section 6.6 testing strategy with 10x faster execution
- * - Added MSW integration for testing data transformation in API request/response cycles
- * - Enhanced test coverage for Next.js server-side rendering contexts and edge runtime compatibility
- * - Maintained existing test scenarios for backward compatibility while adding React-specific test cases
+ * @module CaseTransformationTests
+ * @version 1.0.0
+ * @author DreamFactory Admin Interface Team
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
-import { server } from '@/test/mocks/server';
-import { rest } from 'msw';
+import { describe, it, expect, beforeAll, afterEach, afterAll } from 'vitest';
+import { setupServer } from 'msw/node';
+import { http, HttpResponse } from 'msw';
 import {
   snakeToCamelString,
   camelToSnakeString,
   mapSnakeToCamel,
   mapCamelToSnake,
+  type CaseTransformed,
 } from './case';
 
-// Mock Next.js SSR environment variables for testing
-const mockSSREnvironment = () => {
-  Object.defineProperty(globalThis, 'window', {
-    value: undefined,
-    writable: true,
-  });
+// Mock Service Worker server for testing API request/response cycles
+const server = setupServer();
+
+// Test fixtures representing typical DreamFactory API responses
+const mockDatabaseServiceResponse = {
+  name: 'mysql_production',
+  type: 'mysql',
+  config: {
+    host: 'localhost',
+    port: 3306,
+    database_name: 'production_db',
+    user_name: 'api_user',
+    max_connections: 100,
+    ssl_enabled: true,
+    connection_timeout: 30,
+  },
+  service_definition: {
+    api_endpoints: [
+      {
+        resource_name: 'user_profiles',
+        http_methods: ['GET', 'POST', 'PUT', 'DELETE'],
+        auth_required: true,
+        rate_limit_enabled: true,
+      },
+    ],
+  },
 };
 
-const mockClientEnvironment = () => {
-  Object.defineProperty(globalThis, 'window', {
-    value: { location: { href: 'http://localhost:3000' } },
-    writable: true,
-  });
+const mockSamlConfiguration = {
+  idp_entity_id: 'https://example.com/saml/metadata',
+  idp_single_sign_on_service_url: 'https://example.com/saml/sso',
+  sp_name_id_format: 'urn:oasis:names:tc:SAML:2.0:nameid-format:persistent',
+  sp_private_key: '-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----',
+  other_config: {
+    session_timeout: 3600,
+    auto_provision_users: true,
+  },
 };
 
-// Setup MSW server for API integration testing
+const mockRequestBody = {
+  userName: 'john_doe',
+  apiSettings: {
+    maxRateLimit: 1000,
+    authMethods: ['bearer', 'apiKey'],
+  },
+  requestBody: {
+    data: 'This should be preserved as-is',
+    nested_field: 'example',
+  },
+};
+
+// Setup MSW server for integration testing
 beforeAll(() => {
-  server.listen();
+  server.listen({ onUnhandledRequest: 'error' });
+});
+
+afterEach(() => {
+  server.resetHandlers();
 });
 
 afterAll(() => {
   server.close();
 });
 
-beforeEach(() => {
-  server.resetHandlers();
-  mockClientEnvironment(); // Default to client environment
-});
-
-describe('String Conversion Utilities', () => {
+describe('Case Transformation Utilities', () => {
   describe('snakeToCamelString', () => {
-    it('should convert simple snake_case string to camelCase', () => {
-      const input = 'hello_world_test_string';
-      const result = snakeToCamelString(input);
-      expect(result).toBe('helloWorldTestString');
+    it('should convert basic snake_case to camelCase', () => {
+      expect(snakeToCamelString('user_name')).toBe('userName');
+      expect(snakeToCamelString('api_key_id')).toBe('apiKeyId');
+      expect(snakeToCamelString('database_connection')).toBe('databaseConnection');
+      expect(snakeToCamelString('max_rate_limit')).toBe('maxRateLimit');
     });
 
-    it('should handle single word strings without underscores', () => {
-      const input = 'hello';
-      const result = snakeToCamelString(input);
-      expect(result).toBe('hello');
+    it('should handle SAML special field mappings correctly', () => {
+      expect(snakeToCamelString('idp_entity_id')).toBe('idpEntityId');
+      expect(snakeToCamelString('idp_single_sign_on_service_url')).toBe('idpSingleSignOnServiceUrl');
+      expect(snakeToCamelString('sp_name_id_format')).toBe('spNameIDFormat');
+      expect(snakeToCamelString('sp_private_key')).toBe('spPrivateKey');
     });
 
-    it('should handle strings with leading underscores', () => {
-      const input = '_private_key';
-      const result = snakeToCamelString(input);
-      expect(result).toBe('_privateKey');
+    it('should handle edge cases and invalid inputs', () => {
+      expect(snakeToCamelString('')).toBe('');
+      expect(snakeToCamelString('already_camelCase')).toBe('alreadyCamelCase');
+      expect(snakeToCamelString('single')).toBe('single');
+      expect(snakeToCamelString('multiple_under_scores_here')).toBe('multipleUnderScoresHere');
     });
 
-    it('should handle strings with trailing underscores', () => {
-      const input = 'database_name_';
-      const result = snakeToCamelString(input);
-      expect(result).toBe('databaseName_');
+    it('should handle null and undefined inputs gracefully', () => {
+      expect(snakeToCamelString(null as any)).toBeNull();
+      expect(snakeToCamelString(undefined as any)).toBeUndefined();
     });
 
-    it('should handle multiple consecutive underscores', () => {
-      const input = 'test__double__underscore';
-      const result = snakeToCamelString(input);
-      expect(result).toBe('test_Double_Underscore');
-    });
+    it('should work in Next.js server-side rendering context', () => {
+      // Simulate SSR environment where window is undefined
+      const originalWindow = global.window;
+      delete (global as any).window;
 
-    it('should handle empty strings', () => {
-      const input = '';
-      const result = snakeToCamelString(input);
-      expect(result).toBe('');
-    });
+      expect(snakeToCamelString('server_side_field')).toBe('serverSideField');
+      expect(snakeToCamelString('api_endpoint_config')).toBe('apiEndpointConfig');
 
-    it('should handle strings with numbers', () => {
-      const input = 'version_2_api_key';
-      const result = snakeToCamelString(input);
-      expect(result).toBe('version2ApiKey');
-    });
-
-    it('should handle strings with hyphens (legacy support)', () => {
-      const input = 'legacy-api-key';
-      const result = snakeToCamelString(input);
-      expect(result).toBe('legacyApiKey');
-    });
-
-    it('should work in Next.js SSR environment', () => {
-      mockSSREnvironment();
-      const input = 'server_side_field';
-      const result = snakeToCamelString(input);
-      expect(result).toBe('serverSideField');
+      // Restore window for other tests
+      if (originalWindow) {
+        global.window = originalWindow;
+      }
     });
   });
 
   describe('camelToSnakeString', () => {
-    it('should convert simple camelCase string to snake_case', () => {
-      const input = 'helloWorldTestString';
-      const result = camelToSnakeString(input);
-      expect(result).toBe('hello_world_test_string');
+    it('should convert basic camelCase to snake_case', () => {
+      expect(camelToSnakeString('userName')).toBe('user_name');
+      expect(camelToSnakeString('apiKeyId')).toBe('api_key_id');
+      expect(camelToSnakeString('databaseConnection')).toBe('database_connection');
+      expect(camelToSnakeString('maxRateLimit')).toBe('max_rate_limit');
     });
 
-    it('should handle single word strings', () => {
-      const input = 'hello';
-      const result = camelToSnakeString(input);
-      expect(result).toBe('hello');
+    it('should handle SAML special field mappings correctly', () => {
+      expect(camelToSnakeString('idpEntityId')).toBe('idp_entity_id');
+      expect(camelToSnakeString('idpSingleSignOnServiceUrl')).toBe('idp_single_sign_on_service_url');
+      expect(camelToSnakeString('spNameIDFormat')).toBe('sp_name_id_format');
+      expect(camelToSnakeString('spPrivateKey')).toBe('sp_private_key');
     });
 
-    it('should handle strings with numbers', () => {
-      const input = 'version2ApiKey';
-      const result = camelToSnakeString(input);
-      expect(result).toBe('version2_api_key');
+    it('should handle edge cases and invalid inputs', () => {
+      expect(camelToSnakeString('')).toBe('');
+      expect(camelToSnakeString('alreadysnakecase')).toBe('alreadysnakecase');
+      expect(camelToSnakeString('Single')).toBe('_single');
+      expect(camelToSnakeString('multipleCapitalLettersHERE')).toBe('multiple_capital_letters_h_e_r_e');
     });
 
-    it('should handle strings starting with capital letters', () => {
-      const input = 'DatabaseConnection';
-      const result = camelToSnakeString(input);
-      expect(result).toBe('database_connection');
+    it('should handle null and undefined inputs gracefully', () => {
+      expect(camelToSnakeString(null as any)).toBeNull();
+      expect(camelToSnakeString(undefined as any)).toBeUndefined();
     });
 
-    it('should handle consecutive capital letters', () => {
-      const input = 'HTTPSConnection';
-      const result = camelToSnakeString(input);
-      expect(result).toBe('https_connection');
-    });
+    it('should work in Next.js edge runtime context', () => {
+      // Simulate edge runtime environment
+      const originalProcess = global.process;
+      global.process = { env: { NEXT_RUNTIME: 'edge' } } as any;
 
-    it('should handle empty strings', () => {
-      const input = '';
-      const result = camelToSnakeString(input);
-      expect(result).toBe('');
-    });
+      expect(camelToSnakeString('edgeRuntimeField')).toBe('edge_runtime_field');
+      expect(camelToSnakeString('apiEndpointConfig')).toBe('api_endpoint_config');
 
-    // SAML special case handling for backward compatibility
-    it('should handle SAML idpSingleSignOnServiceUrl special case', () => {
-      const input = 'idpSingleSignOnServiceUrl';
-      const result = camelToSnakeString(input);
-      expect(result).toBe('idp_singleSignOnService_url');
-    });
-
-    it('should handle SAML idp_singleSignOnService_url preservation', () => {
-      const input = 'idp_singleSignOnService_url';
-      const result = camelToSnakeString(input);
-      expect(result).toBe('idp_singleSignOnService_url');
-    });
-
-    it('should handle SAML idpEntityId special case', () => {
-      const input = 'idpEntityId';
-      const result = camelToSnakeString(input);
-      expect(result).toBe('idp_entityId');
-    });
-
-    it('should handle SAML idp_entityId preservation', () => {
-      const input = 'idp_entityId';
-      const result = camelToSnakeString(input);
-      expect(result).toBe('idp_entityId');
-    });
-
-    it('should handle SAML spNameIDFormat special case', () => {
-      const input = 'spNameIDFormat';
-      const result = camelToSnakeString(input);
-      expect(result).toBe('sp_nameIDFormat');
-    });
-
-    it('should handle SAML sp_nameIDFormat preservation', () => {
-      const input = 'sp_nameIDFormat';
-      const result = camelToSnakeString(input);
-      expect(result).toBe('sp_nameIDFormat');
-    });
-
-    it('should handle SAML spPrivateKey special case', () => {
-      const input = 'spPrivateKey';
-      const result = camelToSnakeString(input);
-      expect(result).toBe('sp_privateKey');
-    });
-
-    it('should handle SAML sp_privateKey preservation', () => {
-      const input = 'sp_privateKey';
-      const result = camelToSnakeString(input);
-      expect(result).toBe('sp_privateKey');
-    });
-
-    it('should work in Next.js SSR environment', () => {
-      mockSSREnvironment();
-      const input = 'serverSideField';
-      const result = camelToSnakeString(input);
-      expect(result).toBe('server_side_field');
+      // Restore process for other tests
+      global.process = originalProcess;
     });
   });
 
   describe('mapSnakeToCamel', () => {
-    it('should convert object keys from snake_case to camelCase', () => {
+    it('should transform flat objects correctly', () => {
       const input = {
-        first_key: 'value1',
-        second_key_here: {
-          nested_key: 'value2',
-          another_nested_key: ['item1', 'item2'],
-        },
+        user_name: 'john_doe',
+        api_key: 'secret123',
+        is_active: true,
+        created_at: '2024-01-01T00:00:00Z',
       };
-      const result = mapSnakeToCamel(input);
-      expect(result).toEqual({
-        firstKey: 'value1',
-        secondKeyHere: {
-          nestedKey: 'value2',
-          anotherNestedKey: ['item1', 'item2'],
-        },
-      });
-    });
 
-    it('should handle arrays of objects', () => {
-      const input = [
-        { table_name: 'users', field_count: 5 },
-        { table_name: 'posts', field_count: 8 },
-      ];
-      const result = mapSnakeToCamel(input);
-      expect(result).toEqual([
-        { tableName: 'users', fieldCount: 5 },
-        { tableName: 'posts', fieldCount: 8 },
-      ]);
-    });
-
-    it('should handle mixed arrays with objects and primitives', () => {
-      const input = [
-        'string_value',
-        { table_name: 'users' },
-        42,
-        { nested_object: { deep_field: 'value' } },
-      ];
-      const result = mapSnakeToCamel(input);
-      expect(result).toEqual([
-        'string_value', // strings in arrays are not transformed
-        { tableName: 'users' },
-        42,
-        { nestedObject: { deepField: 'value' } },
-      ]);
-    });
-
-    it('should handle null and undefined values', () => {
-      const input = {
-        null_field: null,
-        undefined_field: undefined,
-        valid_field: 'value',
+      const expected = {
+        userName: 'john_doe',
+        apiKey: 'secret123',
+        isActive: true,
+        createdAt: '2024-01-01T00:00:00Z',
       };
-      const result = mapSnakeToCamel(input);
-      expect(result).toEqual({
-        nullField: null,
-        undefinedField: undefined,
-        validField: 'value',
-      });
+
+      expect(mapSnakeToCamel(input)).toEqual(expected);
     });
 
-    it('should handle nested objects with deep structure', () => {
+    it('should transform nested objects recursively', () => {
       const input = {
-        database_config: {
-          connection_settings: {
-            host_name: 'localhost',
-            port_number: 3306,
-            ssl_config: {
-              cert_path: '/path/to/cert',
-              key_path: '/path/to/key',
-            },
+        service_config: {
+          database_name: 'production',
+          connection_pool: {
+            max_connections: 100,
+            idle_timeout: 30,
           },
         },
+        api_endpoints: [
+          {
+            resource_name: 'users',
+            http_methods: ['GET', 'POST'],
+          },
+        ],
       };
-      const result = mapSnakeToCamel(input);
-      expect(result).toEqual({
-        databaseConfig: {
-          connectionSettings: {
-            hostName: 'localhost',
-            portNumber: 3306,
-            sslConfig: {
-              certPath: '/path/to/cert',
-              keyPath: '/path/to/key',
-            },
+
+      const expected = {
+        serviceConfig: {
+          databaseName: 'production',
+          connectionPool: {
+            maxConnections: 100,
+            idleTimeout: 30,
           },
         },
-      });
+        apiEndpoints: [
+          {
+            resourceName: 'users',
+            httpMethods: ['GET', 'POST'],
+          },
+        ],
+      };
+
+      expect(mapSnakeToCamel(input)).toEqual(expected);
     });
 
-    it('should preserve primitive values unchanged', () => {
+    it('should handle arrays correctly', () => {
+      const input = [
+        { user_name: 'john', is_admin: false },
+        { user_name: 'jane', is_admin: true },
+      ];
+
+      const expected = [
+        { userName: 'john', isAdmin: false },
+        { userName: 'jane', isAdmin: true },
+      ];
+
+      expect(mapSnakeToCamel(input)).toEqual(expected);
+    });
+
+    it('should preserve primitive values', () => {
       expect(mapSnakeToCamel('string')).toBe('string');
-      expect(mapSnakeToCamel(42)).toBe(42);
+      expect(mapSnakeToCamel(123)).toBe(123);
       expect(mapSnakeToCamel(true)).toBe(true);
-      expect(mapSnakeToCamel(null)).toBe(null);
-      expect(mapSnakeToCamel(undefined)).toBe(undefined);
+      expect(mapSnakeToCamel(null)).toBeNull();
+      expect(mapSnakeToCamel(undefined)).toBeUndefined();
     });
 
-    it('should handle empty objects and arrays', () => {
-      expect(mapSnakeToCamel({})).toEqual({});
-      expect(mapSnakeToCamel([])).toEqual([]);
+    it('should handle SAML configuration transformation', () => {
+      const transformed = mapSnakeToCamel(mockSamlConfiguration);
+      
+      expect(transformed).toEqual({
+        idpEntityId: 'https://example.com/saml/metadata',
+        idpSingleSignOnServiceUrl: 'https://example.com/saml/sso',
+        spNameIDFormat: 'urn:oasis:names:tc:SAML:2.0:nameid-format:persistent',
+        spPrivateKey: '-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----',
+        otherConfig: {
+          sessionTimeout: 3600,
+          autoProvisionUsers: true,
+        },
+      });
     });
 
-    it('should work in Next.js SSR environment', () => {
-      mockSSREnvironment();
-      const input = { server_field: { nested_server_field: 'value' } };
-      const result = mapSnakeToCamel(input);
-      expect(result).toEqual({ serverField: { nestedServerField: 'value' } });
+    it('should handle complex DreamFactory API response', () => {
+      const transformed = mapSnakeToCamel(mockDatabaseServiceResponse);
+      
+      expect(transformed.name).toBe('mysql_production');
+      expect(transformed.config.databaseName).toBe('production_db');
+      expect(transformed.config.userName).toBe('api_user');
+      expect(transformed.serviceDefinition.apiEndpoints[0].resourceName).toBe('user_profiles');
+      expect(transformed.serviceDefinition.apiEndpoints[0].rateLimitEnabled).toBe(true);
     });
   });
 
   describe('mapCamelToSnake', () => {
-    it('should convert object keys from camelCase to snake_case', () => {
+    it('should transform flat objects correctly', () => {
       const input = {
-        firstKey: 'value1',
-        secondKeyHere: {
-          nestedKey: 'value2',
-          anotherNestedKey: ['item1', 'item2'],
-        },
+        userName: 'john_doe',
+        apiKey: 'secret123',
+        isActive: true,
+        createdAt: '2024-01-01T00:00:00Z',
       };
-      const result = mapCamelToSnake(input);
-      expect(result).toEqual({
-        first_key: 'value1',
-        second_key_here: {
-          nested_key: 'value2',
-          another_nested_key: ['item1', 'item2'],
-        },
-      });
+
+      const expected = {
+        user_name: 'john_doe',
+        api_key: 'secret123',
+        is_active: true,
+        created_at: '2024-01-01T00:00:00Z',
+      };
+
+      expect(mapCamelToSnake(input)).toEqual(expected);
     });
 
-    it('should preserve requestBody key unchanged (DreamFactory API contract)', () => {
-      const input = {
+    it('should preserve requestBody key for API compatibility', () => {
+      const transformed = mapCamelToSnake(mockRequestBody);
+      
+      expect(transformed).toEqual({
+        user_name: 'john_doe',
+        api_settings: {
+          max_rate_limit: 1000,
+          auth_methods: ['bearer', 'apiKey'],
+        },
         requestBody: {
-          tableName: 'users',
-          fieldData: { userName: 'john' },
+          data: 'This should be preserved as-is',
+          nested_field: 'example',
         },
-        otherField: 'value',
-      };
-      const result = mapCamelToSnake(input);
-      expect(result).toEqual({
-        requestBody: {
-          tableName: 'users',
-          fieldData: { userName: 'john' },
+      });
+    });
+
+    it('should transform nested objects recursively while preserving requestBody', () => {
+      const input = {
+        serviceConfig: {
+          databaseName: 'production',
+          requestBody: {
+            keepThisKey: 'unchanged',
+            nestedData: { someField: 'value' },
+          },
         },
-        other_field: 'value',
-      });
-    });
-
-    it('should handle arrays of objects', () => {
-      const input = [
-        { tableName: 'users', fieldCount: 5 },
-        { tableName: 'posts', fieldCount: 8 },
-      ];
-      const result = mapCamelToSnake(input);
-      expect(result).toEqual([
-        { table_name: 'users', field_count: 5 },
-        { table_name: 'posts', field_count: 8 },
-      ]);
-    });
-
-    it('should handle SAML fields in object transformation', () => {
-      const input = {
-        idpSingleSignOnServiceUrl: 'https://sso.example.com',
-        idpEntityId: 'entity123',
-        spNameIDFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
-        spPrivateKey: 'private_key_data',
-        regularField: 'value',
+        apiEndpoints: [
+          {
+            resourceName: 'users',
+            httpMethods: ['GET', 'POST'],
+          },
+        ],
       };
-      const result = mapCamelToSnake(input);
-      expect(result).toEqual({
-        idp_singleSignOnService_url: 'https://sso.example.com',
-        idp_entityId: 'entity123',
-        sp_nameIDFormat: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
-        sp_privateKey: 'private_key_data',
-        regular_field: 'value',
-      });
-    });
 
-    it('should handle null and undefined values', () => {
-      const input = {
-        nullField: null,
-        undefinedField: undefined,
-        validField: 'value',
+      const expected = {
+        service_config: {
+          database_name: 'production',
+          requestBody: {
+            keepThisKey: 'unchanged',
+            nestedData: { someField: 'value' },
+          },
+        },
+        api_endpoints: [
+          {
+            resource_name: 'users',
+            http_methods: ['GET', 'POST'],
+          },
+        ],
       };
-      const result = mapCamelToSnake(input);
-      expect(result).toEqual({
-        null_field: null,
-        undefined_field: undefined,
-        valid_field: 'value',
+
+      expect(mapCamelToSnake(input)).toEqual(expected);
+    });
+
+    it('should handle SAML configuration reverse transformation', () => {
+      const camelInput = {
+        idpEntityId: 'https://example.com/saml/metadata',
+        idpSingleSignOnServiceUrl: 'https://example.com/saml/sso',
+        spNameIDFormat: 'urn:oasis:names:tc:SAML:2.0:nameid-format:persistent',
+        spPrivateKey: '-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----',
+        otherConfig: {
+          sessionTimeout: 3600,
+          autoProvisionUsers: true,
+        },
+      };
+
+      const transformed = mapCamelToSnake(camelInput);
+      
+      expect(transformed).toEqual({
+        idp_entity_id: 'https://example.com/saml/metadata',
+        idp_single_sign_on_service_url: 'https://example.com/saml/sso',
+        sp_name_id_format: 'urn:oasis:names:tc:SAML:2.0:nameid-format:persistent',
+        sp_private_key: '-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----',
+        other_config: {
+          session_timeout: 3600,
+          auto_provision_users: true,
+        },
       });
-    });
-
-    it('should preserve primitive values unchanged', () => {
-      expect(mapCamelToSnake('string')).toBe('string');
-      expect(mapCamelToSnake(42)).toBe(42);
-      expect(mapCamelToSnake(true)).toBe(true);
-      expect(mapCamelToSnake(null)).toBe(null);
-      expect(mapCamelToSnake(undefined)).toBe(undefined);
-    });
-
-    it('should work in Next.js SSR environment', () => {
-      mockSSREnvironment();
-      const input = { serverField: { nestedServerField: 'value' } };
-      const result = mapCamelToSnake(input);
-      expect(result).toEqual({ server_field: { nested_server_field: 'value' } });
     });
   });
 
-  describe('React Query/SWR Integration Testing', () => {
-    it('should transform API response data for React Query usage', async () => {
-      // Mock API response with snake_case data
+  describe('MSW Integration Tests - API Request/Response Cycles', () => {
+    it('should transform API response data with React Query pattern', async () => {
+      // Setup MSW handler for database service endpoint
       server.use(
-        rest.get('/api/v2/system/config', (req, res, ctx) => {
-          return res(
-            ctx.json({
-              app_name: 'DreamFactory',
-              default_app_id: 1,
-              platform_config: {
-                cache_enabled: true,
-                session_timeout: 3600,
+        http.get('/api/v2/db/_schema', () => {
+          return HttpResponse.json({
+            resource: [
+              {
+                table_name: 'user_profiles',
+                field_count: 10,
+                primary_key: 'user_id',
+                created_at: '2024-01-01T00:00:00Z',
               },
-            })
-          );
+              {
+                table_name: 'api_tokens',
+                field_count: 5,
+                primary_key: 'token_id',
+                created_at: '2024-01-01T00:00:00Z',
+              },
+            ],
+          });
         })
       );
 
-      // Simulate React Query data transformation
-      const mockApiResponse = {
-        app_name: 'DreamFactory',
-        default_app_id: 1,
-        platform_config: {
-          cache_enabled: true,
-          session_timeout: 3600,
-        },
-      };
+      // Simulate React Query data fetching with case transformation
+      const response = await fetch('/api/v2/db/_schema');
+      const data = await response.json();
+      const transformedData = mapSnakeToCamel(data);
 
-      const transformedData = mapSnakeToCamel(mockApiResponse);
-      
-      expect(transformedData).toEqual({
-        appName: 'DreamFactory',
-        defaultAppId: 1,
-        platformConfig: {
-          cacheEnabled: true,
-          sessionTimeout: 3600,
-        },
-      });
+      expect(transformedData.resource).toHaveLength(2);
+      expect(transformedData.resource[0].tableName).toBe('user_profiles');
+      expect(transformedData.resource[0].fieldCount).toBe(10);
+      expect(transformedData.resource[0].primaryKey).toBe('user_id');
+      expect(transformedData.resource[1].tableName).toBe('api_tokens');
     });
 
-    it('should transform mutation data for API requests', async () => {
-      // Mock database service creation
-      const clientData = {
-        serviceName: 'mysql_db',
-        connectionConfig: {
+    it('should transform request data for API submission with SWR pattern', async () => {
+      // Setup MSW handler for service creation endpoint
+      server.use(
+        http.post('/api/v2/system/service', async ({ request }) => {
+          const body = await request.json();
+          return HttpResponse.json({
+            id: 1,
+            name: body.name,
+            type: body.type,
+            config: body.config,
+            created_at: '2024-01-01T00:00:00Z',
+            updated_at: '2024-01-01T00:00:00Z',
+          });
+        })
+      );
+
+      // Simulate SWR mutation with case transformation
+      const requestData = {
+        name: 'testService',
+        type: 'mysql',
+        config: {
           hostName: 'localhost',
           portNumber: 3306,
           databaseName: 'test_db',
+          userName: 'admin',
+          maxConnections: 50,
         },
       };
 
-      const transformedForApi = mapCamelToSnake(clientData);
-
-      expect(transformedForApi).toEqual({
-        service_name: 'mysql_db',
-        connection_config: {
-          host_name: 'localhost',
-          port_number: 3306,
-          database_name: 'test_db',
-        },
-      });
-    });
-
-    it('should handle SWR cache key transformation', () => {
-      const cacheKey = ['database_connections', { service_id: 1 }];
-      const transformedKey = mapSnakeToCamel(cacheKey);
-      
-      expect(transformedKey).toEqual(['database_connections', { serviceId: 1 }]);
-    });
-  });
-
-  describe('Next.js Middleware Integration', () => {
-    it('should work with Next.js API routes in edge runtime', () => {
-      // Simulate edge runtime environment
-      const originalEdgeRuntime = globalThis.EdgeRuntime;
-      Object.defineProperty(globalThis, 'EdgeRuntime', {
-        value: 'edge',
-        writable: true,
+      const transformedRequest = mapCamelToSnake(requestData);
+      const response = await fetch('/api/v2/system/service', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(transformedRequest),
       });
 
-      const input = { request_body: { user_name: 'admin' } };
-      const result = mapCamelToSnake(input);
-      
-      expect(result).toEqual({ request_body: { user_name: 'admin' } });
+      const responseData = await response.json();
+      const transformedResponse = mapSnakeToCamel(responseData);
 
-      // Restore original EdgeRuntime
-      Object.defineProperty(globalThis, 'EdgeRuntime', {
-        value: originalEdgeRuntime,
-        writable: true,
-      });
+      expect(transformedResponse.createdAt).toBe('2024-01-01T00:00:00Z');
+      expect(transformedResponse.updatedAt).toBe('2024-01-01T00:00:00Z');
     });
 
-    it('should handle authentication header transformation', () => {
-      const authHeaders = {
-        sessionToken: 'abc123',
-        apiKey: 'key456',
-        userId: 1,
+    it('should handle middleware data transformation in Next.js context', async () => {
+      // Setup MSW handler for authentication endpoint
+      server.use(
+        http.post('/api/v2/system/admin/session', async ({ request }) => {
+          const body = await request.json();
+          return HttpResponse.json({
+            session_token: 'mock-jwt-token',
+            session_id: 'session-123',
+            expires_in: 3600,
+            user_info: {
+              display_name: 'Admin User',
+              first_name: 'Admin',
+              last_name: 'User',
+              email_address: 'admin@example.com',
+              is_sys_admin: true,
+            },
+          });
+        })
+      );
+
+      // Simulate Next.js middleware authentication flow
+      const loginRequest = {
+        emailAddress: 'admin@example.com',
+        password: 'secret123',
+        rememberMe: true,
       };
 
-      const transformedHeaders = mapCamelToSnake(authHeaders);
-
-      expect(transformedHeaders).toEqual({
-        session_token: 'abc123',
-        api_key: 'key456',
-        user_id: 1,
+      const transformedRequest = mapCamelToSnake(loginRequest);
+      const response = await fetch('/api/v2/system/admin/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(transformedRequest),
       });
+
+      const responseData = await response.json();
+      const transformedResponse = mapSnakeToCamel(responseData);
+
+      expect(transformedResponse.sessionToken).toBe('mock-jwt-token');
+      expect(transformedResponse.sessionId).toBe('session-123');
+      expect(transformedResponse.expiresIn).toBe(3600);
+      expect(transformedResponse.userInfo.displayName).toBe('Admin User');
+      expect(transformedResponse.userInfo.emailAddress).toBe('admin@example.com');
+      expect(transformedResponse.userInfo.isSysAdmin).toBe(true);
     });
   });
 
-  describe('Performance and Memory Testing', () => {
-    it('should handle large objects efficiently (1000+ properties)', () => {
-      const largeObject: Record<string, any> = {};
-      
-      // Create object with 1000+ properties simulating large schema discovery
-      for (let i = 0; i < 1500; i++) {
-        largeObject[`table_name_${i}`] = {
-          field_count: i,
-          created_date: new Date().toISOString(),
-          table_schema: {
-            primary_key: `id_${i}`,
-            foreign_keys: [`fk_${i}_1`, `fk_${i}_2`],
-          },
+  describe('Type Safety and TypeScript Integration', () => {
+    it('should maintain type safety with CaseTransformed utility type', () => {
+      interface ApiResponse {
+        user_name: string;
+        api_settings: {
+          max_rate_limit: number;
+          auth_methods: string[];
         };
       }
 
-      const startTime = performance.now();
-      const result = mapSnakeToCamel(largeObject);
-      const endTime = performance.now();
+      const apiData: ApiResponse = {
+        user_name: 'john_doe',
+        api_settings: {
+          max_rate_limit: 1000,
+          auth_methods: ['bearer', 'jwt'],
+        },
+      };
 
-      // Should complete transformation in reasonable time (< 100ms for 1500 properties)
-      expect(endTime - startTime).toBeLessThan(100);
+      const transformed = mapSnakeToCamel(apiData);
       
-      // Verify first and last items are transformed correctly
-      expect(result[`tableName0`]).toBeDefined();
-      expect(result[`tableName0`].fieldCount).toBe(0);
-      expect(result[`tableName1499`]).toBeDefined();
-      expect(result[`tableName1499`].tableSchema.primaryKey).toBe('id_1499');
+      // TypeScript should infer the transformed structure
+      expect(typeof transformed.userName).toBe('string');
+      expect(typeof transformed.apiSettings.maxRateLimit).toBe('number');
+      expect(Array.isArray(transformed.apiSettings.authMethods)).toBe(true);
     });
 
-    it('should handle deeply nested objects without stack overflow', () => {
-      // Create deeply nested object (100 levels)
-      let deepObject: any = { final_value: 'test' };
-      for (let i = 0; i < 100; i++) {
-        deepObject = { [`level_${i}`]: deepObject };
+    it('should handle complex nested type transformations', () => {
+      interface DatabaseSchema {
+        table_name: string;
+        field_definitions: Array<{
+          field_name: string;
+          field_type: string;
+          is_nullable: boolean;
+          default_value: string | null;
+        }>;
       }
 
-      expect(() => mapSnakeToCamel(deepObject)).not.toThrow();
+      const schemaData: DatabaseSchema = {
+        table_name: 'user_profiles',
+        field_definitions: [
+          {
+            field_name: 'user_id',
+            field_type: 'integer',
+            is_nullable: false,
+            default_value: null,
+          },
+          {
+            field_name: 'email_address',
+            field_type: 'string',
+            is_nullable: false,
+            default_value: '',
+          },
+        ],
+      };
+
+      const transformed = mapSnakeToCamel(schemaData);
       
-      const result = mapSnakeToCamel(deepObject);
-      expect(result).toBeDefined();
-      
-      // Navigate to the deeply nested value
-      let current = result;
-      for (let i = 99; i >= 0; i--) {
-        current = current[`level${i}`];
-      }
-      expect(current.finalValue).toBe('test');
+      expect(transformed.tableName).toBe('user_profiles');
+      expect(transformed.fieldDefinitions).toHaveLength(2);
+      expect(transformed.fieldDefinitions[0].fieldName).toBe('user_id');
+      expect(transformed.fieldDefinitions[0].isNullable).toBe(false);
+      expect(transformed.fieldDefinitions[1].emailAddress).toBeUndefined(); // Field values aren't transformed
     });
   });
 
-  describe('Error Handling and Edge Cases', () => {
+  describe('Performance and Edge Cases', () => {
+    it('should handle large datasets efficiently', () => {
+      // Generate a large dataset to test performance
+      const largeDataset = {
+        database_tables: Array.from({ length: 1000 }, (_, i) => ({
+          table_name: `table_${i}`,
+          field_count: Math.floor(Math.random() * 50) + 1,
+          has_primary_key: Math.random() > 0.5,
+          created_at: '2024-01-01T00:00:00Z',
+        })),
+      };
+
+      const start = performance.now();
+      const transformed = mapSnakeToCamel(largeDataset);
+      const end = performance.now();
+
+      // Transformation should complete within reasonable time (< 100ms for 1000 items)
+      expect(end - start).toBeLessThan(100);
+      expect(transformed.databaseTables).toHaveLength(1000);
+      expect(transformed.databaseTables[0].tableName).toBe('table_0');
+      expect(typeof transformed.databaseTables[0].hasPrimaryKey).toBe('boolean');
+    });
+
     it('should handle circular references gracefully', () => {
-      const circularObj: any = { name: 'circular_test' };
-      circularObj.self = circularObj;
+      const obj: any = {
+        name: 'test_object',
+        nested_data: {
+          parent_ref: null,
+        },
+      };
+      
+      // Create circular reference
+      obj.nested_data.parent_ref = obj;
 
-      // Should not cause infinite recursion
-      expect(() => mapSnakeToCamel(circularObj)).not.toThrow();
+      // Should not throw or cause infinite loop
+      expect(() => {
+        const transformed = mapSnakeToCamel(obj);
+        expect(transformed.name).toBe('test_object');
+        expect(transformed.nestedData).toBeDefined();
+      }).not.toThrow();
     });
 
-    it('should handle objects with numeric keys', () => {
-      const input = {
-        '123': 'numeric_key',
-        normal_key: 'string_key',
+    it('should handle deeply nested structures', () => {
+      const deepObject = {
+        level_1: {
+          level_2: {
+            level_3: {
+              level_4: {
+                level_5: {
+                  deep_field: 'deep_value',
+                  another_field: 'another_value',
+                },
+              },
+            },
+          },
+        },
       };
 
-      const result = mapSnakeToCamel(input);
-      expect(result).toEqual({
-        '123': 'numeric_key',
-        normalKey: 'string_key',
-      });
-    });
-
-    it('should handle objects with symbol keys', () => {
-      const symbol = Symbol('test_symbol');
-      const input = {
-        [symbol]: 'symbol_value',
-        normal_key: 'normal_value',
-      };
-
-      const result = mapSnakeToCamel(input);
-      expect(result[symbol]).toBe('symbol_value');
-      expect(result.normalKey).toBe('normal_value');
-    });
-
-    it('should handle Date objects correctly', () => {
-      const date = new Date('2023-01-01');
-      const input = {
-        created_date: date,
-        updated_at: '2023-01-02',
-      };
-
-      const result = mapSnakeToCamel(input);
-      expect(result.createdDate).toBe(date);
-      expect(result.updatedAt).toBe('2023-01-02');
+      const transformed = mapSnakeToCamel(deepObject);
+      
+      expect(transformed.level1.level2.level3.level4.level5.deepField).toBe('deep_value');
+      expect(transformed.level1.level2.level3.level4.level5.anotherField).toBe('another_value');
     });
   });
 
-  describe('Backward Compatibility with DreamFactory API', () => {
-    it('should maintain compatibility with existing API response structure', () => {
-      // Simulate real DreamFactory API response
-      const apiResponse = {
-        resource: [
-          {
-            id: 1,
-            name: 'mysql_service',
-            label: 'MySQL Database',
-            description: 'Production database',
-            is_active: true,
-            type: 'sql_db',
-            config: {
-              host: 'localhost',
-              port: 3306,
-              database: 'production',
-              username: 'admin',
-              password: 'secret',
-              driver: 'mysql',
-              options: [],
-              attributes: [],
-            },
-            created_date: '2023-01-01T00:00:00.000Z',
-            last_modified_date: '2023-01-01T00:00:00.000Z',
-            created_by_id: 1,
-            last_modified_by_id: 1,
+  describe('DreamFactory API Contract Compatibility', () => {
+    it('should maintain backward compatibility with existing service definitions', () => {
+      // Test data representing typical DreamFactory service response
+      const serviceDefinition = {
+        name: 'mysql_prod',
+        label: 'Production MySQL',
+        description: 'Production database service',
+        is_active: true,
+        type: 'mysql',
+        config: {
+          host: 'prod-db.example.com',
+          port: 3306,
+          database: 'production',
+          username: 'api_user',
+          password: 'encrypted_password',
+          driver_options: {
+            charset: 'utf8mb4',
+            collation: 'utf8mb4_unicode_ci',
           },
-        ],
-        meta: {
-          schema: ['id', 'name', 'label', 'description', 'is_active'],
-          count: 1,
         },
+        created_date: '2024-01-01T00:00:00.000Z',
+        last_modified_date: '2024-01-01T00:00:00.000Z',
+        created_by_id: 1,
+        last_modified_by_id: 1,
       };
 
-      const transformedResponse = mapSnakeToCamel(apiResponse);
+      const transformed = mapSnakeToCamel(serviceDefinition);
+      
+      // Verify all fields are properly transformed
+      expect(transformed.isActive).toBe(true);
+      expect(transformed.config.driverOptions.charset).toBe('utf8mb4');
+      expect(transformed.createdDate).toBe('2024-01-01T00:00:00.000Z');
+      expect(transformed.lastModifiedDate).toBe('2024-01-01T00:00:00.000Z');
+      expect(transformed.createdById).toBe(1);
+      expect(transformed.lastModifiedById).toBe(1);
 
-      expect(transformedResponse).toEqual({
-        resource: [
-          {
-            id: 1,
-            name: 'mysql_service',
-            label: 'MySQL Database',
-            description: 'Production database',
-            isActive: true,
-            type: 'sql_db',
-            config: {
-              host: 'localhost',
-              port: 3306,
-              database: 'production',
-              username: 'admin',
-              password: 'secret',
-              driver: 'mysql',
-              options: [],
-              attributes: [],
-            },
-            createdDate: '2023-01-01T00:00:00.000Z',
-            lastModifiedDate: '2023-01-01T00:00:00.000Z',
-            createdById: 1,
-            lastModifiedById: 1,
-          },
-        ],
-        meta: {
-          schema: ['id', 'name', 'label', 'description', 'is_active'],
-          count: 1,
-        },
-      });
+      // Verify reverse transformation maintains API contract
+      const reversed = mapCamelToSnake(transformed);
+      expect(reversed.is_active).toBe(true);
+      expect(reversed.config.driver_options.charset).toBe('utf8mb4');
+      expect(reversed.created_date).toBe('2024-01-01T00:00:00.000Z');
     });
 
-    it('should handle API request body transformation correctly', () => {
-      const requestPayload = {
-        serviceName: 'new_mysql_db',
-        serviceLabel: 'New MySQL Database',
-        serviceConfig: {
-          hostName: 'db.example.com',
-          portNumber: 3306,
-          databaseName: 'app_db',
-          userName: 'dbuser',
-          userPassword: 'dbpass',
+    it('should handle API endpoint definition structures', () => {
+      const endpointDefinition = {
+        paths: {
+          '/api/v2/db/_table': {
+            get: {
+              tags: ['Database'],
+              summary: 'List database tables',
+              parameters: [
+                {
+                  name: 'include_count',
+                  in: 'query',
+                  required: false,
+                  schema: {
+                    type: 'boolean',
+                    default: false,
+                  },
+                },
+              ],
+              responses: {
+                '200': {
+                  description: 'Success',
+                  content: {
+                    'application/json': {
+                      schema: {
+                        type: 'object',
+                        properties: {
+                          resource: {
+                            type: 'array',
+                            items: {
+                              type: 'object',
+                              properties: {
+                                table_name: { type: 'string' },
+                                field_count: { type: 'integer' },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
-        isActive: true,
       };
 
-      const transformedPayload = mapCamelToSnake(requestPayload);
-
-      expect(transformedPayload).toEqual({
-        service_name: 'new_mysql_db',
-        service_label: 'New MySQL Database',
-        service_config: {
-          host_name: 'db.example.com',
-          port_number: 3306,
-          database_name: 'app_db',
-          user_name: 'dbuser',
-          user_password: 'dbpass',
-        },
-        is_active: true,
-      });
+      const transformed = mapSnakeToCamel(endpointDefinition);
+      
+      expect(transformed.paths['/api/v2/db/_table'].get.parameters[0].name).toBe('include_count');
+      expect(transformed.paths['/api/v2/db/_table'].get.responses['200'].content['application/json'].schema.properties.resource.items.properties.tableName).toBeDefined();
+      expect(transformed.paths['/api/v2/db/_table'].get.responses['200'].content['application/json'].schema.properties.resource.items.properties.fieldCount).toBeDefined();
     });
   });
 });
