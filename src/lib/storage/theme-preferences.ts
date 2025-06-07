@@ -1,334 +1,689 @@
 /**
- * Theme and UI preference management utilities migrated from Angular DfThemeService.
- * Handles dark mode toggle state, table row count preferences, and other UI customization 
- * settings with localStorage persistence and React hook integration.
+ * Theme and UI Preference Management Utilities
  * 
- * This module provides type-safe, SSR-compatible React hooks for managing theme preferences
- * that replace Angular's BehaviorSubject-based theme state management.
+ * Migrated from Angular DfThemeService to React/Next.js architecture.
+ * Provides comprehensive theme state management, dark mode support, system preference
+ * detection, and table row count preferences with localStorage persistence and
+ * React hook integration.
+ * 
+ * This module replaces Angular BehaviorSubject patterns with React hooks while
+ * maintaining backward compatibility with existing preference storage keys.
  */
 
-import { useCallback, useEffect, useMemo, useState, useLayoutEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useLocalStorage } from './ssr-storage';
+import { STORAGE_KEYS, type ThemeMode, type ThemePreferences, type UIPreferences } from './types';
 
-// Storage keys for theme preferences
-export const THEME_STORAGE_KEYS = {
-  DARK_MODE: 'isDarkMode',
-  TABLE_ROW_COUNT: 'currentTableRowNum',
-  SYSTEM_THEME_PREFERENCE: 'systemThemePreference',
-} as const;
+// =============================================================================
+// Constants and Configuration
+// =============================================================================
 
-// Default values for theme preferences
-export const THEME_DEFAULTS = {
-  DARK_MODE: false,
-  TABLE_ROW_COUNT: 10,
-  SYSTEM_THEME_PREFERENCE: true,
-} as const;
-
-// Theme preference types
-export interface ThemePreferences {
-  isDarkMode: boolean;
-  tableRowCount: number;
-  systemThemePreference: boolean;
-}
-
-export interface ThemeContextValue extends ThemePreferences {
-  toggleTheme: () => void;
-  setDarkMode: (isDarkMode: boolean) => void;
-  setTableRowCount: (count: number) => void;
-  setSystemThemePreference: (enabled: boolean) => void;
-  appliedTheme: 'light' | 'dark';
-}
-
-// Utility function to check if we're in a browser environment (SSR-safe)
-const isBrowser = typeof window !== 'undefined';
-
-// Utility function to get system theme preference
-const getSystemTheme = (): boolean => {
-  if (!isBrowser) return THEME_DEFAULTS.DARK_MODE;
-  
-  try {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
-  } catch (error) {
-    console.warn('Failed to detect system theme preference:', error);
-    return THEME_DEFAULTS.DARK_MODE;
-  }
-};
-
-// Type-safe localStorage operations with error handling
-const getStoredValue = <T>(key: string, defaultValue: T): T => {
-  if (!isBrowser) return defaultValue;
-  
-  try {
-    const stored = localStorage.getItem(key);
-    if (stored === null) return defaultValue;
-    
-    return JSON.parse(stored) as T;
-  } catch (error) {
-    console.warn(`Failed to parse stored value for key "${key}":`, error);
-    return defaultValue;
-  }
-};
-
-const setStoredValue = <T>(key: string, value: T): void => {
-  if (!isBrowser) return;
-  
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch (error) {
-    console.error(`Failed to store value for key "${key}":`, error);
-  }
+/**
+ * Default theme preferences matching Angular DfThemeService defaults
+ */
+export const DEFAULT_THEME_PREFERENCES: ThemePreferences = {
+  mode: 'system',
+  isDarkMode: false,
+  currentTableRowNum: 25,
+  followSystemTheme: true,
 };
 
 /**
- * Custom hook for managing dark mode theme preference with localStorage persistence.
- * Migrates functionality from Angular DfThemeService.darkMode$ BehaviorSubject.
- * 
- * @returns Object containing dark mode state and setter functions
+ * Default UI preferences for extended customization
  */
-export const useDarkMode = () => {
-  // Initialize state with stored value or default
-  const [isDarkMode, setIsDarkModeState] = useState<boolean>(() => 
-    getStoredValue(THEME_STORAGE_KEYS.DARK_MODE, THEME_DEFAULTS.DARK_MODE)
-  );
+export const DEFAULT_UI_PREFERENCES: UIPreferences = {
+  sidebarCollapsed: false,
+  tablePageSize: 25,
+  autoRefreshSchemas: true,
+  showAdvancedOptions: false,
+  dateFormat: 'yyyy-MM-dd',
+  timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+};
 
-  const [systemThemePreference, setSystemThemePreferenceState] = useState<boolean>(() =>
-    getStoredValue(THEME_STORAGE_KEYS.SYSTEM_THEME_PREFERENCE, THEME_DEFAULTS.SYSTEM_THEME_PREFERENCE)
-  );
+/**
+ * Table row count options available to users
+ */
+export const TABLE_ROW_COUNT_OPTIONS = [10, 25, 50, 100, 200] as const;
 
-  // SSR-safe effect to sync with stored values after hydration
-  useLayoutEffect(() => {
-    if (isBrowser) {
-      const storedDarkMode = getStoredValue(THEME_STORAGE_KEYS.DARK_MODE, THEME_DEFAULTS.DARK_MODE);
-      const storedSystemPref = getStoredValue(THEME_STORAGE_KEYS.SYSTEM_THEME_PREFERENCE, THEME_DEFAULTS.SYSTEM_THEME_PREFERENCE);
-      
-      setIsDarkModeState(storedDarkMode);
-      setSystemThemePreferenceState(storedSystemPref);
+/**
+ * CSS class names for theme application
+ */
+export const THEME_CLASSES = {
+  LIGHT: 'light',
+  DARK: 'dark',
+} as const;
+
+// =============================================================================
+// Theme Detection and System Integration
+// =============================================================================
+
+/**
+ * Detects system theme preference using matchMedia API
+ * @returns 'dark' if system prefers dark mode, 'light' otherwise
+ */
+export function detectSystemTheme(): 'light' | 'dark' {
+  if (typeof window === 'undefined') {
+    return 'light'; // SSR fallback
+  }
+
+  try {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  } catch (error) {
+    console.warn('System theme detection failed:', error);
+    return 'light';
+  }
+}
+
+/**
+ * Resolves the effective theme mode based on preference and system setting
+ * @param mode - Theme mode preference ('light', 'dark', or 'system')
+ * @returns Effective theme ('light' or 'dark')
+ */
+export function resolveThemeMode(mode: ThemeMode): 'light' | 'dark' {
+  if (mode === 'system') {
+    return detectSystemTheme();
+  }
+  return mode;
+}
+
+/**
+ * Applies theme to document element using CSS classes
+ * @param theme - Theme to apply ('light' or 'dark')
+ */
+export function applyThemeToDocument(theme: 'light' | 'dark'): void {
+  if (typeof document === 'undefined') return;
+
+  const documentElement = document.documentElement;
+  
+  // Remove existing theme classes
+  documentElement.classList.remove(THEME_CLASSES.LIGHT, THEME_CLASSES.DARK);
+  
+  // Apply new theme class
+  documentElement.classList.add(theme === 'dark' ? THEME_CLASSES.DARK : THEME_CLASSES.LIGHT);
+  
+  // Update data attribute for CSS variable cascading
+  documentElement.setAttribute('data-theme', theme);
+  
+  // Dispatch custom event for components that need to respond to theme changes
+  window.dispatchEvent(new CustomEvent('themeChange', { detail: { theme } }));
+}
+
+// =============================================================================
+// React Hooks for Theme Management
+// =============================================================================
+
+/**
+ * Core theme preferences hook with localStorage persistence
+ * Replaces Angular DfThemeService BehaviorSubject patterns
+ */
+export function useThemePreferences(): {
+  preferences: ThemePreferences;
+  updatePreferences: (updates: Partial<ThemePreferences>) => void;
+  resetPreferences: () => void;
+  isLoading: boolean;
+} {
+  const [preferences, setPreferences, clearPreferences] = useLocalStorage<ThemePreferences>(
+    STORAGE_KEYS.IS_DARK_MODE, // Maintain compatibility with existing key
+    {
+      defaultValue: DEFAULT_THEME_PREFERENCES,
+      syncAcrossTabs: true,
     }
+  );
+
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Mark loading as complete after initial load
+  useEffect(() => {
+    setIsLoading(false);
   }, []);
 
-  // Listen for system theme changes when system preference is enabled
+  const updatePreferences = useCallback((updates: Partial<ThemePreferences>) => {
+    setPreferences(prev => ({
+      ...prev,
+      ...updates,
+    }));
+  }, [setPreferences]);
+
+  const resetPreferences = useCallback(() => {
+    clearPreferences();
+    setPreferences(DEFAULT_THEME_PREFERENCES);
+  }, [clearPreferences, setPreferences]);
+
+  return {
+    preferences,
+    updatePreferences,
+    resetPreferences,
+    isLoading,
+  };
+}
+
+/**
+ * Enhanced theme state hook with system preference detection and auto-switching
+ * Provides the primary interface for theme management across the application
+ */
+export function useTheme(): {
+  // Current state
+  currentTheme: 'light' | 'dark';
+  themeMode: ThemeMode;
+  isDarkMode: boolean;
+  isSystemTheme: boolean;
+  
+  // Actions
+  setThemeMode: (mode: ThemeMode) => void;
+  toggleTheme: () => void;
+  
+  // Preferences
+  preferences: ThemePreferences;
+  updatePreferences: (updates: Partial<ThemePreferences>) => void;
+  
+  // Utility
+  isLoading: boolean;
+} {
+  const { preferences, updatePreferences, isLoading } = useThemePreferences();
+  
+  // Track system theme changes
+  const [systemTheme, setSystemTheme] = useState<'light' | 'dark'>(() => detectSystemTheme());
+
+  // Set up system theme change listener
   useEffect(() => {
-    if (!isBrowser || !systemThemePreference) return;
+    if (typeof window === 'undefined') return;
 
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     
     const handleSystemThemeChange = (e: MediaQueryListEvent) => {
-      const systemIsDark = e.matches;
-      setIsDarkModeState(systemIsDark);
-      setStoredValue(THEME_STORAGE_KEYS.DARK_MODE, systemIsDark);
+      const newSystemTheme = e.matches ? 'dark' : 'light';
+      setSystemTheme(newSystemTheme);
+      
+      // Dispatch system theme change event
+      window.dispatchEvent(new CustomEvent('systemThemeChange', { 
+        detail: { theme: newSystemTheme } 
+      }));
     };
 
-    // Set initial theme based on system preference
-    const systemIsDark = mediaQuery.matches;
-    setIsDarkModeState(systemIsDark);
-    setStoredValue(THEME_STORAGE_KEYS.DARK_MODE, systemIsDark);
-
-    // Listen for changes
-    mediaQuery.addEventListener('change', handleSystemThemeChange);
+    // Use modern addEventListener if available, fallback to deprecated addListener
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', handleSystemThemeChange);
+    } else {
+      // @ts-ignore - deprecated but needed for older browsers
+      mediaQuery.addListener(handleSystemThemeChange);
+    }
 
     return () => {
-      mediaQuery.removeEventListener('change', handleSystemThemeChange);
+      if (mediaQuery.removeEventListener) {
+        mediaQuery.removeEventListener('change', handleSystemThemeChange);
+      } else {
+        // @ts-ignore - deprecated but needed for older browsers
+        mediaQuery.removeListener(handleSystemThemeChange);
+      }
     };
-  }, [systemThemePreference]);
-
-  // Setter function that updates both state and localStorage
-  const setDarkMode = useCallback((newIsDarkMode: boolean) => {
-    setIsDarkModeState(newIsDarkMode);
-    setStoredValue(THEME_STORAGE_KEYS.DARK_MODE, newIsDarkMode);
-    
-    // Disable system theme preference when manually setting theme
-    if (systemThemePreference) {
-      setSystemThemePreferenceState(false);
-      setStoredValue(THEME_STORAGE_KEYS.SYSTEM_THEME_PREFERENCE, false);
-    }
-  }, [systemThemePreference]);
-
-  // Toggle function for convenience
-  const toggleTheme = useCallback(() => {
-    setDarkMode(!isDarkMode);
-  }, [isDarkMode, setDarkMode]);
-
-  // Setter for system theme preference
-  const setSystemThemePreference = useCallback((enabled: boolean) => {
-    setSystemThemePreferenceState(enabled);
-    setStoredValue(THEME_STORAGE_KEYS.SYSTEM_THEME_PREFERENCE, enabled);
-    
-    // If enabling system preference, immediately apply system theme
-    if (enabled && isBrowser) {
-      const systemIsDark = getSystemTheme();
-      setIsDarkModeState(systemIsDark);
-      setStoredValue(THEME_STORAGE_KEYS.DARK_MODE, systemIsDark);
-    }
   }, []);
 
-  // Compute the applied theme considering system preference
-  const appliedTheme = useMemo<'light' | 'dark'>(() => {
-    if (systemThemePreference && isBrowser) {
-      return getSystemTheme() ? 'dark' : 'light';
+  // Calculate current effective theme
+  const currentTheme = useMemo(() => {
+    if (preferences.mode === 'system') {
+      return systemTheme;
     }
-    return isDarkMode ? 'dark' : 'light';
-  }, [isDarkMode, systemThemePreference]);
+    return preferences.mode;
+  }, [preferences.mode, systemTheme]);
+
+  // Derived state
+  const isDarkMode = currentTheme === 'dark';
+  const isSystemTheme = preferences.mode === 'system';
+
+  // Apply theme to document when it changes
+  useEffect(() => {
+    if (!isLoading) {
+      applyThemeToDocument(currentTheme);
+      
+      // Update isDarkMode in preferences to maintain compatibility
+      if (preferences.isDarkMode !== isDarkMode) {
+        updatePreferences({ isDarkMode });
+      }
+    }
+  }, [currentTheme, isDarkMode, isLoading, preferences.isDarkMode, updatePreferences]);
+
+  // Set theme mode
+  const setThemeMode = useCallback((mode: ThemeMode) => {
+    updatePreferences({ 
+      mode,
+      followSystemTheme: mode === 'system',
+    });
+  }, [updatePreferences]);
+
+  // Toggle between light and dark (or switch to light/dark if in system mode)
+  const toggleTheme = useCallback(() => {
+    if (preferences.mode === 'system') {
+      // If in system mode, switch to the opposite of current system theme
+      setThemeMode(systemTheme === 'dark' ? 'light' : 'dark');
+    } else {
+      // Toggle between light and dark
+      setThemeMode(preferences.mode === 'dark' ? 'light' : 'dark');
+    }
+  }, [preferences.mode, systemTheme, setThemeMode]);
 
   return {
+    // Current state
+    currentTheme,
+    themeMode: preferences.mode,
     isDarkMode,
-    systemThemePreference,
-    appliedTheme,
-    setDarkMode,
+    isSystemTheme,
+    
+    // Actions
+    setThemeMode,
     toggleTheme,
-    setSystemThemePreference,
+    
+    // Preferences
+    preferences,
+    updatePreferences,
+    
+    // Utility
+    isLoading,
   };
-};
+}
 
 /**
- * Custom hook for managing table row count preference with localStorage persistence.
- * Migrates functionality from Angular DfThemeService.currentTableRowNum$ BehaviorSubject.
- * 
- * @returns Object containing table row count state and setter function
+ * Table row count preference hook with validation
+ * Manages pagination preferences with reactive updates
  */
-export const useTableRowCount = () => {
-  // Initialize state with stored value or default
-  const [tableRowCount, setTableRowCountState] = useState<number>(() => 
-    getStoredValue(THEME_STORAGE_KEYS.TABLE_ROW_COUNT, THEME_DEFAULTS.TABLE_ROW_COUNT)
+export function useTableRowCount(): {
+  rowCount: number;
+  setRowCount: (count: number) => void;
+  availableOptions: readonly number[];
+  isValidRowCount: (count: number) => boolean;
+} {
+  const { preferences, updatePreferences } = useThemePreferences();
+
+  const setRowCount = useCallback((count: number) => {
+    if (TABLE_ROW_COUNT_OPTIONS.includes(count as any)) {
+      updatePreferences({ currentTableRowNum: count });
+    } else {
+      console.warn(`Invalid row count: ${count}. Must be one of:`, TABLE_ROW_COUNT_OPTIONS);
+    }
+  }, [updatePreferences]);
+
+  const isValidRowCount = useCallback((count: number): boolean => {
+    return TABLE_ROW_COUNT_OPTIONS.includes(count as any);
+  }, []);
+
+  return {
+    rowCount: preferences.currentTableRowNum,
+    setRowCount,
+    availableOptions: TABLE_ROW_COUNT_OPTIONS,
+    isValidRowCount,
+  };
+}
+
+/**
+ * Extended UI preferences hook for additional customization options
+ * Provides comprehensive UI state management beyond core theme preferences
+ */
+export function useUIPreferences(): {
+  preferences: UIPreferences;
+  updatePreferences: (updates: Partial<UIPreferences>) => void;
+  resetPreferences: () => void;
+  
+  // Convenience accessors
+  sidebarCollapsed: boolean;
+  setSidebarCollapsed: (collapsed: boolean) => void;
+  tablePageSize: number;
+  setTablePageSize: (size: number) => void;
+  autoRefreshSchemas: boolean;
+  setAutoRefreshSchemas: (autoRefresh: boolean) => void;
+} {
+  const [preferences, setPreferences, clearPreferences] = useLocalStorage<UIPreferences>(
+    STORAGE_KEYS.SIDEBAR_COLLAPSED, // Use existing sidebar key as base
+    {
+      defaultValue: DEFAULT_UI_PREFERENCES,
+      syncAcrossTabs: true,
+    }
   );
 
-  // SSR-safe effect to sync with stored value after hydration
-  useLayoutEffect(() => {
-    if (isBrowser) {
-      const storedCount = getStoredValue(THEME_STORAGE_KEYS.TABLE_ROW_COUNT, THEME_DEFAULTS.TABLE_ROW_COUNT);
-      setTableRowCountState(storedCount);
-    }
-  }, []);
+  const updatePreferences = useCallback((updates: Partial<UIPreferences>) => {
+    setPreferences(prev => ({
+      ...prev,
+      ...updates,
+    }));
+  }, [setPreferences]);
 
-  // Setter function that updates both state and localStorage
-  const setTableRowCount = useCallback((count: number) => {
-    // Validate the count to ensure it's a positive integer
-    const validatedCount = Math.max(1, Math.min(100, Math.floor(count)));
-    
-    setTableRowCountState(validatedCount);
-    setStoredValue(THEME_STORAGE_KEYS.TABLE_ROW_COUNT, validatedCount);
-  }, []);
+  const resetPreferences = useCallback(() => {
+    clearPreferences();
+    setPreferences(DEFAULT_UI_PREFERENCES);
+  }, [clearPreferences, setPreferences]);
 
-  return {
-    tableRowCount,
-    setTableRowCount,
-  };
-};
+  // Convenience setters
+  const setSidebarCollapsed = useCallback((collapsed: boolean) => {
+    updatePreferences({ sidebarCollapsed: collapsed });
+  }, [updatePreferences]);
 
-/**
- * Comprehensive theme preferences hook that combines all theme-related functionality.
- * Provides a complete interface for managing theme state across the application.
- * 
- * @returns Complete theme preferences state and management functions
- */
-export const useThemePreferences = (): ThemeContextValue => {
-  const {
-    isDarkMode,
-    systemThemePreference,
-    appliedTheme,
-    setDarkMode,
-    toggleTheme,
-    setSystemThemePreference,
-  } = useDarkMode();
+  const setTablePageSize = useCallback((size: number) => {
+    updatePreferences({ tablePageSize: size });
+  }, [updatePreferences]);
 
-  const { tableRowCount, setTableRowCount } = useTableRowCount();
+  const setAutoRefreshSchemas = useCallback((autoRefresh: boolean) => {
+    updatePreferences({ autoRefreshSchemas: autoRefresh });
+  }, [updatePreferences]);
 
   return {
-    isDarkMode,
-    tableRowCount,
-    systemThemePreference,
-    appliedTheme,
-    toggleTheme,
-    setDarkMode,
-    setTableRowCount,
-    setSystemThemePreference,
+    preferences,
+    updatePreferences,
+    resetPreferences,
+    
+    // Convenience accessors
+    sidebarCollapsed: preferences.sidebarCollapsed,
+    setSidebarCollapsed,
+    tablePageSize: preferences.tablePageSize,
+    setTablePageSize,
+    autoRefreshSchemas: preferences.autoRefreshSchemas,
+    setAutoRefreshSchemas,
   };
-};
+}
+
+// =============================================================================
+// Theme Context Provider Utilities
+// =============================================================================
 
 /**
- * Effect hook to apply theme classes to the document element.
- * Should be used in the root layout component to ensure theme consistency.
- * 
- * @param appliedTheme - The current applied theme ('light' | 'dark')
+ * Theme context value interface for provider integration
  */
-export const useThemeEffect = (appliedTheme: 'light' | 'dark') => {
-  useLayoutEffect(() => {
-    if (!isBrowser) return;
-
-    const root = document.documentElement;
-    
-    // Remove existing theme classes
-    root.classList.remove('light', 'dark');
-    
-    // Add current theme class
-    root.classList.add(appliedTheme);
-    
-    // Update data attribute for CSS selectors
-    root.setAttribute('data-theme', appliedTheme);
-    
-    // Update meta theme-color for mobile browsers
-    const metaThemeColor = document.querySelector('meta[name="theme-color"]');
-    if (metaThemeColor) {
-      metaThemeColor.setAttribute(
-        'content', 
-        appliedTheme === 'dark' ? '#1a1a1a' : '#ffffff'
-      );
-    }
-  }, [appliedTheme]);
-};
+export interface ThemeContextValue {
+  // Theme state
+  currentTheme: 'light' | 'dark';
+  themeMode: ThemeMode;
+  isDarkMode: boolean;
+  isSystemTheme: boolean;
+  
+  // Theme actions
+  setThemeMode: (mode: ThemeMode) => void;
+  toggleTheme: () => void;
+  
+  // Table preferences
+  tableRowCount: number;
+  setTableRowCount: (count: number) => void;
+  
+  // UI preferences
+  sidebarCollapsed: boolean;
+  setSidebarCollapsed: (collapsed: boolean) => void;
+  
+  // Loading state
+  isLoading: boolean;
+}
 
 /**
- * Utility function to get the current theme preferences synchronously.
- * Useful for server-side operations or when hooks cannot be used.
- * 
- * @returns Current theme preferences from localStorage or defaults
+ * Combined theme state hook for provider integration
+ * Provides all theme-related state and actions in a single hook
  */
-export const getThemePreferences = (): ThemePreferences => {
+export function useThemeContext(): ThemeContextValue {
+  const themeState = useTheme();
+  const tableState = useTableRowCount();
+  const uiState = useUIPreferences();
+
   return {
-    isDarkMode: getStoredValue(THEME_STORAGE_KEYS.DARK_MODE, THEME_DEFAULTS.DARK_MODE),
-    tableRowCount: getStoredValue(THEME_STORAGE_KEYS.TABLE_ROW_COUNT, THEME_DEFAULTS.TABLE_ROW_COUNT),
-    systemThemePreference: getStoredValue(THEME_STORAGE_KEYS.SYSTEM_THEME_PREFERENCE, THEME_DEFAULTS.SYSTEM_THEME_PREFERENCE),
+    // Theme state
+    currentTheme: themeState.currentTheme,
+    themeMode: themeState.themeMode,
+    isDarkMode: themeState.isDarkMode,
+    isSystemTheme: themeState.isSystemTheme,
+    
+    // Theme actions
+    setThemeMode: themeState.setThemeMode,
+    toggleTheme: themeState.toggleTheme,
+    
+    // Table preferences
+    tableRowCount: tableState.rowCount,
+    setTableRowCount: tableState.setRowCount,
+    
+    // UI preferences
+    sidebarCollapsed: uiState.sidebarCollapsed,
+    setSidebarCollapsed: uiState.setSidebarCollapsed,
+    
+    // Loading state
+    isLoading: themeState.isLoading,
   };
-};
+}
+
+// =============================================================================
+// Migration Helper Functions
+// =============================================================================
 
 /**
- * Utility function to initialize theme preferences.
- * Loads initial theme state from localStorage and applies system theme if enabled.
- * Used during application bootstrap to ensure consistent theme state.
+ * Migrates legacy theme preferences from Angular implementation
+ * Handles conversion of old storage keys to new format
  */
-export const initializeThemePreferences = (): void => {
-  if (!isBrowser) return;
+export function migrateLegacyThemePreferences(): void {
+  if (typeof window === 'undefined') return;
 
   try {
-    const preferences = getThemePreferences();
-    
-    // Apply system theme if preference is enabled
-    if (preferences.systemThemePreference) {
-      const systemIsDark = getSystemTheme();
-      setStoredValue(THEME_STORAGE_KEYS.DARK_MODE, systemIsDark);
+    // Check for legacy isDarkMode boolean value
+    const legacyDarkMode = localStorage.getItem('isDarkMode');
+    const legacyTableRowNum = localStorage.getItem('currentTableRowNum');
+
+    if (legacyDarkMode !== null || legacyTableRowNum !== null) {
+      const migratedPreferences: Partial<ThemePreferences> = {};
+
+      // Migrate dark mode preference
+      if (legacyDarkMode !== null) {
+        const isDark = legacyDarkMode === 'true';
+        migratedPreferences.mode = isDark ? 'dark' : 'light';
+        migratedPreferences.isDarkMode = isDark;
+        migratedPreferences.followSystemTheme = false;
+      }
+
+      // Migrate table row count
+      if (legacyTableRowNum !== null) {
+        const rowCount = parseInt(legacyTableRowNum, 10);
+        if (!isNaN(rowCount) && TABLE_ROW_COUNT_OPTIONS.includes(rowCount as any)) {
+          migratedPreferences.currentTableRowNum = rowCount;
+        }
+      }
+
+      // Store migrated preferences
+      const currentPreferences = JSON.parse(
+        localStorage.getItem(STORAGE_KEYS.IS_DARK_MODE) || 
+        JSON.stringify(DEFAULT_THEME_PREFERENCES)
+      );
+
+      localStorage.setItem(
+        STORAGE_KEYS.IS_DARK_MODE,
+        JSON.stringify({
+          ...currentPreferences,
+          ...migratedPreferences,
+        })
+      );
+
+      // Clean up legacy keys
+      localStorage.removeItem('isDarkMode');
+      localStorage.removeItem('currentTableRowNum');
+
+      console.info('Successfully migrated legacy theme preferences');
     }
-    
-    // Apply theme to document immediately
-    const appliedTheme = preferences.systemThemePreference 
-      ? (getSystemTheme() ? 'dark' : 'light')
-      : (preferences.isDarkMode ? 'dark' : 'light');
-      
-    document.documentElement.classList.remove('light', 'dark');
-    document.documentElement.classList.add(appliedTheme);
-    document.documentElement.setAttribute('data-theme', appliedTheme);
-    
   } catch (error) {
-    console.error('Failed to initialize theme preferences:', error);
+    console.warn('Failed to migrate legacy theme preferences:', error);
   }
-};
+}
 
 /**
- * Type guard to validate theme preference objects
+ * Validates and repairs theme preferences if corrupted
+ * Ensures preferences always contain valid values
  */
-export const isValidThemePreferences = (obj: any): obj is ThemePreferences => {
-  return (
-    typeof obj === 'object' &&
-    obj !== null &&
-    typeof obj.isDarkMode === 'boolean' &&
-    typeof obj.tableRowCount === 'number' &&
-    typeof obj.systemThemePreference === 'boolean'
-  );
+export function validateThemePreferences(preferences: any): ThemePreferences {
+  const validated: ThemePreferences = { ...DEFAULT_THEME_PREFERENCES };
+
+  if (preferences && typeof preferences === 'object') {
+    // Validate theme mode
+    if (['light', 'dark', 'system'].includes(preferences.mode)) {
+      validated.mode = preferences.mode;
+    }
+
+    // Validate isDarkMode
+    if (typeof preferences.isDarkMode === 'boolean') {
+      validated.isDarkMode = preferences.isDarkMode;
+    }
+
+    // Validate table row count
+    if (
+      typeof preferences.currentTableRowNum === 'number' &&
+      TABLE_ROW_COUNT_OPTIONS.includes(preferences.currentTableRowNum as any)
+    ) {
+      validated.currentTableRowNum = preferences.currentTableRowNum;
+    }
+
+    // Validate followSystemTheme
+    if (typeof preferences.followSystemTheme === 'boolean') {
+      validated.followSystemTheme = preferences.followSystemTheme;
+    }
+  }
+
+  return validated;
+}
+
+// =============================================================================
+// Event Handling Utilities
+// =============================================================================
+
+/**
+ * Sets up theme change event listeners for cross-component communication
+ * @param callback - Function to call when theme changes
+ * @returns Cleanup function to remove listeners
+ */
+export function setupThemeChangeListener(
+  callback: (theme: 'light' | 'dark') => void
+): () => void {
+  if (typeof window === 'undefined') {
+    return () => {}; // SSR safety
+  }
+
+  const handleThemeChange = (event: CustomEvent<{ theme: 'light' | 'dark' }>) => {
+    callback(event.detail.theme);
+  };
+
+  const handleSystemThemeChange = (event: CustomEvent<{ theme: 'light' | 'dark' }>) => {
+    // Only respond to system theme changes if following system theme
+    const preferences = JSON.parse(
+      localStorage.getItem(STORAGE_KEYS.IS_DARK_MODE) || 
+      JSON.stringify(DEFAULT_THEME_PREFERENCES)
+    );
+    
+    if (preferences.mode === 'system') {
+      callback(event.detail.theme);
+    }
+  };
+
+  // Type assertion for custom events
+  window.addEventListener('themeChange', handleThemeChange as EventListener);
+  window.addEventListener('systemThemeChange', handleSystemThemeChange as EventListener);
+
+  return () => {
+    window.removeEventListener('themeChange', handleThemeChange as EventListener);
+    window.removeEventListener('systemThemeChange', handleSystemThemeChange as EventListener);
+  };
+}
+
+// =============================================================================
+// Utility Functions
+// =============================================================================
+
+/**
+ * Gets the current theme without using React hooks
+ * Useful for utilities and non-React contexts
+ */
+export function getCurrentTheme(): 'light' | 'dark' {
+  if (typeof window === 'undefined') {
+    return 'light'; // SSR fallback
+  }
+
+  try {
+    const preferences = JSON.parse(
+      localStorage.getItem(STORAGE_KEYS.IS_DARK_MODE) || 
+      JSON.stringify(DEFAULT_THEME_PREFERENCES)
+    );
+
+    if (preferences.mode === 'system') {
+      return detectSystemTheme();
+    }
+
+    return preferences.mode;
+  } catch (error) {
+    console.warn('Failed to get current theme:', error);
+    return 'light';
+  }
+}
+
+/**
+ * Gets the current table row count without using React hooks
+ */
+export function getCurrentTableRowCount(): number {
+  if (typeof window === 'undefined') {
+    return DEFAULT_THEME_PREFERENCES.currentTableRowNum;
+  }
+
+  try {
+    const preferences = JSON.parse(
+      localStorage.getItem(STORAGE_KEYS.IS_DARK_MODE) || 
+      JSON.stringify(DEFAULT_THEME_PREFERENCES)
+    );
+
+    return preferences.currentTableRowNum || DEFAULT_THEME_PREFERENCES.currentTableRowNum;
+  } catch (error) {
+    console.warn('Failed to get current table row count:', error);
+    return DEFAULT_THEME_PREFERENCES.currentTableRowNum;
+  }
+}
+
+/**
+ * Initializes theme preferences on application startup
+ * Should be called early in the application lifecycle
+ */
+export function initializeThemePreferences(): void {
+  // Migrate legacy preferences if needed
+  migrateLegacyThemePreferences();
+  
+  // Apply current theme to document
+  const currentTheme = getCurrentTheme();
+  applyThemeToDocument(currentTheme);
+  
+  // Set up initial CSS custom properties if needed
+  if (typeof document !== 'undefined') {
+    document.documentElement.style.setProperty('--initial-theme', currentTheme);
+  }
+}
+
+// =============================================================================
+// Export All Public APIs
+// =============================================================================
+
+export {
+  // Types (re-exported from types.ts for convenience)
+  type ThemeMode,
+  type ThemePreferences,
+  type UIPreferences,
+};
+
+export default {
+  // Constants
+  DEFAULT_THEME_PREFERENCES,
+  DEFAULT_UI_PREFERENCES,
+  TABLE_ROW_COUNT_OPTIONS,
+  THEME_CLASSES,
+  
+  // Core functions
+  detectSystemTheme,
+  resolveThemeMode,
+  applyThemeToDocument,
+  getCurrentTheme,
+  getCurrentTableRowCount,
+  initializeThemePreferences,
+  
+  // React hooks
+  useTheme,
+  useThemePreferences,
+  useTableRowCount,
+  useUIPreferences,
+  useThemeContext,
+  
+  // Migration utilities
+  migrateLegacyThemePreferences,
+  validateThemePreferences,
+  
+  // Event handling
+  setupThemeChangeListener,
 };
