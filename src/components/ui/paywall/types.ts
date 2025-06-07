@@ -1,489 +1,840 @@
 /**
- * Paywall Component Type Definitions
+ * TypeScript Type Definitions for Paywall Component System
  * 
- * Comprehensive TypeScript interfaces for the React 19 Paywall component system
- * supporting feature gating, subscription management, and Calendly integration.
- * Follows Next.js 15.1 patterns and WCAG 2.1 AA accessibility requirements.
+ * Comprehensive type definitions for the React paywall component replacing Angular
+ * DfPaywallComponent. Supports Calendly widget integration, internationalization,
+ * responsive design, and WCAG 2.1 AA accessibility compliance.
  * 
- * @fileoverview Paywall component type definitions with Calendly integration
+ * @fileoverview Paywall component types for DreamFactory Admin Interface React migration
  * @version 1.0.0
+ * @requires React 19.0.0, Next.js 15.1+, TypeScript 5.8+
  */
 
-import { type ReactNode, type ForwardedRef, type HTMLAttributes } from 'react';
-import { 
-  type BaseComponentProps,
-  type AccessibilityProps,
-  type ThemeProps,
-  type ResponsiveProps,
-  type AnimationProps,
-  type FocusProps,
-  type InteractionProps,
-  type LoadingState,
-  type ValidationState
-} from '../../../types/ui';
+import { ReactNode, ComponentPropsWithoutRef, RefObject } from 'react';
+import { BaseComponent, ComponentVariant, ComponentSize, ResponsiveValue } from '@/types/ui';
+
+// ============================================================================
+// CORE PAYWALL COMPONENT TYPES
+// ============================================================================
 
 /**
- * Paywall feature restriction levels
- * Defines different levels of access control for feature gating
+ * Main paywall component props interface
+ * Replaces Angular @Input/@Output decorators with React props pattern
  */
-export type PaywallLevel = 
-  | 'free'           // Free tier - basic features
-  | 'starter'        // Starter plan - limited features
-  | 'professional'   // Professional plan - advanced features
-  | 'enterprise'     // Enterprise plan - all features
-  | 'trial';         // Trial period - temporary access
-
-/**
- * Paywall display variants for different use cases
- */
-export type PaywallVariant =
-  | 'modal'          // Modal overlay blocking interaction
-  | 'inline'         // Inline component within content
-  | 'banner'         // Top/bottom banner notification
-  | 'sidebar'        // Side panel for feature promotion
-  | 'tooltip';       // Tooltip-style micro-interaction
-
-/**
- * Internationalization keys specific to paywall component
- * Supports react-i18next translation system
- */
-export interface PaywallTranslationKeys {
-  /** Main paywall title key */
-  titleKey?: string;
-  /** Paywall description/message key */
-  descriptionKey?: string;
-  /** Primary action button text key */
-  primaryActionKey?: string;
-  /** Secondary action button text key */
-  secondaryActionKey?: string;
-  /** Close button text key */
-  closeButtonKey?: string;
-  /** Feature list items keys */
-  featuresKey?: string[];
-  /** Pricing information key */
-  pricingKey?: string;
-  /** Trial information key */
-  trialInfoKey?: string;
-  /** Contact sales text key */
-  contactSalesKey?: string;
-  /** Loading state message key */
-  loadingKey?: string;
-  /** Error state message key */
-  errorKey?: string;
-  /** Success state message key */
-  successKey?: string;
+export interface PaywallProps extends BaseComponent {
+  /** Optional CSS class name for custom styling */
+  className?: string;
+  
+  /** Custom inline styles with Tailwind CSS compatibility */
+  style?: React.CSSProperties;
+  
+  /** Component variant for different styling themes */
+  variant?: PaywallVariant;
+  
+  /** Component size for responsive design */
+  size?: ComponentSize;
+  
+  /** Custom content to display above the default paywall content */
+  headerContent?: ReactNode;
+  
+  /** Custom content to display below the default paywall content */
+  footerContent?: ReactNode;
+  
+  /** Whether to display the contact information section */
+  showContactInfo?: boolean;
+  
+  /** Whether to display the Calendly widget */
+  showCalendlyWidget?: boolean;
+  
+  /** Custom Calendly configuration */
+  calendlyConfig?: CalendlyConfig;
+  
+  /** Custom styling for the paywall container */
+  containerClassName?: string;
+  
+  /** Custom styling for the Calendly widget container */
+  widgetClassName?: string;
+  
+  /** Responsive breakpoint configurations */
+  responsive?: ResponsiveValue<PaywallLayout>;
+  
+  /** Loading state configuration */
+  loading?: boolean;
+  
+  /** Error state configuration */
+  error?: string | null;
+  
+  /** Event handler for when the component mounts */
+  onMount?: () => void;
+  
+  /** Event handler for when the Calendly widget loads */
+  onCalendlyLoad?: () => void;
+  
+  /** Event handler for when the Calendly widget fails to load */
+  onCalendlyError?: (error: Error) => void;
+  
+  /** Event handler for Calendly widget events */
+  onCalendlyEvent?: (event: CalendlyEvent) => void;
+  
+  // WCAG 2.1 AA Accessibility Props
+  /** ARIA label for screen readers */
+  'aria-label'?: string;
+  
+  /** ARIA description for additional context */
+  'aria-describedby'?: string;
+  
+  /** ARIA labelledby for referencing labeling elements */
+  'aria-labelledby'?: string;
+  
+  /** ARIA role for semantic meaning */
+  role?: 'main' | 'section' | 'region' | 'complementary';
+  
+  /** Tab index for keyboard navigation */
+  tabIndex?: number;
+  
+  /** Whether the component should auto-focus on mount */
+  autoFocus?: boolean;
+  
+  // Internationalization Support (react-i18next)
+  /** Override default translation namespace */
+  translationNamespace?: string;
+  
+  /** Custom translation keys for text content */
+  translations?: PaywallTranslationKeys;
+  
+  /** Language code for localization */
+  locale?: string;
 }
 
 /**
- * Calendly widget configuration for scheduling demos and sales calls
- * Provides type-safe configuration for external Calendly service integration
+ * Paywall component variant types for different use cases
+ */
+export type PaywallVariant = 
+  | 'default'      // Standard paywall display
+  | 'enterprise'   // Enterprise-focused messaging
+  | 'trial'        // Free trial promotion
+  | 'feature'      // Feature-specific paywall
+  | 'minimal'      // Minimal design without extensive content
+  | 'modal'        // Modal overlay variant
+  | 'inline';      // Inline content variant
+
+/**
+ * Paywall layout configurations for responsive design
+ */
+export interface PaywallLayout {
+  /** Number of columns for info sections */
+  columns: 1 | 2 | 3;
+  
+  /** Layout direction */
+  direction: 'column' | 'row';
+  
+  /** Content alignment */
+  alignment: 'left' | 'center' | 'right';
+  
+  /** Spacing between sections */
+  spacing: ComponentSize;
+  
+  /** Whether to stack elements vertically on mobile */
+  stackOnMobile: boolean;
+}
+
+// ============================================================================
+// PAYWALL REF INTERFACE
+// ============================================================================
+
+/**
+ * Paywall component ref interface for forwardRef compatibility
+ * Provides access to imperative methods and DOM elements
+ */
+export interface PaywallRef {
+  /** Reference to the main paywall container element */
+  containerRef: RefObject<HTMLDivElement>;
+  
+  /** Reference to the Calendly widget container element */
+  calendlyRef: RefObject<HTMLDivElement>;
+  
+  /** Initialize the Calendly widget programmatically */
+  initializeCalendly: () => Promise<void>;
+  
+  /** Destroy the Calendly widget */
+  destroyCalendly: () => void;
+  
+  /** Refresh the Calendly widget */
+  refreshCalendly: () => Promise<void>;
+  
+  /** Focus the paywall component for accessibility */
+  focus: () => void;
+  
+  /** Scroll to the paywall component */
+  scrollIntoView: (options?: ScrollIntoViewOptions) => void;
+  
+  /** Get the current Calendly widget state */
+  getCalendlyState: () => CalendlyState;
+  
+  /** Update Calendly configuration dynamically */
+  updateCalendlyConfig: (config: Partial<CalendlyConfig>) => Promise<void>;
+}
+
+// ============================================================================
+// CALENDLY INTEGRATION TYPES
+// ============================================================================
+
+/**
+ * Calendly widget configuration interface
+ * Type-safe configuration for external Calendly service integration
  */
 export interface CalendlyConfig {
   /** Calendly URL for the scheduling widget */
   url: string;
-  /** Widget configuration options */
-  options?: {
-    /** Widget height in pixels */
-    height?: number;
-    /** Widget width in pixels or percentage */
-    width?: number | string;
-    /** Minimum widget height */
-    minWidth?: number;
-    /** Hide event type details */
-    hideEventTypeDetails?: boolean;
-    /** Hide landing page details */
-    hideLandingPageDetails?: boolean;
-    /** Primary color customization */
-    primaryColor?: string;
-    /** Text color customization */
-    textColor?: string;
-    /** Background color customization */
-    backgroundColor?: string;
-    /** Prefilled data for the form */
-    prefill?: {
-      /** Prefilled name */
-      name?: string;
-      /** Prefilled email */
-      email?: string;
-      /** Prefilled phone number */
-      phone?: string;
-      /** Custom questions answers */
-      customAnswers?: Record<string, string>;
-    };
-    /** UTM parameters for tracking */
-    utm?: {
-      /** UTM source */
-      utmSource?: string;
-      /** UTM medium */
-      utmMedium?: string;
-      /** UTM campaign */
-      utmCampaign?: string;
-      /** UTM term */
-      utmTerm?: string;
-      /** UTM content */
-      utmContent?: string;
-    };
-  };
-  /** Calendly widget event handlers */
-  onEventScheduled?: (event: CalendlyEvent) => void;
-  /** Widget load success handler */
-  onWidgetLoad?: () => void;
-  /** Widget load error handler */
-  onWidgetError?: (error: Error) => void;
-  /** Widget height change handler */
-  onHeightChange?: (height: number) => void;
+  
+  /** Widget display mode */
+  mode?: CalendlyMode;
+  
+  /** Widget height in pixels */
+  height?: number;
+  
+  /** Widget minimum height in pixels */
+  minHeight?: number;
+  
+  /** Widget maximum height in pixels */
+  maxHeight?: number;
+  
+  /** Whether to hide event details */
+  hideEventDetails?: boolean;
+  
+  /** Whether to hide event duration */
+  hideEventDuration?: boolean;
+  
+  /** Whether to hide the page details */
+  hidePageDetails?: boolean;
+  
+  /** Primary color for the widget */
+  primaryColor?: string;
+  
+  /** Background color for the widget */
+  backgroundColor?: string;
+  
+  /** Text color for the widget */
+  textColor?: string;
+  
+  /** Whether to auto-load the widget */
+  autoLoad?: boolean;
+  
+  /** Prefill data for the widget */
+  prefill?: CalendlyPrefill;
+  
+  /** UTM parameters for tracking */
+  utm?: CalendlyUTM;
+  
+  /** Custom styles for the widget iframe */
+  styles?: CalendlyStyles;
+  
+  /** Loading timeout in milliseconds */
+  loadTimeout?: number;
+  
+  /** Retry attempts for failed loads */
+  retryAttempts?: number;
+  
+  /** Custom event handlers */
+  onLoad?: () => void;
+  onError?: (error: Error) => void;
+  onEventScheduled?: (event: CalendlyScheduledEvent) => void;
+  onEventCancelled?: (event: CalendlyEvent) => void;
+  onDateAndTimeSelected?: (event: CalendlyEvent) => void;
+  onProfilePageViewed?: (event: CalendlyEvent) => void;
+  onEventTypeViewed?: (event: CalendlyEvent) => void;
 }
 
 /**
- * Calendly event details when a meeting is scheduled
+ * Calendly widget display modes
+ */
+export type CalendlyMode = 
+  | 'inline'     // Embedded inline widget
+  | 'popup'      // Popup modal widget
+  | 'overlay'    // Full-screen overlay
+  | 'redirect';  // Redirect to Calendly site
+
+/**
+ * Calendly prefill data for form fields
+ */
+export interface CalendlyPrefill {
+  /** Prefill name field */
+  name?: string;
+  
+  /** Prefill email field */
+  email?: string;
+  
+  /** Prefill first name field */
+  firstName?: string;
+  
+  /** Prefill last name field */
+  lastName?: string;
+  
+  /** Prefill phone number field */
+  phone?: string;
+  
+  /** Prefill custom question answers */
+  customAnswers?: Record<string, string>;
+  
+  /** Prefill guests array */
+  guests?: string[];
+  
+  /** Prefill date and time */
+  date?: string;
+  
+  /** Prefill timezone */
+  timezone?: string;
+}
+
+/**
+ * Calendly UTM tracking parameters
+ */
+export interface CalendlyUTM {
+  /** UTM source parameter */
+  source?: string;
+  
+  /** UTM medium parameter */
+  medium?: string;
+  
+  /** UTM campaign parameter */
+  campaign?: string;
+  
+  /** UTM term parameter */
+  term?: string;
+  
+  /** UTM content parameter */
+  content?: string;
+  
+  /** Sales force ID for CRM integration */
+  salesforceId?: string;
+}
+
+/**
+ * Calendly widget custom styles
+ */
+export interface CalendlyStyles {
+  /** Custom CSS for the widget container */
+  container?: React.CSSProperties;
+  
+  /** Custom CSS for the iframe */
+  iframe?: React.CSSProperties;
+  
+  /** Custom CSS for loading state */
+  loading?: React.CSSProperties;
+  
+  /** Custom CSS for error state */
+  error?: React.CSSProperties;
+}
+
+/**
+ * Calendly widget state tracking
+ */
+export interface CalendlyState {
+  /** Whether the widget is currently loading */
+  loading: boolean;
+  
+  /** Whether the widget has loaded successfully */
+  loaded: boolean;
+  
+  /** Current error state, if any */
+  error: Error | null;
+  
+  /** Whether the widget is visible */
+  visible: boolean;
+  
+  /** Current widget height */
+  height: number;
+  
+  /** Last load timestamp */
+  lastLoaded: number | null;
+  
+  /** Number of load attempts */
+  loadAttempts: number;
+}
+
+/**
+ * Calendly event data structure
  */
 export interface CalendlyEvent {
-  /** Event UUID */
-  eventUuid: string;
-  /** Event type UUID */
-  eventTypeUuid: string;
-  /** Invitee information */
-  invitee: {
-    /** Invitee name */
-    name: string;
-    /** Invitee email */
-    email: string;
-    /** Invitee phone number */
-    phone?: string;
-    /** Custom question responses */
-    customResponses?: Record<string, string>;
-  };
+  /** Event type identifier */
+  type: CalendlyEventType;
+  
+  /** Event timestamp */
+  timestamp: number;
+  
+  /** Event data payload */
+  data?: Record<string, any>;
+  
+  /** Event source widget ID */
+  source?: string;
+}
+
+/**
+ * Calendly scheduled event data
+ */
+export interface CalendlyScheduledEvent extends CalendlyEvent {
   /** Scheduled event details */
   event: {
-    /** Event start time */
+    /** Event UUID */
+    uuid: string;
+    
+    /** Event name */
+    name: string;
+    
+    /** Scheduled start time */
     startTime: string;
-    /** Event end time */
+    
+    /** Scheduled end time */
     endTime: string;
+    
+    /** Invitee information */
+    invitee: {
+      uuid: string;
+      name: string;
+      email: string;
+      phone?: string;
+    };
+    
     /** Event location */
-    location?: string;
-    /** Meeting join URL */
-    joinUrl?: string;
+    location?: {
+      type: string;
+      location?: string;
+    };
   };
 }
 
 /**
- * Feature gate configuration for specific features
+ * Calendly event types for widget interactions
  */
-export interface FeatureGate {
-  /** Feature identifier */
-  featureId: string;
-  /** Required subscription level */
-  requiredLevel: PaywallLevel;
-  /** Custom feature description */
-  description?: string;
-  /** Feature category for grouping */
-  category?: string;
-  /** Feature priority for display order */
-  priority?: number;
-  /** Custom upgrade message */
-  upgradeMessage?: string;
+export type CalendlyEventType =
+  | 'profile_page_viewed'
+  | 'event_type_viewed'
+  | 'date_and_time_selected'
+  | 'event_scheduled'
+  | 'event_cancelled'
+  | 'widget_loaded'
+  | 'widget_error'
+  | 'height_changed';
+
+// ============================================================================
+// INTERNATIONALIZATION TYPES
+// ============================================================================
+
+/**
+ * Translation keys for react-i18next integration
+ * Replaces Angular Transloco with React i18next patterns
+ */
+export interface PaywallTranslationKeys {
+  /** Main header text */
+  header?: string;
+  
+  /** Secondary header text */
+  subheader?: string;
+  
+  /** Hosted trial section title */
+  hostedTrialTitle?: string;
+  
+  /** Hosted trial section content */
+  hostedTrialContent?: string;
+  
+  /** Learn more section title */
+  learnMoreTitle?: string;
+  
+  /** Learn more section content */
+  learnMoreContent?: string;
+  
+  /** Speak to human section title */
+  speakToHumanTitle?: string;
+  
+  /** Phone label text */
+  phoneLabel?: string;
+  
+  /** Email label text */
+  emailLabel?: string;
+  
+  /** Loading message */
+  loadingMessage?: string;
+  
+  /** Error message */
+  errorMessage?: string;
+  
+  /** Calendly loading message */
+  calendlyLoadingMessage?: string;
+  
+  /** Calendly error message */
+  calendlyErrorMessage?: string;
+  
+  /** Screen reader description */
+  screenReaderDescription?: string;
+  
+  /** Contact information section label */
+  contactInfoLabel?: string;
+  
+  /** Widget container label */
+  widgetContainerLabel?: string;
 }
 
 /**
- * Paywall analytics and tracking configuration
+ * Default translation namespace for the paywall component
  */
-export interface PaywallAnalytics {
-  /** Track paywall impressions */
-  trackImpressions?: boolean;
-  /** Track upgrade clicks */
-  trackUpgradeClicks?: boolean;
-  /** Track Calendly interactions */
-  trackCalendlyInteractions?: boolean;
-  /** Track dismissals */
-  trackDismissals?: boolean;
-  /** Custom event tracking */
-  onAnalyticsEvent?: (event: string, properties?: Record<string, any>) => void;
-}
+export const PAYWALL_TRANSLATION_NAMESPACE = 'paywall' as const;
 
 /**
- * Paywall content configuration
+ * Default translation keys with fallback values
  */
-export interface PaywallContent {
-  /** Main title text */
-  title?: string;
-  /** Description/message text */
-  description?: string;
-  /** List of premium features */
-  features?: Array<{
-    /** Feature title */
-    title: string;
-    /** Feature description */
-    description?: string;
-    /** Feature icon */
-    icon?: ReactNode;
-    /** Feature availability by plan */
-    availableIn?: PaywallLevel[];
-  }>;
-  /** Pricing information */
-  pricing?: {
-    /** Price amount */
-    amount: number;
-    /** Currency code */
-    currency: string;
-    /** Billing period */
-    period: 'monthly' | 'yearly' | 'one-time';
-    /** Price formatting options */
-    formatOptions?: Intl.NumberFormatOptions;
+export const DEFAULT_PAYWALL_TRANSLATIONS: Required<PaywallTranslationKeys> = {
+  header: 'paywall.header',
+  subheader: 'paywall.subheader',
+  hostedTrialTitle: 'paywall.hostedTrial',
+  hostedTrialContent: 'paywall.bookTime',
+  learnMoreTitle: 'paywall.learnMoreTitle',
+  learnMoreContent: 'paywall.gain',
+  speakToHumanTitle: 'paywall.speakToHuman',
+  phoneLabel: 'phone',
+  emailLabel: 'email',
+  loadingMessage: 'Loading...',
+  errorMessage: 'An error occurred. Please try again.',
+  calendlyLoadingMessage: 'Loading scheduling widget...',
+  calendlyErrorMessage: 'Failed to load scheduling widget. Please refresh the page.',
+  screenReaderDescription: 'Paywall content with scheduling options',
+  contactInfoLabel: 'Contact Information',
+  widgetContainerLabel: 'Scheduling Widget',
+} as const;
+
+// ============================================================================
+// RESPONSIVE DESIGN TYPES
+// ============================================================================
+
+/**
+ * Responsive design configuration for paywall layout
+ */
+export interface PaywallResponsiveConfig {
+  /** Breakpoint-specific layout configurations */
+  breakpoints: {
+    xs?: Partial<PaywallLayout>;
+    sm?: Partial<PaywallLayout>;
+    md?: Partial<PaywallLayout>;
+    lg?: Partial<PaywallLayout>;
+    xl?: Partial<PaywallLayout>;
+    '2xl'?: Partial<PaywallLayout>;
   };
-  /** Trial information */
-  trial?: {
-    /** Trial duration in days */
-    duration: number;
-    /** Trial description */
-    description?: string;
-    /** Trial features included */
-    features?: string[];
-  };
+  
+  /** Default layout configuration */
+  default: PaywallLayout;
+  
+  /** Whether to enable responsive behavior */
+  enabled: boolean;
 }
 
 /**
- * PaywallRef interface for component ref handling and DOM element access
- * Provides methods for programmatic control of the paywall component
+ * Default responsive configuration following Tailwind CSS breakpoints
  */
-export interface PaywallRef {
-  /** Reference to the main paywall container element */
-  element: HTMLDivElement | null;
-  /** Show the paywall programmatically */
-  show: () => void;
-  /** Hide the paywall programmatically */
-  hide: () => void;
-  /** Toggle paywall visibility */
-  toggle: () => void;
-  /** Focus the primary action button */
-  focusPrimaryAction: () => void;
-  /** Reset the paywall state */
-  reset: () => void;
-  /** Check if Calendly widget is loaded */
-  isCalendlyLoaded: () => boolean;
-  /** Refresh Calendly widget */
-  refreshCalendly: () => void;
-}
+export const DEFAULT_RESPONSIVE_CONFIG: PaywallResponsiveConfig = {
+  breakpoints: {
+    xs: {
+      columns: 1,
+      direction: 'column',
+      alignment: 'center',
+      stackOnMobile: true,
+    },
+    sm: {
+      columns: 1,
+      direction: 'column',
+      alignment: 'center',
+    },
+    md: {
+      columns: 2,
+      direction: 'row',
+      alignment: 'center',
+    },
+    lg: {
+      columns: 2,
+      direction: 'row',
+      alignment: 'center',
+    },
+    xl: {
+      columns: 2,
+      direction: 'row',
+      alignment: 'center',
+    },
+  },
+  default: {
+    columns: 2,
+    direction: 'row',
+    alignment: 'center',
+    spacing: 'lg',
+    stackOnMobile: true,
+  },
+  enabled: true,
+} as const;
+
+// ============================================================================
+// LOADING AND ERROR STATE TYPES
+// ============================================================================
 
 /**
- * Enhanced loading state for paywall with Calendly integration
+ * Loading state configuration for async operations
  */
-export interface PaywallLoadingState extends LoadingState {
-  /** Calendly widget loading state */
-  calendlyLoading?: boolean;
-  /** Widget initialization progress */
-  widgetProgress?: number;
-  /** Specific loading stage */
-  loadingStage?: 'initializing' | 'loading-content' | 'loading-calendly' | 'ready';
+export interface PaywallLoadingState {
+  /** Whether the component is loading */
+  loading: boolean;
+  
+  /** Loading message to display */
+  message?: string;
+  
+  /** Whether to show a loading spinner */
+  showSpinner?: boolean;
+  
+  /** Custom loading component */
+  loadingComponent?: ReactNode;
+  
+  /** Loading timeout in milliseconds */
+  timeout?: number;
 }
 
 /**
- * Enhanced error state for paywall operations
+ * Error state configuration for error handling
  */
 export interface PaywallErrorState {
-  /** General error state */
-  hasError: boolean;
-  /** Error message */
+  /** Error object or message */
+  error: Error | string | null;
+  
+  /** Whether the error is recoverable */
+  recoverable?: boolean;
+  
+  /** Error message override */
   message?: string;
-  /** Error code for debugging */
-  code?: string;
-  /** Calendly-specific errors */
-  calendlyError?: boolean;
-  /** Network connectivity error */
-  networkError?: boolean;
-  /** Configuration error */
-  configError?: boolean;
-  /** Error recovery action */
-  retryAction?: () => void;
-}
-
-/**
- * Comprehensive PaywallProps interface replacing Angular @Input/@Output decorators
- * with React props pattern for full type safety and accessibility compliance
- */
-export interface PaywallProps extends 
-  BaseComponentProps<HTMLDivElement>,
-  AccessibilityProps,
-  ThemeProps,
-  ResponsiveProps,
-  AnimationProps,
-  FocusProps,
-  Pick<InteractionProps, 'onClick'> {
   
-  /** Paywall visibility state */
-  isVisible?: boolean;
-  /** Paywall display variant */
-  variant?: PaywallVariant;
-  /** Required subscription level for access */
-  requiredLevel: PaywallLevel;
-  /** Current user's subscription level */
-  currentLevel?: PaywallLevel;
-  /** Feature being gated (optional, for analytics) */
-  feature?: FeatureGate;
+  /** Custom error component */
+  errorComponent?: ReactNode;
   
-  /** Paywall content configuration */
-  content?: PaywallContent;
-  /** Internationalization keys */
-  translations?: PaywallTranslationKeys;
-  /** Analytics and tracking configuration */
-  analytics?: PaywallAnalytics;
-  
-  /** Calendly integration configuration */
-  calendlyConfig?: CalendlyConfig;
-  /** Show Calendly widget instead of default upgrade flow */
-  showCalendly?: boolean;
-  /** Calendly widget container class */
-  calendlyClassName?: string;
-  
-  /** Loading state for async operations */
-  loadingState?: PaywallLoadingState;
-  /** Error state for failed operations */
-  errorState?: PaywallErrorState;
-  
-  /** Event Handlers */
-  /** Called when user clicks primary upgrade action */
-  onUpgradeClick?: (level: PaywallLevel) => void;
-  /** Called when user clicks secondary action (trial, demo, etc.) */
-  onSecondaryAction?: (action: string) => void;
-  /** Called when paywall is dismissed */
+  /** Error action handlers */
+  onRetry?: () => void;
   onDismiss?: () => void;
-  /** Called when paywall becomes visible */
-  onShow?: () => void;
-  /** Called when paywall becomes hidden */
-  onHide?: () => void;
-  /** Called when Calendly event is scheduled */
-  onCalendlyEventScheduled?: (event: CalendlyEvent) => void;
-  /** Called when Calendly widget loads successfully */
-  onCalendlyLoad?: () => void;
-  /** Called when Calendly widget encounters error */
-  onCalendlyError?: (error: Error) => void;
   
-  /** Accessibility and UX */
-  /** Automatically show paywall on component mount */
-  autoShow?: boolean;
-  /** Allow closing paywall with escape key */
-  closeOnEscape?: boolean;
-  /** Allow closing paywall by clicking backdrop (modal variant) */
-  closeOnBackdrop?: boolean;
-  /** Trap focus within paywall (modal variant) */
-  trapFocus?: boolean;
-  /** Restore focus to trigger element when closed */
-  restoreFocus?: boolean;
-  /** Custom focus target after paywall closes */
-  focusTargetOnClose?: string | HTMLElement;
+  /** Whether to show error details */
+  showDetails?: boolean;
+}
+
+// ============================================================================
+// COMPONENT COMPOSITION TYPES
+// ============================================================================
+
+/**
+ * Paywall component composition props for compound components
+ */
+export interface PaywallCompositionProps {
+  /** Header section props */
+  header?: PaywallHeaderProps;
   
-  /** Styling and Layout */
-  /** Container class for paywall wrapper */
-  containerClassName?: string;
-  /** Content area class */
-  contentClassName?: string;
-  /** Header area class */
-  headerClassName?: string;
-  /** Footer area class */
-  footerClassName?: string;
-  /** Primary action button class */
-  primaryActionClassName?: string;
-  /** Secondary action button class */
-  secondaryActionClassName?: string;
-  /** Backdrop/overlay class (modal variant) */
-  backdropClassName?: string;
+  /** Content section props */
+  content?: PaywallContentProps;
   
-  /** Advanced Configuration */
-  /** Custom content renderer override */
-  renderContent?: (props: PaywallProps) => ReactNode;
-  /** Custom header renderer override */
-  renderHeader?: (props: PaywallProps) => ReactNode;
-  /** Custom footer renderer override */
-  renderFooter?: (props: PaywallProps) => ReactNode;
-  /** Custom action buttons renderer override */
-  renderActions?: (props: PaywallProps) => ReactNode;
+  /** Widget section props */
+  widget?: PaywallWidgetProps;
   
-  /** Responsive Design Support */
-  /** Mobile-specific variant override */
-  mobileVariant?: PaywallVariant;
-  /** Tablet-specific variant override */
-  tabletVariant?: PaywallVariant;
-  /** Desktop-specific variant override */
-  desktopVariant?: PaywallVariant;
-  
-  /** Animation and Transitions */
-  /** Entry animation type */
-  enterAnimation?: 'fade' | 'slide-up' | 'slide-down' | 'scale' | 'none';
-  /** Exit animation type */
-  exitAnimation?: 'fade' | 'slide-up' | 'slide-down' | 'scale' | 'none';
-  /** Animation duration override */
-  animationDuration?: number;
-  /** Animation delay before showing */
-  showDelay?: number;
-  
-  /** Testing and Development */
-  /** Test ID for automated testing */
-  'data-testid'?: string;
-  /** Development mode flag for debugging */
-  debugMode?: boolean;
-  /** Mock mode for testing without real Calendly */
-  mockMode?: boolean;
+  /** Footer section props */
+  footer?: PaywallFooterProps;
 }
 
 /**
- * Props for PaywallTrigger component that shows paywall on interaction
+ * Paywall header section props
  */
-export interface PaywallTriggerProps extends 
-  BaseComponentProps<HTMLButtonElement>,
-  AccessibilityProps,
-  ThemeProps {
+export interface PaywallHeaderProps extends ComponentPropsWithoutRef<'header'> {
+  /** Header title */
+  title?: ReactNode;
   
-  /** Trigger element content */
-  children: ReactNode;
-  /** Paywall configuration to show */
-  paywallProps: PaywallProps;
-  /** Trigger interaction type */
-  trigger?: 'click' | 'hover' | 'focus';
-  /** Delay before showing paywall (hover/focus triggers) */
-  delay?: number;
-  /** Disabled state */
-  disabled?: boolean;
-  /** Loading state */
-  loading?: boolean;
+  /** Header subtitle */
+  subtitle?: ReactNode;
+  
+  /** Custom header content */
+  children?: ReactNode;
+  
+  /** Header variant */
+  variant?: ComponentVariant;
+  
+  /** Header size */
+  size?: ComponentSize;
 }
 
 /**
- * Context value for PaywallProvider
+ * Paywall content section props
  */
-export interface PaywallContextValue {
-  /** Show paywall with configuration */
-  showPaywall: (props: PaywallProps) => void;
-  /** Hide current paywall */
-  hidePaywall: () => void;
-  /** Current paywall state */
-  currentPaywall: PaywallProps | null;
-  /** Is any paywall currently visible */
-  isVisible: boolean;
-  /** User's current subscription level */
-  userLevel: PaywallLevel;
-  /** Update user's subscription level */
-  setUserLevel: (level: PaywallLevel) => void;
-  /** Check if feature is available for current user */
-  hasAccess: (requiredLevel: PaywallLevel) => boolean;
-  /** Check specific feature access */
-  checkFeatureAccess: (feature: FeatureGate) => boolean;
+export interface PaywallContentProps extends ComponentPropsWithoutRef<'section'> {
+  /** Content columns */
+  columns?: PaywallContentColumn[];
+  
+  /** Content layout */
+  layout?: PaywallLayout;
+  
+  /** Custom content */
+  children?: ReactNode;
 }
 
 /**
- * Utility type for paywall component variants using class-variance-authority
+ * Paywall content column definition
  */
-export type PaywallVariants = {
-  variant: Record<PaywallVariant, string>;
-  size: Record<'sm' | 'md' | 'lg' | 'xl', string>;
-  level: Record<PaywallLevel, string>;
+export interface PaywallContentColumn {
+  /** Column identifier */
+  id: string;
+  
+  /** Column title */
+  title: ReactNode;
+  
+  /** Column content */
+  content: ReactNode;
+  
+  /** Column icon */
+  icon?: ReactNode;
+  
+  /** Column variant */
+  variant?: ComponentVariant;
+  
+  /** Column custom props */
+  props?: ComponentPropsWithoutRef<'div'>;
+}
+
+/**
+ * Paywall widget section props
+ */
+export interface PaywallWidgetProps extends ComponentPropsWithoutRef<'section'> {
+  /** Calendly configuration */
+  calendlyConfig?: CalendlyConfig;
+  
+  /** Widget loading state */
+  loading?: PaywallLoadingState;
+  
+  /** Widget error state */
+  error?: PaywallErrorState;
+  
+  /** Custom widget content */
+  children?: ReactNode;
+}
+
+/**
+ * Paywall footer section props
+ */
+export interface PaywallFooterProps extends ComponentPropsWithoutRef<'footer'> {
+  /** Contact information */
+  contactInfo?: PaywallContactInfo;
+  
+  /** Custom footer content */
+  children?: ReactNode;
+  
+  /** Footer variant */
+  variant?: ComponentVariant;
+}
+
+/**
+ * Contact information configuration
+ */
+export interface PaywallContactInfo {
+  /** Phone number */
+  phone?: string;
+  
+  /** Email address */
+  email?: string;
+  
+  /** Additional contact methods */
+  additional?: Array<{
+    label: string;
+    value: string;
+    href?: string;
+    icon?: ReactNode;
+  }>;
+  
+  /** Whether to show contact info */
+  enabled?: boolean;
+}
+
+// ============================================================================
+// UTILITY TYPES
+// ============================================================================
+
+/**
+ * Extract props type for the paywall component
+ */
+export type PaywallComponentProps = PaywallProps;
+
+/**
+ * Extract ref type for the paywall component
+ */
+export type PaywallComponentRef = PaywallRef;
+
+/**
+ * Paywall component with ref forwarding type
+ */
+export type PaywallWithRef = React.ForwardRefExoticComponent<
+  PaywallProps & React.RefAttributes<PaywallRef>
+>;
+
+/**
+ * Default export interface for the paywall types module
+ */
+export interface PaywallTypesConfig {
+  /** Component prop types */
+  props: PaywallComponentProps;
+  
+  /** Component ref types */
+  ref: PaywallComponentRef;
+  
+  /** Calendly configuration types */
+  calendly: CalendlyConfig;
+  
+  /** Translation key types */
+  translations: PaywallTranslationKeys;
+  
+  /** Responsive configuration types */
+  responsive: PaywallResponsiveConfig;
+  
+  /** Loading state types */
+  loading: PaywallLoadingState;
+  
+  /** Error state types */
+  error: PaywallErrorState;
+}
+
+// ============================================================================
+// TYPE GUARDS AND UTILITIES
+// ============================================================================
+
+/**
+ * Type guard to check if a value is a valid PaywallVariant
+ */
+export const isPaywallVariant = (value: any): value is PaywallVariant => {
+  const validVariants: PaywallVariant[] = [
+    'default',
+    'enterprise',
+    'trial',
+    'feature',
+    'minimal',
+    'modal',
+    'inline',
+  ];
+  return typeof value === 'string' && validVariants.includes(value as PaywallVariant);
 };
 
 /**
- * Export utility types for external usage
+ * Type guard to check if a value is a valid CalendlyMode
  */
-export type PaywallEventHandler = (event: any) => void;
-export type PaywallStateUpdater = (state: any) => void;
+export const isCalendlyMode = (value: any): value is CalendlyMode => {
+  const validModes: CalendlyMode[] = ['inline', 'popup', 'overlay', 'redirect'];
+  return typeof value === 'string' && validModes.includes(value as CalendlyMode);
+};
 
 /**
- * Default export for the main PaywallProps interface
+ * Type guard to check if a value is a valid CalendlyEventType
  */
-export default PaywallProps;
+export const isCalendlyEventType = (value: any): value is CalendlyEventType => {
+  const validTypes: CalendlyEventType[] = [
+    'profile_page_viewed',
+    'event_type_viewed',
+    'date_and_time_selected',
+    'event_scheduled',
+    'event_cancelled',
+    'widget_loaded',
+    'widget_error',
+    'height_changed',
+  ];
+  return typeof value === 'string' && validTypes.includes(value as CalendlyEventType);
+};
