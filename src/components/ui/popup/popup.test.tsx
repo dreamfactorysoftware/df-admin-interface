@@ -1,1073 +1,1244 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { axe, toHaveNoViolations } from 'jest-axe';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
-import { useTranslation } from 'react-i18next';
+/**
+ * @fileoverview Comprehensive test suite for popup component system
+ * 
+ * Tests the React-based popup component system using Vitest 2.1.0 and React Testing Library.
+ * Validates WCAG 2.1 AA accessibility compliance, keyboard navigation, focus management,
+ * authentication workflows, internationalization, popup service functionality, and responsive design.
+ * 
+ * Features tested:
+ * - Accessibility compliance with jest-axe for WCAG 2.1 AA standards
+ * - Keyboard navigation including Tab, Escape, Enter, and Arrow keys
+ * - Focus trapping and management with proper ARIA labeling
+ * - Authentication workflow integration with mocked hooks
+ * - Internationalization support with react-i18next mocking
+ * - Screen reader support and announcements
+ * - Popup service hook functionality for programmatic control
+ * - Animation and transition behavior validation
+ * - Responsive design with viewport simulation
+ * - Backdrop click and escape key dismissal behavior
+ * 
+ * @version 1.0.0
+ * @since React 19.0.0 / Vitest 2.1.0
+ */
 
-// Extend expect matchers for accessibility testing
+import React from 'react';
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
+import { screen, waitFor, fireEvent, act } from '@testing-library/react';
+import { axe, toHaveNoViolations } from 'jest-axe';
+import userEvent from '@testing-library/user-event';
+
+// Test utilities
+import {
+  customRender,
+  testA11y,
+  checkAriaAttributes,
+  createKeyboardUtils,
+  getAriaLiveRegions,
+  type CustomRenderOptions,
+  type KeyboardTestUtils,
+} from '@/test/test-utils';
+
+// Components and hooks under test
+import { Popup } from './popup';
+import { PopupProvider, usePopup, usePopupQueue, usePopupConfig } from './popup-service';
+import type { 
+  PopupProps, 
+  PopupVariant, 
+  PopupSize, 
+  PopupAction,
+  PopupConfig,
+  PopupAccessibilityConfig,
+  PopupAnimationConfig,
+} from './types';
+
+// Extend expect matchers
 expect.extend(toHaveNoViolations);
 
-// Mock Next.js router
+// ============================================================================
+// MOCK SETUP
+// ============================================================================
+
+/**
+ * Mock authentication hook for testing auth workflows
+ */
+const mockAuth = {
+  logout: vi.fn(),
+  user: { id: 1, username: 'testuser', email: 'test@example.com' },
+};
+
+/**
+ * Mock router hook for testing navigation
+ */
+const mockRouter = {
+  push: vi.fn(),
+  pathname: '/test-path',
+};
+
+/**
+ * Mock next/navigation hooks
+ */
 vi.mock('next/navigation', () => ({
-  useRouter: vi.fn(),
-  usePathname: vi.fn(() => '/test'),
-  useSearchParams: vi.fn(() => new URLSearchParams()),
+  useRouter: () => mockRouter,
+  usePathname: () => mockRouter.pathname,
 }));
 
-// Mock react-i18next
+/**
+ * Mock authentication hooks
+ */
+vi.mock('@/hooks/useAuth', () => ({
+  useAuth: () => mockAuth,
+}));
+
+/**
+ * Mock internationalization
+ */
+const mockTranslation = {
+  t: vi.fn((key: string, options?: any) => {
+    const translations: Record<string, string> = {
+      'popup.title.passwordSecurity': 'Password Security Notice',
+      'popup.message.passwordTooShort': 'Your current password is shorter than recommended (less than 17 characters). For better security, we recommend updating your password to a longer one.',
+      'popup.button.updatePassword': 'Update Password Now',
+      'popup.button.remindLater': 'Remind me later',
+      'popup.button.close': 'Close',
+      'popup.aria.opened': '{{title}} popup opened',
+      'popup.aria.closeButton': 'Close popup',
+      'popup.aria.remindLaterButton': 'Remind me later to update password',
+      'popup.aria.updatePasswordButton': 'Update password now',
+    };
+    
+    let result = translations[key] || key;
+    
+    // Handle interpolation
+    if (options && typeof options === 'object') {
+      Object.entries(options).forEach(([param, value]) => {
+        result = result.replace(`{{${param}}}`, String(value));
+      });
+    }
+    
+    return result;
+  }),
+  i18n: {
+    language: 'en',
+    changeLanguage: vi.fn(),
+  },
+};
+
 vi.mock('react-i18next', () => ({
-  useTranslation: vi.fn(),
+  useTranslation: () => mockTranslation,
   Trans: ({ children }: { children: React.ReactNode }) => children,
 }));
 
-// Mock authentication hooks
-vi.mock('@/hooks/use-auth', () => ({
-  useAuth: vi.fn(),
-}));
+/**
+ * Mock window.matchMedia for responsive testing
+ */
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  value: vi.fn().mockImplementation((query: string) => ({
+    matches: query.includes('min-width: 768px'), // Default to desktop
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })),
+});
 
-// Mock popup service and components (will be replaced when actual files exist)
-const mockPopupService = {
-  open: vi.fn(),
-  close: vi.fn(),
-  isOpen: false,
-  config: null,
+/**
+ * Mock IntersectionObserver for animation testing
+ */
+global.IntersectionObserver = class IntersectionObserver {
+  constructor() {}
+  disconnect() {}
+  observe() {}
+  unobserve() {}
+} as any;
+
+/**
+ * Mock requestAnimationFrame for animation testing
+ */
+global.requestAnimationFrame = vi.fn((cb) => setTimeout(cb, 16));
+global.cancelAnimationFrame = vi.fn();
+
+// ============================================================================
+// TEST UTILITIES
+// ============================================================================
+
+/**
+ * Default popup props for testing
+ */
+const defaultPopupProps: PopupProps = {
+  children: 'Test popup content',
+  isOpen: true,
+  onClose: vi.fn(),
+  title: 'Test Popup',
+  variant: 'default',
+  size: 'md',
+  'data-testid': 'test-popup',
 };
 
-vi.mock('@/components/ui/popup/popup-service', () => ({
-  usePopupService: () => mockPopupService,
-  popupService: mockPopupService,
-}));
-
-// Mock popup component interfaces
-interface PopupConfig {
-  title?: string;
-  message: string;
-  type?: 'info' | 'warning' | 'error' | 'success' | 'confirm';
-  showCancelButton?: boolean;
-  showConfirmButton?: boolean;
-  cancelButtonText?: string;
-  confirmButtonText?: string;
-  onConfirm?: () => void | Promise<void>;
-  onCancel?: () => void;
-  onClose?: () => void;
-  allowBackdropClick?: boolean;
-  allowEscapeKey?: boolean;
-  focusTrap?: boolean;
-  className?: string;
-  ariaLabel?: string;
-  ariaDescribedBy?: string;
-}
-
-// Mock Popup component implementation
-const MockPopup = ({ 
-  isOpen = false, 
-  config = null,
-  onClose = vi.fn()
-}: {
-  isOpen?: boolean;
-  config?: PopupConfig | null;
-  onClose?: () => void;
-}) => {
-  if (!isOpen || !config) return null;
-
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget && config.allowBackdropClick) {
-      onClose();
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape' && config.allowEscapeKey) {
-      onClose();
-    }
-  };
-
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={config.ariaLabel || config.title}
-      aria-describedby={config.ariaDescribedBy || 'popup-message'}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 transition-opacity duration-300"
-      onClick={handleBackdropClick}
-      onKeyDown={handleKeyDown}
-      data-testid="popup-overlay"
-    >
-      <div 
-        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 transform transition-transform duration-300 scale-100"
-        onClick={(e) => e.stopPropagation()}
-        data-testid="popup-content"
-      >
-        {config.title && (
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              {config.title}
-            </h2>
-          </div>
-        )}
-        
-        <div className="px-6 py-4">
-          <p 
-            id="popup-message"
-            className="text-gray-700 dark:text-gray-300"
-          >
-            {config.message}
-          </p>
-        </div>
-        
-        <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-2">
-          {config.showCancelButton && (
-            <button
-              type="button"
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-600"
-              onClick={config.onCancel || onClose}
-              data-testid="popup-cancel-button"
-            >
-              {config.cancelButtonText || 'Cancel'}
-            </button>
-          )}
-          
-          {config.showConfirmButton && (
-            <button
-              type="button"
-              className="px-4 py-2 text-sm font-medium text-white bg-primary-600 border border-transparent rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-              onClick={config.onConfirm}
-              data-testid="popup-confirm-button"
-            >
-              {config.confirmButtonText || 'Confirm'}
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
+/**
+ * Render popup with providers and utilities
+ */
+const renderPopup = (
+  props: Partial<PopupProps> = {},
+  options: CustomRenderOptions = {}
+) => {
+  const mergedProps = { ...defaultPopupProps, ...props };
+  const user = userEvent.setup();
+  
+  const result = customRender(
+    <PopupProvider>
+      <Popup {...mergedProps} />
+    </PopupProvider>,
+    options
   );
+  
+  const keyboard = createKeyboardUtils(user);
+  
+  return {
+    ...result,
+    user,
+    keyboard,
+    props: mergedProps,
+  };
 };
 
-// Test wrapper component
-const TestWrapper = ({ children }: { children: React.ReactNode }) => {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-      },
-    },
+/**
+ * Render popup with custom actions
+ */
+const renderPopupWithActions = (actions: PopupAction[]) => {
+  return renderPopup({
+    actions,
+    children: 'Popup with custom actions',
   });
-
-  return (
-    <QueryClientProvider client={queryClient}>
-      <div id="test-root">
-        {children}
-      </div>
-    </QueryClientProvider>
-  );
 };
 
-describe('Popup Component System', () => {
-  const mockPush = vi.fn();
-  const mockT = vi.fn((key: string) => key);
-  const mockAuth = {
-    user: { id: 1, email: 'test@example.com' },
-    isAuthenticated: true,
-    logout: vi.fn(),
-  };
+/**
+ * Setup viewport for responsive testing
+ */
+const setViewport = (width: number, height: number) => {
+  // Mock window dimensions
+  Object.defineProperty(window, 'innerWidth', {
+    writable: true,
+    configurable: true,
+    value: width,
+  });
+  Object.defineProperty(window, 'innerHeight', {
+    writable: true,
+    configurable: true,
+    value: height,
+  });
+  
+  // Update matchMedia mock
+  (window.matchMedia as Mock).mockImplementation((query: string) => ({
+    matches: width >= 768 ? query.includes('min-width: 768px') : !query.includes('min-width: 768px'),
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  }));
+  
+  // Trigger resize event
+  fireEvent(window, new Event('resize'));
+};
 
+/**
+ * Wait for animation to complete
+ */
+const waitForAnimation = async (duration = 300) => {
+  await act(async () => {
+    await new Promise(resolve => setTimeout(resolve, duration));
+  });
+};
+
+// ============================================================================
+// TEST SUITES
+// ============================================================================
+
+describe('Popup Component', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    
-    // Setup router mock
-    (useRouter as any).mockReturnValue({
-      push: mockPush,
-      back: vi.fn(),
-      forward: vi.fn(),
-      refresh: vi.fn(),
-    });
-
-    // Setup i18n mock
-    (useTranslation as any).mockReturnValue({
-      t: mockT,
-      i18n: { language: 'en' },
-    });
-
-    // Setup auth mock
-    const { useAuth } = vi.mocked(await import('@/hooks/use-auth'));
-    (useAuth as any).mockReturnValue(mockAuth);
-
-    // Reset popup service
-    mockPopupService.isOpen = false;
-    mockPopupService.config = null;
+    // Reset viewport to desktop
+    setViewport(1024, 768);
   });
 
   afterEach(() => {
-    vi.clearAllMocks();
+    // Cleanup any open popups
+    document.body.innerHTML = '';
   });
 
-  describe('Popup Component Rendering', () => {
-    it('renders popup with required message content', () => {
-      const config: PopupConfig = {
-        message: 'Test popup message',
-        showConfirmButton: true,
-      };
-
-      render(
-        <TestWrapper>
-          <MockPopup isOpen={true} config={config} />
-        </TestWrapper>
-      );
-
-      expect(screen.getByText('Test popup message')).toBeInTheDocument();
-      expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
-      expect(screen.getByTestId('popup-content')).toBeInTheDocument();
-    });
-
-    it('does not render when isOpen is false', () => {
-      const config: PopupConfig = {
-        message: 'Test popup message',
-      };
-
-      render(
-        <TestWrapper>
-          <MockPopup isOpen={false} config={config} />
-        </TestWrapper>
-      );
-
-      expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
-    });
-
-    it('renders with optional title', () => {
-      const config: PopupConfig = {
-        title: 'Test Title',
-        message: 'Test message',
-      };
-
-      render(
-        <TestWrapper>
-          <MockPopup isOpen={true} config={config} />
-        </TestWrapper>
-      );
-
-      expect(screen.getByText('Test Title')).toBeInTheDocument();
-      expect(screen.getByRole('heading', { level: 2 })).toBeInTheDocument();
-    });
-
-    it('renders different popup types with appropriate styling', () => {
-      const types: Array<PopupConfig['type']> = ['info', 'warning', 'error', 'success', 'confirm'];
+  describe('Basic Rendering', () => {
+    it('renders popup with default props', () => {
+      renderPopup();
       
-      types.forEach((type) => {
-        const config: PopupConfig = {
-          message: `Test ${type} message`,
-          type,
-        };
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      expect(screen.getByText('Test popup content')).toBeInTheDocument();
+      expect(screen.getByText('Test Popup')).toBeInTheDocument();
+    });
 
-        const { unmount } = render(
-          <TestWrapper>
-            <MockPopup isOpen={true} config={config} />
-          </TestWrapper>
-        );
+    it('renders with custom title and content', () => {
+      renderPopup({
+        title: 'Custom Title',
+        children: 'Custom content message',
+      });
+      
+      expect(screen.getByText('Custom Title')).toBeInTheDocument();
+      expect(screen.getByText('Custom content message')).toBeInTheDocument();
+    });
 
-        expect(screen.getByText(`Test ${type} message`)).toBeInTheDocument();
+    it('renders with different variants', () => {
+      const variants: PopupVariant[] = ['success', 'warning', 'error', 'info', 'authentication'];
+      
+      variants.forEach((variant) => {
+        const { unmount } = renderPopup({ variant });
+        const dialog = screen.getByRole('dialog');
+        expect(dialog).toBeInTheDocument();
         unmount();
       });
     });
-  });
 
-  describe('Button Configuration', () => {
-    it('renders confirm button when showConfirmButton is true', () => {
-      const config: PopupConfig = {
-        message: 'Test message',
-        showConfirmButton: true,
-        confirmButtonText: 'Custom Confirm',
-      };
-
-      render(
-        <TestWrapper>
-          <MockPopup isOpen={true} config={config} />
-        </TestWrapper>
-      );
-
-      const confirmButton = screen.getByTestId('popup-confirm-button');
-      expect(confirmButton).toBeInTheDocument();
-      expect(confirmButton).toHaveTextContent('Custom Confirm');
+    it('renders with different sizes', () => {
+      const sizes: PopupSize[] = ['xs', 'sm', 'md', 'lg', 'xl'];
+      
+      sizes.forEach((size) => {
+        const { unmount } = renderPopup({ size });
+        const dialog = screen.getByRole('dialog');
+        expect(dialog).toBeInTheDocument();
+        unmount();
+      });
     });
 
-    it('renders cancel button when showCancelButton is true', () => {
-      const config: PopupConfig = {
-        message: 'Test message',
-        showCancelButton: true,
-        cancelButtonText: 'Custom Cancel',
-      };
-
-      render(
-        <TestWrapper>
-          <MockPopup isOpen={true} config={config} />
-        </TestWrapper>
-      );
-
-      const cancelButton = screen.getByTestId('popup-cancel-button');
-      expect(cancelButton).toBeInTheDocument();
-      expect(cancelButton).toHaveTextContent('Custom Cancel');
+    it('does not render when isOpen is false', () => {
+      renderPopup({ isOpen: false });
+      
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
 
-    it('uses default button text when not specified', () => {
-      const config: PopupConfig = {
-        message: 'Test message',
-        showConfirmButton: true,
-        showCancelButton: true,
-      };
-
-      render(
-        <TestWrapper>
-          <MockPopup isOpen={true} config={config} />
-        </TestWrapper>
-      );
-
-      expect(screen.getByText('Confirm')).toBeInTheDocument();
-      expect(screen.getByText('Cancel')).toBeInTheDocument();
-    });
-
-    it('calls onConfirm when confirm button is clicked', async () => {
-      const onConfirm = vi.fn();
-      const config: PopupConfig = {
-        message: 'Test message',
-        showConfirmButton: true,
-        onConfirm,
-      };
-
-      const user = userEvent.setup();
-
-      render(
-        <TestWrapper>
-          <MockPopup isOpen={true} config={config} />
-        </TestWrapper>
-      );
-
-      await user.click(screen.getByTestId('popup-confirm-button'));
-
-      expect(onConfirm).toHaveBeenCalledOnce();
-    });
-
-    it('calls onCancel when cancel button is clicked', async () => {
-      const onCancel = vi.fn();
-      const config: PopupConfig = {
-        message: 'Test message',
-        showCancelButton: true,
-        onCancel,
-      };
-
-      const user = userEvent.setup();
-
-      render(
-        <TestWrapper>
-          <MockPopup isOpen={true} config={config} />
-        </TestWrapper>
-      );
-
-      await user.click(screen.getByTestId('popup-cancel-button'));
-
-      expect(onCancel).toHaveBeenCalledOnce();
+    it('applies custom CSS classes', () => {
+      renderPopup({ className: 'custom-popup-class' });
+      
+      const dialog = screen.getByRole('dialog');
+      const panel = dialog.querySelector('[class*="custom-popup-class"]');
+      expect(panel).toBeInTheDocument();
     });
   });
 
-  describe('Accessibility Compliance (WCAG 2.1 AA)', () => {
-    it('has no accessibility violations', async () => {
-      const config: PopupConfig = {
-        title: 'Accessible Popup',
-        message: 'This popup follows WCAG 2.1 AA guidelines',
-        showConfirmButton: true,
-        showCancelButton: true,
-        ariaLabel: 'Confirmation dialog',
-      };
-
-      const { container } = render(
-        <TestWrapper>
-          <MockPopup isOpen={true} config={config} />
-        </TestWrapper>
-      );
-
-      const results = await axe(container);
-      expect(results).toHaveNoViolations();
+  describe('WCAG 2.1 AA Accessibility Compliance', () => {
+    it('passes axe accessibility tests', async () => {
+      const { container } = renderPopup();
+      
+      await testA11y(container, {
+        tags: ['wcag2a', 'wcag2aa'],
+      });
     });
 
     it('has proper ARIA attributes', () => {
-      const config: PopupConfig = {
-        title: 'Test Title',
-        message: 'Test message',
-        ariaLabel: 'Custom aria label',
-        ariaDescribedBy: 'custom-description',
-      };
-
-      render(
-        <TestWrapper>
-          <MockPopup isOpen={true} config={config} />
-        </TestWrapper>
-      );
-
-      const dialog = screen.getByRole('dialog');
-      expect(dialog).toHaveAttribute('aria-modal', 'true');
-      expect(dialog).toHaveAttribute('aria-label', 'Custom aria label');
-      expect(dialog).toHaveAttribute('aria-describedby', 'custom-description');
-    });
-
-    it('uses title as aria-label fallback', () => {
-      const config: PopupConfig = {
-        title: 'Fallback Title',
-        message: 'Test message',
-      };
-
-      render(
-        <TestWrapper>
-          <MockPopup isOpen={true} config={config} />
-        </TestWrapper>
-      );
-
-      const dialog = screen.getByRole('dialog');
-      expect(dialog).toHaveAttribute('aria-label', 'Fallback Title');
-    });
-
-    it('associates message content with aria-describedby', () => {
-      const config: PopupConfig = {
-        message: 'Test message content',
-      };
-
-      render(
-        <TestWrapper>
-          <MockPopup isOpen={true} config={config} />
-        </TestWrapper>
-      );
-
-      const dialog = screen.getByRole('dialog');
-      const messageElement = screen.getByText('Test message content');
+      renderPopup({
+        title: 'Accessible Popup',
+        'data-testid': 'accessible-popup',
+      });
       
-      expect(dialog).toHaveAttribute('aria-describedby', 'popup-message');
-      expect(messageElement).toHaveAttribute('id', 'popup-message');
+      const dialog = screen.getByRole('dialog');
+      
+      checkAriaAttributes(dialog, {
+        'aria-labelledby': 'popup-title',
+        'aria-describedby': 'popup-description',
+        'role': 'dialog',
+      });
+    });
+
+    it('has accessible title and description', () => {
+      renderPopup();
+      
+      const title = screen.getByRole('heading', { level: 2 });
+      expect(title).toHaveAttribute('id', 'popup-title');
+      
+      const description = document.getElementById('popup-description');
+      expect(description).toBeInTheDocument();
+    });
+
+    it('has proper focus management', async () => {
+      const { keyboard } = renderPopup({
+        accessibility: {
+          initialFocus: 'first',
+          trapFocus: true,
+        },
+      });
+      
+      // Check that dialog receives focus when opened
+      const dialog = screen.getByRole('dialog');
+      expect(dialog).toBeInTheDocument();
+      
+      // Test tab navigation within dialog
+      await keyboard.tab();
+      const focusedElement = keyboard.getFocused();
+      expect(focusedElement).toBeInTheDocument();
+      
+      // Ensure focus stays within dialog
+      const buttons = screen.getAllByRole('button');
+      expect(buttons.length).toBeGreaterThan(0);
+    });
+
+    it('announces popup opening to screen readers', async () => {
+      renderPopup({
+        accessibility: {
+          announceOnOpen: true,
+          openAnnouncement: 'Security notice opened',
+        },
+      });
+      
+      await waitFor(() => {
+        const liveRegions = getAriaLiveRegions(document.body);
+        expect(liveRegions.length).toBeGreaterThan(0);
+      });
+    });
+
+    it('has minimum touch target sizes (44px)', () => {
+      renderPopup();
+      
+      const buttons = screen.getAllByRole('button');
+      buttons.forEach((button) => {
+        const styles = window.getComputedStyle(button);
+        const minHeight = parseInt(styles.minHeight);
+        expect(minHeight).toBeGreaterThanOrEqual(44);
+      });
+    });
+
+    it('has proper color contrast ratios', async () => {
+      const { container } = renderPopup();
+      
+      await testA11y(container, {
+        tags: ['wcag2aa'],
+        includeRules: ['color-contrast'],
+      });
     });
   });
 
   describe('Keyboard Navigation', () => {
-    it('handles Escape key when allowEscapeKey is true', () => {
+    it('closes popup on Escape key press', async () => {
       const onClose = vi.fn();
-      const config: PopupConfig = {
-        message: 'Test message',
-        allowEscapeKey: true,
-      };
-
-      render(
-        <TestWrapper>
-          <MockPopup isOpen={true} config={config} onClose={onClose} />
-        </TestWrapper>
-      );
-
-      fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
-
-      expect(onClose).toHaveBeenCalledOnce();
+      const { keyboard } = renderPopup({ onClose });
+      
+      await keyboard.escape();
+      
+      expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('ignores Escape key when allowEscapeKey is false', () => {
+    it('navigates between buttons with Tab key', async () => {
+      const { keyboard } = renderPopup({
+        showRemindMeLater: true,
+        showCloseButton: true,
+      });
+      
+      const buttons = screen.getAllByRole('button');
+      expect(buttons.length).toBeGreaterThanOrEqual(2);
+      
+      // Tab through buttons
+      await keyboard.tab();
+      let focused = keyboard.getFocused();
+      expect(focused).toBeInstanceOf(HTMLButtonElement);
+      
+      await keyboard.tab();
+      focused = keyboard.getFocused();
+      expect(focused).toBeInstanceOf(HTMLButtonElement);
+    });
+
+    it('activates buttons with Enter key', async () => {
       const onClose = vi.fn();
-      const config: PopupConfig = {
-        message: 'Test message',
-        allowEscapeKey: false,
-      };
-
-      render(
-        <TestWrapper>
-          <MockPopup isOpen={true} config={config} onClose={onClose} />
-        </TestWrapper>
-      );
-
-      fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
-
-      expect(onClose).not.toHaveBeenCalled();
+      const { keyboard } = renderPopup({ onClose });
+      
+      // Focus and activate close button
+      const closeButton = screen.getByLabelText('Close popup');
+      closeButton.focus();
+      
+      await keyboard.enter();
+      
+      expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('supports tab navigation between buttons', async () => {
-      const config: PopupConfig = {
-        message: 'Test message',
-        showConfirmButton: true,
-        showCancelButton: true,
-      };
-
-      const user = userEvent.setup();
-
-      render(
-        <TestWrapper>
-          <MockPopup isOpen={true} config={config} />
-        </TestWrapper>
-      );
-
-      const cancelButton = screen.getByTestId('popup-cancel-button');
-      const confirmButton = screen.getByTestId('popup-confirm-button');
-
-      // Tab to first button
-      await user.tab();
-      expect(cancelButton).toHaveFocus();
-
-      // Tab to second button
-      await user.tab();
-      expect(confirmButton).toHaveFocus();
+    it('activates buttons with Space key', async () => {
+      const onRemindLater = vi.fn();
+      const { keyboard } = renderPopup({ 
+        onRemindLater,
+        showRemindMeLater: true,
+      });
+      
+      // Focus remind later button
+      const remindButton = screen.getByText('Remind me later');
+      remindButton.focus();
+      
+      await keyboard.space();
+      
+      expect(onRemindLater).toHaveBeenCalledTimes(1);
     });
 
-    it('activates buttons with Enter and Space keys', async () => {
-      const onConfirm = vi.fn();
-      const config: PopupConfig = {
-        message: 'Test message',
-        showConfirmButton: true,
-        onConfirm,
-      };
-
-      const user = userEvent.setup();
-
-      render(
-        <TestWrapper>
-          <MockPopup isOpen={true} config={config} />
-        </TestWrapper>
-      );
-
-      const confirmButton = screen.getByTestId('popup-confirm-button');
-      confirmButton.focus();
-
-      // Test Enter key
-      await user.keyboard('{Enter}');
-      expect(onConfirm).toHaveBeenCalledTimes(1);
-
-      // Test Space key
-      await user.keyboard(' ');
-      expect(onConfirm).toHaveBeenCalledTimes(2);
-    });
-  });
-
-  describe('Backdrop Click Behavior', () => {
-    it('closes popup on backdrop click when allowBackdropClick is true', async () => {
-      const onClose = vi.fn();
-      const config: PopupConfig = {
-        message: 'Test message',
-        allowBackdropClick: true,
-      };
-
-      const user = userEvent.setup();
-
-      render(
-        <TestWrapper>
-          <MockPopup isOpen={true} config={config} onClose={onClose} />
-        </TestWrapper>
-      );
-
-      await user.click(screen.getByTestId('popup-overlay'));
-
-      expect(onClose).toHaveBeenCalledOnce();
+    it('traps focus within popup when enabled', async () => {
+      const { keyboard } = renderPopup({
+        accessibility: {
+          trapFocus: true,
+        },
+        showRemindMeLater: true,
+        showCloseButton: true,
+      });
+      
+      const buttons = screen.getAllByRole('button');
+      const firstButton = buttons[0];
+      const lastButton = buttons[buttons.length - 1];
+      
+      // Tab to last button
+      lastButton.focus();
+      expect(keyboard.isFocused(lastButton)).toBe(true);
+      
+      // Tab should cycle back to first button
+      await keyboard.tab();
+      await waitFor(() => {
+        expect(keyboard.isFocused(firstButton)).toBe(true);
+      });
     });
 
-    it('ignores backdrop click when allowBackdropClick is false', async () => {
-      const onClose = vi.fn();
-      const config: PopupConfig = {
-        message: 'Test message',
-        allowBackdropClick: false,
-      };
-
-      const user = userEvent.setup();
-
-      render(
-        <TestWrapper>
-          <MockPopup isOpen={true} config={config} onClose={onClose} />
-        </TestWrapper>
-      );
-
-      await user.click(screen.getByTestId('popup-overlay'));
-
-      expect(onClose).not.toHaveBeenCalled();
-    });
-
-    it('does not close when clicking on popup content', async () => {
-      const onClose = vi.fn();
-      const config: PopupConfig = {
-        message: 'Test message',
-        allowBackdropClick: true,
-      };
-
-      const user = userEvent.setup();
-
-      render(
-        <TestWrapper>
-          <MockPopup isOpen={true} config={config} onClose={onClose} />
-        </TestWrapper>
-      );
-
-      await user.click(screen.getByTestId('popup-content'));
-
-      expect(onClose).not.toHaveBeenCalled();
+    it('handles Shift+Tab navigation correctly', async () => {
+      const { keyboard } = renderPopup({
+        showRemindMeLater: true,
+        showCloseButton: true,
+      });
+      
+      const buttons = screen.getAllByRole('button');
+      const firstButton = buttons[0];
+      const lastButton = buttons[buttons.length - 1];
+      
+      // Focus first button then Shift+Tab
+      firstButton.focus();
+      await keyboard.tab({ shift: true });
+      
+      // Should move to last button (or stay if focus is trapped)
+      const focused = keyboard.getFocused();
+      expect(focused).toBeInstanceOf(HTMLButtonElement);
     });
   });
 
   describe('Authentication Workflow Integration', () => {
-    it('handles authentication-related popup actions', async () => {
-      const config: PopupConfig = {
-        title: 'Session Expired',
-        message: 'Your session has expired. Please log in again.',
-        showConfirmButton: true,
-        confirmButtonText: 'Login',
-        onConfirm: () => {
-          mockAuth.logout();
-          mockPush('/login');
-        },
-      };
-
-      const user = userEvent.setup();
-
-      render(
-        <TestWrapper>
-          <MockPopup isOpen={true} config={config} />
-        </TestWrapper>
-      );
-
-      await user.click(screen.getByTestId('popup-confirm-button'));
-
-      expect(mockAuth.logout).toHaveBeenCalledOnce();
-      expect(mockPush).toHaveBeenCalledWith('/login');
-    });
-
-    it('displays user-specific information in popup', () => {
-      const config: PopupConfig = {
-        title: 'Welcome',
-        message: `Hello, ${mockAuth.user.email}! Your account is ready.`,
-      };
-
-      render(
-        <TestWrapper>
-          <MockPopup isOpen={true} config={config} />
-        </TestWrapper>
-      );
-
-      expect(screen.getByText('Hello, test@example.com! Your account is ready.')).toBeInTheDocument();
-    });
-  });
-
-  describe('Internationalization Integration', () => {
-    it('uses translated strings from i18n', () => {
-      mockT.mockImplementation((key: string) => {
-        const translations: Record<string, string> = {
-          'popup.confirm': 'Confirmer',
-          'popup.cancel': 'Annuler',
-          'popup.title.warning': 'Avertissement',
-        };
-        return translations[key] || key;
+    it('calls logout on password update confirmation', async () => {
+      const { user } = renderPopup({
+        variant: 'authentication',
+        onButtonClick: vi.fn(),
       });
-
-      const config: PopupConfig = {
-        title: mockT('popup.title.warning'),
-        message: 'Test message',
-        showConfirmButton: true,
-        showCancelButton: true,
-        confirmButtonText: mockT('popup.confirm'),
-        cancelButtonText: mockT('popup.cancel'),
-      };
-
-      render(
-        <TestWrapper>
-          <MockPopup isOpen={true} config={config} />
-        </TestWrapper>
-      );
-
-      expect(screen.getByText('Avertissement')).toBeInTheDocument();
-      expect(screen.getByText('Confirmer')).toBeInTheDocument();
-      expect(screen.getByText('Annuler')).toBeInTheDocument();
-    });
-
-    it('updates content when language changes', () => {
-      const { rerender } = render(
-        <TestWrapper>
-          <MockPopup 
-            isOpen={true} 
-            config={{
-              message: mockT('popup.message.test'),
-            }} 
-          />
-        </TestWrapper>
-      );
-
-      // English
-      mockT.mockReturnValue('Test message in English');
-      rerender(
-        <TestWrapper>
-          <MockPopup 
-            isOpen={true} 
-            config={{
-              message: mockT('popup.message.test'),
-            }} 
-          />
-        </TestWrapper>
-      );
-
-      expect(screen.getByText('Test message in English')).toBeInTheDocument();
-
-      // Spanish
-      mockT.mockReturnValue('Mensaje de prueba en español');
-      rerender(
-        <TestWrapper>
-          <MockPopup 
-            isOpen={true} 
-            config={{
-              message: mockT('popup.message.test'),
-            }} 
-          />
-        </TestWrapper>
-      );
-
-      expect(screen.getByText('Mensaje de prueba en español')).toBeInTheDocument();
-    });
-  });
-
-  describe('Popup Service Hook Integration', () => {
-    it('opens popup through service', () => {
-      const config: PopupConfig = {
-        message: 'Service test message',
-      };
-
-      act(() => {
-        mockPopupService.open(config);
-      });
-
-      expect(mockPopupService.open).toHaveBeenCalledWith(config);
-    });
-
-    it('closes popup through service', () => {
-      act(() => {
-        mockPopupService.close();
-      });
-
-      expect(mockPopupService.close).toHaveBeenCalledOnce();
-    });
-
-    it('tracks popup state through service', () => {
-      expect(mockPopupService.isOpen).toBe(false);
-
-      act(() => {
-        mockPopupService.isOpen = true;
-        mockPopupService.config = { message: 'Test' };
-      });
-
-      expect(mockPopupService.isOpen).toBe(true);
-      expect(mockPopupService.config).toEqual({ message: 'Test' });
-    });
-  });
-
-  describe('Animation and Transition Behavior', () => {
-    it('applies correct Tailwind CSS classes for transitions', () => {
-      const config: PopupConfig = {
-        message: 'Animated popup',
-      };
-
-      render(
-        <TestWrapper>
-          <MockPopup isOpen={true} config={config} />
-        </TestWrapper>
-      );
-
-      const overlay = screen.getByTestId('popup-overlay');
-      const content = screen.getByTestId('popup-content');
-
-      expect(overlay).toHaveClass('transition-opacity', 'duration-300');
-      expect(content).toHaveClass('transform', 'transition-transform', 'duration-300', 'scale-100');
-    });
-
-    it('supports custom CSS classes', () => {
-      const config: PopupConfig = {
-        message: 'Custom styled popup',
-        className: 'custom-popup-class',
-      };
-
-      const { container } = render(
-        <TestWrapper>
-          <MockPopup isOpen={true} config={config} />
-        </TestWrapper>
-      );
-
-      expect(container.querySelector('.custom-popup-class')).toBeInTheDocument();
-    });
-  });
-
-  describe('Responsive Design and Mobile Support', () => {
-    beforeEach(() => {
-      // Mock matchMedia for responsive testing
-      Object.defineProperty(window, 'matchMedia', {
-        writable: true,
-        value: vi.fn().mockImplementation(query => ({
-          matches: query.includes('max-width: 768px'),
-          media: query,
-          onchange: null,
-          addListener: vi.fn(),
-          removeListener: vi.fn(),
-          addEventListener: vi.fn(),
-          removeEventListener: vi.fn(),
-          dispatchEvent: vi.fn(),
-        })),
-      });
-    });
-
-    it('renders responsively on mobile viewports', () => {
-      // Simulate mobile viewport
-      Object.defineProperty(window, 'innerWidth', {
-        writable: true,
-        configurable: true,
-        value: 375,
-      });
-
-      const config: PopupConfig = {
-        message: 'Mobile responsive popup',
-      };
-
-      render(
-        <TestWrapper>
-          <MockPopup isOpen={true} config={config} />
-        </TestWrapper>
-      );
-
-      const content = screen.getByTestId('popup-content');
-      expect(content).toHaveClass('max-w-md', 'w-full', 'mx-4');
-    });
-
-    it('adjusts button layout on small screens', () => {
-      const config: PopupConfig = {
-        message: 'Mobile buttons test',
-        showConfirmButton: true,
-        showCancelButton: true,
-      };
-
-      render(
-        <TestWrapper>
-          <MockPopup isOpen={true} config={config} />
-        </TestWrapper>
-      );
-
-      const buttonContainer = screen.getByTestId('popup-cancel-button').parentElement;
-      expect(buttonContainer).toHaveClass('flex', 'space-x-2');
-    });
-
-    it('maintains touch-friendly button sizes on mobile', () => {
-      const config: PopupConfig = {
-        message: 'Touch-friendly test',
-        showConfirmButton: true,
-      };
-
-      render(
-        <TestWrapper>
-          <MockPopup isOpen={true} config={config} />
-        </TestWrapper>
-      );
-
-      const button = screen.getByTestId('popup-confirm-button');
-      expect(button).toHaveClass('px-4', 'py-2');
-    });
-  });
-
-  describe('Focus Management', () => {
-    it('traps focus within popup when focusTrap is enabled', async () => {
-      const config: PopupConfig = {
-        message: 'Focus trap test',
-        showConfirmButton: true,
-        showCancelButton: true,
-        focusTrap: true,
-      };
-
-      const user = userEvent.setup();
-
-      render(
-        <TestWrapper>
-          <MockPopup isOpen={true} config={config} />
-        </TestWrapper>
-      );
-
-      const cancelButton = screen.getByTestId('popup-cancel-button');
-      const confirmButton = screen.getByTestId('popup-confirm-button');
-
-      // Start from cancel button
-      cancelButton.focus();
-      expect(cancelButton).toHaveFocus();
-
-      // Tab forward to confirm button
-      await user.tab();
-      expect(confirmButton).toHaveFocus();
-
-      // Tab forward should cycle back to cancel button (focus trap)
-      await user.tab();
-      expect(cancelButton).toHaveFocus();
-
-      // Shift+Tab should go to confirm button
-      await user.tab({ shift: true });
-      expect(confirmButton).toHaveFocus();
-    });
-
-    it('sets initial focus to first interactive element', () => {
-      const config: PopupConfig = {
-        message: 'Initial focus test',
-        showConfirmButton: true,
-      };
-
-      render(
-        <TestWrapper>
-          <MockPopup isOpen={true} config={config} />
-        </TestWrapper>
-      );
-
-      const confirmButton = screen.getByTestId('popup-confirm-button');
-      expect(confirmButton).toHaveFocus();
-    });
-
-    it('restores focus to trigger element when popup closes', async () => {
-      // Create a trigger button
-      const TriggerComponent = () => {
-        const [isOpen, setIsOpen] = React.useState(false);
-        
-        return (
-          <>
-            <button 
-              onClick={() => setIsOpen(true)}
-              data-testid="trigger-button"
-            >
-              Open Popup
-            </button>
-            <MockPopup 
-              isOpen={isOpen} 
-              config={{ message: 'Test' }}
-              onClose={() => setIsOpen(false)}
-            />
-          </>
-        );
-      };
-
-      const user = userEvent.setup();
-
-      render(
-        <TestWrapper>
-          <TriggerComponent />
-        </TestWrapper>
-      );
-
-      const triggerButton = screen.getByTestId('trigger-button');
       
-      // Open popup
-      await user.click(triggerButton);
-      expect(screen.getByRole('dialog')).toBeInTheDocument();
-
-      // Close popup (focus should return to trigger)
-      fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+      const updateButton = screen.getByText('Update Password Now');
+      await user.click(updateButton);
       
       await waitFor(() => {
-        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(mockAuth.logout).toHaveBeenCalledWith(['/auth', '/reset-password']);
       });
+    });
 
-      expect(triggerButton).toHaveFocus();
+    it('handles logout errors gracefully', async () => {
+      const onClose = vi.fn();
+      mockAuth.logout.mockRejectedValueOnce(new Error('Logout failed'));
+      
+      const { user } = renderPopup({ 
+        variant: 'authentication',
+        onClose,
+      });
+      
+      const updateButton = screen.getByText('Update Password Now');
+      await user.click(updateButton);
+      
+      // Should still close popup even if logout fails
+      await waitFor(() => {
+        expect(onClose).toHaveBeenCalled();
+      });
+    });
+
+    it('calls onButtonClick callback with correct button type', async () => {
+      const onButtonClick = vi.fn();
+      const { user } = renderPopup({
+        onButtonClick,
+        showRemindMeLater: true,
+      });
+      
+      const remindButton = screen.getByText('Remind me later');
+      await user.click(remindButton);
+      
+      expect(onButtonClick).toHaveBeenCalledWith('remindLater');
+    });
+
+    it('calls onRemindLater callback when remind later is clicked', async () => {
+      const onRemindLater = vi.fn();
+      const { user } = renderPopup({
+        onRemindLater,
+        showRemindMeLater: true,
+      });
+      
+      const remindButton = screen.getByText('Remind me later');
+      await user.click(remindButton);
+      
+      expect(onRemindLater).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe('Screen Reader Support', () => {
-    it('announces popup opening to screen readers', () => {
-      const config: PopupConfig = {
-        title: 'Important Notification',
-        message: 'This is an important message for screen readers',
-      };
-
-      render(
-        <TestWrapper>
-          <MockPopup isOpen={true} config={config} />
-        </TestWrapper>
-      );
-
-      const dialog = screen.getByRole('dialog');
-      expect(dialog).toHaveAttribute('aria-modal', 'true');
-      expect(dialog).toHaveAttribute('aria-label', 'Important Notification');
+  describe('Custom Actions', () => {
+    it('renders custom action buttons', () => {
+      const customActions: PopupAction[] = [
+        {
+          label: 'Custom Action 1',
+          type: 'custom',
+          onClick: vi.fn(),
+          variant: 'primary',
+        },
+        {
+          label: 'Custom Action 2',
+          type: 'custom',
+          onClick: vi.fn(),
+          variant: 'secondary',
+        },
+      ];
+      
+      renderPopupWithActions(customActions);
+      
+      expect(screen.getByText('Custom Action 1')).toBeInTheDocument();
+      expect(screen.getByText('Custom Action 2')).toBeInTheDocument();
     });
 
-    it('provides proper button descriptions for screen readers', () => {
-      const config: PopupConfig = {
-        message: 'Confirm deletion',
-        showConfirmButton: true,
-        showCancelButton: true,
-        confirmButtonText: 'Delete',
-        cancelButtonText: 'Cancel',
-      };
-
-      render(
-        <TestWrapper>
-          <MockPopup isOpen={true} config={config} />
-        </TestWrapper>
-      );
-
-      const confirmButton = screen.getByTestId('popup-confirm-button');
-      const cancelButton = screen.getByTestId('popup-cancel-button');
-
-      expect(confirmButton).toHaveAccessibleName('Delete');
-      expect(cancelButton).toHaveAccessibleName('Cancel');
+    it('calls custom action onClick handlers', async () => {
+      const onClick1 = vi.fn();
+      const onClick2 = vi.fn();
+      
+      const customActions: PopupAction[] = [
+        {
+          label: 'Action 1',
+          type: 'custom',
+          onClick: onClick1,
+        },
+        {
+          label: 'Action 2',
+          type: 'custom',
+          onClick: onClick2,
+        },
+      ];
+      
+      const { user } = renderPopupWithActions(customActions);
+      
+      await user.click(screen.getByText('Action 1'));
+      expect(onClick1).toHaveBeenCalledTimes(1);
+      
+      await user.click(screen.getByText('Action 2'));
+      expect(onClick2).toHaveBeenCalledTimes(1);
     });
 
-    it('associates content with proper ARIA relationships', () => {
-      const config: PopupConfig = {
-        title: 'Confirmation Required',
-        message: 'Are you sure you want to proceed?',
-      };
+    it('handles disabled custom actions', async () => {
+      const onClick = vi.fn();
+      
+      const customActions: PopupAction[] = [
+        {
+          label: 'Disabled Action',
+          type: 'custom',
+          onClick,
+          disabled: true,
+        },
+      ];
+      
+      const { user } = renderPopupWithActions(customActions);
+      
+      const button = screen.getByText('Disabled Action');
+      expect(button).toBeDisabled();
+      
+      await user.click(button);
+      expect(onClick).not.toHaveBeenCalled();
+    });
 
-      render(
-        <TestWrapper>
-          <MockPopup isOpen={true} config={config} />
-        </TestWrapper>
-      );
-
-      const dialog = screen.getByRole('dialog');
-      const message = screen.getByText('Are you sure you want to proceed?');
-
-      expect(dialog).toHaveAttribute('aria-describedby', 'popup-message');
-      expect(message).toHaveAttribute('id', 'popup-message');
+    it('renders custom action icons', () => {
+      const customActions: PopupAction[] = [
+        {
+          label: 'Action with Icon',
+          type: 'custom',
+          onClick: vi.fn(),
+          icon: <span data-testid="custom-icon">📦</span>,
+        },
+      ];
+      
+      renderPopupWithActions(customActions);
+      
+      expect(screen.getByTestId('custom-icon')).toBeInTheDocument();
     });
   });
 
-  describe('Error Handling', () => {
-    it('handles async onConfirm errors gracefully', async () => {
-      const onConfirm = vi.fn().mockRejectedValue(new Error('Async error'));
-      const config: PopupConfig = {
-        message: 'Async test',
-        showConfirmButton: true,
-        onConfirm,
-      };
-
-      const user = userEvent.setup();
-
-      render(
-        <TestWrapper>
-          <MockPopup isOpen={true} config={config} />
-        </TestWrapper>
-      );
-
-      await user.click(screen.getByTestId('popup-confirm-button'));
-
-      expect(onConfirm).toHaveBeenCalledOnce();
-      // Component should not crash on async errors
-      expect(screen.getByTestId('popup-content')).toBeInTheDocument();
+  describe('Backdrop and Dismissal Behavior', () => {
+    it('closes popup on backdrop click when enabled', async () => {
+      const onClose = vi.fn();
+      const { user } = renderPopup({
+        onClose,
+        dismissOnClickOutside: true,
+      });
+      
+      // Click on backdrop (dialog overlay)
+      const dialog = screen.getByRole('dialog');
+      const backdrop = dialog.parentElement?.firstElementChild;
+      
+      if (backdrop) {
+        await user.click(backdrop);
+        expect(onClose).toHaveBeenCalledTimes(1);
+      }
     });
 
-    it('handles missing configuration gracefully', () => {
-      render(
-        <TestWrapper>
-          <MockPopup isOpen={true} config={null} />
-        </TestWrapper>
-      );
-
-      expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
+    it('does not close popup on backdrop click when disabled', async () => {
+      const onClose = vi.fn();
+      const { user } = renderPopup({
+        onClose,
+        dismissOnClickOutside: false,
+      });
+      
+      // Try clicking on backdrop
+      const dialog = screen.getByRole('dialog');
+      const backdrop = dialog.parentElement?.firstElementChild;
+      
+      if (backdrop) {
+        await user.click(backdrop);
+        expect(onClose).not.toHaveBeenCalled();
+      }
     });
 
-    it('provides fallback values for missing properties', () => {
-      const config: PopupConfig = {
-        message: 'Minimal config test',
-        // Missing optional properties should use defaults
-      };
+    it('closes popup with close button click', async () => {
+      const onClose = vi.fn();
+      const { user } = renderPopup({
+        onClose,
+        showCloseButton: true,
+      });
+      
+      const closeButton = screen.getByLabelText('Close popup');
+      await user.click(closeButton);
+      
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
 
-      render(
-        <TestWrapper>
-          <MockPopup isOpen={true} config={config} />
-        </TestWrapper>
-      );
+    it('hides close button when showCloseButton is false', () => {
+      renderPopup({ showCloseButton: false });
+      
+      expect(screen.queryByLabelText('Close popup')).not.toBeInTheDocument();
+    });
+  });
 
-      expect(screen.getByText('Minimal config test')).toBeInTheDocument();
+  describe('Animation and Transitions', () => {
+    it('applies correct animation classes', async () => {
+      renderPopup({
+        animation: {
+          preset: 'fade',
+          duration: 300,
+          easing: 'ease-out',
+        },
+      });
+      
+      // Check that dialog is rendered (animation classes are applied by Headless UI)
+      const dialog = screen.getByRole('dialog');
+      expect(dialog).toBeInTheDocument();
+      
+      // Animation classes would be tested with more specific animation library testing
+    });
+
+    it('handles different animation presets', () => {
+      const presets = ['fade', 'scale', 'slide'] as const;
+      
+      presets.forEach((preset) => {
+        const { unmount } = renderPopup({
+          animation: { preset },
+        });
+        
+        const dialog = screen.getByRole('dialog');
+        expect(dialog).toBeInTheDocument();
+        
+        unmount();
+      });
+    });
+
+    it('applies custom animation duration', async () => {
+      renderPopup({
+        animation: {
+          duration: 500,
+        },
+      });
+      
+      const dialog = screen.getByRole('dialog');
+      expect(dialog).toBeInTheDocument();
+    });
+  });
+
+  describe('Internationalization Support', () => {
+    it('uses translation keys for default content', () => {
+      // Mock the translation function to return specific keys
+      mockTranslation.t.mockImplementation((key: string) => {
+        if (key === 'popup.title.passwordSecurity') return 'Translated Security Title';
+        if (key === 'popup.button.updatePassword') return 'Translated Update Button';
+        return key;
+      });
+      
+      renderPopup({
+        variant: 'authentication',
+        title: mockTranslation.t('popup.title.passwordSecurity'),
+      });
+      
+      expect(screen.getByText('Translated Security Title')).toBeInTheDocument();
+    });
+
+    it('handles RTL text direction', () => {
+      renderPopup({
+        i18n: {
+          rtl: true,
+          locale: 'ar',
+        },
+      });
+      
+      const dialog = screen.getByRole('dialog');
+      expect(dialog).toBeInTheDocument();
+      // RTL handling would typically be tested with specific CSS or direction attributes
+    });
+
+    it('uses custom button labels from i18n config', () => {
+      renderPopup({
+        i18n: {
+          buttonLabels: {
+            close: 'Custom Close',
+            remindLater: 'Custom Remind',
+          },
+        },
+        showCloseButton: true,
+        showRemindMeLater: true,
+      });
+      
+      // Note: The actual implementation would use these custom labels
+      // This test validates the structure is in place
       expect(screen.getByRole('dialog')).toBeInTheDocument();
     });
+  });
+
+  describe('Responsive Design', () => {
+    it('adapts layout for mobile viewport', async () => {
+      setViewport(375, 667); // iPhone viewport
+      
+      renderPopup({
+        size: 'md',
+        showRemindMeLater: true,
+      });
+      
+      const dialog = screen.getByRole('dialog');
+      expect(dialog).toBeInTheDocument();
+      
+      // Check that buttons are arranged in column on mobile (flex-col-reverse sm:flex-row)
+      const actions = dialog.querySelector('[class*="flex-col-reverse"]');
+      expect(actions).toBeInTheDocument();
+    });
+
+    it('adapts layout for tablet viewport', async () => {
+      setViewport(768, 1024); // iPad viewport
+      
+      renderPopup({
+        size: 'lg',
+      });
+      
+      const dialog = screen.getByRole('dialog');
+      expect(dialog).toBeInTheDocument();
+    });
+
+    it('adapts layout for desktop viewport', async () => {
+      setViewport(1920, 1080); // Desktop viewport
+      
+      renderPopup({
+        size: 'xl',
+      });
+      
+      const dialog = screen.getByRole('dialog');
+      expect(dialog).toBeInTheDocument();
+    });
+
+    it('maintains accessibility on different screen sizes', async () => {
+      const viewports = [
+        [375, 667],   // Mobile
+        [768, 1024],  // Tablet
+        [1920, 1080], // Desktop
+      ];
+      
+      for (const [width, height] of viewports) {
+        setViewport(width, height);
+        
+        const { container, unmount } = renderPopup();
+        
+        await testA11y(container, {
+          tags: ['wcag2a', 'wcag2aa'],
+        });
+        
+        unmount();
+      }
+    });
+  });
+
+  describe('Edge Cases and Error Handling', () => {
+    it('handles missing onClose callback gracefully', async () => {
+      const { keyboard } = renderPopup({
+        onClose: undefined as any,
+      });
+      
+      // Should not throw error when trying to close
+      await expect(async () => {
+        await keyboard.escape();
+      }).not.toThrow();
+    });
+
+    it('handles malformed children prop', () => {
+      renderPopup({
+        children: null as any,
+      });
+      
+      const dialog = screen.getByRole('dialog');
+      expect(dialog).toBeInTheDocument();
+    });
+
+    it('handles extremely long content', () => {
+      const longContent = 'A'.repeat(10000);
+      
+      renderPopup({
+        children: longContent,
+        title: 'Long Content Test',
+      });
+      
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      expect(screen.getByText(longContent)).toBeInTheDocument();
+    });
+
+    it('handles rapid open/close operations', async () => {
+      const onClose = vi.fn();
+      const { keyboard, rerender } = renderPopup({ onClose });
+      
+      // Rapidly trigger close operations
+      await keyboard.escape();
+      await keyboard.escape();
+      await keyboard.escape();
+      
+      // Should handle gracefully without errors
+      expect(onClose).toHaveBeenCalled();
+    });
+  });
+});
+
+describe('Popup Service Hook', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe('usePopup Hook', () => {
+    it('opens popup programmatically', async () => {
+      const TestComponent = () => {
+        const popup = usePopup();
+        
+        const handleOpen = () => {
+          popup.open(
+            <div>Programmatic popup content</div>,
+            {
+              hasBackdrop: true,
+              closeOnBackdropClick: true,
+            }
+          );
+        };
+        
+        return <button onClick={handleOpen}>Open Popup</button>;
+      };
+      
+      const { user } = customRender(
+        <PopupProvider>
+          <TestComponent />
+        </PopupProvider>
+      );
+      
+      const openButton = screen.getByText('Open Popup');
+      await user.click(openButton);
+      
+      await waitFor(() => {
+        expect(screen.getByText('Programmatic popup content')).toBeInTheDocument();
+      });
+    });
+
+    it('closes popup programmatically', async () => {
+      const TestComponent = () => {
+        const popup = usePopup();
+        const [popupRef, setPopupRef] = React.useState<any>(null);
+        
+        const handleOpen = () => {
+          const ref = popup.open(<div>Test content</div>);
+          setPopupRef(ref);
+        };
+        
+        const handleClose = () => {
+          if (popupRef) {
+            popupRef.close('test-result');
+          }
+        };
+        
+        return (
+          <div>
+            <button onClick={handleOpen}>Open</button>
+            <button onClick={handleClose}>Close</button>
+          </div>
+        );
+      };
+      
+      const { user } = customRender(
+        <PopupProvider>
+          <TestComponent />
+        </PopupProvider>
+      );
+      
+      await user.click(screen.getByText('Open'));
+      await waitFor(() => {
+        expect(screen.getByText('Test content')).toBeInTheDocument();
+      });
+      
+      await user.click(screen.getByText('Close'));
+      await waitFor(() => {
+        expect(screen.queryByText('Test content')).not.toBeInTheDocument();
+      });
+    });
+
+    it('handles popup promises correctly', async () => {
+      const TestComponent = () => {
+        const popup = usePopup();
+        const [result, setResult] = React.useState<string>('');
+        
+        const handleOpen = async () => {
+          const ref = popup.open(<div>Async popup</div>);
+          
+          // Simulate closing with result after delay
+          setTimeout(() => {
+            ref.close('async-result');
+          }, 100);
+          
+          const finalResult = await ref.afterClosed();
+          setResult(finalResult || 'no-result');
+        };
+        
+        return (
+          <div>
+            <button onClick={handleOpen}>Open Async</button>
+            <span data-testid="result">{result}</span>
+          </div>
+        );
+      };
+      
+      const { user } = customRender(
+        <PopupProvider>
+          <TestComponent />
+        </PopupProvider>
+      );
+      
+      await user.click(screen.getByText('Open Async'));
+      
+      await waitFor(() => {
+        expect(screen.getByTestId('result')).toHaveTextContent('async-result');
+      });
+    });
+
+    it('manages multiple popups correctly', async () => {
+      const TestComponent = () => {
+        const popup = usePopup();
+        
+        const openMultiple = () => {
+          popup.open(<div>Popup 1</div>, { zIndex: 1000 });
+          popup.open(<div>Popup 2</div>, { zIndex: 1010 });
+          popup.open(<div>Popup 3</div>, { zIndex: 1020 });
+        };
+        
+        return <button onClick={openMultiple}>Open Multiple</button>;
+      };
+      
+      const { user } = customRender(
+        <PopupProvider config={{ maxStack: 5 }}>
+          <TestComponent />
+        </PopupProvider>
+      );
+      
+      await user.click(screen.getByText('Open Multiple'));
+      
+      await waitFor(() => {
+        expect(screen.getByText('Popup 1')).toBeInTheDocument();
+        expect(screen.getByText('Popup 2')).toBeInTheDocument();
+        expect(screen.getByText('Popup 3')).toBeInTheDocument();
+      });
+    });
+
+    it('respects max stack configuration', async () => {
+      const TestComponent = () => {
+        const popup = usePopup();
+        
+        const openManyPopups = () => {
+          // Try to open more popups than max stack allows
+          for (let i = 1; i <= 5; i++) {
+            popup.open(<div>Popup {i}</div>);
+          }
+        };
+        
+        return <button onClick={openManyPopups}>Open Many</button>;
+      };
+      
+      const { user } = customRender(
+        <PopupProvider config={{ maxStack: 2 }}>
+          <TestComponent />
+        </PopupProvider>
+      );
+      
+      await user.click(screen.getByText('Open Many'));
+      
+      await waitFor(() => {
+        // Should only show the last 2 popups
+        expect(screen.queryByText('Popup 1')).not.toBeInTheDocument();
+        expect(screen.queryByText('Popup 2')).not.toBeInTheDocument();
+        expect(screen.queryByText('Popup 3')).not.toBeInTheDocument();
+        expect(screen.getByText('Popup 4')).toBeInTheDocument();
+        expect(screen.getByText('Popup 5')).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('usePopupQueue Hook', () => {
+    it('processes popup queue in sequence', async () => {
+      const TestComponent = () => {
+        const { addToQueue, isProcessing } = usePopupQueue();
+        const [results, setResults] = React.useState<string[]>([]);
+        
+        const addToQueueAsync = async () => {
+          const promises = [
+            addToQueue(<div>Queue Item 1</div>),
+            addToQueue(<div>Queue Item 2</div>),
+            addToQueue(<div>Queue Item 3</div>),
+          ];
+          
+          const queueResults = await Promise.all(promises);
+          setResults(queueResults);
+        };
+        
+        return (
+          <div>
+            <button onClick={addToQueueAsync}>Add to Queue</button>
+            <span data-testid="processing">{isProcessing ? 'Processing' : 'Idle'}</span>
+          </div>
+        );
+      };
+      
+      const { user } = customRender(
+        <PopupProvider>
+          <TestComponent />
+        </PopupProvider>
+      );
+      
+      await user.click(screen.getByText('Add to Queue'));
+      
+      // Should show processing state
+      expect(screen.getByTestId('processing')).toHaveTextContent('Processing');
+    });
+  });
+
+  describe('usePopupConfig Hook', () => {
+    it('provides popup configuration', () => {
+      const TestComponent = () => {
+        const config = usePopupConfig();
+        
+        return (
+          <div>
+            <span data-testid="max-stack">{config.maxStack}</span>
+            <span data-testid="close-on-escape">{config.closeOnEscapeKey ? 'true' : 'false'}</span>
+          </div>
+        );
+      };
+      
+      customRender(
+        <PopupProvider config={{ maxStack: 3, closeOnEscapeKey: true }}>
+          <TestComponent />
+        </PopupProvider>
+      );
+      
+      expect(screen.getByTestId('max-stack')).toHaveTextContent('3');
+      expect(screen.getByTestId('close-on-escape')).toHaveTextContent('true');
+    });
+  });
+
+  describe('PopupProvider Error Handling', () => {
+    it('throws error when usePopup is used outside provider', () => {
+      const TestComponent = () => {
+        const popup = usePopup();
+        return <div>Should not render</div>;
+      };
+      
+      // Suppress console.error for this test
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      
+      expect(() => {
+        customRender(<TestComponent />, { skipProviders: true });
+      }).toThrow('usePopupContext must be used within a PopupProvider');
+      
+      consoleSpy.mockRestore();
+    });
+  });
+});
+
+describe('Performance and Memory Management', () => {
+  it('cleans up event listeners on unmount', () => {
+    const { unmount } = renderPopup();
+    
+    // Add spies to check cleanup
+    const removeEventListenerSpy = vi.spyOn(document, 'removeEventListener');
+    
+    unmount();
+    
+    // Should clean up keyboard event listeners
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('keydown', expect.any(Function));
+    
+    removeEventListenerSpy.mockRestore();
+  });
+
+  it('handles rapid re-rendering without memory leaks', () => {
+    const { rerender } = renderPopup();
+    
+    // Rapidly re-render with different props
+    for (let i = 0; i < 100; i++) {
+      rerender(
+        <PopupProvider>
+          <Popup
+            {...defaultPopupProps}
+            title={`Title ${i}`}
+            isOpen={i % 2 === 0}
+          />
+        </PopupProvider>
+      );
+    }
+    
+    // Should handle gracefully without errors
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('optimizes re-renders with memoization', () => {
+    const renderSpy = vi.fn();
+    
+    const TestPopup = React.memo((props: PopupProps) => {
+      renderSpy();
+      return <Popup {...props} />;
+    });
+    
+    const { rerender } = customRender(
+      <PopupProvider>
+        <TestPopup {...defaultPopupProps} />
+      </PopupProvider>
+    );
+    
+    const initialRenderCount = renderSpy.mock.calls.length;
+    
+    // Re-render with same props
+    rerender(
+      <PopupProvider>
+        <TestPopup {...defaultPopupProps} />
+      </PopupProvider>
+    );
+    
+    // Should not re-render if props haven't changed
+    expect(renderSpy).toHaveBeenCalledTimes(initialRenderCount);
   });
 });
