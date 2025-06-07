@@ -1,442 +1,442 @@
 # Button Component System
 
-A comprehensive, accessible button component system for the DreamFactory Admin Interface, built with React 19, TypeScript 5.8+, and Tailwind CSS 4.1+. This system replaces Angular Material button patterns with modern React implementations while maintaining WCAG 2.1 AA compliance and superior developer experience.
+The Button component system provides a comprehensive set of button components for the DreamFactory Admin Interface, implementing WCAG 2.1 AA accessibility standards and replacing all Angular Material button patterns with a modern React 19/Tailwind CSS implementation.
 
 ## Table of Contents
 
-- [Quick Start](#quick-start)
-- [Component API](#component-api)
-- [TypeScript Interfaces](#typescript-interfaces)
-- [Accessibility Features](#accessibility-features)
+- [Overview](#overview)
+- [Components](#components)
+- [API Reference](#api-reference)
+- [Accessibility](#accessibility)
 - [Migration Guide](#migration-guide)
 - [Usage Examples](#usage-examples)
-- [Variants and States](#variants-and-states)
 - [Best Practices](#best-practices)
 - [Troubleshooting](#troubleshooting)
 
-## Quick Start
+## Overview
+
+The Button component system consists of four main components:
+
+- **Button**: Core button component with comprehensive variant support
+- **IconButton**: Specialized icon-only buttons with enhanced accessibility
+- **LoadingButton**: Async operation buttons with automatic loading states
+- **ButtonGroup**: Grouped button layouts with keyboard navigation
+
+### Key Features
+
+- ✅ **WCAG 2.1 AA Compliant**: Minimum 4.5:1 contrast ratios and 44×44px touch targets
+- ⌨️ **Keyboard Navigation**: Focus-visible indicators and arrow key support
+- 📱 **Mobile Optimized**: Touch-friendly targets and responsive design
+- 🎨 **Design System**: Consistent styling with Tailwind CSS design tokens
+- 🔄 **Loading States**: Built-in async operation support
+- 🌙 **Dark Mode**: Full dark mode support with proper contrast
+- 🎯 **Type Safety**: Complete TypeScript interfaces and prop validation
+
+## Components
+
+### Button
+
+The core button component with comprehensive variant and accessibility support.
 
 ```tsx
-import { Button, IconButton, ButtonGroup } from '@/components/ui/button';
-import { Plus, Save, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
-// Basic usage
 <Button variant="primary" size="md">
-  Create Service
+  Save Changes
 </Button>
+```
 
-// With icon
-<Button variant="secondary" size="lg">
-  <Save className="w-4 h-4 mr-2" />
-  Save Configuration
-</Button>
+### IconButton
 
-// Icon-only button
-<IconButton
+Specialized component for icon-only buttons with mandatory accessibility labels.
+
+```tsx
+import { IconButton } from '@/components/ui/button';
+import { Search } from 'lucide-react';
+
+<IconButton 
+  icon={Search}
+  aria-label="Search database tables"
   variant="outline"
-  size="sm"
-  aria-label="Add new entry"
->
-  <Plus className="w-4 h-4" />
-</IconButton>
+/>
+```
 
-// Grouped buttons
-<ButtonGroup orientation="horizontal">
+### LoadingButton
+
+Enhanced button with automatic async operation handling.
+
+```tsx
+import { LoadingButton } from '@/components/ui/button';
+
+<LoadingButton
+  asyncAction={handleSaveDatabase}
+  successMessage="Database connection saved successfully"
+  errorMessage="Failed to save database connection"
+>
+  Test Connection
+</LoadingButton>
+```
+
+### ButtonGroup
+
+Container for related buttons with keyboard navigation support.
+
+```tsx
+import { ButtonGroup, Button } from '@/components/ui/button';
+
+<ButtonGroup label="Form actions" orientation="horizontal">
   <Button variant="outline">Cancel</Button>
-  <Button variant="primary">Confirm</Button>
+  <Button variant="primary">Save</Button>
 </ButtonGroup>
 ```
 
-## Component API
+## API Reference
 
-### Button Component
-
-The primary button component supporting all common use cases with comprehensive accessibility features.
-
-#### Props
-
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `variant` | `'primary' \| 'secondary' \| 'outline' \| 'ghost' \| 'destructive'` | `'primary'` | Visual style variant |
-| `size` | `'sm' \| 'md' \| 'lg'` | `'md'` | Size variant affecting padding and minimum touch targets |
-| `loading` | `boolean` | `false` | Shows loading spinner and disables interaction |
-| `disabled` | `boolean` | `false` | Disables button interaction and applies disabled styling |
-| `fullWidth` | `boolean` | `false` | Makes button span full width of container |
-| `children` | `React.ReactNode` | - | Button content (text, icons, etc.) |
-| `className` | `string` | - | Additional CSS classes |
-| `ariaLabel` | `string` | - | Accessible label for screen readers |
-| `ariaDescribedBy` | `string` | - | References additional descriptive text |
-| `announceOnPress` | `string` | - | Screen reader announcement on button press |
-| `...props` | `ButtonHTMLAttributes<HTMLButtonElement>` | - | All standard button HTML attributes |
-
-### IconButton Component
-
-Specialized component for icon-only buttons with enhanced accessibility requirements.
-
-#### Props
-
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `variant` | `'primary' \| 'secondary' \| 'outline' \| 'ghost' \| 'destructive'` | `'ghost'` | Visual style variant |
-| `size` | `'sm' \| 'md' \| 'lg'` | `'md'` | Size variant with minimum 44x44px touch targets |
-| `shape` | `'square' \| 'circle'` | `'square'` | Button shape for different contexts |
-| `children` | `React.ReactNode` | - | Icon element (required) |
-| `aria-label` | `string` | - | **Required** - Accessible label for icon-only buttons |
-| `...props` | Extends `Button` props | - | All Button component props available |
-
-### ButtonGroup Component
-
-Container for grouping related buttons with consistent spacing and navigation.
-
-#### Props
-
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `orientation` | `'horizontal' \| 'vertical'` | `'horizontal'` | Layout direction |
-| `spacing` | `'tight' \| 'normal' \| 'loose'` | `'normal'` | Spacing between buttons |
-| `variant` | `'default' \| 'toolbar' \| 'dialog'` | `'default'` | Predefined grouping styles |
-| `children` | `React.ReactNode` | - | Button components to group |
-| `ariaLabel` | `string` | - | Group label for screen readers |
-| `className` | `string` | - | Additional CSS classes |
-
-## TypeScript Interfaces
-
-### Core Interfaces
+### Button Props
 
 ```typescript
-import { ButtonHTMLAttributes, ReactNode } from 'react';
-import { VariantProps } from 'class-variance-authority';
-
-// Base button variant configuration
-export interface ButtonVariants extends VariantProps<typeof buttonVariants> {
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive';
-  size?: 'sm' | 'md' | 'lg';
-}
-
-// Main Button component props
-export interface ButtonProps extends 
-  ButtonHTMLAttributes<HTMLButtonElement>,
-  ButtonVariants {
-  loading?: boolean;
+interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  // Visual Variants
+  variant?: 'primary' | 'secondary' | 'success' | 'warning' | 'error' | 'outline' | 'ghost' | 'link';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'icon-sm' | 'icon-md' | 'icon-lg' | 'icon-xl';
   fullWidth?: boolean;
-  children: ReactNode;
+  
+  // Content
+  children: React.ReactNode;
+  icon?: React.ReactNode;
+  iconRight?: React.ReactNode;
+  
+  // Loading States
+  loading?: boolean;
+  loadingText?: string;
+  loadingSpinner?: React.ReactNode;
+  
+  // Accessibility
   ariaLabel?: string;
   ariaDescribedBy?: string;
   announceOnPress?: string;
-}
-
-// IconButton specific props
-export interface IconButtonProps extends Omit<ButtonProps, 'children'> {
-  shape?: 'square' | 'circle';
-  children: ReactNode; // Icon element
-  'aria-label': string; // Required for accessibility
-}
-
-// ButtonGroup configuration
-export interface ButtonGroupProps {
-  orientation?: 'horizontal' | 'vertical';
-  spacing?: 'tight' | 'normal' | 'loose';
-  variant?: 'default' | 'toolbar' | 'dialog';
-  children: ReactNode;
-  ariaLabel?: string;
-  className?: string;
-}
-
-// Accessibility enhancement types
-export interface AccessibilityProps {
-  ariaLabel?: string;
-  ariaDescribedBy?: string;
-  ariaPressed?: boolean;
-  ariaExpanded?: boolean;
   role?: string;
-}
-
-// Loading state configuration
-export interface LoadingConfig {
-  text?: string;
-  spinner?: 'default' | 'dots' | 'pulse';
-  position?: 'start' | 'end' | 'overlay';
+  disableFocusRing?: boolean;
 }
 ```
 
-### Variant Types
+### IconButton Props
 
 ```typescript
-// Color variants with WCAG 2.1 AA compliance
-export type ButtonVariant = 
-  | 'primary'     // Primary brand actions (4.52:1 contrast ratio)
-  | 'secondary'   // Secondary actions (4.51:1 contrast ratio)
-  | 'outline'     // Subtle emphasis (7.14:1 contrast ratio)
-  | 'ghost'       // Minimal emphasis
-  | 'destructive' // Dangerous actions (5.25:1 contrast ratio)
-
-// Size variants with minimum touch targets
-export type ButtonSize = 
-  | 'sm'  // 44x44px minimum (WCAG compliance)
-  | 'md'  // 48x48px standard
-  | 'lg'  // 56x56px enhanced
-
-// State types for interactive feedback
-export type ButtonState = 
-  | 'default'
-  | 'hover'
-  | 'active'
-  | 'focused'
-  | 'loading'
-  | 'disabled'
+interface IconButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  // Icon and Accessibility (Required)
+  icon: LucideIcon;
+  'aria-label': string; // Required for accessibility
+  
+  // Visual Variants
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive';
+  size?: 'sm' | 'default' | 'lg' | 'xl';
+  shape?: 'square' | 'circle';
+  elevation?: 'none' | 'low' | 'medium' | 'high';
+  
+  // Enhanced Features
+  tooltip?: string;
+  loading?: boolean;
+  fab?: boolean; // Floating Action Button
+  asChild?: boolean; // Composition pattern
+}
 ```
 
-## Accessibility Features
+### LoadingButton Props
+
+```typescript
+interface LoadingButtonProps extends ButtonProps {
+  // Async Operation Handling
+  asyncAction?: () => Promise<void> | void;
+  successMessage?: string;
+  errorMessage?: string;
+}
+```
+
+### ButtonGroup Props
+
+```typescript
+interface ButtonGroupProps extends React.HTMLAttributes<HTMLDivElement> {
+  // Layout and Behavior
+  orientation?: 'horizontal' | 'vertical';
+  size?: 'sm' | 'md' | 'lg';
+  variant?: 'default' | 'contained' | 'separated' | 'minimal';
+  
+  // Accessibility
+  label?: string; // Screen reader label
+  ariaDescribedBy?: string;
+  enableKeyboardNavigation?: boolean;
+  
+  // Visual Grouping
+  attached?: boolean; // Connect buttons visually
+  
+  // Content
+  children: React.ReactNode;
+}
+```
+
+### Variant Specifications
+
+#### Button Variants
+
+| Variant | Use Case | Contrast Ratio | Example |
+|---------|----------|----------------|---------|
+| `primary` | Main call-to-action buttons | 7.14:1 (AAA) | Save, Submit, Create |
+| `secondary` | Supporting actions | 4.51:1 (AA) | Edit, View, Configure |
+| `success` | Confirmation and positive actions | 4.89:1 (AA) | Approve, Enable, Activate |
+| `warning` | Caution and intermediate states | 4.68:1 (AA) | Warning dialogs, Pending actions |
+| `error` | Destructive actions | 5.25:1 (AA) | Delete, Remove, Disable |
+| `outline` | Secondary actions with emphasis | 7.14:1 (AAA) | Alternative actions |
+| `ghost` | Minimal impact actions | 10.89:1 (AAA) | Cancel, Dismiss |
+| `link` | Navigation and external links | 7.14:1 (AAA) | Help links, Documentation |
+
+#### Size Specifications
+
+| Size | Dimensions | Touch Target | Use Case |
+|------|------------|--------------|----------|
+| `sm` | 44×44px | 44×44px (WCAG minimum) | Compact interfaces, table actions |
+| `md` | 48×48px | 48×48px | Standard buttons, forms |
+| `lg` | 56×56px | 56×56px | Primary actions, prominent buttons |
+| `xl` | 64×64px | 64×64px | Hero buttons, major CTAs |
+
+## Accessibility
 
 ### WCAG 2.1 AA Compliance
 
-The Button component system meets Level AA accessibility standards through:
+The Button component system is fully compliant with WCAG 2.1 AA accessibility standards:
 
-#### Color Contrast Requirements
-- **Normal Text**: Minimum 4.5:1 contrast ratio
-- **UI Components**: Minimum 3:1 contrast ratio for borders and focus indicators
-- **Enhanced (AAA)**: 7:1 contrast ratio for improved readability
+#### Color and Contrast
+- **Minimum contrast ratios**: 4.5:1 for normal text, 3:1 for UI components
+- **Color independence**: Information conveyed through means other than color alone
+- **High contrast mode**: Compatible with Windows High Contrast Mode
 
-```typescript
-// Color compliance matrix with actual contrast ratios
-const accessibleColors = {
-  primary: {
-    background: '#6366f1', // 4.52:1 vs white ✓ AA
-    text: '#ffffff',       // High contrast
-    border: '#4f46e5',     // 7.14:1 vs white ✓ AAA
-  },
-  secondary: {
-    background: '#f8fafc', // 1.04:1 vs white (light mode)
-    text: '#0f172a',       // 18.91:1 vs white ✓ AAA
-    border: '#cbd5e1',     // 1.39:1 vs white
-  },
-  destructive: {
-    background: '#dc2626', // 5.25:1 vs white ✓ AA
-    text: '#ffffff',       // High contrast
-    border: '#b91c1c',     // 7.36:1 vs white ✓ AAA
-  }
-};
-```
+#### Touch Targets
+- **Minimum size**: 44×44px for all interactive elements
+- **Spacing**: Adequate spacing between adjacent targets
+- **Mobile optimization**: Enhanced touch targets for mobile devices
 
 #### Keyboard Navigation
-
-- **Focus Visible**: 2px solid outline with 2px offset
-- **Touch Targets**: Minimum 44x44px interactive areas
-- **Tab Order**: Logical navigation sequence
-- **Enter/Space**: Standard activation keys
-
-```tsx
-// Focus management example
-<Button
-  variant="primary"
-  onKeyDown={(e) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      handleAction();
-    }
-  }}
-  className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2"
->
-  Submit Form
-</Button>
-```
+- **Focus management**: Visible focus indicators for keyboard-only users
+- **Focus-visible**: Modern focus-visible support (no mouse focus rings)
+- **Tab order**: Logical tab sequence throughout the interface
+- **Arrow key navigation**: ButtonGroup supports arrow key navigation
 
 #### Screen Reader Support
+- **ARIA labels**: Proper labeling for all interactive elements
+- **ARIA states**: Live announcements for loading and state changes
+- **Role attributes**: Semantic roles for assistive technology
+- **Content descriptions**: Descriptive text for complex interactions
 
-- **ARIA Labels**: Descriptive labels for all interactive elements
-- **Live Regions**: Announcements for state changes
-- **Role Attributes**: Proper semantic roles
-- **Group Labeling**: Accessible grouping for button collections
+### Accessibility Features
 
 ```tsx
-// Screen reader optimized button
-<Button
-  variant="primary"
-  loading={isSubmitting}
-  ariaLabel="Submit database configuration form"
-  ariaDescribedBy="form-errors"
-  announceOnPress="Configuration saved successfully"
+// Required ARIA label for icon buttons
+<IconButton 
+  icon={Delete} 
+  aria-label="Delete database connection"
+  aria-describedby="delete-help-text"
+/>
+
+// Screen reader announcements
+<Button 
+  announceOnPress="Database connection saved successfully"
+  loading={isSaving}
+  loadingText="Saving database connection"
 >
-  {isSubmitting ? 'Saving...' : 'Save Configuration'}
+  Save Connection
 </Button>
+
+// Keyboard navigation in groups
+<ButtonGroup 
+  label="Database actions" 
+  enableKeyboardNavigation={true}
+>
+  <Button>Edit</Button>
+  <Button>Test</Button>
+  <Button>Delete</Button>
+</ButtonGroup>
 ```
 
-### Focus Management
+### Testing Accessibility
 
-The button system implements comprehensive focus management:
+The component includes comprehensive accessibility testing:
 
-```typescript
-// Focus ring utility classes
-export const focusStyles = {
-  primary: 'focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2',
-  error: 'focus-visible:ring-2 focus-visible:ring-error-600 focus-visible:ring-offset-2',
-  success: 'focus-visible:ring-2 focus-visible:ring-success-600 focus-visible:ring-offset-2',
-};
+```tsx
+import { render, screen } from '@testing-library/react';
+import { axe } from 'jest-axe';
+import { Button } from './button';
 
-// Focus trap for button groups
-export const useFocusTrap = (refs: RefObject<HTMLButtonElement>[]) => {
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-      // Focus next button
-    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-      // Focus previous button
-    }
-  }, [refs]);
-};
+test('passes accessibility audit', async () => {
+  const { container } = render(
+    <Button variant="primary">Save Changes</Button>
+  );
+  
+  const results = await axe(container);
+  expect(results).toHaveNoViolations();
+});
 ```
 
 ## Migration Guide
 
 ### From Angular Material to React
 
-This guide helps migrate existing Angular Material button patterns to the new React implementation.
+This section provides comprehensive migration guidance from Angular Material button patterns to the new React implementation.
 
 #### Basic Button Migration
 
-**Angular Material (Before):**
-```html
-<!-- mat-button (text button) -->
-<button mat-button color="primary" (click)="handleClick()">
-  Click Me
-</button>
+```typescript
+// Angular Material (BEFORE)
+<button mat-button>Basic</button>
+<button mat-raised-button>Raised</button>
+<button mat-flat-button>Flat</button>
+<button mat-stroked-button>Stroked</button>
 
-<!-- mat-flat-button (filled button) -->
-<button mat-flat-button color="primary" (click)="handleSubmit()">
-  Submit
-</button>
-
-<!-- mat-stroked-button (outlined button) -->
-<button mat-stroked-button (click)="handleCancel()">
-  Cancel
-</button>
-```
-
-**React Implementation (After):**
-```tsx
-{/* Ghost variant replaces mat-button */}
-<Button variant="ghost" onClick={handleClick}>
-  Click Me
-</Button>
-
-{/* Primary variant replaces mat-flat-button */}
-<Button variant="primary" onClick={handleSubmit}>
-  Submit
-</Button>
-
-{/* Outline variant replaces mat-stroked-button */}
-<Button variant="outline" onClick={handleCancel}>
-  Cancel
-</Button>
+// React Implementation (AFTER)
+<Button variant="ghost">Basic</Button>
+<Button variant="secondary">Raised</Button>
+<Button variant="primary">Flat</Button>
+<Button variant="outline">Stroked</Button>
 ```
 
 #### Icon Button Migration
 
-**Angular Material (Before):**
-```html
-<!-- mat-icon-button -->
-<button mat-icon-button (click)="toggleMenu()" [attr.aria-label]="menuLabel">
-  <fa-icon [icon]="faMenu"></fa-icon>
+```typescript
+// Angular Material (BEFORE)
+<button mat-icon-button>
+  <mat-icon>search</mat-icon>
 </button>
 
-<!-- mat-mini-fab -->
-<button mat-mini-fab color="primary" (click)="createNew()" aria-label="Create new entry">
-  <fa-icon [icon]="faPlus"></fa-icon>
+<button mat-mini-fab>
+  <mat-icon>add</mat-icon>
 </button>
-```
 
-**React Implementation (After):**
-```tsx
-{/* IconButton replaces mat-icon-button */}
-<IconButton
+// React Implementation (AFTER)
+<IconButton 
+  icon={Search} 
+  aria-label="Search"
   variant="ghost"
-  shape="square"
-  onClick={toggleMenu}
-  aria-label={menuLabel}
->
-  <Menu className="w-5 h-5" />
-</IconButton>
+/>
 
-{/* FAB variant replaces mat-mini-fab */}
-<IconButton
-  variant="primary"
+<IconButton 
+  icon={Plus} 
+  aria-label="Add item"
   shape="circle"
-  size="lg"
-  onClick={createNew}
-  aria-label="Create new entry"
->
-  <Plus className="w-6 h-6" />
-</IconButton>
+  elevation="medium"
+  fab
+/>
 ```
 
 #### Dialog Actions Migration
 
-**Angular Material (Before):**
-```html
+```typescript
+// Angular Material (BEFORE)
 <div mat-dialog-actions>
-  <button mat-flat-button mat-dialog-close>Cancel</button>
-  <button mat-flat-button color="primary" cdkFocusInitial (click)="confirm()">
-    Confirm
+  <button mat-flat-button mat-dialog-close>
+    {{ 'no' | transloco }}
+  </button>
+  <button mat-flat-button 
+          (click)="onClose()" 
+          cdkFocusInitial 
+          color="primary">
+    {{ 'yes' | transloco }}
   </button>
 </div>
-```
 
-**React Implementation (After):**
-```tsx
-<ButtonGroup variant="dialog" ariaLabel="Dialog actions">
-  <Button variant="outline" onClick={onCancel}>
-    Cancel
+// React Implementation (AFTER)
+<ButtonGroup 
+  label="Dialog actions" 
+  orientation="horizontal"
+  className="justify-end space-x-2"
+>
+  <Button 
+    variant="outline" 
+    onClick={onCancel}
+  >
+    {t('no')}
   </Button>
   <Button 
     variant="primary" 
     onClick={onConfirm}
     autoFocus
   >
-    Confirm
+    {t('yes')}
   </Button>
 </ButtonGroup>
 ```
 
-#### Loading States Migration
+#### Form Button Migration
 
-**Angular Material (Before):**
-```html
-<button mat-flat-button [disabled]="isLoading" (click)="submit()">
-  <mat-spinner *ngIf="isLoading" diameter="20"></mat-spinner>
-  {{ isLoading ? 'Saving...' : 'Save' }}
+```typescript
+// Angular Material (BEFORE)
+<button mat-raised-button 
+        type="submit" 
+        [disabled]="!form.valid"
+        color="primary">
+  Save
 </button>
-```
 
-**React Implementation (After):**
-```tsx
-<Button
+// React Implementation (AFTER)
+<Button 
+  type="submit"
   variant="primary"
-  loading={isLoading}
-  onClick={handleSubmit}
-  disabled={isLoading}
+  disabled={!isFormValid}
+  loading={isSubmitting}
+  announceOnPress="Form submitted successfully"
 >
-  {isLoading ? 'Saving...' : 'Save'}
+  Save
 </Button>
 ```
 
-### Icon Library Migration
-
-**FontAwesome to Lucide React:**
+#### Loading State Migration
 
 ```typescript
-// Angular FontAwesome imports (Before)
-import { faPlus, faEdit, faTrash, faRefresh } from '@fortawesome/free-solid-svg-icons';
+// Angular Material (BEFORE)
+<button mat-flat-button 
+        [disabled]="loading"
+        color="primary">
+  <mat-spinner 
+    *ngIf="loading" 
+    diameter="20"
+    color="primary">
+  </mat-spinner>
+  <span [class.hidden]="loading">Save</span>
+</button>
 
-// Lucide React imports (After)
-import { Plus, Edit, Trash2, RefreshCw } from 'lucide-react';
+// React Implementation (AFTER)
+<Button 
+  variant="primary"
+  loading={loading}
+  loadingText="Saving changes"
+>
+  Save
+</Button>
 
-// Icon usage migration
-const iconMigrationMap = {
-  faPlus: <Plus className="w-4 h-4" />,
-  faEdit: <Edit className="w-4 h-4" />,
-  faTrash: <Trash2 className="w-4 h-4" />,
-  faRefresh: <RefreshCw className="w-4 h-4" />,
-};
+// Or with LoadingButton
+<LoadingButton
+  variant="primary"
+  asyncAction={handleSave}
+  successMessage="Changes saved successfully"
+  errorMessage="Failed to save changes"
+>
+  Save
+</LoadingButton>
 ```
+
+### Migration Checklist
+
+- [ ] Replace `mat-button` with `Button variant="ghost"`
+- [ ] Replace `mat-raised-button` with `Button variant="secondary"`
+- [ ] Replace `mat-flat-button` with `Button variant="primary"`
+- [ ] Replace `mat-stroked-button` with `Button variant="outline"`
+- [ ] Replace `mat-icon-button` with `IconButton`
+- [ ] Replace `mat-mini-fab` with `IconButton fab`
+- [ ] Add required `aria-label` to all IconButton instances
+- [ ] Update color attributes to variant props
+- [ ] Replace Angular loading patterns with built-in loading prop
+- [ ] Update form submission patterns with async handling
+- [ ] Add accessibility labels and descriptions
+- [ ] Test keyboard navigation in button groups
+- [ ] Verify WCAG compliance with automated testing
 
 ## Usage Examples
 
@@ -444,517 +444,467 @@ const iconMigrationMap = {
 
 ```tsx
 import { Button } from '@/components/ui/button';
-import { Save, Download, Share } from 'lucide-react';
 
 // Primary action button
-<Button variant="primary" size="lg">
+<Button variant="primary" size="md">
   Create Database Service
 </Button>
 
-// Secondary action button
+// Secondary action
 <Button variant="secondary" size="md">
-  <Save className="w-4 h-4 mr-2" />
-  Save Configuration
+  Edit Configuration
 </Button>
 
-// Subtle action button
-<Button variant="outline" size="sm">
-  <Download className="w-4 h-4 mr-2" />
-  Export Schema
-</Button>
-
-// Minimal action button
-<Button variant="ghost">
-  <Share className="w-4 h-4 mr-2" />
-  Share
-</Button>
-
-// Destructive action button
-<Button variant="destructive">
+// Destructive action with confirmation
+<Button 
+  variant="error" 
+  announceOnPress="Database service deleted"
+  onClick={handleDelete}
+>
   Delete Service
+</Button>
+
+// Link-style button
+<Button 
+  variant="link" 
+  iconRight={<ExternalLink className="h-4 w-4" />}
+  onClick={openDocumentation}
+>
+  View Documentation
 </Button>
 ```
 
-### Advanced Button States
+### Icon Buttons
+
+```tsx
+import { IconButton } from '@/components/ui/button';
+import { Settings, Search, Plus, MoreVertical } from 'lucide-react';
+
+// Basic icon button
+<IconButton 
+  icon={Settings}
+  aria-label="Open settings"
+  variant="ghost"
+  size="default"
+/>
+
+// Floating action button
+<IconButton 
+  icon={Plus}
+  aria-label="Add new database connection"
+  variant="primary"
+  shape="circle"
+  elevation="medium"
+  fab
+/>
+
+// Table action button
+<IconButton 
+  icon={MoreVertical}
+  aria-label="More actions for this table"
+  variant="ghost"
+  size="sm"
+  tooltip="Additional table actions"
+/>
+
+// Search button with loading
+<IconButton 
+  icon={Search}
+  aria-label="Search tables"
+  variant="outline"
+  loading={isSearching}
+  onClick={handleSearch}
+/>
+```
+
+### Loading and Async Operations
+
+```tsx
+import { Button, LoadingButton } from '@/components/ui/button';
+
+// Manual loading state
+<Button
+  variant="primary"
+  loading={isConnecting}
+  loadingText="Testing database connection"
+  disabled={!isFormValid}
+  onClick={handleTestConnection}
+>
+  Test Connection
+</Button>
+
+// Automatic async handling
+<LoadingButton
+  variant="success"
+  asyncAction={async () => {
+    await saveConfiguration();
+    await refreshData();
+  }}
+  successMessage="Configuration saved and data refreshed"
+  errorMessage="Failed to save configuration"
+>
+  Save and Refresh
+</LoadingButton>
+
+// Custom loading spinner
+<Button
+  variant="primary"
+  loading={isGenerating}
+  loadingSpinner={
+    <div className="flex items-center space-x-2">
+      <Loader2 className="h-4 w-4 animate-spin" />
+      <span>Generating APIs...</span>
+    </div>
+  }
+>
+  Generate REST APIs
+</Button>
+```
+
+### Button Groups
+
+```tsx
+import { ButtonGroup, Button, IconButton } from '@/components/ui/button';
+import { Edit, Copy, Trash } from 'lucide-react';
+
+// Dialog actions
+<ButtonGroup 
+  label="Confirmation dialog actions"
+  orientation="horizontal"
+  className="justify-end mt-6"
+>
+  <Button variant="outline">Cancel</Button>
+  <Button variant="primary">Confirm</Button>
+</ButtonGroup>
+
+// Table row actions
+<ButtonGroup 
+  label="Table row actions"
+  orientation="horizontal"
+  size="sm"
+  variant="minimal"
+>
+  <IconButton 
+    icon={Edit}
+    aria-label="Edit table"
+    variant="ghost"
+    size="sm"
+  />
+  <IconButton 
+    icon={Copy}
+    aria-label="Duplicate table"
+    variant="ghost"
+    size="sm"
+  />
+  <IconButton 
+    icon={Trash}
+    aria-label="Delete table"
+    variant="ghost"
+    size="sm"
+  />
+</ButtonGroup>
+
+// Attached button group
+<ButtonGroup 
+  label="View options"
+  orientation="horizontal"
+  attached={true}
+  variant="contained"
+>
+  <Button variant={viewMode === 'table' ? 'primary' : 'secondary'}>
+    Table View
+  </Button>
+  <Button variant={viewMode === 'card' ? 'primary' : 'secondary'}>
+    Card View
+  </Button>
+  <Button variant={viewMode === 'list' ? 'primary' : 'secondary'}>
+    List View
+  </Button>
+</ButtonGroup>
+
+// Vertical button group
+<ButtonGroup 
+  label="Navigation menu"
+  orientation="vertical"
+  variant="separated"
+  className="w-48"
+>
+  <Button variant="ghost" className="justify-start">
+    Database Services
+  </Button>
+  <Button variant="ghost" className="justify-start">
+    API Documentation
+  </Button>
+  <Button variant="ghost" className="justify-start">
+    User Management
+  </Button>
+</ButtonGroup>
+```
+
+### Form Integration
 
 ```tsx
 import { Button } from '@/components/ui/button';
-import { useState } from 'react';
+import { useForm } from 'react-hook-form';
 
-function DatabaseConfigurationForm() {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isValid, setIsValid] = useState(false);
-
-  const handleSubmit = async () => {
-    setIsSubmitting(true);
-    try {
-      await saveConfiguration();
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+function DatabaseConnectionForm() {
+  const { handleSubmit, formState: { isValid, isSubmitting } } = useForm();
 
   return (
-    <div className="space-y-4">
-      {/* Loading state */}
-      <Button
-        variant="primary"
-        loading={isSubmitting}
-        onClick={handleSubmit}
-        disabled={!isValid || isSubmitting}
-        announceOnPress="Database configuration saved"
+    <form onSubmit={handleSubmit(onSubmit)}>
+      {/* Form fields... */}
+      
+      <ButtonGroup 
+        label="Form actions"
+        orientation="horizontal"
+        className="justify-between mt-6"
       >
-        {isSubmitting ? 'Saving Configuration...' : 'Save Configuration'}
-      </Button>
-
-      {/* Disabled state with tooltip */}
-      <Button
-        variant="secondary"
-        disabled={!isValid}
-        ariaDescribedBy="validation-errors"
-      >
-        Test Connection
-      </Button>
-
-      {/* Full width button */}
-      <Button variant="outline" fullWidth>
-        Cancel and Return to Dashboard
-      </Button>
-    </div>
+        <Button 
+          type="button"
+          variant="outline"
+          onClick={handleReset}
+        >
+          Reset Form
+        </Button>
+        
+        <div className="space-x-2">
+          <Button 
+            type="button"
+            variant="secondary"
+            disabled={!isValid}
+            onClick={handleTestConnection}
+          >
+            Test Connection
+          </Button>
+          
+          <Button 
+            type="submit"
+            variant="primary"
+            loading={isSubmitting}
+            disabled={!isValid}
+            announceOnPress="Database connection saved successfully"
+          >
+            Save Connection
+          </Button>
+        </div>
+      </ButtonGroup>
+    </form>
   );
 }
 ```
 
-### Icon Button Examples
+### Responsive and Mobile Optimized
 
 ```tsx
-import { IconButton } from '@/components/ui/button';
-import { Plus, Edit3, Trash2, RefreshCw, Settings } from 'lucide-react';
-
-// Toolbar actions
-<div className="flex items-center space-x-2">
-  <IconButton
-    variant="primary"
-    size="sm"
-    shape="circle"
-    aria-label="Add new database table"
-  >
-    <Plus className="w-4 h-4" />
-  </IconButton>
-
-  <IconButton
-    variant="ghost"
-    size="sm"
-    aria-label="Refresh schema"
-  >
-    <RefreshCw className="w-4 h-4" />
-  </IconButton>
-
-  <IconButton
-    variant="ghost"
-    size="sm"
-    aria-label="Open settings"
-  >
-    <Settings className="w-4 h-4" />
-  </IconButton>
-</div>
-
-// Table row actions
-<div className="flex items-center justify-end space-x-1">
-  <IconButton
-    variant="ghost"
-    size="sm"
-    aria-label="Edit database configuration"
-  >
-    <Edit3 className="w-4 h-4" />
-  </IconButton>
-
-  <IconButton
-    variant="ghost"
-    size="sm"
-    aria-label="Delete database service"
-  >
-    <Trash2 className="w-4 h-4 text-red-600" />
-  </IconButton>
-</div>
-
-// Floating Action Button (FAB)
-<IconButton
+// Responsive sizing
+<Button 
   variant="primary"
-  size="lg"
-  shape="circle"
-  className="fixed bottom-6 right-6 shadow-lg"
-  aria-label="Create new API endpoint"
+  size={{ base: 'sm', md: 'md', lg: 'lg' }}
+  fullWidth={{ base: true, md: false }}
 >
-  <Plus className="w-6 h-6" />
-</IconButton>
-```
-
-### Button Group Examples
-
-```tsx
-import { Button, ButtonGroup } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-
-// Dialog actions
-<ButtonGroup variant="dialog" ariaLabel="Confirm deletion">
-  <Button variant="outline">Cancel</Button>
-  <Button variant="destructive">Delete Service</Button>
-</ButtonGroup>
-
-// Pagination controls
-<ButtonGroup orientation="horizontal" spacing="tight">
-  <Button variant="outline" size="sm">
-    <ChevronLeft className="w-4 h-4 mr-1" />
-    Previous
-  </Button>
-  <Button variant="outline" size="sm">
-    1
-  </Button>
-  <Button variant="primary" size="sm">
-    2
-  </Button>
-  <Button variant="outline" size="sm">
-    3
-  </Button>
-  <Button variant="outline" size="sm">
-    Next
-    <ChevronRight className="w-4 h-4 ml-1" />
-  </Button>
-</ButtonGroup>
-
-// Vertical toolbar
-<ButtonGroup orientation="vertical" variant="toolbar">
-  <Button variant="ghost" size="sm">Tables</Button>
-  <Button variant="ghost" size="sm">Views</Button>
-  <Button variant="ghost" size="sm">Procedures</Button>
-  <Button variant="ghost" size="sm">Functions</Button>
-</ButtonGroup>
-
-// Form actions with proper spacing
-<ButtonGroup orientation="horizontal" spacing="normal">
-  <Button variant="outline">Reset Form</Button>
-  <Button variant="secondary">Save Draft</Button>
-  <Button variant="primary">Publish Configuration</Button>
-</ButtonGroup>
-```
-
-### Responsive Button Patterns
-
-```tsx
-import { Button } from '@/components/ui/button';
-import { Save, Settings } from 'lucide-react';
-
-// Responsive button with icon/text
-<Button
-  variant="primary"
-  className="w-full sm:w-auto"
->
-  <Save className="w-4 h-4 sm:mr-2" />
-  <span className="hidden sm:inline">Save Configuration</span>
+  Save Changes
 </Button>
 
 // Mobile-optimized button group
-<div className="flex flex-col sm:flex-row gap-2 sm:gap-0">
-  <ButtonGroup 
-    orientation="horizontal" 
-    className="hidden sm:flex"
-  >
-    <Button variant="outline">Cancel</Button>
-    <Button variant="primary">Save</Button>
-  </ButtonGroup>
-  
-  {/* Mobile: Stack buttons vertically */}
-  <div className="flex flex-col gap-2 sm:hidden">
-    <Button variant="primary" fullWidth>Save</Button>
-    <Button variant="outline" fullWidth>Cancel</Button>
-  </div>
+<ButtonGroup 
+  orientation={{ base: 'vertical', md: 'horizontal' }}
+  fullWidth={{ base: true, md: false }}
+  label="Mobile-responsive actions"
+>
+  <Button variant="outline">Cancel</Button>
+  <Button variant="primary">Submit</Button>
+</ButtonGroup>
+
+// Touch-friendly spacing
+<div className="flex flex-col space-y-4 md:flex-row md:space-y-0 md:space-x-4">
+  <Button size="lg" fullWidth={{ base: true, md: false }}>
+    Primary Action
+  </Button>
+  <Button size="lg" variant="outline" fullWidth={{ base: true, md: false }}>
+    Secondary Action
+  </Button>
 </div>
-
-// Responsive icon size
-<Button variant="secondary">
-  <Settings className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-  Database Settings
-</Button>
-```
-
-## Variants and States
-
-### Visual Variants
-
-#### Primary Variant
-- **Use Case**: Main call-to-action buttons
-- **Examples**: "Create Service", "Save Configuration", "Generate API"
-- **Styling**: Solid background with high contrast text
-- **Accessibility**: 4.52:1 contrast ratio (AA compliant)
-
-```tsx
-<Button variant="primary">Create Database Service</Button>
-```
-
-#### Secondary Variant
-- **Use Case**: Supporting actions, alternative choices
-- **Examples**: "Save Draft", "Import Schema", "View Documentation"
-- **Styling**: Muted background with strong text contrast
-- **Accessibility**: 4.51:1 contrast ratio (AA compliant)
-
-```tsx
-<Button variant="secondary">Import Existing Schema</Button>
-```
-
-#### Outline Variant
-- **Use Case**: Subtle emphasis, neutral actions
-- **Examples**: "Cancel", "Back", "Learn More"
-- **Styling**: Transparent background with prominent border
-- **Accessibility**: 7.14:1 border contrast ratio (AAA compliant)
-
-```tsx
-<Button variant="outline">Cancel Operation</Button>
-```
-
-#### Ghost Variant
-- **Use Case**: Minimal emphasis, navigation, menu items
-- **Examples**: Toolbar buttons, table actions, navigation links
-- **Styling**: Transparent background, subtle hover states
-- **Accessibility**: Focus ring for keyboard navigation
-
-```tsx
-<Button variant="ghost">View API Documentation</Button>
-```
-
-#### Destructive Variant
-- **Use Case**: Dangerous actions requiring confirmation
-- **Examples**: "Delete Service", "Remove Table", "Reset Configuration"
-- **Styling**: Error color scheme with high visibility
-- **Accessibility**: 5.25:1 contrast ratio (AA compliant)
-
-```tsx
-<Button variant="destructive">Delete Database Service</Button>
-```
-
-### Size Variants
-
-#### Small (sm)
-- **Dimensions**: Minimum 44x44px (WCAG compliance)
-- **Use Case**: Compact interfaces, table actions, secondary controls
-- **Touch Target**: Meets minimum accessibility requirements
-
-```tsx
-<Button variant="outline" size="sm">Edit</Button>
-```
-
-#### Medium (md) - Default
-- **Dimensions**: 48x48px standard
-- **Use Case**: General purpose buttons, forms, dialogs
-- **Touch Target**: Enhanced usability on touch devices
-
-```tsx
-<Button variant="primary" size="md">Save Configuration</Button>
-```
-
-#### Large (lg)
-- **Dimensions**: 56x56px enhanced
-- **Use Case**: Primary actions, mobile interfaces, prominent CTAs
-- **Touch Target**: Optimal for accessibility and mobile use
-
-```tsx
-<Button variant="primary" size="lg">Create New Service</Button>
-```
-
-### Interactive States
-
-#### Loading State
-- **Behavior**: Shows spinner, disables interaction, announces progress
-- **Implementation**: Built-in loading prop with screen reader support
-
-```tsx
-<Button variant="primary" loading={isSubmitting}>
-  {isSubmitting ? 'Creating Service...' : 'Create Service'}
-</Button>
-```
-
-#### Disabled State
-- **Behavior**: Prevents interaction, reduced opacity, maintains tab order
-- **Accessibility**: Includes aria-disabled and descriptive messaging
-
-```tsx
-<Button 
-  variant="secondary" 
-  disabled={!isValid}
-  ariaDescribedBy="validation-message"
->
-  Test Connection
-</Button>
-```
-
-#### Focus State
-- **Behavior**: Visible focus ring for keyboard navigation
-- **Accessibility**: 2px outline with 2px offset, 3:1 contrast ratio
-
-```tsx
-<Button 
-  variant="primary"
-  className="focus-visible:ring-2 focus-visible:ring-primary-600"
->
-  Submit Form
-</Button>
 ```
 
 ## Best Practices
 
-### Accessibility Guidelines
+### Accessibility Best Practices
 
-1. **Always provide descriptive labels**
+1. **Always provide accessible labels for icon buttons**:
    ```tsx
-   // Good: Descriptive action
-   <Button variant="primary">Create Database Service</Button>
+   // ✅ Good
+   <IconButton 
+     icon={Delete} 
+     aria-label="Delete database connection" 
+   />
    
-   // Better: Include context
-   <Button variant="primary" ariaLabel="Create new database service configuration">
-     Create Service
+   // ❌ Bad
+   <IconButton icon={Delete} />
+   ```
+
+2. **Use descriptive button text**:
+   ```tsx
+   // ✅ Good
+   <Button>Save Database Connection</Button>
+   
+   // ❌ Bad
+   <Button>Save</Button>
+   ```
+
+3. **Provide context for screen readers**:
+   ```tsx
+   // ✅ Good
+   <Button 
+     announceOnPress="Database connection test completed successfully"
+     ariaDescribedBy="connection-help-text"
+   >
+     Test Connection
    </Button>
    ```
 
-2. **Use appropriate variants for context**
+4. **Use proper button groups for related actions**:
    ```tsx
-   // Good: Clear visual hierarchy
-   <ButtonGroup>
+   // ✅ Good
+   <ButtonGroup label="Dialog actions">
      <Button variant="outline">Cancel</Button>
      <Button variant="primary">Save</Button>
    </ButtonGroup>
-   ```
-
-3. **Ensure sufficient color contrast**
-   ```tsx
-   // Good: High contrast destructive action
-   <Button variant="destructive">Delete Service</Button>
    
-   // Avoid: Custom colors without contrast verification
-   <Button className="bg-yellow-300 text-yellow-500">Warning</Button>
+   // ❌ Bad
+   <div>
+     <Button variant="outline">Cancel</Button>
+     <Button variant="primary">Save</Button>
+   </div>
    ```
 
-4. **Provide loading states for async actions**
-   ```tsx
-   <Button 
-     variant="primary"
-     loading={isSubmitting}
-     disabled={isSubmitting}
-     announceOnPress="Configuration saved successfully"
-   >
-     {isSubmitting ? 'Saving...' : 'Save Configuration'}
-   </Button>
-   ```
+### Visual Design Best Practices
 
-### Performance Optimization
+1. **Use variant hierarchy appropriately**:
+   - `primary`: One per page/section for the main action
+   - `secondary`: Supporting actions
+   - `outline`: Alternative or less important actions
+   - `ghost`: Minimal impact actions like Cancel
 
-1. **Use IconButton for icon-only actions**
+2. **Maintain consistent sizing**:
    ```tsx
-   // Optimized: Dedicated icon button component
-   <IconButton variant="ghost" aria-label="Refresh data">
-     <RefreshCw className="w-4 h-4" />
-   </IconButton>
-   
-   // Less optimal: Regular button with icon styling
-   <Button variant="ghost" className="p-2">
-     <RefreshCw className="w-4 h-4" />
-   </Button>
-   ```
-
-2. **Group related buttons efficiently**
-   ```tsx
-   // Optimized: ButtonGroup handles spacing and navigation
-   <ButtonGroup orientation="horizontal">
-     <Button variant="outline">Step 1</Button>
-     <Button variant="outline">Step 2</Button>
-     <Button variant="primary">Step 3</Button>
+   // ✅ Good - consistent sizing in groups
+   <ButtonGroup>
+     <Button size="md" variant="outline">Cancel</Button>
+     <Button size="md" variant="primary">Save</Button>
    </ButtonGroup>
    ```
 
-3. **Implement proper loading states**
+3. **Use loading states for async operations**:
    ```tsx
-   // Good: Built-in loading handling
-   <Button variant="primary" loading={isLoading}>
-     Process Data
+   // ✅ Good
+   <Button 
+     loading={isSubmitting}
+     loadingText="Saving changes"
+   >
+     Save
    </Button>
    ```
 
-### Component Composition
-
-1. **Combine with other UI components**
+4. **Provide visual feedback for user actions**:
    ```tsx
-   import { Button } from '@/components/ui/button';
-   import { Tooltip } from '@/components/ui/tooltip';
-   
-   <Tooltip content="This action cannot be undone">
-     <Button variant="destructive">Delete All Data</Button>
-   </Tooltip>
+   // ✅ Good
+   <Button 
+     variant="success"
+     announceOnPress="Database connected successfully"
+   >
+     Connect
+   </Button>
    ```
 
-2. **Use with form libraries**
+### Performance Best Practices
+
+1. **Use LoadingButton for complex async operations**:
    ```tsx
-   import { useForm } from 'react-hook-form';
+   // ✅ Good - automatic error handling
+   <LoadingButton
+     asyncAction={handleComplexOperation}
+     successMessage="Operation completed"
+     errorMessage="Operation failed"
+   >
+     Execute
+   </LoadingButton>
+   ```
+
+2. **Optimize icon usage**:
+   ```tsx
+   // ✅ Good - tree-shakeable icons
+   import { Save } from 'lucide-react';
    
-   function DatabaseForm() {
-     const { handleSubmit, formState: { isSubmitting, isValid } } = useForm();
-     
+   // ❌ Bad - imports entire icon library
+   import * as Icons from 'lucide-react';
+   ```
+
+3. **Use composition patterns appropriately**:
+   ```tsx
+   // ✅ Good - for complex button compositions
+   <IconButton asChild>
+     <Link href="/settings">
+       <Settings />
+     </Link>
+   </IconButton>
+   ```
+
+### Code Organization Best Practices
+
+1. **Import components cleanly**:
+   ```tsx
+   // ✅ Good
+   import { Button, IconButton, ButtonGroup } from '@/components/ui/button';
+   
+   // ❌ Bad
+   import Button from '@/components/ui/button/button';
+   import IconButton from '@/components/ui/button/icon-button';
+   ```
+
+2. **Use TypeScript for prop validation**:
+   ```tsx
+   // ✅ Good
+   interface FormActionsProps {
+     onSave: () => void;
+     onCancel: () => void;
+     isLoading?: boolean;
+   }
+   
+   function FormActions({ onSave, onCancel, isLoading }: FormActionsProps) {
      return (
-       <form onSubmit={handleSubmit(onSubmit)}>
-         <Button
-           type="submit"
-           variant="primary"
-           loading={isSubmitting}
-           disabled={!isValid}
-         >
-           Create Database Connection
+       <ButtonGroup label="Form actions">
+         <Button variant="outline" onClick={onCancel}>
+           Cancel
          </Button>
-       </form>
+         <Button variant="primary" onClick={onSave} loading={isLoading}>
+           Save
+         </Button>
+       </ButtonGroup>
      );
    }
    ```
 
-3. **Responsive design patterns**
+3. **Create reusable button patterns**:
    ```tsx
-   // Mobile-first responsive button
-   <Button
-     variant="primary"
-     size="sm"
-     className="w-full sm:w-auto sm:size-md lg:size-lg"
-   >
-     <Save className="w-4 h-4 mr-2" />
-     <span className="hidden sm:inline">Save Configuration</span>
-   </Button>
-   ```
-
-### Error Handling
-
-1. **Provide feedback for failed actions**
-   ```tsx
-   function AsyncButton() {
-     const [error, setError] = useState<string | null>(null);
-     
-     const handleClick = async () => {
-       try {
-         await riskyOperation();
-       } catch (err) {
-         setError('Failed to complete operation');
-       }
-     };
-     
+   // ✅ Good - reusable pattern
+   function DeleteButton({ 
+     onDelete, 
+     itemName,
+     ...props 
+   }: { 
+     onDelete: () => void; 
+     itemName: string; 
+   } & ButtonProps) {
      return (
-       <div>
-         <Button
-           variant="primary"
-           onClick={handleClick}
-           ariaDescribedBy={error ? 'button-error' : undefined}
-         >
-           Process Data
-         </Button>
-         {error && (
-           <div id="button-error" role="alert" className="text-red-600 text-sm mt-1">
-             {error}
-           </div>
-         )}
-       </div>
+       <Button
+         variant="error"
+         aria-label={`Delete ${itemName}`}
+         announceOnPress={`${itemName} deleted successfully`}
+         onClick={onDelete}
+         {...props}
+       >
+         Delete
+       </Button>
      );
    }
    ```
@@ -963,191 +913,247 @@ import { Save, Settings } from 'lucide-react';
 
 ### Common Issues and Solutions
 
-#### Issue: Focus Ring Not Visible
+#### 1. Focus Ring Not Visible
 
-**Problem**: Focus indicators don't appear when navigating with keyboard.
+**Problem**: Focus ring not appearing during keyboard navigation.
 
-**Solution**: Ensure `focus-visible` pseudo-class is properly implemented:
-
-```tsx
-// Correct implementation
-<Button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600">
-  Click Me
-</Button>
-
-// Check Tailwind configuration includes focus-visible variant
-// tailwind.config.ts
-module.exports = {
-  variants: {
-    extend: {
-      outline: ['focus-visible'],
-      ring: ['focus-visible'],
-    },
-  },
-};
-```
-
-#### Issue: Icon Button Accessibility Warnings
-
-**Problem**: Screen readers can't identify icon-only button purpose.
-
-**Solution**: Always provide `aria-label` for IconButton components:
+**Solution**: Ensure focus-visible is working correctly:
 
 ```tsx
-// Incorrect: No accessible label
-<IconButton variant="ghost">
-  <Edit className="w-4 h-4" />
-</IconButton>
-
-// Correct: Descriptive label provided
-<IconButton variant="ghost" aria-label="Edit database configuration">
-  <Edit className="w-4 h-4" />
-</IconButton>
-```
-
-#### Issue: Touch Targets Too Small on Mobile
-
-**Problem**: Buttons are difficult to tap on touch devices.
-
-**Solution**: Ensure minimum 44x44px touch targets:
-
-```tsx
-// Check button size variants meet requirements
-const sizeVariants = {
-  sm: "h-11 px-4 min-w-[44px]", // 44px minimum
-  md: "h-12 px-6 min-w-[48px]", // Enhanced usability
-  lg: "h-14 px-8 min-w-[56px]", // Optimal touch experience
-};
-```
-
-#### Issue: Loading State Not Announced to Screen Readers
-
-**Problem**: Users with screen readers don't know when async operations start/complete.
-
-**Solution**: Use `announceOnPress` and proper ARIA attributes:
-
-```tsx
-<Button
-  variant="primary"
-  loading={isLoading}
-  announceOnPress="Database connection test started"
-  aria-live="polite"
+// ✅ Check for focus-visible support
+<Button 
+  disableFocusRing={false} // Ensure this is false (default)
+  className="focus-visible:ring-2" // Custom focus ring if needed
 >
-  {isLoading ? 'Testing Connection...' : 'Test Connection'}
+  Button Text
 </Button>
 ```
 
-#### Issue: Button Group Navigation Not Working
+**Debugging**:
+- Test with Tab key navigation (not mouse clicks)
+- Check browser support for :focus-visible
+- Verify Tailwind CSS includes focus-visible utilities
 
-**Problem**: Arrow key navigation between grouped buttons doesn't function.
+#### 2. Touch Targets Too Small on Mobile
 
-**Solution**: Verify ButtonGroup implements focus management:
+**Problem**: Buttons are difficult to tap on mobile devices.
 
-```tsx
-// Ensure proper keyboard navigation
-<ButtonGroup orientation="horizontal">
-  <Button variant="outline">Previous</Button>
-  <Button variant="outline">Current</Button>
-  <Button variant="outline">Next</Button>
-</ButtonGroup>
-
-// ButtonGroup should handle:
-// - Arrow key navigation between buttons
-// - Home/End key support
-// - Proper tab order management
-```
-
-#### Issue: Custom Styling Overrides Accessibility Features
-
-**Problem**: Custom CSS classes break focus indicators or touch targets.
-
-**Solution**: Extend variants instead of overriding base styles:
+**Solution**: Verify minimum touch target sizes:
 
 ```tsx
-// Avoid: Direct style overrides
-<Button className="p-1 h-8 w-8"> // Breaks touch targets
-  Icon
+// ✅ Ensure minimum 44x44px touch targets
+<Button size="sm"> {/* Minimum 44x44px */}
+  Small Button
 </Button>
 
-// Prefer: Extend through variant system
 <IconButton 
-  variant="ghost" 
-  size="sm"
-  className="hover:bg-blue-50" // Safe additional styling
->
-  <Icon className="w-4 h-4" />
-</IconButton>
+  size="sm" 
+  icon={Icon}
+  aria-label="Icon button" 
+/> {/* Always 44x44px minimum */}
 ```
 
-### Performance Optimization Issues
+**Debugging**:
+- Test on actual mobile devices
+- Use browser dev tools device emulation
+- Check computed styles for min-height and min-width
 
-#### Issue: Slow Rendering with Many Buttons
+#### 3. Loading State Not Working
 
-**Problem**: Pages with multiple buttons render slowly.
+**Problem**: Loading spinner not appearing or button still clickable.
 
-**Solution**: Implement proper memoization and lazy loading:
+**Solution**: Check loading prop implementation:
 
 ```tsx
-import { memo } from 'react';
+// ✅ Correct loading implementation
+<Button 
+  loading={isLoading}
+  onClick={handleClick}
+  disabled={isLoading} // Optional: explicit disabled state
+>
+  Submit
+</Button>
 
-// Memoize button components when props don't change frequently
-const MemoizedButton = memo(Button);
+// ✅ For async operations
+<LoadingButton
+  asyncAction={handleAsyncAction}
+  successMessage="Success!"
+  errorMessage="Failed!"
+>
+  Async Action
+</LoadingButton>
+```
 
-// Use ButtonGroup for collections to optimize layout calculations
-<ButtonGroup>
-  {actions.map((action) => (
-    <MemoizedButton 
-      key={action.id}
-      variant={action.variant}
-      onClick={action.handler}
-    >
-      {action.label}
-    </MemoizedButton>
-  ))}
+**Debugging**:
+- Verify loading state variable is boolean
+- Check if onClick handler is prevented during loading
+- Ensure loading spinner is visible (check z-index and positioning)
+
+#### 4. ARIA Labels Missing for Icon Buttons
+
+**Problem**: Screen readers cannot identify icon button purpose.
+
+**Solution**: Always provide aria-label for IconButton:
+
+```tsx
+// ✅ Required aria-label
+<IconButton 
+  icon={Delete}
+  aria-label="Delete database connection" // Required!
+  onClick={handleDelete}
+/>
+
+// ✅ Enhanced with description
+<IconButton 
+  icon={Edit}
+  aria-label="Edit table schema"
+  aria-describedby="edit-help-text"
+  tooltip="Edit table structure and relationships"
+/>
+```
+
+#### 5. Button Group Navigation Not Working
+
+**Problem**: Arrow keys don't navigate between grouped buttons.
+
+**Solution**: Verify ButtonGroup configuration:
+
+```tsx
+// ✅ Enable keyboard navigation
+<ButtonGroup 
+  enableKeyboardNavigation={true} // Default: true
+  label="Actions" // Provide group label
+  orientation="horizontal"
+>
+  <Button>Action 1</Button>
+  <Button>Action 2</Button>
+  <Button>Action 3</Button>
 </ButtonGroup>
 ```
 
-#### Issue: Bundle Size Concerns
+**Debugging**:
+- Test with arrow keys (←/→ for horizontal, ↑/↓ for vertical)
+- Check that buttons are focusable (not disabled)
+- Verify ARIA attributes are present
+- Test with screen reader to ensure proper announcements
+
+#### 6. Custom Styling Not Applied
+
+**Problem**: Custom CSS classes not overriding component styles.
+
+**Solution**: Use proper CSS class merging:
+
+```tsx
+// ✅ Proper class merging with cn() utility
+import { cn } from '@/lib/utils';
+
+<Button 
+  className={cn(
+    "custom-button-class",
+    variant === 'special' && "special-styles"
+  )}
+>
+  Custom Button
+</Button>
+
+// ✅ Using CSS variables for theming
+<Button 
+  style={{
+    '--button-bg': '#custom-color',
+    '--button-text': '#custom-text-color'
+  }}
+  className="bg-[var(--button-bg)] text-[var(--button-text)]"
+>
+  Themed Button
+</Button>
+```
+
+#### 7. TypeScript Errors
+
+**Problem**: TypeScript compilation errors with button props.
+
+**Solution**: Use proper type definitions:
+
+```tsx
+// ✅ Proper prop typing
+interface CustomButtonProps extends ButtonProps {
+  customProp: string;
+}
+
+function CustomButton({ customProp, ...buttonProps }: CustomButtonProps) {
+  return <Button {...buttonProps}>Custom: {customProp}</Button>;
+}
+
+// ✅ Forward ref typing
+const CustomIconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
+  (props, ref) => {
+    return <IconButton ref={ref} {...props} />;
+  }
+);
+```
+
+### Performance Issues
+
+#### 1. Slow Rendering with Many Buttons
+
+**Problem**: Page becomes slow with numerous button instances.
+
+**Solution**: Optimize rendering patterns:
+
+```tsx
+// ✅ Memoize expensive button lists
+const ButtonList = React.memo(({ items, onAction }) => (
+  <div>
+    {items.map(item => (
+      <Button 
+        key={item.id}
+        onClick={() => onAction(item.id)}
+      >
+        {item.name}
+      </Button>
+    ))}
+  </div>
+));
+
+// ✅ Use callback optimization
+const handleClick = useCallback((id: string) => {
+  // Handle click
+}, []);
+```
+
+#### 2. Bundle Size Issues
 
 **Problem**: Button component system increases bundle size significantly.
 
-**Solution**: Verify tree-shaking and imports are optimized:
+**Solution**: Use proper tree-shaking:
 
 ```tsx
-// Correct: Import only needed components
-import { Button, IconButton } from '@/components/ui/button';
+// ✅ Import only what you need
+import { Button } from '@/components/ui/button';
 
-// Avoid: Importing entire button system when only using basic Button
+// ❌ Don't import entire module
 import * as ButtonComponents from '@/components/ui/button';
 ```
 
 ### Testing Issues
 
-#### Issue: Button Tests Fail in CI Environment
+#### 1. Accessibility Tests Failing
 
-**Problem**: Tests pass locally but fail in continuous integration.
+**Problem**: jest-axe or similar tools reporting accessibility violations.
 
-**Solution**: Ensure proper test environment setup:
+**Solution**: Address common accessibility issues:
 
-```typescript
-// test/setup.ts - Add missing DOM APIs
-Object.defineProperty(window, 'ResizeObserver', {
-  value: class ResizeObserver {
-    observe() {}
-    disconnect() {}
-    unobserve() {}
-  },
-});
+```tsx
+// ✅ Proper test setup
+import { render } from '@testing-library/react';
+import { axe } from 'jest-axe';
 
-// Verify button accessibility in tests
-import { render, screen } from '@testing-library/react';
-import { axe, toHaveNoViolations } from 'jest-axe';
-
-expect.extend(toHaveNoViolations);
-
-test('Button meets accessibility standards', async () => {
+test('button is accessible', async () => {
   const { container } = render(
-    <Button variant="primary">Test Button</Button>
+    <IconButton 
+      icon={Search}
+      aria-label="Search items" // Required!
+    />
   );
   
   const results = await axe(container);
@@ -1155,17 +1161,44 @@ test('Button meets accessibility standards', async () => {
 });
 ```
 
-For additional support, refer to the component implementation files:
-- `button.tsx` - Core button component
-- `icon-button.tsx` - Icon-only button variant  
-- `button-group.tsx` - Button grouping component
-- `button-variants.ts` - Styling and variant definitions
-- `button.test.tsx` - Comprehensive test suite
+#### 2. Interaction Tests Failing
 
----
+**Problem**: Button click handlers not firing in tests.
 
-**Last Updated**: 2024-12-19  
-**Version**: 1.0.0  
-**React Version**: 19.0.0  
-**TypeScript Version**: 5.8+  
-**Accessibility Standard**: WCAG 2.1 AA
+**Solution**: Use proper testing patterns:
+
+```tsx
+// ✅ Test user interactions
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+
+test('button handles click correctly', async () => {
+  const user = userEvent.setup();
+  const handleClick = jest.fn();
+  
+  render(
+    <Button onClick={handleClick}>
+      Test Button
+    </Button>
+  );
+  
+  await user.click(screen.getByRole('button', { name: 'Test Button' }));
+  expect(handleClick).toHaveBeenCalledTimes(1);
+});
+```
+
+### Getting Help
+
+If you encounter issues not covered in this troubleshooting guide:
+
+1. **Check the TypeScript errors**: Most issues are caught at compile time
+2. **Use browser dev tools**: Inspect generated HTML and CSS
+3. **Test with assistive technology**: Use screen readers to verify accessibility
+4. **Review the source code**: All components are well-documented with inline comments
+5. **Check the test files**: Component tests demonstrate proper usage patterns
+
+For additional support, refer to:
+- [WCAG 2.1 Guidelines](https://www.w3.org/WAI/WCAG21/Understanding/)
+- [Tailwind CSS Documentation](https://tailwindcss.com/docs)
+- [React 19 Documentation](https://react.dev/)
+- [Lucide React Icons](https://lucide.dev/guide/packages/lucide-react)
