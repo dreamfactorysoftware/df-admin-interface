@@ -1,742 +1,1131 @@
 # LookupKeys Component
 
-A dynamic key-value pair management component that provides an intuitive interface for adding, editing, and removing lookup key entries. The component supports both table and accordion layouts with full accessibility compliance and React Hook Form integration.
+A comprehensive React component for managing lookup keys within DreamFactory Admin Interface. This component provides an intuitive interface for creating, editing, and organizing lookup key-value pairs with full React Hook Form integration and WCAG 2.1 AA accessibility compliance.
 
-## Features
+## Table of Contents
 
-- **Dynamic Array Management**: Add/remove key-value pairs using React Hook Form's `useFieldArray`
-- **Multiple Layout Options**: Table view (default) and accordion view for space-constrained interfaces
-- **Privacy Controls**: Toggle individual keys as private with visual indicators
-- **Form Integration**: Seamless integration with React Hook Form and validation schemas
-- **Accessibility**: Full WCAG 2.1 AA compliance with keyboard navigation and screen reader support
-- **Responsive Design**: Optimized for desktop and mobile interfaces
-- **Dark Mode Support**: Integrated with theme system for consistent appearance
+- [Overview](#overview)
+- [Installation](#installation)
+- [API Reference](#api-reference)
+- [Usage Examples](#usage-examples)
+- [React Hook Form Integration](#react-hook-form-integration)
+- [Component Variants](#component-variants)
+- [Accessibility Features](#accessibility-features)
+- [Migration Guide](#migration-guide)
+- [Theming and Customization](#theming-and-customization)
+- [Testing](#testing)
+- [Troubleshooting](#troubleshooting)
+- [Best Practices](#best-practices)
+
+## Overview
+
+The LookupKeys component is designed to handle dynamic key-value pair management within forms and configuration interfaces. It supports both table and accordion layout variants, provides comprehensive validation, and integrates seamlessly with React Hook Form's `useFieldArray` hook for optimal performance and developer experience.
+
+### Key Features
+
+- **React Hook Form Integration**: Full compatibility with `useFieldArray` for form management
+- **TypeScript Support**: Complete type safety with comprehensive interface definitions
+- **Accessibility Compliance**: WCAG 2.1 AA compliant with keyboard navigation and screen reader support
+- **Responsive Design**: Adaptive layouts for desktop, tablet, and mobile viewports
+- **Validation**: Built-in validation with Zod schema integration
+- **Performance Optimized**: Virtualization support for large datasets (1000+ items)
+- **Theming**: Full Tailwind CSS customization support
 
 ## Installation
 
 ```bash
-npm install react-hook-form @hookform/resolvers zod
+npm install react-hook-form zod @hookform/resolvers
 ```
 
-## Basic Usage
-
-### Simple Implementation
-
-```tsx
-import { useForm, useFieldArray } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { LookupKeys } from '@/components/ui/lookup-keys';
-
-const schema = z.object({
-  lookupKeys: z.array(z.object({
-    name: z.string().min(1, 'Name is required'),
-    value: z.string(),
-    private: z.boolean().default(false)
-  }))
-});
-
-export function BasicExample() {
-  const form = useForm({
-    resolver: zodResolver(schema),
-    defaultValues: {
-      lookupKeys: []
-    }
-  });
-
-  const { fields, append, remove } = useFieldArray({
-    control: form.control,
-    name: 'lookupKeys'
-  });
-
-  return (
-    <form onSubmit={form.handleSubmit(console.log)}>
-      <LookupKeys
-        fields={fields}
-        append={append}
-        remove={remove}
-        control={form.control}
-        name="lookupKeys"
-      />
-      <button type="submit">Save</button>
-    </form>
-  );
-}
-```
-
-### Accordion Layout
-
-```tsx
-export function AccordionExample() {
-  const form = useForm({
-    resolver: zodResolver(schema),
-    defaultValues: {
-      lookupKeys: [
-        { name: 'API_KEY', value: 'secret-key', private: true },
-        { name: 'DEBUG_MODE', value: 'true', private: false }
-      ]
-    }
-  });
-
-  const { fields, append, remove } = useFieldArray({
-    control: form.control,
-    name: 'lookupKeys'
-  });
-
-  return (
-    <LookupKeys
-      fields={fields}
-      append={append}
-      remove={remove}
-      control={form.control}
-      name="lookupKeys"
-      variant="accordion"
-      title="Configuration Keys"
-      description="Manage application configuration key-value pairs"
-    />
-  );
-}
+```typescript
+import { LookupKeys } from '@/components/ui/lookup-keys'
+import type { LookupKeyItem } from '@/components/ui/lookup-keys/types'
 ```
 
 ## API Reference
 
-### Props
+### LookupKeysProps Interface
 
-#### `LookupKeysProps`
-
-```tsx
+```typescript
 interface LookupKeysProps {
-  /** React Hook Form field array */
-  fields: FieldArrayWithId<LookupKeyEntry>[];
+  /** Form control integration */
+  name: string
+  control: Control<any>
   
-  /** Function to append new entries */
-  append: (value: LookupKeyEntry) => void;
+  /** Component configuration */
+  variant?: 'table' | 'accordion'
+  maxItems?: number
+  minItems?: number
   
-  /** Function to remove entries by index */
-  remove: (index: number) => void;
+  /** Layout and appearance */
+  className?: string
+  disabled?: boolean
+  required?: boolean
   
-  /** React Hook Form control object */
-  control: Control<any>;
+  /** Labels and text */
+  label?: string
+  description?: string
+  addButtonText?: string
+  keyPlaceholder?: string
+  valuePlaceholder?: string
   
-  /** Field name for form registration */
-  name: string;
+  /** Validation */
+  keyValidation?: (key: string) => string | undefined
+  valueValidation?: (value: string) => string | undefined
+  duplicateKeyMessage?: string
   
-  /** Layout variant */
-  variant?: 'table' | 'accordion';
+  /** Accessibility */
+  'aria-label'?: string
+  'aria-describedby'?: string
   
-  /** Title for accordion layout */
-  title?: string;
+  /** Event handlers */
+  onAdd?: (item: LookupKeyItem) => void
+  onRemove?: (index: number) => void
+  onChange?: (items: LookupKeyItem[]) => void
   
-  /** Description for accordion layout */
-  description?: string;
+  /** Advanced features */
+  allowDuplicateKeys?: boolean
+  sortable?: boolean
+  searchable?: boolean
+  exportable?: boolean
   
-  /** Disable all interactions */
-  disabled?: boolean;
-  
-  /** Show loading state */
-  loading?: boolean;
-  
-  /** Custom CSS classes */
-  className?: string;
-  
-  /** Accessibility props */
-  'aria-label'?: string;
-  'aria-describedby'?: string;
-  
-  /** Test identifier */
-  'data-testid'?: string;
+  /** Performance */
+  virtualized?: boolean
+  virtualizedHeight?: number
+}
+
+interface LookupKeyItem {
+  id?: string
+  key: string
+  value: string
+  description?: string
+  enabled?: boolean
+  readonly?: boolean
+}
+
+interface LookupKeysFormData {
+  lookupKeys: LookupKeyItem[]
 }
 ```
 
-#### `LookupKeyEntry`
+### Hook Integration Types
 
-```tsx
-interface LookupKeyEntry {
-  /** Unique identifier (optional for new entries) */
-  id?: string;
-  
-  /** Key name - required field */
-  name: string;
-  
-  /** Key value - can be empty */
-  value: string;
-  
-  /** Privacy flag - determines visibility */
-  private: boolean;
+```typescript
+interface UseLookupKeysReturn {
+  fields: FieldArrayWithId<LookupKeysFormData, 'lookupKeys', 'id'>[]
+  append: (value: LookupKeyItem | LookupKeyItem[]) => void
+  prepend: (value: LookupKeyItem | LookupKeyItem[]) => void
+  insert: (index: number, value: LookupKeyItem | LookupKeyItem[]) => void
+  swap: (indexA: number, indexB: number) => void
+  move: (from: number, to: number) => void
+  update: (index: number, value: LookupKeyItem) => void
+  replace: (value: LookupKeyItem[]) => void
+  remove: (index?: number | number[]) => void
+}
+
+interface LookupKeysValidationSchema {
+  lookupKeys: z.array(z.object({
+    key: z.string().min(1, 'Key is required').max(255, 'Key too long'),
+    value: z.string().min(1, 'Value is required').max(1000, 'Value too long'),
+    description: z.string().optional(),
+    enabled: z.boolean().default(true),
+    readonly: z.boolean().default(false)
+  }))
 }
 ```
 
-### Validation Schema
+## Usage Examples
 
-```tsx
-import { z } from 'zod';
+### Basic Usage
 
-const lookupKeySchema = z.object({
-  name: z.string()
-    .min(1, 'Name is required')
-    .max(100, 'Name must be less than 100 characters')
-    .regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/, 'Invalid key name format'),
-  value: z.string()
-    .max(1000, 'Value must be less than 1000 characters'),
-  private: z.boolean().default(false)
-});
+```typescript
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import { LookupKeys } from '@/components/ui/lookup-keys'
 
-export const lookupKeysFormSchema = z.object({
-  lookupKeys: z.array(lookupKeySchema)
-    .max(50, 'Maximum 50 lookup keys allowed')
-});
-```
+const schema = z.object({
+  lookupKeys: z.array(z.object({
+    key: z.string().min(1, 'Key is required'),
+    value: z.string().min(1, 'Value is required'),
+    description: z.string().optional(),
+    enabled: z.boolean().default(true)
+  }))
+})
 
-## Advanced Usage
+type FormData = z.infer<typeof schema>
 
-### With Custom Validation
+export function BasicLookupKeysExample() {
+  const { control, handleSubmit, formState: { errors } } = useForm<FormData>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      lookupKeys: [
+        { key: 'api_version', value: '2.0', enabled: true },
+        { key: 'timeout', value: '30000', enabled: true }
+      ]
+    }
+  })
 
-```tsx
-import { useForm, useFieldArray } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-
-export function CustomValidationExample() {
-  const customSchema = z.object({
-    lookupKeys: z.array(lookupKeySchema)
-      .refine(
-        (keys) => {
-          const names = keys.map(k => k.name.toLowerCase());
-          return new Set(names).size === names.length;
-        },
-        { message: 'Duplicate key names are not allowed' }
-      )
-  });
-
-  const form = useForm({
-    resolver: zodResolver(customSchema),
-    mode: 'onChange'
-  });
-
-  // ... rest of implementation
-}
-```
-
-### Integration with Parent Forms
-
-```tsx
-export function DatabaseServiceForm() {
-  const form = useForm({
-    resolver: zodResolver(z.object({
-      serviceName: z.string().min(1),
-      connectionString: z.string().min(1),
-      lookupKeys: z.array(lookupKeySchema)
-    }))
-  });
-
-  const { fields, append, remove } = useFieldArray({
-    control: form.control,
-    name: 'lookupKeys'
-  });
+  const onSubmit = (data: FormData) => {
+    console.log('Lookup Keys:', data.lookupKeys)
+  }
 
   return (
-    <form className="space-y-6">
-      <div>
-        <label htmlFor="serviceName">Service Name</label>
-        <input 
-          {...form.register('serviceName')}
-          className="w-full"
-        />
-      </div>
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <LookupKeys
+        name="lookupKeys"
+        control={control}
+        label="Configuration Settings"
+        description="Manage system configuration key-value pairs"
+        keyPlaceholder="Enter configuration key"
+        valuePlaceholder="Enter configuration value"
+        aria-label="Configuration lookup keys management"
+      />
+      
+      <button
+        type="submit"
+        className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+      >
+        Save Configuration
+      </button>
+    </form>
+  )
+}
+```
 
-      <div>
-        <label htmlFor="connectionString">Connection String</label>
-        <input 
-          {...form.register('connectionString')}
-          type="password"
-          className="w-full"
-        />
+### Advanced Usage with Custom Validation
+
+```typescript
+import { useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { LookupKeys } from '@/components/ui/lookup-keys'
+
+export function AdvancedLookupKeysExample() {
+  const [existingKeys] = useState(['reserved_key', 'system_key'])
+  
+  const { control, watch } = useForm({
+    defaultValues: {
+      lookupKeys: []
+    }
+  })
+
+  const customKeyValidation = (key: string): string | undefined => {
+    if (existingKeys.includes(key.toLowerCase())) {
+      return 'This key is reserved and cannot be used'
+    }
+    if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(key)) {
+      return 'Key must start with a letter and contain only letters, numbers, and underscores'
+    }
+    return undefined
+  }
+
+  const customValueValidation = (value: string): string | undefined => {
+    if (value.length > 500) {
+      return 'Value cannot exceed 500 characters'
+    }
+    return undefined
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto p-6">
+      <LookupKeys
+        name="lookupKeys"
+        control={control}
+        variant="accordion"
+        maxItems={50}
+        minItems={1}
+        keyValidation={customKeyValidation}
+        valueValidation={customValueValidation}
+        duplicateKeyMessage="Duplicate keys are not allowed in this configuration"
+        sortable
+        searchable
+        exportable
+        label="API Endpoint Configuration"
+        description="Define custom headers and parameters for API endpoints"
+        addButtonText="Add New Parameter"
+        keyPlaceholder="parameter_name"
+        valuePlaceholder="parameter_value"
+        className="custom-lookup-keys"
+        onAdd={(item) => console.log('Added:', item)}
+        onRemove={(index) => console.log('Removed index:', index)}
+      />
+    </div>
+  )
+}
+```
+
+## React Hook Form Integration
+
+### useFieldArray Integration
+
+The LookupKeys component is built specifically for `useFieldArray` integration:
+
+```typescript
+import { useFieldArray, useForm } from 'react-hook-form'
+import { LookupKeys } from '@/components/ui/lookup-keys'
+
+export function FieldArrayIntegrationExample() {
+  const { control, handleSubmit } = useForm({
+    defaultValues: {
+      lookupKeys: []
+    }
+  })
+
+  const {
+    fields,
+    append,
+    remove,
+    move,
+    update
+  } = useFieldArray({
+    control,
+    name: 'lookupKeys'
+  })
+
+  // Custom handlers for external operations
+  const handleAddPredefined = () => {
+    append([
+      { key: 'content_type', value: 'application/json' },
+      { key: 'cache_timeout', value: '3600' }
+    ])
+  }
+
+  const handleSort = () => {
+    const sortedItems = [...fields].sort((a, b) => a.key.localeCompare(b.key))
+    sortedItems.forEach((item, index) => {
+      if (fields[index]?.id !== item.id) {
+        move(fields.findIndex(f => f.id === item.id), index)
+      }
+    })
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={handleAddPredefined}
+          className="px-3 py-2 text-sm bg-secondary-100 text-secondary-700 rounded-md hover:bg-secondary-200"
+        >
+          Add Predefined
+        </button>
+        <button
+          type="button"
+          onClick={handleSort}
+          className="px-3 py-2 text-sm bg-secondary-100 text-secondary-700 rounded-md hover:bg-secondary-200"
+        >
+          Sort Alphabetically
+        </button>
       </div>
 
       <LookupKeys
-        fields={fields}
-        append={append}
-        remove={remove}
-        control={form.control}
         name="lookupKeys"
-        variant="accordion"
-        title="Additional Configuration"
-        description="Optional key-value pairs for service configuration"
+        control={control}
+        variant="table"
+        sortable
       />
-    </form>
-  );
+    </div>
+  )
 }
 ```
 
-### Controlled vs Uncontrolled
+### Nested Form Integration
 
-```tsx
-// Controlled usage (recommended)
-export function ControlledExample() {
-  const [lookupKeys, setLookupKeys] = useState<LookupKeyEntry[]>([]);
-  
-  const form = useForm({
-    values: { lookupKeys }, // External state controls form
-    resolver: zodResolver(schema)
-  });
+```typescript
+interface ServiceConfiguration {
+  serviceName: string
+  serviceType: string
+  connectionSettings: {
+    lookupKeys: LookupKeyItem[]
+  }
+  advancedSettings: {
+    lookupKeys: LookupKeyItem[]
+  }
+}
 
-  const { fields, append, remove } = useFieldArray({
-    control: form.control,
-    name: 'lookupKeys'
-  });
-
-  // Sync external state with form changes
-  const watchedFields = form.watch('lookupKeys');
-  useEffect(() => {
-    setLookupKeys(watchedFields);
-  }, [watchedFields]);
+export function NestedFormExample() {
+  const { control, handleSubmit } = useForm<ServiceConfiguration>({
+    defaultValues: {
+      serviceName: '',
+      serviceType: 'database',
+      connectionSettings: {
+        lookupKeys: []
+      },
+      advancedSettings: {
+        lookupKeys: []
+      }
+    }
+  })
 
   return (
-    <LookupKeys
-      fields={fields}
-      append={append}
-      remove={remove}
-      control={form.control}
-      name="lookupKeys"
-    />
-  );
+    <form onSubmit={handleSubmit(console.log)} className="space-y-8">
+      <fieldset className="border border-gray-300 rounded-lg p-4">
+        <legend className="text-lg font-medium px-2">Connection Settings</legend>
+        <LookupKeys
+          name="connectionSettings.lookupKeys"
+          control={control}
+          label="Connection Parameters"
+          keyPlaceholder="host, port, database"
+          valuePlaceholder="Enter connection value"
+        />
+      </fieldset>
+
+      <fieldset className="border border-gray-300 rounded-lg p-4">
+        <legend className="text-lg font-medium px-2">Advanced Settings</legend>
+        <LookupKeys
+          name="advancedSettings.lookupKeys"
+          control={control}
+          label="Advanced Configuration"
+          variant="accordion"
+          keyPlaceholder="ssl_mode, timeout"
+          valuePlaceholder="Enter advanced setting value"
+        />
+      </fieldset>
+
+      <button type="submit" className="w-full py-3 bg-primary-600 text-white rounded-lg">
+        Save Service Configuration
+      </button>
+    </form>
+  )
 }
 ```
+
+## Component Variants
+
+### Table Variant (Default)
+
+The table variant provides a spreadsheet-like interface ideal for large datasets:
+
+```typescript
+<LookupKeys
+  name="lookupKeys"
+  control={control}
+  variant="table"
+  virtualized={true}
+  virtualizedHeight={400}
+  searchable
+  sortable
+  exportable
+  label="Database Connection Parameters"
+  description="Configure database connection settings in table format"
+/>
+```
+
+**Features:**
+- Sortable columns
+- Inline editing
+- Bulk selection
+- Export functionality
+- Virtualization for performance
+- Column resizing
+- Search and filter
+
+### Accordion Variant
+
+The accordion variant is perfect for smaller datasets with more detailed editing:
+
+```typescript
+<LookupKeys
+  name="lookupKeys"
+  control={control}
+  variant="accordion"
+  maxItems={20}
+  allowDuplicateKeys={false}
+  label="API Endpoint Headers"
+  description="Configure HTTP headers for API requests"
+  addButtonText="Add New Header"
+/>
+```
+
+**Features:**
+- Expandable sections
+- Rich text editing for values
+- Detailed validation messages
+- Drag-and-drop reordering
+- Compact view option
 
 ## Accessibility Features
 
-### WCAG 2.1 AA Compliance
+The LookupKeys component is fully WCAG 2.1 AA compliant with comprehensive accessibility features:
 
-The LookupKeys component implements comprehensive accessibility features:
+### Keyboard Navigation
 
-- **Keyboard Navigation**: Full keyboard support using Tab, Enter, Space, and Arrow keys
-- **Screen Reader Support**: Proper ARIA labels, descriptions, and announcements
-- **Focus Management**: Logical focus order and visible focus indicators
-- **Color Contrast**: Minimum 4.5:1 contrast ratios for all text and interactive elements
-- **Touch Targets**: Minimum 44x44px touch targets for mobile accessibility
+| Key Combination | Action |
+|---|---|
+| `Tab` / `Shift+Tab` | Navigate between interactive elements |
+| `Enter` / `Space` | Activate buttons and controls |
+| `Escape` | Cancel editing mode or close dialogs |
+| `Arrow Keys` | Navigate within table cells |
+| `F2` | Enter edit mode for table cells |
+| `Delete` | Remove selected items (with confirmation) |
+| `Ctrl+A` | Select all items in table variant |
 
-### Keyboard Interactions
+### Screen Reader Support
 
-| Key | Action |
-|-----|--------|
-| `Tab` | Navigate between form fields and buttons |
-| `Shift + Tab` | Navigate backwards |
-| `Enter` | Activate buttons and submit inline edits |
-| `Space` | Toggle privacy switches and activate buttons |
-| `Escape` | Cancel inline editing (if implemented) |
-| `Arrow Keys` | Navigate between table cells (table variant) |
-
-### Screen Reader Announcements
-
-```tsx
-// Example ARIA labels and descriptions
+```typescript
 <LookupKeys
-  fields={fields}
-  append={append}
-  remove={remove}
-  control={form.control}
   name="lookupKeys"
+  control={control}
   aria-label="Configuration lookup keys"
   aria-describedby="lookup-keys-description"
+  label="System Configuration"
+  description="Manage key-value pairs for system configuration. Use Tab to navigate between fields, Enter to edit, and Delete to remove items."
 />
 
 <div id="lookup-keys-description" className="sr-only">
-  Manage key-value pairs for application configuration. 
-  Use the add button to create new entries, and the remove button to delete existing ones.
+  This component allows you to manage key-value pairs. Each row contains a key field, value field, and optional actions. Use keyboard navigation to move between fields.
 </div>
 ```
 
-### High Contrast Mode Support
+### Live Regions for Dynamic Updates
 
-The component automatically adapts to high contrast modes:
+```typescript
+// Automatic announcements for screen readers
+const announcements = {
+  itemAdded: "New lookup key added",
+  itemRemoved: "Lookup key removed",
+  validationError: "Validation error: {message}",
+  sortChanged: "Items sorted by {column}",
+  searchResult: "{count} items found matching search"
+}
+```
 
-```tsx
-// Custom styling for high contrast
+### Focus Management
+
+```typescript
+// Focus management utilities
+const useFocusManagement = () => {
+  const focusFirstError = useCallback(() => {
+    const firstError = document.querySelector('[data-error="true"]')
+    if (firstError instanceof HTMLElement) {
+      firstError.focus()
+    }
+  }, [])
+
+  const focusNewItem = useCallback((index: number) => {
+    const newItemKey = document.querySelector(`[data-key-index="${index}"]`)
+    if (newItemKey instanceof HTMLElement) {
+      newItemKey.focus()
+    }
+  }, [])
+
+  return { focusFirstError, focusNewItem }
+}
+```
+
+## Migration Guide
+
+### From Angular df-lookup-keys to React LookupKeys
+
+This section provides comprehensive guidance for migrating from the Angular `df-lookup-keys` component to the new React implementation.
+
+#### Architecture Changes
+
+| Angular Implementation | React Implementation | Migration Notes |
+|---|---|---|
+| `@Input()` properties | TypeScript props interface | Replace decorators with props |
+| `@Output()` events | Event handler props | Use callback props instead of EventEmitter |
+| `FormArray` with Angular Forms | `useFieldArray` with React Hook Form | Different validation approach |
+| Angular Material components | Headless UI + Tailwind CSS | Maintain visual consistency |
+| RxJS observables | React Query + SWR | Replace reactive patterns |
+| Angular services | Custom React hooks | Convert service patterns |
+
+#### Code Migration Examples
+
+**Angular Template (Before):**
+```html
+<df-lookup-keys
+  [formArray]="lookupKeysArray"
+  [required]="true"
+  [disabled]="false"
+  label="Configuration Keys"
+  addButtonText="Add Key"
+  (itemAdded)="onItemAdded($event)"
+  (itemRemoved)="onItemRemoved($event)"
+  (validation)="onValidation($event)">
+</df-lookup-keys>
+```
+
+**React Implementation (After):**
+```typescript
 <LookupKeys
-  fields={fields}
-  append={append}
-  remove={remove}
-  control={form.control}
   name="lookupKeys"
-  className={cn(
-    "lookup-keys",
-    "forced-colors:border-solid forced-colors:border-2"
-  )}
+  control={control}
+  required={true}
+  disabled={false}
+  label="Configuration Keys"
+  addButtonText="Add Key"
+  onAdd={handleItemAdded}
+  onRemove={handleItemRemoved}
+  onChange={handleValidation}
 />
 ```
 
-## Migration from Angular
-
-### From `df-lookup-keys` Component
-
-The React LookupKeys component provides equivalent functionality to the Angular `df-lookup-keys`:
-
-#### Key Differences
-
-| Angular | React | Notes |
-|---------|-------|-------|
-| `FormArray` | `useFieldArray` | React Hook Form equivalent for dynamic arrays |
-| `MatTable` | Custom table | Tailwind CSS implementation with better performance |
-| `MatSlideToggle` | Headless UI Switch | Improved accessibility and customization |
-| `FontAwesome` | Lucide React | Smaller bundle size and better tree-shaking |
-| `Transloco` | Next.js i18n | Integrated internationalization solution |
-
-#### Migration Steps
-
-1. **Replace FormArray usage**:
-   ```typescript
-   // Angular
-   lookupKeys = this.fb.array([]);
-   
-   // React
-   const { fields, append, remove } = useFieldArray({
-     control,
-     name: 'lookupKeys'
-   });
-   ```
-
-2. **Update validation patterns**:
-   ```typescript
-   // Angular
-   new FormControl('', Validators.required)
-   
-   // React + Zod
-   name: z.string().min(1, 'Name is required')
-   ```
-
-3. **Convert template to JSX**:
-   ```html
-   <!-- Angular -->
-   <mat-slide-toggle formControlName="private">
-   
-   <!-- React -->
-   <Toggle {...field} />
-   ```
-
-#### Breaking Changes
-
-- **Props API**: Different prop structure for React component composition
-- **Styling**: SCSS classes replaced with Tailwind CSS utilities
-- **Events**: Angular outputs replaced with callback props
-- **Validation**: Angular validators replaced with Zod schema validation
-
-### Code Examples
-
-#### Before (Angular)
-
+**Angular Component Logic (Before):**
 ```typescript
-// Component
-export class DatabaseConfigComponent {
-  lookupKeys = this.fb.array([]);
+export class ConfigurationComponent {
+  @Input() lookupKeysArray: FormArray
   
-  addLookupKey() {
-    this.lookupKeys.push(this.fb.group({
-      name: ['', Validators.required],
-      value: [''],
-      private: [false]
-    }));
+  constructor(private fb: FormBuilder) {
+    this.lookupKeysArray = this.fb.array([])
+  }
+  
+  addLookupKey(): void {
+    const group = this.fb.group({
+      key: ['', Validators.required],
+      value: ['', Validators.required]
+    })
+    this.lookupKeysArray.push(group)
+  }
+  
+  removeLookupKey(index: number): void {
+    this.lookupKeysArray.removeAt(index)
   }
 }
 ```
 
-```html
-<!-- Template -->
-<df-lookup-keys 
-  [formArray]="lookupKeys"
-  [showAccordion]="true">
-</df-lookup-keys>
-```
-
-#### After (React)
-
-```tsx
-// Component
-export function DatabaseConfigComponent() {
+**React Component Logic (After):**
+```typescript
+export function ConfigurationComponent() {
+  const { control, handleSubmit } = useForm({
+    defaultValues: {
+      lookupKeys: []
+    }
+  })
+  
   const { fields, append, remove } = useFieldArray({
     control,
     name: 'lookupKeys'
-  });
+  })
   
-  const addLookupKey = () => {
-    append({ name: '', value: '', private: false });
-  };
-
+  const handleAddKey = useCallback(() => {
+    append({ key: '', value: '' })
+  }, [append])
+  
+  const handleRemoveKey = useCallback((index: number) => {
+    remove(index)
+  }, [remove])
+  
   return (
     <LookupKeys
-      fields={fields}
-      append={append}
-      remove={remove}
-      control={control}
       name="lookupKeys"
-      variant="accordion"
+      control={control}
+      onAdd={handleAddKey}
+      onRemove={handleRemoveKey}
     />
-  );
+  )
 }
+```
+
+#### Validation Migration
+
+**Angular Validators (Before):**
+```typescript
+const validationRules = {
+  key: [Validators.required, Validators.pattern(/^[a-zA-Z][a-zA-Z0-9_]*$/)],
+  value: [Validators.required, Validators.maxLength(500)]
+}
+```
+
+**Zod Schema (After):**
+```typescript
+const lookupKeysSchema = z.object({
+  lookupKeys: z.array(z.object({
+    key: z.string()
+      .min(1, 'Key is required')
+      .regex(/^[a-zA-Z][a-zA-Z0-9_]*$/, 'Invalid key format'),
+    value: z.string()
+      .min(1, 'Value is required')
+      .max(500, 'Value too long')
+  }))
+})
+```
+
+#### State Management Migration
+
+**Angular Service (Before):**
+```typescript
+@Injectable()
+export class LookupKeysService {
+  private lookupKeysSubject = new BehaviorSubject<LookupKeyItem[]>([])
+  public lookupKeys$ = this.lookupKeysSubject.asObservable()
+  
+  updateLookupKeys(keys: LookupKeyItem[]): void {
+    this.lookupKeysSubject.next(keys)
+  }
+}
+```
+
+**Zustand Store (After):**
+```typescript
+interface LookupKeysStore {
+  lookupKeys: LookupKeyItem[]
+  updateLookupKeys: (keys: LookupKeyItem[]) => void
+  addLookupKey: (key: LookupKeyItem) => void
+  removeLookupKey: (index: number) => void
+}
+
+export const useLookupKeysStore = create<LookupKeysStore>((set) => ({
+  lookupKeys: [],
+  updateLookupKeys: (keys) => set({ lookupKeys: keys }),
+  addLookupKey: (key) => set((state) => ({ 
+    lookupKeys: [...state.lookupKeys, key] 
+  })),
+  removeLookupKey: (index) => set((state) => ({
+    lookupKeys: state.lookupKeys.filter((_, i) => i !== index)
+  }))
+}))
 ```
 
 ## Theming and Customization
 
-### Default Styling
+### Tailwind CSS Customization
 
-The component uses Tailwind CSS with design tokens for consistent theming:
+The LookupKeys component supports comprehensive theming through Tailwind CSS classes:
 
-```tsx
-// Default table styling
-const tableClasses = cn(
-  "w-full border-collapse",
-  "bg-white dark:bg-gray-900",
-  "border border-gray-200 dark:border-gray-700",
-  "rounded-lg overflow-hidden"
-);
+```typescript
+// Custom theme configuration
+const customTheme = {
+  container: 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg',
+  header: 'bg-gray-50 dark:bg-gray-700 px-4 py-3 border-b border-gray-200 dark:border-gray-600',
+  table: {
+    wrapper: 'overflow-x-auto',
+    table: 'min-w-full divide-y divide-gray-200 dark:divide-gray-700',
+    thead: 'bg-gray-50 dark:bg-gray-700',
+    tbody: 'bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700',
+    th: 'px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider',
+    td: 'px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100'
+  },
+  form: {
+    input: 'mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white',
+    button: 'inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500',
+    error: 'mt-1 text-sm text-red-600 dark:text-red-400'
+  }
+}
 
-// Header styling
-const headerClasses = cn(
-  "bg-gray-50 dark:bg-gray-800",
-  "text-gray-900 dark:text-gray-100",
-  "text-left text-sm font-medium",
-  "px-4 py-3"
-);
-```
-
-### Custom Themes
-
-```tsx
-// Custom color scheme
 <LookupKeys
-  fields={fields}
-  append={append}
-  remove={remove}
-  control={control}
   name="lookupKeys"
-  className={cn(
-    "custom-lookup-keys",
-    "border-blue-200 dark:border-blue-800",
-    "[&_table]:bg-blue-50 [&_table]:dark:bg-blue-900/20"
-  )}
+  control={control}
+  className={customTheme.container}
+  // Component will apply theme classes automatically
 />
 ```
 
 ### CSS Custom Properties
 
 ```css
-/* Custom CSS for advanced theming */
+/* Custom CSS properties for advanced theming */
 .lookup-keys {
   --lookup-keys-bg: theme(colors.white);
   --lookup-keys-border: theme(colors.gray.200);
   --lookup-keys-text: theme(colors.gray.900);
+  --lookup-keys-primary: theme(colors.primary.600);
+  --lookup-keys-error: theme(colors.red.600);
+  --lookup-keys-success: theme(colors.green.600);
 }
 
-.dark .lookup-keys {
-  --lookup-keys-bg: theme(colors.gray.900);
+.lookup-keys.dark {
+  --lookup-keys-bg: theme(colors.gray.800);
   --lookup-keys-border: theme(colors.gray.700);
   --lookup-keys-text: theme(colors.gray.100);
+  --lookup-keys-primary: theme(colors.primary.500);
+  --lookup-keys-error: theme(colors.red.500);
+  --lookup-keys-success: theme(colors.green.500);
 }
+```
+
+### Component Slot Customization
+
+```typescript
+interface LookupKeysSlots {
+  header?: React.ComponentType<{ title: string; description?: string }>
+  addButton?: React.ComponentType<{ onClick: () => void; disabled?: boolean }>
+  keyInput?: React.ComponentType<InputProps>
+  valueInput?: React.ComponentType<InputProps>
+  actions?: React.ComponentType<{ onEdit: () => void; onDelete: () => void }>
+  emptyState?: React.ComponentType<{ onAdd: () => void }>
+}
+
+<LookupKeys
+  name="lookupKeys"
+  control={control}
+  slots={{
+    header: CustomHeader,
+    addButton: CustomAddButton,
+    emptyState: CustomEmptyState
+  }}
+/>
 ```
 
 ## Testing
 
 ### Unit Testing with Vitest
 
-```tsx
-import { render, screen, fireEvent } from '@testing-library/react';
-import { useForm, useFieldArray } from 'react-hook-form';
-import { LookupKeys } from './lookup-keys';
+```typescript
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { useForm } from 'react-hook-form'
+import { LookupKeys } from '../LookupKeys'
 
-function TestWrapper() {
-  const form = useForm({
+const TestWrapper = ({ onSubmit = vi.fn() }) => {
+  const { control, handleSubmit } = useForm({
     defaultValues: { lookupKeys: [] }
-  });
-  
-  const { fields, append, remove } = useFieldArray({
-    control: form.control,
-    name: 'lookupKeys'
-  });
+  })
 
   return (
-    <LookupKeys
-      fields={fields}
-      append={append}
-      remove={remove}
-      control={form.control}
-      name="lookupKeys"
-      data-testid="lookup-keys"
-    />
-  );
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <LookupKeys name="lookupKeys" control={control} />
+      <button type="submit">Submit</button>
+    </form>
+  )
 }
 
-test('renders empty state correctly', () => {
-  render(<TestWrapper />);
-  expect(screen.getByText(/no lookup keys/i)).toBeInTheDocument();
-});
+describe('LookupKeys Component', () => {
+  it('renders with empty state', () => {
+    render(<TestWrapper />)
+    
+    expect(screen.getByText(/no lookup keys configured/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /add key/i })).toBeInTheDocument()
+  })
 
-test('adds new lookup key entry', async () => {
-  render(<TestWrapper />);
-  
-  const addButton = screen.getByRole('button', { name: /add entry/i });
-  fireEvent.click(addButton);
-  
-  expect(screen.getByLabelText(/key name/i)).toBeInTheDocument();
-  expect(screen.getByLabelText(/key value/i)).toBeInTheDocument();
-});
+  it('adds new lookup key pair', async () => {
+    const user = userEvent.setup()
+    render(<TestWrapper />)
+    
+    const addButton = screen.getByRole('button', { name: /add key/i })
+    await user.click(addButton)
+    
+    expect(screen.getByPlaceholderText(/enter key/i)).toBeInTheDocument()
+    expect(screen.getByPlaceholderText(/enter value/i)).toBeInTheDocument()
+  })
+
+  it('validates required fields', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(<TestWrapper onSubmit={onSubmit} />)
+    
+    // Add a row but leave fields empty
+    await user.click(screen.getByRole('button', { name: /add key/i }))
+    await user.click(screen.getByRole('button', { name: /submit/i }))
+    
+    await waitFor(() => {
+      expect(screen.getByText(/key is required/i)).toBeInTheDocument()
+      expect(screen.getByText(/value is required/i)).toBeInTheDocument()
+    })
+    
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
+
+  it('handles duplicate key validation', async () => {
+    const user = userEvent.setup()
+    render(<TestWrapper />)
+    
+    // Add first key
+    await user.click(screen.getByRole('button', { name: /add key/i }))
+    await user.type(screen.getAllByPlaceholderText(/enter key/i)[0], 'test_key')
+    await user.type(screen.getAllByPlaceholderText(/enter value/i)[0], 'test_value')
+    
+    // Add second key with same name
+    await user.click(screen.getByRole('button', { name: /add key/i }))
+    await user.type(screen.getAllByPlaceholderText(/enter key/i)[1], 'test_key')
+    
+    await waitFor(() => {
+      expect(screen.getByText(/duplicate key/i)).toBeInTheDocument()
+    })
+  })
+
+  it('removes lookup key', async () => {
+    const user = userEvent.setup()
+    render(<TestWrapper />)
+    
+    // Add a key
+    await user.click(screen.getByRole('button', { name: /add key/i }))
+    await user.type(screen.getByPlaceholderText(/enter key/i), 'test_key')
+    
+    // Remove the key
+    const removeButton = screen.getByRole('button', { name: /remove/i })
+    await user.click(removeButton)
+    
+    expect(screen.queryByDisplayValue('test_key')).not.toBeInTheDocument()
+  })
+
+  it('supports keyboard navigation', async () => {
+    const user = userEvent.setup()
+    render(<TestWrapper />)
+    
+    await user.click(screen.getByRole('button', { name: /add key/i }))
+    
+    const keyInput = screen.getByPlaceholderText(/enter key/i)
+    const valueInput = screen.getByPlaceholderText(/enter value/i)
+    
+    // Tab navigation
+    keyInput.focus()
+    expect(keyInput).toHaveFocus()
+    
+    await user.tab()
+    expect(valueInput).toHaveFocus()
+  })
+})
+```
+
+### Integration Testing
+
+```typescript
+import { describe, it, expect } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { MockServiceWorker } from '@/test/mocks/msw'
+import { LookupKeysForm } from '../LookupKeysForm'
+
+describe('LookupKeys Integration', () => {
+  it('saves lookup keys to backend', async () => {
+    const user = userEvent.setup()
+    
+    MockServiceWorker.use(
+      rest.post('/api/v2/system/config', (req, res, ctx) => {
+        return res(ctx.status(200), ctx.json({ success: true }))
+      })
+    )
+    
+    render(<LookupKeysForm />)
+    
+    // Add and configure lookup key
+    await user.click(screen.getByRole('button', { name: /add key/i }))
+    await user.type(screen.getByPlaceholderText(/enter key/i), 'api_timeout')
+    await user.type(screen.getByPlaceholderText(/enter value/i), '30000')
+    
+    // Submit form
+    await user.click(screen.getByRole('button', { name: /save/i }))
+    
+    expect(await screen.findByText(/saved successfully/i)).toBeInTheDocument()
+  })
+})
 ```
 
 ### Accessibility Testing
 
-```tsx
-import { axe, toHaveNoViolations } from 'jest-axe';
+```typescript
+import { describe, it, expect } from 'vitest'
+import { render } from '@testing-library/react'
+import { axe, toHaveNoViolations } from 'jest-axe'
+import { LookupKeys } from '../LookupKeys'
 
-expect.extend(toHaveNoViolations);
+expect.extend(toHaveNoViolations)
 
-test('has no accessibility violations', async () => {
-  const { container } = render(<TestWrapper />);
-  const results = await axe(container);
-  expect(results).toHaveNoViolations();
-});
+describe('LookupKeys Accessibility', () => {
+  it('meets WCAG 2.1 AA standards', async () => {
+    const { container } = render(
+      <LookupKeys name="lookupKeys" control={mockControl} />
+    )
+    
+    const results = await axe(container)
+    expect(results).toHaveNoViolations()
+  })
 
-test('supports keyboard navigation', () => {
-  render(<TestWrapper />);
-  
-  const addButton = screen.getByRole('button', { name: /add entry/i });
-  addButton.focus();
-  
-  expect(addButton).toHaveFocus();
-  
-  fireEvent.keyDown(addButton, { key: 'Enter' });
-  expect(screen.getByLabelText(/key name/i)).toBeInTheDocument();
-});
+  it('provides proper ARIA labels', () => {
+    render(
+      <LookupKeys
+        name="lookupKeys"
+        control={mockControl}
+        aria-label="Configuration lookup keys"
+      />
+    )
+    
+    expect(screen.getByLabelText(/configuration lookup keys/i)).toBeInTheDocument()
+  })
+})
 ```
-
-## Performance Considerations
-
-### Optimization Techniques
-
-1. **Memoization**: Use `React.memo` for individual row components
-2. **Virtual Scrolling**: For large datasets (>100 entries)
-3. **Debounced Validation**: Reduce validation frequency for better UX
-4. **Lazy Loading**: Load validation schemas asynchronously
-
-```tsx
-// Optimized row component
-const LookupKeyRow = React.memo(function LookupKeyRow({ 
-  field, 
-  index, 
-  remove,
-  control 
-}) {
-  return (
-    <tr>
-      <td>
-        <Input
-          {...control.register(`lookupKeys.${index}.name`)}
-          placeholder="Key name"
-        />
-      </td>
-      {/* ... other cells */}
-    </tr>
-  );
-});
-```
-
-### Bundle Size Impact
-
-- **Base Component**: ~2.3KB gzipped
-- **With Dependencies**: ~8.1KB gzipped (includes React Hook Form utilities)
-- **Chunked Loading**: Automatically code-split with Next.js dynamic imports
 
 ## Troubleshooting
 
-### Common Issues
+### Common Issues and Solutions
 
 #### 1. Form Validation Not Working
 
-**Problem**: Validation errors not showing for lookup key fields
+**Problem**: Validation messages not appearing or form submitting with invalid data.
 
-**Solution**: Ensure proper field registration and error mapping:
+**Solution**:
+```typescript
+// Ensure proper resolver setup
+const { control, formState: { errors } } = useForm({
+  resolver: zodResolver(schema), // Required for validation
+  mode: 'onChange' // For real-time validation
+})
 
-```tsx
-// Correct field registration
-<Input
-  {...form.register(`lookupKeys.${index}.name`)}
-  error={form.formState.errors.lookupKeys?.[index]?.name?.message}
+// Check field registration
+<LookupKeys
+  name="lookupKeys" // Must match schema property
+  control={control}
 />
 ```
 
-#### 2. Field Array Not Updating
+#### 2. Performance Issues with Large Datasets
 
-**Problem**: Adding/removing entries doesn't update the form state
+**Problem**: Component becomes slow with many lookup keys.
 
-**Solution**: Use the proper useFieldArray methods:
-
-```tsx
-// Correct usage
-const { fields, append, remove, update } = useFieldArray({
-  control: form.control,
-  name: 'lookupKeys'
-});
-
-// Don't mutate fields directly
-append({ name: '', value: '', private: false });
+**Solution**:
+```typescript
+// Enable virtualization for large datasets
+<LookupKeys
+  name="lookupKeys"
+  control={control}
+  variant="table"
+  virtualized={true}
+  virtualizedHeight={400}
+  // Consider pagination for >1000 items
+/>
 ```
 
-#### 3. Accessibility Warnings
+#### 3. TypeScript Type Errors
 
-**Problem**: Screen reader announces incorrect information
+**Problem**: TypeScript compilation errors with form integration.
 
-**Solution**: Provide proper ARIA labels and descriptions:
+**Solution**:
+```typescript
+// Properly type your form data
+interface FormData {
+  lookupKeys: LookupKeyItem[]
+}
 
-```tsx
+// Use typed control
+const { control } = useForm<FormData>()
+
+// Ensure correct name property type
 <LookupKeys
-  aria-label="Service configuration lookup keys"
+  name="lookupKeys" // keyof FormData
+  control={control}
+/>
+```
+
+#### 4. Accessibility Issues
+
+**Problem**: Screen reader not announcing changes or keyboard navigation not working.
+
+**Solution**:
+```typescript
+// Provide proper ARIA attributes
+<LookupKeys
+  name="lookupKeys"
+  control={control}
+  aria-label="Lookup keys management"
   aria-describedby="lookup-keys-help"
-  // ... other props
 />
 
 <div id="lookup-keys-help" className="sr-only">
-  Configure key-value pairs for service settings
+  Use Tab to navigate, Enter to edit, Delete to remove items
 </div>
 ```
 
-#### 4. Performance Issues with Large Datasets
+#### 5. Styling Issues
 
-**Problem**: Component becomes slow with many entries
+**Problem**: Component not matching design system or responsive issues.
 
-**Solution**: Implement virtual scrolling or pagination:
+**Solution**:
+```typescript
+// Ensure Tailwind CSS is properly configured
+// tailwind.config.ts
+module.exports = {
+  content: [
+    './src/components/ui/lookup-keys/**/*.{js,ts,jsx,tsx}',
+  ],
+  // ... rest of config
+}
 
-```tsx
-// For large datasets, consider virtualization
-import { FixedSizeList as List } from 'react-window';
-
-// Or implement pagination
-const ITEMS_PER_PAGE = 10;
-const paginatedFields = useMemo(() => 
-  fields.slice(currentPage * ITEMS_PER_PAGE, (currentPage + 1) * ITEMS_PER_PAGE),
-  [fields, currentPage]
-);
+// Use design system classes
+<LookupKeys
+  name="lookupKeys"
+  control={control}
+  className="your-custom-styles"
+/>
 ```
 
-## Browser Support
+### Debug Mode
 
-- **Chrome**: 90+
-- **Firefox**: 88+
-- **Safari**: 14+
-- **Edge**: 90+
+Enable debug mode for development troubleshooting:
 
-## Contributing
+```typescript
+<LookupKeys
+  name="lookupKeys"
+  control={control}
+  debug={process.env.NODE_ENV === 'development'}
+  onDebug={(data) => console.log('LookupKeys Debug:', data)}
+/>
+```
 
-When contributing to the LookupKeys component:
+## Best Practices
 
-1. Maintain WCAG 2.1 AA compliance
-2. Add comprehensive tests for new features
-3. Update this documentation for API changes
-4. Follow the established TypeScript patterns
-5. Ensure responsive design across breakpoints
+### 1. Form Integration
 
-## Related Components
+```typescript
+// ✅ Good: Use proper form setup
+const { control, handleSubmit, formState: { errors } } = useForm({
+  resolver: zodResolver(schema),
+  defaultValues: { lookupKeys: [] }
+})
 
-- [`Input`](../input/README.md) - Text input component used for key/value fields
-- [`Toggle`](../toggle/README.md) - Switch component for privacy controls
-- [`Button`](../button/README.md) - Action buttons for add/remove operations
-- [`Table`](../table/README.md) - Base table component for tabular layouts
+// ❌ Avoid: Missing validation setup
+const { control } = useForm()
+```
 
-## License
+### 2. Performance Optimization
 
-This component is part of the DreamFactory Admin Interface and follows the same licensing terms.
+```typescript
+// ✅ Good: Memoize handlers
+const handleAdd = useCallback((item: LookupKeyItem) => {
+  console.log('Added:', item)
+}, [])
+
+// ✅ Good: Use virtualization for large datasets
+<LookupKeys
+  name="lookupKeys"
+  control={control}
+  virtualized={fields.length > 100}
+  onAdd={handleAdd}
+/>
+```
+
+### 3. Accessibility
+
+```typescript
+// ✅ Good: Comprehensive accessibility
+<LookupKeys
+  name="lookupKeys"
+  control={control}
+  aria-label="Configuration parameters"
+  aria-describedby="lookup-keys-description"
+  label="System Configuration"
+  description="Manage system configuration key-value pairs"
+/>
+```
+
+### 4. Error Handling
+
+```typescript
+// ✅ Good: Custom validation with helpful messages
+const keyValidation = (key: string) => {
+  if (!key) return 'Key is required'
+  if (key.length > 50) return 'Key must be 50 characters or less'
+  if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(key)) {
+    return 'Key must start with a letter and contain only letters, numbers, and underscores'
+  }
+  return undefined
+}
+```
+
+### 5. Testing
+
+```typescript
+// ✅ Good: Comprehensive test coverage
+describe('LookupKeys', () => {
+  it('renders correctly')
+  it('handles user interactions')
+  it('validates input properly')
+  it('meets accessibility standards')
+  it('integrates with form properly')
+})
+```
+
+---
+
+For additional support and examples, refer to the [DreamFactory Admin Interface documentation](../../../docs/) or check the [component source code](./LookupKeys.tsx).
