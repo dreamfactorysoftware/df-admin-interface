@@ -1,529 +1,978 @@
 /**
- * SSR-safe React hooks for storage operations that work correctly with Next.js
- * server-side rendering. Provides useLocalStorage, useSessionStorage, and useCookies
- * hooks with proper hydration handling and client-side-only storage access.
+ * SSR-Safe React Storage Hooks for DreamFactory Admin Interface
  * 
- * This module replaces Angular BehaviorSubject patterns with React hooks while
- * ensuring compatibility with Next.js SSR and preventing hydration mismatches.
+ * Provides useLocalStorage, useSessionStorage, and useCookies hooks with proper
+ * hydration handling and client-side-only storage access. Replaces Angular
+ * BehaviorSubject patterns with React hooks that work seamlessly with Next.js
+ * server-side rendering.
+ * 
+ * Key Features:
+ * - SSR compatibility with proper hydration handling
+ * - Cross-tab storage synchronization via storage events
+ * - Reactive state updates using React's useState
+ * - Type-safe storage operations with error handling
+ * - Session token management compatible with Next.js middleware
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { 
+  LocalStorage, 
+  SessionStorage, 
+  CookieStorage, 
+  isBrowser,
+  type StorageOptions,
+  type CookieOptions,
+  type StorageResult 
+} from './storage-utils';
+import { 
+  type StorageKey, 
+  type StorageHookState,
+  type UserSession,
+  STORAGE_KEYS 
+} from './types';
 
-// Types for storage operations
-interface StorageHookOptions<T> {
-  defaultValue: T;
+// =============================================================================
+// Hook Options and Configuration
+// =============================================================================
+
+/**
+ * Configuration options for storage hooks
+ */
+export interface StorageHookOptions<T> extends StorageOptions {
+  /** Default value to return during SSR and when key doesn't exist */
+  defaultValue?: T;
+  /** Whether to enable cross-tab synchronization */
+  syncTabs?: boolean;
+  /** Custom serializer for complex objects */
   serializer?: {
     serialize: (value: T) => string;
     deserialize: (value: string) => T;
   };
-  syncAcrossTabs?: boolean;
+  /** Whether to enable debug logging */
+  debug?: boolean;
+  /** Delay in ms before initializing to avoid hydration mismatches */
+  initDelay?: number;
 }
-
-interface CookieOptions {
-  maxAge?: number;
-  expires?: Date;
-  path?: string;
-  domain?: string;
-  secure?: boolean;
-  httpOnly?: boolean;
-  sameSite?: 'strict' | 'lax' | 'none';
-}
-
-// Custom serializer for complex objects
-const createSerializer = <T>() => ({
-  serialize: (value: T): string => {
-    try {
-      return JSON.stringify(value);
-    } catch (error) {
-      console.warn('Storage serialization error:', error);
-      return String(value);
-    }
-  },
-  deserialize: (value: string): T => {
-    try {
-      return JSON.parse(value);
-    } catch (error) {
-      // Return the raw value if JSON parsing fails
-      return value as unknown as T;
-    }
-  },
-});
-
-// Check if we're in a browser environment
-const isBrowser = typeof window !== 'undefined';
-
-// Check if storage is available and accessible
-const isStorageAvailable = (storage: Storage): boolean => {
-  if (!isBrowser) return false;
-  
-  try {
-    const testKey = '__storage_test__';
-    storage.setItem(testKey, 'test');
-    storage.removeItem(testKey);
-    return true;
-  } catch {
-    return false;
-  }
-};
 
 /**
- * SSR-safe localStorage hook with cross-tab synchronization
- * Replaces Angular BehaviorSubject localStorage patterns
+ * Cookie-specific options extending storage hook options
  */
-export function useLocalStorage<T>(
-  key: string,
-  options: StorageHookOptions<T>
-): [T, (value: T | ((prev: T) => T)) => void, () => void] {
-  const { defaultValue, serializer = createSerializer<T>(), syncAcrossTabs = true } = options;
-  
-  // Track if component has hydrated to prevent SSR mismatches
+export interface CookieHookOptions<T> extends StorageHookOptions<T> {
+  /** Cookie configuration options */
+  cookieOptions?: CookieOptions;
+}
+
+// =============================================================================
+// Hydration Helper Hook
+// =============================================================================
+
+/**
+ * Custom hook to handle SSR hydration safely
+ * Prevents hydration mismatches by delaying client-side storage access
+ */
+function useSSRSafeHydration(initDelay: number = 0): boolean {
   const [isHydrated, setIsHydrated] = useState(false);
-  const [storedValue, setStoredValue] = useState<T>(defaultValue);
-  const suppressStorageEvent = useRef(false);
-
-  // Initialize value after hydration
+  
   useEffect(() => {
-    if (!isBrowser || !isStorageAvailable(localStorage)) {
+    if (initDelay > 0) {
+      const timer = setTimeout(() => {
+        setIsHydrated(true);
+      }, initDelay);
+      return () => clearTimeout(timer);
+    } else {
       setIsHydrated(true);
-      return;
     }
+  }, [initDelay]);
+  
+  return isHydrated && isBrowser;
+}
 
-    try {
-      const item = localStorage.getItem(key);
-      if (item !== null) {
-        setStoredValue(serializer.deserialize(item));
-      }
-    } catch (error) {
-      console.warn(`Error reading localStorage key "${key}":`, error);
-    }
-    
-    setIsHydrated(true);
-  }, [key, serializer]);
+// =============================================================================
+// Storage Event Management
+// =============================================================================
 
-  // Set up storage event listener for cross-tab synchronization
+/**
+ * Hook for managing storage event listeners across tabs
+ */
+function useStorageEventListener<T>(
+  key: string,
+  onStorageChange: (newValue: T, oldValue: T) => void,
+  enabled: boolean = true
+): void {
+  const callbackRef = useRef(onStorageChange);
+  callbackRef.current = onStorageChange;
+
   useEffect(() => {
-    if (!isBrowser || !syncAcrossTabs || !isStorageAvailable(localStorage)) return;
+    if (!enabled || !isBrowser) return;
 
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === key && e.newValue !== null && !suppressStorageEvent.current) {
+    const handleStorageEvent = (event: StorageEvent) => {
+      if (event.key === key && event.storageArea === window.localStorage) {
         try {
-          const newValue = serializer.deserialize(e.newValue);
-          setStoredValue(newValue);
+          const oldValue = event.oldValue ? JSON.parse(event.oldValue) : null;
+          const newValue = event.newValue ? JSON.parse(event.newValue) : null;
+          callbackRef.current(newValue, oldValue);
         } catch (error) {
-          console.warn(`Error parsing storage event for key "${key}":`, error);
+          console.warn(`Failed to parse storage event for key "${key}":`, error);
         }
       }
     };
 
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, [key, serializer, syncAcrossTabs]);
-
-  // Update storage value
-  const setValue = useCallback((value: T | ((prev: T) => T)) => {
-    if (!isBrowser || !isStorageAvailable(localStorage)) {
-      console.warn('localStorage is not available');
-      return;
-    }
-
-    try {
-      // Allow functional updates
-      const valueToStore = value instanceof Function ? value(storedValue) : value;
-      
-      // Prevent triggering storage event for this tab
-      suppressStorageEvent.current = true;
-      
-      const serializedValue = serializer.serialize(valueToStore);
-      localStorage.setItem(key, serializedValue);
-      setStoredValue(valueToStore);
-      
-      // Re-enable storage events after a brief delay
-      setTimeout(() => {
-        suppressStorageEvent.current = false;
-      }, 100);
-    } catch (error) {
-      console.error(`Error setting localStorage key "${key}":`, error);
-    }
-  }, [key, serializer, storedValue]);
-
-  // Remove value from storage
-  const removeValue = useCallback(() => {
-    if (!isBrowser || !isStorageAvailable(localStorage)) {
-      console.warn('localStorage is not available');
-      return;
-    }
-
-    try {
-      suppressStorageEvent.current = true;
-      localStorage.removeItem(key);
-      setStoredValue(defaultValue);
-      
-      setTimeout(() => {
-        suppressStorageEvent.current = false;
-      }, 100);
-    } catch (error) {
-      console.error(`Error removing localStorage key "${key}":`, error);
-    }
-  }, [key, defaultValue]);
-
-  // Return default value during SSR and before hydration
-  if (!isHydrated) {
-    return [defaultValue, setValue, removeValue];
-  }
-
-  return [storedValue, setValue, removeValue];
+    window.addEventListener('storage', handleStorageEvent);
+    return () => window.removeEventListener('storage', handleStorageEvent);
+  }, [key, enabled]);
 }
 
+// =============================================================================
+// useLocalStorage Hook
+// =============================================================================
+
 /**
- * SSR-safe sessionStorage hook for temporary storage needs
- * Provides session-scoped storage that's cleared when the tab is closed
+ * SSR-safe localStorage hook with cross-tab synchronization
+ * Replaces Angular BehaviorSubject patterns with reactive React state
+ * 
+ * @param key - Storage key to manage
+ * @param options - Configuration options including default value and sync settings
+ * @returns Hook state with value, loading, error, and control functions
  */
-export function useSessionStorage<T>(
+export function useLocalStorage<T = any>(
   key: string,
-  options: StorageHookOptions<T>
-): [T, (value: T | ((prev: T) => T)) => void, () => void] {
-  const { defaultValue, serializer = createSerializer<T>() } = options;
-  
-  const [isHydrated, setIsHydrated] = useState(false);
-  const [storedValue, setStoredValue] = useState<T>(defaultValue);
+  options: StorageHookOptions<T> = {}
+): StorageHookState<T> {
+  const {
+    defaultValue,
+    syncTabs = true,
+    debug = false,
+    initDelay = 0,
+    logErrors = true,
+    serializer,
+    ...storageOptions
+  } = options;
 
-  // Initialize value after hydration
+  const isHydrated = useSSRSafeHydration(initDelay);
+  const [state, setState] = useState<{
+    value: T;
+    loading: boolean;
+    error: string | null;
+  }>({
+    value: defaultValue as T,
+    loading: !isHydrated,
+    error: null,
+  });
+
+  // Initialize storage value after hydration
   useEffect(() => {
-    if (!isBrowser || !isStorageAvailable(sessionStorage)) {
-      setIsHydrated(true);
+    if (!isHydrated) return;
+
+    const loadStoredValue = () => {
+      try {
+        const result = LocalStorage.getItem<T>(key, {
+          defaultValue,
+          logErrors,
+          ...storageOptions,
+        });
+
+        if (debug) {
+          console.log(`[useLocalStorage] Loaded key "${key}":`, result);
+        }
+
+        setState({
+          value: result.success ? result.data! : defaultValue as T,
+          loading: false,
+          error: result.success ? null : result.error || 'Failed to load from storage',
+        });
+      } catch (error) {
+        const errorMessage = `Failed to initialize localStorage for key "${key}": ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`;
+        
+        if (logErrors) {
+          console.error(errorMessage, error);
+        }
+
+        setState({
+          value: defaultValue as T,
+          loading: false,
+          error: errorMessage,
+        });
+      }
+    };
+
+    loadStoredValue();
+  }, [isHydrated, key, defaultValue, debug, logErrors, JSON.stringify(storageOptions)]);
+
+  // Handle cross-tab synchronization
+  useStorageEventListener<T>(
+    key,
+    useCallback((newValue: T) => {
+      if (debug) {
+        console.log(`[useLocalStorage] Cross-tab update for key "${key}":`, newValue);
+      }
+      setState(prev => ({
+        ...prev,
+        value: newValue ?? defaultValue as T,
+        error: null,
+      }));
+    }, [key, defaultValue, debug]),
+    syncTabs && isHydrated
+  );
+
+  // Set value function with optimistic updates
+  const setValue = useCallback((newValue: T) => {
+    if (!isHydrated) {
+      console.warn(`[useLocalStorage] Attempted to set value before hydration for key "${key}"`);
       return;
     }
 
     try {
-      const item = sessionStorage.getItem(key);
-      if (item !== null) {
-        setStoredValue(serializer.deserialize(item));
+      // Optimistic update
+      setState(prev => ({
+        ...prev,
+        value: newValue,
+        error: null,
+      }));
+
+      // Persist to storage
+      const result = LocalStorage.setItem<T>(key, newValue, {
+        logErrors,
+        ...storageOptions,
+      });
+
+      if (!result.success) {
+        // Rollback optimistic update on failure
+        setState(prev => ({
+          ...prev,
+          value: prev.value, // Keep previous value
+          error: result.error || 'Failed to save to storage',
+        }));
+      } else if (debug) {
+        console.log(`[useLocalStorage] Set key "${key}":`, newValue);
       }
     } catch (error) {
-      console.warn(`Error reading sessionStorage key "${key}":`, error);
-    }
-    
-    setIsHydrated(true);
-  }, [key, serializer]);
+      const errorMessage = `Failed to set localStorage value for key "${key}": ${
+        error instanceof Error ? error.message : 'Unknown error'
+      }`;
+      
+      if (logErrors) {
+        console.error(errorMessage, error);
+      }
 
-  // Update storage value
-  const setValue = useCallback((value: T | ((prev: T) => T)) => {
-    if (!isBrowser || !isStorageAvailable(sessionStorage)) {
-      console.warn('sessionStorage is not available');
-      return;
+      setState(prev => ({
+        ...prev,
+        error: errorMessage,
+      }));
     }
+  }, [isHydrated, key, debug, logErrors, JSON.stringify(storageOptions)]);
 
-    try {
-      const valueToStore = value instanceof Function ? value(storedValue) : value;
-      const serializedValue = serializer.serialize(valueToStore);
-      sessionStorage.setItem(key, serializedValue);
-      setStoredValue(valueToStore);
-    } catch (error) {
-      console.error(`Error setting sessionStorage key "${key}":`, error);
-    }
-  }, [key, serializer, storedValue]);
-
-  // Remove value from storage
+  // Remove value function
   const removeValue = useCallback(() => {
-    if (!isBrowser || !isStorageAvailable(sessionStorage)) {
-      console.warn('sessionStorage is not available');
+    if (!isHydrated) {
+      console.warn(`[useLocalStorage] Attempted to remove value before hydration for key "${key}"`);
       return;
     }
 
     try {
-      sessionStorage.removeItem(key);
-      setStoredValue(defaultValue);
+      const result = LocalStorage.removeItem(key, { logErrors, ...storageOptions });
+      
+      setState({
+        value: defaultValue as T,
+        loading: false,
+        error: result.success ? null : result.error || 'Failed to remove from storage',
+      });
+
+      if (debug && result.success) {
+        console.log(`[useLocalStorage] Removed key "${key}"`);
+      }
     } catch (error) {
-      console.error(`Error removing sessionStorage key "${key}":`, error);
+      const errorMessage = `Failed to remove localStorage value for key "${key}": ${
+        error instanceof Error ? error.message : 'Unknown error'
+      }`;
+      
+      if (logErrors) {
+        console.error(errorMessage, error);
+      }
+
+      setState(prev => ({
+        ...prev,
+        error: errorMessage,
+      }));
     }
-  }, [key, defaultValue]);
+  }, [isHydrated, key, defaultValue, debug, logErrors, JSON.stringify(storageOptions)]);
 
-  // Return default value during SSR and before hydration
-  if (!isHydrated) {
-    return [defaultValue, setValue, removeValue];
-  }
-
-  return [storedValue, setValue, removeValue];
-}
-
-/**
- * SSR-safe cookie management hook for session token management
- * Compatible with Next.js middleware for authentication workflows
- */
-export function useCookies(): {
-  getCookie: (name: string) => string | null;
-  setCookie: (name: string, value: string, options?: CookieOptions) => void;
-  removeCookie: (name: string, options?: Pick<CookieOptions, 'path' | 'domain'>) => void;
-  getAllCookies: () => Record<string, string>;
-} {
-  const getCookie = useCallback((name: string): string | null => {
-    if (!isBrowser) return null;
+  // Refresh value from storage
+  const refresh = useCallback(() => {
+    if (!isHydrated) return;
 
     try {
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; ${name}=`);
-      if (parts.length === 2) {
-        const cookieValue = parts.pop()?.split(';').shift();
-        return cookieValue ? decodeURIComponent(cookieValue) : null;
+      const result = LocalStorage.getItem<T>(key, {
+        defaultValue,
+        logErrors,
+        ...storageOptions,
+      });
+
+      setState({
+        value: result.success ? result.data! : defaultValue as T,
+        loading: false,
+        error: result.success ? null : result.error || 'Failed to refresh from storage',
+      });
+
+      if (debug) {
+        console.log(`[useLocalStorage] Refreshed key "${key}":`, result);
       }
     } catch (error) {
-      console.warn(`Error reading cookie "${name}":`, error);
-    }
-    
-    return null;
-  }, []);
-
-  const setCookie = useCallback((
-    name: string,
-    value: string,
-    options: CookieOptions = {}
-  ) => {
-    if (!isBrowser) {
-      console.warn('Cannot set cookie during SSR');
-      return;
-    }
-
-    try {
-      const {
-        maxAge,
-        expires,
-        path = '/',
-        domain,
-        secure = false,
-        sameSite = 'strict'
-      } = options;
-
-      let cookieString = `${name}=${encodeURIComponent(value)}`;
+      const errorMessage = `Failed to refresh localStorage value for key "${key}": ${
+        error instanceof Error ? error.message : 'Unknown error'
+      }`;
       
-      if (maxAge !== undefined) {
-        cookieString += `; Max-Age=${maxAge}`;
+      if (logErrors) {
+        console.error(errorMessage, error);
       }
-      
-      if (expires) {
-        cookieString += `; Expires=${expires.toUTCString()}`;
-      }
-      
-      cookieString += `; Path=${path}`;
-      
-      if (domain) {
-        cookieString += `; Domain=${domain}`;
-      }
-      
-      if (secure) {
-        cookieString += '; Secure';
-      }
-      
-      cookieString += `; SameSite=${sameSite}`;
-      
-      document.cookie = cookieString;
-    } catch (error) {
-      console.error(`Error setting cookie "${name}":`, error);
-    }
-  }, []);
 
-  const removeCookie = useCallback((
-    name: string,
-    options: Pick<CookieOptions, 'path' | 'domain'> = {}
-  ) => {
-    if (!isBrowser) {
-      console.warn('Cannot remove cookie during SSR');
-      return;
+      setState(prev => ({
+        ...prev,
+        error: errorMessage,
+      }));
     }
-
-    const { path = '/', domain } = options;
-    
-    try {
-      let cookieString = `${name}=; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=${path}`;
-      
-      if (domain) {
-        cookieString += `; Domain=${domain}`;
-      }
-      
-      document.cookie = cookieString;
-    } catch (error) {
-      console.error(`Error removing cookie "${name}":`, error);
-    }
-  }, []);
-
-  const getAllCookies = useCallback((): Record<string, string> => {
-    if (!isBrowser) return {};
-
-    try {
-      return document.cookie
-        .split(';')
-        .reduce((cookies, cookie) => {
-          const [name, value] = cookie.trim().split('=');
-          if (name && value) {
-            cookies[name] = decodeURIComponent(value);
-          }
-          return cookies;
-        }, {} as Record<string, string>);
-    } catch (error) {
-      console.warn('Error reading all cookies:', error);
-      return {};
-    }
-  }, []);
+  }, [isHydrated, key, defaultValue, debug, logErrors, JSON.stringify(storageOptions)]);
 
   return {
-    getCookie,
-    setCookie,
-    removeCookie,
-    getAllCookies,
+    value: state.value,
+    loading: state.loading,
+    error: state.error,
+    setValue,
+    removeValue,
+    refresh,
   };
 }
 
+// =============================================================================
+// useSessionStorage Hook
+// =============================================================================
+
 /**
- * Hook for reactive cookie state with automatic updates
- * Useful for session token management and authentication state
+ * SSR-safe sessionStorage hook for temporary storage needs
+ * Provides reactive state management for session-scoped data
+ * 
+ * @param key - Storage key to manage
+ * @param options - Configuration options including default value
+ * @returns Hook state with value, loading, error, and control functions
  */
-export function useCookieState(
-  cookieName: string,
-  defaultValue: string = '',
-  options: CookieOptions = {}
-): [string, (value: string) => void, () => void] {
-  const [value, setValue] = useState<string>(defaultValue);
-  const [isHydrated, setIsHydrated] = useState(false);
-  const { getCookie, setCookie, removeCookie } = useCookies();
+export function useSessionStorage<T = any>(
+  key: string,
+  options: StorageHookOptions<T> = {}
+): StorageHookState<T> {
+  const {
+    defaultValue,
+    debug = false,
+    initDelay = 0,
+    logErrors = true,
+    ...storageOptions
+  } = options;
+
+  const isHydrated = useSSRSafeHydration(initDelay);
+  const [state, setState] = useState<{
+    value: T;
+    loading: boolean;
+    error: string | null;
+  }>({
+    value: defaultValue as T,
+    loading: !isHydrated,
+    error: null,
+  });
+
+  // Initialize storage value after hydration
+  useEffect(() => {
+    if (!isHydrated) return;
+
+    try {
+      const result = SessionStorage.getItem<T>(key, {
+        defaultValue,
+        logErrors,
+        ...storageOptions,
+      });
+
+      if (debug) {
+        console.log(`[useSessionStorage] Loaded key "${key}":`, result);
+      }
+
+      setState({
+        value: result.success ? result.data! : defaultValue as T,
+        loading: false,
+        error: result.success ? null : result.error || 'Failed to load from session storage',
+      });
+    } catch (error) {
+      const errorMessage = `Failed to initialize sessionStorage for key "${key}": ${
+        error instanceof Error ? error.message : 'Unknown error'
+      }`;
+      
+      if (logErrors) {
+        console.error(errorMessage, error);
+      }
+
+      setState({
+        value: defaultValue as T,
+        loading: false,
+        error: errorMessage,
+      });
+    }
+  }, [isHydrated, key, defaultValue, debug, logErrors, JSON.stringify(storageOptions)]);
+
+  // Set value function
+  const setValue = useCallback((newValue: T) => {
+    if (!isHydrated) {
+      console.warn(`[useSessionStorage] Attempted to set value before hydration for key "${key}"`);
+      return;
+    }
+
+    try {
+      setState(prev => ({
+        ...prev,
+        value: newValue,
+        error: null,
+      }));
+
+      const result = SessionStorage.setItem<T>(key, newValue, {
+        logErrors,
+        ...storageOptions,
+      });
+
+      if (!result.success) {
+        setState(prev => ({
+          ...prev,
+          error: result.error || 'Failed to save to session storage',
+        }));
+      } else if (debug) {
+        console.log(`[useSessionStorage] Set key "${key}":`, newValue);
+      }
+    } catch (error) {
+      const errorMessage = `Failed to set sessionStorage value for key "${key}": ${
+        error instanceof Error ? error.message : 'Unknown error'
+      }`;
+      
+      if (logErrors) {
+        console.error(errorMessage, error);
+      }
+
+      setState(prev => ({
+        ...prev,
+        error: errorMessage,
+      }));
+    }
+  }, [isHydrated, key, debug, logErrors, JSON.stringify(storageOptions)]);
+
+  // Remove value function
+  const removeValue = useCallback(() => {
+    if (!isHydrated) {
+      console.warn(`[useSessionStorage] Attempted to remove value before hydration for key "${key}"`);
+      return;
+    }
+
+    try {
+      const result = SessionStorage.removeItem(key, { logErrors, ...storageOptions });
+      
+      setState({
+        value: defaultValue as T,
+        loading: false,
+        error: result.success ? null : result.error || 'Failed to remove from session storage',
+      });
+
+      if (debug && result.success) {
+        console.log(`[useSessionStorage] Removed key "${key}"`);
+      }
+    } catch (error) {
+      const errorMessage = `Failed to remove sessionStorage value for key "${key}": ${
+        error instanceof Error ? error.message : 'Unknown error'
+      }`;
+      
+      if (logErrors) {
+        console.error(errorMessage, error);
+      }
+
+      setState(prev => ({
+        ...prev,
+        error: errorMessage,
+      }));
+    }
+  }, [isHydrated, key, defaultValue, debug, logErrors, JSON.stringify(storageOptions)]);
+
+  // Refresh value from storage
+  const refresh = useCallback(() => {
+    if (!isHydrated) return;
+
+    try {
+      const result = SessionStorage.getItem<T>(key, {
+        defaultValue,
+        logErrors,
+        ...storageOptions,
+      });
+
+      setState({
+        value: result.success ? result.data! : defaultValue as T,
+        loading: false,
+        error: result.success ? null : result.error || 'Failed to refresh from session storage',
+      });
+
+      if (debug) {
+        console.log(`[useSessionStorage] Refreshed key "${key}":`, result);
+      }
+    } catch (error) {
+      const errorMessage = `Failed to refresh sessionStorage value for key "${key}": ${
+        error instanceof Error ? error.message : 'Unknown error'
+      }`;
+      
+      if (logErrors) {
+        console.error(errorMessage, error);
+      }
+
+      setState(prev => ({
+        ...prev,
+        error: errorMessage,
+      }));
+    }
+  }, [isHydrated, key, defaultValue, debug, logErrors, JSON.stringify(storageOptions)]);
+
+  return {
+    value: state.value,
+    loading: state.loading,
+    error: state.error,
+    setValue,
+    removeValue,
+    refresh,
+  };
+}
+
+// =============================================================================
+// useCookies Hook
+// =============================================================================
+
+/**
+ * SSR-safe cookie management hook with Next.js middleware support
+ * Optimized for session token management and authentication state
+ * 
+ * @param name - Cookie name to manage
+ * @param options - Configuration options including default value and cookie settings
+ * @returns Hook state with value, loading, error, and control functions
+ */
+export function useCookies<T = string>(
+  name: string,
+  options: CookieHookOptions<T> = {}
+): StorageHookState<T> {
+  const {
+    defaultValue,
+    cookieOptions = {},
+    debug = false,
+    initDelay = 0,
+    logErrors = true,
+    ...storageOptions
+  } = options;
+
+  const isHydrated = useSSRSafeHydration(initDelay);
+  const [state, setState] = useState<{
+    value: T;
+    loading: boolean;
+    error: string | null;
+  }>({
+    value: defaultValue as T,
+    loading: !isHydrated,
+    error: null,
+  });
+
+  // Default cookie options for security
+  const secureOptions: CookieOptions = {
+    maxAge: 1, // 1 day default
+    path: '/',
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    httpOnly: false, // Allow client access for React hooks
+    ...cookieOptions,
+  };
 
   // Initialize cookie value after hydration
   useEffect(() => {
-    if (!isBrowser) {
-      setIsHydrated(true);
+    if (!isHydrated) return;
+
+    try {
+      const result = CookieStorage.getCookie(name, {
+        defaultValue: defaultValue as string,
+        logErrors,
+        ...storageOptions,
+      });
+
+      if (debug) {
+        console.log(`[useCookies] Loaded cookie "${name}":`, result);
+      }
+
+      let parsedValue: T;
+      if (typeof result.data === 'string' && result.data !== defaultValue) {
+        try {
+          // Try to parse as JSON for complex objects
+          parsedValue = JSON.parse(result.data) as T;
+        } catch {
+          // If parsing fails, use as-is (for simple strings)
+          parsedValue = result.data as T;
+        }
+      } else {
+        parsedValue = result.data as T;
+      }
+
+      setState({
+        value: result.success ? parsedValue : defaultValue as T,
+        loading: false,
+        error: result.success ? null : result.error || 'Failed to load cookie',
+      });
+    } catch (error) {
+      const errorMessage = `Failed to initialize cookie "${name}": ${
+        error instanceof Error ? error.message : 'Unknown error'
+      }`;
+      
+      if (logErrors) {
+        console.error(errorMessage, error);
+      }
+
+      setState({
+        value: defaultValue as T,
+        loading: false,
+        error: errorMessage,
+      });
+    }
+  }, [isHydrated, name, defaultValue, debug, logErrors]);
+
+  // Set cookie value function
+  const setValue = useCallback((newValue: T) => {
+    if (!isHydrated) {
+      console.warn(`[useCookies] Attempted to set cookie before hydration for "${name}"`);
       return;
     }
 
-    const cookieValue = getCookie(cookieName);
-    if (cookieValue !== null) {
-      setValue(cookieValue);
+    try {
+      setState(prev => ({
+        ...prev,
+        value: newValue,
+        error: null,
+      }));
+
+      // Serialize value for cookie storage
+      const serializedValue = typeof newValue === 'string' 
+        ? newValue 
+        : JSON.stringify(newValue);
+
+      const result = CookieStorage.setCookie(name, serializedValue, secureOptions);
+
+      if (!result.success) {
+        setState(prev => ({
+          ...prev,
+          error: result.error || 'Failed to save cookie',
+        }));
+      } else if (debug) {
+        console.log(`[useCookies] Set cookie "${name}":`, newValue);
+      }
+    } catch (error) {
+      const errorMessage = `Failed to set cookie "${name}": ${
+        error instanceof Error ? error.message : 'Unknown error'
+      }`;
+      
+      if (logErrors) {
+        console.error(errorMessage, error);
+      }
+
+      setState(prev => ({
+        ...prev,
+        error: errorMessage,
+      }));
     }
-    
-    setIsHydrated(true);
-  }, [cookieName, getCookie]);
+  }, [isHydrated, name, debug, logErrors, secureOptions]);
 
-  // Update cookie value
-  const updateValue = useCallback((newValue: string) => {
-    setValue(newValue);
-    setCookie(cookieName, newValue, {
-      maxAge: 60 * 60 * 24 * 30, // 30 days default
-      sameSite: 'strict',
-      secure: process.env.NODE_ENV === 'production',
-      ...options,
-    });
-  }, [cookieName, setCookie, options]);
-
-  // Remove cookie
+  // Remove cookie function
   const removeValue = useCallback(() => {
-    setValue(defaultValue);
-    removeCookie(cookieName, {
-      path: options.path,
-      domain: options.domain,
-    });
-  }, [cookieName, defaultValue, removeCookie, options.path, options.domain]);
+    if (!isHydrated) {
+      console.warn(`[useCookies] Attempted to remove cookie before hydration for "${name}"`);
+      return;
+    }
 
-  // Return default value during SSR and before hydration
-  if (!isHydrated) {
-    return [defaultValue, updateValue, removeValue];
+    try {
+      const result = CookieStorage.removeCookie(name, {
+        path: secureOptions.path,
+        domain: secureOptions.domain,
+      });
+      
+      setState({
+        value: defaultValue as T,
+        loading: false,
+        error: result.success ? null : result.error || 'Failed to remove cookie',
+      });
+
+      if (debug && result.success) {
+        console.log(`[useCookies] Removed cookie "${name}"`);
+      }
+    } catch (error) {
+      const errorMessage = `Failed to remove cookie "${name}": ${
+        error instanceof Error ? error.message : 'Unknown error'
+      }`;
+      
+      if (logErrors) {
+        console.error(errorMessage, error);
+      }
+
+      setState(prev => ({
+        ...prev,
+        error: errorMessage,
+      }));
+    }
+  }, [isHydrated, name, defaultValue, debug, logErrors, secureOptions.path, secureOptions.domain]);
+
+  // Refresh cookie value
+  const refresh = useCallback(() => {
+    if (!isHydrated) return;
+
+    try {
+      const result = CookieStorage.getCookie(name, {
+        defaultValue: defaultValue as string,
+        logErrors,
+        ...storageOptions,
+      });
+
+      let parsedValue: T;
+      if (typeof result.data === 'string' && result.data !== defaultValue) {
+        try {
+          parsedValue = JSON.parse(result.data) as T;
+        } catch {
+          parsedValue = result.data as T;
+        }
+      } else {
+        parsedValue = result.data as T;
+      }
+
+      setState({
+        value: result.success ? parsedValue : defaultValue as T,
+        loading: false,
+        error: result.success ? null : result.error || 'Failed to refresh cookie',
+      });
+
+      if (debug) {
+        console.log(`[useCookies] Refreshed cookie "${name}":`, result);
+      }
+    } catch (error) {
+      const errorMessage = `Failed to refresh cookie "${name}": ${
+        error instanceof Error ? error.message : 'Unknown error'
+      }`;
+      
+      if (logErrors) {
+        console.error(errorMessage, error);
+      }
+
+      setState(prev => ({
+        ...prev,
+        error: errorMessage,
+      }));
+    }
+  }, [isHydrated, name, defaultValue, debug, logErrors]);
+
+  return {
+    value: state.value,
+    loading: state.loading,
+    error: state.error,
+    setValue,
+    removeValue,
+    refresh,
+  };
+}
+
+// =============================================================================
+// Convenience Hooks for Common Use Cases
+// =============================================================================
+
+/**
+ * Hook for managing session token with Next.js middleware compatibility
+ * Provides secure cookie storage with strict SameSite policy
+ */
+export function useSessionToken(): StorageHookState<string> {
+  return useCookies<string>(STORAGE_KEYS.SESSION_TOKEN, {
+    defaultValue: '',
+    cookieOptions: {
+      maxAge: 1, // 1 day
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      httpOnly: false, // Allow client access for React hooks
+    },
+    debug: process.env.NODE_ENV === 'development',
+  });
+}
+
+/**
+ * Hook for managing user session data in localStorage
+ * Provides reactive updates for authentication state
+ */
+export function useUserSession(): StorageHookState<UserSession | null> {
+  return useLocalStorage<UserSession | null>(STORAGE_KEYS.CURRENT_USER, {
+    defaultValue: null,
+    syncTabs: true,
+    debug: process.env.NODE_ENV === 'development',
+  });
+}
+
+/**
+ * Hook for managing theme preference in localStorage
+ * Supports cross-tab synchronization for consistent theming
+ */
+export function useThemePreference(): StorageHookState<'light' | 'dark' | 'system'> {
+  return useLocalStorage<'light' | 'dark' | 'system'>(STORAGE_KEYS.IS_DARK_MODE, {
+    defaultValue: 'light',
+    syncTabs: true,
+    debug: process.env.NODE_ENV === 'development',
+  });
+}
+
+/**
+ * Hook for managing current service ID in localStorage
+ * Maintains service selection across sessions
+ */
+export function useCurrentServiceId(): StorageHookState<number> {
+  return useLocalStorage<number>(STORAGE_KEYS.CURRENT_SERVICE_ID, {
+    defaultValue: -1,
+    syncTabs: true,
+    debug: process.env.NODE_ENV === 'development',
+  });
+}
+
+/**
+ * Hook for managing temporary wizard or form state in sessionStorage
+ * Automatically cleared when tab/browser is closed
+ */
+export function useTempFormState<T = any>(key: string): StorageHookState<T> {
+  return useSessionStorage<T>(`temp_${key}`, {
+    defaultValue: null as T,
+    debug: process.env.NODE_ENV === 'development',
+  });
+}
+
+// =============================================================================
+// Utility Functions for Storage Management
+// =============================================================================
+
+/**
+ * Clear all application storage (localStorage, sessionStorage, and cookies)
+ * Useful for logout scenarios or development reset
+ */
+export function clearAllStorage(): Promise<void> {
+  return new Promise((resolve) => {
+    if (!isBrowser) {
+      resolve();
+      return;
+    }
+
+    try {
+      // Clear localStorage
+      window.localStorage.clear();
+      
+      // Clear sessionStorage
+      window.sessionStorage.clear();
+      
+      // Clear specific cookies
+      const cookiesToClear = [
+        STORAGE_KEYS.SESSION_TOKEN,
+        STORAGE_KEYS.CURRENT_USER,
+      ];
+      
+      cookiesToClear.forEach(cookieName => {
+        CookieStorage.removeCookie(cookieName);
+      });
+      
+      console.log('[SSR Storage] Cleared all application storage');
+      resolve();
+    } catch (error) {
+      console.error('[SSR Storage] Failed to clear storage:', error);
+      resolve(); // Don't reject to prevent app crashes
+    }
+  });
+}
+
+/**
+ * Check if storage is available and working correctly
+ * Returns capability information for debugging and monitoring
+ */
+export function getStorageCapabilities(): {
+  localStorage: boolean;
+  sessionStorage: boolean;
+  cookies: boolean;
+  crossTabSync: boolean;
+  hydrated: boolean;
+} {
+  if (!isBrowser) {
+    return {
+      localStorage: false,
+      sessionStorage: false,
+      cookies: false,
+      crossTabSync: false,
+      hydrated: false,
+    };
   }
 
-  return [value, updateValue, removeValue];
+  let localStorage = false;
+  let sessionStorage = false;
+  let cookies = false;
+
+  // Test localStorage
+  try {
+    window.localStorage.setItem('test', 'test');
+    window.localStorage.removeItem('test');
+    localStorage = true;
+  } catch {
+    localStorage = false;
+  }
+
+  // Test sessionStorage
+  try {
+    window.sessionStorage.setItem('test', 'test');
+    window.sessionStorage.removeItem('test');
+    sessionStorage = true;
+  } catch {
+    sessionStorage = false;
+  }
+
+  // Test cookies
+  try {
+    document.cookie = 'test=test; path=/';
+    cookies = document.cookie.includes('test=test');
+    document.cookie = 'test=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/';
+  } catch {
+    cookies = false;
+  }
+
+  return {
+    localStorage,
+    sessionStorage,
+    cookies,
+    crossTabSync: localStorage && 'onstorage' in window,
+    hydrated: true,
+  };
 }
 
-/**
- * Utility hook to check if the component has hydrated
- * Useful for conditional rendering of client-only content
- */
-export function useIsHydrated(): boolean {
-  const [isHydrated, setIsHydrated] = useState(false);
+// =============================================================================
+// Export All Hooks and Utilities
+// =============================================================================
 
-  useEffect(() => {
-    setIsHydrated(true);
-  }, []);
+export type {
+  StorageHookOptions,
+  CookieHookOptions,
+  StorageHookState,
+};
 
-  return isHydrated;
-}
-
-/**
- * Storage utility functions that can be used outside of React components
- * These provide fallback behavior for SSR environments
- */
-export const storageUtils = {
-  /**
-   * Safe localStorage getter with SSR fallback
-   */
-  getLocalStorage: <T>(key: string, defaultValue: T, deserializer?: (value: string) => T): T => {
-    if (!isBrowser || !isStorageAvailable(localStorage)) {
-      return defaultValue;
-    }
-
-    try {
-      const item = localStorage.getItem(key);
-      if (item === null) return defaultValue;
-      
-      if (deserializer) {
-        return deserializer(item);
-      }
-      
-      return JSON.parse(item);
-    } catch (error) {
-      console.warn(`Error reading localStorage key "${key}":`, error);
-      return defaultValue;
-    }
-  },
-
-  /**
-   * Safe localStorage setter with SSR fallback
-   */
-  setLocalStorage: <T>(key: string, value: T, serializer?: (value: T) => string): void => {
-    if (!isBrowser || !isStorageAvailable(localStorage)) {
-      console.warn('localStorage is not available');
-      return;
-    }
-
-    try {
-      const serializedValue = serializer ? serializer(value) : JSON.stringify(value);
-      localStorage.setItem(key, serializedValue);
-    } catch (error) {
-      console.error(`Error setting localStorage key "${key}":`, error);
-    }
-  },
-
-  /**
-   * Safe sessionStorage getter with SSR fallback
-   */
-  getSessionStorage: <T>(key: string, defaultValue: T, deserializer?: (value: string) => T): T => {
-    if (!isBrowser || !isStorageAvailable(sessionStorage)) {
-      return defaultValue;
-    }
-
-    try {
-      const item = sessionStorage.getItem(key);
-      if (item === null) return defaultValue;
-      
-      if (deserializer) {
-        return deserializer(item);
-      }
-      
-      return JSON.parse(item);
-    } catch (error) {
-      console.warn(`Error reading sessionStorage key "${key}":`, error);
-      return defaultValue;
-    }
-  },
-
-  /**
-   * Safe sessionStorage setter with SSR fallback
-   */
-  setSessionStorage: <T>(key: string, value: T, serializer?: (value: T) => string): void => {
-    if (!isBrowser || !isStorageAvailable(sessionStorage)) {
-      console.warn('sessionStorage is not available');
-      return;
-    }
-
-    try {
-      const serializedValue = serializer ? serializer(value) : JSON.stringify(value);
-      sessionStorage.setItem(key, serializedValue);
-    } catch (error) {
-      console.error(`Error setting sessionStorage key "${key}":`, error);
-    }
-  },
+export {
+  // Core hooks
+  useLocalStorage,
+  useSessionStorage,
+  useCookies,
+  
+  // Convenience hooks
+  useSessionToken,
+  useUserSession,
+  useThemePreference,
+  useCurrentServiceId,
+  useTempFormState,
+  
+  // Utilities
+  clearAllStorage,
+  getStorageCapabilities,
+  
+  // Re-export from dependencies
+  STORAGE_KEYS,
 };
