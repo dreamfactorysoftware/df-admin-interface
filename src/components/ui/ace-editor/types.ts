@@ -1,376 +1,592 @@
-import { RefObject, ChangeEvent, forwardRef } from 'react';
-import { FieldPath, FieldValues, UseFormRegister } from 'react-hook-form';
+/**
+ * ACE Editor Component Types for DreamFactory Admin Interface
+ * 
+ * TypeScript definitions for the ACE editor component including editor modes,
+ * React component props, configuration options, and accessibility compliance.
+ * 
+ * Migrated from Angular scripts types to React component-specific types.
+ * Integrates with React Hook Form, Tailwind CSS theming, and WCAG 2.1 AA standards.
+ */
+
+import { ReactNode, RefObject, ComponentType, ChangeEvent, ForwardRefExoticComponent, RefAttributes } from 'react';
+import { BaseComponent, ComponentSize, ComponentVariant, FormFieldComponent } from '@/types/ui';
+
+// ============================================================================
+// ACE EDITOR MODE DEFINITIONS
+// ============================================================================
 
 /**
- * ACE Editor mode enumeration for syntax highlighting
+ * ACE Editor mode enumeration
  * Migrated from Angular shared types to React component-specific types
+ * Supports all script types used in DreamFactory event scripts and API generation
  */
 export enum AceEditorMode {
   JSON = 'json',
-  YAML = 'yaml',
+  YAML = 'yaml', 
   TEXT = 'text',
   NODEJS = 'nodejs',
   PHP = 'php',
   PYTHON = 'python',
-  PYTHON3 = 'python3',
+  PYTHON3 = 'python',  // Uses same ACE mode as python
   JAVASCRIPT = 'javascript',
+  SQL = 'sql',
+  XML = 'xml',
+  MARKDOWN = 'markdown',
+  HTML = 'html',
+  CSS = 'css',
+  TYPESCRIPT = 'typescript'
 }
 
 /**
- * Theme configuration for ACE editor
- * Supports Tailwind CSS dark/light mode integration
+ * ACE Editor theme options integrated with Tailwind CSS dark/light mode
  */
-export type AceEditorTheme = 'light' | 'dark' | 'system';
+export enum AceEditorTheme {
+  // Light themes
+  CHROME = 'chrome',
+  CLOUDS = 'clouds',
+  CRIMSON_EDITOR = 'crimson_editor',
+  DAWN = 'dawn',
+  DREAMWEAVER = 'dreamweaver',
+  ECLIPSE = 'eclipse',
+  GITHUB = 'github',
+  IPlastic = 'iplastic',
+  KATZENMILCH = 'katzenmilch',
+  KUROIR = 'kuroir',
+  SQLSERVER = 'sqlserver',
+  TEXTMATE = 'textmate',
+  TOMORROW = 'tomorrow',
+  XCODE = 'xcode',
+  
+  // Dark themes
+  AMBIANCE = 'ambiance',
+  CHAOS = 'chaos',
+  CLOUDS_MIDNIGHT = 'clouds_midnight',
+  COBALT = 'cobalt',
+  DRACULA = 'dracula',
+  GOB = 'gob',
+  GRUVBOX = 'gruvbox',
+  IDLE_FINGERS = 'idle_fingers',
+  KR_THEME = 'kr_theme',
+  MERBIVORE = 'merbivore',
+  MERBIVORE_SOFT = 'merbivore_soft',
+  MONO_INDUSTRIAL = 'mono_industrial',
+  MONOKAI = 'monokai',
+  NORD_DARK = 'nord_dark',
+  PASTEL_ON_DARK = 'pastel_on_dark',
+  SOLARIZED_DARK = 'solarized_dark',
+  TERMINAL = 'terminal',
+  TOMORROW_NIGHT = 'tomorrow_night',
+  TOMORROW_NIGHT_BLUE = 'tomorrow_night_blue',
+  TOMORROW_NIGHT_BRIGHT = 'tomorrow_night_bright',
+  TOMORROW_NIGHT_EIGHTIES = 'tomorrow_night_eighties',
+  TWILIGHT = 'twilight',
+  VIBRANT_INK = 'vibrant_ink'
+}
+
+// ============================================================================
+// EDITOR CONFIGURATION TYPES
+// ============================================================================
 
 /**
- * Size variants for the ACE editor component
- */
-export type AceEditorSize = 'sm' | 'md' | 'lg' | 'xl';
-
-/**
- * ACE editor configuration options
- * Maps to ace.Ace.EditorOptions interface
+ * ACE Editor configuration options
+ * Enhanced for React Hook Form integration and accessibility
  */
 export interface AceEditorConfig {
-  /** Font size in pixels */
-  fontSize?: number;
-  /** Show print margin */
-  showPrintMargin?: boolean;
-  /** Show line numbers in gutter */
-  showGutter?: boolean;
-  /** Highlight active line */
+  // Core editor options
+  mode: AceEditorMode;
+  theme: AceEditorTheme;
+  value: string;
+  defaultValue?: string;
+  
+  // Editor behavior
+  readOnly?: boolean;
   highlightActiveLine?: boolean;
-  /** Tab size in spaces */
+  highlightSelectedWord?: boolean;
+  cursorStyle?: 'ace' | 'slim' | 'smooth' | 'wide';
+  mergeUndoDeltas?: boolean | 'always';
+  
+  // Display options
+  showLineNumbers?: boolean;
+  showGutter?: boolean;
+  showPrintMargin?: boolean;
+  printMarginColumn?: number;
+  fontSize?: number;
+  fontFamily?: string;
+  wrap?: boolean | 'free' | 'printMargin' | number;
+  foldStyle?: 'markbegin' | 'markbeginend' | 'manual';
+  
+  // Tab and indentation
   tabSize?: number;
-  /** Maximum number of lines to display */
-  maxLines?: number;
-  /** Minimum number of lines to display */
-  minLines?: number;
-  /** Enable line wrapping */
-  wrap?: boolean | 'off' | 'free' | 'printMargin';
-  /** Enable auto-completion */
+  useSoftTabs?: boolean;
+  navigateWithinSoftTabs?: boolean;
+  
+  // Autocomplete and snippets
   enableBasicAutocompletion?: boolean;
-  /** Enable live autocompletion */
   enableLiveAutocompletion?: boolean;
-  /** Enable snippets */
   enableSnippets?: boolean;
-  /** Show invisible characters */
-  showInvisibles?: boolean;
-  /** Display indent guides */
-  displayIndentGuides?: boolean;
-  /** Animate scrolling */
-  animatedScroll?: boolean;
-  /** Scroll past end of document */
-  scrollPastEnd?: boolean;
-  /** Focus timeout for accessibility */
-  focusTimeout?: number;
-  /** Use worker for syntax validation */
+  
+  // Search and replace
+  enableSearchBox?: boolean;
+  enableFindAndReplace?: boolean;
+  
+  // Performance options
   useWorker?: boolean;
-}
-
-/**
- * ACE editor callback function types
- */
-export interface AceEditorCallbacks {
-  /** Called when editor value changes */
-  onChange?: (value: string, delta?: any) => void;
-  /** Called when editor loses focus */
-  onBlur?: (event?: any) => void;
-  /** Called when editor gains focus */
-  onFocus?: (event?: any) => void;
-  /** Called when cursor position changes */
-  onCursorChange?: (selection?: any) => void;
-  /** Called when selection changes */
-  onSelectionChange?: (selection?: any) => void;
-  /** Called when editor is loaded and ready */
-  onLoad?: (editor?: any) => void;
-  /** Called before lines change */
-  onBeforeLoad?: (ace?: any) => void;
-  /** Called on input change (similar to onChange but more granular) */
-  onInput?: (delta?: any) => void;
-  /** Called on validation errors */
-  onValidate?: (annotations?: any[]) => void;
-}
-
-/**
- * ACE editor imperative handle methods
- * Exposed via useImperativeHandle for parent component access
- */
-export interface AceEditorRef {
-  /** Get the current editor value */
-  getValue(): string;
-  /** Set the editor value */
-  setValue(value: string): void;
-  /** Focus the editor */
-  focus(): void;
-  /** Blur the editor */
-  blur(): void;
-  /** Get the ACE editor instance */
-  getEditor(): any;
-  /** Clear the editor content */
-  clear(): void;
-  /** Insert text at cursor position */
-  insert(text: string): void;
-  /** Get current cursor position */
-  getCursorPosition(): { row: number; column: number };
-  /** Set cursor position */
-  setCursorPosition(row: number, column: number): void;
-  /** Get selected text */
-  getSelectedText(): string;
-  /** Replace selected text */
-  replaceSelectedText(text: string): void;
-  /** Undo last operation */
-  undo(): void;
-  /** Redo last undone operation */
-  redo(): void;
-  /** Get session (for advanced operations) */
-  getSession(): any;
-  /** Resize editor to fit content */
-  resize(): void;
-}
-
-/**
- * React Hook Form integration types
- */
-export interface AceEditorFormControl<T extends FieldValues = FieldValues> {
-  /** React Hook Form field name */
-  name?: FieldPath<T>;
-  /** React Hook Form register function */
-  register?: UseFormRegister<T>;
-  /** Field rules for validation */
-  rules?: any;
-  /** Default value for the field */
-  defaultValue?: string;
-}
-
-/**
- * Accessibility props for WCAG 2.1 AA compliance
- */
-export interface AceEditorAccessibilityProps {
-  /** Accessible label for screen readers */
-  'aria-label'?: string;
-  /** ID of element that labels this editor */
-  'aria-labelledby'?: string;
-  /** ID of element that describes this editor */
-  'aria-describedby'?: string;
-  /** Whether editor is required */
-  'aria-required'?: boolean;
-  /** Whether editor has invalid input */
-  'aria-invalid'?: boolean;
-  /** Current value of the editor for screen readers */
-  'aria-valuetext'?: string;
-  /** Role override for the editor */
-  role?: string;
-  /** Tab index for keyboard navigation */
-  tabIndex?: number;
-}
-
-/**
- * Error state and validation props
- */
-export interface AceEditorValidationProps {
-  /** Whether the editor has validation errors */
-  hasError?: boolean;
-  /** Error message to display */
-  errorMessage?: string;
-  /** Helper text to display below the editor */
-  helperText?: string;
-  /** Whether the field is required */
-  required?: boolean;
-  /** Custom validation function */
-  validate?: (value: string) => string | boolean | undefined;
-}
-
-/**
- * Loading and state props
- */
-export interface AceEditorStateProps {
-  /** Whether the editor is in loading state */
-  loading?: boolean;
-  /** Whether the editor is disabled */
-  disabled?: boolean;
-  /** Whether the editor is read-only */
-  readonly?: boolean;
-  /** Placeholder text when editor is empty */
+  enableEmmet?: boolean;
+  
+  // Validation
+  showInvisibles?: boolean;
+  displayIndentGuides?: boolean;
+  
+  // Custom options for DreamFactory
   placeholder?: string;
-  /** Whether to auto-focus the editor on mount */
-  autoFocus?: boolean;
+  minLines?: number;
+  maxLines?: number;
+  autoScrollEditorIntoView?: boolean;
+  scrollPastEnd?: number;
 }
 
 /**
- * Comprehensive ACE Editor component props interface
- * Supports React 19 patterns with forwardRef and controlled component behavior
+ * Editor annotations for syntax highlighting and error display
  */
-export interface AceEditorProps<T extends FieldValues = FieldValues>
-  extends AceEditorCallbacks,
-    AceEditorFormControl<T>,
-    AceEditorAccessibilityProps,
-    AceEditorValidationProps,
-    AceEditorStateProps {
-  /** Unique identifier for the editor */
-  id?: string;
-  /** CSS class names */
-  className?: string;
-  /** Inline styles */
-  style?: React.CSSProperties;
-  /** Editor content value (controlled component) */
-  value?: string;
-  /** Default value for uncontrolled component */
-  defaultValue?: string;
-  /** Editor syntax highlighting mode */
+export interface EditorAnnotation {
+  row: number;
+  column: number;
+  text: string;
+  type: 'error' | 'warning' | 'info';
+}
+
+/**
+ * Editor marker for highlighting code sections
+ */
+export interface EditorMarker {
+  startRow: number;
+  startCol: number;
+  endRow: number;
+  endCol: number;
+  className: string;
+  type: 'fullLine' | 'screenLine' | 'text';
+  inFront?: boolean;
+}
+
+/**
+ * Editor cursor position
+ */
+export interface CursorPosition {
+  row: number;
+  column: number;
+}
+
+/**
+ * Editor selection range
+ */
+export interface SelectionRange {
+  start: CursorPosition;
+  end: CursorPosition;
+}
+
+// ============================================================================
+// REACT COMPONENT PROPS INTERFACES
+// ============================================================================
+
+/**
+ * ACE Editor component props interface
+ * Integrates React Hook Form patterns with controlled component design
+ */
+export interface AceEditorProps extends Omit<BaseComponent, 'children'>, FormFieldComponent {
+  // Core editor props
   mode?: AceEditorMode;
-  /** Editor theme (integrates with Tailwind CSS theme) */
   theme?: AceEditorTheme;
-  /** Editor size variant */
-  size?: AceEditorSize;
-  /** Editor configuration options */
-  config?: AceEditorConfig;
-  /** Container element ref */
-  containerRef?: RefObject<HTMLDivElement>;
-  /** Data test ID for testing */
-  'data-testid'?: string;
-  /** Additional data attributes */
-  [key: `data-${string}`]: any;
+  value?: string;
+  defaultValue?: string;
+  
+  // Component behavior
+  readOnly?: boolean;
+  disabled?: boolean;
+  autoFocus?: boolean;
+  
+  // Size and appearance
+  width?: string | number;
+  height?: string | number;
+  minHeight?: string | number;
+  maxHeight?: string | number;
+  fontSize?: ComponentSize | number;
+  
+  // Configuration
+  config?: Partial<AceEditorConfig>;
+  annotations?: EditorAnnotation[];
+  markers?: EditorMarker[];
+  
+  // Event handlers with React-specific typing
+  onChange?: (value: string, event?: ChangeEvent<HTMLDivElement>) => void;
+  onBlur?: (event: React.FocusEvent<HTMLDivElement>, editor: AceEditorInstance) => void;
+  onFocus?: (event: React.FocusEvent<HTMLDivElement>, editor: AceEditorInstance) => void;
+  onLoad?: (editor: AceEditorInstance) => void;
+  onSelectionChange?: (selection: SelectionRange, editor: AceEditorInstance) => void;
+  onCursorChange?: (selection: SelectionRange, editor: AceEditorInstance) => void;
+  onInput?: (text: string, editor: AceEditorInstance) => void;
+  onValidate?: (annotations: EditorAnnotation[]) => void;
+  onScroll?: (editor: AceEditorInstance) => void;
+  onPaste?: (text: string, editor: AceEditorInstance) => void;
+  onCopy?: (text: string, editor: AceEditorInstance) => void;
+  
+  // React Hook Form integration
+  name?: string;
+  control?: any; // React Hook Form control
+  rules?: any;   // React Hook Form validation rules
+  
+  // Accessibility props for WCAG 2.1 AA compliance
+  'aria-label'?: string;
+  'aria-labelledby'?: string;
+  'aria-describedby'?: string;
+  'aria-required'?: boolean;
+  'aria-invalid'?: boolean;
+  'aria-expanded'?: boolean;
+  'aria-multiline'?: boolean;
+  role?: 'textbox' | 'code' | 'application';
+  
+  // Screen reader support
+  announceChanges?: boolean;
+  liveRegionLabel?: string;
+  statusMessage?: string;
+  
+  // Keyboard navigation
+  tabIndex?: number;
+  onKeyDown?: (event: React.KeyboardEvent<HTMLDivElement>) => void;
+  onKeyUp?: (event: React.KeyboardEvent<HTMLDivElement>) => void;
+  onKeyPress?: (event: React.KeyboardEvent<HTMLDivElement>) => void;
+  
+  // Theme integration with Tailwind CSS
+  colorScheme?: 'light' | 'dark' | 'auto';
+  customTheme?: CustomThemeConfig;
+  
+  // Loading states
+  loading?: boolean;
+  loadingText?: string;
+  
+  // Commands and shortcuts
+  commands?: EditorCommand[];
+  keyboardShortcuts?: Record<string, string>;
+  
+  // Advanced features
+  enableEmmet?: boolean;
+  enableVim?: boolean;
+  enableMultiCursor?: boolean;
+  
+  // Performance options
+  debounceChangePeriod?: number;
+  setOptions?: Record<string, any>;
+  
+  // Custom styling
+  className?: string;
+  style?: React.CSSProperties;
+  editorClassName?: string;
+  wrapperClassName?: string;
 }
 
 /**
- * ACE Editor component type with forwardRef support
- * Enables parent components to access editor methods via ref
+ * ACE Editor instance methods and properties
+ * For forwardRef integration and imperative API access
  */
-export type AceEditorComponent = React.ForwardRefExoticComponent<
-  AceEditorProps & React.RefAttributes<AceEditorRef>
+export interface AceEditorInstance {
+  // Value management
+  getValue(): string;
+  setValue(value: string, cursorPos?: number): void;
+  insert(text: string): void;
+  
+  // Selection and cursor
+  getSelection(): SelectionRange;
+  getCursorPosition(): CursorPosition;
+  setCursorPosition(position: CursorPosition): void;
+  selectAll(): void;
+  clearSelection(): void;
+  
+  // Focus management
+  focus(): void;
+  blur(): void;
+  isFocused(): boolean;
+  
+  // Editor state
+  getReadOnly(): boolean;
+  setReadOnly(readOnly: boolean): void;
+  resize(force?: boolean): void;
+  
+  // Search and replace
+  find(needle: string, options?: any): void;
+  findNext(): void;
+  findPrevious(): void;
+  replace(replacement: string): void;
+  replaceAll(replacement: string): void;
+  
+  // Undo/redo
+  undo(): void;
+  redo(): void;
+  getUndoManager(): any;
+  
+  // Session management
+  getSession(): any;
+  setSession(session: any): void;
+  
+  // Options
+  setOption(name: string, value: any): void;
+  setOptions(options: Record<string, any>): void;
+  getOption(name: string): any;
+  
+  // Theme and mode
+  setTheme(theme: string): void;
+  getTheme(): string;
+  setMode(mode: string): void;
+  getMode(): any;
+  
+  // Annotations and markers
+  setAnnotations(annotations: EditorAnnotation[]): void;
+  getAnnotations(): EditorAnnotation[];
+  addMarker(range: any, className: string, type?: string): number;
+  removeMarker(markerId: number): void;
+  
+  // Events
+  on(event: string, callback: Function): void;
+  off(event: string, callback?: Function): void;
+  
+  // Commands
+  addCommand(command: EditorCommand): void;
+  removeCommand(command: string): void;
+  
+  // Destroy
+  destroy(): void;
+}
+
+/**
+ * Editor command definition for custom shortcuts
+ */
+export interface EditorCommand {
+  name: string;
+  bindKey: {
+    win: string;
+    mac: string;
+  };
+  exec: (editor: AceEditorInstance) => void;
+  readOnly?: boolean;
+  description?: string;
+}
+
+/**
+ * Custom theme configuration for Tailwind CSS integration
+ */
+export interface CustomThemeConfig {
+  // Background colors
+  background?: string;
+  foreground?: string;
+  
+  // Syntax highlighting colors
+  keyword?: string;
+  string?: string;
+  comment?: string;
+  number?: string;
+  operator?: string;
+  
+  // UI colors
+  gutter?: string;
+  selection?: string;
+  activeLine?: string;
+  cursor?: string;
+  
+  // Border and margin
+  printMargin?: string;
+  fold?: string;
+  
+  // Error and warning colors
+  error?: string;
+  warning?: string;
+  info?: string;
+}
+
+// ============================================================================
+// FORWARD REF COMPONENT TYPE
+// ============================================================================
+
+/**
+ * ACE Editor component with forwardRef support
+ * Enables parent components to access editor instance methods
+ */
+export type AceEditorComponent = ForwardRefExoticComponent<
+  AceEditorProps & RefAttributes<AceEditorInstance>
 >;
 
 /**
- * Theme context type for ACE editor theming
+ * ACE Editor ref type for React.useRef()
  */
-export interface AceEditorThemeContext {
-  /** Current theme mode */
-  theme: AceEditorTheme;
-  /** Whether dark mode is active */
-  isDarkMode: boolean;
-  /** Toggle theme mode */
-  toggleTheme: () => void;
-  /** Set specific theme */
-  setTheme: (theme: AceEditorTheme) => void;
-  /** System theme preference */
-  systemTheme: 'light' | 'dark';
+export type AceEditorRef = RefObject<AceEditorInstance>;
+
+// ============================================================================
+// FORM INTEGRATION TYPES
+// ============================================================================
+
+/**
+ * ACE Editor field definition for dynamic forms
+ * Extends FormField for React Hook Form integration
+ */
+export interface AceEditorFieldConfig {
+  type: 'ace-editor';
+  mode: AceEditorMode;
+  theme?: AceEditorTheme;
+  height?: string | number;
+  config?: Partial<AceEditorConfig>;
+  validation?: AceEditorValidation;
+  
+  // Form-specific options
+  allowModeChange?: boolean;
+  allowThemeChange?: boolean;
+  showModeSelector?: boolean;
+  showThemeSelector?: boolean;
+  
+  // Preset configurations
+  presets?: EditorPreset[];
+  defaultPreset?: string;
 }
 
 /**
- * Editor instance methods type
- * Provides type safety for ACE editor instance operations
+ * Editor validation rules specific to code content
  */
-export interface AceEditorInstance {
-  /** Editor configuration */
-  setOptions(options: AceEditorConfig): void;
-  /** Get editor value */
-  getValue(): string;
-  /** Set editor value */
-  setValue(value: string, cursorPos?: number): void;
-  /** Get session object */
-  getSession(): any;
-  /** Set editor mode */
-  setMode(mode: string): void;
-  /** Set editor theme */
-  setTheme(theme: string): void;
-  /** Focus editor */
-  focus(): void;
-  /** Blur editor */
-  blur(): void;
-  /** Resize editor */
-  resize(force?: boolean): void;
-  /** Destroy editor instance */
-  destroy(): void;
-  /** Add event listener */
-  on(event: string, callback: Function): void;
-  /** Remove event listener */
-  off(event: string, callback: Function): void;
-  /** Execute command */
-  execCommand(command: string): void;
-  /** Get/set read-only state */
-  setReadOnly(readonly: boolean): void;
-  /** Get commands */
-  commands: any;
-  /** Editor renderer */
-  renderer: any;
-  /** Editor container */
-  container: HTMLElement;
-}
-
-/**
- * Event types for ACE editor
- */
-export interface AceEditorEvents {
-  change: { delta: any; value: string };
-  changeSelection: { selection: any };
-  changeCursor: { cursor: any };
-  focus: { event: FocusEvent };
-  blur: { event: FocusEvent };
-  paste: { text: string };
-  copy: { text: string };
-  cut: { text: string };
-}
-
-/**
- * Utility type for ACE editor mode mapping
- * Maps enum values to ACE mode strings
- */
-export type AceEditorModeMap = {
-  [K in AceEditorMode]: string;
-};
-
-/**
- * Template literal type for ACE mode paths
- * Provides type safety for ACE mode imports
- */
-export type AceModePath = `ace/mode/${string}`;
-
-/**
- * Template literal type for ACE theme paths
- * Provides type safety for ACE theme imports
- */
-export type AceThemePath = `ace/theme/${string}`;
-
-/**
- * ACE editor configuration with enhanced TypeScript 5.8+ patterns
- */
-export interface EnhancedAceEditorConfig extends AceEditorConfig {
-  /** Custom keyboard shortcuts */
-  keyboardShortcuts?: Record<string, string>;
-  /** Custom commands */
-  commands?: Array<{
-    name: string;
-    bindKey: string | { win: string; mac: string };
-    exec: (editor: AceEditorInstance) => void;
-  }>;
-  /** Language-specific options */
-  languageOptions?: {
-    [K in AceEditorMode]?: {
-      /** Language-specific snippets */
-      snippets?: string[];
-      /** Language-specific completions */
-      completions?: string[];
-      /** Language-specific validation rules */
-      validationRules?: any[];
-    };
+export interface AceEditorValidation {
+  required?: boolean;
+  minLength?: number;
+  maxLength?: number;
+  syntax?: boolean; // Enable syntax validation
+  customValidator?: (value: string) => string | boolean;
+  
+  // Language-specific validation
+  json?: {
+    allowComments?: boolean;
+    allowTrailingCommas?: boolean;
+  };
+  yaml?: {
+    allowDuplicateKeys?: boolean;
+  };
+  javascript?: {
+    allowES6?: boolean;
+    allowJSX?: boolean;
   };
 }
 
 /**
- * Export all types for external usage
+ * Editor preset for common configurations
  */
-export type {
-  AceEditorRef,
-  AceEditorCallbacks,
-  AceEditorConfig,
-  AceEditorFormControl,
-  AceEditorAccessibilityProps,
-  AceEditorValidationProps,
-  AceEditorStateProps,
-  AceEditorThemeContext,
-  AceEditorInstance,
-  AceEditorEvents,
-  AceEditorModeMap,
-  EnhancedAceEditorConfig,
+export interface EditorPreset {
+  id: string;
+  name: string;
+  description?: string;
+  mode: AceEditorMode;
+  theme: AceEditorTheme;
+  config: Partial<AceEditorConfig>;
+  
+  // Preset metadata
+  category?: 'script' | 'config' | 'data' | 'template';
+  tags?: string[];
+  readOnly?: boolean;
+}
+
+// ============================================================================
+// UTILITY TYPES
+// ============================================================================
+
+/**
+ * Editor mode utilities
+ */
+export type EditorModeInfo = {
+  [K in AceEditorMode]: {
+    name: string;
+    extensions: string[];
+    description: string;
+    category: 'script' | 'data' | 'markup' | 'config';
+    aceMode: string;
+    supportsSnippets: boolean;
+    supportsAutocompletion: boolean;
+  };
 };
+
+/**
+ * Theme utilities for automatic theme selection
+ */
+export type ThemeCategory = 'light' | 'dark';
+
+export type ThemeInfo = {
+  [K in AceEditorTheme]: {
+    name: string;
+    category: ThemeCategory;
+    description: string;
+    recommended: boolean;
+  };
+};
+
+/**
+ * Editor state for React state management
+ */
+export interface EditorState {
+  value: string;
+  mode: AceEditorMode;
+  theme: AceEditorTheme;
+  readOnly: boolean;
+  loading: boolean;
+  error?: string;
+  annotations: EditorAnnotation[];
+  cursorPosition: CursorPosition;
+  selection: SelectionRange;
+  modified: boolean;
+}
+
+/**
+ * Editor action types for useReducer pattern
+ */
+export type EditorAction =
+  | { type: 'SET_VALUE'; payload: string }
+  | { type: 'SET_MODE'; payload: AceEditorMode }
+  | { type: 'SET_THEME'; payload: AceEditorTheme }
+  | { type: 'SET_READONLY'; payload: boolean }
+  | { type: 'SET_LOADING'; payload: boolean }
+  | { type: 'SET_ERROR'; payload: string | undefined }
+  | { type: 'SET_ANNOTATIONS'; payload: EditorAnnotation[] }
+  | { type: 'SET_CURSOR_POSITION'; payload: CursorPosition }
+  | { type: 'SET_SELECTION'; payload: SelectionRange }
+  | { type: 'SET_MODIFIED'; payload: boolean }
+  | { type: 'RESET' };
+
+// ============================================================================
+// EXPORT ALL TYPES
+// ============================================================================
+
+export type {
+  // Core interfaces
+  AceEditorProps,
+  AceEditorInstance,
+  AceEditorConfig,
+  AceEditorComponent,
+  AceEditorRef,
+  
+  // Configuration types
+  EditorAnnotation,
+  EditorMarker,
+  CursorPosition,
+  SelectionRange,
+  EditorCommand,
+  CustomThemeConfig,
+  
+  // Form integration
+  AceEditorFieldConfig,
+  AceEditorValidation,
+  EditorPreset,
+  
+  // State management
+  EditorState,
+  EditorAction,
+  
+  // Utility types
+  EditorModeInfo,
+  ThemeInfo,
+  ThemeCategory,
+};
+
+// Export enums
+export { AceEditorMode, AceEditorTheme };
+
+// Default export for main configuration
+export default AceEditorProps;
