@@ -1,432 +1,311 @@
 /**
  * Alert Component System - Main Export File
  * 
- * Centralized exports for React 19 Alert compound component system replacing Angular
- * df-alert and df-error components. Enables clean imports like 'import { Alert } from 
- * '@/components/ui/alert' throughout the application while supporting tree-shaking
- * for optimal bundle size.
+ * Centralized exports for the React 19 Alert compound component system replacing
+ * Angular df-alert and df-error components. Provides comprehensive TypeScript
+ * type definitions, tree-shakable named exports, and unified interface for both
+ * inline alerts and error displays in the DreamFactory Admin Interface.
  * 
- * Features:
- * - React 19 compound component pattern (Alert.Icon, Alert.Content, Alert.Dismiss, Alert.Actions)
- * - TypeScript 5.8+ type definitions for props and variants
- * - Support for both df-alert and df-error use cases in unified system
+ * Key Features:
+ * - React 19 compound component pattern (Alert.Icon, Alert.Content, Alert.Dismiss)
+ * - TypeScript 5.8+ type definitions with full type safety
+ * - Tree-shaking optimized named exports for minimal bundle size
  * - WCAG 2.1 AA accessibility compliance
- * - Heroicons integration per technology stack requirements
- * - Tailwind CSS 4.1+ styling with utility-first approach
- * - Tree-shaking support with named exports
+ * - Unified interface supporting both df-alert and df-error use cases
+ * - Tailwind CSS 4.1+ integration with class-variance-authority
  * 
- * @fileoverview Main export file for Alert component system
- * @version 1.0.0
- * @see Technical Specification Section 0 - SUMMARY OF CHANGES
- * @see Technical Specification Section 7.1 - CORE UI TECHNOLOGIES
+ * @example
+ * ```tsx
+ * // Basic alert usage
+ * import { Alert } from '@/components/ui/alert';
+ * <Alert type="success" description="Database connected successfully!" />
+ * 
+ * // Compound component pattern
+ * import { Alert, AlertType } from '@/components/ui/alert';
+ * <Alert type="error" dismissible>
+ *   <Alert.Icon />
+ *   <Alert.Content 
+ *     title="Connection Failed" 
+ *     description="Unable to connect to database" 
+ *   />
+ *   <Alert.Dismiss />
+ * </Alert>
+ * 
+ * // Helper utilities for quick alerts
+ * import { AlertHelpers } from '@/components/ui/alert';
+ * {AlertHelpers.validationError('Email', 'Invalid format', 'email-field')}
+ * ```
+ * 
+ * @see Technical Specification Section 0.2.1 - Implementation Plan
+ * @see Technical Specification Section 7.1 - Core UI Technologies
  */
 
 // =============================================================================
-// MAIN COMPONENT EXPORTS
+// COMPONENT EXPORTS - React 19 Compound Component Pattern
 // =============================================================================
 
 /**
- * Export main Alert compound component and subcomponents
- * Replaces Angular @Component with React compound pattern
+ * Main Alert component with compound pattern support
+ * 
+ * Exported as both named export and default export for maximum compatibility.
+ * Supports both simple usage and compound component patterns.
  */
 export {
   Alert,
-  AlertHelpers,
-  createAlert,
-  useAlertContext,
+  Alert as default,
 } from './alert';
 
 /**
- * Export Alert component as default for flexible import patterns
- * Supports both named and default imports:
- * - import { Alert } from '@/components/ui/alert'
- * - import Alert from '@/components/ui/alert'
+ * Compound component exports for advanced usage patterns
+ * 
+ * These are attached to the main Alert component but also exported individually
+ * for tree-shaking optimization and explicit imports.
  */
-export { default } from './alert';
+export {
+  Alert as AlertRoot,
+} from './alert';
+
+// Note: Alert.Icon, Alert.Content, and Alert.Dismiss are automatically
+// available through the compound component pattern on the main Alert export
 
 // =============================================================================
-// TYPE EXPORTS
+// TYPESCRIPT TYPE EXPORTS - Complete Type System
 // =============================================================================
 
 /**
- * Export all TypeScript type definitions for Alert components
- * Enables type-safe usage with TypeScript 5.8+ support
+ * Core Alert type definitions
+ * Essential types for alert configuration and usage
  */
 export type {
-  // Core Alert types
   AlertType,
   AlertVariant,
   AlertPosition,
-  AlertSize,
-  
-  // Component props interfaces
+  AlertDuration,
+} from './types';
+
+/**
+ * Main component prop interfaces
+ * Primary interfaces for Alert component and its compound components
+ */
+export type {
   AlertProps,
+  AlertAction,
   AlertIconProps,
   AlertContentProps,
   AlertDismissProps,
-  AlertActionsProps,
+} from './types';
+
+/**
+ * Container and system configuration types
+ * Types for advanced alert management and configuration
+ */
+export type {
   AlertContainerProps,
-  
-  // Configuration interfaces
-  AlertResponsiveConfig,
-  AlertAccessibilityConfig,
+  AlertSystemConfig,
+  AlertInstance,
+} from './types';
+
+/**
+ * Styling and theming type definitions
+ * Types for design system integration and customization
+ */
+export type {
+  AlertVariantConfig,
   AlertThemeConfig,
-  AlertValidationState,
-  AlertEventHandlers,
-  AlertCompoundComponent,
+} from './types';
+
+/**
+ * Hook and utility type definitions
+ * Types for React hooks and utility functions
+ */
+export type {
+  UseAlertReturn,
+  AlertAccessibilityUtils,
+  AlertTypeBundle,
+} from './types';
+
+/**
+ * Re-exported base UI types for convenience
+ * Common types from the UI type system for easy access
+ */
+export type {
+  BaseComponent,
+  ComponentVariant,
+  ComponentSize,
+  ResponsiveValue,
+  ComponentVariantConfig,
 } from './types';
 
 // =============================================================================
-// CONFIGURATION EXPORTS
+// UTILITY FUNCTION EXPORTS - Helper Functions and Factories
 // =============================================================================
 
 /**
- * Export default configurations and constants
- * Provides consistent behavior across application
+ * Alert helper utilities for common use cases
+ * 
+ * Provides convenient factory functions for creating alerts quickly.
+ * Replaces Angular service-based alert creation patterns.
  */
 export {
-  ALERT_DEFAULTS,
-  ALERT_TYPE_CONFIGS,
-} from './types';
-
-// =============================================================================
-// UTILITY EXPORTS
-// =============================================================================
+  AlertHelpers,
+} from './alert';
 
 /**
- * Export utility functions and styling helpers
- * Enables customization and programmatic alert creation
+ * Alert creation utilities
+ * 
+ * Factory functions for programmatic alert creation and management.
  */
 export {
-  alertVariants,
-  getAlertClasses,
+  createAlert,
+} from './alert';
+
+/**
+ * Icon and styling utilities
+ * 
+ * Utility functions for alert icons and CSS class generation.
+ */
+export {
   getAlertIcon,
+  getAlertClasses,
+} from './alert';
+
+/**
+ * Alert context hook for compound components
+ * 
+ * React hook for accessing alert context within compound components.
+ */
+export {
+  useAlertContext,
 } from './alert';
 
 // =============================================================================
-// CONVENIENCE RE-EXPORTS
+// CSS VARIANT EXPORTS - Styling System Integration
 // =============================================================================
 
 /**
- * Re-export specific component types for direct usage
- * Maintains compatibility with df-alert and df-error patterns
+ * Class-variance-authority variant configurations
+ * 
+ * CVA configurations for alert styling with Tailwind CSS 4.1+.
+ * Enables external customization and extension of alert styles.
  */
-export type {
-  AlertType as DFAlertType,
-  AlertProps as DFAlertProps,
-  AlertProps as DFErrorProps,
-} from './types';
-
-/**
- * Legacy compatibility exports for migration from Angular
- * Maintains naming patterns during transition period
- */
-export const DFAlert = Alert;
-export const DFError = Alert;
+export {
+  alertVariants,
+  dismissButtonVariants,
+} from './alert';
 
 // =============================================================================
-// COMPOSED EXPORTS FOR COMMON PATTERNS
+// TYPE GUARDS AND VALIDATORS - Runtime Type Safety
 // =============================================================================
-
-/**
- * Export commonly used alert configurations
- * Simplifies creation of standard alert patterns
- */
-export const AlertVariants = {
-  Success: (props: Partial<AlertProps> = {}) => AlertHelpers.success('', props),
-  Error: (props: Partial<AlertProps> = {}) => AlertHelpers.error('', props),
-  Warning: (props: Partial<AlertProps> = {}) => AlertHelpers.warning('', props),
-  Info: (props: Partial<AlertProps> = {}) => AlertHelpers.info('', props),
-  ValidationError: AlertHelpers.validationError,
-  Banner: AlertHelpers.banner,
-} as const;
-
-/**
- * Export alert types for runtime checks
- * Enables type validation and filtering
- */
-export const ALERT_TYPES = ['success', 'error', 'warning', 'info'] as const;
-export const ALERT_VARIANTS = ['filled', 'outlined', 'soft', 'banner'] as const;
-export const ALERT_SIZES = ['sm', 'md', 'lg'] as const;
-export const ALERT_POSITIONS = ['inline', 'floating', 'sticky', 'toast'] as const;
 
 /**
  * Type guard functions for runtime validation
- * Enables safe type checking in dynamic scenarios
+ * 
+ * Utility functions for validating alert types and configurations at runtime.
  */
-export const isAlertType = (value: unknown): value is AlertType => {
-  return typeof value === 'string' && ALERT_TYPES.includes(value as AlertType);
-};
-
-export const isAlertVariant = (value: unknown): value is AlertVariant => {
-  return typeof value === 'string' && ALERT_VARIANTS.includes(value as AlertVariant);
-};
-
-export const isAlertSize = (value: unknown): value is AlertSize => {
-  return typeof value === 'string' && ALERT_SIZES.includes(value as AlertSize);
-};
-
-export const isAlertPosition = (value: unknown): value is AlertPosition => {
-  return typeof value === 'string' && ALERT_POSITIONS.includes(value as AlertPosition);
-};
+export {
+  isAlertType,
+  isAlertVariant,
+  isAlertPosition,
+  validateAlertProps,
+} from './types';
 
 // =============================================================================
-// ACCESSIBILITY EXPORTS
+// CONVENIENCE RE-EXPORTS - Unified Access Patterns
 // =============================================================================
 
 /**
- * Export accessibility utilities and constants
- * Ensures WCAG 2.1 AA compliance across implementations
+ * Complete type bundle export for comprehensive type access
+ * 
+ * Provides a single import for all alert-related types, useful for
+ * configuration files and type-heavy modules.
  */
-export const ALERT_ARIA_LABELS = {
-  success: 'Success alert',
-  error: 'Error alert',
-  warning: 'Warning alert',
-  info: 'Information alert',
-} as const;
-
-export const ALERT_SCREEN_READER_MESSAGES = {
-  dismissed: 'Alert dismissed',
-  autoDismissing: 'Alert will automatically dismiss',
-  requiresAction: 'Alert requires user action',
-} as const;
-
-/**
- * Accessibility helper functions
- * Provides consistent ARIA attributes and announcements
- */
-export const AlertAccessibility = {
-  getAriaLabel: (type: AlertType, title?: string) => 
-    title ? `${ALERT_ARIA_LABELS[type]}: ${title}` : ALERT_ARIA_LABELS[type],
-  
-  getAnnouncementText: (type: AlertType, message: string) =>
-    `${type} alert: ${message}`,
-  
-  shouldAnnounce: (type: AlertType, priority: string = 'medium') =>
-    type === 'error' || priority === 'high',
-} as const;
+export type { default as AlertTypes } from './types';
 
 // =============================================================================
-// MIGRATION HELPERS
+// LEGACY COMPATIBILITY EXPORTS - Angular Migration Support
 // =============================================================================
 
 /**
- * Migration utilities for Angular to React transition
- * Helps map Angular df-alert patterns to React equivalents
+ * Legacy compatibility exports for Angular df-alert migration
+ * 
+ * These exports provide compatibility with existing Angular alert patterns
+ * during the migration process, ensuring smooth transition from Angular to React.
  */
-export const MigrationHelpers = {
-  /**
-   * Convert Angular df-alert props to React Alert props
-   * Maintains functional compatibility during migration
-   */
-  migrateFromDFAlert: (angularProps: Record<string, any>): Partial<AlertProps> => {
-    const {
-      type = 'info',
-      message = '',
-      title = '',
-      dismissible = false,
-      autoClose = false,
-      autoCloseDelay = 5000,
-      ...rest
-    } = angularProps;
 
-    return {
-      type: isAlertType(type) ? type : 'info',
-      description: message,
-      title,
-      dismissible,
-      autoDismiss: autoClose ? autoCloseDelay : undefined,
-      ...rest,
-    };
-  },
+/**
+ * df-alert component replacement
+ * Maps to standard Alert component with appropriate defaults
+ */
+export const DfAlert = Alert;
 
-  /**
-   * Convert Angular df-error props to React Alert props
-   * Specifically handles error validation scenarios
-   */
-  migrateFromDFError: (angularProps: Record<string, any>): Partial<AlertProps> => {
-    const {
-      field = '',
-      message = '',
-      fieldId = '',
-      ...rest
-    } = angularProps;
+/**
+ * df-error component replacement  
+ * Maps to Alert component with error type and validation-specific styling
+ */
+export const DfError = Alert;
 
-    return {
-      type: 'error',
-      title: field ? `${field} Error` : 'Validation Error',
-      description: message,
-      fieldId,
-      dismissible: true,
-      variant: 'soft',
-      size: 'sm',
-      priority: 'high',
-      announce: true,
-      ...rest,
-    };
+/**
+ * Legacy alert type mapping for Angular compatibility
+ * Maintains exact AlertType values from Angular implementation
+ */
+export const ALERT_TYPES = {
+  SUCCESS: 'success' as const,
+  ERROR: 'error' as const,
+  WARNING: 'warning' as const,
+  INFO: 'info' as const,
+} as const;
+
+/**
+ * Legacy alert creation function matching Angular service patterns
+ * Provides familiar API for developers migrating from Angular
+ */
+export const createLegacyAlert = (
+  type: AlertType,
+  message: string,
+  options: Partial<AlertProps> = {}
+) => createAlert({
+  type,
+  description: message,
+  ...options,
+});
+
+// =============================================================================
+// MODULE METADATA - Bundle Information
+// =============================================================================
+
+/**
+ * Component metadata for development tools and documentation
+ */
+export const ALERT_COMPONENT_METADATA = {
+  name: 'Alert',
+  version: '1.0.0',
+  description: 'React 19 Alert component system for DreamFactory Admin Interface',
+  framework: 'React 19 + Next.js 15.1 + Tailwind CSS 4.1+',
+  accessibility: 'WCAG 2.1 AA compliant',
+  replaces: ['df-alert', 'df-error'],
+  patterns: ['compound-component', 'controlled', 'uncontrolled'],
+  exports: {
+    components: ['Alert', 'DfAlert', 'DfError'],
+    types: [
+      'AlertType', 'AlertProps', 'AlertIconProps', 
+      'AlertContentProps', 'AlertDismissProps'
+    ],
+    utilities: ['AlertHelpers', 'createAlert', 'getAlertIcon'],
+    variants: ['alertVariants', 'dismissButtonVariants'],
   },
 } as const;
 
-// =============================================================================
-// PERFORMANCE EXPORTS
-// =============================================================================
-
 /**
- * Performance optimization utilities
- * Enables efficient rendering and memory management
+ * Tree-shaking metadata for bundler optimization
  */
-export const AlertPerformance = {
-  /**
-   * Debounce alert creation to prevent spam
-   * Useful for rapid validation or network error scenarios
-   */
-  debounceAlert: (fn: () => void, delay: number = 300) => {
-    let timeoutId: NodeJS.Timeout;
-    return () => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(fn, delay);
-    };
-  },
-
-  /**
-   * Throttle alert announcements for accessibility
-   * Prevents overwhelming screen readers with rapid updates
-   */
-  throttleAnnouncement: (fn: () => void, limit: number = 1000) => {
-    let inThrottle: boolean;
-    return () => {
-      if (!inThrottle) {
-        fn();
-        inThrottle = true;
-        setTimeout(() => inThrottle = false, limit);
-      }
-    };
-  },
-} as const;
-
-// =============================================================================
-// TESTING EXPORTS
-// =============================================================================
-
-/**
- * Testing utilities for component verification
- * Supports Vitest and Testing Library patterns
- */
-export const AlertTestUtils = {
-  /**
-   * Generate test props for different alert scenarios
-   * Enables consistent testing across components
-   */
-  getTestProps: (overrides: Partial<AlertProps> = {}): AlertProps => ({
-    type: 'info',
-    description: 'Test alert message',
-    'data-testid': 'alert-component',
-    alertId: 'test-alert-id',
-    ...overrides,
-  }),
-
-  /**
-   * Mock alert event handlers for testing
-   * Provides jest-compatible mock functions
-   */
-  getMockHandlers: () => ({
-    onDismiss: jest?.fn?.() || (() => {}),
-    onBeforeDismiss: jest?.fn?.(() => true) || (() => true),
-    onClick: jest?.fn?.() || (() => {}),
-  }),
-
-  /**
-   * Generate accessibility test scenarios
-   * Covers WCAG 2.1 AA compliance testing
-   */
-  getA11yTestCases: () => [
-    { type: 'success' as AlertType, 'aria-live': 'polite' as const },
-    { type: 'error' as AlertType, 'aria-live': 'assertive' as const },
-    { type: 'warning' as AlertType, 'aria-live': 'polite' as const },
-    { type: 'info' as AlertType, 'aria-live': 'polite' as const },
+export const __ALERT_TREE_SHAKE_METADATA__ = {
+  sideEffects: false,
+  pureExports: [
+    'Alert', 'AlertHelpers', 'createAlert', 'getAlertIcon',
+    'alertVariants', 'dismissButtonVariants', 'useAlertContext'
   ],
-} as const;
-
-// =============================================================================
-// COMPREHENSIVE TYPE EXPORT
-// =============================================================================
-
-/**
- * Comprehensive type definition for the complete Alert system
- * Enables full TypeScript support across all use cases
- */
-export interface AlertComponentSystem {
-  Alert: typeof Alert;
-  AlertHelpers: typeof AlertHelpers;
-  createAlert: typeof createAlert;
-  useAlertContext: typeof useAlertContext;
-  AlertVariants: typeof AlertVariants;
-  MigrationHelpers: typeof MigrationHelpers;
-  AlertAccessibility: typeof AlertAccessibility;
-  AlertPerformance: typeof AlertPerformance;
-  AlertTestUtils: typeof AlertTestUtils;
-}
-
-// =============================================================================
-// VERSION INFORMATION
-// =============================================================================
-
-/**
- * Component version and metadata
- * Enables version tracking and compatibility checks
- */
-export const ALERT_COMPONENT_VERSION = '1.0.0';
-export const ALERT_COMPONENT_COMPAT = {
-  react: '>=19.0.0',
-  typescript: '>=5.8.0',
-  nextjs: '>=15.1.0',
-  tailwind: '>=4.1.0',
-} as const;
-
-/**
- * Feature flags for optional functionality
- * Enables progressive feature adoption
- */
-export const ALERT_FEATURES = {
-  animations: true,
-  autoAnnounce: true,
-  autoDismiss: true,
-  compoundComponents: true,
-  keyboardNavigation: true,
-  themeing: true,
-  validation: true,
-  accessibility: true,
-} as const;
-
-// =============================================================================
-// DOCUMENTATION EXPORT
-// =============================================================================
-
-/**
- * Component documentation and usage examples
- * Provides inline documentation for development
- */
-export const AlertDocumentation = {
-  description: 'Comprehensive Alert component system replacing Angular df-alert and df-error with React 19 compound pattern and WCAG 2.1 AA accessibility compliance.',
-  
-  examples: {
-    basic: `<Alert type="info" description="Basic information alert" />`,
-    withTitle: `<Alert type="success" title="Success!" description="Operation completed successfully" />`,
-    dismissible: `<Alert type="warning" description="Warning message" dismissible onDismiss={() => {}} />`,
-    compound: `
-      <Alert type="error" dismissible>
-        <Alert.Icon />
-        <Alert.Content title="Error" description="Something went wrong" />
-        <Alert.Actions actions={<Button>Retry</Button>} />
-        <Alert.Dismiss onDismiss={() => {}} />
-      </Alert>
-    `,
-    validation: `{AlertHelpers.validationError('Email', 'Invalid email format', 'email-field')}`,
-  },
-  
-  migration: {
-    dfAlert: 'Replace <df-alert> with <Alert> component',
-    dfError: 'Replace <df-error> with Alert.validationError() helper',
-    angularService: 'Replace AlertService with AlertHelpers utilities',
-  },
+  typeOnlyExports: [
+    'AlertType', 'AlertProps', 'AlertIconProps', 'AlertContentProps',
+    'AlertDismissProps', 'AlertVariantConfig', 'AlertThemeConfig'
+  ],
 } as const;
