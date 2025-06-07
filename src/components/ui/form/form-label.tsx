@@ -1,479 +1,514 @@
 /**
- * Form Label Component
+ * Form Label Component for DreamFactory Admin Interface
  * 
- * Standardized form label component providing consistent typography, accessibility
- * attributes, and styling for all form inputs. Automatically associates with form
- * controls via htmlFor attributes and supports required field indicators with
- * proper screen reader announcements.
+ * A standardized, accessible form label component that provides consistent typography,
+ * proper accessibility attributes, and styling for all form inputs. Automatically
+ * associates with form controls via htmlFor attributes and supports required field
+ * indicators with proper screen reader announcements.
  * 
- * Features:
+ * Key Features:
  * - WCAG 2.1 AA accessibility compliance with proper label associations
  * - Consistent typography using Tailwind CSS design tokens
  * - Required field indicators with clear visual and screen reader distinction
  * - Dark theme support with 4.5:1 minimum contrast ratio
  * - Integration with form field components for automatic association
- * - Tooltip integration for label descriptions and help text
  * - Responsive text sizing for different viewport sizes
+ * - Tooltip integration for label descriptions and help text
  * 
- * @fileoverview Accessible form label component for DreamFactory Admin Interface
- * @version 1.0.0
+ * Replaces Angular Material mat-label patterns with modern React implementation.
  */
 
-import React, { forwardRef, useId } from 'react';
-import { cn } from '../../../lib/utils';
-import type { 
-  BaseComponentProps, 
-  AccessibilityProps, 
-  ThemeProps, 
-  ResponsiveProps,
-  SizeVariant
-} from '../../../types/ui';
+'use client';
+
+import React, { useId, forwardRef } from 'react';
+import { cva, type VariantProps } from 'class-variance-authority';
+import { cn } from '@/lib/utils';
+import { BaseComponent, ComponentSize, ComponentVariant } from '@/types/ui';
+
+// ============================================================================
+// COMPONENT VARIANTS AND STYLING
+// ============================================================================
+
+/**
+ * Form label variant definitions using class-variance-authority
+ * Provides consistent styling with Tailwind CSS design tokens
+ */
+const formLabelVariants = cva(
+  // Base styles - WCAG 2.1 AA compliant typography and colors
+  [
+    'block font-medium leading-6 transition-colors duration-200',
+    'text-gray-900 dark:text-gray-100',
+    // Focus-within states for enhanced accessibility
+    'group-focus-within:text-primary-700 dark:group-focus-within:text-primary-300',
+    // Ensure minimum contrast ratios (4.5:1 for normal text, 3:1 for large text)
+    'contrast-more:text-gray-950 contrast-more:dark:text-gray-50',
+  ],
+  {
+    variants: {
+      /**
+       * Size variants - responsive text sizing following WCAG guidelines
+       * Large text (18px+) requires only 3:1 contrast ratio
+       */
+      size: {
+        xs: 'text-xs', // 12px - Small auxiliary text
+        sm: 'text-sm', // 14px - Standard form labels
+        md: 'text-base', // 16px - Default size, good accessibility baseline
+        lg: 'text-lg', // 18px - Large text threshold for WCAG
+        xl: 'text-xl', // 20px - Prominent labels
+      },
+      
+      /**
+       * Visual variants for different form contexts
+       */
+      variant: {
+        default: '', // Standard label styling
+        inline: 'inline-block mr-3', // Inline form layouts
+        floating: [ // Floating label pattern
+          'absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none',
+          'transition-all duration-200 ease-in-out origin-left',
+          'peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0',
+          'peer-focus:scale-75 peer-focus:-translate-y-6 peer-focus:translate-x-0',
+          'peer-[:not(:placeholder-shown)]:scale-75 peer-[:not(:placeholder-shown)]:-translate-y-6',
+        ],
+        minimal: 'text-gray-600 dark:text-gray-400 font-normal', // Subtle labels
+        prominent: 'text-lg font-semibold text-gray-900 dark:text-gray-100', // Emphasized labels
+      },
+      
+      /**
+       * State variants for validation and interaction states
+       */
+      state: {
+        default: '',
+        error: 'text-red-700 dark:text-red-400',
+        success: 'text-green-700 dark:text-green-400',
+        warning: 'text-yellow-700 dark:text-yellow-400',
+        disabled: 'text-gray-400 dark:text-gray-600 cursor-not-allowed',
+      },
+      
+      /**
+       * Required field indicator positioning
+       */
+      requiredPosition: {
+        after: '', // Default: asterisk after label text
+        before: '', // Asterisk before label text
+        hidden: '', // Required but visually hidden
+      },
+    },
+    
+    /**
+     * Compound variants for complex styling combinations
+     */
+    compoundVariants: [
+      // Floating labels need different error state styling
+      {
+        variant: 'floating',
+        state: 'error',
+        className: 'peer-focus:text-red-600 dark:peer-focus:text-red-400',
+      },
+      // Large size with prominent variant for section headers
+      {
+        size: 'lg',
+        variant: 'prominent',
+        className: 'border-b border-gray-200 dark:border-gray-700 pb-2 mb-4',
+      },
+      // Inline labels need adjusted spacing
+      {
+        variant: 'inline',
+        size: 'sm',
+        className: 'min-w-[120px]',
+      },
+    ],
+    
+    /**
+     * Default variant values
+     */
+    defaultVariants: {
+      size: 'sm',
+      variant: 'default',
+      state: 'default',
+      requiredPosition: 'after',
+    },
+  }
+);
+
+// ============================================================================
+// COMPONENT INTERFACES
+// ============================================================================
+
+/**
+ * Required field indicator configuration
+ */
+interface RequiredIndicatorConfig {
+  /** Visual indicator (usually asterisk) */
+  symbol?: string;
+  /** Screen reader text for required fields */
+  srText?: string;
+  /** Custom styling for the indicator */
+  className?: string;
+  /** Position relative to label text */
+  position?: 'before' | 'after' | 'hidden';
+}
+
+/**
+ * Tooltip configuration for label descriptions
+ */
+interface TooltipConfig {
+  /** Tooltip content */
+  content: string;
+  /** Tooltip placement */
+  placement?: 'top' | 'bottom' | 'left' | 'right';
+  /** Delay before showing tooltip (ms) */
+  delay?: number;
+  /** Custom tooltip styling */
+  className?: string;
+}
 
 /**
  * Form label component props interface
- * Extends base component props with label-specific functionality
  */
-export interface FormLabelProps extends 
-  BaseComponentProps<HTMLLabelElement>,
-  AccessibilityProps,
-  ThemeProps,
-  ResponsiveProps {
-  
+export interface FormLabelProps 
+  extends Omit<React.LabelHTMLAttributes<HTMLLabelElement>, 'size'>,
+          BaseComponent,
+          VariantProps<typeof formLabelVariants> {
   /** 
-   * Associated form control ID for accessibility
-   * Creates proper label-control association via htmlFor
+   * The form control ID that this label is associated with
+   * Automatically generates unique ID if not provided
    */
   htmlFor?: string;
   
-  /** 
-   * Label text content - required for accessibility
-   * Must be descriptive and meaningful for screen readers
+  /**
+   * Label text content
    */
   children: React.ReactNode;
   
-  /** 
-   * Indicates if the associated field is required
+  /**
+   * Whether the associated field is required
    * Adds visual indicator and screen reader announcement
    */
   required?: boolean;
   
-  /** 
-   * Optional indicator showing the field is optional
-   * Useful when most fields are required
+  /**
+   * Required field indicator configuration
    */
-  optional?: boolean;
+  requiredConfig?: RequiredIndicatorConfig;
   
-  /** 
-   * Additional descriptive text or help information
-   * Rendered as tooltip or secondary text
+  /**
+   * Optional description or help text
+   * Displayed as tooltip or subtitle based on configuration
    */
   description?: string;
   
-  /** 
-   * Error state indicator
-   * Changes styling to error colors with proper contrast
+  /**
+   * Tooltip configuration for additional help
    */
-  error?: boolean;
+  tooltip?: TooltipConfig;
   
-  /** 
-   * Success state indicator
-   * Changes styling to success colors
+  /**
+   * Whether the label should be visually hidden but remain accessible
+   * Useful for screen readers when visual label isn't needed
    */
-  success?: boolean;
+  srOnly?: boolean;
   
-  /** 
-   * Disabled state styling
-   * Applies appropriate opacity and contrast
+  /**
+   * Additional ARIA attributes for enhanced accessibility
    */
-  disabled?: boolean;
+  'aria-describedby'?: string;
+  'aria-labelledby'?: string;
   
-  /** 
-   * Component size variant affecting typography scale
-   * Maps to design system font sizes with responsive scaling
+  /**
+   * Custom ref for imperative operations
    */
-  size?: SizeVariant;
-  
-  /** 
-   * Label positioning variant
-   * Affects layout and spacing relationships
-   */
-  variant?: 'default' | 'inline' | 'floating' | 'stacked';
-  
-  /** 
-   * Tooltip trigger behavior for description text
-   * Controls how additional information is displayed
-   */
-  tooltipTrigger?: 'hover' | 'focus' | 'click' | 'none';
-  
-  /** 
-   * Screen reader only text for additional context
-   * Provides extra information without visual clutter
-   */
-  srOnlyText?: string;
-  
-  /** 
-   * Custom required indicator override
-   * Allows customization of the required field marker
-   */
-  requiredIndicator?: React.ReactNode;
-  
-  /** 
-   * Custom optional indicator override
-   * Allows customization of the optional field marker
-   */
-  optionalIndicator?: React.ReactNode;
-  
-  /** 
-   * Weight of the label text
-   * Controls font weight for visual hierarchy
-   */
-  weight?: 'normal' | 'medium' | 'semibold' | 'bold';
-  
-  /** 
-   * Color variant for the label text
-   * Uses design system color tokens with accessibility compliance
-   */
-  color?: 'default' | 'muted' | 'emphasis' | 'error' | 'success' | 'warning';
+  ref?: React.Ref<HTMLLabelElement>;
 }
 
+// ============================================================================
+// COMPONENT IMPLEMENTATION
+// ============================================================================
+
 /**
- * FormLabel component with comprehensive accessibility and styling support
+ * FormLabel Component
  * 
- * Implements WCAG 2.1 AA guidelines for form labels including:
- * - Proper programmatic association with form controls
- * - Sufficient color contrast ratios (4.5:1 minimum)
- * - Clear visual and screen reader indication of required fields
- * - Responsive typography scaling
- * - Dark theme support with maintained contrast ratios
- * 
- * @param props - FormLabel component props
- * @param ref - Forward ref to the label element
- * @returns Accessible form label component
+ * Provides standardized, accessible form labels with consistent styling
+ * and proper semantic markup for screen readers and assistive technologies.
  */
 export const FormLabel = forwardRef<HTMLLabelElement, FormLabelProps>(
-  ({
-    htmlFor,
-    children,
-    required = false,
-    optional = false,
-    description,
-    error = false,
-    success = false,
-    disabled = false,
-    size = 'md',
-    variant = 'default',
-    tooltipTrigger = 'hover',
-    srOnlyText,
-    requiredIndicator,
-    optionalIndicator,
-    weight = 'medium',
-    color = 'default',
-    className,
-    'aria-describedby': ariaDescribedBy,
-    'aria-labelledby': ariaLabelledBy,
-    'data-testid': testId,
-    ...props
-  }, ref) => {
-    
-    // Generate unique IDs for accessibility relationships
-    const labelId = useId();
+  (
+    {
+      children,
+      className,
+      size,
+      variant,
+      state,
+      requiredPosition,
+      htmlFor: providedHtmlFor,
+      required = false,
+      requiredConfig = {},
+      description,
+      tooltip,
+      srOnly = false,
+      id,
+      'aria-describedby': ariaDescribedBy,
+      'aria-labelledby': ariaLabelledBy,
+      'data-testid': testId,
+      ...props
+    },
+    ref
+  ) => {
+    // Generate unique IDs for accessibility
+    const generatedId = useId();
+    const labelId = id || `label-${generatedId}`;
+    const controlId = providedHtmlFor || `control-${generatedId}`;
     const descriptionId = description ? `${labelId}-description` : undefined;
+    const tooltipId = tooltip ? `${labelId}-tooltip` : undefined;
     
-    // Combine ARIA describedby attributes
-    const combinedDescribedBy = [ariaDescribedBy, descriptionId]
-      .filter(Boolean)
-      .join(' ') || undefined;
-
-    /**
-     * Base label styles with accessibility-focused design
-     * Ensures proper contrast ratios and responsive scaling
-     */
-    const baseStyles = cn(
-      // Base typography and layout
-      "block font-medium leading-6 transition-colors duration-200",
-      
-      // Focus-visible support for keyboard navigation
-      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2",
-      "rounded-sm", // Small border radius for focus ring
-      
-      // Responsive text sizing with accessibility considerations
-      {
-        // Small size - 14px base, scales responsively
-        "text-sm sm:text-sm": size === 'sm',
-        // Medium size - 16px base (default), WCAG large text threshold
-        "text-base sm:text-base": size === 'md', 
-        // Large size - 18px base, exceeds large text threshold
-        "text-lg sm:text-lg": size === 'lg',
-      },
-      
-      // Font weight variants for visual hierarchy
-      {
-        "font-normal": weight === 'normal',
-        "font-medium": weight === 'medium',
-        "font-semibold": weight === 'semibold',
-        "font-bold": weight === 'bold',
-      },
-      
-      // Responsive spacing adjustments
-      {
-        "mb-1.5 sm:mb-1.5": size === 'sm',
-        "mb-2 sm:mb-2": size === 'md',
-        "mb-2.5 sm:mb-2.5": size === 'lg',
-      }
-    );
-
-    /**
-     * Color variants with WCAG 2.1 AA compliant contrast ratios
-     * All color combinations tested for 4.5:1 minimum contrast
-     */
-    const colorStyles = cn({
-      // Default color - high contrast for readability
-      "text-gray-900 dark:text-gray-100": color === 'default' && !error && !success && !disabled,
-      
-      // Muted color - still meets AA contrast requirements
-      "text-gray-700 dark:text-gray-300": color === 'muted' && !error && !success && !disabled,
-      
-      // Emphasis color - stronger contrast for important labels
-      "text-gray-950 dark:text-gray-50": color === 'emphasis' && !error && !success && !disabled,
-      
-      // Error state - 5.25:1 contrast ratio
-      "text-error-600 dark:text-error-400": (error || color === 'error') && !disabled,
-      
-      // Success state - 4.89:1 contrast ratio
-      "text-success-600 dark:text-success-400": (success || color === 'success') && !disabled,
-      
-      // Warning state - 4.68:1 contrast ratio
-      "text-warning-600 dark:text-warning-400": color === 'warning' && !disabled,
-      
-      // Disabled state - reduced opacity while maintaining readability
-      "text-gray-500 dark:text-gray-500 opacity-75": disabled,
-    });
-
-    /**
-     * Variant-specific layout styles
-     * Supports different label positioning patterns
-     */
-    const variantStyles = cn({
-      // Default block layout
-      "block": variant === 'default',
-      
-      // Inline layout for compact forms
-      "inline-block mr-3": variant === 'inline',
-      
-      // Floating label (positioned above input)
-      "absolute left-3 top-2 z-10 origin-[0] transform transition-all duration-200": variant === 'floating',
-      
-      // Stacked layout with additional spacing
-      "block mb-3": variant === 'stacked',
-    });
-
-    /**
-     * Required indicator component with accessibility support
-     * Provides both visual and screen reader indication
-     */
-    const RequiredIndicator = () => {
-      if (!required) return null;
-      
-      if (requiredIndicator) {
-        return <>{requiredIndicator}</>;
-      }
-      
-      return (
-        <>
-          <span 
-            className="text-error-500 dark:text-error-400 ml-1 font-medium"
-            aria-hidden="true"
-          >
-            *
-          </span>
-          <span className="sr-only">
-            (required)
-          </span>
-        </>
-      );
+    // Configure required field indicator
+    const requiredIndicator = {
+      symbol: '*',
+      srText: 'required',
+      position: requiredPosition || 'after',
+      className: 'text-red-500 dark:text-red-400 ml-1',
+      ...requiredConfig,
     };
-
-    /**
-     * Optional indicator component for clarity
-     * Used when most fields are required but some are optional
-     */
-    const OptionalIndicator = () => {
-      if (!optional || required) return null;
-      
-      if (optionalIndicator) {
-        return <>{optionalIndicator}</>;
-      }
+    
+    // Build ARIA attributes
+    const ariaAttributes = {
+      'aria-describedby': [
+        ariaDescribedBy,
+        descriptionId,
+        tooltipId,
+      ].filter(Boolean).join(' ') || undefined,
+      'aria-labelledby': ariaLabelledBy,
+    };
+    
+    // Required indicator element
+    const RequiredIndicator = () => {
+      if (!required || requiredIndicator.position === 'hidden') return null;
       
       return (
-        <span className="text-gray-500 dark:text-gray-400 ml-1 text-sm font-normal">
-          (optional)
+        <span
+          className={cn('select-none', requiredIndicator.className)}
+          aria-label={requiredIndicator.srText}
+          role="img"
+          data-testid={`${testId}-required-indicator`}
+        >
+          {requiredIndicator.symbol}
         </span>
       );
     };
-
-    /**
-     * Description/help text component with tooltip integration
-     * Provides additional context without cluttering the interface
-     */
-    const DescriptionText = () => {
+    
+    // Description element for additional context
+    const DescriptionElement = () => {
       if (!description) return null;
       
       return (
-        <div
+        <span
           id={descriptionId}
           className={cn(
-            "mt-1 text-sm text-gray-600 dark:text-gray-400",
-            "leading-5", // Improved line height for readability
-            {
-              "text-error-600 dark:text-error-400": error,
-              "text-success-600 dark:text-success-400": success,
-              "opacity-75": disabled,
-            }
+            'block text-xs text-gray-600 dark:text-gray-400 mt-1',
+            'leading-4'
           )}
-          role="note"
-          aria-live="polite"
+          data-testid={`${testId}-description`}
         >
           {description}
-        </div>
-      );
-    };
-
-    /**
-     * Screen reader only text for additional context
-     * Provides semantic information without visual impact
-     */
-    const ScreenReaderText = () => {
-      if (!srOnlyText) return null;
-      
-      return (
-        <span className="sr-only">
-          {srOnlyText}
         </span>
       );
     };
-
+    
+    // Tooltip element (simplified implementation - would integrate with tooltip library)
+    const TooltipElement = () => {
+      if (!tooltip) return null;
+      
+      return (
+        <span
+          id={tooltipId}
+          className="sr-only"
+          data-testid={`${testId}-tooltip`}
+        >
+          {tooltip.content}
+        </span>
+      );
+    };
+    
     return (
-      <div className={cn("form-label-container", className)}>
+      <div className="space-y-1">
         <label
           ref={ref}
-          htmlFor={htmlFor}
-          id={ariaLabelledBy || labelId}
-          className={cn(baseStyles, colorStyles, variantStyles)}
-          aria-describedby={combinedDescribedBy}
+          id={labelId}
+          htmlFor={controlId}
+          className={cn(
+            formLabelVariants({ size, variant, state, requiredPosition }),
+            srOnly && 'sr-only',
+            className
+          )}
           data-testid={testId || 'form-label'}
-          data-required={required}
-          data-optional={optional}
-          data-error={error}
-          data-success={success}
-          data-disabled={disabled}
-          data-size={size}
-          data-variant={variant}
+          {...ariaAttributes}
           {...props}
         >
-          {/* Main label content */}
-          <span className="label-text">
+          {/* Required indicator before text */}
+          {requiredIndicator.position === 'before' && <RequiredIndicator />}
+          
+          {/* Label text content */}
+          <span className="select-none">
             {children}
           </span>
           
-          {/* Screen reader only additional context */}
-          <ScreenReaderText />
+          {/* Required indicator after text */}
+          {requiredIndicator.position === 'after' && <RequiredIndicator />}
           
-          {/* Required field indicator */}
-          <RequiredIndicator />
+          {/* Tooltip trigger (would be enhanced with actual tooltip library) */}
+          {tooltip && (
+            <button
+              type="button"
+              className={cn(
+                'ml-2 inline-flex items-center justify-center',
+                'w-4 h-4 rounded-full bg-gray-300 dark:bg-gray-600',
+                'text-xs text-gray-600 dark:text-gray-400',
+                'hover:bg-gray-400 dark:hover:bg-gray-500',
+                'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1',
+                'transition-colors duration-200'
+              )}
+              aria-label={`Show help for ${children}`}
+              aria-describedby={tooltipId}
+              data-testid={`${testId}-tooltip-trigger`}
+            >
+              ?
+            </button>
+          )}
           
-          {/* Optional field indicator */}
-          <OptionalIndicator />
+          {/* Hidden required announcement for screen readers */}
+          {required && (
+            <span className="sr-only">
+              {requiredIndicator.srText}
+            </span>
+          )}
         </label>
         
-        {/* Description/help text */}
-        <DescriptionText />
+        {/* Description text */}
+        <DescriptionElement />
+        
+        {/* Tooltip content (hidden, would be shown by tooltip library) */}
+        <TooltipElement />
       </div>
     );
   }
 );
 
-// Display name for debugging and development tools
 FormLabel.displayName = 'FormLabel';
 
-// Default export for convenient importing
-export default FormLabel;
+// ============================================================================
+// UTILITY FUNCTIONS AND HOOKS
+// ============================================================================
 
 /**
- * Hook for managing label accessibility relationships
- * Provides automatic ID generation and ARIA attribute management
- * 
- * @param options - Configuration options for label relationships
- * @returns Object with label props and helper functions
+ * Hook to generate consistent label IDs and associations
+ * Useful for complex form layouts where labels might be separated from inputs
  */
-export const useFormLabel = (options: {
-  required?: boolean;
-  description?: string;
-  error?: boolean;
-  fieldId?: string;
-} = {}) => {
-  const { required = false, description, error = false, fieldId } = options;
-  
-  const labelId = useId();
-  const descriptionId = description ? `${labelId}-description` : undefined;
-  const errorId = error ? `${labelId}-error` : undefined;
-  
-  // Generate ARIA describedby string
-  const describedBy = [descriptionId, errorId]
-    .filter(Boolean)
-    .join(' ') || undefined;
+export function useFormLabelId(providedId?: string) {
+  const generatedId = useId();
+  const labelId = providedId || `label-${generatedId}`;
+  const controlId = `control-${generatedId}`;
+  const descriptionId = `${labelId}-description`;
+  const errorId = `${labelId}-error`;
   
   return {
-    // Props for the label component
-    labelProps: {
+    labelId,
+    controlId,
+    descriptionId,
+    errorId,
+    getLabelProps: (props: Partial<FormLabelProps> = {}) => ({
       id: labelId,
-      htmlFor: fieldId,
-      required,
-      error,
-    },
-    
-    // Props for the form field
-    fieldProps: {
-      id: fieldId,
+      htmlFor: controlId,
+      ...props,
+    }),
+    getControlProps: (props: any = {}) => ({
+      id: controlId,
       'aria-labelledby': labelId,
-      'aria-describedby': describedBy,
-      'aria-required': required,
-      'aria-invalid': error,
-    },
-    
-    // Helper functions
-    getLabelId: () => labelId,
-    getDescriptionId: () => descriptionId,
-    getErrorId: () => errorId,
+      'aria-describedby': [
+        props['aria-describedby'],
+        descriptionId,
+        props.error ? errorId : undefined,
+      ].filter(Boolean).join(' ') || undefined,
+      ...props,
+    }),
   };
+}
+
+/**
+ * Utility function to create accessible field groups
+ * Helps with complex form layouts that need proper labeling structure
+ */
+export function createFieldGroup(options: {
+  label: string;
+  description?: string;
+  required?: boolean;
+  error?: string;
+}) {
+  const ids = useFormLabelId();
+  
+  return {
+    ...ids,
+    groupProps: {
+      role: 'group',
+      'aria-labelledby': ids.labelId,
+      'aria-describedby': [
+        options.description ? ids.descriptionId : undefined,
+        options.error ? ids.errorId : undefined,
+      ].filter(Boolean).join(' ') || undefined,
+    },
+    labelProps: ids.getLabelProps({
+      required: options.required,
+      description: options.description,
+    }),
+  };
+}
+
+// ============================================================================
+// TYPE EXPORTS
+// ============================================================================
+
+export type { RequiredIndicatorConfig, TooltipConfig };
+export { formLabelVariants };
+
+// ============================================================================
+// DEFAULT CONFIGURATIONS
+// ============================================================================
+
+/**
+ * Default required field configuration
+ * Can be imported and customized for consistent required field styling
+ */
+export const DEFAULT_REQUIRED_CONFIG: RequiredIndicatorConfig = {
+  symbol: '*',
+  srText: 'required',
+  position: 'after',
+  className: 'text-red-500 dark:text-red-400 ml-1 select-none',
 };
 
 /**
- * Component constants for consistent behavior
+ * Accessible color configurations for different states
+ * Ensures WCAG 2.1 AA compliance with 4.5:1 contrast ratios
  */
-export const FORM_LABEL_CONSTANTS = {
-  /** Default size variant */
-  DEFAULT_SIZE: 'md' as SizeVariant,
-  
-  /** Default weight variant */
-  DEFAULT_WEIGHT: 'medium' as const,
-  
-  /** Default color variant */
-  DEFAULT_COLOR: 'default' as const,
-  
-  /** Default variant */
-  DEFAULT_VARIANT: 'default' as const,
-  
-  /** Required indicator character */
-  REQUIRED_INDICATOR: '*',
-  
-  /** Optional text */
-  OPTIONAL_TEXT: '(optional)',
-  
-  /** Screen reader text for required fields */
-  REQUIRED_SR_TEXT: '(required)',
+export const ACCESSIBLE_COLORS = {
+  states: {
+    default: 'text-gray-900 dark:text-gray-100',
+    error: 'text-red-700 dark:text-red-400', // 4.5:1 contrast on white/dark backgrounds
+    success: 'text-green-700 dark:text-green-400',
+    warning: 'text-yellow-800 dark:text-yellow-300', // Enhanced contrast for yellow
+    disabled: 'text-gray-400 dark:text-gray-600',
+  },
+  required: {
+    indicator: 'text-red-500 dark:text-red-400',
+    background: 'bg-red-50 dark:bg-red-900/10',
+  },
 } as const;
 
 /**
- * Export type definitions for external use
+ * Responsive breakpoint configurations for label sizing
+ * Follows Tailwind CSS conventions with accessibility considerations
  */
-export type { FormLabelProps };
+export const RESPONSIVE_LABEL_SIZES = {
+  mobile: 'text-sm',      // 14px - Good for mobile touch targets
+  tablet: 'text-base',    // 16px - Standard desktop size
+  desktop: 'text-base',   // 16px - Consistent across desktop
+  large: 'text-lg',       // 18px - For important labels or large screens
+} as const;
