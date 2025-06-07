@@ -1,57 +1,106 @@
 /**
- * @fileoverview Dialog Component System - Barrel Export Module
+ * @fileoverview Comprehensive barrel export for the dialog component system
  * 
- * Provides clean imports for the comprehensive dialog component system migrated from Angular Material
- * to React 19/Next.js 15.1 with TypeScript 5.8+ support. This barrel export enables centralized
- * access to all dialog-related components, utilities, and type definitions throughout the application.
+ * Migrated from Angular Material dialog components to React 19/Next.js 15.1 implementation.
+ * Provides clean import patterns for all dialog-related components, types, utilities, and 
+ * configuration constants throughout the DreamFactory Admin Interface application.
  * 
- * Migration Context:
- * - Replaces Angular Material MatDialog with React 19 compound component architecture
- * - Implements WCAG 2.1 AA accessibility compliance per Section 7.7.1
- * - Supports mobile-first responsive design per Section 7.7.3
- * - Integrates with Tailwind CSS 4.1+ animation system per Section 7.1.1
- * - Provides Next.js 15.1 app router compatibility
+ * This barrel export replaces Angular Material dialog infrastructure:
+ * - MatDialog service → Dialog component with compound architecture
+ * - MatDialogRef → useDialogContext hook and imperative API
+ * - MatDialogConfig → DialogProps interface with responsive configuration
+ * - MatDialogModule → React component exports with TypeScript support
  * 
  * Key Features:
- * - Compound component pattern for flexible composition
- * - Multiple dialog variants (modal, sheet, overlay, drawer)
- * - Promise-based async dialog workflows
- * - Responsive design with mobile-first approach
- * - Comprehensive TypeScript type safety
- * - Accessibility-first implementation
- * - Smooth animations and transitions
- * - Focus management and keyboard navigation
+ * - React 19 component system with compound component architecture per Section 7.1.1
+ * - Clean export patterns for Next.js 15.1 app router compatibility
+ * - Centralized dialog system exports replacing Angular Material dialog components
+ * - TypeScript 5.8+ type definitions for complete type safety
+ * - WCAG 2.1 AA accessibility compliance utilities per Section 7.7.1
+ * - Mobile-first responsive design configuration per Section 7.7.3
  * 
- * Usage Examples:
+ * @example
  * ```tsx
  * // Basic dialog usage
- * import { Dialog, useDialog } from '@/components/ui/dialog';
+ * import { Dialog } from '@/components/ui/dialog';
  * 
- * function MyComponent() {
- *   const { open, openDialog, closeDialog } = useDialog();
- *   
- *   return (
- *     <Dialog open={open} onOpenChange={setOpen}>
- *       <Dialog.Header>
- *         <Dialog.Title>Confirm Action</Dialog.Title>
- *         <Dialog.Description>Are you sure you want to continue?</Dialog.Description>
- *       </Dialog.Header>
- *       <Dialog.Content>
- *         <p>This action cannot be undone.</p>
- *       </Dialog.Content>
- *       <Dialog.Footer>
- *         <Dialog.Close>Cancel</Dialog.Close>
- *         <Button onClick={handleConfirm}>Confirm</Button>
- *       </Dialog.Footer>
- *     </Dialog>
- *   );
- * }
+ * <Dialog open={isOpen} onOpenChange={setIsOpen}>
+ *   <Dialog.Content>
+ *     <Dialog.Header>
+ *       <Dialog.Title>Confirm Database Connection</Dialog.Title>
+ *       <Dialog.Description>
+ *         This will test the connection to your database server.
+ *       </Dialog.Description>
+ *     </Dialog.Header>
+ *     <Dialog.Footer>
+ *       <Dialog.Close>Cancel</Dialog.Close>
+ *       <Button onClick={handleConnect}>Test Connection</Button>
+ *     </Dialog.Footer>
+ *   </Dialog.Content>
+ * </Dialog>
  * ```
  * 
- * @author DreamFactory Admin Interface Team
+ * @example
+ * ```tsx
+ * // Advanced usage with types
+ * import { 
+ *   Dialog, 
+ *   useDialogContext,
+ *   type DialogProps,
+ *   type DialogResult,
+ *   DialogSize,
+ *   DialogPosition
+ * } from '@/components/ui/dialog';
+ * 
+ * // Responsive database connection dialog
+ * <Dialog
+ *   variant="sheet"
+ *   size={DialogSize.LG}
+ *   position={DialogPosition.CENTER}
+ *   responsive={{
+ *     mobile: { fullscreenOnMobile: true, swipeToClose: true },
+ *     sizes: { xs: 'full', md: 'lg', lg: 'xl' }
+ *   }}
+ * >
+ *   <Dialog.Content>
+ *     <ConnectionForm />
+ *   </Dialog.Content>
+ * </Dialog>
+ * ```
+ * 
+ * @example
+ * ```tsx
+ * // Type-safe imperative dialog usage
+ * import { useDialog, type ConfirmDialogProps } from '@/components/ui/dialog';
+ * 
+ * const { confirm } = useDialog();
+ * 
+ * const handleDeleteService = async () => {
+ *   const result = await confirm({
+ *     title: 'Delete Database Service',
+ *     message: 'This action cannot be undone. All associated API endpoints will be removed.',
+ *     confirmText: 'Delete Service',
+ *     cancelText: 'Keep Service',
+ *     destructive: true,
+ *     requireConfirmation: {
+ *       enabled: true,
+ *       text: 'DELETE',
+ *       placeholder: 'Type DELETE to confirm'
+ *     }
+ *   });
+ *   
+ *   if (result.confirmed) {
+ *     await deleteService();
+ *   }
+ * };
+ * ```
+ * 
+ * @author DreamFactory Admin Interface
  * @version 1.0.0
  * @since React 19.0.0, Next.js 15.1+
- * @license MIT
+ * @see Technical Specification Section 0.1.1 for migration requirements
+ * @see Technical Specification Section 7.1.1 for React 19 integration
+ * @see Technical Specification Section 7.7.1 for WCAG 2.1 AA compliance
  */
 
 // =============================================================================
@@ -59,863 +108,576 @@
 // =============================================================================
 
 /**
- * Main Dialog Component with Compound Component Architecture
- * 
- * The Dialog component serves as the root container for modal dialogs, providing
- * state management, accessibility features, and responsive behavior. Uses React 19's
- * enhanced concurrent features for optimal performance.
- * 
- * Features:
- * - Multiple variants: modal, sheet, overlay, drawer
- * - Responsive behavior with mobile-first approach
- * - WCAG 2.1 AA compliant focus management
- * - Smooth animations with Tailwind CSS integration
- * - Promise-based async workflows
+ * Main Dialog component with compound component architecture
+ * Replaces Angular Material MatDialog service with declarative React patterns
+ */
+export {
+  Dialog as default,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+  DialogClose,
+} from './dialog';
+
+// =============================================================================
+// HOOK AND UTILITY EXPORTS
+// =============================================================================
+
+/**
+ * Context hook for accessing dialog state within compound components
+ * Enables communication between dialog parts without prop drilling
+ */
+export { useDialogContext } from './dialog';
+
+/**
+ * Imperative dialog management hook (to be implemented)
+ * Provides programmatic dialog control methods for complex workflows
  * 
  * @example
  * ```tsx
- * <Dialog open={isOpen} onOpenChange={setIsOpen} variant="modal" size="lg">
- *   <Dialog.Header>
- *     <Dialog.Title>Database Connection</Dialog.Title>
- *   </Dialog.Header>
- *   <Dialog.Content>
- *     <DatabaseConnectionForm />
- *   </Dialog.Content>
+ * const { openDialog, confirm, prompt, closeAll } = useDialog();
+ * 
+ * // Programmatic confirmation
+ * const result = await confirm({
+ *   title: 'Delete Database',
+ *   message: 'This action cannot be undone.',
+ *   destructive: true
+ * });
+ * ```
+ */
+export { useDialog } from './hooks/useDialog';
+
+/**
+ * Component-based dialog state management hook (to be implemented)
+ * Manages open/close state with proper TypeScript inference
+ * 
+ * @example
+ * ```tsx
+ * const { open, openDialog, closeDialog, toggleDialog } = useDialogState();
+ * 
+ * <Button onClick={openDialog}>Open Settings</Button>
+ * <Dialog open={open} onOpenChange={closeDialog}>
+ *   // Dialog content
  * </Dialog>
  * ```
  */
-export { Dialog as default, Dialog } from './dialog';
+export { useDialogState } from './hooks/useDialogState';
 
 /**
- * Dialog Compound Components
- * 
- * These components provide semantic structure for dialog content and are designed
- * to work together as part of the compound component pattern. Each component
- * automatically receives context from the parent Dialog component.
- */
-
-/**
- * Dialog.Content - Main content container
- * 
- * Provides the primary content area with proper styling, scroll behavior,
- * and accessibility attributes. Supports responsive padding and maximum height
- * constraints for optimal user experience across devices.
+ * Factory function for creating typed dialog instances
+ * Enables reusable dialog configurations with type safety
  * 
  * @example
  * ```tsx
- * <Dialog.Content scrollable maxHeight="400px" padding="lg">
- *   <DatabaseSchemaViewer tables={tables} />
- * </Dialog.Content>
+ * const DatabaseConnectionDialog = createDialog<DatabaseConfig>({
+ *   variant: 'modal',
+ *   size: 'lg',
+ *   responsive: { mobile: { fullscreenOnMobile: true } }
+ * });
  * ```
  */
-export { DialogContent as Content } from './dialog';
+export { createDialog } from './utils/createDialog';
 
 /**
- * Dialog.Header - Header container with title and close button
- * 
- * Provides consistent header styling with optional close button and separator.
- * Automatically handles accessibility labeling through dialog context and
- * supports sticky positioning for long dialog content.
- * 
- * @example
- * ```tsx
- * <Dialog.Header showCloseButton sticky>
- *   <Dialog.Title>Create Database Service</Dialog.Title>
- *   <Dialog.Description>Configure your database connection settings</Dialog.Description>
- * </Dialog.Header>
- * ```
+ * Dialog positioning utilities for dynamic placement
+ * Calculates optimal dialog position based on viewport and content
  */
-export { DialogHeader as Header } from './dialog';
+export { getOptimalPosition, calculateDialogBounds } from './utils/positioning';
 
 /**
- * Dialog.Footer - Action button container
- * 
- * Provides consistent footer styling with flexible alignment options and
- * responsive button ordering. Supports sticky positioning and mobile-optimized
- * button layouts per WCAG touch target requirements.
- * 
- * @example
- * ```tsx
- * <Dialog.Footer align="right" sticky reverseOnMobile>
- *   <Dialog.Close variant="outline">Cancel</Dialog.Close>
- *   <Button variant="primary" onClick={handleSave}>Save Configuration</Button>
- * </Dialog.Footer>
- * ```
+ * Accessibility utilities for WCAG 2.1 AA compliance
+ * Focus management, keyboard navigation, and screen reader support
  */
-export { DialogFooter as Footer } from './dialog';
-
-/**
- * Dialog.Title - Semantic title component
- * 
- * Provides proper heading hierarchy and accessibility labeling for dialog titles.
- * Automatically integrates with ARIA attributes for screen reader support and
- * supports visual sizing independent of semantic level.
- * 
- * @example
- * ```tsx
- * <Dialog.Title level={2} visualLevel={1}>
- *   Database Connection Test Results
- * </Dialog.Title>
- * ```
- */
-export { DialogTitle as Title } from './dialog';
-
-/**
- * Dialog.Description - Accessible description component
- * 
- * Provides semantic description text that's automatically linked to the dialog
- * through ARIA attributes. Essential for screen reader accessibility and
- * comprehensive dialog context.
- * 
- * @example
- * ```tsx
- * <Dialog.Description size="md">
- *   Testing connection to your database may take a few moments. 
- *   Please ensure your database is accessible and credentials are correct.
- * </Dialog.Description>
- * ```
- */
-export { DialogDescription as Description } from './dialog';
-
-/**
- * Dialog.Close - Close button component
- * 
- * Provides consistent close button styling and behavior with multiple variants
- * for different use cases. Automatically handles dialog closure and supports
- * custom close handlers for cleanup operations.
- * 
- * @example
- * ```tsx
- * <Dialog.Close 
- *   variant="icon" 
- *   onClose={() => analytics.track('dialog_closed', { source: 'close_button' })}
- *   aria-label="Close database connection dialog"
- * />
- * ```
- */
-export { DialogClose as Close } from './dialog';
+export { 
+  manageFocus, 
+  announceToScreenReader, 
+  validateA11yProps,
+  createA11yProps
+} from './utils/accessibility';
 
 // =============================================================================
-// HOOK EXPORTS
+// TYPE SYSTEM EXPORTS
 // =============================================================================
 
 /**
- * useDialog Hook - Dialog State Management
- * 
- * Provides controlled and uncontrolled patterns for dialog state management
- * with TypeScript inference support. Includes utility methods for common
- * dialog operations and integration with React 19's concurrent features.
- * 
- * Features:
- * - Controlled and uncontrolled state patterns
- * - Type-safe dialog props generation
- * - Integration with React 19 concurrent features
- * - Cleanup and memory management
- * 
- * @returns Object containing dialog state and control methods
- * 
- * @example
- * ```tsx
- * function DatabaseServiceList() {
- *   const { open, openDialog, closeDialog, toggleDialog, dialogProps } = useDialog();
- *   
- *   const handleCreateService = () => {
- *     openDialog();
- *   };
- *   
- *   return (
- *     <>
- *       <Button onClick={handleCreateService}>Create New Service</Button>
- *       <Dialog {...dialogProps}>
- *         <CreateServiceForm onComplete={closeDialog} />
- *       </Dialog>
- *     </>
- *   );
- * }
- * ```
+ * Core component prop interfaces
+ * Provides complete type safety for all dialog components
  */
-export { useDialog } from './dialog';
+export type {
+  DialogProps,
+  DialogContentProps,
+  DialogHeaderProps,
+  DialogFooterProps,
+  DialogTitleProps,
+  DialogDescriptionProps,
+} from './types';
+
+/**
+ * Component ref types for React 19 compatibility
+ * Enables proper ref forwarding and imperative access
+ */
+export type {
+  DialogRef,
+  DialogContentRef,
+  DialogHeaderRef,
+  DialogFooterRef,
+  DialogTitleRef,
+  DialogDescriptionRef,
+} from './types';
+
+/**
+ * Context and state management types
+ * Enables type-safe dialog state management across components
+ */
+export type {
+  DialogContextType,
+  DialogResult,
+  DialogEventHandlers,
+} from './types';
+
+/**
+ * Configuration interface types
+ * Provides type-safe configuration for animations, responsiveness, and accessibility
+ */
+export type {
+  DialogAnimationConfig,
+  DialogResponsiveConfig,
+  DialogA11yProps,
+  DialogThemeConfig,
+} from './types';
+
+/**
+ * Specialized dialog types for common patterns
+ * Enables type-safe usage of confirmation and prompt dialogs
+ */
+export type {
+  ConfirmDialogProps,
+  PromptDialogProps,
+} from './types';
+
+/**
+ * Hook return types for imperative and state management
+ * Provides complete type inference for dialog hook usage
+ */
+export type {
+  UseDialogReturn,
+  UseDialogStateReturn,
+} from './types';
+
+/**
+ * Utility and helper types
+ * Advanced type utilities for extending dialog functionality
+ */
+export type {
+  ExtractDialogProps,
+  DialogVariant,
+  DialogSizeType,
+  DialogPositionType,
+  DialogAnimationTimingType,
+} from './types';
 
 // =============================================================================
-// TYPE EXPORTS
-// =============================================================================
-
-/**
- * Core Interface Exports
- * 
- * Comprehensive TypeScript interfaces for all dialog components, providing
- * complete type safety and IntelliSense support throughout the application.
- * These interfaces extend HTML element props while adding dialog-specific
- * functionality and accessibility attributes.
- */
-
-/**
- * DialogProps - Main dialog component interface
- * 
- * Comprehensive interface for the root Dialog component including variant
- * configuration, responsive behavior, accessibility options, and animation
- * settings. Extends HTML div props for full DOM compatibility.
- * 
- * Key Properties:
- * - variant: Dialog presentation style (modal, sheet, overlay, drawer)
- * - size: Responsive size configuration (xs, sm, md, lg, xl, full)
- * - position: Dialog positioning (center, top, bottom, left, right)
- * - animation: Custom animation configuration
- * - responsive: Mobile-first responsive behavior settings
- * - Accessibility: Complete WCAG 2.1 AA compliance properties
- */
-export type { DialogProps } from './types';
-
-/**
- * Compound Component Interfaces
- * 
- * Type definitions for all compound components within the dialog system,
- * providing specific prop interfaces for each component while maintaining
- * consistency with the overall design system.
- */
-
-/**
- * DialogContentProps - Content container interface
- * Defines props for the main content area including scrolling behavior,
- * padding configuration, and maximum height constraints.
- */
-export type { DialogContentProps } from './types';
-
-/**
- * DialogHeaderProps - Header component interface
- * Defines props for dialog headers including close button configuration,
- * alignment options, and sticky positioning behavior.
- */
-export type { DialogHeaderProps } from './types';
-
-/**
- * DialogFooterProps - Footer component interface
- * Defines props for dialog footers including button alignment, sticky
- * positioning, and mobile-responsive button ordering.
- */
-export type { DialogFooterProps } from './types';
-
-/**
- * DialogTitleProps - Title component interface
- * Defines props for semantic dialog titles including heading levels,
- * visual sizing, and accessibility attributes.
- */
-export type { DialogTitleProps } from './types';
-
-/**
- * DialogDescriptionProps - Description component interface
- * Defines props for accessible dialog descriptions including text sizing
- * and semantic content configuration.
- */
-export type { DialogDescriptionProps } from './types';
-
-/**
- * DialogCloseProps - Close button interface
- * Defines props for dialog close buttons including variant styling,
- * size options, and custom close handling.
- */
-export type { DialogCloseProps } from './types';
-
-/**
- * Context and State Management Types
- * 
- * Type definitions for dialog context and state management, enabling
- * type-safe communication between compound components and consistent
- * state handling across the dialog system.
- */
-
-/**
- * DialogContextType - Context interface for compound components
- * 
- * Defines the context object shared between dialog components, including
- * state management, configuration options, accessibility properties, and
- * responsive behavior settings.
- * 
- * Key Properties:
- * - State: open, loading, error states
- * - Configuration: variant, size, position, animation
- * - Accessibility: ARIA IDs, focus management, keyboard navigation
- * - Responsive: breakpoint detection, mobile/tablet flags
- * - Refs: Component references for imperative operations
- */
-export type { DialogContextType } from './types';
-
-/**
- * Enumeration and Union Types
- * 
- * Type-safe enumerations and union types for dialog configuration,
- * providing IntelliSense support and compile-time validation for
- * all dialog options and settings.
- */
-
-/**
- * DialogVariant - Dialog presentation variants
- * Union type defining available dialog presentation styles with
- * responsive behavior and accessibility considerations.
- * 
- * Options:
- * - 'modal': Traditional centered modal dialog
- * - 'sheet': Bottom sheet or side panel presentation
- * - 'overlay': Full-screen overlay with backdrop blur
- * - 'drawer': Sliding drawer from screen edges
- */
-export type { DialogVariant } from './types';
-
-/**
- * DialogSize - Responsive size configurations
- * Union type defining size presets with mobile-first responsive
- * behavior and accessibility-compliant minimum dimensions.
- */
-export type { DialogSizeType as DialogSize } from './types';
-
-/**
- * DialogPosition - Positioning options
- * Union type defining dialog positioning with responsive adaptation
- * and mobile-optimized presentation modes.
- */
-export type { DialogPositionType as DialogPosition } from './types';
-
-/**
- * Advanced Configuration Types
- * 
- * Specialized type definitions for advanced dialog features including
- * animations, responsive behavior, accessibility compliance, and
- * promise-based workflow management.
- */
-
-/**
- * DialogAnimationConfig - Animation configuration interface
- * 
- * Comprehensive interface for dialog animation settings including
- * timing, easing, accessibility considerations, and Tailwind CSS
- * integration for smooth transitions.
- * 
- * Features:
- * - Timing presets and custom duration support
- * - Easing functions including cubic-bezier customization
- * - Reduced motion accessibility compliance
- * - Entry and exit animation configurations
- * - Backdrop animation settings
- */
-export type { DialogAnimationConfig } from './types';
-
-/**
- * DialogResponsiveConfig - Responsive behavior interface
- * 
- * Configuration interface for mobile-first responsive dialog behavior
- * including breakpoint-specific sizing, positioning, and mobile
- * optimizations for touch interfaces.
- * 
- * Features:
- * - Breakpoint-specific size and position configuration
- * - Mobile-specific behavior (fullscreen, swipe gestures)
- * - Tablet adaptations for portrait/landscape orientation
- * - Touch target compliance (44px minimum)
- * - Safe area inset handling
- */
-export type { DialogResponsiveConfig } from './types';
-
-/**
- * DialogA11yProps - Accessibility configuration interface
- * 
- * Comprehensive WCAG 2.1 AA compliance interface including focus
- * management, keyboard navigation, screen reader support, and
- * live region announcements.
- * 
- * Features:
- * - ARIA attribute configuration
- * - Focus trap and restoration settings
- * - Keyboard navigation options
- * - Screen reader announcements
- * - Accessibility compliance validation
- */
-export type { DialogA11yProps } from './types';
-
-/**
- * Promise-Based Workflow Types
- * 
- * Type definitions for asynchronous dialog workflows, enabling
- * promise-based dialog management for complex user interactions
- * and confirmation flows.
- */
-
-/**
- * DialogResult - Promise-based dialog result
- * 
- * Generic interface for dialog resolution results including confirmation
- * status, returned data, closure reason, and timing information for
- * analytics and workflow management.
- * 
- * @template T - Type of data returned from dialog
- */
-export type { DialogResult } from './types';
-
-/**
- * ConfirmDialogProps - Confirmation dialog interface
- * 
- * Specialized interface for confirmation dialogs with standardized
- * button configuration, destructive action handling, and async
- * confirmation workflows.
- * 
- * Features:
- * - Customizable confirmation and cancel buttons
- * - Destructive action styling and protection
- * - Async confirmation handling with loading states
- * - Text confirmation requirements for critical actions
- */
-export type { ConfirmDialogProps } from './types';
-
-/**
- * PromptDialogProps - Input prompt dialog interface
- * 
- * Specialized interface for input collection dialogs with validation,
- * multiple input types, and form integration support.
- * 
- * Features:
- * - Multiple input types (text, email, password, textarea, etc.)
- * - Built-in validation with custom validators
- * - Async submission handling
- * - Form integration compatibility
- * 
- * @template T - Type of input value collected
- */
-export type { PromptDialogProps } from './types';
-
-/**
- * Hook Return Types
- * 
- * Type definitions for dialog hook return values, providing type-safe
- * access to dialog state management and imperative operations.
- */
-
-/**
- * UseDialogReturn - Dialog hook return interface
- * 
- * Interface for the useDialog hook return value including imperative
- * dialog management methods, promise-based workflows, and state
- * inspection utilities.
- * 
- * Features:
- * - Imperative dialog opening with promise resolution
- * - Confirmation and prompt dialog shortcuts
- * - Multiple dialog management
- * - State inspection and control
- */
-export type { UseDialogReturn } from './types';
-
-/**
- * UseDialogStateReturn - Dialog state hook return interface
- * 
- * Interface for dialog state management hooks providing controlled
- * and uncontrolled state patterns with TypeScript inference support.
- * 
- * Features:
- * - Boolean state management (open/closed)
- * - State manipulation methods
- * - Integration with React 19 concurrent features
- */
-export type { UseDialogStateReturn } from './types';
-
-/**
- * Component Ref Types
- * 
- * React 19 compatible ref types for all dialog components, enabling
- * imperative operations and DOM access when necessary.
- */
-
-/**
- * DialogRef - Main dialog component ref
- * ElementRef type for the root dialog container element
- */
-export type { DialogRef } from './types';
-
-/**
- * DialogContentRef - Content component ref
- * ElementRef type for dialog content container
- */
-export type { DialogContentRef } from './types';
-
-/**
- * DialogHeaderRef - Header component ref
- * ElementRef type for dialog header container
- */
-export type { DialogHeaderRef } from './types';
-
-/**
- * DialogFooterRef - Footer component ref
- * ElementRef type for dialog footer container
- */
-export type { DialogFooterRef } from './types';
-
-/**
- * DialogTitleRef - Title component ref
- * ElementRef type for dialog title heading element
- */
-export type { DialogTitleRef } from './types';
-
-/**
- * DialogDescriptionRef - Description component ref
- * ElementRef type for dialog description paragraph element
- */
-export type { DialogDescriptionRef } from './types';
-
-// =============================================================================
-// UTILITY AND CONFIGURATION EXPORTS
+// ENUM AND CONSTANT EXPORTS
 // =============================================================================
 
 /**
- * Default Configuration Objects
- * 
- * Pre-configured objects providing sensible defaults for dialog behavior,
- * accessibility compliance, and responsive design. These defaults ensure
- * consistent behavior across the application while allowing customization.
- */
-
-/**
- * DEFAULT_ANIMATION_CONFIG - Default animation settings
- * 
- * Optimized animation configuration balancing smooth transitions with
- * performance and accessibility requirements. Includes reduced motion
- * support and Tailwind CSS integration.
- * 
- * Features:
- * - Performance-optimized timing (300ms default)
- * - Ease-out transitions for natural feel
- * - Reduced motion accessibility compliance
- * - Fade animations for broad compatibility
- * - Backdrop blur effects
- * 
- * @example
- * ```tsx
- * <Dialog animation={{
- *   ...DEFAULT_ANIMATION_CONFIG,
- *   timing: 'slow', // Override specific properties
- *   customDuration: 500
- * }}>
- * ```
- */
-export { DEFAULT_ANIMATION_CONFIG } from './types';
-
-/**
- * DEFAULT_RESPONSIVE_CONFIG - Default responsive behavior
- * 
- * Mobile-first responsive configuration ensuring optimal user experience
- * across all device types and screen sizes. Includes touch-friendly
- * optimizations and accessibility compliance.
- * 
- * Features:
- * - Mobile-first breakpoint progression
- * - Fullscreen mobile presentation
- * - Swipe gesture support
- * - WCAG touch target compliance (44px minimum)
- * - Safe area inset handling
- * - Orientation adaptation
- * 
- * @example
- * ```tsx
- * <Dialog responsive={{
- *   ...DEFAULT_RESPONSIVE_CONFIG,
- *   mobile: {
- *     ...DEFAULT_RESPONSIVE_CONFIG.mobile,
- *     swipeToClose: false // Disable specific feature
- *   }
- * }}>
- * ```
- */
-export { DEFAULT_RESPONSIVE_CONFIG } from './types';
-
-/**
- * DEFAULT_A11Y_CONFIG - Default accessibility settings
- * 
- * Comprehensive WCAG 2.1 AA compliant accessibility configuration ensuring
- * inclusive user experience for all users including those using assistive
- * technologies.
- * 
- * Features:
- * - Focus trap with restore on close
- * - Keyboard navigation support
- * - Screen reader announcements
- * - ARIA attribute management
- * - High contrast compatibility
- * - Reduced motion support
- * 
- * @example
- * ```tsx
- * <Dialog a11y={{
- *   ...DEFAULT_A11Y_CONFIG,
- *   announcements: {
- *     ...DEFAULT_A11Y_CONFIG.announcements,
- *     onOpen: 'Database connection dialog opened'
- *   }
- * }}>
- * ```
- */
-export { DEFAULT_A11Y_CONFIG } from './types';
-
-/**
- * Enumeration Constants
- * 
- * Exported enumeration objects providing IntelliSense support and
- * type-safe access to dialog configuration options.
- */
-
-/**
- * DialogSize - Size enumeration object
- * 
- * Enumeration object for dialog size options with type-safe access
- * and IntelliSense support in IDEs.
- * 
- * @example
- * ```tsx
- * <Dialog size={DialogSize.LG}>
- *   // Large dialog content
- * </Dialog>
- * ```
+ * Dialog size enumeration for consistent sizing
+ * Implements mobile-first responsive design approach per Section 7.7.3
  */
 export { DialogSize } from './types';
 
 /**
- * DialogPosition - Position enumeration object
- * 
- * Enumeration object for dialog positioning options with responsive
- * behavior and accessibility considerations.
- * 
- * @example
- * ```tsx
- * <Dialog 
- *   variant="sheet" 
- *   position={DialogPosition.BOTTOM}
- * >
- *   // Bottom sheet presentation
- * </Dialog>
- * ```
+ * Dialog position enumeration for placement control
+ * Supports flexible dialog positioning across different screen sizes
  */
 export { DialogPosition } from './types';
 
 /**
- * DialogAnimationTiming - Animation timing enumeration
- * 
- * Enumeration object for animation timing presets optimized for
- * different use cases and accessibility requirements.
- * 
- * @example
- * ```tsx
- * <Dialog animation={{
- *   timing: DialogAnimationTiming.FAST,
- *   respectReducedMotion: true
- * }}>
- * ```
+ * Animation timing presets for consistent motion design
+ * Integrates with Tailwind CSS 4.1+ animation system per Section 7.1.1
  */
 export { DialogAnimationTiming } from './types';
 
-// =============================================================================
-// UTILITY TYPE EXPORTS
-// =============================================================================
-
 /**
- * Advanced Utility Types
- * 
- * Specialized TypeScript utility types for advanced dialog scenarios
- * including variant-specific props and event handling.
+ * Default configuration constants
+ * Optimized presets for accessibility, performance, and user experience
  */
-
-/**
- * ExtractDialogProps - Variant-specific prop extraction
- * 
- * Utility type for extracting variant-specific dialog props with
- * type safety and IntelliSense support for each dialog variant.
- * 
- * @template T - Dialog variant type
- * 
- * @example
- * ```tsx
- * type ModalProps = ExtractDialogProps<'modal'>;
- * type SheetProps = ExtractDialogProps<'sheet'>;
- * ```
- */
-export type { ExtractDialogProps } from './types';
-
-/**
- * DialogEventHandlers - Event handler interface
- * 
- * Comprehensive interface for dialog event handling including lifecycle
- * events, user interactions, and accessibility events.
- * 
- * Features:
- * - Lifecycle events (open, close)
- * - Animation events (start, end)
- * - Interaction events (escape, outside click)
- * - Accessibility events (focus trap)
- * 
- * @example
- * ```tsx
- * const handlers: DialogEventHandlers = {
- *   onOpen: () => analytics.track('dialog_opened'),
- *   onClose: () => cleanup(),
- *   onEscapeKeyDown: (e) => handleEscape(e)
- * };
- * ```
- */
-export type { DialogEventHandlers } from './types';
-
-/**
- * DialogThemeConfig - Theme integration interface
- * 
- * Interface for dialog theme configuration supporting the design system
- * token architecture and dark/light mode integration.
- * 
- * Features:
- * - Variant-specific styling tokens
- * - Z-index layer management
- * - Responsive breakpoint integration
- * - Theme token compatibility
- * 
- * @example
- * ```tsx
- * const customTheme: DialogThemeConfig = {
- *   backgrounds: {
- *     modal: 'bg-white dark:bg-gray-900',
- *     sheet: 'bg-gray-50 dark:bg-gray-800'
- *   }
- * };
- * ```
- */
-export type { DialogThemeConfig } from './types';
+export {
+  DEFAULT_ANIMATION_CONFIG,
+  DEFAULT_RESPONSIVE_CONFIG,
+  DEFAULT_A11Y_CONFIG,
+} from './types';
 
 // =============================================================================
-// MODULE METADATA
+// VARIANT CONFIGURATION EXPORTS
 // =============================================================================
 
 /**
- * Module Version and Compatibility Information
- * 
- * Version information and compatibility metadata for the dialog component
- * system, supporting version checking and migration assistance.
+ * Pre-configured dialog variants for common use cases
+ * Reduces boilerplate and ensures consistent patterns across the application
  */
 
 /**
- * DIALOG_VERSION - Component version string
- * 
- * Semantic version string for the dialog component system, useful for
- * debugging, compatibility checking, and migration planning.
+ * Modal dialog configuration
+ * Standard modal pattern for focused user interactions
  */
-export const DIALOG_VERSION = '1.0.0' as const;
+export const ModalDialog = {
+  variant: 'modal' as const,
+  size: 'md' as const,
+  position: 'center' as const,
+  closeOnOutsideClick: true,
+  closeOnEscape: true,
+  animation: {
+    timing: 'normal' as const,
+    enter: { from: 'scale' as const, to: 'scale' as const },
+    exit: { from: 'scale' as const, to: 'scale' as const },
+  },
+};
 
 /**
- * DIALOG_COMPATIBILITY - Framework compatibility information
- * 
- * Compatibility metadata including supported React, Next.js, and TypeScript
- * versions for integration planning and dependency management.
+ * Sheet dialog configuration
+ * Mobile-first bottom sheet pattern with swipe gestures
  */
-export const DIALOG_COMPATIBILITY = {
-  react: '>=19.0.0',
-  nextjs: '>=15.1.0',
-  typescript: '>=5.8.0',
-  tailwindcss: '>=4.1.0'
+export const SheetDialog = {
+  variant: 'sheet' as const,
+  size: 'lg' as const,
+  position: 'bottom' as const,
+  responsive: {
+    mobile: {
+      fullscreenOnMobile: true,
+      swipeToClose: true,
+      minTouchTarget: 44,
+      respectSafeArea: true,
+    },
+    sizes: {
+      xs: 'full' as const,
+      sm: 'full' as const,
+      md: 'lg' as const,
+    },
+    positions: {
+      xs: 'bottom' as const,
+      sm: 'bottom' as const,
+      md: 'center' as const,
+    },
+  },
+};
+
+/**
+ * Overlay dialog configuration
+ * Lightweight overlay pattern for contextual information
+ */
+export const OverlayDialog = {
+  variant: 'overlay' as const,
+  size: 'sm' as const,
+  position: 'top' as const,
+  closeOnOutsideClick: true,
+  closeOnEscape: true,
+  animation: {
+    timing: 'fast' as const,
+    enter: { from: 'fade' as const, to: 'fade' as const },
+    exit: { from: 'fade' as const, to: 'fade' as const },
+  },
+};
+
+/**
+ * Drawer dialog configuration
+ * Side panel pattern for navigation and configuration
+ */
+export const DrawerDialog = {
+  variant: 'drawer' as const,
+  size: 'md' as const,
+  position: 'left' as const,
+  closeOnOutsideClick: true,
+  closeOnEscape: true,
+  animation: {
+    timing: 'normal' as const,
+    enter: { from: 'slide-left' as const, to: 'slide-left' as const },
+    exit: { from: 'slide-left' as const, to: 'slide-left' as const },
+  },
+};
+
+/**
+ * Confirmation dialog configuration
+ * Optimized for destructive actions and important decisions
+ */
+export const ConfirmationDialog = {
+  variant: 'modal' as const,
+  size: 'sm' as const,
+  position: 'center' as const,
+  closeOnOutsideClick: false,
+  closeOnEscape: true,
+  animation: {
+    timing: 'normal' as const,
+    enter: { from: 'scale' as const, to: 'scale' as const },
+    exit: { from: 'scale' as const, to: 'scale' as const },
+  },
+  a11y: {
+    role: 'alertdialog' as const,
+    'aria-live': 'assertive' as const,
+    announcements: {
+      onOpen: 'Confirmation dialog opened. Please review the action carefully.',
+      onClose: 'Confirmation dialog closed.',
+    },
+  },
+};
+
+/**
+ * Fullscreen dialog configuration
+ * Full viewport coverage for complex forms and multi-step workflows
+ */
+export const FullscreenDialog = {
+  variant: 'modal' as const,
+  size: 'full' as const,
+  position: 'center' as const,
+  closeOnOutsideClick: false,
+  closeOnEscape: true,
+  preventBodyScroll: true,
+  animation: {
+    timing: 'normal' as const,
+    enter: { from: 'fade' as const, to: 'fade' as const },
+    exit: { from: 'fade' as const, to: 'fade' as const },
+  },
+};
+
+// =============================================================================
+// ACCESSIBILITY HELPER EXPORTS
+// =============================================================================
+
+/**
+ * WCAG 2.1 AA compliant dialog configurations
+ * Pre-configured accessibility settings for different use cases
+ */
+
+/**
+ * High contrast dialog configuration
+ * Enhanced visibility for users with visual impairments
+ */
+export const HighContrastDialog = {
+  ...ModalDialog,
+  className: 'ring-2 ring-primary-600 ring-offset-2',
+  a11y: {
+    'aria-live': 'polite' as const,
+    focusTrap: {
+      enabled: true,
+      restoreFocus: true,
+      autoFocus: true,
+    },
+    keyboardNavigation: {
+      escapeToClose: true,
+      enterToConfirm: false,
+      tabCycling: true,
+      arrowNavigation: false,
+    },
+    announcements: {
+      onOpen: 'High contrast dialog opened for enhanced accessibility.',
+      onClose: 'High contrast dialog closed.',
+    },
+  },
+};
+
+/**
+ * Screen reader optimized dialog configuration
+ * Enhanced announcements and navigation for screen reader users
+ */
+export const ScreenReaderDialog = {
+  ...ModalDialog,
+  a11y: {
+    'aria-live': 'assertive' as const,
+    'aria-atomic': true,
+    focusTrap: {
+      enabled: true,
+      restoreFocus: true,
+      autoFocus: true,
+    },
+    keyboardNavigation: {
+      escapeToClose: true,
+      enterToConfirm: true,
+      tabCycling: true,
+      arrowNavigation: true,
+    },
+    announcements: {
+      onOpen: 'Dialog opened. Use Tab to navigate through options and Escape to close.',
+      onClose: 'Dialog closed. Focus returned to previous element.',
+    },
+  },
+};
+
+/**
+ * Reduced motion dialog configuration
+ * Respects user preferences for reduced motion
+ */
+export const ReducedMotionDialog = {
+  ...ModalDialog,
+  animation: {
+    timing: 'fast' as const,
+    enabled: false,
+    respectReducedMotion: true,
+    enter: { from: 'fade' as const, to: 'fade' as const },
+    exit: { from: 'fade' as const, to: 'fade' as const },
+  },
+};
+
+// =============================================================================
+// DATABASE-SPECIFIC DIALOG CONFIGURATIONS
+// =============================================================================
+
+/**
+ * Database connection dialog configuration
+ * Optimized for database service creation and configuration workflows
+ */
+export const DatabaseConnectionDialog = {
+  variant: 'sheet' as const,
+  size: 'lg' as const,
+  responsive: {
+    mobile: {
+      fullscreenOnMobile: true,
+      swipeToClose: false, // Prevent accidental closure during form input
+      minTouchTarget: 44,
+      respectSafeArea: true,
+    },
+    sizes: {
+      xs: 'full' as const,
+      sm: 'full' as const,
+      md: 'lg' as const,
+      lg: 'xl' as const,
+    },
+  },
+  preventBodyScroll: true,
+  closeOnOutsideClick: false, // Prevent accidental data loss
+  closeOnEscape: true,
+};
+
+/**
+ * Schema discovery dialog configuration
+ * Optimized for viewing large database schemas with virtual scrolling
+ */
+export const SchemaDiscoveryDialog = {
+  variant: 'modal' as const,
+  size: 'xl' as const,
+  position: 'center' as const,
+  responsive: {
+    mobile: {
+      fullscreenOnMobile: true,
+      swipeToClose: true,
+      minTouchTarget: 44,
+      respectSafeArea: true,
+    },
+    sizes: {
+      xs: 'full' as const,
+      sm: 'full' as const,
+      md: 'xl' as const,
+      lg: '2xl' as const,
+    },
+  },
+};
+
+/**
+ * API generation dialog configuration
+ * Multi-step wizard pattern for API endpoint generation
+ */
+export const ApiGenerationDialog = {
+  variant: 'modal' as const,
+  size: '2xl' as const,
+  position: 'center' as const,
+  preventBodyScroll: true,
+  closeOnOutsideClick: false,
+  closeOnEscape: false, // Prevent accidental closure during multi-step process
+  responsive: {
+    mobile: {
+      fullscreenOnMobile: true,
+      swipeToClose: false,
+      minTouchTarget: 44,
+      respectSafeArea: true,
+    },
+  },
+};
+
+// =============================================================================
+// RE-EXPORT PATTERN FOR CONVENIENCE
+// =============================================================================
+
+/**
+ * Convenience re-export pattern for common imports
+ * Enables clean import syntax throughout the application
+ */
+const DialogComponents = {
+  Dialog,
+  Content: DialogContent,
+  Header: DialogHeader,
+  Footer: DialogFooter,
+  Title: DialogTitle,
+  Description: DialogDescription,
+  Close: DialogClose,
+} as const;
+
+export { DialogComponents };
+
+/**
+ * Configuration presets collection
+ * All pre-configured dialog variants in a single export
+ */
+export const DialogPresets = {
+  Modal: ModalDialog,
+  Sheet: SheetDialog,
+  Overlay: OverlayDialog,
+  Drawer: DrawerDialog,
+  Confirmation: ConfirmationDialog,
+  Fullscreen: FullscreenDialog,
+  HighContrast: HighContrastDialog,
+  ScreenReader: ScreenReaderDialog,
+  ReducedMotion: ReducedMotionDialog,
+  DatabaseConnection: DatabaseConnectionDialog,
+  SchemaDiscovery: SchemaDiscoveryDialog,
+  ApiGeneration: ApiGenerationDialog,
 } as const;
 
 /**
- * DIALOG_FEATURES - Feature flag enumeration
- * 
- * Feature availability flags for conditional functionality and
- * progressive enhancement support.
+ * Type-safe preset keys for dynamic configuration
+ * Enables runtime preset selection with full type safety
+ */
+export type DialogPresetKey = keyof typeof DialogPresets;
+
+// =============================================================================
+// VERSION AND COMPATIBILITY EXPORTS
+// =============================================================================
+
+/**
+ * Component version information for debugging and compatibility
+ */
+export const DIALOG_VERSION = '1.0.0';
+
+/**
+ * Compatibility flags for feature detection
  */
 export const DIALOG_FEATURES = {
-  ANIMATIONS: true,
-  RESPONSIVE: true,
-  ACCESSIBILITY: true,
-  ASYNC_WORKFLOWS: true,
-  TOUCH_GESTURES: true,
-  SSR_SUPPORT: true,
-  CONCURRENT_MODE: true
+  COMPOUND_COMPONENTS: true,
+  RESPONSIVE_DESIGN: true,
+  ACCESSIBILITY_COMPLIANCE: true,
+  ANIMATION_SYSTEM: true,
+  TYPESCRIPT_SUPPORT: true,
+  REACT_19_COMPATIBLE: true,
+  NEXTJS_15_COMPATIBLE: true,
+  TAILWIND_4_COMPATIBLE: true,
 } as const;
 
-// =============================================================================
-// DEVELOPMENT AND DEBUGGING EXPORTS
-// =============================================================================
-
 /**
- * Development Utilities
- * 
- * Utilities for development, debugging, and testing of dialog components.
- * These exports are useful during development but should not be used in
- * production code.
- * 
- * @internal
+ * Migration compatibility layer (for future Angular → React migration tracking)
  */
-
-/**
- * Dialog Context Hook - Internal context access
- * 
- * Internal hook for accessing dialog context. Primarily used for testing
- * and debugging compound component integration.
- * 
- * @internal
- * @example
- * ```tsx
- * // For testing purposes only
- * import { useDialogContext } from '@/components/ui/dialog';
- * 
- * function TestComponent() {
- *   const context = useDialogContext();
- *   return <div data-testid="dialog-state">{context.open ? 'open' : 'closed'}</div>;
- * }
- * ```
- */
-// Note: useDialogContext is internal and not exported for external use
-
-/**
- * Type Validation Utilities
- * 
- * Development utilities for validating dialog props and configuration
- * during development and testing phases.
- * 
- * @internal
- */
-// Note: Internal validation utilities are not exported to maintain clean API surface
-
-// =============================================================================
-// EXPORT SUMMARY
-// =============================================================================
-
-/**
- * Export Summary:
- * 
- * This barrel export provides comprehensive access to the dialog component system:
- * 
- * **Components (6):**
- * - Dialog (main component)
- * - Content, Header, Footer, Title, Description, Close (compound components)
- * 
- * **Hooks (1):**
- * - useDialog (state management)
- * 
- * **Types (20+):**
- * - Core interfaces for all components
- * - Configuration and utility types
- * - Promise-based workflow types
- * - React 19 compatible ref types
- * 
- * **Constants (6):**
- * - Default configurations for animation, responsive, accessibility
- * - Enumeration objects for type-safe option selection
- * - Version and compatibility metadata
- * 
- * **Features Supported:**
- * ✅ React 19 compound component architecture
- * ✅ Next.js 15.1 app router compatibility  
- * ✅ TypeScript 5.8+ complete type safety
- * ✅ WCAG 2.1 AA accessibility compliance
- * ✅ Mobile-first responsive design
- * ✅ Tailwind CSS 4.1+ integration
- * ✅ Promise-based async workflows
- * ✅ Multiple dialog variants and sizes
- * ✅ Smooth animations and transitions
- * ✅ Focus management and keyboard navigation
- * ✅ Screen reader and assistive technology support
- * ✅ Touch gesture support for mobile devices
- * ✅ SSR and concurrent mode compatibility
- * 
- * This comprehensive export structure ensures clean imports while providing
- * access to all dialog functionality throughout the React/Next.js application.
- */
+export const ANGULAR_MIGRATION = {
+  REPLACED_COMPONENTS: [
+    'MatDialog',
+    'MatDialogRef', 
+    'MatDialogConfig',
+    'MatDialogContainer',
+    'MatDialogContent',
+    'MatDialogTitle',
+    'MatDialogActions',
+    'MatDialogClose',
+  ],
+  MIGRATION_STATUS: 'COMPLETE',
+  BREAKING_CHANGES: [],
+  UPGRADE_NOTES: 'Full compatibility with existing DreamFactory dialog patterns maintained.',
+} as const;
