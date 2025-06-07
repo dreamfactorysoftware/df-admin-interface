@@ -1,4 +1,48 @@
 {
+  "title": "API Documentation",
+  "subtitle": "Comprehensive REST API documentation for your DreamFactory services",
+  "sections": {
+    "overview": "Overview",
+    "authentication": "Authentication",
+    "services": "Services",
+    "endpoints": "Endpoints",
+    "models": "Models",
+    "examples": "Examples"
+  },
+  "labels": {
+    "service": "Service",
+    "resource": "Resource",
+    "method": "Method",
+    "endpoint": "Endpoint",
+    "parameters": "Parameters",
+    "response": "Response",
+    "example": "Example",
+    "schema": "Schema"
+  },
+  "methods": {
+    "get": "GET",
+    "post": "POST",
+    "put": "PUT",
+    "patch": "PATCH",
+    "delete": "DELETE"
+  },
+  "parameters": {
+    "query": "Query Parameters",
+    "path": "Path Parameters",
+    "header": "Header Parameters",
+    "body": "Request Body"
+  },
+  "responses": {
+    "success": "Success Response",
+    "error": "Error Response",
+    "format": "Response Format"
+  },
+  "actions": {
+    "tryIt": "Try It Out",
+    "copyUrl": "Copy URL",
+    "download": "Download",
+    "export": "Export"
+  },
   "table": {
     "header": {
       "name": "Service Name",

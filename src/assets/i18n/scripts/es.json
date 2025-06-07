@@ -1,0 +1,233 @@
+{
+  "title": "Gestión de Scripts",
+  "subtitle": "Administrar scripts del servidor para lógica de negocio personalizada",
+  "types": {
+    "php": "PHP",
+    "javascript": "JavaScript",
+    "python": "Python",
+    "python3": "Python 3",
+    "nodejs": "Node.js"
+  },
+  "labels": {
+    "name": "Nombre del Script",
+    "type": "Tipo de Script",
+    "language": "Lenguaje del Script",
+    "description": "Descripción",
+    "content": "Contenido del Script",
+    "active": "Activo",
+    "storage": "Tipo de Almacenamiento",
+    "github": "Repositorio GitHub",
+    "local": "Almacenamiento Local",
+    "scriptMethod": "Método del Script",
+    "scriptLocation": "Ubicación del Script",
+    "tableName": "Nombre de la Tabla",
+    "service": "Servicio",
+    "repository": "Repositorio",
+    "branch": "Rama/Etiqueta",
+    "path": "Ruta"
+  },
+  "placeholders": {
+    "enterScriptName": "Ingrese el nombre del script",
+    "enterDescription": "Ingrese la descripción",
+    "selectLanguage": "Seleccione el lenguaje de programación",
+    "selectStorage": "Seleccione el tipo de almacenamiento",
+    "enterRepository": "Ingrese la URL del repositorio",
+    "enterBranch": "Ingrese la rama o etiqueta",
+    "enterPath": "Ingrese la ruta del archivo"
+  },
+  "editor": {
+    "loading": "Cargando contenido del script...",
+    "saving": "Guardando script...",
+    "saved": "Script guardado exitosamente",
+    "error": "Error al cargar el script",
+    "syntax": "Error de sintaxis detectado",
+    "fullscreen": "Entrar en modo pantalla completa",
+    "exitFullscreen": "Salir del modo pantalla completa",
+    "lineNumbers": "Mostrar números de línea",
+    "wordWrap": "Habilitar ajuste de línea",
+    "themes": {
+      "dark": "Tema oscuro",
+      "light": "Tema claro",
+      "auto": "Tema automático"
+    }
+  },
+  "github": {
+    "repository": "URL del Repositorio",
+    "branch": "Rama/Etiqueta",
+    "path": "Ruta del Archivo",
+    "token": "Token de Acceso",
+    "sync": "Sincronizar desde GitHub",
+    "lastSync": "Última sincronización",
+    "syncStatus": {
+      "syncing": "Sincronizando...",
+      "success": "Sincronización completada",
+      "error": "Sincronización fallida",
+      "never": "Nunca sincronizado"
+    }
+  },
+  "actions": {
+    "create": "Crear Script",
+    "edit": "Editar Script",
+    "delete": "Eliminar Script",
+    "duplicate": "Duplicar Script",
+    "test": "Probar Script",
+    "save": "Guardar Script",
+    "cancel": "Cancelar",
+    "import": "Importar Script",
+    "export": "Exportar Script",
+    "refresh": "Actualizar",
+    "viewLatest": "Ver Último",
+    "deleteCache": "Limpiar Caché",
+    "linkToService": "Vincular al Servicio"
+  },
+  "import": {
+    "title": "Importar Script",
+    "fromDesktop": "Desde Escritorio",
+    "fromGitHub": "Desde GitHub",
+    "selectFile": "Seleccionar Archivo",
+    "dragDrop": "Arrastre y suelte archivos aquí o haga clic para explorar",
+    "allowedFormats": "Formatos permitidos: .js, .php, .py, .txt",
+    "maxSize": "Tamaño máximo de archivo: 10MB"
+  },
+  "validation": {
+    "required": "Este campo es obligatorio",
+    "email": "Por favor ingrese una dirección de email válida",
+    "minLength": "Debe tener al menos {{min}} caracteres",
+    "maxLength": "Debe tener máximo {{max}} caracteres",
+    "pattern": "Formato inválido",
+    "numeric": "Debe ser un número válido",
+    "url": "Debe ser una URL válida",
+    "custom": "Valor inválido",
+    "scriptName": {
+      "required": "El nombre del script es obligatorio",
+      "minLength": "El nombre del script debe tener al menos 2 caracteres",
+      "maxLength": "El nombre del script debe tener menos de 100 caracteres",
+      "pattern": "El nombre del script solo puede contener letras, números, guiones y guiones bajos"
+    },
+    "scriptType": {
+      "required": "Por favor seleccione un tipo de script"
+    },
+    "content": {
+      "required": "El contenido del script no puede estar vacío",
+      "syntax": "El script contiene errores de sintaxis"
+    },
+    "github": {
+      "repository": "Por favor ingrese una URL válida de repositorio GitHub",
+      "branch": "El nombre de la rama es obligatorio",
+      "path": "La ruta del archivo es obligatoria",
+      "token": "El token de acceso es obligatorio para repositorios privados"
+    }
+  },
+  "messages": {
+    "create": {
+      "success": "Script creado exitosamente",
+      "error": "Error al crear el script",
+      "pending": "Creando script..."
+    },
+    "update": {
+      "success": "Script actualizado exitosamente",
+      "error": "Error al actualizar el script",
+      "pending": "Actualizando script..."
+    },
+    "delete": {
+      "success": "Script eliminado exitosamente",
+      "error": "Error al eliminar el script",
+      "pending": "Eliminando script...",
+      "confirm": "¿Está seguro de que desea eliminar este script?"
+    },
+    "fetch": {
+      "error": "Error al cargar el script",
+      "pending": "Cargando script...",
+      "empty": "No se encontraron scripts"
+    },
+    "import": {
+      "success": "Archivo de script importado exitosamente",
+      "error": "Error al importar el archivo de script",
+      "pending": "Importando script..."
+    },
+    "sync": {
+      "success": "Se obtuvo exitosamente el último script del origen",
+      "error": "Error al sincronizar el script del repositorio",
+      "pending": "Sincronizando script..."
+    },
+    "cache": {
+      "success": "Script eliminado exitosamente del caché",
+      "error": "Error al limpiar el caché del script",
+      "pending": "Limpiando caché..."
+    },
+    "test": {
+      "success": "Script ejecutado exitosamente",
+      "error": "Error en la ejecución del script",
+      "pending": "Probando script..."
+    }
+  },
+  "dialogs": {
+    "delete": {
+      "title": "Eliminar Script",
+      "message": "¿Está seguro de que desea eliminar \"{{name}}\"?",
+      "warning": "Esta acción no se puede deshacer. Todos los datos asociados serán eliminados permanentemente.",
+      "confirm": "Eliminar Script",
+      "cancel": "Cancelar"
+    },
+    "unsavedChanges": {
+      "title": "Cambios No Guardados",
+      "message": "Tiene cambios sin guardar. ¿Desea guardarlos antes de salir?",
+      "save": "Guardar Cambios",
+      "discard": "Descartar Cambios",
+      "cancel": "Cancelar"
+    },
+    "syntax": {
+      "title": "Error de Sintaxis",
+      "message": "El script contiene errores de sintaxis que pueden impedir que se ejecute correctamente.",
+      "saveAnyway": "Guardar de Todos Modos",
+      "fixErrors": "Corregir Errores",
+      "cancel": "Cancelar"
+    }
+  },
+  "status": {
+    "active": "Activo",
+    "inactive": "Inactivo",
+    "draft": "Borrador",
+    "error": "Error",
+    "syncing": "Sincronizando",
+    "cached": "En Caché"
+  },
+  "filters": {
+    "all": "Todos los Scripts",
+    "active": "Scripts Activos",
+    "inactive": "Scripts Inactivos",
+    "byType": "Filtrar por Tipo",
+    "byStatus": "Filtrar por Estado"
+  },
+  "search": {
+    "placeholder": "Buscar scripts por nombre o descripción...",
+    "noResults": "No se encontraron scripts que coincidan con su búsqueda",
+    "resultsCount": "{{count}} script(s) encontrado(s)"
+  },
+  "errors": {
+    "githubImport": "Formato de archivo inválido. Solo se permiten archivos .js, .php, .py, .txt",
+    "connectionFailed": "Error al conectarse al repositorio",
+    "invalidFormat": "Formato de script inválido",
+    "fileNotFound": "Archivo de script no encontrado en el repositorio",
+    "accessDenied": "Acceso denegado. Por favor verifique sus permisos",
+    "quotaExceeded": "Cuota de almacenamiento excedida",
+    "networkError": "Error de conexión de red",
+    "serverError": "Ocurrió un error del servidor",
+    "validationFailed": "Error en la validación del script",
+    "compilationError": "Error de compilación del script",
+    "executionTimeout": "Se agotó el tiempo de ejecución del script",
+    "memoryLimit": "El script excedió el límite de memoria",
+    "permissionDenied": "Permiso denegado",
+    "resourceNotFound": "Recurso no encontrado",
+    "conflictError": "Conflicto con script existente",
+    "rateLimitExceeded": "Límite de velocidad excedido. Por favor intente de nuevo más tarde"
+  },
+  "info": {
+    "empty": "Aún no se han creado scripts",
+    "emptySearch": "Ningún script coincide con sus filtros actuales",
+    "createFirst": "Cree su primer script para comenzar",
+    "githubIntegration": "Conéctese a GitHub para sincronizar scripts automáticamente",
+    "syntaxHighlighting": "Resaltado de sintaxis disponible para todos los lenguajes soportados",
+    "autoSave": "Los cambios se guardan automáticamente mientras escribe"
+  }
+}

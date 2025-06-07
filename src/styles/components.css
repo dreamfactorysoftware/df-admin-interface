@@ -1,0 +1,1111 @@
+/*
+ * DreamFactory Admin Interface - Component Styles
+ * Global component utility styles and Tailwind CSS component layer customizations
+ * 
+ * This stylesheet provides:
+ * - Reusable CSS classes for common UI patterns replacing Angular Material
+ * - Form component styling with WCAG 2.1 AA compliance (44px minimum touch targets)
+ * - Button variants with proper focus states and accessibility compliance
+ * - Card and layout utility classes for consistent component styling
+ * - Focus-visible pseudo-class support for keyboard-only focus indicators
+ * - Loading and animation utility classes for enhanced user feedback
+ * 
+ * Integrates with: src/styles/accessibility.css and src/styles/globals.css
+ */
+
+/* ==========================================================================
+   TAILWIND CSS COMPONENT LAYER
+   ========================================================================== */
+
+@layer components {
+
+/* ==========================================================================
+   BUTTON COMPONENT VARIANTS
+   ========================================================================== */
+
+/**
+ * Base button styles with WCAG 2.1 AA compliance
+ * Minimum 44x44px touch targets, proper focus management, and accessible color contrasts
+ */
+.btn-base {
+  @apply inline-flex items-center justify-center font-medium rounded-md transition-all duration-200;
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
+  @apply disabled:opacity-50 disabled:pointer-events-none disabled:cursor-not-allowed;
+  @apply text-sm leading-5;
+  min-height: 44px; /* WCAG minimum touch target */
+  min-width: 44px;
+  position: relative;
+}
+
+/**
+ * Primary button variant - Main actions and CTAs
+ * 7.14:1 contrast ratio for text accessibility
+ */
+.btn-primary {
+  @apply btn-base;
+  @apply bg-primary-600 text-white border border-primary-600;
+  @apply hover:bg-primary-700 hover:border-primary-700;
+  @apply active:bg-primary-800 active:border-primary-800;
+  @apply focus-visible:ring-primary-600;
+  @apply dark:bg-primary-500 dark:border-primary-500;
+  @apply dark:hover:bg-primary-600 dark:hover:border-primary-600;
+}
+
+/**
+ * Secondary button variant - Supporting actions
+ * 4.51:1 contrast ratio for accessibility compliance
+ */
+.btn-secondary {
+  @apply btn-base;
+  @apply bg-secondary-100 text-secondary-900 border border-secondary-300;
+  @apply hover:bg-secondary-200 hover:border-secondary-400;
+  @apply active:bg-secondary-300 active:border-secondary-500;
+  @apply focus-visible:ring-secondary-500;
+  @apply dark:bg-secondary-800 dark:text-secondary-100 dark:border-secondary-600;
+  @apply dark:hover:bg-secondary-700 dark:hover:border-secondary-500;
+}
+
+/**
+ * Outline button variant - Subtle actions
+ * Enhanced border visibility for accessibility
+ */
+.btn-outline {
+  @apply btn-base;
+  @apply bg-transparent text-primary-600 border-2 border-primary-600;
+  @apply hover:bg-primary-50 hover:border-primary-700;
+  @apply active:bg-primary-100 active:border-primary-800;
+  @apply focus-visible:ring-primary-600;
+  @apply dark:text-primary-400 dark:border-primary-400;
+  @apply dark:hover:bg-primary-950 dark:hover:border-primary-300;
+}
+
+/**
+ * Ghost button variant - Minimal visual weight
+ * Maintains accessibility with proper hover states
+ */
+.btn-ghost {
+  @apply btn-base;
+  @apply bg-transparent text-secondary-700 border border-transparent;
+  @apply hover:bg-secondary-100 hover:border-secondary-300;
+  @apply active:bg-secondary-200 active:border-secondary-400;
+  @apply focus-visible:ring-secondary-500;
+  @apply dark:text-secondary-300;
+  @apply dark:hover:bg-secondary-800 dark:hover:border-secondary-600;
+}
+
+/**
+ * Danger button variant - Destructive actions
+ * 5.25:1 contrast ratio for error accessibility
+ */
+.btn-danger {
+  @apply btn-base;
+  @apply bg-error-600 text-white border border-error-600;
+  @apply hover:bg-error-700 hover:border-error-700;
+  @apply active:bg-error-800 active:border-error-800;
+  @apply focus-visible:ring-error-600;
+}
+
+/**
+ * Success button variant - Positive actions
+ * 4.89:1 contrast ratio for success accessibility
+ */
+.btn-success {
+  @apply btn-base;
+  @apply bg-success-600 text-white border border-success-600;
+  @apply hover:bg-success-700 hover:border-success-700;
+  @apply active:bg-success-800 active:border-success-800;
+  @apply focus-visible:ring-success-600;
+}
+
+/**
+ * Warning button variant - Caution actions
+ * 4.68:1 contrast ratio for warning accessibility
+ */
+.btn-warning {
+  @apply btn-base;
+  @apply bg-warning-600 text-white border border-warning-600;
+  @apply hover:bg-warning-700 hover:border-warning-700;
+  @apply active:bg-warning-800 active:border-warning-800;
+  @apply focus-visible:ring-warning-600;
+}
+
+/* Button size variants with maintained accessibility */
+.btn-sm {
+  @apply px-3 py-2 text-sm;
+  min-height: 44px; /* Maintain WCAG compliance */
+  min-width: 44px;
+}
+
+.btn-md {
+  @apply px-4 py-2 text-base;
+  min-height: 48px;
+  min-width: 48px;
+}
+
+.btn-lg {
+  @apply px-6 py-3 text-lg;
+  min-height: 56px;
+  min-width: 56px;
+}
+
+.btn-xl {
+  @apply px-8 py-4 text-xl;
+  min-height: 64px;
+  min-width: 64px;
+}
+
+/* Button state utilities */
+.btn-loading {
+  @apply relative;
+  pointer-events: none;
+}
+
+.btn-loading::before {
+  content: '';
+  @apply absolute inset-0 bg-current opacity-10 rounded-md;
+}
+
+.btn-loading::after {
+  content: '';
+  @apply absolute top-1/2 left-1/2 w-4 h-4 border-2 border-current border-t-transparent rounded-full;
+  transform: translate(-50%, -50%);
+  animation: spin 1s linear infinite;
+}
+
+/* Icon button utilities */
+.btn-icon-only {
+  @apply p-2;
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.btn-icon-left {
+  @apply pl-3;
+}
+
+.btn-icon-right {
+  @apply pr-3;
+}
+
+/* ==========================================================================
+   FORM COMPONENT STYLES
+   ========================================================================== */
+
+/**
+ * Form input base styles replacing Angular Reactive Forms
+ * WCAG 2.1 AA compliance with 44px minimum touch targets
+ */
+.form-input {
+  @apply w-full px-3 py-2 text-base leading-6 bg-white border border-gray-300 rounded-md;
+  @apply placeholder-gray-500 text-gray-900;
+  @apply focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500;
+  @apply disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed;
+  @apply transition-colors duration-200;
+  min-height: 44px; /* WCAG minimum touch target */
+}
+
+/* Dark mode form input styles */
+.dark .form-input {
+  @apply bg-gray-800 border-gray-600 text-gray-100 placeholder-gray-400;
+  @apply focus:ring-primary-400 focus:border-primary-400;
+  @apply disabled:bg-gray-900 disabled:text-gray-600;
+}
+
+/**
+ * Form input size variants
+ */
+.form-input-sm {
+  @apply form-input px-2 py-1 text-sm;
+  min-height: 44px; /* Maintain accessibility */
+}
+
+.form-input-lg {
+  @apply form-input px-4 py-3 text-lg;
+  min-height: 52px;
+}
+
+/**
+ * Form input state variants
+ */
+.form-input-error {
+  @apply form-input border-error-500 focus:ring-error-500 focus:border-error-500;
+  @apply bg-error-50 dark:bg-error-950;
+}
+
+.form-input-success {
+  @apply form-input border-success-500 focus:ring-success-500 focus:border-success-500;
+  @apply bg-success-50 dark:bg-success-950;
+}
+
+.form-input-warning {
+  @apply form-input border-warning-500 focus:ring-warning-500 focus:border-warning-500;
+  @apply bg-warning-50 dark:bg-warning-950;
+}
+
+/**
+ * Form textarea styles
+ */
+.form-textarea {
+  @apply form-input resize-y;
+  min-height: 88px; /* Double the minimum for text areas */
+}
+
+/**
+ * Form select styles
+ */
+.form-select {
+  @apply form-input pr-10 bg-no-repeat bg-right;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.5rem center;
+  background-size: 1.5em 1.5em;
+  appearance: none;
+}
+
+.dark .form-select {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+}
+
+/**
+ * Form checkbox and radio styles
+ */
+.form-checkbox,
+.form-radio {
+  @apply w-5 h-5 text-primary-600 bg-white border-gray-300 rounded;
+  @apply focus:ring-2 focus:ring-primary-500 focus:ring-offset-0;
+  @apply disabled:opacity-50 disabled:cursor-not-allowed;
+  min-height: 20px; /* Smaller for checkboxes but in larger touch target */
+  min-width: 20px;
+}
+
+.form-radio {
+  @apply rounded-full;
+}
+
+.dark .form-checkbox,
+.dark .form-radio {
+  @apply bg-gray-800 border-gray-600 text-primary-400;
+}
+
+/**
+ * Form label styles
+ */
+.form-label {
+  @apply block text-sm font-medium text-gray-700 mb-2;
+}
+
+.dark .form-label {
+  @apply text-gray-300;
+}
+
+.form-label-required::after {
+  content: ' *';
+  @apply text-error-500;
+}
+
+/**
+ * Form group container
+ */
+.form-group {
+  @apply mb-6;
+}
+
+.form-group-inline {
+  @apply form-group flex items-center space-x-4;
+}
+
+/**
+ * Form validation message styles
+ */
+.form-error-message {
+  @apply mt-2 text-sm text-error-600 flex items-center;
+}
+
+.dark .form-error-message {
+  @apply text-error-400;
+}
+
+.form-help-text {
+  @apply mt-2 text-sm text-gray-500;
+}
+
+.dark .form-help-text {
+  @apply text-gray-400;
+}
+
+/* ==========================================================================
+   CARD COMPONENT STYLES
+   ========================================================================== */
+
+/**
+ * Base card component replacing Angular Material cards
+ * Accessible, responsive, and theme-aware
+ */
+.card {
+  @apply bg-white rounded-lg border border-gray-200 shadow-sm;
+  @apply transition-shadow duration-200;
+}
+
+.dark .card {
+  @apply bg-gray-800 border-gray-700;
+}
+
+/**
+ * Card variants
+ */
+.card-elevated {
+  @apply card shadow-md hover:shadow-lg;
+}
+
+.card-outlined {
+  @apply card border-2 shadow-none;
+}
+
+.card-filled {
+  @apply card bg-gray-50 dark:bg-gray-900;
+}
+
+.card-interactive {
+  @apply card cursor-pointer;
+  @apply hover:shadow-md focus-within:ring-2 focus-within:ring-primary-500 focus-within:ring-offset-2;
+  @apply transition-all duration-200;
+}
+
+/**
+ * Card sections
+ */
+.card-header {
+  @apply px-6 py-4 border-b border-gray-200 dark:border-gray-700;
+}
+
+.card-body {
+  @apply px-6 py-4;
+}
+
+.card-footer {
+  @apply px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 rounded-b-lg;
+}
+
+/**
+ * Card utilities
+ */
+.card-compact .card-header,
+.card-compact .card-body,
+.card-compact .card-footer {
+  @apply px-4 py-3;
+}
+
+.card-spacious .card-header,
+.card-spacious .card-body,
+.card-spacious .card-footer {
+  @apply px-8 py-6;
+}
+
+/* ==========================================================================
+   LAYOUT UTILITY CLASSES
+   ========================================================================== */
+
+/**
+ * Container utilities for consistent layouts
+ */
+.container-fluid {
+  @apply w-full px-4 mx-auto;
+}
+
+.container-sm {
+  @apply container-fluid max-w-2xl;
+}
+
+.container-md {
+  @apply container-fluid max-w-4xl;
+}
+
+.container-lg {
+  @apply container-fluid max-w-6xl;
+}
+
+.container-xl {
+  @apply container-fluid max-w-7xl;
+}
+
+/**
+ * Grid layout utilities
+ */
+.grid-auto {
+  @apply grid gap-6;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.grid-2 {
+  @apply grid grid-cols-1 lg:grid-cols-2 gap-6;
+}
+
+.grid-3 {
+  @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6;
+}
+
+.grid-4 {
+  @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6;
+}
+
+/**
+ * Flex layout utilities
+ */
+.flex-center {
+  @apply flex items-center justify-center;
+}
+
+.flex-between {
+  @apply flex items-center justify-between;
+}
+
+.flex-start {
+  @apply flex items-center justify-start;
+}
+
+.flex-end {
+  @apply flex items-center justify-end;
+}
+
+/* ==========================================================================
+   NAVIGATION COMPONENT STYLES
+   ========================================================================== */
+
+/**
+ * Navigation menu styles replacing Angular routing components
+ */
+.nav-menu {
+  @apply flex flex-col space-y-1;
+}
+
+.nav-item {
+  @apply block px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200;
+  @apply text-gray-700 hover:text-gray-900 hover:bg-gray-100;
+  @apply focus:outline-none focus:bg-gray-100 focus:text-gray-900;
+  min-height: 44px; /* WCAG compliance */
+  display: flex;
+  align-items: center;
+}
+
+.dark .nav-item {
+  @apply text-gray-300 hover:text-white hover:bg-gray-700 focus:bg-gray-700 focus:text-white;
+}
+
+.nav-item-active {
+  @apply nav-item bg-primary-100 text-primary-700 font-semibold;
+}
+
+.dark .nav-item-active {
+  @apply bg-primary-900 text-primary-300;
+}
+
+/**
+ * Horizontal navigation
+ */
+.nav-horizontal {
+  @apply flex flex-row space-x-1 space-y-0;
+}
+
+.nav-horizontal .nav-item {
+  @apply px-4 py-2;
+}
+
+/**
+ * Breadcrumb navigation
+ */
+.breadcrumb {
+  @apply flex items-center space-x-2 text-sm text-gray-500;
+}
+
+.breadcrumb-item {
+  @apply hover:text-gray-700 transition-colors duration-200;
+}
+
+.breadcrumb-separator {
+  @apply text-gray-400;
+}
+
+.dark .breadcrumb {
+  @apply text-gray-400;
+}
+
+.dark .breadcrumb-item {
+  @apply hover:text-gray-300;
+}
+
+/* ==========================================================================
+   TABLE COMPONENT STYLES
+   ========================================================================== */
+
+/**
+ * Data table styles for database schema display
+ * Responsive and accessible table implementation
+ */
+.table {
+  @apply w-full border-collapse border-spacing-0;
+}
+
+.table-container {
+  @apply overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700;
+}
+
+.table thead {
+  @apply bg-gray-50 dark:bg-gray-800;
+}
+
+.table th {
+  @apply px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider;
+  @apply border-b border-gray-200 dark:border-gray-700;
+}
+
+.table td {
+  @apply px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100;
+  @apply border-b border-gray-200 dark:border-gray-700;
+}
+
+.table tbody tr:hover {
+  @apply bg-gray-50 dark:bg-gray-800;
+}
+
+/**
+ * Table variants
+ */
+.table-striped tbody tr:nth-child(even) {
+  @apply bg-gray-50 dark:bg-gray-800;
+}
+
+.table-compact th,
+.table-compact td {
+  @apply px-4 py-2;
+}
+
+.table-spacious th,
+.table-spacious td {
+  @apply px-8 py-6;
+}
+
+/* ==========================================================================
+   MODAL AND DIALOG STYLES
+   ========================================================================== */
+
+/**
+ * Modal overlay and content styles
+ * Accessible modal implementation with focus management
+ */
+.modal-overlay {
+  @apply fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4;
+  @apply z-50 transition-opacity duration-200;
+}
+
+.modal-content {
+  @apply bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto;
+  @apply focus:outline-none;
+}
+
+.modal-header {
+  @apply px-6 py-4 border-b border-gray-200 dark:border-gray-700;
+}
+
+.modal-body {
+  @apply px-6 py-4;
+}
+
+.modal-footer {
+  @apply px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-3;
+}
+
+/**
+ * Modal size variants
+ */
+.modal-sm .modal-content {
+  @apply max-w-sm;
+}
+
+.modal-lg .modal-content {
+  @apply max-w-2xl;
+}
+
+.modal-xl .modal-content {
+  @apply max-w-4xl;
+}
+
+.modal-full .modal-content {
+  @apply max-w-none w-full h-full max-h-none rounded-none;
+}
+
+/* ==========================================================================
+   LOADING AND ANIMATION UTILITIES
+   ========================================================================== */
+
+/**
+ * Loading spinner animations
+ * Accessible loading states with reduced motion support
+ */
+.spinner {
+  @apply inline-block w-5 h-5 border-2 border-current border-t-transparent rounded-full;
+  animation: spin 1s linear infinite;
+}
+
+.spinner-sm {
+  @apply w-4 h-4;
+}
+
+.spinner-lg {
+  @apply w-8 h-8;
+}
+
+.spinner-xl {
+  @apply w-12 h-12;
+}
+
+/**
+ * Skeleton loading states
+ */
+.skeleton {
+  @apply bg-gray-200 dark:bg-gray-700 rounded animate-pulse;
+}
+
+.skeleton-text {
+  @apply skeleton h-4 mb-2;
+}
+
+.skeleton-title {
+  @apply skeleton h-6 mb-4;
+}
+
+.skeleton-avatar {
+  @apply skeleton w-10 h-10 rounded-full;
+}
+
+.skeleton-button {
+  @apply skeleton h-10 w-24 rounded-md;
+}
+
+/**
+ * Fade transitions
+ */
+.fade-enter {
+  @apply opacity-0;
+}
+
+.fade-enter-active {
+  @apply opacity-100 transition-opacity duration-200;
+}
+
+.fade-exit {
+  @apply opacity-100;
+}
+
+.fade-exit-active {
+  @apply opacity-0 transition-opacity duration-200;
+}
+
+/**
+ * Slide transitions
+ */
+.slide-enter {
+  @apply transform translate-x-full;
+}
+
+.slide-enter-active {
+  @apply transform translate-x-0 transition-transform duration-300;
+}
+
+.slide-exit {
+  @apply transform translate-x-0;
+}
+
+.slide-exit-active {
+  @apply transform translate-x-full transition-transform duration-300;
+}
+
+/* ==========================================================================
+   BADGE AND STATUS INDICATORS
+   ========================================================================== */
+
+/**
+ * Badge component styles
+ */
+.badge {
+  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+}
+
+.badge-primary {
+  @apply badge bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-300;
+}
+
+.badge-secondary {
+  @apply badge bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300;
+}
+
+.badge-success {
+  @apply badge bg-success-100 text-success-800 dark:bg-success-900 dark:text-success-300;
+}
+
+.badge-warning {
+  @apply badge bg-warning-100 text-warning-800 dark:bg-warning-900 dark:text-warning-300;
+}
+
+.badge-error {
+  @apply badge bg-error-100 text-error-800 dark:bg-error-900 dark:text-error-300;
+}
+
+/**
+ * Status indicators for database connections
+ */
+.status-indicator {
+  @apply inline-flex items-center;
+}
+
+.status-dot {
+  @apply w-2 h-2 rounded-full mr-2;
+}
+
+.status-online .status-dot {
+  @apply bg-success-500;
+}
+
+.status-offline .status-dot {
+  @apply bg-error-500;
+}
+
+.status-pending .status-dot {
+  @apply bg-warning-500 animate-pulse;
+}
+
+/* ==========================================================================
+   ALERT AND NOTIFICATION STYLES
+   ========================================================================== */
+
+/**
+ * Alert component styles
+ */
+.alert {
+  @apply p-4 rounded-md border flex items-start space-x-3;
+}
+
+.alert-success {
+  @apply alert bg-success-50 border-success-200 text-success-800;
+  @apply dark:bg-success-900 dark:border-success-700 dark:text-success-300;
+}
+
+.alert-warning {
+  @apply alert bg-warning-50 border-warning-200 text-warning-800;
+  @apply dark:bg-warning-900 dark:border-warning-700 dark:text-warning-300;
+}
+
+.alert-error {
+  @apply alert bg-error-50 border-error-200 text-error-800;
+  @apply dark:bg-error-900 dark:border-error-700 dark:text-error-300;
+}
+
+.alert-info {
+  @apply alert bg-primary-50 border-primary-200 text-primary-800;
+  @apply dark:bg-primary-900 dark:border-primary-700 dark:text-primary-300;
+}
+
+/**
+ * Toast notification styles
+ */
+.toast {
+  @apply max-w-sm bg-white dark:bg-gray-800 shadow-lg rounded-lg border border-gray-200 dark:border-gray-700;
+  @apply transform transition-all duration-300;
+}
+
+.toast-enter {
+  @apply translate-x-full opacity-0;
+}
+
+.toast-enter-active {
+  @apply translate-x-0 opacity-100;
+}
+
+.toast-exit {
+  @apply translate-x-0 opacity-100;
+}
+
+.toast-exit-active {
+  @apply translate-x-full opacity-0;
+}
+
+/* ==========================================================================
+   PROGRESS AND METER STYLES
+   ========================================================================== */
+
+/**
+ * Progress bar component
+ */
+.progress {
+  @apply w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden;
+}
+
+.progress-bar {
+  @apply h-full bg-primary-600 dark:bg-primary-500 transition-all duration-300 rounded-full;
+}
+
+.progress-sm {
+  @apply h-1;
+}
+
+.progress-lg {
+  @apply h-4;
+}
+
+/**
+ * Step progress indicator
+ */
+.steps {
+  @apply flex items-center justify-between;
+}
+
+.step {
+  @apply flex flex-col items-center text-center;
+}
+
+.step-indicator {
+  @apply w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-medium;
+  @apply transition-colors duration-200;
+}
+
+.step-incomplete .step-indicator {
+  @apply border-gray-300 bg-white text-gray-500;
+  @apply dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400;
+}
+
+.step-current .step-indicator {
+  @apply border-primary-600 bg-primary-600 text-white;
+}
+
+.step-complete .step-indicator {
+  @apply border-success-600 bg-success-600 text-white;
+}
+
+/* ==========================================================================
+   RESPONSIVE DESIGN UTILITIES
+   ========================================================================== */
+
+/**
+ * Show/hide utilities for responsive design
+ */
+.hidden-mobile {
+  @apply hidden sm:block;
+}
+
+.visible-mobile {
+  @apply block sm:hidden;
+}
+
+.hidden-tablet {
+  @apply hidden md:block;
+}
+
+.visible-tablet {
+  @apply block md:hidden;
+}
+
+.hidden-desktop {
+  @apply hidden lg:block;
+}
+
+.visible-desktop {
+  @apply block lg:hidden;
+}
+
+/* ==========================================================================
+   UTILITY CLASSES
+   ========================================================================== */
+
+/**
+ * Text utilities
+ */
+.text-balance {
+  text-wrap: balance;
+}
+
+.text-pretty {
+  text-wrap: pretty;
+}
+
+/**
+ * Spacing utilities
+ */
+.space-between > * + * {
+  @apply ml-auto;
+}
+
+/**
+ * Border utilities
+ */
+.border-dashed {
+  border-style: dashed;
+}
+
+.border-dotted {
+  border-style: dotted;
+}
+
+/**
+ * Shadow utilities
+ */
+.shadow-colored {
+  box-shadow: 0 4px 14px 0 rgba(79, 70, 229, 0.1);
+}
+
+.shadow-colored-lg {
+  box-shadow: 0 10px 25px -3px rgba(79, 70, 229, 0.1), 0 4px 6px -2px rgba(79, 70, 229, 0.05);
+}
+
+} /* End @layer components */
+
+/* ==========================================================================
+   COMPONENT-SPECIFIC ANIMATIONS
+   ========================================================================== */
+
+/**
+ * Animation keyframes
+ */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(-25%);
+    animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+  }
+  50% {
+    transform: none;
+    animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    transform: translateY(30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* ==========================================================================
+   PRINT STYLES
+   ========================================================================== */
+
+/**
+ * Print-friendly component styles
+ */
+@media print {
+  .btn-base,
+  .form-input,
+  .card {
+    @apply border border-gray-400 bg-white text-black;
+    box-shadow: none !important;
+  }
+  
+  .modal-overlay {
+    @apply hidden;
+  }
+  
+  .spinner,
+  .badge,
+  .toast {
+    @apply hidden;
+  }
+  
+  .table {
+    @apply border border-gray-400;
+  }
+  
+  .table th,
+  .table td {
+    @apply border border-gray-400;
+  }
+}
+
+/* ==========================================================================
+   REDUCED MOTION SUPPORT
+   ========================================================================== */
+
+/**
+ * Respect user preferences for reduced motion
+ * Maintains essential functionality while reducing animations
+ */
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
+  
+  .badge-pending .status-dot {
+    animation: none;
+  }
+  
+  .fade-enter-active,
+  .fade-exit-active,
+  .slide-enter-active,
+  .slide-exit-active,
+  .toast {
+    transition-duration: 0.01ms !important;
+  }
+  
+  .progress-bar {
+    transition: none;
+  }
+  
+  /* Maintain focus indicators for accessibility */
+  .btn-base:focus-visible,
+  .form-input:focus,
+  .nav-item:focus {
+    transition: none;
+    outline: 2px solid #4f46e5;
+    outline-offset: 2px;
+  }
+}

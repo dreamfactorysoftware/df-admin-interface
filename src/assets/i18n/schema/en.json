@@ -1,139 +1,274 @@
 {
-  "fieldDetailsForm": {
-    "updateSuccess": "Database field successfully updated",
-    "createSuccess": "Database field successfully created",
-    "controls": {
-      "name": { "label": "Name", "tooltip": "The field name used by the API." },
-      "alias": {
-        "label": "Alias",
-        "tooltip": "If set, the alias is used in table access instead of the name."
-      },
-      "label": {
-        "label": "Label",
-        "tooltip": "A displayable name used by clients."
-      },
-      "isVirtual": "Is Virtual?",
-      "isAggregate": "Is Aggregate?",
-      "type": {
-        "label": "Type",
-        "tooltip": "This is a simplified DreamFactory type."
-      },
-      "databaseType": {
-        "label": "Database Type",
-        "tooltip": "If necessary, enter a type acceptable to the underlying database."
-      },
+  "title": "Schema Management",
+  "subtitle": "Manage database schemas, tables, fields, and relationships",
+  "navigation": {
+    "tables": "Tables",
+    "fields": "Fields",
+    "relationships": "Relationships",
+    "schemas": "Schemas"
+  },
+  "tables": {
+    "title": "Database Tables",
+    "labels": {
+      "name": "Table Name",
+      "label": "Label",
+      "plural": "Plural Label",
+      "description": "Description",
+      "primaryKey": "Primary Key",
+      "alias": "Alias",
+      "fieldCount": "Field Count",
+      "relationshipCount": "Relationship Count",
+      "access": "Access Level"
+    },
+    "actions": {
+      "viewSchema": "View Schema",
+      "manageFields": "Manage Fields",
+      "manageRelationships": "Manage Relationships",
+      "generateAPI": "Generate API",
+      "exportSchema": "Export Schema"
+    },
+    "filters": {
+      "all": "All Tables",
+      "withData": "Tables with Data",
+      "empty": "Empty Tables",
+      "system": "System Tables",
+      "custom": "Custom Tables"
+    },
+    "placeholders": {
+      "enterTableName": "Enter {tableName}",
+      "enterAlias": "Enter {alias} label",
+      "enterLabel": "Enter table label",
+      "enterPlural": "Enter table plural label",
+      "enterDescription": "Enter table description"
+    }
+  },
+  "fields": {
+    "title": "Table Fields",
+    "labels": {
+      "name": "Name",
+      "type": "Type",
       "length": "Length",
       "precision": "Precision",
       "scale": "Scale",
+      "nullable": "Allow Null",
+      "default": "Default Value",
+      "autoIncrement": "Auto Increment",
+      "unique": "Unique",
+      "indexed": "Indexed",
+      "comment": "Comment",
+      "validation": "Validation",
+      "alias": "Alias",
+      "label": "Label",
+      "isVirtual": "Is Virtual?",
+      "isAggregate": "Is Aggregate?",
+      "databaseType": "Database Type",
       "fixedLength": "Fixed Length",
       "supportsMultibyte": "Supports Multibyte",
-      "allowNull": "Allow Null",
-      "autoIncrement": "Auto Increment",
-      "defaultValue": "Default Value",
-      "isIndex": "Indexed",
-      "isUnique": "Unique",
       "isPrimaryKey": "Primary Key",
       "isForeignKey": "Foreign Key",
       "refTable": "Reference Table",
       "refField": "Reference Field",
-      "validation": {
-        "label": "Validation",
-        "tooltip": "A JSON object detailing required validations, if any. See here for more info."
-      },
-      "picklist": "Picklist",
-      "dbFunctionTitle": "DB Function Use",
-      "dfFunctionTooltip": "Enter valid syntax for a database function supported by this database vendor, like upper(fieldname), max(fieldname) or concat(field1, '.', field2), to apply to this field for various operations. See here for more info.",
-      "dbFunctionUseDescription": "Assign Database Function To Uses Of This Field",
-      "noDbFunctions": "No DB Function Uses"
+      "picklist": "Picklist"
     },
-    "errors": {
-      "name": "Name is a required field",
+    "types": {
+      "string": "String",
+      "integer": "Integer",
+      "float": "Float",
+      "decimal": "Decimal",
+      "boolean": "Boolean",
+      "date": "Date",
+      "datetime": "DateTime",
+      "timestamp": "Timestamp",
+      "text": "Text",
+      "json": "JSON",
+      "binary": "Binary"
+    },
+    "validation": {
+      "fieldName": "Field name is required",
+      "fieldType": "Field type is required",
+      "lengthRequired": "Length is required for string fields",
+      "precisionRequired": "Precision is required for decimal fields",
+      "required": "This field is required",
+      "email": "Please enter a valid email address",
+      "minLength": "Must be at least {min} characters",
+      "maxLength": "Must be no more than {max} characters",
+      "pattern": "Please match the required format",
+      "numeric": "Must be a valid number",
+      "url": "Please enter a valid URL",
+      "custom": "Custom validation error",
       "json": "Enter valid JSON here",
       "csv": "Enter valid CSV here"
+    },
+    "form": {
+      "controls": {
+        "name": {
+          "label": "Name",
+          "tooltip": "The field name used by the API."
+        },
+        "alias": {
+          "label": "Alias",
+          "tooltip": "If set, the alias is used in table access instead of the name."
+        },
+        "label": {
+          "label": "Label",
+          "tooltip": "A displayable name used by clients."
+        },
+        "type": {
+          "label": "Type",
+          "tooltip": "This is a simplified DreamFactory type."
+        },
+        "databaseType": {
+          "label": "Database Type",
+          "tooltip": "If necessary, enter a type acceptable to the underlying database."
+        },
+        "validation": {
+          "label": "Validation",
+          "tooltip": "A JSON object detailing required validations, if any. See here for more info."
+        }
+      },
+      "dbFunction": {
+        "title": "DB Function Use",
+        "tooltip": "Enter valid syntax for a database function supported by this database vendor, like upper(fieldname), max(fieldname) or concat(field1, '.', field2), to apply to this field for various operations. See here for more info.",
+        "description": "Assign Database Function To Uses Of This Field",
+        "noFunctions": "No DB Function Uses"
+      }
+    },
+    "actions": {
+      "addField": "Add Field"
     }
   },
-  "name": "Name",
-  "alias": "Alias",
-  "type": "Type",
-  "virtual": "Virtual",
-  "aggregate": "Aggregate",
-  "required": "Required",
-  "constraints": "Constraints",
-  "tableName": "Table Name",
-  "label": "Label",
-  "plural": "Plural Label",
-  "description": "Description",
-  "enter": {
-    "tableName": "Enter {tableName}",
-    "alias": "Enter {alias} label",
-    "label": "Enter table label",
-    "plural": "Enter table plural label",
-    "description": "Enter table description"
-  },
-  "fields": "Fields",
-  "addField": "Add Field",
-  "addRelationship": "Add Virtual Relationship",
-  "alerts": {
-    "tableNameError": "Table name is required",
-    "createSuccecss": "Table created",
-    "updateSuccess": "Table updated",
-    "deleteSuccess": "Table deleted"
-  },
-  "primaryKey": "Primary Key",
-  "foreignKey": "Foreign Key",
-  "table": "Table",
   "relationships": {
+    "title": "Table Relationships",
     "heading": "Relationships",
-    "name": {
-      "tooltip": "The auto-generated relation name used by the API."
+    "labels": {
+      "name": "Name",
+      "type": "Type",
+      "localTable": "Local Table",
+      "localField": "Local Field",
+      "foreignTable": "Foreign Table",
+      "foreignField": "Foreign Field",
+      "junction": "Junction Table",
+      "onUpdate": "On Update",
+      "onDelete": "On Delete",
+      "alias": "Alias",
+      "label": "Label",
+      "description": "Description",
+      "fetch": "Always Fetch",
+      "virtualRelationship": "Virtual Relationship"
     },
-    "alias": {
-      "tooltip": "If set, the alias is used in relation access instead of the name."
+    "types": {
+      "belongsTo": "Belongs To",
+      "hasOne": "Has One",
+      "hasMany": "Has Many",
+      "manyToMany": "Many to Many"
     },
-    "label": {
-      "tooltip": "A displayable name used by clients."
+    "actions": {
+      "cascade": "Cascade",
+      "restrict": "Restrict",
+      "setNull": "Set Null",
+      "noAction": "No Action"
     },
-    "description": {
-      "tooltip": "A displayable description used by clients."
+    "form": {
+      "tooltips": {
+        "name": "The auto-generated relation name used by the API.",
+        "alias": "If set, the alias is used in relation access instead of the name.",
+        "label": "A displayable name used by clients.",
+        "description": "A displayable description used by clients."
+      },
+      "dropdowns": {
+        "field": {
+          "label": "Field",
+          "default": "Select Field"
+        },
+        "referenceService": {
+          "label": "Reference Service",
+          "default": "Select Reference Service"
+        },
+        "referenceTable": {
+          "label": "Reference Table",
+          "default": "Select Reference Table"
+        },
+        "referenceField": {
+          "label": "Reference Field",
+          "default": "Select Reference Field"
+        },
+        "junctionService": {
+          "label": "Junction Service",
+          "default": "Select Junction Service"
+        },
+        "junctionTable": {
+          "label": "Junction Table",
+          "default": "Select Junction Table"
+        },
+        "junctionField": {
+          "label": "Junction Field",
+          "default": "Select Junction Field"
+        },
+        "junctionReferenceField": {
+          "label": "Junction Reference Field",
+          "default": "Select Junction Reference Field"
+        }
+      }
     },
-    "fetch": "Always Fetch",
-    "type": "Type",
-    "virtualRelationship": "Virtual Relationship",
-    "field": {
-      "label": "Field",
-      "default": "Select Field"
-    },
-    "referenceService": {
-      "label": "Reference Service",
-      "default": "Select Reference Service"
-    },
-    "referenceTable": {
-      "label": "Reference Table",
-      "default": "Select Reference Table"
-    },
-    "referenceField": {
-      "label": "Reference Field",
-      "default": "Select Reference Field"
-    },
-    "junctionService": {
-      "label": "Junction Service",
-      "default": "Select Junction Service"
-    },
-    "junctionTable": {
-      "label": "Junction Table",
-      "default": "Select Junction Table"
-    },
-    "junctionField": {
-      "label": "Junction Field",
-      "default": "Select Junction Field"
-    },
-    "junctionReferenceField": {
-      "label": "Junction Reference Field",
-      "default": "Select Junction Reference Field"
-    },
-    "alerts": {
-      "createSuccecss": "Relationship created",
-      "updateSuccess": "Relationship updated"
+    "actions_crud": {
+      "addRelationship": "Add Virtual Relationship"
     }
+  },
+  "discovery": {
+    "scanning": "Scanning database schema...",
+    "complete": "Schema discovery complete",
+    "error": "Error during schema discovery",
+    "progress": "Discovery in progress",
+    "foundTables": "Found {count} tables",
+    "foundFields": "Found {count} fields",
+    "foundRelationships": "Found {count} relationships"
+  },
+  "messages": {
+    "create": {
+      "success": "Successfully created",
+      "error": "Failed to create",
+      "pending": "Creating..."
+    },
+    "update": {
+      "success": "Successfully updated",
+      "error": "Failed to update",
+      "pending": "Updating..."
+    },
+    "delete": {
+      "success": "Successfully deleted",
+      "error": "Failed to delete",
+      "pending": "Deleting...",
+      "confirm": "Are you sure you want to delete this item?"
+    },
+    "fetch": {
+      "error": "Failed to fetch data",
+      "pending": "Loading...",
+      "empty": "No data available"
+    },
+    "table": {
+      "createSuccess": "Table created",
+      "updateSuccess": "Table updated",
+      "deleteSuccess": "Table deleted",
+      "nameError": "Table name is required"
+    },
+    "field": {
+      "createSuccess": "Database field successfully created",
+      "updateSuccess": "Database field successfully updated",
+      "deleteSuccess": "Field deleted successfully"
+    },
+    "relationship": {
+      "createSuccess": "Relationship created",
+      "updateSuccess": "Relationship updated",
+      "deleteSuccess": "Relationship deleted"
+    }
+  },
+  "common": {
+    "required": "Required",
+    "constraints": "Constraints",
+    "virtual": "Virtual",
+    "aggregate": "Aggregate",
+    "table": "Table",
+    "primaryKey": "Primary Key",
+    "foreignKey": "Foreign Key"
   }
 }

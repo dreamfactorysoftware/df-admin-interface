@@ -2,14 +2,23 @@
 
 # Compiled output
 /dist
+/.next
 /tmp
-/out-tsc
-/bazel-out
+/build
+/out
 
 # Node
 /node_modules
 npm-debug.log
 yarn-error.log
+pnpm-debug.log
+.pnpm-store/
+
+# Package managers
+/.pnpm-store
+/.pnpm-debug.log
+/.npm
+/.yarn
 
 # IDEs and editors
 .idea/
@@ -28,18 +37,43 @@ yarn-error.log
 !.vscode/extensions.json
 .history/*
 
-# Miscellaneous
-/.angular/cache
-.sass-cache/
-/connect.lock
+# Testing
 /coverage
+/test-results
+/playwright-report
+/test-results/
+/.vitest-cache/
+vitest.config.ts.timestamp*
+
+# Next.js
+/.next/
+/out/
+next-env.d.ts
+.vercel
+.turbo/
+
+# Tailwind CSS
+/src/styles/tailwind.output.css
+
+# PostCSS
+.postcssrc.js.timestamp*
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Miscellaneous
+/connect.lock
 /libpeerconnection.log
-testem.log
 /typings
 
 # System files
 .DS_Store
 Thumbs.db
 
-# assets
-/src/assets/*
+# Static assets
+/public/uploads/*
+/src/assets/i18n/*

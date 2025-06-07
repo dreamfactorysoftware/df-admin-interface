@@ -1,4 +1,73 @@
 {
+  "title": "Users",
+  "subtitle": "Manage user accounts and access permissions",
+  "labels": {
+    "name": "Name",
+    "email": "Email",
+    "firstName": "First Name",
+    "lastName": "Last Name",
+    "displayName": "Display Name",
+    "phone": "Phone",
+    "status": "Status",
+    "role": "Role",
+    "lastLogin": "Last Login",
+    "dateCreated": "Date Created",
+    "defaultApp": "Default App",
+    "security": "Security",
+    "profile": "Profile"
+  },
+  "placeholders": {
+    "searchUsers": "Search users...",
+    "enterName": "Enter name",
+    "enterEmail": "Enter email address",
+    "selectRole": "Select role",
+    "selectApp": "Select default app"
+  },
+  "messages": {
+    "create": {
+      "success": "User created successfully",
+      "error": "Failed to create user",
+      "pending": "Creating user..."
+    },
+    "update": {
+      "success": "User updated successfully",
+      "error": "Failed to update user",
+      "pending": "Updating user..."
+    },
+    "delete": {
+      "success": "User deleted successfully",
+      "error": "Failed to delete user",
+      "pending": "Deleting user...",
+      "confirm": "Are you sure you want to delete this user?"
+    },
+    "fetch": {
+      "error": "Failed to load users",
+      "pending": "Loading users...",
+      "empty": "No users found"
+    }
+  },
+  "validation": {
+    "required": "This field is required",
+    "email": "Please enter a valid email address",
+    "minLength": "Minimum length is {{length}} characters",
+    "maxLength": "Maximum length is {{length}} characters",
+    "pattern": "Please enter a valid format",
+    "numeric": "Please enter a valid number",
+    "url": "Please enter a valid URL",
+    "custom": "Validation failed"
+  },
+  "dialogs": {
+    "delete": {
+      "title": "Delete User",
+      "message": "Are you sure you want to delete this user? This action cannot be undone.",
+      "confirm": "Delete",
+      "cancel": "Cancel"
+    },
+    "deactivate": {
+      "title": "Deactivate User",
+      "message": "Are you sure you want to deactivate this user? They will no longer be able to access the system."
+    }
+  },
   "alerts": {
     "new": "For new Users you can send an email invite so they can set their own password, or set a password for them now.",
     "createdSuccess": "User created successfully",

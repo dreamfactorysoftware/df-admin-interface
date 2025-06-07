@@ -1,78 +1,132 @@
 {
-  "save": "Save",
-  "close": "Close",
-  "create": "Create",
-  "upload": "Upload",
-  "delete": "Delete",
-  "edit": "Edit",
-  "saveAndClear": "Save & Clear Cache",
-  "saveAndContinue": "Save & Continue",
-  "select": "Select",
-  "submit": "Submit",
-  "browse": "Browse",
-  "launch": "Launch",
-  "launchApp": "Launch {{appName}}",
-  "cancel": "Cancel",
-  "basic": "Basic",
-  "selectAnOption": "Select an option",
-  "name": "Name",
-  "value": "Value",
-  "private": "Private",
-  "inviteSent": "An email invite has been sent.",
-  "eventModification": "Allow Event modification",
-  "update": "Update",
-  "confirmed": "Confirmed",
-  "sendInvite": "Send Invite",
-  "pending": "Pending",
-  "id": "ID",
-  "email": "Email",
-  "phone": "Phone",
-  "displayName": "Display Name",
-  "firstName": "First Name",
-  "lastName": "Last Name",
-  "active": "Active",
-  "registration": "Registration",
-  "filter": "Filter",
-  "resetRowCounter": "Reset counter for row {{id}}",
-  "editRow": "Edit row {{id}}",
-  "deleteRow": "Delete row {{id}}",
-  "selectRow": "Select row {{id}}",
-  "selectAll": "Select All",
-  "deselectRow": "Deselect row {{id}}",
-  "deselectAll": "Deselect all",
-  "sortCleared": "Sorting cleared",
-  "sortedAsc": "Sorted ascending",
-  "sortedDesc": "Sorted descending",
-  "search": "Search",
-  "newEntry": "Create a new entry",
-  "clearLimitCounter": "Clear limit counter",
-  "clearLimitCounters": "Clear limit counters",
-  "exportList": "Export list",
-  "importList": "Import list",
-  "description": "Description",
-  "sortDescription": "Sort by {{header}}",
-  "selectPage": "Select Page",
-  "role": "Role",
-  "admins.tabs.role-based-access": "Role",
-  "admins.tabs.logs": "Logs",
-  "apiKey": "API Key",
-  "type": "Type",
-  "rate": "Rate",
-  "counter": "Counter",
-  "user": "User",
-  "service": "Service",
-  "time": "Time",
-  "serviceId": "Service ID",
-  "serviceName": "Service Name",
-  "userEmail": "User Email",
-  "action": "Action",
-  "request": "Request",
-  "files": "Files",
-  "logs": "Logs",
-  "data": "Data",
-  "packages": "Packages",
-  "launchpad": "LaunchPad",
-  "goBack": "Go back",
+  "$schema": "./schema.json",
+  "_metadata": {
+    "version": "2.0.0",
+    "locale": "en",
+    "direction": "ltr",
+    "lastModified": "2024-01-15T00:00:00.000Z",
+    "framework": "next.js",
+    "ssrOptimized": true
+  },
+  "common": {
+    "actions": {
+      "save": "Save",
+      "close": "Close",
+      "create": "Create",
+      "upload": "Upload",
+      "delete": "Delete",
+      "edit": "Edit",
+      "saveAndClear": "Save & Clear Cache",
+      "saveAndContinue": "Save & Continue",
+      "select": "Select",
+      "submit": "Submit",
+      "browse": "Browse",
+      "launch": "Launch",
+      "launchApp": "Launch {{appName}}",
+      "cancel": "Cancel",
+      "update": "Update",
+      "confirmed": "Confirmed",
+      "sendInvite": "Send Invite",
+      "filter": "Filter",
+      "search": "Search",
+      "newEntry": "Create a new entry",
+      "clearLimitCounter": "Clear limit counter",
+      "clearLimitCounters": "Clear limit counters",
+      "exportList": "Export list",
+      "importList": "Import list",
+      "goBack": "Go back",
+      "view": "View",
+      "open": "Open",
+      "confirm": "Confirm"
+    },
+    "labels": {
+      "basic": "Basic",
+      "selectAnOption": "Select an option",
+      "name": "Name",
+      "value": "Value",
+      "private": "Private",
+      "id": "ID",
+      "email": "Email",
+      "phone": "Phone",
+      "displayName": "Display Name",
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "active": "Active",
+      "registration": "Registration",
+      "pending": "Pending",
+      "description": "Description",
+      "role": "Role",
+      "apiKey": "API Key",
+      "type": "Type",
+      "rate": "Rate",
+      "counter": "Counter",
+      "user": "User",
+      "service": "Service",
+      "time": "Time",
+      "serviceId": "Service ID",
+      "serviceName": "Service Name",
+      "userEmail": "User Email",
+      "action": "Action",
+      "request": "Request",
+      "files": "Files",
+      "logs": "Logs",
+      "data": "Data",
+      "packages": "Packages",
+      "launchpad": "LaunchPad",
+      "path": "Path",
+      "version": "Version",
+      "label": "Label",
+      "origins": "Origins",
+      "headers": "Headers",
+      "exposedHeaders": "Exposed Headers",
+      "maxAge": "Max Age",
+      "methods": "Methods",
+      "supportsCredentials": "Supports Credentials",
+      "enabled": "Enabled",
+      "component": "Component",
+      "method": "Method",
+      "frequency": "Frequency (defined in minutes)",
+      "payload": "Payload (JSON)",
+      "noFileSelected": "No file selected",
+      "schema": "Schema",
+      "apiDocs": "API docs",
+      "searchFeatures": "Search Features",
+      "scriptType": "Script Type"
+    },
+    "booleans": {
+      "yes": "Yes",
+      "no": "No"
+    }
+  },
+  "ui": {
+    "accessibility": {
+      "resetRowCounter": "Reset counter for row {{id}}",
+      "editRow": "Edit row {{id}}",
+      "deleteRow": "Delete row {{id}}",
+      "selectRow": "Select row {{id}}",
+      "selectAll": "Select All",
+      "deselectRow": "Deselect row {{id}}",
+      "deselectAll": "Deselect all",
+      "sortCleared": "Sorting cleared",
+      "sortedAsc": "Sorted ascending",
+      "sortedDesc": "Sorted descending",
+      "sortDescription": "Sort by {{header}}",
+      "selectPage": "Select Page",
+      "viewRow": "View row {{id}}",
+      "toggleNav": "Toggle navigation"
+    },
+    "fileUpload": {
+      "desktopFile": "Upload File",
+      "githubFile": "Github Import"
+    },
+    "states": {
+      "noEnteries": "No enteries found, you can create one by clicking on the button above."
+    }
+  },
+  "notifications": {
+    "inviteSent": "An email invite has been sent.",
+    "eventModification": "Allow Event modification"
+  },
   "verbs": {
     "get": "GET (read)",
     "post": "POST (create)",
@@ -80,36 +134,9 @@
     "patch": "PATCH (update)",
     "delete": "DELETE (remove)"
   },
-  "path": "Path",
-  "version": "Version",
-  "yes": "Yes",
-  "no": "No",
-  "confirm": "Confirm",
-  "label": "Label",
-  "confirmDelete": "Are you sure you want to delete this?",
-  "origins": "Origins",
-  "headers": "Headers",
-  "exposedHeaders": "Exposed Headers",
-  "maxAge": "Max Age",
-  "methods": "Methods",
-  "supportsCredentials": "Supports Credentials",
-  "enabled": "Enabled",
-  "component": "Component",
-  "method": "Method",
-  "frequency": "Frequency (defined in minutes)",
-  "payload": "Payload (JSON)",
-  "view": "View",
-  "viewRow": "View row {{id}}",
-  "noEnteries": "No enteries found, you can create one by clicking on the button above.",
-  "open": "Open",
-  "noFileSelected": "No file selected",
-  "toggleNav": "Toggle navigation",
-  "desktopFile": "Upload File",
-  "githubFile": "Github Import",
-  "schema": "Schema",
-  "apiDocs": "API docs",
-  "searchFeatures": "Search Features",
-  "scriptType": "Script Type",
+  "confirmations": {
+    "confirmDelete": "Are you sure you want to delete this?"
+  },
   "scriptTypes": {
     "javascript": "JavaScript",
     "php": "PHP",
@@ -294,8 +321,8 @@
         "header": "{{nav.system-settings.logs.nav}}",
         "create": {
           "header": "Create Log"
-          }
-        },
+        }
+      },
       "reporting": {
         "nav": "Reporting",
         "header": "{{nav.system-settings.reporting.nav}}"
@@ -314,7 +341,9 @@
           "nav": "Create a new admin",
           "header": "{{nav.admin-settings.admins.create.nav}}"
         },
-        "edit": { "header": "{{edit}}" }
+        "edit": {
+          "header": "{{edit}}"
+        }
       },
       "schema": {
         "nav": "Schema",
@@ -344,16 +373,37 @@
           "nav": "Create a new user",
           "header": "{{nav.admin-settings.users.create.nav}}"
         },
-        "edit": { "header": "{{edit}}" }
+        "edit": {
+          "header": "{{edit}}"
+        }
       },
-      "files": { "nav": "{{files}}", "header": "{{files}}" },
-      "logs": { "nav": "{{logs}}", "header": "{{logs}}" }
+      "files": {
+        "nav": "{{files}}",
+        "header": "{{files}}"
+      },
+      "logs": {
+        "nav": "{{logs}}",
+        "header": "{{logs}}"
+      }
     },
-    "profile": { "header": "Profile" },
-    "logout": { "header": "Logout" },
-    "data": { "nav": "{{data}}", "header": "{{data}}" },
-    "package-manager": { "nav": "{{packages}}", "header": "{{packages}}" },
-    "launchpad": { "nav": "{{launchpad}}", "header": "{{launchpad}}" }
+    "profile": {
+      "header": "Profile"
+    },
+    "logout": {
+      "header": "Logout"
+    },
+    "data": {
+      "nav": "{{data}}",
+      "header": "{{data}}"
+    },
+    "package-manager": {
+      "nav": "{{packages}}",
+      "header": "{{packages}}"
+    },
+    "launchpad": {
+      "nav": "{{launchpad}}",
+      "header": "{{launchpad}}"
+    }
   },
   "alerts": {
     "duplicateEmail": "Email address already exists",
@@ -385,5 +435,7 @@
   "language": "Change language",
   "languages": {
     "en": "English"
-  }
+  },
+  "admins.tabs.role-based-access": "Role",
+  "admins.tabs.logs": "Logs"
 }

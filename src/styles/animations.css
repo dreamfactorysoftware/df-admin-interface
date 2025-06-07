@@ -1,0 +1,530 @@
+/**
+ * Animation Styles for DreamFactory Admin Interface
+ * 
+ * Provides performance-optimized CSS animations for React 19/Next.js 15.1 components.
+ * Includes shimmer effects, loading animations, and UI transitions optimized for
+ * Tailwind CSS 4.1+ integration with enhanced developer experience.
+ * 
+ * Features:
+ * - GPU-accelerated animations using CSS transforms
+ * - Shimmer effects for skeleton loading components
+ * - Smooth UI transitions for enhanced user experience
+ * - Dark mode compatible animation variants
+ * - Accessibility-aware reduced motion support
+ * - Performance optimized with will-change and layer promotion
+ * 
+ * @see Technical Specification Section 7.1 - CORE UI TECHNOLOGIES
+ * @see Loading Skeleton Component: src/components/layout/loading/loading-skeleton.tsx
+ * @see WCAG 2.2 Guidelines for reduced motion: https://www.w3.org/WAI/WCAG22/Understanding/animation-from-interactions.html
+ */
+
+/* =============================================================================
+   SHIMMER LOADING ANIMATIONS
+   ============================================================================= */
+
+/**
+ * Shimmer effect keyframes for skeleton loading
+ * Uses translateX transforms for optimal GPU acceleration
+ */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/**
+ * Alternative shimmer effect with opacity changes
+ * Used for subtle loading states in sensitive contexts
+ */
+@keyframes shimmer-subtle {
+  0% {
+    opacity: 0.4;
+    transform: translateX(-100%);
+  }
+  50% {
+    opacity: 0.8;
+    transform: translateX(0%);
+  }
+  100% {
+    opacity: 0.4;
+    transform: translateX(100%);
+  }
+}
+
+/**
+ * Intense shimmer for critical loading states
+ * Faster animation with enhanced visual feedback
+ */
+@keyframes shimmer-intense {
+  0% {
+    transform: translateX(-100%) scaleX(0.8);
+    opacity: 0.6;
+  }
+  25% {
+    transform: translateX(-50%) scaleX(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translateX(0%) scaleX(1.1);
+    opacity: 0.9;
+  }
+  75% {
+    transform: translateX(50%) scaleX(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(100%) scaleX(0.8);
+    opacity: 0.6;
+  }
+}
+
+/**
+ * Slow shimmer for background operations
+ * Reduced distraction while maintaining loading feedback
+ */
+@keyframes shimmer-slow {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0.3;
+  }
+  33% {
+    opacity: 0.6;
+  }
+  50% {
+    transform: translateX(0%);
+    opacity: 0.7;
+  }
+  67% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateX(100%);
+    opacity: 0.3;
+  }
+}
+
+/* =============================================================================
+   SKELETON LOADING UTILITIES
+   ============================================================================= */
+
+/**
+ * Base skeleton loading container
+ * Provides optimal rendering performance for skeleton elements
+ */
+.skeleton-container {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  will-change: transform;
+}
+
+/**
+ * Skeleton shimmer overlay
+ * Applied as ::before pseudo-element for shimmer effects
+ */
+.skeleton-shimmer {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.6),
+    transparent
+  );
+  transform: translateX(-100%);
+  animation: shimmer 2s infinite;
+}
+
+/**
+ * Dark mode shimmer overlay
+ * Optimized for dark theme visibility
+ */
+@media (prefers-color-scheme: dark) {
+  .skeleton-shimmer,
+  .dark .skeleton-shimmer {
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.2),
+      transparent
+    );
+  }
+}
+
+/* =============================================================================
+   UI TRANSITION ANIMATIONS
+   ============================================================================= */
+
+/**
+ * Smooth fade-in animation for content loading
+ * Used when skeleton transitions to actual content
+ */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/**
+ * Slide-in animation for navigation and panels
+ * Optimized for mobile and desktop interfaces
+ */
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/**
+ * Scale-in animation for modals and dialogs
+ * Provides smooth entrance for overlay components
+ */
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/**
+ * Bounce animation for attention-grabbing elements
+ * Used sparingly for important notifications
+ */
+@keyframes bounce-soft {
+  0%, 20%, 53%, 80%, 100% {
+    transform: translate3d(0, 0, 0);
+  }
+  40%, 43% {
+    transform: translate3d(0, -5px, 0);
+  }
+  70% {
+    transform: translate3d(0, -3px, 0);
+  }
+  90% {
+    transform: translate3d(0, -1px, 0);
+  }
+}
+
+/* =============================================================================
+   LOADING SPINNER ANIMATIONS
+   ============================================================================= */
+
+/**
+ * Rotating spinner animation
+ * Optimized for button loading states and small indicators
+ */
+@keyframes spin-smooth {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/**
+ * Pulsing dot animation for loading indicators
+ * Creates breathing effect for subtle loading feedback
+ */
+@keyframes pulse-dots {
+  0%, 80%, 100% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/**
+ * Three-dot loading animation
+ * Sequential animation for multiple dots
+ */
+@keyframes pulse-dot-1 {
+  0%, 80%, 100% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes pulse-dot-2 {
+  0%, 80%, 100% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  /* Delay for sequential effect */
+  0% { animation-delay: 0.2s; }
+}
+
+@keyframes pulse-dot-3 {
+  0%, 80%, 100% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  /* Delay for sequential effect */
+  0% { animation-delay: 0.4s; }
+}
+
+/* =============================================================================
+   UTILITY ANIMATION CLASSES
+   ============================================================================= */
+
+/**
+ * Animation utility classes for Tailwind CSS integration
+ * Provides consistent animation patterns across components
+ */
+
+/* Fade animations */
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+.animate-fade-in-slow {
+  animation: fade-in 0.5s ease-out;
+}
+
+.animate-fade-in-fast {
+  animation: fade-in 0.15s ease-out;
+}
+
+/* Slide animations */
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s ease-out;
+}
+
+.animate-slide-in-left {
+  animation: slide-in-left 0.3s ease-out;
+}
+
+/* Scale animations */
+.animate-scale-in {
+  animation: scale-in 0.2s ease-out;
+}
+
+.animate-scale-in-slow {
+  animation: scale-in 0.4s ease-out;
+}
+
+/* Shimmer animation utilities */
+.animate-shimmer {
+  animation: shimmer 2s infinite;
+}
+
+.animate-shimmer-subtle {
+  animation: shimmer-subtle 2.5s infinite;
+}
+
+.animate-shimmer-intense {
+  animation: shimmer-intense 1.5s infinite;
+}
+
+.animate-shimmer-slow {
+  animation: shimmer-slow 3s infinite;
+}
+
+/* Spinner animations */
+.animate-spin-smooth {
+  animation: spin-smooth 1s linear infinite;
+}
+
+.animate-spin-slow {
+  animation: spin-smooth 2s linear infinite;
+}
+
+/* Pulse animations */
+.animate-pulse-soft {
+  animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.animate-bounce-soft {
+  animation: bounce-soft 1s ease-in-out;
+}
+
+/* =============================================================================
+   ACCESSIBILITY AND REDUCED MOTION
+   ============================================================================= */
+
+/**
+ * Respect user's motion preferences
+ * Reduces animations for users who prefer reduced motion
+ */
+@media (prefers-reduced-motion: reduce) {
+  /* Disable shimmer animations for reduced motion */
+  .animate-shimmer,
+  .animate-shimmer-subtle,
+  .animate-shimmer-intense,
+  .animate-shimmer-slow,
+  .skeleton-shimmer {
+    animation: none;
+  }
+  
+  /* Replace with subtle opacity pulse */
+  .animate-shimmer,
+  .animate-shimmer-subtle,
+  .animate-shimmer-intense,
+  .animate-shimmer-slow {
+    animation: pulse 3s ease-in-out infinite;
+  }
+  
+  /* Reduce other animations to simple fades */
+  .animate-slide-in-right,
+  .animate-slide-in-left,
+  .animate-scale-in,
+  .animate-scale-in-slow {
+    animation: fade-in 0.3s ease-out;
+  }
+  
+  /* Disable bounce and complex movements */
+  .animate-bounce-soft {
+    animation: none;
+  }
+  
+  /* Keep essential loading indicators but simplified */
+  .animate-spin-smooth,
+  .animate-spin-slow {
+    animation: spin-smooth 2s linear infinite;
+  }
+}
+
+/* =============================================================================
+   PERFORMANCE OPTIMIZATIONS
+   ============================================================================= */
+
+/**
+ * Performance optimization hints for browsers
+ * Promotes elements to GPU layer for smoother animations
+ */
+.animate-shimmer,
+.animate-shimmer-subtle,
+.animate-shimmer-intense,
+.animate-shimmer-slow,
+.animate-fade-in,
+.animate-slide-in-right,
+.animate-slide-in-left,
+.animate-scale-in,
+.animate-spin-smooth {
+  will-change: transform, opacity;
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+  /* Force hardware acceleration */
+  transform: translateZ(0);
+}
+
+/**
+ * Reset will-change after animations complete
+ * Prevents unnecessary GPU memory usage
+ */
+.animate-shimmer:not(:hover):not(:focus),
+.animate-fade-in:not(:hover):not(:focus) {
+  will-change: auto;
+}
+
+/* =============================================================================
+   DARK MODE OPTIMIZATIONS
+   ============================================================================= */
+
+/**
+ * Dark mode specific animation adjustments
+ * Optimizes visibility and contrast for dark themes
+ */
+@media (prefers-color-scheme: dark) {
+  /* Adjust shimmer intensity for dark backgrounds */
+  .animate-shimmer-subtle {
+    animation: shimmer-subtle 3s infinite;
+  }
+  
+  /* Enhance visibility of loading states */
+  .skeleton-shimmer {
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.15),
+      transparent
+    );
+  }
+}
+
+/* Dark class variant for explicit dark mode */
+.dark .skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.15),
+    transparent
+  );
+}
+
+.dark .animate-shimmer-subtle {
+  animation: shimmer-subtle 3s infinite;
+}
+
+/* =============================================================================
+   PRINT STYLES
+   ============================================================================= */
+
+/**
+ * Print-friendly animation handling
+ * Disables animations in print media
+ */
+@media print {
+  /* Disable all animations for print */
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  
+  /* Hide loading skeletons in print */
+  .animate-shimmer,
+  .animate-shimmer-subtle,
+  .animate-shimmer-intense,
+  .animate-shimmer-slow,
+  .skeleton-shimmer {
+    display: none !important;
+  }
+}

@@ -1,19 +1,47 @@
 {
-  "pageTitle": "CORS Overview",
-  "pageSubtitle": "Enter allowed hosts and HTTP verbs. You can enter * for all hosts. Use the * option for development to enable application code running locally on your computer to communicate directly with your DreamFactory instance.",
-  "formControls": {
+  "title": "CORS Overview",
+  "subtitle": "Enter allowed hosts and HTTP verbs. You can enter * for all hosts. Use the * option for development to enable application code running locally on your computer to communicate directly with your DreamFactory instance.",
+  "labels": {
+    "enabled": "Enabled",
     "path": "Path",
     "description": "Description",
     "origins": "Origins",
     "headers": "Headers",
-    "exposedHeaders": "Exposed Headers",
-    "maxAge": "Max Age",
     "methods": "Methods",
-    "supportsCredentials": "Supports Credentials",
-    "enabled": "Enabled"
+    "credentials": "Supports Credentials",
+    "maxAge": "Max Age",
+    "exposedHeaders": "Exposed Headers"
   },
-  "alerts": {
+  "placeholders": {
+    "origins": "Enter allowed origins (e.g., https://example.com, *)",
+    "headers": "Enter allowed headers (e.g., Content-Type, Authorization)",
+    "methods": "Select allowed HTTP methods"
+  },
+  "methods": {
+    "get": "GET",
+    "post": "POST",
+    "put": "PUT",
+    "patch": "PATCH",
+    "delete": "DELETE",
+    "options": "OPTIONS",
+    "head": "HEAD"
+  },
+  "validation": {
+    "required": "This field is required",
+    "email": "Please enter a valid email address",
+    "minLength": "Minimum length is {{length}} characters",
+    "maxLength": "Maximum length is {{length}} characters",
+    "pattern": "Please enter a valid format",
+    "numeric": "Please enter a valid number",
+    "url": "Please enter a valid URL",
+    "custom": "Validation failed",
+    "originsFormat": "Please enter valid origins (comma-separated URLs or *)",
+    "headersFormat": "Please enter valid header names (comma-separated)",
+    "maxAgeNumeric": "Max age must be a valid number in seconds"
+  },
+  "messages": {
     "createSuccess": "CORS entry created successfully.",
-    "updateSuccess": "CORS entry updated successfully."
+    "updateSuccess": "CORS entry updated successfully.",
+    "updateError": "Failed to update CORS configuration. Please try again."
   }
 }

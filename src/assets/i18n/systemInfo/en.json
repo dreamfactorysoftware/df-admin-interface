@@ -1,5 +1,42 @@
 {
-  "subheading": "Displays current system information.",
+  "title": "System Information",
+  "subtitle": "Displays current system information.",
+  "sections": {
+    "general": {
+      "title": "General Information", 
+      "version": "Version",
+      "buildDate": "Build Date",
+      "environment": "Environment",
+      "timezone": "Timezone",
+      "locale": "Locale"
+    },
+    "database": {
+      "title": "System Database",
+      "driver": "Cache Driver",
+      "version": "Version",
+      "host": "Host",
+      "status": "Status"
+    },
+    "server": {
+      "title": "Server",
+      "phpVersion": "Server API",
+      "webServer": "Web Server",
+      "memoryLimit": "Memory Limit",
+      "diskSpace": "Disk Space"
+    },
+    "license": {
+      "title": "License Information",
+      "type": "License Level",
+      "expiresAt": "Subscription Expiration Date",
+      "features": "License Key",
+      "status": "Subscription Status"
+    }
+  },
+  "actions": {
+    "refresh": "Refresh",
+    "downloadLogs": "Download Logs",
+    "checkUpdates": "Check Updates"
+  },
   "instance": {
     "instance": "Instance",
     "licenseLevel": "License Level",
@@ -29,5 +66,6 @@
     "userAgent": "User Agent",
     "ipAddress": "IP Address",
     "Locale": "Locale"
-  }
+  },
+  "subheading": "Displays current system information."
 }

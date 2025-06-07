@@ -1,38 +1,144 @@
 {
-  "name": "Limit Name",
-  "description": "Description",
-  "limitType": "Limit Type",
-  "limitRate": "Limit Rate",
-  "limitPeriod": "Limit Period",
-  "role": "Role",
-  "service": "Service",
-  "endpoint": "Endpoint",
-  "user": "User",
-  "verb": "Verb",
-  "active": "Active",
-  "refresh": "Refresh",
-  "invalidForm": "Invalid Form Input",
-  "createSuccessMessage": "Limit successfully created",
-  "updateSuccessMessage": "Limit successfully updated",
-  "deleteSuccessMessage": "Limit successfully deleted",
-  "verbTooltip": "By default, all verbs will be limited unless a specific verb is selected for the limit type.",
-  "limitTypes": {
+  "title": "Rate Limits",
+  "subtitle": "Manage API rate limiting and throttling policies",
+  "labels": {
+    "name": "Limit Name",
+    "description": "Description",
+    "type": "Limit Type",
+    "period": "Limit Period",
+    "limit": "Limit Rate",
+    "active": "Active",
+    "service": "Service",
+    "endpoint": "Endpoint",
+    "verb": "Verb",
+    "user": "User",
+    "role": "Role",
+    "key": "API Key"
+  },
+  "types": {
     "instance": "Instance",
     "user": "User",
-    "eachUser": "Each User",
-    "service": "Service",
     "role": "Role",
+    "service": "Service",
+    "endpoint": "Endpoint",
+    "eachUser": "Each User",
     "serviceByUser": "Service by User",
     "serviceByEachUser": "Service by Each User",
-    "endpoint": "Endpoint",
     "endpointByUser": "Endpoint by User",
     "endpointByEachUser": "Endpoint by Each User"
   },
-  "limitPeriods": {
+  "periods": {
     "minute": "Minute",
     "hour": "Hour",
     "day": "Day",
     "week": "Week",
-    "30Days": "30 Days"
+    "month": "30 Days",
+    "year": "Year"
+  },
+  "validation": {
+    "required": "This field is required",
+    "email": "Please enter a valid email address",
+    "minLength": "Minimum length is {{length}} characters",
+    "maxLength": "Maximum length is {{length}} characters",
+    "pattern": "Please enter a valid format",
+    "numeric": "Please enter a valid number",
+    "url": "Please enter a valid URL",
+    "custom": "Validation failed",
+    "limitValue": "Please enter a valid limit value",
+    "periodRequired": "Limit period is required",
+    "typeRequired": "Limit type is required"
+  },
+  "messages": {
+    "create": {
+      "success": "Limit successfully created",
+      "error": "Failed to create limit",
+      "pending": "Creating limit..."
+    },
+    "update": {
+      "success": "Limit successfully updated",
+      "error": "Failed to update limit",
+      "pending": "Updating limit..."
+    },
+    "delete": {
+      "success": "Limit successfully deleted",
+      "error": "Failed to delete limit",
+      "pending": "Deleting limit...",
+      "confirm": "Are you sure you want to delete this limit?"
+    },
+    "fetch": {
+      "error": "Failed to load limits",
+      "pending": "Loading limits...",
+      "empty": "No limits found"
+    }
+  },
+  "tooltips": {
+    "verbTooltip": "By default, all verbs will be limited unless a specific verb is selected for the limit type.",
+    "limitType": "Choose how the rate limit should be applied - per instance, user, role, service, or endpoint",
+    "limitPeriod": "Select the time window for the rate limit calculation",
+    "limitRate": "Maximum number of requests allowed within the specified period"
+  },
+  "placeholders": {
+    "limitName": "Enter limit name",
+    "limitDescription": "Enter limit description",
+    "selectType": "Select limit type",
+    "selectPeriod": "Select time period",
+    "selectService": "Select service",
+    "selectEndpoint": "Select endpoint",
+    "selectVerb": "Select HTTP verb",
+    "selectUser": "Select user",
+    "selectRole": "Select role"
+  },
+  "actions": {
+    "refresh": "Refresh",
+    "create": "Create Limit",
+    "edit": "Edit Limit",
+    "delete": "Delete Limit",
+    "save": "Save",
+    "cancel": "Cancel",
+    "test": "Test Limit",
+    "export": "Export Configuration"
+  },
+  "status": {
+    "active": "Active",
+    "inactive": "Inactive",
+    "exceeded": "Limit Exceeded",
+    "normal": "Normal"
+  },
+  "errors": {
+    "invalidForm": "Invalid Form Input",
+    "connectionFailed": "Failed to test limit configuration",
+    "duplicateName": "A limit with this name already exists",
+    "invalidRate": "Please enter a valid rate limit value"
+  },
+  
+  "_compatibility": {
+    "comment": "Backward compatibility section - preserves original Angular i18n key structure",
+    "limitType": "Limit Type",
+    "limitRate": "Limit Rate", 
+    "limitPeriod": "Limit Period",
+    "verbTooltip": "By default, all verbs will be limited unless a specific verb is selected for the limit type.",
+    "createSuccessMessage": "Limit successfully created",
+    "updateSuccessMessage": "Limit successfully updated",
+    "deleteSuccessMessage": "Limit successfully deleted",
+    "invalidForm": "Invalid Form Input",
+    "limitTypes": {
+      "instance": "Instance",
+      "user": "User",
+      "eachUser": "Each User",
+      "service": "Service", 
+      "role": "Role",
+      "serviceByUser": "Service by User",
+      "serviceByEachUser": "Service by Each User",
+      "endpoint": "Endpoint",
+      "endpointByUser": "Endpoint by User",
+      "endpointByEachUser": "Endpoint by Each User"
+    },
+    "limitPeriods": {
+      "minute": "Minute",
+      "hour": "Hour", 
+      "day": "Day",
+      "week": "Week",
+      "30Days": "30 Days"
+    }
   }
 }
