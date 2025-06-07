@@ -1,89 +1,349 @@
 /**
- * Comprehensive test suite for the LinkService component
- * Tests form validation, service selection, file operations, cache management,
- * accessibility features, and user interactions using Vitest, React Testing Library, and MSW
+ * LinkService Component Test Suite
+ * 
+ * Comprehensive test coverage for the LinkService component using Vitest, React Testing Library,
+ * and MSW integration. Tests form validation, service operations, accessibility compliance,
+ * and user interactions per React/Next.js testing standards.
+ * 
+ * Test Coverage:
+ * - Component rendering and state management
+ * - React Hook Form integration with Zod validation
+ * - Storage service API operations with MSW mocking
+ * - Accessibility compliance (WCAG 2.1 AA)
+ * - Keyboard navigation and screen reader support
+ * - Theme integration and responsive behavior
+ * - Error handling and loading states
+ * - Performance optimization validation
+ * 
+ * @fileoverview LinkService component test suite
+ * @version 1.0.0
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import React from 'react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { axe, toHaveNoViolations } from 'jest-axe';
-import { rest } from 'msw';
+import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
-import { renderWithProviders } from '@/test/utils/test-utils';
-import { createMockStorageService, createMockStorageServices } from '@/test/mocks/storage-service';
+import { axe } from 'jest-axe';
+
+// Component and utilities
 import { LinkService } from './link-service';
-import type { LinkServiceProps, StorageService, LinkServiceFormData } from './link-service.types';
+import type { LinkServiceProps, StorageService } from './link-service.types';
+import { 
+  customRender, 
+  renderWithForm,
+  testA11y,
+  checkAriaAttributes,
+  createKeyboardUtils,
+  waitForValidation,
+  measureRenderTime,
+  type CustomRenderOptions 
+} from '../../../test/test-utils';
 
-// Extend Jest matchers for accessibility testing
-expect.extend(toHaveNoViolations);
+// ============================================================================
+// MOCK DATA AND UTILITIES
+// ============================================================================
 
-// MSW server setup for API mocking
-const mockHandlers = [
-  // Storage services discovery endpoint
-  rest.get('/api/v2/system/service', (req, res, ctx) => {
-    const services = createMockStorageServices();
-    return res(ctx.json({ resource: services }));
-  }),
-
-  // Storage service connection testing
-  rest.post('/api/v2/system/service/:serviceId/_test', (req, res, ctx) => {
-    const { serviceId } = req.params;
-    return res(ctx.json({ success: true, service_id: serviceId }));
-  }),
-
-  // Storage service content operations
-  rest.get('/api/v2/:serviceId/_file/*', (req, res, ctx) => {
-    const path = req.url.pathname.split('/_file/')[1];
-    return res(
-      ctx.json({
-        name: path,
-        path: `/${path}`,
-        type: 'file',
-        content_type: 'application/json',
-        last_modified: new Date().toISOString(),
-        size: 1024
-      })
-    );
-  }),
-
-  // Cache management operations
-  rest.delete('/api/v2/:serviceId/_cache/*', (req, res, ctx) => {
-    return res(ctx.json({ success: true }));
-  }),
-
-  // Error scenarios for testing error handling
-  rest.get('/api/v2/system/service/error-service', (req, res, ctx) => {
-    return res(
-      ctx.status(500),
-      ctx.json({
-        error: {
-          code: 500,
-          message: 'Internal server error',
-          context: 'Failed to connect to storage service'
-        }
-      })
-    );
-  })
+/**
+ * Mock storage services data for testing
+ * Includes various service types to test filtering and selection
+ */
+const mockStorageServices: StorageService[] = [
+  {
+    id: 1,
+    name: 'github_prod',
+    label: 'Production GitHub',
+    description: 'Production GitHub repository service',
+    isActive: true,
+    type: 'github',
+    mutable: true,
+    deletable: true,
+    createdDate: '2024-01-15T10:30:00Z',
+    lastModifiedDate: '2024-03-10T14:45:00Z',
+    createdById: 1,
+    lastModifiedById: 1,
+    config: {
+      baseUrl: 'https://api.github.com',
+      authentication: 'token',
+      token: '***hidden***',
+    },
+    serviceDocByServiceId: null,
+    refresh: false,
+  },
+  {
+    id: 2,
+    name: 'github_staging',
+    label: 'Staging GitHub',
+    description: 'Staging GitHub repository service',
+    isActive: true,
+    type: 'github',
+    mutable: true,
+    deletable: true,
+    createdDate: '2024-02-01T09:00:00Z',
+    lastModifiedDate: '2024-03-12T11:20:00Z',
+    createdById: 2,
+    lastModifiedById: 1,
+    config: {
+      baseUrl: 'https://api.github.com',
+      authentication: 'token',
+      token: '***hidden***',
+    },
+    serviceDocByServiceId: null,
+    refresh: false,
+  },
+  {
+    id: 3,
+    name: 'file_storage',
+    label: 'Local File Storage',
+    description: 'Local file system storage',
+    isActive: true,
+    type: 'file',
+    mutable: true,
+    deletable: true,
+    createdDate: '2024-02-20T16:45:00Z',
+    lastModifiedDate: '2024-03-08T13:30:00Z',
+    createdById: 3,
+    lastModifiedById: 3,
+    config: {
+      basePath: '/var/storage',
+    },
+    serviceDocByServiceId: null,
+    refresh: false,
+  },
+  {
+    id: 4,
+    name: 'dropbox_service',
+    label: 'Dropbox Storage',
+    description: 'Cloud storage via Dropbox',
+    isActive: false,
+    type: 'dropbox',
+    mutable: true,
+    deletable: true,
+    createdDate: '2024-01-20T12:00:00Z',
+    lastModifiedDate: '2024-03-01T10:15:00Z',
+    createdById: 2,
+    lastModifiedById: 2,
+    config: {
+      apiKey: '***hidden***',
+    },
+    serviceDocByServiceId: null,
+    refresh: false,
+  },
 ];
 
-const server = setupServer(...mockHandlers);
+/**
+ * Mock file content for testing file operations
+ */
+const mockFileContent = {
+  json: '{"name": "test-config", "version": "1.0.0", "description": "Test configuration file"}',
+  javascript: 'function testFunction() {\n  return "Hello World";\n}',
+  text: 'This is a test file content\nLine 2\nLine 3',
+};
 
-// Mock performance API for performance testing
-Object.defineProperty(window, 'performance', {
-  value: {
-    now: vi.fn(() => Date.now()),
-    mark: vi.fn(),
-    measure: vi.fn(),
-    getEntriesByName: vi.fn(() => []),
-    getEntriesByType: vi.fn(() => [])
-  },
-  writable: true
-});
+/**
+ * MSW handlers for LinkService API endpoints
+ */
+const linkServiceHandlers = [
+  // Storage services list endpoint
+  http.get('/api/storage-services', ({ request }) => {
+    const url = new URL(request.url);
+    const group = url.searchParams.get('group');
+    
+    // Filter services by group if specified
+    let services = mockStorageServices;
+    if (group) {
+      const groupTypes = group.split(',').map(g => g.trim());
+      services = mockStorageServices.filter(service => 
+        groupTypes.some(type => service.type.includes(type))
+      );
+    }
+    
+    return HttpResponse.json({
+      resource: services,
+      meta: {
+        count: services.length,
+        total: services.length,
+      }
+    });
+  }),
 
-// Setup and teardown
+  // File content retrieval endpoint
+  http.get('/api/storage/:path*', ({ params, request }) => {
+    const path = Array.isArray(params.path) ? params.path.join('/') : params.path;
+    const url = new URL(request.url);
+    const content = url.searchParams.get('content');
+    
+    // Simulate different file types
+    if (path?.includes('.json')) {
+      return new HttpResponse(mockFileContent.json, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+    } else if (path?.includes('.js')) {
+      return new HttpResponse(mockFileContent.javascript, {
+        headers: {
+          'Content-Type': 'text/plain',
+        },
+      });
+    } else {
+      return new HttpResponse(mockFileContent.text, {
+        headers: {
+          'Content-Type': 'text/plain',
+        },
+      });
+    }
+  }),
+
+  // Cache deletion endpoint
+  http.delete('/api/cache/_event/:cacheKey', ({ params }) => {
+    return HttpResponse.json({
+      success: true,
+      message: `Cache ${params.cacheKey} deleted successfully`,
+    });
+  }),
+
+  // Error scenarios for testing
+  http.get('/api/storage/error-service/*', () => {
+    return HttpResponse.json(
+      {
+        error: {
+          code: 404,
+          message: 'File not found',
+          details: 'The requested file does not exist in the repository',
+        },
+      },
+      { status: 404 }
+    );
+  }),
+
+  http.delete('/api/cache/_event/error-cache', () => {
+    return HttpResponse.json(
+      {
+        error: {
+          code: 500,
+          message: 'Cache deletion failed',
+          details: 'Internal server error while deleting cache',
+        },
+      },
+      { status: 500 }
+    );
+  }),
+];
+
+/**
+ * Test server setup
+ */
+const server = setupServer(...linkServiceHandlers);
+
+/**
+ * Mock storage services hook
+ */
+vi.mock('@/hooks/use-storage-services', () => ({
+  useStorageServices: vi.fn(() => ({
+    data: mockStorageServices,
+    error: null,
+    isLoading: false,
+  })),
+}));
+
+/**
+ * Mock theme hook
+ */
+vi.mock('@/hooks/use-theme', () => ({
+  useTheme: vi.fn(() => ({
+    theme: 'light',
+    isDarkMode: false,
+    setTheme: vi.fn(),
+  })),
+}));
+
+/**
+ * Mock utility functions
+ */
+vi.mock('@/lib/utils', () => ({
+  cn: vi.fn((...classes) => classes.filter(Boolean).join(' ')),
+  readAsText: vi.fn((blob: Blob) => 
+    Promise.resolve(blob.text ? blob.text() : 'mocked file content')
+  ),
+}));
+
+// ============================================================================
+// TEST SETUP AND HELPERS
+// ============================================================================
+
+/**
+ * Default props for LinkService component
+ */
+const defaultProps: LinkServiceProps = {
+  storageServiceId: 'github_prod',
+  onContentChange: vi.fn(),
+  onStoragePathChange: vi.fn(),
+};
+
+/**
+ * Helper function to render LinkService with custom options
+ */
+const renderLinkService = (
+  props: Partial<LinkServiceProps> = {},
+  options: CustomRenderOptions = {}
+) => {
+  const mergedProps = { ...defaultProps, ...props };
+  return customRender(<LinkService {...mergedProps} />, options);
+};
+
+/**
+ * Helper function to render LinkService with form provider
+ */
+const renderLinkServiceWithForm = (
+  props: Partial<LinkServiceProps> = {},
+  formOptions: { defaultValues?: any } = {}
+) => {
+  const mergedProps = { ...defaultProps, ...props };
+  return renderWithForm(<LinkService {...mergedProps} />, formOptions);
+};
+
+/**
+ * Helper function to fill form fields
+ */
+const fillFormFields = async (user: any, data: {
+  service?: string;
+  repository?: string;
+  branch?: string;
+  path?: string;
+}) => {
+  if (data.service) {
+    const serviceSelect = screen.getByRole('combobox', { name: /select service/i });
+    await user.selectOptions(serviceSelect, data.service);
+  }
+  
+  if (data.repository) {
+    const repoInput = screen.getByRole('textbox', { name: /repository/i });
+    await user.clear(repoInput);
+    await user.type(repoInput, data.repository);
+  }
+  
+  if (data.branch) {
+    const branchInput = screen.getByRole('textbox', { name: /branch/i });
+    await user.clear(branchInput);
+    await user.type(branchInput, data.branch);
+  }
+  
+  if (data.path) {
+    const pathInput = screen.getByRole('textbox', { name: /path/i });
+    await user.clear(pathInput);
+    await user.type(pathInput, data.path);
+  }
+};
+
+// ============================================================================
+// TEST SUITE SETUP
+// ============================================================================
+
 beforeEach(() => {
   server.listen({ onUnhandledRequest: 'error' });
+  vi.clearAllMocks();
 });
 
 afterEach(() => {
@@ -95,634 +355,943 @@ afterAll(() => {
   server.close();
 });
 
-// Test data factories
-const createDefaultProps = (): LinkServiceProps => ({
-  serviceId: 'test-storage-service',
-  isExpanded: false,
-  onExpandToggle: vi.fn(),
-  onServiceLinked: vi.fn(),
-  className: 'test-class'
-});
+// ============================================================================
+// COMPONENT RENDERING TESTS
+// ============================================================================
 
-const createMockFormData = (): LinkServiceFormData => ({
-  repositoryUrl: 'https://github.com/example/repo.git',
-  branch: 'main',
-  accessToken: 'test-token-123',
-  directory: '/api',
-  autoSync: true,
-  cacheEnabled: true
-});
-
-describe('LinkService Component', () => {
-  let user: ReturnType<typeof userEvent.setup>;
-  let mockProps: LinkServiceProps;
-
-  beforeEach(() => {
-    user = userEvent.setup();
-    mockProps = createDefaultProps();
+describe('LinkService Component - Rendering', () => {
+  it('should render component with default state', () => {
+    renderLinkService();
+    
+    // Check for disclosure button
+    expect(screen.getByRole('button', { name: /link to service/i })).toBeInTheDocument();
+    
+    // Panel should be collapsed by default
+    expect(screen.queryByRole('form')).not.toBeInTheDocument();
   });
 
-  describe('Component Rendering', () => {
-    it('renders with required props', () => {
-      renderWithProviders(<LinkService {...mockProps} />);
-      
-      expect(screen.getByRole('button', { name: /link service/i })).toBeInTheDocument();
-      expect(screen.getByText(/test-storage-service/i)).toBeInTheDocument();
+  it('should expand panel when disclosure button is clicked', async () => {
+    const { user } = renderLinkService();
+    
+    const disclosureButton = screen.getByRole('button', { name: /link to service/i });
+    await user.click(disclosureButton);
+    
+    // Panel should now be visible
+    expect(screen.getByRole('form')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: /select service/i })).toBeInTheDocument();
+  });
+
+  it('should render with expanded state when defaultExpanded is true', () => {
+    renderLinkService({ defaultExpanded: true });
+    
+    // Panel should be visible immediately
+    expect(screen.getByRole('form')).toBeInTheDocument();
+  });
+
+  it('should not render when no GitHub services are available', () => {
+    const { useStorageServices } = require('@/hooks/use-storage-services');
+    useStorageServices.mockReturnValue({
+      data: mockStorageServices.filter(s => s.type !== 'github'),
+      error: null,
+      isLoading: false,
     });
 
-    it('applies custom className', () => {
-      renderWithProviders(<LinkService {...mockProps} className="custom-class" />);
-      
-      const container = screen.getByRole('region', { name: /service linking/i });
-      expect(container).toHaveClass('custom-class');
+    const { container } = renderLinkService();
+    
+    // Component should not render anything
+    expect(container.firstChild).toBeNull();
+  });
+
+  it('should show loading state when services are being fetched', () => {
+    const { useStorageServices } = require('@/hooks/use-storage-services');
+    useStorageServices.mockReturnValue({
+      data: [],
+      error: null,
+      isLoading: true,
     });
 
-    it('renders in collapsed state by default', () => {
-      renderWithProviders(<LinkService {...mockProps} />);
-      
-      const expandedContent = screen.queryByRole('form', { name: /service configuration/i });
-      expect(expandedContent).not.toBeInTheDocument();
+    renderLinkService();
+    
+    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(screen.getByText(/loading storage services/i)).toBeInTheDocument();
+  });
+
+  it('should show error state when services fail to load', () => {
+    const { useStorageServices } = require('@/hooks/use-storage-services');
+    useStorageServices.mockReturnValue({
+      data: [],
+      error: new Error('Failed to fetch services'),
+      isLoading: false,
     });
 
-    it('renders expanded content when isExpanded is true', () => {
-      renderWithProviders(<LinkService {...mockProps} isExpanded={true} />);
-      
-      const form = screen.getByRole('form', { name: /service configuration/i });
-      expect(form).toBeInTheDocument();
+    renderLinkService();
+    
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(screen.getByText(/failed to load storage services/i)).toBeInTheDocument();
+  });
+});
+
+// ============================================================================
+// FORM VALIDATION TESTS
+// ============================================================================
+
+describe('LinkService Component - Form Validation', () => {
+  beforeEach(async () => {
+    const { user } = renderLinkService();
+    const disclosureButton = screen.getByRole('button', { name: /link to service/i });
+    await user.click(disclosureButton);
+  });
+
+  it('should show validation errors for required fields', async () => {
+    const { user } = renderLinkService();
+    
+    // Expand panel
+    await user.click(screen.getByRole('button', { name: /link to service/i }));
+    
+    // Try to submit without filling required fields
+    const submitButton = screen.getByRole('button', { name: /view latest/i });
+    await user.click(submitButton);
+    
+    await waitFor(() => {
+      expect(screen.getByText(/please select a service/i)).toBeInTheDocument();
+      expect(screen.getByText(/repository name is required/i)).toBeInTheDocument();
+      expect(screen.getByText(/branch or tag is required/i)).toBeInTheDocument();
+      expect(screen.getByText(/file path is required/i)).toBeInTheDocument();
     });
   });
 
-  describe('Form Interaction and Validation', () => {
-    beforeEach(() => {
-      mockProps.isExpanded = true;
+  it('should validate repository name format', async () => {
+    const { user } = renderLinkService();
+    
+    // Expand panel
+    await user.click(screen.getByRole('button', { name: /link to service/i }));
+    
+    // Enter invalid repository name
+    const repoInput = screen.getByRole('textbox', { name: /repository/i });
+    await user.type(repoInput, 'invalid repo name!@#');
+    
+    await waitForValidation();
+    
+    expect(screen.getByText(/invalid repository name format/i)).toBeInTheDocument();
+  });
+
+  it('should validate maximum field lengths', async () => {
+    const { user } = renderLinkService();
+    
+    // Expand panel
+    await user.click(screen.getByRole('button', { name: /link to service/i }));
+    
+    // Enter overly long values
+    const repoInput = screen.getByRole('textbox', { name: /repository/i });
+    const longString = 'a'.repeat(300);
+    await user.type(repoInput, longString);
+    
+    await waitForValidation();
+    
+    expect(screen.getByText(/repository name too long/i)).toBeInTheDocument();
+  });
+
+  it('should validate branch name length', async () => {
+    const { user } = renderLinkService();
+    
+    // Expand panel
+    await user.click(screen.getByRole('button', { name: /link to service/i }));
+    
+    const branchInput = screen.getByRole('textbox', { name: /branch/i });
+    const longBranch = 'a'.repeat(150);
+    await user.clear(branchInput);
+    await user.type(branchInput, longBranch);
+    
+    await waitForValidation();
+    
+    expect(screen.getByText(/branch name too long/i)).toBeInTheDocument();
+  });
+
+  it('should validate file path length', async () => {
+    const { user } = renderLinkService();
+    
+    // Expand panel
+    await user.click(screen.getByRole('button', { name: /link to service/i }));
+    
+    const pathInput = screen.getByRole('textbox', { name: /path/i });
+    const longPath = 'path/'.repeat(100) + 'file.js';
+    await user.type(pathInput, longPath);
+    
+    await waitForValidation();
+    
+    expect(screen.getByText(/file path too long/i)).toBeInTheDocument();
+  });
+
+  it('should enable submit button when form is valid', async () => {
+    const { user } = renderLinkService();
+    
+    // Expand panel
+    await user.click(screen.getByRole('button', { name: /link to service/i }));
+    
+    // Fill all required fields with valid data
+    await fillFormFields(user, {
+      service: 'Production GitHub',
+      repository: 'test-repo',
+      branch: 'main',
+      path: 'config/app.json'
+    });
+    
+    await waitForValidation();
+    
+    const submitButton = screen.getByRole('button', { name: /view latest/i });
+    expect(submitButton).not.toBeDisabled();
+  });
+
+  it('should perform real-time validation on field changes', async () => {
+    const { user } = renderLinkService();
+    
+    // Expand panel
+    await user.click(screen.getByRole('button', { name: /link to service/i }));
+    
+    const repoInput = screen.getByRole('textbox', { name: /repository/i });
+    
+    // Type invalid characters
+    await user.type(repoInput, 'invalid!');
+    await waitForValidation(100);
+    expect(screen.getByText(/invalid repository name format/i)).toBeInTheDocument();
+    
+    // Clear and type valid name
+    await user.clear(repoInput);
+    await user.type(repoInput, 'valid-repo');
+    await waitForValidation(100);
+    expect(screen.queryByText(/invalid repository name format/i)).not.toBeInTheDocument();
+  });
+});
+
+// ============================================================================
+// SERVICE OPERATIONS TESTS
+// ============================================================================
+
+describe('LinkService Component - Service Operations', () => {
+  beforeEach(async () => {
+    const { user } = renderLinkService();
+    const disclosureButton = screen.getByRole('button', { name: /link to service/i });
+    await user.click(disclosureButton);
+  });
+
+  it('should fetch file content when View Latest is clicked', async () => {
+    const mockOnContentChange = vi.fn();
+    const { user } = renderLinkService({ onContentChange: mockOnContentChange });
+    
+    // Expand panel
+    await user.click(screen.getByRole('button', { name: /link to service/i }));
+    
+    // Fill form with valid data
+    await fillFormFields(user, {
+      service: 'Production GitHub',
+      repository: 'test-repo',
+      branch: 'main',
+      path: 'config/app.json'
+    });
+    
+    // Submit form
+    const submitButton = screen.getByRole('button', { name: /view latest/i });
+    await user.click(submitButton);
+    
+    // Should show loading state
+    expect(screen.getByText(/loading/i)).toBeInTheDocument();
+    
+    // Wait for operation to complete
+    await waitFor(() => {
+      expect(mockOnContentChange).toHaveBeenCalledWith(mockFileContent.json);
+    });
+  });
+
+  it('should handle file content fetch errors', async () => {
+    const { user } = renderLinkService();
+    
+    // Expand panel
+    await user.click(screen.getByRole('button', { name: /link to service/i }));
+    
+    // Fill form with error-triggering service
+    await fillFormFields(user, {
+      service: 'Production GitHub',
+      repository: 'error-service',
+      branch: 'main',
+      path: 'nonexistent.json'
+    });
+    
+    // Submit form
+    const submitButton = screen.getByRole('button', { name: /view latest/i });
+    await user.click(submitButton);
+    
+    // Should show error message
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+      expect(screen.getByText(/failed to fetch file/i)).toBeInTheDocument();
+    });
+  });
+
+  it('should delete cache when Delete Cache button is clicked', async () => {
+    const { user } = renderLinkService({ cache: 'test-cache-key' });
+    
+    // Expand panel
+    await user.click(screen.getByRole('button', { name: /link to service/i }));
+    
+    const deleteCacheButton = screen.getByRole('button', { name: /delete cache/i });
+    await user.click(deleteCacheButton);
+    
+    // Should show deleting state
+    expect(screen.getByText(/deleting/i)).toBeInTheDocument();
+    
+    // Wait for operation to complete
+    await waitFor(() => {
+      expect(screen.queryByText(/deleting/i)).not.toBeInTheDocument();
+    });
+  });
+
+  it('should handle cache deletion errors', async () => {
+    const { user } = renderLinkService({ cache: 'error-cache' });
+    
+    // Expand panel
+    await user.click(screen.getByRole('button', { name: /link to service/i }));
+    
+    const deleteCacheButton = screen.getByRole('button', { name: /delete cache/i });
+    await user.click(deleteCacheButton);
+    
+    // Should show error message
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+      expect(screen.getByText(/failed to delete cache/i)).toBeInTheDocument();
+    });
+  });
+
+  it('should not show Delete Cache button when no cache is provided', async () => {
+    const { user } = renderLinkService({ cache: undefined });
+    
+    // Expand panel
+    await user.click(screen.getByRole('button', { name: /link to service/i }));
+    
+    expect(screen.queryByRole('button', { name: /delete cache/i })).not.toBeInTheDocument();
+  });
+
+  it('should update storage path when form values change', async () => {
+    const mockOnStoragePathChange = vi.fn();
+    const { user } = renderLinkService({ onStoragePathChange: mockOnStoragePathChange });
+    
+    // Expand panel
+    await user.click(screen.getByRole('button', { name: /link to service/i }));
+    
+    // Fill form fields one by one
+    await fillFormFields(user, {
+      service: 'Production GitHub',
+      repository: 'test-repo',
+      branch: 'main',
+      path: 'config/app.json'
+    });
+    
+    await waitFor(() => {
+      expect(mockOnStoragePathChange).toHaveBeenCalledWith(
+        'Production GitHub/_repo/test-repo?branch=main&path=config/app.json'
+      );
+    });
+  });
+});
+
+// ============================================================================
+// ACCESSIBILITY TESTS
+// ============================================================================
+
+describe('LinkService Component - Accessibility', () => {
+  it('should have no accessibility violations in default state', async () => {
+    const { container } = renderLinkService();
+    await testA11y(container);
+  });
+
+  it('should have no accessibility violations when expanded', async () => {
+    const { container, user } = renderLinkService();
+    
+    const disclosureButton = screen.getByRole('button', { name: /link to service/i });
+    await user.click(disclosureButton);
+    
+    await testA11y(container);
+  });
+
+  it('should have proper ARIA attributes on disclosure button', async () => {
+    const { user } = renderLinkService();
+    
+    const disclosureButton = screen.getByRole('button', { name: /link to service/i });
+    
+    checkAriaAttributes(disclosureButton, {
+      'aria-expanded': 'false',
+      'aria-controls': 'link-service-panel',
+    });
+    
+    await user.click(disclosureButton);
+    
+    checkAriaAttributes(disclosureButton, {
+      'aria-expanded': 'true',
+    });
+  });
+
+  it('should have proper ARIA attributes on form fields', async () => {
+    const { user } = renderLinkService();
+    
+    // Expand panel
+    await user.click(screen.getByRole('button', { name: /link to service/i }));
+    
+    const serviceSelect = screen.getByRole('combobox', { name: /select service/i });
+    const repoInput = screen.getByRole('textbox', { name: /repository/i });
+    const branchInput = screen.getByRole('textbox', { name: /branch/i });
+    const pathInput = screen.getByRole('textbox', { name: /path/i });
+    
+    // Check required attributes
+    expect(serviceSelect).toHaveAttribute('required');
+    expect(repoInput).toHaveAttribute('required');
+    expect(branchInput).toHaveAttribute('required');
+    expect(pathInput).toHaveAttribute('required');
+  });
+
+  it('should associate form fields with error messages', async () => {
+    const { user } = renderLinkService();
+    
+    // Expand panel
+    await user.click(screen.getByRole('button', { name: /link to service/i }));
+    
+    // Trigger validation error
+    const repoInput = screen.getByRole('textbox', { name: /repository/i });
+    await user.type(repoInput, 'invalid!');
+    await waitForValidation();
+    
+    expect(repoInput).toHaveAttribute('aria-describedby', 'repoInput-error');
+    expect(screen.getByText(/invalid repository name format/i)).toHaveAttribute('id', 'repoInput-error');
+  });
+
+  it('should provide screen reader announcements for operations', async () => {
+    const { user } = renderLinkService();
+    
+    // Expand panel
+    await user.click(screen.getByRole('button', { name: /link to service/i }));
+    
+    // Fill form and submit
+    await fillFormFields(user, {
+      service: 'Production GitHub',
+      repository: 'test-repo',
+      branch: 'main',
+      path: 'config/app.json'
+    });
+    
+    const submitButton = screen.getByRole('button', { name: /view latest/i });
+    await user.click(submitButton);
+    
+    // Check for loading announcement
+    expect(screen.getByText(/loading file content from storage service/i)).toBeInTheDocument();
+  });
+
+  it('should support keyboard navigation', async () => {
+    const { user } = renderLinkService();
+    const keyboard = createKeyboardUtils(user);
+    
+    // Focus disclosure button and activate with Enter
+    const disclosureButton = screen.getByRole('button', { name: /link to service/i });
+    disclosureButton.focus();
+    expect(keyboard.isFocused(disclosureButton)).toBe(true);
+    
+    await keyboard.enter();
+    
+    // Panel should be expanded
+    expect(screen.getByRole('form')).toBeInTheDocument();
+    
+    // Tab through form fields
+    await keyboard.tab();
+    const serviceSelect = screen.getByRole('combobox', { name: /select service/i });
+    expect(keyboard.isFocused(serviceSelect)).toBe(true);
+    
+    await keyboard.tab();
+    const repoInput = screen.getByRole('textbox', { name: /repository/i });
+    expect(keyboard.isFocused(repoInput)).toBe(true);
+  });
+
+  it('should support ARIA live regions for dynamic content', async () => {
+    const { user } = renderLinkService();
+    
+    // Expand panel
+    await user.click(screen.getByRole('button', { name: /link to service/i }));
+    
+    // Error messages should be in live regions
+    const repoInput = screen.getByRole('textbox', { name: /repository/i });
+    await user.type(repoInput, 'invalid!');
+    await waitForValidation();
+    
+    const errorMessage = screen.getByText(/invalid repository name format/i);
+    const liveRegion = errorMessage.closest('[role="alert"]');
+    expect(liveRegion).toHaveAttribute('aria-live', 'assertive');
+  });
+});
+
+// ============================================================================
+// THEME INTEGRATION TESTS
+// ============================================================================
+
+describe('LinkService Component - Theme Integration', () => {
+  it('should apply light theme styles correctly', () => {
+    const { useTheme } = require('@/hooks/use-theme');
+    useTheme.mockReturnValue({
+      theme: 'light',
+      isDarkMode: false,
+      setTheme: vi.fn(),
     });
 
-    it('renders all form fields when expanded', () => {
-      renderWithProviders(<LinkService {...mockProps} />);
-      
-      expect(screen.getByLabelText(/repository url/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/branch/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/access token/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/directory/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/auto sync/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/cache enabled/i)).toBeInTheDocument();
+    renderLinkService();
+    
+    const disclosureButton = screen.getByRole('button', { name: /link to service/i });
+    expect(disclosureButton).toHaveClass('bg-white', 'text-gray-900');
+  });
+
+  it('should apply dark theme styles correctly', () => {
+    const { useTheme } = require('@/hooks/use-theme');
+    useTheme.mockReturnValue({
+      theme: 'dark',
+      isDarkMode: true,
+      setTheme: vi.fn(),
     });
 
-    it('validates required fields', async () => {
-      renderWithProviders(<LinkService {...mockProps} />);
-      
-      const submitButton = screen.getByRole('button', { name: /link service/i });
-      await user.click(submitButton);
-      
-      await waitFor(() => {
-        expect(screen.getByText(/repository url is required/i)).toBeInTheDocument();
-        expect(screen.getByText(/branch is required/i)).toBeInTheDocument();
-      });
+    renderLinkService();
+    
+    const disclosureButton = screen.getByRole('button', { name: /link to service/i });
+    expect(disclosureButton).toHaveClass('bg-gray-800', 'text-white');
+  });
+
+  it('should handle theme transitions smoothly', async () => {
+    const { useTheme } = require('@/hooks/use-theme');
+    const setTheme = vi.fn();
+    
+    useTheme.mockReturnValue({
+      theme: 'light',
+      isDarkMode: false,
+      setTheme,
     });
 
-    it('validates URL format for repository URL', async () => {
-      renderWithProviders(<LinkService {...mockProps} />);
-      
-      const urlInput = screen.getByLabelText(/repository url/i);
-      await user.type(urlInput, 'invalid-url');
-      await user.tab(); // Trigger validation
-      
-      await waitFor(() => {
-        expect(screen.getByText(/please enter a valid repository url/i)).toBeInTheDocument();
-      });
+    const { rerender, user } = renderLinkService();
+    
+    // Start with light theme
+    expect(screen.getByRole('button', { name: /link to service/i })).toHaveClass('bg-white');
+    
+    // Switch to dark theme
+    useTheme.mockReturnValue({
+      theme: 'dark',
+      isDarkMode: true,
+      setTheme,
+    });
+    
+    rerender(<LinkService {...defaultProps} />);
+    
+    // Should now have dark theme classes
+    expect(screen.getByRole('button', { name: /link to service/i })).toHaveClass('bg-gray-800');
+  });
+});
+
+// ============================================================================
+// PERFORMANCE TESTS
+// ============================================================================
+
+describe('LinkService Component - Performance', () => {
+  it('should render within acceptable time limits', async () => {
+    const { renderTime } = await measureRenderTime(() => renderLinkService());
+    
+    // Component should render in under 100ms
+    expect(renderTime).toBeLessThan(100);
+  });
+
+  it('should handle large service lists efficiently', async () => {
+    // Mock a large number of services
+    const largeServiceList = Array.from({ length: 1000 }, (_, index) => ({
+      ...mockStorageServices[0],
+      id: index + 1,
+      name: `service_${index}`,
+      label: `Service ${index}`,
+    }));
+
+    const { useStorageServices } = require('@/hooks/use-storage-services');
+    useStorageServices.mockReturnValue({
+      data: largeServiceList,
+      error: null,
+      isLoading: false,
     });
 
-    it('accepts valid GitHub repository URLs', async () => {
-      renderWithProviders(<LinkService {...mockProps} />);
-      
-      const urlInput = screen.getByLabelText(/repository url/i);
-      await user.type(urlInput, 'https://github.com/example/repo.git');
-      await user.tab();
-      
-      await waitFor(() => {
-        expect(screen.queryByText(/please enter a valid repository url/i)).not.toBeInTheDocument();
-      });
-    });
+    const { renderTime } = await measureRenderTime(() => renderLinkService());
+    
+    // Should still render quickly even with many services
+    expect(renderTime).toBeLessThan(200);
+  });
 
-    it('validates branch name format', async () => {
-      renderWithProviders(<LinkService {...mockProps} />);
-      
-      const branchInput = screen.getByLabelText(/branch/i);
-      await user.type(branchInput, 'invalid..branch..name');
-      await user.tab();
-      
-      await waitFor(() => {
-        expect(screen.getByText(/please enter a valid branch name/i)).toBeInTheDocument();
-      });
-    });
+  it('should debounce validation to avoid excessive API calls', async () => {
+    const { user } = renderLinkService();
+    
+    // Expand panel
+    await user.click(screen.getByRole('button', { name: /link to service/i }));
+    
+    const repoInput = screen.getByRole('textbox', { name: /repository/i });
+    
+    // Type rapidly
+    await user.type(repoInput, 'test-repo', { delay: 10 });
+    
+    // Validation should be debounced
+    await waitForValidation(400);
+    
+    // Should not show validation errors for rapid typing
+    expect(screen.queryByText(/invalid repository name format/i)).not.toBeInTheDocument();
+  });
 
-    it('handles form submission with valid data', async () => {
-      renderWithProviders(<LinkService {...mockProps} />);
-      
-      const formData = createMockFormData();
-      
-      // Fill in form fields
-      await user.type(screen.getByLabelText(/repository url/i), formData.repositoryUrl);
-      await user.type(screen.getByLabelText(/branch/i), formData.branch);
-      await user.type(screen.getByLabelText(/access token/i), formData.accessToken);
-      await user.type(screen.getByLabelText(/directory/i), formData.directory);
-      
-      if (formData.autoSync) {
-        await user.click(screen.getByLabelText(/auto sync/i));
-      }
-      if (formData.cacheEnabled) {
-        await user.click(screen.getByLabelText(/cache enabled/i));
-      }
-      
-      const submitButton = screen.getByRole('button', { name: /link service/i });
-      await user.click(submitButton);
-      
-      await waitFor(() => {
-        expect(mockProps.onServiceLinked).toHaveBeenCalledWith(
-          expect.objectContaining({
-            repositoryUrl: formData.repositoryUrl,
-            branch: formData.branch,
-            directory: formData.directory
-          })
+  it('should minimize re-renders during form interactions', async () => {
+    const renderCount = { count: 0 };
+    
+    const TestComponent = (props: LinkServiceProps) => {
+      renderCount.count++;
+      return <LinkService {...props} />;
+    };
+
+    const { user } = customRender(<TestComponent {...defaultProps} />);
+    
+    const initialRenderCount = renderCount.count;
+    
+    // Expand panel
+    await user.click(screen.getByRole('button', { name: /link to service/i }));
+    
+    // Fill multiple fields
+    await fillFormFields(user, {
+      service: 'Production GitHub',
+      repository: 'test-repo',
+      branch: 'main',
+      path: 'config/app.json'
+    });
+    
+    // Should not have excessive re-renders
+    expect(renderCount.count - initialRenderCount).toBeLessThan(10);
+  });
+});
+
+// ============================================================================
+// ERROR HANDLING TESTS
+// ============================================================================
+
+describe('LinkService Component - Error Handling', () => {
+  it('should handle network errors gracefully', async () => {
+    // Mock network error
+    server.use(
+      http.get('/api/storage/*', () => {
+        return HttpResponse.error();
+      })
+    );
+
+    const { user } = renderLinkService();
+    
+    // Expand panel and submit
+    await user.click(screen.getByRole('button', { name: /link to service/i }));
+    await fillFormFields(user, {
+      service: 'Production GitHub',
+      repository: 'test-repo',
+      branch: 'main',
+      path: 'config/app.json'
+    });
+    
+    const submitButton = screen.getByRole('button', { name: /view latest/i });
+    await user.click(submitButton);
+    
+    // Should show error message
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+      expect(screen.getByText(/failed to load file content/i)).toBeInTheDocument();
+    });
+  });
+
+  it('should handle timeout errors', async () => {
+    // Mock slow response
+    server.use(
+      http.get('/api/storage/*', async () => {
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        return HttpResponse.json({ content: 'slow response' });
+      })
+    );
+
+    const { user } = renderLinkService();
+    
+    // Set shorter timeout for testing
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(() => 
+      Promise.reject(new Error('Request timeout'))
+    ));
+
+    // Expand panel and submit
+    await user.click(screen.getByRole('button', { name: /link to service/i }));
+    await fillFormFields(user, {
+      service: 'Production GitHub',
+      repository: 'test-repo',
+      branch: 'main',
+      path: 'config/app.json'
+    });
+    
+    const submitButton = screen.getByRole('button', { name: /view latest/i });
+    await user.click(submitButton);
+    
+    // Should handle timeout error
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+    });
+  });
+
+  it('should clear previous errors when form is resubmitted', async () => {
+    // First submission with error
+    server.use(
+      http.get('/api/storage/*', () => {
+        return HttpResponse.json(
+          { error: { message: 'File not found' } },
+          { status: 404 }
         );
-      });
-    });
+      })
+    );
 
-    it('prevents submission when form has validation errors', async () => {
-      renderWithProviders(<LinkService {...mockProps} />);
-      
-      // Leave required fields empty and try to submit
-      const submitButton = screen.getByRole('button', { name: /link service/i });
-      await user.click(submitButton);
-      
-      await waitFor(() => {
-        expect(screen.getByText(/repository url is required/i)).toBeInTheDocument();
-      });
-      
-      expect(mockProps.onServiceLinked).not.toHaveBeenCalled();
+    const { user } = renderLinkService();
+    
+    // Expand panel and submit
+    await user.click(screen.getByRole('button', { name: /link to service/i }));
+    await fillFormFields(user, {
+      service: 'Production GitHub',
+      repository: 'test-repo',
+      branch: 'main',
+      path: 'config/app.json'
+    });
+    
+    const submitButton = screen.getByRole('button', { name: /view latest/i });
+    await user.click(submitButton);
+    
+    // Should show error
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+    });
+    
+    // Reset server to successful response
+    server.resetHandlers();
+    server.use(...linkServiceHandlers);
+    
+    // Submit again
+    await user.click(submitButton);
+    
+    // Error should be cleared
+    await waitFor(() => {
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+  });
+});
+
+// ============================================================================
+// INTEGRATION TESTS
+// ============================================================================
+
+describe('LinkService Component - Integration', () => {
+  it('should integrate properly with React Hook Form', async () => {
+    const onSubmit = vi.fn();
+    const { user, formMethods } = renderLinkServiceWithForm();
+    
+    // Set up form submission handler
+    formMethods.handleSubmit(onSubmit);
+    
+    // Expand panel
+    await user.click(screen.getByRole('button', { name: /link to service/i }));
+    
+    // Fill form
+    await fillFormFields(user, {
+      service: 'Production GitHub',
+      repository: 'test-repo',
+      branch: 'main',
+      path: 'config/app.json'
+    });
+    
+    // Form should be valid
+    expect(formMethods.formState.isValid).toBe(true);
+    
+    // Form data should be correct
+    const formData = formMethods.getValues();
+    expect(formData).toEqual({
+      serviceList: 'Production GitHub',
+      repoInput: 'test-repo',
+      branchInput: 'main',
+      pathInput: 'config/app.json',
     });
   });
 
-  describe('Service Selection and Configuration', () => {
-    beforeEach(() => {
-      mockProps.isExpanded = true;
+  it('should work with custom validation schema', async () => {
+    const customSchema = z.object({
+      serviceList: z.string().min(1),
+      repoInput: z.string().min(5, 'Repository name must be at least 5 characters'),
+      branchInput: z.string().min(1),
+      pathInput: z.string().min(1),
     });
 
-    it('loads available storage services on mount', async () => {
-      renderWithProviders(<LinkService {...mockProps} />);
-      
-      await waitFor(() => {
-        const serviceSelect = screen.getByLabelText(/storage service/i);
-        expect(serviceSelect).toBeInTheDocument();
-      });
-      
-      // Should show loading state initially
-      expect(screen.getByText(/loading services/i)).toBeInTheDocument();
-      
-      await waitFor(() => {
-        expect(screen.queryByText(/loading services/i)).not.toBeInTheDocument();
-      });
-    });
-
-    it('displays service connection status', async () => {
-      renderWithProviders(<LinkService {...mockProps} />);
-      
-      const testConnectionButton = screen.getByRole('button', { name: /test connection/i });
-      await user.click(testConnectionButton);
-      
-      await waitFor(() => {
-        expect(screen.getByText(/connection successful/i)).toBeInTheDocument();
-      });
-    });
-
-    it('handles service connection errors gracefully', async () => {
-      // Override mock to return error
-      server.use(
-        rest.post('/api/v2/system/service/:serviceId/_test', (req, res, ctx) => {
-          return res(
-            ctx.status(500),
-            ctx.json({
-              error: {
-                code: 500,
-                message: 'Connection failed',
-                context: 'Invalid credentials'
-              }
-            })
-          );
-        })
-      );
-      
-      renderWithProviders(<LinkService {...mockProps} />);
-      
-      const testConnectionButton = screen.getByRole('button', { name: /test connection/i });
-      await user.click(testConnectionButton);
-      
-      await waitFor(() => {
-        expect(screen.getByText(/connection failed/i)).toBeInTheDocument();
-        expect(screen.getByText(/invalid credentials/i)).toBeInTheDocument();
-      });
-    });
+    const { user } = renderLinkService({ validationSchema: customSchema });
+    
+    // Expand panel
+    await user.click(screen.getByRole('button', { name: /link to service/i }));
+    
+    // Test custom validation
+    const repoInput = screen.getByRole('textbox', { name: /repository/i });
+    await user.type(repoInput, 'abc');
+    await waitForValidation();
+    
+    expect(screen.getByText(/repository name must be at least 5 characters/i)).toBeInTheDocument();
   });
 
-  describe('File Operations and Cache Management', () => {
-    beforeEach(() => {
-      mockProps.isExpanded = true;
+  it('should integrate with storage service loading states', async () => {
+    const { useStorageServices } = require('@/hooks/use-storage-services');
+    
+    // Start with loading state
+    useStorageServices.mockReturnValue({
+      data: [],
+      error: null,
+      isLoading: true,
     });
 
-    it('displays file content when preview is requested', async () => {
-      renderWithProviders(<LinkService {...mockProps} />);
-      
-      const previewButton = screen.getByRole('button', { name: /preview content/i });
-      await user.click(previewButton);
-      
-      await waitFor(() => {
-        expect(screen.getByText(/file content preview/i)).toBeInTheDocument();
-      });
+    const { rerender } = renderLinkService();
+    
+    // Should show loading state
+    expect(screen.getByRole('status')).toBeInTheDocument();
+    
+    // Switch to loaded state
+    useStorageServices.mockReturnValue({
+      data: mockStorageServices,
+      error: null,
+      isLoading: false,
     });
-
-    it('handles file content loading errors', async () => {
-      // Override mock to return error for file operations
-      server.use(
-        rest.get('/api/v2/:serviceId/_file/*', (req, res, ctx) => {
-          return res(
-            ctx.status(404),
-            ctx.json({
-              error: {
-                code: 404,
-                message: 'File not found',
-                context: 'The requested file does not exist'
-              }
-            })
-          );
-        })
-      );
-      
-      renderWithProviders(<LinkService {...mockProps} />);
-      
-      const previewButton = screen.getByRole('button', { name: /preview content/i });
-      await user.click(previewButton);
-      
-      await waitFor(() => {
-        expect(screen.getByText(/file not found/i)).toBeInTheDocument();
-      });
-    });
-
-    it('clears cache when delete cache is clicked', async () => {
-      renderWithProviders(<LinkService {...mockProps} />);
-      
-      const deleteCacheButton = screen.getByRole('button', { name: /clear cache/i });
-      await user.click(deleteCacheButton);
-      
-      // Should show confirmation dialog
-      const confirmDialog = screen.getByRole('dialog', { name: /confirm cache deletion/i });
-      expect(confirmDialog).toBeInTheDocument();
-      
-      const confirmButton = within(confirmDialog).getByRole('button', { name: /confirm/i });
-      await user.click(confirmButton);
-      
-      await waitFor(() => {
-        expect(screen.getByText(/cache cleared successfully/i)).toBeInTheDocument();
-      });
-    });
-
-    it('cancels cache deletion when cancel is clicked', async () => {
-      renderWithProviders(<LinkService {...mockProps} />);
-      
-      const deleteCacheButton = screen.getByRole('button', { name: /clear cache/i });
-      await user.click(deleteCacheButton);
-      
-      const confirmDialog = screen.getByRole('dialog', { name: /confirm cache deletion/i });
-      const cancelButton = within(confirmDialog).getByRole('button', { name: /cancel/i });
-      await user.click(cancelButton);
-      
-      await waitFor(() => {
-        expect(confirmDialog).not.toBeInTheDocument();
-      });
-      
-      expect(screen.queryByText(/cache cleared successfully/i)).not.toBeInTheDocument();
-    });
+    
+    rerender(<LinkService {...defaultProps} />);
+    
+    // Should now show the component
+    expect(screen.getByRole('button', { name: /link to service/i })).toBeInTheDocument();
   });
 
-  describe('Expandable Panel Behavior', () => {
-    it('toggles expansion when header is clicked', async () => {
-      renderWithProviders(<LinkService {...mockProps} />);
-      
-      const toggleButton = screen.getByRole('button', { name: /expand service configuration/i });
-      await user.click(toggleButton);
-      
-      expect(mockProps.onExpandToggle).toHaveBeenCalledWith(true);
+  it('should handle service filtering correctly', () => {
+    const { useStorageServices } = require('@/hooks/use-storage-services');
+    
+    // Mock with mixed service types
+    useStorageServices.mockReturnValue({
+      data: mockStorageServices,
+      error: null,
+      isLoading: false,
     });
 
-    it('supports keyboard navigation for expansion toggle', async () => {
-      renderWithProviders(<LinkService {...mockProps} />);
-      
-      const toggleButton = screen.getByRole('button', { name: /expand service configuration/i });
-      toggleButton.focus();
-      
-      await user.keyboard('{Enter}');
-      expect(mockProps.onExpandToggle).toHaveBeenCalledWith(true);
-      
-      await user.keyboard(' ');
-      expect(mockProps.onExpandToggle).toHaveBeenCalledTimes(2);
+    renderLinkService();
+    
+    // Component should render (has GitHub services)
+    expect(screen.getByRole('button', { name: /link to service/i })).toBeInTheDocument();
+    
+    // Mock with no GitHub services
+    useStorageServices.mockReturnValue({
+      data: mockStorageServices.filter(s => s.type !== 'github'),
+      error: null,
+      isLoading: false,
     });
 
-    it('updates ARIA attributes based on expansion state', () => {
-      const { rerender } = renderWithProviders(<LinkService {...mockProps} />);
-      
-      const toggleButton = screen.getByRole('button', { name: /expand service configuration/i });
-      expect(toggleButton).toHaveAttribute('aria-expanded', 'false');
-      
-      rerender(<LinkService {...mockProps} isExpanded={true} />);
-      expect(toggleButton).toHaveAttribute('aria-expanded', 'true');
+    const { rerender } = renderLinkService();
+    rerender(<LinkService {...defaultProps} />);
+    
+    // Component should not render
+    expect(screen.queryByRole('button', { name: /link to service/i })).not.toBeInTheDocument();
+  });
+});
+
+// ============================================================================
+// EDGE CASES AND BOUNDARY TESTS
+// ============================================================================
+
+describe('LinkService Component - Edge Cases', () => {
+  it('should handle empty storage services array', () => {
+    const { useStorageServices } = require('@/hooks/use-storage-services');
+    useStorageServices.mockReturnValue({
+      data: [],
+      error: null,
+      isLoading: false,
     });
+
+    const { container } = renderLinkService();
+    
+    // Component should not render
+    expect(container.firstChild).toBeNull();
   });
 
-  describe('Accessibility Compliance', () => {
-    it('has no accessibility violations when collapsed', async () => {
-      const { container } = renderWithProviders(<LinkService {...mockProps} />);
-      const results = await axe(container);
-      expect(results).toHaveNoViolations();
+  it('should handle malformed service data', () => {
+    const { useStorageServices } = require('@/hooks/use-storage-services');
+    useStorageServices.mockReturnValue({
+      data: [
+        { id: 1, name: 'test' }, // Missing required properties
+        null,
+        undefined,
+        { ...mockStorageServices[0], type: 'github' }, // Valid service
+      ],
+      error: null,
+      isLoading: false,
     });
 
-    it('has no accessibility violations when expanded', async () => {
-      const { container } = renderWithProviders(
-        <LinkService {...mockProps} isExpanded={true} />
-      );
-      const results = await axe(container);
-      expect(results).toHaveNoViolations();
-    });
-
-    it('provides proper ARIA labels for form fields', () => {
-      renderWithProviders(<LinkService {...mockProps} isExpanded={true} />);
-      
-      expect(screen.getByLabelText(/repository url/i)).toHaveAttribute('aria-required', 'true');
-      expect(screen.getByLabelText(/branch/i)).toHaveAttribute('aria-required', 'true');
-      expect(screen.getByLabelText(/access token/i)).toHaveAttribute('aria-required', 'false');
-    });
-
-    it('announces validation errors to screen readers', async () => {
-      renderWithProviders(<LinkService {...mockProps} isExpanded={true} />);
-      
-      const submitButton = screen.getByRole('button', { name: /link service/i });
-      await user.click(submitButton);
-      
-      await waitFor(() => {
-        const errorMessage = screen.getByText(/repository url is required/i);
-        expect(errorMessage).toHaveAttribute('role', 'alert');
-        expect(errorMessage).toHaveAttribute('aria-live', 'polite');
-      });
-    });
-
-    it('supports keyboard navigation throughout the form', async () => {
-      renderWithProviders(<LinkService {...mockProps} isExpanded={true} />);
-      
-      const firstField = screen.getByLabelText(/repository url/i);
-      firstField.focus();
-      
-      // Tab through all form fields
-      await user.keyboard('{Tab}');
-      expect(screen.getByLabelText(/branch/i)).toHaveFocus();
-      
-      await user.keyboard('{Tab}');
-      expect(screen.getByLabelText(/access token/i)).toHaveFocus();
-      
-      await user.keyboard('{Tab}');
-      expect(screen.getByLabelText(/directory/i)).toHaveFocus();
-    });
-
-    it('provides proper focus management for modal dialogs', async () => {
-      renderWithProviders(<LinkService {...mockProps} isExpanded={true} />);
-      
-      const deleteCacheButton = screen.getByRole('button', { name: /clear cache/i });
-      await user.click(deleteCacheButton);
-      
-      const confirmDialog = screen.getByRole('dialog', { name: /confirm cache deletion/i });
-      expect(confirmDialog).toBeInTheDocument();
-      
-      // Focus should be trapped in the dialog
-      const confirmButton = within(confirmDialog).getByRole('button', { name: /confirm/i });
-      expect(confirmButton).toHaveFocus();
-    });
+    // Should not crash and should render properly
+    renderLinkService();
+    expect(screen.getByRole('button', { name: /link to service/i })).toBeInTheDocument();
   });
 
-  describe('Theme Integration', () => {
-    it('adapts to light theme', () => {
-      renderWithProviders(<LinkService {...mockProps} />, { theme: 'light' });
-      
-      const container = screen.getByRole('region', { name: /service linking/i });
-      expect(container).toHaveClass('bg-white', 'text-gray-900');
+  it('should handle very long service names', async () => {
+    const longServiceName = 'Very Long Service Name That Exceeds Normal Length Expectations And Tests UI Handling';
+    const serviceWithLongName = {
+      ...mockStorageServices[0],
+      name: longServiceName,
+      label: longServiceName,
+    };
+
+    const { useStorageServices } = require('@/hooks/use-storage-services');
+    useStorageServices.mockReturnValue({
+      data: [serviceWithLongName],
+      error: null,
+      isLoading: false,
     });
 
-    it('adapts to dark theme', () => {
-      renderWithProviders(<LinkService {...mockProps} />, { theme: 'dark' });
-      
-      const container = screen.getByRole('region', { name: /service linking/i });
-      expect(container).toHaveClass('bg-gray-800', 'text-gray-100');
-    });
-
-    it('respects system theme preference', () => {
-      // Mock system preference for dark mode
-      Object.defineProperty(window, 'matchMedia', {
-        writable: true,
-        value: vi.fn().mockImplementation((query) => ({
-          matches: query === '(prefers-color-scheme: dark)',
-          media: query,
-          onchange: null,
-          addListener: vi.fn(),
-          removeListener: vi.fn(),
-          addEventListener: vi.fn(),
-          removeEventListener: vi.fn(),
-          dispatchEvent: vi.fn(),
-        })),
-      });
-      
-      renderWithProviders(<LinkService {...mockProps} />, { theme: 'system' });
-      
-      const container = screen.getByRole('region', { name: /service linking/i });
-      expect(container).toHaveClass('dark:bg-gray-800', 'dark:text-gray-100');
-    });
+    const { user } = renderLinkService();
+    
+    // Expand panel
+    await user.click(screen.getByRole('button', { name: /link to service/i }));
+    
+    // Should render service option without breaking layout
+    const serviceSelect = screen.getByRole('combobox', { name: /select service/i });
+    expect(within(serviceSelect).getByText(longServiceName)).toBeInTheDocument();
   });
 
-  describe('Error Handling and Recovery', () => {
-    it('displays error messages when API calls fail', async () => {
-      // Override mock to return error
-      server.use(
-        rest.get('/api/v2/system/service', (req, res, ctx) => {
-          return res(
-            ctx.status(500),
-            ctx.json({
-              error: {
-                code: 500,
-                message: 'Failed to load services',
-                context: 'Database connection error'
-              }
-            })
-          );
-        })
-      );
-      
-      renderWithProviders(<LinkService {...mockProps} isExpanded={true} />);
-      
-      await waitFor(() => {
-        expect(screen.getByText(/failed to load services/i)).toBeInTheDocument();
-        expect(screen.getByText(/database connection error/i)).toBeInTheDocument();
-      });
-    });
-
-    it('provides retry functionality for failed operations', async () => {
-      let callCount = 0;
-      server.use(
-        rest.get('/api/v2/system/service', (req, res, ctx) => {
-          callCount++;
-          if (callCount === 1) {
-            return res(
-              ctx.status(500),
-              ctx.json({ error: { message: 'Temporary error' } })
-            );
-          }
-          return res(ctx.json({ resource: createMockStorageServices() }));
-        })
-      );
-      
-      renderWithProviders(<LinkService {...mockProps} isExpanded={true} />);
-      
-      await waitFor(() => {
-        expect(screen.getByText(/temporary error/i)).toBeInTheDocument();
-      });
-      
-      const retryButton = screen.getByRole('button', { name: /retry/i });
-      await user.click(retryButton);
-      
-      await waitFor(() => {
-        expect(screen.queryByText(/temporary error/i)).not.toBeInTheDocument();
-        expect(screen.getByLabelText(/storage service/i)).toBeInTheDocument();
-      });
-    });
-
-    it('handles network timeouts gracefully', async () => {
-      server.use(
-        rest.get('/api/v2/system/service', (req, res, ctx) => {
-          return res(ctx.delay('infinite'));
-        })
-      );
-      
-      renderWithProviders(<LinkService {...mockProps} isExpanded={true} />);
-      
-      // Should show loading state
-      expect(screen.getByText(/loading services/i)).toBeInTheDocument();
-      
-      // After timeout, should show error
-      await waitFor(
-        () => {
-          expect(screen.getByText(/request timeout/i)).toBeInTheDocument();
-        },
-        { timeout: 10000 }
-      );
-    });
+  it('should handle rapid form interactions', async () => {
+    const { user } = renderLinkService();
+    
+    // Expand panel
+    await user.click(screen.getByRole('button', { name: /link to service/i }));
+    
+    // Rapidly change form values
+    const repoInput = screen.getByRole('textbox', { name: /repository/i });
+    
+    for (let i = 0; i < 10; i++) {
+      await user.clear(repoInput);
+      await user.type(repoInput, `repo-${i}`, { delay: 1 });
+    }
+    
+    // Should handle rapid changes without errors
+    expect(repoInput).toHaveValue('repo-9');
   });
 
-  describe('Performance Optimization', () => {
-    it('renders form fields efficiently under load', async () => {
-      const startTime = performance.now();
-      
-      renderWithProviders(<LinkService {...mockProps} isExpanded={true} />);
-      
-      // Wait for all fields to render
-      await waitFor(() => {
-        expect(screen.getByLabelText(/repository url/i)).toBeInTheDocument();
-        expect(screen.getByLabelText(/branch/i)).toBeInTheDocument();
-        expect(screen.getByLabelText(/access token/i)).toBeInTheDocument();
-      });
-      
-      const endTime = performance.now();
-      const renderTime = endTime - startTime;
-      
-      // Should render within performance budget (100ms as per requirements)
-      expect(renderTime).toBeLessThan(100);
+  it('should handle component unmounting during async operations', async () => {
+    const { user, unmount } = renderLinkService();
+    
+    // Start async operation
+    await user.click(screen.getByRole('button', { name: /link to service/i }));
+    await fillFormFields(user, {
+      service: 'Production GitHub',
+      repository: 'test-repo',
+      branch: 'main',
+      path: 'config/app.json'
     });
-
-    it('debounces form validation to prevent excessive API calls', async () => {
-      const validationSpy = vi.fn();
-      
-      renderWithProviders(<LinkService {...mockProps} isExpanded={true} />);
-      
-      const urlInput = screen.getByLabelText(/repository url/i);
-      
-      // Rapid typing should be debounced
-      await user.type(urlInput, 'https://github.com/example/repo.git', { delay: 10 });
-      
-      // Validation should not be called for every keystroke
-      await waitFor(() => {
-        expect(screen.queryByText(/please enter a valid repository url/i)).not.toBeInTheDocument();
-      });
-    });
-
-    it('optimizes re-renders using React.memo patterns', () => {
-      const { rerender } = renderWithProviders(<LinkService {...mockProps} />);
-      
-      // Component should not re-render unnecessarily
-      const renderSpy = vi.spyOn(React, 'createElement');
-      
-      rerender(<LinkService {...mockProps} />);
-      
-      // Should use memoization to prevent unnecessary re-renders
-      expect(renderSpy).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('User Interaction Patterns', () => {
-    beforeEach(() => {
-      mockProps.isExpanded = true;
-    });
-
-    it('provides clear visual feedback for user actions', async () => {
-      renderWithProviders(<LinkService {...mockProps} />);
-      
-      const submitButton = screen.getByRole('button', { name: /link service/i });
-      
-      // Button should show loading state when clicked
-      await user.click(submitButton);
-      
-      expect(submitButton).toHaveAttribute('aria-busy', 'true');
-      expect(within(submitButton).getByRole('status')).toBeInTheDocument();
-    });
-
-    it('supports progressive disclosure of advanced options', async () => {
-      renderWithProviders(<LinkService {...mockProps} />);
-      
-      // Advanced options should be hidden initially
-      expect(screen.queryByText(/advanced configuration/i)).not.toBeInTheDocument();
-      
-      const showAdvancedButton = screen.getByRole('button', { name: /show advanced options/i });
-      await user.click(showAdvancedButton);
-      
-      expect(screen.getByText(/advanced configuration/i)).toBeInTheDocument();
-    });
-
-    it('provides contextual help and tooltips', async () => {
-      renderWithProviders(<LinkService {...mockProps} />);
-      
-      const helpIcon = screen.getByRole('button', { name: /help for repository url/i });
-      await user.hover(helpIcon);
-      
-      await waitFor(() => {
-        expect(screen.getByRole('tooltip')).toBeInTheDocument();
-        expect(screen.getByText(/enter the git repository url/i)).toBeInTheDocument();
-      });
-    });
-
-    it('handles rapid user interactions gracefully', async () => {
-      renderWithProviders(<LinkService {...mockProps} />);
-      
-      const toggleButton = screen.getByRole('button', { name: /expand service configuration/i });
-      
-      // Rapid clicking should not cause issues
-      for (let i = 0; i < 5; i++) {
-        await user.click(toggleButton);
-      }
-      
-      // Should handle all interactions properly
-      expect(mockProps.onExpandToggle).toHaveBeenCalledTimes(5);
-    });
+    
+    const submitButton = screen.getByRole('button', { name: /view latest/i });
+    await user.click(submitButton);
+    
+    // Unmount component before operation completes
+    unmount();
+    
+    // Should not throw errors or warnings
+    // This is primarily testing that cleanup is handled properly
   });
 });
