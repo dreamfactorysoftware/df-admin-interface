@@ -1,11 +1,10 @@
 /**
  * Language detection utility for DreamFactory Admin Interface
  * Provides browser language detection with localStorage persistence and fallback handling
- * Compatible with Next.js SSR and client-side rendering contexts
+ * Compatible with Next.js SSR/CSR contexts and React component lifecycle
  */
 
 import {
-  SUPPORTED_LANGUAGES,
   SUPPORTED_LANGUAGE_CODES,
   DEFAULT_LANGUAGE,
   LANGUAGE_STORAGE_KEY,
@@ -16,298 +15,254 @@ import {
 } from '../constants/languages';
 
 /**
- * Language detection result containing the detected language and source
- */
-export interface LanguageDetectionResult {
-  /** The detected or fallback language code */
-  language: SupportedLanguageCode;
-  /** The source of the language detection */
-  source: 'localStorage' | 'navigator' | 'fallback';
-  /** Whether this is the user's preferred language (not fallback) */
-  isPreferred: boolean;
-}
-
-/**
- * Detects the user's preferred language with comprehensive fallback logic
+ * Detects the user's preferred language based on localStorage, browser settings, and fallbacks.
+ * Handles both server-side rendering (SSR) and client-side rendering (CSR) contexts.
  * 
- * Detection order:
- * 1. User's saved preference in localStorage
- * 2. Browser's navigator.language preference
- * 3. Browser's navigator.languages array
- * 4. Default fallback language (English)
+ * Priority order:
+ * 1. Stored user preference in localStorage (CSR only)
+ * 2. Browser navigator.language settings (CSR only)
+ * 3. Default language fallback
  * 
- * @returns Language detection result with language code and source information
+ * @returns {SupportedLanguageCode} The detected or default language code
  * 
  * @example
  * ```typescript
  * // In a React component
- * const { language, source, isPreferred } = detectUserLanguage();
- * console.log(`Detected language: ${language} from ${source}`);
+ * const userLanguage = detectUserLanguage();
+ * console.log(userLanguage); // 'en', 'de', 'fr', or 'es'
  * 
- * // Check if it's a user preference vs fallback
- * if (isPreferred) {
- *   console.log('Using user preferred language');
- * } else {
- *   console.log('Using fallback language');
- * }
+ * // In a Next.js server component context
+ * const serverLanguage = detectUserLanguage(); // Returns DEFAULT_LANGUAGE ('en')
  * ```
  */
-export function detectUserLanguage(): LanguageDetectionResult {
-  // SSR safety check - return default during server-side rendering
-  if (typeof window === 'undefined') {
-    return {
-      language: DEFAULT_LANGUAGE,
-      source: 'fallback',
-      isPreferred: false,
-    };
-  }
-
-  try {
-    // 1. Check localStorage for saved user preference
-    const savedLanguage = localStorage.getItem(LANGUAGE_STORAGE_KEY);
-    if (savedLanguage && isSupportedLanguage(savedLanguage)) {
-      return {
-        language: savedLanguage,
-        source: 'localStorage',
-        isPreferred: true,
-      };
-    }
-  } catch (error) {
-    // localStorage might not be available (incognito mode, etc.)
-    console.warn('Failed to access localStorage for language preference:', error);
-  }
-
-  // 2. Check browser's primary language preference
-  if (navigator.language) {
-    const mappedLanguage = mapLocaleToLanguage(navigator.language);
-    if (mappedLanguage) {
-      return {
-        language: mappedLanguage,
-        source: 'navigator',
-        isPreferred: true,
-      };
-    }
-  }
-
-  // 3. Check browser's language preferences array
-  if (navigator.languages && navigator.languages.length > 0) {
-    for (const browserLanguage of navigator.languages) {
-      const mappedLanguage = mapLocaleToLanguage(browserLanguage);
-      if (mappedLanguage) {
-        return {
-          language: mappedLanguage,
-          source: 'navigator',
-          isPreferred: true,
-        };
+export function detectUserLanguage(): SupportedLanguageCode {
+  // Check if we're in a browser environment (CSR)
+  if (typeof window !== 'undefined') {
+    try {
+      // Priority 1: Check localStorage for saved preference
+      const storedLanguage = localStorage.getItem(LANGUAGE_STORAGE_KEY);
+      if (storedLanguage && isSupportedLanguage(storedLanguage)) {
+        return storedLanguage;
       }
-    }
-  }
 
-  // 4. Fallback to default language
-  return {
-    language: DEFAULT_LANGUAGE,
-    source: 'fallback',
-    isPreferred: false,
-  };
-}
-
-/**
- * Saves the user's language preference to localStorage
- * 
- * @param language - The language code to save
- * @returns True if successfully saved, false otherwise
- * 
- * @example
- * ```typescript
- * // Save user's language choice
- * const success = saveLanguagePreference('fr');
- * if (success) {
- *   console.log('Language preference saved');
- * }
- * ```
- */
-export function saveLanguagePreference(language: SupportedLanguageCode): boolean {
-  // SSR safety check
-  if (typeof window === 'undefined') {
-    return false;
-  }
-
-  if (!isSupportedLanguage(language)) {
-    console.warn(`Attempted to save unsupported language: ${language}`);
-    return false;
-  }
-
-  try {
-    localStorage.setItem(LANGUAGE_STORAGE_KEY, language);
-    return true;
-  } catch (error) {
-    console.error('Failed to save language preference:', error);
-    return false;
-  }
-}
-
-/**
- * Clears the saved language preference from localStorage
- * 
- * @returns True if successfully cleared, false otherwise
- * 
- * @example
- * ```typescript
- * // Reset to browser default
- * clearLanguagePreference();
- * const { language } = detectUserLanguage(); // Will use browser/fallback detection
- * ```
- */
-export function clearLanguagePreference(): boolean {
-  // SSR safety check
-  if (typeof window === 'undefined') {
-    return false;
-  }
-
-  try {
-    localStorage.removeItem(LANGUAGE_STORAGE_KEY);
-    return true;
-  } catch (error) {
-    console.error('Failed to clear language preference:', error);
-    return false;
-  }
-}
-
-/**
- * Gets the saved language preference from localStorage without fallback detection
- * 
- * @returns The saved language code or null if none saved or invalid
- * 
- * @example
- * ```typescript
- * const savedLang = getSavedLanguagePreference();
- * if (savedLang) {
- *   console.log(`User has saved preference: ${savedLang}`);
- * } else {
- *   console.log('No saved language preference');
- * }
- * ```
- */
-export function getSavedLanguagePreference(): SupportedLanguageCode | null {
-  // SSR safety check
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
-  try {
-    const savedLanguage = localStorage.getItem(LANGUAGE_STORAGE_KEY);
-    return savedLanguage && isSupportedLanguage(savedLanguage) ? savedLanguage : null;
-  } catch (error) {
-    console.warn('Failed to get saved language preference:', error);
-    return null;
-  }
-}
-
-/**
- * Gets the browser's preferred language without localStorage consideration
- * Used for detecting browser language changes or initial setup
- * 
- * @returns The browser's preferred language code or default if not supported
- * 
- * @example
- * ```typescript
- * const browserLang = getBrowserLanguage();
- * console.log(`Browser prefers: ${browserLang}`);
- * ```
- */
-export function getBrowserLanguage(): SupportedLanguageCode {
-  // SSR safety check
-  if (typeof window === 'undefined') {
-    return DEFAULT_LANGUAGE;
-  }
-
-  // Check primary browser language
-  if (navigator.language) {
-    const mappedLanguage = mapLocaleToLanguage(navigator.language);
-    if (mappedLanguage) {
-      return mappedLanguage;
-    }
-  }
-
-  // Check language preferences array
-  if (navigator.languages && navigator.languages.length > 0) {
-    for (const browserLanguage of navigator.languages) {
-      const mappedLanguage = mapLocaleToLanguage(browserLanguage);
-      if (mappedLanguage) {
-        return mappedLanguage;
+      // Priority 2: Check browser language preferences
+      const browserLanguages = navigator.languages || [navigator.language];
+      
+      for (const locale of browserLanguages) {
+        const mappedLanguage = mapLocaleToLanguage(locale);
+        if (mappedLanguage) {
+          // Save the detected language for future use
+          localStorage.setItem(LANGUAGE_STORAGE_KEY, mappedLanguage);
+          return mappedLanguage;
+        }
       }
+    } catch (error) {
+      // Handle localStorage access errors (e.g., disabled cookies/storage)
+      console.warn('Failed to access localStorage for language detection:', error);
     }
   }
 
+  // Priority 3: Return default language (SSR context or no matches found)
   return DEFAULT_LANGUAGE;
 }
 
 /**
- * Validates if a language code is supported and returns it, or the default language
- * Useful for URL parameters or API responses that may contain invalid language codes
+ * Sets the user's language preference and persists it to localStorage.
+ * Only works in client-side context (CSR). Safe to call in SSR context (no-op).
  * 
- * @param language - The language code to validate
- * @returns A valid supported language code
+ * @param {SupportedLanguageCode} languageCode - The language code to set
+ * @returns {boolean} True if the language was successfully saved, false otherwise
  * 
  * @example
  * ```typescript
- * // From URL parameter or API
- * const urlLang = searchParams.get('lang');
- * const validLang = validateLanguageCode(urlLang);
+ * // In a language selector component
+ * const handleLanguageChange = (newLanguage: SupportedLanguageCode) => {
+ *   const success = setUserLanguage(newLanguage);
+ *   if (success) {
+ *     // Trigger UI update or reload
+ *     window.location.reload();
+ *   }
+ * };
  * ```
  */
-export function validateLanguageCode(language: string | null | undefined): SupportedLanguageCode {
-  if (language && isSupportedLanguage(language)) {
-    return language;
+export function setUserLanguage(languageCode: SupportedLanguageCode): boolean {
+  // Validate the language code
+  if (!isSupportedLanguage(languageCode)) {
+    console.warn(`Unsupported language code: ${languageCode}`);
+    return false;
   }
-  return DEFAULT_LANGUAGE;
+
+  // Only proceed in browser environment
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(LANGUAGE_STORAGE_KEY, languageCode);
+      return true;
+    } catch (error) {
+      console.warn('Failed to save language preference to localStorage:', error);
+      return false;
+    }
+  }
+
+  // SSR context - cannot save to localStorage
+  return false;
 }
 
 /**
- * Creates a language change handler for React components
- * Combines language validation, preference saving, and change notification
+ * Gets the currently stored language preference from localStorage.
+ * Returns null if no preference is stored or if called in SSR context.
  * 
- * @param onLanguageChange - Callback function to handle language changes
- * @returns A function that handles language changes with validation and persistence
+ * @returns {SupportedLanguageCode | null} The stored language code or null
+ * 
+ * @example
+ * ```typescript
+ * // Check if user has a saved preference
+ * const savedLanguage = getStoredLanguage();
+ * if (savedLanguage) {
+ *   console.log(`User prefers: ${savedLanguage}`);
+ * } else {
+ *   console.log('No language preference saved');
+ * }
+ * ```
+ */
+export function getStoredLanguage(): SupportedLanguageCode | null {
+  if (typeof window !== 'undefined') {
+    try {
+      const storedLanguage = localStorage.getItem(LANGUAGE_STORAGE_KEY);
+      return storedLanguage && isSupportedLanguage(storedLanguage) ? storedLanguage : null;
+    } catch (error) {
+      console.warn('Failed to read language preference from localStorage:', error);
+    }
+  }
+  return null;
+}
+
+/**
+ * Clears the stored language preference from localStorage.
+ * Only works in client-side context (CSR). Safe to call in SSR context (no-op).
+ * 
+ * @returns {boolean} True if the preference was successfully cleared, false otherwise
+ * 
+ * @example
+ * ```typescript
+ * // Reset to browser default language detection
+ * const handleResetLanguage = () => {
+ *   const success = clearStoredLanguage();
+ *   if (success) {
+ *     // Re-detect language based on browser settings
+ *     const newLanguage = detectUserLanguage();
+ *     console.log(`Reset to: ${newLanguage}`);
+ *   }
+ * };
+ * ```
+ */
+export function clearStoredLanguage(): boolean {
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.removeItem(LANGUAGE_STORAGE_KEY);
+      return true;
+    } catch (error) {
+      console.warn('Failed to clear language preference from localStorage:', error);
+      return false;
+    }
+  }
+  return false;
+}
+
+/**
+ * Gets all browser language preferences in order of preference.
+ * Returns an empty array in SSR context.
+ * 
+ * @returns {string[]} Array of browser language/locale codes in preference order
+ * 
+ * @example
+ * ```typescript
+ * // Debug language detection
+ * const browserLanguages = getBrowserLanguages();
+ * console.log('Browser languages:', browserLanguages);
+ * // Output: ['en-US', 'en', 'fr-FR', 'fr']
+ * ```
+ */
+export function getBrowserLanguages(): string[] {
+  if (typeof window !== 'undefined' && navigator.languages) {
+    return Array.from(navigator.languages);
+  }
+  return [];
+}
+
+/**
+ * Hook-like function for React components to get language with SSR safety.
+ * This function can be used directly in React components and will handle
+ * both server-side and client-side rendering contexts appropriately.
+ * 
+ * @param {boolean} forceClientSide - If true, only returns language in client context
+ * @returns {SupportedLanguageCode | null} Language code or null in SSR when forceClientSide is true
  * 
  * @example
  * ```typescript
  * // In a React component
- * const handleLanguageChange = createLanguageChangeHandler((newLang) => {
- *   // Update app state, reload translations, etc.
- *   setCurrentLanguage(newLang);
- *   router.push(router.asPath, router.asPath, { locale: newLang });
- * });
+ * const MyComponent = () => {
+ *   const language = getLanguageForComponent();
+ *   
+ *   return (
+ *     <div>
+ *       Current language: {language}
+ *     </div>
+ *   );
+ * };
  * 
- * // Use in language selector
- * <select onChange={(e) => handleLanguageChange(e.target.value)}>
- *   {Object.entries(SUPPORTED_LANGUAGES).map(([code, name]) => (
- *     <option key={code} value={code}>{name}</option>
- *   ))}
- * </select>
+ * // For client-only language detection
+ * const ClientOnlyComponent = () => {
+ *   const language = getLanguageForComponent(true);
+ *   
+ *   if (!language) {
+ *     return <div>Loading language...</div>;
+ *   }
+ *   
+ *   return <div>Client language: {language}</div>;
+ * };
  * ```
  */
-export function createLanguageChangeHandler(
-  onLanguageChange: (language: SupportedLanguageCode) => void
-) {
-  return (language: string) => {
-    const validLanguage = validateLanguageCode(language);
-    const saved = saveLanguagePreference(validLanguage);
-    
-    if (saved) {
-      onLanguageChange(validLanguage);
-    } else {
-      console.warn('Failed to save language preference, but proceeding with change');
-      onLanguageChange(validLanguage);
-    }
-  };
+export function getLanguageForComponent(forceClientSide: boolean = false): SupportedLanguageCode | null {
+  if (forceClientSide && typeof window === 'undefined') {
+    return null;
+  }
+  return detectUserLanguage();
 }
 
-// Re-export constants for convenience
+/**
+ * Utility function to check if the current context is client-side (browser).
+ * Useful for conditional rendering based on environment.
+ * 
+ * @returns {boolean} True if running in browser context, false in server context
+ * 
+ * @example
+ * ```typescript
+ * // Conditional language features
+ * const LanguageSelector = () => {
+ *   const isClient = isClientSide();
+ *   const currentLanguage = detectUserLanguage();
+ *   
+ *   return (
+ *     <div>
+ *       <span>Current: {currentLanguage}</span>
+ *       {isClient && (
+ *         <button onClick={() => setUserLanguage('fr')}>
+ *           Switch to French
+ *         </button>
+ *       )}
+ *     </div>
+ *   );
+ * };
+ * ```
+ */
+export function isClientSide(): boolean {
+  return typeof window !== 'undefined';
+}
+
+// Re-export types and constants for convenience
+export type { SupportedLanguageCode };
 export {
-  SUPPORTED_LANGUAGES,
   SUPPORTED_LANGUAGE_CODES,
   DEFAULT_LANGUAGE,
   LANGUAGE_STORAGE_KEY,
-  type SupportedLanguageCode,
-};
+} from '../constants/languages';
