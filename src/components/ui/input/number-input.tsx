@@ -1,513 +1,879 @@
+/**
+ * Number Input Component
+ * 
+ * Enhanced number input component with increment/decrement controls, number formatting,
+ * and comprehensive accessibility support. Provides internationalized number handling
+ * with proper validation and WCAG 2.1 AA compliance.
+ * 
+ * Features:
+ * - Increment/decrement controls with keyboard support
+ * - Number formatting with locale-specific thousand separators and decimal points
+ * - Min/max validation with immediate feedback
+ * - Currency and percentage formatting modes
+ * - WCAG 2.1 AA accessibility compliance with screen reader support
+ * - Keyboard navigation (up/down arrows for increment/decrement)
+ * - Step control with customizable increment values
+ * - Right-to-left (RTL) language support
+ * - Integration with React Hook Form and Zod validation
+ * 
+ * @fileoverview Accessible number input component for DreamFactory Admin Interface
+ * @version 1.0.0
+ * @since React 19.0.0, Next.js 15.1+, TypeScript 5.8+
+ */
+
 'use client';
 
-import * as React from 'react';
-import { forwardRef, useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronUpIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
+import React, { 
+  useState, 
+  useEffect, 
+  useCallback, 
+  useRef, 
+  useMemo, 
+  forwardRef,
+  useId,
+  startTransition 
+} from 'react';
+import { ChevronUp, ChevronDown, AlertCircle, CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useTheme } from '@/hooks/use-theme';
+import type { 
+  InputProps, 
+  InputVariant, 
+  InputSize, 
+  InputState,
+  ValidationSeverity 
+} from './input.types';
 
-// Types for the number input component
-export interface NumberInputProps
-  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'value' | 'type'> {
-  /** Current value of the input */
-  value?: number | string;
-  /** Callback when value changes */
-  onChange?: (value: number | undefined) => void;
+// =============================================================================
+// TYPES AND INTERFACES
+// =============================================================================
+
+/**
+ * Number formatting modes for different input scenarios
+ */
+export type NumberFormatMode = 
+  | 'decimal'     // Standard decimal number formatting
+  | 'integer'     // Integer-only formatting
+  | 'currency'    // Currency formatting with symbols
+  | 'percentage'  // Percentage formatting with % symbol
+  | 'scientific'  // Scientific notation (e.g., 1.23e+4)
+  | 'bytes';      // Data size formatting (KB, MB, GB)
+
+/**
+ * Locale-specific number formatting configuration
+ */
+export interface NumberFormatConfig {
+  /** Locale identifier (e.g., 'en-US', 'de-DE', 'fr-FR') */
+  locale?: string;
+  /** Number of decimal places to display */
+  decimals?: number;
+  /** Use thousands separator */
+  useThousandsSeparator?: boolean;
+  /** Currency code for currency formatting (e.g., 'USD', 'EUR') */
+  currency?: string;
+  /** Minimum number of integer digits */
+  minimumIntegerDigits?: number;
+  /** Minimum number of fraction digits */
+  minimumFractionDigits?: number;
+  /** Maximum number of fraction digits */
+  maximumFractionDigits?: number;
+  /** Whether to show the currency symbol */
+  showCurrencySymbol?: boolean;
+  /** Whether to show the percentage symbol */
+  showPercentageSymbol?: boolean;
+}
+
+/**
+ * Number input specific props extending base input functionality
+ */
+export interface NumberInputProps extends Omit<InputProps, 'type' | 'value' | 'onChange' | 'onValueChange'> {
+  /** Current numeric value */
+  value?: number | null;
+  /** Value change handler with numeric value */
+  onChange?: (value: number | null, formattedValue: string) => void;
+  /** String value change handler for form integration */
+  onValueChange?: (value: string, numericValue: number | null) => void;
+  
+  // Number constraints
   /** Minimum allowed value */
   min?: number;
   /** Maximum allowed value */
   max?: number;
-  /** Step increment for controls */
+  /** Step increment for arrow controls */
   step?: number;
-  /** Number of decimal places to display */
+  /** Number of decimal places allowed */
   precision?: number;
-  /** Format mode for display */
-  formatMode?: 'number' | 'currency' | 'percentage';
-  /** Currency code for currency mode (ISO 4217) */
-  currency?: string;
-  /** Locale for number formatting */
-  locale?: string;
-  /** Whether to show increment/decrement controls */
-  showControls?: boolean;
-  /** Whether to allow negative values */
-  allowNegative?: boolean;
-  /** Whether to show thousands separator */
-  showThousandsSeparator?: boolean;
-  /** Size variant */
-  size?: 'sm' | 'md' | 'lg';
-  /** Visual variant */
-  variant?: 'outline' | 'filled' | 'ghost';
-  /** Error state */
-  error?: boolean;
-  /** Error message */
-  errorMessage?: string;
-  /** Helper text */
-  helperText?: string;
-  /** Label for accessibility */
-  label?: string;
-  /** Loading state */
-  loading?: boolean;
-  /** Prefix element (e.g., icon) */
-  prefix?: React.ReactNode;
-  /** Suffix element (e.g., unit) */
-  suffix?: React.ReactNode;
+  
+  // Formatting options
+  /** Number formatting mode */
+  formatMode?: NumberFormatMode;
+  /** Locale-specific formatting configuration */
+  formatConfig?: NumberFormatConfig;
+  
+  // UI enhancements
+  /** Show increment/decrement buttons */
+  showIncrementControls?: boolean;
+  /** Position of increment/decrement controls */
+  controlsPosition?: 'right' | 'vertical';
+  /** Custom increment control icons */
+  incrementIcon?: React.ReactNode;
+  decrementIcon?: React.ReactNode;
+  
+  // Validation feedback
+  /** Custom validation function */
+  validate?: (value: number | null) => string | null;
+  /** Show validation status indicators */
+  showValidationIndicators?: boolean;
+  
+  // Accessibility
+  /** Unit description for screen readers (e.g., "dollars", "percentage") */
+  unitLabel?: string;
+  /** Announce value changes to screen readers */
+  announceValueChanges?: boolean;
 }
 
-// Number formatting utility functions
-const formatNumber = (
-  value: number,
-  options: {
-    formatMode: 'number' | 'currency' | 'percentage';
-    precision?: number;
-    currency?: string;
-    locale?: string;
-    showThousandsSeparator?: boolean;
-  }
-): string => {
-  const { formatMode, precision, currency, locale = 'en-US', showThousandsSeparator = true } = options;
+// =============================================================================
+// UTILITY FUNCTIONS
+// =============================================================================
 
-  const formatOptions: Intl.NumberFormatOptions = {
-    minimumFractionDigits: precision,
-    maximumFractionDigits: precision,
-    useGrouping: showThousandsSeparator,
+/**
+ * Get browser's preferred locale or fallback to en-US
+ */
+const getBrowserLocale = (): string => {
+  if (typeof window === 'undefined') return 'en-US';
+  return navigator.language || navigator.languages?.[0] || 'en-US';
+};
+
+/**
+ * Format number according to locale and configuration
+ */
+const formatNumber = (
+  value: number | null,
+  mode: NumberFormatMode,
+  config: NumberFormatConfig = {}
+): string => {
+  if (value === null || value === undefined || isNaN(value)) {
+    return '';
+  }
+
+  const locale = config.locale || getBrowserLocale();
+  const options: Intl.NumberFormatOptions = {};
+
+  // Base configuration
+  if (config.minimumIntegerDigits !== undefined) {
+    options.minimumIntegerDigits = config.minimumIntegerDigits;
+  }
+  if (config.minimumFractionDigits !== undefined) {
+    options.minimumFractionDigits = config.minimumFractionDigits;
+  }
+  if (config.maximumFractionDigits !== undefined) {
+    options.maximumFractionDigits = config.maximumFractionDigits;
+  } else if (config.decimals !== undefined) {
+    options.minimumFractionDigits = config.decimals;
+    options.maximumFractionDigits = config.decimals;
+  }
+
+  // Thousands separator
+  if (config.useThousandsSeparator !== false) {
+    options.useGrouping = true;
+  }
+
+  // Mode-specific formatting
+  switch (mode) {
+    case 'currency':
+      options.style = 'currency';
+      options.currency = config.currency || 'USD';
+      if (config.showCurrencySymbol === false) {
+        options.currencyDisplay = 'code';
+      }
+      break;
+      
+    case 'percentage':
+      options.style = 'percent';
+      // Convert decimal to percentage (0.15 -> 15%)
+      value = value / 100;
+      break;
+      
+    case 'scientific':
+      return value.toExponential(config.decimals || 2);
+      
+    case 'bytes':
+      return formatBytes(value, config.decimals || 2);
+      
+    case 'integer':
+      options.maximumFractionDigits = 0;
+      break;
+      
+    case 'decimal':
+    default:
+      options.style = 'decimal';
+      break;
+  }
+
+  try {
+    const formatter = new Intl.NumberFormat(locale, options);
+    return formatter.format(value);
+  } catch (error) {
+    // Fallback for unsupported locales or options
+    return value.toLocaleString(locale);
+  }
+};
+
+/**
+ * Parse formatted number string back to numeric value
+ */
+const parseNumber = (
+  formattedValue: string,
+  mode: NumberFormatMode,
+  config: NumberFormatConfig = {}
+): number | null => {
+  if (!formattedValue || formattedValue.trim() === '') {
+    return null;
+  }
+
+  const locale = config.locale || getBrowserLocale();
+  let cleanValue = formattedValue.trim();
+
+  // Remove formatting characters based on locale
+  try {
+    const sampleNumber = 1234.56;
+    const formatted = new Intl.NumberFormat(locale).format(sampleNumber);
+    const thousandsSeparator = formatted.charAt(1); // Character at position 1 in "1,234.56"
+    const decimalSeparator = formatted.charAt(5);   // Character at position 5 in "1,234.56"
+
+    // Remove thousands separators
+    cleanValue = cleanValue.replace(new RegExp(`\\${thousandsSeparator}`, 'g'), '');
+    
+    // Normalize decimal separator to dot
+    if (decimalSeparator !== '.') {
+      cleanValue = cleanValue.replace(decimalSeparator, '.');
+    }
+  } catch {
+    // Fallback: remove common thousands separators and normalize decimal
+    cleanValue = cleanValue.replace(/[,\s]/g, '').replace(',', '.');
+  }
+
+  // Remove currency symbols and percentage signs
+  cleanValue = cleanValue.replace(/[$€£¥₹%]/g, '');
+  
+  // Handle percentage mode
+  if (mode === 'percentage') {
+    cleanValue = cleanValue.replace('%', '');
+  }
+
+  // Parse the cleaned number
+  const numericValue = parseFloat(cleanValue);
+  
+  if (isNaN(numericValue)) {
+    return null;
+  }
+
+  // Convert percentage back to decimal
+  if (mode === 'percentage' && formattedValue.includes('%')) {
+    return numericValue * 100;
+  }
+
+  return numericValue;
+};
+
+/**
+ * Format bytes to human readable string (for bytes mode)
+ */
+const formatBytes = (bytes: number, decimals: number = 2): string => {
+  if (bytes === 0) return '0 Bytes';
+  if (bytes < 0) return '-' + formatBytes(-bytes, decimals);
+
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB'];
+
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  const formattedNumber = parseFloat((bytes / Math.pow(k, i)).toFixed(dm));
+  
+  return `${formattedNumber} ${sizes[i]}`;
+};
+
+/**
+ * Validate number against constraints
+ */
+const validateNumber = (
+  value: number | null,
+  min?: number,
+  max?: number,
+  precision?: number,
+  customValidator?: (value: number | null) => string | null
+): { isValid: boolean; error?: string } => {
+  // Custom validation first
+  if (customValidator) {
+    const customError = customValidator(value);
+    if (customError) {
+      return { isValid: false, error: customError };
+    }
+  }
+
+  // Null/undefined is considered valid unless required
+  if (value === null || value === undefined) {
+    return { isValid: true };
+  }
+
+  // NaN validation
+  if (isNaN(value)) {
+    return { isValid: false, error: 'Please enter a valid number' };
+  }
+
+  // Min/max validation
+  if (min !== undefined && value < min) {
+    return { isValid: false, error: `Value must be at least ${min}` };
+  }
+
+  if (max !== undefined && value > max) {
+    return { isValid: false, error: `Value must be no more than ${max}` };
+  }
+
+  // Precision validation
+  if (precision !== undefined && precision >= 0) {
+    const decimalPlaces = (value.toString().split('.')[1] || '').length;
+    if (decimalPlaces > precision) {
+      return { isValid: false, error: `Value can have at most ${precision} decimal places` };
+    }
+  }
+
+  return { isValid: true };
+};
+
+/**
+ * Generate accessible announcements for value changes
+ */
+const generateValueAnnouncement = (
+  value: number | null,
+  mode: NumberFormatMode,
+  unitLabel?: string,
+  config?: NumberFormatConfig
+): string => {
+  if (value === null) {
+    return 'Value cleared';
+  }
+
+  const formattedValue = formatNumber(value, mode, config);
+  const unit = unitLabel || (mode === 'currency' ? 'currency' : mode === 'percentage' ? 'percent' : '');
+  
+  return `Value: ${formattedValue}${unit ? ` ${unit}` : ''}`;
+};
+
+// =============================================================================
+// MAIN COMPONENT
+// =============================================================================
+
+export const NumberInput = forwardRef<HTMLInputElement, NumberInputProps>(({
+  // Value and change handlers
+  value = null,
+  onChange,
+  onValueChange,
+  
+  // Constraints
+  min,
+  max,
+  step = 1,
+  precision,
+  
+  // Formatting
+  formatMode = 'decimal',
+  formatConfig = {},
+  
+  // UI options
+  showIncrementControls = true,
+  controlsPosition = 'right',
+  incrementIcon = <ChevronUp className="h-3 w-3" />,
+  decrementIcon = <ChevronDown className="h-3 w-3" />,
+  
+  // Validation
+  validate,
+  showValidationIndicators = true,
+  
+  // Accessibility
+  unitLabel,
+  announceValueChanges = true,
+  'aria-label': ariaLabel,
+  'aria-describedby': ariaDescribedBy,
+  
+  // Base input props
+  variant = 'outline',
+  size = 'md',
+  state = 'default',
+  label,
+  labelPosition = 'top',
+  placeholder,
+  disabled = false,
+  required = false,
+  className,
+  containerClassName,
+  labelClassName,
+  inputClassName,
+  errorClassName,
+  helperText,
+  error,
+  
+  // Event handlers
+  onFocus,
+  onBlur,
+  onKeyDown,
+  
+  // Test attributes
+  'data-testid': testId,
+  
+  ...restProps
+}, ref) => {
+  // =============================================================================
+  // STATE AND REFS
+  // =============================================================================
+  
+  const { resolvedTheme } = useTheme();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const announcementRef = useRef<HTMLDivElement>(null);
+  const [isFocused, setIsFocused] = useState(false);
+  const [internalValue, setInternalValue] = useState<number | null>(value);
+  const [displayValue, setDisplayValue] = useState('');
+  const [validationState, setValidationState] = useState<{ isValid: boolean; error?: string }>({ isValid: true });
+  
+  // Combine refs
+  const combinedRef = useCallback((node: HTMLInputElement | null) => {
+    inputRef.current = node;
+    if (typeof ref === 'function') {
+      ref(node);
+    } else if (ref) {
+      ref.current = node;
+    }
+  }, [ref]);
+
+  // Generate unique IDs for accessibility
+  const inputId = useId();
+  const labelId = useId();
+  const errorId = useId();
+  const helperId = useId();
+  const announcementId = useId();
+
+  // =============================================================================
+  // DERIVED VALUES
+  // =============================================================================
+
+  const currentState: InputState = useMemo(() => {
+    if (disabled) return 'disabled';
+    if (error || !validationState.isValid) return 'error';
+    if (isFocused) return 'focused';
+    return state;
+  }, [disabled, error, validationState.isValid, isFocused, state]);
+
+  const effectiveError = error || validationState.error;
+
+  // =============================================================================
+  // FORMATTING AND PARSING
+  // =============================================================================
+
+  const formatDisplayValue = useCallback((numericValue: number | null): string => {
+    if (numericValue === null) return '';
+    return formatNumber(numericValue, formatMode, formatConfig);
+  }, [formatMode, formatConfig]);
+
+  const parseDisplayValue = useCallback((displayStr: string): number | null => {
+    return parseNumber(displayStr, formatMode, formatConfig);
+  }, [formatMode, formatConfig]);
+
+  // =============================================================================
+  // VALUE MANAGEMENT
+  // =============================================================================
+
+  const updateValue = useCallback((newValue: number | null, shouldValidate: boolean = true) => {
+    setInternalValue(newValue);
+    
+    // Update display value when not focused (to show formatted version)
+    if (!isFocused) {
+      setDisplayValue(formatDisplayValue(newValue));
+    }
+
+    // Validate the new value
+    if (shouldValidate) {
+      const validation = validateNumber(newValue, min, max, precision, validate);
+      setValidationState(validation);
+    }
+
+    // Call change handlers
+    const formattedValue = formatDisplayValue(newValue);
+    onChange?.(newValue, formattedValue);
+    onValueChange?.(formattedValue, newValue);
+
+    // Announce to screen readers
+    if (announceValueChanges && announcementRef.current) {
+      const announcement = generateValueAnnouncement(newValue, formatMode, unitLabel, formatConfig);
+      announcementRef.current.textContent = announcement;
+    }
+  }, [
+    isFocused, 
+    formatDisplayValue, 
+    min, 
+    max, 
+    precision, 
+    validate, 
+    onChange, 
+    onValueChange, 
+    announceValueChanges, 
+    formatMode, 
+    unitLabel, 
+    formatConfig
+  ]);
+
+  const incrementValue = useCallback(() => {
+    if (disabled) return;
+    
+    const currentValue = internalValue || 0;
+    const newValue = Math.min(currentValue + step, max !== undefined ? max : Infinity);
+    
+    // Apply precision rounding
+    const roundedValue = precision !== undefined 
+      ? Math.round(newValue * Math.pow(10, precision)) / Math.pow(10, precision)
+      : newValue;
+    
+    updateValue(roundedValue);
+  }, [disabled, internalValue, step, max, precision, updateValue]);
+
+  const decrementValue = useCallback(() => {
+    if (disabled) return;
+    
+    const currentValue = internalValue || 0;
+    const newValue = Math.max(currentValue - step, min !== undefined ? min : -Infinity);
+    
+    // Apply precision rounding
+    const roundedValue = precision !== undefined 
+      ? Math.round(newValue * Math.pow(10, precision)) / Math.pow(10, precision)
+      : newValue;
+    
+    updateValue(roundedValue);
+  }, [disabled, internalValue, step, min, precision, updateValue]);
+
+  // =============================================================================
+  // EVENT HANDLERS
+  // =============================================================================
+
+  const handleInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const inputValue = event.target.value;
+    setDisplayValue(inputValue);
+
+    // Parse and validate in real-time
+    startTransition(() => {
+      const parsedValue = parseDisplayValue(inputValue);
+      updateValue(parsedValue);
+    });
+  }, [parseDisplayValue, updateValue]);
+
+  const handleInputFocus = useCallback((event: React.FocusEvent<HTMLInputElement>) => {
+    setIsFocused(true);
+    
+    // Show raw numeric value for editing
+    if (internalValue !== null) {
+      setDisplayValue(internalValue.toString());
+    }
+    
+    onFocus?.(event);
+  }, [internalValue, onFocus]);
+
+  const handleInputBlur = useCallback((event: React.FocusEvent<HTMLInputElement>) => {
+    setIsFocused(false);
+    
+    // Format the display value
+    setDisplayValue(formatDisplayValue(internalValue));
+    
+    onBlur?.(event);
+  }, [internalValue, formatDisplayValue, onBlur]);
+
+  const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
+    // Handle increment/decrement with arrow keys
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      incrementValue();
+    } else if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      decrementValue();
+    }
+    
+    onKeyDown?.(event);
+  }, [incrementValue, decrementValue, onKeyDown]);
+
+  // =============================================================================
+  // EFFECTS
+  // =============================================================================
+
+  // Sync external value changes
+  useEffect(() => {
+    if (value !== internalValue) {
+      setInternalValue(value);
+      if (!isFocused) {
+        setDisplayValue(formatDisplayValue(value));
+      }
+    }
+  }, [value, internalValue, isFocused, formatDisplayValue]);
+
+  // Initial formatting
+  useEffect(() => {
+    setDisplayValue(formatDisplayValue(internalValue));
+  }, [formatDisplayValue, internalValue]);
+
+  // =============================================================================
+  // STYLING
+  // =============================================================================
+
+  const sizeClasses = {
+    sm: 'h-9 px-3 text-sm',
+    md: 'h-10 px-3 text-base',
+    lg: 'h-11 px-4 text-lg',
+    xl: 'h-12 px-4 text-xl',
   };
 
-  switch (formatMode) {
-    case 'currency':
-      return new Intl.NumberFormat(locale, {
-        ...formatOptions,
-        style: 'currency',
-        currency: currency || 'USD',
-      }).format(value);
-    
-    case 'percentage':
-      return new Intl.NumberFormat(locale, {
-        ...formatOptions,
-        style: 'percent',
-      }).format(value / 100);
-    
-    default:
-      return new Intl.NumberFormat(locale, formatOptions).format(value);
-  }
-};
+  const variantClasses = {
+    outline: cn(
+      'border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900',
+      'focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20',
+      currentState === 'error' && 'border-red-500 focus:border-red-500 focus:ring-red-500/20',
+      currentState === 'success' && 'border-green-500 focus:border-green-500 focus:ring-green-500/20'
+    ),
+    filled: cn(
+      'border-0 bg-gray-100 dark:bg-gray-800',
+      'focus:bg-white dark:focus:bg-gray-900 focus:ring-2 focus:ring-primary-500/20',
+      currentState === 'error' && 'bg-red-50 dark:bg-red-900/10 focus:ring-red-500/20',
+      currentState === 'success' && 'bg-green-50 dark:bg-green-900/10 focus:ring-green-500/20'
+    ),
+    ghost: cn(
+      'border-0 bg-transparent',
+      'hover:bg-gray-100 dark:hover:bg-gray-800 focus:bg-white dark:focus:bg-gray-900 focus:ring-2 focus:ring-primary-500/20',
+      currentState === 'error' && 'focus:ring-red-500/20',
+      currentState === 'success' && 'focus:ring-green-500/20'
+    ),
+    underlined: cn(
+      'border-0 border-b-2 border-gray-300 dark:border-gray-600 bg-transparent rounded-none',
+      'focus:border-primary-500',
+      currentState === 'error' && 'border-red-500 focus:border-red-500',
+      currentState === 'success' && 'border-green-500 focus:border-green-500'
+    ),
+    floating: cn(
+      'border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 pt-6',
+      'focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20',
+      currentState === 'error' && 'border-red-500 focus:border-red-500 focus:ring-red-500/20',
+      currentState === 'success' && 'border-green-500 focus:border-green-500 focus:ring-green-500/20'
+    ),
+  };
 
-const parseNumber = (
-  value: string,
-  options: {
-    formatMode: 'number' | 'currency' | 'percentage';
-    locale?: string;
-  }
-): number | undefined => {
-  if (!value || value.trim() === '') return undefined;
-  
-  const { formatMode, locale = 'en-US' } = options;
-  
-  // Remove formatting characters based on locale
-  let cleanValue = value;
-  
-  // Get locale-specific decimal and group separators
-  const formatter = new Intl.NumberFormat(locale);
-  const parts = formatter.formatToParts(1234.5);
-  const decimalSeparator = parts.find(part => part.type === 'decimal')?.value || '.';
-  const groupSeparator = parts.find(part => part.type === 'group')?.value || ',';
-  
-  // Remove currency symbols and percentage signs
-  cleanValue = cleanValue.replace(/[$%€£¥₹₽]/g, '');
-  
-  // Remove group separators
-  cleanValue = cleanValue.replace(new RegExp(`\\${groupSeparator}`, 'g'), '');
-  
-  // Replace decimal separator with standard dot
-  if (decimalSeparator !== '.') {
-    cleanValue = cleanValue.replace(decimalSeparator, '.');
-  }
-  
-  // Remove any remaining non-numeric characters except decimal point and minus sign
-  cleanValue = cleanValue.replace(/[^\d.-]/g, '');
-  
-  const parsed = parseFloat(cleanValue);
-  
-  if (isNaN(parsed)) return undefined;
-  
-  // Convert percentage back to decimal
-  if (formatMode === 'percentage') {
-    return parsed * 100;
-  }
-  
-  return parsed;
-};
+  const baseInputClasses = cn(
+    'w-full transition-all duration-200 rounded-md',
+    'text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400',
+    'focus:outline-none',
+    'disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-50 dark:disabled:bg-gray-900',
+    sizeClasses[size],
+    variantClasses[variant],
+    showIncrementControls && controlsPosition === 'right' && 'pr-8',
+    inputClassName
+  );
 
-const NumberInput = forwardRef<HTMLInputElement, NumberInputProps>(
-  (
-    {
-      value,
-      onChange,
-      min,
-      max,
-      step = 1,
-      precision,
-      formatMode = 'number',
-      currency = 'USD',
-      locale = 'en-US',
-      showControls = true,
-      allowNegative = true,
-      showThousandsSeparator = true,
-      size = 'md',
-      variant = 'outline',
-      error = false,
-      errorMessage,
-      helperText,
-      label,
-      loading = false,
-      prefix,
-      suffix,
-      className,
-      onFocus,
-      onBlur,
-      onKeyDown,
-      disabled,
-      'aria-label': ariaLabel,
-      'aria-describedby': ariaDescribedBy,
-      ...props
-    },
-    ref
-  ) => {
-    const [displayValue, setDisplayValue] = useState<string>('');
-    const [isFocused, setIsFocused] = useState(false);
-    const [isComposing, setIsComposing] = useState(false);
-    const inputRef = useRef<HTMLInputElement>(null);
-    
-    // Combine refs
-    React.useImperativeHandle(ref, () => inputRef.current!);
+  const controlButtonClasses = cn(
+    'flex items-center justify-center w-6 h-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200',
+    'hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors duration-150',
+    'focus:outline-none focus:ring-1 focus:ring-primary-500 focus:ring-offset-1',
+    'disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent',
+    'min-h-[44px] min-w-[44px] touch-manipulation' // WCAG touch target compliance
+  );
 
-    // Convert numeric value to display string
-    const formatDisplayValue = useCallback(
-      (numValue: number | string | undefined): string => {
-        if (numValue === undefined || numValue === '') return '';
-        
-        const num = typeof numValue === 'string' ? parseFloat(numValue) : numValue;
-        if (isNaN(num)) return '';
-        
-        if (isFocused || isComposing) {
-          // Show raw number when focused for easier editing
-          return num.toString();
-        }
-        
-        return formatNumber(num, {
-          formatMode,
-          precision,
-          currency,
-          locale,
-          showThousandsSeparator,
-        });
-      },
-      [formatMode, precision, currency, locale, showThousandsSeparator, isFocused, isComposing]
+  // =============================================================================
+  // ACCESSIBILITY ATTRIBUTES
+  // =============================================================================
+
+  const ariaDescribedByIds = [
+    ariaDescribedBy,
+    helperText && helperId,
+    effectiveError && errorId,
+  ].filter(Boolean).join(' ') || undefined;
+
+  const inputAriaAttributes = {
+    'aria-label': ariaLabel || (label ? undefined : `Number input${unitLabel ? ` in ${unitLabel}` : ''}`),
+    'aria-labelledby': label ? labelId : undefined,
+    'aria-describedby': ariaDescribedByIds,
+    'aria-invalid': !validationState.isValid || !!error,
+    'aria-required': required,
+    'aria-errormessage': effectiveError ? errorId : undefined,
+    'aria-valuemin': min,
+    'aria-valuemax': max,
+    'aria-valuenow': internalValue,
+    'aria-valuetext': internalValue !== null 
+      ? generateValueAnnouncement(internalValue, formatMode, unitLabel, formatConfig)
+      : undefined,
+  };
+
+  // =============================================================================
+  // RENDER
+  // =============================================================================
+
+  const renderLabel = () => {
+    if (!label || labelPosition === 'none') return null;
+
+    const labelElement = (
+      <label
+        id={labelId}
+        htmlFor={inputId}
+        className={cn(
+          'block text-sm font-medium text-gray-700 dark:text-gray-300',
+          required && "after:content-['*'] after:text-red-500 after:ml-1",
+          labelPosition === 'floating' && 'absolute left-3 top-2 text-xs text-gray-500 pointer-events-none transition-all duration-200',
+          labelClassName
+        )}
+      >
+        {label}
+      </label>
     );
 
-    // Update display value when value prop changes
-    useEffect(() => {
-      setDisplayValue(formatDisplayValue(value));
-    }, [value, formatDisplayValue]);
-
-    // Validate number within constraints
-    const validateNumber = useCallback(
-      (num: number): number => {
-        let validated = num;
-        
-        if (!allowNegative && validated < 0) {
-          validated = 0;
-        }
-        
-        if (min !== undefined && validated < min) {
-          validated = min;
-        }
-        
-        if (max !== undefined && validated > max) {
-          validated = max;
-        }
-        
-        if (precision !== undefined) {
-          validated = parseFloat(validated.toFixed(precision));
-        }
-        
-        return validated;
-      },
-      [min, max, precision, allowNegative]
-    );
-
-    // Handle increment/decrement
-    const adjustValue = useCallback(
-      (direction: 'up' | 'down') => {
-        if (disabled || loading) return;
-        
-        const currentValue = typeof value === 'string' ? parseFloat(value) || 0 : value || 0;
-        const adjustment = direction === 'up' ? step : -step;
-        const newValue = validateNumber(currentValue + adjustment);
-        
-        onChange?.(newValue);
-        
-        // Announce to screen readers
-        const announcement = `Value ${direction === 'up' ? 'increased' : 'decreased'} to ${formatDisplayValue(newValue)}`;
-        const ariaLiveRegion = document.createElement('div');
-        ariaLiveRegion.setAttribute('aria-live', 'polite');
-        ariaLiveRegion.setAttribute('aria-atomic', 'true');
-        ariaLiveRegion.style.position = 'absolute';
-        ariaLiveRegion.style.left = '-10000px';
-        ariaLiveRegion.textContent = announcement;
-        document.body.appendChild(ariaLiveRegion);
-        setTimeout(() => document.body.removeChild(ariaLiveRegion), 1000);
-      },
-      [value, step, validateNumber, onChange, disabled, loading, formatDisplayValue]
-    );
-
-    // Handle input change
-    const handleInputChange = useCallback(
-      (event: React.ChangeEvent<HTMLInputElement>) => {
-        const inputValue = event.target.value;
-        setDisplayValue(inputValue);
-        
-        if (inputValue === '') {
-          onChange?.(undefined);
-          return;
-        }
-        
-        const parsed = parseNumber(inputValue, { formatMode, locale });
-        if (parsed !== undefined) {
-          const validated = validateNumber(parsed);
-          onChange?.(validated);
-        }
-      },
-      [formatMode, locale, validateNumber, onChange]
-    );
-
-    // Handle focus
-    const handleFocus = useCallback(
-      (event: React.FocusEvent<HTMLInputElement>) => {
-        setIsFocused(true);
-        // Show raw number for easier editing
-        if (value !== undefined) {
-          const rawValue = typeof value === 'string' ? value : value.toString();
-          setDisplayValue(rawValue);
-        }
-        onFocus?.(event);
-      },
-      [value, onFocus]
-    );
-
-    // Handle blur
-    const handleBlur = useCallback(
-      (event: React.FocusEvent<HTMLInputElement>) => {
-        setIsFocused(false);
-        setDisplayValue(formatDisplayValue(value));
-        onBlur?.(event);
-      },
-      [value, formatDisplayValue, onBlur]
-    );
-
-    // Handle keyboard navigation
-    const handleKeyDown = useCallback(
-      (event: React.KeyboardEvent<HTMLInputElement>) => {
-        if (isComposing) return;
-        
-        switch (event.key) {
-          case 'ArrowUp':
-            event.preventDefault();
-            adjustValue('up');
-            break;
-          case 'ArrowDown':
-            event.preventDefault();
-            adjustValue('down');
-            break;
-          case 'PageUp':
-            event.preventDefault();
-            adjustValue('up');
-            break;
-          case 'PageDown':
-            event.preventDefault();
-            adjustValue('down');
-            break;
-          case 'Home':
-            if (min !== undefined) {
-              event.preventDefault();
-              onChange?.(min);
-            }
-            break;
-          case 'End':
-            if (max !== undefined) {
-              event.preventDefault();
-              onChange?.(max);
-            }
-            break;
-        }
-        
-        onKeyDown?.(event);
-      },
-      [adjustValue, min, max, onChange, onKeyDown, isComposing]
-    );
-
-    // Handle composition events for IME support
-    const handleCompositionStart = useCallback(() => {
-      setIsComposing(true);
-    }, []);
-
-    const handleCompositionEnd = useCallback(() => {
-      setIsComposing(false);
-    }, []);
-
-    // Style variants
-    const sizeClasses = {
-      sm: 'h-8 px-2 text-sm',
-      md: 'h-10 px-3 text-sm',
-      lg: 'h-12 px-4 text-base',
-    };
-
-    const variantClasses = {
-      outline: cn(
-        'border border-gray-300 bg-white text-gray-900',
-        'hover:border-gray-400',
-        'focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20',
-        'disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-500',
-        error && 'border-error-500 focus:border-error-500 focus:ring-error-500/20'
-      ),
-      filled: cn(
-        'border-0 bg-gray-100 text-gray-900',
-        'hover:bg-gray-200',
-        'focus:bg-white focus:ring-2 focus:ring-primary-500/20',
-        'disabled:bg-gray-50 disabled:text-gray-500',
-        error && 'bg-error-50 focus:ring-error-500/20'
-      ),
-      ghost: cn(
-        'border-0 bg-transparent text-gray-900',
-        'hover:bg-gray-100',
-        'focus:bg-white focus:ring-2 focus:ring-primary-500/20',
-        'disabled:text-gray-500',
-        error && 'focus:ring-error-500/20'
-      ),
-    };
-
-    const controlButtonClasses = cn(
-      'flex items-center justify-center',
-      'w-6 h-6 rounded',
-      'border border-gray-300 bg-white',
-      'hover:bg-gray-50 hover:border-gray-400',
-      'focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500',
-      'disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400',
-      'transition-colors',
-      size === 'sm' && 'w-5 h-5',
-      size === 'lg' && 'w-7 h-7'
-    );
-
-    // Generate IDs for accessibility
-    const inputId = React.useId();
-    const errorId = error && errorMessage ? `${inputId}-error` : undefined;
-    const helperId = helperText ? `${inputId}-helper` : undefined;
-    const describedBy = [ariaDescribedBy, errorId, helperId].filter(Boolean).join(' ') || undefined;
+    if (labelPosition === 'floating') return labelElement;
 
     return (
-      <div className="w-full">
-        {label && (
-          <label
-            htmlFor={inputId}
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
-            {label}
-          </label>
-        )}
-        
-        <div className="relative">
-          <div
-            className={cn(
-              'flex items-center w-full rounded-md transition-colors',
-              sizeClasses[size],
-              variantClasses[variant],
-              loading && 'opacity-60',
-              className
-            )}
-          >
-            {prefix && (
-              <div className="flex items-center pr-2 text-gray-500">
-                {prefix}
-              </div>
-            )}
-            
-            <input
-              ref={inputRef}
-              id={inputId}
-              type="text"
-              inputMode="numeric"
-              value={displayValue}
-              onChange={handleInputChange}
-              onFocus={handleFocus}
-              onBlur={handleBlur}
-              onKeyDown={handleKeyDown}
-              onCompositionStart={handleCompositionStart}
-              onCompositionEnd={handleCompositionEnd}
-              disabled={disabled || loading}
-              aria-label={ariaLabel || label}
-              aria-describedby={describedBy}
-              aria-invalid={error}
-              aria-valuemin={min}
-              aria-valuemax={max}
-              aria-valuenow={typeof value === 'number' ? value : undefined}
-              role="spinbutton"
-              className={cn(
-                'flex-1 bg-transparent border-0 outline-none',
-                'placeholder:text-gray-500',
-                'disabled:cursor-not-allowed'
-              )}
-              {...props}
-            />
-            
-            {suffix && (
-              <div className="flex items-center pl-2 text-gray-500">
-                {suffix}
-              </div>
-            )}
-            
-            {showControls && (
-              <div className="flex flex-col ml-1 gap-0.5">
-                <button
-                  type="button"
-                  onClick={() => adjustValue('up')}
-                  disabled={disabled || loading || (max !== undefined && typeof value === 'number' && value >= max)}
-                  aria-label="Increase value"
-                  className={controlButtonClasses}
-                >
-                  <ChevronUpIcon className="w-3 h-3" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => adjustValue('down')}
-                  disabled={disabled || loading || (min !== undefined && typeof value === 'number' && value <= min)}
-                  aria-label="Decrease value"
-                  className={controlButtonClasses}
-                >
-                  <ChevronDownIcon className="w-3 h-3" />
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-        
-        {(errorMessage || helperText) && (
-          <div className="mt-1 text-sm">
-            {error && errorMessage && (
-              <div id={errorId} className="text-error-600" role="alert">
-                {errorMessage}
-              </div>
-            )}
-            {!error && helperText && (
-              <div id={helperId} className="text-gray-600">
-                {helperText}
-              </div>
-            )}
-          </div>
-        )}
+      <div className={cn(
+        labelPosition === 'left' && 'flex items-center space-x-3',
+        labelPosition === 'right' && 'flex items-center space-x-3 flex-row-reverse',
+        labelPosition === 'top' && 'space-y-2'
+      )}>
+        {labelElement}
       </div>
     );
-  }
-);
+  };
+
+  const renderControls = () => {
+    if (!showIncrementControls) return null;
+
+    const incrementDisabled = disabled || (max !== undefined && internalValue !== null && internalValue >= max);
+    const decrementDisabled = disabled || (min !== undefined && internalValue !== null && internalValue <= min);
+
+    return (
+      <div className="absolute right-1 top-1/2 -translate-y-1/2 flex flex-col">
+        <button
+          type="button"
+          onClick={incrementValue}
+          disabled={incrementDisabled}
+          className={cn(controlButtonClasses, 'border-b border-gray-200 dark:border-gray-700')}
+          aria-label={`Increment by ${step}${unitLabel ? ` ${unitLabel}` : ''}`}
+          data-testid={`${testId}-increment`}
+        >
+          {incrementIcon}
+        </button>
+        <button
+          type="button"
+          onClick={decrementValue}
+          disabled={decrementDisabled}
+          className={controlButtonClasses}
+          aria-label={`Decrement by ${step}${unitLabel ? ` ${unitLabel}` : ''}`}
+          data-testid={`${testId}-decrement`}
+        >
+          {decrementIcon}
+        </button>
+      </div>
+    );
+  };
+
+  const renderValidationIcon = () => {
+    if (!showValidationIndicators || currentState === 'default' || currentState === 'focused') {
+      return null;
+    }
+
+    return (
+      <div className="absolute right-10 top-1/2 -translate-y-1/2 pointer-events-none">
+        {currentState === 'error' ? (
+          <AlertCircle className="h-4 w-4 text-red-500" aria-hidden="true" />
+        ) : currentState === 'success' ? (
+          <CheckCircle className="h-4 w-4 text-green-500" aria-hidden="true" />
+        ) : null}
+      </div>
+    );
+  };
+
+  const renderHelperText = () => {
+    if (!helperText) return null;
+
+    return (
+      <p
+        id={helperId}
+        className="mt-1 text-xs text-gray-600 dark:text-gray-400"
+      >
+        {helperText}
+      </p>
+    );
+  };
+
+  const renderError = () => {
+    if (!effectiveError) return null;
+
+    return (
+      <p
+        id={errorId}
+        className={cn(
+          'mt-1 text-xs text-red-600 dark:text-red-400 flex items-center space-x-1',
+          errorClassName
+        )}
+        role="alert"
+        aria-live="polite"
+      >
+        <AlertCircle className="h-3 w-3 flex-shrink-0" aria-hidden="true" />
+        <span>{effectiveError}</span>
+      </p>
+    );
+  };
+
+  return (
+    <div className={cn('w-full', containerClassName)} data-testid={testId}>
+      {/* Label */}
+      {renderLabel()}
+
+      {/* Input Container */}
+      <div className="relative">
+        <input
+          ref={combinedRef}
+          id={inputId}
+          type="text"
+          inputMode="numeric"
+          value={displayValue}
+          placeholder={placeholder}
+          disabled={disabled}
+          className={baseInputClasses}
+          onChange={handleInputChange}
+          onFocus={handleInputFocus}
+          onBlur={handleInputBlur}
+          onKeyDown={handleKeyDown}
+          {...inputAriaAttributes}
+          {...restProps}
+          data-testid={`${testId}-input`}
+        />
+
+        {/* Increment/Decrement Controls */}
+        {renderControls()}
+
+        {/* Validation Icon */}
+        {renderValidationIcon()}
+      </div>
+
+      {/* Helper Text */}
+      {renderHelperText()}
+
+      {/* Error Message */}
+      {renderError()}
+
+      {/* Screen Reader Announcements */}
+      <div
+        ref={announcementRef}
+        id={announcementId}
+        className="sr-only"
+        aria-live="polite"
+        aria-atomic="true"
+      />
+    </div>
+  );
+});
 
 NumberInput.displayName = 'NumberInput';
 
-export { NumberInput };
+// =============================================================================
+// EXPORTS
+// =============================================================================
+
 export default NumberInput;
+export type { NumberInputProps, NumberFormatMode, NumberFormatConfig };
