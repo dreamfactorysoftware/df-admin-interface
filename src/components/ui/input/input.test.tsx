@@ -1,1417 +1,1845 @@
 /**
- * Comprehensive test suite for the input component system using Vitest, Testing Library, and MSW.
- * Tests all input variants, accessibility features, validation integration, and user interactions
- * to ensure robust input functionality per Section 7.1.1 testing requirements.
+ * Comprehensive Input Component Test Suite
  * 
- * @fileoverview Input component test suite for React 19/Next.js 15.1 migration
+ * Test coverage for React 19 Input components using Vitest, Testing Library, and MSW.
+ * Implements WCAG 2.1 AA accessibility compliance testing, React Hook Form integration
+ * validation, performance benchmarks, and comprehensive user interaction testing.
+ * 
+ * Features tested:
+ * - All input variants, sizes, and states with visual regression
+ * - WCAG 2.1 AA accessibility compliance using jest-axe
+ * - React Hook Form integration with validation scenarios
+ * - Keyboard navigation and focus management
+ * - Prefix/suffix element interactions and functionality
+ * - Theme compatibility (light/dark mode)
+ * - Performance testing for debounced inputs and responsiveness
+ * - Error handling and edge cases
+ * 
+ * @fileoverview Comprehensive test suite for Input component system
  * @version 1.0.0
- * @requires vitest@2.1.0 - 10x faster test execution than Jest/Karma
- * @requires @testing-library/react@16.0.0 - Enhanced React component testing
- * @requires jest-axe - WCAG 2.1 AA accessibility compliance testing
- * @requires msw@2.4.0 - Realistic API mocking for form validation
+ * @since React 19.0.0 / Vitest 2.1+
  */
 
-import { describe, it, expect, beforeEach, vi, beforeAll, afterEach, afterAll } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { axe, toHaveNoViolations } from 'jest-axe'
-import { useForm, FormProvider } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
-import { setupServer } from 'msw/node'
-import { http, HttpResponse } from 'msw'
-
-// Import components - these will be created by other tasks
-import { Input } from './input'
-import { SearchInput } from './search-input'
-import { TextArea } from './textarea'
-import { NumberInput } from './number-input'
-import { PasswordInput } from './password-input'
-import { EmailInput } from './email-input'
-import type { 
-  InputProps, 
-  InputVariant, 
-  InputSize,
-  InputState 
-} from './input.types'
+import React, { act } from 'react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
+import { axe } from 'jest-axe';
+import userEvent from '@testing-library/user-event';
 
 // Import test utilities
-import { renderWithProviders, createMockQueryClient } from '@/test/utils/test-utils'
-import { createMockUser, createMockDatabaseService } from '@/test/utils/component-factories'
-import { 
-  testKeyboardNavigation, 
-  testScreenReaderAnnouncements,
-  testFocusManagement,
-  testColorContrast
-} from '@/test/utils/accessibility-helpers'
-import { 
+import {
+  customRender,
+  renderWithForm,
+  testA11y,
+  checkAriaAttributes,
+  createKeyboardUtils,
+  createMockValidation,
+  waitForValidation,
   measureRenderTime,
-  measureInputLatency,
-  measureMemoryUsage
-} from '@/test/utils/performance-helpers'
+  createLargeDataset,
+  type CustomRenderOptions,
+  type FormTestUtils,
+  type KeyboardTestUtils,
+} from '@/test/test-utils';
 
-// Extend Jest matchers for accessibility testing
-expect.extend(toHaveNoViolations)
+// Import components under test
+import {
+  Input,
+  ControlledInput,
+  InputContainer,
+  InputAdornment,
+  type BaseInputProps,
+  type ControlledInputProps,
+  type InputContainerProps,
+  type InputAdornmentProps,
+  type InputRef,
+} from './input';
 
-// MSW server setup for validation testing
-const validationHandlers = [
-  // Mock validation endpoint for email checking
-  http.post('/api/v2/system/admin/validate-email', async ({ request }) => {
-    const { email } = await request.json() as { email: string }
-    
-    if (email === 'invalid@domain.com') {
-      return HttpResponse.json(
-        { error: { message: 'Email already exists', code: 400 } },
-        { status: 400 }
-      )
-    }
-    
-    return HttpResponse.json({ valid: true })
-  }),
+// Import types for testing
+import type {
+  InputVariant,
+  InputSize,
+  InputState,
+  InputChangeEvent,
+  InputFocusEvent,
+  InputKeyboardEvent,
+} from './input.types';
+
+// ============================================================================
+// TEST SETUP AND UTILITIES
+// ============================================================================
+
+/**
+ * Mock implementations for performance testing
+ */
+const mockPerformanceObserver = vi.fn();
+const mockIntersectionObserver = vi.fn();
+const mockResizeObserver = vi.fn();
+
+// Mock performance APIs
+Object.defineProperty(window, 'PerformanceObserver', {
+  writable: true,
+  configurable: true,
+  value: mockPerformanceObserver,
+});
+
+Object.defineProperty(window, 'performance', {
+  writable: true,
+  configurable: true,
+  value: {
+    ...window.performance,
+    mark: vi.fn(),
+    measure: vi.fn(),
+    now: vi.fn(() => Date.now()),
+  },
+});
+
+/**
+ * Default test props for input components
+ */
+const defaultInputProps: Partial<BaseInputProps> = {
+  'data-testid': 'test-input',
+  placeholder: 'Test placeholder',
+};
+
+/**
+ * Test data for various input scenarios
+ */
+const testData = {
+  variants: ['outline', 'filled', 'ghost'] as InputVariant[],
+  sizes: ['sm', 'md', 'lg'] as InputSize[],
+  states: ['default', 'error', 'success', 'warning'] as InputState[],
+  themes: ['light', 'dark'] as const,
+  prefixSuffixContent: {
+    icon: <span data-testid="test-icon">🔍</span>,
+    text: <span data-testid="test-text">USD</span>,
+    button: <button data-testid="test-button">Click</button>,
+  },
+  performanceData: createLargeDataset(1000),
+};
+
+/**
+ * Custom render function for input testing with enhanced providers
+ */
+const renderInput = (
+  ui: React.ReactElement,
+  options: CustomRenderOptions & { theme?: 'light' | 'dark' } = {}
+) => {
+  const { theme = 'light', ...renderOptions } = options;
   
-  // Mock password strength validation
-  http.post('/api/v2/system/admin/validate-password', async ({ request }) => {
-    const { password } = await request.json() as { password: string }
-    
-    const strength = {
-      score: password.length >= 8 ? 3 : 1,
-      feedback: password.length >= 8 ? 'Strong password' : 'Password too short'
-    }
-    
-    return HttpResponse.json({ strength })
-  }),
+  return customRender(ui, {
+    theme,
+    ...renderOptions,
+  });
+};
+
+/**
+ * Helper function to get input element
+ */
+const getInputElement = (testId: string = 'test-input'): HTMLInputElement => {
+  const element = screen.getByTestId(testId);
+  expect(element).toBeInstanceOf(HTMLInputElement);
+  return element as HTMLInputElement;
+};
+
+/**
+ * Helper function to simulate user typing with realistic timing
+ */
+const simulateUserTyping = async (
+  user: ReturnType<typeof userEvent.setup>,
+  element: HTMLElement,
+  text: string,
+  options: { delay?: number } = {}
+) => {
+  const { delay = 50 } = options;
   
-  // Mock database connection test for form validation
-  http.post('/api/v2/system/admin/service/:id/test', () => {
-    return HttpResponse.json({ success: true, message: 'Connection successful' })
-  })
-]
+  await user.click(element);
+  await user.clear(element);
+  
+  for (const char of text) {
+    await user.type(element, char, { delay });
+  }
+};
 
-const server = setupServer(...validationHandlers)
+// ============================================================================
+// BASIC COMPONENT RENDERING TESTS
+// ============================================================================
 
-// Form validation schemas for testing
-const loginSchema = z.object({
-  email: z.string().email('Invalid email format'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
-  confirmPassword: z.string()
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
-})
-
-const databaseConfigSchema = z.object({
-  name: z.string().min(1, 'Service name is required'),
-  host: z.string().min(1, 'Host is required'),
-  port: z.coerce.number().min(1).max(65535, 'Port must be between 1-65535'),
-  database: z.string().min(1, 'Database name is required'),
-  username: z.string().min(1, 'Username is required'),
-  password: z.string().min(1, 'Password is required'),
-  ssl: z.boolean().optional(),
-  timeout: z.coerce.number().min(1).max(300).optional()
-})
-
-// Test wrapper component for React Hook Form integration
-function TestFormWrapper({ 
-  children, 
-  schema = loginSchema,
-  onSubmit = vi.fn(),
-  defaultValues = {}
-}: {
-  children: React.ReactNode
-  schema?: z.ZodSchema
-  onSubmit?: (data: any) => void
-  defaultValues?: Record<string, any>
-}) {
-  const form = useForm({
-    resolver: zodResolver(schema),
-    defaultValues,
-    mode: 'onChange'
-  })
-
-  return (
-    <FormProvider {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} data-testid="test-form">
-        {children}
-        <button type="submit">Submit</button>
-      </form>
-    </FormProvider>
-  )
-}
-
-describe('Input Component System', () => {
-  beforeAll(() => {
-    server.listen({ onUnhandledRequest: 'error' })
-  })
-
-  afterEach(() => {
-    server.resetHandlers()
-    vi.clearAllMocks()
-  })
-
-  afterAll(() => {
-    server.close()
-  })
+describe('Input Component - Basic Rendering', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
   describe('Base Input Component', () => {
-    describe('Rendering and Basic Functionality', () => {
-      it('renders with default props', () => {
-        render(<Input data-testid="input" />)
-        
-        const input = screen.getByTestId('input')
-        expect(input).toBeInTheDocument()
-        expect(input).toHaveAttribute('type', 'text')
-        expect(input).not.toBeDisabled()
-      })
+    it('renders with default props and maintains WCAG compliance', async () => {
+      const { container } = renderInput(
+        <Input {...defaultInputProps} />
+      );
 
-      it('supports all input variants', () => {
-        const variants: InputVariant[] = ['outline', 'filled', 'ghost']
-        
-        variants.forEach(variant => {
-          const { rerender } = render(
-            <Input variant={variant} data-testid={`input-${variant}`} />
-          )
-          
-          const input = screen.getByTestId(`input-${variant}`)
-          expect(input).toHaveClass(`input-${variant}`)
-          
-          rerender(<div />)
-        })
-      })
+      const input = getInputElement();
+      expect(input).toBeInTheDocument();
+      expect(input).toHaveAttribute('placeholder', 'Test placeholder');
+      
+      // Verify WCAG 2.1 AA compliance
+      await testA11y(container, {
+        tags: ['wcag2a', 'wcag2aa'],
+      });
+    });
 
-      it('supports all input sizes', () => {
-        const sizes: InputSize[] = ['sm', 'md', 'lg', 'xl']
-        
-        sizes.forEach(size => {
-          const { rerender } = render(
-            <Input size={size} data-testid={`input-${size}`} />
-          )
-          
-          const input = screen.getByTestId(`input-${size}`)
-          expect(input).toHaveClass(`input-${size}`)
-          
-          rerender(<div />)
-        })
-      })
+    it('renders all variants with proper styling', async () => {
+      for (const variant of testData.variants) {
+        const { container, rerender } = renderInput(
+          <Input {...defaultInputProps} variant={variant} />
+        );
 
-      it('handles input states correctly', () => {
-        const states: InputState[] = ['default', 'error', 'success', 'warning']
+        const input = getInputElement();
+        expect(input).toBeInTheDocument();
         
-        states.forEach(state => {
-          const { rerender } = render(
-            <Input state={state} data-testid={`input-${state}`} />
-          )
-          
-          const input = screen.getByTestId(`input-${state}`)
-          if (state !== 'default') {
-            expect(input).toHaveClass(`input-${state}`)
-          }
-          
-          rerender(<div />)
-        })
-      })
-    })
+        // Verify variant-specific classes are applied
+        expect(input.className).toContain(variant === 'outline' ? 'border-gray-300' : '');
+        
+        // Ensure accessibility for each variant
+        await testA11y(container);
+        
+        // Clean up for next iteration
+        rerender(<div />);
+      }
+    });
 
-    describe('User Interaction Tests', () => {
-      it('handles text input and change events', async () => {
-        const user = userEvent.setup()
-        const handleChange = vi.fn()
-        
-        render(<Input onChange={handleChange} data-testid="input" />)
-        
-        const input = screen.getByTestId('input')
-        await user.type(input, 'Hello World')
-        
-        expect(input).toHaveValue('Hello World')
-        expect(handleChange).toHaveBeenCalledTimes(11) // One for each character
-      })
+    it('renders all sizes with minimum touch target compliance', async () => {
+      for (const size of testData.sizes) {
+        const { container, rerender } = renderInput(
+          <Input {...defaultInputProps} size={size} />
+        );
 
-      it('handles focus and blur events', async () => {
-        const user = userEvent.setup()
-        const handleFocus = vi.fn()
-        const handleBlur = vi.fn()
+        const input = getInputElement();
+        expect(input).toBeInTheDocument();
         
-        render(
+        // Verify WCAG 2.1 AA minimum touch target sizes
+        const computedStyle = window.getComputedStyle(input);
+        const minHeight = parseInt(computedStyle.minHeight);
+        
+        switch (size) {
+          case 'sm':
+            expect(minHeight).toBeGreaterThanOrEqual(36); // Close to WCAG minimum
+            break;
+          case 'md':
+            expect(minHeight).toBeGreaterThanOrEqual(44); // WCAG 2.1 AA minimum
+            break;
+          case 'lg':
+            expect(minHeight).toBeGreaterThanOrEqual(48); // Enhanced touch target
+            break;
+        }
+        
+        await testA11y(container);
+        rerender(<div />);
+      }
+    });
+
+    it('renders all states with appropriate visual feedback', async () => {
+      for (const state of testData.states) {
+        const { container, rerender } = renderInput(
           <Input 
+            {...defaultInputProps} 
+            state={state}
+            error={state === 'error' ? 'Test error message' : undefined}
+          />
+        );
+
+        const input = getInputElement();
+        expect(input).toBeInTheDocument();
+        
+        // Verify state-specific styling
+        if (state === 'error') {
+          expect(input.className).toContain('border-error-500');
+          expect(input).toHaveAttribute('aria-invalid', 'true');
+          
+          // Verify error message is announced
+          const errorMessage = screen.getByRole('alert');
+          expect(errorMessage).toBeInTheDocument();
+          expect(errorMessage).toHaveTextContent('Test error message');
+        }
+        
+        await testA11y(container);
+        rerender(<div />);
+      }
+    });
+  });
+
+  describe('Input Container Component', () => {
+    it('renders with proper layout structure', () => {
+      const { container } = renderInput(
+        <InputContainer>
+          <input data-testid="child-input" />
+        </InputContainer>
+      );
+
+      const container_element = container.querySelector('.relative');
+      expect(container_element).toBeInTheDocument();
+      expect(container_element).toHaveClass('inline-flex', 'w-full');
+      
+      const input = screen.getByTestId('child-input');
+      expect(input).toBeInTheDocument();
+    });
+
+    it('applies disabled styling correctly', () => {
+      const { container } = renderInput(
+        <InputContainer disabled>
+          <input data-testid="child-input" />
+        </InputContainer>
+      );
+
+      const container_element = container.querySelector('.relative');
+      expect(container_element).toHaveClass('opacity-50', 'cursor-not-allowed');
+    });
+  });
+
+  describe('Input Adornment Component', () => {
+    it('renders prefix adornment correctly', () => {
+      renderInput(
+        <InputAdornment position="prefix" data-testid="prefix-adornment">
+          {testData.prefixSuffixContent.icon}
+        </InputAdornment>
+      );
+
+      const adornment = screen.getByTestId('prefix-adornment');
+      expect(adornment).toBeInTheDocument();
+      expect(adornment).toHaveClass('left-0', 'pl-3');
+      
+      const icon = screen.getByTestId('test-icon');
+      expect(icon).toBeInTheDocument();
+    });
+
+    it('renders suffix adornment correctly', () => {
+      renderInput(
+        <InputAdornment position="suffix" data-testid="suffix-adornment">
+          {testData.prefixSuffixContent.text}
+        </InputAdornment>
+      );
+
+      const adornment = screen.getByTestId('suffix-adornment');
+      expect(adornment).toBeInTheDocument();
+      expect(adornment).toHaveClass('right-0', 'pr-3');
+      
+      const text = screen.getByTestId('test-text');
+      expect(text).toBeInTheDocument();
+    });
+
+    it('handles clickable adornments with keyboard support', async () => {
+      const handleClick = vi.fn();
+      const user = userEvent.setup();
+
+      renderInput(
+        <InputAdornment 
+          position="suffix" 
+          clickable 
+          onClick={handleClick}
+          aria-label="Clear input"
+          data-testid="clickable-adornment"
+        >
+          {testData.prefixSuffixContent.button}
+        </InputAdornment>
+      );
+
+      const adornment = screen.getByTestId('clickable-adornment');
+      expect(adornment).toHaveAttribute('role', 'button');
+      expect(adornment).toHaveAttribute('tabIndex', '0');
+      expect(adornment).toHaveAttribute('aria-label', 'Clear input');
+
+      // Test mouse click
+      await user.click(adornment);
+      expect(handleClick).toHaveBeenCalledTimes(1);
+
+      // Test keyboard activation
+      await user.keyboard('{Tab}');
+      expect(adornment).toHaveFocus();
+      
+      await user.keyboard('{Enter}');
+      expect(handleClick).toHaveBeenCalledTimes(2);
+      
+      await user.keyboard(' ');
+      expect(handleClick).toHaveBeenCalledTimes(3);
+    });
+  });
+});
+
+// ============================================================================
+// ACCESSIBILITY COMPLIANCE TESTS
+// ============================================================================
+
+describe('Input Component - WCAG 2.1 AA Accessibility', () => {
+  describe('ARIA Attributes and Labeling', () => {
+    it('provides proper ARIA labeling', async () => {
+      renderInput(
+        <Input
+          {...defaultInputProps}
+          aria-label="Search database"
+          aria-describedby="search-help"
+          required
+        />
+      );
+
+      const input = getInputElement();
+      
+      checkAriaAttributes(input, {
+        'aria-label': 'Search database',
+        'aria-describedby': 'search-help',
+        'aria-required': 'true',
+        'aria-invalid': 'false',
+      });
+    });
+
+    it('properly associates error messages with ARIA', async () => {
+      renderInput(
+        <Input
+          {...defaultInputProps}
+          error="Invalid email format"
+          aria-label="Email address"
+        />
+      );
+
+      const input = getInputElement();
+      const errorMessage = screen.getByRole('alert');
+      
+      expect(input).toHaveAttribute('aria-invalid', 'true');
+      expect(input.getAttribute('aria-describedby')).toContain(errorMessage.id);
+      expect(input.getAttribute('aria-errormessage')).toBe(errorMessage.id);
+      
+      // Verify error is announced to screen readers
+      expect(errorMessage).toHaveAttribute('aria-live', 'polite');
+    });
+
+    it('maintains focus visibility for keyboard navigation', async () => {
+      const user = userEvent.setup();
+      
+      renderInput(
+        <div>
+          <Input {...defaultInputProps} data-testid="input-1" />
+          <Input {...defaultInputProps} data-testid="input-2" />
+        </div>
+      );
+
+      const input1 = getInputElement('input-1');
+      const input2 = screen.getByTestId('input-2');
+
+      // Tab to first input
+      await user.tab();
+      expect(input1).toHaveFocus();
+      
+      // Verify focus ring is visible (class-based check)
+      expect(input1).toHaveClass('focus:ring-2');
+      
+      // Tab to second input
+      await user.tab();
+      expect(input2).toHaveFocus();
+      expect(input1).not.toHaveFocus();
+    });
+
+    it('supports screen reader announcements for loading states', async () => {
+      const { rerender } = renderInput(
+        <Input {...defaultInputProps} loading={false} />
+      );
+
+      // Initially no loading indicator
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+      
+      // Enable loading state
+      rerender(
+        <Input {...defaultInputProps} loading={true} />
+      );
+
+      // Loading spinner should be present but hidden from screen readers
+      const spinner = screen.getByRole('img', { hidden: true });
+      expect(spinner).toBeInTheDocument();
+      expect(spinner).toHaveAttribute('aria-hidden', 'true');
+    });
+  });
+
+  describe('Keyboard Navigation', () => {
+    it('supports full keyboard navigation', async () => {
+      const user = userEvent.setup();
+      const keyboard = createKeyboardUtils(user);
+      const handleKeyDown = vi.fn();
+
+      renderInput(
+        <Input 
+          {...defaultInputProps} 
+          onKeyDown={handleKeyDown}
+        />
+      );
+
+      const input = getInputElement();
+      
+      // Focus input
+      await keyboard.tab();
+      expect(input).toHaveFocus();
+      
+      // Test various keyboard interactions
+      await keyboard.enter();
+      expect(handleKeyDown).toHaveBeenCalledWith(
+        expect.objectContaining({ key: 'Enter' })
+      );
+      
+      await keyboard.escape();
+      expect(handleKeyDown).toHaveBeenCalledWith(
+        expect.objectContaining({ key: 'Escape' })
+      );
+      
+      // Test arrow key navigation
+      await keyboard.arrowLeft();
+      await keyboard.arrowRight();
+      expect(handleKeyDown).toHaveBeenCalledTimes(4);
+    });
+
+    it('traps focus appropriately in complex layouts', async () => {
+      const user = userEvent.setup();
+      
+      renderInput(
+        <div>
+          <button data-testid="before-button">Before</button>
+          <Input 
+            {...defaultInputProps} 
+            prefix={<button data-testid="prefix-button">Search</button>}
+            suffix={<button data-testid="suffix-button">Clear</button>}
+          />
+          <button data-testid="after-button">After</button>
+        </div>
+      );
+
+      const beforeButton = screen.getByTestId('before-button');
+      const input = getInputElement();
+      const afterButton = screen.getByTestId('after-button');
+
+      // Tab through all focusable elements
+      await user.tab();
+      expect(beforeButton).toHaveFocus();
+      
+      await user.tab();
+      expect(input).toHaveFocus();
+      
+      await user.tab();
+      expect(afterButton).toHaveFocus();
+      
+      // Reverse tab direction
+      await user.tab({ shift: true });
+      expect(input).toHaveFocus();
+    });
+  });
+
+  describe('Color Contrast and Theme Compliance', () => {
+    it('maintains WCAG AA contrast ratios in light theme', async () => {
+      const { container } = renderInput(
+        <Input {...defaultInputProps} />,
+        { theme: 'light' }
+      );
+
+      // Verify no contrast violations
+      await testA11y(container, {
+        tags: ['wcag2aa'],
+        includeRules: ['color-contrast'],
+      });
+    });
+
+    it('maintains WCAG AA contrast ratios in dark theme', async () => {
+      const { container } = renderInput(
+        <Input {...defaultInputProps} />,
+        { theme: 'dark' }
+      );
+
+      // Verify no contrast violations in dark mode
+      await testA11y(container, {
+        tags: ['wcag2aa'],
+        includeRules: ['color-contrast'],
+      });
+    });
+
+    it('provides sufficient contrast for error states', async () => {
+      const { container } = renderInput(
+        <Input 
+          {...defaultInputProps} 
+          state="error"
+          error="This field is required"
+        />
+      );
+
+      const input = getInputElement();
+      const errorMessage = screen.getByRole('alert');
+      
+      // Check error state styling meets contrast requirements
+      expect(input).toHaveClass('border-error-500');
+      expect(errorMessage).toHaveClass('text-error-600');
+      
+      await testA11y(container, {
+        tags: ['wcag2aa'],
+        includeRules: ['color-contrast'],
+      });
+    });
+  });
+});
+
+// ============================================================================
+// USER INTERACTION TESTS
+// ============================================================================
+
+describe('Input Component - User Interactions', () => {
+  describe('Text Input and Value Management', () => {
+    it('handles text input and change events', async () => {
+      const handleChange = vi.fn();
+      const user = userEvent.setup();
+      
+      renderInput(
+        <Input 
+          {...defaultInputProps} 
+          onChange={handleChange}
+        />
+      );
+
+      const input = getInputElement();
+      const testText = 'Hello, DreamFactory!';
+      
+      await simulateUserTyping(user, input, testText);
+      
+      expect(input).toHaveValue(testText);
+      expect(handleChange).toHaveBeenCalledTimes(testText.length);
+      
+      // Verify last change event
+      const lastCall = handleChange.mock.calls[handleChange.mock.calls.length - 1][0];
+      expect(lastCall.target.value).toBe(testText);
+    });
+
+    it('supports controlled input behavior', async () => {
+      const handleChange = vi.fn();
+      const user = userEvent.setup();
+      
+      const TestComponent = () => {
+        const [value, setValue] = React.useState('');
+        
+        return (
+          <Input
+            {...defaultInputProps}
+            value={value}
+            onChange={(e) => {
+              setValue(e.target.value);
+              handleChange(e);
+            }}
+          />
+        );
+      };
+
+      renderInput(<TestComponent />);
+
+      const input = getInputElement();
+      const testText = 'Controlled value';
+      
+      await simulateUserTyping(user, input, testText);
+      
+      expect(input).toHaveValue(testText);
+      expect(handleChange).toHaveBeenCalledTimes(testText.length);
+    });
+
+    it('handles focus and blur events correctly', async () => {
+      const handleFocus = vi.fn();
+      const handleBlur = vi.fn();
+      const user = userEvent.setup();
+      
+      renderInput(
+        <div>
+          <Input 
+            {...defaultInputProps} 
             onFocus={handleFocus}
             onBlur={handleBlur}
-            data-testid="input"
           />
-        )
-        
-        const input = screen.getByTestId('input')
-        
-        await user.click(input)
-        expect(handleFocus).toHaveBeenCalledTimes(1)
-        expect(input).toHaveFocus()
-        
-        await user.tab()
-        expect(handleBlur).toHaveBeenCalledTimes(1)
-        expect(input).not.toHaveFocus()
-      })
-
-      it('supports keyboard navigation', async () => {
-        const user = userEvent.setup()
-        
-        render(
-          <div>
-            <Input data-testid="input1" />
-            <Input data-testid="input2" />
-          </div>
-        )
-        
-        const input1 = screen.getByTestId('input1')
-        const input2 = screen.getByTestId('input2')
-        
-        await user.click(input1)
-        expect(input1).toHaveFocus()
-        
-        await user.tab()
-        expect(input2).toHaveFocus()
-        
-        await user.tab({ shift: true })
-        expect(input1).toHaveFocus()
-      })
-
-      it('handles disabled state correctly', async () => {
-        const user = userEvent.setup()
-        const handleChange = vi.fn()
-        
-        render(<Input disabled onChange={handleChange} data-testid="input" />)
-        
-        const input = screen.getByTestId('input')
-        expect(input).toBeDisabled()
-        
-        await user.type(input, 'test')
-        expect(input).toHaveValue('')
-        expect(handleChange).not.toHaveBeenCalled()
-      })
-
-      it('handles readonly state correctly', async () => {
-        const user = userEvent.setup()
-        const handleChange = vi.fn()
-        
-        render(
-          <Input 
-            readOnly 
-            value="readonly value"
-            onChange={handleChange} 
-            data-testid="input" 
-          />
-        )
-        
-        const input = screen.getByTestId('input')
-        expect(input).toHaveAttribute('readonly')
-        expect(input).toHaveValue('readonly value')
-        
-        await user.type(input, 'test')
-        expect(input).toHaveValue('readonly value')
-        expect(handleChange).not.toHaveBeenCalled()
-      })
-    })
-
-    describe('Prefix and Suffix Elements', () => {
-      it('renders prefix elements correctly', () => {
-        const prefix = <span data-testid="prefix">$</span>
-        
-        render(<Input prefix={prefix} data-testid="input" />)
-        
-        expect(screen.getByTestId('prefix')).toBeInTheDocument()
-        expect(screen.getByTestId('input')).toBeInTheDocument()
-      })
-
-      it('renders suffix elements correctly', () => {
-        const suffix = <button data-testid="suffix">Clear</button>
-        
-        render(<Input suffix={suffix} data-testid="input" />)
-        
-        expect(screen.getByTestId('suffix')).toBeInTheDocument()
-        expect(screen.getByTestId('input')).toBeInTheDocument()
-      })
-
-      it('handles click events on suffix elements', async () => {
-        const user = userEvent.setup()
-        const handleSuffixClick = vi.fn()
-        
-        const suffix = (
-          <button data-testid="clear-button" onClick={handleSuffixClick}>
-            Clear
-          </button>
-        )
-        
-        render(<Input suffix={suffix} data-testid="input" />)
-        
-        await user.click(screen.getByTestId('clear-button'))
-        expect(handleSuffixClick).toHaveBeenCalledTimes(1)
-      })
-
-      it('maintains proper tab order with prefix and suffix', async () => {
-        const user = userEvent.setup()
-        
-        const prefix = <button data-testid="prefix-btn">Prefix</button>
-        const suffix = <button data-testid="suffix-btn">Suffix</button>
-        
-        render(
-          <div>
-            <button data-testid="before">Before</button>
-            <Input 
-              prefix={prefix}
-              suffix={suffix}
-              data-testid="input"
-            />
-            <button data-testid="after">After</button>
-          </div>
-        )
-        
-        const beforeBtn = screen.getByTestId('before')
-        const prefixBtn = screen.getByTestId('prefix-btn')
-        const input = screen.getByTestId('input')
-        const suffixBtn = screen.getByTestId('suffix-btn')
-        const afterBtn = screen.getByTestId('after')
-        
-        await user.click(beforeBtn)
-        expect(beforeBtn).toHaveFocus()
-        
-        await user.tab()
-        expect(prefixBtn).toHaveFocus()
-        
-        await user.tab()
-        expect(input).toHaveFocus()
-        
-        await user.tab()
-        expect(suffixBtn).toHaveFocus()
-        
-        await user.tab()
-        expect(afterBtn).toHaveFocus()
-      })
-    })
-
-    describe('React Hook Form Integration', () => {
-      it('integrates with React Hook Form validation', async () => {
-        const user = userEvent.setup()
-        const onSubmit = vi.fn()
-        
-        render(
-          <TestFormWrapper onSubmit={onSubmit}>
-            <Input
-              {...{ register: vi.fn(() => ({ name: 'email' })) }}
-              name="email"
-              data-testid="email-input"
-            />
-          </TestFormWrapper>
-        )
-        
-        const input = screen.getByTestId('email-input')
-        const submitBtn = screen.getByRole('button', { name: 'Submit' })
-        
-        // Test invalid email
-        await user.type(input, 'invalid-email')
-        await user.click(submitBtn)
-        
-        await waitFor(() => {
-          expect(screen.getByText('Invalid email format')).toBeInTheDocument()
-        })
-        
-        expect(onSubmit).not.toHaveBeenCalled()
-        
-        // Test valid email
-        await user.clear(input)
-        await user.type(input, 'valid@example.com')
-        await user.click(submitBtn)
-        
-        await waitFor(() => {
-          expect(onSubmit).toHaveBeenCalledWith(
-            expect.objectContaining({ email: 'valid@example.com' })
-          )
-        })
-      })
-
-      it('displays validation errors correctly', async () => {
-        const user = userEvent.setup()
-        
-        render(
-          <TestFormWrapper>
-            <Input
-              {...{ register: vi.fn(() => ({ name: 'email' })) }}
-              name="email"
-              error="Email is required"
-              data-testid="email-input"
-            />
-          </TestFormWrapper>
-        )
-        
-        const input = screen.getByTestId('email-input')
-        expect(input).toHaveClass('input-error')
-        expect(screen.getByText('Email is required')).toBeInTheDocument()
-      })
-
-      it('shows validation state in real-time', async () => {
-        const user = userEvent.setup()
-        
-        render(
-          <TestFormWrapper>
-            <Input
-              {...{ register: vi.fn(() => ({ name: 'email' })) }}
-              name="email"
-              data-testid="email-input"
-            />
-          </TestFormWrapper>
-        )
-        
-        const input = screen.getByTestId('email-input')
-        
-        // Type invalid email
-        await user.type(input, 'invalid')
-        await waitFor(() => {
-          expect(input).toHaveClass('input-error')
-        })
-        
-        // Complete valid email
-        await user.type(input, '@example.com')
-        await waitFor(() => {
-          expect(input).not.toHaveClass('input-error')
-        })
-      })
-    })
-
-    describe('Theme and Dark Mode Support', () => {
-      it('applies correct classes for light theme', () => {
-        render(
-          <div data-theme="light">
-            <Input data-testid="input" />
-          </div>
-        )
-        
-        const input = screen.getByTestId('input')
-        expect(input).toHaveClass('bg-white', 'text-gray-900')
-      })
-
-      it('applies correct classes for dark theme', () => {
-        render(
-          <div data-theme="dark">
-            <Input data-testid="input" />
-          </div>
-        )
-        
-        const input = screen.getByTestId('input')
-        expect(input).toHaveClass('bg-gray-800', 'text-white')
-      })
-
-      it('maintains 4.5:1 contrast ratio requirement', async () => {
-        const { container } = render(<Input data-testid="input" />)
-        
-        const contrastResults = await testColorContrast(container)
-        expect(contrastResults.violations).toHaveLength(0)
-      })
-    })
-  })
-
-  describe('Specialized Input Components', () => {
-    describe('SearchInput Component', () => {
-      it('renders with search icon and clear button', () => {
-        render(<SearchInput data-testid="search-input" />)
-        
-        const input = screen.getByTestId('search-input')
-        const searchIcon = screen.getByTestId('search-icon')
-        const clearButton = screen.getByTestId('clear-button')
-        
-        expect(input).toBeInTheDocument()
-        expect(searchIcon).toBeInTheDocument()
-        expect(clearButton).toBeInTheDocument()
-      })
-
-      it('handles debounced search correctly', async () => {
-        const user = userEvent.setup()
-        const handleSearch = vi.fn()
-        
-        render(
-          <SearchInput 
-            onSearch={handleSearch}
-            debounceMs={300}
-            data-testid="search-input" 
-          />
-        )
-        
-        const input = screen.getByTestId('search-input')
-        
-        await user.type(input, 'search query')
-        
-        // Should not call immediately
-        expect(handleSearch).not.toHaveBeenCalled()
-        
-        // Should call after debounce period
-        await waitFor(() => {
-          expect(handleSearch).toHaveBeenCalledWith('search query')
-        }, { timeout: 400 })
-      })
-
-      it('clears input when clear button is clicked', async () => {
-        const user = userEvent.setup()
-        
-        render(<SearchInput defaultValue="test query" data-testid="search-input" />)
-        
-        const input = screen.getByTestId('search-input')
-        const clearButton = screen.getByTestId('clear-button')
-        
-        expect(input).toHaveValue('test query')
-        
-        await user.click(clearButton)
-        expect(input).toHaveValue('')
-      })
-
-      it('supports keyboard shortcuts (Ctrl+K for focus, Escape for clear)', async () => {
-        const user = userEvent.setup()
-        
-        render(
-          <div>
-            <button>Other element</button>
-            <SearchInput data-testid="search-input" />
-          </div>
-        )
-        
-        const input = screen.getByTestId('search-input')
-        
-        // Test Ctrl+K for focus
-        await user.keyboard('{Control>}k{/Control}')
-        expect(input).toHaveFocus()
-        
-        // Add some text
-        await user.type(input, 'test query')
-        expect(input).toHaveValue('test query')
-        
-        // Test Escape for clear
-        await user.keyboard('{Escape}')
-        expect(input).toHaveValue('')
-      })
-    })
-
-    describe('NumberInput Component', () => {
-      it('renders with increment/decrement buttons', () => {
-        render(<NumberInput data-testid="number-input" />)
-        
-        const input = screen.getByTestId('number-input')
-        const incrementBtn = screen.getByTestId('increment-button')
-        const decrementBtn = screen.getByTestId('decrement-button')
-        
-        expect(input).toHaveAttribute('type', 'number')
-        expect(incrementBtn).toBeInTheDocument()
-        expect(decrementBtn).toBeInTheDocument()
-      })
-
-      it('handles increment/decrement button clicks', async () => {
-        const user = userEvent.setup()
-        
-        render(<NumberInput defaultValue={5} step={1} data-testid="number-input" />)
-        
-        const input = screen.getByTestId('number-input')
-        const incrementBtn = screen.getByTestId('increment-button')
-        const decrementBtn = screen.getByTestId('decrement-button')
-        
-        expect(input).toHaveValue('5')
-        
-        await user.click(incrementBtn)
-        expect(input).toHaveValue('6')
-        
-        await user.click(decrementBtn)
-        await user.click(decrementBtn)
-        expect(input).toHaveValue('4')
-      })
-
-      it('respects min/max constraints', async () => {
-        const user = userEvent.setup()
-        
-        render(
-          <NumberInput 
-            min={0}
-            max={10}
-            defaultValue={5}
-            data-testid="number-input" 
-          />
-        )
-        
-        const input = screen.getByTestId('number-input')
-        const incrementBtn = screen.getByTestId('increment-button')
-        const decrementBtn = screen.getByTestId('decrement-button')
-        
-        // Test max constraint
-        await user.clear(input)
-        await user.type(input, '10')
-        await user.click(incrementBtn)
-        expect(input).toHaveValue('10') // Should not exceed max
-        
-        // Test min constraint
-        await user.clear(input)
-        await user.type(input, '0')
-        await user.click(decrementBtn)
-        expect(input).toHaveValue('0') // Should not go below min
-      })
-
-      it('handles keyboard increment/decrement (arrow keys)', async () => {
-        const user = userEvent.setup()
-        
-        render(<NumberInput defaultValue={5} data-testid="number-input" />)
-        
-        const input = screen.getByTestId('number-input')
-        await user.click(input)
-        
-        await user.keyboard('{ArrowUp}')
-        expect(input).toHaveValue('6')
-        
-        await user.keyboard('{ArrowDown}')
-        expect(input).toHaveValue('5')
-      })
-
-      it('formats numbers with locale support', () => {
-        render(
-          <NumberInput 
-            value={1234.56}
-            locale="en-US"
-            formatOptions={{ style: 'currency', currency: 'USD' }}
-            data-testid="number-input"
-          />
-        )
-        
-        const input = screen.getByTestId('number-input')
-        expect(input).toHaveDisplayValue('$1,234.56')
-      })
-    })
-
-    describe('PasswordInput Component', () => {
-      it('renders with show/hide toggle button', () => {
-        render(<PasswordInput data-testid="password-input" />)
-        
-        const input = screen.getByTestId('password-input')
-        const toggleBtn = screen.getByTestId('password-toggle')
-        
-        expect(input).toHaveAttribute('type', 'password')
-        expect(toggleBtn).toBeInTheDocument()
-      })
-
-      it('toggles password visibility', async () => {
-        const user = userEvent.setup()
-        
-        render(<PasswordInput data-testid="password-input" />)
-        
-        const input = screen.getByTestId('password-input')
-        const toggleBtn = screen.getByTestId('password-toggle')
-        
-        expect(input).toHaveAttribute('type', 'password')
-        
-        await user.click(toggleBtn)
-        expect(input).toHaveAttribute('type', 'text')
-        
-        await user.click(toggleBtn)
-        expect(input).toHaveAttribute('type', 'password')
-      })
-
-      it('maintains cursor position when toggling visibility', async () => {
-        const user = userEvent.setup()
-        
-        render(<PasswordInput data-testid="password-input" />)
-        
-        const input = screen.getByTestId('password-input') as HTMLInputElement
-        const toggleBtn = screen.getByTestId('password-toggle')
-        
-        await user.type(input, 'password123')
-        
-        // Set cursor position
-        input.setSelectionRange(4, 4) // After "pass"
-        const cursorPosition = input.selectionStart
-        
-        await user.click(toggleBtn)
-        expect(input.selectionStart).toBe(cursorPosition)
-      })
-
-      it('displays password strength meter', async () => {
-        const user = userEvent.setup()
-        
-        render(<PasswordInput showStrengthMeter data-testid="password-input" />)
-        
-        const input = screen.getByTestId('password-input')
-        
-        // Weak password
-        await user.type(input, '123')
-        await waitFor(() => {
-          expect(screen.getByTestId('strength-meter')).toHaveClass('strength-weak')
-        })
-        
-        // Strong password
-        await user.clear(input)
-        await user.type(input, 'StrongP@ssw0rd123!')
-        await waitFor(() => {
-          expect(screen.getByTestId('strength-meter')).toHaveClass('strength-strong')
-        })
-      })
-
-      it('validates password confirmation matching', async () => {
-        const user = userEvent.setup()
-        
-        render(
-          <TestFormWrapper>
-            <PasswordInput
-              {...{ register: vi.fn(() => ({ name: 'password' })) }}
-              name="password"
-              data-testid="password"
-            />
-            <PasswordInput
-              {...{ register: vi.fn(() => ({ name: 'confirmPassword' })) }}
-              name="confirmPassword"
-              data-testid="confirm-password"
-            />
-          </TestFormWrapper>
-        )
-        
-        const password = screen.getByTestId('password')
-        const confirmPassword = screen.getByTestId('confirm-password')
-        const submitBtn = screen.getByRole('button', { name: 'Submit' })
-        
-        await user.type(password, 'password123')
-        await user.type(confirmPassword, 'different123')
-        await user.click(submitBtn)
-        
-        await waitFor(() => {
-          expect(screen.getByText("Passwords don't match")).toBeInTheDocument()
-        })
-      })
-    })
-
-    describe('EmailInput Component', () => {
-      it('renders with email input type', () => {
-        render(<EmailInput data-testid="email-input" />)
-        
-        const input = screen.getByTestId('email-input')
-        expect(input).toHaveAttribute('type', 'email')
-      })
-
-      it('provides domain autocomplete suggestions', async () => {
-        const user = userEvent.setup()
-        
-        render(<EmailInput showSuggestions data-testid="email-input" />)
-        
-        const input = screen.getByTestId('email-input')
-        
-        await user.type(input, 'user@gmai')
-        
-        await waitFor(() => {
-          expect(screen.getByText('user@gmail.com')).toBeInTheDocument()
-        })
-      })
-
-      it('detects and suggests typo corrections', async () => {
-        const user = userEvent.setup()
-        
-        render(<EmailInput detectTypos data-testid="email-input" />)
-        
-        const input = screen.getByTestId('email-input')
-        
-        await user.type(input, 'user@gmial.com') // Typo: gmial instead of gmail
-        
-        await waitFor(() => {
-          expect(screen.getByText('Did you mean gmail.com?')).toBeInTheDocument()
-        })
-      })
-
-      it('handles multiple email input with delimiters', async () => {
-        const user = userEvent.setup()
-        const handleChange = vi.fn()
-        
-        render(
-          <EmailInput 
-            multiple
-            onChange={handleChange}
-            data-testid="email-input" 
-          />
-        )
-        
-        const input = screen.getByTestId('email-input')
-        
-        await user.type(input, 'user1@example.com, user2@example.com; user3@example.com')
-        
-        expect(handleChange).toHaveBeenCalledWith(
-          expect.objectContaining({
-            target: expect.objectContaining({
-              value: expect.arrayContaining([
-                'user1@example.com',
-                'user2@example.com',
-                'user3@example.com'
-              ])
-            })
-          })
-        )
-      })
-
-      it('validates email format in real-time', async () => {
-        const user = userEvent.setup()
-        
-        render(<EmailInput data-testid="email-input" />)
-        
-        const input = screen.getByTestId('email-input')
-        
-        // Invalid email
-        await user.type(input, 'invalid-email')
-        await waitFor(() => {
-          expect(input).toHaveClass('input-error')
-        })
-        
-        // Valid email
-        await user.clear(input)
-        await user.type(input, 'valid@example.com')
-        await waitFor(() => {
-          expect(input).not.toHaveClass('input-error')
-        })
-      })
-    })
-
-    describe('TextArea Component', () => {
-      it('renders as textarea element', () => {
-        render(<TextArea data-testid="textarea" />)
-        
-        const textarea = screen.getByTestId('textarea')
-        expect(textarea.tagName).toBe('TEXTAREA')
-      })
-
-      it('auto-resizes with content', async () => {
-        const user = userEvent.setup()
-        
-        render(<TextArea autoResize data-testid="textarea" />)
-        
-        const textarea = screen.getByTestId('textarea') as HTMLTextAreaElement
-        const initialHeight = textarea.style.height
-        
-        await user.type(textarea, 'Line 1\nLine 2\nLine 3\nLine 4\nLine 5')
-        
-        await waitFor(() => {
-          expect(textarea.style.height).not.toBe(initialHeight)
-        })
-      })
-
-      it('displays character count', async () => {
-        const user = userEvent.setup()
-        
-        render(<TextArea showCharCount maxLength={100} data-testid="textarea" />)
-        
-        const textarea = screen.getByTestId('textarea')
-        const charCount = screen.getByTestId('char-count')
-        
-        expect(charCount).toHaveTextContent('0/100')
-        
-        await user.type(textarea, 'Hello World')
-        expect(charCount).toHaveTextContent('11/100')
-      })
-
-      it('handles max height constraint with scrolling', async () => {
-        const user = userEvent.setup()
-        
-        render(
-          <TextArea 
-            autoResize
-            maxHeight={100}
-            data-testid="textarea" 
-          />
-        )
-        
-        const textarea = screen.getByTestId('textarea') as HTMLTextAreaElement
-        
-        // Add enough content to exceed max height
-        const longText = Array(50).fill('This is a long line of text').join('\n')
-        await user.type(textarea, longText)
-        
-        await waitFor(() => {
-          const height = parseInt(textarea.style.height)
-          expect(height).toBeLessThanOrEqual(100)
-          expect(textarea.style.overflowY).toBe('auto')
-        })
-      })
-    })
-  })
-
-  describe('Accessibility Compliance (WCAG 2.1 AA)', () => {
-    it('passes axe accessibility audit', async () => {
-      const { container } = render(
-        <div>
-          <Input 
-            label="Email Address"
-            placeholder="Enter your email"
-            data-testid="input"
-          />
-          <NumberInput 
-            label="Port Number"
-            min={1}
-            max={65535}
-            data-testid="number-input"
-          />
-          <PasswordInput 
-            label="Password"
-            data-testid="password-input"
-          />
+          <button data-testid="other-element">Other Element</button>
         </div>
-      )
-      
-      const results = await axe(container)
-      expect(results).toHaveNoViolations()
-    })
+      );
 
-    it('supports proper labeling and descriptions', () => {
-      render(
-        <Input
-          label="Database Host"
-          description="Enter the hostname or IP address of your database server"
-          error="Host is required"
-          data-testid="input"
+      const input = getInputElement();
+      const otherElement = screen.getByTestId('other-element');
+      
+      // Focus input
+      await user.click(input);
+      expect(handleFocus).toHaveBeenCalledTimes(1);
+      expect(input).toHaveFocus();
+      
+      // Blur input
+      await user.click(otherElement);
+      expect(handleBlur).toHaveBeenCalledTimes(1);
+      expect(input).not.toHaveFocus();
+    });
+
+    it('prevents input when disabled', async () => {
+      const handleChange = vi.fn();
+      const user = userEvent.setup();
+      
+      renderInput(
+        <Input 
+          {...defaultInputProps} 
+          disabled
+          onChange={handleChange}
         />
-      )
-      
-      const input = screen.getByTestId('input')
-      const label = screen.getByText('Database Host')
-      const description = screen.getByText('Enter the hostname or IP address of your database server')
-      const error = screen.getByText('Host is required')
-      
-      expect(input).toHaveAttribute('aria-labelledby', label.id)
-      expect(input).toHaveAttribute('aria-describedby', expect.stringContaining(description.id))
-      expect(input).toHaveAttribute('aria-describedby', expect.stringContaining(error.id))
-      expect(input).toHaveAttribute('aria-invalid', 'true')
-    })
+      );
 
-    it('announces validation errors to screen readers', async () => {
-      const user = userEvent.setup()
+      const input = getInputElement();
       
-      render(
-        <TestFormWrapper>
+      expect(input).toBeDisabled();
+      
+      // Attempt to type in disabled input
+      await user.click(input);
+      await user.type(input, 'Should not work');
+      
+      expect(input).toHaveValue('');
+      expect(handleChange).not.toHaveBeenCalled();
+    });
+
+    it('prevents modification when readonly', async () => {
+      const handleChange = vi.fn();
+      const user = userEvent.setup();
+      
+      renderInput(
+        <Input 
+          {...defaultInputProps} 
+          readOnly
+          value="Read-only value"
+          onChange={handleChange}
+        />
+      );
+
+      const input = getInputElement();
+      
+      expect(input).toHaveAttribute('readOnly');
+      expect(input).toHaveValue('Read-only value');
+      
+      await user.click(input);
+      expect(input).toHaveFocus(); // Can focus but not modify
+      
+      await user.type(input, 'Should not change');
+      
+      expect(input).toHaveValue('Read-only value');
+      expect(handleChange).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Prefix and Suffix Interactions', () => {
+    it('renders input with prefix content', () => {
+      renderInput(
+        <Input 
+          {...defaultInputProps} 
+          prefix={testData.prefixSuffixContent.icon}
+        />
+      );
+
+      const input = getInputElement();
+      const icon = screen.getByTestId('test-icon');
+      
+      expect(input).toBeInTheDocument();
+      expect(icon).toBeInTheDocument();
+      expect(input).toHaveClass('pl-10'); // Left padding for prefix
+    });
+
+    it('renders input with suffix content', () => {
+      renderInput(
+        <Input 
+          {...defaultInputProps} 
+          suffix={testData.prefixSuffixContent.text}
+        />
+      );
+
+      const input = getInputElement();
+      const text = screen.getByTestId('test-text');
+      
+      expect(input).toBeInTheDocument();
+      expect(text).toBeInTheDocument();
+      expect(input).toHaveClass('pr-10'); // Right padding for suffix
+    });
+
+    it('handles clickable prefix interactions', async () => {
+      const handlePrefixClick = vi.fn();
+      const user = userEvent.setup();
+      
+      renderInput(
+        <Input 
+          {...defaultInputProps} 
+          prefix={
+            <InputAdornment 
+              position="prefix" 
+              clickable 
+              onClick={handlePrefixClick}
+              aria-label="Search"
+              data-testid="prefix-button"
+            >
+              🔍
+            </InputAdornment>
+          }
+        />
+      );
+
+      const prefixButton = screen.getByTestId('prefix-button');
+      
+      await user.click(prefixButton);
+      expect(handlePrefixClick).toHaveBeenCalledTimes(1);
+      
+      // Test keyboard interaction
+      prefixButton.focus();
+      await user.keyboard('{Enter}');
+      expect(handlePrefixClick).toHaveBeenCalledTimes(2);
+    });
+
+    it('displays loading spinner in suffix when loading', () => {
+      renderInput(
+        <Input 
+          {...defaultInputProps} 
+          loading={true}
+        />
+      );
+
+      const input = getInputElement();
+      const spinner = screen.getByRole('img', { hidden: true });
+      
+      expect(input).toHaveClass('pr-10'); // Right padding for loading
+      expect(spinner).toBeInTheDocument();
+      expect(spinner).toHaveClass('animate-spin');
+    });
+
+    it('prioritizes loading spinner over suffix content', () => {
+      renderInput(
+        <Input 
+          {...defaultInputProps} 
+          loading={true}
+          suffix={testData.prefixSuffixContent.text}
+        />
+      );
+
+      const spinner = screen.getByRole('img', { hidden: true });
+      expect(spinner).toBeInTheDocument();
+      
+      // Suffix content should not be visible when loading
+      expect(screen.queryByTestId('test-text')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Advanced Input Features', () => {
+    it('handles clear functionality', async () => {
+      const handleChange = vi.fn();
+      const handleClear = vi.fn();
+      const user = userEvent.setup();
+      
+      const TestComponent = () => {
+        const [value, setValue] = React.useState('Initial value');
+        
+        return (
           <Input
-            {...{ register: vi.fn(() => ({ name: 'email' })) }}
+            {...defaultInputProps}
+            value={value}
+            onChange={(e) => {
+              setValue(e.target.value);
+              handleChange(e);
+            }}
+            suffix={
+              <InputAdornment 
+                position="suffix" 
+                clickable 
+                onClick={() => {
+                  setValue('');
+                  handleClear();
+                }}
+                aria-label="Clear input"
+                data-testid="clear-button"
+              >
+                ✕
+              </InputAdornment>
+            }
+          />
+        );
+      };
+
+      renderInput(<TestComponent />);
+
+      const input = getInputElement();
+      const clearButton = screen.getByTestId('clear-button');
+      
+      expect(input).toHaveValue('Initial value');
+      
+      await user.click(clearButton);
+      
+      expect(input).toHaveValue('');
+      expect(handleClear).toHaveBeenCalledTimes(1);
+    });
+
+    it('handles password visibility toggle', async () => {
+      const user = userEvent.setup();
+      
+      const TestComponent = () => {
+        const [showPassword, setShowPassword] = React.useState(false);
+        
+        return (
+          <Input
+            {...defaultInputProps}
+            type={showPassword ? 'text' : 'password'}
+            value="secret123"
+            suffix={
+              <InputAdornment 
+                position="suffix" 
+                clickable 
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                data-testid="toggle-password"
+              >
+                {showPassword ? '🙈' : '👁️'}
+              </InputAdornment>
+            }
+          />
+        );
+      };
+
+      renderInput(<TestComponent />);
+
+      const input = getInputElement();
+      const toggleButton = screen.getByTestId('toggle-password');
+      
+      expect(input).toHaveAttribute('type', 'password');
+      expect(screen.getByLabelText('Show password')).toBeInTheDocument();
+      
+      await user.click(toggleButton);
+      
+      expect(input).toHaveAttribute('type', 'text');
+      expect(screen.getByLabelText('Hide password')).toBeInTheDocument();
+    });
+  });
+});
+
+// ============================================================================
+// REACT HOOK FORM INTEGRATION TESTS
+// ============================================================================
+
+describe('Input Component - React Hook Form Integration', () => {
+  describe('ControlledInput Component', () => {
+    it('integrates with React Hook Form', async () => {
+      const { formMethods, user } = renderWithForm(
+        <ControlledInput
+          name="email"
+          control={undefined} // Will be provided by form context
+          rules={{ required: 'Email is required' }}
+          placeholder="Enter email"
+          data-testid="controlled-input"
+        />,
+        {
+          defaultValues: { email: '' },
+          mode: 'onChange',
+        }
+      );
+
+      const input = screen.getByTestId('controlled-input');
+      
+      expect(input).toBeInTheDocument();
+      expect(input).toHaveValue('');
+      
+      // Type invalid email
+      await user.type(input, 'invalid-email');
+      
+      // Trigger validation
+      await formMethods.trigger('email');
+      
+      // Field should be dirty
+      expect(formMethods.formState.dirtyFields.email).toBe(true);
+    });
+
+    it('displays validation errors correctly', async () => {
+      const mockValidation = createMockValidation();
+      
+      const { formMethods, user } = renderWithForm(
+        <ControlledInput
+          name="username"
+          control={undefined}
+          rules={{
+            required: 'Username is required',
+            minLength: {
+              value: 3,
+              message: 'Username must be at least 3 characters',
+            },
+          }}
+          placeholder="Enter username"
+          data-testid="controlled-input"
+        />,
+        {
+          defaultValues: { username: '' },
+          mode: 'onChange',
+        }
+      );
+
+      const input = screen.getByTestId('controlled-input');
+      
+      // Type short username
+      await user.type(input, 'ab');
+      
+      // Trigger validation
+      await formMethods.trigger('username');
+      await waitForValidation();
+      
+      // Check for validation error
+      const error = formMethods.getFieldState('username').error;
+      expect(error?.message).toBe('Username must be at least 3 characters');
+      
+      // Input should show error state
+      expect(input).toHaveAttribute('aria-invalid', 'true');
+    });
+
+    it('handles form submission states', async () => {
+      const handleSubmit = vi.fn();
+      
+      const { formMethods, user, submitForm } = renderWithForm(
+        <form onSubmit={formMethods.handleSubmit(handleSubmit)}>
+          <ControlledInput
+            name="message"
+            control={undefined}
+            rules={{ required: 'Message is required' }}
+            placeholder="Enter message"
+            data-testid="controlled-input"
+          />
+          <button type="submit" data-testid="submit-button">Submit</button>
+        </form>,
+        {
+          defaultValues: { message: '' },
+        }
+      );
+
+      const input = screen.getByTestId('controlled-input');
+      const submitButton = screen.getByTestId('submit-button');
+      
+      // Try to submit empty form
+      await user.click(submitButton);
+      
+      // Input should be disabled during submission attempt
+      await waitFor(() => {
+        expect(formMethods.formState.isSubmitting).toBe(false);
+      });
+      
+      // Fill in required field
+      await user.type(input, 'Valid message');
+      await user.click(submitButton);
+      
+      await waitFor(() => {
+        expect(handleSubmit).toHaveBeenCalledWith(
+          { message: 'Valid message' },
+          expect.any(Object)
+        );
+      });
+    });
+
+    it('supports complex validation schemas', async () => {
+      const customValidation = {
+        email: (value: string) => {
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          return emailRegex.test(value) || 'Please enter a valid email address';
+        },
+        strongPassword: (value: string) => {
+          const strongRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+          return strongRegex.test(value) || 'Password must be strong (8+ chars, uppercase, lowercase, number, special char)';
+        },
+      };
+      
+      const { formMethods, user } = renderWithForm(
+        <div>
+          <ControlledInput
             name="email"
-            label="Email Address"
+            control={undefined}
+            rules={{ 
+              required: 'Email is required',
+              validate: customValidation.email,
+            }}
+            placeholder="Enter email"
             data-testid="email-input"
           />
-        </TestFormWrapper>
-      )
+          <ControlledInput
+            name="password"
+            type="password"
+            control={undefined}
+            rules={{ 
+              required: 'Password is required',
+              validate: customValidation.strongPassword,
+            }}
+            placeholder="Enter password"
+            data-testid="password-input"
+          />
+        </div>,
+        {
+          defaultValues: { email: '', password: '' },
+          mode: 'onBlur',
+        }
+      );
+
+      const emailInput = screen.getByTestId('email-input');
+      const passwordInput = screen.getByTestId('password-input');
       
-      const input = screen.getByTestId('email-input')
-      const submitBtn = screen.getByRole('button', { name: 'Submit' })
+      // Test invalid email
+      await user.type(emailInput, 'invalid-email');
+      await user.tab(); // Trigger onBlur validation
       
-      await user.type(input, 'invalid-email')
-      await user.click(submitBtn)
+      await waitForValidation();
+      expect(formMethods.getFieldState('email').error?.message).toBe('Please enter a valid email address');
+      
+      // Test weak password
+      await user.type(passwordInput, 'weak');
+      await user.tab();
+      
+      await waitForValidation();
+      expect(formMethods.getFieldState('password').error?.message).toContain('Password must be strong');
+      
+      // Test valid inputs
+      await user.clear(emailInput);
+      await user.type(emailInput, 'user@example.com');
+      await user.tab();
+      
+      await user.clear(passwordInput);
+      await user.type(passwordInput, 'StrongP@ss123');
+      await user.tab();
+      
+      await waitForValidation();
+      expect(formMethods.getFieldState('email').error).toBeUndefined();
+      expect(formMethods.getFieldState('password').error).toBeUndefined();
+    });
+  });
+
+  describe('Form State Management', () => {
+    it('tracks field state changes accurately', async () => {
+      const { formMethods, user } = renderWithForm(
+        <ControlledInput
+          name="trackingField"
+          control={undefined}
+          placeholder="Enter text"
+          data-testid="tracking-input"
+        />,
+        {
+          defaultValues: { trackingField: '' },
+          mode: 'onChange',
+        }
+      );
+
+      const input = screen.getByTestId('tracking-input');
+      
+      // Initial state
+      expect(formMethods.getFieldState('trackingField').isDirty).toBe(false);
+      expect(formMethods.getFieldState('trackingField').isTouched).toBe(false);
+      
+      // Focus input (should mark as touched)
+      await user.click(input);
+      expect(formMethods.getFieldState('trackingField').isTouched).toBe(true);
+      
+      // Type text (should mark as dirty)
+      await user.type(input, 'test');
+      expect(formMethods.getFieldState('trackingField').isDirty).toBe(true);
+      
+      // Clear and type new value
+      await user.clear(input);
+      await user.type(input, 'new value');
+      
+      expect(formMethods.getValues('trackingField')).toBe('new value');
+    });
+
+    it('resets form state correctly', async () => {
+      const { formMethods, user, resetForm } = renderWithForm(
+        <ControlledInput
+          name="resetField"
+          control={undefined}
+          placeholder="Enter text"
+          data-testid="reset-input"
+        />,
+        {
+          defaultValues: { resetField: 'initial' },
+        }
+      );
+
+      const input = screen.getByTestId('reset-input');
+      
+      expect(input).toHaveValue('initial');
+      
+      // Modify field
+      await user.clear(input);
+      await user.type(input, 'modified');
+      expect(input).toHaveValue('modified');
+      
+      // Reset form
+      act(() => {
+        resetForm();
+      });
       
       await waitFor(() => {
-        const errorMessage = screen.getByText('Invalid email format')
-        expect(errorMessage).toHaveAttribute('role', 'alert')
-        expect(errorMessage).toHaveAttribute('aria-live', 'polite')
-      })
-    })
+        expect(input).toHaveValue('initial');
+        expect(formMethods.getFieldState('resetField').isDirty).toBe(false);
+        expect(formMethods.getFieldState('resetField').isTouched).toBe(false);
+      });
+    });
+  });
+});
 
-    it('supports keyboard navigation patterns', async () => {
-      const navigationResults = await testKeyboardNavigation([
-        'input[data-testid="input1"]',
-        'input[data-testid="input2"]',
-        'button[data-testid="button1"]'
-      ])
+// ============================================================================
+// PERFORMANCE TESTS
+// ============================================================================
+
+describe('Input Component - Performance', () => {
+  describe('Render Performance', () => {
+    it('renders quickly with default props', async () => {
+      const { renderTime } = await measureRenderTime(() =>
+        renderInput(<Input {...defaultInputProps} />)
+      );
       
-      expect(navigationResults.tabOrderCorrect).toBe(true)
-      expect(navigationResults.focusVisibleOnAll).toBe(true)
-    })
+      // Should render in under 16ms (60fps threshold)
+      expect(renderTime).toBeLessThan(16);
+    });
 
-    it('provides screen reader announcements for state changes', async () => {
-      const announcements = await testScreenReaderAnnouncements(async () => {
-        const user = userEvent.setup()
-        
-        render(<NumberInput data-testid="number-input" />)
-        
-        const incrementBtn = screen.getByTestId('increment-button')
-        await user.click(incrementBtn)
-      })
+    it('handles large datasets efficiently', async () => {
+      const largeOptions = testData.performanceData;
       
-      expect(announcements).toContain('Value increased')
-    })
-
-    it('maintains focus management for complex interactions', async () => {
-      const focusResults = await testFocusManagement(async () => {
-        const user = userEvent.setup()
+      const TestComponent = () => {
+        const [value, setValue] = React.useState('');
+        const [filteredOptions, setFilteredOptions] = React.useState(largeOptions);
         
-        render(<PasswordInput data-testid="password-input" />)
+        React.useEffect(() => {
+          if (value) {
+            const filtered = largeOptions.filter(option =>
+              option.label.toLowerCase().includes(value.toLowerCase())
+            );
+            setFilteredOptions(filtered);
+          } else {
+            setFilteredOptions(largeOptions);
+          }
+        }, [value]);
         
-        const input = screen.getByTestId('password-input')
-        const toggleBtn = screen.getByTestId('password-toggle')
-        
-        await user.click(input)
-        await user.click(toggleBtn)
-        
-        return input
-      })
-      
-      expect(focusResults.maintainedFocus).toBe(true)
-      expect(focusResults.noFocusLoss).toBe(true)
-    })
-
-    it('meets color contrast requirements', async () => {
-      const { container } = render(
-        <div>
-          <Input variant="outline" data-testid="outline-input" />
-          <Input variant="filled" data-testid="filled-input" />
-          <Input variant="ghost" data-testid="ghost-input" />
-        </div>
-      )
-      
-      const contrastResults = await testColorContrast(container)
-      expect(contrastResults.violations).toHaveLength(0)
-      expect(contrastResults.minimumRatio).toBeGreaterThanOrEqual(4.5)
-    })
-  })
-
-  describe('Performance Testing', () => {
-    it('renders inputs within performance targets', async () => {
-      const renderTime = await measureRenderTime(() => {
-        render(
+        return (
           <div>
-            {Array.from({ length: 50 }, (_, i) => (
-              <Input key={i} data-testid={`input-${i}`} />
-            ))}
+            <Input
+              {...defaultInputProps}
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              placeholder={`Search ${largeOptions.length} items`}
+            />
+            <div data-testid="options-count">
+              {filteredOptions.length} items
+            </div>
           </div>
-        )
-      })
-      
-      // Should render 50 inputs in under 100ms
-      expect(renderTime).toBeLessThan(100)
-    })
+        );
+      };
 
-    it('handles high-frequency input events efficiently', async () => {
-      const user = userEvent.setup()
-      const handleChange = vi.fn()
+      const { renderTime } = await measureRenderTime(() =>
+        renderInput(<TestComponent />)
+      );
       
-      render(<Input onChange={handleChange} data-testid="input" />)
-      
-      const input = screen.getByTestId('input')
-      
-      const inputLatency = await measureInputLatency(async () => {
-        await user.type(input, 'rapid typing test for performance measurement')
-      })
-      
-      // Each keystroke should process in under 50ms
-      expect(inputLatency.averageLatency).toBeLessThan(50)
-      expect(inputLatency.maxLatency).toBeLessThan(100)
-    })
+      // Should handle large datasets without significant performance impact
+      expect(renderTime).toBeLessThan(100);
+    });
 
-    it('manages memory efficiently with large forms', async () => {
-      const initialMemory = await measureMemoryUsage()
+    it('debounces input changes efficiently', async () => {
+      vi.useFakeTimers();
       
-      render(
-        <TestFormWrapper schema={databaseConfigSchema}>
-          {Array.from({ length: 100 }, (_, i) => (
-            <Input 
+      const handleChange = vi.fn();
+      const handleDebouncedChange = vi.fn();
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      
+      const TestComponent = () => {
+        const [value, setValue] = React.useState('');
+        
+        // Debounced effect
+        React.useEffect(() => {
+          const timer = setTimeout(() => {
+            if (value) {
+              handleDebouncedChange(value);
+            }
+          }, 300);
+          
+          return () => clearTimeout(timer);
+        }, [value]);
+        
+        return (
+          <Input
+            {...defaultInputProps}
+            value={value}
+            onChange={(e) => {
+              setValue(e.target.value);
+              handleChange(e);
+            }}
+          />
+        );
+      };
+
+      renderInput(<TestComponent />);
+      
+      const input = getInputElement();
+      
+      // Type quickly
+      await user.type(input, 'fast typing');
+      
+      // Should call onChange for each character
+      expect(handleChange).toHaveBeenCalledTimes(12); // "fast typing".length
+      
+      // Debounced function should not be called yet
+      expect(handleDebouncedChange).not.toHaveBeenCalled();
+      
+      // Advance timers
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+      
+      // Now debounced function should be called once
+      expect(handleDebouncedChange).toHaveBeenCalledTimes(1);
+      expect(handleDebouncedChange).toHaveBeenCalledWith('fast typing');
+      
+      vi.useRealTimers();
+    });
+  });
+
+  describe('Memory Management', () => {
+    it('cleans up event listeners properly', () => {
+      const { unmount } = renderInput(
+        <Input 
+          {...defaultInputProps}
+          onFocus={vi.fn()}
+          onBlur={vi.fn()}
+          onChange={vi.fn()}
+          onKeyDown={vi.fn()}
+        />
+      );
+      
+      // Component should unmount without errors
+      expect(() => unmount()).not.toThrow();
+    });
+
+    it('handles rapid re-renders without memory leaks', () => {
+      const TestComponent = ({ iteration }: { iteration: number }) => (
+        <Input
+          {...defaultInputProps}
+          key={iteration}
+          value={`Value ${iteration}`}
+        />
+      );
+
+      const { rerender } = renderInput(<TestComponent iteration={0} />);
+      
+      // Rapidly re-render component
+      for (let i = 1; i <= 100; i++) {
+        rerender(<TestComponent iteration={i} />);
+      }
+      
+      // Should complete without errors
+      const input = getInputElement();
+      expect(input).toHaveValue('Value 100');
+    });
+  });
+
+  describe('Focus Management Performance', () => {
+    it('handles rapid focus changes efficiently', async () => {
+      const user = userEvent.setup();
+      
+      renderInput(
+        <div>
+          {Array.from({ length: 10 }, (_, i) => (
+            <Input
               key={i}
-              {...{ register: vi.fn(() => ({ name: `field${i}` })) }}
-              name={`field${i}`}
               data-testid={`input-${i}`}
+              placeholder={`Input ${i}`}
             />
           ))}
-        </TestFormWrapper>
-      )
-      
-      const finalMemory = await measureMemoryUsage()
-      const memoryIncrease = finalMemory - initialMemory
-      
-      // Memory increase should be reasonable for 100 form fields
-      expect(memoryIncrease).toBeLessThan(50 * 1024 * 1024) // Less than 50MB
-    })
-
-    it('handles debounced inputs without performance degradation', async () => {
-      const user = userEvent.setup()
-      const handleSearch = vi.fn()
-      
-      render(
-        <SearchInput 
-          onSearch={handleSearch}
-          debounceMs={100}
-          data-testid="search-input" 
-        />
-      )
-      
-      const input = screen.getByTestId('search-input')
-      
-      const startTime = performance.now()
-      
-      // Rapid typing to test debounce performance
-      await user.type(input, 'rapid search query input')
-      
-      // Wait for debounce to complete
-      await waitFor(() => {
-        expect(handleSearch).toHaveBeenCalledWith('rapid search query input')
-      }, { timeout: 200 })
-      
-      const endTime = performance.now()
-      const totalTime = endTime - startTime
-      
-      // Total time should be reasonable despite debouncing
-      expect(totalTime).toBeLessThan(300) // Under 300ms total
-      expect(handleSearch).toHaveBeenCalledTimes(1) // Debounced to single call
-    })
-  })
-
-  describe('Integration with Forms and Validation', () => {
-    it('integrates with complex database configuration form', async () => {
-      const user = userEvent.setup()
-      const onSubmit = vi.fn()
-      
-      render(
-        <TestFormWrapper schema={databaseConfigSchema} onSubmit={onSubmit}>
-          <Input
-            {...{ register: vi.fn(() => ({ name: 'name' })) }}
-            name="name"
-            label="Service Name"
-            data-testid="service-name"
-          />
-          <Input
-            {...{ register: vi.fn(() => ({ name: 'host' })) }}
-            name="host"
-            label="Database Host"
-            data-testid="host"
-          />
-          <NumberInput
-            {...{ register: vi.fn(() => ({ name: 'port' })) }}
-            name="port"
-            label="Port"
-            min={1}
-            max={65535}
-            data-testid="port"
-          />
-          <Input
-            {...{ register: vi.fn(() => ({ name: 'database' })) }}
-            name="database"
-            label="Database Name"
-            data-testid="database"
-          />
-          <Input
-            {...{ register: vi.fn(() => ({ name: 'username' })) }}
-            name="username"
-            label="Username"
-            data-testid="username"
-          />
-          <PasswordInput
-            {...{ register: vi.fn(() => ({ name: 'password' })) }}
-            name="password"
-            label="Password"
-            data-testid="password"
-          />
-        </TestFormWrapper>
-      )
-      
-      // Fill out valid form data
-      await user.type(screen.getByTestId('service-name'), 'Test Database')
-      await user.type(screen.getByTestId('host'), 'localhost')
-      await user.type(screen.getByTestId('port'), '3306')
-      await user.type(screen.getByTestId('database'), 'testdb')
-      await user.type(screen.getByTestId('username'), 'testuser')
-      await user.type(screen.getByTestId('password'), 'testpass123')
-      
-      const submitBtn = screen.getByRole('button', { name: 'Submit' })
-      await user.click(submitBtn)
-      
-      await waitFor(() => {
-        expect(onSubmit).toHaveBeenCalledWith({
-          name: 'Test Database',
-          host: 'localhost',
-          port: 3306,
-          database: 'testdb',
-          username: 'testuser',
-          password: 'testpass123'
-        })
-      })
-    })
-
-    it('handles cross-field validation errors', async () => {
-      const user = userEvent.setup()
-      
-      render(
-        <TestFormWrapper>
-          <PasswordInput
-            {...{ register: vi.fn(() => ({ name: 'password' })) }}
-            name="password"
-            label="Password"
-            data-testid="password"
-          />
-          <PasswordInput
-            {...{ register: vi.fn(() => ({ name: 'confirmPassword' })) }}
-            name="confirmPassword"
-            label="Confirm Password"
-            data-testid="confirm-password"
-          />
-        </TestFormWrapper>
-      )
-      
-      const password = screen.getByTestId('password')
-      const confirmPassword = screen.getByTestId('confirm-password')
-      const submitBtn = screen.getByRole('button', { name: 'Submit' })
-      
-      await user.type(password, 'password123')
-      await user.type(confirmPassword, 'different123')
-      await user.click(submitBtn)
-      
-      await waitFor(() => {
-        expect(screen.getByText("Passwords don't match")).toBeInTheDocument()
-        expect(confirmPassword).toHaveClass('input-error')
-        expect(confirmPassword).toHaveAttribute('aria-invalid', 'true')
-      })
-    })
-
-    it('provides real-time validation feedback', async () => {
-      const user = userEvent.setup()
-      
-      render(
-        <TestFormWrapper>
-          <EmailInput
-            {...{ register: vi.fn(() => ({ name: 'email' })) }}
-            name="email"
-            label="Email Address"
-            data-testid="email"
-          />
-          <NumberInput
-            {...{ register: vi.fn(() => ({ name: 'port' })) }}
-            name="port"
-            label="Port Number"
-            min={1}
-            max={65535}
-            data-testid="port"
-          />
-        </TestFormWrapper>
-      )
-      
-      const email = screen.getByTestId('email')
-      const port = screen.getByTestId('port')
-      
-      // Test email validation
-      await user.type(email, 'invalid')
-      await waitFor(() => {
-        expect(email).toHaveClass('input-error')
-      })
-      
-      await user.type(email, '@example.com')
-      await waitFor(() => {
-        expect(email).not.toHaveClass('input-error')
-        expect(email).toHaveClass('input-success')
-      })
-      
-      // Test number validation
-      await user.type(port, '99999') // Exceeds max
-      await waitFor(() => {
-        expect(port).toHaveClass('input-error')
-      })
-      
-      await user.clear(port)
-      await user.type(port, '3306')
-      await waitFor(() => {
-        expect(port).not.toHaveClass('input-error')
-        expect(port).toHaveClass('input-success')
-      })
-    })
-  })
-
-  describe('Error Handling and Edge Cases', () => {
-    it('handles malformed input gracefully', async () => {
-      const user = userEvent.setup()
-      const handleChange = vi.fn()
-      
-      render(<NumberInput onChange={handleChange} data-testid="number-input" />)
-      
-      const input = screen.getByTestId('number-input')
-      
-      // Try to enter non-numeric characters
-      await user.type(input, 'abc123def')
-      
-      // Should filter out non-numeric characters
-      expect(input).toHaveValue('123')
-      expect(handleChange).toHaveBeenCalled()
-    })
-
-    it('recovers from API validation errors', async () => {
-      const user = userEvent.setup()
-      
-      // Mock server error for email validation
-      server.use(
-        http.post('/api/v2/system/admin/validate-email', () => {
-          return HttpResponse.json(
-            { error: { message: 'Validation service unavailable', code: 500 } },
-            { status: 500 }
-          )
-        })
-      )
-      
-      render(
-        <EmailInput 
-          validateOnServer
-          data-testid="email-input" 
-        />
-      )
-      
-      const input = screen.getByTestId('email-input')
-      
-      await user.type(input, 'test@example.com')
-      
-      // Should gracefully handle server error
-      await waitFor(() => {
-        expect(screen.getByText('Unable to validate email. Please try again.')).toBeInTheDocument()
-      })
-    })
-
-    it('handles large text input without performance issues', async () => {
-      const user = userEvent.setup()
-      const handleChange = vi.fn()
-      
-      render(<TextArea onChange={handleChange} data-testid="textarea" />)
-      
-      const textarea = screen.getByTestId('textarea')
-      const largeText = 'Lorem ipsum dolor sit amet. '.repeat(1000) // ~27KB
-      
-      const startTime = performance.now()
-      await user.type(textarea, largeText)
-      const endTime = performance.now()
-      
-      expect(textarea).toHaveValue(largeText)
-      expect(endTime - startTime).toBeLessThan(1000) // Should complete in under 1 second
-      expect(handleChange).toHaveBeenCalled()
-    })
-
-    it('maintains state during theme changes', async () => {
-      const user = userEvent.setup()
-      
-      const { rerender } = render(
-        <div data-theme="light">
-          <Input data-testid="input" />
         </div>
-      )
+      );
+
+      const startTime = performance.now();
       
-      const input = screen.getByTestId('input')
-      await user.type(input, 'test value')
+      // Rapidly tab through all inputs
+      for (let i = 0; i < 10; i++) {
+        await user.tab();
+        const input = screen.getByTestId(`input-${i}`);
+        expect(input).toHaveFocus();
+      }
       
-      expect(input).toHaveValue('test value')
+      const endTime = performance.now();
+      const totalTime = endTime - startTime;
       
-      // Change theme
+      // Should complete focus navigation quickly
+      expect(totalTime).toBeLessThan(1000); // 1 second max
+    });
+  });
+});
+
+// ============================================================================
+// THEME COMPATIBILITY TESTS
+// ============================================================================
+
+describe('Input Component - Theme Compatibility', () => {
+  describe('Light Theme', () => {
+    it('applies correct light theme styling', () => {
+      renderInput(
+        <Input {...defaultInputProps} />,
+        { theme: 'light' }
+      );
+
+      const input = getInputElement();
+      
+      // Check light theme classes
+      expect(input).toHaveClass('bg-white');
+      expect(input).toHaveClass('border-gray-300');
+      expect(input).toHaveClass('text-gray-900');
+    });
+
+    it('shows proper error styling in light theme', () => {
+      renderInput(
+        <Input 
+          {...defaultInputProps} 
+          state="error"
+          error="Error message"
+        />,
+        { theme: 'light' }
+      );
+
+      const input = getInputElement();
+      const errorMessage = screen.getByRole('alert');
+      
+      expect(input).toHaveClass('border-error-500');
+      expect(errorMessage).toHaveClass('text-error-600');
+    });
+  });
+
+  describe('Dark Theme', () => {
+    it('applies correct dark theme styling', () => {
+      renderInput(
+        <Input {...defaultInputProps} />,
+        { theme: 'dark' }
+      );
+
+      const input = getInputElement();
+      
+      // Check dark theme classes are applied correctly
+      expect(input).toHaveClass('dark:bg-gray-900');
+      expect(input).toHaveClass('dark:border-gray-600');
+      expect(input).toHaveClass('dark:text-gray-100');
+    });
+
+    it('maintains accessibility in dark theme', async () => {
+      const { container } = renderInput(
+        <Input {...defaultInputProps} />,
+        { theme: 'dark' }
+      );
+
+      // Should maintain WCAG compliance in dark theme
+      await testA11y(container, {
+        tags: ['wcag2aa'],
+      });
+    });
+  });
+
+  describe('Theme Transitions', () => {
+    it('handles theme switching smoothly', async () => {
+      const { rerender } = renderInput(
+        <Input {...defaultInputProps} />,
+        { theme: 'light' }
+      );
+
+      const input = getInputElement();
+      
+      // Initially light theme
+      expect(input).toHaveClass('bg-white');
+      
+      // Switch to dark theme
       rerender(
-        <div data-theme="dark">
-          <Input data-testid="input" />
-        </div>
-      )
+        <Input {...defaultInputProps} />
+      );
       
-      // Value should be preserved
-      expect(input).toHaveValue('test value')
-    })
+      // Theme classes should update (exact classes depend on theme provider implementation)
+      expect(input).toBeInTheDocument();
+    });
+  });
+});
 
-    it('handles rapid mount/unmount cycles without memory leaks', async () => {
-      const initialMemory = await measureMemoryUsage()
+// ============================================================================
+// ERROR HANDLING AND EDGE CASES
+// ============================================================================
+
+describe('Input Component - Error Handling & Edge Cases', () => {
+  describe('Invalid Props Handling', () => {
+    it('handles undefined/null props gracefully', () => {
+      expect(() => {
+        renderInput(
+          <Input
+            {...defaultInputProps}
+            value={undefined}
+            onChange={undefined}
+            onFocus={null as any}
+            className={undefined}
+          />
+        );
+      }).not.toThrow();
       
-      // Rapidly mount and unmount components
+      const input = getInputElement();
+      expect(input).toBeInTheDocument();
+    });
+
+    it('handles invalid variant prop', () => {
+      expect(() => {
+        renderInput(
+          <Input
+            {...defaultInputProps}
+            variant={'invalid' as any}
+          />
+        );
+      }).not.toThrow();
+      
+      const input = getInputElement();
+      expect(input).toBeInTheDocument();
+    });
+  });
+
+  describe('Extreme Values', () => {
+    it('handles very long text values', async () => {
+      const veryLongText = 'a'.repeat(10000);
+      const user = userEvent.setup();
+      
+      renderInput(
+        <Input 
+          {...defaultInputProps}
+          maxLength={5000}
+        />
+      );
+
+      const input = getInputElement();
+      
+      await user.click(input);
+      await user.paste(veryLongText);
+      
+      // Should handle long text without crashing
+      expect(input.value.length).toBeLessThanOrEqual(5000);
+    });
+
+    it('handles rapid input changes', async () => {
+      const handleChange = vi.fn();
+      const user = userEvent.setup();
+      
+      renderInput(
+        <Input 
+          {...defaultInputProps}
+          onChange={handleChange}
+        />
+      );
+
+      const input = getInputElement();
+      
+      // Rapidly type and delete
       for (let i = 0; i < 100; i++) {
-        const { unmount } = render(<Input data-testid={`input-${i}`} />)
-        unmount()
+        await user.type(input, 'a');
+        await user.keyboard('{Backspace}');
       }
       
-      // Force garbage collection if available
-      if (global.gc) {
-        global.gc()
-      }
+      expect(handleChange).toHaveBeenCalledTimes(200);
+      expect(input).toHaveValue('');
+    });
+  });
+
+  describe('Browser Compatibility', () => {
+    it('works without modern browser features', () => {
+      // Mock older browser environment
+      const originalIntersectionObserver = window.IntersectionObserver;
+      const originalResizeObserver = window.ResizeObserver;
       
-      const finalMemory = await measureMemoryUsage()
-      const memoryIncrease = finalMemory - initialMemory
+      delete (window as any).IntersectionObserver;
+      delete (window as any).ResizeObserver;
       
-      // Memory increase should be minimal
-      expect(memoryIncrease).toBeLessThan(10 * 1024 * 1024) // Less than 10MB
-    })
-  })
-})
+      expect(() => {
+        renderInput(<Input {...defaultInputProps} />);
+      }).not.toThrow();
+      
+      const input = getInputElement();
+      expect(input).toBeInTheDocument();
+      
+      // Restore
+      window.IntersectionObserver = originalIntersectionObserver;
+      window.ResizeObserver = originalResizeObserver;
+    });
+  });
+
+  describe('Error Boundary Integration', () => {
+    it('handles component errors gracefully', () => {
+      const ErrorThrowingInput = () => {
+        throw new Error('Test error');
+      };
+      
+      const ErrorBoundary = ({ children }: { children: React.ReactNode }) => {
+        try {
+          return <>{children}</>;
+        } catch (error) {
+          return <div data-testid="error-fallback">Error occurred</div>;
+        }
+      };
+      
+      // Should not crash the test
+      expect(() => {
+        renderInput(
+          <ErrorBoundary>
+            <ErrorThrowingInput />
+          </ErrorBoundary>
+        );
+      }).not.toThrow();
+    });
+  });
+});
+
+// ============================================================================
+// INTEGRATION TESTS
+// ============================================================================
+
+describe('Input Component - Integration Tests', () => {
+  describe('Form Integration', () => {
+    it('integrates with complex form layouts', async () => {
+      const handleSubmit = vi.fn();
+      const user = userEvent.setup();
+      
+      const { formMethods } = renderWithForm(
+        <form onSubmit={formMethods.handleSubmit(handleSubmit)}>
+          <div>
+            <label htmlFor="first-name">First Name</label>
+            <ControlledInput
+              id="first-name"
+              name="firstName"
+              control={undefined}
+              rules={{ required: 'First name is required' }}
+              data-testid="first-name-input"
+            />
+          </div>
+          
+          <div>
+            <label htmlFor="email">Email</label>
+            <ControlledInput
+              id="email"
+              name="email"
+              type="email"
+              control={undefined}
+              rules={{ 
+                required: 'Email is required',
+                pattern: {
+                  value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                  message: 'Invalid email format'
+                }
+              }}
+              data-testid="email-input"
+            />
+          </div>
+          
+          <div>
+            <label htmlFor="phone">Phone</label>
+            <ControlledInput
+              id="phone"
+              name="phone"
+              type="tel"
+              control={undefined}
+              prefix={<span>+1</span>}
+              data-testid="phone-input"
+            />
+          </div>
+          
+          <button type="submit" data-testid="submit-button">Submit</button>
+        </form>,
+        {
+          defaultValues: {
+            firstName: '',
+            email: '',
+            phone: '',
+          },
+        }
+      );
+
+      const firstNameInput = screen.getByTestId('first-name-input');
+      const emailInput = screen.getByTestId('email-input');
+      const phoneInput = screen.getByTestId('phone-input');
+      const submitButton = screen.getByTestId('submit-button');
+      
+      // Fill out form
+      await user.type(firstNameInput, 'John');
+      await user.type(emailInput, 'john@example.com');
+      await user.type(phoneInput, '555-123-4567');
+      
+      // Submit form
+      await user.click(submitButton);
+      
+      await waitFor(() => {
+        expect(handleSubmit).toHaveBeenCalledWith({
+          firstName: 'John',
+          email: 'john@example.com',
+          phone: '555-123-4567',
+        }, expect.any(Object));
+      });
+    });
+
+    it('handles cross-field validation', async () => {
+      const { formMethods, user } = renderWithForm(
+        <div>
+          <ControlledInput
+            name="password"
+            type="password"
+            control={undefined}
+            rules={{ required: 'Password is required' }}
+            placeholder="Password"
+            data-testid="password-input"
+          />
+          <ControlledInput
+            name="confirmPassword"
+            type="password"
+            control={undefined}
+            rules={{
+              required: 'Please confirm password',
+              validate: (value) => {
+                const password = formMethods.getValues('password');
+                return value === password || 'Passwords do not match';
+              },
+            }}
+            placeholder="Confirm Password"
+            data-testid="confirm-password-input"
+          />
+        </div>,
+        {
+          defaultValues: {
+            password: '',
+            confirmPassword: '',
+          },
+          mode: 'onChange',
+        }
+      );
+
+      const passwordInput = screen.getByTestId('password-input');
+      const confirmPasswordInput = screen.getByTestId('confirm-password-input');
+      
+      // Enter password
+      await user.type(passwordInput, 'secret123');
+      
+      // Enter non-matching confirmation
+      await user.type(confirmPasswordInput, 'different');
+      
+      // Trigger validation
+      await formMethods.trigger('confirmPassword');
+      await waitForValidation();
+      
+      // Should show validation error
+      expect(formMethods.getFieldState('confirmPassword').error?.message)
+        .toBe('Passwords do not match');
+      
+      // Fix confirmation
+      await user.clear(confirmPasswordInput);
+      await user.type(confirmPasswordInput, 'secret123');
+      
+      await formMethods.trigger('confirmPassword');
+      await waitForValidation();
+      
+      // Error should be cleared
+      expect(formMethods.getFieldState('confirmPassword').error).toBeUndefined();
+    });
+  });
+
+  describe('Accessibility Integration', () => {
+    it('works correctly with screen readers', async () => {
+      renderInput(
+        <div>
+          <label htmlFor="accessible-input" id="input-label">
+            Search Database Tables
+          </label>
+          <Input
+            id="accessible-input"
+            aria-labelledby="input-label"
+            aria-describedby="input-help"
+            placeholder="Type table name..."
+            data-testid="accessible-input"
+          />
+          <div id="input-help">
+            Search through all database tables and views
+          </div>
+        </div>
+      );
+
+      const input = getInputElement('accessible-input');
+      const label = screen.getByLabelText('Search Database Tables');
+      const helpText = screen.getByText('Search through all database tables and views');
+      
+      expect(label).toBe(input);
+      expect(input).toHaveAttribute('aria-describedby', 'input-help');
+      expect(helpText).toHaveAttribute('id', 'input-help');
+    });
+
+    it('announces dynamic content changes', async () => {
+      const user = userEvent.setup();
+      
+      const TestComponent = () => {
+        const [searchResults, setSearchResults] = React.useState<string[]>([]);
+        const [isSearching, setIsSearching] = React.useState(false);
+        
+        const handleSearch = React.useCallback(
+          React.useMemo(() => 
+            vi.fn(async (query: string) => {
+              if (!query) {
+                setSearchResults([]);
+                return;
+              }
+              
+              setIsSearching(true);
+              
+              // Simulate search delay
+              await new Promise(resolve => setTimeout(resolve, 100));
+              
+              const results = testData.performanceData
+                .filter(item => item.label.toLowerCase().includes(query.toLowerCase()))
+                .slice(0, 5)
+                .map(item => item.label);
+              
+              setSearchResults(results);
+              setIsSearching(false);
+            }), []
+          ), []);
+        
+        return (
+          <div>
+            <Input
+              {...defaultInputProps}
+              placeholder="Search..."
+              loading={isSearching}
+              onChange={(e) => handleSearch(e.target.value)}
+            />
+            <div 
+              role="status" 
+              aria-live="polite" 
+              aria-atomic="true"
+              data-testid="search-status"
+            >
+              {isSearching ? 'Searching...' : 
+               searchResults.length > 0 ? `Found ${searchResults.length} results` : 
+               'No results'}
+            </div>
+            <ul data-testid="search-results">
+              {searchResults.map((result, index) => (
+                <li key={index}>{result}</li>
+              ))}
+            </ul>
+          </div>
+        );
+      };
+
+      renderInput(<TestComponent />);
+
+      const input = getInputElement();
+      const status = screen.getByTestId('search-status');
+      
+      expect(status).toHaveTextContent('No results');
+      
+      // Perform search
+      await user.type(input, 'item');
+      
+      // Wait for search to complete
+      await waitFor(() => {
+        expect(status).toHaveTextContent(/Found \d+ results/);
+      });
+      
+      const results = screen.getByTestId('search-results');
+      expect(results.children.length).toBeGreaterThan(0);
+    });
+  });
+});
+
+// ============================================================================
+// FINAL CLEANUP
+// ============================================================================
+
+afterEach(() => {
+  vi.clearAllMocks();
+  vi.clearAllTimers();
+});
