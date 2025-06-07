@@ -1,444 +1,694 @@
 /**
- * Next.js routing utilities for navigation hierarchy construction and breadcrumb generation.
+ * @fileoverview Next.js routing utilities for DreamFactory Admin Interface
  * 
- * This module provides utilities for working with Next.js App Router patterns, including:
- * - Route definition transformation for navigation structures
- * - Permission-based route filtering for role-based access control
- * - Breadcrumb generation from URL pathnames and route parameters
+ * Provides comprehensive route transformation utilities for converting Angular routing
+ * configurations to Next.js App Router navigation structures. Includes breadcrumb
+ * generation, permission-based filtering, and dynamic route handling for seamless
+ * migration from Angular Router to Next.js file-based routing system.
  * 
- * Key Features:
- * - Next.js App Router compatibility with file-based routing
- * - Dynamic route parameter handling with TypeScript safety
- * - Server-side rendering support for navigation generation
- * - Icon path resolution optimized for Next.js public asset serving
- * - Hierarchical navigation structure with nested route support
+ * Key features:
+ * - transformRoutes: Converts route definitions to navigation structures
+ * - accessibleRoutes: Filters routes based on user permissions
+ * - generateBreadcrumb: Creates route-based breadcrumb trails
+ * - Dynamic route parameter extraction and replacement
+ * - Icon path optimization for Next.js public asset serving
+ * 
+ * @version 2.0.0
+ * @since 2024-12-19
  */
 
-import { ROUTES } from '../../types/routes';
-import { Nav } from '../../types/nav';
+import type { NavigationItem } from '@/types/ui';
+import type { 
+  AppRoutes, 
+  RouteParams, 
+  SearchParams, 
+  Breadcrumb, 
+  RouteMetadata 
+} from '@/types/routes';
+
+// ================================================================================================
+// ROUTE DEFINITION INTERFACES
+// ================================================================================================
 
 /**
- * Next.js route definition interface for navigation generation
- * Supports dynamic routes, nested layouts, and server component patterns
+ * Extended route configuration for navigation hierarchy construction
+ * Replaces Angular Routes interface with Next.js App Router patterns
  */
-export interface NextRouteDefinition {
-  /** Route path segment (e.g., 'users', '[id]', 'create') */
-  path: string;
-  /** Full pathname for navigation (e.g., '/api-connections/database/[service]') */
-  pathname?: string;
-  /** Nested child routes for hierarchical navigation */
-  children?: NextRouteDefinition[];
-  /** Route metadata for navigation display */
-  metadata?: {
-    title?: string;
-    description?: string;
-    icon?: string;
-    requiresAuth?: boolean;
-    roles?: string[];
+export interface RouteDefinition {
+  /** Next.js app directory path (e.g., '/api-connections/database') */
+  path: AppRoutes;
+  
+  /** Display label for navigation */
+  label: string;
+  
+  /** Icon path relative to public directory or icon component name */
+  icon?: string;
+  
+  /** Nested child routes following Next.js directory structure */
+  children?: RouteDefinition[];
+  
+  /** Route metadata for enhanced navigation features */
+  metadata?: RouteMetadata;
+  
+  /** Dynamic route parameter definitions */
+  params?: Record<string, string>;
+  
+  /** Service groups for permission-based filtering */
+  serviceGroups?: string[];
+  
+  /** Whether route is available in current context */
+  enabled?: boolean;
+  
+  /** External link indicator */
+  external?: boolean;
+  
+  /** Badge content for navigation items */
+  badge?: string | number;
+}
+
+/**
+ * Route transformation context for navigation generation
+ */
+export interface RouteTransformContext {
+  /** Current user roles for permission filtering */
+  userRoles?: string[];
+  
+  /** Current user permissions for access control */
+  userPermissions?: string[];
+  
+  /** Current pathname for active state detection */
+  currentPath?: string;
+  
+  /** Base URL for absolute path generation */
+  baseUrl?: string;
+  
+  /** Service groups available to current user */
+  availableServiceGroups?: string[];
+  
+  /** Feature flags for conditional routing */
+  featureFlags?: Record<string, boolean>;
+}
+
+/**
+ * Breadcrumb generation options
+ */
+export interface BreadcrumbOptions {
+  /** Include home/root breadcrumb */
+  includeHome?: boolean;
+  
+  /** Maximum breadcrumb depth */
+  maxDepth?: number;
+  
+  /** Custom label resolver for dynamic segments */
+  labelResolver?: (segment: string, params: RouteParams) => string | Promise<string>;
+  
+  /** Exclude certain path segments */
+  excludeSegments?: string[];
+  
+  /** Custom icon resolver for breadcrumb items */
+  iconResolver?: (segment: string, params: RouteParams) => string | undefined;
+}
+
+// ================================================================================================
+// CORE ROUTE TRANSFORMATION UTILITIES
+// ================================================================================================
+
+/**
+ * Transforms route definitions into navigation hierarchy structure
+ * Converts Angular route.children pattern to Next.js app directory navigation
+ * 
+ * @param routes - Array of route definitions to transform
+ * @param context - Transformation context for filtering and state
+ * @returns Hierarchical navigation structure
+ */
+export function transformRoutes(
+  routes: RouteDefinition[],
+  context: RouteTransformContext = {}
+): NavigationItem[] {
+  const { 
+    userRoles = [], 
+    userPermissions = [], 
+    currentPath = '',
+    availableServiceGroups = [],
+    featureFlags = {}
+  } = context;
+
+  return routes
+    .filter(route => isRouteAccessible(route, { userRoles, userPermissions, availableServiceGroups }))
+    .map(route => transformSingleRoute(route, context))
+    .filter(Boolean) as NavigationItem[];
+}
+
+/**
+ * Transforms a single route definition to navigation item
+ * Handles nested routes, dynamic parameters, and icon path resolution
+ */
+function transformSingleRoute(
+  route: RouteDefinition,
+  context: RouteTransformContext
+): NavigationItem | null {
+  const { currentPath = '', baseUrl = '' } = context;
+
+  // Skip disabled routes
+  if (route.enabled === false) {
+    return null;
+  }
+
+  // Handle feature flag gating
+  if (route.metadata?.permissions?.some(permission => 
+    context.featureFlags?.[`feature_${permission}`] === false
+  )) {
+    return null;
+  }
+
+  // Generate full href with base URL
+  const href = route.external ? route.path : `${baseUrl}${route.path}`;
+
+  // Transform children recursively
+  const children = route.children ? transformRoutes(route.children, context) : undefined;
+
+  // Resolve icon path for Next.js public asset serving
+  const icon = resolveIconPath(route.icon);
+
+  return {
+    id: generateRouteId(route.path),
+    label: route.label,
+    href: route.external ? route.path : href,
+    icon,
+    badge: route.badge,
+    disabled: route.enabled === false,
+    external: route.external || false,
+    children,
+    expanded: children ? isPathActive(route.path, currentPath) : undefined,
+    'aria-label': route.metadata?.description || route.label,
+    'aria-description': route.metadata?.description
   };
 }
 
 /**
- * Breadcrumb trail item for navigation hierarchy
- */
-export interface Breadcrumb {
-  /** Display label for the breadcrumb */
-  label: string;
-  /** Navigation path (undefined for current page) */
-  path?: string;
-  /** Internationalization key for translated labels */
-  translationKey?: string;
-  /** Whether this breadcrumb represents a dynamic parameter */
-  isDynamic?: boolean;
-}
-
-/**
- * Routes excluded from main navigation display
- * These represent action routes, authentication flows, and error states
- */
-const FILTERED_FROM_NAV = [
-  ROUTES.CREATE,
-  ROUTES.IMPORT,
-  ROUTES.EDIT,
-  ROUTES.AUTH,
-  ROUTES.PROFILE,
-  ROUTES.VIEW,
-  ROUTES.ERROR,
-  ROUTES.LICENSE_EXPIRED,
-];
-
-/**
- * Routes that have associated navigation icons
- * Icons are served from Next.js public directory at /nav/{route}.svg
- */
-const NAV_ICONS = [
-  'home',
-  'admin-settings', 
-  'api-connections',
-  'api-security',
-  'system-settings',
-];
-
-/**
- * Transforms Next.js route definitions into navigation structure
+ * Filters routes based on user accessibility and permissions
+ * Maintains filtering logic for navigation accessibility based on user permissions
  * 
- * Filters out dynamic routes (containing []) and excluded navigation routes,
- * then builds hierarchical navigation with proper icon associations.
- * 
- * @param routes - Array of Next.js route definitions
- * @param root - Root path prefix for nested routes
- * @returns Array of navigation items suitable for UI rendering
- * 
- * @example
- * ```typescript
- * const routes = [
- *   { path: 'api-connections', children: [{ path: 'database' }] },
- *   { path: 'admin-settings' }
- * ];
- * const nav = transformRoutes(routes);
- * // Returns navigation items with icons and hierarchy
- * ```
- */
-export function transformRoutes(
-  routes: NextRouteDefinition[], 
-  root = ''
-): Array<Nav> {
-  return routes
-    .filter(route => 
-      route.path &&
-      !route.path.includes('[') && // Exclude dynamic routes like [id]
-      !route.path.includes(']') && 
-      !FILTERED_FROM_NAV.includes(route.path as ROUTES)
-    )
-    .map(route => {
-      const fullPath = root ? `${root}/${route.path}` : `/${route.path}`;
-      
-      if (route.children) {
-        const subRoutes = transformRoutes(route.children, fullPath);
-        return {
-          path: fullPath,
-          subRoutes: subRoutes.length ? subRoutes : undefined,
-          route: route.path as ROUTES,
-          icon: getIconForRoute(route.path),
-        };
-      }
-      
-      return {
-        path: fullPath,
-        route: route.path as ROUTES,
-        icon: getIconForRoute(route.path),
-      };
-    });
-}
-
-/**
- * Gets icon path for navigation route
- * 
- * Returns the appropriate SVG icon path for Next.js public asset serving.
- * Icons are located at /nav/{routeName}.svg in the public directory.
- * 
- * @param routeName - Route name to find icon for
- * @returns Icon path for Next.js Image component or empty string if no icon
- */
-function getIconForRoute(routeName: string): string {
-  if (NAV_ICONS.includes(routeName)) {
-    return `/nav/${routeName}.svg`;
-  }
-  return '';
-}
-
-/**
- * Filters navigation routes based on user permissions
- * 
- * Implements role-based access control by filtering navigation items
- * according to user's allowed tabs and permissions. Maintains hierarchical
- * structure by preserving parent routes if any children are accessible.
- * 
- * @param navs - Navigation items to filter
- * @param allowedTabs - Array of tab permissions for current user
- * @returns Filtered navigation array respecting user permissions
- * 
- * @example
- * ```typescript
- * const userTabs = ['services', 'users', 'schema/data'];
- * const filteredNav = accessibleRoutes(navigationItems, userTabs);
- * // Returns only routes the user can access
- * ```
+ * @param routes - Routes to filter
+ * @param context - User context for permission checking
+ * @returns Filtered routes accessible to current user
  */
 export function accessibleRoutes(
-  navs: Array<Nav>,
-  allowedTabs: Array<string>
-): Array<Nav> {
-  // Base routes always available
-  const allowed: Array<ROUTES> = [ROUTES.SYSTEM_INFO];
-  
-  // Map tab permissions to route access
-  allowedTabs?.forEach(tab => {
-    switch (tab) {
-      case 'apps':
-        allowed.push(ROUTES.API_KEYS);
-        break;
-      case 'users':
-        allowed.push(ROUTES.USERS);
-        break;
-      case 'services':
-        allowed.push(
-          ROUTES.DATABASE,
-          ROUTES.SCRIPTING,
-          ROUTES.NETWORK,
-          ROUTES.FILE,
-          ROUTES.UTILITY,
-          ROUTES.AUTHENTICATION,
-          ROUTES.DF_PLATFORM_APIS
-        );
-        break;
-      case 'apidocs':
-        allowed.push(ROUTES.API_DOCS);
-        break;
-      case 'schema/data':
-        allowed.push(ROUTES.SCHEMA);
-        break;
-      case 'files':
-        allowed.push(ROUTES.FILES);
-        break;
-      case 'scripts':
-        allowed.push(ROUTES.EVENT_SCRIPTS);
-        break;
-      case 'config':
-        allowed.push(
-          ROUTES.CORS,
-          ROUTES.CACHE,
-          ROUTES.EMAIL_TEMPLATES,
-          ROUTES.GLOBAL_LOOKUP_KEYS
-        );
-        break;
-      case 'limits':
-        allowed.push(ROUTES.RATE_LIMITING);
-        break;
-      case 'scheduler':
-        allowed.push(ROUTES.SCHEDULER);
-        break;
-    }
-  });
-  
-  return navs.filter(nav => {
-    if (nav.subRoutes) {
-      // Recursively filter child routes
-      nav.subRoutes = accessibleRoutes(nav.subRoutes, allowedTabs);
-      // Keep parent if any children are accessible
-      return nav.subRoutes.length > 0;
-    }
-    return allowed.includes(nav.route);
-  });
+  routes: RouteDefinition[],
+  context: Pick<RouteTransformContext, 'userRoles' | 'userPermissions' | 'availableServiceGroups'>
+): RouteDefinition[] {
+  return routes.filter(route => isRouteAccessible(route, context));
 }
 
 /**
- * Generates breadcrumb trail from Next.js pathname and route definitions
- * 
- * Parses the current URL pathname to create a hierarchical breadcrumb trail,
- * handling dynamic route parameters (e.g., [id], [service]) and providing
- * proper labels and navigation paths.
- * 
- * Works with Next.js usePathname() hook for client-side navigation and
- * server component pathname parsing for SSR compatibility.
- * 
- * @param routeDefinitions - Next.js route definitions for path resolution
- * @param currentURL - Current pathname from usePathname() or URL
- * @returns Array of breadcrumb items for navigation display
- * 
- * @example
- * ```typescript
- * const pathname = '/api-connections/database/myservice/schema';
- * const breadcrumbs = generateBreadcrumb(routeDefinitions, pathname);
- * // Returns: [
- * //   { label: 'API Connections', path: '/api-connections' },
- * //   { label: 'Database', path: '/api-connections/database' },
- * //   { label: 'myservice', path: '/api-connections/database/myservice' },
- * //   { label: 'Schema' } // No path for current page
- * // ]
- * ```
+ * Checks if a route is accessible to the current user
  */
-export function generateBreadcrumb(
-  routeDefinitions: NextRouteDefinition[],
-  currentURL: string
-): Breadcrumb[] {
+function isRouteAccessible(
+  route: RouteDefinition,
+  context: Pick<RouteTransformContext, 'userRoles' | 'userPermissions' | 'availableServiceGroups'>
+): boolean {
+  const { userRoles = [], userPermissions = [], availableServiceGroups = [] } = context;
+
+  // Check role-based access
+  if (route.metadata?.roles && route.metadata.roles.length > 0) {
+    if (!route.metadata.roles.some(role => userRoles.includes(role))) {
+      return false;
+    }
+  }
+
+  // Check permission-based access
+  if (route.metadata?.permissions && route.metadata.permissions.length > 0) {
+    if (!route.metadata.permissions.some(permission => userPermissions.includes(permission))) {
+      return false;
+    }
+  }
+
+  // Check service group access
+  if (route.serviceGroups && route.serviceGroups.length > 0) {
+    if (!route.serviceGroups.some(group => availableServiceGroups.includes(group))) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+// ================================================================================================
+// BREADCRUMB GENERATION UTILITIES
+// ================================================================================================
+
+/**
+ * Generates breadcrumb trail from Next.js pathname and route parameters
+ * Works with Next.js usePathname and dynamic route patterns
+ * 
+ * @param pathname - Current pathname from Next.js usePathname hook
+ * @param params - Route parameters from Next.js routing
+ * @param routes - Route definitions for label resolution
+ * @param options - Breadcrumb generation options
+ * @returns Array of breadcrumb items
+ */
+export async function generateBreadcrumb(
+  pathname: string,
+  params: RouteParams = {},
+  routes: RouteDefinition[] = [],
+  options: BreadcrumbOptions = {}
+): Promise<Breadcrumb[]> {
+  const {
+    includeHome = true,
+    maxDepth = 10,
+    labelResolver,
+    excludeSegments = [],
+    iconResolver
+  } = options;
+
   const breadcrumbs: Breadcrumb[] = [];
-  
-  // Clean and split the URL path
-  const urlSegments = decodeURIComponent(currentURL)
-    .replace(/^\/+|\/+$/g, '') // Remove leading/trailing slashes
+
+  // Add home breadcrumb if requested
+  if (includeHome && pathname !== '/') {
+    breadcrumbs.push({
+      label: 'Dashboard',
+      href: '/',
+      icon: resolveIconPath('home'),
+      current: false
+    });
+  }
+
+  // Parse pathname into segments
+  const segments = pathname
     .split('/')
-    .filter(segment => segment);
-  
-  // Handle empty path (root)
-  if (urlSegments.length === 0) {
-    return [{ label: 'Home', translationKey: 'nav.home.header' }];
-  }
-  
-  /**
-   * Recursively traverse route definitions to match URL segments
-   */
-  function traverseRoutes(
-    routes: NextRouteDefinition[],
-    pathSoFar: string[] = [],
-    translationKeySoFar: string[] = [],
-    index = 0
-  ): boolean {
-    if (index >= urlSegments.length) {
-      return true;
+    .filter(segment => segment && !excludeSegments.includes(segment));
+
+  // Build breadcrumbs from segments
+  let currentPath = '';
+  for (let i = 0; i < Math.min(segments.length, maxDepth); i++) {
+    const segment = segments[i];
+    currentPath += `/${segment}`;
+
+    // Skip excluded segments
+    if (excludeSegments.includes(segment)) {
+      continue;
     }
-    
-    const currentSegment = urlSegments[index];
-    let matched = false;
-    
-    for (const route of routes) {
-      const path = route.path;
-      const isDynamic = path.startsWith('[') && path.endsWith(']');
-      const matchSegment = isDynamic ? currentSegment : path;
-      
-      // Check if route matches current URL segment
-      if (route.path === currentSegment || isDynamic) {
-        matched = true;
-        const newPath = [...pathSoFar, matchSegment];
-        
-        // Handle nested routes with redirect children
-        if (route.children?.some(child => child.path === '' || child.path === 'page')) {
-          if (traverseRoutes(
-            route.children,
-            newPath,
-            [...translationKeySoFar, path],
-            index + 1
-          )) {
-            return true;
-          }
-        } else {
-          // Build translation key path
-          const translationKeySegment = isDynamic ? path.slice(1, -1) : path;
-          const translationKey = [...translationKeySoFar, translationKeySegment]
-            .join('.')
-            .replace(/\//g, '.');
-          
-          // Create breadcrumb item
-          const breadcrumb: Breadcrumb = {
-            label: isDynamic ? currentSegment : getCurrentSegmentLabel(currentSegment),
-            isDynamic
-          };
-          
-          // Add navigation path for all but the last segment
-          if (index !== urlSegments.length - 1) {
-            breadcrumb.path = '/' + newPath.join('/');
-          }
-          
-          // Add translation key for static routes
-          if (!isDynamic) {
-            breadcrumb.translationKey = `nav.${translationKey}.header`;
-          }
-          
-          breadcrumbs.push(breadcrumb);
-          
-          // Continue traversing nested routes
-          if (traverseRoutes(
-            route.children || [],
-            newPath,
-            [...translationKeySoFar, translationKeySegment],
-            index + 1
-          )) {
-            return true;
-          }
+
+    // Find matching route definition
+    const routeMatch = findRouteByPath(routes, currentPath);
+
+    // Resolve label (prefer custom resolver, then route label, then segment)
+    let label = segment;
+    if (labelResolver) {
+      try {
+        const resolvedLabel = await labelResolver(segment, params);
+        if (resolvedLabel) {
+          label = resolvedLabel;
         }
+      } catch (error) {
+        console.warn('Failed to resolve breadcrumb label:', error);
       }
+    } else if (routeMatch) {
+      label = routeMatch.label;
+    } else {
+      // Transform segment to readable label
+      label = formatSegmentLabel(segment, params);
     }
-    
-    // Handle unmatched segments (fallback for dynamic content)
-    if (!matched) {
-      breadcrumbs.push({
-        label: getCurrentSegmentLabel(currentSegment),
-        path: index !== urlSegments.length - 1 
-          ? '/' + [...pathSoFar, currentSegment].join('/')
-          : undefined,
-      });
-      
-      return traverseRoutes(
-        routeDefinitions,
-        [...pathSoFar, currentSegment],
-        translationKeySoFar,
-        index + 1
-      );
-    }
-    
-    return false;
+
+    // Resolve icon
+    const icon = iconResolver 
+      ? iconResolver(segment, params)
+      : routeMatch?.icon 
+        ? resolveIconPath(routeMatch.icon)
+        : undefined;
+
+    // Add breadcrumb item
+    breadcrumbs.push({
+      label,
+      href: currentPath,
+      icon,
+      current: i === segments.length - 1
+    });
   }
-  
-  // Start traversal from root routes
-  traverseRoutes(routeDefinitions);
-  
-  // Remove path from last breadcrumb (current page)
-  if (breadcrumbs.length > 0 && breadcrumbs[breadcrumbs.length - 1].path) {
-    delete breadcrumbs[breadcrumbs.length - 1].path;
-  }
-  
+
   return breadcrumbs;
 }
 
 /**
- * Extracts display label from URL segment
- * 
- * Handles hyphenated route names and dynamic parameters
- * to create human-readable breadcrumb labels.
- * 
- * @param segment - URL segment to process
- * @returns Formatted display label
+ * Finds a route definition by path
  */
-function getCurrentSegmentLabel(segment: string): string {
-  // Split on hyphens and take the last part for compound names
-  const parts = segment.split('-');
-  const lastPart = parts[parts.length - 1];
+function findRouteByPath(routes: RouteDefinition[], path: string): RouteDefinition | null {
+  for (const route of routes) {
+    if (route.path === path) {
+      return route;
+    }
+    
+    if (route.children) {
+      const childMatch = findRouteByPath(route.children, path);
+      if (childMatch) {
+        return childMatch;
+      }
+    }
+  }
   
-  // Capitalize first letter
-  return lastPart.charAt(0).toUpperCase() + lastPart.slice(1);
+  return null;
 }
 
 /**
- * Creates route definition from Next.js app directory structure
- * 
- * Helper function to build route definitions compatible with Next.js
- * App Router file-based routing conventions.
- * 
- * @param path - Route path segment
- * @param options - Route configuration options
- * @returns Route definition for navigation system
+ * Formats a path segment into a readable label
+ * Handles Next.js dynamic route patterns and parameter substitution
  */
-export function createRouteDefinition(
-  path: string,
-  options: {
-    children?: NextRouteDefinition[];
-    metadata?: NextRouteDefinition['metadata'];
-  } = {}
-): NextRouteDefinition {
-  return {
-    path,
-    children: options.children,
-    metadata: options.metadata,
+function formatSegmentLabel(segment: string, params: RouteParams): string {
+  // Handle dynamic route segments [param] or [...param]
+  if (segment.startsWith('[') && segment.endsWith(']')) {
+    const paramName = segment.slice(1, -1).replace('...', '');
+    const paramValue = params[paramName];
+    
+    if (paramValue) {
+      return Array.isArray(paramValue) ? paramValue.join('/') : String(paramValue);
+    }
+    
+    return segment; // Return original if no param value
+  }
+
+  // Handle special route names with better formatting
+  const labelMap: Record<string, string> = {
+    'api-connections': 'API Connections',
+    'api-security': 'API Security',
+    'admin-settings': 'Admin Settings',
+    'system-settings': 'System Settings',
+    'email-templates': 'Email Templates',
+    'global-lookup-keys': 'Global Lookup Keys',
+    'rate-limiting': 'Rate Limiting',
+    'role-based-access': 'Role-Based Access',
+    'api-keys': 'API Keys',
+    'event-scripts': 'Event Scripts',
+    'api-docs': 'API Documentation',
+    'system-info': 'System Information',
+    'df-platform-apis': 'DreamFactory Platform APIs'
+  };
+
+  // Use mapped label or transform kebab-case to title case
+  return labelMap[segment] || segment
+    .split('-')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+// ================================================================================================
+// UTILITY FUNCTIONS
+// ================================================================================================
+
+/**
+ * Resolves icon paths for Next.js public asset serving
+ * Updates icon path references to work with Next.js public asset serving
+ */
+function resolveIconPath(icon?: string): string | undefined {
+  if (!icon) return undefined;
+
+  // Handle component-based icons (e.g., 'HomeIcon', 'DatabaseIcon')
+  if (icon.endsWith('Icon') || icon.includes('/')) {
+    return icon;
+  }
+
+  // Handle public asset paths - ensure they start with /
+  if (icon.startsWith('icons/') || icon.startsWith('images/')) {
+    return `/${icon}`;
+  }
+
+  // Default to SVG in public/icons directory
+  return `/icons/${icon}.svg`;
+}
+
+/**
+ * Generates a unique route ID from path
+ */
+function generateRouteId(path: string): string {
+  return path.replace(/[^a-zA-Z0-9]/g, '-').replace(/^-|-$/g, '');
+}
+
+/**
+ * Checks if a path is currently active
+ */
+function isPathActive(routePath: string, currentPath: string): boolean {
+  if (routePath === currentPath) return true;
+  
+  // Check if current path starts with route path (for parent routes)
+  return currentPath.startsWith(routePath + '/');
+}
+
+/**
+ * Extracts dynamic parameters from Next.js route path
+ * Handles both single dynamic segments [param] and catch-all routes [...param]
+ */
+export function extractRouteParams(path: string): string[] {
+  const paramPattern = /\[(\.\.\.)?(.*?)\]/g;
+  const matches: string[] = [];
+  let match;
+
+  while ((match = paramPattern.exec(path)) !== null) {
+    matches.push(match[2]); // Extract parameter name
+  }
+
+  return matches;
+}
+
+/**
+ * Builds a route path with parameters replaced
+ * Replaces Angular path parameter handling with Next.js dynamic route patterns
+ */
+export function buildRoutePath(
+  path: string, 
+  params: RouteParams = {}, 
+  searchParams: SearchParams = {}
+): string {
+  let builtPath = path;
+
+  // Replace dynamic parameters in path
+  Object.entries(params).forEach(([key, value]) => {
+    const singleParam = `[${key}]`;
+    const catchAllParam = `[...${key}]`;
+    
+    if (builtPath.includes(singleParam)) {
+      builtPath = builtPath.replace(singleParam, String(value));
+    } else if (builtPath.includes(catchAllParam)) {
+      const valueArray = Array.isArray(value) ? value : [value];
+      builtPath = builtPath.replace(catchAllParam, valueArray.join('/'));
+    }
+  });
+
+  // Add search parameters
+  const searchParamsString = new URLSearchParams();
+  Object.entries(searchParams).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      if (Array.isArray(value)) {
+        value.forEach(v => searchParamsString.append(key, String(v)));
+      } else {
+        searchParamsString.set(key, String(value));
+      }
+    }
+  });
+
+  const queryString = searchParamsString.toString();
+  return queryString ? `${builtPath}?${queryString}` : builtPath;
+}
+
+/**
+ * Type-safe route builder utility
+ * Provides compile-time validation for route construction
+ */
+export function createTypedRoute<T extends AppRoutes>(route: T) {
+  return (params?: RouteParams, searchParams?: SearchParams): string => {
+    return buildRoutePath(route, params, searchParams);
   };
 }
 
-/**
- * Validates if a route path represents a dynamic Next.js route
- * 
- * @param path - Route path to validate
- * @returns True if path contains dynamic segments
- */
-export function isDynamicRoute(path: string): boolean {
-  return path.includes('[') && path.includes(']');
-}
+// ================================================================================================
+// PREDEFINED ROUTE CONFIGURATIONS
+// ================================================================================================
 
 /**
- * Extracts parameter name from dynamic route segment
- * 
- * @param segment - Route segment (e.g., '[id]', '[service]')
- * @returns Parameter name or null if not dynamic
+ * Common route definitions for DreamFactory Admin Interface
+ * Maintains the navigation hierarchy from Angular routing while adapting to Next.js patterns
  */
-export function getRouteParameter(segment: string): string | null {
-  const match = segment.match(/^\[(.+)\]$/);
-  return match ? match[1] : null;
-}
+export const DEFAULT_ROUTES: RouteDefinition[] = [
+  {
+    path: '/',
+    label: 'Dashboard',
+    icon: 'home',
+    metadata: {
+      title: 'Dashboard',
+      description: 'DreamFactory Admin Console dashboard',
+      requiresAuth: true,
+      category: 'main',
+      order: 1
+    }
+  },
+  {
+    path: '/api-connections',
+    label: 'API Connections',
+    icon: 'api',
+    metadata: {
+      title: 'API Connections',
+      description: 'Manage API connections and services',
+      requiresAuth: true,
+      category: 'connections'
+    },
+    children: [
+      {
+        path: '/api-connections/database',
+        label: 'Database Services',
+        icon: 'database',
+        serviceGroups: ['Database'],
+        metadata: {
+          title: 'Database Services',
+          description: 'Manage database connections and API services',
+          requiresAuth: true,
+          category: 'services'
+        },
+        children: [
+          {
+            path: '/api-connections/database/create',
+            label: 'Create Database Service',
+            metadata: {
+              title: 'Create Database Service',
+              description: 'Connect to your database and generate APIs',
+              requiresAuth: true
+            }
+          },
+          {
+            path: '/api-connections/database/[service]',
+            label: 'Service Details',
+            params: { service: 'string' },
+            children: [
+              {
+                path: '/api-connections/database/[service]/schema',
+                label: 'Schema Browser',
+                metadata: {
+                  title: 'Schema Browser',
+                  description: 'Browse and manage database schema'
+                }
+              },
+              {
+                path: '/api-connections/database/[service]/generate',
+                label: 'API Generation',
+                metadata: {
+                  title: 'API Generation',
+                  description: 'Generate REST APIs from database schema'
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    path: '/api-security',
+    label: 'API Security',
+    icon: 'shield',
+    metadata: {
+      title: 'API Security',
+      description: 'Manage API security and access controls',
+      requiresAuth: true,
+      roles: ['admin'],
+      category: 'security'
+    },
+    children: [
+      {
+        path: '/api-security/roles',
+        label: 'Roles',
+        icon: 'users',
+        children: [
+          {
+            path: '/api-security/roles/create',
+            label: 'Create Role'
+          },
+          {
+            path: '/api-security/roles/[id]',
+            label: 'Edit Role',
+            params: { id: 'string' }
+          }
+        ]
+      },
+      {
+        path: '/api-security/limits',
+        label: 'Rate Limiting',
+        icon: 'clock',
+        children: [
+          {
+            path: '/api-security/limits/create',
+            label: 'Create Limit'
+          },
+          {
+            path: '/api-security/limits/[id]',
+            label: 'Edit Limit',
+            params: { id: 'string' }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    path: '/admin-settings',
+    label: 'Admin Settings',
+    icon: 'cog',
+    metadata: {
+      title: 'Admin Settings',
+      description: 'System administration and configuration',
+      requiresAuth: true,
+      roles: ['admin'],
+      category: 'admin'
+    },
+    children: [
+      {
+        path: '/admin-settings/users',
+        label: 'Users',
+        icon: 'user',
+        children: [
+          {
+            path: '/admin-settings/users/create',
+            label: 'Create User'
+          },
+          {
+            path: '/admin-settings/users/[id]',
+            label: 'Edit User',
+            params: { id: 'string' }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    path: '/system-settings',
+    label: 'System Settings',
+    icon: 'server',
+    metadata: {
+      title: 'System Settings',
+      description: 'System configuration and management',
+      requiresAuth: true,
+      roles: ['admin'],
+      category: 'system'
+    }
+  },
+  {
+    path: '/profile',
+    label: 'Profile',
+    icon: 'user-circle',
+    metadata: {
+      title: 'User Profile',
+      description: 'Manage user profile and preferences',
+      requiresAuth: true,
+      category: 'user'
+    }
+  }
+];
+
+/**
+ * Route definitions optimized for mobile navigation
+ */
+export const MOBILE_ROUTES: RouteDefinition[] = DEFAULT_ROUTES.filter(route => 
+  !route.metadata?.category || ['main', 'connections', 'user'].includes(route.metadata.category)
+);
+
+/**
+ * Admin-only routes for privileged users
+ */
+export const ADMIN_ROUTES: RouteDefinition[] = DEFAULT_ROUTES.filter(route =>
+  route.metadata?.roles?.includes('admin')
+);
