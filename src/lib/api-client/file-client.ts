@@ -1,1079 +1,1419 @@
 /**
- * Specialized file operations client that handles file uploads, downloads, 
- * directory management, and file metadata operations.
+ * Specialized file operations client for DreamFactory Admin Interface
  * 
- * Provides comprehensive file management capabilities with progress tracking,
- * security validation, and integration with DreamFactory file services API.
+ * Provides comprehensive file management capabilities including:
+ * - File upload operations with progress tracking and chunked upload support
+ * - File download functionality with proper blob handling and cross-browser compatibility
+ * - Directory operations including creation, listing, deletion, and navigation workflows
+ * - File metadata management with security validation including private key detection
+ * - Integration with DreamFactory file services API with proper authentication
+ * - Absolute URL construction for file operations bypassing Angular baseHref patterns
  * 
- * This client replaces the Angular FileApiService with modern React/Next.js
- * patterns optimized for server-side rendering and client-side interactions.
+ * Migrated from Angular FileApiService to React-compatible implementation with
+ * enhanced performance, better error handling, and modern JavaScript patterns.
+ * 
+ * @module FileClient
+ * @version 1.0.0
+ * @author DreamFactory Admin Interface Team
  */
 
-import type {
+import { BaseApiClient, RequestConfigBuilder } from './base-client';
+import { AuthClient, getCurrentAuthHeaders } from './auth-client';
+import {
   RequestConfig,
-  ListResponse,
-  FileMetadata,
+  HttpMethod,
+  ApiResponse,
   FileUploadConfig,
   FileDownloadConfig,
-  DirectoryListing,
-  DirectoryItem,
+  FileMetadata,
   FileUploadProgress,
+  FileDownloadProgress,
+  FileOperationResult,
+  AuthContext,
   AuthHeaders,
-  ErrorResponse,
+  KeyValuePair,
 } from './types';
 
 // =============================================================================
-// FILE SERVICE TYPES AND INTERFACES
+// CONSTANTS AND CONFIGURATION
 // =============================================================================
 
 /**
- * File service configuration interface
+ * File service configuration constants
  */
-export interface FileService {
-  id: number;
-  name: string;
-  label: string;
-  type: string;
-  description?: string;
-  isActive?: boolean;
-}
+export const FILE_CONFIG = {
+  /** Default chunk size for large file uploads (5MB) */
+  DEFAULT_CHUNK_SIZE: 5 * 1024 * 1024,
+  /** Maximum file size for single upload (100MB) */
+  MAX_SINGLE_FILE_SIZE: 100 * 1024 * 1024,
+  /** Maximum concurrent uploads */
+  MAX_CONCURRENT_UPLOADS: 3,
+  /** File upload timeout in milliseconds (10 minutes) */
+  UPLOAD_TIMEOUT: 10 * 60 * 1000,
+  /** Download timeout in milliseconds (30 minutes) */
+  DOWNLOAD_TIMEOUT: 30 * 60 * 1000,
+  /** Progress update interval in milliseconds */
+  PROGRESS_UPDATE_INTERVAL: 100,
+  /** Retry attempts for failed chunks */
+  CHUNK_RETRY_ATTEMPTS: 3,
+  /** Accepted file types for security validation */
+  SECURITY_SCAN_EXTENSIONS: ['.pem', '.key', '.p12', '.pfx', '.crt', '.cer'],
+  /** Content types for security validation */
+  SECURITY_SCAN_TYPES: ['application/x-pem-file', 'application/pkcs12', 'application/x-x509-ca-cert'],
+} as const;
 
 /**
- * File item with extended metadata
+ * DreamFactory file service API endpoints
  */
-export interface FileItem extends DirectoryItem {
-  contentType?: string;
-  lastModified?: number;
-  size?: number;
-  isHidden?: boolean;
-  permissions?: string;
-  hash?: string;
-}
+export const FILE_ENDPOINTS = {
+  /** Base file service path */
+  BASE: '/api/v2/files',
+  /** Upload endpoint */
+  UPLOAD: '/api/v2/files',
+  /** Download endpoint pattern */
+  DOWNLOAD: '/api/v2/files',
+  /** Directory operations */
+  DIRECTORY: '/api/v2/files',
+  /** File metadata */
+  METADATA: '/api/v2/files',
+  /** Batch operations */
+  BATCH: '/api/v2/files',
+} as const;
 
 /**
- * Directory creation payload
+ * Supported file operation types
  */
-export interface CreateDirectoryPayload {
-  resource: Array<{
-    name: string;
-    type: 'folder';
-    path?: string;
-  }>;
-}
+export type FileOperationType = 
+  | 'upload'
+  | 'download'
+  | 'delete'
+  | 'move'
+  | 'copy'
+  | 'mkdir'
+  | 'rmdir'
+  | 'list'
+  | 'metadata';
 
 /**
- * File upload result
+ * File upload chunk interface
  */
-export interface FileUploadResult {
-  success: boolean;
-  name: string;
+export interface FileChunk {
+  /** Chunk index */
+  index: number;
+  /** Total chunks */
+  total: number;
+  /** Chunk data */
+  data: Blob;
+  /** Chunk size */
   size: number;
-  type: string;
+  /** Start byte position */
+  start: number;
+  /** End byte position */
+  end: number;
+  /** Upload attempt count */
+  attempts: number;
+}
+
+/**
+ * Directory listing item interface
+ */
+export interface DirectoryItem {
+  /** Item name */
+  name: string;
+  /** Full path */
   path: string;
-  url?: string;
+  /** Item type (file or folder) */
+  type: 'file' | 'folder';
+  /** File size in bytes (for files) */
+  size?: number;
+  /** Last modified timestamp */
+  lastModified: string;
+  /** Content type (for files) */
+  contentType?: string;
+  /** Whether item is readable */
+  readable: boolean;
+  /** Whether item is writable */
+  writable: boolean;
+  /** Additional metadata */
   metadata?: Record<string, any>;
 }
 
 /**
- * File listing options
+ * Directory listing response interface
  */
-export interface FileListingOptions extends RequestConfig {
-  /** Include file properties like content-type and size */
-  includeProperties?: boolean;
-  /** Include hidden files and directories */
-  includeHidden?: boolean;
-  /** Recursive directory listing */
-  recursive?: boolean;
-  /** File extension filter */
-  extensions?: string[];
+export interface DirectoryListing {
+  /** Current path */
+  path: string;
+  /** Directory items */
+  items: DirectoryItem[];
+  /** Total item count */
+  totalCount: number;
+  /** Whether there are more items */
+  hasMore: boolean;
+  /** Parent directory path */
+  parentPath?: string;
 }
 
 /**
- * File validation result
+ * File security validation result
  */
-export interface FileValidationResult {
-  isValid: boolean;
+export interface SecurityValidationResult {
+  /** Whether file is safe */
+  isSafe: boolean;
+  /** Security warnings */
   warnings: string[];
-  errors: string[];
-  metadata: {
-    isPotentialPrivateKey: boolean;
-    containsSensitiveData: boolean;
-    fileType: string;
-    encoding?: string;
+  /** Detected issues */
+  issues: string[];
+  /** File classification */
+  classification: 'safe' | 'warning' | 'dangerous';
+  /** Recommended actions */
+  recommendations: string[];
+}
+
+/**
+ * File operation progress tracking
+ */
+export interface FileOperationProgress {
+  /** Operation type */
+  operation: FileOperationType;
+  /** File name */
+  fileName: string;
+  /** Bytes processed */
+  processed: number;
+  /** Total bytes */
+  total: number;
+  /** Progress percentage */
+  percentage: number;
+  /** Processing speed (bytes/second) */
+  speed: number;
+  /** Estimated time remaining (seconds) */
+  timeRemaining?: number;
+  /** Current status */
+  status: 'pending' | 'processing' | 'complete' | 'error' | 'cancelled';
+  /** Error message if failed */
+  error?: string;
+}
+
+// =============================================================================
+// UTILITY FUNCTIONS
+// =============================================================================
+
+/**
+ * Generate unique file operation ID for tracking
+ */
+function generateFileOperationId(): string {
+  return `file_op_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+}
+
+/**
+ * Calculate file chunks for upload
+ */
+function calculateFileChunks(file: File, chunkSize: number = FILE_CONFIG.DEFAULT_CHUNK_SIZE): FileChunk[] {
+  const chunks: FileChunk[] = [];
+  const totalChunks = Math.ceil(file.size / chunkSize);
+  
+  for (let i = 0; i < totalChunks; i++) {
+    const start = i * chunkSize;
+    const end = Math.min(start + chunkSize, file.size);
+    const chunkData = file.slice(start, end);
+    
+    chunks.push({
+      index: i,
+      total: totalChunks,
+      data: chunkData,
+      size: end - start,
+      start,
+      end,
+      attempts: 0,
+    });
+  }
+  
+  return chunks;
+}
+
+/**
+ * Validate file name for security issues
+ */
+function validateFileName(fileName: string): SecurityValidationResult {
+  const warnings: string[] = [];
+  const issues: string[] = [];
+  let classification: 'safe' | 'warning' | 'dangerous' = 'safe';
+  
+  // Check for dangerous file extensions
+  const dangerousExtensions = ['.exe', '.bat', '.cmd', '.com', '.scr', '.pif', '.js', '.jar'];
+  const fileExtension = fileName.toLowerCase().substring(fileName.lastIndexOf('.'));
+  
+  if (dangerousExtensions.includes(fileExtension)) {
+    issues.push(`Potentially dangerous file extension: ${fileExtension}`);
+    classification = 'dangerous';
+  }
+  
+  // Check for security-sensitive extensions
+  if (FILE_CONFIG.SECURITY_SCAN_EXTENSIONS.includes(fileExtension)) {
+    warnings.push(`Security-sensitive file type detected: ${fileExtension}`);
+    if (classification !== 'dangerous') {
+      classification = 'warning';
+    }
+  }
+  
+  // Check for path traversal attempts
+  if (fileName.includes('..') || fileName.includes('./') || fileName.includes('.\\')) {
+    issues.push('Path traversal attempt detected in filename');
+    classification = 'dangerous';
+  }
+  
+  // Check for hidden files
+  if (fileName.startsWith('.') && fileName !== '.htaccess') {
+    warnings.push('Hidden file detected');
+    if (classification === 'safe') {
+      classification = 'warning';
+    }
+  }
+  
+  // Generate recommendations
+  const recommendations: string[] = [];
+  if (issues.length > 0) {
+    recommendations.push('File upload blocked due to security issues');
+    recommendations.push('Rename file to remove dangerous elements');
+  } else if (warnings.length > 0) {
+    recommendations.push('Review file contents before uploading');
+    recommendations.push('Ensure file is from trusted source');
+  }
+  
+  return {
+    isSafe: classification !== 'dangerous',
+    warnings,
+    issues,
+    classification,
+    recommendations,
   };
 }
 
-// =============================================================================
-// FILE CLIENT IMPLEMENTATION
-// =============================================================================
-
 /**
- * Specialized file operations client for DreamFactory file services
- * 
- * Features:
- * - File upload with progress tracking and chunked upload support
- * - File download with proper blob handling and browser compatibility  
- * - Directory operations including creation, listing, deletion, and navigation
- * - File metadata management with security validation
- * - Absolute URL construction bypassing baseHref patterns
- * - Integration with SWR/React Query for intelligent caching
+ * Detect file content type from extension
  */
-export class FileClient {
-  private excludedServices = ['logs', 'log'];
-  private baseUrl: string;
-  private defaultHeaders: Record<string, string>;
-
-  constructor(
-    baseUrl: string = '',
-    defaultHeaders: Record<string, string> = {}
-  ) {
-    this.baseUrl = baseUrl || this.getAbsoluteOrigin();
-    this.defaultHeaders = defaultHeaders;
-  }
-
-  // =============================================================================
-  // PRIVATE UTILITY METHODS
-  // =============================================================================
-
-  /**
-   * Get the absolute origin URL from window location
-   * This bypasses Angular baseHref and router completely
-   */
-  private getAbsoluteOrigin(): string {
-    if (typeof window !== 'undefined') {
-      return window.location.origin;
-    }
-    // Server-side fallback
-    return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
-  }
-
-  /**
-   * Construct absolute URL for file operations
-   * Ensures proper URL construction that bypasses any framework routing
-   */
-  private getAbsoluteApiUrl(path: string): string {
-    // Remove leading slash if present
-    const cleanPath = path.startsWith('/') ? path.substring(1) : path;
-    
-    // Remove any potential framework prefixes
-    const pathWithoutPrefix = cleanPath.replace(/^(dreamfactory\/dist\/)?/, '');
-    
-    // Combine to get the absolute URL that goes directly to /api/v2
-    const absoluteUrl = `${this.baseUrl}/${pathWithoutPrefix}`;
-    
-    console.log(`🔍 Constructed absolute URL for file API request: ${absoluteUrl}`);
-    return absoluteUrl;
-  }
-
-  /**
-   * Check if a file service should be included in the selector
-   */
-  private isSelectableFileService(service: FileService): boolean {
-    return !this.excludedServices.some(
-      exclude =>
-        service.name.toLowerCase().includes(exclude) ||
-        service.label.toLowerCase().includes(exclude)
-    );
-  }
-
-  /**
-   * Get authentication headers for requests
-   */
-  private getAuthHeaders(additionalHeaders?: Record<string, string>): Record<string, string> {
-    return {
-      ...this.defaultHeaders,
-      ...additionalHeaders,
-    };
-  }
-
-  /**
-   * Validate file before upload
-   */
-  private validateFile(file: File): FileValidationResult {
-    const warnings: string[] = [];
-    const errors: string[] = [];
-    
-    // Check file size (default max 100MB)
-    const maxSize = 100 * 1024 * 1024; // 100MB
-    if (file.size > maxSize) {
-      errors.push(`File size ${(file.size / 1024 / 1024).toFixed(2)}MB exceeds maximum allowed size of ${maxSize / 1024 / 1024}MB`);
-    }
-
-    // Detect potential private key files
-    const isPotentialPrivateKey = this.detectPrivateKeyFile(file);
-    if (isPotentialPrivateKey) {
-      warnings.push('Detected potential private key file. Ensure proper security measures are in place.');
-    }
-
-    // Basic file type validation
-    const suspiciousExtensions = ['.exe', '.bat', '.cmd', '.scr', '.vbs', '.js'];
-    const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
-    const containsSensitiveData = suspiciousExtensions.includes(fileExtension);
-    
-    if (containsSensitiveData) {
-      warnings.push(`File type ${fileExtension} may contain executable content.`);
-    }
-
-    return {
-      isValid: errors.length === 0,
-      warnings,
-      errors,
-      metadata: {
-        isPotentialPrivateKey,
-        containsSensitiveData,
-        fileType: file.type || 'unknown',
-        encoding: 'utf-8', // Default assumption
-      },
-    };
-  }
-
-  /**
-   * Detect if file is potentially a private key
-   */
-  private detectPrivateKeyFile(file: File): boolean {
-    const privateKeyExtensions = ['.pem', '.p8', '.key', '.crt', '.cer'];
-    const fileName = file.name.toLowerCase();
-    
-    return privateKeyExtensions.some(ext => fileName.endsWith(ext)) ||
-           fileName.includes('private') ||
-           fileName.includes('secret');
-  }
-
-  /**
-   * Create progress tracking callback
-   */
-  private createProgressCallback(
-    onProgress?: (progress: FileUploadProgress) => void
-  ): ((event: ProgressEvent) => void) | undefined {
-    if (!onProgress) return undefined;
-
-    let startTime = Date.now();
-    
-    return (event: ProgressEvent) => {
-      if (event.lengthComputable) {
-        const loaded = event.loaded;
-        const total = event.total;
-        const percentage = Math.round((loaded / total) * 100);
-        const elapsed = (Date.now() - startTime) / 1000; // seconds
-        const rate = loaded / elapsed; // bytes per second
-        const timeRemaining = elapsed > 0 ? (total - loaded) / rate : 0;
-
-        onProgress({
-          loaded,
-          total,
-          percentage,
-          rate,
-          timeRemaining,
-        });
-      }
-    };
-  }
-
-  // =============================================================================
-  // FILE SERVICE MANAGEMENT
-  // =============================================================================
-
-  /**
-   * Get a list of available file services
-   * Returns both API-fetched services and hardcoded fallbacks
-   */
-  async getFileServices(
-    config: RequestConfig = {}
-  ): Promise<ListResponse<FileService>> {
-    try {
-      // Default hardcoded services as fallback
-      const defaultServices: ListResponse<FileService> = {
-        resource: [
-          {
-            id: 3,
-            name: 'files',
-            label: 'Local File Storage',
-            type: 'local_file',
-          },
-        ],
-        meta: { count: 1 },
-      };
-
-      // If no authentication, return defaults immediately
-      if (!this.defaultHeaders['X-DreamFactory-Session-Token']) {
-        console.warn('No session token available, using hardcoded file services');
-        return defaultServices;
-      }
-
-      // Construct API URL for service listing
-      const url = this.getAbsoluteApiUrl('api/v2/system/service');
-      
-      // Set up request parameters
-      const params = new URLSearchParams({
-        filter: 'type=local_file',
-        fields: 'id,name,label,type',
-        ...config.additionalParams?.reduce((acc, param) => {
-          acc[param.key] = String(param.value);
-          return acc;
-        }, {} as Record<string, string>),
-      });
-
-      // Make the request
-      const response = await fetch(`${url}?${params}`, {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-        signal: config.signal,
-      });
-
-      if (!response.ok) {
-        console.warn('API call failed, using default file services');
-        return defaultServices;
-      }
-
-      const data: ListResponse<FileService> = await response.json();
-
-      // Validate and filter response
-      if (!data?.resource || !Array.isArray(data.resource)) {
-        console.warn('Invalid response format from API, using default services');
-        return defaultServices;
-      }
-
-      // Filter out non-selectable services
-      data.resource = data.resource.filter(service =>
-        this.isSelectableFileService(service)
-      );
-
-      // If no services left after filtering, use defaults
-      if (data.resource.length === 0) {
-        console.warn('No valid file services found in API response, using defaults');
-        return defaultServices;
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Error fetching file services:', error);
-      // Return defaults on any error
-      return {
-        resource: [
-          {
-            id: 3,
-            name: 'files',
-            label: 'Local File Storage',
-            type: 'local_file',
-          },
-        ],
-        meta: { count: 1 },
-      };
-    }
-  }
-
-  // =============================================================================
-  // DIRECTORY OPERATIONS
-  // =============================================================================
-
-  /**
-   * List files and directories in a service path
-   */
-  async listFiles(
-    serviceName: string,
-    path: string = '',
-    options: FileListingOptions = {}
-  ): Promise<DirectoryListing> {
-    if (!serviceName) {
-      console.warn('No service name provided for listFiles, returning empty list');
-      return {
-        path,
-        items: [],
-        totalCount: 0,
-      };
-    }
-
-    try {
-      // Construct the API path
-      const apiPath = path
-        ? `api/v2/${serviceName}/${path}`
-        : `api/v2/${serviceName}`;
-      
-      const url = this.getAbsoluteApiUrl(apiPath);
-      
-      // Set up request parameters
-      const params = new URLSearchParams();
-      
-      if (options.includeProperties) {
-        params.append('include_properties', 'content_type');
-      }
-      
-      params.append('fields', 'name,path,type,content_type,last_modified,size');
-      
-      if (options.includeHidden) {
-        params.append('include_hidden', 'true');
-      }
-
-      // Add additional parameters
-      options.additionalParams?.forEach(param => {
-        params.append(param.key, String(param.value));
-      });
-
-      // Make the request
-      const response = await fetch(`${url}?${params}`, {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-        signal: options.signal,
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      
-      // Transform response to DirectoryListing format
-      const items: DirectoryItem[] = (data.resource || []).map((item: any) => ({
-        name: item.name,
-        type: item.type === 'folder' ? 'directory' : 'file',
-        size: item.size,
-        lastModified: item.last_modified ? new Date(item.last_modified).getTime() : undefined,
-        permissions: item.permissions,
-        path: item.path || `${path}/${item.name}`.replace(/^\/+/, ''),
-      }));
-
-      return {
-        path,
-        items,
-        totalCount: items.length,
-        parentPath: path ? path.substring(0, path.lastIndexOf('/')) || '' : undefined,
-      };
-    } catch (error) {
-      console.error(`Error listing files from ${serviceName}/${path}:`, error);
-      
-      // Provide helpful error context
-      let errorMessage = 'Error loading files. ';
-      if (error instanceof Error) {
-        if (error.message.includes('500')) {
-          errorMessage += 'The server encountered an internal error. This might be a temporary issue.';
-        } else if (error.message.includes('404')) {
-          errorMessage += 'The specified folder does not exist.';
-        } else if (error.message.includes('403') || error.message.includes('401')) {
-          errorMessage += 'You do not have permission to access this location.';
-        } else {
-          errorMessage += 'Please check your connection and try again.';
-        }
-      }
-
-      return {
-        path,
-        items: [],
-        totalCount: 0,
-        error: errorMessage,
-      };
-    }
-  }
-
-  /**
-   * Create a new directory
-   */
-  async createDirectory(
-    serviceName: string,
-    path: string,
-    name: string,
-    config: RequestConfig = {}
-  ): Promise<{ success: boolean; error?: string }> {
-    try {
-      const payload: CreateDirectoryPayload = {
-        resource: [
-          {
-            name,
-            type: 'folder',
-          },
-        ],
-      };
-
-      // Construct the API path
-      const apiPath = path
-        ? `api/v2/${serviceName}/${path}`
-        : `api/v2/${serviceName}`;
-      
-      const url = this.getAbsoluteApiUrl(apiPath);
-      
-      console.log(`Creating directory at absolute URL: ${url}`, payload);
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...this.getAuthHeaders(),
-        },
-        body: JSON.stringify(payload),
-        signal: config.signal,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      console.log('Create directory response:', result);
-
-      return { success: true };
-    } catch (error) {
-      console.error(`Error creating directory at ${serviceName}/${path}:`, error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred',
-      };
-    }
-  }
-
-  /**
-   * Create directory using POST with X-Http-Method header (alternative method)
-   */
-  async createDirectoryWithMethodOverride(
-    serviceName: string,
-    path: string,
-    name: string,
-    config: RequestConfig = {}
-  ): Promise<{ success: boolean; error?: string }> {
-    try {
-      const payload: CreateDirectoryPayload = {
-        resource: [
-          {
-            name,
-            type: 'folder',
-          },
-        ],
-      };
-
-      const apiPath = path
-        ? `api/v2/${serviceName}/${path}`
-        : `api/v2/${serviceName}`;
-      
-      const url = this.getAbsoluteApiUrl(apiPath);
-      
-      console.log(`Creating directory using POST with method override: ${url}`, payload);
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Http-Method': 'POST',
-          ...this.getAuthHeaders(),
-        },
-        body: JSON.stringify(payload),
-        signal: config.signal,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      console.log('Create directory response:', result);
-
-      return { success: true };
-    } catch (error) {
-      console.error(`Error creating directory with method override:`, error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred',
-      };
-    }
-  }
-
-  // =============================================================================
-  // FILE UPLOAD OPERATIONS
-  // =============================================================================
-
-  /**
-   * Upload a file with progress tracking and validation
-   */
-  async uploadFile(
-    serviceName: string,
-    file: File,
-    path: string = '',
-    uploadConfig: FileUploadConfig = {}
-  ): Promise<FileUploadResult> {
-    // Validate file before upload
-    const validation = this.validateFile(file);
-    if (!validation.isValid) {
-      throw new Error(`File validation failed: ${validation.errors.join(', ')}`);
-    }
-
-    // Log warnings if any
-    if (validation.warnings.length > 0) {
-      console.warn('File upload warnings:', validation.warnings);
-    }
-
-    try {
-      // Construct the upload path
-      let apiPath: string;
-      if (path) {
-        const cleanPath = path.replace(/\/$/, '');
-        apiPath = `api/v2/${serviceName}/${cleanPath}/${file.name}`;
-      } else {
-        apiPath = `api/v2/${serviceName}/${file.name}`;
-      }
-
-      const url = this.getAbsoluteApiUrl(apiPath);
-
-      console.log(
-        `⭐⭐⭐ UPLOADING FILE ${file.name} (${file.size} bytes), type: ${file.type} ⭐⭐⭐`
-      );
-      console.log(`To absolute URL: ${url}`);
-
-      // Create FormData for the file
-      const formData = new FormData();
-      formData.append('files', file);
-
-      // Set up the request
-      const headers = this.getAuthHeaders();
-
-      // Create XMLHttpRequest for progress tracking if callback provided
-      if (uploadConfig.onProgress) {
-        return this.uploadFileWithProgress(url, formData, headers, uploadConfig);
-      }
-
-      // Use fetch for simple upload without progress
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      console.log('Upload complete with response:', result);
-
-      // Call success callback if provided
-      if (uploadConfig.onSuccess) {
-        uploadConfig.onSuccess(result);
-      }
-
-      return {
-        success: true,
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        path: path ? `${path}/${file.name}` : file.name,
-        metadata: validation.metadata,
-      };
-    } catch (error) {
-      console.error(`Error uploading file:`, error);
-      
-      // Call error callback if provided
-      if (uploadConfig.onError && error instanceof Error) {
-        uploadConfig.onError(error);
-      }
-
-      throw error;
-    }
-  }
-
-  /**
-   * Upload file with XMLHttpRequest for progress tracking
-   */
-  private uploadFileWithProgress(
-    url: string,
-    formData: FormData,
-    headers: Record<string, string>,
-    config: FileUploadConfig
-  ): Promise<FileUploadResult> {
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-
-      // Set up progress tracking
-      if (config.onProgress) {
-        xhr.upload.addEventListener('progress', this.createProgressCallback(config.onProgress));
-      }
-
-      xhr.addEventListener('load', () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          try {
-            const result = JSON.parse(xhr.responseText);
-            const file = formData.get('files') as File;
-            
-            resolve({
-              success: true,
-              name: file.name,
-              size: file.size,
-              type: file.type,
-              path: file.name, // Simplified - would need actual path from response
-            });
-          } catch (parseError) {
-            reject(new Error('Failed to parse upload response'));
-          }
-        } else {
-          reject(new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`));
-        }
-      });
-
-      xhr.addEventListener('error', () => {
-        reject(new Error('Upload failed due to network error'));
-      });
-
-      xhr.addEventListener('abort', () => {
-        reject(new Error('Upload was aborted'));
-      });
-
-      xhr.open('POST', url);
-
-      // Set headers (note: Content-Type should not be set for FormData)
-      Object.entries(headers).forEach(([key, value]) => {
-        if (key.toLowerCase() !== 'content-type') {
-          xhr.setRequestHeader(key, value);
-        }
-      });
-
-      xhr.send(formData);
-    });
-  }
-
-  /**
-   * Upload multiple files with batch processing
-   */
-  async uploadFiles(
-    serviceName: string,
-    files: FileList | File[],
-    path: string = '',
-    uploadConfig: FileUploadConfig = {}
-  ): Promise<FileUploadResult[]> {
-    const fileArray = Array.from(files);
-    const results: FileUploadResult[] = [];
-    const errors: Error[] = [];
-
-    for (const file of fileArray) {
-      try {
-        const result = await this.uploadFile(serviceName, file, path, uploadConfig);
-        results.push(result);
-      } catch (error) {
-        console.error(`Failed to upload ${file.name}:`, error);
-        errors.push(error instanceof Error ? error : new Error('Unknown upload error'));
-      }
-    }
-
-    if (errors.length > 0 && results.length === 0) {
-      throw new Error(`All uploads failed: ${errors.map(e => e.message).join(', ')}`);
-    }
-
-    return results;
-  }
-
-  // =============================================================================
-  // FILE DOWNLOAD OPERATIONS
-  // =============================================================================
-
-  /**
-   * Download file content as blob
-   */
-  async downloadFile(
-    serviceName: string,
-    filePath: string,
-    downloadConfig: FileDownloadConfig = {}
-  ): Promise<Blob> {
-    try {
-      const apiPath = `api/v2/${serviceName}/${filePath}`;
-      const url = this.getAbsoluteApiUrl(apiPath);
-      
-      console.log(`Downloading file from absolute URL: ${url}`);
-
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Download failed: ${response.status} ${response.statusText}`);
-      }
-
-      const blob = await response.blob();
-
-      // Handle download as attachment if requested
-      if (downloadConfig.asAttachment) {
-        this.downloadBlob(blob, downloadConfig.filename || filePath.split('/').pop() || 'download');
-      }
-
-      return blob;
-    } catch (error) {
-      console.error(`Error downloading file from ${serviceName}/${filePath}:`, error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get file content as text
-   */
-  async getFileText(
-    serviceName: string,
-    filePath: string
-  ): Promise<string> {
-    const blob = await this.downloadFile(serviceName, filePath);
-    return blob.text();
-  }
-
-  /**
-   * Get file content as data URL
-   */
-  async getFileDataUrl(
-    serviceName: string,
-    filePath: string
-  ): Promise<string> {
-    const blob = await this.downloadFile(serviceName, filePath);
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(new Error('Failed to read file as data URL'));
-      reader.readAsDataURL(blob);
-    });
-  }
-
-  /**
-   * Trigger browser download for a blob
-   */
-  private downloadBlob(blob: Blob, filename: string): void {
-    if (typeof window !== 'undefined') {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }
-  }
-
-  // =============================================================================
-  // FILE MANAGEMENT OPERATIONS
-  // =============================================================================
-
-  /**
-   * Delete a file or directory
-   */
-  async deleteFile(
-    serviceName: string,
-    filePath: string,
-    config: RequestConfig = {}
-  ): Promise<{ success: boolean; error?: string }> {
-    try {
-      const apiPath = `api/v2/${serviceName}/${filePath}`;
-      const url = this.getAbsoluteApiUrl(apiPath);
-      
-      console.log(`Deleting file at absolute URL: ${url}`);
-
-      const response = await fetch(url, {
-        method: 'DELETE',
-        headers: this.getAuthHeaders(),
-        signal: config.signal,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      console.log('Delete response:', result);
-
-      return { success: true };
-    } catch (error) {
-      console.error(`Error deleting file at ${serviceName}/${filePath}:`, error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred',
-      };
-    }
-  }
-
-  /**
-   * Get file metadata without downloading content
-   */
-  async getFileMetadata(
-    serviceName: string,
-    filePath: string
-  ): Promise<FileMetadata> {
-    try {
-      const apiPath = `api/v2/${serviceName}/${filePath}`;
-      const url = this.getAbsoluteApiUrl(apiPath);
-      
-      const response = await fetch(url, {
-        method: 'HEAD',
-        headers: this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to get metadata: ${response.status} ${response.statusText}`);
-      }
-
-      const contentLength = response.headers.get('Content-Length');
-      const contentType = response.headers.get('Content-Type');
-      const lastModified = response.headers.get('Last-Modified');
-
-      return {
-        name: filePath.split('/').pop() || filePath,
-        size: contentLength ? parseInt(contentLength, 10) : 0,
-        type: contentType || 'application/octet-stream',
-        lastModified: lastModified ? new Date(lastModified).getTime() : undefined,
-        path: filePath,
-      };
-    } catch (error) {
-      console.error(`Error getting file metadata:`, error);
-      throw error;
-    }
-  }
-
-  /**
-   * Check if file exists
-   */
-  async fileExists(
-    serviceName: string,
-    filePath: string
-  ): Promise<boolean> {
-    try {
-      await this.getFileMetadata(serviceName, filePath);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  // =============================================================================
-  // BATCH OPERATIONS
-  // =============================================================================
-
-  /**
-   * Delete multiple files/directories
-   */
-  async deleteFiles(
-    serviceName: string,
-    filePaths: string[],
-    config: RequestConfig = {}
-  ): Promise<{ success: string[]; failed: Array<{ path: string; error: string }> }> {
-    const success: string[] = [];
-    const failed: Array<{ path: string; error: string }> = [];
-
-    for (const filePath of filePaths) {
-      try {
-        const result = await this.deleteFile(serviceName, filePath, config);
-        if (result.success) {
-          success.push(filePath);
-        } else {
-          failed.push({ path: filePath, error: result.error || 'Unknown error' });
-        }
-      } catch (error) {
-        failed.push({
-          path: filePath,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
-      }
-    }
-
-    return { success, failed };
-  }
+function detectContentType(fileName: string): string {
+  const extension = fileName.toLowerCase().substring(fileName.lastIndexOf('.'));
+  
+  const mimeTypes: Record<string, string> = {
+    '.txt': 'text/plain',
+    '.html': 'text/html',
+    '.css': 'text/css',
+    '.js': 'application/javascript',
+    '.json': 'application/json',
+    '.xml': 'application/xml',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png': 'image/png',
+    '.gif': 'image/gif',
+    '.pdf': 'application/pdf',
+    '.zip': 'application/zip',
+    '.csv': 'text/csv',
+    '.doc': 'application/msword',
+    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    '.xls': 'application/vnd.ms-excel',
+    '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  };
+  
+  return mimeTypes[extension] || 'application/octet-stream';
 }
-
-// =============================================================================
-// FACTORY AND UTILITY FUNCTIONS
-// =============================================================================
-
-/**
- * Create a new FileClient instance
- */
-export function createFileClient(
-  baseUrl?: string,
-  defaultHeaders?: Record<string, string>
-): FileClient {
-  return new FileClient(baseUrl, defaultHeaders);
-}
-
-/**
- * Default file client instance (singleton pattern)
- */
-let defaultFileClient: FileClient | null = null;
-
-/**
- * Get the default file client instance
- */
-export function getFileClient(
-  baseUrl?: string,
-  defaultHeaders?: Record<string, string>
-): FileClient {
-  if (!defaultFileClient) {
-    defaultFileClient = new FileClient(baseUrl, defaultHeaders);
-  }
-  return defaultFileClient;
-}
-
-/**
- * Reset the default file client (useful for testing)
- */
-export function resetFileClient(): void {
-  defaultFileClient = null;
-}
-
-// =============================================================================
-// UTILITY FUNCTIONS FOR FILE OPERATIONS
-// =============================================================================
 
 /**
  * Format file size for display
  */
-export function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 Bytes';
-
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
-
-/**
- * Get file extension from filename
- */
-export function getFileExtension(filename: string): string {
-  return filename.substring(filename.lastIndexOf('.') + 1).toLowerCase();
-}
-
-/**
- * Check if file type is image
- */
-export function isImageFile(contentType: string): boolean {
-  return contentType.startsWith('image/');
-}
-
-/**
- * Check if file type is text
- */
-export function isTextFile(contentType: string): boolean {
-  return contentType.startsWith('text/') || 
-         contentType === 'application/json' ||
-         contentType === 'application/xml';
-}
-
-/**
- * Generate unique filename to avoid conflicts
- */
-export function generateUniqueFilename(originalName: string, existingNames: string[]): string {
-  let counter = 1;
-  let newName = originalName;
-  const extensionIndex = originalName.lastIndexOf('.');
-  const nameWithoutExtension = extensionIndex > 0 ? originalName.substring(0, extensionIndex) : originalName;
-  const extension = extensionIndex > 0 ? originalName.substring(extensionIndex) : '';
-
-  while (existingNames.includes(newName)) {
-    newName = `${nameWithoutExtension} (${counter})${extension}`;
-    counter++;
+function formatFileSize(bytes: number): string {
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let size = bytes;
+  let unitIndex = 0;
+  
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex++;
   }
-
-  return newName;
+  
+  return `${size.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
 }
 
-// Export all types and interfaces
+/**
+ * Calculate upload speed and time remaining
+ */
+function calculateTransferStats(
+  bytesTransferred: number,
+  totalBytes: number,
+  startTime: number
+): { speed: number; timeRemaining?: number } {
+  const elapsed = (Date.now() - startTime) / 1000; // seconds
+  const speed = bytesTransferred / elapsed;
+  
+  let timeRemaining: number | undefined;
+  if (speed > 0) {
+    timeRemaining = (totalBytes - bytesTransferred) / speed;
+  }
+  
+  return { speed, timeRemaining };
+}
+
+/**
+ * Build absolute URL for file operations bypassing baseHref
+ */
+function buildAbsoluteFileUrl(relativePath: string, params?: KeyValuePair[]): string {
+  // Get the current origin directly
+  const origin = typeof window !== 'undefined' 
+    ? window.location.origin 
+    : process.env.NEXT_PUBLIC_API_BASE_URL || '';
+  
+  // Remove leading slash if present
+  const cleanPath = relativePath.startsWith('/') ? relativePath.slice(1) : relativePath;
+  
+  // Build query string
+  let queryString = '';
+  if (params && params.length > 0) {
+    const searchParams = new URLSearchParams();
+    params.forEach(({ key, value }) => {
+      if (value !== undefined && value !== null) {
+        searchParams.append(key, String(value));
+      }
+    });
+    queryString = searchParams.toString();
+  }
+  
+  // Construct absolute URL
+  const fullUrl = `${origin}/${cleanPath}`;
+  return queryString ? `${fullUrl}?${queryString}` : fullUrl;
+}
+
+// =============================================================================
+// MAIN FILE CLIENT CLASS
+// =============================================================================
+
+/**
+ * Specialized file operations client for DreamFactory file services
+ */
+export class FileClient extends BaseApiClient {
+  private uploadProgressCallbacks: Map<string, (progress: FileOperationProgress) => void> = new Map();
+  private downloadProgressCallbacks: Map<string, (progress: FileOperationProgress) => void> = new Map();
+  private activeOperations: Map<string, AbortController> = new Map();
+  
+  /**
+   * Initialize file client with base API client configuration
+   */
+  constructor(
+    baseUrl: string = '',
+    authContext: AuthContext = {
+      isAuthenticated: false,
+      isAuthenticating: false,
+    }
+  ) {
+    super(baseUrl, authContext);
+    
+    // Add file-specific middleware
+    this.addRequestMiddleware({
+      id: 'file-auth-headers',
+      onRequest: async (config: RequestConfig) => {
+        // Add authentication headers for file operations
+        const authHeaders = await getCurrentAuthHeaders();
+        if (!config.additionalHeaders) {
+          config.additionalHeaders = [];
+        }
+        
+        Object.entries(authHeaders).forEach(([key, value]) => {
+          config.additionalHeaders!.push({ key, value });
+        });
+        
+        return config;
+      },
+    });
+  }
+  
+  // =============================================================================
+  // FILE UPLOAD OPERATIONS
+  // =============================================================================
+  
+  /**
+   * Upload single file with progress tracking and validation
+   */
+  async uploadFile(
+    file: File,
+    config: FileUploadConfig & {
+      onProgress?: (progress: FileOperationProgress) => void;
+      validateSecurity?: boolean;
+      enableChunking?: boolean;
+    } = {}
+  ): Promise<FileOperationResult> {
+    const operationId = generateFileOperationId();
+    const startTime = Date.now();
+    
+    try {
+      // Security validation
+      if (config.validateSecurity !== false) {
+        const validation = validateFileName(file.name);
+        if (!validation.isSafe) {
+          throw new Error(`File upload blocked: ${validation.issues.join(', ')}`);
+        }
+        
+        if (validation.warnings.length > 0) {
+          console.warn('File security warnings:', validation.warnings);
+        }
+      }
+      
+      // Size validation
+      if (file.size > FILE_CONFIG.MAX_SINGLE_FILE_SIZE) {
+        throw new Error(`File size ${formatFileSize(file.size)} exceeds maximum allowed size ${formatFileSize(FILE_CONFIG.MAX_SINGLE_FILE_SIZE)}`);
+      }
+      
+      // Register progress callback
+      if (config.onProgress) {
+        this.uploadProgressCallbacks.set(operationId, config.onProgress);
+      }
+      
+      // Create abort controller
+      const abortController = new AbortController();
+      this.activeOperations.set(operationId, abortController);
+      
+      let result: FileOperationResult;
+      
+      // Determine upload method
+      const useChunking = config.enableChunking && file.size > FILE_CONFIG.DEFAULT_CHUNK_SIZE;
+      
+      if (useChunking) {
+        result = await this.uploadFileInChunks(file, config, operationId, startTime, abortController.signal);
+      } else {
+        result = await this.uploadFileDirect(file, config, operationId, startTime, abortController.signal);
+      }
+      
+      // Update final progress
+      if (config.onProgress) {
+        config.onProgress({
+          operation: 'upload',
+          fileName: file.name,
+          processed: file.size,
+          total: file.size,
+          percentage: 100,
+          speed: file.size / ((Date.now() - startTime) / 1000),
+          status: result.success ? 'complete' : 'error',
+          error: result.error?.message,
+        });
+      }
+      
+      return result;
+      
+    } catch (error) {
+      console.error('File upload error:', error);
+      
+      if (config.onProgress) {
+        config.onProgress({
+          operation: 'upload',
+          fileName: file.name,
+          processed: 0,
+          total: file.size,
+          percentage: 0,
+          speed: 0,
+          status: 'error',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+      
+      return {
+        success: false,
+        error: error instanceof Error ? error : new Error('Upload failed'),
+        duration: Date.now() - startTime,
+      };
+    } finally {
+      // Cleanup
+      this.uploadProgressCallbacks.delete(operationId);
+      this.activeOperations.delete(operationId);
+    }
+  }
+  
+  /**
+   * Upload file directly without chunking
+   */
+  private async uploadFileDirect(
+    file: File,
+    config: FileUploadConfig,
+    operationId: string,
+    startTime: number,
+    signal: AbortSignal
+  ): Promise<FileOperationResult> {
+    const formData = new FormData();
+    formData.append(config.fieldName || 'file', file);
+    
+    // Add additional form data
+    if (config.data) {
+      Object.entries(config.data).forEach(([key, value]) => {
+        formData.append(key, String(value));
+      });
+    }
+    
+    // Build upload URL
+    const uploadUrl = config.url || FILE_ENDPOINTS.UPLOAD;
+    const absoluteUrl = buildAbsoluteFileUrl(uploadUrl);
+    
+    // Create progress tracking XMLHttpRequest
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      
+      // Set up progress tracking
+      xhr.upload.addEventListener('progress', (event) => {
+        if (event.lengthComputable) {
+          const callback = this.uploadProgressCallbacks.get(operationId);
+          if (callback) {
+            const stats = calculateTransferStats(event.loaded, event.total, startTime);
+            callback({
+              operation: 'upload',
+              fileName: file.name,
+              processed: event.loaded,
+              total: event.total,
+              percentage: Math.round((event.loaded / event.total) * 100),
+              speed: stats.speed,
+              timeRemaining: stats.timeRemaining,
+              status: 'processing',
+            });
+          }
+        }
+      });
+      
+      xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const response = xhr.responseText ? JSON.parse(xhr.responseText) : {};
+            resolve({
+              success: true,
+              data: response,
+              file: {
+                name: file.name,
+                size: file.size,
+                type: file.type,
+                lastModified: file.lastModified,
+              },
+              url: absoluteUrl,
+              duration: Date.now() - startTime,
+            });
+          } catch (error) {
+            resolve({
+              success: true,
+              data: xhr.responseText,
+              file: {
+                name: file.name,
+                size: file.size,
+                type: file.type,
+                lastModified: file.lastModified,
+              },
+              url: absoluteUrl,
+              duration: Date.now() - startTime,
+            });
+          }
+        } else {
+          reject(new Error(`Upload failed with status ${xhr.status}: ${xhr.statusText}`));
+        }
+      });
+      
+      xhr.addEventListener('error', () => {
+        reject(new Error('Upload failed due to network error'));
+      });
+      
+      xhr.addEventListener('abort', () => {
+        reject(new Error('Upload was cancelled'));
+      });
+      
+      // Handle abort signal
+      signal.addEventListener('abort', () => {
+        xhr.abort();
+      });
+      
+      // Open and configure request
+      xhr.open(config.method || 'POST', absoluteUrl);
+      
+      // Add authentication headers
+      config.headers = config.headers || {};
+      const authHeaders = await getCurrentAuthHeaders();
+      Object.assign(config.headers, authHeaders);
+      
+      // Set headers
+      Object.entries(config.headers).forEach(([key, value]) => {
+        xhr.setRequestHeader(key, value);
+      });
+      
+      // Send request
+      xhr.send(formData);
+    });
+  }
+  
+  /**
+   * Upload file in chunks for large files
+   */
+  private async uploadFileInChunks(
+    file: File,
+    config: FileUploadConfig,
+    operationId: string,
+    startTime: number,
+    signal: AbortSignal
+  ): Promise<FileOperationResult> {
+    const chunks = calculateFileChunks(file, config.chunkSize);
+    const uploadedChunks: number[] = [];
+    let totalUploaded = 0;
+    
+    // Initialize chunked upload session
+    const sessionId = `upload_${operationId}`;
+    
+    try {
+      for (const chunk of chunks) {
+        if (signal.aborted) {
+          throw new Error('Upload cancelled');
+        }
+        
+        await this.uploadChunk(file, chunk, sessionId, config, signal);
+        uploadedChunks.push(chunk.index);
+        totalUploaded += chunk.size;
+        
+        // Update progress
+        const callback = this.uploadProgressCallbacks.get(operationId);
+        if (callback) {
+          const stats = calculateTransferStats(totalUploaded, file.size, startTime);
+          callback({
+            operation: 'upload',
+            fileName: file.name,
+            processed: totalUploaded,
+            total: file.size,
+            percentage: Math.round((totalUploaded / file.size) * 100),
+            speed: stats.speed,
+            timeRemaining: stats.timeRemaining,
+            status: 'processing',
+          });
+        }
+      }
+      
+      // Finalize upload
+      const finalizeResult = await this.finalizeChunkedUpload(sessionId, file, config);
+      
+      return {
+        success: true,
+        data: finalizeResult,
+        file: {
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          lastModified: file.lastModified,
+        },
+        duration: Date.now() - startTime,
+      };
+      
+    } catch (error) {
+      // Cleanup partial upload
+      await this.cleanupChunkedUpload(sessionId).catch(() => {
+        // Ignore cleanup errors
+      });
+      
+      throw error;
+    }
+  }
+  
+  /**
+   * Upload individual chunk
+   */
+  private async uploadChunk(
+    file: File,
+    chunk: FileChunk,
+    sessionId: string,
+    config: FileUploadConfig,
+    signal: AbortSignal
+  ): Promise<void> {
+    const formData = new FormData();
+    formData.append('chunk', chunk.data);
+    formData.append('chunkIndex', chunk.index.toString());
+    formData.append('totalChunks', chunk.total.toString());
+    formData.append('sessionId', sessionId);
+    formData.append('fileName', file.name);
+    
+    const requestConfig = this.createRequest()
+      .method('POST')
+      .contentType('multipart/form-data')
+      .timeout(FILE_CONFIG.UPLOAD_TIMEOUT)
+      .signal(signal)
+      .retry(FILE_CONFIG.CHUNK_RETRY_ATTEMPTS, 1000)
+      .build();
+    
+    const uploadUrl = `${config.url || FILE_ENDPOINTS.UPLOAD}/chunk`;
+    await this.request(uploadUrl, requestConfig, formData);
+  }
+  
+  /**
+   * Finalize chunked upload
+   */
+  private async finalizeChunkedUpload(
+    sessionId: string,
+    file: File,
+    config: FileUploadConfig
+  ): Promise<any> {
+    const requestConfig = this.createRequest()
+      .method('POST')
+      .timeout(FILE_CONFIG.UPLOAD_TIMEOUT)
+      .build();
+    
+    const finalizeUrl = `${config.url || FILE_ENDPOINTS.UPLOAD}/finalize`;
+    const response = await this.request(finalizeUrl, requestConfig, {
+      sessionId,
+      fileName: file.name,
+      totalSize: file.size,
+      ...config.data,
+    });
+    
+    return response;
+  }
+  
+  /**
+   * Cleanup failed chunked upload
+   */
+  private async cleanupChunkedUpload(sessionId: string): Promise<void> {
+    const requestConfig = this.createRequest()
+      .method('DELETE')
+      .timeout(5000)
+      .build();
+    
+    const cleanupUrl = `${FILE_ENDPOINTS.UPLOAD}/cleanup/${sessionId}`;
+    await this.request(cleanupUrl, requestConfig);
+  }
+  
+  /**
+   * Upload multiple files with progress tracking
+   */
+  async uploadMultipleFiles(
+    files: File[],
+    config: FileUploadConfig & {
+      onProgress?: (progress: FileOperationProgress[]) => void;
+      maxConcurrent?: number;
+    } = {}
+  ): Promise<FileOperationResult[]> {
+    const maxConcurrent = config.maxConcurrent || FILE_CONFIG.MAX_CONCURRENT_UPLOADS;
+    const results: FileOperationResult[] = [];
+    const progressMap = new Map<string, FileOperationProgress>();
+    
+    const updateProgress = (fileName: string, progress: FileOperationProgress) => {
+      progressMap.set(fileName, progress);
+      if (config.onProgress) {
+        config.onProgress(Array.from(progressMap.values()));
+      }
+    };
+    
+    // Process files in batches
+    for (let i = 0; i < files.length; i += maxConcurrent) {
+      const batch = files.slice(i, i + maxConcurrent);
+      
+      const batchPromises = batch.map(async (file) => {
+        return this.uploadFile(file, {
+          ...config,
+          onProgress: (progress) => updateProgress(file.name, progress),
+        });
+      });
+      
+      const batchResults = await Promise.allSettled(batchPromises);
+      batchResults.forEach((result) => {
+        if (result.status === 'fulfilled') {
+          results.push(result.value);
+        } else {
+          results.push({
+            success: false,
+            error: new Error(result.reason?.message || 'Upload failed'),
+          });
+        }
+      });
+    }
+    
+    return results;
+  }
+  
+  // =============================================================================
+  // FILE DOWNLOAD OPERATIONS
+  // =============================================================================
+  
+  /**
+   * Download file with progress tracking and blob handling
+   */
+  async downloadFile(
+    config: FileDownloadConfig & {
+      onProgress?: (progress: FileOperationProgress) => void;
+    }
+  ): Promise<FileOperationResult> {
+    const operationId = generateFileOperationId();
+    const startTime = Date.now();
+    
+    try {
+      // Register progress callback
+      if (config.onProgress) {
+        this.downloadProgressCallbacks.set(operationId, config.onProgress);
+      }
+      
+      // Create abort controller
+      const abortController = new AbortController();
+      this.activeOperations.set(operationId, abortController);
+      
+      // Build download URL
+      const downloadUrl = buildAbsoluteFileUrl(config.url, [
+        { key: 'download', value: config.forceDownload ? 'true' : 'false' },
+      ]);
+      
+      // Fetch file with streaming
+      const response = await fetch(downloadUrl, {
+        method: 'GET',
+        headers: {
+          ...await getCurrentAuthHeaders(),
+          ...config.headers,
+        },
+        signal: abortController.signal,
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Download failed: ${response.status} ${response.statusText}`);
+      }
+      
+      // Get file info from headers
+      const contentLength = response.headers.get('content-length');
+      const contentType = response.headers.get('content-type') || 'application/octet-stream';
+      const contentDisposition = response.headers.get('content-disposition');
+      const fileName = config.filename || this.extractFileNameFromDisposition(contentDisposition) || 'download';
+      
+      const totalSize = contentLength ? parseInt(contentLength, 10) : 0;
+      let downloadedSize = 0;
+      
+      // Create readable stream with progress tracking
+      const stream = response.body;
+      if (!stream) {
+        throw new Error('Response body is not readable');
+      }
+      
+      const reader = stream.getReader();
+      const chunks: Uint8Array[] = [];
+      
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          
+          if (done) break;
+          
+          chunks.push(value);
+          downloadedSize += value.length;
+          
+          // Update progress
+          const callback = this.downloadProgressCallbacks.get(operationId);
+          if (callback && totalSize > 0) {
+            const stats = calculateTransferStats(downloadedSize, totalSize, startTime);
+            callback({
+              operation: 'download',
+              fileName,
+              processed: downloadedSize,
+              total: totalSize,
+              percentage: Math.round((downloadedSize / totalSize) * 100),
+              speed: stats.speed,
+              timeRemaining: stats.timeRemaining,
+              status: 'processing',
+            });
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+      
+      // Create blob from chunks
+      const blob = new Blob(chunks, { type: contentType });
+      
+      // Trigger download if requested
+      if (config.forceDownload && typeof window !== 'undefined') {
+        this.triggerBrowserDownload(blob, fileName);
+      }
+      
+      // Update final progress
+      if (config.onProgress) {
+        config.onProgress({
+          operation: 'download',
+          fileName,
+          processed: downloadedSize,
+          total: downloadedSize,
+          percentage: 100,
+          speed: downloadedSize / ((Date.now() - startTime) / 1000),
+          status: 'complete',
+        });
+      }
+      
+      return {
+        success: true,
+        data: blob,
+        file: {
+          name: fileName,
+          size: downloadedSize,
+          type: contentType,
+          lastModified: Date.now(),
+        },
+        url: downloadUrl,
+        duration: Date.now() - startTime,
+      };
+      
+    } catch (error) {
+      console.error('File download error:', error);
+      
+      if (config.onProgress) {
+        config.onProgress({
+          operation: 'download',
+          fileName: config.filename || 'download',
+          processed: 0,
+          total: 0,
+          percentage: 0,
+          speed: 0,
+          status: 'error',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+      
+      return {
+        success: false,
+        error: error instanceof Error ? error : new Error('Download failed'),
+        duration: Date.now() - startTime,
+      };
+    } finally {
+      // Cleanup
+      this.downloadProgressCallbacks.delete(operationId);
+      this.activeOperations.delete(operationId);
+    }
+  }
+  
+  /**
+   * Extract filename from Content-Disposition header
+   */
+  private extractFileNameFromDisposition(disposition: string | null): string | null {
+    if (!disposition) return null;
+    
+    const matches = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+    if (matches?.[1]) {
+      return matches[1].replace(/['"]/g, '');
+    }
+    
+    return null;
+  }
+  
+  /**
+   * Trigger browser download using blob URL
+   */
+  private triggerBrowserDownload(blob: Blob, fileName: string): void {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    link.style.display = 'none';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Clean up blob URL
+    setTimeout(() => URL.revokeObjectURL(url), 100);
+  }
+  
+  // =============================================================================
+  // DIRECTORY OPERATIONS
+  // =============================================================================
+  
+  /**
+   * List directory contents with pagination support
+   */
+  async listDirectory(
+    path: string = '',
+    options: {
+      limit?: number;
+      offset?: number;
+      includeMetadata?: boolean;
+      filter?: string;
+      sort?: string;
+    } = {}
+  ): Promise<DirectoryListing> {
+    const requestConfig = this.createRequest()
+      .method('GET')
+      .timeout(30000)
+      .param('path', path)
+      .param('limit', options.limit || 100)
+      .param('offset', options.offset || 0)
+      .param('include_metadata', options.includeMetadata || false)
+      .build();
+    
+    if (options.filter) {
+      requestConfig.additionalParams?.push({ key: 'filter', value: options.filter });
+    }
+    
+    if (options.sort) {
+      requestConfig.additionalParams?.push({ key: 'order', value: options.sort });
+    }
+    
+    const response = await this.request<{
+      resource: DirectoryItem[];
+      meta: { count: number };
+    }>(FILE_ENDPOINTS.DIRECTORY, requestConfig);
+    
+    const items = response.resource || [];
+    const totalCount = response.meta?.count || items.length;
+    
+    return {
+      path,
+      items,
+      totalCount,
+      hasMore: (options.offset || 0) + items.length < totalCount,
+      parentPath: this.getParentPath(path),
+    };
+  }
+  
+  /**
+   * Create directory
+   */
+  async createDirectory(path: string, recursive: boolean = false): Promise<FileOperationResult> {
+    const startTime = Date.now();
+    
+    try {
+      const requestConfig = this.createRequest()
+        .method('POST')
+        .timeout(30000)
+        .build();
+      
+      const response = await this.request(FILE_ENDPOINTS.DIRECTORY, requestConfig, {
+        path,
+        type: 'folder',
+        recursive,
+      });
+      
+      return {
+        success: true,
+        data: response,
+        duration: Date.now() - startTime,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error : new Error('Directory creation failed'),
+        duration: Date.now() - startTime,
+      };
+    }
+  }
+  
+  /**
+   * Delete directory
+   */
+  async deleteDirectory(
+    path: string,
+    options: {
+      recursive?: boolean;
+      force?: boolean;
+    } = {}
+  ): Promise<FileOperationResult> {
+    const startTime = Date.now();
+    
+    try {
+      const requestConfig = this.createRequest()
+        .method('DELETE')
+        .timeout(60000)
+        .param('path', path)
+        .param('recursive', options.recursive || false)
+        .param('force', options.force || false)
+        .build();
+      
+      const response = await this.request(FILE_ENDPOINTS.DIRECTORY, requestConfig);
+      
+      return {
+        success: true,
+        data: response,
+        duration: Date.now() - startTime,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error : new Error('Directory deletion failed'),
+        duration: Date.now() - startTime,
+      };
+    }
+  }
+  
+  /**
+   * Get parent directory path
+   */
+  private getParentPath(path: string): string | undefined {
+    if (!path || path === '/') return undefined;
+    
+    const normalizedPath = path.endsWith('/') ? path.slice(0, -1) : path;
+    const lastSlashIndex = normalizedPath.lastIndexOf('/');
+    
+    if (lastSlashIndex <= 0) return '/';
+    
+    return normalizedPath.substring(0, lastSlashIndex);
+  }
+  
+  // =============================================================================
+  // FILE METADATA OPERATIONS
+  // =============================================================================
+  
+  /**
+   * Get file metadata with security validation
+   */
+  async getFileMetadata(
+    path: string,
+    options: {
+      includeSecurity?: boolean;
+      includeExtended?: boolean;
+    } = {}
+  ): Promise<FileMetadata & { security?: SecurityValidationResult }> {
+    const requestConfig = this.createRequest()
+      .method('GET')
+      .timeout(30000)
+      .param('path', path)
+      .param('include_metadata', true)
+      .build();
+    
+    const response = await this.request<DirectoryItem>(FILE_ENDPOINTS.METADATA, requestConfig);
+    
+    const metadata: FileMetadata = {
+      name: response.name,
+      size: response.size || 0,
+      type: response.contentType || detectContentType(response.name),
+      lastModified: new Date(response.lastModified).getTime(),
+    };
+    
+    // Add security validation if requested
+    if (options.includeSecurity) {
+      const security = validateFileName(response.name);
+      return { ...metadata, security };
+    }
+    
+    return metadata;
+  }
+  
+  /**
+   * Update file metadata
+   */
+  async updateFileMetadata(
+    path: string,
+    metadata: Partial<FileMetadata>
+  ): Promise<FileOperationResult> {
+    const startTime = Date.now();
+    
+    try {
+      const requestConfig = this.createRequest()
+        .method('PATCH')
+        .timeout(30000)
+        .param('path', path)
+        .build();
+      
+      const response = await this.request(FILE_ENDPOINTS.METADATA, requestConfig, metadata);
+      
+      return {
+        success: true,
+        data: response,
+        duration: Date.now() - startTime,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error : new Error('Metadata update failed'),
+        duration: Date.now() - startTime,
+      };
+    }
+  }
+  
+  // =============================================================================
+  // FILE OPERATION UTILITIES
+  // =============================================================================
+  
+  /**
+   * Delete file
+   */
+  async deleteFile(path: string): Promise<FileOperationResult> {
+    const startTime = Date.now();
+    
+    try {
+      const requestConfig = this.createRequest()
+        .method('DELETE')
+        .timeout(30000)
+        .param('path', path)
+        .build();
+      
+      const response = await this.request(FILE_ENDPOINTS.BASE, requestConfig);
+      
+      return {
+        success: true,
+        data: response,
+        duration: Date.now() - startTime,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error : new Error('File deletion failed'),
+        duration: Date.now() - startTime,
+      };
+    }
+  }
+  
+  /**
+   * Move/rename file
+   */
+  async moveFile(
+    sourcePath: string,
+    destinationPath: string,
+    overwrite: boolean = false
+  ): Promise<FileOperationResult> {
+    const startTime = Date.now();
+    
+    try {
+      const requestConfig = this.createRequest()
+        .method('PATCH')
+        .timeout(30000)
+        .build();
+      
+      const response = await this.request(FILE_ENDPOINTS.BASE, requestConfig, {
+        source: sourcePath,
+        destination: destinationPath,
+        overwrite,
+        operation: 'move',
+      });
+      
+      return {
+        success: true,
+        data: response,
+        duration: Date.now() - startTime,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error : new Error('File move failed'),
+        duration: Date.now() - startTime,
+      };
+    }
+  }
+  
+  /**
+   * Copy file
+   */
+  async copyFile(
+    sourcePath: string,
+    destinationPath: string,
+    overwrite: boolean = false
+  ): Promise<FileOperationResult> {
+    const startTime = Date.now();
+    
+    try {
+      const requestConfig = this.createRequest()
+        .method('POST')
+        .timeout(30000)
+        .build();
+      
+      const response = await this.request(FILE_ENDPOINTS.BASE, requestConfig, {
+        source: sourcePath,
+        destination: destinationPath,
+        overwrite,
+        operation: 'copy',
+      });
+      
+      return {
+        success: true,
+        data: response,
+        duration: Date.now() - startTime,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error : new Error('File copy failed'),
+        duration: Date.now() - startTime,
+      };
+    }
+  }
+  
+  /**
+   * Cancel active file operation
+   */
+  cancelOperation(operationId: string): boolean {
+    const controller = this.activeOperations.get(operationId);
+    if (controller) {
+      controller.abort();
+      this.activeOperations.delete(operationId);
+      return true;
+    }
+    return false;
+  }
+  
+  /**
+   * Cancel all active operations
+   */
+  cancelAllOperations(): void {
+    this.activeOperations.forEach((controller) => {
+      controller.abort();
+    });
+    this.activeOperations.clear();
+    this.uploadProgressCallbacks.clear();
+    this.downloadProgressCallbacks.clear();
+  }
+  
+  /**
+   * Get active operation count
+   */
+  getActiveOperationCount(): number {
+    return this.activeOperations.size;
+  }
+  
+  /**
+   * Validate file for security issues
+   */
+  validateFileForSecurity(file: File): SecurityValidationResult {
+    return validateFileName(file.name);
+  }
+  
+  /**
+   * Format file size for display
+   */
+  formatFileSize(bytes: number): string {
+    return formatFileSize(bytes);
+  }
+  
+  /**
+   * Detect content type from filename
+   */
+  detectContentType(fileName: string): string {
+    return detectContentType(fileName);
+  }
+  
+  /**
+   * Build absolute file URL
+   */
+  buildFileUrl(relativePath: string, params?: KeyValuePair[]): string {
+    return buildAbsoluteFileUrl(relativePath, params);
+  }
+}
+
+// =============================================================================
+// FACTORY FUNCTION AND EXPORTS
+// =============================================================================
+
+/**
+ * Create new FileClient instance with configuration
+ */
+export function createFileClient(
+  baseUrl?: string,
+  authContext?: AuthContext
+): FileClient {
+  return new FileClient(baseUrl, authContext);
+}
+
+// Export types and utilities
 export type {
-  FileService,
-  FileItem,
-  CreateDirectoryPayload,
-  FileUploadResult,
-  FileListingOptions,
-  FileValidationResult,
+  FileOperationType,
+  FileChunk,
+  DirectoryItem,
+  DirectoryListing,
+  SecurityValidationResult,
+  FileOperationProgress,
 };
+
+export {
+  FILE_CONFIG,
+  FILE_ENDPOINTS,
+  generateFileOperationId,
+  calculateFileChunks,
+  validateFileName,
+  detectContentType,
+  formatFileSize,
+  calculateTransferStats,
+  buildAbsoluteFileUrl,
+};
+
+export default FileClient;
