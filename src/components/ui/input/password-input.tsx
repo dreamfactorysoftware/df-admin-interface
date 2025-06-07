@@ -1,569 +1,746 @@
-'use client';
+"use client";
+
+import React, { forwardRef, useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { Eye, EyeOff, Shield, AlertTriangle, CheckCircle2, X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useTheme } from "@/hooks/use-theme";
+import type { InputProps } from "./input.types";
 
 /**
- * Password Input Component
+ * Password Input Component for DreamFactory Admin Interface
  * 
- * Enhanced password input with show/hide toggle, strength meter, and security features.
- * Provides comprehensive UX for password entry with proper accessibility and security
- * considerations for authentication workflows.
+ * Comprehensive password input with show/hide toggle, strength meter, and security features.
+ * Implements WCAG 2.1 AA accessibility compliance with proper password input handling.
  * 
  * Features:
- * - Show/hide toggle with eye icon
- * - Password strength meter with visual and textual feedback
+ * - Show/hide toggle with focus and cursor position preservation
+ * - Visual and textual password strength feedback
  * - Security features (paste prevention, autocomplete control)
- * - Real-time validation with immediate feedback
- * - Password confirmation matching
- * - WCAG 2.1 AA accessibility compliance
+ * - Real-time password validation with actionable feedback
+ * - Password confirmation matching with live validation
+ * - WCAG 2.1 AA accessibility with proper announcements
  * - Secure focus handling and value masking
  * - Password manager integration support
  * 
- * @fileoverview Password input component for secure authentication
+ * @see Technical Specification Section 7.7.1 for design tokens
+ * @see WCAG 2.1 AA Guidelines for password input accessibility
+ * 
+ * @fileoverview Enhanced password input component with security and UX features
  * @version 1.0.0
+ * @since React 19.0.0, Next.js 15.1+, TypeScript 5.8+
  */
 
-import React, { 
-  forwardRef, 
-  useState, 
-  useCallback, 
-  useEffect, 
-  useMemo,
-  useRef,
-  type ForwardedRef,
-  type KeyboardEvent,
-  type ClipboardEvent,
-  type ChangeEvent,
-  type FocusEvent 
-} from 'react';
-import { EyeIcon, EyeSlashIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
-import { cn } from '@/lib/utils';
-import type { InputProps, ValidationState } from '@/types/ui';
+// =============================================================================
+// TYPES AND INTERFACES
+// =============================================================================
 
 /**
- * Password strength levels for validation feedback
+ * Password strength levels with corresponding feedback
  */
-export type PasswordStrength = 'weak' | 'fair' | 'good' | 'strong' | 'excellent';
+export type PasswordStrength = 'none' | 'weak' | 'fair' | 'good' | 'strong';
 
 /**
  * Password validation rule configuration
  */
 export interface PasswordRule {
-  /** Rule identifier */
+  /** Unique identifier for the rule */
   id: string;
-  /** Rule description for display */
+  /** Human-readable description of the rule */
   label: string;
-  /** Validation function */
+  /** Function to test if password meets this rule */
   test: (password: string) => boolean;
-  /** Required for minimum strength */
+  /** Whether this rule is required for form submission */
   required?: boolean;
+  /** Detailed explanation for screen readers */
+  description?: string;
 }
 
 /**
- * Password input component props
+ * Password strength configuration
  */
-export interface PasswordInputProps extends Omit<InputProps, 'type' | 'showPasswordToggle'> {
-  /** Show password strength meter */
-  showStrengthMeter?: boolean;
-  /** Password validation rules */
-  validationRules?: PasswordRule[];
-  /** Minimum required strength level */
-  minStrength?: PasswordStrength;
-  /** Confirmation password for matching validation */
-  confirmValue?: string;
-  /** Enable password confirmation mode */
-  isConfirmation?: boolean;
+export interface PasswordStrengthConfig {
+  /** Show visual strength meter */
+  showMeter?: boolean;
+  /** Show textual strength feedback */
+  showText?: boolean;
+  /** Custom strength calculation function */
+  calculateStrength?: (password: string, rules: PasswordRule[]) => PasswordStrength;
+  /** Custom strength messages */
+  strengthMessages?: Record<PasswordStrength, string>;
+}
+
+/**
+ * Security configuration for password input
+ */
+export interface PasswordSecurityConfig {
   /** Prevent paste operations for security */
   preventPaste?: boolean;
-  /** Custom autocomplete value */
-  autoComplete?: 'new-password' | 'current-password' | 'off';
-  /** Mask value in accessibility announcements */
-  maskValueInAnnouncements?: boolean;
-  /** Show validation rules checklist */
-  showValidationRules?: boolean;
-  /** Focus management configuration */
-  focusManagement?: {
-    /** Maintain cursor position on visibility toggle */
-    maintainCursorPosition?: boolean;
-    /** Auto-focus on mount */
-    autoFocus?: boolean;
+  /** Disable autocomplete (overrides browser behavior) */
+  disableAutocomplete?: boolean;
+  /** Clear input on window blur for security */
+  clearOnBlur?: boolean;
+  /** Mask value in dev tools and browser history */
+  maskValue?: boolean;
+  /** Custom password manager hint */
+  passwordManagerHint?: string;
+}
+
+/**
+ * Password confirmation configuration
+ */
+export interface PasswordConfirmationConfig {
+  /** Password to match against */
+  matchPassword?: string;
+  /** Custom mismatch error message */
+  mismatchMessage?: string;
+  /** Show real-time matching feedback */
+  showMatchFeedback?: boolean;
+}
+
+/**
+ * Enhanced password input props
+ */
+export interface PasswordInputProps extends Omit<InputProps, 'type' | 'showPasswordToggle'> {
+  /** Current password value */
+  value?: string;
+  
+  /** Change handler for password value */
+  onValueChange?: (value: string) => void;
+  
+  /** Password validation rules */
+  rules?: PasswordRule[];
+  
+  /** Password strength configuration */
+  strengthConfig?: PasswordStrengthConfig;
+  
+  /** Security configuration */
+  securityConfig?: PasswordSecurityConfig;
+  
+  /** Password confirmation configuration */
+  confirmationConfig?: PasswordConfirmationConfig;
+  
+  /** Show password requirements list */
+  showRequirements?: boolean;
+  
+  /** Validation triggered callback */
+  onValidation?: (isValid: boolean, strength: PasswordStrength, failedRules: PasswordRule[]) => void;
+  
+  /** Custom password visibility toggle aria-label */
+  toggleAriaLabel?: string;
+  
+  /** Enable enhanced security mode */
+  enhancedSecurity?: boolean;
+  
+  /** Custom strength meter colors */
+  strengthColors?: {
+    none: string;
+    weak: string;
+    fair: string;
+    good: string;
+    strong: string;
   };
 }
 
+// =============================================================================
+// DEFAULT CONFIGURATIONS
+// =============================================================================
+
 /**
- * Default password validation rules following security best practices
+ * Default password validation rules
  */
 const DEFAULT_PASSWORD_RULES: PasswordRule[] = [
   {
-    id: 'length',
-    label: 'At least 8 characters long',
+    id: 'minLength',
+    label: 'At least 8 characters',
+    description: 'Password must contain at least 8 characters',
     test: (password) => password.length >= 8,
     required: true,
   },
   {
     id: 'uppercase',
-    label: 'Contains uppercase letter',
+    label: 'One uppercase letter',
+    description: 'Password must contain at least one uppercase letter',
     test: (password) => /[A-Z]/.test(password),
     required: true,
   },
   {
     id: 'lowercase',
-    label: 'Contains lowercase letter',
+    label: 'One lowercase letter',
+    description: 'Password must contain at least one lowercase letter',
     test: (password) => /[a-z]/.test(password),
     required: true,
   },
   {
     id: 'number',
-    label: 'Contains number',
+    label: 'One number',
+    description: 'Password must contain at least one number',
     test: (password) => /\d/.test(password),
     required: true,
   },
   {
     id: 'special',
-    label: 'Contains special character',
+    label: 'One special character',
+    description: 'Password must contain at least one special character (!@#$%^&*)',
     test: (password) => /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password),
+    required: false,
   },
   {
     id: 'noSpaces',
     label: 'No spaces',
+    description: 'Password cannot contain spaces',
     test: (password) => !/\s/.test(password),
+    required: true,
   },
 ];
 
 /**
- * Calculate password strength based on validation rules
+ * Default strength messages
  */
-function calculatePasswordStrength(
-  password: string, 
+const DEFAULT_STRENGTH_MESSAGES: Record<PasswordStrength, string> = {
+  none: 'Enter a password',
+  weak: 'Weak password',
+  fair: 'Fair password',
+  good: 'Good password',
+  strong: 'Strong password',
+};
+
+/**
+ * Default strength colors for meter
+ */
+const DEFAULT_STRENGTH_COLORS = {
+  none: 'bg-gray-200 dark:bg-gray-700',
+  weak: 'bg-red-500',
+  fair: 'bg-orange-500',
+  good: 'bg-yellow-500',
+  strong: 'bg-green-500',
+};
+
+// =============================================================================
+// UTILITY FUNCTIONS
+// =============================================================================
+
+/**
+ * Calculate password strength based on rules
+ */
+const calculatePasswordStrength = (
+  password: string,
   rules: PasswordRule[]
-): { strength: PasswordStrength; score: number; passedRules: number } {
-  if (!password) {
-    return { strength: 'weak', score: 0, passedRules: 0 };
-  }
-
-  const passedRules = rules.filter(rule => rule.test(password)).length;
-  const totalRules = rules.length;
-  const score = Math.round((passedRules / totalRules) * 100);
-
-  let strength: PasswordStrength;
-  if (score >= 90) strength = 'excellent';
-  else if (score >= 75) strength = 'strong';
-  else if (score >= 60) strength = 'good';
-  else if (score >= 40) strength = 'fair';
-  else strength = 'weak';
-
-  return { strength, score, passedRules };
-}
+): PasswordStrength => {
+  if (!password) return 'none';
+  
+  const passedRules = rules.filter(rule => rule.test(password));
+  const passedRequired = rules.filter(rule => rule.required && rule.test(password));
+  const totalRequired = rules.filter(rule => rule.required).length;
+  
+  // Calculate strength based on passed rules
+  const strength = passedRules.length / rules.length;
+  const requiredMet = passedRequired.length >= totalRequired;
+  
+  if (!requiredMet) return 'weak';
+  if (strength >= 0.9) return 'strong';
+  if (strength >= 0.7) return 'good';
+  if (strength >= 0.5) return 'fair';
+  return 'weak';
+};
 
 /**
- * Get strength meter color classes based on strength level
+ * Generate secure ID for form elements
  */
-function getStrengthColors(strength: PasswordStrength): {
-  bg: string;
-  text: string;
-  border: string;
-} {
-  switch (strength) {
-    case 'excellent':
-      return {
-        bg: 'bg-emerald-500',
-        text: 'text-emerald-700 dark:text-emerald-400',
-        border: 'border-emerald-500',
-      };
-    case 'strong':
-      return {
-        bg: 'bg-green-500',
-        text: 'text-green-700 dark:text-green-400',
-        border: 'border-green-500',
-      };
-    case 'good':
-      return {
-        bg: 'bg-blue-500',
-        text: 'text-blue-700 dark:text-blue-400',
-        border: 'border-blue-500',
-      };
-    case 'fair':
-      return {
-        bg: 'bg-yellow-500',
-        text: 'text-yellow-700 dark:text-yellow-400',
-        border: 'border-yellow-500',
-      };
-    case 'weak':
-    default:
-      return {
-        bg: 'bg-red-500',
-        text: 'text-red-700 dark:text-red-400',
-        border: 'border-red-500',
-      };
-  }
-}
+const generateSecureId = (): string => {
+  return `password-${Math.random().toString(36).substr(2, 9)}`;
+};
 
 /**
- * Password Input Component
- * 
- * Provides secure password input with comprehensive validation, accessibility,
- * and user experience features for authentication workflows.
+ * Announce to screen readers
+ */
+const announceToScreenReader = (message: string): void => {
+  const announcement = document.createElement('div');
+  announcement.setAttribute('aria-live', 'polite');
+  announcement.setAttribute('aria-atomic', 'true');
+  announcement.className = 'sr-only';
+  announcement.textContent = message;
+  document.body.appendChild(announcement);
+  
+  // Remove after announcement
+  setTimeout(() => {
+    if (document.body.contains(announcement)) {
+      document.body.removeChild(announcement);
+    }
+  }, 1000);
+};
+
+// =============================================================================
+// MAIN COMPONENT
+// =============================================================================
+
+/**
+ * PasswordInput component with comprehensive security and UX features
  */
 export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
-  function PasswordInput(
+  (
     {
-      className,
       value = '',
+      onValueChange,
       onChange,
-      onFocus,
-      onBlur,
-      placeholder = 'Enter password',
-      disabled = false,
-      required = false,
-      error,
-      success,
-      helperText,
-      showStrengthMeter = false,
-      validationRules = DEFAULT_PASSWORD_RULES,
-      minStrength = 'good',
-      confirmValue,
-      isConfirmation = false,
-      preventPaste = false,
-      autoComplete = 'new-password',
-      maskValueInAnnouncements = true,
-      showValidationRules = false,
-      focusManagement = {
-        maintainCursorPosition: true,
-        autoFocus: false,
-      },
-      'aria-label': ariaLabel,
+      rules = DEFAULT_PASSWORD_RULES,
+      strengthConfig = {},
+      securityConfig = {},
+      confirmationConfig = {},
+      showRequirements = true,
+      onValidation,
+      toggleAriaLabel,
+      enhancedSecurity = false,
+      strengthColors = DEFAULT_STRENGTH_COLORS,
+      className,
+      containerClassName,
+      labelClassName,
+      helperClassName,
+      errorClassName,
+      disabled,
       'aria-describedby': ariaDescribedBy,
+      'aria-invalid': ariaInvalid,
+      'aria-errormessage': ariaErrorMessage,
       'data-testid': testId,
-      ...inputProps
+      ...props
     },
-    ref: ForwardedRef<HTMLInputElement>
-  ) {
-    // State management
+    ref
+  ) => {
+    // =============================================================================
+    // HOOKS AND STATE
+    // =============================================================================
+    
+    const { resolvedTheme } = useTheme();
     const [isVisible, setIsVisible] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
-    const [cursorPosition, setCursorPosition] = useState<number | null>(null);
-    const internalRef = useRef<HTMLInputElement>(null);
+    const [selectionRange, setSelectionRange] = useState<[number, number] | null>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+    const toggleButtonRef = useRef<HTMLButtonElement>(null);
     
-    // Merge refs for internal and external access
-    const inputRef = (ref || internalRef) as React.RefObject<HTMLInputElement>;
+    // Generate stable IDs for accessibility
+    const ids = useMemo(() => ({
+      input: generateSecureId(),
+      requirements: `${generateSecureId()}-requirements`,
+      strength: `${generateSecureId()}-strength`,
+      toggle: `${generateSecureId()}-toggle`,
+      error: `${generateSecureId()}-error`,
+    }), []);
 
-    // Password strength calculation
-    const strengthData = useMemo(() => {
-      if (!showStrengthMeter || isConfirmation) return null;
-      return calculatePasswordStrength(value, validationRules);
-    }, [value, validationRules, showStrengthMeter, isConfirmation]);
+    // =============================================================================
+    // CONFIGURATION
+    // =============================================================================
+    
+    const {
+      showMeter = true,
+      showText = true,
+      calculateStrength: customCalculateStrength,
+      strengthMessages = DEFAULT_STRENGTH_MESSAGES,
+    } = strengthConfig;
 
-    // Validation state calculation
-    const validationState = useMemo((): ValidationState => {
-      const hasValue = Boolean(value);
-      let isValid = true;
-      let validationError = error;
+    const {
+      preventPaste = enhancedSecurity,
+      disableAutocomplete = enhancedSecurity,
+      clearOnBlur = enhancedSecurity,
+      maskValue = enhancedSecurity,
+      passwordManagerHint = 'current-password',
+    } = securityConfig;
 
-      // Password confirmation validation
-      if (isConfirmation && confirmValue !== undefined) {
-        isValid = value === confirmValue;
-        if (!isValid && hasValue) {
-          validationError = 'Passwords do not match';
-        }
+    const {
+      matchPassword,
+      mismatchMessage = 'Passwords do not match',
+      showMatchFeedback = true,
+    } = confirmationConfig;
+
+    // =============================================================================
+    // COMPUTED VALUES
+    // =============================================================================
+    
+    const passwordStrength = useMemo(() => {
+      if (customCalculateStrength) {
+        return customCalculateStrength(value, rules);
       }
-      // Strength validation for new passwords
-      else if (showStrengthMeter && strengthData && hasValue) {
-        const requiredRules = validationRules.filter(rule => rule.required);
-        const passedRequiredRules = requiredRules.filter(rule => rule.test(value));
-        
-        if (passedRequiredRules.length < requiredRules.length) {
-          isValid = false;
-          if (!validationError) {
-            validationError = 'Password does not meet minimum requirements';
-          }
-        } else {
-          const strengthLevels: PasswordStrength[] = ['weak', 'fair', 'good', 'strong', 'excellent'];
-          const minIndex = strengthLevels.indexOf(minStrength);
-          const currentIndex = strengthLevels.indexOf(strengthData.strength);
-          
-          if (currentIndex < minIndex) {
-            isValid = false;
-            if (!validationError) {
-              validationError = `Password must be at least ${minStrength} strength`;
-            }
-          }
-        }
-      }
+      return calculatePasswordStrength(value, rules);
+    }, [value, rules, customCalculateStrength]);
+
+    const failedRules = useMemo(() => {
+      return rules.filter(rule => !rule.test(value));
+    }, [value, rules]);
+
+    const isValid = useMemo(() => {
+      const requiredRules = rules.filter(rule => rule.required);
+      return requiredRules.every(rule => rule.test(value));
+    }, [value, rules]);
+
+    const passwordsMatch = useMemo(() => {
+      if (!matchPassword) return true;
+      return value === matchPassword;
+    }, [value, matchPassword]);
+
+    const hasError = useMemo(() => {
+      return (!isValid && value.length > 0) || (!passwordsMatch && showMatchFeedback);
+    }, [isValid, value.length, passwordsMatch, showMatchFeedback]);
+
+    const strengthPercentage = useMemo(() => {
+      const strengthMap: Record<PasswordStrength, number> = {
+        none: 0,
+        weak: 25,
+        fair: 50,
+        good: 75,
+        strong: 100,
+      };
+      return strengthMap[passwordStrength];
+    }, [passwordStrength]);
+
+    // =============================================================================
+    // ACCESSIBILITY ATTRIBUTES
+    // =============================================================================
+    
+    const accessibilityProps = useMemo(() => {
+      const describedByIds = [
+        ariaDescribedBy,
+        showRequirements ? ids.requirements : null,
+        showMeter || showText ? ids.strength : null,
+      ].filter(Boolean).join(' ');
 
       return {
-        isValid,
-        isDirty: hasValue,
-        isTouched: isFocused,
-        error: validationError,
+        'aria-describedby': describedByIds || undefined,
+        'aria-invalid': hasError || ariaInvalid,
+        'aria-errormessage': hasError ? (ariaErrorMessage || ids.error) : undefined,
+        'aria-required': props.required,
       };
-    }, [
-      value,
-      error,
-      isConfirmation,
-      confirmValue,
-      showStrengthMeter,
-      strengthData,
-      validationRules,
-      minStrength,
-      isFocused,
-    ]);
+    }, [ariaDescribedBy, showRequirements, showMeter, showText, ids, hasError, ariaInvalid, ariaErrorMessage, props.required]);
 
-    // Accessibility announcements
-    const strengthAnnouncement = useMemo(() => {
-      if (!strengthData || !maskValueInAnnouncements) return '';
-      return `Password strength: ${strengthData.strength}. ${strengthData.passedRules} of ${validationRules.length} requirements met.`;
-    }, [strengthData, maskValueInAnnouncements, validationRules.length]);
-
-    // Toggle password visibility with cursor position preservation
-    const toggleVisibility = useCallback(() => {
-      if (focusManagement.maintainCursorPosition && inputRef.current) {
-        setCursorPosition(inputRef.current.selectionStart);
+    // =============================================================================
+    // EVENT HANDLERS
+    // =============================================================================
+    
+    const handleInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+      const newValue = event.target.value;
+      
+      // Store cursor position for visibility toggle
+      const input = event.target;
+      if (input.selectionStart !== null && input.selectionEnd !== null) {
+        setSelectionRange([input.selectionStart, input.selectionEnd]);
       }
-      setIsVisible(prev => !prev);
-    }, [focusManagement.maintainCursorPosition, inputRef]);
+      
+      // Update value
+      onValueChange?.(newValue);
+      onChange?.(event);
+    }, [onValueChange, onChange]);
 
-    // Restore cursor position after visibility toggle
-    useEffect(() => {
-      if (
-        cursorPosition !== null && 
-        inputRef.current && 
-        focusManagement.maintainCursorPosition
-      ) {
-        requestAnimationFrame(() => {
-          if (inputRef.current) {
-            inputRef.current.setSelectionRange(cursorPosition, cursorPosition);
-            setCursorPosition(null);
-          }
-        });
-      }
-    }, [isVisible, cursorPosition, focusManagement.maintainCursorPosition, inputRef]);
-
-    // Event handlers
-    const handleChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
-      onChange?.(event.target.value);
-    }, [onChange]);
-
-    const handleFocus = useCallback((event: FocusEvent<HTMLInputElement>) => {
+    const handleInputFocus = useCallback((event: React.FocusEvent<HTMLInputElement>) => {
       setIsFocused(true);
-      onFocus?.(event);
-    }, [onFocus]);
+      props.onFocus?.(event);
+    }, [props]);
 
-    const handleBlur = useCallback((event: FocusEvent<HTMLInputElement>) => {
+    const handleInputBlur = useCallback((event: React.FocusEvent<HTMLInputElement>) => {
       setIsFocused(false);
-      onBlur?.(event);
-    }, [onBlur]);
-
-    const handleKeyDown = useCallback((event: KeyboardEvent<HTMLInputElement>) => {
-      // Allow keyboard shortcuts but prevent clipboard operations if configured
-      if (preventPaste && (event.ctrlKey || event.metaKey) && event.key === 'v') {
-        event.preventDefault();
-        return;
+      
+      // Clear password on blur if enhanced security is enabled
+      if (clearOnBlur && value) {
+        onValueChange?.('');
+        announceToScreenReader('Password cleared for security');
       }
-    }, [preventPaste]);
+      
+      props.onBlur?.(event);
+    }, [clearOnBlur, value, onValueChange, props]);
 
-    const handlePaste = useCallback((event: ClipboardEvent<HTMLInputElement>) => {
+    const handlePaste = useCallback((event: React.ClipboardEvent<HTMLInputElement>) => {
       if (preventPaste) {
         event.preventDefault();
+        announceToScreenReader('Paste disabled for security');
+        return;
       }
-    }, [preventPaste]);
+      props.onPaste?.(event);
+    }, [preventPaste, props]);
 
-    // Component styling
-    const inputClasses = cn(
-      // Base input styling
-      'flex h-12 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm',
-      'ring-offset-white placeholder:text-gray-500',
-      'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
-      'disabled:cursor-not-allowed disabled:opacity-50',
-      'dark:border-gray-600 dark:bg-gray-900 dark:ring-offset-gray-900',
-      'dark:placeholder:text-gray-400 dark:focus:ring-primary-400',
+    const toggleVisibility = useCallback(() => {
+      const newVisible = !isVisible;
+      setIsVisible(newVisible);
       
-      // Validation states
-      {
-        'border-red-500 focus:ring-red-500 dark:border-red-400 dark:focus:ring-red-400':
-          validationState.error && !isFocused,
-        'border-green-500 focus:ring-green-500 dark:border-green-400 dark:focus:ring-green-400':
-          success && !validationState.error,
-      },
+      // Restore cursor position after toggle
+      setTimeout(() => {
+        const input = inputRef.current;
+        if (input && selectionRange) {
+          input.focus();
+          input.setSelectionRange(selectionRange[0], selectionRange[1]);
+        }
+      }, 0);
       
-      // Add padding for suffix (toggle button)
-      'pr-12',
+      // Announce visibility change
+      const message = newVisible 
+        ? 'Password is now visible' 
+        : 'Password is now hidden';
+      announceToScreenReader(message);
+    }, [isVisible, selectionRange]);
+
+    const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
+      // Allow Escape to hide password if visible
+      if (event.key === 'Escape' && isVisible) {
+        setIsVisible(false);
+        announceToScreenReader('Password hidden');
+      }
       
-      className
-    );
+      props.onKeyDown?.(event);
+    }, [isVisible, props]);
 
-    const strengthColors = strengthData ? getStrengthColors(strengthData.strength) : null;
+    // =============================================================================
+    // EFFECTS
+    // =============================================================================
+    
+    // Trigger validation callback when validation state changes
+    useEffect(() => {
+      onValidation?.(isValid && passwordsMatch, passwordStrength, failedRules);
+    }, [isValid, passwordsMatch, passwordStrength, failedRules, onValidation]);
 
-    // Generate unique IDs for accessibility
-    const inputId = inputProps.id || `password-input-${Math.random().toString(36).substr(2, 9)}`;
-    const strengthId = `${inputId}-strength`;
-    const rulesId = `${inputId}-rules`;
-    const errorId = `${inputId}-error`;
-    const helperId = `${inputId}-helper`;
+    // Imperative handle for ref
+    React.useImperativeHandle(ref, () => inputRef.current!, []);
 
-    // Build aria-describedby list
-    const describedByIds = [
-      ariaDescribedBy,
-      strengthData && strengthId,
-      showValidationRules && rulesId,
-      validationState.error && errorId,
-      helperText && helperId,
-    ].filter(Boolean).join(' ');
+    // =============================================================================
+    // RENDER HELPERS
+    // =============================================================================
+    
+    const renderPasswordRequirements = () => {
+      if (!showRequirements || rules.length === 0) return null;
 
+      return (
+        <div
+          id={ids.requirements}
+          className="mt-2"
+          aria-label="Password requirements"
+        >
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Password requirements:
+          </p>
+          <ul className="space-y-1">
+            {rules.map((rule) => {
+              const isPassed = rule.test(value);
+              const isRequired = rule.required;
+              
+              return (
+                <li
+                  key={rule.id}
+                  className={cn(
+                    "flex items-center text-sm transition-colors duration-200",
+                    isPassed
+                      ? "text-green-600 dark:text-green-400"
+                      : isRequired
+                      ? "text-red-600 dark:text-red-400"
+                      : "text-gray-500 dark:text-gray-400"
+                  )}
+                >
+                  {isPassed ? (
+                    <CheckCircle2 className="w-4 h-4 mr-2 flex-shrink-0" aria-hidden="true" />
+                  ) : isRequired ? (
+                    <X className="w-4 h-4 mr-2 flex-shrink-0" aria-hidden="true" />
+                  ) : (
+                    <div className="w-4 h-4 mr-2 flex-shrink-0 rounded-full border border-current" aria-hidden="true" />
+                  )}
+                  <span>
+                    {rule.label}
+                    {isRequired && <span className="ml-1 text-red-500">*</span>}
+                  </span>
+                  <span className="sr-only">
+                    {isPassed ? 'met' : 'not met'}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      );
+    };
+
+    const renderStrengthMeter = () => {
+      if (!showMeter && !showText) return null;
+
+      return (
+        <div
+          id={ids.strength}
+          className="mt-2"
+          aria-label={`Password strength: ${strengthMessages[passwordStrength]}`}
+        >
+          {showText && (
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Password strength
+              </span>
+              <span
+                className={cn(
+                  "text-sm font-medium",
+                  passwordStrength === 'none' && "text-gray-500 dark:text-gray-400",
+                  passwordStrength === 'weak' && "text-red-600 dark:text-red-400",
+                  passwordStrength === 'fair' && "text-orange-600 dark:text-orange-400",
+                  passwordStrength === 'good' && "text-yellow-600 dark:text-yellow-400",
+                  passwordStrength === 'strong' && "text-green-600 dark:text-green-400"
+                )}
+                aria-live="polite"
+              >
+                {strengthMessages[passwordStrength]}
+              </span>
+            </div>
+          )}
+          
+          {showMeter && (
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+              <div
+                className={cn(
+                  "h-full transition-all duration-300 ease-out",
+                  strengthColors[passwordStrength]
+                )}
+                style={{ width: `${strengthPercentage}%` }}
+                role="progressbar"
+                aria-valuenow={strengthPercentage}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label={`Password strength: ${strengthPercentage}%`}
+              />
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    const renderError = () => {
+      if (!hasError) return null;
+
+      const errorMessage = !passwordsMatch 
+        ? mismatchMessage 
+        : `Password does not meet requirements: ${failedRules.map(r => r.label).join(', ')}`;
+
+      return (
+        <div
+          id={ids.error}
+          className={cn(
+            "mt-2 flex items-center text-sm text-red-600 dark:text-red-400",
+            errorClassName
+          )}
+          role="alert"
+          aria-live="polite"
+        >
+          <AlertTriangle className="w-4 h-4 mr-2 flex-shrink-0" aria-hidden="true" />
+          {errorMessage}
+        </div>
+      );
+    };
+
+    // =============================================================================
+    // MAIN RENDER
+    // =============================================================================
+    
     return (
-      <div className="w-full space-y-2">
-        {/* Input container */}
+      <div className={cn("space-y-1", containerClassName)} data-testid={testId}>
         <div className="relative">
           <input
             ref={inputRef}
-            id={inputId}
-            type={isVisible ? 'text' : 'password'}
-            value={value}
-            onChange={handleChange}
-            onFocus={handleFocus}
-            onBlur={handleBlur}
-            onKeyDown={handleKeyDown}
+            type={isVisible ? "text" : "password"}
+            value={maskValue && !isFocused ? '•'.repeat(value.length) : value}
+            onChange={handleInputChange}
+            onFocus={handleInputFocus}
+            onBlur={handleInputBlur}
             onPaste={handlePaste}
-            placeholder={placeholder}
+            onKeyDown={handleKeyDown}
+            autoComplete={disableAutocomplete ? "off" : passwordManagerHint}
             disabled={disabled}
-            required={required}
-            autoComplete={autoComplete}
-            autoFocus={focusManagement.autoFocus}
-            className={inputClasses}
-            aria-label={ariaLabel || (isConfirmation ? 'Confirm password' : 'Password')}
-            aria-describedby={describedByIds || undefined}
-            aria-invalid={validationState.error ? 'true' : 'false'}
-            aria-required={required}
-            data-testid={testId}
-            {...inputProps}
+            className={cn(
+              // Base input styles
+              "w-full px-3 py-2 pr-12 border rounded-md shadow-sm transition-colors duration-200",
+              "text-sm placeholder-gray-400 dark:placeholder-gray-500",
+              "min-h-[44px]", // WCAG touch target minimum
+              
+              // Focus states
+              "focus:outline-none focus:ring-2 focus:ring-offset-2",
+              "focus:border-primary-500 focus:ring-primary-500",
+              
+              // Theme variants
+              "bg-white dark:bg-gray-900",
+              "border-gray-300 dark:border-gray-600",
+              "text-gray-900 dark:text-gray-100",
+              
+              // Error states
+              hasError && [
+                "border-red-500 dark:border-red-400",
+                "focus:border-red-500 focus:ring-red-500",
+              ],
+              
+              // Disabled state
+              disabled && [
+                "opacity-50 cursor-not-allowed",
+                "bg-gray-50 dark:bg-gray-800",
+              ],
+              
+              className
+            )}
+            {...accessibilityProps}
+            {...props}
           />
-
-          {/* Password visibility toggle button */}
+          
+          {/* Password toggle button */}
           <button
+            ref={toggleButtonRef}
             type="button"
             onClick={toggleVisibility}
             disabled={disabled}
             className={cn(
-              'absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5',
-              'text-gray-500 hover:text-gray-700 focus:outline-none',
-              'focus:ring-2 focus:ring-primary-500 focus:ring-offset-1 rounded',
-              'disabled:opacity-50 disabled:cursor-not-allowed',
-              'dark:text-gray-400 dark:hover:text-gray-300'
+              "absolute inset-y-0 right-0 flex items-center justify-center w-12",
+              "text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300",
+              "transition-colors duration-200",
+              "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500",
+              "disabled:opacity-50 disabled:cursor-not-allowed",
+              // Ensure minimum touch target
+              "min-w-[44px] min-h-[44px]"
             )}
-            aria-label={isVisible ? 'Hide password' : 'Show password'}
+            aria-label={
+              toggleAriaLabel || 
+              (isVisible ? "Hide password" : "Show password")
+            }
             aria-pressed={isVisible}
-            tabIndex={-1} // Remove from tab order to avoid focus conflicts
+            tabIndex={disabled ? -1 : 0}
           >
             {isVisible ? (
-              <EyeSlashIcon className="h-5 w-5" aria-hidden="true" />
+              <EyeOff className="w-5 h-5" aria-hidden="true" />
             ) : (
-              <EyeIcon className="h-5 w-5" aria-hidden="true" />
+              <Eye className="w-5 h-5" aria-hidden="true" />
             )}
           </button>
         </div>
 
+        {/* Enhanced security indicator */}
+        {enhancedSecurity && (
+          <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
+            <Shield className="w-3 h-3 mr-1" aria-hidden="true" />
+            Enhanced security mode enabled
+          </div>
+        )}
+
         {/* Password strength meter */}
-        {strengthData && showStrengthMeter && !isConfirmation && (
-          <div 
-            id={strengthId}
-            className="space-y-2"
-            aria-live="polite"
-            aria-atomic="true"
-          >
-            {/* Strength bar */}
-            <div className="flex space-x-1">
-              {[1, 2, 3, 4, 5].map((segment) => (
-                <div
-                  key={segment}
-                  className={cn(
-                    'h-2 flex-1 rounded-full transition-colors duration-200',
-                    segment <= Math.ceil((strengthData.score / 100) * 5)
-                      ? strengthColors.bg
-                      : 'bg-gray-200 dark:bg-gray-700'
-                  )}
-                />
-              ))}
-            </div>
+        {renderStrengthMeter()}
 
-            {/* Strength label */}
-            <p className={cn('text-sm font-medium', strengthColors.text)}>
-              Password strength: {strengthData.strength} 
-              {maskValueInAnnouncements && (
-                <span className="sr-only">
-                  {strengthAnnouncement}
-                </span>
-              )}
-            </p>
-          </div>
-        )}
-
-        {/* Validation rules checklist */}
-        {showValidationRules && !isConfirmation && value && (
-          <div id={rulesId} className="space-y-1">
-            <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Password requirements:
-            </p>
-            <ul className="space-y-1 text-sm">
-              {validationRules.map((rule) => {
-                const isRulePassed = rule.test(value);
-                return (
-                  <li
-                    key={rule.id}
-                    className={cn(
-                      'flex items-center gap-2',
-                      isRulePassed
-                        ? 'text-green-700 dark:text-green-400'
-                        : 'text-gray-600 dark:text-gray-400'
-                    )}
-                  >
-                    {isRulePassed ? (
-                      <CheckCircleIcon className="h-4 w-4" aria-hidden="true" />
-                    ) : (
-                      <XCircleIcon className="h-4 w-4" aria-hidden="true" />
-                    )}
-                    <span>{rule.label}</span>
-                    <span className="sr-only">
-                      {isRulePassed ? 'Satisfied' : 'Not satisfied'}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        )}
+        {/* Password requirements */}
+        {renderPasswordRequirements()}
 
         {/* Error message */}
-        {validationState.error && (
-          <div
-            id={errorId}
-            className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400"
-            role="alert"
-            aria-live="polite"
-          >
-            <XCircleIcon className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
-            <span>{validationState.error}</span>
-          </div>
-        )}
-
-        {/* Helper text */}
-        {helperText && !validationState.error && (
-          <p
-            id={helperId}
-            className="text-sm text-gray-600 dark:text-gray-400"
-          >
-            {helperText}
-          </p>
-        )}
-
-        {/* Success message */}
-        {success && validationState.isValid && (
-          <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
-            <CheckCircleIcon className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
-            <span>Password meets all requirements</span>
-          </div>
-        )}
+        {renderError()}
       </div>
     );
   }
 );
 
-PasswordInput.displayName = 'PasswordInput';
+PasswordInput.displayName = "PasswordInput";
+
+// =============================================================================
+// EXPORTS
+// =============================================================================
 
 export default PasswordInput;
+
+export {
+  type PasswordInputProps,
+  type PasswordRule,
+  type PasswordStrength,
+  type PasswordStrengthConfig,
+  type PasswordSecurityConfig,
+  type PasswordConfirmationConfig,
+  DEFAULT_PASSWORD_RULES,
+  DEFAULT_STRENGTH_MESSAGES,
+  calculatePasswordStrength,
+};
