@@ -1,909 +1,1365 @@
 /**
- * Database service configuration fixture factory functions for testing React components
- * and API generation workflows. Provides comprehensive factory functions for creating
- * database services, connection configurations, and schema metadata to support testing
- * of database management interfaces.
- *
- * This module supports all DreamFactory database connector types including MySQL,
- * PostgreSQL, MongoDB, Oracle, SQL Server, Snowflake, and others with realistic
- * configuration data optimized for React Hook Form validation and SWR/React Query
- * caching scenarios.
+ * Database service configuration fixture factory functions for React/Next.js testing
+ * 
+ * Generates realistic database connection data for testing React components and API 
+ * generation workflows. Provides comprehensive factory functions for creating database 
+ * services, connection configurations, and schema metadata to support testing of 
+ * database management interfaces.
+ * 
+ * Features:
+ * - Multi-database type support (MySQL, PostgreSQL, MongoDB, Oracle, Snowflake)
+ * - Connection validation result generation for testing database connectivity scenarios
+ * - Schema metadata factories for testing schema discovery functionality
+ * - Connection pooling and performance tuning parameter generation
+ * - Type-safe factories compatible with React Query and SWR caching
+ * - Virtual scrolling test data for large schemas (1000+ tables)
+ * - Realistic error scenarios for comprehensive testing coverage
+ * 
+ * @see Technical Specification Section F-001 (Database Service Connection Management)
+ * @see Technical Specification Section F-002 (Schema Discovery and Browsing)
  */
 
-import type {
-  DatabaseService,
-  DatabaseConnection,
-  ConnectionConfig,
-  ConnectionTestResult,
+import { 
+  DatabaseConfig,
   DatabaseType,
-  DatabaseSchema,
-  TableMetadata,
-  FieldMetadata,
-  RelationshipMetadata,
-  ConnectionPoolConfig,
+  DatabaseService,
+  DatabaseServiceType,
+  MySQLConfig,
+  PostgreSQLConfig,
+  MongoDBConfig,
+  OracleConfig,
+  SnowflakeConfig,
+  ConnectionTestRequest,
+  ConnectionTestResult,
+  ConnectionCapabilities,
   SSLConfig,
-} from '@/types/database';
-import type {
-  Service,
-  ServiceType,
-  ConfigSchema,
-} from '@/types/service';
-import type {
+  PoolingConfig,
+  DEFAULT_DATABASE_CONFIGS,
+  DATABASE_TYPE_METADATA,
+} from '../../types/database';
+
+import {
+  SchemaData,
   SchemaTable,
   SchemaField,
-  SchemaRelationship,
-  TableRelatedType,
-} from '@/types/schema';
+  TableRelated,
+  SchemaView,
+  StoredProcedure,
+  DatabaseFunction,
+  Sequence,
+  SchemaLoadingState,
+  ProgressiveSchemaData,
+  VirtualScrollItem,
+  SchemaPerformanceMetrics,
+  TreeNodeType,
+  SchemaTreeNode,
+} from '../../types/schema';
+
+import { createCompleteTestDataSet } from '../utils/component-factories';
+
+// =============================================================================
+// DATABASE SERVICE FACTORY FUNCTIONS
+// =============================================================================
 
 /**
- * Default factory options for database service creation
+ * Base database service factory function
+ * Creates a complete database service configuration with all required metadata
  */
-interface DatabaseFactoryOptions {
-  id?: number;
-  active?: boolean;
-  mutable?: boolean;
-  deletable?: boolean;
-  withAdvancedConfig?: boolean;
-  withConnectionPool?: boolean;
-  withSSL?: boolean;
-  includeTestResults?: boolean;
-}
-
-/**
- * Connection configuration factory options
- */
-interface ConnectionConfigOptions {
-  type: DatabaseType;
-  includeOptionalFields?: boolean;
-  withSSL?: boolean;
-  withConnectionPool?: boolean;
-  withCaching?: boolean;
-}
-
-/**
- * Schema factory options for generating table and field metadata
- */
-interface SchemaFactoryOptions {
-  tableCount?: number;
-  fieldsPerTable?: number;
-  includeRelationships?: boolean;
-  includeIndexes?: boolean;
-  includeConstraints?: boolean;
-  withLargeDataset?: boolean;
-}
-
-/**
- * Connection test result factory options
- */
-interface TestResultOptions {
-  success?: boolean;
-  timeout?: boolean;
-  withPerformanceMetrics?: boolean;
-  customError?: string;
-}
-
-/**
- * Supported database types with their specific characteristics
- */
-const DATABASE_TYPES: Record<DatabaseType, {
-  defaultPort: number;
-  driver: string;
-  supportsTransactions: boolean;
-  supportsSchemas: boolean;
-}> = {
-  mysql: {
-    defaultPort: 3306,
-    driver: 'mysql',
-    supportsTransactions: true,
-    supportsSchemas: true,
-  },
-  postgresql: {
-    defaultPort: 5432,
-    driver: 'pgsql',
-    supportsTransactions: true,
-    supportsSchemas: true,
-  },
-  mongodb: {
-    defaultPort: 27017,
-    driver: 'mongodb',
-    supportsTransactions: true,
-    supportsSchemas: false,
-  },
-  sqlite: {
-    defaultPort: 0,
-    driver: 'sqlite',
-    supportsTransactions: true,
-    supportsSchemas: false,
-  },
-  oracle: {
-    defaultPort: 1521,
-    driver: 'oci',
-    supportsTransactions: true,
-    supportsSchemas: true,
-  },
-  sqlserver: {
-    defaultPort: 1433,
-    driver: 'sqlsrv',
-    supportsTransactions: true,
-    supportsSchemas: true,
-  },
-  snowflake: {
-    defaultPort: 443,
-    driver: 'snowflake',
-    supportsTransactions: true,
-    supportsSchemas: true,
-  },
-  mariadb: {
-    defaultPort: 3306,
-    driver: 'mysql',
-    supportsTransactions: true,
-    supportsSchemas: true,
-  },
-  ibmdb2: {
-    defaultPort: 50000,
-    driver: 'ibm',
-    supportsTransactions: true,
-    supportsSchemas: true,
-  },
-};
-
-/**
- * Sample database schemas for different use cases
- */
-const SAMPLE_SCHEMAS = {
-  ecommerce: ['users', 'products', 'orders', 'order_items', 'categories', 'reviews'],
-  crm: ['contacts', 'companies', 'opportunities', 'activities', 'tasks', 'notes'],
-  blog: ['posts', 'authors', 'categories', 'tags', 'comments', 'media'],
-  inventory: ['items', 'warehouses', 'suppliers', 'purchase_orders', 'stock_movements'],
-  analytics: ['events', 'users', 'sessions', 'page_views', 'conversions', 'funnels'],
-};
-
-/**
- * Field type mappings for different database systems
- */
-const FIELD_TYPES_BY_DATABASE: Record<DatabaseType, string[]> = {
-  mysql: ['VARCHAR', 'INT', 'BIGINT', 'DECIMAL', 'TEXT', 'DATETIME', 'TIMESTAMP', 'BOOLEAN', 'JSON'],
-  postgresql: ['VARCHAR', 'INTEGER', 'BIGINT', 'NUMERIC', 'TEXT', 'TIMESTAMP', 'TIMESTAMPTZ', 'BOOLEAN', 'JSONB'],
-  mongodb: ['String', 'Number', 'Date', 'Boolean', 'Array', 'Object', 'ObjectId', 'Decimal128'],
-  sqlite: ['TEXT', 'INTEGER', 'REAL', 'BLOB', 'NUMERIC'],
-  oracle: ['VARCHAR2', 'NUMBER', 'DATE', 'TIMESTAMP', 'CLOB', 'BLOB', 'CHAR'],
-  sqlserver: ['NVARCHAR', 'INT', 'BIGINT', 'DECIMAL', 'DATETIME2', 'BIT', 'TEXT', 'UNIQUEIDENTIFIER'],
-  snowflake: ['VARCHAR', 'NUMBER', 'FLOAT', 'BOOLEAN', 'DATE', 'TIMESTAMP_NTZ', 'VARIANT', 'ARRAY'],
-  mariadb: ['VARCHAR', 'INT', 'BIGINT', 'DECIMAL', 'TEXT', 'DATETIME', 'TIMESTAMP', 'BOOLEAN', 'JSON'],
-  ibmdb2: ['VARCHAR', 'INTEGER', 'BIGINT', 'DECIMAL', 'TIMESTAMP', 'DATE', 'CLOB', 'BLOB'],
-};
-
-/**
- * Generates a realistic database service configuration for testing
- * @param type - Database type (mysql, postgresql, mongodb, etc.)
- * @param options - Configuration options for the service
- * @returns Complete database service configuration
- */
-export function databaseServiceFactory(
+export const databaseServiceFactory = (
   type: DatabaseType,
-  options: DatabaseFactoryOptions = {}
-): DatabaseService {
-  const {
-    id = Math.floor(Math.random() * 1000) + 1,
-    active = true,
-    mutable = true,
-    deletable = true,
-    withAdvancedConfig = false,
-    withConnectionPool = false,
-    withSSL = false,
-  } = options;
-
-  const dbConfig = DATABASE_TYPES[type];
-  const baseConfig = {
-    service_id: id,
-    host: type === 'sqlite' ? undefined : `${type}-server.example.com`,
-    port: type === 'sqlite' ? undefined : dbConfig.defaultPort,
-    database: type === 'sqlite' ? 'test.db' : `${type}_test_db`,
-    username: type === 'sqlite' ? undefined : `${type}_user`,
-    password: type === 'sqlite' ? undefined : 'secure_password_123',
-    max_records: 1000,
-    cache_enabled: false,
-    cache_ttl: 0,
-    options: [],
-    attributes: null,
-    statements: null,
-    allow_upsert: true,
-  };
-
-  // Add advanced configuration options
-  if (withAdvancedConfig) {
-    Object.assign(baseConfig, {
-      timezone: 'UTC',
-      charset: 'utf8mb4',
-      collation: 'utf8mb4_unicode_ci',
-      strict_mode: true,
-      fetch_mode: 'array',
-      default_schema: type === 'postgresql' ? 'public' : undefined,
-    });
-  }
-
-  // Add connection pooling configuration
-  if (withConnectionPool) {
-    Object.assign(baseConfig, {
-      max_connections: 10,
-      min_connections: 1,
-      connection_timeout: 30,
-      idle_timeout: 300,
-      pool_size: 5,
-    });
-  }
-
-  // Add SSL configuration
-  if (withSSL) {
-    Object.assign(baseConfig, {
-      ssl_enabled: true,
-      ssl_verify_cert: true,
-      ssl_ca_cert: '/path/to/ca-cert.pem',
-      ssl_client_cert: '/path/to/client-cert.pem',
-      ssl_client_key: '/path/to/client-key.pem',
-    });
-  }
-
-  return {
-    id,
-    name: `${type}_test_service`,
-    label: `Test ${dbConfig.driver.toUpperCase()} Service`,
-    description: `Test database service for ${type} connections and API generation`,
-    isActive: active,
+  overrides: Partial<DatabaseService> = {}
+): DatabaseService => {
+  const baseService: DatabaseService = {
+    id: 1,
+    name: `test-${type}-service`,
+    label: `Test ${DATABASE_TYPE_METADATA[type].label} Service`,
+    description: `Test ${type} database service for unit testing`,
     type,
-    mutable,
-    deletable,
-    createdDate: new Date().toISOString(),
-    lastModifiedDate: new Date().toISOString(),
+    isActive: true,
+    config: createDatabaseConfig(type),
+    createdDate: '2024-01-01T00:00:00.000Z',
+    lastModifiedDate: '2024-01-01T00:00:00.000Z',
     createdById: 1,
     lastModifiedById: 1,
-    config: baseConfig,
-    serviceDocByServiceId: null,
+    mutable: true,
+    deletable: true,
     refresh: false,
   };
-}
+
+  return { ...baseService, ...overrides };
+};
 
 /**
- * Generates realistic connection configuration for database testing
- * @param options - Connection configuration options
- * @returns Connection configuration object
+ * MySQL database service factory
+ * Generates MySQL-specific configuration with realistic defaults
  */
-export function connectionConfigFactory(
-  options: ConnectionConfigOptions
-): ConnectionConfig {
-  const { type, includeOptionalFields = false, withSSL = false, withConnectionPool = false, withCaching = false } = options;
-  
-  const dbConfig = DATABASE_TYPES[type];
-  const config: ConnectionConfig = {
-    host: type === 'sqlite' ? undefined : `${type}-server.example.com`,
-    port: type === 'sqlite' ? undefined : dbConfig.defaultPort,
-    database: type === 'sqlite' ? 'test.db' : `${type}_database`,
-    username: type === 'sqlite' ? undefined : `${type}_user`,
-    password: type === 'sqlite' ? undefined : 'test_password_123',
-    driver: dbConfig.driver,
+export const mysqlServiceFactory = (
+  overrides: Partial<DatabaseService> = {}
+): DatabaseService => {
+  return databaseServiceFactory('mysql', {
+    name: 'test-mysql-db',
+    label: 'Test MySQL Database',
+    config: mysqlConfigFactory(),
+    ...overrides,
+  });
+};
+
+/**
+ * PostgreSQL database service factory
+ * Generates PostgreSQL-specific configuration with realistic defaults
+ */
+export const postgresqlServiceFactory = (
+  overrides: Partial<DatabaseService> = {}
+): DatabaseService => {
+  return databaseServiceFactory('postgresql', {
+    name: 'test-postgresql-db',
+    label: 'Test PostgreSQL Database',
+    config: postgresqlConfigFactory(),
+    ...overrides,
+  });
+};
+
+/**
+ * MongoDB database service factory
+ * Generates MongoDB-specific configuration with realistic defaults
+ */
+export const mongodbServiceFactory = (
+  overrides: Partial<DatabaseService> = {}
+): DatabaseService => {
+  return databaseServiceFactory('mongodb', {
+    name: 'test-mongodb',
+    label: 'Test MongoDB Database',
+    config: mongodbConfigFactory(),
+    ...overrides,
+  });
+};
+
+/**
+ * Oracle database service factory
+ * Generates Oracle-specific configuration with realistic defaults
+ */
+export const oracleServiceFactory = (
+  overrides: Partial<DatabaseService> = {}
+): DatabaseService => {
+  return databaseServiceFactory('oracle', {
+    name: 'test-oracle-db',
+    label: 'Test Oracle Database',
+    config: oracleConfigFactory(),
+    ...overrides,
+  });
+};
+
+/**
+ * Snowflake database service factory
+ * Generates Snowflake-specific configuration with realistic defaults
+ */
+export const snowflakeServiceFactory = (
+  overrides: Partial<DatabaseService> = {}
+): DatabaseService => {
+  return databaseServiceFactory('snowflake', {
+    name: 'test-snowflake-db',
+    label: 'Test Snowflake Database',
+    config: snowflakeConfigFactory(),
+    ...overrides,
+  });
+};
+
+// =============================================================================
+// DATABASE CONFIGURATION FACTORY FUNCTIONS
+// =============================================================================
+
+/**
+ * Generic database configuration factory
+ * Creates configuration based on database type with appropriate defaults
+ */
+export const createDatabaseConfig = (
+  type: DatabaseType,
+  overrides: Partial<DatabaseConfig> = {}
+): DatabaseConfig => {
+  const configs = {
+    mysql: mysqlConfigFactory,
+    postgresql: postgresqlConfigFactory,
+    mongodb: mongodbConfigFactory,
+    oracle: oracleConfigFactory,
+    snowflake: snowflakeConfigFactory,
   };
 
-  if (includeOptionalFields) {
-    Object.assign(config, {
-      schema: type === 'postgresql' ? 'public' : undefined,
-      charset: 'utf8mb4',
-      collation: 'utf8mb4_unicode_ci',
+  const factory = configs[type];
+  return factory(overrides as any);
+};
+
+/**
+ * MySQL configuration factory
+ * Generates realistic MySQL connection parameters with security considerations
+ */
+export const mysqlConfigFactory = (
+  overrides: Partial<MySQLConfig> = {}
+): MySQLConfig => {
+  const baseConfig: MySQLConfig = {
+    name: 'test-mysql',
+    label: 'Test MySQL Connection',
+    description: 'MySQL database connection for testing',
+    type: 'mysql',
+    host: 'localhost',
+    port: 3306,
+    database: 'test_dreamfactory',
+    username: 'df_test_user',
+    password: 'secure_test_password_123',
+    isActive: true,
+    charset: 'utf8mb4',
+    timezone: 'UTC',
+    strictMode: true,
+    flags: ['FOUND_ROWS'],
+    ssl: sslConfigFactory(),
+    pooling: poolingConfigFactory(),
+    connectionTimeout: 5000,
+    queryTimeout: 30000,
+    options: {
+      autoReconnect: true,
+      reconnectDelay: 2000,
+      maxReconnects: 3,
+    },
+  };
+
+  return { ...baseConfig, ...overrides };
+};
+
+/**
+ * PostgreSQL configuration factory
+ * Generates realistic PostgreSQL connection parameters with advanced features
+ */
+export const postgresqlConfigFactory = (
+  overrides: Partial<PostgreSQLConfig> = {}
+): PostgreSQLConfig => {
+  const baseConfig: PostgreSQLConfig = {
+    name: 'test-postgresql',
+    label: 'Test PostgreSQL Connection',
+    description: 'PostgreSQL database connection for testing',
+    type: 'postgresql',
+    host: 'localhost',
+    port: 5432,
+    database: 'test_dreamfactory',
+    username: 'df_test_user',
+    password: 'secure_test_password_123',
+    isActive: true,
+    searchPath: ['public', 'test_schema'],
+    applicationName: 'DreamFactory Test Suite',
+    statementTimeout: 30000,
+    sslVerification: false,
+    ssl: sslConfigFactory({ enabled: false }),
+    pooling: poolingConfigFactory({ max: 20 }),
+    connectionTimeout: 5000,
+    queryTimeout: 30000,
+    options: {
       timezone: 'UTC',
-      options: {
-        connect_timeout: 10,
-        read_timeout: 30,
-        write_timeout: 30,
-      },
-    });
-  }
+      commandTimeout: 30000,
+      queryTimeout: 30000,
+    },
+  };
 
-  if (withSSL) {
-    config.ssl = {
-      enabled: true,
-      verify_cert: true,
-      ca_cert: '/path/to/ca-certificate.pem',
-      client_cert: '/path/to/client-certificate.pem',
-      client_key: '/path/to/client-key.pem',
-    };
-  }
-
-  if (withConnectionPool) {
-    config.pool = {
-      max_connections: 10,
-      min_connections: 2,
-      acquire_timeout: 30000,
-      idle_timeout: 300000,
-      max_lifetime: 1800000,
-    };
-  }
-
-  if (withCaching) {
-    config.cache = {
-      enabled: true,
-      ttl: 300,
-      prefix: `${type}_cache`,
-      tags: ['database', type],
-    };
-  }
-
-  return config;
-}
+  return { ...baseConfig, ...overrides };
+};
 
 /**
- * Generates database schema metadata for testing schema discovery functionality
- * @param type - Database type
- * @param options - Schema generation options
- * @returns Complete database schema with tables, fields, and relationships
+ * MongoDB configuration factory
+ * Generates realistic MongoDB connection parameters with replica set support
  */
-export function databaseSchemaFactory(
+export const mongodbConfigFactory = (
+  overrides: Partial<MongoDBConfig> = {}
+): MongoDBConfig => {
+  const baseConfig: MongoDBConfig = {
+    name: 'test-mongodb',
+    label: 'Test MongoDB Connection',
+    description: 'MongoDB database connection for testing',
+    type: 'mongodb',
+    host: 'localhost',
+    port: 27017,
+    username: 'df_test_user',
+    password: 'secure_test_password_123',
+    isActive: true,
+    uri: 'mongodb://df_test_user:secure_test_password_123@localhost:27017/test_dreamfactory',
+    defaultDatabase: 'test_dreamfactory',
+    authDatabase: 'admin',
+    replicaSet: 'rs0',
+    readPreference: 'primary',
+    writeConcern: {
+      w: 'majority',
+      j: true,
+      wtimeout: 10000,
+    },
+    ssl: sslConfigFactory({ enabled: false }),
+    pooling: poolingConfigFactory({ max: 50, min: 5 }),
+    connectionTimeout: 5000,
+    queryTimeout: 30000,
+    options: {
+      maxPoolSize: 50,
+      minPoolSize: 5,
+      maxIdleTimeMS: 30000,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+      family: 4,
+    },
+  };
+
+  return { ...baseConfig, ...overrides };
+};
+
+/**
+ * Oracle configuration factory
+ * Generates realistic Oracle connection parameters with enterprise features
+ */
+export const oracleConfigFactory = (
+  overrides: Partial<OracleConfig> = {}
+): OracleConfig => {
+  const baseConfig: OracleConfig = {
+    name: 'test-oracle',
+    label: 'Test Oracle Connection',
+    description: 'Oracle database connection for testing',
+    type: 'oracle',
+    host: 'localhost',
+    port: 1521,
+    database: 'XE',
+    username: 'df_test_user',
+    password: 'secure_test_password_123',
+    isActive: true,
+    serviceName: 'XE',
+    tnsConnectString: '(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=XE)))',
+    edition: 'standard',
+    enableWallet: false,
+    walletLocation: null,
+    ssl: sslConfigFactory({ enabled: false }),
+    pooling: poolingConfigFactory({ max: 15, min: 2 }),
+    connectionTimeout: 5000,
+    queryTimeout: 60000,
+    options: {
+      autoCommit: false,
+      maxRows: 1000,
+      outFormat: 'OBJECT',
+      fetchArraySize: 100,
+    },
+  };
+
+  return { ...baseConfig, ...overrides };
+};
+
+/**
+ * Snowflake configuration factory
+ * Generates realistic Snowflake connection parameters with cloud features
+ */
+export const snowflakeConfigFactory = (
+  overrides: Partial<SnowflakeConfig> = {}
+): SnowflakeConfig => {
+  const baseConfig: SnowflakeConfig = {
+    name: 'test-snowflake',
+    label: 'Test Snowflake Connection',
+    description: 'Snowflake data warehouse connection for testing',
+    type: 'snowflake',
+    host: 'test-account.snowflakecomputing.com',
+    port: 443,
+    database: 'TEST_DATABASE',
+    username: 'DF_TEST_USER',
+    password: 'secure_test_password_123',
+    isActive: true,
+    account: 'test-account',
+    warehouse: 'TEST_WAREHOUSE',
+    role: 'DF_ROLE',
+    sessionParameters: {
+      QUERY_TAG: 'DreamFactory_Test',
+      TIMESTAMP_OUTPUT_FORMAT: 'YYYY-MM-DD HH24:MI:SS.FF3 TZHTZM',
+      TIMESTAMP_TYPE_MAPPING: 'TIMESTAMP_NTZ',
+    },
+    privateKey: null,
+    privateKeyPassphrase: null,
+    ssl: sslConfigFactory({ enabled: true, mode: 'require' }),
+    pooling: poolingConfigFactory({ max: 10, min: 1 }),
+    connectionTimeout: 5000,
+    queryTimeout: 300000, // 5 minutes for complex queries
+    options: {
+      application: 'DreamFactory',
+      insecureConnect: false,
+      ocspFailOpen: true,
+      validateDefaultParameters: true,
+    },
+  };
+
+  return { ...baseConfig, ...overrides };
+};
+
+// =============================================================================
+// CONNECTION CONFIGURATION HELPER FACTORIES
+// =============================================================================
+
+/**
+ * SSL configuration factory
+ * Generates SSL/TLS configuration for secure database connections
+ */
+export const sslConfigFactory = (
+  overrides: Partial<SSLConfig> = {}
+): SSLConfig => {
+  const baseConfig: SSLConfig = {
+    enabled: true,
+    mode: 'prefer',
+    cert: null,
+    key: null,
+    ca: null,
+    rejectUnauthorized: false,
+    serverName: null,
+    ciphers: 'HIGH:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!SRP:!CAMELLIA',
+    minVersion: 'TLSv1.2',
+    maxVersion: 'TLSv1.3',
+  };
+
+  return { ...baseConfig, ...overrides };
+};
+
+/**
+ * Connection pooling configuration factory
+ * Generates optimized pooling settings for database connections
+ */
+export const poolingConfigFactory = (
+  overrides: Partial<PoolingConfig> = {}
+): PoolingConfig => {
+  const baseConfig: PoolingConfig = {
+    enabled: true,
+    min: 2,
+    max: 10,
+    idleTimeoutMillis: 30000,
+    acquireTimeoutMillis: 10000,
+    evictionRunIntervalMillis: 60000,
+    softIdleTimeoutMillis: 25000,
+    testOnBorrow: true,
+    testOnReturn: false,
+    testWhileIdle: true,
+    validationQuery: 'SELECT 1',
+  };
+
+  return { ...baseConfig, ...overrides };
+};
+
+// =============================================================================
+// CONNECTION TEST RESULT FACTORIES
+// =============================================================================
+
+/**
+ * Connection test result factory
+ * Generates realistic connection validation responses for testing scenarios
+ */
+export const connectionTestResultFactory = (
+  success: boolean = true,
+  overrides: Partial<ConnectionTestResult> = {}
+): ConnectionTestResult => {
+  const timestamp = new Date().toISOString();
+  const duration = success ? Math.floor(Math.random() * 1000) + 100 : 5000;
+
+  const baseResult: ConnectionTestResult = {
+    success,
+    duration,
+    timestamp,
+    message: success 
+      ? 'Connection established successfully'
+      : 'Failed to establish database connection',
+    serverVersion: success ? generateServerVersion() : undefined,
+    availableSchemas: success ? generateAvailableSchemas() : undefined,
+    capabilities: success ? connectionCapabilitiesFactory() : undefined,
+    error: success ? undefined : {
+      code: 'CONNECTION_FAILED',
+      message: 'Unable to connect to database server',
+      details: {
+        errno: 2003,
+        code: 'ER_CANT_CONNECT',
+        sqlState: 'HY000',
+        sqlMessage: 'Can\'t connect to MySQL server on \'localhost\' (10061)',
+      },
+    },
+  };
+
+  return { ...baseResult, ...overrides };
+};
+
+/**
+ * Connection test request factory
+ * Generates test requests for database connection validation
+ */
+export const connectionTestRequestFactory = (
   type: DatabaseType,
-  options: SchemaFactoryOptions = {}
-): DatabaseSchema {
-  const {
-    tableCount = 6,
-    fieldsPerTable = 5,
-    includeRelationships = true,
-    includeIndexes = true,
-    includeConstraints = true,
-    withLargeDataset = false,
-  } = options;
+  overrides: Partial<ConnectionTestRequest> = {}
+): ConnectionTestRequest => {
+  const baseRequest: ConnectionTestRequest = {
+    config: createDatabaseConfig(type),
+    timeout: 5000,
+    testSchema: true,
+    testWrite: false,
+  };
 
-  const schemaName = type === 'postgresql' ? 'public' : type === 'oracle' ? 'TESTSCHEMA' : 'test_schema';
-  const tables = generateSampleTables(type, withLargeDataset ? 1000 : tableCount, fieldsPerTable);
-  
-  let relationships: RelationshipMetadata[] = [];
-  if (includeRelationships) {
-    relationships = generateSampleRelationships(tables);
-  }
+  return { ...baseRequest, ...overrides };
+};
 
-  return {
-    name: schemaName,
-    database: `${type}_test_database`,
+/**
+ * Connection capabilities factory
+ * Generates database feature capabilities for testing
+ */
+export const connectionCapabilitiesFactory = (
+  overrides: Partial<ConnectionCapabilities> = {}
+): ConnectionCapabilities => {
+  const baseCapabilities: ConnectionCapabilities = {
+    transactions: true,
+    foreignKeys: true,
+    storedProcedures: true,
+    views: true,
+    fullTextSearch: true,
+    jsonSupport: true,
+    maxConnections: 151,
+    charsets: ['utf8', 'utf8mb4', 'latin1', 'ascii'],
+  };
+
+  return { ...baseCapabilities, ...overrides };
+};
+
+// =============================================================================
+// SCHEMA METADATA FACTORY FUNCTIONS
+// =============================================================================
+
+/**
+ * Database schema factory
+ * Generates comprehensive schema metadata for testing schema discovery functionality
+ */
+export const databaseSchemaFactory = (
+  serviceName: string = 'test-service',
+  tableCount: number = 10,
+  overrides: Partial<SchemaData> = {}
+): SchemaData => {
+  const tables = generateSchemaTablesFactory(tableCount);
+  const views = generateSchemaViewsFactory(Math.floor(tableCount * 0.3));
+  const procedures = generateStoredProceduresFactory(Math.floor(tableCount * 0.2));
+  const functions = generateDatabaseFunctionsFactory(Math.floor(tableCount * 0.1));
+  const sequences = generateSequencesFactory(Math.floor(tableCount * 0.15));
+
+  const baseSchema: SchemaData = {
+    serviceName,
+    serviceId: 1,
+    databaseName: 'test_database',
+    schemaName: 'public',
     tables,
-    relationships,
-    views: generateSampleViews(type, Math.min(tableCount, 3)),
-    procedures: type !== 'mongodb' ? generateSampleProcedures(type, 2) : [],
-    functions: type !== 'mongodb' ? generateSampleFunctions(type, 3) : [],
-    indexes: includeIndexes ? generateSampleIndexes(tables) : [],
-    constraints: includeConstraints ? generateSampleConstraints(tables) : [],
-    createdDate: new Date().toISOString(),
-    lastModifiedDate: new Date().toISOString(),
-  };
-}
-
-/**
- * Generates connection test results for various scenarios
- * @param options - Test result configuration options
- * @returns Connection test result object
- */
-export function connectionTestResultFactory(
-  options: TestResultOptions = {}
-): ConnectionTestResult {
-  const {
-    success = true,
-    timeout = false,
-    withPerformanceMetrics = false,
-    customError,
-  } = options;
-
-  if (timeout) {
-    return {
-      success: false,
-      error: 'Connection timeout after 5000ms',
-      errorCode: 'TIMEOUT',
-      timestamp: new Date().toISOString(),
-      duration: 5000,
-      details: {
-        host: 'unreachable-server.example.com',
-        port: 3306,
-        timeout: 5000,
-      },
-    };
-  }
-
-  if (!success) {
-    return {
-      success: false,
-      error: customError || 'Authentication failed: Access denied for user',
-      errorCode: customError ? 'CUSTOM_ERROR' : 'AUTH_FAILED',
-      timestamp: new Date().toISOString(),
-      duration: 1250,
-      details: {
-        host: 'mysql-server.example.com',
-        port: 3306,
-        database: 'test_db',
-        username: 'invalid_user',
-      },
-    };
-  }
-
-  const result: ConnectionTestResult = {
-    success: true,
-    message: 'Database connection successful',
-    timestamp: new Date().toISOString(),
-    duration: Math.floor(Math.random() * 2000) + 500,
-    serverInfo: {
-      version: '8.0.32',
-      uptime: '1234567',
-      threads: 42,
-      charset: 'utf8mb4',
-    },
+    views,
+    procedures,
+    functions,
+    sequences,
+    lastDiscovered: new Date().toISOString(),
+    totalTables: tables.length,
+    totalFields: tables.reduce((sum, table) => sum + table.fields.length, 0),
+    totalRelationships: tables.reduce((sum, table) => sum + table.related.length, 0),
+    virtualScrollingEnabled: tableCount > 100,
+    pageSize: tableCount > 100 ? 50 : tableCount,
+    estimatedRowHeight: 48,
+    loadingState: schemaLoadingStateFactory(),
+    progressiveData: tableCount > 100 ? progressiveSchemaDataFactory(tableCount) : undefined,
   };
 
-  if (withPerformanceMetrics) {
-    result.performance = {
-      connectionTime: 450,
-      queryTime: 85,
-      networkLatency: 12,
-      serverLoad: 0.35,
-    };
-  }
-
-  return result;
-}
+  return { ...baseSchema, ...overrides };
+};
 
 /**
- * Generates service type configuration schema for database services
- * @param type - Database type
- * @returns Service type with complete configuration schema
+ * Schema table factory
+ * Generates realistic table metadata with fields and relationships
  */
-export function databaseServiceTypeFactory(type: DatabaseType): ServiceType {
-  const dbConfig = DATABASE_TYPES[type];
-  const configSchema: ConfigSchema[] = [];
+export const schemaTableFactory = (
+  name: string,
+  fieldCount: number = 5,
+  overrides: Partial<SchemaTable> = {}
+): SchemaTable => {
+  const fields = generateSchemaFieldsFactory(fieldCount, name);
+  const primaryKey = fields.filter(f => f.isPrimaryKey).map(f => f.name);
 
-  // Basic connection fields
-  if (type !== 'sqlite') {
-    configSchema.push(
-      {
-        name: 'host',
-        label: 'Host',
-        type: 'string',
-        description: 'Database server hostname or IP address',
-        alias: 'host',
-        required: true,
-        default: 'localhost',
-        precision: 0,
-        scale: null,
-        allowNull: false,
-        picklist: null,
-        validation: null,
-        dbFunction: null,
-      },
-      {
-        name: 'port',
-        label: 'Port',
-        type: 'integer',
-        description: 'Database server port number',
-        alias: 'port',
-        required: false,
-        default: dbConfig.defaultPort,
-        precision: 0,
-        scale: null,
-        allowNull: true,
-        picklist: null,
-        validation: null,
-        dbFunction: null,
-      },
-      {
-        name: 'username',
-        label: 'Username',
-        type: 'string',
-        description: 'Database username for authentication',
-        alias: 'username',
-        required: true,
-        default: null,
-        precision: 0,
-        scale: null,
-        allowNull: false,
-        picklist: null,
-        validation: null,
-        dbFunction: null,
-      },
-      {
-        name: 'password',
-        label: 'Password',
-        type: 'password',
-        description: 'Database password for authentication',
-        alias: 'password',
-        required: true,
-        default: null,
-        precision: 0,
-        scale: null,
-        allowNull: false,
-        picklist: null,
-        validation: null,
-        dbFunction: null,
-      }
-    );
-  }
-
-  configSchema.push(
-    {
-      name: 'database',
-      label: type === 'sqlite' ? 'Database File' : 'Database Name',
-      type: 'string',
-      description: type === 'sqlite' ? 'Path to SQLite database file' : 'Name of the database to connect to',
-      alias: 'database',
-      required: true,
-      default: type === 'sqlite' ? 'database.db' : null,
-      precision: 0,
-      scale: null,
-      allowNull: false,
-      picklist: null,
-      validation: null,
-      dbFunction: null,
-    },
-    {
-      name: 'max_records',
-      label: 'Max Records',
-      type: 'integer',
-      description: 'Maximum number of records to return in a single request',
-      alias: 'max_records',
-      required: false,
-      default: 1000,
-      precision: 0,
-      scale: null,
-      allowNull: true,
-      picklist: null,
-      validation: null,
-      dbFunction: null,
-    },
-    {
-      name: 'cache_enabled',
-      label: 'Enable Caching',
-      type: 'boolean',
-      description: 'Enable query result caching for improved performance',
-      alias: 'cache_enabled',
-      required: false,
-      default: false,
-      precision: 0,
-      scale: null,
-      allowNull: true,
-      picklist: null,
-      validation: null,
-      dbFunction: null,
-    }
-  );
-
-  return {
-    name: type,
-    label: dbConfig.driver.toUpperCase(),
-    description: `Database service supporting ${type} connections`,
-    group: 'Database',
-    configSchema,
-  };
-}
-
-/**
- * Generates sample table metadata for schema testing
- */
-function generateSampleTables(
-  type: DatabaseType,
-  count: number,
-  fieldsPerTable: number
-): TableMetadata[] {
-  const schemaType = count > 100 ? 'analytics' : 'ecommerce';
-  const tableNames = count > 100 
-    ? generateLargeTableSet(count)
-    : SAMPLE_SCHEMAS[schemaType].slice(0, count);
-
-  return tableNames.map((tableName, index) => ({
-    name: tableName,
-    label: tableName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-    type: 'table',
-    description: `${tableName} table for data management`,
-    fields: generateSampleFields(type, fieldsPerTable, tableName),
-    primaryKey: 'id',
-    indexes: generateTableIndexes(tableName),
-    constraints: generateTableConstraints(tableName),
+  const baseTable: SchemaTable = {
+    id: `table_${name}`,
+    name,
+    label: name.charAt(0).toUpperCase() + name.slice(1),
+    description: `${name} table for testing`,
+    schema: 'public',
+    alias: name,
+    plural: `${name}s`,
+    isView: false,
+    fields,
+    primaryKey,
+    foreignKeys: generateForeignKeysFactory(fields),
+    indexes: generateTableIndexesFactory(name, fields),
+    constraints: generateTableConstraintsFactory(name, fields),
+    triggers: generateTriggersFactory(name),
+    related: generateTableRelationshipsFactory(name),
+    nameField: fields.find(f => f.type === 'string')?.name || 'name',
     rowCount: Math.floor(Math.random() * 10000) + 100,
-    createdDate: new Date().toISOString(),
-    lastModifiedDate: new Date().toISOString(),
-  }));
-}
-
-/**
- * Generates sample field metadata for table testing
- */
-function generateSampleFields(
-  type: DatabaseType,
-  count: number,
-  tableName: string
-): FieldMetadata[] {
-  const fieldTypes = FIELD_TYPES_BY_DATABASE[type];
-  const commonFields = ['id', 'created_at', 'updated_at'];
-  const specificFields = generateTableSpecificFields(tableName, count - commonFields.length);
-  
-  return [...commonFields, ...specificFields].map((fieldName, index) => {
-    const isId = fieldName === 'id';
-    const isTimestamp = fieldName.includes('_at');
-    
-    return {
-      name: fieldName,
-      label: fieldName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-      type: isId ? 'integer' : isTimestamp ? 'timestamp' : fieldTypes[Math.floor(Math.random() * fieldTypes.length)],
-      dbType: isId ? 'INT' : isTimestamp ? 'TIMESTAMP' : fieldTypes[Math.floor(Math.random() * fieldTypes.length)],
-      required: isId || fieldName === 'name' || fieldName === 'email',
-      allowNull: !isId && fieldName !== 'name' && fieldName !== 'email',
-      autoIncrement: isId,
-      isPrimaryKey: isId,
-      isUnique: isId || fieldName === 'email',
-      isForeignKey: fieldName.endsWith('_id') && !isId,
-      length: isTimestamp ? undefined : Math.floor(Math.random() * 255) + 1,
-      precision: 10,
-      scale: fieldName.includes('price') || fieldName.includes('amount') ? 2 : 0,
-      default: isTimestamp ? 'CURRENT_TIMESTAMP' : null,
-      description: `${fieldName} field for ${tableName}`,
-    };
-  });
-}
-
-/**
- * Generates table-specific field names based on table purpose
- */
-function generateTableSpecificFields(tableName: string, count: number): string[] {
-  const fieldMap: Record<string, string[]> = {
-    users: ['email', 'name', 'password', 'role', 'status'],
-    products: ['name', 'description', 'price', 'category_id', 'sku'],
-    orders: ['user_id', 'total_amount', 'status', 'shipping_address', 'order_number'],
-    companies: ['name', 'industry', 'website', 'employee_count', 'revenue'],
-    posts: ['title', 'content', 'author_id', 'published_at', 'status'],
+    estimatedSize: generateEstimatedSize(),
+    lastModified: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
+    collation: 'utf8mb4_unicode_ci',
+    engine: 'InnoDB',
+    access: 31, // Full CRUD access
+    virtualIndex: 0,
+    virtualHeight: 48,
+    isVisible: true,
+    expanded: false,
+    selected: false,
+    level: 0,
+    hasChildren: true,
+    isLoading: false,
+    apiEnabled: true,
+    generatedEndpoints: [
+      `GET /api/v2/${name}`,
+      `POST /api/v2/${name}`,
+      `GET /api/v2/${name}/{id}`,
+      `PUT /api/v2/${name}/{id}`,
+      `PATCH /api/v2/${name}/{id}`,
+      `DELETE /api/v2/${name}/{id}`,
+    ],
+    cacheKey: `schema_table_${name}_${Date.now()}`,
+    lastCacheUpdate: new Date().toISOString(),
   };
 
-  const baseFields = fieldMap[tableName] || ['name', 'description', 'status', 'priority', 'value'];
-  return baseFields.slice(0, count);
-}
+  return { ...baseTable, ...overrides };
+};
 
 /**
- * Generates sample relationships between tables
+ * Schema field factory
+ * Generates realistic field metadata with validation and constraints
  */
-function generateSampleRelationships(tables: TableMetadata[]): RelationshipMetadata[] {
-  const relationships: RelationshipMetadata[] = [];
+export const schemaFieldFactory = (
+  name: string,
+  type: string = 'string',
+  overrides: Partial<SchemaField> = {}
+): SchemaField => {
+  const isPrimaryKey = name === 'id' || name.endsWith('_id') && name === 'id';
+  const isForeignKey = name.endsWith('_id') && name !== 'id';
+
+  const baseField: SchemaField = {
+    id: `field_${name}`,
+    name,
+    label: name.charAt(0).toUpperCase() + name.slice(1).replace(/_/g, ' '),
+    description: `${name} field`,
+    alias: name,
+    type: type as any,
+    dbType: getDbTypeFromType(type),
+    length: getDefaultLengthForType(type),
+    precision: type.includes('decimal') ? 10 : undefined,
+    scale: type.includes('decimal') ? 2 : undefined,
+    defaultValue: getDefaultValueForType(type),
+    isNullable: !isPrimaryKey,
+    allowNull: !isPrimaryKey,
+    isPrimaryKey,
+    isForeignKey,
+    isUnique: isPrimaryKey || name === 'email',
+    isIndex: isPrimaryKey || isForeignKey,
+    isAutoIncrement: isPrimaryKey && type === 'integer',
+    isComputed: false,
+    isVirtual: false,
+    isAggregate: false,
+    required: isPrimaryKey || name === 'email',
+    fixedLength: false,
+    supportsMultibyte: type === 'string' || type === 'text',
+    refTable: isForeignKey ? name.replace('_id', '') : undefined,
+    refField: isForeignKey ? 'id' : undefined,
+    refOnUpdate: isForeignKey ? 'CASCADE' : undefined,
+    refOnDelete: isForeignKey ? 'SET NULL' : undefined,
+    validation: generateFieldValidation(name, type),
+    constraints: [],
+    picklist: name === 'status' ? ['active', 'inactive', 'pending'] : undefined,
+    format: generateFieldFormat(type),
+    hidden: name === 'password' || name.includes('secret'),
+    dbFunction: [],
+    native: [],
+    value: [],
+  };
+
+  return { ...baseField, ...overrides };
+};
+
+// =============================================================================
+// LARGE DATASET FACTORY FUNCTIONS FOR PERFORMANCE TESTING
+// =============================================================================
+
+/**
+ * Large schema factory for virtual scrolling testing
+ * Generates schemas with 1000+ tables for performance testing
+ */
+export const largeSchemaFactory = (
+  tableCount: number = 1500,
+  serviceName: string = 'large-test-service'
+): SchemaData => {
+  console.log(`Generating large schema with ${tableCount} tables for performance testing...`);
   
-  // Generate foreign key relationships
-  tables.forEach(table => {
-    table.fields.forEach(field => {
-      if (field.isForeignKey && field.name.endsWith('_id')) {
-        const referencedTableName = field.name.replace('_id', '');
-        const referencedTable = tables.find(t => t.name === referencedTableName);
-        
-        if (referencedTable) {
-          relationships.push({
-            name: `fk_${table.name}_${field.name}`,
-            type: 'belongs_to',
-            fromTable: table.name,
-            fromField: field.name,
-            toTable: referencedTable.name,
-            toField: 'id',
-            onUpdate: 'CASCADE',
-            onDelete: 'SET NULL',
-            description: `Foreign key relationship from ${table.name} to ${referencedTable.name}`,
-          });
-        }
-      }
-    });
+  return databaseSchemaFactory(serviceName, tableCount, {
+    virtualScrollingEnabled: true,
+    pageSize: 50,
+    progressiveData: progressiveSchemaDataFactory(tableCount),
   });
-
-  return relationships;
-}
+};
 
 /**
- * Generates sample views for schema testing
+ * Virtual scroll item factory
+ * Generates virtual scroll items for testing TanStack Virtual integration
  */
-function generateSampleViews(type: DatabaseType, count: number): any[] {
-  if (type === 'mongodb') return [];
-  
-  return Array.from({ length: count }, (_, index) => ({
-    name: `view_${index + 1}`,
-    definition: `SELECT * FROM table_${index + 1} WHERE active = 1`,
-    type: 'view',
-  }));
-}
+export const virtualScrollItemFactory = (
+  index: number,
+  table: SchemaTable
+): VirtualScrollItem => {
+  return {
+    index,
+    key: `virtual_item_${table.id}`,
+    data: table,
+    height: 48,
+    isVisible: true,
+    isLoaded: true,
+  };
+};
 
 /**
- * Generates sample stored procedures
+ * Schema performance metrics factory
+ * Generates performance metrics for monitoring schema operations
  */
-function generateSampleProcedures(type: DatabaseType, count: number): any[] {
-  return Array.from({ length: count }, (_, index) => ({
-    name: `proc_${index + 1}`,
-    parameters: ['param1', 'param2'],
-    type: 'procedure',
-  }));
-}
+export const schemaPerformanceMetricsFactory = (
+  tableCount: number = 100
+): SchemaPerformanceMetrics => {
+  return {
+    discoveryTime: Math.floor(Math.random() * 2000) + 500,
+    renderTime: Math.floor(Math.random() * 100) + 10,
+    cacheHitRate: Math.random() * 0.3 + 0.7, // 70-100%
+    totalTables: tableCount,
+    loadedTables: Math.min(tableCount, 50),
+    averageTableSize: Math.floor(Math.random() * 1000) + 100,
+    virtualItemsRendered: Math.min(tableCount, 20),
+    virtualScrollPosition: 0,
+    virtualScrollHeight: tableCount * 48,
+    estimatedMemoryUsage: tableCount * 2048, // bytes per table
+    cacheSize: Math.floor(tableCount * 0.1) * 1024,
+    errors: [],
+    warnings: tableCount > 1000 ? [
+      {
+        type: 'performance_concern',
+        message: 'Large schema detected, consider enabling progressive loading',
+        timestamp: new Date().toISOString(),
+        suggestion: 'Enable virtual scrolling for better performance',
+      },
+    ] : [],
+  };
+};
+
+// =============================================================================
+// TREE STRUCTURE FACTORIES FOR HIERARCHICAL DISPLAY
+// =============================================================================
 
 /**
- * Generates sample functions
+ * Schema tree node factory
+ * Generates tree nodes for hierarchical schema display
  */
-function generateSampleFunctions(type: DatabaseType, count: number): any[] {
-  return Array.from({ length: count }, (_, index) => ({
-    name: `func_${index + 1}`,
-    returnType: 'VARCHAR',
-    type: 'function',
-  }));
-}
+export const schemaTreeNodeFactory = (
+  type: TreeNodeType,
+  name: string,
+  level: number = 0,
+  overrides: Partial<SchemaTreeNode> = {}
+): SchemaTreeNode => {
+  const baseNode: SchemaTreeNode = {
+    id: `${type}_${name}_${level}`,
+    type,
+    name,
+    label: name.charAt(0).toUpperCase() + name.slice(1).replace(/_/g, ' '),
+    description: `${type} node: ${name}`,
+    parentId: level > 0 ? `parent_${level - 1}` : undefined,
+    children: [],
+    level,
+    index: 0,
+    expanded: level < 2,
+    selected: false,
+    isLoading: false,
+    hasChildren: type === 'database' || type === 'schema' || type === 'tables' || type === 'table',
+    virtualIndex: 0,
+    virtualHeight: 32,
+    isVisible: true,
+    data: type === 'table' ? schemaTableFactory(name) : undefined,
+    cacheKey: `tree_node_${type}_${name}_${Date.now()}`,
+    lastUpdated: new Date().toISOString(),
+  };
+
+  return { ...baseNode, ...overrides };
+};
+
+// =============================================================================
+// ERROR SCENARIO FACTORIES
+// =============================================================================
 
 /**
- * Generates sample indexes for tables
+ * Connection error scenarios factory
+ * Generates various connection failure scenarios for testing error handling
  */
-function generateSampleIndexes(tables: TableMetadata[]): any[] {
-  const indexes: any[] = [];
-  
-  tables.forEach(table => {
-    // Primary key index
-    indexes.push({
-      name: `pk_${table.name}`,
-      table: table.name,
-      columns: ['id'],
-      unique: true,
-      type: 'primary',
-    });
+export const connectionErrorScenariosFactory = () => {
+  return {
+    timeout: connectionTestResultFactory(false, {
+      duration: 5000,
+      message: 'Connection timeout after 5000ms',
+      error: {
+        code: 'CONNECTION_TIMEOUT',
+        message: 'Connection timeout',
+        details: { timeout: 5000, attempted: 'localhost:3306' },
+      },
+    }),
     
-    // Additional indexes for common fields
-    table.fields.forEach(field => {
-      if (field.name === 'email' || field.name.endsWith('_id')) {
-        indexes.push({
-          name: `idx_${table.name}_${field.name}`,
-          table: table.name,
-          columns: [field.name],
-          unique: field.isUnique,
-          type: 'btree',
-        });
-      }
-    });
+    invalidCredentials: connectionTestResultFactory(false, {
+      duration: 1500,
+      message: 'Access denied for user',
+      error: {
+        code: 'ACCESS_DENIED',
+        message: 'Access denied for user \'testuser\'@\'localhost\' (using password: YES)',
+        details: { errno: 1045, sqlState: '28000' },
+      },
+    }),
+    
+    hostNotFound: connectionTestResultFactory(false, {
+      duration: 3000,
+      message: 'Host not found',
+      error: {
+        code: 'HOST_NOT_FOUND',
+        message: 'getaddrinfo ENOTFOUND invalid-host',
+        details: { errno: 'ENOTFOUND', hostname: 'invalid-host' },
+      },
+    }),
+    
+    portClosed: connectionTestResultFactory(false, {
+      duration: 2000,
+      message: 'Connection refused',
+      error: {
+        code: 'CONNECTION_REFUSED',
+        message: 'connect ECONNREFUSED 127.0.0.1:3307',
+        details: { errno: 'ECONNREFUSED', port: 3307 },
+      },
+    }),
+    
+    databaseNotFound: connectionTestResultFactory(false, {
+      duration: 1000,
+      message: 'Unknown database',
+      error: {
+        code: 'DATABASE_NOT_FOUND',
+        message: 'Unknown database \'nonexistent_db\'',
+        details: { errno: 1049, sqlState: '42000' },
+      },
+    }),
+    
+    sslRequired: connectionTestResultFactory(false, {
+      duration: 800,
+      message: 'SSL connection required',
+      error: {
+        code: 'SSL_REQUIRED',
+        message: 'SSL connection is required. Please specify SSL options and retry.',
+        details: { sslMode: 'REQUIRED' },
+      },
+    }),
+  };
+};
+
+// =============================================================================
+// MULTI-DATABASE TYPE COLLECTION FACTORIES
+// =============================================================================
+
+/**
+ * All database types collection factory
+ * Generates services for all supported database types
+ */
+export const allDatabaseTypesFactory = () => {
+  return {
+    mysql: mysqlServiceFactory(),
+    postgresql: postgresqlServiceFactory(),
+    mongodb: mongodbServiceFactory(),
+    oracle: oracleServiceFactory(),
+    snowflake: snowflakeServiceFactory(),
+  };
+};
+
+/**
+ * Database service type definitions factory
+ * Generates service type metadata for all supported databases
+ */
+export const databaseServiceTypesFactory = (): DatabaseServiceType[] => {
+  const types: DatabaseType[] = ['mysql', 'postgresql', 'mongodb', 'oracle', 'snowflake'];
+  
+  return types.map(type => ({
+    name: type,
+    label: DATABASE_TYPE_METADATA[type].label,
+    description: DATABASE_TYPE_METADATA[type].description,
+    group: DATABASE_TYPE_METADATA[type].group,
+    class: `Database\\${type.charAt(0).toUpperCase() + type.slice(1)}\\Connection`,
+    configSchema: generateConfigSchemaForType(type),
+    icon: DATABASE_TYPE_METADATA[type].icon,
+    features: DATABASE_TYPE_METADATA[type].features,
+    versions: getVersionsForType(type),
+    licenseRequired: type === 'oracle' ? 'gold' : 'open_source',
+  }));
+};
+
+/**
+ * Complete test dataset factory for comprehensive testing
+ * Combines all factory functions for complete test coverage
+ */
+export const completeDatabaseTestDatasetFactory = () => {
+  return {
+    services: allDatabaseTypesFactory(),
+    schemas: {
+      small: databaseSchemaFactory('small-service', 5),
+      medium: databaseSchemaFactory('medium-service', 50),
+      large: largeSchemaFactory(1000),
+      virtual: largeSchemaFactory(1500),
+    },
+    connections: {
+      success: connectionTestResultFactory(true),
+      errors: connectionErrorScenariosFactory(),
+    },
+    configurations: {
+      ssl: sslConfigFactory(),
+      pooling: poolingConfigFactory(),
+    },
+    performance: {
+      small: schemaPerformanceMetricsFactory(5),
+      medium: schemaPerformanceMetricsFactory(50),
+      large: schemaPerformanceMetricsFactory(1000),
+    },
+    serviceTypes: databaseServiceTypesFactory(),
+  };
+};
+
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
+
+/**
+ * Generates schema tables for testing
+ */
+function generateSchemaTablesFactory(count: number): SchemaTable[] {
+  const commonTables = ['users', 'orders', 'products', 'categories', 'customers'];
+  const tables: SchemaTable[] = [];
+
+  // Add common tables first
+  commonTables.slice(0, Math.min(count, commonTables.length)).forEach((name, index) => {
+    tables.push(schemaTableFactory(name, 5 + index, { virtualIndex: index }));
   });
-  
-  return indexes;
-}
 
-/**
- * Generates sample constraints for tables
- */
-function generateSampleConstraints(tables: TableMetadata[]): any[] {
-  const constraints: any[] = [];
-  
-  tables.forEach(table => {
-    table.fields.forEach(field => {
-      if (field.isForeignKey) {
-        constraints.push({
-          name: `fk_${table.name}_${field.name}`,
-          table: table.name,
-          type: 'foreign_key',
-          columns: [field.name],
-          referencedTable: field.name.replace('_id', ''),
-          referencedColumns: ['id'],
-        });
-      }
-    });
-  });
-  
-  return constraints;
-}
-
-/**
- * Generates table indexes for a specific table
- */
-function generateTableIndexes(tableName: string): any[] {
-  return [
-    {
-      name: `pk_${tableName}`,
-      columns: ['id'],
-      unique: true,
-      type: 'primary',
-    },
-    {
-      name: `idx_${tableName}_created_at`,
-      columns: ['created_at'],
-      unique: false,
-      type: 'btree',
-    },
-  ];
-}
-
-/**
- * Generates table constraints for a specific table
- */
-function generateTableConstraints(tableName: string): any[] {
-  return [
-    {
-      name: `pk_${tableName}`,
-      type: 'primary_key',
-      columns: ['id'],
-    },
-  ];
-}
-
-/**
- * Generates a large set of table names for performance testing
- */
-function generateLargeTableSet(count: number): string[] {
-  const prefixes = ['user', 'product', 'order', 'item', 'log', 'event', 'data', 'record'];
-  const suffixes = ['details', 'history', 'summary', 'archive', 'temp', 'backup'];
-  const tables: string[] = [];
-  
-  for (let i = 0; i < count; i++) {
-    const prefix = prefixes[i % prefixes.length];
-    const suffix = suffixes[Math.floor(i / prefixes.length) % suffixes.length];
-    const number = Math.floor(i / (prefixes.length * suffixes.length)) + 1;
-    tables.push(`${prefix}_${suffix}_${number}`);
+  // Add generated tables for the rest
+  for (let i = commonTables.length; i < count; i++) {
+    const name = `table_${i.toString().padStart(4, '0')}`;
+    tables.push(schemaTableFactory(name, Math.floor(Math.random() * 10) + 3, { virtualIndex: i }));
   }
-  
+
   return tables;
 }
 
 /**
- * Factory for creating database connection test scenarios
- * @param scenarios - Array of test scenario configurations
- * @returns Array of connection test results
+ * Generates schema fields for a table
  */
-export function connectionTestScenariosFactory(
-  scenarios: Array<{ type: DatabaseType; success: boolean; errorType?: string }>
-): ConnectionTestResult[] {
-  return scenarios.map(({ type, success, errorType }) => {
-    if (!success) {
-      const errorMap = {
-        timeout: { timeout: true },
-        auth: { customError: 'Authentication failed: Invalid credentials' },
-        network: { customError: 'Network unreachable: Connection refused' },
-        permission: { customError: 'Permission denied: Insufficient privileges' },
-      };
-      
-      return connectionTestResultFactory(errorMap[errorType as keyof typeof errorMap] || {});
-    }
-    
-    return connectionTestResultFactory({ 
-      success: true, 
-      withPerformanceMetrics: true 
+function generateSchemaFieldsFactory(count: number, tableName: string): SchemaField[] {
+  const fields: SchemaField[] = [];
+  
+  // Always add ID field first
+  fields.push(schemaFieldFactory('id', 'integer', { isPrimaryKey: true, isAutoIncrement: true }));
+  
+  // Add common fields based on table name
+  const commonFields = getCommonFieldsForTable(tableName);
+  commonFields.slice(0, count - 1).forEach(({ name, type, options }) => {
+    fields.push(schemaFieldFactory(name, type, options));
+  });
+
+  // Fill remaining slots with generated fields
+  for (let i = fields.length; i < count; i++) {
+    const fieldName = `field_${i}`;
+    const fieldType = getRandomFieldType();
+    fields.push(schemaFieldFactory(fieldName, fieldType));
+  }
+
+  return fields;
+}
+
+/**
+ * Gets common fields for specific table types
+ */
+function getCommonFieldsForTable(tableName: string): Array<{ name: string; type: string; options?: Partial<SchemaField> }> {
+  const fieldSets: Record<string, Array<{ name: string; type: string; options?: Partial<SchemaField> }>> = {
+    users: [
+      { name: 'email', type: 'string', options: { isUnique: true, required: true } },
+      { name: 'first_name', type: 'string', options: { required: true } },
+      { name: 'last_name', type: 'string', options: { required: true } },
+      { name: 'password', type: 'string', options: { hidden: true, required: true } },
+      { name: 'is_active', type: 'boolean', options: { defaultValue: true } },
+      { name: 'created_at', type: 'timestamp' },
+      { name: 'updated_at', type: 'timestamp' },
+    ],
+    orders: [
+      { name: 'user_id', type: 'integer', options: { isForeignKey: true, refTable: 'users' } },
+      { name: 'order_number', type: 'string', options: { isUnique: true } },
+      { name: 'total_amount', type: 'decimal', options: { precision: 10, scale: 2 } },
+      { name: 'status', type: 'string', options: { picklist: ['pending', 'processing', 'shipped', 'delivered'] } },
+      { name: 'created_at', type: 'timestamp' },
+      { name: 'updated_at', type: 'timestamp' },
+    ],
+    products: [
+      { name: 'name', type: 'string', options: { required: true } },
+      { name: 'description', type: 'text' },
+      { name: 'price', type: 'decimal', options: { precision: 10, scale: 2 } },
+      { name: 'sku', type: 'string', options: { isUnique: true } },
+      { name: 'category_id', type: 'integer', options: { isForeignKey: true, refTable: 'categories' } },
+      { name: 'is_active', type: 'boolean', options: { defaultValue: true } },
+      { name: 'created_at', type: 'timestamp' },
+    ],
+  };
+
+  return fieldSets[tableName] || [
+    { name: 'name', type: 'string' },
+    { name: 'description', type: 'text' },
+    { name: 'is_active', type: 'boolean' },
+    { name: 'created_at', type: 'timestamp' },
+    { name: 'updated_at', type: 'timestamp' },
+  ];
+}
+
+/**
+ * Gets random field type for generated fields
+ */
+function getRandomFieldType(): string {
+  const types = ['string', 'integer', 'boolean', 'timestamp', 'text', 'decimal'];
+  return types[Math.floor(Math.random() * types.length)];
+}
+
+/**
+ * Gets database type from field type
+ */
+function getDbTypeFromType(type: string): string {
+  const typeMap: Record<string, string> = {
+    integer: 'int(11)',
+    string: 'varchar(255)',
+    text: 'text',
+    boolean: 'tinyint(1)',
+    timestamp: 'timestamp',
+    decimal: 'decimal(10,2)',
+    date: 'date',
+    datetime: 'datetime',
+    float: 'float',
+    double: 'double',
+  };
+  return typeMap[type] || 'varchar(255)';
+}
+
+/**
+ * Gets default length for field type
+ */
+function getDefaultLengthForType(type: string): number | undefined {
+  const lengthMap: Record<string, number> = {
+    string: 255,
+    integer: 11,
+    boolean: 1,
+    decimal: 10,
+  };
+  return lengthMap[type];
+}
+
+/**
+ * Gets default value for field type
+ */
+function getDefaultValueForType(type: string): any {
+  const defaultMap: Record<string, any> = {
+    boolean: false,
+    timestamp: 'CURRENT_TIMESTAMP',
+    integer: 0,
+    decimal: '0.00',
+  };
+  return defaultMap[type] || null;
+}
+
+/**
+ * Generates field validation rules
+ */
+function generateFieldValidation(name: string, type: string): any {
+  if (name === 'email') {
+    return { format: 'email', required: true };
+  }
+  if (name === 'password') {
+    return { minLength: 8, required: true };
+  }
+  if (type === 'integer') {
+    return { min: 0 };
+  }
+  return null;
+}
+
+/**
+ * Generates field format configuration
+ */
+function generateFieldFormat(type: string): any {
+  if (type === 'decimal') {
+    return { currencyCode: 'USD', thousandsSeparator: ',', decimalSeparator: '.' };
+  }
+  if (type === 'timestamp') {
+    return { dateFormat: 'YYYY-MM-DD HH:mm:ss' };
+  }
+  return null;
+}
+
+/**
+ * Additional helper functions for generating related data
+ */
+function generateForeignKeysFactory(fields: SchemaField[]): any[] {
+  return fields
+    .filter(f => f.isForeignKey)
+    .map(f => ({
+      name: `fk_${f.name}`,
+      field: f.name,
+      referencedTable: f.refTable!,
+      referencedField: f.refField!,
+      onDelete: f.refOnDelete,
+      onUpdate: f.refOnUpdate,
+    }));
+}
+
+function generateTableIndexesFactory(tableName: string, fields: SchemaField[]): any[] {
+  const indexes: any[] = [];
+  
+  // Primary key index
+  const pkFields = fields.filter(f => f.isPrimaryKey);
+  if (pkFields.length > 0) {
+    indexes.push({
+      name: 'PRIMARY',
+      fields: pkFields.map(f => f.name),
+      unique: true,
+      type: 'btree',
+    });
+  }
+
+  // Unique indexes
+  fields.filter(f => f.isUnique && !f.isPrimaryKey).forEach(f => {
+    indexes.push({
+      name: `uk_${tableName}_${f.name}`,
+      fields: [f.name],
+      unique: true,
+      type: 'btree',
     });
   });
+
+  return indexes;
 }
 
-/**
- * Bulk factory for creating multiple database services for testing
- * @param types - Array of database types to create services for
- * @param baseOptions - Base options to apply to all services
- * @returns Array of database service configurations
- */
-export function bulkDatabaseServicesFactory(
-  types: DatabaseType[],
-  baseOptions: DatabaseFactoryOptions = {}
-): DatabaseService[] {
-  return types.map((type, index) => 
-    databaseServiceFactory(type, {
-      ...baseOptions,
-      id: (baseOptions.id || 100) + index,
-    })
-  );
-}
-
-/**
- * Performance testing data factory for large dataset scenarios
- * @param options - Performance test configuration
- * @returns Large dataset configuration for testing virtual scrolling and pagination
- */
-export function performanceTestDataFactory(options: {
-  tableCount?: number;
-  recordsPerTable?: number;
-  includeComplexRelationships?: boolean;
-}) {
-  const { tableCount = 1000, recordsPerTable = 10000, includeComplexRelationships = true } = options;
+function generateTableConstraintsFactory(tableName: string, fields: SchemaField[]): any[] {
+  const constraints: any[] = [];
   
-  return {
-    schema: databaseSchemaFactory('postgresql', {
-      tableCount,
-      fieldsPerTable: 8,
-      includeRelationships: includeComplexRelationships,
-      withLargeDataset: true,
-    }),
-    connectionTest: connectionTestResultFactory({
-      success: true,
-      withPerformanceMetrics: true,
-    }),
-    estimatedRecords: tableCount * recordsPerTable,
-    performanceMetrics: {
-      expectedLoadTime: Math.floor(tableCount / 100) * 1000, // 1s per 100 tables
-      memoryUsage: Math.floor(tableCount * recordsPerTable * 0.001), // Estimated MB
-      virtualScrollThreshold: 100,
-      paginationSize: 50,
+  fields.filter(f => f.isForeignKey).forEach(f => {
+    constraints.push({
+      name: `fk_${tableName}_${f.name}`,
+      type: 'foreign_key',
+      definition: `FOREIGN KEY (${f.name}) REFERENCES ${f.refTable}(${f.refField})`,
+      fields: [f.name],
+    });
+  });
+
+  return constraints;
+}
+
+function generateTriggersFactory(tableName: string): any[] {
+  return [
+    {
+      name: `trg_${tableName}_updated_at`,
+      timing: 'BEFORE',
+      events: ['UPDATE'],
+      definition: `SET NEW.updated_at = CURRENT_TIMESTAMP`,
+      enabled: true,
     },
+  ];
+}
+
+function generateTableRelationshipsFactory(tableName: string): TableRelated[] {
+  // Generate some basic relationships for common table types
+  if (tableName === 'users') {
+    return [
+      {
+        id: `rel_${tableName}_orders`,
+        alias: 'orders',
+        name: 'orders',
+        label: 'Orders',
+        type: 'has_many',
+        field: 'id',
+        isVirtual: true,
+        refServiceId: 1,
+        refTable: 'orders',
+        refField: 'user_id',
+        alwaysFetch: false,
+        flatten: false,
+        flattenDropPrefix: false,
+      },
+    ];
+  }
+  
+  if (tableName === 'orders') {
+    return [
+      {
+        id: `rel_${tableName}_user`,
+        alias: 'user',
+        name: 'user',
+        label: 'User',
+        type: 'belongs_to',
+        field: 'user_id',
+        isVirtual: true,
+        refServiceId: 1,
+        refTable: 'users',
+        refField: 'id',
+        alwaysFetch: false,
+        flatten: false,
+        flattenDropPrefix: false,
+      },
+    ];
+  }
+
+  return [];
+}
+
+function generateSchemaViewsFactory(count: number): any[] {
+  const views: any[] = [];
+  for (let i = 0; i < count; i++) {
+    views.push({
+      name: `view_${i}`,
+      label: `View ${i}`,
+      definition: `SELECT * FROM table_${i}`,
+      fields: [],
+      updatable: false,
+    });
+  }
+  return views;
+}
+
+function generateStoredProceduresFactory(count: number): any[] {
+  const procedures: any[] = [];
+  for (let i = 0; i < count; i++) {
+    procedures.push({
+      name: `proc_${i}`,
+      label: `Procedure ${i}`,
+      parameters: [],
+      definition: `BEGIN SELECT 1; END`,
+    });
+  }
+  return procedures;
+}
+
+function generateDatabaseFunctionsFactory(count: number): any[] {
+  const functions: any[] = [];
+  for (let i = 0; i < count; i++) {
+    functions.push({
+      name: `func_${i}`,
+      label: `Function ${i}`,
+      parameters: [],
+      returnType: 'INTEGER',
+      definition: `RETURN 1`,
+    });
+  }
+  return functions;
+}
+
+function generateSequencesFactory(count: number): any[] {
+  const sequences: any[] = [];
+  for (let i = 0; i < count; i++) {
+    sequences.push({
+      name: `seq_${i}`,
+      increment: 1,
+      startValue: 1,
+    });
+  }
+  return sequences;
+}
+
+function schemaLoadingStateFactory(): SchemaLoadingState {
+  return {
+    isLoading: false,
+    isError: false,
+    loadedTables: 0,
+    totalTables: 0,
+    currentPage: 1,
+    hasNextPage: false,
+    isFetchingNextPage: false,
   };
 }
+
+function progressiveSchemaDataFactory(totalTables: number): ProgressiveSchemaData {
+  const chunkSize = 50;
+  const totalChunks = Math.ceil(totalTables / chunkSize);
+  
+  return {
+    chunks: [],
+    chunkSize,
+    totalChunks,
+    loadedChunks: 0,
+    lastLoadTime: new Date().toISOString(),
+  };
+}
+
+function generateServerVersion(): string {
+  const versions = {
+    mysql: '8.0.35',
+    postgresql: '15.4',
+    mongodb: '7.0.2',
+    oracle: '19c',
+    snowflake: '7.24.0',
+  };
+  const types = Object.keys(versions) as DatabaseType[];
+  const type = types[Math.floor(Math.random() * types.length)];
+  return versions[type];
+}
+
+function generateAvailableSchemas(): string[] {
+  return ['public', 'information_schema', 'test_schema', 'app_schema'];
+}
+
+function generateEstimatedSize(): string {
+  const sizes = ['1.2 MB', '5.8 MB', '12.3 MB', '450 KB', '2.1 GB'];
+  return sizes[Math.floor(Math.random() * sizes.length)];
+}
+
+function generateConfigSchemaForType(type: DatabaseType): any[] {
+  // Simplified config schema - in real implementation this would be much more detailed
+  return [
+    { name: 'host', type: 'string', required: true },
+    { name: 'port', type: 'integer', required: true },
+    { name: 'database', type: 'string', required: true },
+    { name: 'username', type: 'string', required: true },
+    { name: 'password', type: 'password', required: true },
+  ];
+}
+
+function getVersionsForType(type: DatabaseType): string[] {
+  const versionMap: Record<DatabaseType, string[]> = {
+    mysql: ['5.7', '8.0', '8.1'],
+    postgresql: ['12', '13', '14', '15', '16'],
+    mongodb: ['5.0', '6.0', '7.0'],
+    oracle: ['11g', '12c', '18c', '19c', '21c'],
+    snowflake: ['7.x', '8.x'],
+  };
+  return versionMap[type];
+}
+
+// Export all factory functions for easy testing access
+export {
+  // Configuration factories
+  mysqlConfigFactory,
+  postgresqlConfigFactory,
+  mongodbConfigFactory,
+  oracleConfigFactory,
+  snowflakeConfigFactory,
+  sslConfigFactory,
+  poolingConfigFactory,
+  
+  // Connection testing factories
+  connectionTestRequestFactory,
+  connectionCapabilitiesFactory,
+  connectionErrorScenariosFactory,
+  
+  // Schema factories
+  schemaTableFactory,
+  schemaFieldFactory,
+  schemaTreeNodeFactory,
+  virtualScrollItemFactory,
+  schemaPerformanceMetricsFactory,
+  
+  // Large dataset factories
+  largeSchemaFactory,
+  
+  // Collection factories
+  allDatabaseTypesFactory,
+  databaseServiceTypesFactory,
+  completeDatabaseTestDatasetFactory,
+};
