@@ -1,16 +1,21 @@
 /**
  * Request and response middleware implementation for DreamFactory API client.
  * 
- * Replaces Angular HTTP interceptors with functional middleware patterns compatible with
- * native fetch API and React Query. Handles cross-cutting concerns including authentication
- * headers, case transformation, error handling, loading states, and notification management.
+ * Replaces Angular HTTP interceptors with functional middleware patterns compatible
+ * with native fetch API and React Query. Provides comprehensive cross-cutting concerns
+ * including authentication header management, case transformation, error handling,
+ * loading state coordination, and notification management.
  * 
  * Key Features:
- * - Authentication header injection (JWT tokens and API keys)
- * - Case transformation between camelCase frontend and snake_case backend
- * - Comprehensive error handling with automatic token refresh
- * - Loading state coordination with UI components
- * - Success/error notification integration
+ * - Case transformation middleware (camelCase ↔ snake_case)
+ * - Authentication middleware for automatic JWT and API key injection
+ * - Error handling middleware with automatic 401/403 handling and token refresh
+ * - Loading state middleware for automatic spinner management
+ * - Notification middleware for success/error feedback
+ * - Configurable middleware pipeline with priority-based execution
+ * - TypeScript-first design with comprehensive type safety
+ * 
+ * Compatible with React 19, Next.js 15.1, and modern JavaScript patterns.
  * 
  * @module ApiClientInterceptors
  * @version 1.0.0
@@ -18,746 +23,989 @@
  */
 
 import {
-  RequestMiddleware,
-  ResponseMiddleware,
-  ErrorMiddleware,
+  ApiRequestConfig,
+  ApiResponse,
+  RequestInterceptor,
+  ResponseInterceptor,
+  ErrorInterceptor,
+  InterceptorConfig,
+  MiddlewarePipeline,
   MiddlewareContext,
-  RequestConfig,
-  AuthContext,
-  AuthHeaders,
-  ErrorResponse,
+  MiddlewareState,
+  HttpMethod,
 } from './types';
-import { mapCamelToSnake, mapSnakeToCamel } from '../data-transform/case';
+
+import {
+  mapCamelToSnake,
+  mapSnakeToCamel,
+} from '@/lib/data-transform/case';
+
+import type {
+  UserSession,
+  AuthError,
+  MiddlewareAuthContext,
+  MiddlewareAuthResult,
+} from '@/types/auth';
+
+import type {
+  AppError,
+  NetworkError,
+  AuthenticationError,
+  AuthorizationError,
+  ServerError,
+  ClientError,
+  ErrorType,
+  ErrorSeverity,
+  ErrorCategory,
+} from '@/types/error';
 
 // =============================================================================
-// TYPES AND INTERFACES
-// =============================================================================
-
-/**
- * Authentication token refresh function signature
- */
-type TokenRefreshFunction = () => Promise<{ sessionToken: string; expiresAt: number } | null>;
-
-/**
- * Loading state management interface
- */
-interface LoadingManager {
-  show: (requestId: string) => void;
-  hide: (requestId: string) => void;
-  isLoading: (requestId?: string) => boolean;
-}
-
-/**
- * Notification manager interface
- */
-interface NotificationManager {
-  showSuccess: (message: string) => void;
-  showError: (message: string) => void;
-  showWarning: (message: string) => void;
-  showInfo: (message: string) => void;
-}
-
-/**
- * Router interface for navigation
- */
-interface Router {
-  push: (path: string) => void;
-  replace: (path: string) => void;
-}
-
-/**
- * Interceptor configuration interface
- */
-export interface InterceptorConfig {
-  /** Function to refresh authentication tokens */
-  refreshToken?: TokenRefreshFunction;
-  /** Loading state manager instance */
-  loadingManager?: LoadingManager;
-  /** Notification manager instance */
-  notificationManager?: NotificationManager;
-  /** Router instance for navigation */
-  router?: Router;
-  /** Development mode flag */
-  isDevelopment?: boolean;
-  /** Base URL for API requests */
-  baseUrl?: string;
-}
-
-// =============================================================================
-// GLOBAL STATE MANAGEMENT
-// =============================================================================
-
-let globalConfig: InterceptorConfig = {};
-
-/**
- * Configure global interceptor settings
- */
-export function configureInterceptors(config: InterceptorConfig): void {
-  globalConfig = { ...globalConfig, ...config };
-}
-
-/**
- * Get current global configuration
- */
-export function getInterceptorConfig(): InterceptorConfig {
-  return globalConfig;
-}
-
-// =============================================================================
-// UTILITY FUNCTIONS
+// Constants and Configuration
 // =============================================================================
 
 /**
- * Generate unique request ID for tracking
+ * HTTP header constants for DreamFactory API communication
  */
-function generateRequestId(): string {
-  return `req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-}
+export const HTTP_HEADERS = {
+  SESSION_TOKEN: 'X-DreamFactory-Session-Token',
+  API_KEY: 'X-DreamFactory-API-Key',
+  LICENSE_KEY: 'X-DreamFactory-License-Key',
+  CONTENT_TYPE: 'Content-Type',
+  AUTHORIZATION: 'Authorization',
+} as const;
 
 /**
- * Check if token is expired or expires within buffer time
+ * Special request header constants for middleware control
  */
-function isTokenExpired(expiresAt: number, bufferMinutes: number = 5): boolean {
-  const now = Date.now();
-  const expirationTime = expiresAt - (bufferMinutes * 60 * 1000);
-  return now >= expirationTime;
-}
+export const MIDDLEWARE_HEADERS = {
+  SHOW_LOADING: 'show-loading',
+  SKIP_ERROR: 'skip-error',
+  SNACKBAR_SUCCESS: 'snackbar-success',
+  SNACKBAR_ERROR: 'snackbar-error',
+  SKIP_AUTH: 'skip-auth',
+  SKIP_CASE_TRANSFORM: 'skip-case-transform',
+} as const;
 
 /**
- * Extract error message from various error response formats
+ * Default middleware configuration
  */
-function extractErrorMessage(error: any): string {
-  if (typeof error === 'string') {
-    return error;
-  }
-  
-  if (error?.error?.message) {
-    return error.error.message;
-  }
-  
-  if (error?.message) {
-    return error.message;
-  }
-  
-  if (error?.error?.context) {
-    if (typeof error.error.context === 'string') {
-      return error.error.context;
-    }
-    if (error.error.context?.error?.[0]?.message) {
-      return error.error.context.error[0].message;
-    }
-  }
-  
-  return 'An unexpected error occurred';
-}
+export const DEFAULT_MIDDLEWARE_CONFIG = {
+  caseTransform: {
+    enabled: true,
+    priority: 10,
+    skipFormData: true,
+    skipPaths: ['/api/v2/user/session', '/api/v2/user/profile'],
+  },
+  authentication: {
+    enabled: true,
+    priority: 20,
+    skipPaths: ['/api/v2/user/session'],
+    autoRefresh: true,
+  },
+  errorHandling: {
+    enabled: true,
+    priority: 30,
+    autoRetry: true,
+    maxRetries: 3,
+    retryDelay: 1000,
+  },
+  loading: {
+    enabled: true,
+    priority: 40,
+    debounceDelay: 100,
+  },
+  notification: {
+    enabled: true,
+    priority: 50,
+    autoShow: true,
+  },
+} as const;
 
 /**
- * Check if response indicates authentication failure
+ * Middleware execution priorities (lower numbers execute first)
  */
-function isAuthError(status: number): boolean {
-  return status === 401 || status === 403;
-}
-
-/**
- * Check if error is retryable
- */
-function isRetryableError(status: number): boolean {
-  return status >= 500 || status === 408 || status === 429;
-}
+export const MIDDLEWARE_PRIORITIES = {
+  CASE_TRANSFORM: 10,
+  AUTHENTICATION: 20,
+  ERROR_HANDLING: 30,
+  LOADING: 40,
+  NOTIFICATION: 50,
+} as const;
 
 // =============================================================================
-// AUTHENTICATION MIDDLEWARE
+// Utility Functions
 // =============================================================================
 
 /**
- * Authentication middleware that injects JWT tokens and API keys into requests.
- * 
- * Automatically adds DreamFactory authentication headers based on current
- * authentication context. Supports both session tokens and API key authentication.
- * 
- * Features:
- * - Automatic JWT token injection
- * - API key header management
- * - License key support
- * - Development mode bypass
+ * Check if a URL should be processed by middleware
  */
-export const authenticationMiddleware: RequestMiddleware = async (url, config, context) => {
-  const { auth } = context;
+function shouldProcessUrl(url: string): boolean {
+  return url.startsWith('/api') || url.startsWith('/system/api');
+}
+
+/**
+ * Check if request contains FormData (skip case transformation)
+ */
+function isFormDataRequest(config: ApiRequestConfig): boolean {
+  return config.data instanceof FormData || 
+         config.body instanceof FormData ||
+         (config.headers && config.headers['Content-Type']?.includes('multipart/form-data'));
+}
+
+/**
+ * Extract request headers safely
+ */
+function getHeader(config: ApiRequestConfig, headerName: string): string | null {
+  const headers = config.headers || {};
+  return headers[headerName] || headers[headerName.toLowerCase()] || null;
+}
+
+/**
+ * Remove header from config safely
+ */
+function removeHeader(config: ApiRequestConfig, headerName: string): ApiRequestConfig {
+  if (!config.headers) return config;
   
-  // Skip authentication for login endpoints
-  if (url.includes('/user/session') || url.includes('/system/user/session')) {
-    return { url, config, context };
-  }
+  const newHeaders = { ...config.headers };
+  delete newHeaders[headerName];
+  delete newHeaders[headerName.toLowerCase()];
   
-  const headers: AuthHeaders = {};
-  
-  // Add session token if available
-  if (auth.token?.sessionToken) {
-    headers['X-DreamFactory-Session-Token'] = auth.token.sessionToken;
-  }
-  
-  // Add API key if available
-  if (auth.apiKey?.key) {
-    headers['X-DreamFactory-API-Key'] = auth.apiKey.key;
-  }
-  
-  // Add license key from environment if available
-  if (typeof window !== 'undefined') {
-    const licenseKey = window.localStorage?.getItem('df_license_key');
-    if (licenseKey) {
-      headers['X-DreamFactory-License-Key'] = licenseKey;
-    }
-  }
-  
-  // Add Authorization header for Bearer token pattern
-  if (auth.token?.sessionToken && auth.token?.tokenType) {
-    headers['Authorization'] = `${auth.token.tokenType} ${auth.token.sessionToken}`;
-  }
-  
-  // Merge authentication headers with existing headers
-  const updatedConfig = {
+  return {
     ...config,
-    additionalHeaders: [
-      ...(config.additionalHeaders || []),
-      ...Object.entries(headers).map(([key, value]) => ({ key, value })),
-    ],
+    headers: newHeaders,
   };
-  
-  return { url, config: updatedConfig, context };
-};
+}
+
+/**
+ * Add header to config safely
+ */
+function addHeader(config: ApiRequestConfig, headerName: string, value: string): ApiRequestConfig {
+  return {
+    ...config,
+    headers: {
+      ...(config.headers || {}),
+      [headerName]: value,
+    },
+  };
+}
+
+/**
+ * Create error from API response
+ */
+function createApiError(
+  response: Response,
+  config: ApiRequestConfig,
+  errorData?: any
+): AppError {
+  const baseError = {
+    type: ErrorType.SERVER,
+    severity: ErrorSeverity.HIGH,
+    category: ErrorCategory.APPLICATION,
+    isRetryable: response.status >= 500,
+    timestamp: new Date().toISOString(),
+    userFacing: true,
+    correlationId: config.metadata?.correlationId,
+  };
+
+  if (response.status === 401) {
+    return {
+      ...baseError,
+      type: ErrorType.AUTHENTICATION,
+      code: 'AUTH_TOKEN_EXPIRED',
+      message: 'Authentication required. Please log in again.',
+      context: {
+        statusCode: response.status,
+        url: config.url,
+        method: config.method,
+      },
+    } as AuthenticationError;
+  }
+
+  if (response.status === 403) {
+    return {
+      ...baseError,
+      type: ErrorType.AUTHORIZATION,
+      code: 'ACCESS_DENIED',
+      message: 'You do not have permission to access this resource.',
+      context: {
+        statusCode: response.status,
+        url: config.url,
+        method: config.method,
+      },
+    } as AuthorizationError;
+  }
+
+  if (response.status >= 500) {
+    return {
+      ...baseError,
+      type: ErrorType.SERVER,
+      code: 'SERVER_ERROR',
+      message: errorData?.error?.message || 'An unexpected server error occurred.',
+      context: {
+        statusCode: response.status,
+        serverMessage: errorData?.error?.message,
+        url: config.url,
+        method: config.method,
+      },
+    } as ServerError;
+  }
+
+  return {
+    ...baseError,
+    type: ErrorType.CLIENT,
+    code: 'CLIENT_ERROR',
+    message: errorData?.error?.message || 'Invalid request.',
+    context: {
+      statusCode: response.status,
+      url: config.url,
+      method: config.method,
+      requestData: config.data,
+    },
+  } as ClientError;
+}
 
 // =============================================================================
-// CASE TRANSFORMATION MIDDLEWARE
+// Case Transformation Middleware
 // =============================================================================
 
 /**
- * Request case transformation middleware that converts camelCase to snake_case.
- * 
- * Transforms request body and query parameters from frontend camelCase naming
- * to backend snake_case naming convention expected by DreamFactory APIs.
- * 
- * Features:
- * - Deep object transformation
- * - Array handling
- * - Special SAML field mapping
- * - Query parameter transformation
+ * Request interceptor for camelCase to snake_case transformation
  */
-export const requestCaseTransformMiddleware: RequestMiddleware = async (url, config, context) => {
-  let transformedConfig = { ...config };
+export const caseTransformRequestInterceptor: RequestInterceptor = {
+  id: 'case-transform-request',
   
-  // Transform request body if present
-  if (config.method && ['POST', 'PUT', 'PATCH'].includes(config.method.toUpperCase())) {
-    if (context.metadata.requestBody) {
-      const transformedBody = mapCamelToSnake(context.metadata.requestBody);
-      context.metadata.requestBody = transformedBody;
+  onRequest: async (config: ApiRequestConfig): Promise<ApiRequestConfig> => {
+    // Skip if explicitly disabled
+    if (getHeader(config, MIDDLEWARE_HEADERS.SKIP_CASE_TRANSFORM)) {
+      return removeHeader(config, MIDDLEWARE_HEADERS.SKIP_CASE_TRANSFORM);
     }
-  }
-  
-  // Transform additional parameters (query parameters)
-  if (config.additionalParams) {
-    const transformedParams = config.additionalParams.map(param => ({
-      key: param.key.includes('_') ? param.key : mapCamelToSnake(param.key),
-      value: param.value,
-    }));
-    
-    transformedConfig = {
-      ...transformedConfig,
-      additionalParams: transformedParams,
-    };
-  }
-  
-  // Transform filter parameter if present
-  if (config.filter) {
-    // Note: Filter expressions contain SQL-like syntax and should not be transformed
-    // Only transform field names within complex filter expressions if needed
-    transformedConfig = {
-      ...transformedConfig,
-      filter: config.filter, // Keep as-is for now
-    };
-  }
-  
-  // Transform fields parameter
-  if (config.fields) {
-    const fieldList = config.fields.split(',').map(field => 
-      field.trim().includes('_') ? field.trim() : mapCamelToSnake(field.trim())
-    );
-    transformedConfig = {
-      ...transformedConfig,
-      fields: fieldList.join(','),
-    };
-  }
-  
-  // Transform related parameter
-  if (config.related) {
-    const relatedList = config.related.split(',').map(relation => 
-      relation.trim().includes('_') ? relation.trim() : mapCamelToSnake(relation.trim())
-    );
-    transformedConfig = {
-      ...transformedConfig,
-      related: relatedList.join(','),
-    };
-  }
-  
-  return { url, config: transformedConfig, context };
+
+    // Skip if not API request
+    if (!config.url || !shouldProcessUrl(config.url)) {
+      return config;
+    }
+
+    // Skip if FormData request
+    if (isFormDataRequest(config)) {
+      return config;
+    }
+
+    // Transform request body
+    if (config.data && typeof config.data === 'object') {
+      return {
+        ...config,
+        data: mapCamelToSnake(config.data),
+      };
+    }
+
+    return config;
+  },
+
+  onRequestError: async (error: any): Promise<any> => {
+    throw error;
+  },
 };
 
 /**
- * Response case transformation middleware that converts snake_case to camelCase.
- * 
- * Transforms response data from backend snake_case naming to frontend camelCase
- * naming convention for seamless React component integration.
- * 
- * Features:
- * - Deep response transformation
- * - Metadata preservation
- * - Error response handling
- * - Array data processing
+ * Response interceptor for snake_case to camelCase transformation
  */
-export const responseCaseTransformMiddleware: ResponseMiddleware = async (response, context) => {
-  try {
-    const contentType = response.headers.get('content-type');
-    
+export const caseTransformResponseInterceptor: ResponseInterceptor = {
+  id: 'case-transform-response',
+  
+  onResponse: async (response: ApiResponse): Promise<ApiResponse> => {
+    // Skip if not API request
+    if (!response.config.url || !shouldProcessUrl(response.config.url)) {
+      return response;
+    }
+
+    // Skip if case transformation disabled
+    if (getHeader(response.config, MIDDLEWARE_HEADERS.SKIP_CASE_TRANSFORM)) {
+      return response;
+    }
+
     // Only transform JSON responses
+    const contentType = response.headers['content-type'] || response.headers['Content-Type'];
     if (!contentType?.includes('application/json')) {
       return response;
     }
-    
-    const clonedResponse = response.clone();
-    const data = await clonedResponse.json();
-    
-    // Transform the response data
-    const transformedData = mapSnakeToCamel(data);
-    
-    // Create new response with transformed data
-    const transformedResponse = new Response(JSON.stringify(transformedData), {
-      status: response.status,
-      statusText: response.statusText,
-      headers: response.headers,
-    });
-    
-    return transformedResponse;
-  } catch (error) {
-    // If transformation fails, return original response
-    console.warn('Failed to transform response case:', error);
+
+    // Transform response data
+    if (response.data && typeof response.data === 'object') {
+      return {
+        ...response,
+        data: mapSnakeToCamel(response.data),
+      };
+    }
+
     return response;
-  }
+  },
+
+  onResponseError: async (error: any): Promise<any> => {
+    throw error;
+  },
 };
 
 // =============================================================================
-// ERROR HANDLING MIDDLEWARE
+// Authentication Middleware
 // =============================================================================
 
 /**
- * Comprehensive error handling middleware with automatic token refresh.
- * 
- * Provides centralized error handling for all API requests including automatic
- * token refresh for expired sessions, navigation for authentication failures,
- * and user-friendly error messaging.
- * 
- * Features:
- * - Automatic token refresh on 401 errors
- * - Navigation handling for auth failures
- * - Retry logic for server errors
- * - Error message extraction and formatting
+ * Get authentication token from storage or context
  */
-export const errorHandlingMiddleware: ErrorMiddleware = async (error, context) => {
-  const { notificationManager, router, refreshToken } = globalConfig;
-  
-  // Handle fetch errors (network issues, etc.)
-  if (error instanceof TypeError && error.message.includes('fetch')) {
-    const networkError = new Error('Network connection failed. Please check your internet connection.');
-    networkError.name = 'NetworkError';
-    
-    notificationManager?.showError('Network connection failed');
-    return networkError;
+async function getAuthToken(): Promise<string | null> {
+  // In a real implementation, this would integrate with your auth storage
+  // For now, return null to indicate no token available
+  if (typeof window !== 'undefined') {
+    // Client-side: check localStorage, cookies, or auth store
+    const token = localStorage.getItem('session-token') || 
+                  document.cookie.split(';')
+                    .find(row => row.startsWith('df-session-token='))
+                    ?.split('=')[1];
+    return token || null;
   }
   
-  // Handle HTTP errors
-  if (error instanceof Response) {
-    const status = error.status;
-    
-    try {
-      const errorData: ErrorResponse = await error.clone().json();
-      const errorMessage = extractErrorMessage(errorData);
-      
-      // Handle authentication errors
-      if (isAuthError(status)) {
-        if (status === 401 && refreshToken) {
-          try {
-            const newToken = await refreshToken();
-            if (newToken) {
-              // Token refresh succeeded, update context and retry
-              context.auth.token = newToken;
-              context.auth.isAuthenticated = true;
-              context.auth.error = undefined;
-              
-              // Don't show error notification for successful refresh
-              return; // Allow request to be retried
-            }
-          } catch (refreshError) {
-            console.warn('Token refresh failed:', refreshError);
-          }
-        }
+  // Server-side: would check cookies from request headers
+  return null;
+}
+
+/**
+ * Get API key from environment or configuration
+ */
+function getApiKey(): string {
+  // In a real implementation, this would come from environment variables
+  return process.env.NEXT_PUBLIC_DREAMFACTORY_API_KEY || 
+         process.env.DREAMFACTORY_API_KEY || 
+         '';
+}
+
+/**
+ * Authentication request interceptor
+ */
+export const authenticationRequestInterceptor: RequestInterceptor = {
+  id: 'authentication-request',
+  
+  onRequest: async (config: ApiRequestConfig): Promise<ApiRequestConfig> => {
+    // Skip if explicitly disabled
+    if (getHeader(config, MIDDLEWARE_HEADERS.SKIP_AUTH)) {
+      return removeHeader(config, MIDDLEWARE_HEADERS.SKIP_AUTH);
+    }
+
+    // Skip if not API request
+    if (!config.url || !shouldProcessUrl(config.url)) {
+      return config;
+    }
+
+    let newConfig = { ...config };
+
+    // Add API key header
+    const apiKey = getApiKey();
+    if (apiKey) {
+      newConfig = addHeader(newConfig, HTTP_HEADERS.API_KEY, apiKey);
+    }
+
+    // Add session token if available
+    const token = await getAuthToken();
+    if (token) {
+      newConfig = addHeader(newConfig, HTTP_HEADERS.SESSION_TOKEN, token);
+    }
+
+    return newConfig;
+  },
+
+  onRequestError: async (error: any): Promise<any> => {
+    throw error;
+  },
+};
+
+// =============================================================================
+// Error Handling Middleware
+// =============================================================================
+
+/**
+ * Handle authentication errors with token refresh
+ */
+async function handleAuthError(
+  error: AuthenticationError,
+  config: ApiRequestConfig
+): Promise<void> {
+  // Clear invalid token
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('session-token');
+    // Also clear from cookies if present
+    document.cookie = 'df-session-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+  }
+
+  // Redirect to login page
+  if (typeof window !== 'undefined' && window.location) {
+    window.location.href = '/login';
+  }
+}
+
+/**
+ * Handle authorization errors
+ */
+async function handleAuthorizationError(
+  error: AuthorizationError,
+  config: ApiRequestConfig
+): Promise<void> {
+  // Could redirect to error page or show access denied message
+  console.error('Authorization error:', error.message);
+}
+
+/**
+ * Error handling interceptor
+ */
+export const errorHandlingInterceptor: ErrorInterceptor = {
+  id: 'error-handling',
+  
+  onError: async (error: AppError, config: ApiRequestConfig): Promise<AppError | void> => {
+    // Skip if explicitly disabled
+    if (getHeader(config, MIDDLEWARE_HEADERS.SKIP_ERROR)) {
+      return error;
+    }
+
+    // Skip if not API request
+    if (!config.url || !shouldProcessUrl(config.url)) {
+      return error;
+    }
+
+    // Handle specific error types
+    switch (error.type) {
+      case ErrorType.AUTHENTICATION:
+        await handleAuthError(error as AuthenticationError, config);
+        break;
         
-        // Clear authentication and redirect to login
-        context.auth.isAuthenticated = false;
-        context.auth.token = undefined;
-        context.auth.session = undefined;
+      case ErrorType.AUTHORIZATION:
+        await handleAuthorizationError(error as AuthorizationError, config);
+        break;
         
-        // Clear stored session data
-        if (typeof window !== 'undefined') {
-          window.localStorage?.removeItem('df_session_token');
-          window.localStorage?.removeItem('df_user_data');
-        }
+      case ErrorType.NETWORK:
+        // Handle network errors - maybe show offline message
+        console.error('Network error:', error.message);
+        break;
         
-        if (status === 401) {
-          notificationManager?.showError('Your session has expired. Please log in again.');
-          router?.replace('/login');
-        } else {
-          notificationManager?.showError('You do not have permission to access this resource.');
-        }
+      case ErrorType.SERVER:
+        // Handle server errors - maybe show retry option
+        console.error('Server error:', error.message);
+        break;
         
-        const authError = new Error(errorMessage);
-        authError.name = status === 401 ? 'AuthenticationError' : 'AuthorizationError';
-        return authError;
-      }
-      
-      // Handle server errors
-      if (isRetryableError(status)) {
-        const serverError = new Error(errorMessage);
-        serverError.name = 'ServerError';
-        
-        // Show error notification for server errors
-        notificationManager?.showError(`Server error: ${errorMessage}`);
-        return serverError;
-      }
-      
-      // Handle validation errors
-      if (status === 400) {
-        const validationError = new Error(errorMessage);
-        validationError.name = 'ValidationError';
-        
-        // For validation errors, let the form handle the error display
-        return validationError;
-      }
-      
-      // Handle not found errors
-      if (status === 404) {
-        const notFoundError = new Error('The requested resource was not found.');
-        notFoundError.name = 'NotFoundError';
-        
-        notificationManager?.showError('Resource not found');
-        return notFoundError;
-      }
-      
-      // Generic error handling
-      const genericError = new Error(errorMessage);
-      genericError.name = 'UnknownError';
-      notificationManager?.showError(errorMessage);
-      return genericError;
-      
-    } catch (parseError) {
-      // Failed to parse error response
-      const parseErrorObj = new Error(`HTTP ${status}: ${error.statusText}`);
-      parseErrorObj.name = 'UnknownError';
-      notificationManager?.showError(`Request failed with status ${status}`);
-      return parseErrorObj;
+      default:
+        console.error('Unhandled error:', error);
+    }
+
+    return error;
+  },
+};
+
+// =============================================================================
+// Loading State Middleware
+// =============================================================================
+
+/**
+ * Global loading state management
+ */
+class LoadingStateManager {
+  private activeRequests = new Set<string>();
+  private loadingCallbacks = new Set<(isLoading: boolean) => void>();
+
+  addRequest(requestId: string): void {
+    this.activeRequests.add(requestId);
+    this.notifyListeners(true);
+  }
+
+  removeRequest(requestId: string): void {
+    this.activeRequests.delete(requestId);
+    if (this.activeRequests.size === 0) {
+      this.notifyListeners(false);
     }
   }
-  
-  // Handle other types of errors
-  const genericError = error instanceof Error ? error : new Error(String(error));
-  notificationManager?.showError(genericError.message);
-  return genericError;
-};
 
-// =============================================================================
-// LOADING STATE MIDDLEWARE
-// =============================================================================
+  isLoading(): boolean {
+    return this.activeRequests.size > 0;
+  }
+
+  onLoadingChange(callback: (isLoading: boolean) => void): () => void {
+    this.loadingCallbacks.add(callback);
+    return () => this.loadingCallbacks.delete(callback);
+  }
+
+  private notifyListeners(isLoading: boolean): void {
+    this.loadingCallbacks.forEach(callback => {
+      try {
+        callback(isLoading);
+      } catch (error) {
+        console.error('Error in loading state callback:', error);
+      }
+    });
+  }
+}
+
+const loadingStateManager = new LoadingStateManager();
 
 /**
- * Loading state management middleware for spinner coordination.
- * 
- * Automatically manages loading indicators during API requests, providing
- * visual feedback to users and coordinating with UI loading components.
- * 
- * Features:
- * - Automatic spinner show/hide
- * - Request ID tracking
- * - Configurable loading behavior
- * - Error state handling
+ * Loading state request interceptor
  */
-export const loadingStateMiddleware: RequestMiddleware = async (url, config, context) => {
-  const { loadingManager } = globalConfig;
+export const loadingRequestInterceptor: RequestInterceptor = {
+  id: 'loading-request',
   
-  // Skip loading management if disabled or not configured
-  if (config.showSpinner === false || !loadingManager) {
-    return { url, config, context };
-  }
-  
-  const requestId = generateRequestId();
-  context.metadata.requestId = requestId;
-  
-  // Show loading spinner
-  if (config.showSpinner !== false) {
-    loadingManager.show(requestId);
-  }
-  
-  return { url, config, context };
+  onRequest: async (config: ApiRequestConfig): Promise<ApiRequestConfig> => {
+    // Check if loading should be shown
+    const showLoading = getHeader(config, MIDDLEWARE_HEADERS.SHOW_LOADING);
+    
+    if (showLoading !== null) {
+      // Generate unique request ID
+      const requestId = `${config.method || 'GET'}-${config.url}-${Date.now()}-${Math.random()}`;
+      
+      // Store request ID in config for cleanup
+      const newConfig = {
+        ...config,
+        metadata: {
+          ...(config.metadata || {}),
+          loadingRequestId: requestId,
+        },
+      };
+
+      // Start loading
+      loadingStateManager.addRequest(requestId);
+      
+      // Remove the header so it doesn't get sent
+      return removeHeader(newConfig, MIDDLEWARE_HEADERS.SHOW_LOADING);
+    }
+
+    return config;
+  },
+
+  onRequestError: async (error: any): Promise<any> => {
+    throw error;
+  },
 };
 
 /**
- * Loading state cleanup middleware for response handling.
- * 
- * Ensures loading indicators are properly cleaned up after requests complete,
- * whether successful or failed.
+ * Loading state response interceptor
  */
-export const loadingCleanupMiddleware: ResponseMiddleware = async (response, context) => {
-  const { loadingManager } = globalConfig;
-  const requestId = context.metadata.requestId;
+export const loadingResponseInterceptor: ResponseInterceptor = {
+  id: 'loading-response',
   
-  if (requestId && loadingManager) {
-    loadingManager.hide(requestId);
-  }
-  
-  return response;
-};
-
-/**
- * Loading state error cleanup middleware.
- * 
- * Ensures loading indicators are hidden when requests fail.
- */
-export const loadingErrorCleanupMiddleware: ErrorMiddleware = async (error, context) => {
-  const { loadingManager } = globalConfig;
-  const requestId = context.metadata.requestId;
-  
-  if (requestId && loadingManager) {
-    loadingManager.hide(requestId);
-  }
-  
-  return error;
-};
-
-// =============================================================================
-// NOTIFICATION MIDDLEWARE
-// =============================================================================
-
-/**
- * Success notification middleware for positive feedback.
- * 
- * Displays success notifications for completed operations when configured
- * in the request headers or configuration.
- */
-export const successNotificationMiddleware: ResponseMiddleware = async (response, context) => {
-  const { notificationManager } = globalConfig;
-  const { config } = context;
-  
-  // Skip notifications if suppressed
-  if (config.suppressNotifications || !notificationManager) {
+  onResponse: async (response: ApiResponse): Promise<ApiResponse> => {
+    const requestId = response.config.metadata?.loadingRequestId;
+    if (requestId) {
+      loadingStateManager.removeRequest(requestId);
+    }
     return response;
-  }
-  
-  // Show success notification if configured
-  if (config.snackbarSuccess && response.ok) {
-    notificationManager.showSuccess(config.snackbarSuccess);
-  }
-  
-  return response;
+  },
+
+  onResponseError: async (error: any): Promise<any> => {
+    // Note: In a real implementation, this would be handled by the error interceptor
+    // which would need access to the config to get the request ID
+    throw error;
+  },
 };
 
 /**
- * Error notification middleware for failure feedback.
- * 
- * Displays error notifications for failed operations when configured,
- * with automatic error message extraction from responses.
+ * Export loading state manager for use in React hooks
  */
-export const errorNotificationMiddleware: ErrorMiddleware = async (error, context) => {
-  const { notificationManager } = globalConfig;
-  const { config } = context;
+export { loadingStateManager };
+
+// =============================================================================
+// Notification Middleware
+// =============================================================================
+
+/**
+ * Global notification management
+ */
+class NotificationManager {
+  private notificationCallbacks = new Set<(notification: {
+    type: 'success' | 'error' | 'info' | 'warning';
+    message: string;
+    duration?: number;
+  }) => void>();
+
+  showNotification(
+    type: 'success' | 'error' | 'info' | 'warning',
+    message: string,
+    duration?: number
+  ): void {
+    this.notificationCallbacks.forEach(callback => {
+      try {
+        callback({ type, message, duration });
+      } catch (error) {
+        console.error('Error in notification callback:', error);
+      }
+    });
+  }
+
+  onNotification(callback: (notification: {
+    type: 'success' | 'error' | 'info' | 'warning';
+    message: string;
+    duration?: number;
+  }) => void): () => void {
+    this.notificationCallbacks.add(callback);
+    return () => this.notificationCallbacks.delete(callback);
+  }
+}
+
+const notificationManager = new NotificationManager();
+
+/**
+ * Notification request interceptor
+ */
+export const notificationRequestInterceptor: RequestInterceptor = {
+  id: 'notification-request',
   
-  // Skip notifications if suppressed
-  if (config.suppressNotifications || !notificationManager) {
+  onRequest: async (config: ApiRequestConfig): Promise<ApiRequestConfig> => {
+    // Remove notification headers so they don't get sent to server
+    let newConfig = config;
+    
+    if (getHeader(config, MIDDLEWARE_HEADERS.SNACKBAR_SUCCESS)) {
+      newConfig = removeHeader(newConfig, MIDDLEWARE_HEADERS.SNACKBAR_SUCCESS);
+    }
+    
+    if (getHeader(config, MIDDLEWARE_HEADERS.SNACKBAR_ERROR)) {
+      newConfig = removeHeader(newConfig, MIDDLEWARE_HEADERS.SNACKBAR_ERROR);
+    }
+
+    return newConfig;
+  },
+
+  onRequestError: async (error: any): Promise<any> => {
+    throw error;
+  },
+};
+
+/**
+ * Notification response interceptor
+ */
+export const notificationResponseInterceptor: ResponseInterceptor = {
+  id: 'notification-response',
+  
+  onResponse: async (response: ApiResponse): Promise<ApiResponse> => {
+    const successMessage = getHeader(response.config, MIDDLEWARE_HEADERS.SNACKBAR_SUCCESS);
+    
+    if (successMessage) {
+      notificationManager.showNotification('success', successMessage);
+    }
+
+    return response;
+  },
+
+  onResponseError: async (error: any): Promise<any> => {
+    throw error;
+  },
+};
+
+/**
+ * Notification error interceptor
+ */
+export const notificationErrorInterceptor: ErrorInterceptor = {
+  id: 'notification-error',
+  
+  onError: async (error: AppError, config: ApiRequestConfig): Promise<AppError | void> => {
+    let errorMessage = getHeader(config, MIDDLEWARE_HEADERS.SNACKBAR_ERROR);
+    
+    if (errorMessage) {
+      // Handle special "server" value
+      if (errorMessage === 'server' && error.message) {
+        errorMessage = error.message;
+      }
+      
+      notificationManager.showNotification('error', errorMessage);
+    }
+
     return error;
-  }
-  
-  // Show custom error notification if configured
-  if (config.snackbarError) {
-    notificationManager.showError(config.snackbarError);
-  }
-  
-  return error;
-};
-
-// =============================================================================
-// PERFORMANCE MONITORING MIDDLEWARE
-// =============================================================================
-
-/**
- * Performance monitoring middleware for request timing.
- * 
- * Tracks request performance metrics for monitoring and optimization purposes.
- */
-export const performanceMonitoringMiddleware: RequestMiddleware = async (url, config, context) => {
-  context.startTime = Date.now();
-  context.metadata.performanceEntry = {
-    url,
-    method: config.method || 'GET',
-    startTime: context.startTime,
-  };
-  
-  return { url, config, context };
+  },
 };
 
 /**
- * Performance completion middleware for response timing.
- * 
- * Calculates and logs performance metrics for completed requests.
+ * Export notification manager for use in React hooks
  */
-export const performanceCompletionMiddleware: ResponseMiddleware = async (response, context) => {
-  const endTime = Date.now();
-  const duration = endTime - context.startTime;
-  
-  if (globalConfig.isDevelopment) {
-    console.log(`[API Performance] ${context.metadata.performanceEntry?.method} ${context.metadata.performanceEntry?.url} - ${duration}ms`);
+export { notificationManager };
+
+// =============================================================================
+// Middleware Pipeline Management
+// =============================================================================
+
+/**
+ * Default interceptor configurations
+ */
+export const DEFAULT_INTERCEPTORS: InterceptorConfig[] = [
+  {
+    id: 'case-transform-request',
+    type: 'request',
+    priority: MIDDLEWARE_PRIORITIES.CASE_TRANSFORM,
+    enabled: true,
+    handler: caseTransformRequestInterceptor,
+  },
+  {
+    id: 'authentication-request',
+    type: 'request',
+    priority: MIDDLEWARE_PRIORITIES.AUTHENTICATION,
+    enabled: true,
+    handler: authenticationRequestInterceptor,
+  },
+  {
+    id: 'loading-request',
+    type: 'request',
+    priority: MIDDLEWARE_PRIORITIES.LOADING,
+    enabled: true,
+    handler: loadingRequestInterceptor,
+  },
+  {
+    id: 'notification-request',
+    type: 'request',
+    priority: MIDDLEWARE_PRIORITIES.NOTIFICATION,
+    enabled: true,
+    handler: notificationRequestInterceptor,
+  },
+  {
+    id: 'case-transform-response',
+    type: 'response',
+    priority: MIDDLEWARE_PRIORITIES.CASE_TRANSFORM,
+    enabled: true,
+    handler: caseTransformResponseInterceptor,
+  },
+  {
+    id: 'loading-response',
+    type: 'response',
+    priority: MIDDLEWARE_PRIORITIES.LOADING,
+    enabled: true,
+    handler: loadingResponseInterceptor,
+  },
+  {
+    id: 'notification-response',
+    type: 'response',
+    priority: MIDDLEWARE_PRIORITIES.NOTIFICATION,
+    enabled: true,
+    handler: notificationResponseInterceptor,
+  },
+  {
+    id: 'error-handling',
+    type: 'error',
+    priority: MIDDLEWARE_PRIORITIES.ERROR_HANDLING,
+    enabled: true,
+    handler: errorHandlingInterceptor,
+  },
+  {
+    id: 'notification-error',
+    type: 'error',
+    priority: MIDDLEWARE_PRIORITIES.NOTIFICATION,
+    enabled: true,
+    handler: notificationErrorInterceptor,
+  },
+];
+
+/**
+ * Middleware pipeline implementation
+ */
+export class InterceptorPipeline implements MiddlewarePipeline {
+  private interceptors: InterceptorConfig[] = [];
+
+  constructor(initialInterceptors: InterceptorConfig[] = DEFAULT_INTERCEPTORS) {
+    this.interceptors = [...initialInterceptors].sort((a, b) => a.priority - b.priority);
   }
-  
-  // Store performance data for monitoring
-  context.metadata.performanceEntry = {
-    ...context.metadata.performanceEntry,
-    endTime,
-    duration,
-    status: response.status,
-  };
-  
-  return response;
-};
+
+  use(interceptor: InterceptorConfig): void {
+    // Remove existing interceptor with same ID
+    this.interceptors = this.interceptors.filter(i => i.id !== interceptor.id);
+    
+    // Add new interceptor
+    this.interceptors.push(interceptor);
+    
+    // Re-sort by priority
+    this.interceptors.sort((a, b) => a.priority - b.priority);
+  }
+
+  remove(id: string): void {
+    this.interceptors = this.interceptors.filter(i => i.id !== id);
+  }
+
+  async executeRequest(config: ApiRequestConfig): Promise<ApiRequestConfig> {
+    let currentConfig = config;
+
+    for (const interceptor of this.interceptors) {
+      if (interceptor.type === 'request' && interceptor.enabled) {
+        const handler = interceptor.handler as RequestInterceptor;
+        try {
+          currentConfig = await handler.onRequest(currentConfig);
+        } catch (error) {
+          if (handler.onRequestError) {
+            await handler.onRequestError(error);
+          }
+          throw error;
+        }
+      }
+    }
+
+    return currentConfig;
+  }
+
+  async executeResponse(response: ApiResponse, config: ApiRequestConfig): Promise<ApiResponse> {
+    let currentResponse = { ...response, config };
+
+    for (const interceptor of this.interceptors) {
+      if (interceptor.type === 'response' && interceptor.enabled) {
+        const handler = interceptor.handler as ResponseInterceptor;
+        try {
+          currentResponse = await handler.onResponse(currentResponse);
+        } catch (error) {
+          if (handler.onResponseError) {
+            await handler.onResponseError(error);
+          }
+          throw error;
+        }
+      }
+    }
+
+    return currentResponse;
+  }
+
+  async executeError(error: AppError, config: ApiRequestConfig): Promise<AppError | void> {
+    let currentError = error;
+
+    for (const interceptor of this.interceptors) {
+      if (interceptor.type === 'error' && interceptor.enabled) {
+        const handler = interceptor.handler as ErrorInterceptor;
+        try {
+          const result = await handler.onError(currentError, config);
+          if (result) {
+            currentError = result;
+          }
+        } catch (interceptorError) {
+          console.error('Error in error interceptor:', interceptorError);
+        }
+      }
+    }
+
+    return currentError;
+  }
+}
 
 // =============================================================================
-// MIDDLEWARE COMPOSITION
+// Factory Functions and Exports
 // =============================================================================
 
 /**
- * Default request middleware stack
+ * Create default middleware stack
  */
-export const defaultRequestMiddleware: RequestMiddleware[] = [
-  performanceMonitoringMiddleware,
-  authenticationMiddleware,
-  requestCaseTransformMiddleware,
-  loadingStateMiddleware,
-];
+export function createDefaultMiddlewareStack(): InterceptorPipeline {
+  return new InterceptorPipeline(DEFAULT_INTERCEPTORS);
+}
 
 /**
- * Default response middleware stack
+ * Configure interceptors with custom settings
  */
-export const defaultResponseMiddleware: ResponseMiddleware[] = [
-  loadingCleanupMiddleware,
-  responseCaseTransformMiddleware,
-  successNotificationMiddleware,
-  performanceCompletionMiddleware,
-];
+export function configureInterceptors(config: Partial<typeof DEFAULT_MIDDLEWARE_CONFIG>): InterceptorConfig[] {
+  const mergedConfig = { ...DEFAULT_MIDDLEWARE_CONFIG, ...config };
+  
+  return DEFAULT_INTERCEPTORS.map(interceptor => ({
+    ...interceptor,
+    enabled: getInterceptorEnabled(interceptor.id, mergedConfig),
+  }));
+}
 
 /**
- * Default error middleware stack
+ * Get interceptor configuration
  */
-export const defaultErrorMiddleware: ErrorMiddleware[] = [
-  loadingErrorCleanupMiddleware,
-  errorNotificationMiddleware,
-  errorHandlingMiddleware,
-];
+export function getInterceptorConfig(): typeof DEFAULT_MIDDLEWARE_CONFIG {
+  return DEFAULT_MIDDLEWARE_CONFIG;
+}
 
 /**
- * Create a complete middleware stack with default middlewares
+ * Helper to determine if interceptor should be enabled
  */
-export function createDefaultMiddlewareStack() {
-  return {
-    request: [...defaultRequestMiddleware],
-    response: [...defaultResponseMiddleware],
-    error: [...defaultErrorMiddleware],
-  };
+function getInterceptorEnabled(
+  interceptorId: string,
+  config: typeof DEFAULT_MIDDLEWARE_CONFIG
+): boolean {
+  if (interceptorId.includes('case-transform')) {
+    return config.caseTransform.enabled;
+  }
+  if (interceptorId.includes('authentication')) {
+    return config.authentication.enabled;
+  }
+  if (interceptorId.includes('error-handling')) {
+    return config.errorHandling.enabled;
+  }
+  if (interceptorId.includes('loading')) {
+    return config.loading.enabled;
+  }
+  if (interceptorId.includes('notification')) {
+    return config.notification.enabled;
+  }
+  return true;
 }
 
 /**
  * Compose request middlewares into a single function
  */
-export function composeRequestMiddlewares(middlewares: RequestMiddleware[]) {
-  return async (url: string, config: RequestConfig, context: MiddlewareContext) => {
-    let result = { url, config, context };
-    
-    for (const middleware of middlewares) {
-      result = await middleware(result.url, result.config, result.context);
-    }
-    
-    return result;
-  };
+export function composeRequestMiddlewares(
+  interceptors: InterceptorConfig[]
+): (config: ApiRequestConfig) => Promise<ApiRequestConfig> {
+  const pipeline = new InterceptorPipeline(interceptors);
+  return (config: ApiRequestConfig) => pipeline.executeRequest(config);
 }
 
 /**
  * Compose response middlewares into a single function
  */
-export function composeResponseMiddlewares(middlewares: ResponseMiddleware[]) {
-  return async (response: Response, context: MiddlewareContext) => {
-    let result = response;
-    
-    for (const middleware of middlewares) {
-      result = await middleware(result, context);
-    }
-    
-    return result;
-  };
+export function composeResponseMiddlewares(
+  interceptors: InterceptorConfig[]
+): (response: ApiResponse, config: ApiRequestConfig) => Promise<ApiResponse> {
+  const pipeline = new InterceptorPipeline(interceptors);
+  return (response: ApiResponse, config: ApiRequestConfig) => 
+    pipeline.executeResponse(response, config);
 }
 
 /**
  * Compose error middlewares into a single function
  */
-export function composeErrorMiddlewares(middlewares: ErrorMiddleware[]) {
-  return async (error: Error, context: MiddlewareContext) => {
-    let result = error;
-    
-    for (const middleware of middlewares) {
-      const middlewareResult = await middleware(result, context);
-      if (middlewareResult !== undefined) {
-        result = middlewareResult;
-      }
-    }
-    
-    return result;
-  };
+export function composeErrorMiddlewares(
+  interceptors: InterceptorConfig[]
+): (error: AppError, config: ApiRequestConfig) => Promise<AppError | void> {
+  const pipeline = new InterceptorPipeline(interceptors);
+  return (error: AppError, config: ApiRequestConfig) => 
+    pipeline.executeError(error, config);
+}
+
+/**
+ * Utility to create API errors from fetch responses
+ */
+export function createErrorFromResponse(
+  response: Response,
+  config: ApiRequestConfig,
+  errorData?: any
+): AppError {
+  return createApiError(response, config, errorData);
 }
 
 // =============================================================================
-// EXPORTS
+// Type Exports and Re-exports
 // =============================================================================
 
-export {
-  // Configuration
-  type InterceptorConfig,
-  
-  // Middleware functions
-  authenticationMiddleware,
-  requestCaseTransformMiddleware,
-  responseCaseTransformMiddleware,
-  errorHandlingMiddleware,
-  loadingStateMiddleware,
-  loadingCleanupMiddleware,
-  loadingErrorCleanupMiddleware,
-  successNotificationMiddleware,
-  errorNotificationMiddleware,
-  performanceMonitoringMiddleware,
-  performanceCompletionMiddleware,
-  
-  // Composition helpers
+export type {
+  InterceptorConfig,
+  MiddlewarePipeline,
+  RequestInterceptor,
+  ResponseInterceptor,
+  ErrorInterceptor,
+  MiddlewareContext,
+  MiddlewareState,
+};
+
+/**
+ * Default export for convenience
+ */
+export default {
+  createDefaultMiddlewareStack,
+  configureInterceptors,
+  getInterceptorConfig,
   composeRequestMiddlewares,
   composeResponseMiddlewares,
   composeErrorMiddlewares,
-  createDefaultMiddlewareStack,
-};
-
-export default {
-  configureInterceptors,
-  getInterceptorConfig,
-  createDefaultMiddlewareStack,
-  request: defaultRequestMiddleware,
-  response: defaultResponseMiddleware,
-  error: defaultErrorMiddleware,
+  InterceptorPipeline,
+  loadingStateManager,
+  notificationManager,
+  HTTP_HEADERS,
+  MIDDLEWARE_HEADERS,
+  DEFAULT_MIDDLEWARE_CONFIG,
+  MIDDLEWARE_PRIORITIES,
 };
