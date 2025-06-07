@@ -1,414 +1,592 @@
 /**
- * TypeScript type definitions for API client library including request configuration,
- * response types, middleware interfaces, and authentication types.
+ * Comprehensive TypeScript type definitions for API client library
  * 
- * This module provides comprehensive type safety for all API client operations,
- * ensuring proper TypeScript integration throughout the React/Next.js application
- * while maintaining compatibility with DreamFactory API patterns.
+ * This module provides complete type safety for all API client operations including:
+ * - Request configuration with pagination, filtering, sorting, and custom options
+ * - Response type definitions for all API interactions
+ * - Middleware interfaces for request/response transformation and authentication
+ * - Authentication types for JWT tokens, session management, and headers
+ * - Error handling types for comprehensive error recovery workflows
+ * - File operation types for upload, download, progress tracking, and metadata
+ * 
+ * Supports React 19/Next.js 15.1 patterns with server-side rendering,
+ * concurrent features, and enhanced performance characteristics.
+ * 
+ * @fileoverview API client type definitions for DreamFactory Admin Interface
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-// =============================================================================
-// CORE TYPES AND INTERFACES
-// =============================================================================
+// Import authentication types for session and token management
+import type {
+  UserSession,
+  LoginCredentials,
+  LoginResponse,
+  AuthError,
+  JWTPayload,
+  MiddlewareAuthContext,
+  MiddlewareAuthResult,
+} from '@/types/auth';
+
+// Import comprehensive error handling types
+import type {
+  AppError,
+  NetworkError,
+  ValidationError,
+  AuthenticationError,
+  AuthorizationError,
+  ServerError,
+  ClientError,
+  SystemError,
+  ErrorContext,
+  RetryConfig,
+  CircuitBreakerConfig,
+  RecoveryAction,
+  UserFriendlyErrorMessage,
+} from '@/types/error';
+
+// Import generic HTTP types for compatibility
+import type {
+  KeyValuePair,
+  RequestOptions as LegacyRequestOptions,
+} from '@/types/generic-http';
+
+// ============================================================================
+// Core API Client Configuration Types
+// ============================================================================
 
 /**
- * Standard HTTP methods supported by the API client
+ * Primary API client configuration interface
+ * Supports both client-side and server-side operation contexts
  */
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS';
-
-/**
- * Content types supported for request bodies
- */
-export type ContentType = 
-  | 'application/json'
-  | 'application/x-www-form-urlencoded'
-  | 'multipart/form-data'
-  | 'text/plain'
-  | 'application/octet-stream';
-
-/**
- * Cache control strategies for request optimization
- */
-export type CacheStrategy = 
-  | 'no-cache'
-  | 'no-store'
-  | 'max-age'
-  | 'must-revalidate'
-  | 'private'
-  | 'public';
-
-// =============================================================================
-// REQUEST CONFIGURATION TYPES
-// =============================================================================
-
-/**
- * Key-value pair interface for additional parameters and headers
- */
-export interface KeyValuePair {
-  key: string;
-  value: string | number | boolean;
+export interface ApiClientConfig {
+  /** Base URL for API requests */
+  baseUrl: string;
+  /** DreamFactory API key for authentication */
+  apiKey: string;
+  /** Default timeout for requests in milliseconds */
+  timeout: number;
+  /** Whether to include credentials in cross-origin requests */
+  withCredentials: boolean;
+  /** Retry configuration for failed requests */
+  retryConfig: RetryConfig;
+  /** Circuit breaker configuration for preventing cascade failures */
+  circuitBreakerConfig: CircuitBreakerConfig;
+  /** Request/response interceptor configurations */
+  interceptors: InterceptorConfig[];
+  /** Server-side specific configuration */
+  serverSide?: ServerSideConfig;
+  /** Debug mode for development */
+  debug?: boolean;
 }
 
 /**
- * Pagination configuration for list requests
+ * Server-side specific configuration for Next.js SSR/ISR contexts
  */
-export interface PaginationConfig {
-  /** Number of items to return (default: 25) */
-  limit?: number;
-  /** Number of items to skip (default: 0) */
-  offset?: number;
-  /** Include total count in response metadata */
-  includeCount?: boolean;
+export interface ServerSideConfig {
+  /** Enable server-side request processing */
+  enabled: boolean;
+  /** Cookie name for session token extraction */
+  sessionCookieName: string;
+  /** Next.js revalidation interval for ISR */
+  revalidateInterval: number;
+  /** Custom headers for server-side requests */
+  serverHeaders: Record<string, string>;
 }
 
 /**
- * Filtering configuration for data queries
+ * Request interceptor configuration for middleware pipeline
  */
-export interface FilterConfig {
-  /** SQL-style filter expression */
-  filter?: string;
-  /** Comma-separated list of fields to include */
-  fields?: string;
-  /** Comma-separated list of related resources to include */
-  related?: string;
-  /** Comma-separated list of fields to sort by */
-  sort?: string;
+export interface InterceptorConfig {
+  /** Unique identifier for the interceptor */
+  id: string;
+  /** Interceptor type classification */
+  type: 'request' | 'response' | 'error';
+  /** Execution priority (lower numbers execute first) */
+  priority: number;
+  /** Whether interceptor is enabled */
+  enabled: boolean;
+  /** Interceptor implementation function */
+  handler: InterceptorHandler;
 }
 
 /**
- * Loading and notification configuration
+ * Generic interceptor handler function type
  */
-export interface UIConfig {
-  /** Show loading spinner during request */
-  showSpinner?: boolean;
-  /** Success message to display in snackbar */
-  snackbarSuccess?: string;
-  /** Error message to display in snackbar */
-  snackbarError?: string;
-  /** Suppress all notifications */
-  suppressNotifications?: boolean;
-}
+export type InterceptorHandler = 
+  | RequestInterceptor
+  | ResponseInterceptor
+  | ErrorInterceptor;
 
-/**
- * Cache control configuration
- */
-export interface CacheConfig {
-  /** Include cache control headers */
-  includeCacheControl?: boolean;
-  /** Force refresh, bypassing cache */
-  refresh?: boolean;
-  /** Cache strategy to apply */
-  strategy?: CacheStrategy;
-  /** Cache time-to-live in seconds */
-  ttl?: number;
-}
+// ============================================================================
+// Request Configuration and Options Types
+// ============================================================================
 
 /**
  * Comprehensive request configuration interface
- * Extends the original RequestOptions with React/Next.js patterns
+ * Extends native RequestInit with DreamFactory-specific options
  */
-export interface RequestConfig extends PaginationConfig, FilterConfig, UIConfig, CacheConfig {
-  /** HTTP method for the request */
+export interface ApiRequestConfig extends Omit<RequestInit, 'body'> {
+  /** Request URL (relative to baseUrl) */
+  url?: string;
+  /** HTTP method override */
   method?: HttpMethod;
-  /** Content type for request body */
-  contentType?: ContentType;
-  /** Additional query parameters */
-  additionalParams?: KeyValuePair[];
-  /** Additional HTTP headers */
-  additionalHeaders?: KeyValuePair[];
-  /** Request timeout in milliseconds */
+  /** Request parameters for URL query string */
+  params?: RequestParams;
+  /** Request body data (automatically serialized) */
+  data?: any;
+  /** Custom headers for this request */
+  headers?: Record<string, string>;
+  /** Request timeout override in milliseconds */
   timeout?: number;
-  /** Number of retry attempts on failure */
-  retryAttempts?: number;
-  /** Delay between retry attempts in milliseconds */
-  retryDelay?: number;
-  /** AbortController signal for request cancellation */
+  /** Authentication configuration */
+  auth?: AuthConfig;
+  /** Retry configuration override */
+  retry?: Partial<RetryConfig>;
+  /** Caching configuration */
+  cache?: CacheConfig;
+  /** Progress tracking configuration */
+  progress?: ProgressConfig;
+  /** Additional request metadata */
+  metadata?: RequestMetadata;
+  /** Abort signal for request cancellation */
   signal?: AbortSignal;
 }
 
 /**
- * SWR-specific configuration options
+ * HTTP methods supported by the API client
  */
-export interface SWRConfig {
-  /** Revalidate on window focus */
-  revalidateOnFocus?: boolean;
-  /** Revalidate on network reconnect */
-  revalidateOnReconnect?: boolean;
-  /** Refresh interval in milliseconds */
-  refreshInterval?: number;
-  /** Deduplicate requests with same key */
-  dedupingInterval?: number;
-  /** Error retry count */
-  errorRetryCount?: number;
-  /** Keep previous data when key changes */
-  keepPreviousData?: boolean;
+export type HttpMethod = 
+  | 'GET' 
+  | 'POST' 
+  | 'PUT' 
+  | 'PATCH' 
+  | 'DELETE' 
+  | 'HEAD' 
+  | 'OPTIONS';
+
+/**
+ * Request parameters interface with DreamFactory query options
+ */
+export interface RequestParams {
+  /** Pagination parameters */
+  limit?: number;
+  offset?: number;
+  /** Filtering parameters */
+  filter?: string;
+  /** Sorting parameters */
+  sort?: string;
+  /** Field selection */
+  fields?: string;
+  /** Related resource inclusion */
+  related?: string;
+  /** Include count in response */
+  includeCount?: boolean;
+  /** Include schema information */
+  includeSchema?: boolean;
+  /** Custom query parameters */
+  [key: string]: any;
 }
 
 /**
- * React Query specific configuration options
+ * Authentication configuration for requests
  */
-export interface ReactQueryConfig {
-  /** Time in milliseconds that the data is considered fresh */
-  staleTime?: number;
-  /** Time in milliseconds that unused/inactive cache data remains in memory */
-  cacheTime?: number;
-  /** Enable/disable the query */
-  enabled?: boolean;
-  /** Retry failed requests */
-  retry?: boolean | number | ((failureCount: number, error: unknown) => boolean);
-  /** Retry delay function */
-  retryDelay?: (retryAttempt: number) => number;
-  /** Refetch interval in milliseconds */
-  refetchInterval?: number;
-  /** Select specific data from query result */
-  select?: (data: any) => any;
+export interface AuthConfig {
+  /** Session token for authenticated requests */
+  sessionToken?: string;
+  /** API key override */
+  apiKey?: string;
+  /** Custom authentication headers */
+  headers?: Record<string, string>;
+  /** Whether to skip authentication for this request */
+  skipAuth?: boolean;
 }
 
-// =============================================================================
-// RESPONSE TYPES
-// =============================================================================
+/**
+ * Caching configuration for request optimization
+ */
+export interface CacheConfig {
+  /** Cache key override */
+  key?: string;
+  /** Cache TTL in milliseconds */
+  ttl?: number;
+  /** Whether to force fresh data */
+  fresh?: boolean;
+  /** Whether to use stale data while revalidating */
+  staleWhileRevalidate?: boolean;
+  /** Cache tags for invalidation */
+  tags?: string[];
+}
 
 /**
- * Standard success response structure
+ * Progress tracking configuration for file operations
  */
-export interface SuccessResponse {
+export interface ProgressConfig {
+  /** Whether to track upload/download progress */
+  enabled: boolean;
+  /** Progress callback function */
+  onProgress?: (progress: ProgressEvent) => void;
+  /** Progress update interval in milliseconds */
+  interval?: number;
+}
+
+/**
+ * Request metadata for debugging and monitoring
+ */
+export interface RequestMetadata {
+  /** Request correlation ID */
+  correlationId?: string;
+  /** Feature context */
+  feature?: string;
+  /** Component context */
+  component?: string;
+  /** User action that triggered the request */
+  userAction?: string;
+  /** Custom metadata */
+  [key: string]: any;
+}
+
+// ============================================================================
+// Response Types and Interfaces
+// ============================================================================
+
+/**
+ * Standard API response wrapper interface
+ * Follows DreamFactory response format conventions
+ */
+export interface ApiResponse<T = any> {
+  /** Response data payload */
+  data: T;
+  /** Response metadata */
+  meta?: ResponseMeta;
+  /** Response status information */
+  status: ResponseStatus;
+  /** Response headers */
+  headers: Record<string, string>;
+  /** Request configuration that generated this response */
+  config: ApiRequestConfig;
+}
+
+/**
+ * Response metadata interface
+ */
+export interface ResponseMeta {
+  /** Total count of available records */
+  count?: number;
+  /** Pagination information */
+  pagination?: PaginationMeta;
+  /** Response timing information */
+  timing?: TimingMeta;
+  /** Cache information */
+  cache?: CacheMeta;
+  /** Additional metadata */
+  [key: string]: any;
+}
+
+/**
+ * Pagination metadata for list responses
+ */
+export interface PaginationMeta {
+  /** Current page offset */
+  offset: number;
+  /** Page size limit */
+  limit: number;
+  /** Total number of records */
+  total: number;
+  /** Whether there are more pages available */
+  hasMore: boolean;
+  /** Next page offset */
+  nextOffset?: number;
+  /** Previous page offset */
+  prevOffset?: number;
+}
+
+/**
+ * Timing metadata for performance monitoring
+ */
+export interface TimingMeta {
+  /** Request start timestamp */
+  requestStart: number;
+  /** Response received timestamp */
+  responseEnd: number;
+  /** Total request duration in milliseconds */
+  duration: number;
+  /** Server processing time */
+  serverTime?: number;
+}
+
+/**
+ * Cache metadata for cache-aware responses
+ */
+export interface CacheMeta {
+  /** Whether response was served from cache */
+  hit: boolean;
+  /** Cache key used */
+  key?: string;
+  /** Cache expiration timestamp */
+  expires?: number;
+  /** Cache tags */
+  tags?: string[];
+}
+
+/**
+ * Response status information
+ */
+export interface ResponseStatus {
+  /** HTTP status code */
+  code: number;
+  /** HTTP status text */
+  text: string;
+  /** Whether the request was successful */
   success: boolean;
+  /** Server-side processing status */
+  serverStatus?: string;
 }
 
 /**
- * Error context can be string or complex object
+ * Specialized response types for common operations
  */
-export type ErrorContext = 
-  | string 
-  | { 
-      error: Array<any>; 
-      resource: Array<ErrorResponse>; 
-    };
-
-/**
- * Standard error response structure
- */
-export interface ErrorResponse {
-  error: {
-    code: string;
-    context: ErrorContext;
-    message: string;
-    status_code: number;
+export interface ListResponse<T> extends ApiResponse<T[]> {
+  meta: ResponseMeta & {
+    pagination: PaginationMeta;
   };
 }
 
+export interface CreateResponse<T> extends ApiResponse<T> {
+  data: T & {
+    id: number | string;
+    created_date: string;
+  };
+}
+
+export interface UpdateResponse<T> extends ApiResponse<T> {
+  data: T & {
+    last_modified_date: string;
+  };
+}
+
+export interface DeleteResponse extends ApiResponse<{ success: boolean }> {
+  data: {
+    success: boolean;
+    deleted_count?: number;
+  };
+}
+
+export interface BulkResponse<T> extends ApiResponse<T[]> {
+  data: T[];
+  meta: ResponseMeta & {
+    successCount: number;
+    errorCount: number;
+    errors?: AppError[];
+  };
+}
+
+// ============================================================================
+// Middleware and Interceptor Types
+// ============================================================================
+
 /**
- * Pagination metadata
+ * Request interceptor interface for request transformation
  */
-export interface ResponseMeta {
-  count: number;
-  limit?: number;
-  offset?: number;
-  total?: number;
+export interface RequestInterceptor {
+  /** Unique interceptor identifier */
+  id: string;
+  /** Transform outgoing request */
+  onRequest: (config: ApiRequestConfig) => Promise<ApiRequestConfig> | ApiRequestConfig;
+  /** Handle request errors */
+  onRequestError?: (error: any) => Promise<any> | any;
 }
 
 /**
- * Generic list response with pagination metadata
+ * Response interceptor interface for response transformation
  */
-export interface ListResponse<T> {
-  resource: Array<T>;
-  meta: ResponseMeta;
+export interface ResponseInterceptor {
+  /** Unique interceptor identifier */
+  id: string;
+  /** Transform incoming response */
+  onResponse: (response: ApiResponse) => Promise<ApiResponse> | ApiResponse;
+  /** Handle response errors */
+  onResponseError?: (error: any) => Promise<any> | any;
 }
 
 /**
- * Create operation response
+ * Error interceptor interface for comprehensive error handling
  */
-export interface CreateResponse {
-  id: number;
-  success?: boolean;
+export interface ErrorInterceptor {
+  /** Unique interceptor identifier */
+  id: string;
+  /** Handle any error in the request/response cycle */
+  onError: (error: AppError, config: ApiRequestConfig) => Promise<AppError | void> | AppError | void;
 }
 
 /**
- * Update operation response
- */
-export interface UpdateResponse {
-  id: number;
-  success?: boolean;
-}
-
-/**
- * Delete operation response
- */
-export interface DeleteResponse {
-  success: boolean;
-  id?: number;
-}
-
-/**
- * Bulk operation response
- */
-export interface BulkResponse<T> {
-  created?: T[];
-  updated?: T[];
-  deleted?: number[];
-  errors?: ErrorResponse[];
-}
-
-// =============================================================================
-// AUTHENTICATION TYPES
-// =============================================================================
-
-/**
- * Authentication token structure
- */
-export interface AuthToken {
-  /** JWT session token */
-  sessionToken: string;
-  /** Token expiration timestamp */
-  expiresAt: number;
-  /** Refresh token for automatic renewal */
-  refreshToken?: string;
-  /** Token type (Bearer, etc.) */
-  tokenType?: string;
-}
-
-/**
- * API key authentication structure
- */
-export interface ApiKey {
-  /** API key value */
-  key: string;
-  /** API key name/identifier */
-  name?: string;
-  /** Key permissions */
-  permissions?: string[];
-}
-
-/**
- * Session data structure
- */
-export interface SessionData {
-  /** User ID */
-  userId: number;
-  /** Username */
-  username: string;
-  /** User email */
-  email?: string;
-  /** User roles */
-  roles?: string[];
-  /** Session metadata */
-  metadata?: Record<string, any>;
-  /** Last activity timestamp */
-  lastActivity?: number;
-}
-
-/**
- * Authentication headers for API requests
- */
-export interface AuthHeaders {
-  'X-DreamFactory-Session-Token'?: string;
-  'X-DreamFactory-API-Key'?: string;
-  'X-DreamFactory-License-Key'?: string;
-  'Authorization'?: string;
-}
-
-/**
- * Complete authentication context
- */
-export interface AuthContext {
-  /** Current authentication token */
-  token?: AuthToken;
-  /** API key if using API key auth */
-  apiKey?: ApiKey;
-  /** Current session data */
-  session?: SessionData;
-  /** Authentication status */
-  isAuthenticated: boolean;
-  /** Authentication in progress */
-  isAuthenticating: boolean;
-  /** Last authentication error */
-  error?: string;
-}
-
-// =============================================================================
-// MIDDLEWARE INTERFACES
-// =============================================================================
-
-/**
- * Middleware context passed through the request pipeline
+ * Middleware execution context
  */
 export interface MiddlewareContext {
-  /** Request configuration */
-  config: RequestConfig;
-  /** Authentication context */
-  auth: AuthContext;
-  /** Request metadata */
+  /** Current request configuration */
+  request: ApiRequestConfig;
+  /** Response if available */
+  response?: ApiResponse;
+  /** Error if occurred */
+  error?: AppError;
+  /** Middleware execution state */
+  state: MiddlewareState;
+  /** Context metadata */
   metadata: Record<string, any>;
-  /** Start time for performance tracking */
+}
+
+/**
+ * Middleware execution state tracking
+ */
+export interface MiddlewareState {
+  /** Whether request is authenticated */
+  authenticated: boolean;
+  /** Whether request has been retried */
+  retried: boolean;
+  /** Retry attempt count */
+  retryCount: number;
+  /** Whether circuit breaker is open */
+  circuitBreakerOpen: boolean;
+  /** Execution start time */
   startTime: number;
 }
 
 /**
- * Request middleware function signature
+ * Middleware pipeline configuration
  */
-export interface RequestMiddleware {
-  (
-    url: string,
-    config: RequestConfig,
-    context: MiddlewareContext
-  ): Promise<{ url: string; config: RequestConfig; context: MiddlewareContext }> | 
-     { url: string; config: RequestConfig; context: MiddlewareContext };
+export interface MiddlewarePipeline {
+  /** Registered interceptors */
+  interceptors: InterceptorConfig[];
+  /** Add new interceptor */
+  use: (interceptor: InterceptorConfig) => void;
+  /** Remove interceptor by ID */
+  remove: (id: string) => void;
+  /** Execute request pipeline */
+  executeRequest: (config: ApiRequestConfig) => Promise<ApiRequestConfig>;
+  /** Execute response pipeline */
+  executeResponse: (response: ApiResponse, config: ApiRequestConfig) => Promise<ApiResponse>;
+  /** Execute error pipeline */
+  executeError: (error: AppError, config: ApiRequestConfig) => Promise<AppError | void>;
+}
+
+// ============================================================================
+// Authentication and Session Types
+// ============================================================================
+
+/**
+ * Session management interface for API client
+ */
+export interface SessionManager {
+  /** Get current session token */
+  getToken: () => Promise<string | null>;
+  /** Set session token */
+  setToken: (token: string) => Promise<void>;
+  /** Clear session token */
+  clearToken: () => Promise<void>;
+  /** Validate current session */
+  validateSession: () => Promise<boolean>;
+  /** Refresh session token */
+  refreshToken: () => Promise<string>;
+  /** Get session metadata */
+  getSessionMeta: () => Promise<SessionMetadata | null>;
 }
 
 /**
- * Response middleware function signature
+ * Session metadata for tracking and validation
  */
-export interface ResponseMiddleware {
-  (
-    response: Response,
-    context: MiddlewareContext
-  ): Promise<Response> | Response;
+export interface SessionMetadata {
+  /** Session creation timestamp */
+  createdAt: string;
+  /** Session expiration timestamp */
+  expiresAt: string;
+  /** Last activity timestamp */
+  lastActivity: string;
+  /** User information */
+  user: UserSession;
+  /** Session capabilities */
+  capabilities: string[];
 }
 
 /**
- * Error middleware function signature
+ * Authentication provider interface
  */
-export interface ErrorMiddleware {
-  (
-    error: Error,
-    context: MiddlewareContext
-  ): Promise<Error | void> | Error | void;
+export interface AuthProvider {
+  /** Authenticate with credentials */
+  login: (credentials: LoginCredentials) => Promise<LoginResponse>;
+  /** Logout and clear session */
+  logout: () => Promise<void>;
+  /** Refresh authentication token */
+  refresh: () => Promise<LoginResponse>;
+  /** Validate current authentication */
+  validate: () => Promise<boolean>;
+  /** Get current authentication state */
+  getState: () => Promise<AuthState>;
 }
 
 /**
- * Complete middleware stack configuration
+ * Authentication state interface
  */
-export interface MiddlewareStack {
-  /** Request middleware functions */
-  request: RequestMiddleware[];
-  /** Response middleware functions */
-  response: ResponseMiddleware[];
-  /** Error middleware functions */
-  error: ErrorMiddleware[];
+export interface AuthState {
+  /** Whether user is authenticated */
+  isAuthenticated: boolean;
+  /** Current user session */
+  session: UserSession | null;
+  /** Session token */
+  token: string | null;
+  /** Authentication loading state */
+  isLoading: boolean;
+  /** Authentication error */
+  error: AuthError | null;
 }
 
-// =============================================================================
-// FILE OPERATION TYPES
-// =============================================================================
+// ============================================================================
+// File Operation Types
+// ============================================================================
 
 /**
- * File upload progress information
+ * File upload configuration interface
  */
-export interface FileUploadProgress {
-  /** Bytes uploaded */
-  loaded: number;
-  /** Total bytes to upload */
-  total: number;
-  /** Upload percentage (0-100) */
-  percentage: number;
-  /** Upload speed in bytes/second */
-  rate?: number;
-  /** Estimated time remaining in seconds */
-  timeRemaining?: number;
+export interface FileUploadConfig {
+  /** Target upload URL */
+  url?: string;
+  /** HTTP method for upload */
+  method?: 'POST' | 'PUT';
+  /** Form field name for file */
+  fieldName?: string;
+  /** Maximum file size in bytes */
+  maxSize?: number;
+  /** Accepted file types */
+  acceptedTypes?: string[];
+  /** Additional form data */
+  data?: Record<string, any>;
+  /** Upload headers */
+  headers?: Record<string, string>;
+  /** Chunk size for large file uploads */
+  chunkSize?: number;
+  /** Whether to enable chunked upload */
+  chunked?: boolean;
+  /** Progress tracking configuration */
+  progress?: ProgressConfig;
 }
 
 /**
- * File metadata information
+ * File download configuration interface
+ */
+export interface FileDownloadConfig {
+  /** Download URL */
+  url: string;
+  /** Target filename */
+  filename?: string;
+  /** Whether to force download */
+  forceDownload?: boolean;
+  /** Progress tracking configuration */
+  progress?: ProgressConfig;
+  /** Custom headers */
+  headers?: Record<string, string>;
+}
+
+/**
+ * File metadata interface
  */
 export interface FileMetadata {
   /** File name */
@@ -418,261 +596,485 @@ export interface FileMetadata {
   /** MIME type */
   type: string;
   /** Last modified timestamp */
-  lastModified?: number;
-  /** File path */
-  path?: string;
-  /** File permissions */
-  permissions?: string;
+  lastModified: number;
   /** File hash/checksum */
   hash?: string;
+  /** Custom metadata */
+  [key: string]: any;
 }
 
 /**
- * File upload configuration
+ * File upload progress event
  */
-export interface FileUploadConfig {
-  /** Allow multiple file uploads */
-  multiple?: boolean;
-  /** Maximum file size in bytes */
-  maxSize?: number;
-  /** Accepted file types */
-  accept?: string[];
-  /** Upload chunk size for large files */
-  chunkSize?: number;
-  /** Progress callback function */
-  onProgress?: (progress: FileUploadProgress) => void;
-  /** Success callback function */
-  onSuccess?: (response: any) => void;
-  /** Error callback function */
-  onError?: (error: Error) => void;
+export interface FileUploadProgress {
+  /** Bytes loaded */
+  loaded: number;
+  /** Total bytes */
+  total: number;
+  /** Progress percentage */
+  percentage: number;
+  /** Upload speed in bytes per second */
+  speed?: number;
+  /** Estimated time remaining in seconds */
+  timeRemaining?: number;
+  /** Current chunk information for chunked uploads */
+  chunk?: {
+    index: number;
+    total: number;
+    size: number;
+  };
 }
 
 /**
- * File download configuration
+ * File download progress event
  */
-export interface FileDownloadConfig {
-  /** Download as attachment */
-  asAttachment?: boolean;
-  /** Custom filename for download */
-  filename?: string;
-  /** Progress callback function */
-  onProgress?: (progress: FileUploadProgress) => void;
+export interface FileDownloadProgress {
+  /** Bytes received */
+  received: number;
+  /** Total bytes (if known) */
+  total?: number;
+  /** Progress percentage */
+  percentage?: number;
+  /** Download speed in bytes per second */
+  speed?: number;
+  /** Estimated time remaining in seconds */
+  timeRemaining?: number;
 }
 
 /**
- * Directory listing item
+ * File operation result interface
  */
-export interface DirectoryItem {
-  /** Item name */
-  name: string;
-  /** Item type (file or directory) */
-  type: 'file' | 'directory';
-  /** Item size in bytes (files only) */
-  size?: number;
-  /** Last modified timestamp */
-  lastModified?: number;
-  /** Item permissions */
-  permissions?: string;
-  /** Full path to item */
-  path: string;
-}
-
-/**
- * Directory listing response
- */
-export interface DirectoryListing {
-  /** Current directory path */
-  path: string;
-  /** Directory items */
-  items: DirectoryItem[];
-  /** Total items count */
-  totalCount: number;
-  /** Parent directory path */
-  parentPath?: string;
-}
-
-// =============================================================================
-// SPECIALIZED API CLIENT TYPES
-// =============================================================================
-
-/**
- * Database connection test result
- */
-export interface ConnectionTestResult {
-  /** Connection successful */
+export interface FileOperationResult {
+  /** Whether operation was successful */
   success: boolean;
-  /** Connection time in milliseconds */
-  connectionTime?: number;
-  /** Error message if failed */
-  error?: string;
-  /** Database version information */
-  version?: string;
-  /** Additional connection metadata */
+  /** File metadata */
+  file?: FileMetadata;
+  /** Server response data */
+  data?: any;
+  /** Operation error if failed */
+  error?: AppError;
+  /** Upload/download URL */
+  url?: string;
+  /** Operation duration in milliseconds */
+  duration?: number;
+}
+
+/**
+ * File service interface for comprehensive file operations
+ */
+export interface FileService {
+  /** Upload single file */
+  upload: (file: File, config?: FileUploadConfig) => Promise<FileOperationResult>;
+  /** Upload multiple files */
+  uploadMultiple: (files: File[], config?: FileUploadConfig) => Promise<FileOperationResult[]>;
+  /** Download file */
+  download: (config: FileDownloadConfig) => Promise<FileOperationResult>;
+  /** Delete file */
+  delete: (fileId: string) => Promise<FileOperationResult>;
+  /** Get file metadata */
+  getMetadata: (fileId: string) => Promise<FileMetadata>;
+  /** List files */
+  list: (params?: RequestParams) => Promise<ListResponse<FileMetadata>>;
+}
+
+// ============================================================================
+// Progress and Event Types
+// ============================================================================
+
+/**
+ * Generic progress event interface
+ */
+export interface ProgressEvent {
+  /** Event type */
+  type: 'upload' | 'download' | 'processing';
+  /** Progress state */
+  state: 'start' | 'progress' | 'complete' | 'error' | 'abort';
+  /** Progress data */
+  data: FileUploadProgress | FileDownloadProgress | any;
+  /** Event timestamp */
+  timestamp: number;
+  /** Event metadata */
   metadata?: Record<string, any>;
 }
 
 /**
- * Schema discovery result
+ * Event listener function type
  */
-export interface SchemaDiscoveryResult {
-  /** Database tables */
-  tables: Array<{
-    name: string;
-    type: string;
-    fields: Array<{
-      name: string;
-      type: string;
-      required: boolean;
-      default?: any;
-    }>;
-  }>;
-  /** Discovery metadata */
-  metadata: {
-    tableCount: number;
-    discoveryTime: number;
-  };
+export type ProgressEventListener = (event: ProgressEvent) => void;
+
+/**
+ * Event emitter interface for progress tracking
+ */
+export interface ProgressEventEmitter {
+  /** Add event listener */
+  on: (event: string, listener: ProgressEventListener) => void;
+  /** Remove event listener */
+  off: (event: string, listener: ProgressEventListener) => void;
+  /** Emit event */
+  emit: (event: string, data: ProgressEvent) => void;
+  /** Remove all listeners */
+  removeAllListeners: () => void;
+}
+
+// ============================================================================
+// API Client Instance Types
+// ============================================================================
+
+/**
+ * Main API client interface
+ * Provides comprehensive HTTP client functionality with DreamFactory integration
+ */
+export interface ApiClient {
+  /** Client configuration */
+  config: ApiClientConfig;
+  
+  /** Session manager */
+  session: SessionManager;
+  
+  /** Authentication provider */
+  auth: AuthProvider;
+  
+  /** File service */
+  files: FileService;
+  
+  /** Middleware pipeline */
+  middleware: MiddlewarePipeline;
+  
+  /** Make HTTP request with full configuration */
+  request: <T = any>(config: ApiRequestConfig) => Promise<ApiResponse<T>>;
+  
+  /** GET request convenience method */
+  get: <T = any>(url: string, config?: Partial<ApiRequestConfig>) => Promise<ApiResponse<T>>;
+  
+  /** POST request convenience method */
+  post: <T = any>(url: string, data?: any, config?: Partial<ApiRequestConfig>) => Promise<ApiResponse<T>>;
+  
+  /** PUT request convenience method */
+  put: <T = any>(url: string, data?: any, config?: Partial<ApiRequestConfig>) => Promise<ApiResponse<T>>;
+  
+  /** PATCH request convenience method */
+  patch: <T = any>(url: string, data?: any, config?: Partial<ApiRequestConfig>) => Promise<ApiResponse<T>>;
+  
+  /** DELETE request convenience method */
+  delete: <T = any>(url: string, config?: Partial<ApiRequestConfig>) => Promise<ApiResponse<T>>;
+  
+  /** HEAD request convenience method */
+  head: (url: string, config?: Partial<ApiRequestConfig>) => Promise<ApiResponse<void>>;
+  
+  /** OPTIONS request convenience method */
+  options: (url: string, config?: Partial<ApiRequestConfig>) => Promise<ApiResponse<void>>;
+  
+  /** Create new client instance with modified configuration */
+  create: (config: Partial<ApiClientConfig>) => ApiClient;
+  
+  /** Test connection to API */
+  testConnection: () => Promise<boolean>;
+  
+  /** Get client health status */
+  getHealth: () => Promise<HealthStatus>;
+  
+  /** Clean up resources and close connections */
+  dispose: () => Promise<void>;
 }
 
 /**
- * API endpoint generation result
+ * Health status interface for client monitoring
  */
-export interface EndpointGenerationResult {
-  /** Generated endpoints */
-  endpoints: Array<{
-    path: string;
-    method: HttpMethod;
-    description: string;
-    parameters?: Array<{
-      name: string;
-      type: string;
-      required: boolean;
-    }>;
-  }>;
-  /** OpenAPI specification */
-  openApiSpec?: object;
-  /** Generation metadata */
-  metadata: {
-    endpointCount: number;
-    generationTime: number;
+export interface HealthStatus {
+  /** Whether client is healthy */
+  healthy: boolean;
+  /** Connection status to API */
+  connected: boolean;
+  /** Authentication status */
+  authenticated: boolean;
+  /** Circuit breaker status */
+  circuitBreakerOpen: boolean;
+  /** Active request count */
+  activeRequests: number;
+  /** Error rate in last minute */
+  errorRate: number;
+  /** Average response time */
+  averageResponseTime: number;
+  /** Last health check timestamp */
+  lastCheck: string;
+}
+
+// ============================================================================
+// Factory and Builder Types
+// ============================================================================
+
+/**
+ * API client factory interface
+ */
+export interface ApiClientFactory {
+  /** Create new client instance */
+  create: (config: ApiClientConfig) => ApiClient;
+  /** Create client with default configuration */
+  createDefault: () => ApiClient;
+  /** Create server-side client instance */
+  createServerSide: (config?: Partial<ServerSideConfig>) => ApiClient;
+  /** Get shared client instance */
+  getShared: () => ApiClient;
+}
+
+/**
+ * Configuration builder interface for fluent API
+ */
+export interface ConfigBuilder {
+  /** Set base URL */
+  baseUrl: (url: string) => ConfigBuilder;
+  /** Set API key */
+  apiKey: (key: string) => ConfigBuilder;
+  /** Set timeout */
+  timeout: (ms: number) => ConfigBuilder;
+  /** Enable debug mode */
+  debug: (enabled?: boolean) => ConfigBuilder;
+  /** Configure retry behavior */
+  retry: (config: Partial<RetryConfig>) => ConfigBuilder;
+  /** Add interceptor */
+  use: (interceptor: InterceptorConfig) => ConfigBuilder;
+  /** Build final configuration */
+  build: () => ApiClientConfig;
+}
+
+// ============================================================================
+// React Integration Types
+// ============================================================================
+
+/**
+ * React hook configuration for API client integration
+ */
+export interface UseApiClientConfig {
+  /** Client configuration override */
+  config?: Partial<ApiClientConfig>;
+  /** Whether to create server-side client */
+  serverSide?: boolean;
+  /** Whether to enable automatic error handling */
+  autoError?: boolean;
+  /** Whether to enable automatic loading states */
+  autoLoading?: boolean;
+}
+
+/**
+ * React hook return interface
+ */
+export interface UseApiClientReturn {
+  /** API client instance */
+  client: ApiClient;
+  /** Loading state */
+  isLoading: boolean;
+  /** Error state */
+  error: AppError | null;
+  /** Clear error state */
+  clearError: () => void;
+  /** Refresh client connection */
+  refresh: () => Promise<void>;
+}
+
+// ============================================================================
+// Testing and Development Types
+// ============================================================================
+
+/**
+ * Mock API client configuration for testing
+ */
+export interface MockApiClientConfig {
+  /** Whether to enable mocking */
+  enabled: boolean;
+  /** Mock response delay in milliseconds */
+  delay?: number;
+  /** Mock response configurations */
+  responses: MockResponse[];
+  /** Whether to fall through to real API for unmatched requests */
+  fallthrough?: boolean;
+}
+
+/**
+ * Mock response configuration
+ */
+export interface MockResponse {
+  /** Request matcher */
+  matcher: RequestMatcher;
+  /** Mock response data */
+  response: Partial<ApiResponse> | ((config: ApiRequestConfig) => Partial<ApiResponse>);
+  /** Response delay override */
+  delay?: number;
+  /** Whether this mock is enabled */
+  enabled?: boolean;
+}
+
+/**
+ * Request matcher for mock responses
+ */
+export interface RequestMatcher {
+  /** URL pattern to match */
+  url?: string | RegExp;
+  /** HTTP method to match */
+  method?: HttpMethod;
+  /** Custom matcher function */
+  custom?: (config: ApiRequestConfig) => boolean;
+}
+
+// ============================================================================
+// Legacy Compatibility Types
+// ============================================================================
+
+/**
+ * Legacy request options interface for backward compatibility
+ * @deprecated Use ApiRequestConfig instead
+ */
+export interface LegacyRequestOptions extends LegacyRequestOptions {}
+
+/**
+ * Legacy response format for Angular migration compatibility
+ * @deprecated Use ApiResponse instead
+ */
+export interface LegacyApiResponse<T = any> {
+  /** Response data */
+  resource?: T;
+  /** Metadata */
+  meta?: { count?: number };
+  /** Success flag */
+  success?: boolean;
+  /** Error information */
+  error?: {
+    code: string;
+    message: string;
+    status_code: number;
+    context?: any;
   };
 }
 
-// =============================================================================
-// UTILITY TYPES
-// =============================================================================
+// ============================================================================
+// Type Utilities and Exports
+// ============================================================================
 
 /**
- * Extract the resource type from a ListResponse
+ * Extract response data type from API response
  */
-export type ExtractResourceType<T> = T extends ListResponse<infer U> ? U : never;
+export type ExtractResponseData<T> = T extends ApiResponse<infer U> ? U : never;
 
 /**
- * Make all properties of a type optional
+ * Extract list item type from list response
  */
-export type PartialConfig<T> = {
-  [P in keyof T]?: T[P];
+export type ExtractListItem<T> = T extends ListResponse<infer U> ? U : never;
+
+/**
+ * Create type-safe request configuration
+ */
+export type TypedRequestConfig<T = any> = ApiRequestConfig & {
+  data?: T;
 };
 
 /**
- * Combine multiple configuration interfaces
+ * Create type-safe response type
  */
-export type CombinedConfig<T extends Record<string, any>[]> = T extends readonly [
-  infer First,
-  ...infer Rest
-]
-  ? First & CombinedConfig<Rest>
-  : {};
+export type TypedResponse<T = any> = ApiResponse<T>;
 
-/**
- * API client error types
- */
-export type ApiClientError = 
-  | 'NetworkError'
-  | 'TimeoutError'
-  | 'AuthenticationError'
-  | 'AuthorizationError'
-  | 'ValidationError'
-  | 'ServerError'
-  | 'UnknownError';
-
-/**
- * Request context for debugging and monitoring
- */
-export interface RequestContext {
-  /** Request ID for tracing */
-  requestId: string;
-  /** Request timestamp */
-  timestamp: number;
-  /** Request duration in milliseconds */
-  duration?: number;
-  /** Request retry count */
-  retryCount: number;
-  /** Request source (component, hook, etc.) */
-  source?: string;
-}
-
-// =============================================================================
-// EXPORT AGGREGATION
-// =============================================================================
-
-/**
- * Complete API client configuration combining all config interfaces
- */
-export interface ApiClientConfig extends 
-  RequestConfig, 
-  SWRConfig, 
-  ReactQueryConfig, 
-  FileUploadConfig {
-  /** Base URL for API requests */
-  baseUrl: string;
-  /** Default authentication headers */
-  defaultHeaders?: AuthHeaders;
-  /** Global middleware stack */
-  middleware?: Partial<MiddlewareStack>;
-  /** Default request timeout */
-  defaultTimeout?: number;
-  /** Enable development mode features */
-  developmentMode?: boolean;
-}
-
-/**
- * Re-export commonly used types for convenience
- */
+// Export all types for convenient importing
 export type {
-  // Core types
-  HttpMethod,
-  ContentType,
-  CacheStrategy,
+  // Core configuration
+  ApiClientConfig,
+  ServerSideConfig,
+  InterceptorConfig,
   
-  // Configuration types
-  RequestConfig,
-  PaginationConfig,
-  FilterConfig,
-  UIConfig,
+  // Request types
+  ApiRequestConfig,
+  RequestParams,
+  AuthConfig,
   CacheConfig,
+  ProgressConfig,
+  RequestMetadata,
   
   // Response types
-  SuccessResponse,
-  ErrorResponse,
+  ApiResponse,
+  ResponseMeta,
+  PaginationMeta,
+  TimingMeta,
+  CacheMeta,
+  ResponseStatus,
   ListResponse,
   CreateResponse,
   UpdateResponse,
   DeleteResponse,
-  
-  // Authentication types
-  AuthToken,
-  AuthContext,
-  AuthHeaders,
+  BulkResponse,
   
   // Middleware types
+  RequestInterceptor,
+  ResponseInterceptor,
+  ErrorInterceptor,
   MiddlewareContext,
-  RequestMiddleware,
-  ResponseMiddleware,
-  ErrorMiddleware,
+  MiddlewareState,
+  MiddlewarePipeline,
+  
+  // Authentication types
+  SessionManager,
+  SessionMetadata,
+  AuthProvider,
+  AuthState,
   
   // File operation types
-  FileMetadata,
   FileUploadConfig,
   FileDownloadConfig,
-  DirectoryListing,
+  FileMetadata,
+  FileUploadProgress,
+  FileDownloadProgress,
+  FileOperationResult,
+  FileService,
+  
+  // Progress and events
+  ProgressEvent,
+  ProgressEventListener,
+  ProgressEventEmitter,
+  
+  // Client types
+  ApiClient,
+  HealthStatus,
+  ApiClientFactory,
+  ConfigBuilder,
+  
+  // React integration
+  UseApiClientConfig,
+  UseApiClientReturn,
+  
+  // Testing types
+  MockApiClientConfig,
+  MockResponse,
+  RequestMatcher,
+  
+  // Legacy compatibility
+  LegacyApiResponse,
+  
+  // Type utilities
+  ExtractResponseData,
+  ExtractListItem,
+  TypedRequestConfig,
+  TypedResponse,
+};
+
+// Export common enums and constants
+export { HttpMethod };
+
+// Default configuration values
+export const DEFAULT_CONFIG: Partial<ApiClientConfig> = {
+  timeout: 30000,
+  withCredentials: true,
+  debug: process.env.NODE_ENV === 'development',
+  retryConfig: {
+    maxAttempts: 3,
+    initialDelay: 1000,
+    maxDelay: 10000,
+    backoffFactor: 2,
+    jitter: true,
+    retryableStatusCodes: [408, 429, 500, 502, 503, 504],
+    retryableNetworkErrors: ['TIMEOUT', 'NETWORK_ERROR', 'ECONNRESET'],
+  },
+  interceptors: [],
+};
+
+export const DEFAULT_SERVER_CONFIG: ServerSideConfig = {
+  enabled: true,
+  sessionCookieName: 'df-session-token',
+  revalidateInterval: 60,
+  serverHeaders: {},
 };
