@@ -1,322 +1,424 @@
 /**
  * LinkService Component System - Barrel Exports
  * 
- * Centralized export module for React 19 LinkService component system that provides
- * external storage service linking functionality with comprehensive TypeScript support,
- * React Hook Form integration, and WCAG 2.1 AA accessibility compliance.
+ * Centralized export file for external storage service linking functionality
+ * that replaces Angular df-link-service module in the DreamFactory Admin Interface.
  * 
- * This barrel export follows Next.js 15.1 app router patterns and modern React
- * component library conventions with optimized tree-shaking support for production builds.
+ * This barrel export provides comprehensive access to:
+ * - LinkService component (main service linking interface)
+ * - Storage service type definitions and interfaces
+ * - Form validation schemas and utilities
+ * - Service configuration types and metadata
+ * - Connection testing and file operation utilities
  * 
- * @fileoverview Centralized exports for LinkService component and utilities
- * @version 1.0.0
- * @since React 19, Next.js 15.1, TypeScript 5.8+
+ * @framework React 19 + Next.js 15.1
+ * @styling Tailwind CSS 4.1+ with Headless UI components  
+ * @forms React Hook Form 7.52+ with Zod schema validation
+ * @accessibility WCAG 2.1 AA compliant storage service interface
+ * @performance Real-time validation under 100ms per Section 0 requirements
  */
 
 // =============================================================================
-// COMPONENT EXPORTS
+// PRIMARY COMPONENT EXPORTS
 // =============================================================================
 
 /**
- * Main LinkService Component
+ * Main LinkService component - Primary export for storage service linking
  * 
- * React 19 component for linking external storage services (GitHub, file services)
- * with comprehensive form validation, caching, and accessibility features.
- * 
- * Features:
- * - React Hook Form integration with Zod validation
- * - SWR-powered data fetching and caching
- * - WCAG 2.1 AA accessibility compliance
- * - Headless UI components with Tailwind CSS styling
- * - Progressive enhancement and loading states
- * - Real-time form validation under 100ms
+ * Replaces Angular df-link-service component with comprehensive React 19 implementation:
+ * - External storage service connection (AWS S3, Azure Blob, Google Cloud, etc.)
+ * - React Hook Form integration with real-time validation under 100ms
+ * - Expandable service configuration with accessibility compliance
+ * - Connection testing and file operation validation
+ * - Service-specific configuration forms with dynamic field rendering
+ * - Comprehensive error handling and loading states
+ * - WCAG 2.1 AA accessibility with screen reader support
  * 
  * @example
  * ```tsx
  * import { LinkService } from '@/components/ui/link-service';
  * 
- * function MyComponent() {
- *   return (
- *     <LinkService
- *       storageServiceId="github-service"
- *       onContentChange={(content) => console.log(content)}
- *       onStoragePathChange={(path) => console.log(path)}
- *     />
- *   );
- * }
+ * <LinkService
+ *   onSubmit={handleServiceConfig}
+ *   availableTypes={['aws_s3', 'azure_blob']}
+ *   enableTesting={true}
+ *   showAdvanced={false}
+ * />
  * ```
  */
-export { LinkService } from './link-service';
+export { 
+  LinkService as default,
+  LinkService,
+} from './link-service';
 
 /**
- * Default export for LinkService component
- * Supports both named and default import patterns for compatibility
+ * LinkService component prop interfaces and configuration types
+ * Provides comprehensive TypeScript support for all service linking scenarios
  */
-export { default } from './link-service';
-
-// =============================================================================
-// TYPE DEFINITIONS EXPORTS
-// =============================================================================
-
-/**
- * Core Component Props and Interfaces
- * Essential type definitions for LinkService component usage
- */
-export type {
+export type { 
   LinkServiceProps,
   LinkServiceFormData,
-  LinkServiceFormContext,
   LinkServiceState,
   LinkServiceEventHandlers,
-  LinkServiceTheme,
-} from './link-service.types';
+} from './link-service';
+
+// =============================================================================
+// STORAGE SERVICE TYPE DEFINITIONS
+// =============================================================================
 
 /**
- * Storage Service Type Definitions
- * Comprehensive interfaces for external storage service integration
+ * Core storage service interfaces and type definitions
+ * Supports all major cloud storage providers and traditional file systems
  */
 export type {
+  // Primary service types
   StorageService,
   StorageServiceType,
-  StorageServiceAPI,
-  ServiceConnectionConfig,
-  ServiceConfigSchema,
-  ServiceLabelType,
+  StorageServiceCategory,
+  StorageCapabilities,
+  StorageAuthMethod,
+  
+  // Service configuration interfaces
+  BaseStorageConfig,
+  StorageServiceConfig,
+  AWSS3Config,
+  AzureBlobConfig,
+  GoogleCloudConfig,
+  LocalFileConfig,
+  FtpConfig,
+  CustomStorageConfig,
+  
+  // Dynamic configuration types
+  ExtractServiceConfig,
 } from './link-service.types';
 
-/**
- * Form Management Types
- * React Hook Form and validation-related type definitions
- */
-export type {
-  LinkServiceFormSchema,
-  LinkServiceFormFields,
-  UseLinkServiceFormReturn,
-} from './link-service.types';
+// =============================================================================
+// FORM AND VALIDATION TYPES
+// =============================================================================
 
 /**
- * Cache and File Management Types
- * Types for content caching and file operations
+ * Form data structures and validation schemas for service configuration
+ * Integrates with React Hook Form and Zod for type-safe form handling
  */
 export type {
-  CacheManagement,
-  FileContentManagement,
-  CacheOperations,
-  FileOperations,
+  // Form data and validation
+  LinkServiceValidationSchemas,
+  DynamicLinkServiceSchema,
+  
+  // Component prop interfaces
+  ServiceTypeSelectorProps,
+  ServiceConfigFormProps,
+  ConnectionTestProps,
+  ServiceListProps,
+  
+  // Form field component interfaces
+  FormFieldProps,
+  FormFieldConfig,
+  FormConfig,
+  FormValidationResult,
+  FormSubmissionResult,
+  UseFormResult,
+  FormState,
+  FormActions,
+  DynamicFormConfig,
 } from './link-service.types';
 
+// =============================================================================
+// CONNECTION TESTING AND FILE OPERATIONS
+// =============================================================================
+
 /**
- * Hook Return Types
- * Type definitions for custom React hooks used by LinkService
+ * Connection testing interfaces and file operation utilities
+ * Provides comprehensive service validation and file management capabilities
  */
 export type {
+  // Connection testing
+  ConnectionTestResult,
+  TestResult,
   UseStorageServicesReturn,
+  
+  // File operations
+  FileOperations,
+  FileUploadResult,
+  FileDownloadResult,
+  FileListResult,
+  FileDeleteResult,
+  FileMetadataResult,
+  DirectoryCreateResult,
+  FileCopyResult,
+  FileMoveResult,
+  
+  // File and directory metadata
+  FileMetadata,
+  FileInfo,
+  DirectoryInfo,
 } from './link-service.types';
 
+// =============================================================================
+// SERVICE MANAGEMENT UTILITIES
+// =============================================================================
+
 /**
- * Utility and Helper Types
- * Additional type utilities for advanced usage patterns
+ * Storage service management utilities and configuration helpers
+ * Provides service registry, cache management, and metadata utilities
  */
 export type {
-  StorageServiceTypes,
-  ServiceConfigurationKeys,
+  // Service management
+  ServiceMetadata,
+  ServiceRegistry,
+  ServiceCacheManager,
+  CacheManagement,
+  
+  // API integration
+  StorageServiceEndpoints,
+  StorageServiceSwrConfig,
+  StorageServiceMutations,
+  
+  // Component utilities
+  ComponentVariant,
+  ComponentSize,
+  ComponentState,
+  ResponsiveValue,
+  ThemeConfig,
+  LoadingState,
+  ValidationState,
 } from './link-service.types';
 
 // =============================================================================
-// UTILITY FUNCTION EXPORTS
+// FORM CONTROL AND VALIDATION UTILITIES
 // =============================================================================
 
 /**
- * Type Guard Functions
- * Runtime type checking utilities for storage service and form data validation
- * 
- * @example
- * ```tsx
- * import { isStorageService, isLinkServiceFormData } from '@/components/ui/link-service';
- * 
- * if (isStorageService(data)) {
- *   // TypeScript knows data is StorageService
- *   console.log(data.name);
- * }
- * ```
+ * Re-export commonly used form and validation utilities
+ * Provides single import point for React Hook Form and Zod integration
  */
-export {
-  isStorageService,
-  isLinkServiceFormData,
+export type {
+  // React Hook Form types
+  UseFormReturn,
+  FieldError,
+  Control,
+  FieldValues,
+  Path,
+  
+  // Zod validation types
+  z,
 } from './link-service.types';
 
 // =============================================================================
-// CONFIGURATION CONSTANTS EXPORTS
+// CONSTANTS AND CONFIGURATION PRESETS
 // =============================================================================
 
 /**
- * Default Configuration Constants
- * Production-ready default values for LinkService configuration
- * 
- * @example
- * ```tsx
- * import { LINK_SERVICE_DEFAULTS } from '@/components/ui/link-service';
- * 
- * const cacheConfig = {
- *   ttl: LINK_SERVICE_DEFAULTS.CACHE_TTL,
- *   timeout: LINK_SERVICE_DEFAULTS.REQUEST_TIMEOUT,
- * };
- * ```
+ * Storage service constants and default configurations
+ * Maintains consistency across storage service implementations
  */
 export {
+  // Default configurations
   LINK_SERVICE_DEFAULTS,
+  SERVICE_TYPE_CONFIG,
+  STORAGE_SERVICE_CONSTANTS,
 } from './link-service.types';
 
+// =============================================================================
+// COMPONENT COLLECTIONS FOR BULK IMPORTS
+// =============================================================================
+
 /**
- * Service Type Configuration Mapping
- * Predefined configurations for different storage service types
+ * Complete LinkService component collection for bulk imports
+ * Useful for component libraries and documentation systems
  * 
  * @example
  * ```tsx
- * import { SERVICE_TYPE_CONFIG } from '@/components/ui/link-service';
+ * import { LinkServiceComponents } from '@/components/ui/link-service';
  * 
- * const githubConfig = SERVICE_TYPE_CONFIG.github;
- * if (githubConfig.supportsRepository) {
- *   // Enable repository-specific features
- * }
+ * // Access all components through the collection
+ * const { LinkService } = LinkServiceComponents;
  * ```
  */
-export {
-  SERVICE_TYPE_CONFIG,
-} from './link-service.types';
-
-// =============================================================================
-// RE-EXPORTS FOR CONVENIENCE
-// =============================================================================
-
-/**
- * Convenient re-exports of commonly used types
- * Grouped exports for simplified imports in consumer components
- */
-
-/**
- * Form-related exports
- * All types and utilities needed for form integration
- */
-export type {
-  LinkServiceProps as Props,
-  LinkServiceFormData as FormData,
-  LinkServiceFormContext as FormContext,
-  LinkServiceEventHandlers as EventHandlers,
-} from './link-service.types';
-
-/**
- * Service-related exports  
- * All types needed for storage service integration
- */
-export type {
-  StorageService as Service,
-  StorageServiceType as ServiceType,
-  ServiceConnectionConfig as ConnectionConfig,
-} from './link-service.types';
-
-/**
- * State management exports
- * Types for component state and operations
- */
-export type {
-  LinkServiceState as State,
-  CacheManagement as Cache,
-  FileContentManagement as FileContent,
-} from './link-service.types';
-
-// =============================================================================
-// TREE-SHAKING OPTIMIZATION
-// =============================================================================
-
-/**
- * Named export collections for optimized tree-shaking
- * Organized by functional area to enable selective imports
- */
-
-/**
- * Component exports - Main component and related UI elements
- */
-export const Component = {
+export const LinkServiceComponents = {
   LinkService,
 } as const;
 
 /**
- * Types exports - Core type definitions organized by category
+ * LinkService utilities collection for bulk imports
+ * Provides access to all service management and validation utilities
+ * 
+ * @example
+ * ```tsx
+ * import { LinkServiceUtils } from '@/components/ui/link-service';
+ * 
+ * // Access utilities through the collection
+ * const config = LinkServiceUtils.SERVICE_TYPE_CONFIG.aws_s3;
+ * ```
  */
-export const Types = {
-  // Component props and state
-  Props: {} as LinkServiceProps,
-  FormData: {} as LinkServiceFormData,
-  State: {} as LinkServiceState,
+export const LinkServiceUtils = {
+  LINK_SERVICE_DEFAULTS,
+  SERVICE_TYPE_CONFIG,
+  STORAGE_SERVICE_CONSTANTS,
+} as const;
+
+// =============================================================================
+// TYPE COLLECTION EXPORTS
+// =============================================================================
+
+/**
+ * Complete type collection for LinkService system
+ * Consolidates all TypeScript interfaces and types for easy import
+ * 
+ * @example
+ * ```tsx
+ * import type { LinkServiceSystemTypes } from '@/components/ui/link-service';
+ * 
+ * type MyServiceConfig = LinkServiceSystemTypes['StorageServiceConfig'];
+ * ```
+ */
+export interface LinkServiceSystemTypes {
+  // Core component types
+  LinkServiceProps: LinkServiceProps;
+  LinkServiceFormData: LinkServiceFormData;
+  LinkServiceState: LinkServiceState;
   
-  // Service definitions
-  Service: {} as StorageService,
-  ServiceType: {} as StorageServiceType,
+  // Storage service types
+  StorageService: StorageService;
+  StorageServiceConfig: StorageServiceConfig;
+  StorageCapabilities: StorageCapabilities;
+  
+  // Connection and testing types
+  ConnectionTestResult: ConnectionTestResult;
+  FileOperations: FileOperations;
   
   // Configuration types
-  ConnectionConfig: {} as ServiceConnectionConfig,
-  CacheConfig: {} as CacheManagement,
+  ServiceMetadata: ServiceMetadata;
+  ServiceRegistry: ServiceRegistry;
+}
+
+// =============================================================================
+// STORAGE SERVICE TYPE UNIONS
+// =============================================================================
+
+/**
+ * Storage service type unions for dynamic component creation
+ * Useful for configuration-driven service rendering and type narrowing
+ */
+export type StorageServiceVariant = 
+  | 'aws_s3'
+  | 'azure_blob' 
+  | 'google_cloud'
+  | 'local_file'
+  | 'ftp'
+  | 'sftp'
+  | 'dropbox'
+  | 'onedrive'
+  | 'box'
+  | 'rackspace'
+  | 'openstack'
+  | 'custom';
+
+/**
+ * Storage service categories for UI organization and filtering
+ */
+export type StorageCategory = 'cloud' | 'filesystem' | 'enterprise' | 'custom';
+
+/**
+ * Authentication method variants for service configuration
+ */
+export type AuthMethodVariant = 
+  | 'api_key'
+  | 'oauth2'
+  | 'username_password'
+  | 'certificate'
+  | 'shared_key'
+  | 'iam_role'
+  | 'service_account'
+  | 'connection_string';
+
+// =============================================================================
+// ACCESSIBILITY AND COMPLIANCE CONSTANTS
+// =============================================================================
+
+/**
+ * WCAG 2.1 AA compliance constants for LinkService component system
+ * Provides reference values for accessibility validation and testing
+ */
+export const LINK_SERVICE_ACCESSIBILITY = {
+  /**
+   * ARIA labels for storage service components
+   */
+  ARIA_LABELS: {
+    serviceSelector: 'Select storage service type',
+    configurationForm: 'Storage service configuration form',
+    connectionTest: 'Test storage service connection',
+    advancedOptions: 'Advanced configuration options',
+    serviceStatus: 'Storage service connection status',
+  },
   
-  // Hook return types
-  FormReturn: {} as UseLinkServiceFormReturn,
-  ServicesReturn: {} as UseStorageServicesReturn,
+  /**
+   * Minimum interaction target sizes per WCAG guidelines
+   */
+  TOUCH_TARGETS: {
+    minimum: { width: 44, height: 44 },
+    recommended: { width: 48, height: 48 },
+  },
+  
+  /**
+   * Screen reader announcements and live regions
+   */
+  LIVE_REGIONS: {
+    connectionStatus: 'polite',
+    validationErrors: 'assertive',
+    operationProgress: 'polite',
+  },
+  
+  /**
+   * Focus management settings
+   */
+  FOCUS_MANAGEMENT: {
+    trapFocus: true,
+    restoreFocus: true,
+    skipLinks: true,
+  },
 } as const;
 
 /**
- * Utilities exports - Helper functions and type guards
+ * Default LinkService configuration for consistent application defaults
+ * Ensures proper accessibility, performance, and user experience settings
  */
-export const Utils = {
-  isStorageService,
-  isLinkServiceFormData,
-} as const;
-
-/**
- * Constants exports - Configuration defaults and mappings
- */
-export const Constants = {
-  DEFAULTS: LINK_SERVICE_DEFAULTS,
-  SERVICE_TYPES: SERVICE_TYPE_CONFIG,
+export const DEFAULT_LINK_SERVICE_CONFIG = {
+  // Component behavior
+  enableRealTimeValidation: true,
+  validationDelay: 300, // milliseconds
+  enableConnectionTesting: true,
+  showAdvancedOptions: false,
+  
+  // UI preferences
+  variant: 'default' as const,
+  size: 'md' as const,
+  mode: 'form' as const,
+  
+  // Accessibility settings
+  enableKeyboardNavigation: true,
+  announceStateChanges: true,
+  useAriaLiveRegions: true,
+  
+  // Performance settings
+  cacheConnectionTests: true,
+  debounceValidation: true,
+  enableOptimisticUpdates: false,
 } as const;
 
 // =============================================================================
-// METADATA AND DOCUMENTATION
+// LEGACY COMPATIBILITY (DEPRECATED)
 // =============================================================================
 
 /**
- * Component metadata for development tools and documentation
+ * Default export object for backward compatibility
+ * @deprecated Use named exports instead for better tree-shaking and explicit imports
  */
-export const LinkServiceMeta = {
-  displayName: 'LinkService',
-  version: '1.0.0',
-  description: 'External storage service linking component with form validation and caching',
-  category: 'Form',
-  subcategory: 'Storage Integration',
-  tags: ['storage', 'github', 'form', 'validation', 'accessibility'],
-  status: 'stable',
-  framework: 'React 19',
-  dependencies: {
-    'react-hook-form': '^7.52.0',
-    'zod': '^3.22.0',
-    'swr': '^2.2.0',
-    '@headlessui/react': '^2.0.0',
-  },
-  accessibility: {
-    wcag: '2.1 AA',
-    screenReader: true,
-    keyboard: true,
-    colorContrast: true,
-    focusManagement: true,
-  },
-  testing: {
-    unit: true,
-    integration: true,
-    accessibility: true,
-    performance: true,
-  },
+const LinkServiceModule = {
+  LinkService,
+  LinkServiceComponents,
+  LinkServiceUtils,
 } as const;
 
-/**
- * Export metadata for development tools
- */
-export const meta = LinkServiceMeta;
+// Note: Not exporting default module to encourage named imports
+// export default LinkServiceModule;
