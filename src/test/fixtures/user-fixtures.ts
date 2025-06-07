@@ -1,772 +1,1176 @@
 /**
- * User and admin profile fixture factory functions for testing authentication,
- * authorization, and user management React components with Next.js middleware integration.
+ * User and Admin Profile Fixture Factory Functions
  * 
- * Provides comprehensive factory functions for creating user profiles, admin accounts,
- * roles, permissions, and session data to support testing of user management interfaces
- * with JWT token validation and role-based access control.
+ * Comprehensive factory functions for generating realistic user data for testing
+ * authentication, authorization, and user management React components in the
+ * DreamFactory Admin Interface.
  * 
- * @fileoverview User management test fixtures supporting React Hook Form validation,
- * Next.js middleware authentication, and comprehensive security testing scenarios.
- */
-
-import { faker } from '@faker-js/faker';
-
-/**
- * User profile types based on the refactored React/Next.js architecture
- */
-export interface UserProfile {
-  id: number;
-  email: string;
-  firstName: string;
-  lastName: string;
-  displayName: string;
-  phone?: string;
-  username?: string;
-  isActive: boolean;
-  isSysAdmin: boolean;
-  lastLoginDate?: string;
-  registrationDate: string;
-  emailVerified: boolean;
-  twoFactorEnabled: boolean;
-  defaultAppId?: number;
-  apps: UserApp[];
-  roles: Role[];
-  permissions: Permission[];
-  profile?: UserProfileDetails;
-}
-
-/**
- * Admin profile with enhanced privileges for administrative operations
- */
-export interface AdminProfile extends UserProfile {
-  adminLevel: 'super' | 'system' | 'limited';
-  canManageUsers: boolean;
-  canManageServices: boolean;
-  canManageApps: boolean;
-  canManageRoles: boolean;
-  canViewLogs: boolean;
-  canModifySystem: boolean;
-  lastAdminActivity?: string;
-  adminNotes?: string;
-}
-
-/**
- * Role definition with granular permissions for RBAC testing
- */
-export interface Role {
-  id: number;
-  name: string;
-  description: string;
-  isActive: boolean;
-  roleServiceAccessByRoleId: RoleServiceAccess[];
-  roleAppAccessByRoleId: RoleAppAccess[];
-  permissions: Permission[];
-  users?: UserProfile[];
-  createdDate: string;
-  lastModifiedDate: string;
-}
-
-/**
- * Permission definition for fine-grained access control
- */
-export interface Permission {
-  id: number;
-  name: string;
-  resource: string;
-  action: 'create' | 'read' | 'update' | 'delete' | 'execute';
-  component?: string;
-  verb?: string;
-  service?: string;
-  isActive: boolean;
-}
-
-/**
- * User session data with JWT token information
- */
-export interface UserSession {
-  sessionToken: string;
-  refreshToken?: string;
-  sessionId: string;
-  userId: number;
-  expires: string;
-  issuedAt: string;
-  lastActivity: string;
-  ipAddress: string;
-  userAgent: string;
-  isValid: boolean;
-  permissions: Permission[];
-  roles: string[];
-}
-
-/**
- * User registration data for testing registration workflows
- */
-export interface UserRegistration {
-  email: string;
-  firstName: string;
-  lastName: string;
-  displayName: string;
-  password: string;
-  confirmPassword: string;
-  phone?: string;
-  username?: string;
-  sendInvite?: boolean;
-  verificationToken?: string;
-  registrationDate?: string;
-}
-
-/**
- * Password reset data for testing password recovery flows
- */
-export interface PasswordReset {
-  email: string;
-  resetToken: string;
-  tokenExpires: string;
-  newPassword?: string;
-  confirmPassword?: string;
-  isTokenValid: boolean;
-  requestedAt: string;
-  completedAt?: string;
-}
-
-/**
- * Multi-factor authentication data
- */
-export interface MfaConfiguration {
-  userId: number;
-  isEnabled: boolean;
-  method: 'totp' | 'sms' | 'email';
-  secret?: string;
-  backupCodes: string[];
-  lastUsed?: string;
-  verificationCode?: string;
-  isCodeValid?: boolean;
-}
-
-/**
- * User app access configuration
- */
-export interface UserApp {
-  id: number;
-  name: string;
-  description?: string;
-  url?: string;
-  isDefault: boolean;
-  allowFullAccess: boolean;
-  roles: Role[];
-}
-
-/**
- * Role service access configuration
- */
-export interface RoleServiceAccess {
-  id: number;
-  roleId: number;
-  serviceId: number;
-  component?: string;
-  verbMask: number;
-  requestorMask: number;
-  filters?: string;
-  filterOp?: string;
-}
-
-/**
- * Role app access configuration
- */
-export interface RoleAppAccess {
-  id: number;
-  roleId: number;
-  appId: number;
-  allowFullAccess: boolean;
-}
-
-/**
- * Extended user profile details
- */
-export interface UserProfileDetails {
-  bio?: string;
-  avatar?: string;
-  timezone?: string;
-  locale?: string;
-  dateFormat?: string;
-  theme?: 'light' | 'dark' | 'system';
-  preferences: Record<string, any>;
-}
-
-/**
- * Factory function configuration options
- */
-export interface UserFactoryOptions {
-  id?: number;
-  email?: string;
-  isActive?: boolean;
-  isSysAdmin?: boolean;
-  roles?: Role[];
-  permissions?: Permission[];
-  emailVerified?: boolean;
-  twoFactorEnabled?: boolean;
-  includeProfile?: boolean;
-  includeApps?: boolean;
-}
-
-export interface AdminFactoryOptions extends UserFactoryOptions {
-  adminLevel?: 'super' | 'system' | 'limited';
-  canManageUsers?: boolean;
-  canManageServices?: boolean;
-  canManageApps?: boolean;
-  canManageRoles?: boolean;
-  canViewLogs?: boolean;
-  canModifySystem?: boolean;
-}
-
-export interface RoleFactoryOptions {
-  id?: number;
-  name?: string;
-  isActive?: boolean;
-  includePermissions?: boolean;
-  includeServiceAccess?: boolean;
-  includeAppAccess?: boolean;
-  permissionCount?: number;
-}
-
-export interface SessionFactoryOptions {
-  userId?: number;
-  isValid?: boolean;
-  expiresInHours?: number;
-  includeRefreshToken?: boolean;
-  roles?: string[];
-  permissions?: Permission[];
-}
-
-/**
- * Generate a realistic user profile with configurable options
+ * Features:
+ * - User profile mock data for authentication and authorization testing
+ * - Role-based access control data for testing permission scenarios
+ * - Session management data for testing JWT token validation
+ * - User registration and password reset data for testing user lifecycle
+ * - Multi-factor authentication data and security credential generation
+ * - Support for testing user relationship data including apps and services
  * 
- * @param options - Configuration options for user generation
- * @returns UserProfile - Generated user profile with realistic data
+ * @fileoverview User fixture factories for React component testing
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
-export function userProfileFactory(options: UserFactoryOptions = {}): UserProfile {
-  const id = options.id ?? faker.number.int({ min: 1, max: 10000 });
-  const firstName = faker.person.firstName();
-  const lastName = faker.person.lastName();
-  const email = options.email ?? faker.internet.email({ firstName, lastName }).toLowerCase();
-  
-  const baseUser: UserProfile = {
+
+import {
+  UserProfile,
+  AdminProfile,
+  UserSession,
+  UserRow,
+  LoginCredentials,
+  LoginResponse,
+  RegisterDetails,
+  ForgetPasswordRequest,
+  ResetFormData,
+  UpdatePasswordRequest,
+  UpdatePasswordResponse,
+  SecurityQuestion,
+  UserAppRole,
+  LookupKey,
+  UserParams,
+  AdminCapability,
+  SystemPermission,
+  SessionCookieData,
+  SessionValidationResult,
+  SessionError,
+  JWTTokenPayload,
+  TokenRefreshResult
+} from '../../types/user';
+
+import {
+  RoleType,
+  RoleServiceAccess,
+  RoleLookup,
+  RoleWithRelations,
+  RoleRow,
+  CreateRoleData,
+  HttpVerb,
+  ServiceAccessConfig,
+  RolePermissionSummary
+} from '../../types/role';
+
+import {
+  UserSession as AuthUserSession,
+  LoginCredentials as AuthLoginCredentials,
+  LoginResponse as AuthLoginResponse,
+  RegisterDetails as AuthRegisterDetails,
+  RolePermission,
+  MiddlewareAuthContext,
+  MiddlewareAuthResult,
+  JWTPayload,
+  AuthState,
+  AuthError,
+  AuthErrorCode,
+  ForgetPasswordRequest as AuthForgetPasswordRequest,
+  ResetFormData as AuthResetFormData,
+  UpdatePasswordRequest as AuthUpdatePasswordRequest,
+  UpdatePasswordResponse as AuthUpdatePasswordResponse,
+  SecurityQuestion as AuthSecurityQuestion,
+  OAuthLoginRequest,
+  SAMLAuthParams,
+  AuthCookieConfig,
+  SessionStorage
+} from '../../types/auth';
+
+import { generateTestId, generateTestEmail, generateTestDate } from '../utils/component-factories';
+
+// =============================================================================
+// CORE USER PROFILE FACTORIES
+// =============================================================================
+
+/**
+ * Factory function for creating user profile test data
+ * Generates realistic user accounts with configurable roles and permissions
+ * 
+ * @param overrides - Partial user profile data to override defaults
+ * @returns Complete UserProfile object for testing
+ */
+export const userProfileFactory = (overrides: Partial<UserProfile> = {}): UserProfile => {
+  const id = overrides.id || Math.floor(Math.random() * 10000) + 1;
+  const baseProfile: UserProfile = {
+    // Core identification
     id,
-    email,
-    firstName,
-    lastName,
-    displayName: options.includeProfile ? `${firstName} ${lastName}` : faker.person.fullName(),
-    phone: faker.phone.number(),
-    username: faker.internet.userName({ firstName, lastName }).toLowerCase(),
-    isActive: options.isActive ?? faker.datatype.boolean({ probability: 0.9 }),
-    isSysAdmin: options.isSysAdmin ?? faker.datatype.boolean({ probability: 0.1 }),
-    lastLoginDate: faker.date.recent({ days: 30 }).toISOString(),
-    registrationDate: faker.date.past({ years: 2 }).toISOString(),
-    emailVerified: options.emailVerified ?? faker.datatype.boolean({ probability: 0.95 }),
-    twoFactorEnabled: options.twoFactorEnabled ?? faker.datatype.boolean({ probability: 0.3 }),
-    defaultAppId: faker.number.int({ min: 1, max: 5 }),
-    apps: options.includeApps ? generateUserApps() : [],
-    roles: options.roles ?? [roleFactory({ name: 'User' })],
-    permissions: options.permissions ?? generateBasicPermissions(),
+    username: `user${id}`,
+    email: `user${id}@example.com`,
+    first_name: 'John',
+    last_name: 'Doe',
+    display_name: 'John Doe',
+    
+    // Authentication & Security
+    is_active: true,
+    confirmed: true,
+    security_question: 'What is your favorite color?',
+    security_answer: 'blue',
+    password_set_date: generateTestDate(-30).toISOString(),
+    last_login_date: generateTestDate(-1).toISOString(),
+    failed_login_attempts: 0,
+    locked_until: null,
+    
+    // Profile details
+    phone: '+1-555-123-4567',
+    name: 'John Doe',
+    
+    // Audit trail
+    created_date: generateTestDate(-90).toISOString(),
+    last_modified_date: generateTestDate(-1).toISOString(),
+    created_by_id: 1,
+    last_modified_by_id: 1,
+    
+    // Relationships and metadata
+    lookup_by_user_id: [],
+    user_to_app_to_role_by_user_id: [],
+    
+    // RBAC integration
+    role: roleTypeFactory(),
+    permissions: ['read_profile', 'update_profile'],
+    accessibleRoutes: ['/profile', '/api-connections'],
+    
+    // Enhanced security for Next.js SSR
+    sessionId: `session_${id}_${Date.now()}`,
+    tokenVersion: 1,
+    lastActivity: generateTestDate().toISOString(),
   };
 
-  if (options.includeProfile) {
-    baseUser.profile = {
-      bio: faker.lorem.sentences(2),
-      avatar: faker.image.avatar(),
-      timezone: faker.location.timeZone(),
-      locale: faker.location.countryCode(),
-      dateFormat: faker.helpers.arrayElement(['MM/DD/YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD']),
-      theme: faker.helpers.arrayElement(['light', 'dark', 'system']),
-      preferences: {
-        emailNotifications: faker.datatype.boolean(),
-        darkMode: faker.datatype.boolean(),
-        compactView: faker.datatype.boolean(),
-        autoRefresh: faker.datatype.boolean(),
-      },
-    };
-  }
-
-  return baseUser;
-}
-
-/**
- * Generate an administrative user profile with elevated privileges
- * 
- * @param options - Configuration options for admin generation
- * @returns AdminProfile - Generated admin profile with enhanced permissions
- */
-export function adminProfileFactory(options: AdminFactoryOptions = {}): AdminProfile {
-  const baseUser = userProfileFactory({
-    ...options,
-    isSysAdmin: true,
-    isActive: true,
-    emailVerified: true,
-    roles: options.roles ?? [roleFactory({ name: 'Administrator' })],
-    includeProfile: true,
-    includeApps: true,
-  });
-
-  const adminProfile: AdminProfile = {
-    ...baseUser,
-    adminLevel: options.adminLevel ?? faker.helpers.arrayElement(['super', 'system', 'limited']),
-    canManageUsers: options.canManageUsers ?? faker.datatype.boolean({ probability: 0.8 }),
-    canManageServices: options.canManageServices ?? faker.datatype.boolean({ probability: 0.9 }),
-    canManageApps: options.canManageApps ?? faker.datatype.boolean({ probability: 0.7 }),
-    canManageRoles: options.canManageRoles ?? faker.datatype.boolean({ probability: 0.6 }),
-    canViewLogs: options.canViewLogs ?? faker.datatype.boolean({ probability: 0.9 }),
-    canModifySystem: options.canModifySystem ?? faker.datatype.boolean({ probability: 0.5 }),
-    lastAdminActivity: faker.date.recent({ days: 7 }).toISOString(),
-    adminNotes: faker.lorem.sentences(1),
-    permissions: generateAdminPermissions(),
-  };
-
-  return adminProfile;
-}
-
-/**
- * Generate a role configuration with associated permissions
- * 
- * @param options - Configuration options for role generation
- * @returns Role - Generated role with permissions and access controls
- */
-export function roleFactory(options: RoleFactoryOptions = {}): Role {
-  const id = options.id ?? faker.number.int({ min: 1, max: 100 });
-  const name = options.name ?? faker.helpers.arrayElement([
-    'Administrator',
-    'User',
-    'Developer',
-    'Read Only',
-    'API Developer',
-    'Database Manager',
-    'Service Administrator',
-    'Content Manager'
-  ]);
-
-  const role: Role = {
-    id,
-    name,
-    description: faker.lorem.sentence(),
-    isActive: options.isActive ?? faker.datatype.boolean({ probability: 0.9 }),
-    roleServiceAccessByRoleId: options.includeServiceAccess ? generateRoleServiceAccess(id) : [],
-    roleAppAccessByRoleId: options.includeAppAccess ? generateRoleAppAccess(id) : [],
-    permissions: options.includePermissions ? generatePermissionsByRole(name, options.permissionCount) : [],
-    createdDate: faker.date.past({ years: 1 }).toISOString(),
-    lastModifiedDate: faker.date.recent({ days: 30 }).toISOString(),
-  };
-
-  return role;
-}
-
-/**
- * Generate role-based permission configurations for RBAC testing
- * 
- * @param roleName - Name of the role to generate permissions for
- * @param count - Number of permissions to generate
- * @returns Permission[] - Array of permissions based on role type
- */
-export function rolePermissionFactory(roleName: string, count: number = 5): Permission[] {
-  return generatePermissionsByRole(roleName, count);
-}
-
-/**
- * Generate user session data with JWT token information
- * 
- * @param options - Configuration options for session generation
- * @returns UserSession - Generated session with realistic token data
- */
-export function userSessionFactory(options: SessionFactoryOptions = {}): UserSession {
-  const userId = options.userId ?? faker.number.int({ min: 1, max: 10000 });
-  const issuedAt = new Date();
-  const expiresInHours = options.expiresInHours ?? 24;
-  const expires = new Date(issuedAt.getTime() + (expiresInHours * 60 * 60 * 1000));
-
-  // Generate realistic JWT token structure (header.payload.signature)
-  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-  const payload = btoa(JSON.stringify({
-    sub: userId.toString(),
-    exp: Math.floor(expires.getTime() / 1000),
-    iat: Math.floor(issuedAt.getTime() / 1000),
-    roles: options.roles ?? ['User'],
-  }));
-  const signature = faker.string.alphanumeric(43);
-  const sessionToken = `${header}.${payload}.${signature}`;
-
-  const session: UserSession = {
-    sessionToken,
-    refreshToken: options.includeRefreshToken ? faker.string.uuid() : undefined,
-    sessionId: faker.string.uuid(),
-    userId,
-    expires: expires.toISOString(),
-    issuedAt: issuedAt.toISOString(),
-    lastActivity: faker.date.recent({ days: 1 }).toISOString(),
-    ipAddress: faker.internet.ip(),
-    userAgent: faker.internet.userAgent(),
-    isValid: options.isValid ?? true,
-    permissions: options.permissions ?? generateBasicPermissions(),
-    roles: options.roles ?? ['User'],
-  };
-
-  return session;
-}
-
-/**
- * Generate user registration data for testing user lifecycle management
- * 
- * @param options - Configuration options for registration data
- * @returns UserRegistration - Generated registration data with validation
- */
-export function userRegistrationFactory(options: Partial<UserRegistration> = {}): UserRegistration {
-  const firstName = options.firstName ?? faker.person.firstName();
-  const lastName = options.lastName ?? faker.person.lastName();
-  const email = options.email ?? faker.internet.email({ firstName, lastName }).toLowerCase();
-  const password = options.password ?? 'TestPassword123!';
-
-  const registration: UserRegistration = {
-    email,
-    firstName,
-    lastName,
-    displayName: options.displayName ?? `${firstName} ${lastName}`,
-    password,
-    confirmPassword: options.confirmPassword ?? password,
-    phone: options.phone ?? faker.phone.number(),
-    username: options.username ?? faker.internet.userName({ firstName, lastName }).toLowerCase(),
-    sendInvite: options.sendInvite ?? faker.datatype.boolean({ probability: 0.7 }),
-    verificationToken: options.verificationToken ?? faker.string.uuid(),
-    registrationDate: options.registrationDate ?? new Date().toISOString(),
-  };
-
-  return registration;
-}
-
-/**
- * Generate password reset data for testing password recovery workflows
- * 
- * @param options - Configuration options for password reset
- * @returns PasswordReset - Generated password reset data
- */
-export function passwordResetFactory(options: Partial<PasswordReset> = {}): PasswordReset {
-  const requestedAt = new Date();
-  const tokenExpires = new Date(requestedAt.getTime() + (24 * 60 * 60 * 1000)); // 24 hours
-
-  const reset: PasswordReset = {
-    email: options.email ?? faker.internet.email().toLowerCase(),
-    resetToken: options.resetToken ?? faker.string.uuid(),
-    tokenExpires: options.tokenExpires ?? tokenExpires.toISOString(),
-    newPassword: options.newPassword,
-    confirmPassword: options.confirmPassword,
-    isTokenValid: options.isTokenValid ?? true,
-    requestedAt: options.requestedAt ?? requestedAt.toISOString(),
-    completedAt: options.completedAt,
-  };
-
-  return reset;
-}
-
-/**
- * Generate multi-factor authentication configuration data
- * 
- * @param userId - User ID for MFA configuration
- * @param options - Additional MFA options
- * @returns MfaConfiguration - Generated MFA configuration
- */
-export function mfaConfigurationFactory(
-  userId: number, 
-  options: Partial<MfaConfiguration> = {}
-): MfaConfiguration {
-  const isEnabled = options.isEnabled ?? faker.datatype.boolean({ probability: 0.3 });
-  
-  const config: MfaConfiguration = {
-    userId,
-    isEnabled,
-    method: options.method ?? faker.helpers.arrayElement(['totp', 'sms', 'email']),
-    secret: isEnabled ? (options.secret ?? faker.string.alphanumeric(32)) : undefined,
-    backupCodes: isEnabled ? Array.from({ length: 8 }, () => faker.string.alphanumeric(8)) : [],
-    lastUsed: isEnabled ? faker.date.recent({ days: 30 }).toISOString() : undefined,
-    verificationCode: options.verificationCode ?? faker.string.numeric(6),
-    isCodeValid: options.isCodeValid ?? faker.datatype.boolean({ probability: 0.8 }),
-  };
-
-  return config;
-}
-
-/**
- * Generate comprehensive user relationship data including apps and service assignments
- * 
- * @param userId - User ID for relationship data
- * @param includeApps - Whether to include app assignments
- * @param includeServices - Whether to include service access
- * @returns Object containing user relationship data
- */
-export function userRelationshipFactory(
-  userId: number,
-  includeApps: boolean = true,
-  includeServices: boolean = true
-) {
-  return {
-    userId,
-    apps: includeApps ? generateUserApps() : [],
-    serviceAccess: includeServices ? generateUserServiceAccess(userId) : [],
-    roleAssignments: generateUserRoleAssignments(userId),
-    permissions: generateBasicPermissions(),
-  };
-}
-
-/**
- * Generate a complete user scenario for comprehensive testing
- * 
- * @param scenario - Type of scenario to generate
- * @returns Object containing complete user scenario data
- */
-export function userScenarioFactory(
-  scenario: 'admin_setup' | 'new_user' | 'power_user' | 'restricted_user' | 'deactivated_user'
-) {
-  switch (scenario) {
-    case 'admin_setup':
-      return {
-        user: adminProfileFactory({ adminLevel: 'super' }),
-        session: userSessionFactory({ roles: ['Administrator'], expiresInHours: 8 }),
-        mfa: mfaConfigurationFactory(1, { isEnabled: true, method: 'totp' }),
-        relationships: userRelationshipFactory(1, true, true),
-      };
-
-    case 'new_user':
-      return {
-        registration: userRegistrationFactory(),
-        user: userProfileFactory({ emailVerified: false, isActive: false }),
-        verificationToken: faker.string.uuid(),
-      };
-
-    case 'power_user':
-      return {
-        user: userProfileFactory({ 
-          roles: [roleFactory({ name: 'Developer' }), roleFactory({ name: 'API Developer' })],
-          twoFactorEnabled: true,
-          includeProfile: true,
-          includeApps: true,
-        }),
-        session: userSessionFactory({ roles: ['Developer', 'API Developer'] }),
-        mfa: mfaConfigurationFactory(1, { isEnabled: true }),
-        relationships: userRelationshipFactory(1, true, true),
-      };
-
-    case 'restricted_user':
-      return {
-        user: userProfileFactory({ 
-          roles: [roleFactory({ name: 'Read Only' })],
-          permissions: generateRestrictedPermissions(),
-        }),
-        session: userSessionFactory({ roles: ['Read Only'] }),
-        relationships: userRelationshipFactory(1, false, false),
-      };
-
-    case 'deactivated_user':
-      return {
-        user: userProfileFactory({ isActive: false }),
-        session: userSessionFactory({ isValid: false }),
-        deactivationReason: 'Account suspended for security review',
-        deactivationDate: faker.date.recent({ days: 7 }).toISOString(),
-      };
-
-    default:
-      return userProfileFactory();
-  }
-}
-
-// Helper functions for generating related data
-
-function generateUserApps(): UserApp[] {
-  const count = faker.number.int({ min: 1, max: 5 });
-  return Array.from({ length: count }, (_, index) => ({
-    id: index + 1,
-    name: faker.helpers.arrayElement(['Admin App', 'API Manager', 'File Manager', 'Analytics Dashboard', 'Custom App']),
-    description: faker.lorem.sentence(),
-    url: faker.internet.url(),
-    isDefault: index === 0,
-    allowFullAccess: faker.datatype.boolean({ probability: 0.3 }),
-    roles: [roleFactory()],
-  }));
-}
-
-function generateBasicPermissions(): Permission[] {
-  return [
-    {
-      id: 1,
-      name: 'database.read',
-      resource: 'database',
-      action: 'read',
-      component: '*',
-      verb: 'GET',
-      service: 'system',
-      isActive: true,
-    },
-    {
-      id: 2,
-      name: 'api.read',
-      resource: 'api',
-      action: 'read',
-      component: '*',
-      verb: 'GET',
-      service: 'system',
-      isActive: true,
-    },
-  ];
-}
-
-function generateAdminPermissions(): Permission[] {
-  const adminActions = ['create', 'read', 'update', 'delete', 'execute'] as const;
-  const resources = ['user', 'role', 'service', 'database', 'api', 'system', 'logs', 'config'];
-  
-  return resources.flatMap((resource, resourceIndex) =>
-    adminActions.map((action, actionIndex) => ({
-      id: resourceIndex * adminActions.length + actionIndex + 1,
-      name: `${resource}.${action}`,
-      resource,
-      action,
-      component: '*',
-      verb: action === 'read' ? 'GET' : action === 'create' ? 'POST' : action === 'update' ? 'PUT' : 'DELETE',
-      service: 'system',
-      isActive: true,
-    }))
-  );
-}
-
-function generateRestrictedPermissions(): Permission[] {
-  return [
-    {
-      id: 1,
-      name: 'api.read',
-      resource: 'api',
-      action: 'read',
-      component: 'docs',
-      verb: 'GET',
-      service: 'system',
-      isActive: true,
-    },
-  ];
-}
-
-function generatePermissionsByRole(roleName: string, count: number = 5): Permission[] {
-  const rolePermissions: Record<string, string[]> = {
-    'Administrator': ['user.create', 'user.read', 'user.update', 'user.delete', 'system.execute'],
-    'Developer': ['api.create', 'api.read', 'api.update', 'database.read', 'service.read'],
-    'User': ['api.read', 'database.read'],
-    'Read Only': ['api.read'],
-    'API Developer': ['api.create', 'api.read', 'api.update', 'api.delete'],
-    'Database Manager': ['database.create', 'database.read', 'database.update', 'database.delete'],
-    'Service Administrator': ['service.create', 'service.read', 'service.update', 'service.delete'],
-    'Content Manager': ['content.create', 'content.read', 'content.update', 'content.delete'],
-  };
-
-  const permissions = rolePermissions[roleName] || ['api.read'];
-  return permissions.slice(0, count).map((permission, index) => {
-    const [resource, action] = permission.split('.');
-    return {
-      id: index + 1,
-      name: permission,
-      resource,
-      action: action as any,
-      component: '*',
-      verb: action === 'read' ? 'GET' : action === 'create' ? 'POST' : action === 'update' ? 'PUT' : 'DELETE',
-      service: 'system',
-      isActive: true,
-    };
-  });
-}
-
-function generateRoleServiceAccess(roleId: number): RoleServiceAccess[] {
-  const count = faker.number.int({ min: 1, max: 3 });
-  return Array.from({ length: count }, (_, index) => ({
-    id: index + 1,
-    roleId,
-    serviceId: faker.number.int({ min: 1, max: 10 }),
-    component: faker.helpers.arrayElement(['*', 'tables', 'views', 'procedures']),
-    verbMask: faker.number.int({ min: 1, max: 31 }), // Binary mask for CRUD operations
-    requestorMask: faker.number.int({ min: 1, max: 7 }), // Binary mask for requestor types
-    filters: faker.helpers.arrayElement([undefined, 'user_id = {user.id}', 'active = true']),
-    filterOp: faker.helpers.arrayElement([undefined, 'AND', 'OR']),
-  }));
-}
-
-function generateRoleAppAccess(roleId: number): RoleAppAccess[] {
-  const count = faker.number.int({ min: 1, max: 3 });
-  return Array.from({ length: count }, (_, index) => ({
-    id: index + 1,
-    roleId,
-    appId: faker.number.int({ min: 1, max: 5 }),
-    allowFullAccess: faker.datatype.boolean({ probability: 0.5 }),
-  }));
-}
-
-function generateUserServiceAccess(userId: number) {
-  return Array.from({ length: faker.number.int({ min: 0, max: 3 }) }, (_, index) => ({
-    id: index + 1,
-    userId,
-    serviceId: faker.number.int({ min: 1, max: 10 }),
-    serviceName: faker.helpers.arrayElement(['mysql', 'postgresql', 'mongodb', 'api-docs']),
-    accessLevel: faker.helpers.arrayElement(['read', 'write', 'admin']),
-    isActive: faker.datatype.boolean({ probability: 0.9 }),
-  }));
-}
-
-function generateUserRoleAssignments(userId: number) {
-  return Array.from({ length: faker.number.int({ min: 1, max: 3 }) }, (_, index) => ({
-    id: index + 1,
-    userId,
-    roleId: faker.number.int({ min: 1, max: 10 }),
-    assignedDate: faker.date.past({ years: 1 }).toISOString(),
-    assignedBy: faker.number.int({ min: 1, max: 5 }),
-    isActive: faker.datatype.boolean({ probability: 0.95 }),
-  }));
-}
-
-/**
- * Export all factory functions and types for easy consumption
- */
-export const UserFixtures = {
-  // Main factory functions
-  userProfile: userProfileFactory,
-  adminProfile: adminProfileFactory,
-  role: roleFactory,
-  rolePermission: rolePermissionFactory,
-  userSession: userSessionFactory,
-  userRegistration: userRegistrationFactory,
-  passwordReset: passwordResetFactory,
-  mfaConfiguration: mfaConfigurationFactory,
-  userRelationship: userRelationshipFactory,
-  userScenario: userScenarioFactory,
-
-  // Helper functions for specific scenarios
-  basicUser: () => userProfileFactory({ roles: [roleFactory({ name: 'User' })] }),
-  adminUser: () => adminProfileFactory({ adminLevel: 'super' }),
-  developerUser: () => userProfileFactory({ 
-    roles: [roleFactory({ name: 'Developer' })],
-    twoFactorEnabled: true,
-  }),
-  readOnlyUser: () => userProfileFactory({ 
-    roles: [roleFactory({ name: 'Read Only' })],
-    permissions: generateRestrictedPermissions(),
-  }),
-  inactiveUser: () => userProfileFactory({ isActive: false }),
-  unverifiedUser: () => userProfileFactory({ emailVerified: false }),
-
-  // Session scenarios
-  validSession: () => userSessionFactory({ isValid: true }),
-  expiredSession: () => userSessionFactory({ isValid: false, expiresInHours: -1 }),
-  adminSession: () => userSessionFactory({ roles: ['Administrator'] }),
-
-  // Registration scenarios
-  newRegistration: () => userRegistrationFactory(),
-  inviteRegistration: () => userRegistrationFactory({ sendInvite: true }),
-
-  // Password reset scenarios
-  activeReset: () => passwordResetFactory({ isTokenValid: true }),
-  expiredReset: () => passwordResetFactory({ isTokenValid: false }),
-
-  // MFA scenarios
-  enabledMfa: (userId: number) => mfaConfigurationFactory(userId, { isEnabled: true }),
-  disabledMfa: (userId: number) => mfaConfigurationFactory(userId, { isEnabled: false }),
+  return { ...baseProfile, ...overrides };
 };
 
-export default UserFixtures;
+/**
+ * Factory function for creating admin profile test data
+ * Generates administrative user accounts with elevated privileges
+ * 
+ * @param overrides - Partial admin profile data to override defaults
+ * @returns Complete AdminProfile object for testing
+ */
+export const adminProfileFactory = (overrides: Partial<AdminProfile> = {}): AdminProfile => {
+  const id = overrides.id || Math.floor(Math.random() * 100) + 1000;
+  const baseProfile = userProfileFactory({
+    id,
+    username: `admin${id}`,
+    email: `admin${id}@example.com`,
+    first_name: 'Admin',
+    last_name: 'User',
+    display_name: 'Admin User',
+    role: adminRoleTypeFactory(),
+    permissions: [
+      'read_users', 'create_users', 'update_users', 'delete_users',
+      'read_services', 'create_services', 'update_services', 'delete_services',
+      'read_schema', 'update_schema', 'generate_apis', 'manage_security',
+      'view_logs', 'system_backup'
+    ],
+    accessibleRoutes: [
+      '/admin-settings', '/system-settings', '/api-security',
+      '/adf-users', '/adf-admins', '/adf-services', '/adf-schema'
+    ],
+  });
+
+  const adminExtensions: Partial<AdminProfile> = {
+    // Admin-specific flags
+    is_sys_admin: true,
+    
+    // Enhanced access control
+    accessibleTabs: [
+      'users', 'admins', 'services', 'schema', 'api-docs',
+      'config', 'files', 'apps', 'scripts', 'scheduler'
+    ],
+    restrictedRoutes: [],
+    adminCapabilities: [
+      'user_management', 'service_management', 'schema_management',
+      'api_generation', 'system_configuration', 'security_management',
+      'audit_access', 'backup_restore'
+    ] as AdminCapability[],
+    
+    // System-level permissions
+    systemPermissions: [
+      'read_users', 'create_users', 'update_users', 'delete_users',
+      'read_services', 'create_services', 'update_services', 'delete_services',
+      'read_schema', 'update_schema', 'generate_apis', 'manage_security',
+      'view_logs', 'system_backup'
+    ] as SystemPermission[],
+  };
+
+  return { ...baseProfile, ...adminExtensions, ...overrides };
+};
+
+/**
+ * Factory function for creating root admin profile
+ * Generates super administrator with full system access
+ */
+export const rootAdminProfileFactory = (overrides: Partial<AdminProfile> = {}): AdminProfile => {
+  return adminProfileFactory({
+    id: 1,
+    username: 'root',
+    email: 'root@example.com',
+    first_name: 'Root',
+    last_name: 'Administrator',
+    display_name: 'Root Administrator',
+    is_sys_admin: true,
+    adminCapabilities: [
+      'user_management', 'service_management', 'schema_management',
+      'api_generation', 'system_configuration', 'security_management',
+      'audit_access', 'backup_restore'
+    ] as AdminCapability[],
+    accessibleTabs: ['*'], // All tabs
+    systemPermissions: [
+      'read_users', 'create_users', 'update_users', 'delete_users',
+      'read_services', 'create_services', 'update_services', 'delete_services',
+      'read_schema', 'update_schema', 'generate_apis', 'manage_security',
+      'view_logs', 'system_backup'
+    ] as SystemPermission[],
+    ...overrides
+  });
+};
+
+/**
+ * Factory function for creating user row data for table display
+ * Optimized for UI rendering and table operations
+ */
+export const userRowFactory = (overrides: Partial<UserRow> = {}): UserRow => {
+  const id = overrides.id || Math.floor(Math.random() * 10000) + 1;
+  return {
+    id,
+    username: `user${id}`,
+    email: `user${id}@example.com`,
+    display_name: `User ${id}`,
+    name: `User ${id}`,
+    is_active: true,
+    last_login_date: generateTestDate(-1).toISOString(),
+    created_date: generateTestDate(-90).toISOString(),
+    role: 'user',
+    isLoading: false,
+    isSelected: false,
+    ...overrides
+  };
+};
+
+// =============================================================================
+// ROLE-BASED ACCESS CONTROL FACTORIES
+// =============================================================================
+
+/**
+ * Factory function for creating role type data
+ * Generates role configurations for RBAC testing
+ */
+export const roleTypeFactory = (overrides: Partial<RoleType> = {}): RoleType => {
+  const id = overrides.id || Math.floor(Math.random() * 100) + 1;
+  return {
+    id,
+    name: `role_${id}`,
+    description: `Test role ${id}`,
+    isActive: true,
+    createdById: 1,
+    createdDate: generateTestDate(-30).toISOString(),
+    lastModifiedById: 1,
+    lastModifiedDate: generateTestDate(-1).toISOString(),
+    lookupByRoleId: [],
+    accessibleTabs: ['profile', 'api-connections'],
+    ...overrides
+  };
+};
+
+/**
+ * Factory for admin role type with full permissions
+ */
+export const adminRoleTypeFactory = (): RoleType => {
+  return roleTypeFactory({
+    id: 1,
+    name: 'admin',
+    description: 'Administrator role with full access',
+    accessibleTabs: [
+      'users', 'admins', 'services', 'schema', 'api-docs',
+      'config', 'files', 'apps', 'scripts', 'scheduler'
+    ]
+  });
+};
+
+/**
+ * Factory for read-only role type
+ */
+export const readOnlyRoleTypeFactory = (): RoleType => {
+  return roleTypeFactory({
+    id: 2,
+    name: 'readonly',
+    description: 'Read-only access role',
+    accessibleTabs: ['profile', 'api-docs']
+  });
+};
+
+/**
+ * Factory for API developer role type
+ */
+export const apiDeveloperRoleTypeFactory = (): RoleType => {
+  return roleTypeFactory({
+    id: 3,
+    name: 'api_developer',
+    description: 'API developer with service and schema access',
+    accessibleTabs: ['services', 'schema', 'api-docs']
+  });
+};
+
+/**
+ * Factory function for role service access configuration
+ * Defines service-level permissions for roles
+ */
+export const roleServiceAccessFactory = (overrides: Partial<RoleServiceAccess> = {}): RoleServiceAccess => {
+  const id = overrides.id || Math.floor(Math.random() * 1000) + 1;
+  return {
+    id,
+    roleId: 1,
+    serviceId: 1,
+    component: '*',
+    verbMask: HttpVerb.GET | HttpVerb.POST, // Default to read/write
+    requestorType: 1,
+    filters: '',
+    filterOp: 'AND',
+    ...overrides
+  };
+};
+
+/**
+ * Factory function for role lookup configuration
+ * Provides dynamic value lookups for role-based functionality
+ */
+export const roleLookupFactory = (overrides: Partial<RoleLookup> = {}): RoleLookup => {
+  const id = overrides.id || Math.floor(Math.random() * 1000) + 1;
+  return {
+    id,
+    roleId: 1,
+    name: `lookup_key_${id}`,
+    value: `lookup_value_${id}`,
+    private: false,
+    description: `Test lookup configuration ${id}`,
+    ...overrides
+  };
+};
+
+/**
+ * Factory function for role permission configurations
+ * Creates granular permission specifications
+ */
+export const rolePermissionFactory = (overrides: Partial<RolePermission> = {}): RolePermission => {
+  return {
+    resource: 'users',
+    operations: ['read'],
+    constraints: {},
+    ...overrides
+  };
+};
+
+/**
+ * Factory for role permission summary
+ * Aggregated view of role permissions for display
+ */
+export const rolePermissionSummaryFactory = (overrides: Partial<RolePermissionSummary> = {}): RolePermissionSummary => {
+  return {
+    roleId: 1,
+    serviceCount: 3,
+    fullAccessServices: ['user'],
+    limitedAccessServices: ['system'],
+    lookupCount: 2,
+    isAdmin: false,
+    ...overrides
+  };
+};
+
+// =============================================================================
+// SESSION MANAGEMENT FACTORIES
+// =============================================================================
+
+/**
+ * Factory function for user session data
+ * Generates authentication session data with JWT tokens
+ */
+export const userSessionFactory = (overrides: Partial<UserSession> = {}): UserSession => {
+  const id = overrides.id || Math.floor(Math.random() * 10000) + 1;
+  const sessionId = `session_${id}_${Date.now()}`;
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+  return {
+    // Core session data
+    id,
+    session_token: `jwt_token_${sessionId}`,
+    sessionToken: `jwt_token_${sessionId}`,
+    user_id: id,
+    username: `user${id}`,
+    email: `user${id}@example.com`,
+    display_name: `User ${id}`,
+    
+    // Enhanced for Next.js middleware
+    host: 'localhost',
+    is_sys_admin: false,
+    is_active: true,
+    token_map: {
+      session: `jwt_token_${sessionId}`,
+      refresh: `refresh_${sessionId}`
+    },
+    
+    // Session metadata
+    created_date: generateTestDate().toISOString(),
+    expires_at: expiresAt.toISOString(),
+    last_activity: generateTestDate().toISOString(),
+    user_agent: 'Mozilla/5.0 (compatible; Test Browser)',
+    ip_address: '127.0.0.1',
+    
+    // RBAC data for middleware
+    role: roleTypeFactory(),
+    permissions: ['read_profile', 'update_profile'],
+    accessibleRoutes: ['/profile', '/api-connections'],
+    restrictedRoutes: ['/admin-settings', '/system-settings'],
+    
+    // Security enhancements
+    tokenVersion: 1,
+    refreshToken: `refresh_${sessionId}`,
+    csrfToken: `csrf_${sessionId}`,
+    
+    // Next.js specific
+    isServerSide: false,
+    cookieData: sessionCookieDataFactory({ sessionId }),
+    
+    ...overrides
+  };
+};
+
+/**
+ * Factory for admin user session with elevated privileges
+ */
+export const adminSessionFactory = (overrides: Partial<UserSession> = {}): UserSession => {
+  const baseSession = userSessionFactory({
+    id: 1,
+    username: 'admin',
+    email: 'admin@example.com',
+    display_name: 'Admin User',
+    is_sys_admin: true,
+    role: adminRoleTypeFactory(),
+    permissions: [
+      'read_users', 'create_users', 'update_users', 'delete_users',
+      'read_services', 'create_services', 'update_services', 'delete_services',
+      'manage_security', 'view_logs'
+    ],
+    accessibleRoutes: [
+      '/admin-settings', '/system-settings', '/api-security',
+      '/adf-users', '/adf-admins', '/adf-services'
+    ],
+    restrictedRoutes: [],
+    ...overrides
+  });
+
+  return baseSession;
+};
+
+/**
+ * Factory for session cookie data
+ * Used for Next.js middleware hydration
+ */
+export const sessionCookieDataFactory = (overrides: Partial<SessionCookieData> = {}): SessionCookieData => {
+  const sessionId = overrides.sessionId || `session_${Date.now()}`;
+  return {
+    sessionId,
+    userId: 1,
+    tokenVersion: 1,
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    secure: true,
+    httpOnly: true,
+    sameSite: 'strict',
+    ...overrides
+  };
+};
+
+/**
+ * Factory for session validation results
+ * Used for middleware processing
+ */
+export const sessionValidationResultFactory = (
+  isValid: boolean = true,
+  overrides: Partial<SessionValidationResult> = {}
+): SessionValidationResult => {
+  const base: SessionValidationResult = {
+    isValid,
+    session: isValid ? userSessionFactory() : undefined,
+    error: isValid ? undefined : 'token_expired' as SessionError,
+    requiresRefresh: false,
+    redirectTo: isValid ? undefined : '/login'
+  };
+
+  return { ...base, ...overrides };
+};
+
+/**
+ * Factory for JWT token payload
+ * Creates JWT payload for server-side validation
+ */
+export const jwtTokenPayloadFactory = (overrides: Partial<JWTTokenPayload> = {}): JWTTokenPayload => {
+  const userId = overrides.sub || Math.floor(Math.random() * 10000) + 1;
+  const now = Math.floor(Date.now() / 1000);
+
+  return {
+    sub: userId.toString(),
+    username: `user${userId}`,
+    email: `user${userId}@example.com`,
+    role: 'user',
+    permissions: ['read_profile', 'update_profile'],
+    iat: now,
+    exp: now + (24 * 60 * 60), // 24 hours
+    jti: `jwt_${userId}_${now}`,
+    aud: 'dreamfactory-admin',
+    iss: 'dreamfactory',
+    tokenVersion: 1,
+    sessionId: `session_${userId}_${now}`,
+    ...overrides
+  };
+};
+
+/**
+ * Factory for token refresh results
+ * Used for automatic token renewal testing
+ */
+export const tokenRefreshResultFactory = (
+  success: boolean = true,
+  overrides: Partial<TokenRefreshResult> = {}
+): TokenRefreshResult => {
+  const sessionId = `refresh_${Date.now()}`;
+  
+  return {
+    success,
+    accessToken: success ? `jwt_new_${sessionId}` : undefined,
+    refreshToken: success ? `refresh_new_${sessionId}` : undefined,
+    expiresIn: success ? 86400 : undefined, // 24 hours
+    error: success ? undefined : 'refresh_token_expired',
+    requiresReauth: !success,
+    ...overrides
+  };
+};
+
+// =============================================================================
+// AUTHENTICATION FLOW FACTORIES
+// =============================================================================
+
+/**
+ * Factory function for login credentials
+ * Creates various login credential scenarios for testing
+ */
+export const loginCredentialsFactory = (overrides: Partial<LoginCredentials> = {}): LoginCredentials => {
+  return {
+    username: 'testuser',
+    email: 'testuser@example.com',
+    password: 'SecurePassword123!',
+    remember: false,
+    service: undefined,
+    captcha: undefined,
+    twoFactorCode: undefined,
+    deviceId: `device_${Date.now()}`,
+    ...overrides
+  };
+};
+
+/**
+ * Factory for admin login credentials
+ */
+export const adminLoginCredentialsFactory = (): LoginCredentials => {
+  return loginCredentialsFactory({
+    username: 'admin',
+    email: 'admin@example.com',
+    password: 'AdminPassword123!'
+  });
+};
+
+/**
+ * Factory function for login response data
+ * Creates successful and failed login responses
+ */
+export const loginResponseFactory = (
+  success: boolean = true,
+  overrides: Partial<LoginResponse> = {}
+): LoginResponse => {
+  if (!success) {
+    return {
+      error: 'invalid_credentials',
+      error_description: 'Invalid username or password',
+      ...overrides
+    };
+  }
+
+  const sessionToken = `jwt_${Date.now()}`;
+  const user = userProfileFactory();
+
+  return {
+    session_token: sessionToken,
+    sessionToken,
+    refresh_token: `refresh_${Date.now()}`,
+    expires_in: 86400, // 24 hours
+    token_type: 'Bearer',
+    user,
+    permissions: user.permissions,
+    sessionId: user.sessionId,
+    tokenVersion: user.tokenVersion,
+    csrfToken: `csrf_${Date.now()}`,
+    ...overrides
+  };
+};
+
+/**
+ * Factory function for user registration details
+ * Creates registration data for new user account testing
+ */
+export const registerDetailsFactory = (overrides: Partial<RegisterDetails> = {}): RegisterDetails => {
+  const id = Math.floor(Math.random() * 10000) + 1;
+  return {
+    username: `newuser${id}`,
+    email: `newuser${id}@example.com`,
+    password: 'NewUserPassword123!',
+    confirmPassword: 'NewUserPassword123!',
+    first_name: 'New',
+    last_name: 'User',
+    display_name: 'New User',
+    phone: '+1-555-987-6543',
+    security_question: 'What is your pet\'s name?',
+    security_answer: 'Fluffy',
+    acceptTerms: true,
+    acceptPrivacy: true,
+    source: 'web_registration',
+    referral: undefined,
+    ...overrides
+  };
+};
+
+// =============================================================================
+// PASSWORD MANAGEMENT FACTORIES
+// =============================================================================
+
+/**
+ * Factory function for forget password requests
+ * Creates password reset request data
+ */
+export const forgetPasswordRequestFactory = (overrides: Partial<ForgetPasswordRequest> = {}): ForgetPasswordRequest => {
+  return {
+    email: 'user@example.com',
+    username: undefined,
+    captcha: undefined,
+    ...overrides
+  };
+};
+
+/**
+ * Factory function for password reset form data
+ * Creates password reset form submissions
+ */
+export const resetFormDataFactory = (overrides: Partial<ResetFormData> = {}): ResetFormData => {
+  return {
+    code: 'RESET123456',
+    password: 'NewPassword123!',
+    confirmPassword: 'NewPassword123!',
+    email: 'user@example.com',
+    username: 'user',
+    deviceId: `device_${Date.now()}`,
+    timestamp: new Date().toISOString(),
+    ...overrides
+  };
+};
+
+/**
+ * Factory function for password update requests
+ * Creates password change request data
+ */
+export const updatePasswordRequestFactory = (overrides: Partial<UpdatePasswordRequest> = {}): UpdatePasswordRequest => {
+  return {
+    old_password: 'OldPassword123!',
+    new_password: 'NewPassword123!',
+    confirm_password: 'NewPassword123!',
+    force_logout_all: false,
+    sessionId: `session_${Date.now()}`,
+    ...overrides
+  };
+};
+
+/**
+ * Factory function for password update responses
+ * Creates password update response data
+ */
+export const updatePasswordResponseFactory = (
+  success: boolean = true,
+  overrides: Partial<UpdatePasswordResponse> = {}
+): UpdatePasswordResponse => {
+  return {
+    success,
+    message: success ? 'Password updated successfully' : 'Password update failed',
+    session_token: success ? `jwt_new_${Date.now()}` : undefined,
+    sessionToken: success ? `jwt_new_${Date.now()}` : undefined,
+    requiresReauth: !success,
+    loggedOutSessions: success ? 3 : 0,
+    ...overrides
+  };
+};
+
+/**
+ * Factory function for security questions
+ * Creates security question data
+ */
+export const securityQuestionFactory = (overrides: Partial<SecurityQuestion> = {}): SecurityQuestion => {
+  const questions = [
+    'What is your favorite color?',
+    'What is your pet\'s name?',
+    'What city were you born in?',
+    'What is your mother\'s maiden name?',
+    'What was your first car?'
+  ];
+
+  return {
+    id: Math.floor(Math.random() * questions.length),
+    question: questions[Math.floor(Math.random() * questions.length)],
+    answer: undefined, // Never include answer in response
+    is_default: true,
+    ...overrides
+  };
+};
+
+// =============================================================================
+// MULTI-FACTOR AUTHENTICATION FACTORIES
+// =============================================================================
+
+/**
+ * Factory for OAuth login requests
+ * Creates external authentication provider data
+ */
+export const oauthLoginRequestFactory = (overrides: Partial<OAuthLoginRequest> = {}): OAuthLoginRequest => {
+  return {
+    oauthToken: `oauth_token_${Date.now()}`,
+    code: `auth_code_${Date.now()}`,
+    state: `state_${Date.now()}`,
+    provider: 'google',
+    ...overrides
+  };
+};
+
+/**
+ * Factory for SAML authentication parameters
+ * Creates SAML-based single sign-on data
+ */
+export const samlAuthParamsFactory = (overrides: Partial<SAMLAuthParams> = {}): SAMLAuthParams => {
+  return {
+    samlResponse: `saml_response_${Date.now()}`,
+    relayState: `relay_state_${Date.now()}`,
+    provider: 'enterprise_sso',
+    ...overrides
+  };
+};
+
+/**
+ * Factory for authentication cookie configuration
+ * Creates secure cookie settings for session storage
+ */
+export const authCookieConfigFactory = (overrides: Partial<AuthCookieConfig> = {}): AuthCookieConfig => {
+  return {
+    name: 'df-session',
+    maxAge: 86400, // 24 hours
+    secure: true,
+    httpOnly: true,
+    sameSite: 'strict',
+    domain: undefined,
+    path: '/',
+    ...overrides
+  };
+};
+
+// =============================================================================
+// USER RELATIONSHIP FACTORIES
+// =============================================================================
+
+/**
+ * Factory function for user-app role mappings
+ * Creates multi-app access control data
+ */
+export const userAppRoleFactory = (overrides: Partial<UserAppRole> = {}): UserAppRole => {
+  const id = overrides.id || Math.floor(Math.random() * 1000) + 1;
+  return {
+    id,
+    user_id: 1,
+    app_id: 1,
+    role_id: 1,
+    created_date: generateTestDate(-30).toISOString(),
+    last_modified_date: generateTestDate(-1).toISOString(),
+    created_by_id: 1,
+    last_modified_by_id: 1,
+    ...overrides
+  };
+};
+
+/**
+ * Factory function for lookup keys
+ * Creates additional user metadata and configuration
+ */
+export const lookupKeyFactory = (overrides: Partial<LookupKey> = {}): LookupKey => {
+  const id = overrides.id || Math.floor(Math.random() * 1000) + 1;
+  return {
+    id,
+    name: `lookup_key_${id}`,
+    value: `lookup_value_${id}`,
+    private: false,
+    description: `Test lookup key ${id}`,
+    created_date: generateTestDate(-30).toISOString(),
+    last_modified_date: generateTestDate(-1).toISOString(),
+    created_by_id: 1,
+    last_modified_by_id: 1,
+    ...overrides
+  };
+};
+
+/**
+ * Factory function for user parameters
+ * Creates routing and API call parameters
+ */
+export const userParamsFactory = (overrides: Partial<UserParams> = {}): UserParams => {
+  return {
+    admin: false,
+    code: undefined,
+    email: undefined,
+    username: undefined,
+    id: undefined,
+    tab: undefined,
+    action: undefined,
+    returnUrl: undefined,
+    ...overrides
+  };
+};
+
+// =============================================================================
+// MIDDLEWARE AUTHENTICATION FACTORIES
+// =============================================================================
+
+/**
+ * Factory for middleware authentication context
+ * Creates request context for server-side authentication
+ */
+export const middlewareAuthContextFactory = (overrides: Partial<MiddlewareAuthContext> = {}): MiddlewareAuthContext => {
+  const sessionToken = `jwt_${Date.now()}`;
+  return {
+    headers: {
+      'authorization': `Bearer ${sessionToken}`,
+      'user-agent': 'Mozilla/5.0 (compatible; Test Browser)',
+      'x-forwarded-for': '127.0.0.1'
+    },
+    sessionToken,
+    refreshToken: `refresh_${Date.now()}`,
+    pathname: '/dashboard',
+    userAgent: 'Mozilla/5.0 (compatible; Test Browser)',
+    clientIP: '127.0.0.1',
+    ...overrides
+  };
+};
+
+/**
+ * Factory for middleware authentication results
+ * Creates authentication processing decisions
+ */
+export const middlewareAuthResultFactory = (
+  isAuthenticated: boolean = true,
+  isAuthorized: boolean = true,
+  overrides: Partial<MiddlewareAuthResult> = {}
+): MiddlewareAuthResult => {
+  return {
+    isAuthenticated,
+    isAuthorized,
+    user: isAuthenticated ? userSessionFactory() : undefined,
+    redirectTo: (!isAuthenticated || !isAuthorized) ? '/login' : undefined,
+    updatedToken: undefined,
+    error: undefined,
+    headers: {},
+    ...overrides
+  };
+};
+
+/**
+ * Factory for JWT payload for middleware validation
+ * Creates server-side JWT token data
+ */
+export const jwtPayloadFactory = (overrides: Partial<JWTPayload> = {}): JWTPayload => {
+  const userId = Math.floor(Math.random() * 10000) + 1;
+  const now = Math.floor(Date.now() / 1000);
+
+  return {
+    sub: userId.toString(),
+    iat: now,
+    exp: now + (24 * 60 * 60), // 24 hours
+    iss: 'dreamfactory',
+    user: {
+      id: userId,
+      email: `user${userId}@example.com`,
+      firstName: 'Test',
+      lastName: 'User',
+      roleId: 1,
+      isRootAdmin: false,
+      isSysAdmin: false
+    },
+    permissions: ['read_profile', 'update_profile'],
+    sessionId: `session_${userId}_${now}`,
+    ...overrides
+  };
+};
+
+// =============================================================================
+// AUTHENTICATION STATE FACTORIES
+// =============================================================================
+
+/**
+ * Factory for authentication state
+ * Creates application-wide authentication state
+ */
+export const authStateFactory = (overrides: Partial<AuthState> = {}): AuthState => {
+  return {
+    isAuthenticated: false,
+    isLoading: false,
+    user: null,
+    error: null,
+    isRefreshing: false,
+    ...overrides
+  };
+};
+
+/**
+ * Factory for authenticated state
+ */
+export const authenticatedStateFactory = (user?: UserSession): AuthState => {
+  return authStateFactory({
+    isAuthenticated: true,
+    user: user || userSessionFactory(),
+    error: null
+  });
+};
+
+/**
+ * Factory for authentication errors
+ * Creates detailed error reporting data
+ */
+export const authErrorFactory = (overrides: Partial<AuthError> = {}): AuthError => {
+  return {
+    code: AuthErrorCode.INVALID_CREDENTIALS,
+    message: 'Invalid username or password',
+    statusCode: 401,
+    context: 'login_form',
+    timestamp: new Date().toISOString(),
+    requestId: `req_${Date.now()}`,
+    ...overrides
+  };
+};
+
+// =============================================================================
+// COLLECTION FACTORIES FOR COMPREHENSIVE TESTING
+// =============================================================================
+
+/**
+ * Factory for creating complete user management test datasets
+ * Provides comprehensive data for testing user management interfaces
+ */
+export const createUserManagementTestDataSet = () => {
+  return {
+    // User profiles
+    users: {
+      basicUser: userProfileFactory(),
+      adminUser: adminProfileFactory(),
+      rootAdmin: rootAdminProfileFactory(),
+      inactiveUser: userProfileFactory({ is_active: false }),
+      unconfirmedUser: userProfileFactory({ confirmed: false }),
+      lockedUser: userProfileFactory({ 
+        locked_until: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        failed_login_attempts: 5
+      })
+    },
+
+    // User rows for table display
+    userRows: Array.from({ length: 10 }, (_, i) => userRowFactory({ id: i + 1 })),
+
+    // Roles
+    roles: {
+      admin: adminRoleTypeFactory(),
+      user: roleTypeFactory(),
+      readonly: readOnlyRoleTypeFactory(),
+      apiDeveloper: apiDeveloperRoleTypeFactory()
+    },
+
+    // Sessions
+    sessions: {
+      userSession: userSessionFactory(),
+      adminSession: adminSessionFactory(),
+      expiredSession: userSessionFactory({
+        expires_at: generateTestDate(-1).toISOString()
+      })
+    },
+
+    // Authentication flows
+    auth: {
+      loginCredentials: loginCredentialsFactory(),
+      adminLoginCredentials: adminLoginCredentialsFactory(),
+      successfulLogin: loginResponseFactory(true),
+      failedLogin: loginResponseFactory(false),
+      registration: registerDetailsFactory()
+    },
+
+    // Password management
+    passwords: {
+      forgetRequest: forgetPasswordRequestFactory(),
+      resetForm: resetFormDataFactory(),
+      updateRequest: updatePasswordRequestFactory(),
+      updateResponse: updatePasswordResponseFactory(true),
+      securityQuestion: securityQuestionFactory()
+    },
+
+    // Relationships
+    relationships: {
+      userAppRole: userAppRoleFactory(),
+      lookupKey: lookupKeyFactory(),
+      userParams: userParamsFactory()
+    },
+
+    // Middleware
+    middleware: {
+      authContext: middlewareAuthContextFactory(),
+      authResult: middlewareAuthResultFactory(),
+      jwtPayload: jwtPayloadFactory()
+    }
+  };
+};
+
+/**
+ * Factory for creating specific test scenarios
+ * Provides targeted test data for common testing scenarios
+ */
+export const createUserTestScenario = (scenario: string) => {
+  const scenarios = {
+    'successful-login': () => ({
+      credentials: loginCredentialsFactory(),
+      response: loginResponseFactory(true),
+      session: userSessionFactory(),
+      user: userProfileFactory()
+    }),
+
+    'failed-login': () => ({
+      credentials: loginCredentialsFactory({ password: 'wrong_password' }),
+      response: loginResponseFactory(false),
+      error: authErrorFactory()
+    }),
+
+    'admin-management': () => ({
+      currentAdmin: adminProfileFactory(),
+      users: [
+        userProfileFactory({ id: 1 }),
+        userProfileFactory({ id: 2, is_active: false }),
+        adminProfileFactory({ id: 3 })
+      ],
+      roles: [
+        adminRoleTypeFactory(),
+        roleTypeFactory(),
+        readOnlyRoleTypeFactory()
+      ]
+    }),
+
+    'password-reset': () => ({
+      forgetRequest: forgetPasswordRequestFactory(),
+      resetForm: resetFormDataFactory(),
+      securityQuestion: securityQuestionFactory(),
+      response: updatePasswordResponseFactory(true)
+    }),
+
+    'multi-factor-auth': () => ({
+      credentials: loginCredentialsFactory({ twoFactorCode: '123456' }),
+      oauthRequest: oauthLoginRequestFactory(),
+      samlParams: samlAuthParamsFactory()
+    }),
+
+    'session-management': () => ({
+      activeSession: userSessionFactory(),
+      expiredSession: userSessionFactory({
+        expires_at: generateTestDate(-1).toISOString()
+      }),
+      refreshResult: tokenRefreshResultFactory(true),
+      cookieConfig: authCookieConfigFactory()
+    }),
+
+    'role-based-access': () => ({
+      adminUser: adminProfileFactory(),
+      regularUser: userProfileFactory(),
+      readOnlyUser: userProfileFactory({ role: readOnlyRoleTypeFactory() }),
+      rolePermissions: [
+        rolePermissionFactory({ resource: 'users', operations: ['read', 'create', 'update', 'delete'] }),
+        rolePermissionFactory({ resource: 'services', operations: ['read'] }),
+        rolePermissionFactory({ resource: 'schema', operations: ['read', 'update'] })
+      ]
+    })
+  };
+
+  const scenarioFn = scenarios[scenario as keyof typeof scenarios];
+  if (!scenarioFn) {
+    throw new Error(`Unknown user test scenario: ${scenario}`);
+  }
+
+  return scenarioFn();
+};
+
+// =============================================================================
+// EXPORTS
+// =============================================================================
+
+export {
+  // Core user factories
+  userProfileFactory,
+  adminProfileFactory,
+  rootAdminProfileFactory,
+  userRowFactory,
+
+  // Role factories
+  roleTypeFactory,
+  adminRoleTypeFactory,
+  readOnlyRoleTypeFactory,
+  apiDeveloperRoleTypeFactory,
+  roleServiceAccessFactory,
+  roleLookupFactory,
+  rolePermissionFactory,
+  rolePermissionSummaryFactory,
+
+  // Session factories
+  userSessionFactory,
+  adminSessionFactory,
+  sessionCookieDataFactory,
+  sessionValidationResultFactory,
+  jwtTokenPayloadFactory,
+  tokenRefreshResultFactory,
+
+  // Authentication factories
+  loginCredentialsFactory,
+  adminLoginCredentialsFactory,
+  loginResponseFactory,
+  registerDetailsFactory,
+
+  // Password management factories
+  forgetPasswordRequestFactory,
+  resetFormDataFactory,
+  updatePasswordRequestFactory,
+  updatePasswordResponseFactory,
+  securityQuestionFactory,
+
+  // MFA factories
+  oauthLoginRequestFactory,
+  samlAuthParamsFactory,
+  authCookieConfigFactory,
+
+  // Relationship factories
+  userAppRoleFactory,
+  lookupKeyFactory,
+  userParamsFactory,
+
+  // Middleware factories
+  middlewareAuthContextFactory,
+  middlewareAuthResultFactory,
+  jwtPayloadFactory,
+
+  // State factories
+  authStateFactory,
+  authenticatedStateFactory,
+  authErrorFactory,
+
+  // Collection factories
+  createUserManagementTestDataSet,
+  createUserTestScenario
+};
