@@ -1,460 +1,312 @@
 /**
- * API rate-limiting types and payload structures maintaining compatibility while supporting React component patterns.
+ * API Rate Limiting Types for React Component Integration
  * 
- * These types preserve the exact API contracts from the original Angular implementation
- * while providing enhanced TypeScript support for React Query patterns, React Hook Form
- * integration, and component composition used throughout the modernized Next.js application.
- * Maintains full compatibility with DreamFactory Core backend rate limiting endpoints.
+ * Comprehensive rate limiting type definitions maintaining full backend API compatibility
+ * while supporting modern React component patterns for limit management. These types enable
+ * seamless integration with DreamFactory Core rate limiting endpoints while providing
+ * enhanced TypeScript support for React 19/Next.js 15.1 component architecture.
  * 
- * @module LimitTypes
+ * This module preserves all existing rate limiting data contracts and endpoint compatibility
+ * while introducing React-specific patterns for form management, state handling, and
+ * component integration with React Hook Form, SWR/React Query, and Zustand state management.
+ * 
+ * @fileoverview Rate limiting types for React/Next.js integration
  * @version 1.0.0
  * @since Next.js 15.1 / React 19 migration
  */
 
-import type { RoleType } from './role';
-import type { Service } from './service';
-import type { UserProfile } from './user';
+import { ReactNode } from 'react';
+import type { RoleType, RoleRow } from './role';
+import type { Service, ServiceRow, ServiceType } from './service';
+import type { UserType, UserRow } from './user';
 
 // =============================================================================
-// CORE LIMIT TYPES
-// =============================================================================
-
-/**
- * Supported limit types for rate limiting configuration.
- * Maps to backend limit_type configurations in DreamFactory API endpoints.
- */
-export type LimitTypeCategory = 
-  | 'api'
-  | 'user'
-  | 'role'
-  | 'service'
-  | 'endpoint'
-  | 'global';
-
-/**
- * Time period units for rate limiting windows.
- * Used with rate configuration to define the temporal scope of rate limits.
- */
-export type LimitPeriod = 
-  | 'minute'
-  | 'hour' 
-  | 'day'
-  | '7-day'
-  | '30-day';
-
-/**
- * HTTP verb types for endpoint-specific rate limiting.
- * Maps to REST API method restrictions for granular access control.
- */
-export type LimitVerb = 
-  | 'GET'
-  | 'POST'
-  | 'PUT'
-  | 'PATCH'
-  | 'DELETE'
-  | 'OPTIONS'
-  | '*'; // wildcard for all verbs
-
-// =============================================================================
-// CACHE AND TRACKING TYPES
+// PRESERVED BACKEND API COMPATIBILITY INTERFACES
 // =============================================================================
 
 /**
- * Cache limit tracking interface for rate limit state management.
- * Maintains real-time tracking of rate limit consumption and remaining quota.
- * Used by React Query for cache invalidation and SWR for real-time updates.
+ * Core rate limit type interface matching DreamFactory backend structure.
+ * Maintains exact compatibility with /api/v2/system/limit endpoints for
+ * seamless integration with existing DreamFactory Core installations.
  * 
- * @interface CacheLimitType
- * @example
- * ```tsx
- * // React component displaying rate limit status
- * function RateLimitStatus({ cacheLimit }: { cacheLimit: CacheLimitType }) {
- *   const remainingPercent = (cacheLimit.remaining / cacheLimit.max) * 100;
- *   
- *   return (
- *     <div className="flex items-center space-x-2">
- *       <div className="w-24 bg-gray-200 rounded-full h-2">
- *         <div 
- *           className="bg-blue-600 h-2 rounded-full" 
- *           style={{ width: `${remainingPercent}%` }}
- *         />
- *       </div>
- *       <span className="text-sm text-gray-600">
- *         {cacheLimit.remaining}/{cacheLimit.max} remaining
- *       </span>
- *     </div>
- *   );
- * }
- * ```
- */
-export interface CacheLimitType {
-  /** Unique cache limit identifier for tracking purposes */
-  id: number;
-  
-  /** Cache key identifier for rate limit lookup and management */
-  key: string;
-  
-  /** Maximum allowed requests/operations within the time period */
-  max: number;
-  
-  /** Current number of attempts made within the current period */
-  attempts: number;
-  
-  /** Remaining requests/operations available in the current period */
-  remaining: number;
-  
-  /** Optional expiration timestamp for cache entry cleanup */
-  expiresAt?: string;
-  
-  /** Optional last reset timestamp for period tracking */
-  lastReset?: string;
-}
-
-// =============================================================================
-// MAIN LIMIT ENTITY
-// =============================================================================
-
-/**
- * Complete rate limit entity interface with full audit trail and relationships.
- * 
- * Represents the complete limit object as returned from DreamFactory API endpoints.
- * Used in limit creation/editing forms, detailed views, and comprehensive rate limit
- * management workflows. Fully compatible with React Hook Form validation
- * and React Query mutations for CRUD operations.
+ * Used in:
+ * - Rate limit CRUD operations through backend APIs
+ * - Limit configuration workflows and management interfaces
+ * - API response mapping for limit endpoint operations
+ * - Rate limiting enforcement and validation logic
  * 
  * @interface LimitType
  * @example
- * ```tsx
- * // React Hook Form integration with limit editing
- * function LimitEditForm({ limit }: { limit: LimitType }) {
- *   const { register, handleSubmit, watch, formState: { errors } } = useForm<LimitType>({
- *     defaultValues: limit,
- *     resolver: zodResolver(limitSchema)
- *   });
- * 
- *   const limitType = watch('type');
- *   
- *   const updateLimitMutation = useMutation({
- *     mutationFn: updateLimit,
- *     onSuccess: () => {
- *       queryClient.invalidateQueries(['limits']);
- *       queryClient.invalidateQueries(['limit', limit.id]);
- *     }
- *   });
- * 
- *   return (
- *     <form onSubmit={handleSubmit(updateLimitMutation.mutate)}>
- *       <input {...register('name')} placeholder="Limit name" />
- *       <textarea {...register('description')} placeholder="Description" />
- *       <select {...register('type')}>
- *         <option value="api">API Limit</option>
- *         <option value="user">User Limit</option>
- *         <option value="role">Role Limit</option>
- *       </select>
- *       
- *       {limitType === 'endpoint' && (
- *         <input {...register('endpoint')} placeholder="Endpoint path" />
- *       )}
- *       
- *       <input type="number" {...register('rate')} placeholder="Rate limit" />
- *       <select {...register('period')}>
- *         <option value="minute">Per Minute</option>
- *         <option value="hour">Per Hour</option>
- *         <option value="day">Per Day</option>
- *       </select>
- *     </form>
- *   );
- * }
+ * ```typescript
+ * const rateLimit: LimitType = {
+ *   id: 1,
+ *   name: "api_user_limit",
+ *   description: "Standard API rate limit for regular users",
+ *   type: "api",
+ *   rate: 1000,
+ *   period: 3600,
+ *   userId: 42,
+ *   roleId: 3,
+ *   serviceId: 15,
+ *   isActive: true,
+ *   createdDate: "2024-01-15T10:30:00Z",
+ *   lastModifiedDate: "2024-01-15T10:30:00Z",
+ *   createdById: 1,
+ *   lastModifiedById: 1
+ * };
  * ```
  */
 export interface LimitType {
-  /** ISO 8601 creation timestamp for audit and sorting purposes */
-  createdDate: string;
+  /** Unique rate limit identifier from backend database */
+  id: number;
   
-  /** Detailed description of the rate limit for documentation and clarity */
+  /** Human-readable limit name for identification and management */
+  name: string;
+  
+  /** Detailed description of the rate limit purpose and scope */
   description: string;
   
-  /** Specific endpoint path for endpoint-type limits (null for other types) */
-  endpoint: string | null;
+  /** Type of rate limit - determines enforcement scope and behavior */
+  type: 'api' | 'user' | 'role' | 'service' | 'endpoint' | 'global';
   
-  /** Unique limit identifier matching database primary key */
-  id: number;
-  
-  /** Rate limit activation status for enforcement control */
-  isActive: boolean;
-  
-  /** Generated cache key text for rate limit lookup optimization */
-  keyText: string;
-  
-  /** ISO 8601 last modification timestamp for audit purposes */
-  lastModifiedDate: string;
-  
-  /** Array of cache limit entries for real-time tracking and monitoring */
-  limitCacheByLimitId: CacheLimitType[];
-  
-  /** Human-readable limit name displayed in UI components */
-  name: string;
-  
-  /** Time period for rate limit window (minute, hour, day, etc.) */
-  period: LimitPeriod;
-  
-  /** Maximum number of requests/operations allowed per period */
+  /** Maximum number of requests allowed within the specified period */
   rate: number;
   
-  /** Associated role entity for role-based limits (null for other types) */
-  roleByRoleId: RoleType | null;
+  /** Time period in seconds for rate limit window (e.g., 3600 for 1 hour) */
+  period: number;
   
-  /** Role ID foreign key for role-based rate limiting (null if not applicable) */
-  roleId: number | null;
+  /** 
+   * User ID for user-specific rate limits.
+   * When specified, limit applies only to the associated user.
+   * Mutually exclusive with roleId for targeted rate limiting.
+   */
+  userId?: number;
   
-  /** Associated service entity for service-based limits (null for other types) */
-  serviceByServiceId: Service | null;
+  /** 
+   * Role ID for role-based rate limits.
+   * When specified, limit applies to all users with the associated role.
+   * Mutually exclusive with userId for role-wide rate limiting.
+   */
+  roleId?: number;
   
-  /** Service ID foreign key for service-based rate limiting (null if not applicable) */
-  serviceId: number | null;
+  /** 
+   * Service ID for service-specific rate limits.
+   * When specified, limit applies only to requests targeting the associated service.
+   * Enables granular per-service rate limiting strategies.
+   */
+  serviceId?: number;
   
-  /** Limit type category determining the scope and application of the rate limit */
-  type: LimitTypeCategory;
+  /** Whether the rate limit is currently active and enforced */
+  isActive: boolean;
   
-  /** Associated user entity for user-based limits (null for other types) */
-  userByUserId: UserProfile | null;
+  /** ISO 8601 timestamp when rate limit was created */
+  createdDate: string;
   
-  /** User ID foreign key for user-based rate limiting (null if not applicable) */
-  userId: number | null;
+  /** ISO 8601 timestamp when rate limit was last modified */
+  lastModifiedDate: string;
   
-  /** HTTP verb restriction for endpoint limits (null for non-endpoint limits) */
-  verb: LimitVerb | null;
+  /** ID of administrator who created this rate limit */
+  createdById: number;
+  
+  /** ID of administrator who last modified this rate limit */
+  lastModifiedById: number;
+  
+  /** 
+   * Optional endpoint pattern for fine-grained rate limiting.
+   * Supports wildcards and regex patterns for flexible endpoint matching.
+   * Examples: "/api/v2/database/*", "/api/v2/user/session"
+   */
+  endpointPattern?: string;
+  
+  /** 
+   * HTTP methods affected by this rate limit.
+   * When specified, limit applies only to matching HTTP verbs.
+   * Supports granular rate limiting per operation type.
+   */
+  httpMethods?: ('GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'OPTIONS')[];
+  
+  /** 
+   * Additional metadata for rate limit configuration.
+   * Extensible object for custom rate limiting parameters and backend-specific settings.
+   */
+  metadata?: Record<string, unknown>;
 }
 
-// =============================================================================
-// TABLE DISPLAY TYPES
-// =============================================================================
-
 /**
- * Simplified limit interface for table display and basic operations.
+ * Simplified rate limit interface for table display and listing operations.
+ * Optimized for React component rendering and table virtualization with TanStack Virtual.
  * 
- * Used primarily in limit management tables and listing components where only
- * essential limit information is needed. Optimized for React table components
- * with TanStack Virtual and provides clean data transformation patterns.
+ * Used in:
+ * - Rate limit management tables and data grids
+ * - Limit overview displays and summary components
+ * - Quick selection and filtering interfaces
+ * - Performance-optimized list rendering
  * 
- * @interface LimitTableRowData
+ * @interface LimitRow
  * @example
- * ```tsx
- * // React component usage with limit table
- * function LimitTableRow({ limit }: { limit: LimitTableRowData }) {
- *   return (
- *     <tr className="border-b hover:bg-gray-50">
- *       <td className="px-4 py-2">{limit.name}</td>
- *       <td className="px-4 py-2">
- *         <Badge variant="outline">{limit.limitType}</Badge>
- *       </td>
- *       <td className="px-4 py-2">{limit.limitRate}</td>
- *       <td className="px-4 py-2">{limit.limitCounter}</td>
- *       <td className="px-4 py-2">
- *         <Badge variant={limit.active ? 'success' : 'secondary'}>
- *           {limit.active ? 'Active' : 'Inactive'}
- *         </Badge>
- *       </td>
- *     </tr>
- *   );
- * }
+ * ```typescript
+ * const limitRow: LimitRow = {
+ *   id: 1,
+ *   name: "user_api_limit",
+ *   type: "user",
+ *   rate: 500,
+ *   period: 3600,
+ *   isActive: true,
+ *   associatedEntity: "john.doe@example.com",
+ *   lastEnforced: "2024-01-15T14:22:00Z"
+ * };
  * ```
  */
-export interface LimitTableRowData {
-  /** Unique limit identifier for database operations and routing */
+export interface LimitRow {
+  /** Unique rate limit identifier */
   id: number;
   
-  /** Human-readable limit name displayed in table cells */
+  /** Rate limit name for display purposes */
   name: string;
   
-  /** Limit type category as string for display purposes */
-  limitType: string;
+  /** Rate limit type for categorization and filtering */
+  type: LimitType['type'];
   
-  /** Rate limit value as formatted string for table presentation */
-  limitRate: string;
+  /** Request rate per period for quick reference */
+  rate: number;
   
-  /** Counter identifier or description for tracking purposes */
-  limitCounter: string;
+  /** Time period in seconds for rate limit window */
+  period: number;
   
-  /** Associated user ID for user-specific limits (null if not applicable) */
-  user: number | null;
+  /** Active status for UI state management */
+  isActive: boolean;
   
-  /** Associated service ID for service-specific limits (null if not applicable) */
-  service: number | null;
+  /** 
+   * Display name of associated entity (user email, role name, service name).
+   * Provides quick identification without requiring additional lookups.
+   */
+  associatedEntity?: string;
   
-  /** Associated role ID for role-specific limits (null if not applicable) */
-  role: number | null;
+  /** 
+   * Last enforcement timestamp for monitoring and debugging.
+   * Helps administrators understand rate limit usage patterns.
+   */
+  lastEnforced?: string;
   
-  /** Limit activation status for UI state management */
-  active: boolean;
+  /** 
+   * Current usage count within the current period.
+   * Enables real-time monitoring of rate limit consumption.
+   */
+  currentUsage?: number;
+  
+  /** 
+   * Percentage of rate limit currently consumed.
+   * Calculated value for progress indicators and alerts.
+   */
+  usagePercentage?: number;
 }
 
-// =============================================================================
-// PAYLOAD TYPES FOR API OPERATIONS
-// =============================================================================
-
 /**
- * Payload interface for creating new rate limits.
- * 
- * Used with React Hook Form for limit creation workflows and API mutations.
- * Excludes auto-generated fields like ID and timestamps while including
- * cache initialization data for immediate rate limit enforcement.
+ * Rate limit creation payload for API requests.
+ * Used with React Hook Form for limit creation workflows and form validation.
  * 
  * @interface CreateLimitPayload
  * @example
- * ```tsx
- * // React Hook Form with limit creation
- * function CreateLimitForm() {
- *   const { register, handleSubmit, watch } = useForm<CreateLimitPayload>();
- *   
- *   const createLimitMutation = useMutation({
- *     mutationFn: (data: CreateLimitPayload) => createLimit(data),
- *     onSuccess: () => {
- *       queryClient.invalidateQueries(['limits']);
- *       toast.success('Rate limit created successfully');
- *     }
- *   });
- * 
- *   const limitType = watch('type');
- * 
- *   return (
- *     <form onSubmit={handleSubmit(createLimitMutation.mutate)}>
- *       <input {...register('name', { required: 'Name is required' })} />
- *       <textarea {...register('description')} />
- *       
- *       <select {...register('type', { required: 'Type is required' })}>
- *         <option value="api">API Limit</option>
- *         <option value="user">User Limit</option>
- *         <option value="role">Role Limit</option>
- *         <option value="service">Service Limit</option>
- *         <option value="endpoint">Endpoint Limit</option>
- *       </select>
- * 
- *       {limitType === 'user' && (
- *         <select {...register('userId')}>
- *           {users.map(user => (
- *             <option key={user.id} value={user.id}>{user.name}</option>
- *           ))}
- *         </select>
- *       )}
- * 
- *       <input 
- *         type="number" 
- *         {...register('rate', { required: 'Rate is required' })} 
- *         placeholder="Rate limit"
- *       />
- *       
- *       <select {...register('period')}>
- *         <option value="minute">Per Minute</option>
- *         <option value="hour">Per Hour</option>
- *         <option value="day">Per Day</option>
- *       </select>
- *       
- *       <input type="checkbox" {...register('isActive')} />
- *     </form>
- *   );
- * }
+ * ```typescript
+ * const newLimit: CreateLimitPayload = {
+ *   name: "premium_user_limit",
+ *   description: "Enhanced rate limit for premium subscribers",
+ *   type: "role",
+ *   rate: 5000,
+ *   period: 3600,
+ *   roleId: 5,
+ *   isActive: true,
+ *   httpMethods: ["GET", "POST"],
+ *   endpointPattern: "/api/v2/database/*"
+ * };
  * ```
  */
 export interface CreateLimitPayload {
-  /** Initial cache configuration data for rate limit tracking setup */
-  cacheData: object;
-  
-  /** Descriptive text explaining the purpose and scope of the rate limit */
-  description: string | null;
-  
-  /** Specific endpoint path for endpoint-type limits */
-  endpoint: string | null;
-  
-  /** Initial activation status for the new rate limit */
-  isActive: boolean;
-  
-  /** Unique name identifier for the rate limit */
+  /** Rate limit name (required, unique constraint) */
   name: string;
   
-  /** Time period for the rate limit window */
-  period: LimitPeriod;
+  /** Rate limit description (required for documentation) */
+  description: string;
   
-  /** Rate limit value as string for form compatibility */
-  rate: string;
+  /** Rate limit type (required, determines enforcement scope) */
+  type: LimitType['type'];
   
-  /** Role ID for role-based limits */
-  roleId: number | null;
+  /** Request rate per period (required, positive integer) */
+  rate: number;
   
-  /** Service ID for service-based limits */
-  serviceId: number | null;
+  /** Time period in seconds (required, positive integer) */
+  period: number;
   
-  /** Limit type category */
-  type: LimitTypeCategory;
+  /** User ID for user-specific limits (optional, mutually exclusive with roleId) */
+  userId?: number;
   
-  /** User ID for user-based limits */
-  userId: number | null;
+  /** Role ID for role-based limits (optional, mutually exclusive with userId) */
+  roleId?: number;
   
-  /** HTTP verb restriction for endpoint limits */
-  verb: LimitVerb | null;
+  /** Service ID for service-specific limits (optional) */
+  serviceId?: number;
+  
+  /** Initial active status (optional, defaults to true) */
+  isActive?: boolean;
+  
+  /** Endpoint pattern for targeted rate limiting (optional) */
+  endpointPattern?: string;
+  
+  /** HTTP methods for selective rate limiting (optional) */
+  httpMethods?: LimitType['httpMethods'];
+  
+  /** Additional configuration metadata (optional) */
+  metadata?: Record<string, unknown>;
 }
 
 /**
- * Payload interface for updating existing rate limits.
- * 
- * Extends CreateLimitPayload with required ID and audit fields while
- * excluding cache data (managed separately) and converting rate to number.
- * Used with React Hook Form for limit editing workflows and API mutations.
+ * Rate limit update payload for API requests.
+ * Used with React Hook Form for limit modification workflows and partial updates.
  * 
  * @interface UpdateLimitPayload
  * @example
- * ```tsx
- * // React Hook Form with limit updates
- * function UpdateLimitForm({ existingLimit }: { existingLimit: LimitType }) {
- *   const { register, handleSubmit, formState: { errors } } = useForm<UpdateLimitPayload>({
- *     defaultValues: {
- *       id: existingLimit.id,
- *       name: existingLimit.name,
- *       description: existingLimit.description,
- *       rate: existingLimit.rate,
- *       period: existingLimit.period,
- *       isActive: existingLimit.isActive,
- *       type: existingLimit.type,
- *       // ... other fields
- *     }
- *   });
- *   
- *   const updateLimitMutation = useMutation({
- *     mutationFn: (data: UpdateLimitPayload) => updateLimit(data),
- *     onSuccess: () => {
- *       queryClient.invalidateQueries(['limits']);
- *       queryClient.invalidateQueries(['limit', existingLimit.id]);
- *     }
- *   });
- * 
- *   return (
- *     <form onSubmit={handleSubmit(updateLimitMutation.mutate)}>
- *       <input {...register('name')} />
- *       <textarea {...register('description')} />
- *       <input type="number" {...register('rate')} />
- *       <select {...register('period')}>
- *         <option value="minute">Per Minute</option>
- *         <option value="hour">Per Hour</option>
- *         <option value="day">Per Day</option>
- *       </select>
- *       <input type="checkbox" {...register('isActive')} />
- *     </form>
- *   );
- * }
+ * ```typescript
+ * const limitUpdate: UpdateLimitPayload = {
+ *   rate: 2000,
+ *   period: 7200,
+ *   isActive: false,
+ *   description: "Updated rate limit for maintenance window"
+ * };
  * ```
  */
-export interface UpdateLimitPayload extends Omit<CreateLimitPayload, 'cacheData' | 'rate'> {
-  /** Unique identifier of the limit being updated */
-  id: number;
+export interface UpdateLimitPayload {
+  /** Updated rate limit name (optional) */
+  name?: string;
   
-  /** Original creation timestamp (preserved for audit trail) */
-  createdDate: string;
+  /** Updated rate limit description (optional) */
+  description?: string;
   
-  /** Last modification timestamp (updated by backend) */
-  lastModifiedDate: string;
+  /** Updated request rate per period (optional) */
+  rate?: number;
   
-  /** Rate limit value as number for precise calculations */
-  rate: number;
+  /** Updated time period in seconds (optional) */
+  period?: number;
+  
+  /** Updated user ID association (optional) */
+  userId?: number;
+  
+  /** Updated role ID association (optional) */
+  roleId?: number;
+  
+  /** Updated service ID association (optional) */
+  serviceId?: number;
+  
+  /** Updated active status (optional) */
+  isActive?: boolean;
+  
+  /** Updated endpoint pattern (optional) */
+  endpointPattern?: string;
+  
+  /** Updated HTTP methods (optional) */
+  httpMethods?: LimitType['httpMethods'];
+  
+  /** Updated configuration metadata (optional) */
+  metadata?: Record<string, unknown>;
 }
 
 // =============================================================================
@@ -462,254 +314,385 @@ export interface UpdateLimitPayload extends Omit<CreateLimitPayload, 'cacheData'
 // =============================================================================
 
 /**
- * Union type for limit-related operations supporting both display and full data scenarios.
- * Useful for React components that may receive either simplified or complete limit data.
+ * Extended rate limit interface for React component state management.
+ * Combines backend data with client-side state, UI concerns, and form handling.
  * 
- * @example
- * ```tsx
- * function LimitComponent({ limit }: { limit: AnyLimit }) {
- *   // Type guard for full limit data
- *   if ('createdDate' in limit) {
- *     return <DetailedLimitView limit={limit} />;
- *   }
- *   return <SimpleLimitView limit={limit} />;
- * }
- * ```
+ * @interface LimitComponentState
  */
-export type AnyLimit = LimitTableRowData | LimitType;
+export interface LimitComponentState extends LimitType {
+  /** Loading state for limit operations (create, update, delete) */
+  loading?: boolean;
+  
+  /** Error state for limit operations and validation failures */
+  error?: string | null;
+  
+  /** Whether limit is currently being edited in form interfaces */
+  isEditing?: boolean;
+  
+  /** Whether limit is selected in multi-select management interfaces */
+  isSelected?: boolean;
+  
+  /** Form validation errors for React Hook Form integration */
+  validationErrors?: LimitValidationErrors;
+  
+  /** Original values for change tracking and dirty state detection */
+  originalValues?: Partial<LimitType>;
+  
+  /** Form dirty state for unsaved changes warning */
+  isDirty?: boolean;
+  
+  /** 
+   * Associated entity data for display purposes.
+   * Populated from user, role, or service lookups to avoid additional API calls.
+   */
+  associatedUser?: UserRow;
+  associatedRole?: RoleRow;
+  associatedService?: ServiceRow;
+  
+  /** 
+   * Real-time usage statistics for monitoring and alerts.
+   * Updated through WebSocket connections or polling mechanisms.
+   */
+  usageStats?: LimitUsageStats;
+  
+  /** 
+   * Enforcement history for debugging and audit purposes.
+   * Limited to recent events to avoid excessive memory usage.
+   */
+  recentEnforcements?: LimitEnforcementEvent[];
+}
 
 /**
- * React component props interface for limit-related components.
- * Provides type safety for limit prop passing and component composition.
+ * Validation error mapping for rate limit form fields.
+ * Provides structured error handling for React Hook Form integration.
  * 
- * @interface LimitComponentProps
- * @example
- * ```tsx
- * const LimitCard: React.FC<LimitComponentProps> = ({ 
- *   limit, 
- *   onEdit, 
- *   onDelete, 
- *   onToggleActive,
- *   readonly = false 
- * }) => (
- *   <Card className={readonly ? 'opacity-75' : ''}>
- *     <CardHeader>
- *       <CardTitle className="flex items-center justify-between">
- *         {limit.name}
- *         <Badge variant={isLimitType(limit) && limit.isActive ? 'success' : 'secondary'}>
- *           {isLimitType(limit) ? (limit.isActive ? 'Active' : 'Inactive') : 
- *            (limit.active ? 'Active' : 'Inactive')}
- *         </Badge>
- *       </CardTitle>
- *     </CardHeader>
- *     <CardContent>
- *       <p className="text-sm text-gray-600">
- *         {isLimitType(limit) ? limit.description : `Type: ${limit.limitType}`}
- *       </p>
- *       {isLimitType(limit) && (
- *         <p className="text-sm">
- *           Rate: {limit.rate} per {limit.period}
- *         </p>
- *       )}
- *     </CardContent>
- *     {!readonly && (
- *       <CardActions>
- *         <Button onClick={() => onEdit?.(limit)}>Edit</Button>
- *         <Button 
- *           variant="outline" 
- *           onClick={() => onToggleActive?.(limit.id, !isLimitActive(limit))}
- *         >
- *           {isLimitActive(limit) ? 'Deactivate' : 'Activate'}
- *         </Button>
- *         <Button variant="destructive" onClick={() => onDelete?.(limit.id)}>
- *           Delete
- *         </Button>
- *       </CardActions>
- *     )}
- *   </Card>
- * );
- * ```
+ * @interface LimitValidationErrors
  */
-export interface LimitComponentProps {
-  /** Limit data for display and operations */
-  limit: AnyLimit;
+export interface LimitValidationErrors {
+  /** Name field validation errors */
+  name?: string[];
   
-  /** Optional edit handler for limit modification workflows */
-  onEdit?: (limit: AnyLimit) => void;
+  /** Description field validation errors */
+  description?: string[];
   
-  /** Optional delete handler for limit removal operations */
-  onDelete?: (limitId: number) => void;
+  /** Type field validation errors */
+  type?: string[];
   
-  /** Optional toggle handler for activating/deactivating limits */
-  onToggleActive?: (limitId: number, isActive: boolean) => void;
+  /** Rate field validation errors */
+  rate?: string[];
   
-  /** Optional selection handler for multi-limit operations */
-  onSelect?: (limitId: number, selected: boolean) => void;
+  /** Period field validation errors */
+  period?: string[];
   
-  /** Optional flag for read-only display mode */
-  readonly?: boolean;
+  /** User ID validation errors */
+  userId?: string[];
   
-  /** Optional CSS classes for component styling */
+  /** Role ID validation errors */
+  roleId?: string[];
+  
+  /** Service ID validation errors */
+  serviceId?: string[];
+  
+  /** Endpoint pattern validation errors */
+  endpointPattern?: string[];
+  
+  /** HTTP methods validation errors */
+  httpMethods?: string[];
+  
+  /** General validation errors not specific to individual fields */
+  general?: string[];
+  
+  /** Cross-field validation errors (e.g., conflicting userId and roleId) */
+  crossField?: string[];
+}
+
+/**
+ * Rate limit usage statistics for monitoring and alerting.
+ * Provides real-time insights into rate limit consumption patterns.
+ * 
+ * @interface LimitUsageStats
+ */
+export interface LimitUsageStats {
+  /** Current request count within the active period */
+  currentRequests: number;
+  
+  /** Maximum requests allowed within the period */
+  maxRequests: number;
+  
+  /** Percentage of rate limit currently consumed */
+  usagePercentage: number;
+  
+  /** Timestamp when the current period started */
+  periodStart: string;
+  
+  /** Timestamp when the current period will reset */
+  periodEnd: string;
+  
+  /** Remaining time in seconds until period reset */
+  timeRemaining: number;
+  
+  /** Recent request rate (requests per minute) */
+  recentRequestRate: number;
+  
+  /** Peak usage percentage reached in the current period */
+  peakUsagePercentage: number;
+  
+  /** Number of times this limit has been exceeded in the last 24 hours */
+  violationCount24h: number;
+  
+  /** Average usage percentage over the last 24 hours */
+  averageUsage24h: number;
+}
+
+/**
+ * Rate limit enforcement event for audit trails and debugging.
+ * Captures individual rate limit violations and enforcement actions.
+ * 
+ * @interface LimitEnforcementEvent
+ */
+export interface LimitEnforcementEvent {
+  /** Unique event identifier */
+  id: string;
+  
+  /** Timestamp when enforcement occurred */
+  timestamp: string;
+  
+  /** Type of enforcement action taken */
+  action: 'blocked' | 'throttled' | 'warned' | 'allowed';
+  
+  /** Request details that triggered enforcement */
+  request: {
+    method: string;
+    endpoint: string;
+    userAgent?: string;
+    ipAddress?: string;
+    userId?: number;
+    sessionId?: string;
+  };
+  
+  /** Rate limit state at time of enforcement */
+  limitState: {
+    currentRequests: number;
+    maxRequests: number;
+    timeRemaining: number;
+  };
+  
+  /** Additional context and metadata */
+  metadata?: Record<string, unknown>;
+}
+
+// =============================================================================
+// REACT COMPONENT PROPS INTERFACES
+// =============================================================================
+
+/**
+ * Rate limit management component props interface.
+ * Supports comprehensive limit management workflows with full CRUD capabilities.
+ * 
+ * @interface LimitManagementComponentProps
+ */
+export interface LimitManagementComponentProps {
+  /** Current user context for permission checking and audit trails */
+  currentUser?: {
+    id: number;
+    roles: RoleRow[];
+    permissions: string[];
+  };
+  
+  /** Available rate limits for management and display */
+  limits?: LimitType[];
+  
+  /** Loading state for limit data fetching */
+  loading?: boolean;
+  
+  /** Error state for limit operations */
+  error?: string | null;
+  
+  /** Rate limit creation handler */
+  onCreateLimit?: (limit: CreateLimitPayload) => Promise<void>;
+  
+  /** Rate limit update handler */
+  onUpdateLimit?: (id: number, limit: UpdateLimitPayload) => Promise<void>;
+  
+  /** Rate limit deletion handler */
+  onDeleteLimit?: (id: number) => Promise<void>;
+  
+  /** Rate limit selection handler for detailed views */
+  onSelectLimit?: (limit: LimitType) => void;
+  
+  /** Bulk operations handler for multiple limits */
+  onBulkAction?: (action: 'activate' | 'deactivate' | 'delete', limitIds: number[]) => Promise<void>;
+  
+  /** Available users for user-specific limits */
+  availableUsers?: UserRow[];
+  
+  /** Available roles for role-based limits */
+  availableRoles?: RoleRow[];
+  
+  /** Available services for service-specific limits */
+  availableServices?: ServiceRow[];
+  
+  /** Component styling classes */
   className?: string;
   
-  /** Optional variant for different display styles */
-  variant?: 'card' | 'row' | 'compact';
+  /** Child components for custom layouts */
+  children?: ReactNode;
 }
 
 /**
- * Limit configuration hook interface for React Hook Form integration.
- * Provides comprehensive form state management for limit creation and editing.
+ * Rate limit form component props interface.
+ * Supports both creation and editing workflows with comprehensive validation.
  * 
- * @interface LimitFormHook
- * @example
- * ```tsx
- * function useLimitForm(initialLimit?: LimitType): LimitFormHook {
- *   const { register, handleSubmit, watch, formState, setValue, reset } = useForm<CreateLimitPayload | UpdateLimitPayload>({
- *     defaultValues: initialLimit ? transformLimitToPayload(initialLimit) : getDefaultLimitPayload()
- *   });
- * 
- *   const [isSubmitting, setIsSubmitting] = useState(false);
- *   const [submitErrors, setSubmitErrors] = useState<Record<string, string>>({});
- * 
- *   const submitForm = async (data: CreateLimitPayload | UpdateLimitPayload) => {
- *     setIsSubmitting(true);
- *     try {
- *       if ('id' in data) {
- *         await updateLimit(data);
- *       } else {
- *         await createLimit(data);
- *       }
- *       setSubmitErrors({});
- *     } catch (error) {
- *       setSubmitErrors({ submit: error.message });
- *     } finally {
- *       setIsSubmitting(false);
- *     }
- *   };
- * 
- *   return {
- *     register,
- *     handleSubmit,
- *     watch,
- *     formState,
- *     isSubmitting,
- *     submitForm,
- *     errors: { ...formState.errors, ...submitErrors },
- *     setValue,
- *     reset
- *   };
- * }
- * ```
+ * @interface LimitFormProps
  */
-export interface LimitFormHook {
-  /** React Hook Form register function for form field binding */
-  register: any;
+export interface LimitFormProps {
+  /** Rate limit being edited (undefined for create mode) */
+  limit?: LimitType;
   
-  /** React Hook Form handleSubmit function for form submission */
-  handleSubmit: any;
+  /** Available users for user-specific limit assignment */
+  availableUsers?: UserRow[];
   
-  /** React Hook Form watch function for reactive field monitoring */
-  watch: any;
+  /** Available roles for role-based limit assignment */
+  availableRoles?: RoleRow[];
   
-  /** React Hook Form state including validation errors and submission status */
-  formState: any;
+  /** Available services for service-specific limit assignment */
+  availableServices?: ServiceRow[];
   
-  /** Loading state for form submission operations */
-  isSubmitting: boolean;
+  /** Available service types for filtering and validation */
+  availableServiceTypes?: ServiceType[];
   
-  /** Function to submit form data with error handling */
-  submitForm: (data: CreateLimitPayload | UpdateLimitPayload) => Promise<void>;
+  /** Form submission handler */
+  onSubmit: (limit: CreateLimitPayload | UpdateLimitPayload) => Promise<void>;
   
-  /** Combined validation and submission errors */
-  errors: Record<string, string>;
+  /** Form cancellation handler */
+  onCancel?: () => void;
   
-  /** Function to programmatically set field values */
-  setValue: any;
+  /** Loading state during form submission */
+  loading?: boolean;
   
-  /** Function to reset form to initial state */
-  reset: any;
+  /** Form validation errors */
+  errors?: LimitValidationErrors;
+  
+  /** Read-only mode for viewing existing limits */
+  readOnly?: boolean;
+  
+  /** Default values for form initialization */
+  defaultValues?: Partial<CreateLimitPayload>;
+  
+  /** Form validation mode (onChange, onBlur, onSubmit) */
+  validationMode?: 'onChange' | 'onBlur' | 'onSubmit';
+  
+  /** Component styling classes */
+  className?: string;
 }
 
 /**
- * Limit list management hook interface for data fetching and operations.
- * Integrates with SWR/React Query for optimal data synchronization.
+ * Rate limit selector component props interface.
+ * Supports multi-select and single-select scenarios for limit assignment.
  * 
- * @interface LimitListHook
- * @example
- * ```tsx
- * function useLimitList(filters?: LimitFilters): LimitListHook {
- *   const { data, error, mutate } = useSWR(
- *     ['limits', filters],
- *     () => fetchLimits(filters)
- *   );
- * 
- *   const deleteLimitMutation = useMutation({
- *     mutationFn: deleteLimit,
- *     onSuccess: () => mutate()
- *   });
- * 
- *   const toggleLimitMutation = useMutation({
- *     mutationFn: ({ id, isActive }: { id: number; isActive: boolean }) => 
- *       updateLimit({ id, isActive }),
- *     onSuccess: () => mutate()
- *   });
- * 
- *   return {
- *     limits: data?.limits || [],
- *     isLoading: !data && !error,
- *     error,
- *     refetch: () => mutate(),
- *     deleteLimit: deleteLimitMutation.mutate,
- *     toggleLimit: toggleLimitMutation.mutate,
- *     isDeleting: deleteLimitMutation.isLoading,
- *     isToggling: toggleLimitMutation.isLoading
- *   };
- * }
- * ```
+ * @interface LimitSelectorProps
  */
-export interface LimitListHook {
-  /** Array of limit table row data for display */
-  limits: LimitTableRowData[];
+export interface LimitSelectorProps {
+  /** Available rate limits for selection */
+  limits: LimitRow[];
   
-  /** Loading state for initial data fetch */
-  isLoading: boolean;
+  /** Currently selected limit IDs */
+  selectedIds?: number[];
   
-  /** Error state for failed data operations */
-  error: Error | null;
+  /** Multi-select mode enabling multiple limit selection */
+  multiple?: boolean;
   
-  /** Function to manually refetch limit data */
-  refetch: () => Promise<void>;
+  /** Placeholder text for empty state */
+  placeholder?: string;
   
-  /** Function to delete a limit by ID */
-  deleteLimit: (id: number) => Promise<void>;
+  /** Disabled state for form control */
+  disabled?: boolean;
   
-  /** Function to toggle limit active status */
-  toggleLimit: (id: number, isActive: boolean) => Promise<void>;
+  /** Loading state during data fetching */
+  loading?: boolean;
   
-  /** Loading state for delete operations */
-  isDeleting: boolean;
+  /** Error message for validation failures */
+  error?: string;
   
-  /** Loading state for toggle operations */
-  isToggling: boolean;
-}
-
-// =============================================================================
-// UTILITY TYPES AND HELPERS
-// =============================================================================
-
-/**
- * Filter configuration for limit list queries.
- * Used with React Hook Form for search and filtering interfaces.
- */
-export interface LimitFilters {
-  /** Text search across limit names and descriptions */
-  search?: string;
+  /** Selection change handler */
+  onChange: (selectedIds: number[]) => void;
   
-  /** Filter by limit type category */
-  type?: LimitTypeCategory;
+  /** Search functionality for large limit lists */
+  searchable?: boolean;
+  
+  /** Filter by limit type */
+  filterByType?: LimitType['type'][];
   
   /** Filter by active status */
-  isActive?: boolean;
+  filterByActiveStatus?: boolean;
+  
+  /** Custom limit display renderer */
+  renderLimit?: (limit: LimitRow) => ReactNode;
+  
+  /** Component styling classes */
+  className?: string;
+}
+
+/**
+ * Rate limit monitor component props interface.
+ * Provides real-time monitoring and alerting capabilities.
+ * 
+ * @interface LimitMonitorProps
+ */
+export interface LimitMonitorProps {
+  /** Rate limits to monitor */
+  limits: LimitType[];
+  
+  /** Real-time usage data */
+  usageData?: Record<number, LimitUsageStats>;
+  
+  /** Recent enforcement events */
+  enforcementEvents?: LimitEnforcementEvent[];
+  
+  /** Alert thresholds for usage warnings */
+  alertThresholds?: {
+    warning: number; // Percentage (e.g., 80)
+    critical: number; // Percentage (e.g., 95)
+  };
+  
+  /** Refresh interval in milliseconds for real-time updates */
+  refreshInterval?: number;
+  
+  /** Alert handler for threshold violations */
+  onAlert?: (limit: LimitType, usage: LimitUsageStats, level: 'warning' | 'critical') => void;
+  
+  /** Export handler for monitoring data */
+  onExport?: (format: 'csv' | 'json') => void;
+  
+  /** Time range for historical data display */
+  timeRange?: {
+    start: string;
+    end: string;
+  };
+  
+  /** Component styling classes */
+  className?: string;
+}
+
+// =============================================================================
+// RATE LIMIT QUERY AND MUTATION TYPES
+// =============================================================================
+
+/**
+ * Rate limit query parameters for React Query/SWR integration.
+ * Supports filtering, sorting, and pagination for optimal data fetching.
+ * 
+ * @interface LimitQueryParams
+ */
+export interface LimitQueryParams {
+  /** Filter by active status */
+  active?: boolean;
+  
+  /** Filter by limit type */
+  type?: LimitType['type'][];
+  
+  /** Search by name or description */
+  search?: string;
   
   /** Filter by associated user ID */
   userId?: number;
@@ -720,243 +703,562 @@ export interface LimitFilters {
   /** Filter by associated service ID */
   serviceId?: number;
   
-  /** Pagination offset */
-  offset?: number;
+  /** Filter by endpoint pattern */
+  endpointPattern?: string;
+  
+  /** Filter by HTTP methods */
+  httpMethods?: string[];
+  
+  /** Include usage statistics in response */
+  includeUsageStats?: boolean;
+  
+  /** Include recent enforcement events */
+  includeEnforcementHistory?: boolean;
+  
+  /** Include associated entity details (user, role, service) */
+  includeAssociatedEntities?: boolean;
   
   /** Pagination limit */
   limit?: number;
   
+  /** Pagination offset */
+  offset?: number;
+  
   /** Sort field */
-  sortBy?: 'name' | 'type' | 'rate' | 'createdDate' | 'lastModifiedDate';
+  sortBy?: keyof LimitType | 'usagePercentage' | 'lastEnforced';
   
   /** Sort direction */
-  sortOrder?: 'asc' | 'desc';
+  sortDirection?: 'asc' | 'desc';
+  
+  /** Time range for usage statistics */
+  timeRange?: {
+    start: string;
+    end: string;
+  };
+}
+
+// =============================================================================
+// RATE LIMIT HOOK INTEGRATION TYPES
+// =============================================================================
+
+/**
+ * Rate limit management hook return interface.
+ * Provides comprehensive CRUD operations and state management for React components.
+ * 
+ * @interface UseLimitManagementReturn
+ */
+export interface UseLimitManagementReturn {
+  /** Available rate limits */
+  limits: LimitType[];
+  
+  /** Loading state for data operations */
+  loading: boolean;
+  
+  /** Error state for failed operations */
+  error: string | null;
+  
+  /** Create rate limit function */
+  createLimit: (payload: CreateLimitPayload) => Promise<LimitType>;
+  
+  /** Update rate limit function */
+  updateLimit: (id: number, payload: UpdateLimitPayload) => Promise<LimitType>;
+  
+  /** Delete rate limit function */
+  deleteLimit: (id: number) => Promise<void>;
+  
+  /** Bulk activate/deactivate limits */
+  bulkUpdateStatus: (limitIds: number[], isActive: boolean) => Promise<void>;
+  
+  /** Bulk delete limits */
+  bulkDelete: (limitIds: number[]) => Promise<void>;
+  
+  /** Refresh limits data */
+  refreshLimits: () => Promise<void>;
+  
+  /** Get limit by ID */
+  getLimitById: (id: number) => LimitType | undefined;
+  
+  /** Filter limits based on criteria */
+  filterLimits: (params: LimitQueryParams) => LimitType[];
+  
+  /** Get usage statistics for limit */
+  getLimitUsage: (id: number) => Promise<LimitUsageStats>;
+  
+  /** Get enforcement history for limit */
+  getEnforcementHistory: (id: number, timeRange?: { start: string; end: string }) => Promise<LimitEnforcementEvent[]>;
 }
 
 /**
- * Type guard to check if a limit object is a complete LimitType.
- * Useful for React components that handle both LimitTableRowData and LimitType.
+ * Rate limit selection hook return interface.
+ * Manages multi-select state for limit management interfaces.
  * 
- * @param limit - Limit object to check
- * @returns True if limit is LimitType, false if LimitTableRowData
- * 
- * @example
- * ```tsx
- * function LimitDisplay({ limit }: { limit: AnyLimit }) {
- *   if (isLimitType(limit)) {
- *     return (
- *       <div>
- *         <h3>{limit.name}</h3>
- *         <p>{limit.description}</p>
- *         <p>Rate: {limit.rate} per {limit.period}</p>
- *         <p>Created: {new Date(limit.createdDate).toLocaleDateString()}</p>
- *         <p>Modified: {new Date(limit.lastModifiedDate).toLocaleDateString()}</p>
- *       </div>
- *     );
- *   }
- *   
- *   return (
- *     <div>
- *       <h3>{limit.name}</h3>
- *       <p>Type: {limit.limitType}</p>
- *       <p>Rate: {limit.limitRate}</p>
- *       <p>Status: {limit.active ? 'Active' : 'Inactive'}</p>
- *     </div>
- *   );
- * }
- * ```
+ * @interface UseLimitSelectionReturn
  */
-export const isLimitType = (limit: AnyLimit): limit is LimitType => {
-  return 'createdDate' in limit && 'lastModifiedDate' in limit && 'rate' in limit;
-};
+export interface UseLimitSelectionReturn {
+  /** Currently selected limit IDs */
+  selectedIds: number[];
+  
+  /** Select limit function */
+  selectLimit: (id: number) => void;
+  
+  /** Deselect limit function */
+  deselectLimit: (id: number) => void;
+  
+  /** Toggle limit selection */
+  toggleLimit: (id: number) => void;
+  
+  /** Select all limits */
+  selectAll: (limitIds: number[]) => void;
+  
+  /** Clear all selections */
+  clearSelection: () => void;
+  
+  /** Check if limit is selected */
+  isSelected: (id: number) => boolean;
+  
+  /** Get selected limits */
+  getSelectedLimits: (allLimits: LimitType[]) => LimitType[];
+  
+  /** Selection count */
+  selectionCount: number;
+}
+
+// =============================================================================
+// RATE LIMIT EVENT TYPES
+// =============================================================================
 
 /**
- * Helper function to extract active status from any limit type.
- * Provides consistent access to activation state across different limit interfaces.
- * 
- * @param limit - Limit object of any type
- * @returns Boolean active status
+ * Rate limit management event types for component communication.
+ * Enables event-driven architecture for limit management workflows.
  */
-export const isLimitActive = (limit: AnyLimit): boolean => {
-  return isLimitType(limit) ? limit.isActive : limit.active;
-};
+export type LimitManagementEvent =
+  | 'limit:created'
+  | 'limit:updated'
+  | 'limit:deleted'
+  | 'limit:activated'
+  | 'limit:deactivated'
+  | 'limit:exceeded'
+  | 'limit:warning'
+  | 'limits:loaded'
+  | 'limits:error';
 
 /**
- * Utility function for transforming LimitType to LimitTableRowData for table display.
- * Maintains consistency with original Angular component mapping patterns.
+ * Rate limit event payload interface.
+ * Provides structured event data for component communication and audit trails.
  * 
- * @param limit - Complete limit entity from API
- * @returns Simplified limit data optimized for table display
- * 
- * @example
- * ```tsx
- * const mapLimitTypeToRow: LimitMapper = (limit: LimitType): LimitTableRowData => ({
- *   id: limit.id,
- *   name: limit.name,
- *   limitType: limit.type,
- *   limitRate: `${limit.rate} per ${limit.period}`,
- *   limitCounter: limit.keyText || 'N/A',
- *   user: limit.userId,
- *   service: limit.serviceId,
- *   role: limit.roleId,
- *   active: limit.isActive,
- * });
- * ```
+ * @interface LimitEventPayload
  */
-export type LimitMapper = (limit: LimitType) => LimitTableRowData;
+export interface LimitEventPayload {
+  /** Event type identifier */
+  type: LimitManagementEvent;
+  
+  /** Rate limit data (if applicable) */
+  limit?: LimitType;
+  
+  /** Rate limit ID (if applicable) */
+  limitId?: number;
+  
+  /** Error information (if applicable) */
+  error?: string;
+  
+  /** Usage statistics (for monitoring events) */
+  usageStats?: LimitUsageStats;
+  
+  /** Enforcement event (for violation events) */
+  enforcementEvent?: LimitEnforcementEvent;
+  
+  /** Additional event data */
+  data?: Record<string, unknown>;
+  
+  /** Event timestamp */
+  timestamp: string;
+  
+  /** User who triggered the event */
+  triggeredBy?: number;
+}
 
 /**
- * Default limit mapper function implementation.
- * Provides consistent data transformation between LimitType and LimitTableRowData interfaces.
- * Maintains backward compatibility with Angular component patterns.
- * 
- * @param limit - Complete limit entity from DreamFactory API
- * @returns Simplified limit data optimized for table display
+ * Rate limit event handler function type.
+ * Enables consistent event handling across components.
  */
-export const mapLimitTypeToRow: LimitMapper = (limit: LimitType): LimitTableRowData => ({
-  id: limit.id,
-  name: limit.name,
-  limitType: limit.type,
-  limitRate: `${limit.rate} per ${limit.period}`,
-  limitCounter: limit.keyText || `${limit.name}_${limit.type}`,
-  user: limit.userId,
-  service: limit.serviceId,
-  role: limit.roleId,
-  active: limit.isActive,
-});
+export type LimitEventHandler = (payload: LimitEventPayload) => void;
+
+// =============================================================================
+// RATE LIMIT UTILITY TYPES
+// =============================================================================
 
 /**
- * Utility function to get default values for limit creation forms.
- * Provides sensible defaults for React Hook Form initialization.
+ * Rate limit comparison result for change detection.
+ * Enables sophisticated diff tracking for form management.
  * 
- * @param type - Optional limit type to set specific defaults
- * @returns Default limit payload for form initialization
+ * @interface LimitComparisonResult
  */
-export function getDefaultLimitPayload(type?: LimitTypeCategory): Partial<CreateLimitPayload> {
-  return {
-    cacheData: {},
-    description: '',
-    endpoint: null,
-    isActive: true,
-    name: '',
-    period: 'hour',
-    rate: '100',
-    roleId: null,
-    serviceId: null,
-    type: type || 'api',
-    userId: null,
-    verb: null,
+export interface LimitComparisonResult {
+  /** Whether limits are functionally equivalent */
+  isEqual: boolean;
+  
+  /** Fields that have changed between versions */
+  changedFields: (keyof LimitType)[];
+  
+  /** Detailed field-by-field differences */
+  differences: Record<keyof LimitType, {
+    oldValue: any;
+    newValue: any;
+  }>;
+  
+  /** Whether changes affect rate limiting behavior */
+  behaviorChanged: boolean;
+  
+  /** Whether changes require immediate enforcement update */
+  requiresImmediateUpdate: boolean;
+}
+
+/**
+ * Rate limit validation result interface.
+ * Provides comprehensive validation feedback for form components.
+ * 
+ * @interface LimitValidationResult
+ */
+export interface LimitValidationResult {
+  /** Whether limit configuration is valid */
+  isValid: boolean;
+  
+  /** Validation errors by field */
+  errors: LimitValidationErrors;
+  
+  /** Validation warnings (non-blocking issues) */
+  warnings?: Record<string, string[]>;
+  
+  /** Suggested improvements for limit configuration */
+  suggestions?: string[];
+  
+  /** Estimated impact of the rate limit configuration */
+  impact?: {
+    affectedUsers: number;
+    affectedServices: number;
+    estimatedBlockedRequests: number;
   };
 }
 
 /**
- * Utility function to transform LimitType to UpdateLimitPayload.
- * Used for populating edit forms with existing limit data.
+ * Rate limit export/import format for backup and migration.
+ * Supports comprehensive limit configuration portability.
  * 
- * @param limit - Existing limit entity
- * @returns Update payload for form initialization
+ * @interface LimitExportData
  */
-export function transformLimitToUpdatePayload(limit: LimitType): UpdateLimitPayload {
+export interface LimitExportData {
+  /** Export metadata */
+  metadata: {
+    version: string;
+    exportDate: string;
+    exportedBy: number;
+    totalLimits: number;
+    exportedFrom: string; // Environment or instance identifier
+  };
+  
+  /** Rate limit data */
+  limits: LimitType[];
+  
+  /** Associated entity data for context */
+  associatedEntities?: {
+    users: UserRow[];
+    roles: RoleRow[];
+    services: ServiceRow[];
+  };
+  
+  /** Usage statistics at time of export */
+  usageSnapshots?: Record<number, LimitUsageStats>;
+  
+  /** Export options used */
+  options: {
+    includeInactiveLimits: boolean;
+    includeUsageStats: boolean;
+    includeAssociatedEntities: boolean;
+    includeEnforcementHistory: boolean;
+    timeRange?: {
+      start: string;
+      end: string;
+    };
+  };
+}
+
+// =============================================================================
+// TYPE GUARDS AND VALIDATORS
+// =============================================================================
+
+/**
+ * Type guard to check if an object is a valid LimitType.
+ * Provides runtime type safety for API responses and data validation.
+ * 
+ * @param obj - Object to validate
+ * @returns true if object matches LimitType interface
+ */
+export function isLimitType(obj: any): obj is LimitType {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    typeof obj.id === 'number' &&
+    typeof obj.name === 'string' &&
+    typeof obj.description === 'string' &&
+    typeof obj.type === 'string' &&
+    ['api', 'user', 'role', 'service', 'endpoint', 'global'].includes(obj.type) &&
+    typeof obj.rate === 'number' &&
+    obj.rate > 0 &&
+    typeof obj.period === 'number' &&
+    obj.period > 0 &&
+    typeof obj.isActive === 'boolean' &&
+    typeof obj.createdDate === 'string' &&
+    typeof obj.lastModifiedDate === 'string' &&
+    typeof obj.createdById === 'number' &&
+    typeof obj.lastModifiedById === 'number' &&
+    (obj.userId === undefined || typeof obj.userId === 'number') &&
+    (obj.roleId === undefined || typeof obj.roleId === 'number') &&
+    (obj.serviceId === undefined || typeof obj.serviceId === 'number') &&
+    (obj.endpointPattern === undefined || typeof obj.endpointPattern === 'string') &&
+    (obj.httpMethods === undefined || (
+      Array.isArray(obj.httpMethods) &&
+      obj.httpMethods.every((method: any) => 
+        typeof method === 'string' &&
+        ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'].includes(method)
+      )
+    )) &&
+    (obj.metadata === undefined || (
+      typeof obj.metadata === 'object' &&
+      obj.metadata !== null
+    ))
+  );
+}
+
+/**
+ * Type guard to check if an object is a valid LimitRow.
+ * Provides runtime validation for table and listing components.
+ * 
+ * @param obj - Object to validate
+ * @returns true if object matches LimitRow interface
+ */
+export function isLimitRow(obj: any): obj is LimitRow {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    typeof obj.id === 'number' &&
+    typeof obj.name === 'string' &&
+    typeof obj.type === 'string' &&
+    ['api', 'user', 'role', 'service', 'endpoint', 'global'].includes(obj.type) &&
+    typeof obj.rate === 'number' &&
+    obj.rate > 0 &&
+    typeof obj.period === 'number' &&
+    obj.period > 0 &&
+    typeof obj.isActive === 'boolean' &&
+    (obj.associatedEntity === undefined || typeof obj.associatedEntity === 'string') &&
+    (obj.lastEnforced === undefined || typeof obj.lastEnforced === 'string') &&
+    (obj.currentUsage === undefined || typeof obj.currentUsage === 'number') &&
+    (obj.usagePercentage === undefined || (
+      typeof obj.usagePercentage === 'number' &&
+      obj.usagePercentage >= 0 &&
+      obj.usagePercentage <= 100
+    ))
+  );
+}
+
+/**
+ * Validates rate limit data according to business rules and constraints.
+ * Provides comprehensive validation for form components and API payloads.
+ * 
+ * @param limit - Rate limit data to validate
+ * @returns Detailed validation result with errors and suggestions
+ */
+export function validateLimitData(limit: Partial<LimitType | CreateLimitPayload>): LimitValidationResult {
+  const errors: LimitValidationErrors = {};
+  const warnings: Record<string, string[]> = {};
+  const suggestions: string[] = [];
+  
+  // Name validation
+  if (!limit.name) {
+    errors.name = ['Rate limit name is required'];
+  } else if (limit.name.length < 3) {
+    errors.name = ['Rate limit name must be at least 3 characters'];
+  } else if (limit.name.length > 64) {
+    errors.name = ['Rate limit name must not exceed 64 characters'];
+  } else if (!/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(limit.name)) {
+    errors.name = ['Rate limit name must start with a letter and contain only letters, numbers, underscores, and hyphens'];
+  }
+  
+  // Description validation
+  if (!limit.description) {
+    errors.description = ['Rate limit description is required'];
+  } else if (limit.description.length > 1000) {
+    errors.description = ['Rate limit description must not exceed 1000 characters'];
+  }
+  
+  // Type validation
+  if (!limit.type) {
+    errors.type = ['Rate limit type is required'];
+  } else if (!['api', 'user', 'role', 'service', 'endpoint', 'global'].includes(limit.type)) {
+    errors.type = ['Invalid rate limit type'];
+  }
+  
+  // Rate validation
+  if (limit.rate === undefined || limit.rate === null) {
+    errors.rate = ['Rate value is required'];
+  } else if (!Number.isInteger(limit.rate) || limit.rate <= 0) {
+    errors.rate = ['Rate must be a positive integer'];
+  } else if (limit.rate > 1000000) {
+    warnings.rate = ['Very high rate limit may impact system performance'];
+    suggestions.push('Consider whether such a high rate limit is necessary');
+  }
+  
+  // Period validation
+  if (limit.period === undefined || limit.period === null) {
+    errors.period = ['Period value is required'];
+  } else if (!Number.isInteger(limit.period) || limit.period <= 0) {
+    errors.period = ['Period must be a positive integer (seconds)'];
+  } else if (limit.period < 60) {
+    warnings.period = ['Very short periods may cause performance issues'];
+    suggestions.push('Consider using periods of at least 60 seconds');
+  } else if (limit.period > 86400) {
+    warnings.period = ['Very long periods may not provide effective rate limiting'];
+  }
+  
+  // Association validation
+  const hasUserAssociation = limit.userId !== undefined && limit.userId !== null;
+  const hasRoleAssociation = limit.roleId !== undefined && limit.roleId !== null;
+  const hasServiceAssociation = limit.serviceId !== undefined && limit.serviceId !== null;
+  
+  if (hasUserAssociation && hasRoleAssociation) {
+    errors.crossField = ['Cannot specify both user and role for the same rate limit'];
+  }
+  
+  if (limit.type === 'user' && !hasUserAssociation) {
+    errors.userId = ['User ID is required for user-type rate limits'];
+  }
+  
+  if (limit.type === 'role' && !hasRoleAssociation) {
+    errors.roleId = ['Role ID is required for role-type rate limits'];
+  }
+  
+  if (limit.type === 'service' && !hasServiceAssociation) {
+    errors.serviceId = ['Service ID is required for service-type rate limits'];
+  }
+  
+  // Endpoint pattern validation
+  if (limit.endpointPattern) {
+    try {
+      // Basic pattern validation - check for common issues
+      if (limit.endpointPattern.includes('//')) {
+        warnings.endpointPattern = ['Double slashes in endpoint pattern may cause matching issues'];
+      }
+      if (!limit.endpointPattern.startsWith('/')) {
+        warnings.endpointPattern = ['Endpoint patterns should typically start with /'];
+      }
+    } catch (e) {
+      errors.endpointPattern = ['Invalid endpoint pattern format'];
+    }
+  }
+  
+  // HTTP methods validation
+  if (limit.httpMethods && limit.httpMethods.length === 0) {
+    warnings.httpMethods = ['No HTTP methods specified - rate limit will apply to all methods'];
+  }
+  
+  // Performance and usability suggestions
+  if (limit.rate && limit.period) {
+    const requestsPerSecond = limit.rate / limit.period;
+    if (requestsPerSecond > 100) {
+      suggestions.push('High request rate may require additional monitoring');
+    }
+    if (requestsPerSecond < 0.01) {
+      suggestions.push('Very low request rate may be too restrictive');
+    }
+  }
+  
   return {
-    id: limit.id,
-    createdDate: limit.createdDate,
-    lastModifiedDate: limit.lastModifiedDate,
-    description: limit.description,
-    endpoint: limit.endpoint,
-    isActive: limit.isActive,
-    name: limit.name,
-    period: limit.period,
-    rate: limit.rate,
-    roleId: limit.roleId,
-    serviceId: limit.serviceId,
-    type: limit.type,
-    userId: limit.userId,
-    verb: limit.verb,
+    isValid: Object.keys(errors).length === 0,
+    errors,
+    warnings: Object.keys(warnings).length > 0 ? warnings : undefined,
+    suggestions: suggestions.length > 0 ? suggestions : undefined
   };
 }
 
 /**
- * Limit type metadata for UI display and form options.
- * Provides human-readable labels and descriptions for limit types.
+ * Default values for creating new rate limits.
+ * Provides sensible defaults for form initialization and quick setup.
  */
-export const LimitTypeMetadata = {
-  api: { 
-    label: 'API Limit', 
-    description: 'Global API rate limiting across all endpoints',
-    icon: '🌐',
-    color: 'blue'
-  },
-  user: { 
-    label: 'User Limit', 
-    description: 'Rate limiting specific to individual users',
-    icon: '👤',
-    color: 'green'
-  },
-  role: { 
-    label: 'Role Limit', 
-    description: 'Rate limiting applied to user roles',
-    icon: '🛡️',
-    color: 'purple'
-  },
-  service: { 
-    label: 'Service Limit', 
-    description: 'Rate limiting for specific database services',
-    icon: '🔧',
-    color: 'orange'
-  },
-  endpoint: { 
-    label: 'Endpoint Limit', 
-    description: 'Rate limiting for specific API endpoints',
-    icon: '🎯',
-    color: 'red'
-  },
-  global: { 
-    label: 'Global Limit', 
-    description: 'System-wide rate limiting configuration',
-    icon: '🌍',
-    color: 'gray'
-  },
-} as const;
+export const DEFAULT_LIMIT_VALUES: Partial<CreateLimitPayload> = {
+  isActive: true,
+  rate: 1000,
+  period: 3600, // 1 hour
+  type: 'api'
+};
 
 /**
- * Period metadata for time window configuration.
- * Provides display labels and duration information for rate limit periods.
+ * Rate limit field labels for form components.
+ * Provides consistent labeling across the application interface.
  */
-export const PeriodMetadata = {
-  minute: { label: 'Per Minute', seconds: 60, shortLabel: '/min' },
-  hour: { label: 'Per Hour', seconds: 3600, shortLabel: '/hr' },
-  day: { label: 'Per Day', seconds: 86400, shortLabel: '/day' },
-  '7-day': { label: 'Per Week', seconds: 604800, shortLabel: '/week' },
-  '30-day': { label: 'Per Month', seconds: 2592000, shortLabel: '/month' },
-} as const;
+export const LIMIT_FIELD_LABELS: Record<keyof LimitType, string> = {
+  id: 'ID',
+  name: 'Rate Limit Name',
+  description: 'Description',
+  type: 'Limit Type',
+  rate: 'Requests per Period',
+  period: 'Period (seconds)',
+  userId: 'Target User',
+  roleId: 'Target Role',
+  serviceId: 'Target Service',
+  isActive: 'Active',
+  createdDate: 'Created Date',
+  lastModifiedDate: 'Last Modified Date',
+  createdById: 'Created By',
+  lastModifiedById: 'Last Modified By',
+  endpointPattern: 'Endpoint Pattern',
+  httpMethods: 'HTTP Methods',
+  metadata: 'Additional Configuration'
+};
 
 /**
- * Export all types for convenient importing
+ * Common rate limit configurations for quick setup.
+ * Provides predefined templates for typical use cases.
  */
-export type {
-  // Core types
-  LimitTypeCategory,
-  LimitPeriod,
-  LimitVerb,
-  
-  // Cache and tracking
-  CacheLimitType,
-  
-  // Main entity
-  LimitType,
-  LimitTableRowData,
-  
-  // Payload types
-  CreateLimitPayload,
-  UpdateLimitPayload,
-  
-  // Component integration
-  AnyLimit,
-  LimitComponentProps,
-  LimitFormHook,
-  LimitListHook,
-  LimitFilters,
-  
-  // Utility types
-  LimitMapper,
+export const COMMON_LIMIT_TEMPLATES: Record<string, Partial<CreateLimitPayload>> = {
+  standard_user: {
+    name: 'standard_user_limit',
+    description: 'Standard rate limit for regular users',
+    type: 'role',
+    rate: 1000,
+    period: 3600,
+    isActive: true
+  },
+  premium_user: {
+    name: 'premium_user_limit',
+    description: 'Enhanced rate limit for premium users',
+    type: 'role',
+    rate: 5000,
+    period: 3600,
+    isActive: true
+  },
+  api_service: {
+    name: 'api_service_limit',
+    description: 'Service-specific API rate limit',
+    type: 'service',
+    rate: 10000,
+    period: 3600,
+    isActive: true
+  },
+  database_operations: {
+    name: 'database_ops_limit',
+    description: 'Rate limit for database operations',
+    type: 'endpoint',
+    rate: 500,
+    period: 300, // 5 minutes
+    endpointPattern: '/api/v2/database/*',
+    httpMethods: ['POST', 'PUT', 'PATCH', 'DELETE'],
+    isActive: true
+  },
+  global_emergency: {
+    name: 'emergency_global_limit',
+    description: 'Emergency global rate limit for system protection',
+    type: 'global',
+    rate: 100,
+    period: 60,
+    isActive: false // Typically activated during emergencies
+  }
 };
