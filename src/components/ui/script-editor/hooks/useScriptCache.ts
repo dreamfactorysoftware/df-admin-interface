@@ -1,753 +1,823 @@
 /**
- * Script Cache Management Hook
+ * React Hook for Script Cache Management
  * 
- * React hook for managing script cache operations including viewing latest cached scripts
- * and cache deletion. Implements the viewLatest and deleteCache functionality using 
- * React Query for server state management with intelligent caching, optimistic updates,
- * and comprehensive error handling.
+ * Provides comprehensive script cache operations including viewing latest cached scripts
+ * and cache deletion with optimistic updates. Implements React Query for intelligent
+ * server state management, automatic format detection for JSON/file content, and
+ * seamless integration with DreamFactory storage services.
  * 
- * Features:
- * - React Query integration for cache operations with intelligent caching and background synchronization
- * - File path construction maintaining compatibility with existing storage service patterns
- * - Support for both JSON and file content retrieval with automatic format detection
- * - Cache deletion with optimistic updates and proper error rollback per Section 4.3.2 state management workflows
- * - TypeScript 5.8+ strict typing for cache operations and content state management
- * - Integration with cache service API endpoints maintaining existing DreamFactory authentication patterns
- * - User feedback integration with snackbar notifications for cache operation status
+ * Migrated from Angular service-based cache management to React hooks with enhanced
+ * performance through SWR caching, error handling with retry strategies, and user
+ * feedback integration through snackbar notifications.
  * 
- * @fileoverview Script cache management hook with React Query and optimistic updates
+ * @fileoverview Script cache management hook with React Query integration
  * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-import { useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { type CacheOperation, type CacheOperationResult, type CacheContent } from '../types';
+import { useCallback, useMemo } from 'react';
+import { apiClient, type ApiResponse } from '@/lib/api-client';
+import { 
+  ScriptContent, 
+  ScriptType, 
+  StorageService,
+  extensionToScriptType 
+} from '@/components/ui/script-editor/types';
+import { ApiErrorResponse } from '@/types/api';
 
-// =============================================================================
-// TYPE DEFINITIONS
-// =============================================================================
-
-/**
- * Cache service API response interface
- * Compatible with DreamFactory storage service endpoints
- */
-interface CacheServiceResponse<T = any> {
-  /** Response success status */
-  success: boolean;
-  /** Response data payload */
-  data?: T;
-  /** Error message if operation failed */
-  error?: string;
-  /** Response metadata */
-  meta?: {
-    /** Total number of items */
-    total?: number;
-    /** Cache timestamp */
-    cached_at?: string;
-    /** Cache expiry timestamp */
-    expires_at?: string;
-    /** Content hash for validation */
-    hash?: string;
-  };
-}
+// ============================================================================
+// CACHE CONTENT AND OPERATION TYPES
+// ============================================================================
 
 /**
- * Cache content item from API
+ * Cache entry structure for script content with metadata
  */
-interface CacheContentItem {
-  /** Cache key identifier */
-  key: string;
-  /** Cached content value */
-  content: string;
-  /** Content metadata */
-  metadata?: {
-    /** Original file name */
-    filename?: string;
-    /** Content type/format */
-    type?: string;
-    /** File size in bytes */
-    size?: number;
-    /** Last modified timestamp */
-    modified?: string;
-  };
+export interface ScriptCacheEntry {
+  /** Unique cache identifier */
+  id: string;
+  /** Script name */
+  name: string;
+  /** File path within storage service */
+  path: string;
+  /** Storage service identifier */
+  service_name: string;
+  /** Script content or JSON data */
+  content: string | Record<string, any>;
+  /** Content type detection */
+  content_type: 'json' | 'text';
+  /** Script type (derived from file extension) */
+  script_type: ScriptType;
+  /** File size in bytes */
+  size: number;
+  /** Last modified timestamp */
+  last_modified: string;
   /** Cache creation timestamp */
-  created_at: string;
+  cached_at: string;
   /** Cache expiry timestamp */
   expires_at?: string;
-  /** Content hash for validation */
-  hash?: string;
+  /** Content checksum for integrity */
+  checksum?: string;
 }
 
 /**
- * Configuration options for the script cache hook
+ * Cache operation result with comprehensive metadata
  */
-interface UseScriptCacheConfig {
-  /** Storage service ID for cache operations */
-  storageServiceId?: string;
-  /** Storage path for cache file location */
-  storagePath?: string;
-  /** Cache key prefix for namespacing */
-  cacheKeyPrefix?: string;
-  /** Enable automatic cache revalidation */
-  enableAutoRevalidation?: boolean;
-  /** Cache revalidation interval in milliseconds */
-  revalidationInterval?: number;
-  /** Enable optimistic updates for mutations */
-  enableOptimisticUpdates?: boolean;
-  /** Enable detailed error logging */
-  enableErrorLogging?: boolean;
-}
-
-/**
- * Return type for the useScriptCache hook
- */
-interface UseScriptCacheReturn {
-  /** Latest cached content query state */
-  latestCache: {
-    /** Cached content data */
-    data: CacheContent | null;
-    /** Loading state */
-    isLoading: boolean;
-    /** Error state */
-    error: string | null;
-    /** Refetch function */
-    refetch: () => Promise<void>;
-    /** Data staleness indicator */
-    isStale: boolean;
-    /** Last update timestamp */
-    lastUpdated?: Date;
-  };
-
-  /** Cache deletion mutation state */
-  deleteCache: {
-    /** Mutation function */
-    mutate: (cacheKey?: string) => Promise<void>;
-    /** Mutation loading state */
-    isLoading: boolean;
-    /** Mutation error state */
-    error: string | null;
-    /** Reset mutation state */
-    reset: () => void;
-  };
-
-  /** Cache view latest operation */
-  viewLatest: {
-    /** View latest cache function */
-    execute: () => Promise<CacheContent | null>;
-    /** Loading state */
-    isLoading: boolean;
-    /** Error state */
-    error: string | null;
-  };
-
-  /** Utility functions */
-  utils: {
-    /** Construct cache file path */
-    constructCachePath: (serviceId?: string, path?: string) => string;
-    /** Detect content format */
-    detectContentFormat: (filename: string, content: string) => 'json' | 'text';
-    /** Validate cache content */
-    validateCacheContent: (content: CacheContent) => boolean;
-    /** Clear all cache queries */
-    clearCacheQueries: () => void;
+export interface CacheOperationResult {
+  /** Operation success status */
+  success: boolean;
+  /** Operation type performed */
+  operation: 'view' | 'delete' | 'clear_all';
+  /** Affected cache entries */
+  affected_entries?: ScriptCacheEntry[];
+  /** Operation timestamp */
+  timestamp: string;
+  /** Error details (if operation failed) */
+  error?: string;
+  /** Additional operation metadata */
+  metadata?: {
+    /** Number of entries processed */
+    entries_processed: number;
+    /** Processing duration in milliseconds */
+    duration_ms: number;
+    /** Service used for operation */
+    service_name?: string;
   };
 }
 
 /**
- * Error types for cache operations
+ * Cache query parameters for filtering and pagination
  */
-type CacheErrorType = 
-  | 'CACHE_NOT_FOUND'
-  | 'CACHE_EXPIRED'
-  | 'INVALID_STORAGE_CONFIG'
-  | 'NETWORK_ERROR'
-  | 'AUTHENTICATION_ERROR'
-  | 'VALIDATION_ERROR'
-  | 'UNKNOWN_ERROR';
+export interface CacheQueryParams {
+  /** Storage service filter */
+  service_name?: string;
+  /** Script type filter */
+  script_type?: ScriptType;
+  /** Content type filter */
+  content_type?: 'json' | 'text';
+  /** Name pattern filter */
+  name_pattern?: string;
+  /** Maximum entries to return */
+  limit?: number;
+  /** Offset for pagination */
+  offset?: number;
+  /** Sort order */
+  sort?: 'name' | 'last_modified' | 'cached_at' | 'size';
+  /** Sort direction */
+  order?: 'asc' | 'desc';
+  /** Include expired entries */
+  include_expired?: boolean;
+}
 
 /**
- * Cache operation error interface
+ * Snackbar notification interface for user feedback
+ * Since use-snackbar.ts doesn't exist yet, defining the expected interface
  */
-interface CacheError {
-  /** Error type classification */
-  type: CacheErrorType;
-  /** Error message */
+interface SnackbarOptions {
+  /** Notification message */
   message: string;
-  /** Error details */
-  details?: string;
-  /** Original error object */
-  originalError?: Error;
-  /** Retry suggestions */
-  retryable: boolean;
+  /** Notification type */
+  type: 'success' | 'error' | 'warning' | 'info';
+  /** Duration in milliseconds */
+  duration?: number;
+  /** Whether notification can be dismissed */
+  dismissible?: boolean;
+  /** Action button configuration */
+  action?: {
+    label: string;
+    handler: () => void;
+  };
 }
-
-// =============================================================================
-// MOCK API CLIENT IMPLEMENTATION
-// =============================================================================
 
 /**
- * Mock API client for cache operations
- * In production, this would be replaced with actual API client implementation
+ * Mock snackbar hook interface (to be replaced when actual hook exists)
  */
-const mockApiClient = {
-  /**
-   * Fetch latest cached content
-   */
-  async fetchLatestCache(serviceId: string, path: string): Promise<CacheServiceResponse<CacheContentItem>> {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 200 + Math.random() * 300));
-
-    // Simulate different response scenarios
-    const scenario = Math.random();
-    
-    if (scenario < 0.1) {
-      // Simulate error scenario (10%)
-      throw new Error('Cache service temporarily unavailable');
-    }
-    
-    if (scenario < 0.2) {
-      // Simulate cache not found (10%)
-      return {
-        success: false,
-        error: 'No cached content found for the specified path',
-      };
-    }
-
-    // Simulate successful cache retrieval
-    const isJsonFile = path.endsWith('.json');
-    const mockContent = isJsonFile 
-      ? JSON.stringify({ message: 'Sample cached JSON content', timestamp: new Date().toISOString() }, null, 2)
-      : `// Sample cached script content
-function greet(name) {
-  return \`Hello, \${name}! This is cached content.\`;
+interface UseSnackbarReturn {
+  showSnackbar: (options: SnackbarOptions) => void;
+  hideSnackbar: () => void;
 }
 
-console.log(greet('DreamFactory Admin'));`;
+// ============================================================================
+// FILE UTILITIES AND PATH CONSTRUCTION
+// ============================================================================
 
-    return {
-      success: true,
-      data: {
-        key: `${serviceId}:${path}`,
-        content: mockContent,
-        metadata: {
-          filename: path.split('/').pop() || 'script.js',
-          type: isJsonFile ? 'application/json' : 'text/javascript',
-          size: mockContent.length,
-          modified: new Date(Date.now() - Math.random() * 86400000).toISOString(),
-        },
-        created_at: new Date(Date.now() - Math.random() * 86400000 * 7).toISOString(),
-        expires_at: new Date(Date.now() + 86400000).toISOString(),
-        hash: `cache_${Date.now()}_${Math.random().toString(36).substring(7)}`,
-      },
-      meta: {
-        total: 1,
-        cached_at: new Date().toISOString(),
-        hash: `meta_${Date.now()}`,
-      },
-    };
-  },
+/**
+ * File path construction utilities for storage service compatibility
+ * Maintains compatibility with existing Angular storage service patterns
+ */
+class FilePathUtils {
+  /**
+   * Construct full file path combining storage service and relative path
+   */
+  static constructPath(serviceName: string, relativePath: string): string {
+    const cleanServiceName = serviceName.replace(/^\/+|\/+$/g, '');
+    const cleanRelativePath = relativePath.replace(/^\/+/, '');
+    
+    return `${cleanServiceName}/${cleanRelativePath}`;
+  }
 
   /**
-   * Delete cached content
+   * Extract service name from full path
    */
-  async deleteCache(serviceId: string, path: string, cacheKey?: string): Promise<CacheServiceResponse> {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 150 + Math.random() * 200));
+  static extractServiceName(fullPath: string): string {
+    const parts = fullPath.split('/');
+    return parts[0] || '';
+  }
 
-    // Simulate different response scenarios
-    const scenario = Math.random();
-    
-    if (scenario < 0.05) {
-      // Simulate error scenario (5%)
-      throw new Error('Failed to delete cache: Permission denied');
-    }
+  /**
+   * Extract relative path from full path
+   */
+  static extractRelativePath(fullPath: string): string {
+    const parts = fullPath.split('/');
+    return parts.slice(1).join('/');
+  }
 
-    // Simulate successful deletion
-    return {
-      success: true,
-      meta: {
-        cached_at: new Date().toISOString(),
-      },
-    };
-  },
+  /**
+   * Detect content format based on file extension
+   */
+  static detectContentType(path: string): 'json' | 'text' {
+    const extension = path.toLowerCase().split('.').pop();
+    return extension === 'json' ? 'json' : 'text';
+  }
+
+  /**
+   * Determine script type from file extension
+   */
+  static getScriptType(path: string): ScriptType {
+    const extension = `.${path.toLowerCase().split('.').pop()}`;
+    return extensionToScriptType[extension] || ScriptType.TEXT;
+  }
+
+  /**
+   * Validate file path format
+   */
+  static validatePath(path: string): boolean {
+    if (!path || typeof path !== 'string') return false;
+    if (path.includes('..') || path.includes('//')) return false;
+    if (path.startsWith('/') || path.endsWith('/')) return false;
+    return true;
+  }
+
+  /**
+   * Normalize file path for consistent handling
+   */
+  static normalizePath(path: string): string {
+    return path
+      .replace(/\/+/g, '/') // Replace multiple slashes with single
+      .replace(/^\/+|\/+$/g, '') // Remove leading/trailing slashes
+      .trim();
+  }
+}
+
+// ============================================================================
+// MOCK IMPLEMENTATIONS FOR MISSING DEPENDENCIES
+// ============================================================================
+
+/**
+ * Mock implementation for use-snackbar hook
+ * To be replaced when actual hook is implemented
+ */
+const useSnackbar = (): UseSnackbarReturn => {
+  const showSnackbar = useCallback((options: SnackbarOptions) => {
+    // Mock implementation - would normally show actual notification
+    console.log(`[Snackbar] ${options.type.toUpperCase()}: ${options.message}`);
+  }, []);
+
+  const hideSnackbar = useCallback(() => {
+    // Mock implementation
+    console.log('[Snackbar] Hide notification');
+  }, []);
+
+  return { showSnackbar, hideSnackbar };
 };
 
-// Mock notification hook
-const useSnackbar = () => ({
-  showSnackbar: (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
-    console.log(`[${type.toUpperCase()}] ${message}`);
-  },
-});
-
-// =============================================================================
-// MAIN HOOK IMPLEMENTATION
-// =============================================================================
+// ============================================================================
+// CACHE QUERY KEYS AND API ENDPOINTS
+// ============================================================================
 
 /**
- * Script cache management hook
- * 
- * Provides comprehensive cache operations including viewing latest cached scripts
- * and cache deletion with React Query integration, optimistic updates, and error handling.
- * 
- * @param config - Configuration options for cache operations
- * @returns Cache management interface with queries, mutations, and utilities
+ * React Query cache keys for consistent cache management
  */
-export function useScriptCache(config: UseScriptCacheConfig = {}): UseScriptCacheReturn {
+export const CACHE_QUERY_KEYS = {
+  /** Base key for all script cache queries */
+  scripts: ['script-cache'] as const,
+  
+  /** All cached scripts with optional filters */
+  list: (params?: CacheQueryParams) => ['script-cache', 'list', params] as const,
+  
+  /** Single cache entry by ID */
+  detail: (id: string) => ['script-cache', 'detail', id] as const,
+  
+  /** Cache statistics and metadata */
+  stats: () => ['script-cache', 'stats'] as const,
+  
+  /** Service-specific cache entries */
+  byService: (serviceName: string) => ['script-cache', 'service', serviceName] as const,
+} as const;
+
+/**
+ * DreamFactory API endpoints for cache operations
+ */
+const CACHE_API_ENDPOINTS = {
+  /** List cached scripts */
+  list: '/system/cache/script',
+  
+  /** Get specific cache entry */
+  detail: (id: string) => `/system/cache/script/${encodeURIComponent(id)}`,
+  
+  /** Delete cache entry */
+  delete: (id: string) => `/system/cache/script/${encodeURIComponent(id)}`,
+  
+  /** Clear all cache */
+  clear: '/system/cache/script',
+  
+  /** Cache statistics */
+  stats: '/system/cache/script/stats',
+} as const;
+
+// ============================================================================
+// SCRIPT CACHE HOOK IMPLEMENTATION
+// ============================================================================
+
+/**
+ * Hook options for script cache management configuration
+ */
+export interface UseScriptCacheOptions {
+  /** Initial query parameters */
+  initialParams?: CacheQueryParams;
+  
+  /** Enable real-time updates */
+  enableRealTimeUpdates?: boolean;
+  
+  /** Cache refresh interval in milliseconds */
+  refreshInterval?: number;
+  
+  /** Enable background refetch on window focus */
+  refetchOnWindowFocus?: boolean;
+  
+  /** Enable automatic retry on errors */
+  enableRetry?: boolean;
+  
+  /** Maximum retry attempts */
+  maxRetryAttempts?: number;
+  
+  /** Show success notifications */
+  showSuccessNotifications?: boolean;
+  
+  /** Show error notifications */
+  showErrorNotifications?: boolean;
+  
+  /** Custom error handler */
+  onError?: (error: ApiErrorResponse) => void;
+  
+  /** Custom success handler */
+  onSuccess?: (result: CacheOperationResult) => void;
+}
+
+/**
+ * Return type for useScriptCache hook
+ */
+export interface UseScriptCacheReturn {
+  // ============================================================================
+  // CACHE DATA AND STATE
+  // ============================================================================
+  
+  /** Cached script entries */
+  cacheEntries: ScriptCacheEntry[];
+  
+  /** Loading state for cache data */
+  isLoading: boolean;
+  
+  /** Error state */
+  error: ApiErrorResponse | null;
+  
+  /** Whether cache is being refreshed */
+  isRefreshing: boolean;
+  
+  /** Cache statistics */
+  cacheStats: {
+    total_entries: number;
+    total_size: number;
+    services_count: number;
+    expired_entries: number;
+  } | null;
+  
+  // ============================================================================
+  // CACHE OPERATIONS
+  // ============================================================================
+  
+  /** View latest cached scripts with optional filtering */
+  viewLatest: (params?: CacheQueryParams) => Promise<ScriptCacheEntry[]>;
+  
+  /** Delete specific cache entry */
+  deleteCache: {
+    mutate: (id: string) => void;
+    mutateAsync: (id: string) => Promise<CacheOperationResult>;
+    isPending: boolean;
+    error: ApiErrorResponse | null;
+    reset: () => void;
+  };
+  
+  /** Clear all cache entries */
+  clearAllCache: {
+    mutate: () => void;
+    mutateAsync: () => Promise<CacheOperationResult>;
+    isPending: boolean;
+    error: ApiErrorResponse | null;
+    reset: () => void;
+  };
+  
+  // ============================================================================
+  // UTILITY FUNCTIONS
+  // ============================================================================
+  
+  /** Manually refresh cache data */
+  refreshCache: () => Promise<void>;
+  
+  /** Get cache entry by ID */
+  getCacheEntry: (id: string) => ScriptCacheEntry | undefined;
+  
+  /** Get content from cache entry with format detection */
+  getContent: (entry: ScriptCacheEntry) => {
+    content: string | Record<string, any>;
+    type: 'json' | 'text';
+    script_type: ScriptType;
+  };
+  
+  /** Validate cache entry integrity */
+  validateEntry: (entry: ScriptCacheEntry) => boolean;
+  
+  /** Get cache entries by service */
+  getEntriesByService: (serviceName: string) => ScriptCacheEntry[];
+  
+  /** Build file path for storage service */
+  buildFilePath: (serviceName: string, relativePath: string) => string;
+}
+
+/**
+ * Custom hook for script cache management
+ * 
+ * Provides comprehensive cache operations with React Query integration,
+ * optimistic updates, error handling, and user feedback. Replaces Angular
+ * service-based cache management with modern React patterns.
+ */
+export function useScriptCache(options: UseScriptCacheOptions = {}): UseScriptCacheReturn {
   const {
-    storageServiceId,
-    storagePath,
-    cacheKeyPrefix = 'script_cache',
-    enableAutoRevalidation = true,
-    revalidationInterval = 5 * 60 * 1000, // 5 minutes
-    enableOptimisticUpdates = true,
-    enableErrorLogging = true,
-  } = config;
+    initialParams,
+    enableRealTimeUpdates = true,
+    refreshInterval = 30000, // 30 seconds
+    refetchOnWindowFocus = true,
+    enableRetry = true,
+    maxRetryAttempts = 3,
+    showSuccessNotifications = true,
+    showErrorNotifications = true,
+    onError,
+    onSuccess,
+  } = options;
 
   const queryClient = useQueryClient();
   const { showSnackbar } = useSnackbar();
 
-  // =============================================================================
+  // ============================================================================
+  // CACHE DATA QUERIES
+  // ============================================================================
+
+  /**
+   * Main query for cached script entries
+   */
+  const {
+    data: cacheData,
+    error: cacheError,
+    isLoading,
+    isRefetching: isRefreshing,
+    refetch: refetchCache,
+  } = useQuery({
+    queryKey: CACHE_QUERY_KEYS.list(initialParams),
+    queryFn: async () => {
+      const response = await apiClient.get<{ resource: ScriptCacheEntry[] }>(
+        CACHE_API_ENDPOINTS.list,
+        {
+          headers: initialParams ? { 
+            'Content-Type': 'application/json',
+            ...Object.entries(initialParams).reduce((acc, [key, value]) => {
+              if (value !== undefined) {
+                acc[`X-Filter-${key}`] = String(value);
+              }
+              return acc;
+            }, {} as Record<string, string>)
+          } : undefined,
+        }
+      );
+
+      if (!response.resource) {
+        throw new Error('Invalid cache data response format');
+      }
+
+      return response.resource;
+    },
+    enabled: true,
+    staleTime: 10000, // 10 seconds
+    refetchInterval: enableRealTimeUpdates ? refreshInterval : false,
+    refetchOnWindowFocus,
+    retry: enableRetry ? maxRetryAttempts : false,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+  });
+
+  /**
+   * Query for cache statistics
+   */
+  const { data: cacheStats } = useQuery({
+    queryKey: CACHE_QUERY_KEYS.stats(),
+    queryFn: async () => {
+      const response = await apiClient.get<{
+        resource: {
+          total_entries: number;
+          total_size: number;
+          services_count: number;
+          expired_entries: number;
+        }
+      }>(CACHE_API_ENDPOINTS.stats);
+      
+      return response.resource;
+    },
+    enabled: true,
+    staleTime: 60000, // 1 minute
+    retry: enableRetry ? 2 : false,
+  });
+
+  // ============================================================================
+  // CACHE MUTATIONS
+  // ============================================================================
+
+  /**
+   * Delete cache entry mutation with optimistic updates
+   */
+  const deleteCacheMutation = useMutation({
+    mutationFn: async (id: string): Promise<CacheOperationResult> => {
+      const startTime = Date.now();
+      
+      const response = await apiClient.delete<{ success: boolean; message?: string }>(
+        CACHE_API_ENDPOINTS.delete(id)
+      );
+
+      return {
+        success: true,
+        operation: 'delete',
+        affected_entries: cacheData?.filter(entry => entry.id === id) || [],
+        timestamp: new Date().toISOString(),
+        metadata: {
+          entries_processed: 1,
+          duration_ms: Date.now() - startTime,
+        },
+      };
+    },
+    
+    // Optimistic update - immediately remove from UI
+    onMutate: async (id: string) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: CACHE_QUERY_KEYS.list() });
+
+      // Snapshot the previous value
+      const previousCache = queryClient.getQueryData<ScriptCacheEntry[]>(
+        CACHE_QUERY_KEYS.list(initialParams)
+      );
+
+      // Optimistically update the cache
+      if (previousCache) {
+        queryClient.setQueryData<ScriptCacheEntry[]>(
+          CACHE_QUERY_KEYS.list(initialParams),
+          previousCache.filter(entry => entry.id !== id)
+        );
+      }
+
+      return { previousCache };
+    },
+    
+    // On error, rollback optimistic update
+    onError: (error: ApiErrorResponse, id: string, context) => {
+      if (context?.previousCache) {
+        queryClient.setQueryData(
+          CACHE_QUERY_KEYS.list(initialParams),
+          context.previousCache
+        );
+      }
+
+      if (showErrorNotifications) {
+        showSnackbar({
+          type: 'error',
+          message: `Failed to delete cache entry: ${error.error?.message || 'Unknown error'}`,
+          duration: 5000,
+          dismissible: true,
+        });
+      }
+
+      onError?.(error);
+    },
+    
+    // On success, show notification and trigger callbacks
+    onSuccess: (result: CacheOperationResult) => {
+      if (showSuccessNotifications) {
+        showSnackbar({
+          type: 'success',
+          message: 'Cache entry deleted successfully',
+          duration: 3000,
+          dismissible: true,
+        });
+      }
+
+      onSuccess?.(result);
+    },
+    
+    // Always refetch to ensure consistency
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: CACHE_QUERY_KEYS.list() });
+      queryClient.invalidateQueries({ queryKey: CACHE_QUERY_KEYS.stats() });
+    },
+  });
+
+  /**
+   * Clear all cache mutation
+   */
+  const clearAllCacheMutation = useMutation({
+    mutationFn: async (): Promise<CacheOperationResult> => {
+      const startTime = Date.now();
+      const entriesCount = cacheData?.length || 0;
+      
+      const response = await apiClient.delete<{ success: boolean; message?: string }>(
+        CACHE_API_ENDPOINTS.clear
+      );
+
+      return {
+        success: true,
+        operation: 'clear_all',
+        affected_entries: cacheData || [],
+        timestamp: new Date().toISOString(),
+        metadata: {
+          entries_processed: entriesCount,
+          duration_ms: Date.now() - startTime,
+        },
+      };
+    },
+    
+    // Optimistic update - clear all entries
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: CACHE_QUERY_KEYS.list() });
+
+      const previousCache = queryClient.getQueryData<ScriptCacheEntry[]>(
+        CACHE_QUERY_KEYS.list(initialParams)
+      );
+
+      queryClient.setQueryData<ScriptCacheEntry[]>(
+        CACHE_QUERY_KEYS.list(initialParams),
+        []
+      );
+
+      return { previousCache };
+    },
+    
+    onError: (error: ApiErrorResponse, _, context) => {
+      if (context?.previousCache) {
+        queryClient.setQueryData(
+          CACHE_QUERY_KEYS.list(initialParams),
+          context.previousCache
+        );
+      }
+
+      if (showErrorNotifications) {
+        showSnackbar({
+          type: 'error',
+          message: `Failed to clear cache: ${error.error?.message || 'Unknown error'}`,
+          duration: 5000,
+          dismissible: true,
+        });
+      }
+
+      onError?.(error);
+    },
+    
+    onSuccess: (result: CacheOperationResult) => {
+      if (showSuccessNotifications) {
+        const entriesCount = result.metadata?.entries_processed || 0;
+        showSnackbar({
+          type: 'success',
+          message: `Successfully cleared ${entriesCount} cache entries`,
+          duration: 3000,
+          dismissible: true,
+        });
+      }
+
+      onSuccess?.(result);
+    },
+    
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: CACHE_QUERY_KEYS.list() });
+      queryClient.invalidateQueries({ queryKey: CACHE_QUERY_KEYS.stats() });
+    },
+  });
+
+  // ============================================================================
   // UTILITY FUNCTIONS
-  // =============================================================================
+  // ============================================================================
 
   /**
-   * Construct cache file path from storage service and path
-   * Maintains compatibility with existing storage service patterns
+   * View latest cached scripts with optional filtering
    */
-  const constructCachePath = useCallback((serviceId?: string, path?: string): string => {
-    const finalServiceId = serviceId || storageServiceId;
-    const finalPath = path || storagePath;
-    
-    if (!finalServiceId || !finalPath) {
-      return '';
-    }
-    
-    // Normalize path separators and remove leading/trailing slashes
-    const normalizedPath = finalPath.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
-    
-    // Construct full cache path
-    return `${finalServiceId}/${normalizedPath}`;
-  }, [storageServiceId, storagePath]);
+  const viewLatest = useCallback(async (params?: CacheQueryParams): Promise<ScriptCacheEntry[]> => {
+    const response = await apiClient.get<{ resource: ScriptCacheEntry[] }>(
+      CACHE_API_ENDPOINTS.list,
+      {
+        headers: params ? {
+          'Content-Type': 'application/json',
+          ...Object.entries(params).reduce((acc, [key, value]) => {
+            if (value !== undefined) {
+              acc[`X-Filter-${key}`] = String(value);
+            }
+            return acc;
+          }, {} as Record<string, string>)
+        } : undefined,
+      }
+    );
 
-  /**
-   * Detect content format based on file extension and content analysis
-   * Supports automatic format detection for JSON vs text content
-   */
-  const detectContentFormat = useCallback((filename: string, content: string): 'json' | 'text' => {
-    // Check file extension first
-    if (filename.toLowerCase().endsWith('.json')) {
-      return 'json';
-    }
-    
-    // Attempt to parse content as JSON
-    try {
-      JSON.parse(content.trim());
-      return 'json';
-    } catch {
-      return 'text';
-    }
+    return response.resource || [];
   }, []);
 
   /**
-   * Validate cache content structure and integrity
+   * Manually refresh cache data
    */
-  const validateCacheContent = useCallback((content: CacheContent): boolean => {
-    if (!content || typeof content !== 'object') {
+  const refreshCache = useCallback(async (): Promise<void> => {
+    await refetchCache();
+  }, [refetchCache]);
+
+  /**
+   * Get cache entry by ID
+   */
+  const getCacheEntry = useCallback((id: string): ScriptCacheEntry | undefined => {
+    return cacheData?.find(entry => entry.id === id);
+  }, [cacheData]);
+
+  /**
+   * Get content from cache entry with format detection
+   */
+  const getContent = useCallback((entry: ScriptCacheEntry) => {
+    const contentType = FilePathUtils.detectContentType(entry.path);
+    const scriptType = FilePathUtils.getScriptType(entry.path);
+    
+    let content: string | Record<string, any>;
+    
+    if (contentType === 'json' && typeof entry.content === 'string') {
+      try {
+        content = JSON.parse(entry.content);
+      } catch {
+        // Fallback to text if JSON parsing fails
+        content = entry.content;
+      }
+    } else {
+      content = entry.content;
+    }
+
+    return {
+      content,
+      type: contentType,
+      script_type: scriptType,
+    };
+  }, []);
+
+  /**
+   * Validate cache entry integrity
+   */
+  const validateEntry = useCallback((entry: ScriptCacheEntry): boolean => {
+    if (!entry || !entry.id || !entry.name || !entry.path) {
       return false;
     }
-    
-    // Validate required fields
-    if (typeof content.content !== 'string' || !content.cachedAt) {
+
+    if (!FilePathUtils.validatePath(entry.path)) {
       return false;
     }
-    
-    // Validate timestamp
-    if (!(content.cachedAt instanceof Date) && isNaN(new Date(content.cachedAt).getTime())) {
-      return false;
+
+    if (entry.checksum && typeof entry.content === 'string') {
+      // In a real implementation, you would verify the checksum
+      // For now, just check if content exists
+      return entry.content.length > 0;
     }
-    
+
     return true;
   }, []);
 
   /**
-   * Clear all cache-related queries from React Query cache
+   * Get cache entries by service
    */
-  const clearCacheQueries = useCallback(() => {
-    queryClient.invalidateQueries({
-      predicate: (query) => {
-        const queryKey = query.queryKey;
-        return Array.isArray(queryKey) && queryKey[0] === cacheKeyPrefix;
-      },
-    });
-  }, [queryClient, cacheKeyPrefix]);
+  const getEntriesByService = useCallback((serviceName: string): ScriptCacheEntry[] => {
+    return cacheData?.filter(entry => entry.service_name === serviceName) || [];
+  }, [cacheData]);
 
   /**
-   * Create standardized cache error object
+   * Build file path for storage service
    */
-  const createCacheError = useCallback((
-    type: CacheErrorType,
-    message: string,
-    originalError?: Error,
-    details?: string
-  ): CacheError => {
-    const error: CacheError = {
-      type,
-      message,
-      details,
-      originalError,
-      retryable: ['NETWORK_ERROR', 'UNKNOWN_ERROR'].includes(type),
-    };
+  const buildFilePath = useCallback((serviceName: string, relativePath: string): string => {
+    return FilePathUtils.constructPath(serviceName, relativePath);
+  }, []);
 
-    if (enableErrorLogging) {
-      console.error('[useScriptCache] Cache operation error:', error);
-    }
+  // ============================================================================
+  // MEMOIZED RETURN VALUES
+  // ============================================================================
 
-    return error;
-  }, [enableErrorLogging]);
-
-  // =============================================================================
-  // REACT QUERY CONFIGURATION
-  // =============================================================================
-
-  /**
-   * Query key factory for cache operations
-   */
-  const cacheQueryKeys = useMemo(() => ({
-    all: [cacheKeyPrefix] as const,
-    latest: (serviceId: string, path: string) => 
-      [cacheKeyPrefix, 'latest', serviceId, path] as const,
-    content: (cacheKey: string) => 
-      [cacheKeyPrefix, 'content', cacheKey] as const,
-  }), [cacheKeyPrefix]);
-
-  // =============================================================================
-  // LATEST CACHE QUERY
-  // =============================================================================
-
-  /**
-   * React Query for fetching latest cached content
-   * Implements intelligent caching with background synchronization per Section 3.2.4
-   */
-  const latestCacheQuery = useQuery({
-    queryKey: cacheQueryKeys.latest(storageServiceId || '', storagePath || ''),
-    queryFn: async (): Promise<CacheContent | null> => {
-      if (!storageServiceId || !storagePath) {
-        throw createCacheError(
-          'INVALID_STORAGE_CONFIG',
-          'Storage service ID and path are required for cache operations',
-          undefined,
-          'Ensure both storageServiceId and storagePath are provided'
-        );
-      }
-
-      try {
-        const response = await mockApiClient.fetchLatestCache(storageServiceId, storagePath);
-        
-        if (!response.success || !response.data) {
-          if (response.error?.includes('not found')) {
-            return null; // Cache not found, return null instead of throwing
-          }
-          throw createCacheError(
-            'CACHE_NOT_FOUND',
-            response.error || 'Failed to fetch cached content',
-            undefined,
-            'Cache may have expired or been manually deleted'
-          );
-        }
-
-        const { data } = response;
-        const format = detectContentFormat(
-          data.metadata?.filename || 'unknown',
-          data.content
-        );
-
-        // Transform API response to CacheContent interface
-        const cacheContent: CacheContent = {
-          content: data.content,
-          metadata: {
-            name: data.metadata?.filename,
-            size: data.metadata?.size,
-            language: format === 'json' ? 'json' : 'javascript',
-            storage: {
-              serviceId: storageServiceId,
-              path: storagePath,
-            },
-          },
-          cachedAt: new Date(data.created_at),
-          expiresAt: data.expires_at ? new Date(data.expires_at) : undefined,
-          hash: data.hash,
-        };
-
-        // Validate transformed content
-        if (!validateCacheContent(cacheContent)) {
-          throw createCacheError(
-            'VALIDATION_ERROR',
-            'Invalid cache content structure received from server',
-            undefined,
-            'The cached content does not match expected format'
-          );
-        }
-
-        return cacheContent;
-      } catch (error) {
-        if (error instanceof Error && error.message.includes('Cache operation error:')) {
-          throw error; // Re-throw cache errors as-is
-        }
-
-        throw createCacheError(
-          'NETWORK_ERROR',
-          'Failed to fetch cached content due to network error',
-          error as Error,
-          'Check your network connection and try again'
-        );
-      }
-    },
-    enabled: Boolean(storageServiceId && storagePath),
-    staleTime: enableAutoRevalidation ? revalidationInterval : Infinity,
-    gcTime: 10 * 60 * 1000, // 10 minutes
-    refetchOnWindowFocus: enableAutoRevalidation,
-    refetchOnReconnect: true,
-    retry: (failureCount, error) => {
-      // Don't retry for validation or configuration errors
-      if (error instanceof Error && error.message.includes('INVALID_STORAGE_CONFIG')) {
-        return false;
-      }
-      if (error instanceof Error && error.message.includes('VALIDATION_ERROR')) {
-        return false;
-      }
-      // Retry up to 3 times for network errors
-      return failureCount < 3;
-    },
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-  });
-
-  // =============================================================================
-  // CACHE DELETION MUTATION
-  // =============================================================================
-
-  /**
-   * React Query mutation for cache deletion
-   * Implements optimistic updates with error rollback per Section 4.3.2
-   */
-  const deleteCacheMutation = useMutation({
-    mutationFn: async (cacheKey?: string): Promise<CacheOperationResult> => {
-      if (!storageServiceId || !storagePath) {
-        throw createCacheError(
-          'INVALID_STORAGE_CONFIG',
-          'Storage service ID and path are required for cache deletion',
-          undefined,
-          'Ensure both storageServiceId and storagePath are provided'
-        );
-      }
-
-      try {
-        const response = await mockApiClient.deleteCache(storageServiceId, storagePath, cacheKey);
-        
-        if (!response.success) {
-          throw createCacheError(
-            'NETWORK_ERROR',
-            response.error || 'Failed to delete cache',
-            undefined,
-            'Cache deletion was rejected by the server'
-          );
-        }
-
-        const result: CacheOperationResult = {
-          success: true,
-          operation: 'deleteCache',
-          key: cacheKey || constructCachePath(storageServiceId, storagePath),
-          timestamp: new Date(),
-        };
-
-        return result;
-      } catch (error) {
-        if (error instanceof Error && error.message.includes('Cache operation error:')) {
-          throw error; // Re-throw cache errors as-is
-        }
-
-        throw createCacheError(
-          'NETWORK_ERROR',
-          'Failed to delete cache due to network error',
-          error as Error,
-          'Check your network connection and try again'
-        );
-      }
-    },
-    onMutate: async (cacheKey?: string) => {
-      if (!enableOptimisticUpdates) return;
-
-      // Cancel any outgoing refetches
-      const queryKey = cacheQueryKeys.latest(storageServiceId || '', storagePath || '');
-      await queryClient.cancelQueries({ queryKey });
-
-      // Snapshot the previous value
-      const previousCache = queryClient.getQueryData(queryKey);
-
-      // Optimistically remove the cache data
-      queryClient.setQueryData(queryKey, null);
-
-      // Show optimistic feedback
-      showSnackbar('Deleting cache...', 'info');
-
-      // Return context object with snapshotted value
-      return { previousCache, queryKey };
-    },
-    onSuccess: (result, cacheKey, context) => {
-      // Show success notification
-      showSnackbar('Cache deleted successfully', 'success');
-
-      // Invalidate related queries to ensure consistency
-      queryClient.invalidateQueries({
-        queryKey: cacheQueryKeys.all,
-      });
-    },
-    onError: (error, cacheKey, context) => {
-      // Rollback optimistic update
-      if (context && enableOptimisticUpdates) {
-        queryClient.setQueryData(context.queryKey, context.previousCache);
-      }
-
-      // Extract error message
-      const errorMessage = error instanceof Error 
-        ? error.message 
-        : 'Failed to delete cache';
-
-      // Show error notification
-      showSnackbar(errorMessage, 'error');
-
-      if (enableErrorLogging) {
-        console.error('[useScriptCache] Cache deletion failed:', error);
-      }
-    },
-    onSettled: () => {
-      // Always refetch after mutation settles to ensure data consistency
-      const queryKey = cacheQueryKeys.latest(storageServiceId || '', storagePath || '');
-      queryClient.invalidateQueries({ queryKey });
-    },
-  });
-
-  // =============================================================================
-  // VIEW LATEST OPERATION
-  // =============================================================================
-
-  /**
-   * Manual view latest cache operation
-   * Provides imperative API for triggering cache view operations
-   */
-  const viewLatestOperation = useMemo(() => ({
-    execute: async (): Promise<CacheContent | null> => {
-      try {
-        showSnackbar('Loading latest cache...', 'info');
-        
-        const result = await latestCacheQuery.refetch();
-        
-        if (result.data) {
-          showSnackbar('Latest cache loaded successfully', 'success');
-          return result.data;
-        } else {
-          showSnackbar('No cached content found', 'warning');
-          return null;
-        }
-      } catch (error) {
-        const errorMessage = error instanceof Error 
-          ? error.message 
-          : 'Failed to load latest cache';
-        
-        showSnackbar(errorMessage, 'error');
-        throw error;
-      }
-    },
-    isLoading: latestCacheQuery.isFetching,
-    error: latestCacheQuery.error?.message || null,
-  }), [latestCacheQuery, showSnackbar]);
-
-  // =============================================================================
-  // RETURN INTERFACE
-  // =============================================================================
+  const cacheEntries = useMemo(() => cacheData || [], [cacheData]);
+  const error = useMemo(() => cacheError as ApiErrorResponse | null, [cacheError]);
 
   return {
-    latestCache: {
-      data: latestCacheQuery.data || null,
-      isLoading: latestCacheQuery.isLoading,
-      error: latestCacheQuery.error?.message || null,
-      refetch: async () => {
-        await latestCacheQuery.refetch();
-      },
-      isStale: latestCacheQuery.isStale,
-      lastUpdated: latestCacheQuery.dataUpdatedAt ? new Date(latestCacheQuery.dataUpdatedAt) : undefined,
-    },
-
+    // Cache data and state
+    cacheEntries,
+    isLoading,
+    error,
+    isRefreshing,
+    cacheStats: cacheStats || null,
+    
+    // Cache operations
+    viewLatest,
     deleteCache: {
-      mutate: async (cacheKey?: string) => {
-        await deleteCacheMutation.mutateAsync(cacheKey);
-      },
-      isLoading: deleteCacheMutation.isPending,
-      error: deleteCacheMutation.error?.message || null,
+      mutate: deleteCacheMutation.mutate,
+      mutateAsync: deleteCacheMutation.mutateAsync,
+      isPending: deleteCacheMutation.isPending,
+      error: deleteCacheMutation.error as ApiErrorResponse | null,
       reset: deleteCacheMutation.reset,
     },
-
-    viewLatest: viewLatestOperation,
-
-    utils: {
-      constructCachePath,
-      detectContentFormat,
-      validateCacheContent,
-      clearCacheQueries,
+    clearAllCache: {
+      mutate: clearAllCacheMutation.mutate,
+      mutateAsync: clearAllCacheMutation.mutateAsync,
+      isPending: clearAllCacheMutation.isPending,
+      error: clearAllCacheMutation.error as ApiErrorResponse | null,
+      reset: clearAllCacheMutation.reset,
     },
+    
+    // Utility functions
+    refreshCache,
+    getCacheEntry,
+    getContent,
+    validateEntry,
+    getEntriesByService,
+    buildFilePath,
   };
 }
 
-// =============================================================================
-// UTILITY FUNCTIONS AND EXPORTS
-// =============================================================================
+// ============================================================================
+// EXPORT TYPES AND UTILITIES
+// ============================================================================
 
-/**
- * Higher-order hook for script cache operations with default configuration
- * Provides a pre-configured version of useScriptCache with common defaults
- */
-export function useScriptCacheWithDefaults(
-  storageServiceId?: string,
-  storagePath?: string
-): UseScriptCacheReturn {
-  return useScriptCache({
-    storageServiceId,
-    storagePath,
-    enableAutoRevalidation: true,
-    revalidationInterval: 5 * 60 * 1000,
-    enableOptimisticUpdates: true,
-    enableErrorLogging: process.env.NODE_ENV === 'development',
-  });
-}
+// Export utility classes and functions
+export { FilePathUtils };
 
-/**
- * Cache operation factory for creating standardized cache operations
- */
-export const createCacheOperation = (
-  operation: CacheOperation,
-  key?: string,
-  data?: any
-): CacheOperationResult => ({
-  success: true,
-  operation,
-  data,
-  key,
-  timestamp: new Date(),
-});
-
-/**
- * Default export
- */
-export default useScriptCache;
-
-// =============================================================================
-// TYPE EXPORTS
-// =============================================================================
-
+// Export interfaces for external use
 export type {
-  UseScriptCacheConfig,
+  ScriptCacheEntry,
+  CacheOperationResult,
+  CacheQueryParams,
+  UseScriptCacheOptions,
   UseScriptCacheReturn,
-  CacheServiceResponse,
-  CacheContentItem,
-  CacheError,
-  CacheErrorType,
+  SnackbarOptions,
 };
+
+// Export query keys for external cache invalidation
+export { CACHE_QUERY_KEYS };
+
+// Default export for convenience
+export default useScriptCache;
