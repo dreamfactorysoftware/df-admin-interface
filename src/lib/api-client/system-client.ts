@@ -1,845 +1,988 @@
 /**
- * System API client that provides specialized endpoints for system configuration,
- * environment data, and administrative operations.
+ * System API Client for DreamFactory Administrative Operations
  * 
- * This client handles system-specific API calls with proper authentication, error handling,
- * and configuration management for DreamFactory system endpoints. It replaces the Angular
- * DfSystemService and DfSystemConfigDataService with React-compatible patterns optimized
- * for SWR and React Query integration.
+ * Provides specialized endpoints for system configuration management, environment data retrieval,
+ * license validation, and administrative operations. This client replaces the Angular-based
+ * DfSystemService and DfSystemConfigDataService with React-compatible patterns optimized for
+ * Next.js 15.1 and React Query integration.
  * 
  * Key Features:
  * - System configuration fetching with intelligent caching
- * - Environment data synchronization with background refetching
- * - License validation and subscription data management
- * - Error handling with token clearance on system configuration failures
- * - React Query and SWR compatibility for optimal data synchronization
+ * - Environment and system data synchronization
+ * - License validation and subscription management
+ * - Error handling with automatic token clearance
+ * - Background refetching for configuration updates
+ * - Integration with React Query for optimal performance
+ * 
+ * @module SystemApiClient
+ * @version 1.0.0
+ * @author DreamFactory Admin Interface Team
  */
 
-import { 
-  RequestConfig, 
-  SuccessResponse, 
-  ErrorResponse,
-  AuthHeaders,
-  SWRConfig,
-  ReactQueryConfig 
-} from './types';
+import { BaseApiClient, RequestConfig } from './base-client';
+import { AuthContext, AuthHeaders } from './types';
+import { clearAuthToken } from './auth-client';
+import type { 
+  Environment, 
+  System, 
+  SystemInfo,
+  ServerInfo,
+  AuthenticationConfig,
+  LicenseValidationRequest,
+  LicenseValidationResponse 
+} from '../../types/system';
+import type { 
+  LicenseInfo,
+  LicenseCheckResponse,
+  LicenseType,
+  LicenseFeature,
+  FeatureAvailability,
+  PaywallResult 
+} from '../../types/license';
 
 // =============================================================================
-// SYSTEM API TYPES AND INTERFACES
+// CONSTANTS AND CONFIGURATION
 // =============================================================================
 
 /**
- * Environment configuration data structure
+ * System API endpoint paths
  */
-export interface Environment {
-  authentication: {
-    allowOpenRegistration: boolean;
-    openRegEmailServiceId: number;
-    allowForeverSessions: boolean;
-    loginAttribute: string;
-    adldap: Array<any>;
-    oauth: Array<any>;
-    saml: Array<any>;
-  };
-  server: {
-    host: string;
-    machine: string;
-    release: string;
-    serverOs: string;
-    version: string;
-  };
-  platform?: {
-    bitnami?: boolean;
-    docker?: boolean;
-    version_current?: string;
-    upgrade_available?: boolean;
-  };
-  config?: Record<string, any>;
-  branding?: {
-    name?: string;
-    logo?: string;
-    favicon?: string;
-  };
+export const SYSTEM_ENDPOINTS = {
+  /** Environment configuration endpoint */
+  ENVIRONMENT: '/system/environment',
+  /** System resource information endpoint */
+  SYSTEM: '/system/resource',
+  /** System configuration endpoint */
+  CONFIG: '/system/config',
+  /** License validation endpoint */
+  LICENSE: '/system/license',
+  /** License check endpoint for validation */
+  LICENSE_CHECK: '/system/license/check',
+  /** System information endpoint */
+  INFO: '/system',
+  /** Server information endpoint */
+  SERVER: '/system/server',
+  /** Cache management endpoint */
+  CACHE: '/system/cache',
+  /** Email configuration endpoint */
+  EMAIL: '/system/email',
+  /** CORS configuration endpoint */
+  CORS: '/system/cors',
+  /** Lookup keys endpoint */
+  LOOKUP_KEYS: '/system/lookup',
+} as const;
+
+/**
+ * Cache keys for React Query integration
+ */
+export const SYSTEM_CACHE_KEYS = {
+  /** Environment data cache key */
+  ENVIRONMENT: ['system', 'environment'] as const,
+  /** System resources cache key */
+  SYSTEM: ['system', 'resource'] as const,
+  /** License information cache key */
+  LICENSE: ['system', 'license'] as const,
+  /** License validation cache key */
+  LICENSE_CHECK: ['system', 'license', 'check'] as const,
+  /** System information cache key */
+  INFO: ['system', 'info'] as const,
+  /** Server information cache key */
+  SERVER: ['system', 'server'] as const,
+  /** System configuration cache key */
+  CONFIG: ['system', 'config'] as const,
+} as const;
+
+/**
+ * Cache TTL configuration in milliseconds
+ */
+export const SYSTEM_CACHE_TTL = {
+  /** Environment data cache TTL (5 minutes) */
+  ENVIRONMENT: 5 * 60 * 1000,
+  /** System resources cache TTL (10 minutes) */
+  SYSTEM: 10 * 60 * 1000,
+  /** License info cache TTL (1 hour) */
+  LICENSE: 60 * 60 * 1000,
+  /** License validation cache TTL (30 minutes) */
+  LICENSE_CHECK: 30 * 60 * 1000,
+  /** System info cache TTL (1 hour) */
+  INFO: 60 * 60 * 1000,
+  /** Server info cache TTL (1 hour) */
+  SERVER: 60 * 60 * 1000,
+  /** System config cache TTL (30 minutes) */
+  CONFIG: 30 * 60 * 1000,
+} as const;
+
+/**
+ * Error retry configuration for system operations
+ */
+export const SYSTEM_RETRY_CONFIG = {
+  /** Maximum retry attempts for failed requests */
+  maxRetries: 2,
+  /** Base delay between retries in milliseconds */
+  baseDelay: 1000,
+  /** Maximum delay between retries in milliseconds */
+  maxDelay: 5000,
+  /** Backoff factor for exponential backoff */
+  backoffFactor: 2,
+} as const;
+
+// =============================================================================
+// TYPE DEFINITIONS
+// =============================================================================
+
+/**
+ * System client configuration interface
+ */
+export interface SystemClientConfig {
+  /** Base API client instance */
+  baseClient: BaseApiClient;
+  /** Authentication context */
+  authContext: AuthContext;
+  /** Cache TTL overrides */
+  cacheTTL?: Partial<typeof SYSTEM_CACHE_TTL>;
+  /** Retry configuration overrides */
+  retryConfig?: Partial<typeof SYSTEM_RETRY_CONFIG>;
+  /** Enable background refetching */
+  backgroundRefetch?: boolean;
+  /** Error callback for token clearance */
+  onAuthError?: () => void;
 }
 
 /**
- * System configuration data structure
+ * System data response interface
  */
-export interface System {
-  resource: Array<{
-    name: string;
-    type: string;
-    group?: string;
-    description?: string;
-    is_active?: boolean;
-    config?: Record<string, any>;
-  }>;
-  meta?: {
-    count: number;
-    schema?: Array<string>;
-  };
+export interface SystemDataResponse {
+  /** Environment configuration data */
+  environment: Environment;
+  /** System resources data */
+  system: System;
+  /** Timestamp when data was fetched */
+  fetchedAt: number;
+  /** Whether data was fetched from cache */
+  fromCache: boolean;
 }
 
 /**
- * License check response structure
+ * License validation result interface
  */
-export interface LicenseCheckResponse {
-  success: boolean;
-  valid: boolean;
-  expired?: boolean;
-  daysLeft?: number;
-  plan?: string;
-  features?: string[];
-  limits?: {
-    users?: number;
-    apis?: number;
-    storage?: number;
-  };
-  message?: string;
-  error?: string;
+export interface LicenseValidationResult {
+  /** License information */
+  licenseInfo: LicenseInfo;
+  /** Validation response from server */
+  checkResponse?: LicenseCheckResponse;
+  /** Feature availability map */
+  featureAvailability: Record<LicenseFeature, FeatureAvailability>;
+  /** Timestamp when validation was performed */
+  validatedAt: number;
 }
 
 /**
- * Subscription data response structure
+ * System health check result interface
  */
-export interface SubscriptionData {
-  plan: string;
-  status: string;
-  expirationDate?: string;
-  features: string[];
-  limits: {
-    users: number;
-    apis: number;
-    storage: number;
-    requests: number;
-  };
-  billing?: {
-    interval?: string;
-    amount?: number;
-    currency?: string;
-  };
-}
-
-/**
- * System information response structure
- */
-export interface SystemInfo {
+export interface SystemHealthResult {
+  /** Whether system is healthy */
+  isHealthy: boolean;
+  /** System version information */
   version: string;
-  host: string;
-  machine: string;
-  platform: {
-    name: string;
-    version: string;
-    architecture: string;
-  };
-  server: {
-    software: string;
-    version: string;
-  };
-  database?: {
-    driver: string;
-    version: string;
-  };
-  cache?: {
-    driver: string;
-    enabled: boolean;
-  };
-  storage?: {
-    available: number;
-    total: number;
-  };
-}
-
-/**
- * Configuration item structure for system settings
- */
-export interface ConfigItem {
-  name: string;
-  value: any;
-  type: string;
-  description?: string;
-  is_secret?: boolean;
-  default_value?: any;
-  validation?: {
-    required?: boolean;
-    min?: number;
-    max?: number;
-    pattern?: string;
-  };
-}
-
-/**
- * System performance metrics
- */
-export interface SystemMetrics {
-  memory: {
-    used: number;
-    total: number;
-    percentage: number;
-  };
-  cpu: {
-    usage: number;
-    cores: number;
-  };
-  disk: {
-    used: number;
-    total: number;
-    percentage: number;
-  };
-  requests: {
-    total: number;
-    success: number;
-    errors: number;
-    averageResponseTime: number;
-  };
+  /** Server uptime in seconds */
   uptime: number;
-  timestamp: number;
+  /** Database connectivity status */
+  databaseConnected: boolean;
+  /** Cache status */
+  cacheEnabled: boolean;
+  /** Any health check errors */
+  errors: string[];
 }
 
 // =============================================================================
-// SYSTEM CLIENT CONFIGURATION
+// SYSTEM API CLIENT CLASS
 // =============================================================================
 
 /**
- * System client configuration options
+ * System API client for DreamFactory administrative operations
  */
-export interface SystemClientConfig extends RequestConfig {
-  /** Base URL for system API endpoints */
-  baseUrl?: string;
-  /** Default authentication headers */
-  defaultHeaders?: AuthHeaders;
-  /** Environment data refresh interval in milliseconds (default: 30000) */
-  environmentRefreshInterval?: number;
-  /** System data refresh interval in milliseconds (default: 60000) */
-  systemRefreshInterval?: number;
-  /** License check refresh interval in milliseconds (default: 300000) */
-  licenseRefreshInterval?: number;
-  /** Enable automatic background synchronization */
-  enableBackgroundSync?: boolean;
-  /** Retry configuration for failed requests */
-  retryConfig?: {
-    attempts: number;
-    delay: number;
-    backoff: boolean;
-  };
-}
-
-/**
- * SWR configuration for system data fetching
- */
-export interface SystemSWRConfig extends SWRConfig {
-  /** Environment data SWR options */
-  environment?: Partial<SWRConfig>;
-  /** System data SWR options */
-  system?: Partial<SWRConfig>;
-  /** License data SWR options */
-  license?: Partial<SWRConfig>;
-}
-
-/**
- * React Query configuration for system data fetching
- */
-export interface SystemReactQueryConfig extends ReactQueryConfig {
-  /** Environment data query options */
-  environment?: Partial<ReactQueryConfig>;
-  /** System data query options */
-  system?: Partial<ReactQueryConfig>;
-  /** License data query options */
-  license?: Partial<ReactQueryConfig>;
-}
-
-// =============================================================================
-// SYSTEM API CLIENT IMPLEMENTATION
-// =============================================================================
-
-/**
- * System API client class for handling system configuration and environment data
- */
-export class SystemClient {
-  private baseUrl: string;
-  private defaultHeaders: AuthHeaders;
+export class SystemApiClient {
+  private baseClient: BaseApiClient;
+  private authContext: AuthContext;
   private config: SystemClientConfig;
 
-  constructor(config: SystemClientConfig = {}) {
-    this.baseUrl = config.baseUrl || '/api/v2';
-    this.defaultHeaders = config.defaultHeaders || {};
-    this.config = {
-      environmentRefreshInterval: 30000, // 30 seconds
-      systemRefreshInterval: 60000, // 1 minute
-      licenseRefreshInterval: 300000, // 5 minutes
-      enableBackgroundSync: true,
-      retryConfig: {
-        attempts: 3,
-        delay: 1000,
-        backoff: true,
-      },
-      ...config,
-    };
-  }
-
-  // =============================================================================
-  // CORE SYSTEM ENDPOINTS
-  // =============================================================================
-
   /**
-   * Generic GET request to system endpoints
-   * @param endpoint - The system endpoint path
-   * @param config - Request configuration options
-   * @returns Promise with response data
+   * Initialize system API client
+   * 
+   * @param config - System client configuration
    */
-  async get<T = any>(endpoint: string, config: RequestConfig = {}): Promise<T> {
-    const url = `${this.baseUrl}/system/${endpoint}`;
-    const headers = {
-      ...this.defaultHeaders,
-      ...config.additionalHeaders?.reduce((acc, header) => {
-        acc[header.key] = String(header.value);
-        return acc;
-      }, {} as Record<string, string>),
-    };
-
-    try {
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          ...headers,
-        },
-        signal: config.signal,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({
-          error: {
-            code: response.status,
-            message: response.statusText,
-            status_code: response.status,
-          },
-        }));
-        throw new Error(JSON.stringify(errorData));
-      }
-
-      return await response.json();
-    } catch (error) {
-      this.handleSystemError(error, config);
-      throw error;
-    }
+  constructor(config: SystemClientConfig) {
+    this.baseClient = config.baseClient;
+    this.authContext = config.authContext;
+    this.config = config;
   }
 
   /**
-   * Generic POST request to system endpoints
-   * @param endpoint - The system endpoint path
-   * @param data - Request payload data
-   * @param config - Request configuration options
-   * @returns Promise with response data
+   * Update authentication context
+   * 
+   * @param authContext - Updated authentication context
    */
-  async post<T = any>(
-    endpoint: string, 
-    data: any, 
-    config: RequestConfig = {}
-  ): Promise<T> {
-    const url = `${this.baseUrl}/system/${endpoint}`;
-    const headers = {
-      ...this.defaultHeaders,
-      ...config.additionalHeaders?.reduce((acc, header) => {
-        acc[header.key] = String(header.value);
-        return acc;
-      }, {} as Record<string, string>),
-    };
-
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...headers,
-        },
-        body: JSON.stringify(data),
-        signal: config.signal,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({
-          error: {
-            code: response.status,
-            message: response.statusText,
-            status_code: response.status,
-          },
-        }));
-        throw new Error(JSON.stringify(errorData));
-      }
-
-      return await response.json();
-    } catch (error) {
-      this.handleSystemError(error, config);
-      throw error;
-    }
+  updateAuthContext(authContext: Partial<AuthContext>): void {
+    this.authContext = { ...this.authContext, ...authContext };
+    this.baseClient.updateAuthContext(this.authContext);
   }
 
   // =============================================================================
-  // ENVIRONMENT DATA MANAGEMENT
+  // ENVIRONMENT AND SYSTEM DATA OPERATIONS
   // =============================================================================
 
   /**
    * Fetch environment configuration data
-   * @param config - Request configuration options
-   * @returns Promise with environment data
+   * 
+   * Retrieves authentication settings, server information, and environment-specific
+   * configuration. Implements intelligent caching and error handling with token
+   * clearance on authentication failures.
+   * 
+   * @param options - Request configuration options
+   * @returns Promise resolving to environment data
    */
-  async fetchEnvironmentData(config: RequestConfig = {}): Promise<Environment> {
-    return this.get<Environment>('environment', {
-      showSpinner: true,
-      ...config,
-    });
-  }
-
-  /**
-   * Get SWR key for environment data
-   * @returns SWR cache key for environment data
-   */
-  getEnvironmentSWRKey(): string {
-    return '/api/v2/system/environment';
-  }
-
-  /**
-   * Get React Query key for environment data
-   * @returns React Query cache key for environment data
-   */
-  getEnvironmentQueryKey(): string[] {
-    return ['system', 'environment'];
-  }
-
-  /**
-   * Get SWR configuration for environment data fetching
-   * @param customConfig - Custom SWR configuration
-   * @returns SWR configuration object
-   */
-  getEnvironmentSWRConfig(customConfig: Partial<SWRConfig> = {}): SWRConfig {
-    return {
-      refreshInterval: this.config.environmentRefreshInterval,
-      revalidateOnFocus: true,
-      revalidateOnReconnect: true,
-      dedupingInterval: 5000,
-      errorRetryCount: this.config.retryConfig?.attempts || 3,
-      ...customConfig,
-    };
-  }
-
-  /**
-   * Get React Query configuration for environment data fetching
-   * @param customConfig - Custom React Query configuration
-   * @returns React Query configuration object
-   */
-  getEnvironmentQueryConfig(customConfig: Partial<ReactQueryConfig> = {}): ReactQueryConfig {
-    return {
-      staleTime: this.config.environmentRefreshInterval,
-      cacheTime: this.config.environmentRefreshInterval * 2,
-      retry: this.config.retryConfig?.attempts || 3,
-      retryDelay: (retryAttempt: number) => 
-        Math.min(1000 * 2 ** retryAttempt, 30000),
-      refetchInterval: this.config.enableBackgroundSync 
-        ? this.config.environmentRefreshInterval 
-        : false,
-      ...customConfig,
-    };
-  }
-
-  // =============================================================================
-  // SYSTEM DATA MANAGEMENT
-  // =============================================================================
-
-  /**
-   * Fetch system configuration data
-   * @param config - Request configuration options
-   * @returns Promise with system data
-   */
-  async fetchSystemData(config: RequestConfig = {}): Promise<System> {
-    return this.get<System>('', {
-      showSpinner: true,
-      suppressNotifications: true, // Skip error notifications for system data
-      ...config,
-    });
-  }
-
-  /**
-   * Get SWR key for system data
-   * @returns SWR cache key for system data
-   */
-  getSystemSWRKey(): string {
-    return '/api/v2/system';
-  }
-
-  /**
-   * Get React Query key for system data
-   * @returns React Query cache key for system data
-   */
-  getSystemQueryKey(): string[] {
-    return ['system', 'config'];
-  }
-
-  /**
-   * Get SWR configuration for system data fetching
-   * @param customConfig - Custom SWR configuration
-   * @returns SWR configuration object
-   */
-  getSystemSWRConfig(customConfig: Partial<SWRConfig> = {}): SWRConfig {
-    return {
-      refreshInterval: this.config.systemRefreshInterval,
-      revalidateOnFocus: false, // Less frequent revalidation for system data
-      revalidateOnReconnect: true,
-      dedupingInterval: 10000,
-      errorRetryCount: this.config.retryConfig?.attempts || 3,
-      ...customConfig,
-    };
-  }
-
-  /**
-   * Get React Query configuration for system data fetching
-   * @param customConfig - Custom React Query configuration
-   * @returns React Query configuration object
-   */
-  getSystemQueryConfig(customConfig: Partial<ReactQueryConfig> = {}): ReactQueryConfig {
-    return {
-      staleTime: this.config.systemRefreshInterval,
-      cacheTime: this.config.systemRefreshInterval * 3,
-      retry: this.config.retryConfig?.attempts || 3,
-      retryDelay: (retryAttempt: number) => 
-        Math.min(1000 * 2 ** retryAttempt, 30000),
-      refetchInterval: this.config.enableBackgroundSync 
-        ? this.config.systemRefreshInterval 
-        : false,
-      ...customConfig,
-    };
-  }
-
-  // =============================================================================
-  // SYSTEM INFORMATION AND MONITORING
-  // =============================================================================
-
-  /**
-   * Fetch detailed system information
-   * @param config - Request configuration options
-   * @returns Promise with system information
-   */
-  async fetchSystemInfo(config: RequestConfig = {}): Promise<SystemInfo> {
-    return this.get<SystemInfo>('info', config);
-  }
-
-  /**
-   * Fetch system performance metrics
-   * @param config - Request configuration options
-   * @returns Promise with system metrics
-   */
-  async fetchSystemMetrics(config: RequestConfig = {}): Promise<SystemMetrics> {
-    return this.get<SystemMetrics>('metrics', config);
-  }
-
-  /**
-   * Fetch system configuration items
-   * @param config - Request configuration options
-   * @returns Promise with configuration items
-   */
-  async fetchConfigItems(config: RequestConfig = {}): Promise<ConfigItem[]> {
-    const response = await this.get<{ resource: ConfigItem[] }>('config', config);
-    return response.resource || [];
-  }
-
-  /**
-   * Update system configuration item
-   * @param name - Configuration item name
-   * @param value - New configuration value
-   * @param config - Request configuration options
-   * @returns Promise with update response
-   */
-  async updateConfigItem(
-    name: string, 
-    value: any, 
-    config: RequestConfig = {}
-  ): Promise<SuccessResponse> {
-    return this.post(`config/${name}`, { value }, config);
-  }
-
-  // =============================================================================
-  // LICENSE VALIDATION AND SUBSCRIPTION MANAGEMENT
-  // =============================================================================
-
-  /**
-   * Check license validity with license key
-   * @param licenseKey - License key to validate
-   * @param config - Request configuration options
-   * @returns Promise with license check response
-   */
-  async checkLicense(
-    licenseKey: string, 
-    config: RequestConfig = {}
-  ): Promise<LicenseCheckResponse> {
-    const url = 'https://updates.dreamfactory.com/check';
-    const headers = {
-      'X-DreamFactory-License-Key': licenseKey,
-      ...config.additionalHeaders?.reduce((acc, header) => {
-        acc[header.key] = String(header.value);
-        return acc;
-      }, {} as Record<string, string>),
-    };
-
+  async fetchEnvironmentData(options: RequestConfig = {}): Promise<Environment> {
     try {
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          ...headers,
-        },
-        signal: config.signal,
-      });
+      const requestConfig: RequestConfig = {
+        ...options,
+        retryAttempts: this.config.retryConfig?.maxRetries ?? SYSTEM_RETRY_CONFIG.maxRetries,
+        retryDelay: this.config.retryConfig?.baseDelay ?? SYSTEM_RETRY_CONFIG.baseDelay,
+        suppressNotifications: true, // Handle errors manually
+      };
 
-      const data = await response.json();
+      const response = await this.baseClient.get<Environment>(
+        SYSTEM_ENDPOINTS.ENVIRONMENT,
+        requestConfig
+      );
 
-      if (!response.ok) {
-        return {
-          success: false,
-          valid: false,
-          error: data.message || 'License validation failed',
-        };
-      }
-
-      // Transform snake_case to camelCase for consistency
-      return this.transformLicenseResponse(data);
+      return response;
     } catch (error) {
+      // Clear token on authentication failure per original service behavior
+      if (this.isAuthenticationError(error)) {
+        await this.handleAuthenticationError();
+      }
+      
+      throw this.enhanceSystemError(error, 'fetchEnvironmentData');
+    }
+  }
+
+  /**
+   * Fetch system resource information
+   * 
+   * Retrieves available system resources, services, and configuration metadata.
+   * Supports optional error suppression for non-critical system data.
+   * 
+   * @param options - Request configuration options
+   * @returns Promise resolving to system resources
+   */
+  async fetchSystemData(options: RequestConfig = {}): Promise<System> {
+    try {
+      const requestConfig: RequestConfig = {
+        ...options,
+        retryAttempts: this.config.retryConfig?.maxRetries ?? SYSTEM_RETRY_CONFIG.maxRetries,
+        retryDelay: this.config.retryConfig?.baseDelay ?? SYSTEM_RETRY_CONFIG.baseDelay,
+        suppressNotifications: true,
+        additionalHeaders: [
+          { key: 'skip-error', value: 'true' } // Suppress error notifications
+        ],
+      };
+
+      const response = await this.baseClient.get<System>(
+        SYSTEM_ENDPOINTS.SYSTEM,
+        requestConfig
+      );
+
+      return response;
+    } catch (error) {
+      // System data errors are non-critical, log but don't throw
+      console.warn('System data fetch failed:', error);
+      
       return {
-        success: false,
-        valid: false,
-        error: error instanceof Error ? error.message : 'License check failed',
+        resource: []
       };
     }
   }
 
   /**
-   * Fetch subscription data for the current license
-   * @param config - Request configuration options
-   * @returns Promise with subscription data
+   * Fetch combined environment and system data
+   * 
+   * Efficiently retrieves both environment and system data in parallel,
+   * implementing proper error handling and caching strategies.
+   * 
+   * @param options - Request configuration options
+   * @returns Promise resolving to combined system data
    */
-  async fetchSubscriptionData(config: RequestConfig = {}): Promise<SubscriptionData> {
-    return this.get<SubscriptionData>('subscription', config);
-  }
+  async fetchSystemDataCombined(options: RequestConfig = {}): Promise<SystemDataResponse> {
+    const startTime = Date.now();
 
-  /**
-   * Get SWR key for license validation
-   * @param licenseKey - License key for cache key generation
-   * @returns SWR cache key for license data
-   */
-  getLicenseSWRKey(licenseKey: string): string {
-    return `/license/check/${licenseKey}`;
-  }
+    try {
+      // Fetch both environment and system data in parallel
+      const [environment, system] = await Promise.allSettled([
+        this.fetchEnvironmentData(options),
+        this.fetchSystemData(options)
+      ]);
 
-  /**
-   * Get React Query key for license validation
-   * @param licenseKey - License key for cache key generation
-   * @returns React Query cache key for license data
-   */
-  getLicenseQueryKey(licenseKey: string): string[] {
-    return ['license', 'check', licenseKey];
-  }
+      const environmentData = environment.status === 'fulfilled' 
+        ? environment.value 
+        : {
+            authentication: {
+              allowOpenRegistration: false,
+              openRegEmailServiceId: 0,
+              allowForeverSessions: false,
+              loginAttribute: 'email',
+              adldap: [],
+              oauth: [],
+              saml: [],
+            },
+            server: {
+              host: '',
+              machine: '',
+              release: '',
+              serverOs: '',
+              version: '',
+            },
+          };
 
-  /**
-   * Get SWR configuration for license data fetching
-   * @param customConfig - Custom SWR configuration
-   * @returns SWR configuration object
-   */
-  getLicenseSWRConfig(customConfig: Partial<SWRConfig> = {}): SWRConfig {
-    return {
-      refreshInterval: this.config.licenseRefreshInterval,
-      revalidateOnFocus: false, // Less frequent revalidation for license data
-      revalidateOnReconnect: true,
-      dedupingInterval: 60000, // 1 minute deduplication
-      errorRetryCount: 2, // Fewer retries for license checks
-      ...customConfig,
-    };
-  }
+      const systemData = system.status === 'fulfilled' 
+        ? system.value 
+        : { resource: [] };
 
-  /**
-   * Get React Query configuration for license data fetching
-   * @param customConfig - Custom React Query configuration
-   * @returns React Query configuration object
-   */
-  getLicenseQueryConfig(customConfig: Partial<ReactQueryConfig> = {}): ReactQueryConfig {
-    return {
-      staleTime: this.config.licenseRefreshInterval,
-      cacheTime: this.config.licenseRefreshInterval * 2,
-      retry: 2, // Fewer retries for license checks
-      retryDelay: (retryAttempt: number) => 
-        Math.min(2000 * 2 ** retryAttempt, 10000),
-      refetchInterval: this.config.enableBackgroundSync 
-        ? this.config.licenseRefreshInterval 
-        : false,
-      ...customConfig,
-    };
+      return {
+        environment: environmentData,
+        system: systemData,
+        fetchedAt: startTime,
+        fromCache: false, // This would be determined by React Query
+      };
+    } catch (error) {
+      throw this.enhanceSystemError(error, 'fetchSystemDataCombined');
+    }
   }
 
   // =============================================================================
-  // CACHE MANAGEMENT AND UTILITIES
+  // SYSTEM CONFIGURATION OPERATIONS
+  // =============================================================================
+
+  /**
+   * Get system information
+   * 
+   * @param options - Request configuration options
+   * @returns Promise resolving to system information
+   */
+  async getSystemInfo(options: RequestConfig = {}): Promise<SystemInfo> {
+    try {
+      const response = await this.baseClient.get<SystemInfo>(
+        SYSTEM_ENDPOINTS.INFO,
+        options
+      );
+
+      return response;
+    } catch (error) {
+      throw this.enhanceSystemError(error, 'getSystemInfo');
+    }
+  }
+
+  /**
+   * Get server information
+   * 
+   * @param options - Request configuration options
+   * @returns Promise resolving to server information
+   */
+  async getServerInfo(options: RequestConfig = {}): Promise<ServerInfo> {
+    try {
+      const response = await this.baseClient.get<ServerInfo>(
+        SYSTEM_ENDPOINTS.SERVER,
+        options
+      );
+
+      return response;
+    } catch (error) {
+      throw this.enhanceSystemError(error, 'getServerInfo');
+    }
+  }
+
+  /**
+   * Update system configuration
+   * 
+   * @param config - Configuration updates
+   * @param options - Request configuration options
+   * @returns Promise resolving to updated configuration
+   */
+  async updateSystemConfig(
+    config: Partial<SystemInfo>, 
+    options: RequestConfig = {}
+  ): Promise<SystemInfo> {
+    try {
+      const response = await this.baseClient.put<SystemInfo>(
+        SYSTEM_ENDPOINTS.CONFIG,
+        config,
+        options
+      );
+
+      return response;
+    } catch (error) {
+      throw this.enhanceSystemError(error, 'updateSystemConfig');
+    }
+  }
+
+  // =============================================================================
+  // LICENSE VALIDATION AND MANAGEMENT
+  // =============================================================================
+
+  /**
+   * Validate license key
+   * 
+   * Performs license validation against DreamFactory licensing server,
+   * including feature availability determination and paywall configuration.
+   * 
+   * @param licenseKey - License key to validate
+   * @param options - Request configuration options
+   * @returns Promise resolving to license validation response
+   */
+  async validateLicense(
+    licenseKey: string, 
+    options: RequestConfig = {}
+  ): Promise<LicenseCheckResponse> {
+    try {
+      const validationRequest: LicenseValidationRequest = {
+        license_key: licenseKey,
+      };
+
+      const response = await this.baseClient.post<LicenseCheckResponse>(
+        SYSTEM_ENDPOINTS.LICENSE_CHECK,
+        validationRequest,
+        {
+          ...options,
+          suppressNotifications: true,
+        }
+      );
+
+      return response;
+    } catch (error) {
+      throw this.enhanceSystemError(error, 'validateLicense');
+    }
+  }
+
+  /**
+   * Get current license information
+   * 
+   * Retrieves comprehensive license information including status, features,
+   * and subscription details for paywall and feature gating functionality.
+   * 
+   * @param options - Request configuration options
+   * @returns Promise resolving to license information
+   */
+  async getLicenseInfo(options: RequestConfig = {}): Promise<LicenseValidationResult> {
+    try {
+      // Fetch both environment (for license key) and license validation
+      const environment = await this.fetchEnvironmentData(options);
+      
+      let licenseInfo: LicenseInfo;
+      let checkResponse: LicenseCheckResponse | undefined;
+      
+      // Determine license type and perform validation if needed
+      if (typeof environment.license === 'string' && environment.license) {
+        // Commercial license - validate with server
+        try {
+          checkResponse = await this.validateLicense(environment.license, options);
+          
+          licenseInfo = {
+            type: this.determineLicenseType(environment.license, checkResponse),
+            key: environment.license,
+            status: this.determineLicenseStatus(checkResponse),
+            checkResponse,
+            isTrial: this.isTrialLicense(checkResponse),
+            isHosted: environment.server?.hosted === true,
+            version: environment.server?.version,
+          };
+        } catch (error) {
+          // License validation failed
+          licenseInfo = {
+            type: 'OPEN_SOURCE',
+            key: environment.license,
+            status: 'invalid',
+            isTrial: false,
+            isHosted: environment.server?.hosted === true,
+            version: environment.server?.version,
+          };
+        }
+      } else {
+        // Open source license
+        licenseInfo = {
+          type: 'OPEN_SOURCE',
+          key: environment.license || false,
+          status: 'valid',
+          isTrial: false,
+          isHosted: environment.server?.hosted === true,
+          version: environment.server?.version,
+        };
+      }
+
+      // Calculate feature availability
+      const featureAvailability = this.calculateFeatureAvailability(licenseInfo);
+
+      return {
+        licenseInfo,
+        checkResponse,
+        featureAvailability,
+        validatedAt: Date.now(),
+      };
+    } catch (error) {
+      throw this.enhanceSystemError(error, 'getLicenseInfo');
+    }
+  }
+
+  /**
+   * Check feature availability based on license
+   * 
+   * @param feature - Feature to check
+   * @param licenseInfo - Optional license info (will fetch if not provided)
+   * @returns Promise resolving to feature availability
+   */
+  async isFeatureAvailable(
+    feature: LicenseFeature,
+    licenseInfo?: LicenseInfo
+  ): Promise<FeatureAvailability> {
+    try {
+      if (!licenseInfo) {
+        const validation = await this.getLicenseInfo();
+        licenseInfo = validation.licenseInfo;
+      }
+
+      const featureAvailability = this.calculateFeatureAvailability(licenseInfo);
+      return featureAvailability[feature];
+    } catch (error) {
+      // On error, assume feature is not available
+      return {
+        isAvailable: false,
+        requiresUpgrade: true,
+        minimumTier: 'SILVER',
+        reason: 'License validation failed',
+      };
+    }
+  }
+
+  /**
+   * Activate paywall for specific resources
+   * 
+   * @param resources - Resources to check for paywall activation
+   * @param licenseInfo - Optional license info
+   * @returns Promise resolving to paywall activation result
+   */
+  async activatePaywall(
+    resources?: string | string[],
+    licenseInfo?: LicenseInfo
+  ): Promise<PaywallResult> {
+    try {
+      if (!licenseInfo) {
+        const validation = await this.getLicenseInfo();
+        licenseInfo = validation.licenseInfo;
+      }
+
+      const resourceArray = Array.isArray(resources) 
+        ? resources 
+        : resources 
+          ? [resources] 
+          : [];
+
+      // For open source license, show paywall for premium features
+      const shouldShow = licenseInfo.type === 'OPEN_SOURCE' && 
+        resourceArray.length > 0;
+
+      return {
+        shouldShowPaywall: shouldShow,
+        resource: Array.isArray(resources) ? undefined : resources,
+        availableResources: this.getAvailableResourcesForLicense(licenseInfo),
+      };
+    } catch (error) {
+      // On error, be conservative and show paywall
+      return {
+        shouldShowPaywall: true,
+        resource: Array.isArray(resources) ? undefined : resources,
+        availableResources: [],
+      };
+    }
+  }
+
+  // =============================================================================
+  // CACHE MANAGEMENT OPERATIONS
   // =============================================================================
 
   /**
    * Clear system cache
-   * @param config - Request configuration options
-   * @returns Promise with cache clear response
+   * 
+   * @param cacheType - Type of cache to clear (optional)
+   * @param options - Request configuration options
+   * @returns Promise resolving when cache is cleared
    */
-  async clearSystemCache(config: RequestConfig = {}): Promise<SuccessResponse> {
-    return this.post('cache', { clear: true }, config);
-  }
-
-  /**
-   * Get cache statistics
-   * @param config - Request configuration options
-   * @returns Promise with cache statistics
-   */
-  async getCacheStats(config: RequestConfig = {}): Promise<any> {
-    return this.get('cache', config);
-  }
-
-  /**
-   * Warm up system cache
-   * @param config - Request configuration options
-   * @returns Promise with cache warm-up response
-   */
-  async warmUpCache(config: RequestConfig = {}): Promise<SuccessResponse> {
-    return this.post('cache/warmup', {}, config);
-  }
-
-  // =============================================================================
-  // ERROR HANDLING AND UTILITIES
-  // =============================================================================
-
-  /**
-   * Handle system-specific errors with token clearance
-   * @param error - Error object from failed request
-   * @param config - Request configuration that may contain error handlers
-   */
-  private handleSystemError(error: any, config: RequestConfig): void {
+  async clearSystemCache(
+    cacheType?: string,
+    options: RequestConfig = {}
+  ): Promise<void> {
     try {
-      const errorData = JSON.parse(error.message);
+      const endpoint = cacheType 
+        ? `${SYSTEM_ENDPOINTS.CACHE}/${cacheType}`
+        : SYSTEM_ENDPOINTS.CACHE;
+
+      await this.baseClient.delete(endpoint, options);
+    } catch (error) {
+      throw this.enhanceSystemError(error, 'clearSystemCache');
+    }
+  }
+
+  /**
+   * Get cache status
+   * 
+   * @param options - Request configuration options
+   * @returns Promise resolving to cache status
+   */
+  async getCacheStatus(options: RequestConfig = {}): Promise<any> {
+    try {
+      const response = await this.baseClient.get(SYSTEM_ENDPOINTS.CACHE, options);
+      return response;
+    } catch (error) {
+      throw this.enhanceSystemError(error, 'getCacheStatus');
+    }
+  }
+
+  // =============================================================================
+  // SYSTEM HEALTH AND MONITORING
+  // =============================================================================
+
+  /**
+   * Perform system health check
+   * 
+   * @param options - Request configuration options
+   * @returns Promise resolving to health check result
+   */
+  async performHealthCheck(options: RequestConfig = {}): Promise<SystemHealthResult> {
+    try {
+      const [systemInfo, serverInfo] = await Promise.allSettled([
+        this.getSystemInfo(options),
+        this.getServerInfo(options)
+      ]);
+
+      const errors: string[] = [];
       
-      // Clear token on authentication/authorization failures during system configuration
-      if (errorData.error?.status_code === 401 || errorData.error?.status_code === 403) {
-        // Trigger token clearance through auth client
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('auth:token-expired'));
-        }
+      if (systemInfo.status === 'rejected') {
+        errors.push(`System info check failed: ${systemInfo.reason}`);
       }
-    } catch {
-      // If error message is not JSON, handle as generic error
-      if (error.message?.includes('401') || error.message?.includes('403')) {
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('auth:token-expired'));
-        }
+      
+      if (serverInfo.status === 'rejected') {
+        errors.push(`Server info check failed: ${serverInfo.reason}`);
       }
+
+      const systemData = systemInfo.status === 'fulfilled' ? systemInfo.value : null;
+      const serverData = serverInfo.status === 'fulfilled' ? serverInfo.value : null;
+
+      return {
+        isHealthy: errors.length === 0,
+        version: serverData?.version || systemData?.version || 'unknown',
+        uptime: serverData?.uptime || 0,
+        databaseConnected: systemData?.database?.connected !== false,
+        cacheEnabled: systemData?.cache?.enabled !== false,
+        errors,
+      };
+    } catch (error) {
+      return {
+        isHealthy: false,
+        version: 'unknown',
+        uptime: 0,
+        databaseConnected: false,
+        cacheEnabled: false,
+        errors: [String(error)],
+      };
+    }
+  }
+
+  // =============================================================================
+  // PRIVATE HELPER METHODS
+  // =============================================================================
+
+  /**
+   * Check if error is an authentication error
+   * 
+   * @param error - Error to check
+   * @returns True if authentication error
+   */
+  private isAuthenticationError(error: any): boolean {
+    return error?.status === 401 || 
+           error?.status === 403 ||
+           error?.message?.includes('unauthorized') ||
+           error?.message?.includes('forbidden');
+  }
+
+  /**
+   * Handle authentication error by clearing tokens
+   */
+  private async handleAuthenticationError(): Promise<void> {
+    try {
+      await clearAuthToken();
+      if (this.config.onAuthError) {
+        this.config.onAuthError();
+      }
+    } catch (error) {
+      console.error('Failed to clear authentication token:', error);
     }
   }
 
   /**
-   * Transform license response from snake_case to camelCase
-   * @param response - Raw license response
-   * @returns Transformed license response
+   * Enhance system-specific errors with context
+   * 
+   * @param error - Original error
+   * @param operation - Operation that failed
+   * @returns Enhanced error with system context
    */
-  private transformLicenseResponse(response: any): LicenseCheckResponse {
-    return {
-      success: response.success ?? true,
-      valid: response.valid ?? false,
-      expired: response.expired,
-      daysLeft: response.days_left,
-      plan: response.plan,
-      features: response.features,
-      limits: response.limits ? {
-        users: response.limits.users,
-        apis: response.limits.apis,
-        storage: response.limits.storage,
-      } : undefined,
-      message: response.message,
-      error: response.error,
-    };
-  }
-
-  /**
-   * Get all system-related SWR keys for cache invalidation
-   * @returns Array of all system SWR cache keys
-   */
-  getAllSystemSWRKeys(): string[] {
-    return [
-      this.getEnvironmentSWRKey(),
-      this.getSystemSWRKey(),
-    ];
-  }
-
-  /**
-   * Get all system-related React Query keys for cache invalidation
-   * @returns Array of all system React Query cache keys
-   */
-  getAllSystemQueryKeys(): string[][] {
-    return [
-      this.getEnvironmentQueryKey(),
-      this.getSystemQueryKey(),
-      ['system', 'info'],
-      ['system', 'metrics'],
-      ['system', 'config'],
-      ['system', 'cache'],
-    ];
-  }
-
-  /**
-   * Update client configuration
-   * @param newConfig - New configuration options to merge
-   */
-  updateConfig(newConfig: Partial<SystemClientConfig>): void {
-    this.config = { ...this.config, ...newConfig };
+  private enhanceSystemError(error: any, operation: string): Error {
+    const enhancedError = new Error(
+      `System operation '${operation}' failed: ${error.message || error}`
+    );
     
-    if (newConfig.baseUrl) {
-      this.baseUrl = newConfig.baseUrl;
-    }
+    // Preserve original error properties
+    Object.assign(enhancedError, error);
     
-    if (newConfig.defaultHeaders) {
-      this.defaultHeaders = { ...this.defaultHeaders, ...newConfig.defaultHeaders };
+    return enhancedError;
+  }
+
+  /**
+   * Determine license type from validation response
+   * 
+   * @param licenseKey - License key
+   * @param checkResponse - Validation response
+   * @returns License type
+   */
+  private determineLicenseType(
+    licenseKey: string, 
+    checkResponse?: LicenseCheckResponse
+  ): LicenseType {
+    if (!licenseKey || licenseKey === 'false') {
+      return 'OPEN_SOURCE';
     }
+
+    // Analyze validation response to determine tier
+    if (checkResponse?.statusCode === '200' || checkResponse?.statusCode === 'valid') {
+      // Could analyze license features to determine SILVER vs GOLD
+      // For now, assume SILVER for valid commercial licenses
+      return 'SILVER';
+    }
+
+    return 'OPEN_SOURCE';
+  }
+
+  /**
+   * Determine license status from validation response
+   * 
+   * @param checkResponse - Validation response
+   * @returns License status
+   */
+  private determineLicenseStatus(checkResponse?: LicenseCheckResponse) {
+    if (!checkResponse) {
+      return 'unknown' as const;
+    }
+
+    switch (checkResponse.statusCode) {
+      case '200':
+      case 'valid':
+        return 'valid' as const;
+      case 'expired':
+        return 'expired' as const;
+      case 'invalid':
+        return 'invalid' as const;
+      default:
+        return 'unknown' as const;
+    }
+  }
+
+  /**
+   * Check if license is a trial license
+   * 
+   * @param checkResponse - Validation response
+   * @returns True if trial license
+   */
+  private isTrialLicense(checkResponse?: LicenseCheckResponse): boolean {
+    return checkResponse?.msg?.toLowerCase().includes('trial') || false;
+  }
+
+  /**
+   * Calculate feature availability based on license
+   * 
+   * @param licenseInfo - License information
+   * @returns Feature availability map
+   */
+  private calculateFeatureAvailability(
+    licenseInfo: LicenseInfo
+  ): Record<LicenseFeature, FeatureAvailability> {
+    const features: LicenseFeature[] = [
+      'event-scripts',
+      'rate-limiting',
+      'scheduler',
+      'reporting'
+    ];
+
+    const availability: Record<LicenseFeature, FeatureAvailability> = {} as any;
+
+    features.forEach(feature => {
+      const isAvailable = this.isFeatureAvailableForLicense(feature, licenseInfo);
+      const minimumTier = this.getMinimumTierForFeature(feature);
+
+      availability[feature] = {
+        isAvailable,
+        requiresUpgrade: !isAvailable && licenseInfo.type === 'OPEN_SOURCE',
+        minimumTier,
+        reason: isAvailable ? undefined : `Requires ${minimumTier} license or higher`,
+      };
+    });
+
+    return availability;
+  }
+
+  /**
+   * Check if feature is available for given license
+   * 
+   * @param feature - Feature to check
+   * @param licenseInfo - License information
+   * @returns True if feature is available
+   */
+  private isFeatureAvailableForLicense(
+    feature: LicenseFeature, 
+    licenseInfo: LicenseInfo
+  ): boolean {
+    // Open source features are always available
+    if (licenseInfo.type === 'OPEN_SOURCE') {
+      return false; // Premium features not available in open source
+    }
+
+    // All features available in SILVER and GOLD
+    return licenseInfo.status === 'valid';
+  }
+
+  /**
+   * Get minimum license tier required for feature
+   * 
+   * @param feature - Feature to check
+   * @returns Minimum required license tier
+   */
+  private getMinimumTierForFeature(feature: LicenseFeature): LicenseType {
+    // All premium features require at least SILVER license
+    return 'SILVER';
+  }
+
+  /**
+   * Get available resources for license type
+   * 
+   * @param licenseInfo - License information
+   * @returns Array of available resource names
+   */
+  private getAvailableResourcesForLicense(licenseInfo: LicenseInfo): string[] {
+    const baseResources = ['database', 'api-docs', 'users', 'roles'];
+    
+    if (licenseInfo.type === 'OPEN_SOURCE') {
+      return baseResources;
+    }
+
+    // Add premium resources for commercial licenses
+    return [
+      ...baseResources,
+      'event-scripts',
+      'rate-limiting',
+      'scheduler',
+      'reporting',
+      'advanced-caching',
+    ];
   }
 }
 
 // =============================================================================
-// DEFAULT CLIENT INSTANCE AND UTILITIES
+// FACTORY FUNCTIONS AND UTILITIES
 // =============================================================================
 
 /**
- * Default system client instance
+ * Create a new SystemApiClient instance
+ * 
+ * @param baseClient - Base API client instance
+ * @param authContext - Authentication context
+ * @param config - Optional configuration overrides
+ * @returns SystemApiClient instance
  */
-export const systemClient = new SystemClient();
-
-/**
- * Create a new system client with custom configuration
- * @param config - System client configuration
- * @returns New SystemClient instance
- */
-export function createSystemClient(config: SystemClientConfig = {}): SystemClient {
-  return new SystemClient(config);
+export function createSystemClient(
+  baseClient: BaseApiClient,
+  authContext: AuthContext,
+  config?: Partial<Omit<SystemClientConfig, 'baseClient' | 'authContext'>>
+): SystemApiClient {
+  return new SystemApiClient({
+    baseClient,
+    authContext,
+    ...config,
+  });
 }
 
 /**
- * System client factory function for dependency injection
- * @param config - System client configuration
- * @returns SystemClient instance
+ * React Query cache key generators for system operations
  */
-export const createSystemClientFactory = (config: SystemClientConfig = {}) => {
-  return () => new SystemClient(config);
+export const systemCacheKeys = {
+  /**
+   * Generate cache key for environment data
+   */
+  environment: () => SYSTEM_CACHE_KEYS.ENVIRONMENT,
+  
+  /**
+   * Generate cache key for system resources
+   */
+  system: () => SYSTEM_CACHE_KEYS.SYSTEM,
+  
+  /**
+   * Generate cache key for license information
+   */
+  license: () => SYSTEM_CACHE_KEYS.LICENSE,
+  
+  /**
+   * Generate cache key for license validation
+   */
+  licenseCheck: (licenseKey?: string) => 
+    licenseKey 
+      ? [...SYSTEM_CACHE_KEYS.LICENSE_CHECK, licenseKey] 
+      : SYSTEM_CACHE_KEYS.LICENSE_CHECK,
+  
+  /**
+   * Generate cache key for system information
+   */
+  info: () => SYSTEM_CACHE_KEYS.INFO,
+  
+  /**
+   * Generate cache key for server information
+   */
+  server: () => SYSTEM_CACHE_KEYS.SERVER,
+  
+  /**
+   * Generate cache key for system configuration
+   */
+  config: () => SYSTEM_CACHE_KEYS.CONFIG,
 };
 
 // =============================================================================
-// TYPE EXPORTS
+// EXPORTS
 // =============================================================================
 
-export type {
-  Environment,
-  System,
-  LicenseCheckResponse,
-  SubscriptionData,
-  SystemInfo,
-  ConfigItem,
-  SystemMetrics,
-  SystemClientConfig,
-  SystemSWRConfig,
-  SystemReactQueryConfig,
+export {
+  // Main class
+  SystemApiClient,
+  
+  // Factory function
+  createSystemClient,
+  
+  // Cache utilities
+  systemCacheKeys,
+  
+  // Constants
+  SYSTEM_ENDPOINTS,
+  SYSTEM_CACHE_KEYS,
+  SYSTEM_CACHE_TTL,
+  SYSTEM_RETRY_CONFIG,
+  
+  // Types
+  type SystemClientConfig,
+  type SystemDataResponse,
+  type LicenseValidationResult,
+  type SystemHealthResult,
 };
+
+export default SystemApiClient;
