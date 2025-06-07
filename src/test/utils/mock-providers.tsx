@@ -1,574 +1,787 @@
 /**
- * Mock Providers for React Component Testing
+ * Mock Context Providers for Testing
  * 
- * Provides comprehensive React context providers and wrapper components for testing
- * that replicate Angular TestBed module configuration. Delivers standardized testing
- * contexts including authentication, theme, internationalization, router, and form
- * providers for isolated component testing with realistic application state simulation.
+ * Provides individual React context providers for isolated component testing
+ * that replicate Angular TestBed module configuration patterns. Each provider
+ * can be used independently for granular test setup or combined for comprehensive
+ * testing scenarios requiring multiple contexts.
+ * 
+ * Key Features:
+ * - Individual provider components for targeted testing scenarios
+ * - Authentication state mocking with session management simulation
+ * - Theme and internationalization provider setup for UI component testing
+ * - Next.js router context mocking for navigation component testing
+ * - React Query client mocking with configurable cache behavior
+ * - Form provider wrapper for React Hook Form testing with validation scenarios
+ * - Accessibility testing provider with screen reader simulation capabilities
+ * 
+ * Usage Pattern:
+ * ```tsx
+ * // Individual provider testing
+ * render(<MockAuthProvider user={mockUser}><Component /></MockAuthProvider>);
+ * 
+ * // Multiple provider composition
+ * render(
+ *   <TestQueryProvider>
+ *     <MockAuthProvider user={mockUser}>
+ *       <MockThemeProvider theme="dark">
+ *         <Component />
+ *       </MockThemeProvider>
+ *     </MockAuthProvider>
+ *   </TestQueryProvider>
+ * );
+ * ```
  */
 
-import React, { ReactNode, ReactElement } from 'react';
+'use client';
+
+import React, { ReactNode, createContext, useContext, useMemo } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, RenderOptions, RenderResult } from '@testing-library/react';
-import { useRouter } from 'next/navigation';
-import { FormProvider as ReactHookFormProvider, useForm, UseFormProps } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { ThemeProvider as NextThemesProvider } from 'next-themes';
-
-import { 
-  UserSession, 
-  SessionManager, 
-  AUTH_STATES,
-  RBAC_PERMISSIONS,
-  type AuthState,
-  type RBACPermission,
-} from '../../lib/auth/session';
+import { AppRouterContext } from 'next/dist/shared/lib/app-router-context.shared-runtime';
+import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
+import { SearchParamsContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
+import { FormProvider, UseFormReturn, FieldValues } from 'react-hook-form';
+import type { UserSession, AuthState, AuthActions } from '@/types/auth';
+import type { UserProfile } from '@/types/user';
 
 // =============================================================================
-// TYPES AND INTERFACES
+// MOCK AUTHENTICATION PROVIDER
 // =============================================================================
 
 /**
- * Mock authentication state configuration
+ * Mock authentication context interface
  */
-export interface MockAuthState {
-  isAuthenticated: boolean;
-  user?: Partial<UserSession> | null;
-  state?: AuthState;
-  permissions?: RBACPermission[];
-  loading?: boolean;
-  error?: string | null;
+interface MockAuthContextValue extends AuthState, AuthActions {
+  // Additional testing utilities
+  _setUser: (user: UserSession | null) => void;
+  _setLoading: (loading: boolean) => void;
+  _setError: (error: any) => void;
+  _triggerRefresh: () => void;
 }
 
 /**
- * Mock router configuration for Next.js testing
+ * Mock authentication context
  */
-export interface MockRouterConfig {
-  pathname?: string;
-  query?: Record<string, string | string[]>;
-  asPath?: string;
-  push?: jest.Mock;
-  replace?: jest.Mock;
-  back?: jest.Mock;
-  prefetch?: jest.Mock;
-  reload?: jest.Mock;
-  isReady?: boolean;
-}
+const MockAuthContext = createContext<MockAuthContextValue | null>(null);
 
 /**
- * Mock theme configuration
+ * Mock authentication provider configuration
  */
-export interface MockThemeConfig {
-  theme?: 'light' | 'dark' | 'system';
-  systemTheme?: 'light' | 'dark';
-  resolvedTheme?: 'light' | 'dark';
-  setTheme?: jest.Mock;
-  themes?: string[];
-}
-
-/**
- * Mock form configuration for React Hook Form testing
- */
-export interface MockFormConfig<T = any> {
-  defaultValues?: Partial<T>;
-  schema?: z.ZodSchema<T>;
-  mode?: 'onBlur' | 'onChange' | 'onSubmit' | 'onTouched' | 'all';
-  reValidateMode?: 'onBlur' | 'onChange' | 'onSubmit';
-  shouldFocusError?: boolean;
-}
-
-/**
- * Mock accessibility testing configuration
- */
-export interface MockA11yConfig {
-  announcements?: string[];
-  screenReaderMode?: boolean;
-  keyboardNavigation?: boolean;
-  highContrast?: boolean;
-  reducedMotion?: boolean;
-  announceChanges?: jest.Mock;
-  focusManagement?: jest.Mock;
-}
-
-/**
- * Comprehensive test provider configuration
- */
-export interface TestProvidersConfig {
-  auth?: MockAuthState;
-  router?: MockRouterConfig;
-  theme?: MockThemeConfig;
-  form?: MockFormConfig;
-  accessibility?: MockA11yConfig;
-  queryClient?: QueryClient;
-  disableErrorBoundary?: boolean;
-}
-
-/**
- * Custom render options extending RTL RenderOptions
- */
-export interface CustomRenderOptions extends Omit<RenderOptions, 'wrapper'> {
-  providers?: TestProvidersConfig;
-  wrapper?: React.ComponentType<{ children: ReactNode }>;
-}
-
-// =============================================================================
-// MOCK CONTEXTS
-// =============================================================================
-
-/**
- * Mock Authentication Context
- */
-interface AuthContextValue {
-  session: UserSession | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  state: AuthState;
-  error: string | null;
-  login: jest.Mock;
-  logout: jest.Mock;
-  refresh: jest.Mock;
-  hasPermission: jest.Mock;
-  hasRole: jest.Mock;
-  updateActivity: jest.Mock;
-}
-
-const MockAuthContext = React.createContext<AuthContextValue | null>(null);
-
-/**
- * Mock Router Context (for Next.js router testing)
- */
-interface RouterContextValue {
-  pathname: string;
-  query: Record<string, string | string[]>;
-  asPath: string;
-  push: jest.Mock;
-  replace: jest.Mock;
-  back: jest.Mock;
-  prefetch: jest.Mock;
-  reload: jest.Mock;
-  isReady: boolean;
-}
-
-const MockRouterContext = React.createContext<RouterContextValue | null>(null);
-
-/**
- * Mock Accessibility Context
- */
-interface A11yContextValue {
-  announcements: string[];
-  screenReaderMode: boolean;
-  keyboardNavigation: boolean;
-  highContrast: boolean;
-  reducedMotion: boolean;
-  announce: jest.Mock;
-  focus: jest.Mock;
-  setScreenReaderMode: jest.Mock;
-  setKeyboardNavigation: jest.Mock;
-  setHighContrast: jest.Mock;
-  setReducedMotion: jest.Mock;
-}
-
-const MockA11yContext = React.createContext<A11yContextValue | null>(null);
-
-// =============================================================================
-// PROVIDER COMPONENTS
-// =============================================================================
-
-/**
- * Test Query Provider with optimized configuration for testing
- */
-export function TestQueryProvider({ 
-  children,
-  queryClient,
-}: {
+export interface MockAuthProviderProps {
   children: ReactNode;
-  queryClient?: QueryClient;
-}) {
-  const defaultQueryClient = React.useMemo(() => {
-    return queryClient || new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false, // Disable retries in tests
-          gcTime: 0, // Disable garbage collection
-          staleTime: 0, // Always refetch
-          refetchOnWindowFocus: false, // Disable refetch on window focus
-          refetchOnMount: false, // Control refetching manually
-          refetchOnReconnect: false, // Disable refetch on reconnect
-        },
-        mutations: {
-          retry: false, // Disable retries in tests
-          gcTime: 0, // Disable garbage collection
-        },
-      },
-      logger: {
-        log: () => {}, // Silence logs in tests
-        warn: () => {},
-        error: () => {},
-      },
-    });
-  }, [queryClient]);
-
-  return (
-    <QueryClientProvider client={defaultQueryClient}>
-      {children}
-    </QueryClientProvider>
-  );
+  /** Initial user state for testing */
+  user?: UserSession | null;
+  /** Initial loading state */
+  isLoading?: boolean;
+  /** Initial error state */
+  error?: any;
+  /** Mock authentication state */
+  isAuthenticated?: boolean;
+  /** Mock refresh state */
+  isRefreshing?: boolean;
+  /** Mock user permissions */
+  permissions?: string[];
+  /** Mock implementation of authentication actions */
+  mockActions?: Partial<AuthActions>;
 }
 
 /**
- * Mock Authentication Provider for testing authentication states
+ * Mock authentication provider for testing authentication flows
+ * 
+ * Provides controllable authentication state for testing components
+ * that depend on user sessions, permissions, and authentication status.
+ * Supports dynamic state updates during testing through utility methods.
+ * 
+ * @param props Authentication provider configuration
  */
-export function MockAuthProvider({
+export const MockAuthProvider: React.FC<MockAuthProviderProps> = ({
   children,
-  config = {},
-}: {
-  children: ReactNode;
-  config?: MockAuthState;
-}) {
-  const {
-    isAuthenticated = false,
-    user = null,
-    state = AUTH_STATES.UNAUTHENTICATED,
-    permissions = [],
-    loading = false,
-    error = null,
-  } = config;
+  user = null,
+  isLoading = false,
+  error = null,
+  isAuthenticated = !!user,
+  isRefreshing = false,
+  permissions = [],
+  mockActions = {},
+}) => {
+  const [currentUser, setCurrentUser] = React.useState<UserSession | null>(user);
+  const [currentLoading, setCurrentLoading] = React.useState(isLoading);
+  const [currentError, setCurrentError] = React.useState(error);
+  const [currentRefreshing, setCurrentRefreshing] = React.useState(isRefreshing);
 
-  // Create mock session if user is provided
-  const mockSession = React.useMemo((): UserSession | null => {
-    if (!user || !isAuthenticated) return null;
-
-    return {
-      userId: user.userId || 'test-user-id',
-      email: user.email || 'test@example.com',
-      firstName: user.firstName || 'Test',
-      lastName: user.lastName || 'User',
-      displayName: user.displayName || 'Test User',
-      roles: user.roles || ['user'],
-      permissions: permissions,
-      sessionId: user.sessionId || 'test-session-id',
-      sessionToken: user.sessionToken || 'test-token',
-      refreshToken: user.refreshToken || 'test-refresh-token',
-      csrfToken: user.csrfToken || 'test-csrf-token',
-      issuedAt: user.issuedAt || Date.now(),
-      expiresAt: user.expiresAt || Date.now() + 3600000, // 1 hour
-      lastActivity: user.lastActivity || Date.now(),
-      isRootAdmin: user.isRootAdmin || false,
-      isSysAdmin: user.isSysAdmin || false,
-      roleId: user.roleId || 'user-role',
-      accessibleTabs: user.accessibleTabs || [],
-      preferences: user.preferences || {},
-    };
-  }, [user, isAuthenticated, permissions]);
-
-  // Mock authentication functions
-  const mockAuthValue = React.useMemo((): AuthContextValue => ({
-    session: mockSession,
-    isAuthenticated,
-    isLoading: loading,
-    state,
-    error,
-    login: jest.fn().mockResolvedValue({ success: true }),
-    logout: jest.fn().mockResolvedValue({ success: true }),
-    refresh: jest.fn().mockResolvedValue({ success: true }),
-    hasPermission: jest.fn((permission: RBACPermission) => 
-      permissions.includes(permission)
-    ),
-    hasRole: jest.fn((roles: string | string[]) => {
-      if (!mockSession) return false;
-      const roleArray = Array.isArray(roles) ? roles : [roles];
-      return roleArray.some(role => mockSession.roles.includes(role));
+  // Default mock implementations for authentication actions
+  const defaultMockActions: AuthActions = {
+    login: jest.fn().mockResolvedValue(undefined),
+    loginWithToken: jest.fn().mockResolvedValue(undefined),
+    logout: jest.fn().mockResolvedValue(undefined),
+    register: jest.fn().mockResolvedValue(undefined),
+    refreshToken: jest.fn().mockResolvedValue(undefined),
+    forgotPassword: jest.fn().mockResolvedValue({ success: true, message: 'Password reset email sent' }),
+    updatePassword: jest.fn().mockResolvedValue({ success: true, message: 'Password updated' }),
+    oauthLogin: jest.fn().mockResolvedValue(undefined),
+    samlLogin: jest.fn().mockResolvedValue(undefined),
+    updateUser: jest.fn((userData: Partial<UserSession>) => {
+      if (currentUser) {
+        setCurrentUser({ ...currentUser, ...userData });
+      }
     }),
-    updateActivity: jest.fn(),
-  }), [mockSession, isAuthenticated, loading, state, error, permissions]);
-
-  return (
-    <MockAuthContext.Provider value={mockAuthValue}>
-      {children}
-    </MockAuthContext.Provider>
-  );
-}
-
-/**
- * Theme Provider wrapper for testing light/dark theme variations
- */
-export function MockThemeProvider({
-  children,
-  config = {},
-}: {
-  children: ReactNode;
-  config?: MockThemeConfig;
-}) {
-  const {
-    theme = 'light',
-    systemTheme = 'light',
-    resolvedTheme = 'light',
-    setTheme = jest.fn(),
-    themes = ['light', 'dark', 'system'],
-  } = config;
-
-  // Mock theme context value
-  const mockThemeValue = React.useMemo(() => ({
-    theme,
-    systemTheme,
-    resolvedTheme,
-    setTheme,
-    themes,
-    forcedTheme: undefined,
-    enableSystem: true,
-    enableColorScheme: true,
-  }), [theme, systemTheme, resolvedTheme, setTheme, themes]);
-
-  return (
-    <NextThemesProvider
-      attribute="class"
-      defaultTheme="system"
-      enableSystem
-      value={mockThemeValue}
-    >
-      {children}
-    </NextThemesProvider>
-  );
-}
-
-/**
- * Mock Router Provider for Next.js router testing
- */
-export function MockRouterProvider({
-  children,
-  config = {},
-}: {
-  children: ReactNode;
-  config?: MockRouterConfig;
-}) {
-  const {
-    pathname = '/',
-    query = {},
-    asPath = '/',
-    push = jest.fn().mockResolvedValue(true),
-    replace = jest.fn().mockResolvedValue(true),
-    back = jest.fn(),
-    prefetch = jest.fn().mockResolvedValue(undefined),
-    reload = jest.fn(),
-    isReady = true,
-  } = config;
-
-  const mockRouterValue = React.useMemo((): RouterContextValue => ({
-    pathname,
-    query,
-    asPath,
-    push,
-    replace,
-    back,
-    prefetch,
-    reload,
-    isReady,
-  }), [pathname, query, asPath, push, replace, back, prefetch, reload, isReady]);
-
-  return (
-    <MockRouterContext.Provider value={mockRouterValue}>
-      {children}
-    </MockRouterContext.Provider>
-  );
-}
-
-/**
- * Form Provider wrapper for React Hook Form testing
- */
-export function MockFormProvider<T = any>({
-  children,
-  config = {},
-}: {
-  children: ReactNode;
-  config?: MockFormConfig<T>;
-}) {
-  const {
-    defaultValues = {} as Partial<T>,
-    schema,
-    mode = 'onSubmit',
-    reValidateMode = 'onChange',
-    shouldFocusError = true,
-  } = config;
-
-  const formConfig: UseFormProps<T> = {
-    defaultValues,
-    mode,
-    reValidateMode,
-    shouldFocusError,
-    ...(schema && { resolver: zodResolver(schema) }),
+    clearError: jest.fn(() => setCurrentError(null)),
+    checkSession: jest.fn().mockResolvedValue(!!currentUser),
+    hasRole: jest.fn((role: string) => currentUser?.roles?.includes(role) || false),
+    hasPermission: jest.fn((permission: string) => permissions.includes(permission)),
+    canAccessService: jest.fn((serviceName: string) => !!currentUser),
+    checkPermissions: jest.fn((requiredPermissions: string[]) => 
+      requiredPermissions.every(permission => permissions.includes(permission))
+    ),
+    clearAuthState: jest.fn().mockResolvedValue(undefined),
   };
 
-  const methods = useForm<T>(formConfig);
+  const contextValue: MockAuthContextValue = useMemo(() => ({
+    // Authentication state
+    isAuthenticated: !!currentUser,
+    isLoading: currentLoading,
+    user: currentUser,
+    error: currentError,
+    isRefreshing: currentRefreshing,
+    permissions,
 
-  return (
-    <ReactHookFormProvider {...methods}>
-      {children}
-    </ReactHookFormProvider>
-  );
-}
+    // Authentication actions (merged with custom mocks)
+    ...defaultMockActions,
+    ...mockActions,
 
-/**
- * Accessibility Testing Provider with screen reader simulation
- */
-export function MockAccessibilityProvider({
-  children,
-  config = {},
-}: {
-  children: ReactNode;
-  config?: MockA11yConfig;
-}) {
-  const {
-    announcements = [],
-    screenReaderMode = false,
-    keyboardNavigation = false,
-    highContrast = false,
-    reducedMotion = false,
-    announceChanges = jest.fn(),
-    focusManagement = jest.fn(),
-  } = config;
-
-  const [currentAnnouncements, setCurrentAnnouncements] = React.useState<string[]>(announcements);
-  const [isScreenReaderMode, setIsScreenReaderMode] = React.useState(screenReaderMode);
-  const [isKeyboardNavigation, setIsKeyboardNavigation] = React.useState(keyboardNavigation);
-  const [isHighContrast, setIsHighContrast] = React.useState(highContrast);
-  const [isReducedMotion, setIsReducedMotion] = React.useState(reducedMotion);
-
-  const mockA11yValue = React.useMemo((): A11yContextValue => ({
-    announcements: currentAnnouncements,
-    screenReaderMode: isScreenReaderMode,
-    keyboardNavigation: isKeyboardNavigation,
-    highContrast: isHighContrast,
-    reducedMotion: isReducedMotion,
-    announce: jest.fn((message: string) => {
-      setCurrentAnnouncements(prev => [...prev, message]);
-      announceChanges(message);
-    }),
-    focus: jest.fn((element?: HTMLElement) => {
-      if (element) {
-        element.focus();
-      }
-      focusManagement(element);
-    }),
-    setScreenReaderMode: jest.fn((enabled: boolean) => {
-      setIsScreenReaderMode(enabled);
-    }),
-    setKeyboardNavigation: jest.fn((enabled: boolean) => {
-      setIsKeyboardNavigation(enabled);
-    }),
-    setHighContrast: jest.fn((enabled: boolean) => {
-      setIsHighContrast(enabled);
-    }),
-    setReducedMotion: jest.fn((enabled: boolean) => {
-      setIsReducedMotion(enabled);
-    }),
+    // Testing utilities
+    _setUser: setCurrentUser,
+    _setLoading: setCurrentLoading,
+    _setError: setCurrentError,
+    _triggerRefresh: () => setCurrentRefreshing(true),
   }), [
-    currentAnnouncements,
-    isScreenReaderMode,
-    isKeyboardNavigation,
-    isHighContrast,
-    isReducedMotion,
-    announceChanges,
-    focusManagement,
+    currentUser,
+    currentLoading,
+    currentError,
+    currentRefreshing,
+    permissions,
+    mockActions,
   ]);
 
   return (
-    <MockA11yContext.Provider value={mockA11yValue}>
+    <MockAuthContext.Provider value={contextValue}>
       {children}
-    </MockA11yContext.Provider>
+    </MockAuthContext.Provider>
   );
-}
+};
 
 /**
- * Error Boundary for testing error scenarios
+ * Hook to access mock authentication context in tests
  */
-interface ErrorBoundaryState {
-  hasError: boolean;
-  error?: Error;
-}
-
-class TestErrorBoundary extends React.Component<
-  { children: ReactNode; onError?: (error: Error) => void },
-  ErrorBoundaryState
-> {
-  constructor(props: { children: ReactNode; onError?: (error: Error) => void }) {
-    super(props);
-    this.state = { hasError: false };
+export const useMockAuth = (): MockAuthContextValue => {
+  const context = useContext(MockAuthContext);
+  if (!context) {
+    throw new Error('useMockAuth must be used within a MockAuthProvider');
   }
-
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    this.props.onError?.(error);
-    console.error('Test Error Boundary caught an error:', error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div data-testid="error-boundary">
-          <h2>Test Error Boundary</h2>
-          <details>
-            <summary>Error Details</summary>
-            <pre>{this.state.error?.message}</pre>
-            <pre>{this.state.error?.stack}</pre>
-          </details>
-        </div>
-      );
-    }
-
-    return this.props.children;
-  }
-}
+  return context;
+};
 
 // =============================================================================
-// COMBINED PROVIDERS
+// MOCK THEME PROVIDER
 // =============================================================================
 
 /**
- * All-in-one test providers wrapper component
+ * Theme context interface
  */
-export function AllProvidersWrapper({
-  children,
-  config = {},
-}: {
+interface ThemeContextValue {
+  theme: 'light' | 'dark' | 'system';
+  setTheme: (theme: 'light' | 'dark' | 'system') => void;
+  resolvedTheme: 'light' | 'dark';
+  systemTheme: 'light' | 'dark';
+}
+
+/**
+ * Mock theme context
+ */
+const MockThemeContext = createContext<ThemeContextValue | null>(null);
+
+/**
+ * Mock theme provider configuration
+ */
+export interface MockThemeProviderProps {
   children: ReactNode;
-  config?: TestProvidersConfig;
-}) {
-  const {
-    auth,
-    router,
-    theme,
-    form,
-    accessibility,
-    queryClient,
-    disableErrorBoundary = false,
-  } = config;
+  /** Initial theme state */
+  theme?: 'light' | 'dark' | 'system';
+  /** System theme preference for testing */
+  systemTheme?: 'light' | 'dark';
+  /** Disable theme transitions for testing */
+  disableTransitions?: boolean;
+}
 
+/**
+ * Mock theme provider for testing theme-dependent components
+ * 
+ * Provides controllable theme state for testing components that respond
+ * to light/dark theme changes. Includes system theme preference simulation
+ * and theme transition controls for consistent testing.
+ * 
+ * @param props Theme provider configuration
+ */
+export const MockThemeProvider: React.FC<MockThemeProviderProps> = ({
+  children,
+  theme: initialTheme = 'light',
+  systemTheme = 'light',
+  disableTransitions = true,
+}) => {
+  const [currentTheme, setCurrentTheme] = React.useState<'light' | 'dark' | 'system'>(initialTheme);
+
+  const resolvedTheme = currentTheme === 'system' ? systemTheme : currentTheme;
+
+  const contextValue: ThemeContextValue = useMemo(() => ({
+    theme: currentTheme,
+    setTheme: setCurrentTheme,
+    resolvedTheme,
+    systemTheme,
+  }), [currentTheme, resolvedTheme, systemTheme]);
+
+  // Apply theme classes to container for Tailwind CSS testing
+  const themeClasses = [
+    resolvedTheme,
+    disableTransitions ? 'transition-none' : '',
+  ].filter(Boolean).join(' ');
+
+  return (
+    <MockThemeContext.Provider value={contextValue}>
+      <div className={themeClasses} data-testid="theme-provider" data-theme={resolvedTheme}>
+        {children}
+      </div>
+    </MockThemeContext.Provider>
+  );
+};
+
+/**
+ * Hook to access mock theme context in tests
+ */
+export const useMockTheme = (): ThemeContextValue => {
+  const context = useContext(MockThemeContext);
+  if (!context) {
+    throw new Error('useMockTheme must be used within a MockThemeProvider');
+  }
+  return context;
+};
+
+// =============================================================================
+// MOCK ROUTER PROVIDER
+// =============================================================================
+
+/**
+ * Mock Next.js router interface
+ */
+export interface MockRouter {
+  push: jest.Mock;
+  replace: jest.Mock;
+  prefetch: jest.Mock;
+  back: jest.Mock;
+  forward: jest.Mock;
+  refresh: jest.Mock;
+}
+
+/**
+ * Mock router provider configuration
+ */
+export interface MockRouterProviderProps {
+  children: ReactNode;
+  /** Current pathname for testing */
+  pathname?: string;
+  /** Search parameters for testing */
+  searchParams?: URLSearchParams;
+  /** Mock router implementation */
+  router?: Partial<MockRouter>;
+  /** Enable router call tracking */
+  trackCalls?: boolean;
+}
+
+/**
+ * Creates a mock Next.js App Router for testing
+ */
+export const createMockRouter = (overrides: Partial<MockRouter> = {}): MockRouter => ({
+  push: jest.fn(),
+  replace: jest.fn(),
+  prefetch: jest.fn(),
+  back: jest.fn(),
+  forward: jest.fn(),
+  refresh: jest.fn(),
+  ...overrides,
+});
+
+/**
+ * Mock router provider for testing navigation components
+ * 
+ * Provides Next.js App Router context mocking for testing components
+ * that use router hooks. Includes pathname, search params, and router
+ * action mocking with call tracking capabilities.
+ * 
+ * @param props Router provider configuration
+ */
+export const MockRouterProvider: React.FC<MockRouterProviderProps> = ({
+  children,
+  pathname = '/',
+  searchParams = new URLSearchParams(),
+  router = {},
+  trackCalls = true,
+}) => {
+  const mockRouter = useMemo(() => createMockRouter(router), [router]);
+
+  // Track router calls if enabled
+  React.useEffect(() => {
+    if (trackCalls) {
+      const originalPush = mockRouter.push;
+      mockRouter.push = jest.fn((...args) => {
+        console.log('[MockRouter] push called with:', args);
+        return originalPush(...args);
+      });
+    }
+  }, [mockRouter, trackCalls]);
+
+  return (
+    <AppRouterContext.Provider value={mockRouter as any}>
+      <PathnameContext.Provider value={pathname}>
+        <SearchParamsContext.Provider value={searchParams}>
+          {children}
+        </SearchParamsContext.Provider>
+      </PathnameContext.Provider>
+    </AppRouterContext.Provider>
+  );
+};
+
+// =============================================================================
+// TEST QUERY PROVIDER
+// =============================================================================
+
+/**
+ * Test query client configuration
+ */
+export interface TestQueryProviderProps {
+  children: ReactNode;
+  /** Custom query client instance */
+  queryClient?: QueryClient;
+  /** Initial query data for testing */
+  initialData?: Record<string, any>;
+  /** Disable retries for consistent testing */
+  disableRetry?: boolean;
+  /** Custom stale time for testing */
+  staleTime?: number;
+  /** Custom cache time for testing */
+  cacheTime?: number;
+}
+
+/**
+ * Test query provider replacing Angular HTTP testing module
+ * 
+ * Provides TanStack React Query client configuration optimized for testing.
+ * Includes initial data setup, retry disabling, and cache time controls
+ * for predictable test behavior.
+ * 
+ * @param props Query provider configuration
+ */
+export const TestQueryProvider: React.FC<TestQueryProviderProps> = ({
+  children,
+  queryClient: customQueryClient,
+  initialData = {},
+  disableRetry = true,
+  staleTime = 0,
+  cacheTime = 0,
+}) => {
+  const queryClient = useMemo(() => {
+    if (customQueryClient) return customQueryClient;
+
+    const client = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: disableRetry ? false : 3,
+          staleTime,
+          gcTime: cacheTime,
+          refetchOnMount: false,
+          refetchOnWindowFocus: false,
+          refetchOnReconnect: false,
+        },
+        mutations: {
+          retry: disableRetry ? false : 3,
+        },
+      },
+    });
+
+    // Set initial data if provided
+    Object.entries(initialData).forEach(([queryKey, data]) => {
+      client.setQueryData([queryKey], data);
+    });
+
+    return client;
+  }, [customQueryClient, initialData, disableRetry, staleTime, cacheTime]);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      {children}
+    </QueryClientProvider>
+  );
+};
+
+// =============================================================================
+// MOCK FORM PROVIDER
+// =============================================================================
+
+/**
+ * Mock form provider configuration
+ */
+export interface MockFormProviderProps<T extends FieldValues = FieldValues> {
+  children: ReactNode;
+  /** React Hook Form methods for testing */
+  formMethods?: UseFormReturn<T>;
+  /** Default values for form testing */
+  defaultValues?: Partial<T>;
+  /** Mock validation errors */
+  errors?: Record<string, any>;
+  /** Mock form state */
+  isValid?: boolean;
+  /** Mock submission state */
+  isSubmitting?: boolean;
+  /** Mock dirty state */
+  isDirty?: boolean;
+}
+
+/**
+ * Mock form provider for React Hook Form testing
+ * 
+ * Provides React Hook Form context with configurable form state for testing
+ * form components and validation scenarios. Supports custom form methods,
+ * validation errors, and form state simulation.
+ * 
+ * @param props Form provider configuration
+ */
+export const MockFormProvider = <T extends FieldValues = FieldValues>({
+  children,
+  formMethods,
+  defaultValues = {} as Partial<T>,
+  errors = {},
+  isValid = true,
+  isSubmitting = false,
+  isDirty = false,
+}: MockFormProviderProps<T>) => {
+  const mockFormMethods: UseFormReturn<T> = useMemo(() => {
+    if (formMethods) return formMethods;
+
+    return {
+      register: jest.fn(),
+      unregister: jest.fn(),
+      handleSubmit: jest.fn(),
+      reset: jest.fn(),
+      setError: jest.fn(),
+      clearErrors: jest.fn(),
+      setValue: jest.fn(),
+      getValue: jest.fn(),
+      getValues: jest.fn(() => defaultValues as T),
+      watch: jest.fn(),
+      trigger: jest.fn().mockResolvedValue(true),
+      formState: {
+        errors,
+        isValid,
+        isSubmitting,
+        isDirty,
+        isLoading: false,
+        isSubmitted: false,
+        isSubmitSuccessful: false,
+        isValidating: false,
+        submitCount: 0,
+        touchedFields: {},
+        dirtyFields: {},
+        defaultValues,
+      },
+      control: {} as any,
+      getFieldState: jest.fn(),
+      resetField: jest.fn(),
+      setFocus: jest.fn(),
+    } as UseFormReturn<T>;
+  }, [formMethods, defaultValues, errors, isValid, isSubmitting, isDirty]);
+
+  return (
+    <FormProvider {...mockFormMethods}>
+      {children}
+    </FormProvider>
+  );
+};
+
+// =============================================================================
+// ACCESSIBILITY TESTING PROVIDER
+// =============================================================================
+
+/**
+ * Accessibility context interface
+ */
+interface AccessibilityContextValue {
+  screenReaderEnabled: boolean;
+  reducedMotion: boolean;
+  highContrast: boolean;
+  announceMessage: (message: string) => void;
+  setScreenReaderEnabled: (enabled: boolean) => void;
+  setReducedMotion: (enabled: boolean) => void;
+  setHighContrast: (enabled: boolean) => void;
+}
+
+/**
+ * Mock accessibility context
+ */
+const MockAccessibilityContext = createContext<AccessibilityContextValue | null>(null);
+
+/**
+ * Accessibility provider configuration
+ */
+export interface MockAccessibilityProviderProps {
+  children: ReactNode;
+  /** Initial screen reader state */
+  screenReaderEnabled?: boolean;
+  /** Initial reduced motion preference */
+  reducedMotion?: boolean;
+  /** Initial high contrast preference */
+  highContrast?: boolean;
+  /** Custom message announcer for testing */
+  messageAnnouncer?: (message: string) => void;
+}
+
+/**
+ * Mock accessibility provider for testing accessible components
+ * 
+ * Provides accessibility context simulation for testing components with
+ * screen reader support, reduced motion preferences, and high contrast
+ * modes. Includes message announcement tracking for ARIA live regions.
+ * 
+ * @param props Accessibility provider configuration
+ */
+export const MockAccessibilityProvider: React.FC<MockAccessibilityProviderProps> = ({
+  children,
+  screenReaderEnabled = false,
+  reducedMotion = false,
+  highContrast = false,
+  messageAnnouncer = jest.fn(),
+}) => {
+  const [currentScreenReaderEnabled, setCurrentScreenReaderEnabled] = React.useState(screenReaderEnabled);
+  const [currentReducedMotion, setCurrentReducedMotion] = React.useState(reducedMotion);
+  const [currentHighContrast, setCurrentHighContrast] = React.useState(highContrast);
+
+  const contextValue: AccessibilityContextValue = useMemo(() => ({
+    screenReaderEnabled: currentScreenReaderEnabled,
+    reducedMotion: currentReducedMotion,
+    highContrast: currentHighContrast,
+    announceMessage: messageAnnouncer,
+    setScreenReaderEnabled: setCurrentScreenReaderEnabled,
+    setReducedMotion: setCurrentReducedMotion,
+    setHighContrast: setCurrentHighContrast,
+  }), [
+    currentScreenReaderEnabled,
+    currentReducedMotion,
+    currentHighContrast,
+    messageAnnouncer,
+  ]);
+
+  // Apply accessibility classes for testing
+  const accessibilityClasses = [
+    currentReducedMotion ? 'motion-reduce' : '',
+    currentHighContrast ? 'contrast-more' : '',
+  ].filter(Boolean).join(' ');
+
+  return (
+    <MockAccessibilityContext.Provider value={contextValue}>
+      <div 
+        className={accessibilityClasses}
+        data-testid="accessibility-provider"
+        data-screen-reader={currentScreenReaderEnabled}
+        data-reduced-motion={currentReducedMotion}
+        data-high-contrast={currentHighContrast}
+      >
+        {children}
+      </div>
+    </MockAccessibilityContext.Provider>
+  );
+};
+
+/**
+ * Hook to access mock accessibility context in tests
+ */
+export const useMockAccessibility = (): AccessibilityContextValue => {
+  const context = useContext(MockAccessibilityContext);
+  if (!context) {
+    throw new Error('useMockAccessibility must be used within a MockAccessibilityProvider');
+  }
+  return context;
+};
+
+// =============================================================================
+// INTERNATIONALIZATION PROVIDER
+// =============================================================================
+
+/**
+ * Internationalization context interface
+ */
+interface I18nContextValue {
+  locale: string;
+  setLocale: (locale: string) => void;
+  t: (key: string, params?: Record<string, any>) => string;
+  formatDate: (date: Date, options?: Intl.DateTimeFormatOptions) => string;
+  formatNumber: (value: number, options?: Intl.NumberFormatOptions) => string;
+}
+
+/**
+ * Mock internationalization context
+ */
+const MockI18nContext = createContext<I18nContextValue | null>(null);
+
+/**
+ * Internationalization provider configuration
+ */
+export interface MockI18nProviderProps {
+  children: ReactNode;
+  /** Initial locale */
+  locale?: string;
+  /** Mock translations */
+  translations?: Record<string, Record<string, string>>;
+  /** Custom translation function */
+  customT?: (key: string, params?: Record<string, any>) => string;
+}
+
+/**
+ * Mock internationalization provider for testing localized components
+ * 
+ * Provides i18n context simulation for testing components with translations,
+ * date formatting, and number formatting. Supports custom translation
+ * dictionaries and locale switching for testing internationalization.
+ * 
+ * @param props I18n provider configuration
+ */
+export const MockI18nProvider: React.FC<MockI18nProviderProps> = ({
+  children,
+  locale = 'en-US',
+  translations = {},
+  customT,
+}) => {
+  const [currentLocale, setCurrentLocale] = React.useState(locale);
+
+  const t = useMemo(() => {
+    if (customT) return customT;
+
+    return (key: string, params: Record<string, any> = {}) => {
+      const localeTranslations = translations[currentLocale] || translations['en-US'] || {};
+      let translation = localeTranslations[key] || key;
+
+      // Simple parameter substitution
+      Object.entries(params).forEach(([paramKey, paramValue]) => {
+        translation = translation.replace(new RegExp(`{{${paramKey}}}`, 'g'), String(paramValue));
+      });
+
+      return translation;
+    };
+  }, [customT, translations, currentLocale]);
+
+  const formatDate = useMemo(() => {
+    return (date: Date, options: Intl.DateTimeFormatOptions = {}) => {
+      return new Intl.DateTimeFormat(currentLocale, options).format(date);
+    };
+  }, [currentLocale]);
+
+  const formatNumber = useMemo(() => {
+    return (value: number, options: Intl.NumberFormatOptions = {}) => {
+      return new Intl.NumberFormat(currentLocale, options).format(value);
+    };
+  }, [currentLocale]);
+
+  const contextValue: I18nContextValue = useMemo(() => ({
+    locale: currentLocale,
+    setLocale: setCurrentLocale,
+    t,
+    formatDate,
+    formatNumber,
+  }), [currentLocale, t, formatDate, formatNumber]);
+
+  return (
+    <MockI18nContext.Provider value={contextValue}>
+      <div data-testid="i18n-provider" data-locale={currentLocale}>
+        {children}
+      </div>
+    </MockI18nContext.Provider>
+  );
+};
+
+/**
+ * Hook to access mock i18n context in tests
+ */
+export const useMockI18n = (): I18nContextValue => {
+  const context = useContext(MockI18nContext);
+  if (!context) {
+    throw new Error('useMockI18n must be used within a MockI18nProvider');
+  }
+  return context;
+};
+
+// =============================================================================
+// COMPOSITE PROVIDER UTILITIES
+// =============================================================================
+
+/**
+ * Configuration for multiple providers
+ */
+export interface CompositeProviderProps {
+  children: ReactNode;
+  auth?: MockAuthProviderProps;
+  theme?: MockThemeProviderProps;
+  router?: MockRouterProviderProps;
+  query?: TestQueryProviderProps;
+  form?: MockFormProviderProps;
+  accessibility?: MockAccessibilityProviderProps;
+  i18n?: MockI18nProviderProps;
+}
+
+/**
+ * Composite provider for testing with multiple contexts
+ * 
+ * Provides a convenient way to compose multiple mock providers for
+ * comprehensive testing scenarios. Maintains proper provider ordering
+ * and context isolation for complex component testing.
+ * 
+ * @param props Composite provider configuration
+ */
+export const MockCompositeProvider: React.FC<CompositeProviderProps> = ({
+  children,
+  auth,
+  theme,
+  router,
+  query,
+  form,
+  accessibility,
+  i18n,
+}) => {
   let wrappedChildren = children;
 
-  // Wrap with providers in reverse order (innermost first)
-  if (form) {
+  // Wrap in reverse order to maintain proper context hierarchy
+  if (i18n) {
     wrappedChildren = (
-      <MockFormProvider config={form}>
+      <MockI18nProvider {...i18n}>
         {wrappedChildren}
-      </MockFormProvider>
+      </MockI18nProvider>
     );
   }
 
   if (accessibility) {
     wrappedChildren = (
-      <MockAccessibilityProvider config={accessibility}>
+      <MockAccessibilityProvider {...accessibility}>
         {wrappedChildren}
       </MockAccessibilityProvider>
     );
   }
 
+  if (form) {
+    wrappedChildren = (
+      <MockFormProvider {...form}>
+        {wrappedChildren}
+      </MockFormProvider>
+    );
+  }
+
   if (router) {
     wrappedChildren = (
-      <MockRouterProvider config={router}>
+      <MockRouterProvider {...router}>
         {wrappedChildren}
       </MockRouterProvider>
     );
@@ -576,7 +789,7 @@ export function AllProvidersWrapper({
 
   if (theme) {
     wrappedChildren = (
-      <MockThemeProvider config={theme}>
+      <MockThemeProvider {...theme}>
         {wrappedChildren}
       </MockThemeProvider>
     );
@@ -584,342 +797,41 @@ export function AllProvidersWrapper({
 
   if (auth) {
     wrappedChildren = (
-      <MockAuthProvider config={auth}>
+      <MockAuthProvider {...auth}>
         {wrappedChildren}
       </MockAuthProvider>
     );
   }
 
-  // Query provider should be one of the outermost
-  wrappedChildren = (
-    <TestQueryProvider queryClient={queryClient}>
-      {wrappedChildren}
-    </TestQueryProvider>
-  );
-
-  // Error boundary should be the outermost
-  if (!disableErrorBoundary) {
+  if (query) {
     wrappedChildren = (
-      <TestErrorBoundary>
+      <TestQueryProvider {...query}>
         {wrappedChildren}
-      </TestErrorBoundary>
+      </TestQueryProvider>
     );
   }
 
   return <>{wrappedChildren}</>;
-}
+};
 
 // =============================================================================
-// CUSTOM HOOKS FOR ACCESSING MOCK CONTEXTS
-// =============================================================================
-
-/**
- * Hook to access mock authentication context in tests
- */
-export function useMockAuth(): AuthContextValue {
-  const context = React.useContext(MockAuthContext);
-  if (!context) {
-    throw new Error('useMockAuth must be used within MockAuthProvider');
-  }
-  return context;
-}
-
-/**
- * Hook to access mock router context in tests
- */
-export function useMockRouter(): RouterContextValue {
-  const context = React.useContext(MockRouterContext);
-  if (!context) {
-    throw new Error('useMockRouter must be used within MockRouterProvider');
-  }
-  return context;
-}
-
-/**
- * Hook to access mock accessibility context in tests
- */
-export function useMockA11y(): A11yContextValue {
-  const context = React.useContext(MockA11yContext);
-  if (!context) {
-    throw new Error('useMockA11y must be used within MockAccessibilityProvider');
-  }
-  return context;
-}
-
-// =============================================================================
-// CUSTOM RENDER FUNCTIONS
-// =============================================================================
-
-/**
- * Custom render function that wraps components with test providers
- */
-export function renderWithProviders(
-  ui: ReactElement,
-  options: CustomRenderOptions = {}
-): RenderResult {
-  const { providers, ...renderOptions } = options;
-
-  function TestWrapper({ children }: { children: ReactNode }): ReactElement {
-    return (
-      <AllProvidersWrapper config={providers}>
-        {children}
-      </AllProvidersWrapper>
-    );
-  }
-
-  return render(ui, {
-    wrapper: options.wrapper || TestWrapper,
-    ...renderOptions,
-  });
-}
-
-/**
- * Render function specifically for authenticated components
- */
-export function renderWithAuth(
-  ui: ReactElement,
-  authConfig: MockAuthState = { isAuthenticated: true },
-  options: CustomRenderOptions = {}
-): RenderResult {
-  return renderWithProviders(ui, {
-    ...options,
-    providers: {
-      ...options.providers,
-      auth: { ...authConfig },
-    },
-  });
-}
-
-/**
- * Render function specifically for form components
- */
-export function renderWithForm<T = any>(
-  ui: ReactElement,
-  formConfig: MockFormConfig<T> = {},
-  options: CustomRenderOptions = {}
-): RenderResult {
-  return renderWithProviders(ui, {
-    ...options,
-    providers: {
-      ...options.providers,
-      form: formConfig,
-    },
-  });
-}
-
-/**
- * Render function specifically for router-dependent components
- */
-export function renderWithRouter(
-  ui: ReactElement,
-  routerConfig: MockRouterConfig = {},
-  options: CustomRenderOptions = {}
-): RenderResult {
-  return renderWithProviders(ui, {
-    ...options,
-    providers: {
-      ...options.providers,
-      router: routerConfig,
-    },
-  });
-}
-
-/**
- * Render function specifically for accessibility testing
- */
-export function renderWithA11y(
-  ui: ReactElement,
-  a11yConfig: MockA11yConfig = { screenReaderMode: true },
-  options: CustomRenderOptions = {}
-): RenderResult {
-  return renderWithProviders(ui, {
-    ...options,
-    providers: {
-      ...options.providers,
-      accessibility: a11yConfig,
-    },
-  });
-}
-
-// =============================================================================
-// TEST UTILITIES AND HELPERS
-// =============================================================================
-
-/**
- * Creates a mock user session for testing
- */
-export function createMockUserSession(overrides: Partial<UserSession> = {}): UserSession {
-  return {
-    userId: 'test-user-id',
-    email: 'test@example.com',
-    firstName: 'Test',
-    lastName: 'User',
-    displayName: 'Test User',
-    roles: ['user'],
-    permissions: [RBAC_PERMISSIONS.USER_READ],
-    sessionId: 'test-session-id',
-    sessionToken: 'test-token',
-    refreshToken: 'test-refresh-token',
-    csrfToken: 'test-csrf-token',
-    issuedAt: Date.now(),
-    expiresAt: Date.now() + 3600000, // 1 hour
-    lastActivity: Date.now(),
-    isRootAdmin: false,
-    isSysAdmin: false,
-    roleId: 'user-role',
-    accessibleTabs: [],
-    preferences: {},
-    ...overrides,
-  };
-}
-
-/**
- * Creates a mock admin user session for testing
- */
-export function createMockAdminSession(overrides: Partial<UserSession> = {}): UserSession {
-  return createMockUserSession({
-    roles: ['admin'],
-    permissions: [
-      RBAC_PERMISSIONS.SUPER_ADMIN,
-      RBAC_PERMISSIONS.SYSTEM_ADMIN,
-      RBAC_PERMISSIONS.USER_READ,
-      RBAC_PERMISSIONS.USER_WRITE,
-    ],
-    isRootAdmin: true,
-    isSysAdmin: true,
-    accessibleTabs: ['users', 'admins', 'roles', 'services', 'schema'],
-    ...overrides,
-  });
-}
-
-/**
- * Creates a basic test query client with test-friendly defaults
- */
-export function createTestQueryClient(): QueryClient {
-  return new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-        gcTime: 0,
-        staleTime: Infinity,
-        refetchOnWindowFocus: false,
-        refetchOnMount: false,
-        refetchOnReconnect: false,
-      },
-      mutations: {
-        retry: false,
-        gcTime: 0,
-      },
-    },
-    logger: {
-      log: () => {},
-      warn: () => {},
-      error: () => {},
-    },
-  });
-}
-
-/**
- * Mock form validation schema for testing
- */
-export const mockValidationSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
-  email: z.string().email('Invalid email'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
-  confirmPassword: z.string(),
-}).refine(data => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
-});
-
-/**
- * Wait for all pending queries to settle (useful for async testing)
- */
-export async function waitForQueriesToSettle(queryClient: QueryClient): Promise<void> {
-  await queryClient.getQueryCache().clear();
-  await new Promise(resolve => setTimeout(resolve, 0));
-}
-
-/**
- * Mock window.matchMedia for responsive testing
- */
-export function mockMatchMedia(matches: boolean = false): void {
-  Object.defineProperty(window, 'matchMedia', {
-    writable: true,
-    value: jest.fn().mockImplementation((query) => ({
-      matches,
-      media: query,
-      onchange: null,
-      addListener: jest.fn(), // deprecated
-      removeListener: jest.fn(), // deprecated
-      addEventListener: jest.fn(),
-      removeEventListener: jest.fn(),
-      dispatchEvent: jest.fn(),
-    })),
-  });
-}
-
-/**
- * Mock window.ResizeObserver for component testing
- */
-export function mockResizeObserver(): void {
-  class MockResizeObserver {
-    observe = jest.fn();
-    unobserve = jest.fn();
-    disconnect = jest.fn();
-  }
-
-  Object.defineProperty(window, 'ResizeObserver', {
-    writable: true,
-    value: MockResizeObserver,
-  });
-}
-
-/**
- * Mock localStorage for testing
- */
-export function mockLocalStorage(): { [key: string]: string } {
-  const store: { [key: string]: string } = {};
-
-  Object.defineProperty(window, 'localStorage', {
-    value: {
-      getItem: jest.fn((key: string) => store[key] || null),
-      setItem: jest.fn((key: string, value: string) => {
-        store[key] = value;
-      }),
-      removeItem: jest.fn((key: string) => {
-        delete store[key];
-      }),
-      clear: jest.fn(() => {
-        Object.keys(store).forEach(key => {
-          delete store[key];
-        });
-      }),
-      key: jest.fn((index: number) => {
-        const keys = Object.keys(store);
-        return keys[index] || null;
-      }),
-      length: Object.keys(store).length,
-    },
-  });
-
-  return store;
-}
-
-// =============================================================================
-// EXPORTS
+// EXPORT ALL PROVIDERS AND UTILITIES
 // =============================================================================
 
 export {
-  type MockAuthState,
-  type MockRouterConfig,
-  type MockThemeConfig,
-  type MockFormConfig,
-  type MockA11yConfig,
-  type TestProvidersConfig,
-  type CustomRenderOptions,
+  MockAuthContext,
+  MockThemeContext,
+  MockAccessibilityContext,
+  MockI18nContext,
 };
 
-// Re-export testing library utilities for convenience
-export * from '@testing-library/react';
-export { default as userEvent } from '@testing-library/user-event';
+// Type exports for provider props
+export type {
+  MockAuthContextValue,
+  ThemeContextValue,
+  AccessibilityContextValue,
+  I18nContextValue,
+};
+
+// Default export for convenience
+export default MockCompositeProvider;
