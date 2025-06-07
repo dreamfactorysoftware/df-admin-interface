@@ -1,54 +1,55 @@
 /**
- * Storage Management Index
+ * Storage Library - Main Export Module
  * 
- * Centralized export hub for all storage utilities and React hooks that replace Angular services
- * throughout the DreamFactory Admin Interface migration. Provides type-safe storage management,
- * SSR-compatible React hooks, and reactive state management patterns.
+ * Provides a unified interface for all storage utilities and hooks used throughout
+ * the DreamFactory Admin Interface. This module centralizes browser storage management,
+ * React hooks for SSR-safe storage operations, and user session management utilities
+ * that replace Angular services throughout the application.
  * 
- * This module serves as the main interface for all storage-related operations, replacing
- * Angular's BehaviorSubject patterns with modern React hooks and providing seamless
- * integration with Next.js server-side rendering capabilities.
+ * Key Features:
+ * - Type-safe localStorage and sessionStorage management with error handling
+ * - SSR-compatible storage operations for Next.js server-side rendering
+ * - Reactive state management using React hooks instead of RxJS observables
+ * - Cross-tab synchronization for consistent application state
+ * - Secure session token management with Next.js middleware integration
+ * - User preferences and UI state persistence across browser sessions
  * 
- * @fileoverview Main export file for storage utilities migrated from Angular services
- * @version 1.0.0
- * @since 2024-01-01
- * 
- * Migration Notes:
- * - Replaces Angular localStorage/sessionStorage service patterns
- * - Provides SSR-safe storage operations for Next.js compatibility
- * - Implements React hooks for reactive state management
- * - Maintains API compatibility with existing Angular service interfaces
+ * Architecture:
+ * This module serves as the central export point for all storage-related functionality,
+ * organizing exports by category while maintaining a flat import structure for
+ * consuming components. All storage operations are designed to be SSR-safe and
+ * compatible with React 19 concurrent features.
  */
 
 // =============================================================================
 // Type Definitions and Constants
 // =============================================================================
 
-// Re-export all type definitions for external consumption
+/**
+ * Export all type definitions for storage operations
+ * Provides comprehensive type safety across the storage layer
+ */
 export type {
   // Core storage types
   StorageKey,
+  StorageValue,
+  StorageResult,
   StorageOptions,
   CookieOptions,
   StorageEvent,
-  StorageValue,
-  StorageResult,
   StorageHookState,
-  StorageMigrationMap,
-  ApplicationState,
-  PersistenceConfig,
   
-  // User session types
+  // User session and authentication types
   UserSession,
   AuthState,
   UserProfile,
   
-  // Theme preference types
+  // Theme and UI preference types
   ThemeMode,
   ThemePreferences,
   UIPreferences,
   
-  // UI state types
+  // UI state management types
   PopupState,
   OnboardingState,
   NavigationState,
@@ -58,11 +59,22 @@ export type {
   DatabaseServiceType,
   ServiceStatus,
   ServiceState,
+  
+  // Migration and application state types
+  StorageMigrationMap,
+  ApplicationState,
+  PersistenceConfig,
 } from './types';
 
-// Export storage key constants
+/**
+ * Export storage key constants for type-safe key usage
+ */
+export { STORAGE_KEYS } from './types';
+
+/**
+ * Export type guard utilities for runtime validation
+ */
 export {
-  STORAGE_KEYS,
   isUserSession,
   isStorageKey,
   isThemeMode,
@@ -73,561 +85,459 @@ export {
 // Core Storage Utilities
 // =============================================================================
 
-// Browser environment detection
-export { isBrowser } from './storage-utils';
-
-// Core storage classes with error handling and JSON serialization
+/**
+ * Export core storage utilities for direct storage operations
+ * These provide the foundation for all storage interactions
+ */
 export {
-  LocalStorage,
-  SessionStorage,
-  CookieStorage,
-  Storage,
-  storageHelpers,
-  STORAGE_KEYS as CORE_STORAGE_KEYS,
-} from './storage-utils';
-
-// Re-export storage operation types from storage-utils
-export type {
-  StorageOptions as CoreStorageOptions,
-  CookieOptions as CoreCookieOptions,
-  StorageResult as CoreStorageResult,
-  StorageKey as CoreStorageKey,
+  // Environment detection utilities
+  isBrowser,
+  isStorageAvailable,
+  areCookiesAvailable,
+  
+  // Storage operation utilities
+  localStorage,
+  sessionStorage,
+  cookies,
+  
+  // High-level storage operations
+  userSession,
+  themePreferences,
+  serviceState,
+  
+  // Migration and utility functions
+  migrationUtils,
+  getStorageUsage,
+  clearAllStorage,
+  validateStorageIntegrity,
+  
+  // Main storage API (comprehensive interface)
+  storage,
 } from './storage-utils';
 
 // =============================================================================
 // SSR-Safe React Hooks
 // =============================================================================
 
-// SSR-compatible storage hooks for Next.js integration
+/**
+ * Export SSR-compatible React hooks for storage operations
+ * These hooks provide reactive state management with SSR safety
+ */
 export {
+  // Core storage hooks
   useLocalStorage,
   useSessionStorage,
   useCookies,
-  useCookieState,
-  useIsHydrated,
-  storageUtils,
+  
+  // Convenience hooks for common use cases
+  useSessionToken,
+  useUserSession,
+  useThemePreference,
+  useCurrentServiceId,
+  useTempFormState,
+  
+  // Utility functions for storage management
+  clearAllStorage as clearAllStorageHook,
+  getStorageCapabilities,
 } from './ssr-storage';
 
-// Re-export SSR storage hook types
+/**
+ * Export hook configuration types
+ */
 export type {
   StorageHookOptions,
-  CookieOptions as SSRCookieOptions,
+  CookieHookOptions,
 } from './ssr-storage';
 
 // =============================================================================
-// User Session Management
+// User Session and Authentication Management
 // =============================================================================
 
-// User session and authentication state management
+/**
+ * Export user session management utilities and hooks
+ * Provides comprehensive authentication state management
+ */
 export {
-  // Session storage constants
-  SESSION_STORAGE_KEYS,
+  // Session token management class
+  SessionTokenManager,
   
-  // Core hooks for session management
-  useSessionToken,
-  useUserStorage,
-  useUserSession,
+  // User data management class  
+  UserDataManager,
+  
+  // Configuration constants
+  SESSION_CONFIG,
+  DEFAULT_AUTH_STATE,
+  SESSION_COOKIE_OPTIONS,
+  
+  // Primary authentication hooks
   useAuthState,
+  useRoleAccess,
+  useSessionData,
   
-  // Utility functions for external usage
+  // Utility functions for migration compatibility
   sessionUtils,
-  
-  // Default export object
-  default as userSessionExports,
-} from './user-session';
-
-// Re-export user session types
-export type {
-  UserSession as UserSessionType,
-  UserProfile as UserProfileType,
-  RoleType,
 } from './user-session';
 
 // =============================================================================
-// Theme and UI Preferences
+// Theme and UI Preferences Management
 // =============================================================================
 
-// Theme preference management with localStorage persistence
+/**
+ * Export theme preference management utilities and hooks
+ * Provides dark mode, table preferences, and UI customization
+ */
 export {
-  // Storage keys and defaults
-  THEME_STORAGE_KEYS,
-  THEME_DEFAULTS,
+  // Default configuration constants
+  DEFAULT_THEME_PREFERENCES,
+  DEFAULT_UI_PREFERENCES,
+  TABLE_ROW_COUNT_OPTIONS,
   
-  // Core theme hooks
-  useDarkMode,
+  // Theme management hooks
+  useThemeManager,
+  useSystemThemeDetection,
+  useDarkModeToggle,
+  
+  // UI preference hooks
+  useUIPreferences,
   useTableRowCount,
-  useThemePreferences,
   
-  // Theme effect utilities
-  useThemeEffect,
-  
-  // Utility functions
-  getThemePreferences,
-  initializeThemePreferences,
-  isValidThemePreferences,
-} from './theme-preferences';
-
-// Re-export theme preference types
-export type {
-  ThemePreferences as ThemePreferencesType,
-  ThemeContextValue,
+  // Theme utility functions
+  themeUtils,
+  getSystemThemePreference,
+  applyThemeToDocument,
 } from './theme-preferences';
 
 // =============================================================================
 // UI State Management
 // =============================================================================
 
-// UI state management replacing Angular PopupService and DFStorageService
+/**
+ * Export UI state management hooks for application interface
+ * Provides popup visibility, onboarding state, and navigation state
+ */
 export {
-  // Storage keys and defaults
-  UI_STORAGE_KEYS,
-  DEFAULT_UI_CONFIG,
+  // Default state constants
   DEFAULT_POPUP_STATE,
+  DEFAULT_ONBOARDING_STATE,
+  DEFAULT_NAVIGATION_STATE,
   
-  // UI state hooks
-  usePasswordPopupState,
-  useFirstTimeUserState,
-  useDialogVisibilityState,
-  useUIState,
+  // UI state management hooks
+  usePopupState,
   useOnboardingState,
-  useUIStateSynchronization,
+  useNavigationState,
+  useUIState,
   
-  // Utility functions
-  isUIFeatureEnabled,
-  getCurrentUIState,
-} from './ui-state';
-
-// Re-export UI state types
-export type {
-  UIStateConfig,
-  PopupVisibilityState,
+  // Specific UI preference hooks
+  useFirstTimeUser,
+  usePasswordPopup,
+  useBreadcrumbs,
+  
+  // UI state utility functions
+  uiStateUtils,
 } from './ui-state';
 
 // =============================================================================
 // Service State Management
 // =============================================================================
 
-// Service selection and navigation state management
+/**
+ * Export service selection and navigation state management
+ * Provides database service tracking and navigation context
+ */
 export {
-  // Core service state hooks
-  useCurrentServiceId,
-  useServiceNavigationState,
+  // Default service state constants
+  DEFAULT_SERVICE_STATE,
+  SERVICE_NAVIGATION_MODES,
+  
+  // Service state management hooks
   useServiceState,
+  useCurrentService,
+  useServiceHistory,
+  useServiceNavigation,
   
-  // Storage utilities
-  serviceIdStorage,
-  serviceNavigationStorage,
-  serviceStatePersistence,
+  // Service selection utilities
+  useServiceSelector,
+  useRecentServices,
   
-  // Constants
-  STORAGE_KEYS as SERVICE_STORAGE_KEYS,
-  
-  // Default export
-  default as serviceStateExports,
-} from './service-state';
-
-// Re-export service state types
-export type {
-  ServiceNavigationState,
-  ServiceState as ServiceStateType,
+  // Service state utility functions
+  serviceStateUtils,
+  validateServiceState,
 } from './service-state';
 
 // =============================================================================
-// Unified Storage Interface
+// Convenience Re-exports and Aliases
 // =============================================================================
 
 /**
- * Unified storage management interface providing centralized access to all storage operations.
- * This class consolidates Angular service patterns into a single, React-compatible interface.
- * 
- * Features:
- * - Type-safe storage operations with automatic JSON serialization
- * - SSR-compatible with Next.js server-side rendering
- * - Cross-tab synchronization for session and preference management
- * - Unified error handling and logging
- * - Migration compatibility with existing Angular service APIs
+ * Create convenient aliases for commonly used functions
+ * Provides backwards compatibility and simplified imports
  */
-export class UnifiedStorageManager {
-  /**
-   * Initialize storage manager with optional configuration
-   * @param config - Storage configuration options
-   */
-  constructor(private config?: {
-    enableLogging?: boolean;
-    enableCrossTabs?: boolean;
-    defaultTTL?: number;
-  }) {}
 
-  /**
-   * Get all current storage states for debugging and development
-   * @returns Complete storage state snapshot
-   */
-  getStorageSnapshot() {
-    return {
-      sessionToken: sessionUtils.getToken(),
-      userSession: sessionUtils.getUserSession(),
-      restrictedAccess: sessionUtils.getRestrictedAccess(),
-      themePreferences: getThemePreferences(),
-      uiState: getCurrentUIState(),
-      currentServiceId: serviceIdStorage.getCurrentServiceId(),
-      storageInfo: Storage.getStorageInfo(),
-    };
-  }
+// Storage operation aliases for common patterns
+export const setItem = localStorage.setItem;
+export const getItem = localStorage.getItem;
+export const removeItem = localStorage.removeItem;
+export const setSessionItem = sessionStorage.setItem;
+export const getSessionItem = sessionStorage.getItem;
+export const removeSessionItem = sessionStorage.removeItem;
+export const setCookie = cookies.setItem;
+export const getCookie = cookies.getItem;
+export const removeCookie = cookies.removeItem;
 
-  /**
-   * Clear all application storage data (logout scenario)
-   * @param preserveTheme - Whether to preserve theme preferences
-   */
-  clearAllStorage(preserveTheme: boolean = false) {
-    // Clear session data
-    sessionUtils.clearAllSessionData();
-    
-    // Clear service state
-    serviceStatePersistence.clearCurrentServiceId();
-    serviceStatePersistence.clearAllNavigationStates();
-    
-    // Clear UI state
-    if (!preserveTheme) {
-      LocalStorage.removeItem(UI_STORAGE_KEYS.UI_PREFERENCES);
-      LocalStorage.removeItem(THEME_STORAGE_KEYS.DARK_MODE);
-      LocalStorage.removeItem(THEME_STORAGE_KEYS.TABLE_ROW_COUNT);
-      LocalStorage.removeItem(THEME_STORAGE_KEYS.SYSTEM_THEME_PREFERENCE);
-    }
-    
-    // Clear popup and dialog states
-    LocalStorage.removeItem(UI_STORAGE_KEYS.SHOW_PASSWORD_POPUP);
-    LocalStorage.removeItem(UI_STORAGE_KEYS.CONFIG_FIRST_TIME_USER);
-    LocalStorage.removeItem(UI_STORAGE_KEYS.DIALOG_VISIBILITY);
-    LocalStorage.removeItem(UI_STORAGE_KEYS.ONBOARDING_STATE);
-    
-    // Clear browser caches
-    Storage.clearAll(['session_token', 'df_session_token']);
-  }
+// Hook aliases for common use cases
+export { useLocalStorage as useStorage };
+export { useSessionStorage as useSession };
+export { useCookies as useCookie };
 
-  /**
-   * Migrate storage data from Angular service format to React format
-   * @param migrationMap - Mapping configuration for data migration
-   */
-  migrateFromAngularServices(migrationMap?: StorageMigrationMap) {
-    if (!isBrowser) return;
-    
-    // Default migration mappings for common Angular service keys
-    const defaultMigrationMap: StorageMigrationMap = {
-      behaviorSubjects: {
-        'isDarkMode': {
-          reactKey: STORAGE_KEYS.IS_DARK_MODE,
-          defaultValue: false,
-        },
-        'currentServiceId': {
-          reactKey: STORAGE_KEYS.CURRENT_SERVICE_ID,
-          defaultValue: -1,
-          transform: (value) => parseInt(value, 10) || -1,
-        },
-        'showPasswordPopup': {
-          reactKey: STORAGE_KEYS.SHOW_PASSWORD_POPUP,
-          defaultValue: false,
-        },
-      },
-      localStorageKeys: {
-        'currentUser': STORAGE_KEYS.CURRENT_USER,
-        'configFirstTimeUser': STORAGE_KEYS.CONFIG_FIRST_TIME_USER,
-      },
-      cookieKeys: {
-        'session_token': STORAGE_KEYS.SESSION_TOKEN,
-      },
-    };
-    
-    const actualMigrationMap = migrationMap || defaultMigrationMap;
-    
-    // Migrate BehaviorSubject values
-    Object.entries(actualMigrationMap.behaviorSubjects).forEach(([oldKey, mapping]) => {
-      const oldValue = LocalStorage.getItem(oldKey, { defaultValue: mapping.defaultValue });
-      if (oldValue.success && oldValue.data !== undefined) {
-        const newValue = mapping.transform ? mapping.transform(oldValue.data) : oldValue.data;
-        LocalStorage.setItem(mapping.reactKey, newValue);
-        LocalStorage.removeItem(oldKey); // Clean up old key
-      }
-    });
-    
-    // Migrate localStorage keys
-    Object.entries(actualMigrationMap.localStorageKeys).forEach(([oldKey, newKey]) => {
-      const oldValue = LocalStorage.getItem(oldKey);
-      if (oldValue.success && oldValue.data !== undefined) {
-        LocalStorage.setItem(newKey, oldValue.data);
-        LocalStorage.removeItem(oldKey); // Clean up old key
-      }
-    });
-    
-    // Migrate cookie keys
-    Object.entries(actualMigrationMap.cookieKeys).forEach(([oldKey, newKey]) => {
-      const oldValue = CookieStorage.getCookie(oldKey);
-      if (oldValue.success && oldValue.data !== undefined) {
-        CookieStorage.setCookie(newKey, oldValue.data);
-        CookieStorage.removeCookie(oldKey); // Clean up old key
-      }
-    });
-  }
-
-  /**
-   * Validate storage integrity and repair corrupted data
-   * @returns Validation report with any issues found and resolved
-   */
-  validateAndRepairStorage() {
-    const issues: string[] = [];
-    const repairs: string[] = [];
-    
-    try {
-      // Validate user session data
-      const userSession = sessionUtils.getUserSession();
-      if (userSession && !isUserSession(userSession)) {
-        sessionUtils.clearUserSession();
-        issues.push('Invalid user session data detected');
-        repairs.push('Cleared corrupted user session');
-      }
-      
-      // Validate theme preferences
-      const themePrefs = getThemePreferences();
-      if (!isValidThemePreferences(themePrefs)) {
-        initializeThemePreferences();
-        issues.push('Invalid theme preferences detected');
-        repairs.push('Reset theme preferences to defaults');
-      }
-      
-      // Validate service ID
-      const serviceId = serviceIdStorage.getCurrentServiceId();
-      if (isNaN(serviceId) || serviceId < -1) {
-        serviceIdStorage.setCurrentServiceId(-1);
-        issues.push('Invalid service ID detected');
-        repairs.push('Reset service ID to default (-1)');
-      }
-      
-      // Clean up expired navigation states
-      serviceStatePersistence.cleanupExpiredStates();
-      repairs.push('Cleaned up expired navigation states');
-      
-    } catch (error) {
-      issues.push(`Storage validation error: ${error}`);
-    }
-    
-    return {
-      hasIssues: issues.length > 0,
-      issues,
-      repairs,
-      timestamp: new Date().toISOString(),
-    };
-  }
-}
-
-// =============================================================================
-// Convenience Exports and Default Interface
-// =============================================================================
-
-/**
- * Pre-configured storage manager instance for immediate use throughout the application
- */
-export const storageManager = new UnifiedStorageManager({
-  enableLogging: process.env.NODE_ENV === 'development',
-  enableCrossTabs: true,
-  defaultTTL: 5 * 60 * 1000, // 5 minutes
-});
-
-/**
- * Collection of commonly used storage operations for quick access
- */
-export const commonStorageOperations = {
-  // Authentication operations
-  authentication: {
-    getToken: () => sessionUtils.getToken(),
-    setToken: (token: string) => sessionUtils.setToken(token),
-    clearToken: () => sessionUtils.clearToken(),
-    getUser: () => sessionUtils.getUserSession(),
-    setUser: (user: UserSession) => sessionUtils.setUserSession(user),
-    clearUser: () => sessionUtils.clearUserSession(),
-    isLoggedIn: () => Boolean(sessionUtils.getToken()),
-  },
-  
-  // Theme operations
-  theme: {
-    isDarkMode: () => getThemePreferences().isDarkMode,
-    toggleDarkMode: () => {
-      const current = getThemePreferences();
-      LocalStorage.setItem(THEME_STORAGE_KEYS.DARK_MODE, !current.isDarkMode);
-    },
-    getTableRowCount: () => getThemePreferences().tableRowCount,
-    setTableRowCount: (count: number) => {
-      LocalStorage.setItem(THEME_STORAGE_KEYS.TABLE_ROW_COUNT, count);
-    },
-  },
-  
-  // Service operations
-  service: {
-    getCurrentServiceId: () => serviceIdStorage.getCurrentServiceId(),
-    setCurrentServiceId: (id: number) => serviceIdStorage.setCurrentServiceId(id),
-    clearCurrentServiceId: () => serviceIdStorage.clearCurrentServiceId(),
-    hasSelectedService: () => serviceIdStorage.getCurrentServiceId() !== -1,
-  },
-  
-  // UI state operations
-  ui: {
-    isFirstTimeUser: () => getCurrentUIState().onboarding.isFirstTimeUser,
-    markOnboardingComplete: () => {
-      LocalStorage.setItem(UI_STORAGE_KEYS.CONFIG_FIRST_TIME_USER, true);
-    },
-    shouldShowPasswordPopup: () => getCurrentUIState().popups.showPasswordPopup,
-    setShowPasswordPopup: (show: boolean) => {
-      LocalStorage.setItem(UI_STORAGE_KEYS.SHOW_PASSWORD_POPUP, show);
-    },
-  },
-};
-
-/**
- * Storage utility functions for external consumption
- */
-export const storageUtilities = {
-  // Environment detection
-  isBrowser,
-  
-  // Storage info
-  getStorageInfo: Storage.getStorageInfo,
-  
-  // Clear operations
-  clearAll: (preserveTheme: boolean = false) => storageManager.clearAllStorage(preserveTheme),
-  
-  // Migration utilities
-  migrateFromAngular: (migrationMap?: StorageMigrationMap) => 
-    storageManager.migrateFromAngularServices(migrationMap),
-  
-  // Validation and repair
-  validateStorage: () => storageManager.validateAndRepairStorage(),
-  
-  // Snapshot for debugging
-  getSnapshot: () => storageManager.getStorageSnapshot(),
-};
-
-/**
- * Default export providing the complete storage interface
- * This serves as the primary entry point for all storage operations
- */
-export default {
-  // Core utilities
-  LocalStorage,
-  SessionStorage,
-  CookieStorage,
-  Storage,
-  storageHelpers,
-  
-  // SSR-safe hooks
+// Migration helpers for Angular to React transition
+export const storageHooks = {
   useLocalStorage,
   useSessionStorage,
   useCookies,
-  useCookieState,
-  useIsHydrated,
-  
-  // User session hooks
   useSessionToken,
-  useUserStorage,
   useUserSession,
-  useAuthState,
-  
-  // Theme hooks
-  useDarkMode,
-  useTableRowCount,
-  useThemePreferences,
-  useThemeEffect,
-  
-  // UI state hooks
-  usePasswordPopupState,
-  useFirstTimeUserState,
-  useDialogVisibilityState,
-  useUIState,
-  useOnboardingState,
-  useUIStateSynchronization,
-  
-  // Service state hooks
+  useThemePreference,
   useCurrentServiceId,
-  useServiceNavigationState,
-  useServiceState,
-  
-  // Management interface
-  UnifiedStorageManager,
-  storageManager,
-  commonStorageOperations,
-  storageUtilities,
-  
-  // Constants
+};
+
+export const storageUtils = {
+  isBrowser,
+  isStorageAvailable,
+  areCookiesAvailable,
+  localStorage,
+  sessionStorage,
+  cookies,
+  getStorageUsage,
+  clearAllStorage,
+  validateStorageIntegrity,
+};
+
+export const authUtils = {
+  SessionTokenManager,
+  UserDataManager,
+  sessionUtils,
+};
+
+// =============================================================================
+// Main Storage Interface
+// =============================================================================
+
+/**
+ * Primary storage interface combining all utilities for single import
+ * This provides a comprehensive API for all storage operations
+ */
+export const dfStorage = {
+  // Type constants
   STORAGE_KEYS,
-  SESSION_STORAGE_KEYS,
-  THEME_STORAGE_KEYS,
-  THEME_DEFAULTS,
-  UI_STORAGE_KEYS,
-  DEFAULT_UI_CONFIG,
+  
+  // Environment detection
+  isBrowser,
+  isStorageAvailable,
+  areCookiesAvailable,
+  
+  // Core storage operations
+  localStorage,
+  sessionStorage,
+  cookies,
+  
+  // React hooks
+  hooks: {
+    useLocalStorage,
+    useSessionStorage,
+    useCookies,
+    useSessionToken,
+    useUserSession,
+    useThemePreference,
+    useCurrentServiceId,
+    useAuthState,
+    useRoleAccess,
+    useThemeManager,
+    useUIPreferences,
+    useServiceState,
+  },
   
   // Utility functions
-  sessionUtils,
-  getThemePreferences,
-  initializeThemePreferences,
-  isUIFeatureEnabled,
-  getCurrentUIState,
-  serviceIdStorage,
-  serviceNavigationStorage,
-  serviceStatePersistence,
+  utils: {
+    getStorageUsage,
+    clearAllStorage,
+    validateStorageIntegrity,
+    getStorageCapabilities,
+    migrationUtils,
+    sessionUtils,
+    themeUtils: {} as any, // Will be populated from theme-preferences
+    uiStateUtils: {} as any, // Will be populated from ui-state
+    serviceStateUtils: {} as any, // Will be populated from service-state
+  },
   
-  // Type guards
-  isUserSession,
-  isStorageKey,
-  isThemeMode,
-  isDatabaseServiceType,
-  isValidThemePreferences,
+  // Session management
+  session: {
+    SessionTokenManager,
+    UserDataManager,
+    config: SESSION_CONFIG,
+    defaultAuthState: DEFAULT_AUTH_STATE,
+  },
+  
+  // Theme management
+  theme: {
+    defaults: DEFAULT_THEME_PREFERENCES,
+    uiDefaults: DEFAULT_UI_PREFERENCES,
+    rowCountOptions: TABLE_ROW_COUNT_OPTIONS,
+  },
+  
+  // Migration helpers
+  migration: {
+    migrateLocalStorageKeys: migrationUtils.migrateLocalStorageKeys,
+    cleanupOldKeys: migrationUtils.cleanupOldKeys,
+  },
 };
+
+// =============================================================================
+// Default Export
+// =============================================================================
+
+/**
+ * Default export provides the complete storage interface
+ * Enables both named imports and default import patterns:
+ * 
+ * import storage from '@/lib/storage'           // Full interface
+ * import { useLocalStorage } from '@/lib/storage'  // Named imports
+ */
+export default dfStorage;
+
+// =============================================================================
+// JSDoc Type Definitions for IDE Support
+// =============================================================================
+
+/**
+ * @typedef {Object} StorageLibrary
+ * @description Main storage library interface providing all storage utilities
+ * 
+ * @property {Object} STORAGE_KEYS - Type-safe storage key constants
+ * @property {Function} isBrowser - Environment detection for browser context
+ * @property {Object} localStorage - Type-safe localStorage utilities  
+ * @property {Object} sessionStorage - Type-safe sessionStorage utilities
+ * @property {Object} cookies - Secure cookie management utilities
+ * @property {Object} hooks - React hooks for storage operations
+ * @property {Object} utils - Utility functions for storage management
+ * @property {Object} session - User session and authentication management
+ * @property {Object} theme - Theme and UI preference management
+ * @property {Object} migration - Migration utilities for Angular transition
+ */
+
+/**
+ * @typedef {Object} StorageHooks
+ * @description React hooks for SSR-safe storage operations
+ * 
+ * @property {Function} useLocalStorage - localStorage hook with SSR support
+ * @property {Function} useSessionStorage - sessionStorage hook with SSR support
+ * @property {Function} useCookies - Cookie management hook with security
+ * @property {Function} useSessionToken - Session token management hook
+ * @property {Function} useUserSession - User session data management hook
+ * @property {Function} useAuthState - Complete authentication state hook
+ * @property {Function} useThemeManager - Theme preference management hook
+ * @property {Function} useServiceState - Service selection state hook
+ */
+
+/**
+ * @typedef {Object} StorageUtils
+ * @description Utility functions for storage operations and debugging
+ * 
+ * @property {Function} getStorageUsage - Calculate storage quota usage
+ * @property {Function} clearAllStorage - Clear all application storage
+ * @property {Function} validateStorageIntegrity - Validate storage consistency
+ * @property {Function} getStorageCapabilities - Check storage availability
+ * @property {Object} migrationUtils - Angular to React migration utilities
+ */
 
 // =============================================================================
 // Module Documentation
 // =============================================================================
 
 /**
- * @example
- * // Basic usage with React hooks
- * import { useUserSession, useThemePreferences, useCurrentServiceId } from '@/lib/storage';
+ * # Storage Library Usage Examples
+ * 
+ * ## Basic Storage Operations
+ * ```typescript
+ * import { localStorage, sessionStorage, cookies } from '@/lib/storage';
+ * 
+ * // Set and get localStorage items with type safety
+ * localStorage.setItem(STORAGE_KEYS.CURRENT_USER, userData);
+ * const user = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+ * 
+ * // Session storage for temporary data
+ * sessionStorage.setItem('tempFormData', formState);
+ * const formData = sessionStorage.getItem('tempFormData');
+ * 
+ * // Secure cookie management
+ * cookies.setItem(STORAGE_KEYS.SESSION_TOKEN, token, {
+ *   secure: true,
+ *   sameSite: 'strict',
+ *   maxAge: 86400, // 24 hours
+ * });
+ * ```
+ * 
+ * ## React Hooks for Components
+ * ```typescript
+ * import { useLocalStorage, useSessionToken, useAuthState } from '@/lib/storage';
  * 
  * function MyComponent() {
- *   const { userSession, isLoggedIn, logout } = useUserSession();
- *   const { isDarkMode, toggleTheme } = useThemePreferences();
- *   const { currentServiceId, setCurrentServiceId } = useCurrentServiceId();
+ *   // SSR-safe localStorage hook
+ *   const [theme, setTheme] = useLocalStorage('theme', { defaultValue: 'light' });
+ *   
+ *   // Session token management
+ *   const { value: token, setValue: setToken } = useSessionToken();
+ *   
+ *   // Complete authentication state
+ *   const { authState, login, logout } = useAuthState();
  *   
  *   return (
- *     <div className={isDarkMode ? 'dark' : 'light'}>
- *       {isLoggedIn ? (
- *         <div>Welcome, {userSession?.name}!</div>
+ *     <div>
+ *       <button onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>
+ *         Toggle Theme
+ *       </button>
+ *       {authState.isLoggedIn ? (
+ *         <button onClick={logout}>Logout</button>
  *       ) : (
- *         <div>Please log in</div>
+ *         <button onClick={() => login({ email, password })}>Login</button>
  *       )}
  *     </div>
  *   );
  * }
+ * ```
  * 
- * @example
- * // Direct storage operations
- * import { storageManager, commonStorageOperations } from '@/lib/storage';
+ * ## Complete Storage Interface
+ * ```typescript
+ * import storage from '@/lib/storage';
  * 
- * // Quick operations
- * if (commonStorageOperations.authentication.isLoggedIn()) {
- *   console.log('User is authenticated');
+ * // Environment detection
+ * if (storage.isBrowser()) {
+ *   // Check storage capabilities
+ *   const capabilities = storage.utils.getStorageCapabilities();
+ *   
+ *   // Get storage usage for monitoring
+ *   const usage = storage.utils.getStorageUsage();
+ *   
+ *   // Validate storage integrity
+ *   const integrity = storage.utils.validateStorageIntegrity();
  * }
  * 
- * // Full storage snapshot for debugging
- * const snapshot = storageManager.getStorageSnapshot();
- * console.log('Current storage state:', snapshot);
+ * // Session management
+ * const tokenManager = storage.session.SessionTokenManager;
+ * const isValid = tokenManager.validateToken();
  * 
- * @example
- * // Migration from Angular services
- * import { storageUtilities } from '@/lib/storage';
+ * // Migration utilities
+ * storage.migration.migrateLocalStorageKeys();
+ * storage.migration.cleanupOldKeys();
+ * ```
  * 
- * // Migrate existing Angular localStorage data
- * storageUtilities.migrateFromAngular();
- * 
- * // Validate and repair any corrupted data
- * const validationReport = storageUtilities.validateStorage();
- * if (validationReport.hasIssues) {
- *   console.warn('Storage issues found and repaired:', validationReport);
+ * ## Error Handling
+ * All storage operations return `StorageResult<T>` objects for safe error handling:
+ * ```typescript
+ * const result = localStorage.setItem('key', 'value');
+ * if (result.success) {
+ *   console.log('Storage successful');
+ * } else {
+ *   console.error('Storage failed:', result.error);
  * }
+ * ```
  */
