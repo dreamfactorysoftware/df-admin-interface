@@ -1,290 +1,285 @@
 /**
- * File Selector Component System
+ * File Selector Component System - Barrel Exports
  * 
- * Centralized barrel export for the file selector component library providing
- * comprehensive file selection, browsing, and upload capabilities.
+ * Centralized export file for the comprehensive file selector component system.
+ * Provides clean import statements and tree-shaking optimized exports for React 19/Next.js 15.1
+ * file selection, upload, and management functionality.
  * 
- * This module exports all file selector components, hooks, and types for
- * seamless integration throughout the DreamFactory Admin Interface.
+ * This barrel export enables clean imports throughout the application:
  * 
- * @module FileSelector
+ * @example
+ * ```typescript
+ * // Import main components
+ * import { FileSelector, FileSelectorDialog } from '@/components/ui/file-selector';
+ * 
+ * // Import hooks
+ * import { useFileApi, useFileSelector } from '@/components/ui/file-selector';
+ * 
+ * // Import types
+ * import type { SelectedFile, FileApiInfo } from '@/components/ui/file-selector';
+ * ```
+ * 
+ * @fileoverview Barrel exports for file selector component system
  * @version 1.0.0
- * @since React 19, Next.js 15.1+
  */
 
 // =============================================================================
-// MAIN COMPONENTS
+// MAIN COMPONENT EXPORTS
 // =============================================================================
 
 /**
- * Primary file selector component for inline file selection workflows.
- * Provides comprehensive file selection functionality with upload capabilities,
- * service integration, and accessibility compliance.
- * 
- * @example
- * ```tsx
- * import { FileSelector } from '@/components/ui/file-selector';
- * 
- * <FileSelector
- *   onFileSelect={(file) => handleFileSelection(file)}
- *   acceptedTypes={['.json', '.xml']}
- *   serviceId="my-service"
- * />
- * ```
- */
-export { default as FileSelector } from './FileSelector';
-
-/**
- * Modal dialog component for file browsing, folder navigation, and file uploads.
- * Implements hierarchical folder navigation, file upload with progress tracking,
- * file type filtering, and service selection in a modal interface.
- * 
- * @example
- * ```tsx
- * import { FileSelectorDialog } from '@/components/ui/file-selector';
- * 
- * <FileSelectorDialog
- *   isOpen={isDialogOpen}
- *   onClose={() => setIsDialogOpen(false)}
- *   onFileSelect={(file) => handleFileSelection(file)}
- *   allowMultiple={true}
- * />
- * ```
- */
-export { default as FileSelectorDialog } from './FileSelectorDialog';
-
-/**
- * Simple folder creation dialog component for inline folder creation workflows.
- * Provides form-based folder creation with validation and error handling.
- * 
- * @example
- * ```tsx
- * import { CreateFolderDialog } from '@/components/ui/file-selector';
- * 
- * <CreateFolderDialog
- *   isOpen={showCreateFolder}
- *   onClose={() => setShowCreateFolder(false)}
- *   onFolderCreate={(folderName) => handleFolderCreation(folderName)}
- *   currentPath="/uploads"
- * />
- * ```
- */
-export { default as CreateFolderDialog } from './CreateFolderDialog';
-
-// =============================================================================
-// REACT HOOKS
-// =============================================================================
-
-/**
- * React hook providing all file API operations including service discovery,
- * file listing, upload functionality, and directory creation.
- * Uses React Query for intelligent caching, error handling, and background synchronization.
- * 
- * @example
- * ```tsx
- * import { useFileApi } from '@/components/ui/file-selector';
- * 
- * const {
- *   services,
- *   listFiles,
- *   uploadFile,
- *   createFolder,
- *   isLoading,
- *   error
- * } = useFileApi();
- * ```
- */
-export { useFileApi } from './hooks/useFileApi';
-
-/**
- * React hook managing file selector component state including selected files,
- * navigation history, loading states, and user interactions.
- * Provides stateful file selection logic with folder navigation and validation.
- * 
- * @example
- * ```tsx
- * import { useFileSelector } from '@/components/ui/file-selector';
- * 
- * const {
- *   selectedFiles,
- *   currentPath,
- *   isLoading,
- *   selectFile,
- *   navigateToFolder,
- *   goBack
- * } = useFileSelector({
- *   allowMultiple: true,
- *   acceptedTypes: ['.pdf', '.doc']
- * });
- * ```
- */
-export { useFileSelector } from './hooks/useFileSelector';
-
-// =============================================================================
-// TYPESCRIPT TYPES & INTERFACES
-// =============================================================================
-
-/**
- * Core file selector component types and interfaces.
- * Provides comprehensive type definitions for file metadata, selection state,
- * API responses, and component configuration.
- */
-export type {
-  /**
-   * Configuration object for file API service information.
-   * Contains service metadata, connection details, and capabilities.
-   */
-  FileApiInfo,
-  
-  /**
-   * Represents a selected file with metadata and selection state.
-   * Used throughout the file selector component system for file tracking.
-   */
-  SelectedFile,
-  
-  /**
-   * Comprehensive file metadata interface including system properties,
-   * permissions, and additional attributes for file management.
-   */
-  FileMetadata,
-  
-  /**
-   * Directory metadata interface for folder representations
-   * including nested structure and permission information.
-   */
-  DirectoryMetadata,
-  
-  /**
-   * File upload progress tracking interface with cancellation support.
-   * Provides real-time upload status and control mechanisms.
-   */
-  FileUploadProgress,
-  
-  /**
-   * File selector component configuration options.
-   * Defines component behavior, validation rules, and UI preferences.
-   */
-  FileSelectorProps,
-  
-  /**
-   * File selector dialog component configuration options.
-   * Extends base selector props with modal-specific settings.
-   */
-  FileSelectorDialogProps,
-  
-  /**
-   * Create folder dialog component configuration options.
-   * Defines folder creation workflow parameters and validation.
-   */
-  CreateFolderDialogProps,
-  
-  /**
-   * File API hook configuration and return types.
-   * Provides type safety for all file operation methods and state.
-   */
-  UseFileApiOptions,
-  UseFileApiReturn,
-  
-  /**
-   * File selector hook configuration and return types.
-   * Ensures type safety for component state management and interactions.
-   */
-  UseFileSelectorOptions,
-  UseFileSelectorReturn,
-  
-  /**
-   * File filter configuration for restricting selectable files.
-   * Supports extension-based, MIME type, and size-based filtering.
-   */
-  FileFilter,
-  
-  /**
-   * File service configuration for different storage backends.
-   * Supports local, cloud, and custom storage service integration.
-   */
-  FileServiceConfig,
-  
-  /**
-   * Error interfaces for comprehensive file operation error handling.
-   * Provides structured error information for user feedback.
-   */
-  FileApiError,
-  FileUploadError,
-  FileSelectorError,
-} from './types';
-
-// =============================================================================
-// VALIDATION SCHEMAS
-// =============================================================================
-
-/**
- * Zod validation schemas for runtime type checking and form validation.
- * Ensures data integrity and provides developer-friendly error messages.
+ * Core file selector components
+ * Export both named and default exports for flexible usage patterns
  */
 export {
-  /**
-   * Validation schema for file metadata objects.
-   * Ensures file information conforms to expected structure.
-   */
-  FileMetadataSchema,
-  
-  /**
-   * Validation schema for directory metadata objects.
-   * Validates folder structure and permission information.
-   */
-  DirectoryMetadataSchema,
-  
-  /**
-   * Validation schema for file API service configuration.
-   * Validates service connection parameters and capabilities.
-   */
-  FileApiInfoSchema,
-  
-  /**
-   * Validation schema for file selector component props.
-   * Ensures component configuration is valid and complete.
-   */
-  FileSelectorPropsSchema,
-  
-  /**
-   * Validation schema for file upload progress tracking.
-   * Validates upload status and progress information.
-   */
-  FileUploadProgressSchema,
-} from './types';
+  FileSelector,
+  CompactFileSelector,
+  UploadFileSelector,
+  default as DefaultFileSelector,
+} from './FileSelector';
+
+export {
+  FileSelectorDialog,
+  default as DefaultFileSelectorDialog,
+} from './FileSelectorDialog';
+
+export {
+  CreateFolderDialog,
+  default as DefaultCreateFolderDialog,
+} from './CreateFolderDialog';
 
 // =============================================================================
-// UTILITY EXPORTS
+// HOOK EXPORTS
 // =============================================================================
 
 /**
- * Re-export hooks barrel for convenience.
- * Provides access to all file selector hooks through a single import.
- * 
- * @example
- * ```tsx
- * import * as FileHooks from '@/components/ui/file-selector/hooks';
- * // or
- * import { useFileApi, useFileSelector } from '@/components/ui/file-selector/hooks';
- * ```
+ * File API operation hooks
+ * Provides React Query integration for file operations
  */
-export * from './hooks';
+export {
+  useFileApi,
+  useFileList,
+  useFileUpload,
+  FILE_API_QUERY_KEYS,
+} from './hooks/useFileApi';
+
+/**
+ * File selector state management hooks
+ * Provides comprehensive state management for file selection workflows
+ */
+export {
+  useFileSelector,
+  useFileSelectorNavigation,
+  useFileValidation,
+  default as defaultUseFileSelector,
+} from './hooks/useFileSelector';
+
+// =============================================================================
+// TYPE EXPORTS
+// =============================================================================
+
+/**
+ * Core data interfaces for file operations
+ * Essential types for file handling and API integration
+ */
+export type {
+  FileApiInfo,
+  SelectedFile,
+  FileItem,
+  FileMetadata,
+  FileUploadProgress,
+  FileOperationResult,
+  ApiResponse,
+} from './types';
+
+/**
+ * Component prop interfaces
+ * TypeScript interfaces for component configuration and usage
+ */
+export type {
+  FileSelectorProps,
+  FileSelectorDialogProps,
+  FileSelectorDialogData,
+  CreateFolderDialogProps,
+} from './types';
+
+/**
+ * Hook interfaces and return types
+ * TypeScript interfaces for hook usage and return values
+ */
+export type {
+  UseFileApiReturn,
+  UseFileSelectorReturn,
+  FileValidationOptions,
+  PaginationOptions,
+} from './types';
+
+/**
+ * Error handling types
+ * Comprehensive error types for file operations
+ */
+export type {
+  FileError,
+  FileErrorType,
+} from './types';
+
+/**
+ * Utility and configuration types
+ * Additional types for advanced usage and configuration
+ */
+export type {
+  FileSizeFormatOptions,
+} from './types';
+
+// =============================================================================
+// VALIDATION SCHEMA EXPORTS
+// =============================================================================
+
+/**
+ * Zod validation schemas for runtime type checking
+ * Exported for external validation needs and form integration
+ */
+export {
+  FileApiInfoSchema,
+  SelectedFileSchema,
+  FileMetadataSchema,
+  FileItemSchema,
+  FileUploadProgressSchema,
+  FileOperationResultSchema,
+  FileSelectorDialogDataSchema,
+  FileErrorSchema,
+  FileValidationOptionsSchema,
+  ApiResponseSchema,
+  PaginationOptionsSchema,
+} from './types';
+
+// =============================================================================
+// TYPE GUARD EXPORTS
+// =============================================================================
+
+/**
+ * Runtime type checking utilities
+ * Type guards for validating object structures at runtime
+ */
+export {
+  isFileApiInfo,
+  isSelectedFile,
+  isFileItem,
+  isFileError,
+} from './types';
+
+// =============================================================================
+// COMPONENT VARIANT EXPORTS
+// =============================================================================
+
+/**
+ * Re-export component variants for direct access
+ * Enables specific component variant imports for optimized bundle size
+ */
+export { CompactFileSelector as FileSelector_Compact } from './FileSelector';
+export { UploadFileSelector as FileSelector_Upload } from './FileSelector';
+
+// =============================================================================
+// FORM DATA EXPORTS
+// =============================================================================
+
+/**
+ * Form data types from individual components
+ * Exported for React Hook Form integration and external form handling
+ */
+export type { CreateFolderFormData } from './CreateFolderDialog';
 
 // =============================================================================
 // DEFAULT EXPORT
 // =============================================================================
 
 /**
- * Default export provides the main FileSelector component for convenience.
- * Enables both named and default import patterns for flexible usage.
- * 
- * @example
- * ```tsx
- * // Named import (recommended)
- * import { FileSelector } from '@/components/ui/file-selector';
- * 
- * // Default import (alternative)
- * import FileSelector from '@/components/ui/file-selector';
- * ```
+ * Default export for primary component
+ * Enables default import syntax: import FileSelector from '@/components/ui/file-selector'
  */
-export { default } from './FileSelector';
+export { FileSelector as default } from './FileSelector';
+
+// =============================================================================
+// UTILITY CONSTANTS
+// =============================================================================
+
+/**
+ * Query key constants for React Query cache management
+ * Exported for external cache invalidation and management
+ */
+export { FILE_API_QUERY_KEYS } from './hooks/useFileApi';
+
+// =============================================================================
+// DOCUMENTATION EXPORTS
+// =============================================================================
+
+/**
+ * Component documentation interfaces
+ * These exports provide TypeScript IntelliSense support and documentation
+ * for component props, helping developers understand available options.
+ */
+
+/**
+ * @namespace FileSelectorComponents
+ * @description Collection of file selector components for different use cases
+ * 
+ * @component FileSelector - Main file selector with full functionality
+ * @component CompactFileSelector - Minimal file selector for forms
+ * @component UploadFileSelector - Upload-focused file selector
+ * @component FileSelectorDialog - Modal dialog for file selection
+ * @component CreateFolderDialog - Dialog for creating new folders
+ */
+
+/**
+ * @namespace FileSelectorHooks
+ * @description React hooks for file operations and state management
+ * 
+ * @hook useFileApi - File API operations with React Query
+ * @hook useFileSelector - File selector state management
+ * @hook useFileList - File listing with automatic caching
+ * @hook useFileUpload - File upload with progress tracking
+ * @hook useFileSelectorNavigation - Navigation state management
+ * @hook useFileValidation - File validation utilities
+ */
+
+/**
+ * @namespace FileSelectorTypes
+ * @description TypeScript interfaces and types for file operations
+ * 
+ * @interface FileApiInfo - File service configuration
+ * @interface SelectedFile - Selected file information
+ * @interface FileItem - File or folder item in listings
+ * @interface FileUploadProgress - Upload progress tracking
+ * @interface FileError - Error handling structure
+ */
+
+// =============================================================================
+// VERSION INFORMATION
+// =============================================================================
+
+/**
+ * Component version information
+ * Used for debugging and compatibility checking
+ */
+export const FILE_SELECTOR_VERSION = '1.0.0';
+
+/**
+ * Migration information
+ * Indicates source Angular component for reference
+ */
+export const MIGRATION_SOURCE = 'df-file-selector.component.ts';
+
+/**
+ * Feature compatibility matrix
+ * Documents React 19 and Next.js 15.1 feature usage
+ */
+export const FEATURE_COMPATIBILITY = {
+  react: '19.0.0',
+  nextjs: '15.1.0',
+  typescript: '5.8.0',
+  tailwind: '4.1.0',
+  reactQuery: '5.0.0',
+  reactHookForm: '7.52.0',
+  headlessUI: '2.0.0',
+  zod: '3.22.0',
+} as const;
