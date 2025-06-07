@@ -1,1368 +1,1553 @@
 /**
- * File Selector Dialog Component
+ * FileSelectorDialog Component
  * 
- * A comprehensive modal dialog component for file browsing, folder navigation, and file uploads.
- * Migrated from Angular df-file-selector-dialog.component to React with enhanced functionality
- * including virtual scrolling, drag-and-drop upload, keyboard navigation, and accessibility features.
+ * Comprehensive modal dialog for file browsing, folder navigation, and file uploads.
+ * Migrated from Angular df-file-selector-dialog.component to React with enhanced
+ * functionality including virtual scrolling, drag-and-drop, progress tracking,
+ * and extensive accessibility support.
  * 
- * Key Features:
- * - Headless UI Dialog for accessibility compliance (WCAG 2.1 AA)
- * - React Query integration for intelligent file API caching
- * - Virtual scrolling for handling large directories (1000+ files)
- * - Drag-and-drop file upload with progress tracking and cancellation
- * - Comprehensive keyboard navigation support
- * - Responsive design optimized for mobile file selection
- * - Real-time file type validation and filtering
- * - Multi-service file API support
+ * Features:
+ * - Headless UI Dialog with proper focus management and accessibility (WCAG 2.1 AA)
+ * - React Query integration for intelligent caching and file operations
+ * - Virtual scrolling for handling large file directories (1000+ files)
+ * - File upload with real-time progress tracking and cancellation support
+ * - Drag-and-drop file upload with visual feedback and validation
+ * - Keyboard navigation support for all interactive elements
+ * - Responsive design optimized for mobile and desktop workflows
+ * - Integration with DreamFactory file service APIs with error handling
+ * - Support for multiple file formats and configurable restrictions
+ * - Comprehensive file filtering, sorting, and search capabilities
+ * - Batch file operations with progress tracking
  * 
- * @fileoverview Modal dialog for comprehensive file management and selection
+ * @fileoverview Modal dialog component for comprehensive file management
  * @version 1.0.0
+ * @migrated_from src/app/shared/components/df-file-selector-dialog/df-file-selector-dialog.component.ts
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
 'use client';
 
 import React, { 
-  useCallback, 
+  useState, 
   useEffect, 
   useRef, 
-  useState, 
+  useCallback, 
   useMemo,
-  useId,
-  forwardRef
+  Fragment,
+  KeyboardEvent,
+  DragEvent,
+  ChangeEvent
 } from 'react';
-import { useForm, type SubmitHandler } from 'react-hook-form';
+import { 
+  Dialog, 
+  DialogPanel, 
+  DialogTitle, 
+  DialogBackdrop,
+  Disclosure,
+  DisclosureButton,
+  DisclosurePanel,
+  Transition
+} from '@headlessui/react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
-import { 
-  FolderIcon,
-  FolderOpenIcon,
-  DocumentIcon,
-  ArrowLeftIcon,
-  CloudArrowUpIcon,
-  PlusIcon,
+
+// Icons from Heroicons
+import {
   XMarkIcon,
+  DocumentIcon,
+  FolderIcon,
+  PhotoIcon,
+  VideoIcon,
+  MusicalNoteIcon,
+  ArchiveBoxIcon,
+  CodeBracketIcon,
+  DocumentTextIcon,
+  ChevronRightIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
   MagnifyingGlassIcon,
+  AdjustmentsHorizontalIcon,
+  ArrowUpTrayIcon,
+  PlusIcon,
+  TrashIcon,
+  ArrowPathIcon,
+  HomeIcon,
+  CloudArrowUpIcon,
   ExclamationTriangleIcon,
   CheckCircleIcon,
   InformationCircleIcon,
-  ChevronRightIcon,
-  Bars3Icon,
-  ListBulletIcon,
-  PhotoIcon,
-  ChevronDownIcon,
-  ChevronUpIcon
+  EyeIcon,
+  FolderPlusIcon,
+  Bars3BottomLeftIcon,
+  ViewColumnsIcon,
+  TableCellsIcon,
+  ListBulletIcon
 } from '@heroicons/react/24/outline';
-import { 
-  CheckCircleIcon as CheckCircleIconSolid,
-  FolderIcon as FolderIconSolid
+
+import {
+  DocumentIcon as DocumentIconSolid,
+  FolderIcon as FolderIconSolid,
+  PhotoIcon as PhotoIconSolid,
+  VideoIcon as VideoIconSolid,
+  MusicalNoteIcon as MusicalNoteIconSolid,
+  ArchiveBoxIcon as ArchiveBoxIconSolid,
+  CodeBracketIcon as CodeBracketIconSolid,
+  DocumentTextIcon as DocumentTextIconSolid
 } from '@heroicons/react/24/solid';
-import { 
-  type FileApiInfo,
-  type SelectedFile,
-  type FileItem,
-  type FileSelectorDialogProps,
-  type FileSelectorDialogData,
-  type FileUploadProgress,
-  type FileOperationResult,
-  FileErrorSchema,
-  type FileError
+
+// Internal imports
+import { cn } from '../../../lib/utils';
+import { useFileApi, useFileList } from './hooks/useFileApi';
+import { CreateFolderDialog, useCreateFolderDialog } from './CreateFolderDialog';
+import type {
+  FileMetadata,
+  SelectedFile,
+  FileApiInfo,
+  FileSelectorComponent,
+  FileValidationResult,
+  FileUploadError,
+  FileBrowserViewMode,
+  FileType,
+  FileSortField,
+  UploadState,
+  FileEventHandlers,
+  FileFilter
 } from './types';
-import { CreateFolderDialog } from './CreateFolderDialog';
 
-// =============================================================================
-// VALIDATION SCHEMAS & TYPES
-// =============================================================================
+// ============================================================================
+// VALIDATION SCHEMAS AND CONSTANTS
+// ============================================================================
 
 /**
- * File filter validation schema
+ * Search form validation schema
  */
-const fileFilterSchema = z.object({
-  searchTerm: z.string().optional(),
-  fileType: z.enum(['all', 'files', 'folders']).default('all'),
-  sortBy: z.enum(['name', 'type', 'size', 'lastModified']).default('name'),
-  sortDirection: z.enum(['asc', 'desc']).default('asc'),
+const searchFormSchema = z.object({
+  query: z.string().max(100, 'Search query too long'),
+  includeHidden: z.boolean().default(false),
+  fileTypeFilter: z.string().optional(),
 });
 
-type FileFilterData = z.infer<typeof fileFilterSchema>;
+type SearchFormData = z.infer<typeof searchFormSchema>;
 
 /**
- * Upload validation schema
+ * File upload form validation schema
  */
-const uploadValidationSchema = z.object({
+const uploadFormSchema = z.object({
   files: z.array(z.instanceof(File)).min(1, 'At least one file is required'),
-  overwriteExisting: z.boolean().default(false),
+  overwrite: z.boolean().default(false),
+  generateThumbnails: z.boolean().default(true),
+  extractMetadata: z.boolean().default(true),
 });
 
-type UploadValidationData = z.infer<typeof uploadValidationSchema>;
+type UploadFormData = z.infer<typeof uploadFormSchema>;
 
-// =============================================================================
-// CONSTANTS & CONFIGURATION
-// =============================================================================
-
+/**
+ * Constants for component configuration
+ */
 const VIRTUAL_ITEM_HEIGHT = 48; // Height of each file item in pixels
-const VIRTUAL_OVERSCAN = 10; // Number of items to render outside visible area
-const DRAG_DROP_ACCEPT_TYPES = {
-  'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'],
-  'text/*': ['.txt', '.json', '.xml', '.csv', '.log'],
-  'application/*': ['.pdf', '.zip', '.tar', '.gz'],
-  '.pem': ['.pem'],
-  '.p8': ['.p8'],
-  '.key': ['.key'],
-} as const;
-
-const FILE_SIZE_LIMITS = {
-  default: 50 * 1024 * 1024, // 50MB
-  image: 10 * 1024 * 1024,   // 10MB for images
-  document: 25 * 1024 * 1024, // 25MB for documents
-} as const;
-
-const BREADCRUMB_MAX_ITEMS = 5; // Maximum breadcrumb items before truncation
-
-// =============================================================================
-// HELPER COMPONENTS
-// =============================================================================
+const VIRTUAL_OVERSCAN = 5; // Number of items to render outside visible area
+const MAX_SEARCH_RESULTS = 500; // Maximum search results to display
+const DEBOUNCE_DELAY = 300; // Search input debounce delay in ms
+const DRAG_DROP_TIMEOUT = 3000; // Drag feedback timeout in ms
 
 /**
- * File icon component with type-based rendering
+ * File type icon mapping for visual representation
  */
-const FileIcon = React.memo(({ 
-  file, 
-  className = "h-5 w-5",
-  selected = false 
-}: { 
-  file: FileItem; 
+const FILE_TYPE_ICONS: Record<FileType, React.ComponentType<{ className?: string }>> = {
+  image: PhotoIcon,
+  video: VideoIcon,
+  audio: MusicalNoteIcon,
+  document: DocumentIcon,
+  spreadsheet: DocumentIcon,
+  presentation: DocumentIcon,
+  archive: ArchiveBoxIcon,
+  code: CodeBracketIcon,
+  text: DocumentTextIcon,
+  pdf: DocumentIcon,
+  executable: DocumentIcon,
+  font: DocumentTextIcon,
+  other: DocumentIcon,
+} as const;
+
+/**
+ * File type solid icon mapping for visual representation
+ */
+const FILE_TYPE_ICONS_SOLID: Record<FileType, React.ComponentType<{ className?: string }>> = {
+  image: PhotoIconSolid,
+  video: VideoIconSolid,
+  audio: MusicalNoteIconSolid,
+  document: DocumentIconSolid,
+  spreadsheet: DocumentIconSolid,
+  presentation: DocumentIconSolid,
+  archive: ArchiveBoxIconSolid,
+  code: CodeBracketIconSolid,
+  text: DocumentTextIconSolid,
+  pdf: DocumentIconSolid,
+  executable: DocumentIconSolid,
+  font: DocumentTextIconSolid,
+  other: DocumentIconSolid,
+} as const;
+
+/**
+ * View mode configurations
+ */
+const VIEW_MODE_CONFIG = {
+  grid: { icon: ViewColumnsIcon, label: 'Grid View', itemHeight: 120 },
+  list: { icon: ListBulletIcon, label: 'List View', itemHeight: 48 },
+  table: { icon: TableCellsIcon, label: 'Table View', itemHeight: 40 },
+  tiles: { icon: Bars3BottomLeftIcon, label: 'Tiles View', itemHeight: 80 },
+} as const;
+
+// ============================================================================
+// COMPONENT INTERFACES
+// ============================================================================
+
+/**
+ * Props interface for FileSelectorDialog component
+ */
+export interface FileSelectorDialogProps extends Omit<FileSelectorComponent, 'selectedFiles' | 'onSelectionChange'> {
+  /** Whether the dialog is open */
+  open: boolean;
+  
+  /** Function called when dialog should close */
+  onClose: () => void;
+  
+  /** Function called when file selection is confirmed */
+  onConfirm: (files: SelectedFile[]) => void;
+  
+  /** Initial file selection */
+  initialSelection?: SelectedFile[];
+  
+  /** Custom CSS class for styling */
   className?: string;
-  selected?: boolean;
-}) => {
-  const iconClass = `${className} ${
-    file.type === 'folder' 
-      ? (selected ? 'text-blue-600 dark:text-blue-400' : 'text-blue-500 dark:text-blue-400')
-      : (selected ? 'text-gray-700 dark:text-gray-200' : 'text-gray-600 dark:text-gray-400')
-  }`;
-
-  if (file.type === 'folder') {
-    return selected ? (
-      <FolderOpenIcon className={iconClass} aria-hidden="true" />
-    ) : (
-      <FolderIcon className={iconClass} aria-hidden="true" />
-    );
-  }
-
-  // Determine file type based on extension or content type
-  const extension = file.name.toLowerCase().split('.').pop();
-  const isImage = file.contentType?.startsWith('image/') || 
-    ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension || '');
-
-  if (isImage) {
-    return <PhotoIcon className={iconClass} aria-hidden="true" />;
-  }
-
-  return <DocumentIcon className={iconClass} aria-hidden="true" />;
-});
-
-FileIcon.displayName = 'FileIcon';
+  
+  /** Test identifier for component testing */
+  'data-testid'?: string;
+  
+  /** Dialog title override */
+  title?: string;
+  
+  /** Dialog description */
+  description?: string;
+  
+  /** Custom confirm button text */
+  confirmText?: string;
+  
+  /** Custom cancel button text */
+  cancelText?: string;
+}
 
 /**
- * Breadcrumb navigation component
+ * Internal state interface for file browser
  */
-const BreadcrumbNavigation = React.memo(({ 
-  currentPath, 
-  serviceName, 
-  onNavigate,
-  className = ""
-}: {
+interface FileBrowserState {
   currentPath: string;
-  serviceName: string;
-  onNavigate: (path: string) => void;
-  className?: string;
-}) => {
-  const pathSegments = useMemo(() => {
-    if (!currentPath) return [];
-    return currentPath.split('/').filter(Boolean);
-  }, [currentPath]);
-
-  const breadcrumbs = useMemo(() => {
-    const items = [
-      { name: serviceName, path: '', isRoot: true }
-    ];
-
-    let currentSegmentPath = '';
-    for (const segment of pathSegments) {
-      currentSegmentPath = currentSegmentPath ? `${currentSegmentPath}/${segment}` : segment;
-      items.push({
-        name: segment,
-        path: currentSegmentPath,
-        isRoot: false
-      });
-    }
-
-    // Truncate if too many items
-    if (items.length > BREADCRUMB_MAX_ITEMS) {
-      return [
-        items[0], // Always show root
-        { name: '...', path: '', isEllipsis: true },
-        ...items.slice(-(BREADCRUMB_MAX_ITEMS - 2))
-      ];
-    }
-
-    return items;
-  }, [serviceName, pathSegments]);
-
-  return (
-    <nav className={`flex items-center space-x-1 text-sm ${className}`} aria-label="Breadcrumb">
-      <ol className="flex items-center space-x-1">
-        {breadcrumbs.map((item, index) => (
-          <li key={`${item.path}-${index}`} className="flex items-center">
-            {index > 0 && (
-              <ChevronRightIcon 
-                className="h-4 w-4 text-gray-400 dark:text-gray-500 mx-1" 
-                aria-hidden="true" 
-              />
-            )}
-            {item.isEllipsis ? (
-              <span className="text-gray-500 dark:text-gray-400">...</span>
-            ) : (
-              <button
-                type="button"
-                onClick={() => onNavigate(item.path)}
-                className={`font-medium transition-colors hover:text-primary-600 dark:hover:text-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 rounded-sm px-1 py-0.5 ${
-                  index === breadcrumbs.length - 1
-                    ? 'text-gray-900 dark:text-gray-100'
-                    : 'text-gray-600 dark:text-gray-400'
-                }`}
-                aria-current={index === breadcrumbs.length - 1 ? 'page' : undefined}
-              >
-                {item.name}
-              </button>
-            )}
-          </li>
-        ))}
-      </ol>
-    </nav>
-  );
-});
-
-BreadcrumbNavigation.displayName = 'BreadcrumbNavigation';
-
-/**
- * File upload progress component
- */
-const UploadProgressIndicator = React.memo(({ 
-  progress,
-  onCancel 
-}: {
-  progress: FileUploadProgress;
-  onCancel?: () => void;
-}) => {
-  const progressPercentage = Math.round(progress.progress);
-  const speedMBps = progress.speed ? (progress.speed / 1024 / 1024).toFixed(1) : '0';
-  const remainingTime = progress.timeRemaining 
-    ? `${Math.ceil(progress.timeRemaining)}s remaining`
-    : '';
-
-  return (
-    <div className="w-full p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center space-x-3">
-          <CloudArrowUpIcon className="h-5 w-5 text-blue-500" aria-hidden="true" />
-          <div>
-            <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
-              Uploading {progress.file.name}
-            </p>
-            <p className="text-xs text-blue-600 dark:text-blue-300">
-              {speedMBps} MB/s • {remainingTime}
-            </p>
-          </div>
-        </div>
-        {onCancel && progress.status === 'uploading' && (
-          <button
-            type="button"
-            onClick={onCancel}
-            className="p-1 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 transition-colors"
-            aria-label="Cancel upload"
-          >
-            <XMarkIcon className="h-4 w-4" aria-hidden="true" />
-          </button>
-        )}
-      </div>
-      
-      <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2 mb-2">
-        <div
-          className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
-          style={{ width: `${progressPercentage}%` }}
-          role="progressbar"
-          aria-valuenow={progressPercentage}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-label={`Upload progress: ${progressPercentage}%`}
-        />
-      </div>
-      
-      <div className="flex justify-between text-xs text-blue-600 dark:text-blue-300">
-        <span>{progressPercentage}% complete</span>
-        <span>
-          {(progress.bytesUploaded / 1024 / 1024).toFixed(1)} MB / {(progress.totalBytes / 1024 / 1024).toFixed(1)} MB
-        </span>
-      </div>
-    </div>
-  );
-});
-
-UploadProgressIndicator.displayName = 'UploadProgressIndicator';
-
-// =============================================================================
-// CUSTOM HOOKS
-// =============================================================================
-
-/**
- * Custom hook for file API operations with caching
- */
-function useFileApi() {
-  const queryClient = useQueryClient();
-
-  // File listing query
-  const createFileListingQuery = useCallback((serviceName: string, path: string) => ({
-    queryKey: ['files', serviceName, path],
-    queryFn: async (): Promise<FileItem[]> => {
-      try {
-        // This would be replaced with actual API call
-        // For now, return mock data to demonstrate structure
-        const mockFiles: FileItem[] = [
-          {
-            name: 'documents',
-            path: path ? `${path}/documents` : 'documents',
-            type: 'folder' as const,
-            lastModified: new Date().toISOString(),
-            selectable: true,
-          },
-          {
-            name: 'config.json',
-            path: path ? `${path}/config.json` : 'config.json',
-            type: 'file' as const,
-            contentType: 'application/json',
-            size: 1024,
-            lastModified: new Date().toISOString(),
-            selectable: true,
-          }
-        ];
-        
-        return mockFiles;
-      } catch (error) {
-        console.error('Failed to fetch files:', error);
-        throw error;
-      }
-    },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 10 * 60 * 1000, // 10 minutes
-    retry: (failureCount, error: any) => {
-      if (error?.status === 404 || error?.status === 403) {
-        return false; // Don't retry for these errors
-      }
-      return failureCount < 3;
-    },
-  }), []);
-
-  // File upload mutation
-  const uploadFileMutation = useMutation({
-    mutationFn: async ({ 
-      serviceName, 
-      file, 
-      path,
-      onProgress 
-    }: {
-      serviceName: string;
-      file: File;
-      path: string;
-      onProgress?: (progress: number) => void;
-    }): Promise<SelectedFile> => {
-      // Mock upload implementation - replace with actual API call
-      return new Promise((resolve) => {
-        let progress = 0;
-        const interval = setInterval(() => {
-          progress += Math.random() * 20;
-          if (progress >= 100) {
-            progress = 100;
-            clearInterval(interval);
-            onProgress?.(progress);
-            
-            // Return mock uploaded file result
-            resolve({
-              path: `/opt/dreamfactory/storage/app/${path ? `${path}/` : ''}${file.name}`,
-              relativePath: path ? `${path}/${file.name}` : file.name,
-              fileName: file.name,
-              name: file.name,
-              serviceId: 1, // Mock service ID
-              serviceName: serviceName,
-              size: file.size,
-              contentType: file.type,
-              lastModified: new Date().toISOString(),
-            });
-          } else {
-            onProgress?.(progress);
-          }
-        }, 100);
-      });
-    },
-    onSuccess: (data, variables) => {
-      // Invalidate file listings to refresh the view
-      queryClient.invalidateQueries({
-        queryKey: ['files', variables.serviceName, variables.path]
-      });
-    },
-  });
-
-  // Folder creation mutation
-  const createFolderMutation = useMutation({
-    mutationFn: async ({ 
-      serviceName, 
-      path, 
-      folderName 
-    }: {
-      serviceName: string;
-      path: string;
-      folderName: string;
-    }): Promise<void> => {
-      // Mock folder creation - replace with actual API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-    },
-    onSuccess: (data, variables) => {
-      // Invalidate file listings to refresh the view
-      queryClient.invalidateQueries({
-        queryKey: ['files', variables.serviceName, variables.path]
-      });
-    },
-  });
-
-  return {
-    createFileListingQuery,
-    uploadFile: uploadFileMutation.mutate,
-    createFolder: createFolderMutation.mutate,
-    isUploading: uploadFileMutation.isPending,
-    isCreatingFolder: createFolderMutation.isPending,
-    uploadError: uploadFileMutation.error,
-    createFolderError: createFolderMutation.error,
-  };
+  selectedService: string;
+  viewMode: FileBrowserViewMode;
+  sortField: FileSortField;
+  sortDirection: 'asc' | 'desc';
+  selectedFiles: Set<string>;
+  searchQuery: string;
+  showHiddenFiles: boolean;
+  activeFilters: string[];
+  uploadProgress: Map<string, number>;
+  dragActive: boolean;
+  previewFile: FileMetadata | null;
 }
 
 /**
- * Custom hook for drag and drop functionality
+ * File operation status interface
  */
-function useDragAndDrop({
-  onFilesDropped,
-  allowedExtensions,
-  maxFileSize,
-  multiple = false,
-}: {
-  onFilesDropped: (files: File[]) => void;
-  allowedExtensions: string[];
-  maxFileSize?: number;
-  multiple?: boolean;
-}) {
-  const [isDragOver, setIsDragOver] = useState(false);
-  const [dragCounter, setDragCounter] = useState(0);
+interface FileOperationStatus {
+  type: 'upload' | 'delete' | 'create' | 'move' | 'copy';
+  status: 'pending' | 'progress' | 'success' | 'error';
+  message: string;
+  progress?: number;
+  file?: string;
+}
 
-  const validateFiles = useCallback((files: File[]): { valid: File[]; errors: string[] } => {
-    const errors: string[] = [];
-    const valid: File[] = [];
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
 
-    for (const file of files) {
-      // Check file extension
-      const extension = '.' + file.name.split('.').pop()?.toLowerCase();
-      if (!allowedExtensions.includes(extension)) {
-        errors.push(`${file.name}: File type not allowed (${extension})`);
-        continue;
-      }
+/**
+ * Get file type from metadata
+ */
+function getFileType(file: FileMetadata): FileType {
+  if (file.isDirectory) return 'other';
+  if (file.type) return file.type;
+  
+  // Fallback to extension-based detection
+  const ext = file.extension.toLowerCase();
+  
+  if (['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.svg', '.webp'].includes(ext)) return 'image';
+  if (['.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.mkv'].includes(ext)) return 'video';
+  if (['.mp3', '.wav', '.flac', '.aac', '.ogg', '.wma'].includes(ext)) return 'audio';
+  if (['.pdf'].includes(ext)) return 'pdf';
+  if (['.doc', '.docx', '.odt', '.rtf'].includes(ext)) return 'document';
+  if (['.xls', '.xlsx', '.ods', '.csv'].includes(ext)) return 'spreadsheet';
+  if (['.ppt', '.pptx', '.odp'].includes(ext)) return 'presentation';
+  if (['.zip', '.rar', '.7z', '.tar', '.gz', '.bz2'].includes(ext)) return 'archive';
+  if (['.js', '.ts', '.jsx', '.tsx', '.py', '.java', '.cpp', '.c', '.php', '.rb', '.go', '.rs'].includes(ext)) return 'code';
+  if (['.txt', '.md', '.log', '.json', '.xml', '.yml', '.yaml'].includes(ext)) return 'text';
+  if (['.exe', '.msi', '.dmg', '.app', '.deb', '.rpm'].includes(ext)) return 'executable';
+  if (['.ttf', '.otf', '.woff', '.woff2', '.eot'].includes(ext)) return 'font';
+  
+  return 'other';
+}
 
-      // Check file size
-      const limit = maxFileSize || FILE_SIZE_LIMITS.default;
-      if (file.size > limit) {
-        errors.push(`${file.name}: File too large (${(file.size / 1024 / 1024).toFixed(1)}MB > ${(limit / 1024 / 1024).toFixed(1)}MB)`);
-        continue;
-      }
+/**
+ * Format file size for display
+ */
+function formatFileSize(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+}
 
-      valid.push(file);
-    }
+/**
+ * Format date for display
+ */
+function formatDate(dateString: string): string {
+  try {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(date);
+  } catch (error) {
+    return 'Unknown';
+  }
+}
 
-    // Check multiple files restriction
-    if (!multiple && valid.length > 1) {
-      errors.push('Only one file can be uploaded at a time');
-      return { valid: valid.slice(0, 1), errors };
-    }
-
-    return { valid, errors };
-  }, [allowedExtensions, maxFileSize, multiple]);
-
-  const handleDragEnter = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragCounter(prev => prev + 1);
-    setIsDragOver(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragCounter(prev => {
-      const newCounter = prev - 1;
-      if (newCounter === 0) {
-        setIsDragOver(false);
-      }
-      return newCounter;
+/**
+ * Validate file against restrictions
+ */
+function validateFile(file: File, apiInfo: FileApiInfo): FileValidationResult {
+  const errors: Array<{ code: string; message: string }> = [];
+  const warnings: Array<{ code: string; message: string; severity: 'low' | 'medium' | 'high' }> = [];
+  
+  // Check file size
+  if (file.size > apiInfo.maxFileSize) {
+    errors.push({
+      code: 'FILE_TOO_LARGE',
+      message: `File size ${formatFileSize(file.size)} exceeds maximum allowed size of ${formatFileSize(apiInfo.maxFileSize)}`
     });
-  }, []);
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
-    setDragCounter(0);
-
-    const { files } = e.dataTransfer;
-    if (files.length > 0) {
-      const fileArray = Array.from(files);
-      const { valid, errors } = validateFiles(fileArray);
-      
-      if (errors.length > 0) {
-        console.warn('File validation errors:', errors);
-        // You might want to show these errors to the user
-      }
-      
-      if (valid.length > 0) {
-        onFilesDropped(valid);
-      }
+  }
+  
+  // Check file extension
+  if (apiInfo.allowedExtensions && apiInfo.allowedExtensions.length > 0) {
+    const fileExt = '.' + file.name.split('.').pop()?.toLowerCase();
+    if (!apiInfo.allowedExtensions.includes(fileExt)) {
+      errors.push({
+        code: 'INVALID_EXTENSION',
+        message: `File extension ${fileExt} is not allowed. Allowed extensions: ${apiInfo.allowedExtensions.join(', ')}`
+      });
     }
-  }, [onFilesDropped, validateFiles]);
-
+  }
+  
+  // Check MIME type
+  if (apiInfo.allowedMimeTypes && apiInfo.allowedMimeTypes.length > 0) {
+    if (!apiInfo.allowedMimeTypes.includes(file.type)) {
+      errors.push({
+        code: 'INVALID_MIME_TYPE',
+        message: `File type ${file.type} is not allowed. Allowed types: ${apiInfo.allowedMimeTypes.join(', ')}`
+      });
+    }
+  }
+  
+  // Check filename validity
+  if (!/^[^<>:"|?*\\\/]+$/.test(file.name)) {
+    errors.push({
+      code: 'FILENAME_INVALID',
+      message: 'Filename contains invalid characters: < > : " | ? * \\ /'
+    });
+  }
+  
   return {
-    isDragOver,
-    dragHandlers: {
-      onDragEnter: handleDragEnter,
-      onDragLeave: handleDragLeave,
-      onDragOver: handleDragOver,
-      onDrop: handleDrop,
-    },
-    validateFiles,
+    isValid: errors.length === 0,
+    errors: errors.map(error => ({
+      code: error.code as any,
+      message: error.message,
+      context: { filename: file.name, size: file.size, type: file.type },
+    })),
+    warnings: warnings.map(warning => ({
+      code: warning.code,
+      message: warning.message,
+      severity: warning.severity,
+    })),
+    validatedAt: new Date().toISOString(),
+    appliedRules: ['size', 'extension', 'mimeType', 'filename'],
   };
 }
 
-// =============================================================================
-// MAIN COMPONENT
-// =============================================================================
+/**
+ * Generate breadcrumb navigation from path
+ */
+function generateBreadcrumbs(path: string): Array<{ name: string; path: string }> {
+  if (!path || path === '/') {
+    return [{ name: 'Root', path: '/' }];
+  }
+  
+  const segments = path.split('/').filter(Boolean);
+  const breadcrumbs = [{ name: 'Root', path: '/' }];
+  
+  let currentPath = '';
+  for (const segment of segments) {
+    currentPath += `/${segment}`;
+    breadcrumbs.push({
+      name: segment,
+      path: currentPath,
+    });
+  }
+  
+  return breadcrumbs;
+}
 
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
+
+/**
+ * FileSelectorDialog component for comprehensive file management
+ */
 export function FileSelectorDialog({
   open,
   onClose,
-  onFileSelected,
-  data,
-  title = 'Select File',
+  onConfirm,
+  apiInfo,
+  initialSelection = [],
+  selectionMode = 'multiple',
+  uploadMode = 'automatic',
+  maxFiles = 10,
+  showProgress = true,
+  showPreviews = true,
+  enableBatchOperations = true,
+  browserConfig,
+  dragDropConfig,
+  previewConfig,
+  queueConfig,
+  variant = 'modal',
   size = 'lg',
-  className = '',
-  ...props
-}: FileSelectorDialogProps) {
-  // Refs for focus management and virtual scrolling
+  readOnly = false,
+  fileFilter,
+  fileSorter,
+  className,
+  'data-testid': testId = 'file-selector-dialog',
+  title = 'Select Files',
+  description,
+  confirmText = 'Select',
+  cancelText = 'Cancel',
+  ...eventHandlers
+}: FileSelectorDialogProps & FileEventHandlers) {
+  
+  // ========================================================================
+  // REFS AND STATE
+  // ========================================================================
+  
   const initialFocusRef = useRef<HTMLButtonElement>(null);
-  const scrollElementRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // State management
-  const [selectedFileApi, setSelectedFileApi] = useState<FileApiInfo | null>(null);
-  const [currentPath, setCurrentPath] = useState<string>('');
-  const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
-  const [navigationStack, setNavigationStack] = useState<string[]>([]);
-  const [uploadProgress, setUploadProgress] = useState<FileUploadProgress[]>([]);
-  const [createFolderDialogOpen, setCreateFolderDialogOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
-
-  // Form management for filters and search
-  const filterForm = useForm<FileFilterData>({
-    resolver: zodResolver(fileFilterSchema),
+  const virtualParentRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
+  
+  // File browser state
+  const [browserState, setBrowserState] = useState<FileBrowserState>({
+    currentPath: '/',
+    selectedService: apiInfo.serviceName,
+    viewMode: browserConfig?.viewMode || 'list',
+    sortField: browserConfig?.sorting?.defaultField || 'name',
+    sortDirection: browserConfig?.sorting?.defaultDirection || 'asc',
+    selectedFiles: new Set(initialSelection.map(f => f.path)),
+    searchQuery: '',
+    showHiddenFiles: browserConfig?.showHiddenFiles || false,
+    activeFilters: [],
+    uploadProgress: new Map(),
+    dragActive: false,
+    previewFile: null,
+  });
+  
+  // UI state
+  const [operationStatus, setOperationStatus] = useState<FileOperationStatus | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadQueue, setUploadQueue] = useState<File[]>([]);
+  
+  // Form setup
+  const searchForm = useForm<SearchFormData>({
+    resolver: zodResolver(searchFormSchema),
     defaultValues: {
-      searchTerm: '',
-      fileType: 'all',
-      sortBy: 'name',
-      sortDirection: 'asc',
+      query: '',
+      includeHidden: false,
+      fileTypeFilter: '',
     },
   });
-
-  // Custom hooks
-  const fileApi = useFileApi();
-  const dragAndDrop = useDragAndDrop({
-    onFilesDropped: handleFilesDropped,
-    allowedExtensions: data.allowedExtensions,
-    maxFileSize: data.maxFileSize,
-    multiple: data.multiple,
+  
+  const uploadForm = useForm<UploadFormData>({
+    resolver: zodResolver(uploadFormSchema),
+    defaultValues: {
+      files: [],
+      overwrite: false,
+      generateThumbnails: true,
+      extractMetadata: true,
+    },
   });
-
+  
+  // Create folder dialog
+  const createFolderDialog = useCreateFolderDialog();
+  
+  // ========================================================================
+  // API HOOKS
+  // ========================================================================
+  
+  const { 
+    fileServices,
+    isLoadingServices,
+    createFileListQuery,
+    uploadFile,
+    createDirectory,
+    deleteFile,
+    isLoading: isApiLoading
+  } = useFileApi();
+  
   // File listing query
-  const fileListingQuery = useQuery(
-    selectedFileApi 
-      ? fileApi.createFileListingQuery(selectedFileApi.name, currentPath)
-      : { enabled: false }
+  const fileListQuery = useQuery(
+    createFileListQuery(browserState.selectedService, browserState.currentPath)
   );
-
-  // =============================================================================
+  
+  // ========================================================================
   // COMPUTED VALUES
-  // =============================================================================
-
-  const filteredAndSortedFiles = useMemo(() => {
-    if (!fileListingQuery.data) return [];
-
-    const { searchTerm, fileType, sortBy, sortDirection } = filterForm.watch();
-    let filtered = [...fileListingQuery.data];
-
+  // ========================================================================
+  
+  /**
+   * Processed file list with filtering, sorting, and search
+   */
+  const processedFiles = useMemo(() => {
+    let files = fileListQuery.data?.resource || [];
+    
     // Apply search filter
-    if (searchTerm) {
-      const searchLower = searchTerm.toLowerCase();
-      filtered = filtered.filter(file => 
-        file.name.toLowerCase().includes(searchLower)
+    if (browserState.searchQuery) {
+      const query = browserState.searchQuery.toLowerCase();
+      files = files.filter(file => 
+        file.name.toLowerCase().includes(query) ||
+        file.path.toLowerCase().includes(query)
       );
     }
-
-    // Apply type filter
-    if (fileType !== 'all') {
-      filtered = filtered.filter(file => {
-        if (fileType === 'files') return file.type === 'file';
-        if (fileType === 'folders') return file.type === 'folder';
-        return true;
+    
+    // Apply hidden files filter
+    if (!browserState.showHiddenFiles) {
+      files = files.filter(file => !file.name.startsWith('.'));
+    }
+    
+    // Apply custom file filter
+    if (fileFilter) {
+      files = files.filter(file => fileFilter(new File([], file.name)));
+    }
+    
+    // Apply type filters
+    if (browserState.activeFilters.length > 0) {
+      files = files.filter(file => {
+        const fileType = getFileType(file);
+        return browserState.activeFilters.includes(fileType);
       });
     }
-
-    // Apply sorting
-    filtered.sort((a, b) => {
-      let comparison = 0;
-      
-      // Always sort folders first
-      if (a.type !== b.type) {
-        return a.type === 'folder' ? -1 : 1;
+    
+    // Sort files
+    files.sort((a, b) => {
+      // Directories first if configured
+      if (browserConfig?.sorting?.directoriesFirst) {
+        if (a.isDirectory && !b.isDirectory) return -1;
+        if (!a.isDirectory && b.isDirectory) return 1;
       }
-
-      switch (sortBy) {
+      
+      let compareResult = 0;
+      
+      switch (browserState.sortField) {
         case 'name':
-          comparison = a.name.localeCompare(b.name);
-          break;
-        case 'type':
-          comparison = (a.contentType || '').localeCompare(b.contentType || '');
+          compareResult = a.name.localeCompare(b.name);
           break;
         case 'size':
-          comparison = (a.size || 0) - (b.size || 0);
+          compareResult = a.size - b.size;
           break;
-        case 'lastModified':
-          comparison = new Date(a.lastModified || 0).getTime() - new Date(b.lastModified || 0).getTime();
+        case 'type':
+          compareResult = getFileType(a).localeCompare(getFileType(b));
           break;
+        case 'modified':
+          const aDate = new Date(a.modifiedAt || 0).getTime();
+          const bDate = new Date(b.modifiedAt || 0).getTime();
+          compareResult = aDate - bDate;
+          break;
+        case 'created':
+          const aCreateDate = new Date(a.createdAt || 0).getTime();
+          const bCreateDate = new Date(b.createdAt || 0).getTime();
+          compareResult = aCreateDate - bCreateDate;
+          break;
+        case 'extension':
+          compareResult = a.extension.localeCompare(b.extension);
+          break;
+        default:
+          compareResult = a.name.localeCompare(b.name);
       }
-
-      return sortDirection === 'asc' ? comparison : -comparison;
+      
+      return browserState.sortDirection === 'desc' ? -compareResult : compareResult;
     });
-
-    return filtered;
-  }, [fileListingQuery.data, filterForm.watch()]);
-
-  // Virtual scrolling setup
+    
+    // Apply custom sorter
+    if (fileSorter) {
+      files.sort((a, b) => fileSorter(
+        { ...a, file: new File([], a.name) } as SelectedFile,
+        { ...b, file: new File([], b.name) } as SelectedFile
+      ));
+    }
+    
+    return files.slice(0, MAX_SEARCH_RESULTS);
+  }, [
+    fileListQuery.data?.resource,
+    browserState.searchQuery,
+    browserState.showHiddenFiles,
+    browserState.activeFilters,
+    browserState.sortField,
+    browserState.sortDirection,
+    browserConfig?.sorting,
+    fileFilter,
+    fileSorter
+  ]);
+  
+  /**
+   * Selected files as SelectedFile objects
+   */
+  const selectedFileObjects = useMemo(() => {
+    const selected: SelectedFile[] = [];
+    
+    for (const filePath of browserState.selectedFiles) {
+      const file = processedFiles.find(f => f.path === filePath);
+      if (file) {
+        selected.push({
+          ...file,
+          uploadState: 'completed' as UploadState,
+          validation: {
+            isValid: true,
+            errors: [],
+            warnings: [],
+            validatedAt: new Date().toISOString(),
+            appliedRules: [],
+          },
+        });
+      }
+    }
+    
+    return selected;
+  }, [browserState.selectedFiles, processedFiles]);
+  
+  /**
+   * Available file type filters
+   */
+  const availableFileTypes = useMemo(() => {
+    const types = new Set<FileType>();
+    processedFiles.forEach(file => {
+      if (!file.isDirectory) {
+        types.add(getFileType(file));
+      }
+    });
+    return Array.from(types);
+  }, [processedFiles]);
+  
+  /**
+   * Breadcrumb navigation
+   */
+  const breadcrumbs = useMemo(() => 
+    generateBreadcrumbs(browserState.currentPath), 
+    [browserState.currentPath]
+  );
+  
+  // ========================================================================
+  // VIRTUAL SCROLLING SETUP
+  // ========================================================================
+  
+  /**
+   * Virtual scrolling configuration
+   */
   const virtualizer = useVirtualizer({
-    count: filteredAndSortedFiles.length,
-    getScrollElement: () => scrollElementRef.current,
-    estimateSize: () => VIRTUAL_ITEM_HEIGHT,
+    count: processedFiles.length,
+    getScrollElement: () => virtualParentRef.current,
+    estimateSize: () => VIEW_MODE_CONFIG[browserState.viewMode].itemHeight,
     overscan: VIRTUAL_OVERSCAN,
   });
-
-  const isLoading = fileListingQuery.isLoading || fileApi.isUploading || fileApi.isCreatingFolder;
-  const isSelectorOnly = data.selectorOnly || false;
-  const hasUploadPermission = !isSelectorOnly;
-  const canCreateFolders = hasUploadPermission;
-
-  // =============================================================================
+  
+  // ========================================================================
   // EVENT HANDLERS
-  // =============================================================================
-
-  function handleFilesDropped(files: File[]) {
-    if (!hasUploadPermission || !selectedFileApi) return;
-    
-    files.forEach(file => {
-      handleFileUpload(file);
+  // ========================================================================
+  
+  /**
+   * Handle file selection toggle
+   */
+  const handleFileSelect = useCallback((file: FileMetadata, selected: boolean) => {
+    setBrowserState(prev => {
+      const newSelected = new Set(prev.selectedFiles);
+      
+      if (selected) {
+        if (selectionMode === 'single') {
+          newSelected.clear();
+        }
+        if (newSelected.size < maxFiles) {
+          newSelected.add(file.path);
+        }
+      } else {
+        newSelected.delete(file.path);
+      }
+      
+      return { ...prev, selectedFiles: newSelected };
     });
-  }
-
-  function handleFileUpload(file: File) {
-    if (!selectedFileApi) return;
-
-    const progressId = `${file.name}-${Date.now()}`;
-    const initialProgress: FileUploadProgress = {
-      file,
+    
+    eventHandlers.onSelectionChange?.(selectedFileObjects);
+  }, [selectionMode, maxFiles, selectedFileObjects, eventHandlers]);
+  
+  /**
+   * Handle directory navigation
+   */
+  const handleDirectoryClick = useCallback((directory: FileMetadata) => {
+    if (!directory.isDirectory) return;
+    
+    setBrowserState(prev => ({
+      ...prev,
+      currentPath: directory.path,
+      selectedFiles: new Set(), // Clear selection when navigating
+    }));
+  }, []);
+  
+  /**
+   * Handle breadcrumb navigation
+   */
+  const handleBreadcrumbClick = useCallback((path: string) => {
+    setBrowserState(prev => ({
+      ...prev,
+      currentPath: path,
+      selectedFiles: new Set(),
+    }));
+  }, []);
+  
+  /**
+   * Handle search input
+   */
+  const handleSearch = useCallback((query: string) => {
+    setBrowserState(prev => ({ ...prev, searchQuery: query }));
+  }, []);
+  
+  /**
+   * Handle file upload from input
+   */
+  const handleFileInputChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
+    
+    setUploadQueue(files);
+    
+    if (uploadMode === 'automatic') {
+      processFileUploads(files);
+    }
+    
+    eventHandlers.onFileInputChange?.(event);
+  }, [uploadMode, eventHandlers]);
+  
+  /**
+   * Process file uploads with progress tracking
+   */
+  const processFileUploads = useCallback(async (files: File[]) => {
+    if (readOnly || !apiInfo.permissions.canUpload) return;
+    
+    setIsUploading(true);
+    setOperationStatus({
+      type: 'upload',
+      status: 'progress',
+      message: `Uploading ${files.length} file(s)...`,
       progress: 0,
-      bytesUploaded: 0,
-      totalBytes: file.size,
-      status: 'pending',
-      startTime: new Date(),
-    };
-
-    setUploadProgress(prev => [...prev, initialProgress]);
-
-    fileApi.uploadFile(
-      {
-        serviceName: selectedFileApi.name,
-        file,
-        path: currentPath,
-        onProgress: (progress) => {
-          setUploadProgress(prev => prev.map(p => 
-            p.file.name === file.name 
-              ? { 
-                  ...p, 
-                  progress, 
-                  bytesUploaded: Math.round((progress / 100) * file.size),
-                  status: progress === 100 ? 'completed' : 'uploading',
-                  completionTime: progress === 100 ? new Date() : undefined,
-                } 
-              : p
-          ));
-        },
-      },
-      {
-        onSuccess: (result) => {
-          setUploadProgress(prev => prev.filter(p => p.file.name !== file.name));
-          
-          // Auto-select uploaded file if in selection mode
-          if (!data.uploadMode) {
-            const uploadedFileItem: FileItem = {
-              name: result.fileName,
-              path: result.relativePath || result.fileName,
-              type: 'file',
-              contentType: result.contentType,
-              size: result.size,
-              lastModified: result.lastModified,
-              selectable: true,
-            };
-            setSelectedFile(uploadedFileItem);
-          }
-        },
-        onError: (error) => {
-          setUploadProgress(prev => prev.map(p => 
-            p.file.name === file.name 
-              ? { ...p, status: 'error', error: error.message } 
-              : p
-          ));
-        },
-      }
-    );
-  }
-
-  function handleFileInputChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const files = event.target.files;
-    if (files && files.length > 0) {
-      const fileArray = Array.from(files);
-      const { valid, errors } = dragAndDrop.validateFiles(fileArray);
-      
-      if (errors.length > 0) {
-        console.warn('File validation errors:', errors);
-        // Show validation errors to user
-      }
-      
-      valid.forEach(file => handleFileUpload(file));
-    }
-    
-    // Reset input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  }
-
-  function handleSelectFileApi(fileApi: FileApiInfo) {
-    setSelectedFileApi(fileApi);
-    setCurrentPath('');
-    setNavigationStack([]);
-    setSelectedFile(null);
-  }
-
-  function handleNavigateToPath(path: string) {
-    if (path === currentPath) return;
-    
-    // Add current path to navigation stack if going deeper
-    if (path.startsWith(currentPath) && path !== currentPath) {
-      setNavigationStack(prev => [...prev, currentPath]);
-    } else {
-      // Going to a parent path or completely different path
-      setNavigationStack([]);
-    }
-    
-    setCurrentPath(path);
-    setSelectedFile(null);
-  }
-
-  function handleNavigateBack() {
-    if (navigationStack.length > 0) {
-      const previousPath = navigationStack[navigationStack.length - 1];
-      setNavigationStack(prev => prev.slice(0, -1));
-      setCurrentPath(previousPath);
-    } else if (selectedFileApi) {
-      // Go back to service selection
-      setSelectedFileApi(null);
-      setCurrentPath('');
-      setSelectedFile(null);
-    }
-  }
-
-  function handleOpenFolder(folder: FileItem) {
-    setNavigationStack(prev => [...prev, currentPath]);
-    setCurrentPath(folder.path);
-    setSelectedFile(null);
-  }
-
-  function handleSelectFile(file: FileItem) {
-    // Validate file extension
-    const fileExt = '.' + file.name.split('.').pop()?.toLowerCase();
-    if (!data.allowedExtensions.includes(fileExt)) {
-      console.warn(`File type ${fileExt} not allowed`);
-      return;
-    }
-
-    setSelectedFile(file);
-  }
-
-  function handleConfirmSelection() {
-    if (!selectedFile || !selectedFileApi || selectedFile.type !== 'file') return;
-
-    const result: SelectedFile = {
-      path: `/opt/dreamfactory/storage/app/${selectedFile.path}`,
-      relativePath: selectedFile.path,
-      fileName: selectedFile.name,
-      name: selectedFile.name,
-      serviceId: selectedFileApi.id,
-      serviceName: selectedFileApi.name,
-      size: selectedFile.size,
-      contentType: selectedFile.contentType,
-      lastModified: selectedFile.lastModified,
-    };
-
-    onFileSelected?.(result);
-    onClose();
-  }
-
-  function handleCreateFolder(folderName: string) {
-    if (!selectedFileApi) return;
-
-    fileApi.createFolder({
-      serviceName: selectedFileApi.name,
-      path: currentPath,
-      folderName,
     });
-  }
-
-  function handleClose() {
-    onClose();
-    // Reset state when dialog closes
-    setTimeout(() => {
-      setSelectedFileApi(null);
-      setCurrentPath('');
-      setSelectedFile(null);
-      setNavigationStack([]);
-      setUploadProgress([]);
-      filterForm.reset();
-    }, 200);
-  }
-
-  function handleKeyDown(event: React.KeyboardEvent) {
-    // Escape key - close dialog
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      handleClose();
+    
+    let completed = 0;
+    
+    for (const file of files) {
+      try {
+        // Validate file
+        const validation = validateFile(file, apiInfo);
+        if (!validation.isValid) {
+          console.error('File validation failed:', validation.errors);
+          continue;
+        }
+        
+        // Upload file with progress tracking
+        await uploadFile({
+          serviceName: browserState.selectedService,
+          file,
+          path: browserState.currentPath,
+          onProgress: (progress) => {
+            setBrowserState(prev => {
+              const newProgress = new Map(prev.uploadProgress);
+              newProgress.set(file.name, progress.progress || 0);
+              return { ...prev, uploadProgress: newProgress };
+            });
+          },
+        });
+        
+        completed++;
+        setOperationStatus({
+          type: 'upload',
+          status: 'progress',
+          message: `Uploaded ${completed} of ${files.length} file(s)`,
+          progress: Math.round((completed / files.length) * 100),
+        });
+        
+        eventHandlers.onUploadComplete?.({
+          ...file,
+          path: `${browserState.currentPath}/${file.name}`,
+        } as SelectedFile);
+        
+      } catch (error) {
+        console.error('Upload failed:', error);
+        eventHandlers.onUploadError?.({
+          ...file,
+          path: `${browserState.currentPath}/${file.name}`,
+        } as SelectedFile, error as FileUploadError);
+      }
+    }
+    
+    setIsUploading(false);
+    setUploadQueue([]);
+    setOperationStatus({
+      type: 'upload',
+      status: 'success',
+      message: `Successfully uploaded ${completed} file(s)`,
+    });
+    
+    // Clear status after delay
+    setTimeout(() => setOperationStatus(null), 3000);
+  }, [
+    readOnly,
+    apiInfo,
+    browserState.selectedService,
+    browserState.currentPath,
+    uploadFile,
+    eventHandlers
+  ]);
+  
+  /**
+   * Handle drag and drop events
+   */
+  const handleDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
+    if (readOnly || !dragDropConfig?.enabled) return;
+    
+    event.preventDefault();
+    event.stopPropagation();
+    
+    if (!browserState.dragActive) {
+      setBrowserState(prev => ({ ...prev, dragActive: true }));
+    }
+    
+    eventHandlers.onDragOver?.(event);
+  }, [readOnly, dragDropConfig, browserState.dragActive, eventHandlers]);
+  
+  const handleDragLeave = useCallback((event: DragEvent<HTMLDivElement>) => {
+    if (readOnly || !dragDropConfig?.enabled) return;
+    
+    event.preventDefault();
+    event.stopPropagation();
+    
+    // Only hide drag active if leaving the entire drop zone
+    if (event.currentTarget === event.target) {
+      setBrowserState(prev => ({ ...prev, dragActive: false }));
+    }
+    
+    eventHandlers.onDragLeave?.(event);
+  }, [readOnly, dragDropConfig, eventHandlers]);
+  
+  const handleDrop = useCallback((event: DragEvent<HTMLDivElement>) => {
+    if (readOnly || !dragDropConfig?.enabled) return;
+    
+    event.preventDefault();
+    event.stopPropagation();
+    
+    setBrowserState(prev => ({ ...prev, dragActive: false }));
+    
+    const files = Array.from(event.dataTransfer.files);
+    if (files.length === 0) return;
+    
+    // Validate drop if custom validation provided
+    if (dragDropConfig.validateDrop && !dragDropConfig.validateDrop(event)) {
       return;
     }
-
-    // Enter key - confirm selection if file is selected
-    if (event.key === 'Enter' && selectedFile && selectedFile.type === 'file') {
-      event.preventDefault();
-      handleConfirmSelection();
-      return;
+    
+    setUploadQueue(files);
+    
+    if (uploadMode === 'automatic') {
+      processFileUploads(files);
     }
-
-    // Backspace/Delete - navigate back
-    if ((event.key === 'Backspace' || event.key === 'Delete') && !event.target) {
-      event.preventDefault();
-      handleNavigateBack();
-      return;
+    
+    eventHandlers.onDrop?.(event);
+  }, [
+    readOnly,
+    dragDropConfig,
+    uploadMode,
+    processFileUploads,
+    eventHandlers
+  ]);
+  
+  /**
+   * Handle keyboard navigation
+   */
+  const handleKeyDown = useCallback((event: KeyboardEvent<HTMLDivElement>) => {
+    if (!open) return;
+    
+    switch (event.key) {
+      case 'Escape':
+        event.preventDefault();
+        onClose();
+        break;
+        
+      case 'Enter':
+        if (event.ctrlKey || event.metaKey) {
+          event.preventDefault();
+          onConfirm(selectedFileObjects);
+        }
+        break;
+        
+      case 'a':
+        if (event.ctrlKey || event.metaKey) {
+          event.preventDefault();
+          if (selectionMode === 'multiple') {
+            setBrowserState(prev => ({
+              ...prev,
+              selectedFiles: new Set(processedFiles.slice(0, maxFiles).map(f => f.path))
+            }));
+          }
+        }
+        break;
+        
+      case 'Delete':
+        if (enableBatchOperations && browserState.selectedFiles.size > 0) {
+          event.preventDefault();
+          // Handle bulk delete
+        }
+        break;
+        
+      case 'F2':
+        if (browserState.selectedFiles.size === 1) {
+          event.preventDefault();
+          // Handle file rename
+        }
+        break;
     }
-  }
-
-  // =============================================================================
+  }, [
+    open,
+    onClose,
+    onConfirm,
+    selectedFileObjects,
+    selectionMode,
+    processedFiles,
+    maxFiles,
+    enableBatchOperations,
+    browserState.selectedFiles
+  ]);
+  
+  /**
+   * Handle folder creation
+   */
+  const handleCreateFolder = useCallback((folder: FileMetadata) => {
+    createDirectory({
+      serviceName: browserState.selectedService,
+      path: browserState.currentPath,
+      name: folder.name,
+    });
+    
+    setOperationStatus({
+      type: 'create',
+      status: 'success',
+      message: `Folder "${folder.name}" created successfully`,
+    });
+    
+    setTimeout(() => setOperationStatus(null), 3000);
+  }, [createDirectory, browserState.selectedService, browserState.currentPath]);
+  
+  // ========================================================================
   // EFFECTS
-  // =============================================================================
-
-  // Reset selection when path changes
-  useEffect(() => {
-    setSelectedFile(null);
-  }, [currentPath]);
-
-  // Focus management
+  // ========================================================================
+  
+  /**
+   * Focus management when dialog opens
+   */
   useEffect(() => {
     if (open && initialFocusRef.current) {
-      const timeoutId = setTimeout(() => {
+      const timer = setTimeout(() => {
         initialFocusRef.current?.focus();
       }, 100);
-      return () => clearTimeout(timeoutId);
+      return () => clearTimeout(timer);
     }
   }, [open]);
-
-  // Auto-select service if only one available
+  
+  /**
+   * Keyboard event listeners
+   */
   useEffect(() => {
-    if (open && data.fileApis.length === 1 && !selectedFileApi) {
-      handleSelectFileApi(data.fileApis[0]);
-    }
-  }, [open, data.fileApis, selectedFileApi]);
-
-  // Handle upload mode
+    const handleGlobalKeyDown = (event: KeyboardEvent) => {
+      if (!open) return;
+      
+      // Global shortcuts
+      if (event.ctrlKey || event.metaKey) {
+        switch (event.key) {
+          case 'o':
+            event.preventDefault();
+            fileInputRef.current?.click();
+            break;
+          case 'n':
+            if (event.shiftKey && apiInfo.permissions.canCreateFolders) {
+              event.preventDefault();
+              createFolderDialog.open();
+            }
+            break;
+          case 'f':
+            event.preventDefault();
+            // Focus search input
+            break;
+        }
+      }
+    };
+    
+    document.addEventListener('keydown', handleGlobalKeyDown as any);
+    return () => document.removeEventListener('keydown', handleGlobalKeyDown as any);
+  }, [open, apiInfo.permissions, createFolderDialog]);
+  
+  /**
+   * Auto-clear drag state
+   */
   useEffect(() => {
-    if (data.uploadMode && data.fileToUpload && selectedFileApi) {
-      handleFileUpload(data.fileToUpload);
+    if (browserState.dragActive) {
+      const timer = setTimeout(() => {
+        setBrowserState(prev => ({ ...prev, dragActive: false }));
+      }, DRAG_DROP_TIMEOUT);
+      return () => clearTimeout(timer);
     }
-  }, [data.uploadMode, data.fileToUpload, selectedFileApi]);
-
-  // =============================================================================
+  }, [browserState.dragActive]);
+  
+  // ========================================================================
   // RENDER HELPERS
-  // =============================================================================
-
-  const renderServiceSelection = () => (
-    <div className="p-6">
-      <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
-        Select a File Service
-      </h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {data.fileApis.map((fileApi) => (
-          <button
-            key={fileApi.id}
-            type="button"
-            onClick={() => handleSelectFileApi(fileApi)}
-            className="flex items-center p-4 border border-gray-300 dark:border-gray-600 rounded-lg hover:border-primary-500 dark:hover:border-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
-          >
-            <FolderIconSolid className="h-8 w-8 text-primary-600 dark:text-primary-400 mr-3" aria-hidden="true" />
-            <div className="text-left">
-              <div className="font-medium text-gray-900 dark:text-gray-100">
-                {fileApi.label || fileApi.name}
-              </div>
-              <div className="text-sm text-gray-500 dark:text-gray-400">
-                {fileApi.type}
-              </div>
-              {fileApi.description && (
-                <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                  {fileApi.description}
-                </div>
+  // ========================================================================
+  
+  /**
+   * Render file item with appropriate view mode
+   */
+  const renderFileItem = useCallback((file: FileMetadata, index: number) => {
+    const isSelected = browserState.selectedFiles.has(file.path);
+    const FileIcon = file.isDirectory 
+      ? (isSelected ? FolderIconSolid : FolderIcon)
+      : (isSelected ? FILE_TYPE_ICONS_SOLID[getFileType(file)] : FILE_TYPE_ICONS[getFileType(file)]);
+    
+    const handleClick = () => {
+      if (file.isDirectory) {
+        handleDirectoryClick(file);
+      } else {
+        handleFileSelect(file, !isSelected);
+      }
+    };
+    
+    const handleDoubleClick = () => {
+      if (file.isDirectory) {
+        handleDirectoryClick(file);
+      } else if (selectionMode === 'single') {
+        onConfirm([{
+          ...file,
+          uploadState: 'completed' as UploadState,
+          validation: {
+            isValid: true,
+            errors: [],
+            warnings: [],
+            validatedAt: new Date().toISOString(),
+            appliedRules: [],
+          },
+        }]);
+      }
+    };
+    
+    return (
+      <div
+        key={file.path}
+        className={cn(
+          "flex items-center gap-3 px-3 py-2 hover:bg-gray-50 cursor-pointer transition-colors duration-200",
+          "focus:outline-none focus:bg-blue-50 focus:ring-2 focus:ring-blue-500 focus:ring-inset",
+          isSelected && "bg-blue-50 border-l-4 border-blue-500",
+          file.isDirectory && "font-medium"
+        )}
+        onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
+        tabIndex={0}
+        role="button"
+        aria-selected={isSelected}
+        aria-label={`${file.isDirectory ? 'Folder' : 'File'}: ${file.name}`}
+      >
+        <FileIcon 
+          className={cn(
+            "h-5 w-5 flex-shrink-0",
+            file.isDirectory ? "text-blue-600" : "text-gray-500",
+            isSelected && "text-blue-600"
+          )} 
+        />
+        
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between">
+            <span className={cn(
+              "text-sm truncate",
+              isSelected ? "text-blue-900 font-medium" : "text-gray-900"
+            )}>
+              {file.name}
+            </span>
+            
+            {!file.isDirectory && (
+              <span className="text-xs text-gray-500 ml-2 flex-shrink-0">
+                {formatFileSize(file.size)}
+              </span>
+            )}
+          </div>
+          
+          {browserState.viewMode === 'table' && (
+            <div className="flex items-center gap-4 text-xs text-gray-500 mt-1">
+              <span>{getFileType(file)}</span>
+              {file.modifiedAt && (
+                <span>{formatDate(file.modifiedAt)}</span>
               )}
             </div>
+          )}
+        </div>
+        
+        {isSelected && (
+          <CheckCircleIcon className="h-4 w-4 text-blue-600 flex-shrink-0" />
+        )}
+      </div>
+    );
+  }, [
+    browserState.selectedFiles,
+    browserState.viewMode,
+    handleDirectoryClick,
+    handleFileSelect,
+    selectionMode,
+    onConfirm
+  ]);
+  
+  /**
+   * Render toolbar with actions and controls
+   */
+  const renderToolbar = () => (
+    <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
+      {/* Left section - Navigation and breadcrumbs */}
+      <div className="flex items-center gap-2 flex-1 min-w-0">
+        <button
+          type="button"
+          onClick={() => handleBreadcrumbClick('/')}
+          className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          aria-label="Go to root directory"
+        >
+          <HomeIcon className="h-4 w-4" />
+        </button>
+        
+        <nav aria-label="Breadcrumb" className="flex items-center gap-1 min-w-0">
+          {breadcrumbs.map((crumb, index) => (
+            <Fragment key={crumb.path}>
+              {index > 0 && (
+                <ChevronRightIcon className="h-3 w-3 text-gray-400" />
+              )}
+              <button
+                type="button"
+                onClick={() => handleBreadcrumbClick(crumb.path)}
+                className={cn(
+                  "text-sm px-2 py-1 rounded hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 truncate",
+                  index === breadcrumbs.length - 1
+                    ? "text-gray-900 font-medium"
+                    : "text-gray-600 hover:text-gray-800"
+                )}
+              >
+                {crumb.name}
+              </button>
+            </Fragment>
+          ))}
+        </nav>
+      </div>
+      
+      {/* Right section - Actions */}
+      <div className="flex items-center gap-2">
+        {/* Search */}
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Search files..."
+            value={browserState.searchQuery}
+            onChange={(e) => handleSearch(e.target.value)}
+            className="w-48 pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+          <MagnifyingGlassIcon className="h-4 w-4 text-gray-400 absolute left-2.5 top-2" />
+        </div>
+        
+        {/* View mode toggle */}
+        <div className="flex rounded-lg border border-gray-300 overflow-hidden">
+          {(Object.keys(VIEW_MODE_CONFIG) as FileBrowserViewMode[]).map((mode) => {
+            const ModeIcon = VIEW_MODE_CONFIG[mode].icon;
+            return (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setBrowserState(prev => ({ ...prev, viewMode: mode }))}
+                className={cn(
+                  "p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500",
+                  browserState.viewMode === mode && "bg-blue-100 text-blue-600"
+                )}
+                aria-label={VIEW_MODE_CONFIG[mode].label}
+                title={VIEW_MODE_CONFIG[mode].label}
+              >
+                <ModeIcon className="h-4 w-4" />
+              </button>
+            );
+          })}
+        </div>
+        
+        {/* Upload button */}
+        {!readOnly && apiInfo.permissions.canUpload && (
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-200"
+          >
+            <ArrowUpTrayIcon className="h-4 w-4" />
+            Upload Files
           </button>
-        ))}
+        )}
+        
+        {/* New folder button */}
+        {!readOnly && apiInfo.permissions.canCreateFolders && (
+          <button
+            type="button"
+            onClick={createFolderDialog.open}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-200"
+          >
+            <FolderPlusIcon className="h-4 w-4" />
+            New Folder
+          </button>
+        )}
+        
+        {/* Refresh button */}
+        <button
+          type="button"
+          onClick={() => fileListQuery.refetch()}
+          disabled={fileListQuery.isRefetching}
+          className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 disabled:text-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-200"
+          aria-label="Refresh file list"
+        >
+          <ArrowPathIcon className={cn(
+            "h-4 w-4",
+            fileListQuery.isRefetching && "animate-spin"
+          )} />
+        </button>
       </div>
     </div>
   );
-
-  const renderFileBrowser = () => (
-    <div 
-      className="flex flex-col h-full"
-      {...dragAndDrop.dragHandlers}
-    >
-      {/* Navigation Header */}
-      <div className="border-b border-gray-200 dark:border-gray-700 p-4">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center space-x-2">
-            <button
-              type="button"
-              onClick={handleNavigateBack}
-              className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
-              aria-label="Go back"
-            >
-              <ArrowLeftIcon className="h-5 w-5" aria-hidden="true" />
-            </button>
-            <div className="flex items-center space-x-2">
-              <button
-                type="button"
-                onClick={() => setViewMode(viewMode === 'list' ? 'grid' : 'list')}
-                className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
-                aria-label={`Switch to ${viewMode === 'list' ? 'grid' : 'list'} view`}
-              >
-                {viewMode === 'list' ? (
-                  <Bars3Icon className="h-5 w-5" aria-hidden="true" />
-                ) : (
-                  <ListBulletIcon className="h-5 w-5" aria-hidden="true" />
-                )}
-              </button>
-            </div>
-          </div>
+  
+  /**
+   * Render main file browser content
+   */
+  const renderFileBrowser = () => {
+    if (fileListQuery.isLoading) {
+      return (
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
         </div>
-
-        {/* Breadcrumb Navigation */}
-        <BreadcrumbNavigation
-          currentPath={currentPath}
-          serviceName={selectedFileApi?.name || 'Service'}
-          onNavigate={handleNavigateToPath}
-          className="mb-3"
-        />
-
-        {/* Search and Filter Controls */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="flex-1">
-            <div className="relative">
-              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" aria-hidden="true" />
-              <input
-                type="text"
-                placeholder="Search files..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                {...filterForm.register('searchTerm')}
-              />
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <select
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              {...filterForm.register('fileType')}
-            >
-              <option value="all">All</option>
-              <option value="files">Files</option>
-              <option value="folders">Folders</option>
-            </select>
-            <select
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              {...filterForm.register('sortBy')}
-            >
-              <option value="name">Name</option>
-              <option value="type">Type</option>
-              <option value="size">Size</option>
-              <option value="lastModified">Modified</option>
-            </select>
-          </div>
+      );
+    }
+    
+    if (fileListQuery.error) {
+      return (
+        <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+          <ExclamationTriangleIcon className="h-12 w-12 mb-4 text-red-500" />
+          <p className="text-sm font-medium">Failed to load files</p>
+          <p className="text-xs text-gray-400 mt-1">
+            {fileListQuery.error instanceof Error ? fileListQuery.error.message : 'Unknown error'}
+          </p>
+          <button
+            type="button"
+            onClick={() => fileListQuery.refetch()}
+            className="mt-4 px-3 py-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            Try Again
+          </button>
         </div>
-
-        {/* Action Buttons - only show if not selector-only mode */}
-        {hasUploadPermission && (
-          <div className="flex gap-2 mt-3">
-            <button
-              type="button"
-              onClick={() => setCreateFolderDialogOpen(true)}
-              disabled={isLoading}
-              className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <PlusIcon className="h-4 w-4 mr-2" aria-hidden="true" />
-              New Folder
-            </button>
+      );
+    }
+    
+    if (processedFiles.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+          <FolderIcon className="h-12 w-12 mb-4" />
+          <p className="text-sm font-medium">
+            {browserState.searchQuery ? 'No files match your search' : 'This folder is empty'}
+          </p>
+          {!readOnly && apiInfo.permissions.canUpload && (
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              disabled={isLoading}
-              className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="mt-4 px-3 py-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <CloudArrowUpIcon className="h-4 w-4 mr-2" aria-hidden="true" />
-              Upload Files
+              Upload your first file
             </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple={data.multiple}
-              accept={data.allowedExtensions.join(',')}
-              onChange={handleFileInputChange}
-              className="hidden"
-              aria-label="File upload input"
-            />
-          </div>
-        )}
-      </div>
-
-      {/* Upload Progress */}
-      {uploadProgress.length > 0 && (
-        <div className="p-4 space-y-3 border-b border-gray-200 dark:border-gray-700">
-          {uploadProgress.map((progress, index) => (
-            <UploadProgressIndicator
-              key={`${progress.file.name}-${index}`}
-              progress={progress}
-              onCancel={() => {
-                setUploadProgress(prev => prev.filter((_, i) => i !== index));
+          )}
+        </div>
+      );
+    }
+    
+    return (
+      <div
+        ref={virtualParentRef}
+        className="flex-1 overflow-auto"
+        style={{ height: '400px' }}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        <div
+          style={{
+            height: `${virtualizer.getTotalSize()}px`,
+            width: '100%',
+            position: 'relative',
+          }}
+        >
+          {virtualizer.getVirtualItems().map((virtualItem) => (
+            <div
+              key={virtualItem.key}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: `${virtualItem.size}px`,
+                transform: `translateY(${virtualItem.start}px)`,
               }}
-            />
+            >
+              {renderFileItem(processedFiles[virtualItem.index], virtualItem.index)}
+            </div>
           ))}
         </div>
-      )}
-
-      {/* File List Container */}
-      <div className="flex-1 overflow-hidden">
+        
         {/* Drag overlay */}
-        {dragAndDrop.isDragOver && hasUploadPermission && (
-          <div className="absolute inset-0 bg-primary-500/10 border-2 border-dashed border-primary-500 rounded-lg flex items-center justify-center z-10">
+        {browserState.dragActive && dragDropConfig?.enabled && (
+          <div className="absolute inset-0 bg-blue-50 bg-opacity-90 border-2 border-dashed border-blue-300 flex items-center justify-center">
             <div className="text-center">
-              <CloudArrowUpIcon className="h-12 w-12 text-primary-500 mx-auto mb-2" aria-hidden="true" />
-              <p className="text-primary-700 dark:text-primary-300 font-medium">
-                Drop files here to upload
+              <CloudArrowUpIcon className="h-12 w-12 text-blue-500 mx-auto mb-2" />
+              <p className="text-blue-700 font-medium">
+                {dragDropConfig.dragOverText || 'Drop files here to upload'}
               </p>
             </div>
           </div>
         )}
-
-        {/* Loading State */}
-        {isLoading && !uploadProgress.length && (
-          <div className="flex items-center justify-center h-32">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-            <span className="ml-3 text-gray-600 dark:text-gray-400">Loading files...</span>
-          </div>
+      </div>
+    );
+  };
+  
+  /**
+   * Render status bar with selection info and operations
+   */
+  const renderStatusBar = () => (
+    <div className="flex items-center justify-between p-3 bg-gray-50 border-t border-gray-200">
+      <div className="flex items-center gap-4 text-sm text-gray-600">
+        <span>
+          {processedFiles.length} item{processedFiles.length !== 1 ? 's' : ''}
+        </span>
+        
+        {browserState.selectedFiles.size > 0 && (
+          <span className="text-blue-600 font-medium">
+            {browserState.selectedFiles.size} selected
+          </span>
         )}
-
-        {/* Error State */}
-        {fileListingQuery.error && (
-          <div className="p-6 text-center">
-            <ExclamationTriangleIcon className="h-12 w-12 text-red-500 mx-auto mb-3" aria-hidden="true" />
-            <p className="text-red-600 dark:text-red-400 font-medium mb-2">
-              Failed to load files
-            </p>
-            <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
-              {fileListingQuery.error.message}
-            </p>
-            <button
-              type="button"
-              onClick={() => fileListingQuery.refetch()}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-            >
-              Try Again
-            </button>
-          </div>
+        
+        {isUploading && (
+          <span className="flex items-center gap-2">
+            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600" />
+            Uploading...
+          </span>
         )}
-
-        {/* Empty State */}
-        {!isLoading && !fileListingQuery.error && filteredAndSortedFiles.length === 0 && (
-          <div className="p-6 text-center">
-            <FolderIcon className="h-12 w-12 text-gray-400 mx-auto mb-3" aria-hidden="true" />
-            <p className="text-gray-600 dark:text-gray-400 font-medium mb-2">
-              {filterForm.watch('searchTerm') ? 'No matching files found' : 'This folder is empty'}
-            </p>
-            {hasUploadPermission && !filterForm.watch('searchTerm') && (
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors"
-              >
-                <CloudArrowUpIcon className="h-4 w-4 mr-2" aria-hidden="true" />
-                Upload Files
-              </button>
+      </div>
+      
+      <div className="flex items-center gap-2">
+        {operationStatus && (
+          <div className={cn(
+            "flex items-center gap-2 px-3 py-1 rounded-lg text-sm",
+            operationStatus.status === 'success' && "bg-green-100 text-green-800",
+            operationStatus.status === 'error' && "bg-red-100 text-red-800",
+            operationStatus.status === 'progress' && "bg-blue-100 text-blue-800"
+          )}>
+            {operationStatus.status === 'success' && <CheckCircleIcon className="h-4 w-4" />}
+            {operationStatus.status === 'error' && <ExclamationTriangleIcon className="h-4 w-4" />}
+            {operationStatus.status === 'progress' && (
+              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600" />
             )}
-          </div>
-        )}
-
-        {/* File List with Virtual Scrolling */}
-        {!isLoading && !fileListingQuery.error && filteredAndSortedFiles.length > 0 && (
-          <div
-            ref={scrollElementRef}
-            className="h-full overflow-auto"
-            style={{ height: '400px' }}
-          >
-            <div
-              style={{
-                height: `${virtualizer.getTotalSize()}px`,
-                width: '100%',
-                position: 'relative',
-              }}
-            >
-              {virtualizer.getVirtualItems().map((virtualItem) => {
-                const file = filteredAndSortedFiles[virtualItem.index];
-                const isSelected = selectedFile?.path === file.path;
-
-                return (
-                  <div
-                    key={virtualItem.key}
-                    data-index={virtualItem.index}
-                    ref={virtualizer.measureElement}
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      height: `${virtualItem.size}px`,
-                      transform: `translateY(${virtualItem.start}px)`,
-                    }}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (file.type === 'folder') {
-                          handleOpenFolder(file);
-                        } else {
-                          handleSelectFile(file);
-                        }
-                      }}
-                      onDoubleClick={() => {
-                        if (file.type === 'folder') {
-                          handleOpenFolder(file);
-                        } else if (file.type === 'file') {
-                          handleConfirmSelection();
-                        }
-                      }}
-                      className={`w-full flex items-center px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-500 ${
-                        isSelected
-                          ? 'bg-primary-50 dark:bg-primary-900/30 border-primary-200 dark:border-primary-800'
-                          : 'border-transparent'
-                      } border-l-4`}
-                      aria-pressed={isSelected}
-                      aria-label={`${file.type === 'folder' ? 'Open folder' : 'Select file'} ${file.name}`}
-                    >
-                      <div className="flex items-center flex-1 min-w-0">
-                        <FileIcon 
-                          file={file} 
-                          className="h-5 w-5 mr-3 flex-shrink-0" 
-                          selected={isSelected}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-sm font-medium truncate ${
-                            isSelected 
-                              ? 'text-primary-900 dark:text-primary-100' 
-                              : 'text-gray-900 dark:text-gray-100'
-                          }`}>
-                            {file.name}
-                          </p>
-                          <div className="flex items-center space-x-4 text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            <span>{file.type === 'folder' ? 'Folder' : file.contentType || 'File'}</span>
-                            {file.size && (
-                              <span>{(file.size / 1024).toFixed(1)} KB</span>
-                            )}
-                            {file.lastModified && (
-                              <span>{new Date(file.lastModified).toLocaleDateString()}</span>
-                            )}
-                          </div>
-                        </div>
-                        {isSelected && (
-                          <CheckCircleIconSolid 
-                            className="h-5 w-5 text-primary-600 dark:text-primary-400 flex-shrink-0 ml-3" 
-                            aria-hidden="true" 
-                          />
-                        )}
-                      </div>
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
+            <span>{operationStatus.message}</span>
           </div>
         )}
       </div>
-
-      {/* Selector-only info */}
-      {isSelectorOnly && (
-        <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border-t border-blue-200 dark:border-blue-800">
-          <div className="flex items-start space-x-3">
-            <InformationCircleIcon className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" aria-hidden="true" />
-            <p className="text-sm text-blue-700 dark:text-blue-300">
-              You can only select existing files. To upload new files, please use the File Manager.
-            </p>
-          </div>
-        </div>
-      )}
     </div>
   );
-
-  // =============================================================================
+  
+  // ========================================================================
   // MAIN RENDER
-  // =============================================================================
-
+  // ========================================================================
+  
   return (
     <>
-      <Dialog 
-        open={open} 
-        onClose={handleClose}
+      <Dialog
+        open={open}
+        onClose={onClose}
         className="relative z-50"
-        initialFocus={initialFocusRef}
+        data-testid={testId}
       >
         {/* Backdrop */}
-        <div 
-          className="fixed inset-0 bg-black/30 backdrop-blur-sm transition-opacity"
-          aria-hidden="true"
-        />
-
+        <DialogBackdrop className="fixed inset-0 bg-black/25 backdrop-blur-sm" />
+        
         {/* Dialog container */}
         <div className="fixed inset-0 flex items-center justify-center p-4">
-          <DialogPanel
-            className={`w-full max-w-4xl max-h-[90vh] rounded-lg bg-white dark:bg-gray-900 shadow-xl ring-1 ring-gray-900/10 dark:ring-gray-100/10 flex flex-col ${className}`}
+          <DialogPanel 
+            className={cn(
+              "w-full max-w-4xl max-h-[90vh] bg-white rounded-xl shadow-xl",
+              "transform transition-all duration-200 ease-out",
+              "flex flex-col",
+              className
+            )}
             onKeyDown={handleKeyDown}
-            {...props}
           >
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex-shrink-0">
-              <div className="flex items-center space-x-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-100 dark:bg-primary-900">
-                  {data.uploadMode ? (
-                    <CloudArrowUpIcon className="h-5 w-5 text-primary-600 dark:text-primary-400" aria-hidden="true" />
-                  ) : (
-                    <FolderOpenIcon className="h-5 w-5 text-primary-600 dark:text-primary-400" aria-hidden="true" />
-                  )}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <DocumentIcon className="h-6 w-6 text-blue-600" />
                 </div>
                 <div>
-                  <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                    {data.uploadMode ? 'Upload File' : title}
+                  <DialogTitle className="text-lg font-semibold text-gray-900">
+                    {title}
                   </DialogTitle>
-                  {data.allowedExtensions.length > 0 && (
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      Allowed file types: {data.allowedExtensions.join(', ')}
-                    </p>
+                  {description && (
+                    <p className="text-sm text-gray-600 mt-1">{description}</p>
                   )}
                 </div>
               </div>
+              
               <button
                 type="button"
-                onClick={handleClose}
-                className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 rounded-sm p-1"
+                onClick={onClose}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 aria-label="Close dialog"
               >
-                <XMarkIcon className="h-6 w-6" aria-hidden="true" />
+                <XMarkIcon className="h-6 w-6" />
               </button>
             </div>
-
-            {/* Content */}
-            <div className="flex-1 overflow-hidden">
-              {!selectedFileApi ? renderServiceSelection() : renderFileBrowser()}
+            
+            {/* Toolbar */}
+            {renderToolbar()}
+            
+            {/* Main content */}
+            <div className="flex-1 flex flex-col min-h-0">
+              {renderFileBrowser()}
             </div>
-
-            {/* Actions */}
-            <div className="flex justify-end space-x-3 border-t border-gray-200 dark:border-gray-700 px-6 py-4 flex-shrink-0">
-              <button
-                type="button"
-                onClick={handleClose}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmSelection}
-                disabled={!selectedFile || selectedFile.type !== 'file' || isLoading}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                ref={initialFocusRef}
-              >
-                {data.uploadMode ? 'Upload' : 'Choose'}
-              </button>
+            
+            {/* Status bar */}
+            {renderStatusBar()}
+            
+            {/* Footer actions */}
+            <div className="flex justify-between items-center p-6 border-t border-gray-200 bg-gray-50">
+              <div className="text-sm text-gray-600">
+                {selectionMode === 'multiple' && maxFiles && (
+                  <span>
+                    {browserState.selectedFiles.size} of {maxFiles} files selected
+                  </span>
+                )}
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-200"
+                >
+                  {cancelText}
+                </button>
+                
+                <button
+                  ref={initialFocusRef}
+                  type="button"
+                  onClick={() => onConfirm(selectedFileObjects)}
+                  disabled={browserState.selectedFiles.size === 0}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-200"
+                >
+                  {confirmText} ({browserState.selectedFiles.size})
+                </button>
+              </div>
             </div>
           </DialogPanel>
         </div>
       </Dialog>
-
-      {/* Create Folder Dialog */}
+      
+      {/* Hidden file input for upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple={selectionMode === 'multiple'}
+        onChange={handleFileInputChange}
+        className="hidden"
+        accept={apiInfo.allowedExtensions?.join(',')}
+      />
+      
+      {/* Create folder dialog */}
       <CreateFolderDialog
-        open={createFolderDialogOpen}
-        onClose={() => setCreateFolderDialogOpen(false)}
-        onFolderCreated={(folderPath) => {
-          setCreateFolderDialogOpen(false);
-          // Refresh file listing
-          if (selectedFileApi) {
-            fileListingQuery.refetch();
-          }
-        }}
-        currentPath={currentPath}
-        fileService={selectedFileApi}
-        createFolder={handleCreateFolder}
+        open={createFolderDialog.isOpen}
+        onClose={createFolderDialog.close}
+        onFolderCreated={handleCreateFolder}
+        currentPath={browserState.currentPath}
+        apiInfo={apiInfo}
+        existingFiles={processedFiles}
       />
     </>
   );
 }
 
-// =============================================================================
-// EXPORTS
-// =============================================================================
+// ============================================================================
+// EXPORT
+// ============================================================================
 
 export default FileSelectorDialog;
-export type { FileSelectorDialogProps };
+
+/**
+ * Hook for using FileSelectorDialog with common patterns
+ */
+export function useFileSelectorDialog() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
+  
+  const open = useCallback(() => setIsOpen(true), []);
+  const close = useCallback(() => setIsOpen(false), []);
+  
+  const handleConfirm = useCallback((files: SelectedFile[]) => {
+    setSelectedFiles(files);
+    setIsOpen(false);
+  }, []);
+  
+  return {
+    isOpen,
+    selectedFiles,
+    open,
+    close,
+    handleConfirm,
+  };
+}
+
+/**
+ * File type detection utility
+ */
+export { getFileType, formatFileSize, formatDate, validateFile };
