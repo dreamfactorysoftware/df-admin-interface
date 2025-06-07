@@ -1,292 +1,390 @@
 /**
- * License and entitlement check response types for React component integration.
+ * License and entitlement check response types maintaining API compatibility
+ * while supporting React component integration for license validation workflows.
  * 
- * This module provides type definitions for license checking workflows that maintain
- * full compatibility with existing DreamFactory backend endpoints while supporting
- * modern React component patterns including React Query caching, component state
- * management, and Next.js middleware integration.
- * 
- * The types defined here support:
- * - Server-side license validation through Next.js middleware
- * - React Query/SWR intelligent caching for license status
- * - Component-level license checking with React hooks
- * - Optimistic updates for license renewal workflows
- * - Background synchronization of license status
+ * This module provides types for license checking functionality that integrates
+ * with Next.js middleware authentication flows and React component patterns.
+ * The types maintain full compatibility with existing DreamFactory license
+ * validation endpoints while adding support for React-based UI components.
  */
 
 /**
- * Response interface for license and entitlement checking endpoints.
+ * Response structure for license and entitlement validation API calls.
  * 
- * This interface maintains full compatibility with the existing DreamFactory
- * backend API contract while supporting React component integration patterns.
+ * Used by license checking components to determine UI availability,
+ * display license status messages, and handle renewal workflows.
+ * Maintains compatibility with existing `/system/environment` endpoint
+ * and DreamFactory license validation infrastructure.
  * 
- * @example React Query Integration
+ * @interface CheckResponse
+ * @example
  * ```typescript
- * const { data: licenseStatus, error, isLoading } = useQuery({
- *   queryKey: ['license-check'],
- *   queryFn: fetchLicenseStatus,
- *   staleTime: 5 * 60 * 1000, // 5 minutes
- *   cacheTime: 10 * 60 * 1000, // 10 minutes
- *   refetchInterval: 30 * 60 * 1000, // Check every 30 minutes
- * });
- * ```
- * 
- * @example SWR Integration
- * ```typescript
- * const { data: licenseCheck, mutate } = useSWR(
- *   '/api/v2/system/license/check',
- *   fetcher,
- *   {
- *     refreshInterval: 30 * 60 * 1000, // 30 minutes
- *     revalidateOnFocus: true,
- *     revalidateOnReconnect: true,
- *   }
- * );
- * ```
- * 
- * @example Component Usage
- * ```typescript
- * function LicenseStatus({ checkResponse }: { checkResponse: CheckResponse }) {
- *   const shouldDisableUI = checkResponse.disableUi === 'true';
- *   const isExpired = checkResponse.statusCode === 'EXPIRED';
- *   
- *   if (shouldDisableUI) {
- *     return <PaywallComponent message={checkResponse.msg} />;
- *   }
- *   
- *   return (
- *     <div className={cn(
- *       "license-status",
- *       isExpired && "border-red-500 bg-red-50"
- *     )}>
- *       <p>{checkResponse.msg}</p>
- *       {checkResponse.renewalDate && (
- *         <p>Renewal Date: {checkResponse.renewalDate}</p>
- *       )}
- *     </div>
+ * // React component usage for license validation
+ * const LicenseChecker: React.FC = () => {
+ *   const { data: licenseStatus, error } = useSWR<CheckResponse>(
+ *     '/api/v2/system/environment',
+ *     fetcher
  *   );
- * }
+ * 
+ *   if (licenseStatus?.disableUi === 'true') {
+ *     return <LicenseExpiredBanner />;
+ *   }
+ * 
+ *   return <Application />;
+ * };
  * ```
  */
 export interface CheckResponse {
   /**
-   * Flag indicating whether the UI should be disabled due to license issues.
+   * String indicator for UI feature availability based on license status.
    * 
-   * When set to 'true', React components should render appropriate
-   * paywall or license warning interfaces. This supports conditional
-   * rendering patterns for license enforcement.
+   * When "true", indicates that certain UI features should be disabled
+   * due to license restrictions or expiration. React components should
+   * check this field to conditionally render features or show upgrade prompts.
    * 
    * @example
    * ```typescript
-   * const isUIDisabled = checkResponse.disableUi === 'true';
-   * if (isUIDisabled) {
-   *   return <PaywallComponent />;
-   * }
+   * // Conditional feature rendering based on license status
+   * const DatabaseServicePanel: React.FC = () => {
+   *   const { data: license } = useLicenseCheck();
+   *   
+   *   if (license?.disableUi === 'true') {
+   *     return <UpgradeRequiredMessage />;
+   *   }
+   *   
+   *   return <DatabaseConnectionForm />;
+   * };
    * ```
    */
   disableUi: string;
 
   /**
-   * Human-readable message about the current license status.
+   * Human-readable license status message for display in React components.
    * 
-   * This message can be displayed directly in React components
-   * for user notification about license status, expiration warnings,
-   * or renewal requirements.
+   * Contains descriptive text about the current license state, renewal
+   * requirements, or any restrictions. Should be displayed to users
+   * in license status components and notification banners.
    * 
    * @example
    * ```typescript
-   * <Alert variant={isWarning ? 'warning' : 'info'}>
-   *   {checkResponse.msg}
-   * </Alert>
+   * // Display license message in notification component
+   * const LicenseNotification: React.FC<{ message: string }> = ({ message }) => (
+   *   <Alert variant="warning" className="mb-4">
+   *     <AlertTriangle className="h-4 w-4" />
+   *     <AlertTitle>License Notice</AlertTitle>
+   *     <AlertDescription>{message}</AlertDescription>
+   *   </Alert>
+   * );
    * ```
    */
   msg: string;
 
   /**
-   * ISO date string representing when the license needs to be renewed.
+   * License renewal date in string format for renewal workflow components.
    * 
-   * This supports date formatting and countdown components in React
-   * applications for proactive license management.
+   * Represents when the current license expires and requires renewal.
+   * React components use this for countdown timers, renewal reminders,
+   * and proactive license management workflows.
    * 
    * @example
    * ```typescript
-   * const renewalDate = new Date(checkResponse.renewalDate);
-   * const daysUntilRenewal = differenceInDays(renewalDate, new Date());
+   * // License expiration countdown component
+   * const LicenseRenewalTimer: React.FC<{ renewalDate: string }> = ({ renewalDate }) => {
+   *   const daysUntilRenewal = useMemo(() => {
+   *     const renewal = new Date(renewalDate);
+   *     const now = new Date();
+   *     return Math.ceil((renewal.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+   *   }, [renewalDate]);
    * 
-   * <RenewalCountdown
-   *   renewalDate={renewalDate}
-   *   daysRemaining={daysUntilRenewal}
-   * />
+   *   if (daysUntilRenewal <= 30) {
+   *     return (
+   *       <Badge variant="destructive">
+   *         License expires in {daysUntilRenewal} days
+   *       </Badge>
+   *     );
+   *   }
+   *   
+   *   return null;
+   * };
    * ```
    */
   renewalDate: string;
 
   /**
-   * Status code indicating the current license state.
+   * License validation status code for programmatic license state handling.
    * 
-   * Common values include 'ACTIVE', 'EXPIRED', 'WARNING', 'INVALID'.
-   * This supports conditional styling and component behavior based
-   * on license status.
+   * Provides machine-readable status for license validation results.
+   * React components and middleware use this for conditional logic,
+   * error handling, and license state management workflows.
    * 
    * @example
    * ```typescript
-   * const statusVariant = {
-   *   'ACTIVE': 'success',
-   *   'EXPIRED': 'destructive',
-   *   'WARNING': 'warning',
-   *   'INVALID': 'destructive'
-   * }[checkResponse.statusCode] || 'default';
-   * 
-   * <Badge variant={statusVariant}>
-   *   {checkResponse.statusCode}
-   * </Badge>
+   * // License status-based routing in Next.js middleware
+   * export function middleware(request: NextRequest) {
+   *   const licenseStatus = await checkLicense();
+   *   
+   *   if (licenseStatus.statusCode === 'EXPIRED') {
+   *     return NextResponse.redirect(new URL('/license-expired', request.url));
+   *   }
+   *   
+   *   if (licenseStatus.statusCode === 'TRIAL_EXPIRED') {
+   *     return NextResponse.redirect(new URL('/upgrade-required', request.url));
+   *   }
+   *   
+   *   return NextResponse.next();
+   * }
    * ```
    */
   statusCode: string;
 }
 
 /**
- * Type guard to validate CheckResponse objects at runtime.
+ * License checking hook result interface for React component integration.
  * 
- * This utility function provides type safety when working with
- * API responses that should conform to the CheckResponse interface,
- * supporting robust error handling in React components.
+ * Provides a standardized interface for React hooks that perform license
+ * validation, integrating with SWR/React Query for intelligent caching
+ * and background revalidation of license status.
  * 
- * @param obj - Object to validate as CheckResponse
- * @returns Type predicate indicating if object is valid CheckResponse
- * 
+ * @interface LicenseCheckResult
  * @example
  * ```typescript
- * const handleLicenseCheck = (data: unknown) => {
- *   if (isCheckResponse(data)) {
- *     // data is now typed as CheckResponse
- *     setLicenseStatus(data);
- *   } else {
- *     setError('Invalid license check response');
- *   }
- * };
+ * // Custom hook for license checking with caching
+ * export function useLicenseCheck(): LicenseCheckResult {
+ *   const { data, error, isLoading } = useSWR<CheckResponse>(
+ *     '/api/v2/system/environment',
+ *     fetcher,
+ *     {
+ *       refreshInterval: 300000, // Recheck every 5 minutes
+ *       revalidateOnFocus: false,
+ *       revalidateOnReconnect: true
+ *     }
+ *   );
+ * 
+ *   return {
+ *     licenseStatus: data,
+ *     isLoading,
+ *     error,
+ *     isLicenseValid: data?.statusCode === 'VALID',
+ *     isUIDisabled: data?.disableUi === 'true'
+ *   };
+ * }
  * ```
  */
-export function isCheckResponse(obj: unknown): obj is CheckResponse {
-  return (
-    typeof obj === 'object' &&
-    obj !== null &&
-    typeof (obj as CheckResponse).disableUi === 'string' &&
-    typeof (obj as CheckResponse).msg === 'string' &&
-    typeof (obj as CheckResponse).renewalDate === 'string' &&
-    typeof (obj as CheckResponse).statusCode === 'string'
-  );
-}
-
-/**
- * Options for configuring license check behavior in React components.
- * 
- * This interface supports various caching and polling strategies
- * for license checking in React Query/SWR implementations.
- */
-export interface LicenseCheckOptions {
+export interface LicenseCheckResult {
   /**
-   * How long to consider cached license data fresh (in milliseconds).
-   * Default: 5 minutes (300000ms)
-   */
-  staleTime?: number;
-
-  /**
-   * How long to keep license data in cache (in milliseconds).
-   * Default: 10 minutes (600000ms)
-   */
-  cacheTime?: number;
-
-  /**
-   * Interval for automatic license check polling (in milliseconds).
-   * Default: 30 minutes (1800000ms)
-   */
-  refetchInterval?: number;
-
-  /**
-   * Whether to revalidate license on window focus.
-   * Default: true
-   */
-  revalidateOnFocus?: boolean;
-
-  /**
-   * Whether to revalidate license on network reconnect.
-   * Default: true
-   */
-  revalidateOnReconnect?: boolean;
-
-  /**
-   * Whether to show loading indicators during license checks.
-   * Default: false
-   */
-  showLoading?: boolean;
-
-  /**
-   * Callback function when license check fails.
-   */
-  onError?: (error: Error) => void;
-
-  /**
-   * Callback function when license status changes.
-   */
-  onStatusChange?: (status: CheckResponse) => void;
-}
-
-/**
- * Utility type for React components that depend on license status.
- * 
- * This type helps ensure that license-aware components receive
- * the necessary license information for proper rendering.
- */
-export interface LicenseAwareComponentProps {
-  /**
-   * Current license check response data.
+   * Current license status data from the API response.
+   * Undefined when loading or if an error occurred.
    */
   licenseStatus?: CheckResponse;
 
   /**
-   * Whether license check is currently loading.
+   * Loading state indicator for React component rendering.
+   * True when the license check request is in progress.
    */
-  isLicenseLoading?: boolean;
+  isLoading: boolean;
 
   /**
-   * Error from license check, if any.
+   * Error state for license check failures.
+   * Contains error information when the license check API call fails.
    */
-  licenseError?: Error | null;
+  error?: Error;
 
   /**
-   * Function to manually trigger license status refresh.
+   * Computed boolean indicating whether the license is in a valid state.
+   * Derived from the statusCode field for convenient conditional rendering.
    */
-  refreshLicense?: () => void;
+  isLicenseValid: boolean;
+
+  /**
+   * Computed boolean indicating whether UI features should be disabled.
+   * Derived from the disableUi field for React component conditional logic.
+   */
+  isUIDisabled: boolean;
 }
 
 /**
- * Status enumeration for common license check status codes.
+ * Configuration options for license checking components and hooks.
  * 
- * This provides type safety and IDE autocompletion when working
- * with license status codes in React components.
- */
-export const LICENSE_STATUS = {
-  ACTIVE: 'ACTIVE',
-  EXPIRED: 'EXPIRED',
-  WARNING: 'WARNING',
-  INVALID: 'INVALID',
-  GRACE_PERIOD: 'GRACE_PERIOD',
-  TRIAL: 'TRIAL',
-  SUSPENDED: 'SUSPENDED'
-} as const;
-
-/**
- * Type derived from LICENSE_STATUS constant for type safety.
- */
-export type LicenseStatusCode = typeof LICENSE_STATUS[keyof typeof LICENSE_STATUS];
-
-/**
- * Type guard to check if a status code is valid.
+ * Allows customization of license checking behavior, caching strategies,
+ * and integration with React Query/SWR for optimal performance in
+ * React applications.
  * 
- * @param status - Status code to validate
- * @returns Whether the status code is a valid LicenseStatusCode
+ * @interface LicenseCheckOptions
+ * @example
+ * ```typescript
+ * // Configure license checking with custom options
+ * const licenseOptions: LicenseCheckOptions = {
+ *   refreshInterval: 600000, // Check every 10 minutes
+ *   enableBackgroundRefresh: true,
+ *   onLicenseExpired: () => {
+ *     // Redirect to renewal page
+ *     router.push('/license-renewal');
+ *   },
+ *   onUIDisabled: (message) => {
+ *     // Show upgrade modal
+ *     setShowUpgradeModal(true);
+ *   }
+ * };
+ * ```
  */
-export function isValidLicenseStatus(status: string): status is LicenseStatusCode {
-  return Object.values(LICENSE_STATUS).includes(status as LicenseStatusCode);
+export interface LicenseCheckOptions {
+  /**
+   * Interval in milliseconds for background license status revalidation.
+   * Defaults to 5 minutes for balanced performance and responsiveness.
+   */
+  refreshInterval?: number;
+
+  /**
+   * Whether to enable background refresh of license status.
+   * When true, license status is checked periodically even when not in focus.
+   */
+  enableBackgroundRefresh?: boolean;
+
+  /**
+   * Callback function executed when license is detected as expired.
+   * Used for custom handling of license expiration scenarios.
+   */
+  onLicenseExpired?: () => void;
+
+  /**
+   * Callback function executed when UI should be disabled due to license restrictions.
+   * Receives the license message for display in custom UI components.
+   */
+  onUIDisabled?: (message: string) => void;
+
+  /**
+   * Custom error handler for license check failures.
+   * Allows applications to implement custom error recovery strategies.
+   */
+  onError?: (error: Error) => void;
 }
+
+/**
+ * License status enumeration for type-safe status code handling.
+ * 
+ * Provides strongly-typed alternatives to string status codes
+ * for improved developer experience and compile-time validation
+ * in React components and TypeScript applications.
+ * 
+ * @enum LicenseStatus
+ * @example
+ * ```typescript
+ * // Type-safe license status handling
+ * const LicenseStatusBadge: React.FC<{ status: string }> = ({ status }) => {
+ *   switch (status as LicenseStatus) {
+ *     case LicenseStatus.VALID:
+ *       return <Badge variant="success">License Active</Badge>;
+ *     case LicenseStatus.EXPIRED:
+ *       return <Badge variant="destructive">License Expired</Badge>;
+ *     case LicenseStatus.TRIAL:
+ *       return <Badge variant="warning">Trial License</Badge>;
+ *     case LicenseStatus.TRIAL_EXPIRED:
+ *       return <Badge variant="destructive">Trial Expired</Badge>;
+ *     default:
+ *       return <Badge variant="secondary">Unknown Status</Badge>;
+ *   }
+ * };
+ * ```
+ */
+export enum LicenseStatus {
+  /**
+   * License is valid and fully functional.
+   */
+  VALID = 'VALID',
+
+  /**
+   * License has expired and requires renewal.
+   */
+  EXPIRED = 'EXPIRED',
+
+  /**
+   * Currently running on a trial license.
+   */
+  TRIAL = 'TRIAL',
+
+  /**
+   * Trial license has expired.
+   */
+  TRIAL_EXPIRED = 'TRIAL_EXPIRED',
+
+  /**
+   * License validation failed or is invalid.
+   */
+  INVALID = 'INVALID',
+
+  /**
+   * Unable to verify license status.
+   */
+  UNKNOWN = 'UNKNOWN'
+}
+
+/**
+ * Type guard function to validate CheckResponse interface conformance.
+ * 
+ * Provides runtime validation for license check API responses,
+ * ensuring type safety when working with dynamic API data in
+ * React components and middleware functions.
+ * 
+ * @param data - Unknown data to validate as CheckResponse
+ * @returns True if data conforms to CheckResponse interface
+ * 
+ * @example
+ * ```typescript
+ * // Validate API response in React component
+ * const LicenseProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+ *   const [licenseStatus, setLicenseStatus] = useState<CheckResponse | null>(null);
+ * 
+ *   useEffect(() => {
+ *     fetch('/api/v2/system/environment')
+ *       .then(res => res.json())
+ *       .then(data => {
+ *         if (isCheckResponse(data)) {
+ *           setLicenseStatus(data);
+ *         } else {
+ *           console.error('Invalid license response format');
+ *         }
+ *       });
+ *   }, []);
+ * 
+ *   return (
+ *     <LicenseContext.Provider value={licenseStatus}>
+ *       {children}
+ *     </LicenseContext.Provider>
+ *   );
+ * };
+ * ```
+ */
+export function isCheckResponse(data: unknown): data is CheckResponse {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    typeof (data as any).disableUi === 'string' &&
+    typeof (data as any).msg === 'string' &&
+    typeof (data as any).renewalDate === 'string' &&
+    typeof (data as any).statusCode === 'string'
+  );
+}
+
+/**
+ * Default license check options for consistent behavior across components.
+ * 
+ * Provides sensible defaults for license checking configuration,
+ * optimized for React applications with balanced performance and
+ * user experience considerations.
+ */
+export const DEFAULT_LICENSE_CHECK_OPTIONS: Required<LicenseCheckOptions> = {
+  refreshInterval: 300000, // 5 minutes
+  enableBackgroundRefresh: true,
+  onLicenseExpired: () => {
+    // Default: Log license expiration for debugging
+    console.warn('License has expired');
+  },
+  onUIDisabled: (message: string) => {
+    // Default: Log UI restriction for debugging
+    console.warn('UI features disabled:', message);
+  },
+  onError: (error: Error) => {
+    // Default: Log license check errors
+    console.error('License check failed:', error);
+  }
+};
