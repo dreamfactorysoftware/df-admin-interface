@@ -1,984 +1,862 @@
 /**
- * @fileoverview Dialog component types adapted for React dialog patterns and Headless UI integration
+ * @fileoverview Core dialog types for React/Next.js dialog patterns and Headless UI integration
  * 
- * This file provides comprehensive type definitions for dialog data structures and configurations
- * that complement the React 19/Next.js 15.1 dialog component system. It replaces Angular Material
- * dialog contracts with modern React patterns supporting Portal-based rendering, accessibility,
- * and enhanced state management.
+ * This file provides streamlined dialog interfaces adapted for React dialog patterns,
+ * replacing Angular Material dialog contracts with modern React patterns supporting
+ * Headless UI modals, React Portal rendering, and accessible dialog components.
  * 
  * Key Features:
  * - React Portal-based dialog rendering support
- * - WCAG 2.1 AA accessibility compliance with enhanced screen reader support
- * - Headless UI modal compatibility and integration patterns
- * - React state management integration with Zustand and React Query
- * - TypeScript 5.8+ enhanced type safety with strict inference
- * - Mobile-first responsive dialog data structures
- * - Promise-based async dialog workflows for modern React patterns
+ * - React state management integration patterns
+ * - WCAG 2.1 AA accessible dialog patterns
+ * - Headless UI Dialog primitive compatibility
+ * - Promise-based dialog workflows for async operations
+ * - TypeScript 5.8+ enhanced type safety
  * 
- * @author DreamFactory Admin Interface  
+ * Integration Notes:
+ * - Complements /src/components/ui/dialog/types.ts with simplified interfaces
+ * - Supports React 19 concurrent features and state management
+ * - Designed for Next.js 15.1+ app router compatibility
+ * - Follows Section 7.7.1 accessibility standards
+ * 
+ * @author DreamFactory Admin Interface Migration
  * @version 1.0.0
- * @since React 19.0.0, Next.js 15.1+, TypeScript 5.8+
+ * @since React 19.0.0, Next.js 15.1+
  */
 
-import { ReactNode, ComponentType, RefObject } from 'react';
+import { ReactNode, RefObject } from 'react';
 
 // =============================================================================
 // CORE DIALOG DATA INTERFACES
 // =============================================================================
 
 /**
+ * Base dialog data interface for React dialog patterns
+ * Replaces Angular dialog data contracts with React-specific patterns
+ */
+export interface DialogData<T = unknown> {
+  /** Unique identifier for the dialog instance */
+  id?: string;
+  
+  /** Dialog title for accessibility and display */
+  title?: string;
+  
+  /** Dialog content - supports React nodes */
+  content?: ReactNode;
+  
+  /** Custom data payload passed to dialog */
+  data?: T;
+  
+  /** Dialog variant for styling and behavior */
+  variant?: 'modal' | 'sheet' | 'drawer' | 'overlay';
+  
+  /** Size configuration */
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
+  
+  /** Whether dialog can be dismissed */
+  dismissible?: boolean;
+  
+  /** Portal container for React Portal rendering */
+  container?: HTMLElement | string;
+  
+  /** Z-index for stacking context */
+  zIndex?: number;
+}
+
+/**
  * Enhanced ConfirmDialogData interface for React dialog components
- * Replaces Angular Material dialog data with React-optimized patterns
+ * Updated from Angular Material patterns to support React state management
  */
 export interface ConfirmDialogData {
-  /** Dialog title with React element support */
-  title: string | ReactNode;
+  /** Confirmation dialog title */
+  title: string;
   
-  /** Main confirmation message content */
-  message: string | ReactNode;
-  
-  /** Optional detailed description or additional context */
-  description?: string | ReactNode;
+  /** Message content - supports React nodes for rich formatting */
+  message: ReactNode;
   
   /** Confirm button configuration */
-  confirm: {
-    /** Button text */
-    text: string;
-    /** Button variant for styling */
+  confirmButton?: {
+    text?: string;
     variant?: 'default' | 'primary' | 'destructive' | 'success' | 'warning';
-    /** Loading state during confirmation */
     loading?: boolean;
-    /** Disabled state */
     disabled?: boolean;
-    /** Icon component to display */
-    icon?: ComponentType<{ className?: string }>;
-    /** Accessibility label */
-    ariaLabel?: string;
+    'data-testid'?: string;
   };
   
   /** Cancel button configuration */
-  cancel: {
-    /** Button text */
-    text: string;
-    /** Button variant for styling */
-    variant?: 'ghost' | 'outline' | 'secondary';
-    /** Disabled state */
+  cancelButton?: {
+    text?: string;
+    variant?: 'default' | 'secondary' | 'ghost' | 'outline';
     disabled?: boolean;
-    /** Icon component to display */
-    icon?: ComponentType<{ className?: string }>;
-    /** Accessibility label */
-    ariaLabel?: string;
+    'data-testid'?: string;
   };
   
-  /** Dialog appearance and behavior */
-  appearance?: {
-    /** Dialog size */
-    size?: 'sm' | 'md' | 'lg' | 'xl';
-    /** Whether the action is destructive */
-    destructive?: boolean;
-    /** Show warning icon */
-    showIcon?: boolean;
-    /** Custom icon component */
-    customIcon?: ComponentType<{ className?: string }>;
-    /** Icon color theme */
-    iconColor?: 'info' | 'warning' | 'error' | 'success';
+  /** Icon to display in the confirmation dialog */
+  icon?: {
+    name: string;
+    color?: 'default' | 'primary' | 'success' | 'warning' | 'error';
+    size?: 'sm' | 'md' | 'lg';
   };
   
-  /** Advanced confirmation requirements */
-  verification?: {
-    /** Require typing confirmation text */
-    requireText?: {
-      enabled: boolean;
-      text: string;
-      placeholder?: string;
-      caseSensitive?: boolean;
-    };
-    /** Require checkbox confirmation */
-    requireCheckbox?: {
-      enabled: boolean;
-      text: string | ReactNode;
-      required: boolean;
-    };
-    /** Countdown timer before confirm is enabled */
-    countdown?: {
-      enabled: boolean;
-      seconds: number;
-      message?: string;
-    };
-  };
+  /** Whether the action is destructive (affects styling) */
+  destructive?: boolean;
   
-  /** Accessibility enhancements */
-  accessibility?: {
-    /** Announce to screen readers when opened */
-    announceOnOpen?: string;
-    /** Announce when action is destructive */
-    destructiveWarning?: string;
-    /** Focus element after confirmation */
-    focusAfterConfirm?: string | HTMLElement;
-    /** Focus element after cancellation */
-    focusAfterCancel?: string | HTMLElement;
-  };
-  
-  /** Data payload to pass through the dialog */
-  data?: unknown;
-  
-  /** Context information for tracking */
-  context?: {
-    /** Source component or page */
-    source?: string;
-    /** Action being confirmed */
-    action?: string;
-    /** Additional metadata */
-    metadata?: Record<string, unknown>;
-  };
-}
-
-// =============================================================================
-// REACT PORTAL DIALOG INTERFACES
-// =============================================================================
-
-/**
- * Portal-based dialog rendering configuration
- * Enables flexible dialog rendering across React component trees
- */
-export interface DialogPortalConfig {
-  /** Portal container element or selector */
-  container?: HTMLElement | string | null;
-  
-  /** Whether to create container if it doesn't exist */
-  createContainer?: boolean;
-  
-  /** Container creation configuration */
-  containerConfig?: {
-    /** Container element tag name */
-    tagName?: string;
-    /** Container CSS classes */
-    className?: string;
-    /** Container inline styles */
-    style?: React.CSSProperties;
-    /** Container ARIA attributes */
-    ariaAttributes?: Record<string, string>;
-  };
-  
-  /** Z-index management */
-  zIndex?: {
-    /** Base z-index for layering */
-    base?: number;
-    /** Auto-increment for stacked dialogs */
-    autoIncrement?: boolean;
-    /** Maximum z-index value */
-    max?: number;
-  };
-  
-  /** Portal cleanup behavior */
-  cleanup?: {
-    /** Remove container on unmount */
-    removeContainer?: boolean;
-    /** Cleanup delay in milliseconds */
-    delay?: number;
-    /** Force cleanup on page unload */
-    forceCleanup?: boolean;
-  };
-}
-
-/**
- * React Portal dialog rendering data
- * Comprehensive configuration for Portal-based dialog systems
- */
-export interface PortalDialogData {
-  /** Unique identifier for the dialog instance */
-  id: string;
-  
-  /** Portal configuration */
-  portal: DialogPortalConfig;
-  
-  /** Dialog content component or element */
-  content: ReactNode | ComponentType<any>;
-  
-  /** Props to pass to content component */
-  contentProps?: Record<string, unknown>;
-  
-  /** Portal-specific accessibility settings */
-  accessibility: {
-    /** Focus management across portals */
-    focusManagement: {
-      /** Trap focus within portal */
-      trapFocus: boolean;
-      /** Restore focus on close */
-      restoreFocus: boolean;
-      /** Initial focus target */
-      initialFocus?: string | HTMLElement | RefObject<HTMLElement>;
-      /** Final focus target */
-      finalFocus?: string | HTMLElement | RefObject<HTMLElement>;
-    };
-    
-    /** Screen reader announcements */
-    announcements: {
-      /** Announce when portal opens */
-      onOpen?: string;
-      /** Announce when portal closes */
-      onClose?: string;
-      /** Live region for dynamic updates */
-      liveRegion?: 'polite' | 'assertive' | 'off';
-    };
-    
-    /** Keyboard navigation */
-    keyboard: {
-      /** Close on escape key */
-      escapeToClose: boolean;
-      /** Prevent background interaction */
-      preventBackgroundInteraction: boolean;
-      /** Enable tab cycling */
-      enableTabCycling: boolean;
-    };
-  };
-  
-  /** Portal lifecycle callbacks */
-  lifecycle?: {
-    /** Called before portal mounts */
-    beforeMount?: () => void | Promise<void>;
-    /** Called after portal mounts */
-    afterMount?: () => void | Promise<void>;
-    /** Called before portal unmounts */
-    beforeUnmount?: () => void | Promise<void>;
-    /** Called after portal unmounts */
-    afterUnmount?: () => void | Promise<void>;
-  };
-}
-
-// =============================================================================
-// REACT STATE MANAGEMENT INTEGRATION
-// =============================================================================
-
-/**
- * Dialog state management configuration for React patterns
- * Integrates with Zustand, React Query, and local component state
- */
-export interface DialogStateConfig {
-  /** State management strategy */
-  strategy: 'local' | 'zustand' | 'context' | 'reducer' | 'external';
-  
-  /** Local state configuration */
-  local?: {
-    /** Initial open state */
-    initialOpen?: boolean;
-    /** Persist state in sessionStorage */
-    persist?: boolean;
-    /** Storage key for persistence */
-    storageKey?: string;
-  };
-  
-  /** Zustand store integration */
-  zustand?: {
-    /** Store selector function */
-    selector?: (state: any) => any;
-    /** State update function */
-    updater?: (state: any, action: any) => any;
-    /** Store subscription options */
-    subscription?: {
-      /** Subscribe to specific slice */
-      slice?: string;
-      /** Equality function for re-renders */
-      equalityFn?: (a: any, b: any) => boolean;
-    };
-  };
-  
-  /** React Context integration */
-  context?: {
-    /** Context provider reference */
-    provider?: React.Context<any>;
-    /** Context value selector */
-    selector?: (contextValue: any) => any;
-    /** Default context value */
-    defaultValue?: any;
-  };
-  
-  /** External state integration */
-  external?: {
-    /** Get current state */
-    getValue: () => any;
-    /** Set state value */
-    setValue: (value: any) => void;
-    /** Subscribe to state changes */
-    subscribe?: (callback: (value: any) => void) => () => void;
-  };
-  
-  /** State synchronization */
-  sync?: {
-    /** Debounce state updates */
-    debounce?: number;
-    /** Throttle state updates */
-    throttle?: number;
-    /** Sync with URL parameters */
-    urlSync?: {
-      enabled: boolean;
-      paramName?: string;
-      serialize?: (value: any) => string;
-      deserialize?: (value: string) => any;
-    };
-  };
-}
-
-/**
- * Dialog context data for React component tree integration
- * Enables dialog state sharing across component hierarchies
- */
-export interface DialogContextData {
-  /** Dialog registry for managing multiple dialogs */
-  registry: {
-    /** Active dialog instances */
-    active: Map<string, DialogInstance>;
-    /** Dialog stack for layering */
-    stack: string[];
-    /** Maximum concurrent dialogs */
-    maxConcurrent?: number;
-  };
-  
-  /** Global dialog configuration */
-  config: {
-    /** Default portal container */
-    defaultContainer?: HTMLElement | string;
-    /** Default z-index base */
-    defaultZIndex?: number;
-    /** Animation preferences */
-    animations?: {
-      enabled: boolean;
-      duration: number;
-      easing: string;
-    };
-    /** Accessibility defaults */
-    accessibility?: {
-      focusTrap: boolean;
-      announceOnOpen: boolean;
-      closeOnEscape: boolean;
-    };
-  };
-  
-  /** Event system for dialog coordination */
-  events: {
-    /** Event emitter for dialog events */
-    emitter?: {
-      emit: (event: string, data?: any) => void;
-      on: (event: string, handler: (data?: any) => void) => () => void;
-      off: (event: string, handler: (data?: any) => void) => void;
-    };
-    /** Global event handlers */
-    handlers?: {
-      onDialogOpen?: (dialog: DialogInstance) => void;
-      onDialogClose?: (dialog: DialogInstance) => void;
-      onDialogError?: (dialog: DialogInstance, error: Error) => void;
-    };
-  };
-  
-  /** Performance monitoring */
-  performance?: {
-    /** Track dialog render times */
-    trackRenderTime?: boolean;
-    /** Track memory usage */
-    trackMemory?: boolean;
-    /** Performance thresholds */
-    thresholds?: {
-      renderTime?: number;
-      memoryUsage?: number;
-    };
-  };
-}
-
-// =============================================================================
-// HEADLESS UI MODAL INTEGRATION
-// =============================================================================
-
-/**
- * Headless UI modal compatibility configuration
- * Ensures seamless integration with Headless UI Dialog primitive
- */
-export interface HeadlessUIDialogConfig {
-  /** Headless UI Dialog.Panel configuration */
-  panel: {
-    /** Custom className for panel */
-    className?: string;
-    /** Panel click behavior */
-    onClick?: (event: React.MouseEvent) => void;
-    /** Panel keyboard behavior */
-    onKeyDown?: (event: React.KeyboardEvent) => void;
-    /** Panel focus behavior */
-    onFocus?: (event: React.FocusEvent) => void;
-  };
-  
-  /** Headless UI Dialog.Overlay configuration */
-  overlay: {
-    /** Custom className for overlay */
-    className?: string;
-    /** Overlay click behavior */
-    onClick?: (event: React.MouseEvent) => void;
-    /** Overlay opacity */
-    opacity?: number;
-    /** Overlay blur effect */
-    blur?: boolean;
-  };
-  
-  /** Headless UI Transition integration */
-  transition: {
-    /** Show transition */
-    show?: {
-      enter?: string;
-      enterFrom?: string;
-      enterTo?: string;
-      leave?: string;
-      leaveFrom?: string;
-      leaveTo?: string;
-    };
-    /** Child transition */
-    child?: {
-      enter?: string;
-      enterFrom?: string;
-      enterTo?: string;
-      leave?: string;
-      leaveFrom?: string;
-      leaveTo?: string;
-    };
-  };
-  
-  /** Focus management integration */
-  focus: {
-    /** Initial focus element */
-    initialFocus?: RefObject<HTMLElement>;
-    /** Restore focus */
-    restoreFocus?: boolean;
-    /** Focus trap enabled */
-    trapFocus?: boolean;
-  };
-  
-  /** Dialog state integration */
-  state: {
-    /** Open state */
-    open: boolean;
-    /** Open state change handler */
-    onOpenChange: (open: boolean) => void;
-    /** Close handler */
-    onClose?: () => void;
-  };
-  
-  /** Accessibility overrides */
-  accessibility: {
-    /** Custom aria-label */
-    ariaLabel?: string;
-    /** Custom aria-labelledby */
-    ariaLabelledBy?: string;
-    /** Custom aria-describedby */
-    ariaDescribedBy?: string;
-    /** Custom role */
-    role?: string;
-  };
-}
-
-// =============================================================================
-// DIALOG WORKFLOW INTERFACES
-// =============================================================================
-
-/**
- * Dialog instance tracking and management
- * Provides runtime information about active dialog instances
- */
-export interface DialogInstance {
-  /** Unique instance identifier */
-  id: string;
-  
-  /** Dialog type */
-  type: 'confirm' | 'prompt' | 'alert' | 'custom';
-  
-  /** Dialog data configuration */
-  data: ConfirmDialogData | PromptDialogData | AlertDialogData | CustomDialogData;
-  
-  /** Current state */
-  state: {
-    /** Whether dialog is open */
-    open: boolean;
-    /** Loading state */
-    loading: boolean;
-    /** Error state */
-    error?: {
-      message: string;
-      code?: string;
-      recoverable: boolean;
-    };
-    /** Resolution state */
-    resolved: boolean;
-    /** Resolution result */
-    result?: DialogResult;
-  };
-  
-  /** Timing information */
-  timing: {
-    /** Creation timestamp */
-    created: number;
-    /** Opened timestamp */
-    opened?: number;
-    /** Closed timestamp */
-    closed?: number;
-    /** Total duration */
-    duration?: number;
-  };
-  
-  /** Portal information */
-  portal: {
-    /** Portal container */
-    container: HTMLElement;
-    /** Z-index value */
-    zIndex: number;
-    /** Cleanup function */
-    cleanup?: () => void;
-  };
-  
-  /** Accessibility state */
-  accessibility: {
-    /** Focus trap active */
-    focusTrapActive: boolean;
-    /** Previously focused element */
-    previouslyFocused?: HTMLElement;
-    /** Screen reader announced */
-    announced: boolean;
-  };
-}
-
-/**
- * Dialog result with enhanced metadata
- * Provides comprehensive information about dialog resolution
- */
-export interface DialogResult<T = unknown> {
-  /** Whether dialog was confirmed */
-  confirmed: boolean;
-  
-  /** Result data */
-  data?: T;
-  
-  /** How dialog was closed */
-  reason: 'confirm' | 'cancel' | 'escape' | 'outside-click' | 'programmatic' | 'error';
-  
-  /** Timing information */
-  timing: {
-    /** When dialog was opened */
-    opened: number;
-    /** When dialog was closed */
-    closed: number;
-    /** Total interaction duration */
-    duration: number;
-    /** Time to first interaction */
-    timeToInteraction?: number;
-  };
-  
-  /** User interaction metadata */
-  interaction: {
-    /** Number of focus changes */
-    focusChanges: number;
-    /** Keyboard interactions */
-    keyboardInteractions: number;
-    /** Mouse interactions */
-    mouseInteractions: number;
-    /** Touch interactions */
-    touchInteractions: number;
-  };
-  
-  /** Accessibility metrics */
-  accessibility: {
-    /** Screen reader usage detected */
-    screenReaderUsed: boolean;
-    /** Keyboard navigation used */
-    keyboardNavigation: boolean;
-    /** High contrast mode detected */
-    highContrastMode: boolean;
-    /** Reduced motion preference */
-    reducedMotion: boolean;
-  };
-  
-  /** Error information if applicable */
-  error?: {
-    /** Error message */
-    message: string;
-    /** Error code */
-    code?: string;
-    /** Stack trace */
-    stack?: string;
-    /** Recovery attempted */
-    recoveryAttempted: boolean;
-  };
-}
-
-// =============================================================================
-// SPECIALIZED DIALOG DATA TYPES
-// =============================================================================
-
-/**
- * Prompt dialog data for user input collection
- */
-export interface PromptDialogData {
-  /** Dialog title */
-  title: string | ReactNode;
-  
-  /** Prompt message */
-  message?: string | ReactNode;
-  
-  /** Input configuration */
-  input: {
-    /** Input type */
-    type: 'text' | 'email' | 'password' | 'number' | 'tel' | 'url' | 'textarea' | 'select' | 'multiselect';
-    /** Input placeholder */
+  /** Require additional confirmation (typing confirmation text) */
+  requireTextConfirmation?: {
+    enabled: boolean;
+    expectedText: string;
     placeholder?: string;
-    /** Default value */
-    defaultValue?: string;
-    /** Input label */
-    label?: string;
-    /** Help text */
     helpText?: string;
-    /** Required field indicator */
-    required?: boolean;
-    /** Input options for select types */
-    options?: Array<{
-      value: string | number;
-      label: string;
-      disabled?: boolean;
-    }>;
+  };
+  
+  /** Accessibility configuration */
+  accessibility?: {
+    'aria-describedby'?: string;
+    announceOnOpen?: string;
+    announceOnConfirm?: string;
+    announceOnCancel?: string;
+  };
+  
+  /** Dialog size override */
+  size?: 'xs' | 'sm' | 'md' | 'lg';
+  
+  /** Whether to prevent closing on outside click */
+  preventOutsideClose?: boolean;
+  
+  /** Whether to prevent closing on escape key */
+  preventEscapeClose?: boolean;
+}
+
+/**
+ * Prompt dialog data interface for input collection
+ * Supports various input types and validation patterns
+ */
+export interface PromptDialogData<T = string> {
+  /** Prompt dialog title */
+  title: string;
+  
+  /** Prompt message or description */
+  message?: ReactNode;
+  
+  /** Input field configuration */
+  input: {
+    type: 'text' | 'email' | 'password' | 'number' | 'tel' | 'url' | 'textarea' | 'select';
+    placeholder?: string;
+    defaultValue?: string;
+    options?: Array<{ value: string; label: string; disabled?: boolean }>;
+    multiline?: boolean;
+    rows?: number;
+    maxLength?: number;
   };
   
   /** Validation configuration */
   validation?: {
-    /** Required validation */
     required?: boolean;
-    /** Minimum length */
     minLength?: number;
-    /** Maximum length */
     maxLength?: number;
-    /** Pattern validation */
-    pattern?: RegExp;
-    /** Custom validator function */
-    validator?: (value: string) => string | null;
-    /** Real-time validation */
-    realTime?: boolean;
+    pattern?: RegExp | string;
+    min?: number;
+    max?: number;
+    validator?: (value: T) => string | null | Promise<string | null>;
   };
   
-  /** Button configuration */
-  buttons: {
-    /** Submit button */
-    submit: {
-      text: string;
-      variant?: 'primary' | 'secondary' | 'success';
-      disabled?: boolean;
-    };
-    /** Cancel button */
-    cancel: {
-      text: string;
-      variant?: 'ghost' | 'outline';
-      disabled?: boolean;
-    };
+  /** Submit button configuration */
+  submitButton?: {
+    text?: string;
+    variant?: 'default' | 'primary' | 'success';
+    loading?: boolean;
   };
   
-  /** Additional configuration */
-  config?: {
-    /** Allow empty submission */
-    allowEmpty?: boolean;
-    /** Auto-focus input */
-    autoFocus?: boolean;
-    /** Select all text on focus */
-    selectAllOnFocus?: boolean;
-    /** Submit on Enter key */
-    submitOnEnter?: boolean;
+  /** Cancel button configuration */
+  cancelButton?: {
+    text?: string;
+    variant?: 'default' | 'secondary' | 'ghost';
+  };
+  
+  /** Dialog size */
+  size?: 'sm' | 'md' | 'lg';
+  
+  /** Accessibility configuration */
+  accessibility?: {
+    inputLabel?: string;
+    inputDescription?: string;
+    errorAnnouncement?: string;
   };
 }
 
 /**
- * Alert dialog data for notifications
+ * Alert dialog data interface for notifications and messages
+ * Provides standardized alert patterns with accessibility support
  */
 export interface AlertDialogData {
   /** Alert title */
-  title: string | ReactNode;
+  title: string;
   
-  /** Alert message */
-  message: string | ReactNode;
+  /** Alert message content */
+  message: ReactNode;
   
-  /** Alert type */
+  /** Alert type affecting styling and icons */
   type: 'info' | 'success' | 'warning' | 'error';
   
-  /** Alert icon configuration */
-  icon?: {
-    /** Show default icon for type */
-    show: boolean;
-    /** Custom icon component */
-    custom?: ComponentType<{ className?: string }>;
-    /** Icon position */
-    position?: 'left' | 'top';
-  };
-  
-  /** Action button configuration */
-  action: {
-    /** Button text */
-    text: string;
-    /** Button variant */
-    variant?: 'primary' | 'secondary' | 'ghost';
-    /** Auto-close after action */
-    autoClose?: boolean;
-  };
+  /** Action buttons */
+  actions?: Array<{
+    label: string;
+    variant?: 'default' | 'primary' | 'secondary' | 'destructive';
+    action?: () => void | Promise<void>;
+    loading?: boolean;
+    disabled?: boolean;
+    'data-testid'?: string;
+  }>;
   
   /** Auto-dismiss configuration */
   autoDismiss?: {
-    /** Enable auto-dismiss */
     enabled: boolean;
-    /** Dismiss timeout in milliseconds */
-    timeout: number;
-    /** Show countdown */
-    showCountdown?: boolean;
-    /** Pause on hover */
-    pauseOnHover?: boolean;
+    duration: number; // in milliseconds
+    showProgress?: boolean;
+  };
+  
+  /** Dialog size */
+  size?: 'sm' | 'md' | 'lg';
+  
+  /** Accessibility configuration */
+  accessibility?: {
+    role?: 'alert' | 'alertdialog';
+    'aria-live'?: 'polite' | 'assertive';
+    announceOnOpen?: string;
+  };
+}
+
+// =============================================================================
+// REACT PORTAL AND RENDERING INTERFACES
+// =============================================================================
+
+/**
+ * React Portal configuration for dialog rendering
+ * Enables portal-based rendering with proper cleanup and accessibility
+ */
+export interface DialogPortalConfig {
+  /** Portal container element or selector */
+  container?: HTMLElement | string;
+  
+  /** Portal key for React reconciliation */
+  key?: string;
+  
+  /** Whether to append to container or replace */
+  appendMode?: 'append' | 'replace';
+  
+  /** CSS classes to apply to portal container */
+  containerClassName?: string;
+  
+  /** Inline styles for portal container */
+  containerStyle?: React.CSSProperties;
+  
+  /** Whether to preserve container on unmount */
+  preserveContainer?: boolean;
+  
+  /** Cleanup function called on portal unmount */
+  onUnmount?: () => void;
+}
+
+/**
+ * Dialog component tree context for React component integration
+ * Provides state and methods accessible throughout the dialog component tree
+ */
+export interface DialogComponentContext {
+  /** Whether the dialog is currently open */
+  isOpen: boolean;
+  
+  /** Function to close the dialog */
+  close: (reason?: DialogCloseReason) => void;
+  
+  /** Function to update dialog data */
+  updateData: <T>(data: Partial<T>) => void;
+  
+  /** Current dialog data */
+  data: DialogData;
+  
+  /** Portal configuration */
+  portal: DialogPortalConfig;
+  
+  /** Loading state for async operations */
+  loading: boolean;
+  
+  /** Error state */
+  error: {
+    hasError: boolean;
+    message?: string;
+    code?: string;
+  };
+  
+  /** Dialog refs for imperative access */
+  refs: {
+    dialog: RefObject<HTMLDivElement>;
+    content: RefObject<HTMLDivElement>;
+    backdrop: RefObject<HTMLDivElement>;
+    focusTrap: RefObject<HTMLDivElement>;
+  };
+  
+  /** Accessibility state */
+  accessibility: {
+    titleId: string;
+    descriptionId: string;
+    labelledBy?: string;
+    describedBy?: string;
+  };
+}
+
+// =============================================================================
+// STATE MANAGEMENT INTERFACES
+// =============================================================================
+
+/**
+ * Dialog state management interface for React state patterns
+ * Supports both controlled and uncontrolled dialog patterns
+ */
+export interface DialogState {
+  /** Whether the dialog is open */
+  open: boolean;
+  
+  /** Current dialog data */
+  data: DialogData | null;
+  
+  /** Loading state */
+  loading: boolean;
+  
+  /** Error state */
+  error: string | null;
+  
+  /** Result from dialog interaction */
+  result: DialogResult | null;
+  
+  /** History of dialog interactions */
+  history: DialogInteraction[];
+}
+
+/**
+ * Dialog state actions for managing dialog lifecycle
+ * Provides type-safe actions for dialog state updates
+ */
+export interface DialogStateActions {
+  /** Open dialog with data */
+  openDialog: <T>(data: DialogData<T>) => void;
+  
+  /** Close dialog with optional result */
+  closeDialog: (result?: DialogResult) => void;
+  
+  /** Update dialog data */
+  updateData: <T>(data: Partial<DialogData<T>>) => void;
+  
+  /** Set loading state */
+  setLoading: (loading: boolean) => void;
+  
+  /** Set error state */
+  setError: (error: string | null) => void;
+  
+  /** Clear dialog state */
+  clear: () => void;
+  
+  /** Reset to initial state */
+  reset: () => void;
+}
+
+/**
+ * Dialog hook return interface for custom React hooks
+ * Provides consistent API for dialog management hooks
+ */
+export interface UseDialogReturn {
+  /** Current dialog state */
+  state: DialogState;
+  
+  /** Dialog actions */
+  actions: DialogStateActions;
+  
+  /** Helper methods */
+  helpers: {
+    /** Check if dialog is open */
+    isOpen: boolean;
+    
+    /** Check if dialog has error */
+    hasError: boolean;
+    
+    /** Check if dialog is loading */
+    isLoading: boolean;
+    
+    /** Get current dialog data */
+    getCurrentData: <T>() => DialogData<T> | null;
+    
+    /** Get dialog result */
+    getResult: <T>() => DialogResult<T> | null;
+  };
+  
+  /** Convenience methods for common dialog types */
+  convenience: {
+    /** Open confirmation dialog */
+    confirm: (data: ConfirmDialogData) => Promise<boolean>;
+    
+    /** Open prompt dialog */
+    prompt: <T>(data: PromptDialogData<T>) => Promise<T | null>;
+    
+    /** Open alert dialog */
+    alert: (data: AlertDialogData) => Promise<void>;
+  };
+}
+
+// =============================================================================
+// DIALOG RESULT AND INTERACTION INTERFACES
+// =============================================================================
+
+/**
+ * Dialog close reasons for tracking user interactions
+ */
+export type DialogCloseReason = 
+  | 'confirm' 
+  | 'cancel' 
+  | 'escape' 
+  | 'outside-click' 
+  | 'programmatic'
+  | 'error'
+  | 'timeout';
+
+/**
+ * Dialog interaction result interface
+ * Provides comprehensive result data for dialog interactions
+ */
+export interface DialogResult<T = unknown> {
+  /** Whether the dialog was confirmed */
+  confirmed: boolean;
+  
+  /** How the dialog was closed */
+  reason: DialogCloseReason;
+  
+  /** Data returned from dialog */
+  data?: T;
+  
+  /** Timestamp of interaction */
+  timestamp: number;
+  
+  /** Duration dialog was open (in milliseconds) */
+  duration: number;
+  
+  /** Any error that occurred */
+  error?: {
+    message: string;
+    code?: string;
+    details?: unknown;
   };
 }
 
 /**
- * Custom dialog data for specialized use cases
+ * Dialog interaction tracking interface
+ * For analytics and debugging dialog usage patterns
  */
-export interface CustomDialogData {
-  /** Dialog identifier */
+export interface DialogInteraction {
+  /** Unique interaction ID */
   id: string;
   
-  /** Custom content component */
-  content: ComponentType<any>;
+  /** Dialog type/variant */
+  type: string;
   
-  /** Props to pass to content component */
-  contentProps?: Record<string, unknown>;
+  /** Timestamp when dialog opened */
+  openedAt: number;
+  
+  /** Timestamp when dialog closed */
+  closedAt?: number;
+  
+  /** How dialog was closed */
+  closeReason?: DialogCloseReason;
+  
+  /** User actions within dialog */
+  actions: Array<{
+    type: string;
+    timestamp: number;
+    data?: unknown;
+  }>;
   
   /** Dialog configuration */
-  config: {
-    /** Dialog title */
-    title?: string | ReactNode;
-    /** Dialog size */
-    size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
-    /** Close behavior */
-    closeBehavior?: {
-      /** Show close button */
-      showCloseButton: boolean;
-      /** Close on outside click */
-      closeOnOutsideClick: boolean;
-      /** Close on escape */
-      closeOnEscape: boolean;
-    };
-    /** Scrollable content */
-    scrollable?: boolean;
+  config: DialogData;
+  
+  /** Result of interaction */
+  result?: DialogResult;
+}
+
+// =============================================================================
+// ACCESSIBILITY PATTERN INTERFACES
+// =============================================================================
+
+/**
+ * React accessibility patterns for dialog components
+ * Implements WCAG 2.1 AA requirements for modal dialogs
+ */
+export interface DialogAccessibilityPatterns {
+  /** Focus management configuration */
+  focus: {
+    /** Element to focus when dialog opens */
+    initialFocus?: HTMLElement | string;
+    
+    /** Element to focus when dialog closes */
+    restoreFocus?: HTMLElement | string;
+    
+    /** Whether to trap focus within dialog */
+    trapFocus: boolean;
+    
+    /** Whether to auto-focus first interactive element */
+    autoFocus: boolean;
+  };
+  
+  /** Keyboard navigation patterns */
+  keyboard: {
+    /** Close on escape key */
+    escapeToClose: boolean;
+    
+    /** Confirm on enter key */
+    enterToConfirm: boolean;
+    
+    /** Tab key cycling behavior */
+    tabCycling: 'trap' | 'wrap' | 'none';
+    
+    /** Arrow key navigation */
+    arrowNavigation: boolean;
+  };
+  
+  /** Screen reader announcements */
+  announcements: {
+    /** Announce when dialog opens */
+    onOpen?: string;
+    
+    /** Announce when dialog closes */
+    onClose?: string;
+    
+    /** Announce loading states */
+    onLoading?: string;
+    
+    /** Announce errors */
+    onError?: string;
+    
+    /** Announce success states */
+    onSuccess?: string;
+  };
+  
+  /** ARIA attributes configuration */
+  aria: {
+    /** Dialog role */
+    role: 'dialog' | 'alertdialog';
+    
     /** Modal behavior */
-    modal?: boolean;
-  };
-  
-  /** Event handlers */
-  handlers?: {
-    /** Custom close handler */
-    onClose?: () => void | Promise<void>;
-    /** Content ready handler */
-    onContentReady?: () => void;
-    /** Error handler */
-    onError?: (error: Error) => void;
-  };
-  
-  /** Data payload */
-  payload?: unknown;
-}
-
-// =============================================================================
-// ACCESSIBILITY ENHANCEMENT INTERFACES
-// =============================================================================
-
-/**
- * Enhanced accessibility configuration for React dialog patterns
- * Extends WCAG 2.1 AA compliance with React-specific enhancements
- */
-export interface DialogAccessibilityConfig {
-  /** Screen reader optimizations */
-  screenReader: {
-    /** Announce dialog content changes */
-    announceDynamicContent: boolean;
-    /** Live region configuration */
-    liveRegion: {
-      /** Politeness level */
-      politeness: 'polite' | 'assertive' | 'off';
-      /** Atomic announcements */
-      atomic: boolean;
-      /** Relevant changes to announce */
-      relevant: 'additions' | 'removals' | 'text' | 'all';
-    };
-    /** Reading flow optimization */
-    readingFlow: {
-      /** Optimize heading structure */
-      optimizeHeadings: boolean;
-      /** Skip repeated content */
-      skipRepeatedContent: boolean;
-      /** Provide content summary */
-      provideSummary: boolean;
-    };
-  };
-  
-  /** Motor accessibility */
-  motor: {
-    /** Large touch targets */
-    largeTouchTargets: boolean;
-    /** Minimum touch target size */
-    minTouchTargetSize: number;
-    /** Click target spacing */
-    targetSpacing: number;
-    /** Gesture alternatives */
-    gestureAlternatives: boolean;
-  };
-  
-  /** Cognitive accessibility */
-  cognitive: {
-    /** Clear language mode */
-    clearLanguage: boolean;
-    /** Progress indicators */
-    showProgress: boolean;
-    /** Error prevention */
-    errorPrevention: boolean;
-    /** Context help */
-    contextHelp: boolean;
-    /** Timeout warnings */
-    timeoutWarnings: boolean;
-  };
-  
-  /** Visual accessibility */
-  visual: {
-    /** High contrast support */
-    highContrast: boolean;
-    /** Color blind support */
-    colorBlindSupport: boolean;
-    /** Font size scaling */
-    fontSizeScaling: boolean;
-    /** Motion sensitivity */
-    motionSensitivity: {
-      /** Respect reduced motion */
-      respectReducedMotion: boolean;
-      /** Alternative animations */
-      alternativeAnimations: boolean;
-      /** Disable parallax */
-      disableParallax: boolean;
-    };
+    modal: boolean;
+    
+    /** Live region politeness */
+    live?: 'polite' | 'assertive' | 'off';
+    
+    /** Atomic updates */
+    atomic?: boolean;
+    
+    /** Custom aria-label */
+    label?: string;
+    
+    /** Reference to labelling element */
+    labelledBy?: string;
+    
+    /** Reference to describing element */
+    describedBy?: string;
   };
 }
 
 // =============================================================================
-// PERFORMANCE AND OPTIMIZATION INTERFACES
+// HEADLESS UI INTEGRATION INTERFACES
 // =============================================================================
 
 /**
- * Dialog performance optimization configuration
- * Enables efficient rendering and resource management
+ * Headless UI Dialog integration configuration
+ * Provides type-safe integration with Headless UI Dialog primitive
  */
-export interface DialogPerformanceConfig {
-  /** Lazy loading configuration */
-  lazyLoading: {
-    /** Enable lazy loading */
-    enabled: boolean;
-    /** Loading threshold */
-    threshold: number;
-    /** Preload strategy */
-    preload: 'none' | 'metadata' | 'auto';
+export interface HeadlessUIDialogConfig {
+  /** Whether dialog is open (controlled) */
+  open: boolean;
+  
+  /** Callback when open state changes */
+  onClose: (value: boolean) => void;
+  
+  /** Initial focus element */
+  initialFocus?: RefObject<HTMLElement>;
+  
+  /** Static dialog (doesn't close on outside click) */
+  static?: boolean;
+  
+  /** Unmount dialog when closed */
+  unmount?: boolean;
+  
+  /** Dialog element props */
+  dialogProps?: {
+    className?: string;
+    style?: React.CSSProperties;
+    'data-testid'?: string;
   };
   
-  /** Virtualization for large content */
-  virtualization: {
-    /** Enable virtualization */
-    enabled: boolean;
-    /** Item height estimation */
-    estimatedItemHeight: number;
-    /** Overscan count */
-    overscanCount: number;
+  /** Panel element props */
+  panelProps?: {
+    className?: string;
+    style?: React.CSSProperties;
+    'data-testid'?: string;
   };
   
-  /** Memory management */
-  memory: {
-    /** Cleanup on unmount */
-    cleanupOnUnmount: boolean;
-    /** Memory usage threshold */
-    memoryThreshold: number;
-    /** Garbage collection hints */
-    gcHints: boolean;
+  /** Backdrop element props */
+  backdropProps?: {
+    className?: string;
+    style?: React.CSSProperties;
+    'data-testid'?: string;
   };
   
-  /** Rendering optimizations */
-  rendering: {
-    /** Use React concurrent features */
-    useConcurrentFeatures: boolean;
-    /** Debounce re-renders */
-    debounceRenders: number;
-    /** Batch state updates */
-    batchStateUpdates: boolean;
+  /** Transition configuration */
+  transition?: {
+    show?: boolean;
+    appear?: boolean;
+    enter?: string;
+    enterFrom?: string;
+    enterTo?: string;
+    leave?: string;
+    leaveFrom?: string;
+    leaveTo?: string;
+  };
+}
+
+/**
+ * React dialog library compatibility interface
+ * Supports integration with various React dialog libraries
+ */
+export interface ReactDialogLibraryConfig {
+  /** Library type being used */
+  library: 'headlessui' | 'radix' | 'reach' | 'mui' | 'custom';
+  
+  /** Library-specific configuration */
+  config: unknown;
+  
+  /** Adapter functions for library integration */
+  adapter?: {
+    /** Convert our props to library props */
+    propsAdapter?: (props: DialogData) => unknown;
+    
+    /** Convert library events to our events */
+    eventAdapter?: (event: unknown) => DialogResult;
+    
+    /** Custom render function */
+    customRender?: (props: DialogData) => ReactNode;
+  };
+  
+  /** Feature flags for library capabilities */
+  features?: {
+    /** Supports portal rendering */
+    portal: boolean;
+    
+    /** Supports focus trapping */
+    focusTrap: boolean;
+    
+    /** Supports animations */
+    animations: boolean;
+    
+    /** Supports nested dialogs */
+    nesting: boolean;
+    
+    /** Supports accessibility features */
+    accessibility: boolean;
   };
 }
 
 // =============================================================================
-// TYPE EXPORTS AND UTILITIES
+// UTILITY AND HELPER TYPES
 // =============================================================================
 
 /**
- * Union type for all dialog data types
+ * Dialog event handler types for type-safe event handling
  */
-export type AnyDialogData = 
-  | ConfirmDialogData 
-  | PromptDialogData 
-  | AlertDialogData 
-  | CustomDialogData;
-
-/**
- * Dialog data type discriminator
- */
-export type DialogDataType<T extends AnyDialogData> = 
-  T extends ConfirmDialogData ? 'confirm' :
-  T extends PromptDialogData ? 'prompt' :
-  T extends AlertDialogData ? 'alert' :
-  T extends CustomDialogData ? 'custom' :
-  never;
-
-/**
- * Extract dialog result type from dialog data
- */
-export type ExtractDialogResult<T extends AnyDialogData> =
-  T extends ConfirmDialogData ? DialogResult<boolean> :
-  T extends PromptDialogData ? DialogResult<string> :
-  T extends AlertDialogData ? DialogResult<void> :
-  T extends CustomDialogData ? DialogResult<unknown> :
-  DialogResult<unknown>;
-
-/**
- * Type-safe dialog creator function type
- */
-export type DialogCreator<T extends AnyDialogData> = (
-  data: T
-) => Promise<ExtractDialogResult<T>>;
-
-/**
- * Dialog event types for type-safe event handling
- */
-export interface DialogEvents {
-  'dialog:open': { instance: DialogInstance };
-  'dialog:close': { instance: DialogInstance; result: DialogResult };
-  'dialog:error': { instance: DialogInstance; error: Error };
-  'dialog:focus-change': { instance: DialogInstance; element: HTMLElement };
-  'dialog:state-change': { instance: DialogInstance; state: any };
+export interface DialogEventHandlers<T = unknown> {
+  /** Called when dialog opens */
+  onOpen?: (data: DialogData<T>) => void;
+  
+  /** Called when dialog closes */
+  onClose?: (result: DialogResult<T>) => void;
+  
+  /** Called when dialog data updates */
+  onDataChange?: (data: DialogData<T>) => void;
+  
+  /** Called when loading state changes */
+  onLoadingChange?: (loading: boolean) => void;
+  
+  /** Called when error occurs */
+  onError?: (error: string) => void;
+  
+  /** Called before dialog opens (can prevent opening) */
+  onBeforeOpen?: (data: DialogData<T>) => boolean | Promise<boolean>;
+  
+  /** Called before dialog closes (can prevent closing) */
+  onBeforeClose?: (result: DialogResult<T>) => boolean | Promise<boolean>;
 }
 
 /**
- * Default configuration values
+ * Dialog configuration validator interface
+ * Provides runtime validation for dialog configurations
  */
-export const DEFAULT_DIALOG_CONFIG = {
-  portal: {
-    container: 'body',
-    createContainer: false,
-    zIndex: { base: 1000, autoIncrement: true, max: 9999 },
-    cleanup: { removeContainer: false, delay: 0, forceCleanup: true }
-  },
-  accessibility: {
-    focusTrap: true,
-    restoreFocus: true,
-    announceOnOpen: true,
-    closeOnEscape: true,
-    preventBackgroundInteraction: true
-  },
-  performance: {
-    lazyLoading: { enabled: true, threshold: 0.1, preload: 'metadata' },
-    memory: { cleanupOnUnmount: true, memoryThreshold: 50, gcHints: true },
-    rendering: { useConcurrentFeatures: true, debounceRenders: 16, batchStateUpdates: true }
-  }
-} as const;
+export interface DialogConfigValidator {
+  /** Validate dialog data */
+  validateData: <T>(data: DialogData<T>) => ValidationResult;
+  
+  /** Validate accessibility configuration */
+  validateAccessibility: (config: DialogAccessibilityPatterns) => ValidationResult;
+  
+  /** Validate portal configuration */
+  validatePortal: (config: DialogPortalConfig) => ValidationResult;
+  
+  /** Get validation errors */
+  getErrors: () => ValidationError[];
+  
+  /** Check if configuration is valid */
+  isValid: () => boolean;
+}
+
+/**
+ * Validation result interface
+ */
+export interface ValidationResult {
+  /** Whether validation passed */
+  valid: boolean;
+  
+  /** Validation errors */
+  errors: ValidationError[];
+  
+  /** Validation warnings */
+  warnings: ValidationWarning[];
+}
+
+/**
+ * Validation error interface
+ */
+export interface ValidationError {
+  /** Error code */
+  code: string;
+  
+  /** Error message */
+  message: string;
+  
+  /** Field that caused error */
+  field?: string;
+  
+  /** Severity level */
+  severity: 'error' | 'warning' | 'info';
+}
+
+/**
+ * Validation warning interface
+ */
+export interface ValidationWarning {
+  /** Warning code */
+  code: string;
+  
+  /** Warning message */
+  message: string;
+  
+  /** Field that caused warning */
+  field?: string;
+  
+  /** Suggestion for improvement */
+  suggestion?: string;
+}
+
+// =============================================================================
+// TYPE GUARDS AND UTILITIES
+// =============================================================================
+
+/**
+ * Type guard for ConfirmDialogData
+ */
+export function isConfirmDialogData(data: unknown): data is ConfirmDialogData {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    'title' in data &&
+    'message' in data &&
+    typeof (data as ConfirmDialogData).title === 'string'
+  );
+}
+
+/**
+ * Type guard for PromptDialogData
+ */
+export function isPromptDialogData<T>(data: unknown): data is PromptDialogData<T> {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    'title' in data &&
+    'input' in data &&
+    typeof (data as PromptDialogData<T>).title === 'string' &&
+    typeof (data as PromptDialogData<T>).input === 'object'
+  );
+}
+
+/**
+ * Type guard for AlertDialogData
+ */
+export function isAlertDialogData(data: unknown): data is AlertDialogData {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    'title' in data &&
+    'message' in data &&
+    'type' in data &&
+    typeof (data as AlertDialogData).title === 'string' &&
+    ['info', 'success', 'warning', 'error'].includes((data as AlertDialogData).type)
+  );
+}
+
+/**
+ * Type guard for DialogResult
+ */
+export function isDialogResult<T>(value: unknown): value is DialogResult<T> {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'confirmed' in value &&
+    'reason' in value &&
+    'timestamp' in value &&
+    typeof (value as DialogResult<T>).confirmed === 'boolean' &&
+    typeof (value as DialogResult<T>).timestamp === 'number'
+  );
+}
+
+// =============================================================================
+// EXPORT ALL TYPES
+// =============================================================================
+
+export type {
+  // Core interfaces
+  DialogData,
+  ConfirmDialogData,
+  PromptDialogData,
+  AlertDialogData,
+  
+  // Portal and context
+  DialogPortalConfig,
+  DialogComponentContext,
+  
+  // State management
+  DialogState,
+  DialogStateActions,
+  UseDialogReturn,
+  
+  // Results and interactions
+  DialogCloseReason,
+  DialogResult,
+  DialogInteraction,
+  
+  // Accessibility
+  DialogAccessibilityPatterns,
+  
+  // Library integration
+  HeadlessUIDialogConfig,
+  ReactDialogLibraryConfig,
+  
+  // Utilities
+  DialogEventHandlers,
+  DialogConfigValidator,
+  ValidationResult,
+  ValidationError,
+  ValidationWarning,
+};
