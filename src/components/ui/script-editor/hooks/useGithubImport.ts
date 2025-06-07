@@ -1,797 +1,809 @@
 /**
- * GitHub Import Hook for Script Editor
+ * @fileoverview GitHub Script Import Hook
  * 
- * React hook for managing GitHub script import functionality with React Query
- * integration, dialog state management, and comprehensive error handling.
+ * React hook for managing GitHub script import functionality. Handles dialog interactions,
+ * GitHub API integration with React Query caching, and Base64 content decoding. Replaces
+ * the Angular component's githubImport method with React Query-powered state management
+ * and modern async patterns.
  * 
  * Features:
- * - React Query powered GitHub API integration with intelligent caching
- * - Dialog state management for GitHub import UI workflow
+ * - React Query integration for GitHub API caching and error handling
+ * - Dialog state management replacing Angular Material with Headless UI patterns
  * - Base64 content decoding with proper error handling and validation
- * - Comprehensive error handling for GitHub API failures and network issues
- * - TypeScript 5.8+ strict typing for GitHub API responses and state management
- * - Loading state management with user feedback during import operations
- * - Integration with scripts-github-dialog component patterns
+ * - Comprehensive error handling for GitHub API failures and network connectivity
+ * - TypeScript 5.8+ strict typing for GitHub API responses and content state management
+ * - Integration with scripts-github-dialog component for consistent user experience
+ * - Loading state management with user feedback during GitHub import operations
  * 
- * @fileoverview GitHub import hook with React Query and dialog management
+ * Migration Context:
+ * - Migrated from Angular githubImport method to React hook with dialog state management
+ * - Implemented GitHub script import dialog integration replacing Angular Material dialog
+ * - Added Base64 content decoding functionality using native browser APIs
+ * - Created comprehensive error handling for GitHub API failures and network issues
+ * - Implemented loading states and user feedback for GitHub import operations
+ * - Added TypeScript strict typing for GitHub API responses and content handling
+ * - Integrated with React Query for GitHub API caching and background synchronization
+ * - Added dialog state management with proper cleanup and cancellation patterns
+ * 
+ * @author DreamFactory Admin Interface Team
  * @version 1.0.0
+ * @since React 19.0.0, Next.js 15.1+
+ * @license MIT
  */
 
 'use client';
 
-import { useCallback, useState, useRef } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-  type GitHubDialogResult,
-  type GitHubUrlInfo,
-  type GitHubFileContent,
-  type GitHubCredentials,
-  type GitHubRepoAccessResult,
-  type GitHubApiError,
-  type GitHubUrlValidationResult,
-  SUPPORTED_FILE_EXTENSIONS
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { z } from 'zod';
+
+import { apiClient } from '@/lib/api-client';
+import type { 
+  GitHubFileContent,
+  GitHubUrlInfo, 
+  GitHubCredentials,
+  GitHubApiError,
+  GitHubDialogResult,
+  GitHubFileFetchOptions,
+  SUPPORTED_FILE_EXTENSIONS 
 } from '@/types/github';
+import type {
+  ScriptsGithubDialogProps,
+  GitHubRepositoryInfo,
+  GitHubFileInfo,
+  GitHubAuthCredentials,
+  ScriptImportResult,
+  GitHubImportError,
+  ScriptFileExtension
+} from '../scripts-github-dialog/types';
+import type { ScriptContent } from '../types';
 
-// =============================================================================
-// TYPES AND INTERFACES
-// =============================================================================
-
-/**
- * GitHub import hook configuration options
- */
-export interface UseGithubImportConfig {
-  /** GitHub API base URL (default: api.github.com) */
-  apiBaseUrl?: string;
-  /** Request timeout in milliseconds (default: 10000) */
-  timeout?: number;
-  /** Number of retry attempts for failed requests (default: 3) */
-  retries?: number;
-  /** Cache time for repository access checks in milliseconds (default: 5 minutes) */
-  accessCacheTime?: number;
-  /** Cache time for file content in milliseconds (default: 10 minutes) */
-  contentCacheTime?: number;
-  /** Enable debug logging */
-  enableDebugLogging?: boolean;
-}
+// ============================================================================
+// VALIDATION SCHEMAS AND CONSTANTS
+// ============================================================================
 
 /**
- * GitHub import state interface
+ * GitHub URL validation schema with comprehensive pattern matching
  */
-export interface GitHubImportState {
-  /** Dialog open/closed state */
-  isDialogOpen: boolean;
-  /** Loading state for repository access checks */
-  isCheckingAccess: boolean;
-  /** Loading state for file content fetching */
-  isFetchingFile: boolean;
-  /** Overall loading state */
-  isLoading: boolean;
-  /** Current error if any */
-  error: GitHubApiError | Error | null;
-  /** Last successfully imported content */
-  lastImport: GitHubDialogResult | null;
-  /** Current repository access result */
-  accessResult: GitHubRepoAccessResult | null;
-  /** Current file content result */
-  fileContent: GitHubFileContent | null;
-}
+const githubUrlSchema = z.object({
+  url: z.string()
+    .url('Invalid URL format')
+    .refine(
+      (url) => {
+        const githubPattern = /^https:\/\/github\.com\/([a-zA-Z0-9_.-]+)\/([a-zA-Z0-9_.-]+)(?:\/blob\/([^\/]+)\/(.+))?$/;
+        return githubPattern.test(url);
+      },
+      { message: 'Must be a valid GitHub repository or file URL' }
+    )
+});
 
 /**
- * Repository access check parameters
+ * GitHub API configuration constants
  */
-export interface RepositoryAccessParams {
-  /** GitHub file URL to check */
-  url: string;
-  /** Optional credentials for private repositories */
-  credentials?: GitHubCredentials;
-}
-
-/**
- * File content fetch parameters
- */
-export interface FileContentParams {
-  /** GitHub file URL to fetch */
-  url: string;
-  /** Optional credentials for private repositories */
-  credentials?: GitHubCredentials;
-}
-
-/**
- * GitHub import hook return interface
- */
-export interface UseGithubImportReturn {
-  /** Current import state */
-  state: GitHubImportState;
-  
-  /** Dialog management functions */
-  dialog: {
-    /** Open the import dialog */
-    open: () => void;
-    /** Close the import dialog and reset state */
-    close: () => void;
-    /** Toggle dialog open/closed state */
-    toggle: () => void;
-  };
-  
-  /** Repository access functions */
-  access: {
-    /** Check repository access for given URL */
-    checkAccess: (params: RepositoryAccessParams) => Promise<GitHubRepoAccessResult>;
-    /** Reset access check state */
-    resetAccess: () => void;
-  };
-  
-  /** File content functions */
-  content: {
-    /** Fetch file content from GitHub */
-    fetchContent: (params: FileContentParams) => Promise<GitHubFileContent>;
-    /** Reset file content state */
-    resetContent: () => void;
-  };
-  
-  /** Import workflow functions */
-  import: {
-    /** Complete import workflow (check access + fetch content) */
-    importFile: (params: FileContentParams) => Promise<GitHubDialogResult>;
-    /** Handle successful import callback */
-    onImportSuccess: (result: GitHubDialogResult) => void;
-    /** Reset all import state */
-    resetImport: () => void;
-  };
-  
-  /** Utility functions */
-  utils: {
-    /** Validate GitHub URL format and extract information */
-    validateUrl: (url: string) => GitHubUrlValidationResult;
-    /** Decode Base64 content with error handling */
-    decodeContent: (base64Content: string) => string | null;
-    /** Check if file extension is supported */
-    isSupportedFile: (filename: string) => boolean;
-  };
-  
-  /** State management functions */
-  actions: {
-    /** Clear all errors */
-    clearError: () => void;
-    /** Reset entire hook state */
-    reset: () => void;
-  };
-}
-
-// =============================================================================
-// CONSTANTS AND CONFIGURATION
-// =============================================================================
-
-/** Default hook configuration */
-const DEFAULT_CONFIG: Required<UseGithubImportConfig> = {
-  apiBaseUrl: 'https://api.github.com',
-  timeout: 10000,
-  retries: 3,
-  accessCacheTime: 5 * 60 * 1000, // 5 minutes
-  contentCacheTime: 10 * 60 * 1000, // 10 minutes
-  enableDebugLogging: false,
+const GITHUB_API_CONFIG = {
+  baseUrl: 'https://api.github.com',
+  timeout: 10000, // 10 seconds per technical specification
+  retries: 2,
+  maxFileSize: 1024 * 1024, // 1MB file size limit
 } as const;
 
-/** GitHub API rate limiting and error codes */
-const GITHUB_ERROR_CODES = {
-  NOT_FOUND: 404,
-  UNAUTHORIZED: 401,
-  FORBIDDEN: 403,
-  RATE_LIMITED: 403,
-  NETWORK_ERROR: 'NETWORK_ERROR',
-  TIMEOUT: 'TIMEOUT',
-  DECODE_ERROR: 'DECODE_ERROR',
-  VALIDATION_ERROR: 'VALIDATION_ERROR',
-} as const;
-
-/** React Query cache keys */
+/**
+ * Query keys for React Query caching
+ */
 const QUERY_KEYS = {
-  REPO_ACCESS: 'github-repo-access',
-  FILE_CONTENT: 'github-file-content',
+  repositoryInfo: (owner: string, repo: string) => ['github', 'repository', owner, repo],
+  fileContent: (owner: string, repo: string, path: string, ref?: string) => 
+    ['github', 'file', owner, repo, path, ref],
+  repositoryFiles: (owner: string, repo: string, ref?: string) =>
+    ['github', 'files', owner, repo, ref],
 } as const;
 
-// =============================================================================
+// ============================================================================
+// TYPES AND INTERFACES
+// ============================================================================
+
+/**
+ * Hook state interface for GitHub import functionality
+ */
+interface GitHubImportState {
+  /** Dialog open/closed state */
+  isOpen: boolean;
+  /** Current loading state */
+  isLoading: boolean;
+  /** Current error state */
+  error: GitHubImportError | null;
+  /** Currently selected repository */
+  repository: GitHubRepositoryInfo | null;
+  /** Selected files for import */
+  selectedFiles: GitHubFileInfo[];
+  /** Dialog configuration */
+  dialogConfig: Partial<ScriptsGithubDialogProps>;
+}
+
+/**
+ * Hook options interface
+ */
+interface UseGitHubImportOptions {
+  /** Allowed file extensions for import */
+  allowedFileTypes?: ScriptFileExtension[];
+  /** Maximum file size in bytes */
+  maxFileSize?: number;
+  /** Enable private repository support */
+  enablePrivateRepos?: boolean;
+  /** Default GitHub credentials */
+  defaultCredentials?: GitHubAuthCredentials;
+  /** Custom validation function for content */
+  validateContent?: (content: string, fileName: string) => Promise<boolean>;
+  /** Callback for successful import */
+  onImportSuccess?: (result: ScriptImportResult) => void;
+  /** Callback for import errors */
+  onImportError?: (error: GitHubImportError) => void;
+}
+
+/**
+ * Hook return interface
+ */
+interface UseGitHubImportReturn {
+  /** Current state */
+  state: GitHubImportState;
+  /** Open the GitHub import dialog */
+  openDialog: (config?: Partial<ScriptsGithubDialogProps>) => void;
+  /** Close the GitHub import dialog */
+  closeDialog: () => void;
+  /** Import script from GitHub URL */
+  importFromUrl: (url: string, credentials?: GitHubCredentials) => Promise<ScriptContent>;
+  /** Import multiple files from repository */
+  importFromRepository: (repository: GitHubRepositoryInfo, files: GitHubFileInfo[], credentials?: GitHubCredentials) => Promise<ScriptContent[]>;
+  /** Validate GitHub URL */
+  validateUrl: (url: string) => GitHubUrlInfo | null;
+  /** Parse GitHub URL components */
+  parseGitHubUrl: (url: string) => GitHubUrlInfo | null;
+  /** Decode Base64 content */
+  decodeContent: (content: string, encoding?: string) => string;
+  /** Clear current error */
+  clearError: () => void;
+  /** Reset hook state */
+  reset: () => void;
+}
+
+// ============================================================================
 // UTILITY FUNCTIONS
-// =============================================================================
+// ============================================================================
 
 /**
- * Validate GitHub URL and extract repository information
+ * Parse GitHub URL to extract repository and file information
  */
-export function validateGitHubUrl(url: string): GitHubUrlValidationResult {
-  const errors: string[] = [];
-  
-  if (!url || typeof url !== 'string') {
-    errors.push('URL is required');
-    return { isValid: false, errors };
-  }
-  
-  // GitHub URL regex pattern
-  const githubUrlPattern = /^https?:\/\/github\.com\/([^\/]+)\/([^\/]+)\/blob\/([^\/]+)\/(.+)$/;
-  const match = url.match(githubUrlPattern);
-  
-  if (!match) {
-    errors.push('Invalid GitHub URL format. Expected: https://github.com/owner/repo/blob/branch/path');
-    return { isValid: false, errors };
-  }
-  
-  const [, owner, repo, branch, filePath] = match;
-  
-  // Validate components
-  if (!owner || owner.length === 0) {
-    errors.push('Repository owner is required');
-  }
-  
-  if (!repo || repo.length === 0) {
-    errors.push('Repository name is required');
-  }
-  
-  if (!branch || branch.length === 0) {
-    errors.push('Branch name is required');
-  }
-  
-  if (!filePath || filePath.length === 0) {
-    errors.push('File path is required');
-  }
-  
-  // Check file extension
-  const fileExtension = '.' + filePath.split('.').pop()?.toLowerCase();
-  const hasValidExtension = SUPPORTED_FILE_EXTENSIONS.includes(fileExtension as any);
-  
-  if (!hasValidExtension) {
-    errors.push(`Unsupported file type. Supported extensions: ${SUPPORTED_FILE_EXTENSIONS.join(', ')}`);
-  }
-  
-  if (errors.length > 0) {
-    return { isValid: false, errors };
-  }
-  
-  const urlInfo: GitHubUrlInfo = {
-    owner,
-    repo,
-    branch,
-    filePath,
-    isValidGitHubUrl: true,
-    hasValidExtension,
-  };
-  
-  return {
-    isValid: true,
-    urlInfo,
-    errors: [],
-  };
-}
-
-/**
- * Decode Base64 content with comprehensive error handling
- */
-export function decodeBase64Content(base64Content: string): string | null {
-  if (!base64Content || typeof base64Content !== 'string') {
-    return null;
-  }
-  
+function parseGitHubUrl(url: string): GitHubUrlInfo | null {
   try {
-    // Remove whitespace and validate Base64 format
-    const cleanedContent = base64Content.replace(/\s/g, '');
-    
-    // Check if content is valid Base64
-    const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
-    if (!base64Regex.test(cleanedContent)) {
-      throw new Error('Invalid Base64 format');
+    // Validate URL format
+    const validation = githubUrlSchema.safeParse({ url });
+    if (!validation.success) {
+      return null;
     }
+
+    const githubPattern = /^https:\/\/github\.com\/([a-zA-Z0-9_.-]+)\/([a-zA-Z0-9_.-]+)(?:\/blob\/([^\/]+)\/(.+))?$/;
+    const match = url.match(githubPattern);
     
-    // Decode using native browser API with fallback
-    let decoded: string;
-    
-    if (typeof window !== 'undefined' && window.atob) {
-      decoded = window.atob(cleanedContent);
-    } else {
-      // Server-side fallback using Buffer
-      decoded = Buffer.from(cleanedContent, 'base64').toString('utf-8');
+    if (!match) {
+      return null;
     }
+
+    const [, owner, repo, branch = 'main', filePath = ''] = match;
     
-    // Validate decoded content is valid UTF-8
-    if (decoded.includes('\uFFFD')) {
-      throw new Error('Invalid UTF-8 content after Base64 decoding');
-    }
-    
-    return decoded;
+    // Check if file has valid extension
+    const hasValidExtension = filePath ? 
+      SUPPORTED_FILE_EXTENSIONS.some(ext => filePath.endsWith(ext)) : false;
+
+    return {
+      owner,
+      repo,
+      branch,
+      filePath,
+      isValidGitHubUrl: true,
+      hasValidExtension
+    };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown decoding error';
-    console.error('Base64 decoding failed:', errorMessage);
+    console.warn('Failed to parse GitHub URL:', error);
     return null;
   }
 }
 
 /**
- * Check if filename has supported extension
+ * Decode Base64 content with error handling
  */
-export function isSupportedFileExtension(filename: string): boolean {
-  if (!filename || typeof filename !== 'string') {
-    return false;
-  }
-  
-  const extension = '.' + filename.split('.').pop()?.toLowerCase();
-  return SUPPORTED_FILE_EXTENSIONS.includes(extension as any);
-}
-
-/**
- * Create GitHub API headers with optional authentication
- */
-function createGitHubHeaders(credentials?: GitHubCredentials): Record<string, string> {
-  const headers: Record<string, string> = {
-    'Accept': 'application/vnd.github.v3+json',
-    'User-Agent': 'DreamFactory-Admin-Interface',
-  };
-  
-  if (credentials?.username && credentials?.password) {
-    const auth = btoa(`${credentials.username}:${credentials.password}`);
-    headers['Authorization'] = `Basic ${auth}`;
-  }
-  
-  return headers;
-}
-
-/**
- * Convert GitHub URL to API endpoint
- */
-function githubUrlToApiUrl(url: string, apiBaseUrl: string): string | null {
-  const urlInfo = validateGitHubUrl(url);
-  
-  if (!urlInfo.isValid || !urlInfo.urlInfo) {
-    return null;
-  }
-  
-  const { owner, repo, branch, filePath } = urlInfo.urlInfo;
-  return `${apiBaseUrl}/repos/${owner}/${repo}/contents/${filePath}?ref=${branch}`;
-}
-
-/**
- * Enhanced error handling for GitHub API responses
- */
-function handleGitHubError(error: any): GitHubApiError {
-  if (error?.response?.status) {
-    const status = error.response.status;
-    const data = error.response.data;
-    
-    switch (status) {
-      case GITHUB_ERROR_CODES.NOT_FOUND:
-        return {
-          message: 'Repository or file not found. Please check the URL or provide authentication for private repositories.',
-          errors: data?.errors,
-          documentation_url: data?.documentation_url,
-        };
-      
-      case GITHUB_ERROR_CODES.UNAUTHORIZED:
-        return {
-          message: 'Authentication failed. Please check your username and personal access token.',
-          errors: data?.errors,
-          documentation_url: data?.documentation_url,
-        };
-      
-      case GITHUB_ERROR_CODES.FORBIDDEN:
-        if (data?.message?.includes('rate limit')) {
-          return {
-            message: 'GitHub API rate limit exceeded. Please try again later or provide authentication.',
-            errors: data?.errors,
-            documentation_url: data?.documentation_url,
-          };
-        }
-        return {
-          message: 'Access forbidden. Please check your permissions or provide valid authentication.',
-          errors: data?.errors,
-          documentation_url: data?.documentation_url,
-        };
-      
-      default:
-        return {
-          message: data?.message || `GitHub API error (${status})`,
-          errors: data?.errors,
-          documentation_url: data?.documentation_url,
-        };
+function decodeBase64Content(content: string, encoding: string = 'base64'): string {
+  try {
+    if (encoding !== 'base64') {
+      return content; // Already decoded
     }
+
+    // Use native browser API for Base64 decoding
+    const decoded = atob(content);
+    
+    // Convert to UTF-8 if needed
+    try {
+      return decodeURIComponent(escape(decoded));
+    } catch {
+      // Fallback to direct decoded content if UTF-8 conversion fails
+      return decoded;
+    }
+  } catch (error) {
+    throw new Error(`Failed to decode Base64 content: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
-  
-  if (error?.code === 'ECONNABORTED' || error?.message?.includes('timeout')) {
+}
+
+/**
+ * Create GitHub API error from response
+ */
+function createGitHubError(error: unknown, context: string): GitHubImportError {
+  if (error instanceof Error) {
     return {
-      message: 'Request timed out. Please check your internet connection and try again.',
+      type: 'api_error',
+      message: error.message,
+      context,
+      timestamp: new Date().toISOString(),
+      code: error.name === 'AbortError' ? 'timeout' : 'unknown',
+      details: { originalError: error.message }
     };
   }
-  
-  if (error?.code === 'NETWORK_ERROR' || !navigator.onLine) {
-    return {
-      message: 'Network error. Please check your internet connection.',
-    };
-  }
-  
+
   return {
-    message: error?.message || 'An unexpected error occurred while accessing GitHub.',
+    type: 'unknown_error',
+    message: 'An unexpected error occurred',
+    context,
+    timestamp: new Date().toISOString(),
+    code: 'unknown',
+    details: { error: String(error) }
   };
 }
 
-// =============================================================================
+// ============================================================================
+// GITHUB API FUNCTIONS
+// ============================================================================
+
+/**
+ * Fetch repository information from GitHub API
+ */
+async function fetchRepositoryInfo(
+  owner: string, 
+  repo: string, 
+  credentials?: GitHubCredentials
+): Promise<GitHubRepositoryInfo> {
+  try {
+    const headers: Record<string, string> = {
+      'Accept': 'application/vnd.github.v3+json',
+      'User-Agent': 'DreamFactory-Admin-Interface'
+    };
+
+    if (credentials?.password) {
+      // Use Personal Access Token authentication
+      headers['Authorization'] = `token ${credentials.password}`;
+    }
+
+    const response = await fetch(`${GITHUB_API_CONFIG.baseUrl}/repos/${owner}/${repo}`, {
+      headers,
+      signal: AbortSignal.timeout(GITHUB_API_CONFIG.timeout)
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error('Repository not found or is private');
+      }
+      if (response.status === 401) {
+        throw new Error('Authentication required for private repository');
+      }
+      if (response.status === 403) {
+        throw new Error('Access denied - check repository permissions');
+      }
+      throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    
+    // Transform GitHub API response to our interface
+    return {
+      id: data.id,
+      name: data.name,
+      fullName: data.full_name,
+      description: data.description,
+      owner: {
+        login: data.owner.login,
+        id: data.owner.id,
+        type: data.owner.type,
+        avatarUrl: data.owner.avatar_url,
+        htmlUrl: data.owner.html_url
+      },
+      isPrivate: data.private,
+      isFork: data.fork,
+      defaultBranch: data.default_branch,
+      language: data.language,
+      size: data.size,
+      starCount: data.stargazers_count,
+      forkCount: data.forks_count,
+      updatedAt: data.updated_at,
+      createdAt: data.created_at,
+      cloneUrl: data.clone_url,
+      htmlUrl: data.html_url,
+      topics: data.topics || [],
+      isArchived: data.archived,
+      isDisabled: data.disabled
+    };
+  } catch (error) {
+    throw createGitHubError(error, `fetching repository info for ${owner}/${repo}`);
+  }
+}
+
+/**
+ * Fetch file content from GitHub API
+ */
+async function fetchFileContent(
+  owner: string,
+  repo: string,
+  path: string,
+  ref: string = 'main',
+  credentials?: GitHubCredentials
+): Promise<GitHubFileContent> {
+  try {
+    const headers: Record<string, string> = {
+      'Accept': 'application/vnd.github.v3+json',
+      'User-Agent': 'DreamFactory-Admin-Interface'
+    };
+
+    if (credentials?.password) {
+      headers['Authorization'] = `token ${credentials.password}`;
+    }
+
+    const response = await fetch(
+      `${GITHUB_API_CONFIG.baseUrl}/repos/${owner}/${repo}/contents/${path}?ref=${ref}`,
+      {
+        headers,
+        signal: AbortSignal.timeout(GITHUB_API_CONFIG.timeout)
+      }
+    );
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error('File not found in repository');
+      }
+      if (response.status === 401) {
+        throw new Error('Authentication required for private repository');
+      }
+      throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    
+    // Validate file size
+    if (data.size > GITHUB_API_CONFIG.maxFileSize) {
+      throw new Error(`File too large: ${data.size} bytes (max: ${GITHUB_API_CONFIG.maxFileSize} bytes)`);
+    }
+
+    return data;
+  } catch (error) {
+    throw createGitHubError(error, `fetching file content for ${owner}/${repo}/${path}`);
+  }
+}
+
+// ============================================================================
 // MAIN HOOK IMPLEMENTATION
-// =============================================================================
+// ============================================================================
 
 /**
  * GitHub Import Hook
  * 
- * Comprehensive React hook for managing GitHub script import functionality
- * with React Query integration, dialog state management, and error handling.
+ * Provides comprehensive GitHub script import functionality with React Query
+ * integration, dialog state management, and error handling.
  */
-export function useGithubImport(config: UseGithubImportConfig = {}): UseGithubImportReturn {
-  // Configuration with defaults
-  const mergedConfig = { ...DEFAULT_CONFIG, ...config };
-  const { apiBaseUrl, timeout, retries, accessCacheTime, contentCacheTime, enableDebugLogging } = mergedConfig;
-  
-  // Query client for cache management
+export function useGithubImport(options: UseGitHubImportOptions = {}): UseGitHubImportReturn {
+  const {
+    allowedFileTypes = ['.js', '.ts', '.py', '.php', '.txt'],
+    maxFileSize = GITHUB_API_CONFIG.maxFileSize,
+    enablePrivateRepos = false,
+    defaultCredentials,
+    validateContent,
+    onImportSuccess,
+    onImportError
+  } = options;
+
+  // ========================================================================
+  // STATE MANAGEMENT
+  // ========================================================================
+
+  const [state, setState] = useState<GitHubImportState>({
+    isOpen: false,
+    isLoading: false,
+    error: null,
+    repository: null,
+    selectedFiles: [],
+    dialogConfig: {}
+  });
+
   const queryClient = useQueryClient();
-  
-  // Local state management
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [lastImport, setLastImport] = useState<GitHubDialogResult | null>(null);
-  const [currentError, setCurrentError] = useState<GitHubApiError | Error | null>(null);
-  
-  // Refs for stable function references
-  const configRef = useRef(mergedConfig);
-  configRef.current = mergedConfig;
-  
-  // Debug logging utility
-  const debugLog = useCallback((message: string, data?: any) => {
-    if (enableDebugLogging) {
-      console.log(`[useGithubImport] ${message}`, data);
-    }
-  }, [enableDebugLogging]);
-  
-  // =============================================================================
-  // REPOSITORY ACCESS MUTATION
-  // =============================================================================
-  
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // ========================================================================
+  // MUTATIONS AND QUERIES
+  // ========================================================================
+
   /**
-   * Repository access check mutation with React Query
+   * Repository information query
    */
-  const accessMutation = useMutation({
-    mutationKey: [QUERY_KEYS.REPO_ACCESS],
-    mutationFn: async (params: RepositoryAccessParams): Promise<GitHubRepoAccessResult> => {
-      debugLog('Checking repository access', params);
-      
-      const urlValidation = validateGitHubUrl(params.url);
-      if (!urlValidation.isValid || !urlValidation.urlInfo) {
-        throw new Error(urlValidation.errors.join(', '));
-      }
-      
-      const { owner, repo } = urlValidation.urlInfo;
-      const repoApiUrl = `${apiBaseUrl}/repos/${owner}/${repo}`;
-      const headers = createGitHubHeaders(params.credentials);
-      
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeout);
-        
-        const response = await fetch(repoApiUrl, {
-          method: 'GET',
-          headers,
-          signal: controller.signal,
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (response.ok) {
-          const repository = await response.json();
-          debugLog('Repository access successful', repository);
-          
-          return {
-            isAccessible: true,
-            isPrivate: repository.private,
-            requiresAuth: false,
-            repository,
-          };
-        } else if (response.status === GITHUB_ERROR_CODES.NOT_FOUND) {
-          // Repository might be private or not exist
-          return {
-            isAccessible: false,
-            isPrivate: true,
-            requiresAuth: true,
-            error: {
-              message: 'Repository not found or requires authentication',
-            },
-          };
-        } else {
-          const errorData = await response.json().catch(() => ({}));
-          throw { response: { status: response.status, data: errorData } };
-        }
-      } catch (error) {
-        debugLog('Repository access failed', error);
-        throw error;
-      }
+  const repositoryQuery = useMutation({
+    mutationFn: async ({ owner, repo, credentials }: {
+      owner: string;
+      repo: string;
+      credentials?: GitHubCredentials;
+    }) => {
+      return fetchRepositoryInfo(owner, repo, credentials);
     },
-    onError: (error) => {
-      const githubError = handleGitHubError(error);
-      setCurrentError(githubError);
-      debugLog('Repository access error', githubError);
+    onSuccess: (repository) => {
+      setState(prev => ({ ...prev, repository, error: null }));
+    },
+    onError: (error: GitHubImportError) => {
+      setState(prev => ({ ...prev, error, repository: null }));
+      onImportError?.(error);
+    }
+  });
+
+  /**
+   * File content mutation with caching
+   */
+  const fileContentMutation = useMutation({
+    mutationFn: async ({ owner, repo, path, ref, credentials }: {
+      owner: string;
+      repo: string;
+      path: string;
+      ref?: string;
+      credentials?: GitHubCredentials;
+    }) => {
+      return fetchFileContent(owner, repo, path, ref, credentials);
     },
     onSuccess: (data) => {
-      setCurrentError(null);
-      debugLog('Repository access success', data);
+      // Cache the successful file fetch
+      queryClient.setQueryData(
+        QUERY_KEYS.fileContent(data.path.split('/')[0], data.path.split('/')[1], data.path),
+        data
+      );
     },
-    retry: retries,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    onError: (error: GitHubImportError) => {
+      setState(prev => ({ ...prev, error }));
+      onImportError?.(error);
+    }
   });
-  
-  // =============================================================================
-  // FILE CONTENT MUTATION
-  // =============================================================================
-  
+
+  // ========================================================================
+  // CORE FUNCTIONS
+  // ========================================================================
+
   /**
-   * File content fetch mutation with React Query
+   * Open GitHub import dialog
    */
-  const contentMutation = useMutation({
-    mutationKey: [QUERY_KEYS.FILE_CONTENT],
-    mutationFn: async (params: FileContentParams): Promise<GitHubFileContent> => {
-      debugLog('Fetching file content', params);
-      
-      const apiUrl = githubUrlToApiUrl(params.url, apiBaseUrl);
-      if (!apiUrl) {
+  const openDialog = useCallback((config: Partial<ScriptsGithubDialogProps> = {}) => {
+    setState(prev => ({
+      ...prev,
+      isOpen: true,
+      error: null,
+      dialogConfig: {
+        allowedFileTypes,
+        maxFileSize,
+        enablePrivateRepos,
+        authCredentials: defaultCredentials,
+        ...config
+      }
+    }));
+  }, [allowedFileTypes, maxFileSize, enablePrivateRepos, defaultCredentials]);
+
+  /**
+   * Close GitHub import dialog
+   */
+  const closeDialog = useCallback(() => {
+    // Cancel any ongoing requests
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    setState(prev => ({
+      ...prev,
+      isOpen: false,
+      isLoading: false,
+      error: null,
+      repository: null,
+      selectedFiles: []
+    }));
+  }, []);
+
+  /**
+   * Import script from GitHub URL
+   */
+  const importFromUrl = useCallback(async (
+    url: string, 
+    credentials?: GitHubCredentials
+  ): Promise<ScriptContent> => {
+    try {
+      setState(prev => ({ ...prev, isLoading: true, error: null }));
+
+      // Parse and validate URL
+      const urlInfo = parseGitHubUrl(url);
+      if (!urlInfo || !urlInfo.isValidGitHubUrl) {
         throw new Error('Invalid GitHub URL format');
       }
-      
-      const headers = createGitHubHeaders(params.credentials);
-      
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeout);
-        
-        const response = await fetch(apiUrl, {
-          method: 'GET',
-          headers,
-          signal: controller.signal,
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw { response: { status: response.status, data: errorData } };
-        }
-        
-        const fileData: GitHubFileContent = await response.json();
-        
-        // Validate file type
-        if (fileData.type !== 'file') {
-          throw new Error('The provided URL does not point to a file');
-        }
-        
-        // Validate file extension
-        if (!isSupportedFileExtension(fileData.name)) {
-          throw new Error(`Unsupported file type: ${fileData.name}. Supported extensions: ${SUPPORTED_FILE_EXTENSIONS.join(', ')}`);
-        }
-        
-        debugLog('File content fetched successfully', fileData);
-        return fileData;
-      } catch (error) {
-        debugLog('File content fetch failed', error);
-        throw error;
+
+      if (!urlInfo.filePath) {
+        throw new Error('URL must point to a specific file');
       }
-    },
-    onError: (error) => {
-      const githubError = handleGitHubError(error);
-      setCurrentError(githubError);
-      debugLog('File content error', githubError);
-    },
-    onSuccess: (data) => {
-      setCurrentError(null);
-      debugLog('File content success', data);
-    },
-    retry: retries,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-  });
-  
-  // =============================================================================
-  // DIALOG MANAGEMENT FUNCTIONS
-  // =============================================================================
-  
-  const openDialog = useCallback(() => {
-    debugLog('Opening GitHub import dialog');
-    setIsDialogOpen(true);
-    setCurrentError(null);
-  }, [debugLog]);
-  
-  const closeDialog = useCallback(() => {
-    debugLog('Closing GitHub import dialog');
-    setIsDialogOpen(false);
-    setCurrentError(null);
-    accessMutation.reset();
-    contentMutation.reset();
-  }, [debugLog, accessMutation, contentMutation]);
-  
-  const toggleDialog = useCallback(() => {
-    if (isDialogOpen) {
-      closeDialog();
-    } else {
-      openDialog();
-    }
-  }, [isDialogOpen, closeDialog, openDialog]);
-  
-  // =============================================================================
-  // IMPORT WORKFLOW FUNCTIONS
-  // =============================================================================
-  
-  const importFile = useCallback(async (params: FileContentParams): Promise<GitHubDialogResult> => {
-    debugLog('Starting complete import workflow', params);
-    
-    try {
-      // Step 1: Check repository access (optional for public repos)
-      let accessResult: GitHubRepoAccessResult | null = null;
-      try {
-        accessResult = await accessMutation.mutateAsync(params);
-      } catch (error) {
-        // Access check failed - might still be able to fetch file if public
-        debugLog('Access check failed, attempting direct file fetch', error);
+
+      if (!urlInfo.hasValidExtension) {
+        throw new Error(`File type not supported. Allowed types: ${allowedFileTypes.join(', ')}`);
       }
-      
-      // Step 2: Fetch file content
-      const fileContent = await contentMutation.mutateAsync(params);
-      
-      // Step 3: Create import result
-      const urlValidation = validateGitHubUrl(params.url);
-      if (!urlValidation.isValid || !urlValidation.urlInfo) {
-        throw new Error('Invalid GitHub URL after successful fetch');
+
+      // Create abort controller for this request
+      abortControllerRef.current = new AbortController();
+
+      // Fetch repository info
+      const repository = await repositoryQuery.mutateAsync({
+        owner: urlInfo.owner,
+        repo: urlInfo.repo,
+        credentials
+      });
+
+      // Fetch file content
+      const fileContent = await fileContentMutation.mutateAsync({
+        owner: urlInfo.owner,
+        repo: urlInfo.repo,
+        path: urlInfo.filePath,
+        ref: urlInfo.branch,
+        credentials
+      });
+
+      // Decode content
+      const decodedContent = decodeBase64Content(fileContent.content, fileContent.encoding);
+
+      // Validate content if validator provided
+      if (validateContent) {
+        const isValid = await validateContent(decodedContent, fileContent.name);
+        if (!isValid) {
+          throw new Error('Script content validation failed');
+        }
       }
-      
-      const result: GitHubDialogResult = {
-        data: fileContent,
-        repoInfo: urlValidation.urlInfo,
+
+      // Create script content object
+      const scriptContent: ScriptContent = {
+        name: fileContent.name,
+        description: `Imported from ${repository.fullName}`,
+        type: getScriptTypeFromExtension(fileContent.name),
+        context: 'custom_service' as const,
+        source: 'github' as const,
+        content: decodedContent,
+        path: fileContent.path,
+        repository_url: repository.htmlUrl,
+        ref: urlInfo.branch,
+        config: {
+          importedFrom: url,
+          repositoryInfo: repository,
+          fileSize: fileContent.size,
+          importedAt: new Date().toISOString()
+        }
       };
+
+      setState(prev => ({ ...prev, isLoading: false, error: null }));
       
-      debugLog('Import workflow completed successfully', result);
-      return result;
+      const result: ScriptImportResult = {
+        scripts: [scriptContent],
+        repository,
+        importedFiles: [{
+          name: fileContent.name,
+          path: fileContent.path,
+          size: fileContent.size,
+          content: decodedContent
+        }],
+        metadata: {
+          totalFiles: 1,
+          totalSize: fileContent.size,
+          importedAt: new Date().toISOString(),
+          source: 'url'
+        }
+      };
+
+      onImportSuccess?.(result);
+      return scriptContent;
+
     } catch (error) {
-      debugLog('Import workflow failed', error);
+      const gitHubError = createGitHubError(error, 'importing from URL');
+      setState(prev => ({ ...prev, isLoading: false, error: gitHubError }));
+      onImportError?.(gitHubError);
       throw error;
     }
-  }, [accessMutation, contentMutation, debugLog]);
-  
-  const onImportSuccess = useCallback((result: GitHubDialogResult) => {
-    debugLog('Import success callback', result);
-    setLastImport(result);
-    setCurrentError(null);
-    closeDialog();
-  }, [debugLog, closeDialog]);
-  
-  // =============================================================================
-  // UTILITY FUNCTIONS
-  // =============================================================================
-  
-  const validateUrl = useCallback((url: string): GitHubUrlValidationResult => {
-    return validateGitHubUrl(url);
+  }, [allowedFileTypes, validateContent, onImportSuccess, onImportError, repositoryQuery, fileContentMutation]);
+
+  /**
+   * Import multiple files from repository
+   */
+  const importFromRepository = useCallback(async (
+    repository: GitHubRepositoryInfo,
+    files: GitHubFileInfo[],
+    credentials?: GitHubCredentials
+  ): Promise<ScriptContent[]> => {
+    try {
+      setState(prev => ({ ...prev, isLoading: true, error: null }));
+
+      const scriptContents: ScriptContent[] = [];
+      const importedFiles: Array<{ name: string; path: string; size: number; content: string }> = [];
+
+      for (const file of files) {
+        try {
+          // Fetch file content
+          const fileContent = await fileContentMutation.mutateAsync({
+            owner: repository.owner.login,
+            repo: repository.name,
+            path: file.path,
+            credentials
+          });
+
+          // Decode content
+          const decodedContent = decodeBase64Content(fileContent.content, fileContent.encoding);
+
+          // Validate content if validator provided
+          if (validateContent) {
+            const isValid = await validateContent(decodedContent, file.name);
+            if (!isValid) {
+              console.warn(`Skipping file ${file.name}: validation failed`);
+              continue;
+            }
+          }
+
+          // Create script content object
+          const scriptContent: ScriptContent = {
+            name: file.name,
+            description: `Imported from ${repository.fullName}`,
+            type: getScriptTypeFromExtension(file.name),
+            context: 'custom_service' as const,
+            source: 'github' as const,
+            content: decodedContent,
+            path: file.path,
+            repository_url: repository.htmlUrl,
+            ref: repository.defaultBranch,
+            config: {
+              repositoryInfo: repository,
+              fileSize: file.size,
+              importedAt: new Date().toISOString()
+            }
+          };
+
+          scriptContents.push(scriptContent);
+          importedFiles.push({
+            name: file.name,
+            path: file.path,
+            size: file.size,
+            content: decodedContent
+          });
+
+        } catch (error) {
+          console.warn(`Failed to import file ${file.name}:`, error);
+          // Continue with other files
+        }
+      }
+
+      setState(prev => ({ ...prev, isLoading: false, error: null }));
+
+      const result: ScriptImportResult = {
+        scripts: scriptContents,
+        repository,
+        importedFiles,
+        metadata: {
+          totalFiles: importedFiles.length,
+          totalSize: importedFiles.reduce((sum, f) => sum + f.size, 0),
+          importedAt: new Date().toISOString(),
+          source: 'repository'
+        }
+      };
+
+      onImportSuccess?.(result);
+      return scriptContents;
+
+    } catch (error) {
+      const gitHubError = createGitHubError(error, 'importing from repository');
+      setState(prev => ({ ...prev, isLoading: false, error: gitHubError }));
+      onImportError?.(gitHubError);
+      throw error;
+    }
+  }, [validateContent, onImportSuccess, onImportError, fileContentMutation]);
+
+  /**
+   * Validate GitHub URL
+   */
+  const validateUrl = useCallback((url: string): GitHubUrlInfo | null => {
+    return parseGitHubUrl(url);
   }, []);
-  
-  const decodeContent = useCallback((base64Content: string): string | null => {
-    return decodeBase64Content(base64Content);
-  }, []);
-  
-  const isSupportedFile = useCallback((filename: string): boolean => {
-    return isSupportedFileExtension(filename);
-  }, []);
-  
-  // =============================================================================
-  // STATE MANAGEMENT FUNCTIONS
-  // =============================================================================
-  
+
+  /**
+   * Clear current error
+   */
   const clearError = useCallback(() => {
-    debugLog('Clearing error state');
-    setCurrentError(null);
-  }, [debugLog]);
-  
+    setState(prev => ({ ...prev, error: null }));
+  }, []);
+
+  /**
+   * Reset hook state
+   */
   const reset = useCallback(() => {
-    debugLog('Resetting all hook state');
-    setIsDialogOpen(false);
-    setLastImport(null);
-    setCurrentError(null);
-    accessMutation.reset();
-    contentMutation.reset();
-    
-    // Clear React Query cache for this hook
-    queryClient.removeQueries({ queryKey: [QUERY_KEYS.REPO_ACCESS] });
-    queryClient.removeQueries({ queryKey: [QUERY_KEYS.FILE_CONTENT] });
-  }, [debugLog, accessMutation, contentMutation, queryClient]);
-  
-  const resetAccess = useCallback(() => {
-    debugLog('Resetting access state');
-    accessMutation.reset();
-  }, [debugLog, accessMutation]);
-  
-  const resetContent = useCallback(() => {
-    debugLog('Resetting content state');
-    contentMutation.reset();
-  }, [debugLog, contentMutation]);
-  
-  const resetImport = useCallback(() => {
-    debugLog('Resetting import state');
-    setLastImport(null);
-    setCurrentError(null);
-    accessMutation.reset();
-    contentMutation.reset();
-  }, [debugLog, accessMutation, contentMutation]);
-  
-  // =============================================================================
-  // COMPUTED STATE
-  // =============================================================================
-  
-  const state: GitHubImportState = {
-    isDialogOpen,
-    isCheckingAccess: accessMutation.isPending,
-    isFetchingFile: contentMutation.isPending,
-    isLoading: accessMutation.isPending || contentMutation.isPending,
-    error: currentError || accessMutation.error || contentMutation.error || null,
-    lastImport,
-    accessResult: accessMutation.data || null,
-    fileContent: contentMutation.data || null,
-  };
-  
-  // =============================================================================
+    // Cancel any ongoing requests
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    setState({
+      isOpen: false,
+      isLoading: false,
+      error: null,
+      repository: null,
+      selectedFiles: [],
+      dialogConfig: {}
+    });
+  }, []);
+
+  // ========================================================================
+  // CLEANUP
+  // ========================================================================
+
+  useEffect(() => {
+    return () => {
+      // Cleanup on unmount
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  // ========================================================================
   // RETURN INTERFACE
-  // =============================================================================
-  
+  // ========================================================================
+
   return {
     state,
-    
-    dialog: {
-      open: openDialog,
-      close: closeDialog,
-      toggle: toggleDialog,
-    },
-    
-    access: {
-      checkAccess: accessMutation.mutateAsync,
-      resetAccess,
-    },
-    
-    content: {
-      fetchContent: contentMutation.mutateAsync,
-      resetContent,
-    },
-    
-    import: {
-      importFile,
-      onImportSuccess,
-      resetImport,
-    },
-    
-    utils: {
-      validateUrl,
-      decodeContent,
-      isSupportedFile,
-    },
-    
-    actions: {
-      clearError,
-      reset,
-    },
+    openDialog,
+    closeDialog,
+    importFromUrl,
+    importFromRepository,
+    validateUrl,
+    parseGitHubUrl: parseGitHubUrl,
+    decodeContent: decodeBase64Content,
+    clearError,
+    reset
   };
 }
 
-// =============================================================================
-// EXPORTS
-// =============================================================================
+// ============================================================================
+// UTILITY HELPER FUNCTIONS
+// ============================================================================
 
+/**
+ * Get script type from file extension
+ */
+function getScriptTypeFromExtension(fileName: string): any {
+  const extension = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
+  
+  const typeMap: Record<string, string> = {
+    '.js': 'javascript',
+    '.ts': 'javascript',
+    '.jsx': 'javascript',
+    '.tsx': 'javascript',
+    '.py': 'python3',
+    '.php': 'php',
+    '.txt': 'text',
+    '.md': 'text'
+  };
+
+  return typeMap[extension] || 'text';
+}
+
+// Export default hook
 export default useGithubImport;
 
-/**
- * Re-export utility functions for standalone usage
- */
-export {
-  validateGitHubUrl,
-  decodeBase64Content,
-  isSupportedFileExtension,
-};
-
-/**
- * Re-export types for external usage
- */
+// Export types for external usage
 export type {
-  UseGithubImportConfig,
-  UseGithubImportReturn,
-  GitHubImportState,
-  RepositoryAccessParams,
-  FileContentParams,
+  UseGitHubImportOptions,
+  UseGitHubImportReturn,
+  GitHubImportState
 };
