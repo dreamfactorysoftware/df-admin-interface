@@ -1,1070 +1,1244 @@
 /**
  * Session Management Utilities
  * 
- * Provides secure session lifecycle management, state persistence, and session validation
- * for Next.js authentication flows. Implements HTTP-only cookie integration, session 
- * expiration handling, and automatic session refresh capabilities with comprehensive
- * security features and cross-tab synchronization.
+ * Provides comprehensive session lifecycle management for DreamFactory Admin Interface.
+ * Implements secure session handling with HTTP-only cookies, automatic token refresh,
+ * cross-tab synchronization, and robust security monitoring for Next.js applications.
+ * 
+ * Key Features:
+ * - Session lifecycle management with secure initialization, validation, and cleanup workflows
+ * - Session state persistence with automatic synchronization and cross-tab coordination
+ * - Session expiration detection with automatic refresh and configurable timeout handling
+ * - Session validation with token verification and comprehensive authentication checks
+ * - Session metadata management including user roles, permissions, and access restrictions
+ * - Integration with HTTP-only cookies for secure session token storage with SameSite=Strict configuration
+ * - Session security features including automatic logout, session invalidation, and security monitoring
+ * 
+ * Security Compliance:
+ * - OWASP session management best practices
+ * - Next.js 15.1+ middleware integration support
+ * - Cross-tab session coordination with storage events
+ * - Automatic security monitoring and threat detection
  */
 
-import { 
-  storeSessionToken, 
-  getSessionToken, 
-  refreshSessionToken, 
-  getRefreshToken,
-  getCsrfToken,
-  performLogoutCleanup,
-  cleanupExpiredCookies,
-  emergencySessionInvalidation,
-  type SessionData,
-  type CookieValidationResult,
-  type CookieCleanupOptions,
+import { NextRequest, NextResponse } from 'next/server';
+import {
+  UserSession,
+  AuthState,
+  SessionStorage,
+  MiddlewareAuthResult,
+  JWTPayload,
+  AuthError,
+  AuthErrorCode,
+} from '@/types/auth';
+import {
+  SessionValidationResult,
+  SessionCookieData,
+  SessionError,
+} from '@/types/user';
+import {
+  setSessionTokenCookie,
+  getSessionTokenCookie,
+  clearSessionTokenCookie,
+  refreshSessionTokenCookie,
+  performCookieCleanup,
+  checkCookieExpiration,
+  SessionCookieOptions,
+  CookieValidationResult,
 } from './cookies';
 import {
-  SESSION_CONFIG,
-  TOKEN_EXPIRATION,
-  AUTH_STATES,
-  AUTH_EVENTS,
-  VALIDATION_MESSAGES,
-  RBAC_PERMISSIONS,
-  AUDIT_EVENTS,
-  LOG_LEVELS,
-  type AuthState,
-  type AuthEvent,
-  type RBACPermission,
-  type AuditEvent,
-  type LogLevel,
-} from './constants';
+  validateJWTToken,
+  parseJWTPayload,
+  isTokenExpired,
+  needsTokenRefresh,
+  getTimeToExpiry,
+  extractTokenFromRequest,
+  JWTLifecycleManager,
+  TokenRefreshManager,
+  JWTValidationError,
+  JWTValidationResult,
+  TokenRefreshResult,
+} from './jwt';
 
 // =============================================================================
 // TYPES AND INTERFACES
 // =============================================================================
 
 /**
- * User authentication data structure
+ * Session initialization configuration
  */
-export interface UserSession {
-  userId: string;
-  email: string;
-  firstName?: string;
-  lastName?: string;
-  displayName?: string;
-  roles: string[];
-  permissions: RBACPermission[];
-  sessionId: string;
-  sessionToken: string;
-  refreshToken?: string;
-  csrfToken?: string;
-  issuedAt: number;
-  expiresAt: number;
-  lastActivity: number;
-  isRootAdmin: boolean;
-  isSysAdmin: boolean;
-  roleId?: string;
-  accessibleTabs?: string[];
-  preferences?: Record<string, any>;
-}
-
-/**
- * Session initialization options
- */
-export interface SessionInitOptions {
-  rememberMe?: boolean;
-  skipValidation?: boolean;
+export interface SessionInitConfig {
+  /** JWT token to initialize session with */
+  token: string;
+  /** Whether to extend session for "remember me" */
+  extended?: boolean;
+  /** Custom session duration in seconds */
+  customDuration?: number;
+  /** Enable automatic refresh */
   autoRefresh?: boolean;
-  backgroundSync?: boolean;
-  crossTabSync?: boolean;
+  /** Custom domain for cross-domain sessions */
+  domain?: string;
+  /** Initialize with user data */
+  userData?: Partial<UserSession>;
 }
 
 /**
- * Session validation result
+ * Session validation options
  */
-export interface SessionValidationResult {
-  isValid: boolean;
-  session?: UserSession | null;
-  state: AuthState;
-  error?: string;
-  needsRefresh?: boolean;
-  expired?: boolean;
-  tampered?: boolean;
-  timeUntilExpiry?: number;
+export interface SessionValidationOptions {
+  /** Verify token signature */
+  verifySignature?: boolean;
+  /** Check token expiration */
+  checkExpiration?: boolean;
+  /** Validate user permissions */
+  checkPermissions?: boolean;
+  /** Required permissions for validation */
+  requiredPermissions?: string[];
+  /** Validate against blacklist */
+  checkBlacklist?: boolean;
+  /** Allow expired tokens for refresh */
+  allowExpiredForRefresh?: boolean;
 }
 
 /**
- * Session refresh result
+ * Session refresh configuration
  */
-export interface SessionRefreshResult {
-  success: boolean;
-  session?: UserSession;
-  error?: string;
-  newToken?: string;
-  needsReauth?: boolean;
+export interface SessionRefreshConfig {
+  /** Force refresh even if not needed */
+  force?: boolean;
+  /** Extend session duration */
+  extend?: boolean;
+  /** Custom expiration duration */
+  customDuration?: number;
+  /** Update user data during refresh */
+  updateUserData?: boolean;
 }
 
 /**
- * Session event data
+ * Session cleanup configuration
  */
-export interface SessionEventData {
-  sessionId?: string;
-  userId?: string;
-  event: AuthEvent;
-  timestamp: number;
-  metadata?: Record<string, any>;
+export interface SessionCleanupConfig {
+  /** Clear all authentication cookies */
+  clearCookies?: boolean;
+  /** Clear browser storage */
+  clearStorage?: boolean;
+  /** Invalidate server-side session */
+  invalidateServerSession?: boolean;
+  /** Notify other tabs of logout */
+  broadcastLogout?: boolean;
+  /** Custom cleanup actions */
+  customActions?: (() => Promise<void>)[];
 }
 
 /**
- * Session state change listener
+ * Session metadata for security monitoring
  */
-export type SessionStateChangeListener = (state: AuthState, session?: UserSession) => void;
-
-/**
- * Session activity data
- */
-export interface SessionActivity {
-  lastActivity: number;
-  idleTime: number;
-  isIdle: boolean;
-  warningShown: boolean;
-}
-
-/**
- * Cross-tab session synchronization data
- */
-export interface CrossTabSyncData {
-  sessionId: string;
-  action: 'login' | 'logout' | 'refresh' | 'update' | 'invalidate';
-  timestamp: number;
-  data?: any;
-}
-
-// =============================================================================
-// SESSION STATE MANAGEMENT
-// =============================================================================
-
-/**
- * Session manager class providing comprehensive session lifecycle management
- */
-export class SessionManager {
-  private static instance: SessionManager;
-  private currentSession: UserSession | null = null;
-  private sessionState: AuthState = AUTH_STATES.UNAUTHENTICATED;
-  private refreshTimer: NodeJS.Timeout | null = null;
-  private validationTimer: NodeJS.Timeout | null = null;
-  private activityTimer: NodeJS.Timeout | null = null;
-  private stateListeners: Set<SessionStateChangeListener> = new Set();
-  private isInitialized = false;
-  private sessionActivity: SessionActivity = {
-    lastActivity: Date.now(),
-    idleTime: 0,
-    isIdle: false,
-    warningShown: false,
+export interface SessionMetadata {
+  /** Session creation timestamp */
+  createdAt: Date;
+  /** Last activity timestamp */
+  lastActivity: Date;
+  /** Last validation timestamp */
+  lastValidation: Date;
+  /** Session refresh count */
+  refreshCount: number;
+  /** User agent information */
+  userAgent?: string;
+  /** Client IP address */
+  clientIP?: string;
+  /** Device identifier */
+  deviceId?: string;
+  /** Session flags */
+  flags: {
+    /** Session is extended (remember me) */
+    isExtended: boolean;
+    /** Auto-refresh is enabled */
+    autoRefresh: boolean;
+    /** Session is from mobile device */
+    isMobile: boolean;
+    /** Session has elevated privileges */
+    hasElevatedPrivileges: boolean;
   };
+}
 
-  private constructor() {
-    this.setupActivityMonitoring();
-    this.setupCrossTabSync();
+/**
+ * Session security monitoring result
+ */
+export interface SessionSecurityResult {
+  /** Security check passed */
+  isSecure: boolean;
+  /** Security threats detected */
+  threats: string[];
+  /** Recommended actions */
+  recommendations: string[];
+  /** Risk level (low, medium, high, critical) */
+  riskLevel: 'low' | 'medium' | 'high' | 'critical';
+  /** Should force logout */
+  shouldLogout: boolean;
+}
+
+/**
+ * Cross-tab session event types
+ */
+export enum SessionEventType {
+  SESSION_CREATED = 'session_created',
+  SESSION_UPDATED = 'session_updated',
+  SESSION_REFRESHED = 'session_refreshed',
+  SESSION_EXPIRED = 'session_expired',
+  SESSION_DESTROYED = 'session_destroyed',
+  LOGOUT_ALL_TABS = 'logout_all_tabs',
+  PERMISSION_CHANGED = 'permission_changed',
+  SECURITY_ALERT = 'security_alert',
+}
+
+/**
+ * Session event data for cross-tab communication
+ */
+export interface SessionEvent {
+  type: SessionEventType;
+  timestamp: number;
+  sessionId?: string;
+  userId?: number;
+  data?: any;
+  source?: string;
+}
+
+/**
+ * Session storage event listener callback
+ */
+export type SessionEventListener = (event: SessionEvent) => void;
+
+// =============================================================================
+// SESSION LIFECYCLE MANAGER
+// =============================================================================
+
+/**
+ * Comprehensive session lifecycle manager
+ * Handles all aspects of session management including initialization, validation,
+ * refresh, cleanup, and cross-tab synchronization
+ */
+export class SessionLifecycleManager {
+  private jwtManager: JWTLifecycleManager;
+  private refreshManager: TokenRefreshManager;
+  private metadata: SessionMetadata | null = null;
+  private eventListeners: Map<SessionEventType, SessionEventListener[]> = new Map();
+  private storageListener: ((event: StorageEvent) => void) | null = null;
+  private securityTimer: NodeJS.Timeout | null = null;
+  private activityTimer: NodeJS.Timeout | null = null;
+
+  constructor() {
+    this.jwtManager = new JWTLifecycleManager();
+    this.refreshManager = new TokenRefreshManager();
+    this.initializeStorageListener();
+    this.startSecurityMonitoring();
   }
 
   /**
-   * Get singleton instance of SessionManager
+   * Initializes a new session with comprehensive security setup
    */
-  public static getInstance(): SessionManager {
-    if (!SessionManager.instance) {
-      SessionManager.instance = new SessionManager();
-    }
-    return SessionManager.instance;
-  }
-
-  /**
-   * Initialize session management with optional configuration
-   */
-  public async initialize(options: SessionInitOptions = {}): Promise<SessionValidationResult> {
+  async initializeSession(config: SessionInitConfig): Promise<SessionValidationResult> {
     try {
-      const {
-        skipValidation = false,
-        autoRefresh = true,
-        backgroundSync = true,
-        crossTabSync = true,
-      } = options;
-
-      this.logSessionEvent('SESSION_INIT_STARTED', 'info', { options });
-
-      // Clean up any expired cookies first
-      await cleanupExpiredCookies();
-
-      // Validate existing session if not skipping validation
-      if (!skipValidation) {
-        const validationResult = await this.validateCurrentSession();
-        
-        if (validationResult.isValid && validationResult.session) {
-          await this.setSession(validationResult.session, { 
-            skipStore: true, 
-            autoRefresh,
-            backgroundSync,
-          });
-        } else if (validationResult.needsRefresh) {
-          const refreshResult = await this.refreshSession();
-          if (refreshResult.success && refreshResult.session) {
-            await this.setSession(refreshResult.session, { 
-              skipStore: false, 
-              autoRefresh,
-              backgroundSync,
-            });
-          }
-        }
-      }
-
-      // Setup background processes
-      if (autoRefresh) {
-        this.setupAutoRefresh();
-      }
-
-      if (backgroundSync) {
-        this.setupBackgroundValidation();
-      }
-
-      this.isInitialized = true;
-      
-      const result: SessionValidationResult = {
-        isValid: this.currentSession !== null,
-        session: this.currentSession,
-        state: this.sessionState,
-        timeUntilExpiry: this.currentSession ? 
-          this.currentSession.expiresAt - Date.now() : undefined,
-      };
-
-      this.logSessionEvent('SESSION_INIT_COMPLETED', 'info', {
-        isValid: result.isValid,
-        sessionId: this.currentSession?.sessionId,
-        state: this.sessionState,
+      // Validate input token
+      const tokenValidation = validateJWTToken(config.token, {
+        verifySignature: false,
+        checkExpiration: true,
+        checkNotBefore: true,
+        validateIssuer: true,
+        validateAudience: true,
       });
 
-      return result;
-    } catch (error) {
-      this.logSessionEvent('SESSION_INIT_FAILED', 'error', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-
-      return {
-        isValid: false,
-        state: AUTH_STATES.UNAUTHENTICATED,
-        error: 'Session initialization failed',
-      };
-    }
-  }
-
-  /**
-   * Create new session from authentication response
-   */
-  public async createSession(
-    authData: {
-      userId: string;
-      email: string;
-      sessionToken: string;
-      refreshToken?: string;
-      csrfToken?: string;
-      roles?: string[];
-      permissions?: RBACPermission[];
-      userData?: any;
-    },
-    options: SessionInitOptions = {}
-  ): Promise<SessionValidationResult> {
-    try {
-      const { rememberMe = false } = options;
-      const now = Date.now();
-      
-      // Calculate session expiration
-      const expiresAt = now + (rememberMe 
-        ? SESSION_CONFIG.TIMEOUTS.REMEMBER_ME 
-        : SESSION_CONFIG.TIMEOUTS.DEFAULT);
-
-      // Create session data
-      const sessionData: UserSession = {
-        userId: authData.userId,
-        email: authData.email,
-        firstName: authData.userData?.firstName || authData.userData?.first_name,
-        lastName: authData.userData?.lastName || authData.userData?.last_name,
-        displayName: authData.userData?.displayName || authData.userData?.name || authData.email,
-        roles: authData.roles || [],
-        permissions: authData.permissions || [],
-        sessionId: this.generateSessionId(),
-        sessionToken: authData.sessionToken,
-        refreshToken: authData.refreshToken,
-        csrfToken: authData.csrfToken,
-        issuedAt: now,
-        expiresAt,
-        lastActivity: now,
-        isRootAdmin: authData.userData?.isRootAdmin || false,
-        isSysAdmin: authData.userData?.isSysAdmin || false,
-        roleId: authData.userData?.roleId,
-        accessibleTabs: authData.userData?.accessibleTabs || [],
-        preferences: authData.userData?.preferences || {},
-      };
-
-      // Store session in cookies
-      const cookieData: SessionData = {
-        userId: sessionData.userId,
-        email: sessionData.email,
-        roles: sessionData.roles,
-        permissions: sessionData.permissions,
-        sessionId: sessionData.sessionId,
-        issuedAt: sessionData.issuedAt,
-        expiresAt: sessionData.expiresAt,
-        lastActivity: sessionData.lastActivity,
-        refreshToken: sessionData.refreshToken,
-        csrfToken: sessionData.csrfToken,
-      };
-
-      const storeSuccess = await storeSessionToken(cookieData, rememberMe);
-      
-      if (!storeSuccess) {
-        throw new Error('Failed to store session in cookies');
+      if (!tokenValidation.isValid || !tokenValidation.payload) {
+        return {
+          isValid: false,
+          error: 'invalid_token',
+          session: undefined,
+        };
       }
 
-      // Set active session
-      await this.setSession(sessionData, options);
+      // Set session cookie with security configuration
+      const cookieOptions: SessionCookieOptions = {
+        extended: config.extended || false,
+        domain: config.domain,
+        customExpiration: config.customDuration,
+        autoRefresh: config.autoRefresh !== false,
+      };
+
+      const cookieResult = await setSessionTokenCookie(config.token, cookieOptions);
+      if (!cookieResult.isValid) {
+        return {
+          isValid: false,
+          error: 'cookie_set_failed',
+          session: undefined,
+        };
+      }
+
+      // Create session metadata
+      this.metadata = {
+        createdAt: new Date(),
+        lastActivity: new Date(),
+        lastValidation: new Date(),
+        refreshCount: 0,
+        flags: {
+          isExtended: config.extended || false,
+          autoRefresh: config.autoRefresh !== false,
+          isMobile: this.detectMobileDevice(),
+          hasElevatedPrivileges: this.hasElevatedPrivileges(tokenValidation.payload),
+        },
+      };
+
+      // Create user session object
+      const userSession = this.createUserSessionFromPayload(tokenValidation.payload, config.userData);
+
+      // Set up automatic refresh if enabled
+      if (config.autoRefresh !== false) {
+        await this.jwtManager.validateAndScheduleRefresh(
+          config.token,
+          '', // Refresh token handled separately
+          this.handleTokenRefresh.bind(this)
+        );
+      }
 
       // Broadcast session creation to other tabs
-      this.broadcastSessionChange('login', sessionData);
+      this.broadcastSessionEvent({
+        type: SessionEventType.SESSION_CREATED,
+        timestamp: Date.now(),
+        sessionId: userSession.sessionId,
+        userId: userSession.id,
+      });
 
-      this.logSessionEvent('SESSION_CREATED', 'info', {
-        sessionId: sessionData.sessionId,
-        userId: sessionData.userId,
-        rememberMe,
-        expiresAt: new Date(sessionData.expiresAt).toISOString(),
+      // Start activity tracking
+      this.startActivityTracking();
+
+      return {
+        isValid: true,
+        session: userSession,
+        error: undefined,
+      };
+    } catch (error) {
+      console.error('Session initialization failed:', error);
+      return {
+        isValid: false,
+        error: 'initialization_failed',
+        session: undefined,
+      };
+    }
+  }
+
+  /**
+   * Validates current session with comprehensive security checks
+   */
+  async validateSession(options: SessionValidationOptions = {}): Promise<SessionValidationResult> {
+    try {
+      // Get session token from cookies
+      const cookieResult = await getSessionTokenCookie();
+      if (!cookieResult.isValid || !cookieResult.value) {
+        return {
+          isValid: false,
+          error: 'no_session_token',
+          session: undefined,
+        };
+      }
+
+      // Validate JWT token
+      const tokenValidation = validateJWTToken(cookieResult.value, {
+        verifySignature: options.verifySignature || false,
+        checkExpiration: options.checkExpiration !== false,
+        checkNotBefore: true,
+        validateIssuer: true,
+        validateAudience: true,
+        requiredClaims: ['sub', 'exp', 'iat', 'email'],
+      });
+
+      if (!tokenValidation.isValid || !tokenValidation.payload) {
+        // Handle expired tokens specially if refresh is allowed
+        if (tokenValidation.error === JWTValidationError.TOKEN_EXPIRED && options.allowExpiredForRefresh) {
+          return {
+            isValid: false,
+            error: 'token_expired',
+            session: undefined,
+            requiresRefresh: true,
+          };
+        }
+
+        return {
+          isValid: false,
+          error: this.mapJWTErrorToSessionError(tokenValidation.error),
+          session: undefined,
+        };
+      }
+
+      // Check permissions if required
+      if (options.checkPermissions && options.requiredPermissions) {
+        const hasPermissions = this.validatePermissions(
+          tokenValidation.payload,
+          options.requiredPermissions
+        );
+        if (!hasPermissions) {
+          return {
+            isValid: false,
+            error: 'permission_denied',
+            session: undefined,
+          };
+        }
+      }
+
+      // Perform security checks
+      const securityResult = await this.performSecurityChecks(tokenValidation.payload);
+      if (!securityResult.isSecure) {
+        if (securityResult.shouldLogout) {
+          await this.cleanupSession({ broadcastLogout: true });
+          return {
+            isValid: false,
+            error: 'security_violation',
+            session: undefined,
+          };
+        }
+      }
+
+      // Update metadata
+      if (this.metadata) {
+        this.metadata.lastValidation = new Date();
+        this.metadata.lastActivity = new Date();
+      }
+
+      // Create session object
+      const userSession = this.createUserSessionFromPayload(tokenValidation.payload);
+
+      // Check if refresh is needed
+      const needsRefresh = needsTokenRefresh(cookieResult.value);
+      if (needsRefresh) {
+        // Schedule or trigger refresh
+        this.scheduleTokenRefresh();
+      }
+
+      return {
+        isValid: true,
+        session: userSession,
+        error: undefined,
+        requiresRefresh: needsRefresh,
+      };
+    } catch (error) {
+      console.error('Session validation failed:', error);
+      return {
+        isValid: false,
+        error: 'validation_failed',
+        session: undefined,
+      };
+    }
+  }
+
+  /**
+   * Refreshes current session with new token and updated expiration
+   */
+  async refreshSession(config: SessionRefreshConfig = {}): Promise<SessionValidationResult> {
+    try {
+      // Get current session token
+      const currentTokenResult = await getSessionTokenCookie();
+      if (!currentTokenResult.isValid || !currentTokenResult.value) {
+        return {
+          isValid: false,
+          error: 'no_session_token',
+          session: undefined,
+        };
+      }
+
+      // Check if refresh is actually needed (unless forced)
+      if (!config.force && !needsTokenRefresh(currentTokenResult.value)) {
+        // Token is still fresh, just update activity
+        this.updateActivity();
+        const payload = parseJWTPayload(currentTokenResult.value);
+        if (payload) {
+          return {
+            isValid: true,
+            session: this.createUserSessionFromPayload(payload),
+            error: undefined,
+          };
+        }
+      }
+
+      // Attempt token refresh
+      const refreshResult = await this.refreshManager.refreshToken(currentTokenResult.value);
+      if (!refreshResult.success || !refreshResult.accessToken) {
+        return {
+          isValid: false,
+          error: 'refresh_failed',
+          session: undefined,
+        };
+      }
+
+      // Update session cookie with new token
+      const cookieOptions: SessionCookieOptions = {
+        extended: config.extend || (this.metadata?.flags.isExtended || false),
+        customExpiration: config.customDuration,
+        autoRefresh: true,
+      };
+
+      const cookieResult = await refreshSessionTokenCookie(
+        refreshResult.accessToken,
+        cookieOptions
+      );
+
+      if (!cookieResult.isValid) {
+        return {
+          isValid: false,
+          error: 'cookie_update_failed',
+          session: undefined,
+        };
+      }
+
+      // Update metadata
+      if (this.metadata) {
+        this.metadata.refreshCount += 1;
+        this.metadata.lastActivity = new Date();
+        this.metadata.lastValidation = new Date();
+      }
+
+      // Parse new token and create session
+      const newPayload = parseJWTPayload(refreshResult.accessToken);
+      if (!newPayload) {
+        return {
+          isValid: false,
+          error: 'invalid_refreshed_token',
+          session: undefined,
+        };
+      }
+
+      const userSession = this.createUserSessionFromPayload(newPayload);
+
+      // Broadcast refresh event
+      this.broadcastSessionEvent({
+        type: SessionEventType.SESSION_REFRESHED,
+        timestamp: Date.now(),
+        sessionId: userSession.sessionId,
+        userId: userSession.id,
       });
 
       return {
         isValid: true,
-        session: sessionData,
-        state: this.sessionState,
-        timeUntilExpiry: sessionData.expiresAt - now,
+        session: userSession,
+        error: undefined,
       };
     } catch (error) {
-      this.logSessionEvent('SESSION_CREATE_FAILED', 'error', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        userId: authData.userId,
-      });
-
+      console.error('Session refresh failed:', error);
       return {
         isValid: false,
-        state: AUTH_STATES.UNAUTHENTICATED,
-        error: 'Failed to create session',
+        error: 'refresh_failed',
+        session: undefined,
       };
     }
   }
 
   /**
-   * Validate current session without network calls
+   * Performs comprehensive session cleanup and invalidation
    */
-  public async validateCurrentSession(): Promise<SessionValidationResult> {
+  async cleanupSession(config: SessionCleanupConfig = {}): Promise<boolean> {
     try {
-      const sessionData = await getSessionToken();
-      
-      if (!sessionData) {
-        return {
-          isValid: false,
-          state: AUTH_STATES.UNAUTHENTICATED,
-          error: 'No session found',
-        };
+      // Clear session cookie
+      if (config.clearCookies !== false) {
+        const cookieCleanupResults = await performCookieCleanup();
+        const successful = cookieCleanupResults.every(result => result.isValid);
+        if (!successful) {
+          console.warn('Some cookies failed to clear during cleanup');
+        }
       }
 
-      const now = Date.now();
-      const timeUntilExpiry = sessionData.expiresAt - now;
-
-      // Check if session has expired
-      if (timeUntilExpiry <= 0) {
-        await this.clearSession();
-        return {
-          isValid: false,
-          state: AUTH_STATES.SESSION_EXPIRED,
-          error: VALIDATION_MESSAGES.SESSION_EXPIRED,
-          expired: true,
-          timeUntilExpiry: 0,
-        };
+      // Clear browser storage
+      if (config.clearStorage && typeof window !== 'undefined') {
+        try {
+          localStorage.removeItem('df_session_data');
+          localStorage.removeItem('df_user_preferences');
+          sessionStorage.clear();
+        } catch (error) {
+          console.warn('Failed to clear browser storage:', error);
+        }
       }
 
-      // Check if session needs refresh
-      const needsRefresh = timeUntilExpiry <= SESSION_CONFIG.REFRESH.THRESHOLD;
+      // Execute custom cleanup actions
+      if (config.customActions) {
+        await Promise.allSettled(
+          config.customActions.map(action => action())
+        );
+      }
 
-      // Convert cookie data to session data
-      const session: UserSession = {
-        userId: sessionData.userId,
-        email: sessionData.email,
-        firstName: '',
-        lastName: '',
-        displayName: sessionData.email,
-        roles: sessionData.roles,
-        permissions: sessionData.permissions,
-        sessionId: sessionData.sessionId,
-        sessionToken: '', // Token is in HTTP-only cookie
-        refreshToken: sessionData.refreshToken,
-        csrfToken: sessionData.csrfToken,
-        issuedAt: sessionData.issuedAt,
-        expiresAt: sessionData.expiresAt,
-        lastActivity: sessionData.lastActivity || now,
-        isRootAdmin: sessionData.permissions.includes(RBAC_PERMISSIONS.SUPER_ADMIN),
-        isSysAdmin: sessionData.permissions.includes(RBAC_PERMISSIONS.SYSTEM_ADMIN),
-        accessibleTabs: [],
-        preferences: {},
-      };
+      // Broadcast logout event
+      if (config.broadcastLogout !== false) {
+        this.broadcastSessionEvent({
+          type: SessionEventType.SESSION_DESTROYED,
+          timestamp: Date.now(),
+          sessionId: this.metadata?.toString() || 'unknown',
+        });
+      }
 
-      const result: SessionValidationResult = {
-        isValid: true,
-        session,
-        state: AUTH_STATES.AUTHENTICATED,
-        needsRefresh,
-        timeUntilExpiry,
-      };
+      // Clean up timers and listeners
+      this.cleanup();
 
-      // Update current session if valid
-      this.currentSession = session;
-      this.updateSessionState(AUTH_STATES.AUTHENTICATED);
-
-      return result;
+      return true;
     } catch (error) {
-      this.logSessionEvent('SESSION_VALIDATE_FAILED', 'error', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-
-      return {
-        isValid: false,
-        state: AUTH_STATES.UNAUTHENTICATED,
-        error: 'Session validation failed',
-      };
-    }
-  }
-
-  /**
-   * Refresh session token
-   */
-  public async refreshSession(): Promise<SessionRefreshResult> {
-    try {
-      if (!this.currentSession) {
-        throw new Error('No active session to refresh');
-      }
-
-      this.updateSessionState(AUTH_STATES.TOKEN_REFRESHING);
-
-      const refreshToken = await getRefreshToken();
-      if (!refreshToken) {
-        throw new Error('No refresh token available');
-      }
-
-      // In a real implementation, this would make an API call to refresh the token
-      // For now, we'll simulate token refresh by extending the current session
-      const now = Date.now();
-      const newExpiresAt = now + SESSION_CONFIG.TIMEOUTS.DEFAULT;
-      
-      const updatedSession: UserSession = {
-        ...this.currentSession,
-        expiresAt: newExpiresAt,
-        lastActivity: now,
-      };
-
-      // Update session in cookies
-      const success = await refreshSessionToken({
-        userId: updatedSession.userId,
-        email: updatedSession.email,
-        roles: updatedSession.roles,
-        permissions: updatedSession.permissions,
-        sessionId: updatedSession.sessionId,
-        issuedAt: updatedSession.issuedAt,
-        expiresAt: updatedSession.expiresAt,
-        lastActivity: updatedSession.lastActivity,
-        refreshToken: updatedSession.refreshToken,
-        csrfToken: updatedSession.csrfToken,
-      });
-
-      if (!success) {
-        throw new Error('Failed to update session in cookies');
-      }
-
-      this.currentSession = updatedSession;
-      this.updateSessionState(AUTH_STATES.AUTHENTICATED);
-
-      // Broadcast refresh to other tabs
-      this.broadcastSessionChange('refresh', updatedSession);
-
-      this.logSessionEvent('SESSION_REFRESHED', 'info', {
-        sessionId: updatedSession.sessionId,
-        newExpiresAt: new Date(updatedSession.expiresAt).toISOString(),
-      });
-
-      return {
-        success: true,
-        session: updatedSession,
-        newToken: updatedSession.sessionToken,
-      };
-    } catch (error) {
-      this.updateSessionState(AUTH_STATES.AUTHENTICATED); // Revert state
-      
-      this.logSessionEvent('SESSION_REFRESH_FAILED', 'error', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        sessionId: this.currentSession?.sessionId,
-      });
-
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Token refresh failed',
-        needsReauth: true,
-      };
-    }
-  }
-
-  /**
-   * Clear current session and cleanup
-   */
-  public async clearSession(reason?: string): Promise<boolean> {
-    try {
-      const sessionId = this.currentSession?.sessionId;
-
-      // Clear all timers
-      this.clearTimers();
-
-      // Perform cookie cleanup
-      const cleanupSuccess = await performLogoutCleanup();
-
-      // Clear session data
-      this.currentSession = null;
-      this.updateSessionState(AUTH_STATES.UNAUTHENTICATED);
-
-      // Broadcast logout to other tabs
-      this.broadcastSessionChange('logout', null);
-
-      this.logSessionEvent('SESSION_CLEARED', 'info', {
-        sessionId,
-        reason: reason || 'Manual logout',
-        cleanupSuccess,
-      });
-
-      return cleanupSuccess;
-    } catch (error) {
-      this.logSessionEvent('SESSION_CLEAR_FAILED', 'error', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-
+      console.error('Session cleanup failed:', error);
       return false;
     }
   }
 
   /**
-   * Get current session data
+   * Checks session expiration status with configurable tolerance
    */
-  public getCurrentSession(): UserSession | null {
-    return this.currentSession;
-  }
+  async checkSessionExpiration(): Promise<{
+    isExpired: boolean;
+    timeToExpiry: number;
+    requiresRefresh: boolean;
+    shouldWarn: boolean;
+  }> {
+    try {
+      const cookieResult = await getSessionTokenCookie();
+      if (!cookieResult.isValid || !cookieResult.value) {
+        return {
+          isExpired: true,
+          timeToExpiry: 0,
+          requiresRefresh: false,
+          shouldWarn: false,
+        };
+      }
 
-  /**
-   * Get current session state
-   */
-  public getSessionState(): AuthState {
-    return this.sessionState;
-  }
+      const isExpired = isTokenExpired(cookieResult.value);
+      const timeToExpiry = getTimeToExpiry(cookieResult.value) || 0;
+      const requiresRefresh = needsTokenRefresh(cookieResult.value);
+      
+      // Warn if less than 5 minutes remaining
+      const shouldWarn = timeToExpiry > 0 && timeToExpiry < 300000; // 5 minutes in ms
 
-  /**
-   * Check if user has specific permission
-   */
-  public hasPermission(permission: RBACPermission): boolean {
-    return this.currentSession?.permissions.includes(permission) || false;
-  }
-
-  /**
-   * Check if user has any of the specified roles
-   */
-  public hasRole(roles: string | string[]): boolean {
-    if (!this.currentSession) return false;
-    
-    const roleArray = Array.isArray(roles) ? roles : [roles];
-    return roleArray.some(role => this.currentSession!.roles.includes(role));
-  }
-
-  /**
-   * Check if session is expired
-   */
-  public isSessionExpired(): boolean {
-    if (!this.currentSession) return true;
-    return Date.now() >= this.currentSession.expiresAt;
-  }
-
-  /**
-   * Get time until session expires
-   */
-  public getTimeUntilExpiry(): number {
-    if (!this.currentSession) return 0;
-    return Math.max(0, this.currentSession.expiresAt - Date.now());
-  }
-
-  /**
-   * Update session activity timestamp
-   */
-  public updateActivity(): void {
-    const now = Date.now();
-    this.sessionActivity.lastActivity = now;
-    this.sessionActivity.idleTime = 0;
-    this.sessionActivity.isIdle = false;
-
-    if (this.currentSession) {
-      this.currentSession.lastActivity = now;
-      // Note: In production, you might want to throttle cookie updates
-      // to avoid excessive writes on every user action
+      return {
+        isExpired,
+        timeToExpiry,
+        requiresRefresh,
+        shouldWarn,
+      };
+    } catch (error) {
+      console.error('Session expiration check failed:', error);
+      return {
+        isExpired: true,
+        timeToExpiry: 0,
+        requiresRefresh: false,
+        shouldWarn: false,
+      };
     }
   }
 
   /**
-   * Add session state change listener
+   * Gets current session metadata for monitoring and analytics
    */
-  public addStateChangeListener(listener: SessionStateChangeListener): () => void {
-    this.stateListeners.add(listener);
-    return () => this.stateListeners.delete(listener);
+  getSessionMetadata(): SessionMetadata | null {
+    return this.metadata ? { ...this.metadata } : null;
+  }
+
+  // =============================================================================
+  // CROSS-TAB SYNCHRONIZATION
+  // =============================================================================
+
+  /**
+   * Adds event listener for session events across tabs
+   */
+  addEventListener(type: SessionEventType, listener: SessionEventListener): void {
+    if (!this.eventListeners.has(type)) {
+      this.eventListeners.set(type, []);
+    }
+    this.eventListeners.get(type)!.push(listener);
   }
 
   /**
-   * Emergency session invalidation (security measure)
+   * Removes event listener for session events
    */
-  public async emergencyInvalidation(domains?: string[]): Promise<boolean> {
+  removeEventListener(type: SessionEventType, listener: SessionEventListener): void {
+    const listeners = this.eventListeners.get(type);
+    if (listeners) {
+      const index = listeners.indexOf(listener);
+      if (index > -1) {
+        listeners.splice(index, 1);
+      }
+    }
+  }
+
+  /**
+   * Broadcasts session event to other tabs via localStorage
+   */
+  private broadcastSessionEvent(event: SessionEvent): void {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const eventData = {
+          ...event,
+          source: 'session-manager',
+        };
+        localStorage.setItem('df_session_event', JSON.stringify(eventData));
+        // Remove immediately to trigger storage event
+        localStorage.removeItem('df_session_event');
+      } catch (error) {
+        console.warn('Failed to broadcast session event:', error);
+      }
+    }
+  }
+
+  /**
+   * Initializes storage event listener for cross-tab communication
+   */
+  private initializeStorageListener(): void {
+    if (typeof window !== 'undefined') {
+      this.storageListener = (event: StorageEvent) => {
+        if (event.key === 'df_session_event' && event.newValue) {
+          try {
+            const sessionEvent: SessionEvent = JSON.parse(event.newValue);
+            this.handleSessionEvent(sessionEvent);
+          } catch (error) {
+            console.warn('Failed to parse session event:', error);
+          }
+        }
+      };
+      window.addEventListener('storage', this.storageListener);
+    }
+  }
+
+  /**
+   * Handles incoming session events from other tabs
+   */
+  private handleSessionEvent(event: SessionEvent): void {
+    // Ignore events from the same tab
+    if (event.source === 'session-manager') {
+      return;
+    }
+
+    const listeners = this.eventListeners.get(event.type);
+    if (listeners) {
+      listeners.forEach(listener => {
+        try {
+          listener(event);
+        } catch (error) {
+          console.error('Session event listener error:', error);
+        }
+      });
+    }
+
+    // Handle special events
+    switch (event.type) {
+      case SessionEventType.LOGOUT_ALL_TABS:
+        this.cleanupSession({ broadcastLogout: false });
+        break;
+      case SessionEventType.SESSION_DESTROYED:
+        // Another tab logged out, check if we should also logout
+        this.validateSession().then(result => {
+          if (!result.isValid) {
+            this.cleanupSession({ broadcastLogout: false });
+          }
+        });
+        break;
+    }
+  }
+
+  // =============================================================================
+  // SECURITY MONITORING
+  // =============================================================================
+
+  /**
+   * Performs comprehensive security checks on session
+   */
+  private async performSecurityChecks(payload: JWTPayload): Promise<SessionSecurityResult> {
+    const threats: string[] = [];
+    const recommendations: string[] = [];
+    let riskLevel: 'low' | 'medium' | 'high' | 'critical' = 'low';
+    let shouldLogout = false;
+
     try {
-      this.clearTimers();
-      
-      const success = await emergencySessionInvalidation(domains);
-      
-      this.currentSession = null;
-      this.updateSessionState(AUTH_STATES.UNAUTHENTICATED);
-      
-      // Broadcast emergency invalidation
-      this.broadcastSessionChange('invalidate', null);
+      // Check for token age
+      const tokenAge = Date.now() / 1000 - payload.iat;
+      if (tokenAge > 86400) { // 24 hours
+        threats.push('Long-lived token detected');
+        riskLevel = 'medium';
+      }
 
-      this.logSessionEvent('EMERGENCY_INVALIDATION', 'security', {
-        domains,
-        success,
-      });
+      // Check for unusual permissions
+      if (payload.permissions && payload.permissions.length > 20) {
+        threats.push('Excessive permissions detected');
+        recommendations.push('Review user permissions');
+        riskLevel = 'medium';
+      }
 
-      return success;
+      // Check session metadata for anomalies
+      if (this.metadata) {
+        const sessionAge = Date.now() - this.metadata.createdAt.getTime();
+        if (sessionAge > 86400000 && !this.metadata.flags.isExtended) { // 24 hours
+          threats.push('Extended session without remember-me flag');
+          riskLevel = 'high';
+        }
+
+        if (this.metadata.refreshCount > 100) {
+          threats.push('Excessive refresh attempts');
+          riskLevel = 'high';
+          shouldLogout = true;
+        }
+      }
+
+      // Additional security checks would go here
+      // (IP validation, device fingerprinting, etc.)
+
     } catch (error) {
-      this.logSessionEvent('EMERGENCY_INVALIDATION_FAILED', 'error', {
-        error: error instanceof Error ? error.message : 'Unknown error',
+      threats.push('Security check failed');
+      riskLevel = 'medium';
+    }
+
+    return {
+      isSecure: threats.length === 0 || riskLevel === 'low',
+      threats,
+      recommendations,
+      riskLevel,
+      shouldLogout,
+    };
+  }
+
+  /**
+   * Starts security monitoring timer
+   */
+  private startSecurityMonitoring(): void {
+    this.securityTimer = setInterval(async () => {
+      const validation = await this.validateSession({
+        checkExpiration: true,
+        checkPermissions: false,
       });
 
+      if (!validation.isValid) {
+        this.cleanupSession({ broadcastLogout: true });
+      }
+    }, 300000); // Check every 5 minutes
+  }
+
+  /**
+   * Starts activity tracking for session extension
+   */
+  private startActivityTracking(): void {
+    if (typeof window !== 'undefined') {
+      const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+      
+      const updateActivity = () => {
+        this.updateActivity();
+      };
+
+      activityEvents.forEach(event => {
+        window.addEventListener(event, updateActivity, { passive: true });
+      });
+    }
+  }
+
+  /**
+   * Updates last activity timestamp
+   */
+  private updateActivity(): void {
+    if (this.metadata) {
+      this.metadata.lastActivity = new Date();
+    }
+  }
+
+  // =============================================================================
+  // UTILITY METHODS
+  // =============================================================================
+
+  /**
+   * Creates UserSession object from JWT payload
+   */
+  private createUserSessionFromPayload(payload: JWTPayload, userData?: Partial<UserSession>): UserSession {
+    return {
+      id: parseInt(payload.sub),
+      email: payload.email,
+      firstName: payload.first_name || '',
+      lastName: payload.last_name || '',
+      name: payload.name || `${payload.first_name || ''} ${payload.last_name || ''}`.trim(),
+      host: payload.iss || '',
+      sessionId: payload.sid || payload.session_id || '',
+      sessionToken: '', // Set by caller
+      tokenExpiryDate: new Date(payload.exp * 1000),
+      lastLoginDate: new Date(payload.iat * 1000).toISOString(),
+      isRootAdmin: payload.permissions?.includes('root_admin') || false,
+      isSysAdmin: payload.permissions?.includes('sys_admin') || false,
+      roleId: 0, // Would need to be extracted from payload or provided
+      role: undefined, // Would need to be provided separately
+      profile: undefined, // Would need to be provided separately
+      ...userData,
+    };
+  }
+
+  /**
+   * Maps JWT validation errors to session errors
+   */
+  private mapJWTErrorToSessionError(error?: JWTValidationError): SessionError {
+    switch (error) {
+      case JWTValidationError.TOKEN_EXPIRED:
+        return 'token_expired';
+      case JWTValidationError.TOKEN_INVALID:
+      case JWTValidationError.INVALID_FORMAT:
+      case JWTValidationError.INVALID_SIGNATURE:
+        return 'token_invalid';
+      case JWTValidationError.MISSING_CLAIMS:
+        return 'authentication_required';
+      default:
+        return 'session_expired';
+    }
+  }
+
+  /**
+   * Validates user permissions against required permissions
+   */
+  private validatePermissions(payload: JWTPayload, requiredPermissions: string[]): boolean {
+    if (!payload.permissions || !Array.isArray(payload.permissions)) {
       return false;
     }
-  }
 
-  // =============================================================================
-  // PRIVATE HELPER METHODS
-  // =============================================================================
-
-  /**
-   * Set active session with options
-   */
-  private async setSession(
-    session: UserSession, 
-    options: { 
-      skipStore?: boolean; 
-      autoRefresh?: boolean; 
-      backgroundSync?: boolean; 
-    } = {}
-  ): Promise<void> {
-    this.currentSession = session;
-    this.updateSessionState(AUTH_STATES.AUTHENTICATED);
-    this.updateActivity();
-
-    if (options.autoRefresh) {
-      this.setupAutoRefresh();
-    }
-
-    if (options.backgroundSync) {
-      this.setupBackgroundValidation();
-    }
+    return requiredPermissions.every(permission => 
+      payload.permissions.includes(permission)
+    );
   }
 
   /**
-   * Update session state and notify listeners
+   * Detects if the current device is mobile
    */
-  private updateSessionState(newState: AuthState): void {
-    const previousState = this.sessionState;
-    this.sessionState = newState;
-
-    if (previousState !== newState) {
-      this.stateListeners.forEach(listener => {
-        try {
-          listener(newState, this.currentSession || undefined);
-        } catch (error) {
-          console.error('Session state listener error:', error);
-        }
-      });
-    }
-  }
-
-  /**
-   * Setup automatic token refresh
-   */
-  private setupAutoRefresh(): void {
-    if (this.refreshTimer) {
-      clearInterval(this.refreshTimer);
-    }
-
-    this.refreshTimer = setInterval(async () => {
-      if (!this.currentSession) return;
-
-      const timeUntilExpiry = this.getTimeUntilExpiry();
-      
-      if (timeUntilExpiry <= SESSION_CONFIG.REFRESH.THRESHOLD && timeUntilExpiry > 0) {
-        await this.refreshSession();
-      }
-    }, SESSION_CONFIG.REFRESH.BACKGROUND_INTERVAL);
-  }
-
-  /**
-   * Setup background session validation
-   */
-  private setupBackgroundValidation(): void {
-    if (this.validationTimer) {
-      clearInterval(this.validationTimer);
-    }
-
-    this.validationTimer = setInterval(async () => {
-      if (!this.currentSession) return;
-
-      const validationResult = await this.validateCurrentSession();
-      
-      if (!validationResult.isValid) {
-        await this.clearSession('Background validation failed');
-      } else if (validationResult.needsRefresh) {
-        await this.refreshSession();
-      }
-    }, SESSION_CONFIG.VALIDATION.INTERVAL);
-  }
-
-  /**
-   * Setup user activity monitoring
-   */
-  private setupActivityMonitoring(): void {
-    if (typeof window === 'undefined') return; // Server-side check
-
-    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+  private detectMobileDevice(): boolean {
+    if (typeof window === 'undefined') return false;
     
-    const activityHandler = () => {
-      this.updateActivity();
-    };
-
-    events.forEach(event => {
-      document.addEventListener(event, activityHandler, true);
-    });
-
-    // Monitor idle time
-    this.activityTimer = setInterval(() => {
-      const now = Date.now();
-      this.sessionActivity.idleTime = now - this.sessionActivity.lastActivity;
-      
-      const wasIdle = this.sessionActivity.isIdle;
-      this.sessionActivity.isIdle = this.sessionActivity.idleTime >= SESSION_CONFIG.VALIDATION.IDLE_TIMEOUT;
-
-      // Show warning before session expires
-      if (this.currentSession && !this.sessionActivity.warningShown) {
-        const timeUntilExpiry = this.getTimeUntilExpiry();
-        if (timeUntilExpiry <= SESSION_CONFIG.VALIDATION.WARNING_THRESHOLD && timeUntilExpiry > 0) {
-          this.sessionActivity.warningShown = true;
-          this.logSessionEvent('SESSION_EXPIRY_WARNING', 'warn', {
-            timeUntilExpiry,
-            sessionId: this.currentSession.sessionId,
-          });
-        }
-      }
-
-      // Reset warning flag when session is refreshed
-      if (this.sessionActivity.warningShown && this.getTimeUntilExpiry() > SESSION_CONFIG.VALIDATION.WARNING_THRESHOLD) {
-        this.sessionActivity.warningShown = false;
-      }
-    }, 60000); // Check every minute
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+      navigator.userAgent
+    );
   }
 
   /**
-   * Setup cross-tab session synchronization
+   * Checks if user has elevated privileges
    */
-  private setupCrossTabSync(): void {
-    if (typeof window === 'undefined') return; // Server-side check
-
-    window.addEventListener('storage', (event) => {
-      if (event.key === 'session_sync' && event.newValue) {
-        try {
-          const syncData: CrossTabSyncData = JSON.parse(event.newValue);
-          this.handleCrossTabSync(syncData);
-        } catch (error) {
-          console.error('Cross-tab sync error:', error);
-        }
-      }
-    });
+  private hasElevatedPrivileges(payload: JWTPayload): boolean {
+    const elevatedPermissions = ['root_admin', 'sys_admin', 'user_management', 'system_configuration'];
+    return payload.permissions?.some(permission => 
+      elevatedPermissions.includes(permission)
+    ) || false;
   }
 
   /**
-   * Handle cross-tab synchronization events
+   * Handles automatic token refresh
    */
-  private async handleCrossTabSync(syncData: CrossTabSyncData): Promise<void> {
-    switch (syncData.action) {
-      case 'login':
-        if (!this.currentSession || this.currentSession.sessionId !== syncData.sessionId) {
-          await this.initialize({ skipValidation: false });
-        }
-        break;
-      
-      case 'logout':
-      case 'invalidate':
-        if (this.currentSession) {
-          await this.clearSession('Cross-tab logout');
-        }
-        break;
-      
-      case 'refresh':
-        if (this.currentSession && this.currentSession.sessionId === syncData.sessionId) {
-          await this.validateCurrentSession();
-        }
-        break;
-    }
-  }
-
-  /**
-   * Broadcast session changes to other tabs
-   */
-  private broadcastSessionChange(action: CrossTabSyncData['action'], session: UserSession | null): void {
-    if (typeof window === 'undefined') return; // Server-side check
-
-    const syncData: CrossTabSyncData = {
-      sessionId: session?.sessionId || '',
-      action,
-      timestamp: Date.now(),
-      data: session ? { userId: session.userId } : null,
-    };
-
+  private async handleTokenRefresh(tokens: { accessToken: string; refreshToken: string }): Promise<void> {
     try {
-      localStorage.setItem('session_sync', JSON.stringify(syncData));
-      // Clear the item immediately to trigger storage event
-      localStorage.removeItem('session_sync');
+      await refreshSessionTokenCookie(tokens.accessToken);
+      
+      // Broadcast refresh event
+      const payload = parseJWTPayload(tokens.accessToken);
+      if (payload) {
+        this.broadcastSessionEvent({
+          type: SessionEventType.SESSION_REFRESHED,
+          timestamp: Date.now(),
+          sessionId: payload.sid || payload.session_id || '',
+          userId: parseInt(payload.sub),
+        });
+      }
     } catch (error) {
-      console.error('Cross-tab broadcast error:', error);
+      console.error('Automatic token refresh failed:', error);
+      // Force cleanup on refresh failure
+      await this.cleanupSession({ broadcastLogout: true });
     }
   }
 
   /**
-   * Clear all timers
+   * Schedules token refresh for near-expired tokens
    */
-  private clearTimers(): void {
-    if (this.refreshTimer) {
-      clearInterval(this.refreshTimer);
-      this.refreshTimer = null;
-    }
+  private scheduleTokenRefresh(): void {
+    // Use JWT manager's built-in refresh scheduling
+    // This is a placeholder for additional refresh logic if needed
+  }
 
-    if (this.validationTimer) {
-      clearInterval(this.validationTimer);
-      this.validationTimer = null;
+  /**
+   * Cleans up all timers and listeners
+   */
+  private cleanup(): void {
+    // Clear timers
+    if (this.securityTimer) {
+      clearInterval(this.securityTimer);
+      this.securityTimer = null;
     }
 
     if (this.activityTimer) {
       clearInterval(this.activityTimer);
       this.activityTimer = null;
     }
-  }
 
-  /**
-   * Generate unique session ID
-   */
-  private generateSessionId(): string {
-    return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  }
+    // Remove storage listener
+    if (this.storageListener && typeof window !== 'undefined') {
+      window.removeEventListener('storage', this.storageListener);
+      this.storageListener = null;
+    }
 
-  /**
-   * Log session-related events
-   */
-  private logSessionEvent(
-    event: string,
-    level: LogLevel,
-    data: Record<string, any> = {}
-  ): void {
-    try {
-      const logEntry = {
-        timestamp: new Date().toISOString(),
-        event,
-        level,
-        component: 'session-manager',
-        sessionId: this.currentSession?.sessionId,
-        userId: this.currentSession?.userId,
-        ...data,
+    // Clean up JWT manager
+    this.jwtManager.cleanup();
+
+    // Clear metadata
+    this.metadata = null;
+
+    // Clear event listeners
+    this.eventListeners.clear();
+  }
+}
+
+// =============================================================================
+// MIDDLEWARE INTEGRATION UTILITIES
+// =============================================================================
+
+/**
+ * Validates session for Next.js middleware with comprehensive checks
+ */
+export async function validateSessionForMiddleware(
+  request: NextRequest
+): Promise<MiddlewareAuthResult> {
+  try {
+    // Extract tokens from request
+    const { accessToken } = extractTokenFromRequest(request);
+    
+    if (!accessToken) {
+      return {
+        isAuthenticated: false,
+        isAuthorized: false,
+        redirectTo: '/login',
+        error: {
+          code: AuthErrorCode.UNAUTHORIZED,
+          message: 'No session token found',
+          statusCode: 401,
+        },
       };
+    }
 
-      if (level === 'error' || level === 'security') {
-        console.error('[SESSION]', JSON.stringify(logEntry));
-      } else if (level === 'warn') {
-        console.warn('[SESSION]', JSON.stringify(logEntry));
-      } else if (process.env.NODE_ENV === 'development') {
-        console.log('[SESSION]', JSON.stringify(logEntry));
+    // Validate token
+    const validation = validateJWTToken(accessToken, {
+      verifySignature: false, // Server-side verification required
+      checkExpiration: true,
+      checkNotBefore: true,
+      validateIssuer: true,
+      validateAudience: true,
+    });
+
+    if (!validation.isValid || !validation.payload) {
+      return {
+        isAuthenticated: false,
+        isAuthorized: false,
+        redirectTo: '/login',
+        error: {
+          code: AuthErrorCode.TOKEN_INVALID,
+          message: 'Invalid session token',
+          statusCode: 401,
+        },
+      };
+    }
+
+    // Create user session from payload
+    const sessionManager = new SessionLifecycleManager();
+    const userSession = sessionManager['createUserSessionFromPayload'](validation.payload);
+
+    return {
+      isAuthenticated: true,
+      isAuthorized: true,
+      user: userSession,
+      updatedToken: validation.needsRefresh ? undefined : accessToken,
+      headers: {
+        'X-User-ID': userSession.id.toString(),
+        'X-Session-ID': userSession.sessionId,
+      },
+    };
+  } catch (error) {
+    console.error('Middleware session validation failed:', error);
+    return {
+      isAuthenticated: false,
+      isAuthorized: false,
+      redirectTo: '/login',
+      error: {
+        code: AuthErrorCode.SERVER_ERROR,
+        message: 'Session validation failed',
+        statusCode: 500,
+      },
+    };
+  }
+}
+
+/**
+ * Creates session token cookie for middleware responses
+ */
+export async function setSessionCookieForMiddleware(
+  response: NextResponse,
+  token: string,
+  options?: SessionCookieOptions
+): Promise<void> {
+  await setSessionTokenCookie(token, options, response);
+}
+
+/**
+ * Clears session cookies for middleware logout
+ */
+export async function clearSessionCookiesForMiddleware(
+  response: NextResponse
+): Promise<void> {
+  await performCookieCleanup(response);
+}
+
+// =============================================================================
+// SESSION STORAGE UTILITIES
+// =============================================================================
+
+/**
+ * Browser session storage implementation
+ */
+export class BrowserSessionStorage implements SessionStorage {
+  private readonly SESSION_KEY = 'df_session_data';
+  private readonly TOKEN_KEY = 'df_session_token';
+
+  setSession(session: UserSession): void {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        localStorage.setItem(this.SESSION_KEY, JSON.stringify(session));
+      } catch (error) {
+        console.warn('Failed to store session in localStorage:', error);
       }
-    } catch (error) {
-      console.error('[SESSION] Logging failed:', error);
+    }
+  }
+
+  getSession(): UserSession | null {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const stored = localStorage.getItem(this.SESSION_KEY);
+        return stored ? JSON.parse(stored) : null;
+      } catch (error) {
+        console.warn('Failed to retrieve session from localStorage:', error);
+        return null;
+      }
+    }
+    return null;
+  }
+
+  clearSession(): void {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        localStorage.removeItem(this.SESSION_KEY);
+      } catch (error) {
+        console.warn('Failed to clear session from localStorage:', error);
+      }
+    }
+  }
+
+  setToken(token: string): void {
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      try {
+        sessionStorage.setItem(this.TOKEN_KEY, token);
+      } catch (error) {
+        console.warn('Failed to store token in sessionStorage:', error);
+      }
+    }
+  }
+
+  getToken(): string | null {
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      try {
+        return sessionStorage.getItem(this.TOKEN_KEY);
+      } catch (error) {
+        console.warn('Failed to retrieve token from sessionStorage:', error);
+        return null;
+      }
+    }
+    return null;
+  }
+
+  clearToken(): void {
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      try {
+        sessionStorage.removeItem(this.TOKEN_KEY);
+      } catch (error) {
+        console.warn('Failed to clear token from sessionStorage:', error);
+      }
     }
   }
 }
+
+// =============================================================================
+// GLOBAL INSTANCES AND EXPORTS
+// =============================================================================
+
+// Global session manager instance
+let globalSessionManager: SessionLifecycleManager | null = null;
+
+/**
+ * Gets or creates the global session manager instance
+ */
+export function getSessionManager(): SessionLifecycleManager {
+  if (!globalSessionManager) {
+    globalSessionManager = new SessionLifecycleManager();
+  }
+  return globalSessionManager;
+}
+
+/**
+ * Browser session storage instance
+ */
+export const browserSessionStorage = new BrowserSessionStorage();
 
 // =============================================================================
 // CONVENIENCE FUNCTIONS
 // =============================================================================
 
 /**
- * Get global session manager instance
+ * Initializes a new session with the global manager
  */
-export function getSessionManager(): SessionManager {
-  return SessionManager.getInstance();
+export async function initializeSession(config: SessionInitConfig): Promise<SessionValidationResult> {
+  return getSessionManager().initializeSession(config);
 }
 
 /**
- * Initialize session management
+ * Validates current session with the global manager
  */
-export async function initializeSession(options?: SessionInitOptions): Promise<SessionValidationResult> {
-  return getSessionManager().initialize(options);
+export async function validateSession(options?: SessionValidationOptions): Promise<SessionValidationResult> {
+  return getSessionManager().validateSession(options);
 }
 
 /**
- * Create new session from authentication data
+ * Refreshes current session with the global manager
  */
-export async function createUserSession(
-  authData: {
-    userId: string;
-    email: string;
-    sessionToken: string;
-    refreshToken?: string;
-    csrfToken?: string;
-    roles?: string[];
-    permissions?: RBACPermission[];
-    userData?: any;
-  },
-  options?: SessionInitOptions
-): Promise<SessionValidationResult> {
-  return getSessionManager().createSession(authData, options);
+export async function refreshSession(config?: SessionRefreshConfig): Promise<SessionValidationResult> {
+  return getSessionManager().refreshSession(config);
 }
 
 /**
- * Validate current session
+ * Cleans up current session with the global manager
  */
-export async function validateSession(): Promise<SessionValidationResult> {
-  return getSessionManager().validateCurrentSession();
+export async function cleanupSession(config?: SessionCleanupConfig): Promise<boolean> {
+  return getSessionManager().cleanupSession(config);
 }
 
 /**
- * Refresh current session
+ * Checks session expiration with the global manager
  */
-export async function refreshCurrentSession(): Promise<SessionRefreshResult> {
-  return getSessionManager().refreshSession();
+export async function checkSessionExpiration(): Promise<{
+  isExpired: boolean;
+  timeToExpiry: number;
+  requiresRefresh: boolean;
+  shouldWarn: boolean;
+}> {
+  return getSessionManager().checkSessionExpiration();
 }
 
 /**
- * Logout and clear session
+ * Gets session metadata from the global manager
  */
-export async function logoutUser(reason?: string): Promise<boolean> {
-  return getSessionManager().clearSession(reason);
+export function getSessionMetadata(): SessionMetadata | null {
+  return getSessionManager().getSessionMetadata();
 }
 
-/**
- * Get current user session
- */
-export function getCurrentUserSession(): UserSession | null {
-  return getSessionManager().getCurrentSession();
-}
-
-/**
- * Check if user is authenticated
- */
-export function isAuthenticated(): boolean {
-  const session = getCurrentUserSession();
-  return session !== null && !getSessionManager().isSessionExpired();
-}
-
-/**
- * Check if user has specific permission
- */
-export function userHasPermission(permission: RBACPermission): boolean {
-  return getSessionManager().hasPermission(permission);
-}
-
-/**
- * Check if user has role
- */
-export function userHasRole(roles: string | string[]): boolean {
-  return getSessionManager().hasRole(roles);
-}
-
-/**
- * Get time until session expires
- */
-export function getSessionTimeRemaining(): number {
-  return getSessionManager().getTimeUntilExpiry();
-}
-
-/**
- * Update user activity timestamp
- */
-export function updateUserActivity(): void {
-  getSessionManager().updateActivity();
-}
-
-/**
- * Add session state change listener
- */
-export function onSessionStateChange(listener: SessionStateChangeListener): () => void {
-  return getSessionManager().addStateChangeListener(listener);
-}
-
-/**
- * Emergency session invalidation
- */
-export async function emergencySessionInvalidation(domains?: string[]): Promise<boolean> {
-  return getSessionManager().emergencyInvalidation(domains);
-}
-
-// =============================================================================
-// REACT HOOKS INTEGRATION
-// =============================================================================
-
-/**
- * Session hook data interface for React integration
- */
-export interface UseSessionData {
-  session: UserSession | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  state: AuthState;
-  timeUntilExpiry: number;
-  hasPermission: (permission: RBACPermission) => boolean;
-  hasRole: (roles: string | string[]) => boolean;
-  refresh: () => Promise<SessionRefreshResult>;
-  logout: (reason?: string) => Promise<boolean>;
-  updateActivity: () => void;
-}
-
-/**
- * Hook factory for React integration (to be used with React)
- * Note: This is a factory function - the actual React hook would be implemented
- * in a separate hooks file that imports this session manager
- */
-export function createSessionHook() {
-  // This would be implemented as a React hook in the hooks directory
-  // It would use the SessionManager and provide reactive state updates
-  return {
-    useSession: (): UseSessionData => {
-      throw new Error('useSession hook must be implemented in React context');
-    },
-  };
-}
-
-// =============================================================================
-// EXPORTS
-// =============================================================================
+// Export types and classes
+export type {
+  SessionInitConfig,
+  SessionValidationOptions,
+  SessionRefreshConfig,
+  SessionCleanupConfig,
+  SessionMetadata,
+  SessionSecurityResult,
+  SessionEvent,
+  SessionEventListener,
+};
 
 export {
-  type UserSession,
-  type SessionInitOptions,
-  type SessionValidationResult,
-  type SessionRefreshResult,
-  type SessionEventData,
-  type SessionStateChangeListener,
-  type SessionActivity,
-  type CrossTabSyncData,
-  SessionManager,
+  SessionLifecycleManager,
+  SessionEventType,
+  BrowserSessionStorage,
 };
