@@ -1,533 +1,571 @@
 /**
- * Navigation structure types for Next.js App Router integration
+ * Navigation Structure Types for Next.js App Router Integration
  * 
  * Defines menu hierarchies and routing patterns for React components,
- * supporting file-based routing, dynamic routes, and permission-based filtering.
+ * supporting file-based routing with dynamic routes and icon integration.
  * 
- * Replaces Angular router-specific navigation patterns with Next.js
- * App Router conventions while maintaining functional parity.
+ * @version 2.0.0
+ * @since React/Next.js Migration
+ * @compatibility Next.js 15.1+, React 19, @heroicons/react 2.0+
  */
 
-import { ComponentType } from 'react';
-import { LucideIcon } from 'lucide-react';
+import type { 
+  RouteValue, 
+  RouteParams, 
+  BreadcrumbConfig,
+  generateRoute 
+} from './routes';
+
+// ============================================================================
+// ICON TYPES FOR REACT INTEGRATION
+// ============================================================================
 
 /**
- * Base navigation item interface for Next.js App Router
- * Supports both static and dynamic routes with parameter patterns
+ * Heroicons icon component type for React integration
+ * Replaces Angular Material icon strings with React components
  */
-export interface NavItem {
+export type HeroIconComponent = React.ComponentType<{
+  className?: string;
+  'aria-hidden'?: boolean;
+}>;
+
+/**
+ * Icon specification supporting both Heroicons and custom icons
+ */
+export interface IconSpec {
+  /** Heroicon component (outline variant preferred for navigation) */
+  heroIcon?: HeroIconComponent;
+  /** Custom icon component for specialized use cases */
+  customIcon?: React.ComponentType<{ className?: string }>;
+  /** Fallback icon name for server-side rendering */
+  fallbackName?: string;
+  /** ARIA label for accessibility */
+  ariaLabel?: string;
+}
+
+/**
+ * Icon size variants for different navigation contexts
+ */
+export type IconSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+
+/**
+ * Icon theme variants for light/dark mode support
+ */
+export type IconTheme = 'light' | 'dark' | 'auto';
+
+// ============================================================================
+// NAVIGATION ITEM TYPES
+// ============================================================================
+
+/**
+ * Base navigation item interface supporting Next.js App Router patterns
+ */
+export interface BaseNavItem {
   /** Unique identifier for the navigation item */
   id: string;
-  
-  /** Display label for the navigation item - supports i18n keys */
+  /** Display text for the navigation item */
   label: string;
-  
-  /** Next.js App Router path - supports dynamic routes with [param] syntax */
-  href?: string;
-  
-  /** Lucide React icon component for consistent iconography */
-  icon?: LucideIcon;
-  
-  /** Alt text for accessibility - required when icon is present */
-  iconAlt?: string;
-  
-  /** Child navigation items for hierarchical menus */
-  children?: NavItem[];
-  
-  /** Required permissions to display this nav item */
-  permissions?: string[];
-  
-  /** Whether this item should only show for admin users */
-  adminOnly?: boolean;
-  
-  /** Whether this item is currently disabled */
+  /** Optional description for tooltips or accessibility */
+  description?: string;
+  /** Icon configuration for React components */
+  icon?: IconSpec;
+  /** Whether this item is currently active */
+  active?: boolean;
+  /** Whether this item is disabled */
   disabled?: boolean;
-  
-  /** Optional badge content (e.g., notification count) */
-  badge?: string | number;
-  
-  /** Badge variant for styling */
-  badgeVariant?: 'default' | 'secondary' | 'destructive' | 'success' | 'warning';
-  
-  /** Whether the item should open in a new tab */
-  external?: boolean;
-  
-  /** CSS classes for custom styling */
+  /** Custom CSS classes for styling */
   className?: string;
-  
-  /** Whether to show this item in breadcrumbs */
-  hiddenInBreadcrumbs?: boolean;
-  
-  /** Custom metadata for extensibility */
-  meta?: Record<string, any>;
+  /** Accessibility attributes */
+  ariaAttributes?: Record<string, string>;
 }
 
 /**
- * Navigation group for organizing related nav items
- * Supports collapsible sections and visual separation
+ * Navigation link item for direct routing
  */
-export interface NavGroup {
-  /** Unique identifier for the navigation group */
-  id: string;
-  
-  /** Display label for the group */
-  label: string;
-  
-  /** Navigation items within this group */
-  items: NavItem[];
-  
+export interface NavLinkItem extends BaseNavItem {
+  type: 'link';
+  /** Next.js route path (supports dynamic routes) */
+  href: RouteValue | string;
+  /** External link indicator */
+  external?: boolean;
+  /** Open in new tab/window */
+  target?: '_blank' | '_self' | '_parent' | '_top';
+  /** Prefetch behavior for Next.js Link component */
+  prefetch?: boolean;
+}
+
+/**
+ * Navigation group item for organizing related links
+ */
+export interface NavGroupItem extends BaseNavItem {
+  type: 'group';
+  /** Child navigation items */
+  children: NavItem[];
   /** Whether the group is collapsible */
   collapsible?: boolean;
-  
-  /** Default collapsed state for collapsible groups */
+  /** Whether the group is initially collapsed */
   defaultCollapsed?: boolean;
-  
-  /** Required permissions to display this group */
-  permissions?: string[];
-  
-  /** Whether to show a separator after this group */
-  separator?: boolean;
-  
-  /** Custom metadata for the group */
-  meta?: Record<string, any>;
+  /** Maximum number of visible children before "show more" */
+  maxVisible?: number;
 }
 
 /**
- * Main navigation configuration interface
- * Defines the complete navigation structure for the application
+ * Navigation divider for visual separation
  */
-export interface NavigationConfig {
-  /** Navigation groups organized by functional area */
-  groups: NavGroup[];
-  
-  /** Quick access items for header/toolbar */
-  quickAccess?: NavItem[];
-  
-  /** User menu items */
-  userMenu?: NavItem[];
-  
-  /** Footer navigation items */
-  footer?: NavItem[];
-  
-  /** Configuration metadata */
-  meta?: {
-    /** Version of the navigation schema */
-    version: string;
-    /** Last updated timestamp */
-    lastUpdated: Date;
-    /** Additional configuration options */
-    [key: string]: any;
-  };
-}
-
-/**
- * Navigation state for managing active routes and UI state
- */
-export interface NavigationState {
-  /** Currently active route path */
-  activeRoute: string;
-  
-  /** Previous route for back navigation */
-  previousRoute?: string;
-  
-  /** Breadcrumb trail for current route */
-  breadcrumbs: BreadcrumbItem[];
-  
-  /** Whether mobile navigation menu is open */
-  mobileMenuOpen: boolean;
-  
-  /** Whether sidebar is collapsed in desktop view */
-  sidebarCollapsed: boolean;
-  
-  /** Expanded navigation groups */
-  expandedGroups: string[];
-  
-  /** Search query for navigation filtering */
-  searchQuery?: string;
-  
-  /** Loading state for navigation data */
-  loading: boolean;
-  
-  /** Error state for navigation loading */
-  error?: string;
-}
-
-/**
- * Breadcrumb item for navigation context
- */
-export interface BreadcrumbItem {
-  /** Display label for the breadcrumb */
-  label: string;
-  
-  /** Navigation path - undefined for current page */
-  href?: string;
-  
-  /** Icon for the breadcrumb item */
-  icon?: LucideIcon;
-  
-  /** Whether this is the current page */
-  current?: boolean;
-  
-  /** Additional metadata */
-  meta?: Record<string, any>;
-}
-
-/**
- * Route parameter definition for dynamic routes
- */
-export interface RouteParam {
-  /** Parameter name (without brackets) */
-  name: string;
-  
-  /** Whether the parameter is optional */
-  optional?: boolean;
-  
-  /** Parameter validation pattern */
-  pattern?: RegExp;
-  
-  /** Description for documentation */
-  description?: string;
-}
-
-/**
- * Route definition for complex navigation scenarios
- */
-export interface RouteDefinition {
-  /** Route pattern with Next.js dynamic syntax */
-  pattern: string;
-  
-  /** Human-readable route name */
-  name: string;
-  
-  /** Route parameters */
-  params?: RouteParam[];
-  
-  /** Whether authentication is required */
-  requiresAuth?: boolean;
-  
-  /** Required permissions for access */
-  permissions?: string[];
-  
-  /** Page metadata */
-  meta?: {
-    title?: string;
-    description?: string;
-    keywords?: string[];
-  };
-}
-
-/**
- * Navigation action interface for interactive elements
- */
-export interface NavigationAction {
-  /** Action identifier */
+export interface NavDividerItem {
+  type: 'divider';
+  /** Unique identifier */
   id: string;
-  
-  /** Action label */
-  label: string;
-  
-  /** Icon for the action */
-  icon?: LucideIcon;
-  
-  /** Click handler function */
-  onClick: () => void | Promise<void>;
-  
-  /** Whether the action is currently loading */
-  loading?: boolean;
-  
-  /** Whether the action is disabled */
-  disabled?: boolean;
-  
-  /** Action variant for styling */
-  variant?: 'default' | 'primary' | 'secondary' | 'destructive';
-  
-  /** Additional CSS classes */
+  /** Optional label for semantic dividers */
+  label?: string;
+  /** Custom CSS classes */
   className?: string;
 }
 
 /**
- * Navigation hook return type for useNavigation hook
+ * Navigation action item for interactive elements
  */
-export interface NavigationHookReturn {
-  /** Current navigation state */
-  state: NavigationState;
-  
-  /** Navigation configuration */
-  config: NavigationConfig;
-  
-  /** Function to navigate to a route */
-  navigateTo: (href: string, options?: { replace?: boolean; shallow?: boolean }) => void;
-  
-  /** Function to toggle mobile menu */
-  toggleMobileMenu: () => void;
-  
-  /** Function to toggle sidebar collapse */
-  toggleSidebar: () => void;
-  
-  /** Function to expand/collapse navigation group */
-  toggleGroup: (groupId: string) => void;
-  
-  /** Function to set search query */
-  setSearchQuery: (query: string) => void;
-  
-  /** Function to check if user has permission for nav item */
-  hasPermission: (permissions?: string[]) => boolean;
-  
-  /** Function to get filtered navigation items based on permissions */
-  getFilteredNavigation: () => NavigationConfig;
-  
-  /** Function to generate breadcrumbs for current route */
-  generateBreadcrumbs: (pathname: string) => BreadcrumbItem[];
+export interface NavActionItem extends BaseNavItem {
+  type: 'action';
+  /** Action handler function */
+  onAction: () => void | Promise<void>;
+  /** Loading state for async actions */
+  loading?: boolean;
+  /** Action variant for styling */
+  variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
 }
 
 /**
- * Navigation context type for React Context
+ * Union type for all navigation item types
  */
-export interface NavigationContextType {
-  /** Navigation state and actions */
-  navigation: NavigationHookReturn;
-  
-  /** Whether navigation is initialized */
-  initialized: boolean;
-  
-  /** Loading state for navigation initialization */
+export type NavItem = NavLinkItem | NavGroupItem | NavDividerItem | NavActionItem;
+
+// ============================================================================
+// NAVIGATION MENU STRUCTURE
+// ============================================================================
+
+/**
+ * Navigation menu configuration for main application navigation
+ */
+export interface NavigationMenu {
+  /** Menu identifier */
+  id: string;
+  /** Menu title */
+  title?: string;
+  /** Menu items */
+  items: NavItem[];
+  /** Menu orientation */
+  orientation?: 'horizontal' | 'vertical';
+  /** Menu size variant */
+  size?: 'sm' | 'md' | 'lg';
+  /** Menu theme variant */
+  theme?: 'light' | 'dark' | 'auto';
+  /** Whether menu supports search */
+  searchable?: boolean;
+  /** Whether menu is collapsible */
+  collapsible?: boolean;
+  /** Custom CSS classes */
+  className?: string;
+}
+
+/**
+ * Sidebar navigation configuration
+ */
+export interface SidebarNavigation extends NavigationMenu {
+  /** Whether sidebar is collapsed */
+  collapsed?: boolean;
+  /** Collapsed width in pixels */
+  collapsedWidth?: number;
+  /** Expanded width in pixels */
+  expandedWidth?: number;
+  /** Collapse/expand animation duration */
+  animationDuration?: number;
+  /** Whether to show tooltips when collapsed */
+  showTooltipsWhenCollapsed?: boolean;
+  /** Footer content configuration */
+  footer?: {
+    items: NavItem[];
+    className?: string;
+  };
+}
+
+/**
+ * Top navigation bar configuration
+ */
+export interface TopNavigation extends NavigationMenu {
+  /** Logo configuration */
+  logo?: {
+    src: string;
+    alt: string;
+    href?: string;
+    width?: number;
+    height?: number;
+  };
+  /** User menu configuration */
+  userMenu?: {
+    trigger: NavItem;
+    items: NavItem[];
+  };
+  /** Search configuration */
+  search?: {
+    placeholder: string;
+    onSearch: (query: string) => void;
+    className?: string;
+  };
+}
+
+/**
+ * Breadcrumb navigation configuration
+ */
+export interface BreadcrumbNavigation {
+  /** Breadcrumb items */
+  items: BreadcrumbConfig[];
+  /** Maximum number of visible items */
+  maxItems?: number;
+  /** Separator icon or text */
+  separator?: IconSpec | string;
+  /** Whether to show home icon */
+  showHome?: boolean;
+  /** Custom CSS classes */
+  className?: string;
+}
+
+/**
+ * Tab navigation configuration for sub-page navigation
+ */
+export interface TabNavigation {
+  /** Tab items */
+  items: NavLinkItem[];
+  /** Active tab identifier */
+  activeTab?: string;
+  /** Tab variant */
+  variant?: 'default' | 'pills' | 'underline';
+  /** Tab size */
+  size?: 'sm' | 'md' | 'lg';
+  /** Whether tabs are scrollable */
+  scrollable?: boolean;
+  /** Custom CSS classes */
+  className?: string;
+}
+
+// ============================================================================
+// NAVIGATION STATE MANAGEMENT
+// ============================================================================
+
+/**
+ * Navigation state for managing active states and user interactions
+ */
+export interface NavigationState {
+  /** Currently active route */
+  activeRoute: string;
+  /** Navigation history for back/forward */
+  history: string[];
+  /** Whether navigation is loading */
   loading: boolean;
-  
-  /** Error state for navigation initialization */
-  error?: string;
+  /** Sidebar collapsed state */
+  sidebarCollapsed: boolean;
+  /** User permissions for route access */
+  permissions: Record<string, boolean>;
+  /** Navigation preferences */
+  preferences: NavigationPreferences;
 }
 
 /**
- * Permission checker function type
+ * User preferences for navigation behavior
  */
-export type PermissionChecker = (permissions: string[]) => boolean;
+export interface NavigationPreferences {
+  /** Remember sidebar collapsed state */
+  rememberSidebarState: boolean;
+  /** Auto-collapse sidebar on mobile */
+  autoCollapseMobile: boolean;
+  /** Show breadcrumbs */
+  showBreadcrumbs: boolean;
+  /** Animation preferences */
+  enableAnimations: boolean;
+  /** Keyboard navigation enabled */
+  enableKeyboardNav: boolean;
+}
+
+// ============================================================================
+// NAVIGATION GUARDS AND PERMISSIONS
+// ============================================================================
 
 /**
- * Navigation filter function type
+ * Navigation guard result for route protection
  */
-export type NavigationFilter = (item: NavItem, context: { 
-  user: any; 
-  permissions: string[]; 
-  searchQuery?: string; 
-}) => boolean;
+export interface NavigationGuardResult {
+  /** Whether navigation is allowed */
+  allowed: boolean;
+  /** Redirect route if navigation is blocked */
+  redirectTo?: string;
+  /** Error message for blocked navigation */
+  reason?: string;
+}
 
 /**
- * Breadcrumb generator function type
+ * Navigation guard function type
  */
-export type BreadcrumbGenerator = (pathname: string, config: NavigationConfig) => BreadcrumbItem[];
+export type NavigationGuard = (
+  route: string,
+  params?: RouteParams
+) => NavigationGuardResult | Promise<NavigationGuardResult>;
 
 /**
- * Navigation event types for analytics and tracking
+ * Navigation context for managing guards and permissions
  */
-export type NavigationEventType = 
-  | 'navigate'
-  | 'search'
-  | 'expand'
-  | 'collapse'
-  | 'toggle-sidebar'
-  | 'toggle-mobile-menu';
+export interface NavigationContext {
+  /** Authentication guard */
+  authGuard: NavigationGuard;
+  /** Role-based access control guard */
+  roleGuard: NavigationGuard;
+  /** Feature flag guard */
+  featureGuard: NavigationGuard;
+  /** Custom guards */
+  customGuards: NavigationGuard[];
+}
+
+// ============================================================================
+// NAVIGATION UTILITIES AND HELPERS
+// ============================================================================
 
 /**
- * Navigation event data structure
+ * Navigation item builder for creating menu items programmatically
+ */
+export interface NavItemBuilder {
+  /** Create a link item */
+  link(config: Omit<NavLinkItem, 'type'>): NavLinkItem;
+  /** Create a group item */
+  group(config: Omit<NavGroupItem, 'type'>): NavGroupItem;
+  /** Create a divider item */
+  divider(config: Omit<NavDividerItem, 'type'>): NavDividerItem;
+  /** Create an action item */
+  action(config: Omit<NavActionItem, 'type'>): NavActionItem;
+}
+
+/**
+ * Navigation analytics tracking configuration
+ */
+export interface NavigationAnalytics {
+  /** Track navigation events */
+  trackNavigation: boolean;
+  /** Track menu interactions */
+  trackMenuInteractions: boolean;
+  /** Custom event tracking function */
+  onNavigationEvent?: (event: NavigationEvent) => void;
+}
+
+/**
+ * Navigation event types for analytics
  */
 export interface NavigationEvent {
   /** Event type */
-  type: NavigationEventType;
-  
-  /** Event timestamp */
-  timestamp: Date;
-  
-  /** Route or item that triggered the event */
-  target: string;
-  
-  /** Additional event data */
-  data?: Record<string, any>;
-  
-  /** User context when event occurred */
-  context?: {
-    userId?: string;
-    sessionId?: string;
-    userAgent?: string;
+  type: 'route_change' | 'menu_click' | 'sidebar_toggle' | 'search_use';
+  /** Event metadata */
+  metadata: {
+    from?: string;
+    to?: string;
+    itemId?: string;
+    query?: string;
+    timestamp: number;
+  };
+}
+
+// ============================================================================
+// RESPONSIVE NAVIGATION TYPES
+// ============================================================================
+
+/**
+ * Responsive navigation configuration for different screen sizes
+ */
+export interface ResponsiveNavigation {
+  /** Desktop navigation configuration */
+  desktop: {
+    sidebar: SidebarNavigation;
+    topNav: TopNavigation;
+  };
+  /** Tablet navigation configuration */
+  tablet: {
+    sidebar?: SidebarNavigation;
+    topNav: TopNavigation;
+    bottomNav?: NavigationMenu;
+  };
+  /** Mobile navigation configuration */
+  mobile: {
+    topNav: TopNavigation;
+    bottomNav?: NavigationMenu;
+    drawerNav?: SidebarNavigation;
+  };
+  /** Breakpoints for responsive behavior */
+  breakpoints: {
+    mobile: number;
+    tablet: number;
+    desktop: number;
   };
 }
 
 /**
- * Default navigation structure for DreamFactory Admin Interface
- * This represents the standard menu hierarchy for the application
+ * Navigation layout configuration
  */
-export const DEFAULT_NAVIGATION: NavigationConfig = {
-  groups: [
-    {
-      id: 'main',
-      label: 'Main',
-      items: [
-        {
-          id: 'dashboard',
-          label: 'Dashboard',
-          href: '/',
-          permissions: ['view_dashboard']
-        }
-      ]
-    },
-    {
-      id: 'api-management',
-      label: 'API Management',
-      items: [
-        {
-          id: 'api-connections',
-          label: 'API Connections',
-          href: '/api-connections',
-          children: [
-            {
-              id: 'database-services',
-              label: 'Database Services',
-              href: '/api-connections/database',
-              permissions: ['view_services']
-            }
-          ]
-        },
-        {
-          id: 'api-security',
-          label: 'API Security',
-          href: '/api-security',
-          children: [
-            {
-              id: 'roles',
-              label: 'Roles',
-              href: '/api-security/roles',
-              permissions: ['manage_roles']
-            },
-            {
-              id: 'limits',
-              label: 'Limits',
-              href: '/api-security/limits',
-              permissions: ['manage_limits']
-            }
-          ]
-        }
-      ]
-    },
-    {
-      id: 'administration',
-      label: 'Administration',
-      items: [
-        {
-          id: 'admin-settings',
-          label: 'Admin Settings',
-          href: '/admin-settings',
-          adminOnly: true
-        },
-        {
-          id: 'system-settings',
-          label: 'System Settings',
-          href: '/system-settings',
-          adminOnly: true
-        }
-      ]
-    }
-  ],
-  quickAccess: [
-    {
-      id: 'create-service',
-      label: 'Create Service',
-      href: '/api-connections/database/create'
-    }
-  ],
-  userMenu: [
-    {
-      id: 'profile',
-      label: 'Profile',
-      href: '/profile'
-    },
-    {
-      id: 'settings',
-      label: 'Settings',
-      href: '/profile/settings'
-    }
-  ],
-  meta: {
-    version: '1.0.0',
-    lastUpdated: new Date()
-  }
+export interface NavigationLayout {
+  /** Layout type */
+  type: 'sidebar' | 'top' | 'mixed' | 'drawer';
+  /** Responsive configuration */
+  responsive: ResponsiveNavigation;
+  /** Global navigation settings */
+  settings: {
+    enableSearch: boolean;
+    enableBreadcrumbs: boolean;
+    enableUserMenu: boolean;
+    enableNotifications: boolean;
+    enableThemeToggle: boolean;
+  };
+}
+
+// ============================================================================
+// ACCESSIBILITY TYPES
+// ============================================================================
+
+/**
+ * Accessibility configuration for navigation components
+ */
+export interface NavigationAccessibility {
+  /** ARIA landmark roles */
+  landmarks: boolean;
+  /** Skip links for keyboard navigation */
+  skipLinks: boolean;
+  /** Focus management */
+  focusManagement: boolean;
+  /** Screen reader announcements */
+  announcements: boolean;
+  /** High contrast mode support */
+  highContrast: boolean;
+  /** Reduced motion support */
+  reducedMotion: boolean;
+}
+
+/**
+ * Keyboard navigation configuration
+ */
+export interface KeyboardNavigation {
+  /** Enable arrow key navigation */
+  arrowKeys: boolean;
+  /** Enable tab navigation */
+  tabNavigation: boolean;
+  /** Enable escape key to close */
+  escapeToClose: boolean;
+  /** Enable enter/space activation */
+  enterSpaceActivation: boolean;
+  /** Custom keyboard shortcuts */
+  shortcuts: KeyboardShortcut[];
+}
+
+/**
+ * Keyboard shortcut configuration
+ */
+export interface KeyboardShortcut {
+  /** Key combination */
+  keys: string[];
+  /** Action to perform */
+  action: () => void;
+  /** Description for help menu */
+  description: string;
+  /** Whether shortcut is global */
+  global?: boolean;
+}
+
+// ============================================================================
+// EXPORT TYPES
+// ============================================================================
+
+export type {
+  // Core navigation types
+  BaseNavItem,
+  NavLinkItem,
+  NavGroupItem,
+  NavDividerItem,
+  NavActionItem,
+  NavItem,
+  
+  // Menu configurations
+  NavigationMenu,
+  SidebarNavigation,
+  TopNavigation,
+  BreadcrumbNavigation,
+  TabNavigation,
+  
+  // State management
+  NavigationState,
+  NavigationPreferences,
+  
+  // Guards and permissions
+  NavigationGuardResult,
+  NavigationGuard,
+  NavigationContext,
+  
+  // Utilities
+  NavItemBuilder,
+  NavigationAnalytics,
+  NavigationEvent,
+  
+  // Responsive and layout
+  ResponsiveNavigation,
+  NavigationLayout,
+  
+  // Accessibility
+  NavigationAccessibility,
+  KeyboardNavigation,
+  KeyboardShortcut,
+  
+  // Icon types
+  HeroIconComponent,
+  IconSpec,
+  IconSize,
+  IconTheme,
+};
+
+// ============================================================================
+// DEFAULT CONFIGURATIONS
+// ============================================================================
+
+/**
+ * Default navigation preferences
+ */
+export const DEFAULT_NAV_PREFERENCES: NavigationPreferences = {
+  rememberSidebarState: true,
+  autoCollapseMobile: true,
+  showBreadcrumbs: true,
+  enableAnimations: true,
+  enableKeyboardNav: true,
 };
 
 /**
- * Route patterns for dynamic route matching
+ * Default responsive breakpoints
  */
-export const ROUTE_PATTERNS = {
-  // Dashboard routes
-  HOME: '/',
-  
-  // API Connection routes
-  API_CONNECTIONS: '/api-connections',
-  DATABASE_SERVICES: '/api-connections/database',
-  CREATE_SERVICE: '/api-connections/database/create',
-  SERVICE_DETAIL: '/api-connections/database/[service]',
-  SERVICE_SCHEMA: '/api-connections/database/[service]/schema',
-  SERVICE_GENERATE: '/api-connections/database/[service]/generate',
-  
-  // API Security routes
-  API_SECURITY: '/api-security',
-  ROLES: '/api-security/roles',
-  ROLE_DETAIL: '/api-security/roles/[id]',
-  CREATE_ROLE: '/api-security/roles/create',
-  LIMITS: '/api-security/limits',
-  LIMIT_DETAIL: '/api-security/limits/[id]',
-  CREATE_LIMIT: '/api-security/limits/create',
-  
-  // Administration routes
-  ADMIN_SETTINGS: '/admin-settings',
-  SYSTEM_SETTINGS: '/system-settings',
-  
-  // User routes
-  PROFILE: '/profile',
-  PROFILE_SETTINGS: '/profile/settings',
-  
-  // Auth routes
-  LOGIN: '/login',
-  LOGOUT: '/logout'
+export const DEFAULT_BREAKPOINTS = {
+  mobile: 768,
+  tablet: 1024,
+  desktop: 1280,
 } as const;
 
 /**
- * Type for route pattern values
+ * Default accessibility configuration
  */
-export type RoutePattern = typeof ROUTE_PATTERNS[keyof typeof ROUTE_PATTERNS];
+export const DEFAULT_ACCESSIBILITY: NavigationAccessibility = {
+  landmarks: true,
+  skipLinks: true,
+  focusManagement: true,
+  announcements: true,
+  highContrast: true,
+  reducedMotion: true,
+};
 
 /**
- * Function to check if a route matches a pattern
+ * Default keyboard navigation configuration
  */
-export function matchesRoute(pathname: string, pattern: RoutePattern): boolean {
-  // Convert Next.js pattern to regex
-  const regexPattern = pattern
-    .replace(/\[([^\]]+)\]/g, '([^/]+)') // Replace [param] with regex group
-    .replace(/\//g, '\\/'); // Escape forward slashes
-  
-  const regex = new RegExp(`^${regexPattern}$`);
-  return regex.test(pathname);
-}
-
-/**
- * Function to extract parameters from a route
- */
-export function extractParams(pathname: string, pattern: RoutePattern): Record<string, string> {
-  const params: Record<string, string> = {};
-  
-  // Get parameter names from pattern
-  const paramMatches = pattern.match(/\[([^\]]+)\]/g);
-  if (!paramMatches) return params;
-  
-  const paramNames = paramMatches.map(match => match.slice(1, -1));
-  
-  // Convert pattern to regex and extract values
-  const regexPattern = pattern.replace(/\[([^\]]+)\]/g, '([^/]+)');
-  const regex = new RegExp(regexPattern);
-  const matches = pathname.match(regex);
-  
-  if (matches) {
-    paramNames.forEach((name, index) => {
-      params[name] = matches[index + 1];
-    });
-  }
-  
-  return params;
-}
+export const DEFAULT_KEYBOARD_NAV: KeyboardNavigation = {
+  arrowKeys: true,
+  tabNavigation: true,
+  escapeToClose: true,
+  enterSpaceActivation: true,
+  shortcuts: [],
+};
