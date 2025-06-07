@@ -1,400 +1,462 @@
+/**
+ * Textarea component with auto-resize functionality, character counting, and WCAG 2.1 AA accessibility compliance
+ * Provides enhanced UX for multi-line text input with consistent styling and validation integration
+ * 
+ * @file src/components/ui/input/textarea.tsx
+ * @since 1.0.0
+ */
+
 'use client';
 
-import React, { forwardRef, useCallback, useEffect, useRef, useState } from 'react';
+import React, { forwardRef, useId, useState, useCallback, useRef, useEffect, useImperativeHandle } from 'react';
+import { useController, FieldValues, FieldPath } from 'react-hook-form';
+import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
+import { useTheme } from '@/hooks/use-theme';
+import {
+  TextareaProps,
+  ControlledTextareaProps,
+  TextareaRef,
+  TextareaChangeEvent,
+  TextareaFocusEvent,
+  TextareaKeyboardEvent
+} from './input.types';
 
 /**
- * Textarea component props interface
- * Extends standard HTML textarea attributes with enhanced functionality
+ * Textarea variant styles using class-variance-authority
+ * Implements WCAG 2.1 AA compliant design tokens from Section 7.7.1
  */
-export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
-  /** Visual variant of the textarea */
-  variant?: 'outline' | 'filled' | 'ghost';
-  /** Size variant affecting height and padding */
-  size?: 'sm' | 'md' | 'lg';
-  /** Whether the textarea should auto-resize based on content */
-  autoResize?: boolean;
-  /** Maximum height for auto-resize in pixels */
-  maxHeight?: number;
-  /** Minimum height for auto-resize in pixels */
-  minHeight?: number;
-  /** Maximum character count */
-  maxLength?: number;
-  /** Whether to show character count */
-  showCharacterCount?: boolean;
-  /** Error state for validation feedback */
-  error?: boolean;
-  /** Error message to display */
-  errorMessage?: string;
-  /** Success state for validation feedback */
-  success?: boolean;
-  /** Label for the textarea */
-  label?: string;
-  /** Helper text to display below the textarea */
-  helperText?: string;
-  /** Whether the label is required (shows asterisk) */
-  required?: boolean;
-  /** Custom class name for the container */
-  containerClassName?: string;
-  /** Ref for the container element */
-  containerRef?: React.RefObject<HTMLDivElement>;
+const textareaVariants = cva(
+  [
+    // Base styles with accessibility compliance
+    'w-full rounded-md border transition-all duration-200',
+    'text-sm font-normal leading-5',
+    'placeholder:text-gray-400 dark:placeholder:text-gray-500',
+    'disabled:cursor-not-allowed disabled:opacity-50',
+    'read-only:cursor-default read-only:bg-gray-50 dark:read-only:bg-gray-800',
+    // Focus styles with WCAG 2.1 AA compliance (3:1 contrast ratio for UI components)
+    'focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-offset-2',
+    'focus:border-primary-600 dark:focus:ring-primary-500 dark:focus:border-primary-500',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2',
+    // Textarea specific styles
+    'block resize-none overflow-hidden',
+  ],
+  {
+    variants: {
+      variant: {
+        outline: [
+          'bg-white dark:bg-gray-900',
+          'border-gray-300 dark:border-gray-600',
+          'text-gray-900 dark:text-gray-100',
+          'hover:border-gray-400 dark:hover:border-gray-500',
+        ],
+        filled: [
+          'bg-gray-50 dark:bg-gray-800',
+          'border-gray-200 dark:border-gray-700',
+          'text-gray-900 dark:text-gray-100',
+          'hover:bg-gray-100 dark:hover:bg-gray-750',
+          'hover:border-gray-300 dark:hover:border-gray-600',
+        ],
+        ghost: [
+          'bg-transparent',
+          'border-transparent',
+          'text-gray-900 dark:text-gray-100',
+          'hover:bg-gray-50 dark:hover:bg-gray-800',
+          'hover:border-gray-200 dark:hover:border-gray-700',
+        ],
+      },
+      size: {
+        sm: [
+          'px-3 py-1.5 text-sm',
+          'min-h-[72px]', // 2 lines minimum for textarea
+        ],
+        md: [
+          'px-3 py-2 text-sm',
+          'min-h-[88px]', // 2.5 lines minimum for textarea
+        ],
+        lg: [
+          'px-4 py-3 text-base',
+          'min-h-[96px]', // 2.5 lines minimum for textarea
+        ],
+      },
+      state: {
+        default: '',
+        error: [
+          'border-error-500 dark:border-error-400',
+          'text-error-900 dark:text-error-100',
+          'focus:ring-error-500 focus:border-error-500',
+          'dark:focus:ring-error-400 dark:focus:border-error-400',
+        ],
+        success: [
+          'border-success-500 dark:border-success-400',
+          'text-success-900 dark:text-success-100',
+          'focus:ring-success-500 focus:border-success-500',
+          'dark:focus:ring-success-400 dark:focus:border-success-400',
+        ],
+        warning: [
+          'border-warning-500 dark:border-warning-400',
+          'text-warning-900 dark:text-warning-100',
+          'focus:ring-warning-500 focus:border-warning-500',
+          'dark:focus:ring-warning-400 dark:focus:border-warning-400',
+        ],
+      },
+      resize: {
+        none: 'resize-none',
+        vertical: 'resize-y',
+        horizontal: 'resize-x',
+        both: 'resize',
+      },
+    },
+    defaultVariants: {
+      variant: 'outline',
+      size: 'md',
+      state: 'default',
+      resize: 'none',
+    },
+  }
+);
+
+/**
+ * Character count display styles
+ */
+const characterCountVariants = cva(
+  'text-xs transition-colors duration-200 text-right',
+  {
+    variants: {
+      state: {
+        default: 'text-gray-500 dark:text-gray-400',
+        warning: 'text-warning-600 dark:text-warning-400',
+        error: 'text-error-600 dark:text-error-400',
+      },
+    },
+    defaultVariants: {
+      state: 'default',
+    },
+  }
+);
+
+/**
+ * Auto-resize hook for textarea elements
+ * Maintains smooth performance with large text content
+ */
+function useAutoResize(
+  textareaRef: React.RefObject<HTMLTextAreaElement>,
+  value: string,
+  minRows: number = 2,
+  maxRows: number = 10,
+  autoResize: boolean = true
+) {
+  const resizeTextarea = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (!textarea || !autoResize) return;
+
+    // Reset height to auto to get the correct scrollHeight
+    textarea.style.height = 'auto';
+    
+    // Calculate line height
+    const style = window.getComputedStyle(textarea);
+    const lineHeight = parseInt(style.lineHeight) || parseInt(style.fontSize) * 1.2;
+    
+    // Calculate min and max heights
+    const minHeight = lineHeight * minRows;
+    const maxHeight = lineHeight * maxRows;
+    
+    // Set new height based on scroll height, constrained by min/max
+    const newHeight = Math.min(Math.max(textarea.scrollHeight, minHeight), maxHeight);
+    textarea.style.height = `${newHeight}px`;
+    
+    // Handle overflow for max height
+    textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden';
+  }, [autoResize, minRows, maxRows]);
+
+  // Resize when value changes
+  useEffect(() => {
+    resizeTextarea();
+  }, [value, resizeTextarea]);
+
+  // Resize on mount and window resize
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    // Initial resize
+    resizeTextarea();
+
+    // Handle window resize
+    const handleResize = () => {
+      resizeTextarea();
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [resizeTextarea]);
+
+  return resizeTextarea;
 }
 
 /**
- * Textarea component for multi-line text input with auto-resize functionality,
- * character counting, and consistent styling. Provides enhanced UX for longer
- * text content with proper accessibility and validation integration.
- *
- * Features:
- * - Auto-resize functionality that grows with content up to maximum height
- * - Character count display with visual indicators for approaching limits
- * - WCAG 2.1 AA accessibility compliance with proper labeling and keyboard navigation
- * - React Hook Form integration for validation and form state management
- * - Size variants (sm, md, lg) for various use cases
- * - Consistent styling with other input components using Tailwind CSS design tokens
- * - Proper focus management and disabled state handling
+ * Character count hook with visual and screen reader announcements
  */
-export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
+function useCharacterCount(
+  value: string = '',
+  maxLength?: number,
+  showCharacterCount: boolean = false
+) {
+  const currentLength = value.length;
+  const hasMaxLength = maxLength !== undefined;
+  
+  // Calculate warning and error thresholds
+  const warningThreshold = hasMaxLength ? Math.floor(maxLength * 0.8) : Infinity;
+  const errorThreshold = hasMaxLength ? maxLength : Infinity;
+  
+  // Determine state
+  const state = currentLength >= errorThreshold 
+    ? 'error' 
+    : currentLength >= warningThreshold 
+    ? 'warning' 
+    : 'default';
+
+  // Generate accessible announcement text
+  const announcementText = hasMaxLength 
+    ? `${currentLength} of ${maxLength} characters used`
+    : `${currentLength} characters entered`;
+
+  return {
+    currentLength,
+    maxLength,
+    hasMaxLength,
+    state,
+    announcementText,
+    isNearLimit: state === 'warning',
+    isOverLimit: state === 'error',
+    showCount: showCharacterCount || hasMaxLength,
+  };
+}
+
+/**
+ * Textarea component with auto-resize, character counting, and accessibility
+ */
+export const Textarea = forwardRef<TextareaRef, TextareaProps>(
   (
     {
-      className,
-      containerClassName,
-      containerRef,
       variant = 'outline',
       size = 'md',
+      state = 'default',
+      resize = 'none',
       autoResize = true,
-      maxHeight = 400,
-      minHeight,
-      maxLength,
+      minRows = 2,
+      maxRows = 10,
       showCharacterCount = false,
-      error = false,
-      errorMessage,
-      success = false,
-      label,
-      helperText,
+      error,
+      helpText,
+      className,
+      containerClassName,
       required = false,
-      value,
-      defaultValue,
-      onChange,
-      onInput,
       disabled = false,
       readOnly = false,
+      maxLength,
+      rows: providedRows,
+      id: providedId,
+      value: controlledValue,
+      defaultValue,
+      'aria-label': ariaLabel,
       'aria-describedby': ariaDescribedBy,
       'aria-invalid': ariaInvalid,
-      'aria-required': ariaRequired,
-      id,
+      'aria-errormessage': ariaErrorMessage,
+      onChange,
+      onFocus,
+      onBlur,
+      onKeyDown,
       ...props
     },
     ref
   ) => {
-    // Internal state for character count and auto-resize
-    const [characterCount, setCharacterCount] = useState(0);
-    const [currentHeight, setCurrentHeight] = useState<number | undefined>(undefined);
+    const generatedId = useId();
+    const id = providedId || generatedId;
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const [focused, setFocused] = useState(false);
+    const [internalValue, setInternalValue] = useState(defaultValue || '');
     
-    // Refs for internal functionality
-    const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-    const hiddenTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+    // Use controlled value if provided, otherwise use internal state
+    const value = controlledValue !== undefined ? controlledValue : internalValue;
     
-    // Generate unique IDs for accessibility
-    const textareaId = id || `textarea-${Math.random().toString(36).substr(2, 9)}`;
-    const labelId = `${textareaId}-label`;
-    const helperTextId = `${textareaId}-helper`;
-    const errorId = `${textareaId}-error`;
-    const charCountId = `${textareaId}-char-count`;
-    
-    // Combine refs
-    const combinedRef = useCallback(
-      (element: HTMLTextAreaElement | null) => {
-        textareaRef.current = element;
-        if (typeof ref === 'function') {
-          ref(element);
-        } else if (ref) {
-          ref.current = element;
-        }
-      },
-      [ref]
-    );
+    const { resolvedTheme } = useTheme();
 
-    /**
-     * Calculate the height needed for the textarea content
-     */
-    const calculateHeight = useCallback((content: string): number => {
-      if (!hiddenTextareaRef.current || !autoResize) return currentHeight || 0;
-      
-      const hiddenTextarea = hiddenTextareaRef.current;
-      hiddenTextarea.value = content;
-      
-      // Reset height to auto to get the correct scrollHeight
-      hiddenTextarea.style.height = 'auto';
-      const scrollHeight = hiddenTextarea.scrollHeight;
-      
-      // Apply min/max height constraints
-      const minHeightValue = minHeight || 0;
-      const maxHeightValue = maxHeight || Infinity;
-      
-      return Math.min(Math.max(scrollHeight, minHeightValue), maxHeightValue);
-    }, [autoResize, minHeight, maxHeight, currentHeight]);
+    // Expose textarea element through ref
+    useImperativeHandle(ref, () => textareaRef.current!, []);
 
-    /**
-     * Handle textarea content changes and auto-resize
-     */
-    const handleChange = useCallback(
-      (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-        const newValue = event.target.value;
-        
-        // Update character count
-        setCharacterCount(newValue.length);
-        
-        // Handle auto-resize
-        if (autoResize) {
-          const newHeight = calculateHeight(newValue);
-          setCurrentHeight(newHeight);
-        }
-        
-        // Call parent onChange handler
-        onChange?.(event);
-      },
-      [onChange, autoResize, calculateHeight]
-    );
+    // Auto-resize functionality
+    const resizeTextarea = useAutoResize(textareaRef, value, minRows, maxRows, autoResize);
 
-    /**
-     * Handle input events for real-time updates
-     */
-    const handleInput = useCallback(
-      (event: React.FormEvent<HTMLTextAreaElement>) => {
-        const target = event.target as HTMLTextAreaElement;
-        const newValue = target.value;
-        
-        // Update character count
-        setCharacterCount(newValue.length);
-        
-        // Handle auto-resize
-        if (autoResize) {
-          const newHeight = calculateHeight(newValue);
-          setCurrentHeight(newHeight);
-        }
-        
-        // Call parent onInput handler
-        onInput?.(event);
-      },
-      [onInput, autoResize, calculateHeight]
-    );
+    // Character count functionality
+    const characterCount = useCharacterCount(value, maxLength, showCharacterCount);
 
-    // Initialize character count and height on mount and value changes
-    useEffect(() => {
-      const currentValue = value || defaultValue || '';
-      const currentValueString = typeof currentValue === 'string' ? currentValue : String(currentValue);
+    // Generate IDs for associated elements
+    const errorId = error ? `${id}-error` : undefined;
+    const helpId = helpText ? `${id}-help` : undefined;
+    const countId = characterCount.showCount ? `${id}-count` : undefined;
+    const describedByIds = [ariaDescribedBy, errorId, helpId, countId].filter(Boolean).join(' ') || undefined;
+
+    // Determine textarea state based on error, character count, and other states
+    const textareaState = error 
+      ? 'error' 
+      : characterCount.isOverLimit 
+      ? 'error' 
+      : characterCount.isNearLimit 
+      ? 'warning' 
+      : state;
+
+    // Calculate rows for non-auto-resize mode
+    const calculatedRows = autoResize ? minRows : (providedRows || minRows);
+
+    // Handle focus events with proper state management
+    const handleFocus = useCallback((event: TextareaFocusEvent) => {
+      setFocused(true);
+      onFocus?.(event);
+    }, [onFocus]);
+
+    const handleBlur = useCallback((event: TextareaFocusEvent) => {
+      setFocused(false);
+      onBlur?.(event);
+    }, [onBlur]);
+
+    // Handle change events with auto-resize
+    const handleChange = useCallback((event: TextareaChangeEvent) => {
+      const newValue = event.target.value;
       
-      setCharacterCount(currentValueString.length);
-      
-      if (autoResize) {
-        const initialHeight = calculateHeight(currentValueString);
-        setCurrentHeight(initialHeight);
+      // Update internal value if uncontrolled
+      if (controlledValue === undefined) {
+        setInternalValue(newValue);
       }
-    }, [value, defaultValue, autoResize, calculateHeight]);
-
-    // Base styles for the textarea
-    const baseStyles = cn(
-      // Base textarea styling
-      'w-full rounded-md transition-all duration-200',
-      'placeholder:text-gray-400 dark:placeholder:text-gray-500',
-      'resize-none', // Disable manual resize when auto-resize is enabled
       
-      // Typography
-      'text-sm leading-relaxed',
-      'font-normal',
+      // Call external onChange handler
+      onChange?.(event);
       
-      // Focus styles - WCAG 2.1 AA compliant
-      'focus:outline-none',
-      'focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2',
-      'focus-visible:border-primary-600',
-      
-      // Disabled state
-      'disabled:cursor-not-allowed disabled:opacity-50',
-      'disabled:bg-gray-50 dark:disabled:bg-gray-800/50',
-      
-      // Read-only state
-      'read-only:bg-gray-50 dark:read-only:bg-gray-800/50',
-      'read-only:cursor-default',
-      
-      // Accessibility - ensure minimum touch target
-      size === 'sm' ? 'min-h-[44px]' : size === 'md' ? 'min-h-[48px]' : 'min-h-[52px]'
-    );
+      // Trigger resize on next frame to ensure DOM is updated
+      requestAnimationFrame(() => {
+        resizeTextarea();
+      });
+    }, [controlledValue, onChange, resizeTextarea]);
 
-    // Variant-specific styles
-    const variantStyles = {
-      outline: cn(
-        'bg-white dark:bg-gray-900',
-        'border border-gray-300 dark:border-gray-600',
-        'hover:border-gray-400 dark:hover:border-gray-500',
-        error && 'border-error-500 dark:border-error-400',
-        success && 'border-success-500 dark:border-success-400',
-        'focus:border-primary-600 dark:focus:border-primary-400'
-      ),
-      filled: cn(
-        'bg-gray-50 dark:bg-gray-800',
-        'border border-transparent',
-        'hover:bg-gray-100 dark:hover:bg-gray-700',
-        error && 'bg-error-50 dark:bg-error-900/20 border-error-500',
-        success && 'bg-success-50 dark:bg-success-900/20 border-success-500',
-        'focus:bg-white dark:focus:bg-gray-900',
-        'focus:border-primary-600 dark:focus:border-primary-400'
-      ),
-      ghost: cn(
-        'bg-transparent',
-        'border border-transparent',
-        'hover:bg-gray-50 dark:hover:bg-gray-800/50',
-        error && 'hover:bg-error-50 dark:hover:bg-error-900/20',
-        success && 'hover:bg-success-50 dark:hover:bg-success-900/20',
-        'focus:bg-white dark:focus:bg-gray-900',
-        'focus:border-primary-600 dark:focus:border-primary-400'
-      ),
-    };
+    // Handle keyboard events for accessibility
+    const handleKeyDown = useCallback((event: TextareaKeyboardEvent) => {
+      // Handle Ctrl+A for select all
+      if (event.ctrlKey && event.key === 'a') {
+        event.currentTarget.select();
+        event.preventDefault();
+        return;
+      }
 
-    // Size-specific styles
-    const sizeStyles = {
-      sm: 'px-3 py-2 text-sm',
-      md: 'px-3 py-2.5 text-sm',
-      lg: 'px-4 py-3 text-base',
-    };
+      // Handle Tab key for indentation if desired
+      if (event.key === 'Tab' && !event.shiftKey && !event.ctrlKey && !event.altKey) {
+        // Allow default tab behavior for navigation
+        // Custom tab handling can be added here if needed
+      }
 
-    // Character count styling
-    const isNearLimit = maxLength && characterCount >= maxLength * 0.8;
-    const isOverLimit = maxLength && characterCount > maxLength;
-    
-    const characterCountStyles = cn(
-      'text-xs mt-1 transition-colors duration-200',
-      isOverLimit
-        ? 'text-error-600 dark:text-error-400'
-        : isNearLimit
-        ? 'text-warning-600 dark:text-warning-400'
-        : 'text-gray-500 dark:text-gray-400'
-    );
-
-    // Determine ARIA describedby
-    const describedByIds = [
-      helperText && helperTextId,
-      errorMessage && errorId,
-      showCharacterCount && charCountId,
-      ariaDescribedBy,
-    ].filter(Boolean).join(' ') || undefined;
-
-    // Container styles
-    const containerStyles = cn('w-full', containerClassName);
-
-    // Label styles
-    const labelStyles = cn(
-      'block text-sm font-medium mb-1.5',
-      'text-gray-700 dark:text-gray-300',
-      error && 'text-error-600 dark:text-error-400',
-      success && 'text-success-600 dark:text-success-400',
-      disabled && 'text-gray-400 dark:text-gray-600'
-    );
-
-    // Helper text styles
-    const helperTextStyles = cn(
-      'text-xs mt-1 transition-colors duration-200',
-      error ? 'text-error-600 dark:text-error-400' : 'text-gray-500 dark:text-gray-400'
-    );
+      onKeyDown?.(event);
+    }, [onKeyDown]);
 
     return (
-      <div className={containerStyles} ref={containerRef}>
-        {/* Label */}
-        {label && (
-          <label htmlFor={textareaId} id={labelId} className={labelStyles}>
-            {label}
-            {required && (
-              <span className="text-error-500 ml-1" aria-label="required">
-                *
-              </span>
-            )}
-          </label>
-        )}
-
-        {/* Hidden textarea for height calculation */}
-        {autoResize && (
+      <div className={cn('w-full', containerClassName)}>
+        <div className="relative">
+          {/* Main textarea element */}
           <textarea
-            ref={hiddenTextareaRef}
-            className={cn(baseStyles, variantStyles[variant], sizeStyles[size])}
-            style={{
-              position: 'absolute',
-              top: -9999,
-              left: -9999,
-              visibility: 'hidden',
-              height: 'auto',
-              minHeight: 'auto',
-              maxHeight: 'none',
-              overflow: 'hidden',
-            }}
-            tabIndex={-1}
-            aria-hidden="true"
-            readOnly
+            ref={textareaRef}
+            id={id}
+            className={cn(
+              textareaVariants({
+                variant,
+                size,
+                state: textareaState,
+                resize: autoResize ? 'none' : resize,
+              }),
+              className
+            )}
+            rows={calculatedRows}
+            disabled={disabled}
+            readOnly={readOnly}
+            required={required}
+            maxLength={maxLength}
+            value={value}
+            aria-label={ariaLabel}
+            aria-describedby={describedByIds}
+            aria-invalid={ariaInvalid || Boolean(error) || characterCount.isOverLimit}
+            aria-errormessage={ariaErrorMessage || errorId}
+            onChange={handleChange}
+            onFocus={handleFocus}
+            onBlur={handleBlur}
+            onKeyDown={handleKeyDown}
+            {...props}
           />
+
+          {/* Resize handle indicator for manual resize mode */}
+          {!autoResize && resize !== 'none' && (
+            <div 
+              className="absolute bottom-1 right-1 w-3 h-3 opacity-20 pointer-events-none"
+              aria-hidden="true"
+            >
+              <svg 
+                className="w-full h-full text-gray-400" 
+                fill="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path d="M22 22H2v-2h20v2zm0-4H6v-2h16v2zm0-4H10v-2h12v2z" />
+              </svg>
+            </div>
+          )}
+        </div>
+
+        {/* Character count display */}
+        {characterCount.showCount && (
+          <div
+            id={countId}
+            className={cn(
+              'mt-1 flex justify-end',
+              characterCountVariants({ state: characterCount.state })
+            )}
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            <span role="status" aria-label={characterCount.announcementText}>
+              {characterCount.hasMaxLength 
+                ? `${characterCount.currentLength} / ${characterCount.maxLength}`
+                : characterCount.currentLength
+              }
+              <span className="sr-only"> characters</span>
+            </span>
+          </div>
         )}
 
-        {/* Main textarea */}
-        <textarea
-          ref={combinedRef}
-          id={textareaId}
-          className={cn(
-            baseStyles,
-            variantStyles[variant],
-            sizeStyles[size],
-            className
-          )}
-          style={{
-            height: autoResize && currentHeight ? `${currentHeight}px` : undefined,
-            resize: autoResize ? 'none' : 'vertical',
-          }}
-          value={value}
-          defaultValue={defaultValue}
-          onChange={handleChange}
-          onInput={handleInput}
-          disabled={disabled}
-          readOnly={readOnly}
-          maxLength={maxLength}
-          aria-describedby={describedByIds}
-          aria-invalid={ariaInvalid ?? (error ? 'true' : undefined)}
-          aria-required={ariaRequired ?? (required ? 'true' : undefined)}
-          aria-labelledby={label ? labelId : undefined}
-          {...props}
-        />
+        {/* Error message with ARIA live region */}
+        {error && (
+          <div
+            id={errorId}
+            className="mt-1 text-sm text-error-600 dark:text-error-400"
+            role="alert"
+            aria-live="polite"
+          >
+            {error}
+          </div>
+        )}
 
-        {/* Footer with helper text and character count */}
-        {(helperText || errorMessage || showCharacterCount) && (
-          <div className="flex justify-between items-start mt-1 gap-2">
-            <div className="flex-1">
-              {/* Helper text or error message */}
-              {(helperText || errorMessage) && (
-                <p
-                  id={errorMessage ? errorId : helperTextId}
-                  className={helperTextStyles}
-                  role={error ? 'alert' : undefined}
-                  aria-live={error ? 'polite' : undefined}
-                >
-                  {errorMessage || helperText}
-                </p>
-              )}
-            </div>
+        {/* Character limit exceeded message */}
+        {characterCount.isOverLimit && !error && (
+          <div
+            className="mt-1 text-sm text-error-600 dark:text-error-400"
+            role="alert"
+            aria-live="polite"
+          >
+            Character limit exceeded by {characterCount.currentLength - characterCount.maxLength!} characters
+          </div>
+        )}
 
-            {/* Character count */}
-            {showCharacterCount && (
-              <div
-                id={charCountId}
-                className={characterCountStyles}
-                aria-live="polite"
-                aria-label={`${characterCount}${maxLength ? ` of ${maxLength}` : ''} characters`}
-              >
-                {characterCount}
-                {maxLength && (
-                  <>
-                    <span aria-hidden="true">/</span>
-                    <span className="sr-only">of</span>
-                    {maxLength}
-                  </>
-                )}
-              </div>
-            )}
+        {/* Help text */}
+        {helpText && !error && !characterCount.isOverLimit && (
+          <div
+            id={helpId}
+            className="mt-1 text-sm text-gray-500 dark:text-gray-400"
+          >
+            {helpText}
           </div>
         )}
       </div>
@@ -404,4 +466,45 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
 
 Textarea.displayName = 'Textarea';
 
-export default Textarea;
+/**
+ * Controlled Textarea component with React Hook Form integration
+ * Automatically handles field registration, validation, and error display
+ */
+export function ControlledTextarea<
+  TFieldValues extends FieldValues = FieldValues,
+  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>
+>({
+  control,
+  name,
+  defaultValue,
+  rules,
+  shouldUnregister,
+  ...textareaProps
+}: ControlledTextareaProps<TFieldValues, TName>) {
+  const {
+    field,
+    fieldState: { error, isDirty, isTouched },
+    formState: { isSubmitting }
+  } = useController({
+    name,
+    control,
+    defaultValue,
+    rules,
+    shouldUnregister,
+  });
+
+  return (
+    <Textarea
+      {...textareaProps}
+      {...field}
+      error={error?.message}
+      disabled={textareaProps.disabled || isSubmitting}
+      aria-invalid={Boolean(error)}
+      state={error ? 'error' : textareaProps.state}
+    />
+  );
+}
+
+// Export types for external use
+export type { TextareaRef, TextareaChangeEvent, TextareaFocusEvent, TextareaKeyboardEvent };
+export type { TextareaProps, ControlledTextareaProps } from './input.types';
