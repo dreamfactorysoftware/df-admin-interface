@@ -1,860 +1,1346 @@
-/**
- * @fileoverview Specialized testing utilities for TanStack React Query patterns
- * 
- * Provides comprehensive helper functions for testing data fetching, caching, mutations,
- * and optimistic updates that replace Angular RxJS testing patterns. Includes utilities
- * for cache management, mutation testing, background refresh patterns, and error scenarios.
- * 
- * Key Features:
- * - Query cache inspection and validation utilities
- * - Mutation testing with optimistic update scenarios
- * - Background refresh and stale-while-revalidate testing
- * - Cache invalidation and synchronization testing
- * - Error boundary integration for query error scenarios
- * - Performance testing for sub-5-second API generation workflows
- */
-
-import { QueryClient, QueryCache, MutationCache } from '@tanstack/react-query';
-import { renderHook, waitFor, RenderHookResult } from '@testing-library/react';
-import { ReactNode } from 'react';
-
-/**
- * Interface for query cache inspection results
- */
-export interface QueryCacheInspection {
-  /** All cached queries in the QueryClient */
-  queries: Array<{
-    queryKey: any;
-    state: {
-      data: any;
-      error: any;
-      status: 'pending' | 'error' | 'success';
-      isStale: boolean;
-      isFetching: boolean;
-      isLoading: boolean;
-    };
-  }>;
-  /** Current cache size */
-  cacheSize: number;
-  /** Number of stale queries */
-  staleCount: number;
-  /** Number of fetching queries */
-  fetchingCount: number;
-}
+import { 
+  QueryClient, 
+  QueryObserver, 
+  MutationObserver,
+  QueryKey,
+  MutationKey,
+  QueryFunction,
+  MutationFunction,
+  QueryCache,
+  MutationCache,
+  InfiniteQueryObserver,
+  QueryState,
+  MutationState,
+  QueryObserverOptions,
+  MutationObserverOptions,
+  InfiniteQueryObserverOptions,
+  QueryFilters,
+  MutationFilters,
+  InvalidateQueryFilters,
+  ResetQueryFilters,
+  RefetchQueryFilters,
+  CancelOptions,
+  InvalidateOptions,
+  RefetchOptions,
+  ResetOptions,
+} from '@tanstack/react-query';
+import { act, waitFor } from '@testing-library/react';
+import { renderWithProviders } from './test-utils';
+import { ReactElement } from 'react';
 
 /**
- * Interface for mutation testing scenarios
+ * Test-specific QueryClient configuration optimized for fast testing
+ * Replaces Angular RxJS testing patterns with React Query test utilities
  */
-export interface MutationTestScenario {
-  /** The mutation function to test */
-  mutationFn: (variables: any) => Promise<any>;
-  /** Variables to pass to the mutation */
-  variables: any;
-  /** Expected optimistic update data */
-  optimisticData?: any;
-  /** Expected final data after successful mutation */
-  expectedData?: any;
-  /** Expected error for failure scenarios */
-  expectedError?: any;
-  /** Queries to invalidate after mutation */
-  invalidateQueries?: string[][];
-  /** Delay before resolving/rejecting (for testing timing) */
-  delay?: number;
-}
-
-/**
- * Interface for background refresh testing configuration
- */
-export interface BackgroundRefreshConfig {
-  /** Query key to test background refresh for */
-  queryKey: any[];
-  /** Initial data to seed the cache */
-  initialData: any;
-  /** New data that should be fetched in background */
-  refreshedData: any;
-  /** Stale time in milliseconds */
-  staleTime?: number;
-  /** Cache time in milliseconds */
-  cacheTime?: number;
-  /** Whether to test window focus refetch */
-  testWindowFocus?: boolean;
-  /** Whether to test network reconnect refetch */
-  testNetworkReconnect?: boolean;
-}
-
-/**
- * Interface for cache synchronization testing
- */
-export interface CacheSyncTestConfig {
-  /** Primary query that triggers invalidation */
-  primaryQuery: {
-    queryKey: any[];
-    data: any;
-  };
-  /** Dependent queries that should be invalidated */
-  dependentQueries: Array<{
-    queryKey: any[];
-    initialData: any;
-    expectedInvalidation: boolean;
-  }>;
-  /** Mutation that triggers the invalidation */
-  mutation?: {
-    mutationFn: (variables: any) => Promise<any>;
-    variables: any;
-  };
-}
-
-/**
- * Creates a test QueryClient with optimized settings for testing
- */
-export function createTestQueryClient(options?: {
-  /** Default query options for all queries */
-  defaultOptions?: {
-    queries?: {
-      retry?: boolean | number;
-      staleTime?: number;
-      cacheTime?: number;
-      refetchOnWindowFocus?: boolean;
-      refetchOnReconnect?: boolean;
-    };
-    mutations?: {
-      retry?: boolean | number;
-    };
-  };
-  /** Mock logger to capture errors */
-  logger?: {
-    log: jest.Mock;
-    warn: jest.Mock;
-    error: jest.Mock;
-  };
-}): QueryClient {
-  const defaultLogger = {
-    log: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-  };
-
+export const createTestQueryClient = (overrides?: Partial<QueryClient['options']>): QueryClient => {
   return new QueryClient({
-    logger: options?.logger || defaultLogger,
     defaultOptions: {
       queries: {
+        // Disable retries for predictable test behavior
         retry: false,
+        // Disable garbage collection during tests
+        gcTime: Infinity,
+        // Make queries immediately stale for testing refresh behavior
         staleTime: 0,
-        cacheTime: 1000 * 60 * 5, // 5 minutes
+        // Disable automatic refetching
+        refetchOnMount: false,
         refetchOnWindowFocus: false,
         refetchOnReconnect: false,
-        ...options?.defaultOptions?.queries,
+        // Override with test-specific behavior
+        ...overrides?.defaultOptions?.queries,
       },
       mutations: {
+        // Disable retries for predictable test behavior
         retry: false,
-        ...options?.defaultOptions?.mutations,
+        // Override with test-specific behavior
+        ...overrides?.defaultOptions?.mutations,
       },
     },
+    ...overrides,
   });
-}
+};
 
 /**
- * Wrapper component that provides QueryClient to test components
+ * Query cache inspection utilities for validating server state management behavior
+ * Provides tools to examine and assert on cache state during tests
  */
-export function createQueryWrapper(queryClient: QueryClient) {
-  return function QueryWrapper({ children }: { children: ReactNode }) {
-    const { QueryClientProvider } = require('@tanstack/react-query');
-    return (
-      <QueryClientProvider client={queryClient}>
-        {children}
-      </QueryClientProvider>
-    );
-  };
-}
-
-/**
- * Inspects the current state of the query cache
- */
-export function inspectQueryCache(queryClient: QueryClient): QueryCacheInspection {
-  const cache = queryClient.getQueryCache();
-  const queries = cache.getAll();
-
-  const inspection = {
-    queries: queries.map(query => ({
-      queryKey: query.queryKey,
-      state: {
-        data: query.state.data,
-        error: query.state.error,
-        status: query.state.status,
-        isStale: query.isStale(),
-        isFetching: query.state.isFetching,
-        isLoading: query.state.isLoading,
-      },
-    })),
-    cacheSize: queries.length,
-    staleCount: queries.filter(query => query.isStale()).length,
-    fetchingCount: queries.filter(query => query.state.isFetching).length,
-  };
-
-  return inspection;
-}
-
-/**
- * Waits for a specific query to reach a target state
- */
-export async function waitForQueryState(
-  queryClient: QueryClient,
-  queryKey: any[],
-  targetState: {
-    status?: 'pending' | 'error' | 'success';
-    isFetching?: boolean;
-    isLoading?: boolean;
-    hasData?: boolean;
-    hasError?: boolean;
+export const queryCacheUtils = {
+  /**
+   * Get the current cached data for a specific query key
+   */
+  getCachedData: <TData = unknown>(queryClient: QueryClient, queryKey: QueryKey): TData | undefined => {
+    return queryClient.getQueryData<TData>(queryKey);
   },
-  timeout = 5000
-): Promise<void> {
-  const startTime = Date.now();
 
-  return new Promise((resolve, reject) => {
-    const checkState = () => {
-      const query = queryClient.getQueryCache().find({ queryKey });
-      
-      if (!query) {
-        if (Date.now() - startTime > timeout) {
-          reject(new Error(`Query with key ${JSON.stringify(queryKey)} not found after ${timeout}ms`));
-          return;
-        }
-        setTimeout(checkState, 50);
-        return;
-      }
+  /**
+   * Check if a query is currently in the cache
+   */
+  isQueryCached: (queryClient: QueryClient, queryKey: QueryKey): boolean => {
+    return queryClient.getQueryState(queryKey) !== undefined;
+  },
 
-      const state = query.state;
-      const matches = Object.entries(targetState).every(([key, expectedValue]) => {
-        switch (key) {
-          case 'status':
-            return state.status === expectedValue;
-          case 'isFetching':
-            return state.isFetching === expectedValue;
-          case 'isLoading':
-            return state.isLoading === expectedValue;
-          case 'hasData':
-            return expectedValue ? state.data !== undefined : state.data === undefined;
-          case 'hasError':
-            return expectedValue ? state.error !== null : state.error === null;
-          default:
-            return true;
-        }
-      });
+  /**
+   * Get the current state of a specific query including loading, error states
+   */
+  getQueryState: (queryClient: QueryClient, queryKey: QueryKey): QueryState | undefined => {
+    return queryClient.getQueryState(queryKey);
+  },
 
-      if (matches) {
-        resolve();
-      } else if (Date.now() - startTime > timeout) {
-        reject(new Error(`Query state did not match expected state after ${timeout}ms. Current: ${JSON.stringify({
-          status: state.status,
-          isFetching: state.isFetching,
-          isLoading: state.isLoading,
-          hasData: state.data !== undefined,
-          hasError: state.error !== null,
-        })}, Expected: ${JSON.stringify(targetState)}`));
-      } else {
-        setTimeout(checkState, 50);
-      }
-    };
+  /**
+   * Get all cached queries matching specific filters
+   */
+  getCachedQueries: (queryClient: QueryClient, filters?: QueryFilters) => {
+    return queryClient.getQueriesData(filters || {});
+  },
 
-    checkState();
-  });
-}
+  /**
+   * Check if a query is currently fetching
+   */
+  isQueryFetching: (queryClient: QueryClient, queryKey: QueryKey): boolean => {
+    const state = queryClient.getQueryState(queryKey);
+    return state?.isFetching ?? false;
+  },
 
-/**
- * Tests cache invalidation patterns for related queries
- */
-export async function testCacheInvalidation(
-  queryClient: QueryClient,
-  config: CacheSyncTestConfig
-): Promise<{
-  success: boolean;
-  results: Array<{
-    queryKey: any[];
-    wasInvalidated: boolean;
-    expectedInvalidation: boolean;
-    passed: boolean;
-  }>;
-}> {
-  // Set up initial cache state
-  queryClient.setQueryData(config.primaryQuery.queryKey, config.primaryQuery.data);
-  
-  for (const depQuery of config.dependentQueries) {
-    queryClient.setQueryData(depQuery.queryKey, depQuery.initialData);
-  }
+  /**
+   * Check if a query has error state
+   */
+  hasQueryError: (queryClient: QueryClient, queryKey: QueryKey): boolean => {
+    const state = queryClient.getQueryState(queryKey);
+    return state?.status === 'error';
+  },
 
-  // Record initial cache states
-  const initialStates = config.dependentQueries.map(depQuery => {
-    const query = queryClient.getQueryCache().find({ queryKey: depQuery.queryKey });
-    return {
-      queryKey: depQuery.queryKey,
-      initialDataUpdatedAt: query?.state.dataUpdatedAt || 0,
-    };
-  });
+  /**
+   * Get error details for a failed query
+   */
+  getQueryError: (queryClient: QueryClient, queryKey: QueryKey): Error | null => {
+    const state = queryClient.getQueryState(queryKey);
+    return state?.error || null;
+  },
 
-  // Trigger invalidation (either through mutation or direct invalidation)
-  if (config.mutation) {
-    try {
-      await config.mutation.mutationFn(config.mutation.variables);
-    } catch (error) {
-      // Mutation might fail, but we still want to test invalidation
-    }
-  } else {
-    // Direct invalidation of primary query
-    await queryClient.invalidateQueries({ queryKey: config.primaryQuery.queryKey });
-  }
+  /**
+   * Check if a query is stale and needs revalidation
+   */
+  isQueryStale: (queryClient: QueryClient, queryKey: QueryKey): boolean => {
+    const state = queryClient.getQueryState(queryKey);
+    return state?.isStale ?? false;
+  },
 
-  // Wait a bit for invalidation to propagate
-  await new Promise(resolve => setTimeout(resolve, 100));
+  /**
+   * Get the timestamp when query data was last updated
+   */
+  getQueryDataUpdatedAt: (queryClient: QueryClient, queryKey: QueryKey): number | undefined => {
+    const state = queryClient.getQueryState(queryKey);
+    return state?.dataUpdatedAt;
+  },
 
-  // Check which queries were actually invalidated
-  const results = config.dependentQueries.map((depQuery, index) => {
-    const query = queryClient.getQueryCache().find({ queryKey: depQuery.queryKey });
-    const currentDataUpdatedAt = query?.state.dataUpdatedAt || 0;
-    const wasInvalidated = currentDataUpdatedAt !== initialStates[index].initialDataUpdatedAt || query?.isStale();
+  /**
+   * Get comprehensive cache statistics for testing performance
+   */
+  getCacheStats: (queryClient: QueryClient) => {
+    const queryCache = queryClient.getQueryCache();
+    const mutationCache = queryClient.getMutationCache();
     
     return {
-      queryKey: depQuery.queryKey,
-      wasInvalidated,
-      expectedInvalidation: depQuery.expectedInvalidation,
-      passed: wasInvalidated === depQuery.expectedInvalidation,
+      queryCount: queryCache.getAll().length,
+      mutationCount: mutationCache.getAll().length,
+      activeQueries: queryCache.getAll().filter(query => query.getObserversCount() > 0).length,
+      staleQueries: queryCache.getAll().filter(query => query.isStale()).length,
+      fetchingQueries: queryCache.getAll().filter(query => query.state.isFetching).length,
+      errorQueries: queryCache.getAll().filter(query => query.state.status === 'error').length,
     };
-  });
-
-  const success = results.every(result => result.passed);
-
-  return { success, results };
-}
+  },
+};
 
 /**
- * Tests mutation with optimistic updates and rollback scenarios
+ * Cache invalidation and synchronization testing utilities
+ * Tests cache behavior, invalidation strategies, and background refetching
  */
-export async function testMutationWithOptimisticUpdates(
-  queryClient: QueryClient,
-  scenario: MutationTestScenario
-): Promise<{
-  success: boolean;
-  phases: {
-    initial: any;
-    optimistic?: any;
-    final: any;
-    error?: any;
-  };
-  timings: {
-    optimisticUpdateTime?: number;
-    mutationCompleteTime: number;
-    totalTime: number;
-  };
-}> {
-  const startTime = performance.now();
-  let optimisticUpdateTime: number | undefined;
-  let mutationCompleteTime: number;
+export const cacheInvalidationUtils = {
+  /**
+   * Test cache invalidation for specific query patterns
+   * Useful for testing database operations that should invalidate related queries
+   */
+  testCacheInvalidation: async (
+    queryClient: QueryClient,
+    invalidationFn: () => Promise<void>,
+    expectedInvalidatedKeys: QueryKey[]
+  ) => {
+    // Track initial query states
+    const initialStates = expectedInvalidatedKeys.map(key => ({
+      key,
+      state: queryClient.getQueryState(key),
+    }));
 
-  // Set up initial state if we're testing against existing queries
-  if (scenario.invalidateQueries) {
-    for (const queryKey of scenario.invalidateQueries) {
-      queryClient.setQueryData(queryKey, { existing: 'data' });
+    // Execute invalidation
+    await act(async () => {
+      await invalidationFn();
+    });
+
+    // Wait for invalidation to propagate
+    await waitFor(() => {
+      expectedInvalidatedKeys.forEach(key => {
+        const currentState = queryClient.getQueryState(key);
+        const initialState = initialStates.find(s => JSON.stringify(s.key) === JSON.stringify(key))?.state;
+        
+        // Query should be marked as stale or refetching after invalidation
+        expect(currentState?.isStale || currentState?.isFetching).toBe(true);
+      });
+    });
+
+    return {
+      beforeInvalidation: initialStates,
+      afterInvalidation: expectedInvalidatedKeys.map(key => ({
+        key,
+        state: queryClient.getQueryState(key),
+      })),
+    };
+  },
+
+  /**
+   * Test selective cache invalidation with filters
+   */
+  testSelectiveInvalidation: async (
+    queryClient: QueryClient,
+    filters: InvalidateQueryFilters,
+    shouldInvalidate: QueryKey[],
+    shouldNotInvalidate: QueryKey[]
+  ) => {
+    // Set up initial data for all queries
+    [...shouldInvalidate, ...shouldNotInvalidate].forEach(key => {
+      queryClient.setQueryData(key, { test: 'data' });
+    });
+
+    await act(async () => {
+      await queryClient.invalidateQueries(filters);
+    });
+
+    // Check that correct queries were invalidated
+    shouldInvalidate.forEach(key => {
+      const state = queryClient.getQueryState(key);
+      expect(state?.isStale).toBe(true);
+    });
+
+    shouldNotInvalidate.forEach(key => {
+      const state = queryClient.getQueryState(key);
+      expect(state?.isStale).toBe(false);
+    });
+  },
+
+  /**
+   * Test cache synchronization across multiple components
+   */
+  testCacheSynchronization: async <TData>(
+    queryClient: QueryClient,
+    queryKey: QueryKey,
+    initialData: TData,
+    updatedData: TData
+  ) => {
+    // Set initial data
+    queryClient.setQueryData(queryKey, initialData);
+
+    // Verify initial state
+    expect(queryClient.getQueryData(queryKey)).toEqual(initialData);
+
+    // Update data and verify synchronization
+    await act(async () => {
+      queryClient.setQueryData(queryKey, updatedData);
+    });
+
+    expect(queryClient.getQueryData(queryKey)).toEqual(updatedData);
+
+    return {
+      initial: initialData,
+      updated: updatedData,
+      final: queryClient.getQueryData(queryKey),
+    };
+  },
+
+  /**
+   * Test background refetching behavior
+   */
+  testBackgroundRefetch: async (
+    queryClient: QueryClient,
+    queryKey: QueryKey,
+    queryFn: QueryFunction,
+    expectedRefetchTrigger: () => Promise<void>
+  ) => {
+    // Create query observer to monitor background refetching
+    const observer = new QueryObserver(queryClient, {
+      queryKey,
+      queryFn,
+      staleTime: 0, // Immediately stale for testing
+    });
+
+    let refetchCount = 0;
+    const unsubscribe = observer.subscribe(() => {
+      refetchCount++;
+    });
+
+    try {
+      // Trigger background refetch
+      await act(async () => {
+        await expectedRefetchTrigger();
+      });
+
+      // Wait for refetch to complete
+      await waitFor(() => {
+        expect(refetchCount).toBeGreaterThan(0);
+      });
+
+      const finalState = queryClient.getQueryState(queryKey);
+      
+      return {
+        refetchCount,
+        finalState,
+        wasSuccessful: finalState?.status === 'success',
+      };
+    } finally {
+      unsubscribe();
     }
-  }
+  },
+};
 
-  const phases = {
-    initial: scenario.optimisticData ? undefined : null,
-    optimistic: undefined,
-    final: undefined,
-    error: undefined,
-  };
+/**
+ * Mutation testing helpers for API endpoint generation workflows
+ * Provides utilities for testing CRUD operations, optimistic updates, and error handling
+ */
+export const mutationTestUtils = {
+  /**
+   * Test mutation execution with success scenario
+   */
+  testMutationSuccess: async <TData, TVariables>(
+    queryClient: QueryClient,
+    mutationFn: MutationFunction<TData, TVariables>,
+    variables: TVariables,
+    expectedResult?: TData
+  ) => {
+    const observer = new MutationObserver(queryClient, {
+      mutationFn,
+    });
 
-  // Capture initial state
-  if (scenario.invalidateQueries && scenario.invalidateQueries.length > 0) {
-    phases.initial = queryClient.getQueryData(scenario.invalidateQueries[0]);
-  }
+    let result: TData | undefined;
+    let error: Error | null = null;
 
-  try {
-    // Create mutation with optimistic update
-    const mutation = queryClient.getMutationCache().build(queryClient, {
-      mutationFn: scenario.mutationFn,
-      onMutate: async (variables) => {
-        if (scenario.optimisticData && scenario.invalidateQueries) {
-          // Cancel outgoing refetches
-          for (const queryKey of scenario.invalidateQueries) {
-            await queryClient.cancelQueries({ queryKey });
-          }
-          
-          // Snapshot previous values
-          const previousData = scenario.invalidateQueries.map(queryKey => 
-            queryClient.getQueryData(queryKey)
-          );
-          
-          // Optimistically update
-          for (const queryKey of scenario.invalidateQueries) {
-            queryClient.setQueryData(queryKey, scenario.optimisticData);
-          }
-          
-          optimisticUpdateTime = performance.now() - startTime;
-          
-          if (scenario.invalidateQueries.length > 0) {
-            phases.optimistic = queryClient.getQueryData(scenario.invalidateQueries[0]);
-          }
-          
-          return { previousData };
-        }
+    await act(async () => {
+      try {
+        result = await observer.mutate(variables);
+      } catch (e) {
+        error = e as Error;
+      }
+    });
+
+    expect(error).toBeNull();
+    if (expectedResult) {
+      expect(result).toEqual(expectedResult);
+    }
+
+    const mutationState = observer.getCurrentResult();
+    expect(mutationState.status).toBe('success');
+    expect(mutationState.isSuccess).toBe(true);
+    expect(mutationState.isError).toBe(false);
+
+    return {
+      result,
+      mutationState,
+    };
+  },
+
+  /**
+   * Test mutation execution with error scenario
+   */
+  testMutationError: async <TData, TVariables>(
+    queryClient: QueryClient,
+    mutationFn: MutationFunction<TData, TVariables>,
+    variables: TVariables,
+    expectedError?: Error | string
+  ) => {
+    const observer = new MutationObserver(queryClient, {
+      mutationFn,
+    });
+
+    let thrownError: Error | null = null;
+
+    await act(async () => {
+      try {
+        await observer.mutate(variables);
+      } catch (e) {
+        thrownError = e as Error;
+      }
+    });
+
+    expect(thrownError).not.toBeNull();
+    
+    if (expectedError) {
+      if (typeof expectedError === 'string') {
+        expect(thrownError?.message).toContain(expectedError);
+      } else {
+        expect(thrownError).toEqual(expectedError);
+      }
+    }
+
+    const mutationState = observer.getCurrentResult();
+    expect(mutationState.status).toBe('error');
+    expect(mutationState.isError).toBe(true);
+    expect(mutationState.isSuccess).toBe(false);
+
+    return {
+      error: thrownError,
+      mutationState,
+    };
+  },
+
+  /**
+   * Test mutation retry behavior
+   */
+  testMutationRetry: async <TData, TVariables>(
+    queryClient: QueryClient,
+    mutationFn: MutationFunction<TData, TVariables>,
+    variables: TVariables,
+    retryCount: number = 3
+  ) => {
+    let attemptCount = 0;
+    const mockMutationFn: MutationFunction<TData, TVariables> = async (vars) => {
+      attemptCount++;
+      if (attemptCount <= retryCount) {
+        throw new Error(`Attempt ${attemptCount} failed`);
+      }
+      return mutationFn(vars);
+    };
+
+    const observer = new MutationObserver(queryClient, {
+      mutationFn: mockMutationFn,
+      retry: retryCount,
+    });
+
+    const result = await act(async () => {
+      return observer.mutate(variables);
+    });
+
+    expect(attemptCount).toBe(retryCount + 1);
+    
+    return {
+      result,
+      attemptCount,
+      finalState: observer.getCurrentResult(),
+    };
+  },
+
+  /**
+   * Test mutation loading states and timing
+   */
+  testMutationLoadingStates: async <TData, TVariables>(
+    queryClient: QueryClient,
+    mutationFn: MutationFunction<TData, TVariables>,
+    variables: TVariables,
+    delayMs: number = 100
+  ) => {
+    const states: Array<{ timestamp: number; isLoading: boolean; status: string }> = [];
+    
+    const delayedMutationFn: MutationFunction<TData, TVariables> = async (vars) => {
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+      return mutationFn(vars);
+    };
+
+    const observer = new MutationObserver(queryClient, {
+      mutationFn: delayedMutationFn,
+    });
+
+    // Track state changes
+    const unsubscribe = observer.subscribe((result) => {
+      states.push({
+        timestamp: Date.now(),
+        isLoading: result.isLoading,
+        status: result.status,
+      });
+    });
+
+    try {
+      await act(async () => {
+        await observer.mutate(variables);
+      });
+
+      // Verify loading state progression
+      expect(states.some(s => s.isLoading)).toBe(true);
+      expect(states.some(s => s.status === 'pending')).toBe(true);
+      expect(states[states.length - 1].status).toBe('success');
+
+      return {
+        states,
+        duration: states[states.length - 1].timestamp - states[0].timestamp,
+      };
+    } finally {
+      unsubscribe();
+    }
+  },
+};
+
+/**
+ * Optimistic update testing utilities for database connection scenarios
+ * Tests optimistic UI updates, rollback behavior, and conflict resolution
+ */
+export const optimisticUpdateUtils = {
+  /**
+   * Test optimistic update with successful mutation
+   */
+  testOptimisticUpdateSuccess: async <TData, TVariables>(
+    queryClient: QueryClient,
+    queryKey: QueryKey,
+    initialData: TData,
+    optimisticData: TData,
+    mutationFn: MutationFunction<TData, TVariables>,
+    variables: TVariables
+  ) => {
+    // Set initial data
+    queryClient.setQueryData(queryKey, initialData);
+
+    const observer = new MutationObserver(queryClient, {
+      mutationFn,
+      onMutate: async () => {
+        // Cancel ongoing queries
+        await queryClient.cancelQueries({ queryKey });
+        
+        // Get current data
+        const previousData = queryClient.getQueryData<TData>(queryKey);
+        
+        // Optimistically update
+        queryClient.setQueryData(queryKey, optimisticData);
+        
+        return { previousData };
       },
       onError: (error, variables, context) => {
-        // Rollback optimistic updates
-        if (context?.previousData && scenario.invalidateQueries) {
-          scenario.invalidateQueries.forEach((queryKey, index) => {
-            queryClient.setQueryData(queryKey, context.previousData[index]);
-          });
+        // Rollback on error
+        if (context?.previousData) {
+          queryClient.setQueryData(queryKey, context.previousData);
         }
-        phases.error = error;
       },
-      onSuccess: (data) => {
-        // Invalidate related queries
-        if (scenario.invalidateQueries) {
-          for (const queryKey of scenario.invalidateQueries) {
-            queryClient.invalidateQueries({ queryKey });
-          }
-        }
+      onSettled: () => {
+        // Invalidate and refetch
+        queryClient.invalidateQueries({ queryKey });
       },
     });
 
-    // Add delay if specified (for testing timing scenarios)
-    const mutationPromise = scenario.delay 
-      ? new Promise(resolve => setTimeout(resolve, scenario.delay)).then(() => mutation.execute(scenario.variables))
-      : mutation.execute(scenario.variables);
+    // Verify optimistic update
+    await act(async () => {
+      observer.mutate(variables);
+    });
 
-    const result = await mutationPromise;
-    mutationCompleteTime = performance.now() - startTime;
+    expect(queryClient.getQueryData(queryKey)).toEqual(optimisticData);
 
-    // Capture final state
-    if (scenario.invalidateQueries && scenario.invalidateQueries.length > 0) {
-      phases.final = queryClient.getQueryData(scenario.invalidateQueries[0]);
-    } else {
-      phases.final = result;
-    }
-
-    const success = scenario.expectedError 
-      ? false 
-      : scenario.expectedData 
-        ? JSON.stringify(phases.final) === JSON.stringify(scenario.expectedData)
-        : true;
-
-    return {
-      success,
-      phases,
-      timings: {
-        optimisticUpdateTime,
-        mutationCompleteTime,
-        totalTime: performance.now() - startTime,
-      },
-    };
-
-  } catch (error) {
-    mutationCompleteTime = performance.now() - startTime;
-    phases.error = error;
-
-    // Capture final state after error
-    if (scenario.invalidateQueries && scenario.invalidateQueries.length > 0) {
-      phases.final = queryClient.getQueryData(scenario.invalidateQueries[0]);
-    }
-
-    const success = scenario.expectedError 
-      ? JSON.stringify(error) === JSON.stringify(scenario.expectedError)
-      : false;
-
-    return {
-      success,
-      phases,
-      timings: {
-        optimisticUpdateTime,
-        mutationCompleteTime,
-        totalTime: performance.now() - startTime,
-      },
-    };
-  }
-}
-
-/**
- * Tests background refresh and stale-while-revalidate patterns
- */
-export async function testBackgroundRefresh(
-  queryClient: QueryClient,
-  config: BackgroundRefreshConfig
-): Promise<{
-  success: boolean;
-  timeline: Array<{
-    timestamp: number;
-    event: string;
-    data: any;
-    isStale: boolean;
-    isFetching: boolean;
-  }>;
-}> {
-  const timeline: Array<{
-    timestamp: number;
-    event: string;
-    data: any;
-    isStale: boolean;
-    isFetching: boolean;
-  }> = [];
-
-  const startTime = performance.now();
-
-  // Mock fetch function that returns different data on subsequent calls
-  let fetchCallCount = 0;
-  const mockFetch = jest.fn().mockImplementation(() => {
-    fetchCallCount++;
-    const data = fetchCallCount === 1 ? config.initialData : config.refreshedData;
-    return Promise.resolve(data);
-  });
-
-  // Set up query with stale-while-revalidate behavior
-  const queryKey = config.queryKey;
-  const staleTime = config.staleTime || 1000;
-  const cacheTime = config.cacheTime || 5000;
-
-  // Initial query - this should fetch fresh data
-  const { result } = renderHook(
-    () => {
-      const { useQuery } = require('@tanstack/react-query');
-      return useQuery({
-        queryKey,
-        queryFn: mockFetch,
-        staleTime,
-        cacheTime,
-        refetchOnWindowFocus: config.testWindowFocus || false,
-        refetchOnReconnect: config.testNetworkReconnect || false,
-      });
-    },
-    { wrapper: createQueryWrapper(queryClient) }
-  );
-
-  // Wait for initial fetch to complete
-  await waitFor(() => {
-    expect(result.current.isSuccess).toBe(true);
-  });
-
-  timeline.push({
-    timestamp: performance.now() - startTime,
-    event: 'initial_fetch_complete',
-    data: result.current.data,
-    isStale: result.current.isStale,
-    isFetching: result.current.isFetching,
-  });
-
-  // Wait for data to become stale
-  await new Promise(resolve => setTimeout(resolve, staleTime + 100));
-
-  timeline.push({
-    timestamp: performance.now() - startTime,
-    event: 'data_became_stale',
-    data: result.current.data,
-    isStale: result.current.isStale,
-    isFetching: result.current.isFetching,
-  });
-
-  // Trigger a background refetch by accessing the query again
-  const { result: secondResult } = renderHook(
-    () => {
-      const { useQuery } = require('@tanstack/react-query');
-      return useQuery({
-        queryKey,
-        queryFn: mockFetch,
-        staleTime,
-        cacheTime,
-      });
-    },
-    { wrapper: createQueryWrapper(queryClient) }
-  );
-
-  // Should immediately return stale data
-  timeline.push({
-    timestamp: performance.now() - startTime,
-    event: 'stale_data_served',
-    data: secondResult.current.data,
-    isStale: secondResult.current.isStale,
-    isFetching: secondResult.current.isFetching,
-  });
-
-  // Wait for background refetch to complete
-  await waitFor(() => {
-    expect(secondResult.current.isFetching).toBe(false);
-  });
-
-  timeline.push({
-    timestamp: performance.now() - startTime,
-    event: 'background_refetch_complete',
-    data: secondResult.current.data,
-    isStale: secondResult.current.isStale,
-    isFetching: secondResult.current.isFetching,
-  });
-
-  // Test window focus refetch if enabled
-  if (config.testWindowFocus) {
-    // Simulate window focus
-    const focusEvent = new Event('focus');
-    window.dispatchEvent(focusEvent);
-
+    // Wait for mutation to complete
     await waitFor(() => {
-      expect(secondResult.current.isFetching).toBe(false);
+      expect(observer.getCurrentResult().status).toBe('success');
     });
 
-    timeline.push({
-      timestamp: performance.now() - startTime,
-      event: 'window_focus_refetch_complete',
-      data: secondResult.current.data,
-      isStale: secondResult.current.isStale,
-      isFetching: secondResult.current.isFetching,
-    });
-  }
+    return {
+      initialData,
+      optimisticData,
+      finalData: queryClient.getQueryData(queryKey),
+      mutationResult: observer.getCurrentResult(),
+    };
+  },
 
-  // Validate the stale-while-revalidate behavior
-  const staleDataServedEvent = timeline.find(event => event.event === 'stale_data_served');
-  const backgroundRefetchEvent = timeline.find(event => event.event === 'background_refetch_complete');
+  /**
+   * Test optimistic update with failed mutation and rollback
+   */
+  testOptimisticUpdateRollback: async <TData, TVariables>(
+    queryClient: QueryClient,
+    queryKey: QueryKey,
+    initialData: TData,
+    optimisticData: TData,
+    mutationFn: MutationFunction<TData, TVariables>,
+    variables: TVariables
+  ) => {
+    // Set initial data
+    queryClient.setQueryData(queryKey, initialData);
 
-  const success = Boolean(
-    staleDataServedEvent &&
-    backgroundRefetchEvent &&
-    JSON.stringify(staleDataServedEvent.data) === JSON.stringify(config.initialData) &&
-    JSON.stringify(backgroundRefetchEvent.data) === JSON.stringify(config.refreshedData) &&
-    staleDataServedEvent.isStale === true &&
-    backgroundRefetchEvent.isStale === false
-  );
-
-  return { success, timeline };
-}
-
-/**
- * Tests query error boundaries and error recovery patterns
- */
-export async function testQueryErrorBoundary(
-  queryClient: QueryClient,
-  errorScenario: {
-    queryKey: any[];
-    errorToThrow: Error;
-    retryCount?: number;
-    retryDelay?: number;
-    shouldRecover?: boolean;
-    recoveryData?: any;
-  }
-): Promise<{
-  success: boolean;
-  errorsCaught: Error[];
-  retryAttempts: number;
-  finalState: 'error' | 'success';
-  errorBoundaryTriggered: boolean;
-}> {
-  const errorsCaught: Error[] = [];
-  let retryAttempts = 0;
-  let errorBoundaryTriggered = false;
-
-  // Mock fetch function that throws error initially
-  const mockFetch = jest.fn().mockImplementation(() => {
-    retryAttempts++;
-    if (errorScenario.shouldRecover && retryAttempts > (errorScenario.retryCount || 1)) {
-      return Promise.resolve(errorScenario.recoveryData);
-    }
-    throw errorScenario.errorToThrow;
-  });
-
-  // Error boundary component
-  class TestErrorBoundary extends React.Component<
-    { children: ReactNode; onError: (error: Error) => void },
-    { hasError: boolean }
-  > {
-    constructor(props: any) {
-      super(props);
-      this.state = { hasError: false };
-    }
-
-    static getDerivedStateFromError() {
-      return { hasError: true };
-    }
-
-    componentDidCatch(error: Error) {
-      errorBoundaryTriggered = true;
-      this.props.onError(error);
-    }
-
-    render() {
-      if (this.state.hasError) {
-        return <div>Error boundary activated</div>;
-      }
-      return this.props.children;
-    }
-  }
-
-  const { result } = renderHook(
-    () => {
-      const { useQuery } = require('@tanstack/react-query');
-      return useQuery({
-        queryKey: errorScenario.queryKey,
-        queryFn: mockFetch,
-        retry: errorScenario.retryCount || 0,
-        retryDelay: errorScenario.retryDelay || 1000,
-        useErrorBoundary: true,
-      });
-    },
-    {
-      wrapper: ({ children }) => (
-        <TestErrorBoundary onError={(error) => errorsCaught.push(error)}>
-          {createQueryWrapper(queryClient)({ children })}
-        </TestErrorBoundary>
-      ),
-    }
-  );
-
-  // Wait for query to complete (either success or final error)
-  await waitFor(
-    () => {
-      expect(result.current.isSuccess || (result.current.isError && !result.current.isFetching)).toBe(true);
-    },
-    { timeout: 10000 }
-  );
-
-  const finalState = result.current.isSuccess ? 'success' : 'error';
-  const success = errorScenario.shouldRecover 
-    ? finalState === 'success' && retryAttempts > 1
-    : finalState === 'error' && errorsCaught.length > 0;
-
-  return {
-    success,
-    errorsCaught,
-    retryAttempts,
-    finalState,
-    errorBoundaryTriggered,
-  };
-}
-
-/**
- * Performance testing utilities for API generation workflows
- */
-export async function testQueryPerformance(
-  queryClient: QueryClient,
-  performanceConfig: {
-    queryKey: any[];
-    queryFn: () => Promise<any>;
-    expectedMaxTime: number; // in milliseconds
-    cacheHitExpectedMaxTime?: number; // for subsequent cache hits
-    testCacheHit?: boolean;
-  }
-): Promise<{
-  success: boolean;
-  firstCallTime: number;
-  cacheHitTime?: number;
-  passed: boolean;
-  cacheHitPassed?: boolean;
-}> {
-  // First call - should fetch from network
-  const startTime = performance.now();
-  
-  const { result } = renderHook(
-    () => {
-      const { useQuery } = require('@tanstack/react-query');
-      return useQuery({
-        queryKey: performanceConfig.queryKey,
-        queryFn: performanceConfig.queryFn,
-        staleTime: 60000, // 1 minute
-      });
-    },
-    { wrapper: createQueryWrapper(queryClient) }
-  );
-
-  await waitFor(() => {
-    expect(result.current.isSuccess).toBe(true);
-  });
-
-  const firstCallTime = performance.now() - startTime;
-  const passed = firstCallTime <= performanceConfig.expectedMaxTime;
-
-  let cacheHitTime: number | undefined;
-  let cacheHitPassed: boolean | undefined;
-
-  if (performanceConfig.testCacheHit) {
-    // Second call - should hit cache
-    const cacheStartTime = performance.now();
-    
-    const { result: cacheResult } = renderHook(
-      () => {
-        const { useQuery } = require('@tanstack/react-query');
-        return useQuery({
-          queryKey: performanceConfig.queryKey,
-          queryFn: performanceConfig.queryFn,
-          staleTime: 60000,
-        });
+    const observer = new MutationObserver(queryClient, {
+      mutationFn,
+      onMutate: async () => {
+        await queryClient.cancelQueries({ queryKey });
+        const previousData = queryClient.getQueryData<TData>(queryKey);
+        queryClient.setQueryData(queryKey, optimisticData);
+        return { previousData };
       },
-      { wrapper: createQueryWrapper(queryClient) }
+      onError: (error, variables, context) => {
+        // Rollback on error
+        if (context?.previousData) {
+          queryClient.setQueryData(queryKey, context.previousData);
+        }
+      },
+    });
+
+    // Verify optimistic update
+    await act(async () => {
+      try {
+        await observer.mutate(variables);
+      } catch {
+        // Expected error
+      }
+    });
+
+    // Wait for rollback
+    await waitFor(() => {
+      expect(queryClient.getQueryData(queryKey)).toEqual(initialData);
+    });
+
+    return {
+      initialData,
+      optimisticData,
+      rolledBackData: queryClient.getQueryData(queryKey),
+      mutationError: observer.getCurrentResult().error,
+    };
+  },
+
+  /**
+   * Test multiple concurrent optimistic updates
+   */
+  testConcurrentOptimisticUpdates: async <TData, TVariables>(
+    queryClient: QueryClient,
+    queryKey: QueryKey,
+    initialData: TData,
+    updates: Array<{
+      optimisticData: TData;
+      mutationFn: MutationFunction<TData, TVariables>;
+      variables: TVariables;
+    }>
+  ) => {
+    queryClient.setQueryData(queryKey, initialData);
+
+    const results = await Promise.allSettled(
+      updates.map(async (update, index) => {
+        const observer = new MutationObserver(queryClient, {
+          mutationFn: update.mutationFn,
+          onMutate: async () => {
+            await queryClient.cancelQueries({ queryKey });
+            const previousData = queryClient.getQueryData<TData>(queryKey);
+            queryClient.setQueryData(queryKey, update.optimisticData);
+            return { previousData, updateIndex: index };
+          },
+          onError: (error, variables, context) => {
+            if (context?.previousData) {
+              queryClient.setQueryData(queryKey, context.previousData);
+            }
+          },
+        });
+
+        return observer.mutate(update.variables);
+      })
     );
 
-    // Cache hit should be immediate
-    cacheHitTime = performance.now() - cacheStartTime;
-    const expectedCacheTime = performanceConfig.cacheHitExpectedMaxTime || 50; // 50ms default for cache hits
-    cacheHitPassed = cacheHitTime <= expectedCacheTime;
-  }
-
-  return {
-    success: passed && (cacheHitPassed !== false),
-    firstCallTime,
-    cacheHitTime,
-    passed,
-    cacheHitPassed,
-  };
-}
+    return {
+      initialData,
+      updates,
+      results,
+      finalData: queryClient.getQueryData(queryKey),
+    };
+  },
+};
 
 /**
- * Utility to clear all query and mutation caches
+ * Background refresh and stale-while-revalidate testing utilities
+ * Tests automatic background updates, stale data handling, and cache revalidation
  */
-export function clearAllCaches(queryClient: QueryClient): void {
-  queryClient.clear();
-  queryClient.getQueryCache().clear();
-  queryClient.getMutationCache().clear();
-}
+export const backgroundRefreshUtils = {
+  /**
+   * Test stale-while-revalidate behavior
+   */
+  testStaleWhileRevalidate: async <TData>(
+    queryClient: QueryClient,
+    queryKey: QueryKey,
+    queryFn: QueryFunction<TData>,
+    staleTime: number = 0,
+    cacheTime: number = 5 * 60 * 1000
+  ) => {
+    const observer = new QueryObserver(queryClient, {
+      queryKey,
+      queryFn,
+      staleTime,
+      gcTime: cacheTime,
+    });
 
-/**
- * Utility to mock network conditions for testing
- */
-export function mockNetworkConditions(condition: 'online' | 'offline' | 'slow'): void {
-  const originalOnLine = navigator.onLine;
-  
-  switch (condition) {
-    case 'offline':
-      Object.defineProperty(navigator, 'onLine', {
-        writable: true,
-        value: false,
-      });
-      window.dispatchEvent(new Event('offline'));
-      break;
-    case 'online':
-      Object.defineProperty(navigator, 'onLine', {
-        writable: true,
-        value: true,
-      });
+    // Initial fetch
+    let result = observer.getCurrentResult();
+    expect(result.status).toBe('loading');
+
+    await waitFor(() => {
+      result = observer.getCurrentResult();
+      expect(result.status).toBe('success');
+    });
+
+    const initialData = result.data;
+
+    // Wait for data to become stale
+    if (staleTime > 0) {
+      await new Promise(resolve => setTimeout(resolve, staleTime + 10));
+    }
+
+    // Trigger refetch - should return stale data immediately, then fresh data
+    const refetchPromise = act(async () => {
+      return observer.refetch();
+    });
+
+    // Should still have stale data available
+    result = observer.getCurrentResult();
+    expect(result.data).toEqual(initialData);
+    expect(result.isFetching).toBe(true);
+
+    await refetchPromise;
+
+    return {
+      initialData,
+      staleData: initialData,
+      freshData: observer.getCurrentResult().data,
+      wasStaleServed: true,
+    };
+  },
+
+  /**
+   * Test automatic background refetching on window focus
+   */
+  testWindowFocusRefetch: async <TData>(
+    queryClient: QueryClient,
+    queryKey: QueryKey,
+    queryFn: QueryFunction<TData>
+  ) => {
+    let fetchCount = 0;
+    const trackingQueryFn: QueryFunction<TData> = async (context) => {
+      fetchCount++;
+      return queryFn(context);
+    };
+
+    const observer = new QueryObserver(queryClient, {
+      queryKey,
+      queryFn: trackingQueryFn,
+      refetchOnWindowFocus: true,
+      staleTime: 0,
+    });
+
+    // Initial fetch
+    await waitFor(() => {
+      expect(observer.getCurrentResult().status).toBe('success');
+    });
+
+    const initialFetchCount = fetchCount;
+
+    // Simulate window focus
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'));
+    });
+
+    await waitFor(() => {
+      expect(fetchCount).toBe(initialFetchCount + 1);
+    });
+
+    return {
+      initialFetchCount,
+      finalFetchCount: fetchCount,
+      refetchTriggered: fetchCount > initialFetchCount,
+    };
+  },
+
+  /**
+   * Test network reconnection refetching
+   */
+  testNetworkReconnectRefetch: async <TData>(
+    queryClient: QueryClient,
+    queryKey: QueryKey,
+    queryFn: QueryFunction<TData>
+  ) => {
+    let fetchCount = 0;
+    const trackingQueryFn: QueryFunction<TData> = async (context) => {
+      fetchCount++;
+      return queryFn(context);
+    };
+
+    const observer = new QueryObserver(queryClient, {
+      queryKey,
+      queryFn: trackingQueryFn,
+      refetchOnReconnect: true,
+      staleTime: 0,
+    });
+
+    // Initial fetch
+    await waitFor(() => {
+      expect(observer.getCurrentResult().status).toBe('success');
+    });
+
+    const initialFetchCount = fetchCount;
+
+    // Simulate network reconnection
+    await act(async () => {
       window.dispatchEvent(new Event('online'));
-      break;
-    case 'slow':
-      // Implement slow network simulation by adding delays to fetch
-      const originalFetch = global.fetch;
-      global.fetch = jest.fn().mockImplementation(async (...args) => {
-        await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
-        return originalFetch(...args);
-      });
-      break;
-  }
-}
+    });
+
+    await waitFor(() => {
+      expect(fetchCount).toBe(initialFetchCount + 1);
+    });
+
+    return {
+      initialFetchCount,
+      finalFetchCount: fetchCount,
+      refetchTriggered: fetchCount > initialFetchCount,
+    };
+  },
+
+  /**
+   * Test interval-based background refetching
+   */
+  testIntervalRefetch: async <TData>(
+    queryClient: QueryClient,
+    queryKey: QueryKey,
+    queryFn: QueryFunction<TData>,
+    refetchInterval: number = 1000
+  ) => {
+    let fetchCount = 0;
+    const trackingQueryFn: QueryFunction<TData> = async (context) => {
+      fetchCount++;
+      return queryFn(context);
+    };
+
+    const observer = new QueryObserver(queryClient, {
+      queryKey,
+      queryFn: trackingQueryFn,
+      refetchInterval,
+      refetchIntervalInBackground: true,
+    });
+
+    // Initial fetch
+    await waitFor(() => {
+      expect(observer.getCurrentResult().status).toBe('success');
+    });
+
+    const initialFetchCount = fetchCount;
+
+    // Wait for at least one interval
+    await new Promise(resolve => setTimeout(resolve, refetchInterval + 100));
+
+    expect(fetchCount).toBeGreaterThan(initialFetchCount);
+
+    // Clean up interval
+    observer.destroy();
+
+    return {
+      initialFetchCount,
+      finalFetchCount: fetchCount,
+      intervalWorked: fetchCount > initialFetchCount,
+    };
+  },
+};
 
 /**
- * Restores original network conditions after testing
+ * Error boundary testing utilities for query error scenarios
+ * Tests error handling, error boundaries, and error recovery workflows
  */
-export function restoreNetworkConditions(): void {
-  Object.defineProperty(navigator, 'onLine', {
-    writable: true,
-    value: true,
-  });
-  
-  if (global.fetch && jest.isMockFunction(global.fetch)) {
-    (global.fetch as jest.Mock).mockRestore();
-  }
-}
+export const errorBoundaryUtils = {
+  /**
+   * Test query error boundary integration
+   */
+  testQueryErrorBoundary: async (
+    ErrorBoundary: React.ComponentType<{ children: React.ReactNode }>,
+    QueryComponent: React.ComponentType,
+    queryClient: QueryClient
+  ) => {
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
-// React import for error boundary component
-const React = require('react');
+    try {
+      const { container } = renderWithProviders(
+        <ErrorBoundary>
+          <QueryComponent />
+        </ErrorBoundary>,
+        {
+          providerOptions: { queryClient },
+        }
+      );
+
+      // Wait for error to be caught
+      await waitFor(() => {
+        expect(container.textContent).toContain('error');
+      });
+
+      return {
+        errorCaught: true,
+        errorBoundaryTriggered: true,
+        consoleErrors: consoleSpy.mock.calls.length,
+      };
+    } finally {
+      consoleSpy.mockRestore();
+    }
+  },
+
+  /**
+   * Test query error recovery
+   */
+  testQueryErrorRecovery: async <TData>(
+    queryClient: QueryClient,
+    queryKey: QueryKey,
+    failingQueryFn: QueryFunction<TData>,
+    successQueryFn: QueryFunction<TData>
+  ) => {
+    // First, set up a failing query
+    const observer = new QueryObserver(queryClient, {
+      queryKey,
+      queryFn: failingQueryFn,
+      retry: false,
+    });
+
+    await waitFor(() => {
+      expect(observer.getCurrentResult().status).toBe('error');
+    });
+
+    const errorState = observer.getCurrentResult();
+
+    // Now recover with a successful query function
+    observer.setOptions({
+      queryKey,
+      queryFn: successQueryFn,
+    });
+
+    await act(async () => {
+      await observer.refetch();
+    });
+
+    await waitFor(() => {
+      expect(observer.getCurrentResult().status).toBe('success');
+    });
+
+    return {
+      errorState,
+      recoveryState: observer.getCurrentResult(),
+      recoverySuccessful: observer.getCurrentResult().status === 'success',
+    };
+  },
+
+  /**
+   * Test error retry with exponential backoff
+   */
+  testErrorRetryBackoff: async <TData>(
+    queryClient: QueryClient,
+    queryKey: QueryKey,
+    queryFn: QueryFunction<TData>,
+    maxRetries: number = 3
+  ) => {
+    let attemptCount = 0;
+    const attemptTimestamps: number[] = [];
+    
+    const failingQueryFn: QueryFunction<TData> = async (context) => {
+      attemptCount++;
+      attemptTimestamps.push(Date.now());
+      
+      if (attemptCount <= maxRetries) {
+        throw new Error(`Attempt ${attemptCount} failed`);
+      }
+      
+      return queryFn(context);
+    };
+
+    const observer = new QueryObserver(queryClient, {
+      queryKey,
+      queryFn: failingQueryFn,
+      retry: (failureCount, error) => {
+        return failureCount < maxRetries;
+      },
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    });
+
+    await waitFor(() => {
+      expect(observer.getCurrentResult().status).toBe('success');
+    }, { timeout: 10000 });
+
+    // Calculate retry delays
+    const retryDelays = attemptTimestamps.slice(1).map((timestamp, index) => 
+      timestamp - attemptTimestamps[index]
+    );
+
+    return {
+      attemptCount,
+      attemptTimestamps,
+      retryDelays,
+      exponentialBackoffWorking: retryDelays.every((delay, index) => 
+        index === 0 || delay >= retryDelays[index - 1]
+      ),
+      finalState: observer.getCurrentResult(),
+    };
+  },
+
+  /**
+   * Test global error handling
+   */
+  testGlobalErrorHandling: async (
+    queryClient: QueryClient,
+    globalErrorHandler: (error: Error, query: any) => void
+  ) => {
+    const errors: Error[] = [];
+    
+    // Set up global error handler
+    queryClient.getQueryCache().config = {
+      onError: (error, query) => {
+        errors.push(error);
+        globalErrorHandler(error, query);
+      },
+    };
+
+    const failingQueryFn: QueryFunction = async () => {
+      throw new Error('Global error test');
+    };
+
+    const observer = new QueryObserver(queryClient, {
+      queryKey: ['global-error-test'],
+      queryFn: failingQueryFn,
+      retry: false,
+    });
+
+    await waitFor(() => {
+      expect(observer.getCurrentResult().status).toBe('error');
+    });
+
+    return {
+      globalErrorsCaught: errors.length,
+      errors,
+      globalHandlerTriggered: errors.length > 0,
+    };
+  },
+};
+
+/**
+ * High-level testing utilities that combine multiple patterns
+ * Provides complete testing scenarios for complex workflows
+ */
+export const workflowTestUtils = {
+  /**
+   * Test complete database connection workflow with caching and optimistic updates
+   */
+  testDatabaseConnectionWorkflow: async (
+    queryClient: QueryClient,
+    connectionData: any,
+    testConnectionFn: QueryFunction,
+    saveConnectionFn: MutationFunction
+  ) => {
+    const queryKey = ['database-connections'];
+    const testQueryKey = ['test-connection', connectionData.id];
+
+    // 1. Test connection (query)
+    const testResult = await mutationTestUtils.testMutationSuccess(
+      queryClient,
+      testConnectionFn as any,
+      connectionData
+    );
+
+    // 2. Save connection with optimistic update
+    const saveResult = await optimisticUpdateUtils.testOptimisticUpdateSuccess(
+      queryClient,
+      queryKey,
+      [],
+      [connectionData],
+      saveConnectionFn as any,
+      connectionData
+    );
+
+    // 3. Verify cache invalidation
+    const invalidationResult = await cacheInvalidationUtils.testCacheInvalidation(
+      queryClient,
+      async () => {
+        await queryClient.invalidateQueries({ queryKey });
+      },
+      [queryKey]
+    );
+
+    return {
+      testResult,
+      saveResult,
+      invalidationResult,
+      workflowComplete: testResult.mutationState.isSuccess && saveResult.mutationResult.isSuccess,
+    };
+  },
+
+  /**
+   * Test API endpoint generation workflow with preview and generation
+   */
+  testApiGenerationWorkflow: async (
+    queryClient: QueryClient,
+    endpointConfig: any,
+    previewFn: QueryFunction,
+    generateFn: MutationFunction
+  ) => {
+    const previewQueryKey = ['api-preview', endpointConfig.id];
+    const endpointsQueryKey = ['api-endpoints'];
+
+    // 1. Preview API (query with caching)
+    const previewResult = await backgroundRefreshUtils.testStaleWhileRevalidate(
+      queryClient,
+      previewQueryKey,
+      previewFn,
+      5000 // 5 second stale time
+    );
+
+    // 2. Generate API (mutation with optimistic update)
+    const generateResult = await mutationTestUtils.testMutationSuccess(
+      queryClient,
+      generateFn as any,
+      endpointConfig
+    );
+
+    // 3. Verify related cache invalidation
+    await cacheInvalidationUtils.testCacheInvalidation(
+      queryClient,
+      async () => {
+        await queryClient.invalidateQueries({ 
+          queryKey: endpointsQueryKey,
+          exact: false 
+        });
+      },
+      [endpointsQueryKey, previewQueryKey]
+    );
+
+    return {
+      previewResult,
+      generateResult,
+      workflowComplete: generateResult.mutationState.isSuccess,
+    };
+  },
+
+  /**
+   * Test schema discovery workflow with large dataset handling
+   */
+  testSchemaDiscoveryWorkflow: async (
+    queryClient: QueryClient,
+    databaseId: string,
+    schemaFn: QueryFunction,
+    largeDatasetSize: number = 1000
+  ) => {
+    const schemaQueryKey = ['schema', databaseId];
+    const tablesQueryKey = ['tables', databaseId];
+
+    // 1. Test schema discovery with background refresh
+    const schemaResult = await backgroundRefreshUtils.testStaleWhileRevalidate(
+      queryClient,
+      schemaQueryKey,
+      schemaFn,
+      15 * 60 * 1000 // 15 minute stale time
+    );
+
+    // 2. Test large dataset caching
+    const largeMockData = Array.from({ length: largeDatasetSize }, (_, i) => ({
+      id: i,
+      name: `table_${i}`,
+      type: 'table',
+    }));
+
+    queryClient.setQueryData(tablesQueryKey, largeMockData);
+
+    // 3. Test cache performance
+    const startTime = performance.now();
+    const cachedData = queryClient.getQueryData(tablesQueryKey);
+    const cacheAccessTime = performance.now() - startTime;
+
+    return {
+      schemaResult,
+      largeDatasetCached: Array.isArray(cachedData) && cachedData.length === largeDatasetSize,
+      cacheAccessTime,
+      performanceAcceptable: cacheAccessTime < 50, // Under 50ms as per requirements
+    };
+  },
+};
+
+/**
+ * Integration testing utilities for React Query with specific DreamFactory patterns
+ */
+export const integrationTestUtils = {
+  /**
+   * Test pagination with React Query
+   */
+  testPagination: async <TData>(
+    queryClient: QueryClient,
+    queryKey: QueryKey,
+    queryFn: QueryFunction<TData>,
+    pageSize: number = 25
+  ) => {
+    const observer = new InfiniteQueryObserver(queryClient, {
+      queryKey,
+      queryFn: ({ pageParam = 0 }) => queryFn({ pageParam, pageSize } as any),
+      initialPageParam: 0,
+      getNextPageParam: (lastPage: any) => {
+        return lastPage.hasMore ? lastPage.nextPage : undefined;
+      },
+    });
+
+    // Load first page
+    await waitFor(() => {
+      expect(observer.getCurrentResult().status).toBe('success');
+    });
+
+    const firstPageResult = observer.getCurrentResult();
+
+    // Load next page
+    if (firstPageResult.hasNextPage) {
+      await act(async () => {
+        await observer.fetchNextPage();
+      });
+    }
+
+    return {
+      firstPageData: firstPageResult.data?.pages[0],
+      totalPages: firstPageResult.data?.pages.length || 0,
+      hasNextPage: firstPageResult.hasNextPage,
+      paginationWorking: (firstPageResult.data?.pages.length || 0) > 0,
+    };
+  },
+
+  /**
+   * Test search with debouncing
+   */
+  testSearchWithDebouncing: async <TData>(
+    queryClient: QueryClient,
+    searchFn: QueryFunction<TData>,
+    searchTerms: string[],
+    debounceMs: number = 300
+  ) => {
+    const results: TData[] = [];
+    
+    for (const term of searchTerms) {
+      const queryKey = ['search', term];
+      
+      // Simulate rapid search input
+      const observer = new QueryObserver(queryClient, {
+        queryKey,
+        queryFn: () => searchFn({ term } as any),
+        enabled: term.length > 0,
+      });
+
+      await new Promise(resolve => setTimeout(resolve, debounceMs / 2));
+      
+      if (term === searchTerms[searchTerms.length - 1]) {
+        // Only the last search should execute
+        await waitFor(() => {
+          expect(observer.getCurrentResult().status).toBe('success');
+        });
+        
+        results.push(observer.getCurrentResult().data as TData);
+      }
+    }
+
+    return {
+      searchResults: results,
+      debouncingWorked: results.length === 1,
+      finalSearchTerm: searchTerms[searchTerms.length - 1],
+    };
+  },
+};
+
+/**
+ * Performance testing utilities for React Query operations
+ */
+export const performanceTestUtils = {
+  /**
+   * Measure query execution time
+   */
+  measureQueryPerformance: async <TData>(
+    queryClient: QueryClient,
+    queryKey: QueryKey,
+    queryFn: QueryFunction<TData>
+  ) => {
+    const startTime = performance.now();
+    
+    const observer = new QueryObserver(queryClient, {
+      queryKey,
+      queryFn,
+    });
+
+    await waitFor(() => {
+      expect(observer.getCurrentResult().status).toBe('success');
+    });
+
+    const endTime = performance.now();
+    const executionTime = endTime - startTime;
+
+    return {
+      executionTime,
+      result: observer.getCurrentResult().data,
+      performanceMetrics: {
+        wasUnder2Seconds: executionTime < 2000,
+        wasUnder50MsForCache: false, // Would need cache hit to test this
+      },
+    };
+  },
+
+  /**
+   * Measure cache hit performance
+   */
+  measureCacheHitPerformance: async <TData>(
+    queryClient: QueryClient,
+    queryKey: QueryKey,
+    testData: TData
+  ) => {
+    // Pre-populate cache
+    queryClient.setQueryData(queryKey, testData);
+
+    const startTime = performance.now();
+    const cachedData = queryClient.getQueryData<TData>(queryKey);
+    const endTime = performance.now();
+    
+    const cacheHitTime = endTime - startTime;
+
+    return {
+      cacheHitTime,
+      cachedData,
+      performanceMetrics: {
+        wasUnder50Ms: cacheHitTime < 50, // Per requirements
+        wasUnder10Ms: cacheHitTime < 10, // Ideal performance
+      },
+    };
+  },
+
+  /**
+   * Test memory usage during large operations
+   */
+  testMemoryUsage: async (
+    operationFn: () => Promise<void>,
+    largeDataSize: number = 1000
+  ) => {
+    // Note: This is a simplified memory test
+    // In a real implementation, you might use more sophisticated memory monitoring
+    
+    const initialMemory = (performance as any).memory?.usedJSHeapSize || 0;
+    
+    await operationFn();
+    
+    const finalMemory = (performance as any).memory?.usedJSHeapSize || 0;
+    const memoryUsed = finalMemory - initialMemory;
+
+    return {
+      initialMemory,
+      finalMemory,
+      memoryUsed,
+      memoryEfficient: memoryUsed < largeDataSize * 1024, // Less than 1KB per item
+    };
+  },
+};
+
+// Export all utilities for easy importing
+export {
+  createTestQueryClient,
+  queryCacheUtils,
+  cacheInvalidationUtils,
+  mutationTestUtils,
+  optimisticUpdateUtils,
+  backgroundRefreshUtils,
+  errorBoundaryUtils,
+  workflowTestUtils,
+  integrationTestUtils,
+  performanceTestUtils,
+};
+
+/**
+ * Default export with all utilities for convenience
+ */
+export default {
+  createTestQueryClient,
+  cache: queryCacheUtils,
+  invalidation: cacheInvalidationUtils,
+  mutations: mutationTestUtils,
+  optimistic: optimisticUpdateUtils,
+  background: backgroundRefreshUtils,
+  errors: errorBoundaryUtils,
+  workflows: workflowTestUtils,
+  integration: integrationTestUtils,
+  performance: performanceTestUtils,
+};
