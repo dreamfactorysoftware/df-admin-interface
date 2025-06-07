@@ -1,529 +1,414 @@
 /**
- * React Hook for Storage Path Validation Logic
+ * Storage Path Validation Hook for Script Editor
  * 
- * Manages storage path validation logic and form control integration for the script editor.
- * Handles the dynamic validation requirements where storage path becomes required when a 
- * storage service is selected, replicating the Angular component's FormControl validation 
- * patterns with React Hook Form.
+ * React hook for managing storage path validation logic and form control integration.
+ * Handles dynamic validation requirements where storage path becomes required when a 
+ * storage service is selected, replicating the Angular component's FormControl 
+ * validation patterns with React Hook Form.
  * 
- * Key Features:
- * - Dynamic validation rules based on storage service selection
- * - Real-time validation feedback under 100ms requirement
- * - Automatic form field reset behavior on service changes
- * - TypeScript 5.8+ strict typing with Zod schema integration
- * - React Hook Form integration with error state management
+ * Key features:
+ * - Dynamic validation where storagePath becomes required when storageServiceId is selected
+ * - Automatic form field reset behavior when storage service selection changes
+ * - Real-time validation under 100ms requirement per React/Next.js integration standards
+ * - Integration with Zod schema validation for type-safe form validation patterns
+ * - Comprehensive error state management with user-friendly validation messages
  * 
- * @fileoverview Storage validation hook for script editor form integration
+ * @fileoverview Storage validation hook for React Hook Form integration
  * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-import { useCallback, useEffect, useMemo } from 'react';
-import { type UseFormReturn, type FieldValues, type Path } from 'react-hook-form';
-import { z } from 'zod';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { 
-  type ScriptEditorFormData, 
-  type StorageService,
-  type StoragePathValidation 
-} from '../types';
-
-// =============================================================================
-// TYPE DEFINITIONS
-// =============================================================================
+  type UseFormSetValue, 
+  type UseFormClearErrors, 
+  type UseFormSetError, 
+  type UseFormTrigger,
+  type UseFormWatch,
+  type FieldErrors,
+  type FieldValues,
+  type Path
+} from 'react-hook-form';
+import { z } from 'zod';
+import type { 
+  EnhancedValidationState, 
+  FormFieldValidation,
+  FormFieldError 
+} from '@/types/forms';
+import type { StorageService } from '../types';
 
 /**
- * Configuration options for the useStorageValidation hook
+ * Storage validation configuration interface
  */
-export interface UseStorageValidationConfig {
-  /** React Hook Form instance for form integration */
-  form: UseFormReturn<ScriptEditorFormData>;
-  /** Available storage services for validation context */
-  storageServices?: StorageService[];
-  /** Custom validation rules for storage paths */
-  pathValidation?: StoragePathValidation;
-  /** Debounce time for validation in milliseconds (default: 100ms) */
-  debounceTime?: number;
+export interface StorageValidationConfig {
   /** Enable real-time validation (default: true) */
   realTimeValidation?: boolean;
-  /** Custom error messages */
-  errorMessages?: {
-    pathRequired?: string;
-    pathInvalid?: string;
-    serviceRequired?: string;
+  /** Validation debounce delay in milliseconds (default: 100) */
+  debounceMs?: number;
+  /** Custom validation messages */
+  messages?: {
+    storagePathRequired?: string;
+    storagePathInvalid?: string;
+    storageServiceRequired?: string;
   };
+  /** Maximum path length validation */
+  maxPathLength?: number;
+  /** Allow empty path when no storage service selected */
+  allowEmptyPath?: boolean;
 }
 
 /**
- * Validation result interface for storage path validation
+ * Storage validation form fields interface
  */
-export interface StorageValidationResult {
-  /** Whether the storage path is valid */
-  isValid: boolean;
-  /** Validation error message if invalid */
-  error?: string;
-  /** Validation error code for programmatic handling */
-  errorCode?: StorageValidationErrorCode;
+export interface StorageValidationFields extends FieldValues {
+  /** Storage service ID field */
+  storageServiceId: string | null;
+  /** Storage path field */
+  storagePath: string;
 }
 
 /**
- * Storage validation error codes for specific error handling
+ * Storage validation return interface
  */
-export type StorageValidationErrorCode = 
-  | 'STORAGE_PATH_REQUIRED'
-  | 'STORAGE_PATH_INVALID'
-  | 'STORAGE_PATH_TOO_LONG'
-  | 'STORAGE_PATH_TOO_SHORT'
-  | 'STORAGE_PATH_FORBIDDEN_PATTERN'
-  | 'STORAGE_SERVICE_REQUIRED';
-
-/**
- * Return type for the useStorageValidation hook
- */
-export interface UseStorageValidationReturn {
+export interface UseStorageValidationReturn<T extends StorageValidationFields = StorageValidationFields> {
+  /** Validation schema for storage fields */
+  validationSchema: z.ZodObject<{
+    storageServiceId: z.ZodNullable<z.ZodString>;
+    storagePath: z.ZodString;
+  }>;
+  
+  /** Validate storage path field manually */
+  validateStoragePath: () => Promise<boolean>;
+  
+  /** Check if storage path is required based on service selection */
+  isStoragePathRequired: boolean;
+  
   /** Current validation state for storage path */
-  validationState: {
-    isValid: boolean;
-    error?: string;
-    errorCode?: StorageValidationErrorCode;
-    isDirty: boolean;
-    isTouched: boolean;
+  storagePathValidationState: EnhancedValidationState;
+  
+  /** Handle storage service change with automatic validation */
+  handleStorageServiceChange: (serviceId: string | null) => void;
+  
+  /** Handle storage path change with validation */
+  handleStoragePathChange: (path: string) => void;
+  
+  /** Get storage validation error messages */
+  getValidationErrors: () => {
+    storageServiceId?: FormFieldError;
+    storagePath?: FormFieldError;
   };
   
-  /** Validation utilities and methods */
-  validation: {
-    /** Validate storage path based on current service selection */
-    validateStoragePath: (path?: string, serviceId?: string) => StorageValidationResult;
-    /** Clear validation errors */
-    clearValidationErrors: () => void;
-    /** Reset form fields related to storage */
-    resetStorageFields: () => void;
-    /** Check if storage path is required based on service selection */
-    isStoragePathRequired: () => boolean;
-  };
+  /** Reset storage validation state */
+  resetValidation: () => void;
   
-  /** Form field state management */
-  fieldState: {
-    /** Whether storage path field should be enabled */
-    isStoragePathEnabled: boolean;
-    /** Whether storage path field should be required */
-    isStoragePathRequired: boolean;
-    /** Current storage service selection */
-    selectedServiceId?: string;
-    /** Current storage path value */
-    storagePath?: string;
-  };
-  
-  /** Event handlers for form integration */
-  handlers: {
-    /** Handle storage service selection change */
-    onStorageServiceChange: (serviceId: string | null) => void;
-    /** Handle storage path change */
-    onStoragePathChange: (path: string) => void;
-    /** Handle form field focus events */
-    onFieldFocus: (fieldName: 'storageServiceId' | 'storagePath') => void;
-    /** Handle form field blur events */
-    onFieldBlur: (fieldName: 'storageServiceId' | 'storagePath') => void;
+  /** Current validation performance metrics */
+  validationMetrics: {
+    lastValidationTime: number;
+    averageValidationTime: number;
+    totalValidations: number;
   };
 }
 
-// =============================================================================
-// VALIDATION SCHEMAS
-// =============================================================================
-
 /**
- * Dynamic Zod schema for storage path validation
- * Creates a validation schema that adapts based on storage service selection
+ * Storage path validation hook implementation
+ * 
+ * Provides dynamic validation logic where storage path becomes required when
+ * a storage service is selected. Integrates with React Hook Form patterns
+ * and maintains compatibility with the original Angular component behavior.
+ * 
+ * @param params Hook configuration parameters
+ * @returns Storage validation utilities and state
  */
-const createStoragePathSchema = (
-  storageServiceId?: string,
-  pathValidation?: StoragePathValidation,
-  errorMessages?: UseStorageValidationConfig['errorMessages']
-) => {
-  // Base storage path schema
-  let pathSchema = z.string();
+export function useStorageValidation<T extends StorageValidationFields = StorageValidationFields>({
+  watch,
+  setValue,
+  clearErrors,
+  setError,
+  trigger,
+  errors = {},
+  storageServices = [],
+  config = {}
+}: {
+  /** React Hook Form watch function */
+  watch: UseFormWatch<T>;
+  /** React Hook Form setValue function */
+  setValue: UseFormSetValue<T>;
+  /** React Hook Form clearErrors function */
+  clearErrors: UseFormClearErrors<T>;
+  /** React Hook Form setError function */
+  setError: UseFormSetError<T>;
+  /** React Hook Form trigger function */
+  trigger: UseFormTrigger<T>;
+  /** Current form errors */
+  errors?: FieldErrors<T>;
+  /** Available storage services */
+  storageServices?: StorageService[];
+  /** Validation configuration */
+  config?: StorageValidationConfig;
+}): UseStorageValidationReturn<T> {
   
-  // Apply conditional required validation based on service selection
-  if (storageServiceId) {
-    pathSchema = pathSchema
-      .min(1, errorMessages?.pathRequired || 'Storage path is required when a storage service is selected');
-    
-    // Apply additional validation rules if provided
-    if (pathValidation) {
-      // Minimum length validation
-      if (pathValidation.minLength) {
-        pathSchema = pathSchema.min(
-          pathValidation.minLength,
-          `Storage path must be at least ${pathValidation.minLength} characters`
-        );
-      }
-      
-      // Maximum length validation
-      if (pathValidation.maxLength) {
-        pathSchema = pathSchema.max(
-          pathValidation.maxLength,
-          `Storage path must be less than ${pathValidation.maxLength} characters`
-        );
-      }
-      
-      // Pattern validation
-      if (pathValidation.allowedPatterns?.length) {
-        pathSchema = pathSchema.refine(
-          (path) => pathValidation.allowedPatterns!.some(pattern => 
-            new RegExp(pattern).test(path)
-          ),
-          {
-            message: errorMessages?.pathInvalid || 'Storage path format is invalid'
-          }
-        );
-      }
-      
-      // Forbidden pattern validation
-      if (pathValidation.forbiddenPatterns?.length) {
-        pathSchema = pathSchema.refine(
-          (path) => !pathValidation.forbiddenPatterns!.some(pattern => 
-            new RegExp(pattern).test(path)
-          ),
-          {
-            message: 'Storage path contains forbidden characters or patterns'
-          }
-        );
-      }
+  // Configuration with defaults
+  const validationConfig = useMemo<Required<StorageValidationConfig>>(() => ({
+    realTimeValidation: true,
+    debounceMs: 100,
+    maxPathLength: 500,
+    allowEmptyPath: true,
+    messages: {
+      storagePathRequired: 'Storage path is required when a storage service is selected',
+      storagePathInvalid: 'Please enter a valid storage path',
+      storageServiceRequired: 'Please select a storage service'
+    },
+    ...config
+  }), [config]);
+
+  // Performance tracking
+  const validationMetrics = useRef({
+    lastValidationTime: 0,
+    totalValidationTime: 0,
+    totalValidations: 0,
+    validationHistory: [] as number[]
+  });
+
+  // Debounce timeout reference
+  const debounceTimeoutRef = useRef<NodeJS.Timeout>();
+
+  // Watch form fields
+  const storageServiceId = watch('storageServiceId' as Path<T>);
+  const storagePath = watch('storagePath' as Path<T>);
+
+  // Determine if storage path is required
+  const isStoragePathRequired = useMemo(() => {
+    return Boolean(storageServiceId && storageServiceId.trim() !== '');
+  }, [storageServiceId]);
+
+  // Create dynamic validation schema based on storage service selection
+  const validationSchema = useMemo(() => {
+    const baseSchema = z.object({
+      storageServiceId: z.string().nullable(),
+      storagePath: z.string()
+    });
+
+    // If storage service is selected, make path required
+    if (isStoragePathRequired) {
+      return baseSchema.extend({
+        storagePath: z
+          .string()
+          .min(1, validationConfig.messages.storagePathRequired)
+          .max(
+            validationConfig.maxPathLength, 
+            `Storage path must be less than ${validationConfig.maxPathLength} characters`
+          )
+          .refine(
+            (path) => {
+              // Basic path validation - no leading/trailing spaces, valid characters
+              const trimmedPath = path.trim();
+              if (trimmedPath !== path) return false;
+              
+              // Check for invalid characters (adjust as needed for your storage system)
+              const invalidChars = /[<>:"|?*\x00-\x1f]/;
+              return !invalidChars.test(path);
+            },
+            {
+              message: validationConfig.messages.storagePathInvalid
+            }
+          )
+      });
     }
-  } else {
-    // Optional when no service is selected
-    pathSchema = pathSchema.optional();
-  }
-  
-  return pathSchema;
-};
 
-// =============================================================================
-// MAIN HOOK IMPLEMENTATION
-// =============================================================================
+    // If no storage service selected, path can be empty
+    return baseSchema.extend({
+      storagePath: validationConfig.allowEmptyPath 
+        ? z.string().optional().or(z.literal(''))
+        : z.string().min(1, validationConfig.messages.storagePathRequired)
+    });
+  }, [isStoragePathRequired, validationConfig]);
 
-/**
- * Custom React hook for managing storage path validation logic and form control integration
- * 
- * This hook implements the dynamic validation requirements where storage path becomes required
- * when a storage service is selected, replicating the Angular component's FormControl validation
- * patterns with React Hook Form integration.
- * 
- * @param config - Configuration options for the hook
- * @returns Hook return object with validation state and utilities
- * 
- * @example
- * ```tsx
- * const form = useForm<ScriptEditorFormData>({
- *   resolver: zodResolver(ScriptEditorFormSchema),
- *   mode: 'onChange',
- *   defaultValues: {
- *     content: '',
- *     storageServiceId: '',
- *     storagePath: ''
- *   }
- * });
- * 
- * const storageValidation = useStorageValidation({
- *   form,
- *   storageServices,
- *   realTimeValidation: true,
- *   debounceTime: 100
- * });
- * 
- * // Use in component
- * const { validationState, handlers, fieldState } = storageValidation;
- * ```
- */
-export function useStorageValidation(
-  config: UseStorageValidationConfig
-): UseStorageValidationReturn {
-  const {
-    form,
-    storageServices = [],
-    pathValidation,
-    debounceTime = 100,
-    realTimeValidation = true,
-    errorMessages
-  } = config;
-  
-  // Extract form methods and state
-  const { 
-    watch, 
-    setValue, 
-    setError, 
-    clearErrors, 
-    formState: { errors, touchedFields, dirtyFields },
-    trigger,
-    resetField
-  } = form;
-  
-  // Watch form field values for reactive validation
-  const storageServiceId = watch('storageServiceId');
-  const storagePath = watch('storagePath');
-  
-  // =============================================================================
-  // VALIDATION LOGIC
-  // =============================================================================
-  
+  // Get current validation state for storage path
+  const storagePathValidationState = useMemo<EnhancedValidationState>(() => {
+    const error = errors['storagePath' as keyof T] as FormFieldError | undefined;
+    const hasError = Boolean(error);
+    const isValidating = false; // Could be enhanced with async validation state
+    
+    return {
+      isValid: !hasError,
+      isDirty: Boolean(storagePath && storagePath !== ''),
+      isTouched: Boolean(storagePath !== undefined),
+      error: error?.message,
+      validationTime: validationMetrics.current.lastValidationTime,
+      isValidating,
+      hasBeenValidated: validationMetrics.current.totalValidations > 0,
+      lastValidated: validationMetrics.current.totalValidations > 0 
+        ? new Date() 
+        : undefined
+    };
+  }, [errors, storagePath, validationMetrics.current]);
+
   /**
-   * Validates storage path based on current service selection and custom rules
+   * Validate storage path field with performance tracking
    */
-  const validateStoragePath = useCallback((
-    path?: string, 
-    serviceId?: string
-  ): StorageValidationResult => {
-    const currentPath = path ?? storagePath;
-    const currentServiceId = serviceId ?? storageServiceId;
+  const validateStoragePath = useCallback(async (): Promise<boolean> => {
+    const startTime = performance.now();
     
     try {
-      // Create dynamic schema based on current service selection
-      const schema = createStoragePathSchema(currentServiceId, pathValidation, errorMessages);
+      const result = await trigger('storagePath' as Path<T>);
       
-      // Validate the path
-      schema.parse(currentPath);
+      // Track validation performance
+      const validationTime = performance.now() - startTime;
+      validationMetrics.current.lastValidationTime = validationTime;
+      validationMetrics.current.totalValidationTime += validationTime;
+      validationMetrics.current.totalValidations += 1;
+      validationMetrics.current.validationHistory.push(validationTime);
       
-      // Apply custom validation if provided
-      if (pathValidation?.customValidator && currentPath && currentServiceId) {
-        const selectedService = storageServices.find(s => s.id === currentServiceId);
-        if (selectedService) {
-          const customError = pathValidation.customValidator(currentPath, selectedService.type);
-          if (customError) {
-            return {
-              isValid: false,
-              error: customError,
-              errorCode: 'STORAGE_PATH_INVALID'
-            };
-          }
-        }
+      // Keep only last 10 validation times for average calculation
+      if (validationMetrics.current.validationHistory.length > 10) {
+        validationMetrics.current.validationHistory.shift();
       }
       
-      return { isValid: true };
+      return result;
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        const firstError = error.errors[0];
-        return {
-          isValid: false,
-          error: firstError.message,
-          errorCode: getErrorCodeFromMessage(firstError.message)
-        };
-      }
-      
-      return {
-        isValid: false,
-        error: 'Storage path validation failed',
-        errorCode: 'STORAGE_PATH_INVALID'
-      };
+      console.error('Storage path validation error:', error);
+      return false;
     }
-  }, [storagePath, storageServiceId, pathValidation, errorMessages, storageServices]);
-  
-  /**
-   * Maps validation error messages to specific error codes
-   */
-  const getErrorCodeFromMessage = useCallback((message: string): StorageValidationErrorCode => {
-    if (message.includes('required')) return 'STORAGE_PATH_REQUIRED';
-    if (message.includes('at least')) return 'STORAGE_PATH_TOO_SHORT';
-    if (message.includes('less than')) return 'STORAGE_PATH_TOO_LONG';
-    if (message.includes('forbidden')) return 'STORAGE_PATH_FORBIDDEN_PATTERN';
-    return 'STORAGE_PATH_INVALID';
-  }, []);
-  
-  /**
-   * Determines if storage path is required based on service selection
-   */
-  const isStoragePathRequired = useCallback((): boolean => {
-    return Boolean(storageServiceId && storageServiceId.trim().length > 0);
-  }, [storageServiceId]);
-  
-  /**
-   * Clears validation errors for storage fields
-   */
-  const clearValidationErrors = useCallback(() => {
-    clearErrors(['storageServiceId', 'storagePath']);
-  }, [clearErrors]);
-  
-  /**
-   * Resets storage-related form fields
-   */
-  const resetStorageFields = useCallback(() => {
-    resetField('storagePath');
-    clearValidationErrors();
-  }, [resetField, clearValidationErrors]);
-  
-  // =============================================================================
-  // EVENT HANDLERS
-  // =============================================================================
-  
-  /**
-   * Handles storage service selection change
-   * Implements the Angular component's valueChanges subscription logic
-   */
-  const onStorageServiceChange = useCallback((serviceId: string | null) => {
-    // Reset storage path when service changes (replicating Angular behavior)
-    resetField('storagePath');
-    
-    // Update the service ID
-    setValue('storageServiceId', serviceId || '', { shouldValidate: realTimeValidation });
-    
-    // Clear any existing errors
-    clearErrors('storagePath');
-    
-    // Trigger validation if real-time validation is enabled
-    if (realTimeValidation && serviceId) {
-      // Use setTimeout to ensure validation happens after state updates
-      setTimeout(() => {
-        trigger('storagePath');
-      }, debounceTime);
-    }
-  }, [resetField, setValue, clearErrors, trigger, realTimeValidation, debounceTime]);
-  
-  /**
-   * Handles storage path change with debounced validation
-   */
-  const onStoragePathChange = useCallback((path: string) => {
-    setValue('storagePath', path, { shouldValidate: realTimeValidation });
-    
-    if (realTimeValidation) {
-      // Debounced validation to meet 100ms requirement
-      setTimeout(() => {
-        const validationResult = validateStoragePath(path);
-        if (!validationResult.isValid && validationResult.error) {
-          setError('storagePath', {
-            type: 'validation',
-            message: validationResult.error
-          });
-        } else {
-          clearErrors('storagePath');
-        }
-      }, debounceTime);
-    }
-  }, [setValue, validateStoragePath, setError, clearErrors, realTimeValidation, debounceTime]);
-  
-  /**
-   * Handles field focus events for accessibility and UX
-   */
-  const onFieldFocus = useCallback((fieldName: 'storageServiceId' | 'storagePath') => {
-    // Clear errors on focus to improve UX
-    clearErrors(fieldName);
-  }, [clearErrors]);
-  
-  /**
-   * Handles field blur events for validation triggers
-   */
-  const onFieldBlur = useCallback((fieldName: 'storageServiceId' | 'storagePath') => {
-    // Trigger validation on blur
-    trigger(fieldName);
   }, [trigger]);
-  
-  // =============================================================================
-  // EFFECTS
-  // =============================================================================
-  
+
   /**
-   * Effect to handle storage service changes and apply validation
-   * Replicates the Angular component's ngOnInit and valueChanges logic
+   * Handle storage service change with automatic path reset and validation
+   * Replicates the Angular component's storageServiceId.valueChanges behavior
    */
-  useEffect(() => {
-    // Apply initial validation if storage service is already selected
-    if (storageServiceId) {
-      // Add required validation to storage path
-      if (realTimeValidation) {
-        trigger('storagePath');
-      }
-    } else {
-      // Clear storage path validation errors when no service is selected
-      clearErrors('storagePath');
+  const handleStorageServiceChange = useCallback((serviceId: string | null) => {
+    // Clear any existing debounce
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
     }
-  }, [storageServiceId, trigger, clearErrors, realTimeValidation]);
-  
-  /**
-   * Effect for real-time storage path validation
-   */
-  useEffect(() => {
-    if (realTimeValidation && storagePath !== undefined) {
-      const timeoutId = setTimeout(() => {
-        const validationResult = validateStoragePath();
-        if (!validationResult.isValid && validationResult.error) {
-          setError('storagePath', {
-            type: 'validation',
-            message: validationResult.error
-          });
-        } else if (validationResult.isValid && errors.storagePath) {
-          clearErrors('storagePath');
-        }
-      }, debounceTime);
-      
-      return () => clearTimeout(timeoutId);
+
+    // Update storage service ID
+    setValue('storageServiceId' as Path<T>, serviceId as any);
+
+    // Reset storage path when service changes (matches Angular behavior)
+    setValue('storagePath' as Path<T>, '' as any);
+    
+    // Clear any existing storage path errors
+    clearErrors('storagePath' as Path<T>);
+
+    // Validate after state update if real-time validation is enabled
+    if (validationConfig.realTimeValidation) {
+      debounceTimeoutRef.current = setTimeout(() => {
+        validateStoragePath();
+      }, validationConfig.debounceMs);
     }
-  }, [storagePath, validateStoragePath, setError, clearErrors, errors.storagePath, realTimeValidation, debounceTime]);
-  
-  // =============================================================================
-  // COMPUTED VALUES
-  // =============================================================================
-  
+  }, [setValue, clearErrors, validateStoragePath, validationConfig]);
+
   /**
-   * Current validation state for storage path
+   * Handle storage path change with debounced validation
    */
-  const validationState = useMemo(() => {
-    const result = validateStoragePath();
+  const handleStoragePathChange = useCallback((path: string) => {
+    // Clear any existing debounce
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+
+    // Update path value
+    setValue('storagePath' as Path<T>, path as any);
+
+    // Debounced validation
+    if (validationConfig.realTimeValidation) {
+      debounceTimeoutRef.current = setTimeout(() => {
+        validateStoragePath();
+      }, validationConfig.debounceMs);
+    }
+  }, [setValue, validateStoragePath, validationConfig]);
+
+  /**
+   * Get formatted validation error messages
+   */
+  const getValidationErrors = useCallback(() => {
+    const storageServiceError = errors['storageServiceId' as keyof T] as FormFieldError | undefined;
+    const storagePathError = errors['storagePath' as keyof T] as FormFieldError | undefined;
+
     return {
-      isValid: result.isValid,
-      error: result.error,
-      errorCode: result.errorCode,
-      isDirty: Boolean(dirtyFields.storagePath),
-      isTouched: Boolean(touchedFields.storagePath)
+      storageServiceId: storageServiceError ? {
+        ...storageServiceError,
+        severity: 'error' as const,
+        field: 'storageServiceId',
+        timestamp: new Date()
+      } : undefined,
+      storagePath: storagePathError ? {
+        ...storagePathError,
+        severity: 'error' as const,
+        field: 'storagePath',
+        timestamp: new Date()
+      } : undefined
     };
-  }, [validateStoragePath, dirtyFields.storagePath, touchedFields.storagePath]);
-  
+  }, [errors]);
+
   /**
-   * Form field state information
+   * Reset validation state and clear errors
    */
-  const fieldState = useMemo(() => ({
-    isStoragePathEnabled: true, // Always enabled for user interaction
-    isStoragePathRequired: isStoragePathRequired(),
-    selectedServiceId: storageServiceId,
-    storagePath
-  }), [storageServiceId, storagePath, isStoragePathRequired]);
-  
-  /**
-   * Event handlers object for component integration
-   */
-  const handlers = useMemo(() => ({
-    onStorageServiceChange,
-    onStoragePathChange,
-    onFieldFocus,
-    onFieldBlur
-  }), [onStorageServiceChange, onStoragePathChange, onFieldFocus, onFieldBlur]);
-  
-  /**
-   * Validation utilities object
-   */
-  const validation = useMemo(() => ({
-    validateStoragePath,
-    clearValidationErrors,
-    resetStorageFields,
-    isStoragePathRequired
-  }), [validateStoragePath, clearValidationErrors, resetStorageFields, isStoragePathRequired]);
-  
-  // =============================================================================
-  // RETURN HOOK INTERFACE
-  // =============================================================================
-  
+  const resetValidation = useCallback(() => {
+    clearErrors(['storageServiceId' as Path<T>, 'storagePath' as Path<T>]);
+    
+    // Reset performance metrics
+    validationMetrics.current = {
+      lastValidationTime: 0,
+      totalValidationTime: 0,
+      totalValidations: 0,
+      validationHistory: []
+    };
+    
+    // Clear any pending debounce
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+  }, [clearErrors]);
+
+  // Calculate average validation time
+  const averageValidationTime = useMemo(() => {
+    const { validationHistory } = validationMetrics.current;
+    if (validationHistory.length === 0) return 0;
+    
+    return validationHistory.reduce((sum, time) => sum + time, 0) / validationHistory.length;
+  }, [validationMetrics.current.validationHistory]);
+
+  // Effect to handle automatic validation when storage service selection changes
+  // Replicates the Angular component's ngOnInit and valueChanges subscription behavior
+  useEffect(() => {
+    // If storage service is selected on mount, ensure path validation is applied
+    if (storageServiceId && !storagePath) {
+      // This matches the Angular behavior: if service is selected, path validation is required
+      if (validationConfig.realTimeValidation) {
+        const timeoutId = setTimeout(() => {
+          validateStoragePath();
+        }, validationConfig.debounceMs);
+        
+        return () => clearTimeout(timeoutId);
+      }
+    }
+  }, [storageServiceId, storagePath, validateStoragePath, validationConfig]);
+
+  // Cleanup debounce on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
+  }, []);
+
   return {
-    validationState,
-    validation,
-    fieldState,
-    handlers
+    validationSchema,
+    validateStoragePath,
+    isStoragePathRequired,
+    storagePathValidationState,
+    handleStorageServiceChange,
+    handleStoragePathChange,
+    getValidationErrors,
+    resetValidation,
+    validationMetrics: {
+      lastValidationTime: validationMetrics.current.lastValidationTime,
+      averageValidationTime,
+      totalValidations: validationMetrics.current.totalValidations
+    }
   };
 }
 
-// =============================================================================
-// EXPORTS
-// =============================================================================
-
 export default useStorageValidation;
-
-export type {
-  UseStorageValidationConfig,
-  UseStorageValidationReturn,
-  StorageValidationResult,
-  StorageValidationErrorCode
-};
