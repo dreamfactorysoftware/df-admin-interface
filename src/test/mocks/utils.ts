@@ -1,59 +1,144 @@
 /**
  * MSW Utility Functions
  * 
- * Comprehensive utility functions for Mock Service Worker (MSW) that replicate
- * Angular interceptor behavior. Provides case transformation middleware,
- * authentication header validation, and request/response processing helpers
- * for consistent API contract compatibility during the React/Next.js migration.
+ * Comprehensive utility functions for Mock Service Worker operations including
+ * case transformation middleware, authentication header validation, and request/response
+ * processing helpers. Replicates Angular interceptor behavior in MSW middleware format.
+ * 
+ * This module provides:
+ * - Case transformation to maintain API contract compatibility (camelCase ↔ snake_case)
+ * - Authentication header processing for session management
+ * - Request/response transformation utilities for consistent data handling
+ * - Query parameter and pagination utilities for CRUD operations
+ * - MSW response helpers for standardized API responses
  */
 
-import { http, HttpResponse, type HttpHandler } from 'msw';
-import type { RequestHandler } from 'msw';
+import { HttpResponse } from 'msw';
 
-// Constants for DreamFactory headers (replicated from Angular constants)
-export const SESSION_TOKEN_HEADER = 'X-DreamFactory-Session-Token';
+// ============================================================================
+// CONSTANTS & TYPES
+// ============================================================================
+
+/**
+ * DreamFactory API headers for authentication and authorization
+ */
 export const API_KEY_HEADER = 'X-DreamFactory-API-Key';
+export const SESSION_TOKEN_HEADER = 'X-DreamFactory-Session-Token';
 export const LICENSE_KEY_HEADER = 'X-DreamFactory-License-Key';
 
 /**
- * Case Transformation Utilities
- * Replicates the behavior from src/app/shared/utilities/case.ts and case.interceptor.ts
+ * Content type headers for API responses
  */
+export const CONTENT_TYPE_JSON = 'application/json';
+export const CONTENT_TYPE_FORM_DATA = 'multipart/form-data';
+export const CONTENT_TYPE_BLOB = 'application/octet-stream';
+
+/**
+ * Authentication header validation result
+ */
+export interface AuthValidationResult {
+  isValid: boolean;
+  apiKey?: string;
+  sessionToken?: string;
+  userId?: string;
+  userType?: 'user' | 'admin';
+  errors: string[];
+}
+
+/**
+ * Query parameter extraction result
+ */
+export interface QueryParamsResult {
+  limit?: number;
+  offset?: number;
+  filter?: string;
+  order?: string;
+  include?: string;
+  fields?: string;
+  related?: string;
+  include_count?: boolean;
+  [key: string]: unknown;
+}
+
+/**
+ * Pagination metadata for list responses
+ */
+export interface PaginationMeta {
+  count?: number;
+  limit: number;
+  offset: number;
+  total?: number;
+}
+
+/**
+ * Standard DreamFactory API response structure
+ */
+export interface DreamFactoryResponse<T = unknown> {
+  resource?: T[];
+  count?: number;
+  meta?: PaginationMeta;
+}
+
+// ============================================================================
+// CASE TRANSFORMATION UTILITIES
+// ============================================================================
 
 /**
  * Converts snake_case string to camelCase
- * @param str - String in snake_case format
- * @returns String in camelCase format
+ * Handles special cases for DreamFactory SAML and OAuth configurations
+ * 
+ * @param str - String to transform
+ * @returns Transformed camelCase string
  */
-export const snakeToCamelString = (str: string): string =>
-  str.replace(/([-_]\w)/g, g => g[1].toUpperCase());
+export const snakeToCamelString = (str: string): string => {
+  // Handle special SAML/OAuth cases that maintain specific formatting
+  const specialCases: Record<string, string> = {
+    'idp_singleSignOnService_url': 'idpSingleSignOnServiceUrl',
+    'idp_entityId': 'idpEntityId',
+    'sp_nameIDFormat': 'spNameIDFormat',
+    'sp_privateKey': 'spPrivateKey',
+  };
+
+  if (specialCases[str]) {
+    return specialCases[str];
+  }
+
+  return str.replace(/([-_]\w)/g, g => g[1].toUpperCase());
+};
 
 /**
- * Converts camelCase string to snake_case with special handling for SAML fields
- * @param str - String in camelCase format
- * @returns String in snake_case format
+ * Converts camelCase string to snake_case
+ * Handles special cases for DreamFactory SAML and OAuth configurations
+ * 
+ * @param str - String to transform
+ * @returns Transformed snake_case string
  */
 export const camelToSnakeString = (str: string): string => {
-  // Special cases for SAML fields (preserved from Angular implementation)
-  if (str === 'idpSingleSignOnServiceUrl' || str === 'idp_singleSignOnService_url') {
-    return 'idp_singleSignOnService_url';
+  // Handle special SAML/OAuth cases that maintain specific formatting
+  const specialCases: Record<string, string> = {
+    'idpSingleSignOnServiceUrl': 'idp_singleSignOnService_url',
+    'idp_singleSignOnService_url': 'idp_singleSignOnService_url',
+    'idpEntityId': 'idp_entityId',
+    'idp_entityId': 'idp_entityId',
+    'spNameIDFormat': 'sp_nameIDFormat',
+    'sp_nameIDFormat': 'sp_nameIDFormat',
+    'spPrivateKey': 'sp_privateKey',
+    'sp_privateKey': 'sp_privateKey',
+  };
+
+  if (specialCases[str]) {
+    return specialCases[str];
   }
-  if (str === 'idpEntityId' || str === 'idp_entityId') {
-    return 'idp_entityId';
-  }
-  if (str === 'spNameIDFormat' || str === 'sp_nameIDFormat') {
-    return 'sp_nameIDFormat';
-  }
-  if (str === 'spPrivateKey' || str === 'sp_privateKey') {
-    return 'sp_privateKey';
-  }
+
   return str.replace(/([a-z0-9]|(?=[A-Z]))([A-Z])/g, '$1_$2').toLowerCase();
 };
 
 /**
- * Recursively converts object keys from snake_case to camelCase
- * @param obj - Object with snake_case keys
- * @returns Object with camelCase keys
+ * Recursively transforms object keys from snake_case to camelCase
+ * Preserves arrays and handles nested objects
+ * 
+ * @param obj - Object to transform
+ * @returns Transformed object with camelCase keys
  */
 export function mapSnakeToCamel<T>(obj: T): T {
   if (Array.isArray(obj)) {
@@ -68,16 +153,17 @@ export function mapSnakeToCamel<T>(obj: T): T {
       }
     }
     return newObj as unknown as T;
-  } else {
-    return obj;
   }
+  return obj;
 }
 
 /**
- * Recursively converts object keys from camelCase to snake_case
- * Preserves 'requestBody' field without transformation (from Angular implementation)
- * @param obj - Object with camelCase keys
- * @returns Object with snake_case keys
+ * Recursively transforms object keys from camelCase to snake_case
+ * Preserves arrays and handles nested objects
+ * Special handling for requestBody field which should not be transformed
+ * 
+ * @param obj - Object to transform
+ * @returns Transformed object with snake_case keys
  */
 export function mapCamelToSnake<T>(obj: T): T {
   if (Array.isArray(obj)) {
@@ -86,8 +172,8 @@ export function mapCamelToSnake<T>(obj: T): T {
     const newObj: Record<string, unknown> = {};
     for (const key in obj) {
       if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        // Special case: requestBody should not be transformed (OpenAPI spec field)
         if (key === 'requestBody') {
-          // Preserve requestBody without transformation (from Angular implementation)
           newObj[key] = (obj as Record<string, unknown>)[key];
         } else {
           newObj[camelToSnakeString(key)] = mapCamelToSnake(
@@ -97,146 +183,354 @@ export function mapCamelToSnake<T>(obj: T): T {
       }
     }
     return newObj as unknown as T;
-  } else {
-    return obj;
   }
+  return obj;
 }
 
 /**
- * Authentication Header Utilities
- * Replicates the behavior from session-token.interceptor.ts
- */
-
-/**
- * Validates DreamFactory API authentication headers
+ * MSW middleware for case transformation that replicates Angular caseInterceptor behavior
+ * Transforms request bodies from camelCase to snake_case and response bodies from snake_case to camelCase
+ * Only applies to JSON API endpoints, skips FormData requests
+ * 
  * @param request - MSW request object
- * @returns Object containing validation status and extracted tokens
+ * @param requestBody - Parsed request body
+ * @returns Object with transformed request body and response transformer function
  */
-export function validateAuthHeaders(request: Request) {
-  const apiKey = request.headers.get(API_KEY_HEADER);
-  const sessionToken = request.headers.get(SESSION_TOKEN_HEADER);
-  const licenseKey = request.headers.get(LICENSE_KEY_HEADER);
+export function applyCaseTransformation(
+  request: Request,
+  requestBody: unknown
+): {
+  transformedRequestBody: unknown;
+  transformResponse: (responseBody: unknown) => unknown;
+} {
+  // Only apply transformation to /api endpoints and non-FormData requests
+  const shouldTransform = request.url.includes('/api') && 
+    !request.headers.get('content-type')?.includes('multipart/form-data');
 
-  // Check for required API key
-  const hasValidApiKey = Boolean(apiKey);
-  
-  // Session token is optional but when present should be valid format
-  const hasSessionToken = Boolean(sessionToken);
-  const isSessionTokenValid = !sessionToken || (typeof sessionToken === 'string' && sessionToken.length > 10);
+  if (!shouldTransform) {
+    return {
+      transformedRequestBody: requestBody,
+      transformResponse: (body: unknown) => body,
+    };
+  }
+
+  // Transform request body from camelCase to snake_case
+  const transformedRequestBody = mapCamelToSnake(requestBody);
+
+  // Return response transformer function
+  const transformResponse = (responseBody: unknown) => {
+    // Check if response should be transformed (JSON content)
+    if (responseBody && typeof responseBody === 'object') {
+      return mapSnakeToCamel(responseBody);
+    }
+    return responseBody;
+  };
 
   return {
-    isValid: hasValidApiKey && isSessionTokenValid,
-    hasApiKey: hasValidApiKey,
-    hasSessionToken,
-    isSessionTokenValid,
+    transformedRequestBody,
+    transformResponse,
+  };
+}
+
+// ============================================================================
+// AUTHENTICATION UTILITIES
+// ============================================================================
+
+/**
+ * Validates authentication headers in MSW request
+ * Checks for required API key and optional session token
+ * 
+ * @param request - MSW request object
+ * @returns Authentication validation result
+ */
+export function validateAuthHeaders(request: Request): AuthValidationResult {
+  const apiKey = request.headers.get(API_KEY_HEADER);
+  const sessionToken = request.headers.get(SESSION_TOKEN_HEADER);
+  const errors: string[] = [];
+
+  // API key is always required for DreamFactory API calls
+  if (!apiKey) {
+    errors.push('Missing API key header');
+  }
+
+  // Mock API key validation (in real scenario, this would validate against environment)
+  const validApiKey = 'mock-api-key-for-testing';
+  if (apiKey && apiKey !== validApiKey) {
+    errors.push('Invalid API key');
+  }
+
+  let userId: string | undefined;
+  let userType: 'user' | 'admin' | undefined;
+
+  // Session token validation (optional for some endpoints)
+  if (sessionToken) {
+    try {
+      // Mock JWT token parsing (in real scenario, this would validate JWT signature)
+      const tokenPayload = JSON.parse(atob(sessionToken.split('.')[1] || ''));
+      userId = tokenPayload.sub;
+      userType = tokenPayload.role?.includes('admin') ? 'admin' : 'user';
+    } catch {
+      errors.push('Invalid session token format');
+    }
+  }
+
+  return {
+    isValid: errors.length === 0,
     apiKey,
     sessionToken,
-    licenseKey,
-    // Helper method to check if this is an authenticated request
-    isAuthenticated: hasValidApiKey && hasSessionToken && isSessionTokenValid,
+    userId,
+    userType,
+    errors,
   };
 }
 
 /**
- * Creates authentication error responses for invalid headers
- * @param reason - Reason for authentication failure
- * @returns HttpResponse with 401 status and DreamFactory error format
+ * Generates mock session token for testing authentication flows
+ * Creates a simple JWT-like structure for development/testing
+ * 
+ * @param userId - User ID to include in token
+ * @param userType - Type of user (user or admin)
+ * @param expirationMinutes - Token expiration in minutes (default: 60)
+ * @returns Mock JWT token string
  */
-export function createAuthErrorResponse(reason: string) {
-  return HttpResponse.json(
-    {
-      error: {
-        code: 401,
-        message: `Authentication failed: ${reason}`,
-        status_code: 401,
-        context: null,
-      },
-    },
-    { status: 401 }
-  );
+export function generateMockSessionToken(
+  userId: string,
+  userType: 'user' | 'admin' = 'user',
+  expirationMinutes: number = 60
+): string {
+  const header = { alg: 'HS256', typ: 'JWT' };
+  const now = Math.floor(Date.now() / 1000);
+  const payload = {
+    sub: userId,
+    iat: now,
+    exp: now + (expirationMinutes * 60),
+    role: userType === 'admin' ? ['admin', 'user'] : ['user'],
+    type: userType,
+  };
+
+  // Create mock JWT (not cryptographically signed, for testing only)
+  const encodedHeader = btoa(JSON.stringify(header));
+  const encodedPayload = btoa(JSON.stringify(payload));
+  const mockSignature = btoa(`mock-signature-${userId}-${now}`);
+
+  return `${encodedHeader}.${encodedPayload}.${mockSignature}`;
 }
 
-/**
- * Request/Response Processing Utilities
- */
+// ============================================================================
+// REQUEST/RESPONSE PROCESSING UTILITIES
+// ============================================================================
 
 /**
- * Processes MSW request body and applies case transformation
- * Replicates the case.interceptor.ts request transformation logic
+ * Processes and parses request body based on content type
+ * Handles JSON, FormData, and plain text requests
+ * 
  * @param request - MSW request object
- * @returns Transformed request body
+ * @returns Promise resolving to parsed request body
  */
-export async function processRequestBody(request: Request) {
-  // Skip transformation for FormData (like file uploads)
-  const contentType = request.headers.get('Content-Type') || '';
-  if (contentType.includes('multipart/form-data') || contentType.includes('application/x-www-form-urlencoded')) {
-    return null; // Let MSW handle FormData naturally
-  }
+export async function processRequestBody(request: Request): Promise<unknown> {
+  const contentType = request.headers.get('content-type') || '';
 
   try {
-    const body = await request.json();
-    // Transform camelCase to snake_case for API compatibility
-    return mapCamelToSnake(body);
-  } catch {
-    // If body is not JSON, return null
+    if (contentType.includes('application/json')) {
+      return await request.json();
+    } else if (contentType.includes('multipart/form-data')) {
+      return await request.formData();
+    } else if (contentType.includes('text/')) {
+      return await request.text();
+    } else {
+      // Default to JSON parsing for API endpoints
+      const text = await request.text();
+      return text ? JSON.parse(text) : null;
+    }
+  } catch (error) {
+    // If parsing fails, return null rather than throwing
+    console.warn('Failed to parse request body:', error);
     return null;
   }
 }
 
 /**
- * Processes MSW response body and applies case transformation
- * Replicates the case.interceptor.ts response transformation logic
- * @param responseData - Response data to transform
- * @returns Transformed response data
- */
-export function processResponseBody<T>(responseData: T): T {
-  // Transform snake_case to camelCase for React component compatibility
-  return mapSnakeToCamel(responseData);
-}
-
-/**
- * Creates a standardized JSON response with case transformation
+ * Creates standardized JSON response for MSW handlers
+ * Applies case transformation and includes proper headers
+ * 
  * @param data - Response data
- * @param options - Response options (status, headers, etc.)
- * @returns HttpResponse with transformed data
+ * @param status - HTTP status code (default: 200)
+ * @param headers - Additional headers
+ * @returns MSW HttpResponse
  */
-export function createJsonResponse<T>(
-  data: T,
-  options: { status?: number; headers?: Record<string, string> } = {}
-) {
-  const transformedData = processResponseBody(data);
-  
-  return HttpResponse.json(transformedData, {
-    status: options.status || 200,
+export function createJsonResponse(
+  data: unknown,
+  status: number = 200,
+  headers: Record<string, string> = {}
+): HttpResponse {
+  return HttpResponse.json(data, {
+    status,
     headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
+      'Content-Type': CONTENT_TYPE_JSON,
+      ...headers,
     },
   });
 }
 
 /**
- * Query Parameter and Pagination Utilities
+ * Creates DreamFactory-formatted list response with pagination metadata
+ * 
+ * @param resource - Array of resource items
+ * @param pagination - Pagination metadata
+ * @param status - HTTP status code
+ * @returns MSW HttpResponse with DreamFactory list format
  */
+export function createListResponse<T>(
+  resource: T[],
+  pagination: PaginationMeta,
+  status: number = 200
+): HttpResponse {
+  const response: DreamFactoryResponse<T> = {
+    resource,
+    count: resource.length,
+    meta: pagination,
+  };
+
+  // Include total count if available
+  if (pagination.total !== undefined) {
+    response.count = pagination.total;
+  }
+
+  return createJsonResponse(response, status);
+}
 
 /**
- * Extracts and parses query parameters from URL
- * @param url - Request URL
- * @returns Object with parsed query parameters
+ * Creates standardized error response
+ * 
+ * @param message - Error message
+ * @param status - HTTP status code
+ * @param code - Error code
+ * @param context - Additional error context
+ * @returns MSW HttpResponse with error format
  */
-export function extractQueryParams(url: string) {
-  const urlObj = new URL(url);
-  const params: Record<string, any> = {};
+export function createErrorResponse(
+  message: string,
+  status: number = 400,
+  code?: string,
+  context?: Record<string, unknown>
+): HttpResponse {
+  const errorResponse = {
+    error: {
+      code: code || status.toString(),
+      message,
+      status_code: status,
+      ...(context && { context }),
+    },
+  };
 
-  urlObj.searchParams.forEach((value, key) => {
-    // Handle common parameter transformations
-    if (key === 'limit' || key === 'offset') {
-      params[key] = parseInt(value, 10);
-    } else if (key === 'include_count') {
-      params[key] = value === 'true';
-    } else if (key === 'filter' || key === 'fields' || key === 'order') {
-      params[key] = value;
-    } else {
+  return createJsonResponse(errorResponse, status);
+}
+
+/**
+ * Creates authentication error response (401)
+ */
+export function createAuthErrorResponse(message: string = 'Authentication required'): HttpResponse {
+  return createErrorResponse(message, 401, 'AUTHENTICATION_REQUIRED');
+}
+
+/**
+ * Creates unauthorized error response (401)
+ */
+export function createUnauthorizedError(message: string = 'Invalid credentials'): HttpResponse {
+  return createErrorResponse(message, 401, 'UNAUTHORIZED');
+}
+
+/**
+ * Creates forbidden error response (403)
+ */
+export function createForbiddenError(message: string = 'Access forbidden'): HttpResponse {
+  return createErrorResponse(message, 403, 'FORBIDDEN');
+}
+
+/**
+ * Creates validation error response (422)
+ */
+export function createValidationError(
+  message: string = 'Validation failed',
+  fieldErrors?: Record<string, string[]>
+): HttpResponse {
+  const context = fieldErrors ? { field_errors: fieldErrors } : undefined;
+  return createErrorResponse(message, 422, 'VALIDATION_ERROR', context);
+}
+
+/**
+ * Creates not found error response (404)
+ */
+export function createNotFoundError(message: string = 'Resource not found'): HttpResponse {
+  return createErrorResponse(message, 404, 'NOT_FOUND');
+}
+
+/**
+ * Creates blob response for file downloads
+ */
+export function createBlobResponse(
+  data: string | Uint8Array,
+  contentType: string = CONTENT_TYPE_BLOB,
+  filename?: string
+): HttpResponse {
+  const headers: Record<string, string> = {
+    'Content-Type': contentType,
+  };
+
+  if (filename) {
+    headers['Content-Disposition'] = `attachment; filename="${filename}"`;
+  }
+
+  return new HttpResponse(data, {
+    status: 200,
+    headers,
+  });
+}
+
+// ============================================================================
+// QUERY PARAMETER & PAGINATION UTILITIES
+// ============================================================================
+
+/**
+ * Extracts and parses query parameters from MSW request URL
+ * Handles common DreamFactory API parameters like limit, offset, filter, order
+ * 
+ * @param request - MSW request object
+ * @returns Parsed query parameters
+ */
+export function extractQueryParams(request: Request): QueryParamsResult {
+  const url = new URL(request.url);
+  const params: QueryParamsResult = {};
+
+  // Parse standard pagination parameters
+  const limit = url.searchParams.get('limit');
+  if (limit) {
+    params.limit = parseInt(limit, 10);
+  }
+
+  const offset = url.searchParams.get('offset');
+  if (offset) {
+    params.offset = parseInt(offset, 10);
+  }
+
+  // Parse boolean parameters
+  const includeCount = url.searchParams.get('include_count');
+  if (includeCount) {
+    params.include_count = includeCount === 'true' || includeCount === '1';
+  }
+
+  // Parse string parameters
+  const stringParams = ['filter', 'order', 'include', 'fields', 'related'];
+  stringParams.forEach(param => {
+    const value = url.searchParams.get(param);
+    if (value) {
+      params[param] = value;
+    }
+  });
+
+  // Parse all other parameters as strings
+  url.searchParams.forEach((value, key) => {
+    if (!params.hasOwnProperty(key)) {
       params[key] = value;
     }
   });
@@ -245,396 +539,246 @@ export function extractQueryParams(url: string) {
 }
 
 /**
- * Creates paginated response metadata
- * @param totalCount - Total number of items
- * @param limit - Items per page
- * @param offset - Starting offset
- * @returns Pagination metadata object
+ * Applies pagination to an array of data
+ * Returns sliced array and pagination metadata
+ * 
+ * @param data - Array of data to paginate
+ * @param limit - Number of items per page (default: 25)
+ * @param offset - Starting offset (default: 0)
+ * @returns Object with paginated data and metadata
  */
-export function createPaginationMeta(totalCount: number, limit?: number, offset?: number) {
-  const actualLimit = limit || totalCount;
-  const actualOffset = offset || 0;
-  
+export function applyPagination<T>(
+  data: T[],
+  limit: number = 25,
+  offset: number = 0
+): {
+  data: T[];
+  meta: PaginationMeta;
+} {
+  const start = Math.max(0, offset);
+  const end = start + Math.max(1, limit);
+  const paginatedData = data.slice(start, end);
+
   return {
-    count: Math.min(actualLimit, totalCount - actualOffset),
-    limit: actualLimit,
-    offset: actualOffset,
-    total: totalCount,
-    hasMore: (actualOffset + actualLimit) < totalCount,
+    data: paginatedData,
+    meta: {
+      count: paginatedData.length,
+      limit,
+      offset: start,
+      total: data.length,
+    },
   };
 }
 
 /**
- * Applies pagination to an array of data
- * @param data - Array of data to paginate
- * @param limit - Items per page
- * @param offset - Starting offset
- * @returns Paginated slice of data
- */
-export function paginateData<T>(data: T[], limit?: number, offset?: number): T[] {
-  const actualOffset = offset || 0;
-  const actualLimit = limit || data.length;
-  
-  return data.slice(actualOffset, actualOffset + actualLimit);
-}
-
-/**
- * Applies filtering to data based on query parameters
- * Basic implementation for common DreamFactory filter patterns
+ * Applies filtering to an array of data based on filter string
+ * Supports simple field:value filtering and text search
+ * 
  * @param data - Array of data to filter
- * @param filter - Filter string (simplified implementation)
- * @returns Filtered data
+ * @param filter - Filter string (e.g., "name=test" or "searchterm")
+ * @returns Filtered array
  */
-export function applyFilter<T>(data: T[], filter?: string): T[] {
+export function applyFilter<T extends Record<string, unknown>>(
+  data: T[],
+  filter?: string
+): T[] {
   if (!filter) return data;
 
-  // Simple filter implementation - in real usage, this would be more sophisticated
-  const lowerFilter = filter.toLowerCase();
+  // Check if filter is field:value format
+  const fieldValueMatch = filter.match(/^(\w+)[:=](.+)$/);
+  if (fieldValueMatch) {
+    const [, field, value] = fieldValueMatch;
+    return data.filter(item => {
+      const fieldValue = String(item[field] || '').toLowerCase();
+      return fieldValue.includes(value.toLowerCase());
+    });
+  }
+
+  // Apply general text search across all string fields
+  const searchTerm = filter.toLowerCase();
   return data.filter(item => {
-    if (typeof item === 'object' && item !== null) {
-      return Object.values(item).some(value => 
-        String(value).toLowerCase().includes(lowerFilter)
-      );
-    }
-    return String(item).toLowerCase().includes(lowerFilter);
+    return Object.values(item).some(value => 
+      String(value).toLowerCase().includes(searchTerm)
+    );
   });
 }
 
 /**
- * Applies sorting to data based on order parameter
+ * Applies sorting to an array of data based on order string
+ * Supports ascending and descending order (e.g., "name", "-created_at")
+ * 
  * @param data - Array of data to sort
- * @param order - Order string (e.g., "name ASC", "created_date DESC")
- * @returns Sorted data
+ * @param order - Sort order string
+ * @returns Sorted array
  */
-export function applySort<T>(data: T[], order?: string): T[] {
+export function applySort<T extends Record<string, unknown>>(
+  data: T[],
+  order?: string
+): T[] {
   if (!order) return data;
 
-  const [field, direction = 'ASC'] = order.split(' ');
-  const isDesc = direction.toUpperCase() === 'DESC';
+  // Parse order string: "-field" for descending, "field" for ascending
+  const isDescending = order.startsWith('-');
+  const field = isDescending ? order.slice(1) : order;
 
   return [...data].sort((a, b) => {
-    const aVal = (a as any)[field];
-    const bVal = (b as any)[field];
+    const aValue = a[field];
+    const bValue = b[field];
 
-    if (aVal < bVal) return isDesc ? 1 : -1;
-    if (aVal > bVal) return isDesc ? -1 : 1;
-    return 0;
+    // Handle null/undefined values
+    if (aValue == null && bValue == null) return 0;
+    if (aValue == null) return 1;
+    if (bValue == null) return -1;
+
+    // Compare values
+    let comparison = 0;
+    if (aValue < bValue) comparison = -1;
+    else if (aValue > bValue) comparison = 1;
+
+    return isDescending ? -comparison : comparison;
   });
 }
 
-/**
- * MSW Middleware Utilities
- */
+// ============================================================================
+// UTILITY HELPERS
+// ============================================================================
 
 /**
- * Creates MSW middleware for case transformation
- * Replicates Angular case.interceptor.ts behavior
+ * Simulates network delay for more realistic testing
+ * 
+ * @param ms - Delay in milliseconds (default: 100)
+ * @returns Promise that resolves after delay
  */
-export function createCaseTransformMiddleware() {
-  return (handler: HttpHandler) => {
-    return async (request: Request) => {
-      // Only transform requests to /api endpoints
-      if (!request.url.includes('/api')) {
-        return handler(request);
-      }
-
-      // Clone request with transformed body
-      let transformedRequest = request;
-      if (request.method !== 'GET' && request.method !== 'DELETE') {
-        const transformedBody = await processRequestBody(request);
-        if (transformedBody !== null) {
-          transformedRequest = new Request(request, {
-            body: JSON.stringify(transformedBody),
-          });
-        }
-      }
-
-      // Process response
-      const response = await handler(transformedRequest);
-      
-      // Transform response if it's JSON
-      const contentType = response.headers.get('Content-Type') || '';
-      if (contentType.includes('application/json')) {
-        try {
-          const responseData = await response.json();
-          return createJsonResponse(responseData, {
-            status: response.status,
-            headers: Object.fromEntries(response.headers.entries()),
-          });
-        } catch {
-          // If response is not JSON, return as-is
-          return response;
-        }
-      }
-
-      return response;
-    };
-  };
+export function simulateNetworkDelay(ms: number = 100): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
-
-/**
- * Creates MSW middleware for authentication validation
- * Replicates Angular session-token.interceptor.ts behavior
- */
-export function createAuthMiddleware(options: { requireAuth?: boolean } = {}) {
-  return (handler: HttpHandler) => {
-    return async (request: Request) => {
-      // Only validate auth for /api endpoints
-      if (!request.url.includes('/api')) {
-        return handler(request);
-      }
-
-      const authValidation = validateAuthHeaders(request);
-
-      // If authentication is required and not valid, return 401
-      if (options.requireAuth && !authValidation.isValid) {
-        if (!authValidation.hasApiKey) {
-          return createAuthErrorResponse('Missing API key');
-        }
-        if (!authValidation.isSessionTokenValid) {
-          return createAuthErrorResponse('Invalid session token');
-        }
-      }
-
-      // Add authentication context to request (if needed by handlers)
-      const authenticatedRequest = new Request(request, {
-        headers: {
-          ...Object.fromEntries(request.headers.entries()),
-          'x-auth-context': JSON.stringify({
-            isAuthenticated: authValidation.isAuthenticated,
-            hasApiKey: authValidation.hasApiKey,
-            hasSessionToken: authValidation.hasSessionToken,
-          }),
-        },
-      });
-
-      return handler(authenticatedRequest);
-    };
-  };
-}
-
-/**
- * Error Response Utilities
- * Replicates Angular error.interceptor.ts patterns
- */
-
-/**
- * Creates standardized DreamFactory error response
- * @param statusCode - HTTP status code
- * @param message - Error message
- * @param context - Additional error context
- * @returns HttpResponse with DreamFactory error format
- */
-export function createErrorResponse(
-  statusCode: number,
-  message: string,
-  context: any = null
-) {
-  return HttpResponse.json(
-    {
-      error: {
-        code: statusCode,
-        message,
-        status_code: statusCode,
-        context,
-      },
-    },
-    { status: statusCode }
-  );
-}
-
-/**
- * Creates a 400 Bad Request error response
- */
-export function createBadRequestError(message: string, context?: any) {
-  return createErrorResponse(400, message, context);
-}
-
-/**
- * Creates a 401 Unauthorized error response
- */
-export function createUnauthorizedError(message: string = 'Unauthorized access') {
-  return createErrorResponse(401, message);
-}
-
-/**
- * Creates a 403 Forbidden error response
- */
-export function createForbiddenError(message: string = 'Access denied') {
-  return createErrorResponse(403, message);
-}
-
-/**
- * Creates a 404 Not Found error response
- */
-export function createNotFoundError(message: string = 'Resource not found') {
-  return createErrorResponse(404, message);
-}
-
-/**
- * Creates a 422 Unprocessable Entity error response (validation errors)
- */
-export function createValidationError(message: string, validationErrors: any = null) {
-  return createErrorResponse(422, message, validationErrors);
-}
-
-/**
- * Creates a 500 Internal Server Error response
- */
-export function createServerError(message: string = 'Internal server error') {
-  return createErrorResponse(500, message);
-}
-
-/**
- * URL and Path Utilities
- */
-
-/**
- * Extracts service name from DreamFactory API path
- * @param path - API path (e.g., "/api/v2/mysql/_schema")
- * @returns Service name or null
- */
-export function extractServiceName(path: string): string | null {
-  const match = path.match(/^\/api\/v2\/([^\/]+)/);
-  return match ? match[1] : null;
-}
-
-/**
- * Extracts resource path from DreamFactory API path
- * @param path - API path (e.g., "/api/v2/mysql/_schema/users")
- * @returns Resource path or null
- */
-export function extractResourcePath(path: string): string | null {
-  const match = path.match(/^\/api\/v2\/[^\/]+(.*)$/);
-  return match ? match[1] : null;
-}
-
-/**
- * Checks if path is a system API endpoint
- * @param path - API path
- * @returns True if system API endpoint
- */
-export function isSystemApiPath(path: string): boolean {
-  return path.startsWith('/api/v2/system') || path.startsWith('/system/api/v2');
-}
-
-/**
- * Checks if path is a service API endpoint
- * @param path - API path
- * @returns True if service API endpoint
- */
-export function isServiceApiPath(path: string): boolean {
-  return path.startsWith('/api/v2/') && !isSystemApiPath(path);
-}
-
-/**
- * Development Utilities
- */
 
 /**
  * Logs MSW request details for debugging
+ * 
  * @param request - MSW request object
- * @param context - Additional context
+ * @param additional - Additional data to log
  */
-export function logRequest(request: Request, context?: string) {
+export function logRequest(request: Request, additional?: Record<string, unknown>): void {
   if (process.env.NODE_ENV === 'development') {
-    console.log(`[MSW ${context || 'Request'}]`, {
-      method: request.method,
-      url: request.url,
-      headers: Object.fromEntries(request.headers.entries()),
-    });
+    console.log(`[MSW] ${request.method} ${request.url}`, additional);
   }
 }
 
 /**
- * Simulates network delay for realistic testing
- * @param delay - Delay in milliseconds (default: 100-500ms random)
+ * Extracts ID parameter from URL path
+ * Handles both single IDs and comma-separated lists
+ * 
+ * @param url - Request URL
+ * @param pathPattern - Path pattern to match (e.g., "/api/v2/system/user/:id")
+ * @returns Extracted ID(s)
  */
-export function simulateNetworkDelay(delay?: number): Promise<void> {
-  const actualDelay = delay || Math.random() * 400 + 100; // 100-500ms random delay
-  return new Promise(resolve => setTimeout(resolve, actualDelay));
+export function extractIdFromPath(url: string, pathPattern: string): string | string[] | null {
+  // Simple ID extraction from URL
+  const urlPath = new URL(url).pathname;
+  const pathSegments = urlPath.split('/');
+  const lastSegment = pathSegments[pathSegments.length - 1];
+
+  // Check if last segment looks like an ID or comma-separated IDs
+  if (lastSegment && lastSegment !== '') {
+    // Handle comma-separated IDs for bulk operations
+    if (lastSegment.includes(',')) {
+      return lastSegment.split(',').map(id => id.trim());
+    }
+    return lastSegment;
+  }
+
+  return null;
 }
 
 /**
- * Type definitions for MSW utilities
+ * Validates required fields in request body
+ * 
+ * @param body - Request body object
+ * @param requiredFields - Array of required field names
+ * @returns Validation result with missing fields
  */
-export interface AuthContext {
-  isAuthenticated: boolean;
-  hasApiKey: boolean;
-  hasSessionToken: boolean;
-  apiKey?: string;
-  sessionToken?: string;
-  licenseKey?: string;
-}
+export function validateRequiredFields(
+  body: Record<string, unknown>,
+  requiredFields: string[]
+): { isValid: boolean; missingFields: string[] } {
+  const missingFields = requiredFields.filter(field => 
+    body[field] === undefined || body[field] === null || body[field] === ''
+  );
 
-export interface PaginationParams {
-  limit?: number;
-  offset?: number;
-  include_count?: boolean;
-}
-
-export interface QueryParams extends PaginationParams {
-  filter?: string;
-  fields?: string;
-  order?: string;
-  [key: string]: any;
-}
-
-export interface DreamFactoryErrorResponse {
-  error: {
-    code: number;
-    message: string;
-    status_code: number;
-    context: any;
+  return {
+    isValid: missingFields.length === 0,
+    missingFields,
   };
 }
 
 /**
- * Export all utilities for easy importing
+ * Converts FormData to plain object for easier processing
+ * 
+ * @param formData - FormData object from request
+ * @returns Plain object representation
  */
-export default {
-  // Case transformation
-  snakeToCamelString,
-  camelToSnakeString,
-  mapSnakeToCamel,
-  mapCamelToSnake,
+export function formDataToObject(formData: FormData): Record<string, unknown> {
+  const obj: Record<string, unknown> = {};
   
-  // Authentication
-  validateAuthHeaders,
-  createAuthErrorResponse,
+  formData.forEach((value, key) => {
+    // Handle multiple values for same key
+    if (obj[key] !== undefined) {
+      if (Array.isArray(obj[key])) {
+        (obj[key] as unknown[]).push(value);
+      } else {
+        obj[key] = [obj[key], value];
+      }
+    } else {
+      obj[key] = value;
+    }
+  });
+
+  return obj;
+}
+
+/**
+ * Generates deterministic mock data based on seed
+ * Useful for consistent test data generation
+ * 
+ * @param seed - Seed string for deterministic generation
+ * @param template - Template object to populate
+ * @returns Generated mock data
+ */
+export function generateMockData<T extends Record<string, unknown>>(
+  seed: string,
+  template: T
+): T {
+  // Simple hash function for deterministic generation
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    const char = seed.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+
+  const result = { ...template };
   
-  // Request/Response processing
-  processRequestBody,
-  processResponseBody,
-  createJsonResponse,
-  
-  // Query and pagination
-  extractQueryParams,
-  createPaginationMeta,
-  paginateData,
-  applyFilter,
-  applySort,
-  
-  // Middleware
-  createCaseTransformMiddleware,
-  createAuthMiddleware,
-  
-  // Error responses
-  createErrorResponse,
-  createBadRequestError,
-  createUnauthorizedError,
-  createForbiddenError,
-  createNotFoundError,
-  createValidationError,
-  createServerError,
-  
-  // URL utilities
-  extractServiceName,
-  extractResourcePath,
-  isSystemApiPath,
-  isServiceApiPath,
-  
-  // Development utilities
-  logRequest,
-  simulateNetworkDelay,
-};
+  // Use hash to generate consistent values
+  Object.keys(result).forEach((key, index) => {
+    const value = result[key];
+    if (typeof value === 'string' && value.includes('{')) {
+      // Replace placeholder patterns
+      result[key] = value.replace(/\{(\w+)\}/g, (match, placeholder) => {
+        const placeholderHash = Math.abs(hash + index);
+        switch (placeholder) {
+          case 'id':
+            return (placeholderHash % 1000 + 1).toString();
+          case 'name':
+            return `test-${placeholderHash % 100}`;
+          case 'email':
+            return `user${placeholderHash % 100}@example.com`;
+          default:
+            return match;
+        }
+      });
+    }
+  });
+
+  return result;
+}
