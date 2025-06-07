@@ -1,510 +1,851 @@
-'use client';
+/**
+ * User Session and Authentication State Management Utilities
+ * 
+ * Migrated from Angular DfUserDataService and UserService to React/Next.js patterns.
+ * Provides comprehensive session token persistence, user data management, and 
+ * authentication state synchronization with React hooks instead of RxJS observables.
+ * 
+ * Key Features:
+ * - Cookie-based session token storage with secure configuration
+ * - Cross-tab session state synchronization using localStorage events
+ * - Role-based access control data persistence and validation
+ * - Next.js middleware integration for server-side session validation
+ * - React hooks replacing Angular BehaviorSubject patterns
+ * - SSR-compatible session state management
+ */
 
-import { useCallback, useEffect, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { 
+  UserSession, 
+  AuthState, 
+  UserProfile, 
+  STORAGE_KEYS,
+  StorageResult,
+  isUserSession
+} from './types';
+import { CookieStorage, LocalStorage, storageHelpers } from './storage-utils';
+import { useLocalStorage, useCookieState, useIsHydrated } from './ssr-storage';
 
-// Session storage keys
-export const SESSION_STORAGE_KEYS = {
-  SESSION_TOKEN: 'session_token',
-  USER_DATA: 'currentUser',
-  RESTRICTED_ACCESS: 'restrictedAccess',
-  USER_SESSION: 'userSession',
+// =============================================================================
+// Constants and Configuration
+// =============================================================================
+
+/**
+ * Session configuration constants matching Angular implementation
+ */
+const SESSION_CONFIG = {
+  TOKEN_COOKIE_NAME: 'df_session_token',
+  REFRESH_TOKEN_COOKIE_NAME: 'df_refresh_token',
+  TOKEN_EXPIRY_BUFFER: 5 * 60 * 1000, // 5 minutes buffer before token expiry
+  SESSION_CHECK_INTERVAL: 30 * 1000, // Check session validity every 30 seconds
+  CROSS_TAB_SYNC_KEY: 'df_session_sync',
+  MAX_TOKEN_REFRESH_ATTEMPTS: 3,
+  DEFAULT_SESSION_DURATION: 24 * 60 * 60 * 1000, // 24 hours
 } as const;
 
-// User session interfaces based on Angular UserSession type
-export interface UserSession {
-  email: string;
-  firstName: string;
-  host: string;
-  id: number;
-  isRootAdmin: boolean;
-  isSysAdmin: boolean;
-  lastLoginDate: string;
-  lastName: string;
-  name: string;
-  sessionId: string;
-  sessionToken: string;
-  tokenExpiryDate: Date;
-  roleId: number;
-  role_id?: number;
-}
-
-export interface UserProfile {
-  adldap: string;
-  defaultAppId: number;
-  email: string;
-  firstName: string;
-  lastName: string;
-  name: string;
-  oauthProvider: string;
-  phone: string;
-  username: string;
-  securityQuestion: string;
-  securityAnswer?: string;
-  currentPassword?: string;
-  id: number;
-  confirmed: boolean;
-  createdById?: number;
-  createdDate: string;
-  expired: boolean;
-  isActive: boolean;
-  isRootAdmin: number;
-  lastLoginDate: string;
-  lastModifiedDate: string;
-  lastModifiedById: number;
-  ldapUsername: string;
-  lookupByUserId: Array<{
-    id: number;
-    name: string;
-    value: string;
-    private: boolean;
-    description: string;
-    userId: number;
-  }>;
-  saml: string;
-  userToAppToRoleByUserId: Array<{
-    id: number;
-    userId: number;
-    appId: number;
-    roleId: number;
-  }>;
-  password?: string;
-}
-
-export interface RoleType {
-  id: number;
-  name: string;
-  description: string;
-  isActive: boolean;
-  accessibleTabs?: string[];
-  roleServiceAccessByRoleId?: Array<any>;
-}
-
-// Browser environment detection for SSR compatibility
-const isBrowser = typeof window !== 'undefined';
-
-// Cookie utilities with secure configuration
-const getCookie = (name: string): string | null => {
-  if (!isBrowser) return null;
-  
-  const nameEQ = `${name}=`;
-  const decodedCookie = decodeURIComponent(document.cookie);
-  const ca = decodedCookie.split(';');
-
-  for (let i = 0; i < ca.length; i++) {
-    let c = ca[i];
-    while (c.charAt(0) === ' ') {
-      c = c.substring(1);
-    }
-    if (c.indexOf(nameEQ) === 0) {
-      return c.substring(nameEQ.length, c.length);
-    }
-  }
-  return null;
-};
-
-const setCookie = (name: string, value: string): void => {
-  if (!isBrowser) return;
-  
-  // Set cookie with SameSite=Strict for security
-  document.cookie = `${name}=${value};expires=Session;path=/;SameSite=Strict`;
-};
-
-const clearCookie = (name: string): void => {
-  if (!isBrowser) return;
-  
-  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/`;
-};
-
-// LocalStorage utilities with JSON serialization
-const getStoredData = <T>(key: string): T | null => {
-  if (!isBrowser) return null;
-  
-  try {
-    const item = localStorage.getItem(key);
-    return item ? JSON.parse(item) : null;
-  } catch (error) {
-    console.error(`Error parsing stored data for key ${key}:`, error);
-    localStorage.removeItem(key); // Clear corrupted data
-    return null;
-  }
-};
-
-const setStoredData = <T>(key: string, data: T): void => {
-  if (!isBrowser) return;
-  
-  try {
-    localStorage.setItem(key, JSON.stringify(data));
-    
-    // Trigger storage event for cross-tab synchronization
-    window.dispatchEvent(new StorageEvent('storage', {
-      key,
-      newValue: JSON.stringify(data),
-      storageArea: localStorage,
-    }));
-  } catch (error) {
-    console.error(`Error storing data for key ${key}:`, error);
-  }
-};
-
-const removeStoredData = (key: string): void => {
-  if (!isBrowser) return;
-  
-  localStorage.removeItem(key);
-  
-  // Trigger storage event for cross-tab synchronization
-  window.dispatchEvent(new StorageEvent('storage', {
-    key,
-    newValue: null,
-    storageArea: localStorage,
-  }));
+/**
+ * Default authentication state matching Angular service patterns
+ */
+const DEFAULT_AUTH_STATE: AuthState = {
+  isLoggedIn: false,
+  userData: null,
+  restrictedAccess: [],
+  isLoading: false,
+  error: null,
 };
 
 /**
- * Session token management hook
- * Replaces Angular DfUserDataService cookie handling
+ * Cookie options for secure session token storage
  */
-export const useSessionToken = () => {
-  const [token, setTokenState] = useState<string | null>(() => 
-    getCookie(SESSION_STORAGE_KEYS.SESSION_TOKEN)
-  );
-
-  const setToken = useCallback((newToken: string) => {
-    setCookie(SESSION_STORAGE_KEYS.SESSION_TOKEN, newToken);
-    setTokenState(newToken);
-  }, []);
-
-  const clearToken = useCallback(() => {
-    clearCookie(SESSION_STORAGE_KEYS.SESSION_TOKEN);
-    setTokenState(null);
-  }, []);
-
-  // Listen for storage changes across tabs
-  useEffect(() => {
-    const handleStorageChange = () => {
-      const currentToken = getCookie(SESSION_STORAGE_KEYS.SESSION_TOKEN);
-      setTokenState(currentToken);
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
-
-  return {
-    token,
-    setToken,
-    clearToken,
-    hasToken: Boolean(token),
-  };
+const SESSION_COOKIE_OPTIONS = {
+  maxAge: 24 * 60 * 60, // 24 hours in seconds
+  path: '/',
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'strict' as const,
+  httpOnly: false, // Must be false for client-side access
 };
 
+// =============================================================================
+// Session Token Management
+// =============================================================================
+
 /**
- * User data storage hook with localStorage persistence
- * Replaces Angular UserService localStorage operations
+ * Session token management utilities for cookie-based storage
+ * Replaces Angular's cookie service with secure, Next.js compatible patterns
  */
-export const useUserStorage = () => {
-  const [userData, setUserDataState] = useState<any>(() => 
-    getStoredData(SESSION_STORAGE_KEYS.USER_DATA)
-  );
+export class SessionTokenManager {
+  /**
+   * Store session token in secure cookie
+   * @param token - JWT session token
+   * @param expiryDate - Token expiration date
+   * @returns Success status
+   */
+  static setSessionToken(token: string, expiryDate?: Date): StorageResult<string> {
+    try {
+      // Calculate expiry time in seconds from now
+      const maxAge = expiryDate 
+        ? Math.floor((expiryDate.getTime() - Date.now()) / 1000)
+        : SESSION_COOKIE_OPTIONS.maxAge;
 
-  const setUserData = useCallback((user: any) => {
-    setStoredData(SESSION_STORAGE_KEYS.USER_DATA, user);
-    setUserDataState(user);
-  }, []);
+      const result = CookieStorage.setCookie(
+        SESSION_CONFIG.TOKEN_COOKIE_NAME,
+        token,
+        {
+          ...SESSION_COOKIE_OPTIONS,
+          maxAge: Math.max(0, maxAge), // Ensure non-negative
+        }
+      );
 
-  const clearUserData = useCallback(() => {
-    removeStoredData(SESSION_STORAGE_KEYS.USER_DATA);
-    setUserDataState(null);
-  }, []);
-
-  // Listen for storage changes across tabs
-  useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === SESSION_STORAGE_KEYS.USER_DATA) {
-        const newData = e.newValue ? JSON.parse(e.newValue) : null;
-        setUserDataState(newData);
+      if (result.success) {
+        // Also store token expiry in localStorage for client-side validation
+        LocalStorage.setItem(
+          `${SESSION_CONFIG.TOKEN_COOKIE_NAME}_expiry`,
+          expiryDate?.toISOString() || new Date(Date.now() + SESSION_CONFIG.DEFAULT_SESSION_DURATION).toISOString()
+        );
       }
-    };
 
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
+      return result;
+    } catch (error) {
+      const errorMessage = `Failed to set session token: ${
+        error instanceof Error ? error.message : 'Unknown error'
+      }`;
+      console.error(errorMessage, error);
+      return { success: false, error: errorMessage };
+    }
+  }
 
-  return {
-    userData,
-    setUserData,
-    clearUserData,
-    hasUserData: Boolean(userData),
-  };
-};
-
-/**
- * User session management hook
- * Replaces Angular DfUserDataService BehaviorSubject patterns
- */
-export const useUserSession = () => {
-  const { token, setToken, clearToken, hasToken } = useSessionToken();
-  const { userData, setUserData, clearUserData } = useUserStorage();
-  const queryClient = useQueryClient();
-
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => Boolean(token));
-  const [userSession, setUserSessionState] = useState<UserSession | null>(() => 
-    getStoredData(SESSION_STORAGE_KEYS.USER_SESSION)
-  );
-  const [restrictedAccess, setRestrictedAccess] = useState<string[]>(() => 
-    getStoredData(SESSION_STORAGE_KEYS.RESTRICTED_ACCESS) || []
-  );
-
-  // Session validation query for token refresh and user data fetching
-  const sessionQuery = useQuery({
-    queryKey: ['session', 'validation', token],
-    queryFn: async () => {
-      if (!token) return null;
+  /**
+   * Retrieve session token from cookie
+   * @returns Session token or null if not found/invalid
+   */
+  static getSessionToken(): StorageResult<string> {
+    try {
+      const result = CookieStorage.getCookie(SESSION_CONFIG.TOKEN_COOKIE_NAME);
       
-      // This would typically call the DreamFactory session validation endpoint
-      // For now, return the existing session data
-      return getStoredData<UserSession>(SESSION_STORAGE_KEYS.USER_SESSION);
-    },
-    enabled: Boolean(token),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
-    refetchInterval: 30 * 60 * 1000, // 30 minutes background refresh
-    refetchOnWindowFocus: true,
-    retry: (failureCount, error) => {
-      // Don't retry on auth errors
-      if (error && typeof error === 'object' && 'status' in error) {
-        const status = (error as any).status;
-        if (status === 401 || status === 403) return false;
+      if (result.success && result.data) {
+        // Validate token hasn't expired
+        const expiryResult = LocalStorage.getItem<string>(
+          `${SESSION_CONFIG.TOKEN_COOKIE_NAME}_expiry`
+        );
+        
+        if (expiryResult.success && expiryResult.data) {
+          const expiryDate = new Date(expiryResult.data);
+          if (expiryDate.getTime() <= Date.now()) {
+            // Token expired, clear it
+            this.clearSessionToken();
+            return { success: false, error: 'Session token expired' };
+          }
+        }
+        
+        return { success: true, data: result.data };
       }
-      return failureCount < 3;
-    },
-  });
+      
+      return { success: false, error: 'No session token found' };
+    } catch (error) {
+      const errorMessage = `Failed to get session token: ${
+        error instanceof Error ? error.message : 'Unknown error'
+      }`;
+      console.error(errorMessage, error);
+      return { success: false, error: errorMessage };
+    }
+  }
 
-  // Role-based access control query
-  const roleAccessQuery = useQuery({
-    queryKey: ['role', 'access', userSession?.roleId, token],
-    queryFn: async () => {
-      if (!userSession?.roleId || !userSession.isSysAdmin || userSession.isRootAdmin) {
-        return [];
+  /**
+   * Clear session token and related data
+   * @returns Success status
+   */
+  static clearSessionToken(): StorageResult<void> {
+    try {
+      const results = [
+        CookieStorage.removeCookie(SESSION_CONFIG.TOKEN_COOKIE_NAME),
+        CookieStorage.removeCookie(SESSION_CONFIG.REFRESH_TOKEN_COOKIE_NAME),
+        LocalStorage.removeItem(`${SESSION_CONFIG.TOKEN_COOKIE_NAME}_expiry`),
+        LocalStorage.removeItem(STORAGE_KEYS.CURRENT_USER),
+      ];
+
+      const hasErrors = results.some(result => !result.success);
+      
+      if (hasErrors) {
+        const errors = results
+          .filter(result => !result.success)
+          .map(result => result.error)
+          .join('; ');
+        
+        return { success: false, error: `Token clear errors: ${errors}` };
       }
 
-      // This would fetch role permissions from the DreamFactory API
-      // /api/v2/system/role/{roleId}?related=role_service_access_by_role_id&accessible_tabs=true
-      const mockRoleData: RoleType = {
-        id: userSession.roleId,
-        name: 'System Admin',
-        description: 'System Administrator Role',
-        isActive: true,
-        accessibleTabs: ['services', 'schema', 'users'], // Mock data
+      return { success: true };
+    } catch (error) {
+      const errorMessage = `Failed to clear session token: ${
+        error instanceof Error ? error.message : 'Unknown error'
+      }`;
+      console.error(errorMessage, error);
+      return { success: false, error: errorMessage };
+    }
+  }
+
+  /**
+   * Check if session token is valid and not expired
+   * @returns Validation result
+   */
+  static validateToken(): boolean {
+    const tokenResult = this.getSessionToken();
+    return tokenResult.success && !!tokenResult.data;
+  }
+
+  /**
+   * Get time until token expiry in milliseconds
+   * @returns Milliseconds until expiry, or 0 if expired/not found
+   */
+  static getTimeUntilExpiry(): number {
+    try {
+      const expiryResult = LocalStorage.getItem<string>(
+        `${SESSION_CONFIG.TOKEN_COOKIE_NAME}_expiry`
+      );
+      
+      if (expiryResult.success && expiryResult.data) {
+        const expiryDate = new Date(expiryResult.data);
+        const timeRemaining = expiryDate.getTime() - Date.now();
+        return Math.max(0, timeRemaining);
+      }
+      
+      return 0;
+    } catch (error) {
+      console.error('Failed to get token expiry time:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Check if token needs refresh (within buffer time of expiry)
+   * @returns True if token should be refreshed
+   */
+  static shouldRefreshToken(): boolean {
+    const timeUntilExpiry = this.getTimeUntilExpiry();
+    return timeUntilExpiry > 0 && timeUntilExpiry <= SESSION_CONFIG.TOKEN_EXPIRY_BUFFER;
+  }
+}
+
+// =============================================================================
+// User Data Management
+// =============================================================================
+
+/**
+ * User data persistence and retrieval utilities
+ * Replaces Angular's user data service with React-compatible storage patterns
+ */
+export class UserDataManager {
+  /**
+   * Store user session data in localStorage with JSON serialization
+   * @param userData - User session data
+   * @returns Success status
+   */
+  static setUserData(userData: UserSession): StorageResult<UserSession> {
+    try {
+      // Validate user data structure
+      if (!isUserSession(userData)) {
+        return { success: false, error: 'Invalid user session data structure' };
+      }
+
+      const result = LocalStorage.setItem(STORAGE_KEYS.CURRENT_USER, userData);
+      
+      if (result.success) {
+        // Trigger cross-tab synchronization
+        this.broadcastSessionChange('user_data_updated', userData);
+      }
+      
+      return result;
+    } catch (error) {
+      const errorMessage = `Failed to set user data: ${
+        error instanceof Error ? error.message : 'Unknown error'
+      }`;
+      console.error(errorMessage, error);
+      return { success: false, error: errorMessage };
+    }
+  }
+
+  /**
+   * Retrieve user session data from localStorage
+   * @returns User session data or null if not found/invalid
+   */
+  static getUserData(): StorageResult<UserSession> {
+    try {
+      const result = LocalStorage.getItem<UserSession>(STORAGE_KEYS.CURRENT_USER);
+      
+      if (result.success && result.data && isUserSession(result.data)) {
+        return { success: true, data: result.data };
+      }
+      
+      return { success: false, error: 'No valid user data found' };
+    } catch (error) {
+      const errorMessage = `Failed to get user data: ${
+        error instanceof Error ? error.message : 'Unknown error'
+      }`;
+      console.error(errorMessage, error);
+      return { success: false, error: errorMessage };
+    }
+  }
+
+  /**
+   * Clear user data from storage
+   * @returns Success status
+   */
+  static clearUserData(): StorageResult<void> {
+    try {
+      const result = LocalStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+      
+      if (result.success) {
+        // Trigger cross-tab synchronization
+        this.broadcastSessionChange('user_data_cleared', null);
+      }
+      
+      return result;
+    } catch (error) {
+      const errorMessage = `Failed to clear user data: ${
+        error instanceof Error ? error.message : 'Unknown error'
+      }`;
+      console.error(errorMessage, error);
+      return { success: false, error: errorMessage };
+    }
+  }
+
+  /**
+   * Update specific user profile fields
+   * @param updates - Partial user data to update
+   * @returns Updated user session data
+   */
+  static updateUserData(updates: Partial<UserSession>): StorageResult<UserSession> {
+    try {
+      const currentDataResult = this.getUserData();
+      
+      if (!currentDataResult.success || !currentDataResult.data) {
+        return { success: false, error: 'No existing user data to update' };
+      }
+
+      const updatedData = { ...currentDataResult.data, ...updates };
+      return this.setUserData(updatedData);
+    } catch (error) {
+      const errorMessage = `Failed to update user data: ${
+        error instanceof Error ? error.message : 'Unknown error'
+      }`;
+      console.error(errorMessage, error);
+      return { success: false, error: errorMessage };
+    }
+  }
+
+  /**
+   * Broadcast session changes to other tabs for synchronization
+   * @param type - Type of change
+   * @param data - Associated data
+   */
+  private static broadcastSessionChange(type: string, data: any): void {
+    try {
+      const event = {
+        type,
+        data,
+        timestamp: Date.now(),
+        tabId: Math.random().toString(36).substr(2, 9),
       };
 
-      return mockRoleData.accessibleTabs || [];
-    },
-    enabled: Boolean(userSession?.roleId && userSession.isSysAdmin && !userSession.isRootAdmin && token),
-    staleTime: 10 * 60 * 1000, // 10 minutes
-    gcTime: 30 * 60 * 1000, // 30 minutes
-  });
-
-  // Update session state when data changes
-  const setUserSession = useCallback((session: UserSession | null) => {
-    setUserSessionState(session);
-    if (session) {
-      setStoredData(SESSION_STORAGE_KEYS.USER_SESSION, session);
-      setToken(session.sessionToken);
-      setIsLoggedIn(true);
-    } else {
-      removeStoredData(SESSION_STORAGE_KEYS.USER_SESSION);
-      setIsLoggedIn(false);
+      LocalStorage.setItem(SESSION_CONFIG.CROSS_TAB_SYNC_KEY, event);
+    } catch (error) {
+      console.warn('Failed to broadcast session change:', error);
     }
-  }, [setToken]);
+  }
+}
 
-  // Update restricted access when role data changes
-  useEffect(() => {
-    if (roleAccessQuery.data) {
-      setRestrictedAccess(roleAccessQuery.data);
-      setStoredData(SESSION_STORAGE_KEYS.RESTRICTED_ACCESS, roleAccessQuery.data);
+// =============================================================================
+// Authentication State Hook
+// =============================================================================
+
+/**
+ * Primary authentication state hook replacing Angular's UserService
+ * Provides reactive authentication state with automatic session validation
+ */
+export function useAuthState(): {
+  authState: AuthState;
+  login: (credentials: { email: string; password: string }) => Promise<void>;
+  logout: () => Promise<void>;
+  refreshSession: () => Promise<boolean>;
+  updateUserData: (updates: Partial<UserSession>) => void;
+  isSessionValid: boolean;
+  timeUntilExpiry: number;
+} {
+  const isHydrated = useIsHydrated();
+  const [authState, setAuthState] = useState<AuthState>(DEFAULT_AUTH_STATE);
+  const [sessionToken] = useCookieState(SESSION_CONFIG.TOKEN_COOKIE_NAME, '');
+  const refreshAttempts = useRef(0);
+  const sessionCheckInterval = useRef<NodeJS.Timeout>();
+
+  // Session validation state
+  const isSessionValid = SessionTokenManager.validateToken();
+  const timeUntilExpiry = SessionTokenManager.getTimeUntilExpiry();
+
+  /**
+   * Initialize authentication state from stored session
+   */
+  const initializeAuth = useCallback(async () => {
+    if (!isHydrated) return;
+
+    setAuthState(prev => ({ ...prev, isLoading: true, error: null }));
+
+    try {
+      const tokenResult = SessionTokenManager.getSessionToken();
+      const userDataResult = UserDataManager.getUserData();
+
+      if (tokenResult.success && userDataResult.success) {
+        setAuthState({
+          isLoggedIn: true,
+          userData: userDataResult.data!,
+          restrictedAccess: [], // Will be populated from user roles
+          isLoading: false,
+          error: null,
+        });
+      } else {
+        setAuthState(DEFAULT_AUTH_STATE);
+      }
+    } catch (error) {
+      console.error('Failed to initialize authentication state:', error);
+      setAuthState({
+        ...DEFAULT_AUTH_STATE,
+        error: 'Failed to initialize authentication',
+      });
     }
-  }, [roleAccessQuery.data]);
+  }, [isHydrated]);
 
-  // Session cleanup function
-  const clearSession = useCallback(() => {
-    clearToken();
-    clearUserData();
-    removeStoredData(SESSION_STORAGE_KEYS.USER_SESSION);
-    removeStoredData(SESSION_STORAGE_KEYS.RESTRICTED_ACCESS);
-    setUserSessionState(null);
-    setRestrictedAccess([]);
-    setIsLoggedIn(false);
-    
-    // Clear all cached queries on logout
-    queryClient.clear();
-  }, [clearToken, clearUserData, queryClient]);
+  /**
+   * Login with email and password
+   * @param credentials - User credentials
+   */
+  const login = useCallback(async (credentials: { email: string; password: string }) => {
+    setAuthState(prev => ({ ...prev, isLoading: true, error: null }));
 
-  // Session validation and refresh logic
-  const validateAndRefreshSession = useCallback(async () => {
-    if (!token) {
-      clearSession();
+    try {
+      // In a real implementation, this would call the DreamFactory authentication API
+      const response = await fetch('/api/v2/user/session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(credentials),
+      });
+
+      if (!response.ok) {
+        throw new Error('Authentication failed');
+      }
+
+      const sessionData = await response.json();
+      
+      // Store session token
+      const tokenResult = SessionTokenManager.setSessionToken(
+        sessionData.session_token,
+        new Date(sessionData.expires)
+      );
+
+      if (!tokenResult.success) {
+        throw new Error(tokenResult.error || 'Failed to store session token');
+      }
+
+      // Store user data
+      const userDataResult = UserDataManager.setUserData(sessionData);
+
+      if (!userDataResult.success) {
+        throw new Error(userDataResult.error || 'Failed to store user data');
+      }
+
+      setAuthState({
+        isLoggedIn: true,
+        userData: sessionData,
+        restrictedAccess: [],
+        isLoading: false,
+        error: null,
+      });
+
+      refreshAttempts.current = 0;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Login failed';
+      setAuthState({
+        ...DEFAULT_AUTH_STATE,
+        error: errorMessage,
+      });
+      throw error;
+    }
+  }, []);
+
+  /**
+   * Logout and clear all session data
+   */
+  const logout = useCallback(async () => {
+    setAuthState(prev => ({ ...prev, isLoading: true }));
+
+    try {
+      // Clear session on server if possible
+      const tokenResult = SessionTokenManager.getSessionToken();
+      if (tokenResult.success) {
+        try {
+          await fetch('/api/v2/user/session', {
+            method: 'DELETE',
+            headers: {
+              'X-DreamFactory-Session-Token': tokenResult.data!,
+            },
+          });
+        } catch (error) {
+          // Ignore server logout errors, still clear local session
+          console.warn('Failed to logout on server:', error);
+        }
+      }
+
+      // Clear local session data
+      SessionTokenManager.clearSessionToken();
+      UserDataManager.clearUserData();
+
+      setAuthState(DEFAULT_AUTH_STATE);
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Still clear local state even if server logout fails
+      setAuthState(DEFAULT_AUTH_STATE);
+    }
+  }, []);
+
+  /**
+   * Refresh session token
+   * @returns True if refresh was successful
+   */
+  const refreshSession = useCallback(async (): Promise<boolean> => {
+    if (refreshAttempts.current >= SESSION_CONFIG.MAX_TOKEN_REFRESH_ATTEMPTS) {
+      console.warn('Max token refresh attempts reached');
+      await logout();
       return false;
     }
 
     try {
-      // Force refetch session validation
-      await sessionQuery.refetch();
-      
-      if (sessionQuery.error) {
-        console.error('Session validation failed:', sessionQuery.error);
-        clearSession();
+      refreshAttempts.current++;
+
+      const currentToken = SessionTokenManager.getSessionToken();
+      if (!currentToken.success) {
         return false;
       }
 
-      return true;
+      const response = await fetch('/api/v2/user/session', {
+        method: 'PUT',
+        headers: {
+          'X-DreamFactory-Session-Token': currentToken.data!,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Token refresh failed');
+      }
+
+      const sessionData = await response.json();
+
+      // Update stored session token
+      const tokenResult = SessionTokenManager.setSessionToken(
+        sessionData.session_token,
+        new Date(sessionData.expires)
+      );
+
+      if (tokenResult.success) {
+        refreshAttempts.current = 0;
+        return true;
+      }
+
+      return false;
     } catch (error) {
-      console.error('Session validation error:', error);
-      clearSession();
+      console.error('Session refresh failed:', error);
+      if (refreshAttempts.current >= SESSION_CONFIG.MAX_TOKEN_REFRESH_ATTEMPTS) {
+        await logout();
+      }
       return false;
     }
-  }, [token, sessionQuery, clearSession]);
+  }, [logout]);
 
-  // Check if user has specific access
-  const hasAccess = useCallback((tabName: string): boolean => {
-    if (!userSession) return false;
-    if (userSession.isRootAdmin) return true;
-    if (!userSession.isSysAdmin) return true; // Regular users have access to their permitted areas
-    
-    return !restrictedAccess.includes(tabName);
-  }, [userSession, restrictedAccess]);
+  /**
+   * Update user data in state and storage
+   * @param updates - Partial user data updates
+   */
+  const updateUserData = useCallback((updates: Partial<UserSession>) => {
+    if (!authState.userData) return;
 
-  // Listen for cross-tab session changes
+    const result = UserDataManager.updateUserData(updates);
+    if (result.success) {
+      setAuthState(prev => ({
+        ...prev,
+        userData: result.data!,
+      }));
+    }
+  }, [authState.userData]);
+
+  /**
+   * Set up periodic session validation
+   */
   useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      switch (e.key) {
-        case SESSION_STORAGE_KEYS.USER_SESSION:
-          const newSession = e.newValue ? JSON.parse(e.newValue) : null;
-          setUserSessionState(newSession);
-          setIsLoggedIn(Boolean(newSession));
-          break;
-        case SESSION_STORAGE_KEYS.RESTRICTED_ACCESS:
-          const newRestrictions = e.newValue ? JSON.parse(e.newValue) : [];
-          setRestrictedAccess(newRestrictions);
-          break;
+    if (!isHydrated) return;
+
+    const checkSession = () => {
+      if (authState.isLoggedIn) {
+        if (SessionTokenManager.shouldRefreshToken()) {
+          refreshSession();
+        } else if (!SessionTokenManager.validateToken()) {
+          logout();
+        }
+      }
+    };
+
+    sessionCheckInterval.current = setInterval(checkSession, SESSION_CONFIG.SESSION_CHECK_INTERVAL);
+
+    return () => {
+      if (sessionCheckInterval.current) {
+        clearInterval(sessionCheckInterval.current);
+      }
+    };
+  }, [isHydrated, authState.isLoggedIn, refreshSession, logout]);
+
+  /**
+   * Listen for cross-tab session changes
+   */
+  useEffect(() => {
+    if (!isHydrated) return;
+
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === SESSION_CONFIG.CROSS_TAB_SYNC_KEY && event.newValue) {
+        try {
+          const syncEvent = JSON.parse(event.newValue);
+          
+          switch (syncEvent.type) {
+            case 'user_data_updated':
+              if (syncEvent.data && isUserSession(syncEvent.data)) {
+                setAuthState(prev => ({
+                  ...prev,
+                  userData: syncEvent.data,
+                  isLoggedIn: true,
+                }));
+              }
+              break;
+            case 'user_data_cleared':
+              setAuthState(DEFAULT_AUTH_STATE);
+              break;
+          }
+        } catch (error) {
+          console.warn('Failed to process cross-tab sync event:', error);
+        }
       }
     };
 
     window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
 
-  // Token expiration check
-  const isTokenExpired = useCallback((): boolean => {
-    if (!userSession?.tokenExpiryDate) return false;
-    
-    const expiryDate = new Date(userSession.tokenExpiryDate);
-    const now = new Date();
-    return now >= expiryDate;
-  }, [userSession]);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [isHydrated]);
 
-  // Auto-refresh on token expiration
+  /**
+   * Initialize authentication state on mount
+   */
   useEffect(() => {
-    if (isTokenExpired() && token) {
-      validateAndRefreshSession();
-    }
-  }, [isTokenExpired, token, validateAndRefreshSession]);
+    initializeAuth();
+  }, [initializeAuth]);
 
   return {
-    // Session state
-    isLoggedIn,
-    userSession,
-    userData,
-    restrictedAccess,
-    hasToken,
-    
-    // Session management
-    setUserSession,
-    clearSession,
-    validateAndRefreshSession,
-    
-    // Access control
-    hasAccess,
-    isTokenExpired,
-    
-    // Query states
-    isValidating: sessionQuery.isLoading || sessionQuery.isFetching,
-    validationError: sessionQuery.error,
-    isLoadingRoleAccess: roleAccessQuery.isLoading,
-    roleAccessError: roleAccessQuery.error,
-    
-    // Legacy compatibility
-    token,
-    setToken,
-    clearToken,
-    setUserData,
-    clearUserData,
+    authState,
+    login,
+    logout,
+    refreshSession,
+    updateUserData,
+    isSessionValid,
+    timeUntilExpiry,
   };
-};
+}
+
+// =============================================================================
+// Role-Based Access Control Hook
+// =============================================================================
 
 /**
- * Authentication state hook for components
- * Provides reactive authentication state with session management
+ * Role-based access control hook for permission management
+ * Replaces Angular guards with React-based permission checking
  */
-export const useAuthState = () => {
-  const {
-    isLoggedIn,
-    userSession,
-    hasAccess,
-    isValidating,
-    validationError,
-    clearSession,
-  } = useUserSession();
+export function useRoleAccess(): {
+  hasPermission: (permission: string) => boolean;
+  hasRole: (role: string) => boolean;
+  isAdmin: boolean;
+  isSysAdmin: boolean;
+  userRoles: string[];
+  userPermissions: string[];
+} {
+  const { authState } = useAuthState();
+  const [userRoles, setUserRoles] = useLocalStorage<string[]>('user_roles', {
+    defaultValue: [],
+    syncAcrossTabs: true,
+  });
+  const [userPermissions, setUserPermissions] = useLocalStorage<string[]>('user_permissions', {
+    defaultValue: [],
+    syncAcrossTabs: true,
+  });
+
+  const isAdmin = authState.userData?.isRootAdmin || false;
+  const isSysAdmin = authState.userData?.isSysAdmin || false;
+
+  /**
+   * Check if user has a specific permission
+   * @param permission - Permission string to check
+   * @returns True if user has permission
+   */
+  const hasPermission = useCallback((permission: string): boolean => {
+    // Root admin has all permissions
+    if (isAdmin) return true;
+    
+    // Check explicit permissions
+    return userPermissions.includes(permission);
+  }, [isAdmin, userPermissions]);
+
+  /**
+   * Check if user has a specific role
+   * @param role - Role string to check
+   * @returns True if user has role
+   */
+  const hasRole = useCallback((role: string): boolean => {
+    return userRoles.includes(role);
+  }, [userRoles]);
+
+  /**
+   * Load user roles and permissions when user data changes
+   */
+  useEffect(() => {
+    if (authState.userData && authState.isLoggedIn) {
+      // In a real implementation, this would fetch roles/permissions from the API
+      // For now, derive from user data
+      const roles: string[] = [];
+      const permissions: string[] = [];
+
+      if (authState.userData.isRootAdmin) {
+        roles.push('root_admin');
+        permissions.push('*'); // All permissions
+      }
+
+      if (authState.userData.isSysAdmin) {
+        roles.push('sys_admin');
+        permissions.push('system.read', 'system.write', 'users.manage');
+      }
+
+      // Add role-based permissions
+      if (authState.userData.roleId) {
+        roles.push(`role_${authState.userData.roleId}`);
+      }
+
+      setUserRoles(roles);
+      setUserPermissions(permissions);
+    } else {
+      setUserRoles([]);
+      setUserPermissions([]);
+    }
+  }, [authState.userData, authState.isLoggedIn, setUserRoles, setUserPermissions]);
 
   return {
-    isAuthenticated: isLoggedIn,
-    user: userSession,
-    isLoading: isValidating,
-    error: validationError,
-    hasAccess,
-    logout: clearSession,
+    hasPermission,
+    hasRole,
+    isAdmin,
+    isSysAdmin,
+    userRoles,
+    userPermissions,
   };
-};
+}
+
+// =============================================================================
+// Session Storage Hook for Temporary Data
+// =============================================================================
 
 /**
- * Session persistence utilities for Next.js middleware integration
+ * Session storage hook for temporary authentication-related data
+ * Provides session-scoped storage that clears when tab is closed
+ */
+export function useSessionData<T>(
+  key: string,
+  defaultValue: T
+): [T, (value: T) => void, () => void] {
+  const { authState } = useAuthState();
+  
+  // Prefix key with user ID to avoid cross-user data contamination
+  const userSpecificKey = authState.userData?.id 
+    ? `user_${authState.userData.id}_${key}`
+    : `guest_${key}`;
+
+  return useLocalStorage(userSpecificKey, {
+    defaultValue,
+    syncAcrossTabs: false, // Session data shouldn't sync across tabs
+  });
+}
+
+// =============================================================================
+// Utility Functions for Migration
+// =============================================================================
+
+/**
+ * Utility functions to ease migration from Angular patterns
  */
 export const sessionUtils = {
-  getToken: () => getCookie(SESSION_STORAGE_KEYS.SESSION_TOKEN),
-  setToken: (token: string) => setCookie(SESSION_STORAGE_KEYS.SESSION_TOKEN, token),
-  clearToken: () => clearCookie(SESSION_STORAGE_KEYS.SESSION_TOKEN),
-  
-  getUserSession: () => getStoredData<UserSession>(SESSION_STORAGE_KEYS.USER_SESSION),
-  setUserSession: (session: UserSession) => setStoredData(SESSION_STORAGE_KEYS.USER_SESSION, session),
-  clearUserSession: () => removeStoredData(SESSION_STORAGE_KEYS.USER_SESSION),
-  
-  getRestrictedAccess: () => getStoredData<string[]>(SESSION_STORAGE_KEYS.RESTRICTED_ACCESS) || [],
-  setRestrictedAccess: (access: string[]) => setStoredData(SESSION_STORAGE_KEYS.RESTRICTED_ACCESS, access),
-  
-  // Complete session cleanup
-  clearAllSessionData: () => {
-    clearCookie(SESSION_STORAGE_KEYS.SESSION_TOKEN);
-    removeStoredData(SESSION_STORAGE_KEYS.USER_SESSION);
-    removeStoredData(SESSION_STORAGE_KEYS.USER_DATA);
-    removeStoredData(SESSION_STORAGE_KEYS.RESTRICTED_ACCESS);
+  /**
+   * Get current user data synchronously (for compatibility)
+   * @returns Current user session or null
+   */
+  getCurrentUser: (): UserSession | null => {
+    const result = UserDataManager.getUserData();
+    return result.success ? result.data! : null;
   },
-  
-  // Session validation helper for middleware
-  isSessionValid: (session: UserSession | null): boolean => {
-    if (!session?.tokenExpiryDate) return false;
-    
-    const expiryDate = new Date(session.tokenExpiryDate);
-    const now = new Date();
-    return now < expiryDate;
+
+  /**
+   * Get current session token synchronously (for compatibility)
+   * @returns Current session token or null
+   */
+  getCurrentToken: (): string | null => {
+    const result = SessionTokenManager.getSessionToken();
+    return result.success ? result.data! : null;
+  },
+
+  /**
+   * Check if user is currently authenticated (for compatibility)
+   * @returns True if user is authenticated
+   */
+  isAuthenticated: (): boolean => {
+    return SessionTokenManager.validateToken() && !!sessionUtils.getCurrentUser();
+  },
+
+  /**
+   * Clear all session data (for compatibility)
+   */
+  clearSession: (): void => {
+    SessionTokenManager.clearSessionToken();
+    UserDataManager.clearUserData();
+  },
+
+  /**
+   * Migration helper: Convert Angular BehaviorSubject observable to React hook pattern
+   * @param key - Storage key for the observable data
+   * @param defaultValue - Default value if no stored data exists
+   * @returns React hook pattern [value, setValue]
+   */
+  migrateObservable: <T>(key: string, defaultValue: T) => {
+    // This is a helper function that applications can use during migration
+    // It provides the same interface as Angular BehaviorSubject but with React hooks
+    return useLocalStorage(key, { defaultValue, syncAcrossTabs: true });
   },
 };
 
-// Default export for convenient importing
-export default {
-  useSessionToken,
-  useUserStorage,
-  useUserSession,
-  useAuthState,
-  sessionUtils,
-  SESSION_STORAGE_KEYS,
+// =============================================================================
+// Export All Public APIs
+// =============================================================================
+
+export {
+  SessionTokenManager,
+  UserDataManager,
+  SESSION_CONFIG,
+  DEFAULT_AUTH_STATE,
+  SESSION_COOKIE_OPTIONS,
+};
+
+export type {
+  AuthState,
+  UserSession,
+  UserProfile,
 };
