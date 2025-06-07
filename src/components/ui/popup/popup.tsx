@@ -1,375 +1,652 @@
-'use client';
+"use client";
 
-import React, { Fragment, useEffect } from 'react';
+import React, { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import { useRouter } from 'next/navigation';
+import { Button, IconButton } from '@/components/ui/button/button';
 import { cn } from '@/lib/utils';
-import { PopupProps, PopupVariant, PopupSize, POPUP_SIZE_CONFIG } from './types';
+import { useAuth } from '@/hooks/useAuth';
+import type {
+  PopupProps,
+  PopupConfig,
+  PopupVariant,
+  PopupSize,
+  PopupButtonType,
+  PopupAnimationConfig,
+  PopupAccessibilityConfig,
+  PopupThemeConfig,
+  PopupI18nConfig,
+  AuthWorkflowCallbacks,
+  AuthRedirectReason,
+  LogoutReason,
+} from './types';
 
-// Note: These hooks don't exist yet but are expected to be created as part of the migration
-// They should implement the interfaces described in the comments below
-interface AuthHook {
-  logout: (redirectPath?: string[]) => Promise<void>;
-  user: any;
-}
+// =============================================================================
+// CONSTANTS AND CONFIGURATION
+// =============================================================================
 
-interface RouterHook {
-  push: (path: string) => void;
-  pathname: string;
-}
-
-// Temporary implementations until actual hooks are created
-const useAuth = (): AuthHook => ({
-  logout: async (redirectPath?: string[]) => {
-    // Implementation should redirect to authentication flow
-    console.warn('useAuth hook not implemented yet');
-    if (redirectPath && redirectPath.length > 0) {
-      window.location.href = redirectPath.join('/');
-    }
+/**
+ * Default popup configuration values ensuring WCAG 2.1 AA compliance
+ */
+const DEFAULT_POPUP_CONFIG: Required<PopupConfig> = {
+  message: 'Your current password is shorter than recommended (less than 17 characters). For better security, we recommend updating your password to a longer one.',
+  showRemindMeLater: true,
+  title: 'Password Security Notice',
+  variant: 'authentication',
+  size: 'md',
+  dismissOnClickOutside: false,
+  showCloseButton: true,
+  autoCloseTimeout: 0,
+  className: '',
+  accessibility: {
+    role: 'alertdialog',
+    ariaLabel: 'Password Security Notice',
+    trapFocus: true,
+    initialFocus: 'first',
+    announceOnOpen: true,
+    modal: true,
   },
-  user: null,
-});
-
-const useRouter = (): RouterHook => ({
-  push: (path: string) => {
-    // Implementation should use Next.js router
-    console.warn('useRouter hook not implemented yet');
-    window.location.href = path;
+  animation: {
+    preset: 'fade',
+    duration: 200,
+    easing: 'ease-out',
+    animateBackdrop: true,
   },
-  pathname: typeof window !== 'undefined' ? window.location.pathname : '',
-});
-
-// Button component assumption - should match the actual Button component interface
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
-  size?: 'sm' | 'md' | 'lg';
-  children: React.ReactNode;
-}
-
-const Button: React.FC<ButtonProps> = ({ 
-  variant = 'primary', 
-  size = 'md', 
-  className, 
-  children, 
-  ...props 
-}) => {
-  const baseStyles = cn(
-    'inline-flex items-center justify-center font-medium rounded-md transition-colors duration-200',
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2',
-    'disabled:opacity-50 disabled:pointer-events-none',
-    'min-h-[44px]' // WCAG minimum touch target size
-  );
-
-  const variants = {
-    primary: 'bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800 border border-primary-600',
-    secondary: 'bg-secondary-100 text-secondary-900 hover:bg-secondary-200 active:bg-secondary-300 border border-secondary-300',
-    outline: 'bg-transparent text-primary-600 hover:bg-primary-50 active:bg-primary-100 border-2 border-primary-600',
-    ghost: 'bg-transparent text-secondary-700 hover:bg-secondary-100 active:bg-secondary-200 border border-transparent',
-  };
-
-  const sizes = {
-    sm: 'h-11 px-4 text-sm min-w-[44px]',
-    md: 'h-12 px-6 text-base min-w-[48px]',
-    lg: 'h-14 px-8 text-lg min-w-[56px]',
-  };
-
-  return (
-    <button
-      className={cn(baseStyles, variants[variant], sizes[size], className)}
-      {...props}
-    >
-      {children}
-    </button>
-  );
 };
 
 /**
- * Popup Component - React implementation of password security notice functionality
- * 
- * Replaces Angular DfPopupComponent with WCAG 2.1 AA accessibility standards including:
- * - Focus trapping via Headless UI Dialog
- * - Escape key handling
- * - Proper ARIA labeling
- * - Configurable message content and button visibility
- * - Authentication redirect workflow integration
- * 
- * @param props PopupProps configuration
+ * Authentication redirect routes mapping
  */
-export const Popup: React.FC<PopupProps> = ({
+const AUTH_ROUTES = {
+  LOGIN: '/login',
+  RESET_PASSWORD: '/auth/reset-password',
+  UNAUTHORIZED: '/unauthorized',
+  MAINTENANCE: '/maintenance',
+} as const;
+
+/**
+ * Internationalization keys for popup content
+ */
+const I18N_KEYS = {
+  TITLE: 'popup.passwordSecurity.title',
+  MESSAGE: 'popup.passwordSecurity.message',
+  REMIND_LATER: 'popup.actions.remindLater',
+  UPDATE_NOW: 'popup.actions.updateNow',
+  CLOSE: 'popup.actions.close',
+  CONFIRM: 'popup.actions.confirm',
+  CANCEL: 'popup.actions.cancel',
+} as const;
+
+/**
+ * WCAG 2.1 AA compliant variant styles using design tokens
+ */
+const POPUP_VARIANT_STYLES = {
+  default: {
+    container: 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700',
+    header: 'text-gray-900 dark:text-gray-100',
+    content: 'text-gray-700 dark:text-gray-300',
+    backdrop: 'bg-gray-500/75',
+  },
+  success: {
+    container: 'bg-success-50 dark:bg-success-950 border border-success-200 dark:border-success-800',
+    header: 'text-success-900 dark:text-success-100',
+    content: 'text-success-800 dark:text-success-200',
+    backdrop: 'bg-success-500/75',
+  },
+  warning: {
+    container: 'bg-warning-50 dark:bg-warning-950 border border-warning-200 dark:border-warning-800',
+    header: 'text-warning-900 dark:text-warning-100',
+    content: 'text-warning-800 dark:text-warning-200',
+    backdrop: 'bg-warning-500/75',
+  },
+  error: {
+    container: 'bg-error-50 dark:bg-error-950 border border-error-200 dark:border-error-800',
+    header: 'text-error-900 dark:text-error-100',
+    content: 'text-error-800 dark:text-error-200',
+    backdrop: 'bg-error-500/75',
+  },
+  info: {
+    container: 'bg-primary-50 dark:bg-primary-950 border border-primary-200 dark:border-primary-800',
+    header: 'text-primary-900 dark:text-primary-100',
+    content: 'text-primary-800 dark:text-primary-200',
+    backdrop: 'bg-primary-500/75',
+  },
+  confirmation: {
+    container: 'bg-white dark:bg-gray-900 border-2 border-primary-600',
+    header: 'text-gray-900 dark:text-gray-100',
+    content: 'text-gray-700 dark:text-gray-300',
+    backdrop: 'bg-gray-500/75',
+  },
+  authentication: {
+    container: 'bg-white dark:bg-gray-900 border-2 border-primary-600',
+    header: 'text-primary-700 dark:text-primary-300',
+    content: 'text-gray-700 dark:text-gray-300',
+    backdrop: 'bg-gray-900/75',
+  },
+  announcement: {
+    container: 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-2xl',
+    header: 'text-gray-900 dark:text-gray-100',
+    content: 'text-gray-700 dark:text-gray-300',
+    backdrop: 'bg-gray-500/75',
+  },
+} as const;
+
+/**
+ * Size configurations with minimum WCAG touch targets
+ */
+const POPUP_SIZE_STYLES = {
+  xs: 'max-w-xs p-4',
+  sm: 'max-w-sm p-6',
+  md: 'max-w-md p-6',
+  lg: 'max-w-lg p-8',
+  xl: 'max-w-xl p-8',
+  full: 'max-w-full p-8',
+} as const;
+
+// =============================================================================
+// UTILITY FUNCTIONS
+// =============================================================================
+
+/**
+ * Simple translation function placeholder
+ * In a real implementation, this would integrate with react-i18next
+ */
+function useTranslation() {
+  const translate = useCallback((key: string, params?: Record<string, any>) => {
+    // Simplified translation mapping for demo
+    const translations: Record<string, string> = {
+      [I18N_KEYS.TITLE]: 'Password Security Notice',
+      [I18N_KEYS.MESSAGE]: 'Your current password is shorter than recommended (less than 17 characters). For better security, we recommend updating your password to a longer one.',
+      [I18N_KEYS.REMIND_LATER]: 'Remind me later',
+      [I18N_KEYS.UPDATE_NOW]: 'Update Password Now',
+      [I18N_KEYS.CLOSE]: 'Close',
+      [I18N_KEYS.CONFIRM]: 'Confirm',
+      [I18N_KEYS.CANCEL]: 'Cancel',
+    };
+
+    let translation = translations[key] || key;
+    
+    // Simple parameter substitution
+    if (params) {
+      Object.entries(params).forEach(([paramKey, value]) => {
+        translation = translation.replace(`{{${paramKey}}}`, String(value));
+      });
+    }
+
+    return translation;
+  }, []);
+
+  return { t: translate };
+}
+
+/**
+ * Announces content to screen readers using aria-live regions
+ */
+function announceToScreenReader(message: string, priority: 'polite' | 'assertive' = 'polite') {
+  const announcement = document.createElement('div');
+  announcement.setAttribute('aria-live', priority);
+  announcement.setAttribute('aria-atomic', 'true');
+  announcement.className = 'sr-only fixed -top-px -left-px w-px h-px overflow-hidden';
+  announcement.textContent = message;
+  
+  document.body.appendChild(announcement);
+  
+  // Clean up after announcement
+  setTimeout(() => {
+    if (document.body.contains(announcement)) {
+      document.body.removeChild(announcement);
+    }
+  }, 1000);
+}
+
+/**
+ * Generates unique IDs for accessibility labeling
+ */
+function generateId(prefix: string = 'popup'): string {
+  return `${prefix}-${Math.random().toString(36).substr(2, 9)}`;
+}
+
+// =============================================================================
+// MAIN POPUP COMPONENT
+// =============================================================================
+
+/**
+ * Main React popup component implementing password security notice functionality
+ * 
+ * Features:
+ * - WCAG 2.1 AA accessibility with focus trapping and keyboard navigation
+ * - Headless UI Dialog primitive for robust modal behavior
+ * - Tailwind CSS 4.1+ styling with design tokens
+ * - Configurable message content and actions
+ * - Authentication redirect workflow integration
+ * - Smooth animations and responsive design
+ * - Internationalization support
+ * 
+ * @example
+ * ```tsx
+ * // Basic usage
+ * <Popup isOpen={isOpen} onClose={handleClose}>
+ *   Your password security notice content
+ * </Popup>
+ * 
+ * // With configuration
+ * <Popup
+ *   isOpen={isOpen}
+ *   onClose={handleClose}
+ *   variant="authentication"
+ *   size="md"
+ *   showRemindMeLater={true}
+ *   onRemindLater={handleRemindLater}
+ *   dismissOnClickOutside={false}
+ * >
+ *   Custom security message content
+ * </Popup>
+ * ```
+ */
+export function Popup({
   children,
   isOpen,
   onClose,
   onRemindLater,
   onOpen,
   onButtonClick,
-  title = 'Password Security Notice',
+  title,
   variant = 'authentication',
   size = 'md',
-  dismissOnClickOutside = true,
-  showCloseButton = true,
   showRemindMeLater = true,
-  actions,
+  dismissOnClickOutside = false,
+  showCloseButton = true,
+  autoCloseTimeout = 0,
   className,
-  accessibility = {
-    role: 'dialog',
-    trapFocus: true,
-    initialFocus: 'first',
-    announceOnOpen: true,
-    modal: true,
-  },
-  animation = {
-    preset: 'fade',
-    duration: 200,
-    easing: 'ease-out',
-    animateBackdrop: true,
-  },
-  'data-testid': testId,
+  accessibility,
+  animation,
+  theme,
+  i18n,
+  actions,
+  portalRef,
+  zIndex = 1000,
+  'data-testid': dataTestId = 'popup',
   ...props
-}) => {
-  const auth = useAuth();
+}: PopupProps) {
+  // =============================================================================
+  // HOOKS AND STATE
+  // =============================================================================
+
   const router = useRouter();
+  const { logout, isAuthenticated } = useAuth();
+  const { t } = useTranslation();
+  
+  // Component state
+  const [isVisible, setIsVisible] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+  
+  // Refs for accessibility
+  const titleId = useRef(generateId('popup-title')).current;
+  const descriptionId = useRef(generateId('popup-description')).current;
+  const initialFocusRef = useRef<HTMLButtonElement>(null);
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const confirmButtonRef = useRef<HTMLButtonElement>(null);
+  
+  // Auto-close timer
+  const autoCloseTimerRef = useRef<NodeJS.Timeout>();
 
-  // Default authentication workflow message
-  const defaultMessage = "Your current password is shorter than recommended (less than 17 characters). For better security, we recommend updating your password to a longer one.";
+  // =============================================================================
+  // CONFIGURATION MERGING
+  // =============================================================================
 
-  // Effect to announce popup opening to screen readers
+  const config = {
+    ...DEFAULT_POPUP_CONFIG,
+    title,
+    variant,
+    size,
+    showRemindMeLater,
+    dismissOnClickOutside,
+    showCloseButton,
+    autoCloseTimeout,
+    className,
+    accessibility: { ...DEFAULT_POPUP_CONFIG.accessibility, ...accessibility },
+    animation: { ...DEFAULT_POPUP_CONFIG.animation, ...animation },
+  };
+
+  const variantStyles = POPUP_VARIANT_STYLES[config.variant];
+  const sizeStyles = POPUP_SIZE_STYLES[config.size];
+
+  // =============================================================================
+  // EFFECT HANDLERS
+  // =============================================================================
+
+  /**
+   * Handle popup open/close state changes
+   */
   useEffect(() => {
-    if (isOpen && accessibility.announceOnOpen) {
-      const announcement = accessibility.openAnnouncement || `${title} popup opened`;
+    if (isOpen && !isVisible) {
+      setIsVisible(true);
+      setIsClosing(false);
       
-      // Create a live region for screen reader announcement
-      const liveRegion = document.createElement('div');
-      liveRegion.setAttribute('aria-live', 'polite');
-      liveRegion.setAttribute('aria-atomic', 'true');
-      liveRegion.className = 'sr-only';
-      liveRegion.textContent = announcement;
+      // Announce popup opening to screen readers
+      if (config.accessibility.announceOnOpen) {
+        const message = config.accessibility.openAnnouncement || 
+          `${t(I18N_KEYS.TITLE)} dialog opened`;
+        announceToScreenReader(message, 'assertive');
+      }
       
-      document.body.appendChild(liveRegion);
-      
-      // Clean up after announcement
-      setTimeout(() => {
-        if (document.body.contains(liveRegion)) {
-          document.body.removeChild(liveRegion);
-        }
-      }, 1000);
-      
-      // Call onOpen callback if provided
+      // Call onOpen callback
       onOpen?.();
+      
+      // Set up auto-close timer
+      if (config.autoCloseTimeout > 0) {
+        autoCloseTimerRef.current = setTimeout(() => {
+          handleClose('timeout');
+        }, config.autoCloseTimeout);
+      }
+    } else if (!isOpen && isVisible) {
+      setIsClosing(true);
+      
+      // Clear auto-close timer
+      if (autoCloseTimerRef.current) {
+        clearTimeout(autoCloseTimerRef.current);
+        autoCloseTimerRef.current = undefined;
+      }
+      
+      // Delay hiding to allow exit animation
+      setTimeout(() => {
+        setIsVisible(false);
+        setIsClosing(false);
+      }, config.animation.duration);
     }
-  }, [isOpen, accessibility.announceOnOpen, accessibility.openAnnouncement, title, onOpen]);
+  }, [isOpen, isVisible, config, onOpen, t]);
 
-  // Handle button clicks with analytics and callback support
-  const handleButtonClick = (buttonType: 'close' | 'confirm' | 'remindLater', action?: () => void) => {
+  /**
+   * Cleanup timers on unmount
+   */
+  useEffect(() => {
     return () => {
-      // Execute button-specific action
-      action?.();
-      
-      // Notify parent component
-      onButtonClick?.(buttonType);
-      
-      // Handle specific authentication workflows
-      if (buttonType === 'confirm') {
-        handleConfirm();
-      } else if (buttonType === 'remindLater') {
-        handleRemindLater();
-      } else {
-        onClose();
+      if (autoCloseTimerRef.current) {
+        clearTimeout(autoCloseTimerRef.current);
       }
     };
-  };
+  }, []);
 
-  // Handle password update confirmation - logout and redirect to auth flow
-  const handleConfirm = async () => {
-    try {
-      // Logout user and redirect to password reset
-      await auth.logout(['/auth', '/reset-password']);
-      
-      // Close popup after successful logout
-      onClose();
-    } catch (error) {
-      console.error('Error during logout:', error);
-      // Still close popup even if logout fails
-      onClose();
-    }
-  };
+  // =============================================================================
+  // EVENT HANDLERS
+  // =============================================================================
 
-  // Handle remind me later functionality
-  const handleRemindLater = () => {
-    onRemindLater?.();
+  /**
+   * Enhanced close handler with button type tracking
+   */
+  const handleClose = useCallback((buttonType: PopupButtonType | 'dismissal' | 'timeout' = 'close') => {
+    onButtonClick?.(buttonType as PopupButtonType);
     onClose();
-  };
+  }, [onClose, onButtonClick]);
 
-  // Get variant-specific styling
-  const getVariantStyles = (variant: PopupVariant) => {
-    const variants = {
-      default: 'border-gray-200',
-      success: 'border-success-200',
-      warning: 'border-warning-200',
-      error: 'border-error-200',
-      info: 'border-primary-200',
-      confirmation: 'border-primary-200',
-      authentication: 'border-warning-200', // Password security uses warning colors
-      announcement: 'border-primary-200',
-    };
-    
-    return variants[variant] || variants.default;
-  };
+  /**
+   * Handle "Remind me later" action
+   */
+  const handleRemindLater = useCallback(() => {
+    onRemindLater?.();
+    handleClose('remindLater');
+  }, [onRemindLater, handleClose]);
 
-  // Get size configuration
-  const sizeConfig = POPUP_SIZE_CONFIG[size];
-
-  // Animation classes for Headless UI transitions
-  const getAnimationClasses = () => {
-    if (animation.preset === 'fade') {
-      return {
-        enter: 'ease-out duration-300',
-        enterFrom: 'opacity-0',
-        enterTo: 'opacity-100',
-        leave: 'ease-in duration-200',
-        leaveFrom: 'opacity-100',
-        leaveTo: 'opacity-0',
-      };
+  /**
+   * Handle authentication redirect (Update Password Now)
+   */
+  const handleAuthRedirect = useCallback(async () => {
+    try {
+      // Log out user and redirect to password reset
+      if (isAuthenticated) {
+        await logout();
+      }
+      
+      // Navigate to password reset page
+      router.push(AUTH_ROUTES.RESET_PASSWORD);
+      
+      // Announce action to screen readers
+      announceToScreenReader('Redirecting to password update page', 'assertive');
+      
+      handleClose('confirm');
+    } catch (error) {
+      console.error('Failed to handle auth redirect:', error);
+      
+      // Fallback: just navigate to login
+      router.push(AUTH_ROUTES.LOGIN);
+      handleClose('confirm');
     }
-    
-    return {
-      enter: 'ease-out duration-300',
-      enterFrom: 'opacity-0 scale-95',
-      enterTo: 'opacity-100 scale-100',
-      leave: 'ease-in duration-200',
-      leaveFrom: 'opacity-100 scale-100',
-      leaveTo: 'opacity-0 scale-95',
-    };
+  }, [isAuthenticated, logout, router, handleClose]);
+
+  /**
+   * Handle backdrop click
+   */
+  const handleBackdropClick = useCallback(() => {
+    if (config.dismissOnClickOutside) {
+      handleClose('dismissal');
+    }
+  }, [config.dismissOnClickOutside, handleClose]);
+
+  /**
+   * Handle keyboard events for accessibility
+   */
+  const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
+    switch (event.key) {
+      case 'Escape':
+        if (config.dismissOnClickOutside) {
+          event.preventDefault();
+          handleClose('dismissal');
+        }
+        break;
+      
+      case 'Tab':
+        // Focus management is handled by Headless UI Dialog
+        break;
+      
+      default:
+        break;
+    }
+  }, [config.dismissOnClickOutside, handleClose]);
+
+  // =============================================================================
+  // RENDER HELPERS
+  // =============================================================================
+
+  /**
+   * Render popup actions (buttons)
+   */
+  const renderActions = () => {
+    // Use custom actions if provided
+    if (actions && actions.length > 0) {
+      return (
+        <div className="flex justify-center gap-3 mt-6">
+          {actions.map((action, index) => (
+            <Button
+              key={index}
+              ref={action.type === 'confirm' ? confirmButtonRef : 
+                   action.type === 'cancel' ? cancelButtonRef : undefined}
+              variant={action.variant || 'primary'}
+              disabled={action.disabled}
+              loading={action.loading}
+              onClick={action.onClick}
+              ariaLabel={action.ariaLabel}
+              className="min-w-[120px]"
+              data-testid={`popup-action-${action.type}`}
+            >
+              {action.icon && (
+                <span className="mr-2" aria-hidden="true">
+                  {action.icon}
+                </span>
+              )}
+              {action.label}
+            </Button>
+          ))}
+        </div>
+      );
+    }
+
+    // Default authentication popup actions
+    return (
+      <div className="flex justify-center gap-3 mt-6">
+        {config.showRemindMeLater && (
+          <Button
+            ref={cancelButtonRef}
+            variant="outline"
+            onClick={handleRemindLater}
+            className="min-w-[120px]"
+            data-testid="popup-remind-later"
+            ariaLabel={t(I18N_KEYS.REMIND_LATER)}
+          >
+            {t(I18N_KEYS.REMIND_LATER)}
+          </Button>
+        )}
+        <Button
+          ref={confirmButtonRef}
+          variant="primary"
+          onClick={handleAuthRedirect}
+          className="min-w-[120px]"
+          data-testid="popup-update-now"
+          ariaLabel={t(I18N_KEYS.UPDATE_NOW)}
+        >
+          {t(I18N_KEYS.UPDATE_NOW)}
+        </Button>
+      </div>
+    );
   };
 
-  const animationClasses = getAnimationClasses();
+  /**
+   * Render close button
+   */
+  const renderCloseButton = () => {
+    if (!config.showCloseButton) return null;
+
+    return (
+      <div className="absolute top-4 right-4">
+        <IconButton
+          icon={<span className="text-lg" aria-hidden="true">×</span>}
+          ariaLabel={t(I18N_KEYS.CLOSE)}
+          variant="ghost"
+          size="icon-md"
+          onClick={() => handleClose('close')}
+          className="hover:bg-gray-100 dark:hover:bg-gray-800"
+          data-testid="popup-close"
+        />
+      </div>
+    );
+  };
+
+  // =============================================================================
+  // RENDER COMPONENT
+  // =============================================================================
+
+  if (!isVisible && !isOpen) {
+    return null;
+  }
 
   return (
-    <Transition appear show={isOpen} as={Fragment}>
+    <Transition
+      show={isOpen}
+      as={Fragment}
+      appear
+    >
       <Dialog
         as="div"
-        className="relative z-50"
-        onClose={dismissOnClickOutside ? onClose : () => {}}
-        role={accessibility.role}
-        aria-labelledby="popup-title"
-        aria-describedby="popup-description"
-        data-testid={testId}
+        className="relative"
+        style={{ zIndex }}
+        onClose={config.dismissOnClickOutside ? handleClose : () => {}}
+        initialFocus={config.accessibility.initialFocus === 'cancel' ? cancelButtonRef :
+                     config.accessibility.initialFocus === 'confirm' ? confirmButtonRef :
+                     initialFocusRef}
+        data-testid={dataTestId}
+        {...props}
       >
         {/* Backdrop */}
         <Transition.Child
           as={Fragment}
-          enter={animationClasses.enter}
-          enterFrom={animationClasses.enterFrom}
-          enterTo={animationClasses.enterTo}
-          leave={animationClasses.leave}
-          leaveFrom={animationClasses.leaveFrom}
-          leaveTo={animationClasses.leaveTo}
+          enter="ease-out duration-200"
+          enterFrom="opacity-0"
+          enterTo="opacity-100"
+          leave="ease-in duration-150"
+          leaveFrom="opacity-100"
+          leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 bg-black/25 backdrop-blur-sm" />
+          <div 
+            className={cn(
+              "fixed inset-0 transition-opacity",
+              variantStyles.backdrop,
+              config.animation.animateBackdrop && "backdrop-blur-sm"
+            )}
+            onClick={handleBackdropClick}
+            aria-hidden="true"
+          />
         </Transition.Child>
 
-        {/* Dialog container */}
+        {/* Popup container */}
         <div className="fixed inset-0 overflow-y-auto">
           <div className="flex min-h-full items-center justify-center p-4 text-center">
             <Transition.Child
               as={Fragment}
-              enter={animationClasses.enter}
-              enterFrom={animationClasses.enterFrom}
-              enterTo={animationClasses.enterTo}
-              leave={animationClasses.leave}
-              leaveFrom={animationClasses.leaveFrom}
-              leaveTo={animationClasses.leaveTo}
+              enter="ease-out duration-200"
+              enterFrom="opacity-0 scale-95 translate-y-4"
+              enterTo="opacity-100 scale-100 translate-y-0"
+              leave="ease-in duration-150"
+              leaveFrom="opacity-100 scale-100 translate-y-0"
+              leaveTo="opacity-0 scale-95 translate-y-4"
             >
               <Dialog.Panel
                 className={cn(
-                  'w-full transform overflow-hidden rounded-2xl bg-white text-left align-middle shadow-xl transition-all',
-                  'border-2',
-                  getVariantStyles(variant),
-                  sizeConfig.padding,
+                  // Base styles
+                  "relative w-full rounded-lg shadow-xl transform transition-all",
+                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2",
+                  
+                  // Variant and size styles
+                  variantStyles.container,
+                  sizeStyles,
+                  
+                  // Custom className
                   className
                 )}
-                style={{ maxWidth: sizeConfig.maxWidth }}
+                onKeyDown={handleKeyDown}
+                role={config.accessibility.role}
+                aria-labelledby={titleId}
+                aria-describedby={descriptionId}
+                aria-modal={config.accessibility.modal}
               >
+                {/* Close button */}
+                {renderCloseButton()}
+
                 {/* Header */}
-                <div className="flex items-center justify-between mb-6">
+                <div className="mb-4">
                   <Dialog.Title
                     as="h2"
-                    id="popup-title"
-                    className="text-xl font-semibold text-gray-900 leading-6"
+                    id={titleId}
+                    className={cn(
+                      "text-lg font-semibold leading-6",
+                      variantStyles.header
+                    )}
                   >
-                    {title}
+                    {config.title || t(I18N_KEYS.TITLE)}
                   </Dialog.Title>
-                  
-                  {showCloseButton && (
-                    <button
-                      type="button"
-                      className={cn(
-                        'rounded-md p-2 text-gray-400 hover:text-gray-500',
-                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
-                        'transition-colors duration-200'
-                      )}
-                      onClick={handleButtonClick('close')}
-                      aria-label="Close popup"
-                    >
-                      <XMarkIcon className="h-5 w-5" aria-hidden="true" />
-                    </button>
-                  )}
                 </div>
 
                 {/* Content */}
-                <div id="popup-description" className="mb-8">
-                  {typeof children === 'string' ? (
-                    <p className="text-sm text-gray-600 leading-relaxed">
-                      {children || defaultMessage}
-                    </p>
-                  ) : (
-                    children
-                  )}
+                <div className="mb-6">
+                  <div
+                    id={descriptionId}
+                    className={cn(
+                      "text-sm leading-5",
+                      variantStyles.content
+                    )}
+                  >
+                    {children || config.message || t(I18N_KEYS.MESSAGE)}
+                  </div>
                 </div>
 
                 {/* Actions */}
-                <div className="flex flex-col-reverse sm:flex-row sm:justify-center gap-3">
-                  {/* Custom actions or default actions */}
-                  {actions ? (
-                    actions.map((action, index) => (
-                      <Button
-                        key={index}
-                        variant={action.variant || 'secondary'}
-                        disabled={action.disabled}
-                        onClick={handleButtonClick('custom', action.onClick)}
-                        aria-label={action.ariaLabel}
-                        className="sm:min-w-[140px]"
-                      >
-                        {action.icon && <span className="mr-2">{action.icon}</span>}
-                        {action.label}
-                      </Button>
-                    ))
-                  ) : (
-                    <>
-                      {/* Remind me later button - conditionally rendered */}
-                      {showRemindMeLater && (
-                        <Button
-                          variant="outline"
-                          onClick={handleButtonClick('remindLater')}
-                          className="sm:min-w-[140px]"
-                          aria-label="Remind me later to update password"
-                        >
-                          Remind me later
-                        </Button>
-                      )}
-                      
-                      {/* Primary action button */}
-                      <Button
-                        variant="primary"
-                        onClick={handleButtonClick('confirm')}
-                        className="sm:min-w-[140px]"
-                        aria-label="Update password now"
-                        autoFocus={accessibility.initialFocus === 'confirm'}
-                      >
-                        Update Password Now
-                      </Button>
-                    </>
-                  )}
-                </div>
+                {renderActions()}
+
+                {/* Hidden button for initial focus if needed */}
+                <button
+                  ref={initialFocusRef}
+                  className="sr-only"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                />
               </Dialog.Panel>
             </Transition.Child>
           </div>
@@ -377,11 +654,130 @@ export const Popup: React.FC<PopupProps> = ({
       </Dialog>
     </Transition>
   );
-};
+}
 
-// Default export for easier importing
+// =============================================================================
+// COMPOUND COMPONENTS AND EXPORTS
+// =============================================================================
+
+/**
+ * Password security popup with pre-configured authentication workflow
+ */
+export interface PasswordSecurityPopupProps extends Omit<PopupProps, 'children' | 'variant'> {
+  /** Custom security message */
+  message?: string;
+}
+
+export function PasswordSecurityPopup({
+  message,
+  ...props
+}: PasswordSecurityPopupProps) {
+  const { t } = useTranslation();
+  
+  return (
+    <Popup
+      variant="authentication"
+      title={t(I18N_KEYS.TITLE)}
+      accessibility={{
+        role: 'alertdialog',
+        ariaLabel: t(I18N_KEYS.TITLE),
+        announceOnOpen: true,
+      }}
+      {...props}
+    >
+      {message || t(I18N_KEYS.MESSAGE)}
+    </Popup>
+  );
+}
+
+/**
+ * Confirmation popup with pre-configured actions
+ */
+export interface ConfirmationPopupProps extends Omit<PopupProps, 'children' | 'variant'> {
+  /** Confirmation message */
+  message: string;
+  /** Confirm button label */
+  confirmLabel?: string;
+  /** Cancel button label */
+  cancelLabel?: string;
+  /** Confirm action handler */
+  onConfirm: () => void;
+  /** Cancel action handler */
+  onCancel?: () => void;
+}
+
+export function ConfirmationPopup({
+  message,
+  confirmLabel,
+  cancelLabel,
+  onConfirm,
+  onCancel,
+  onClose,
+  ...props
+}: ConfirmationPopupProps) {
+  const { t } = useTranslation();
+
+  const actions = [
+    {
+      label: cancelLabel || t(I18N_KEYS.CANCEL),
+      type: 'cancel' as PopupButtonType,
+      variant: 'outline' as const,
+      onClick: () => {
+        onCancel?.();
+        onClose();
+      },
+    },
+    {
+      label: confirmLabel || t(I18N_KEYS.CONFIRM),
+      type: 'confirm' as PopupButtonType,
+      variant: 'primary' as const,
+      onClick: () => {
+        onConfirm();
+        onClose();
+      },
+    },
+  ];
+
+  return (
+    <Popup
+      variant="confirmation"
+      actions={actions}
+      onClose={onClose}
+      accessibility={{
+        role: 'alertdialog',
+        initialFocus: 'cancel',
+      }}
+      {...props}
+    >
+      {message}
+    </Popup>
+  );
+}
+
+// Export main component as default
 export default Popup;
 
-// Named exports for specific use cases
-export type { PopupProps } from './types';
-export { type PopupVariant, type PopupSize } from './types';
+// Export all types for external usage
+export type {
+  PopupProps,
+  PopupConfig,
+  PopupVariant,
+  PopupSize,
+  PopupButtonType,
+  PopupAnimationConfig,
+  PopupAccessibilityConfig,
+  PopupThemeConfig,
+  PopupI18nConfig,
+  AuthWorkflowCallbacks,
+  AuthRedirectReason,
+  LogoutReason,
+};
+
+// Export configuration constants
+export {
+  DEFAULT_POPUP_CONFIG,
+  AUTH_ROUTES,
+  I18N_KEYS,
+  POPUP_VARIANT_STYLES,
+  POPUP_SIZE_STYLES,
+};
