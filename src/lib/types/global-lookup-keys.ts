@@ -1,593 +1,380 @@
 /**
- * Global Lookup Key Types
+ * Global Lookup Keys Type Definitions
  * 
- * This module provides type definitions for global lookup key management
- * in the DreamFactory Admin Interface. These types maintain full compatibility
- * with existing backend APIs while supporting React component integration
- * patterns including React Hook Form, React Query, and table components.
+ * Maintains full API compatibility with DreamFactory backend while supporting
+ * React component integration for lookup key management functionality.
  * 
- * Key Features:
- * - Maintains backend API compatibility with DreamFactory Core
- * - Supports React Hook Form integration for lookup key management
- * - Provides types for React Query cache management and data fetching
- * - Includes table component interfaces for lookup key listings
- * - Supports React component state management patterns
- * 
- * @module GlobalLookupKeyTypes
+ * Global lookup keys provide system-wide configuration values that can be
+ * referenced throughout the DreamFactory platform for dynamic configuration
+ * and customization without requiring code changes.
  */
 
 /**
- * Global Lookup Key Entity
+ * Core lookup key interface maintaining exact backend API compatibility.
  * 
- * Represents a global lookup key as returned by the DreamFactory API.
- * This interface maintains exact compatibility with the backend API
- * response format and should not be modified to preserve API contracts.
- * 
- * Used for:
- * - API response type safety
- * - Database entity representation
- * - React component prop types
- * - React Query cache types
- * 
- * @interface LookupKeyType
- * @example
- * ```typescript
- * // React component using lookup key data
- * const LookupKeyDisplay: React.FC<{ lookupKey: LookupKeyType }> = ({ lookupKey }) => {
- *   return (
- *     <div>
- *       <h3>{lookupKey.name}</h3>
- *       <p>{lookupKey.value}</p>
- *       <span>{lookupKey.private ? 'Private' : 'Public'}</span>
- *     </div>
- *   );
- * };
- * 
- * // React Query usage
- * const { data: lookupKeys } = useQuery<LookupKeyType[]>({
- *   queryKey: ['lookupKeys'],
- *   queryFn: () => fetchLookupKeys()
- * });
- * ```
+ * This interface preserves the original DreamFactory lookup key data structure
+ * to ensure seamless integration with existing backend endpoints and services.
+ * All field names, types, and constraints remain unchanged from the Angular implementation.
  */
 export interface LookupKeyType {
-  /** Unique identifier for the lookup key (auto-generated on create) */
-  id?: number;
+  /** Unique identifier for the lookup key (null for new entries) */
+  id?: number | null;
   
-  /** Name/key identifier for the lookup value */
+  /** 
+   * Unique name identifier for the lookup key
+   * Must be unique across all lookup keys in the system
+   * Used as the reference key for retrieving values
+   */
   name: string;
   
-  /** The lookup value associated with the key */
+  /** 
+   * The configuration value associated with the lookup key
+   * Can contain any string value including JSON, URLs, or plain text
+   */
   value: string;
   
-  /** Whether this lookup key is private (restricted access) */
+  /** 
+   * Privacy flag indicating if the lookup key value should be hidden
+   * Private keys are typically used for sensitive configuration values
+   * like API keys, passwords, or internal system settings
+   */
   private: boolean;
   
-  /** Optional description explaining the purpose of this lookup key */
+  /** 
+   * Optional human-readable description of the lookup key's purpose
+   * Used for documentation and administrative clarity
+   */
   description?: string;
   
-  /** ISO string timestamp when the lookup key was created */
+  /** ISO timestamp of when the lookup key was created */
   created_date?: string;
   
-  /** ISO string timestamp when the lookup key was last modified */
+  /** ISO timestamp of when the lookup key was last modified */
   last_modified_date?: string;
   
-  /** ID of the user who created this lookup key */
+  /** User ID of the person who created this lookup key */
   created_by_id?: number;
   
-  /** ID of the user who last modified this lookup key */
+  /** User ID of the person who last modified this lookup key */
   last_modified_by_id?: number;
 }
 
 /**
- * Lookup Key Table Row Data
+ * Form data structure for React Hook Form integration
  * 
- * Simplified interface for displaying lookup keys in React table components.
- * Contains essential fields needed for table listing views with performance
- * optimization for large datasets.
- * 
- * Used for:
- * - React table component data prop
- * - List view optimizations
- * - Search and filter operations
- * - Bulk operations selection
- * 
- * @interface LookupKeyRow
- * @example
- * ```typescript
- * // React table component integration
- * const LookupKeyTable: React.FC<{ data: LookupKeyRow[] }> = ({ data }) => {
- *   const columns = [
- *     { key: 'name', header: 'Name' },
- *     { key: 'value', header: 'Value' },
- *     { key: 'private', header: 'Private' }
- *   ];
- *   
- *   return <DataTable data={data} columns={columns} />;
- * };
- * ```
+ * Extends the base LookupKeyType to support React component patterns
+ * and form validation requirements in the lookup keys management interface.
  */
-export interface LookupKeyRow {
-  /** Unique identifier for row operations */
+export interface LookupKeyFormData extends LookupKeyType {
+  /** Internal form state tracking for React Hook Form */
+  _isNew?: boolean;
+  
+  /** Validation state for unique name constraint checking */
+  _nameValidation?: {
+    isValid: boolean;
+    isChecking: boolean;
+    errorMessage?: string;
+  };
+  
+  /** UI state for expanded/collapsed display in accordion views */
+  _expanded?: boolean;
+}
+
+/**
+ * API request payload for creating new lookup keys
+ * 
+ * Defines the structure expected by DreamFactory backend endpoints
+ * when creating multiple lookup keys in a single request.
+ */
+export interface CreateLookupKeysRequest {
+  /** Array of lookup key objects to create */
+  resource: Omit<LookupKeyType, 'id' | 'created_date' | 'last_modified_date' | 'created_by_id' | 'last_modified_by_id'>[];
+}
+
+/**
+ * API request payload for updating existing lookup keys
+ * 
+ * Defines the structure for individual lookup key updates
+ * maintaining compatibility with DreamFactory PATCH/PUT operations.
+ */
+export interface UpdateLookupKeyRequest extends Omit<LookupKeyType, 'created_date' | 'created_by_id'> {
+  /** Required ID for update operations */
   id: number;
-  
-  /** Display name for the lookup key */
-  name: string;
-  
-  /** The lookup value (may be truncated for display) */
-  value: string;
-  
-  /** Privacy status for access control display */
-  private: boolean;
-  
-  /** Optional description for tooltip or expanded view */
-  description?: string;
 }
 
 /**
- * Create Lookup Key Payload
+ * API response structure for lookup key operations
  * 
- * Data structure for creating new global lookup keys.
- * Excludes auto-generated fields (id, timestamps) and includes
- * only user-provided data for React Hook Form integration.
- * 
- * Used for:
- * - React Hook Form schema validation
- * - API request payloads
- * - Form component prop types
- * - Zod schema definitions
- * 
- * @interface CreateLookupKeyPayload
- * @example
- * ```typescript
- * // React Hook Form usage
- * const { register, handleSubmit } = useForm<CreateLookupKeyPayload>();
- * 
- * const onSubmit = async (data: CreateLookupKeyPayload) => {
- *   await createLookupKey(data);
- * };
- * 
- * // Form JSX
- * <form onSubmit={handleSubmit(onSubmit)}>
- *   <input {...register('name', { required: true })} />
- *   <input {...register('value', { required: true })} />
- *   <input type="checkbox" {...register('private')} />
- *   <textarea {...register('description')} />
- * </form>
- * ```
+ * Standard DreamFactory response format for lookup key endpoints
+ * including metadata and resource data.
  */
-export interface CreateLookupKeyPayload {
-  /** Name/key identifier for the lookup value */
-  name: string;
+export interface LookupKeysResponse {
+  /** Array of lookup key objects returned from the API */
+  resource: LookupKeyType[];
   
-  /** The lookup value to store */
-  value: string;
-  
-  /** Whether this lookup key should be private (default: false) */
-  private: boolean;
-  
-  /** Optional description explaining the purpose */
-  description?: string;
+  /** API response metadata */
+  meta?: {
+    /** Total count of lookup keys in the system */
+    count?: number;
+    
+    /** Schema information for the lookup keys resource */
+    schema?: string[];
+  };
 }
 
 /**
- * Update Lookup Key Payload
+ * Lookup key validation constraints for React components
  * 
- * Data structure for updating existing global lookup keys.
- * All fields are optional to support partial updates through
- * React Hook Form and PATCH operations.
- * 
- * Used for:
- * - React Hook Form edit forms
- * - API PATCH request payloads
- * - Optimistic update operations
- * - Form component prop types
- * 
- * @interface UpdateLookupKeyPayload
- * @example
- * ```typescript
- * // React Hook Form update usage
- * const { register, handleSubmit } = useForm<UpdateLookupKeyPayload>({
- *   defaultValues: existingLookupKey
- * });
- * 
- * const onUpdate = async (data: UpdateLookupKeyPayload) => {
- *   await updateLookupKey(lookupKeyId, data);
- * };
- * ```
+ * Defines validation rules that must be enforced in React forms
+ * to maintain data integrity and backend compatibility.
  */
-export interface UpdateLookupKeyPayload {
-  /** Updated name/key identifier */
-  name?: string;
+export interface LookupKeyValidation {
+  /** Name field validation rules */
+  name: {
+    required: true;
+    minLength: 1;
+    maxLength: 255;
+    pattern: string; // Must be valid identifier pattern
+    unique: true; // Must be unique across all lookup keys
+  };
   
-  /** Updated lookup value */
-  value?: string;
+  /** Value field validation rules */
+  value: {
+    required: false;
+    maxLength: 65535; // Text field limit
+  };
   
-  /** Updated privacy setting */
-  private?: boolean;
-  
-  /** Updated description */
-  description?: string;
+  /** Description field validation rules */
+  description: {
+    required: false;
+    maxLength: 1000;
+  };
 }
 
 /**
- * Lookup Key Form Data
+ * Lookup keys management component props interface
  * 
- * Extended interface combining entity data with form-specific
- * metadata for React Hook Form integration. Includes validation
- * state and UI-specific properties.
- * 
- * Used for:
- * - React Hook Form TypeScript integration
- * - Form component state management
- * - Validation error handling
- * - Form field configuration
- * 
- * @interface LookupKeyFormData
- * @example
- * ```typescript
- * // Advanced form integration
- * const LookupKeyForm: React.FC<{ initialData?: LookupKeyFormData }> = ({ initialData }) => {
- *   const {
- *     register,
- *     handleSubmit,
- *     formState: { errors, isSubmitting }
- *   } = useForm<LookupKeyFormData>({
- *     defaultValues: initialData
- *   });
- * 
- *   return (
- *     <form>
- *       <div>
- *         <input
- *           {...register('name', {
- *             required: 'Name is required',
- *             maxLength: { value: 255, message: 'Name too long' }
- *           })}
- *         />
- *         {errors.name && <span>{errors.name.message}</span>}
- *       </div>
- *     </form>
- *   );
- * };
- * ```
+ * Defines the interface for React components that handle lookup key
+ * operations, ensuring consistent prop structure across components.
  */
-export interface LookupKeyFormData extends CreateLookupKeyPayload {
-  /** Form field ID for React Hook Form registration */
-  id?: number;
+export interface LookupKeysComponentProps {
+  /** Initial lookup keys data to display */
+  initialData?: LookupKeyType[];
   
-  /** Form mode to determine validation rules */
-  mode?: 'create' | 'edit';
+  /** Whether to show the accordion wrapper interface */
+  showAccordion?: boolean;
   
-  /** Whether the form is in a loading state */
-  isLoading?: boolean;
+  /** Whether the form is in read-only mode */
+  readOnly?: boolean;
   
-  /** Whether the form has been modified */
-  isDirty?: boolean;
-}
-
-/**
- * Lookup Key Component Props
- * 
- * Common prop interface for React components that display or manage
- * lookup keys. Provides type safety for component composition and
- * consistent prop patterns across the application.
- * 
- * Used for:
- * - React component prop types
- * - Component composition patterns
- * - Event handler type safety
- * - React component documentation
- * 
- * @interface LookupKeyComponentProps
- * @example
- * ```typescript
- * // Component implementation
- * const LookupKeyManager: React.FC<LookupKeyComponentProps> = ({
- *   lookupKey,
- *   onEdit,
- *   onDelete,
- *   onSelect,
- *   readonly = false,
- *   className
- * }) => {
- *   return (
- *     <div className={className}>
- *       <LookupKeyDisplay lookupKey={lookupKey} />
- *       {!readonly && (
- *         <div>
- *           <button onClick={() => onEdit?.(lookupKey)}>Edit</button>
- *           <button onClick={() => onDelete?.(lookupKey.id!)}>Delete</button>
- *         </div>
- *       )}
- *     </div>
- *   );
- * };
- * ```
- */
-export interface LookupKeyComponentProps {
-  /** The lookup key data to display/manage */
-  lookupKey: LookupKeyType;
+  /** Callback function for handling save operations */
+  onSave?: (keys: LookupKeyType[]) => Promise<void>;
   
-  /** Optional callback when lookup key is edited */
-  onEdit?: (lookupKey: LookupKeyType) => void;
-  
-  /** Optional callback when lookup key is deleted */
-  onDelete?: (id: number) => void;
-  
-  /** Optional callback when lookup key is selected */
-  onSelect?: (lookupKey: LookupKeyType) => void;
-  
-  /** Whether the component is in read-only mode */
-  readonly?: boolean;
-  
-  /** Additional CSS classes for styling */
-  className?: string;
-  
-  /** Test ID for automated testing */
-  'data-testid'?: string;
-}
-
-/**
- * Lookup Key List Component Props
- * 
- * Props interface for React components that display lists of lookup keys.
- * Supports pagination, filtering, sorting, and bulk operations commonly
- * needed in administrative interfaces.
- * 
- * Used for:
- * - Table component prop types
- * - List view component integration
- * - Bulk operation handlers
- * - Search and filter integration
- * 
- * @interface LookupKeyListProps
- * @example
- * ```typescript
- * // List component usage
- * const LookupKeyList: React.FC<LookupKeyListProps> = ({
- *   lookupKeys,
- *   loading,
- *   onEdit,
- *   onDelete,
- *   onBulkDelete,
- *   searchTerm,
- *   onSearchChange
- * }) => {
- *   const [selectedKeys, setSelectedKeys] = useState<number[]>([]);
- * 
- *   const filteredKeys = lookupKeys.filter(key =>
- *     key.name.toLowerCase().includes(searchTerm.toLowerCase())
- *   );
- * 
- *   return (
- *     <div>
- *       <SearchInput value={searchTerm} onChange={onSearchChange} />
- *       <LookupKeyTable 
- *         data={filteredKeys}
- *         loading={loading}
- *         onRowEdit={onEdit}
- *         onRowDelete={onDelete}
- *         selectedRows={selectedKeys}
- *         onSelectionChange={setSelectedKeys}
- *       />
- *       {selectedKeys.length > 0 && (
- *         <button onClick={() => onBulkDelete?.(selectedKeys)}>
- *           Delete Selected
- *         </button>
- *       )}
- *     </div>
- *   );
- * };
- * ```
- */
-export interface LookupKeyListProps {
-  /** Array of lookup keys to display */
-  lookupKeys: LookupKeyType[];
+  /** Callback function for handling validation errors */
+  onValidationError?: (errors: Record<string, string>) => void;
   
   /** Loading state for async operations */
   loading?: boolean;
   
-  /** Error state for error handling */
+  /** Error state for displaying operation failures */
   error?: string | null;
   
-  /** Search term for filtering */
-  searchTerm?: string;
-  
-  /** Callback for search term changes */
-  onSearchChange?: (term: string) => void;
-  
-  /** Callback for editing a lookup key */
-  onEdit?: (lookupKey: LookupKeyType) => void;
-  
-  /** Callback for deleting a single lookup key */
-  onDelete?: (id: number) => void;
-  
-  /** Callback for bulk delete operations */
-  onBulkDelete?: (ids: number[]) => void;
-  
-  /** Callback for creating new lookup keys */
-  onCreate?: () => void;
-  
-  /** Whether bulk operations are enabled */
-  enableBulkOperations?: boolean;
-  
-  /** Additional CSS classes */
+  /** CSS class name for custom styling */
   className?: string;
 }
 
 /**
- * Lookup Key Filter Options
+ * Lookup key table column definition for data tables
  * 
- * Configuration interface for filtering lookup keys in React components.
- * Supports various filter criteria commonly used in administrative
- * interfaces for lookup key management.
+ * Defines the structure for displaying lookup keys in table format
+ * with sorting, filtering, and action capabilities.
+ */
+export interface LookupKeyTableColumn {
+  /** Column identifier */
+  key: keyof LookupKeyType | 'actions';
+  
+  /** Display label for the column header */
+  label: string;
+  
+  /** Whether the column is sortable */
+  sortable?: boolean;
+  
+  /** Whether the column is filterable */
+  filterable?: boolean;
+  
+  /** Whether the column should be hidden for private values */
+  hideForPrivate?: boolean;
+  
+  /** Custom render function for the column content */
+  render?: (value: any, row: LookupKeyType) => React.ReactNode;
+  
+  /** Column width specification */
+  width?: string | number;
+  
+  /** Whether the column should stick to the end */
+  sticky?: boolean;
+}
+
+/**
+ * Hook return type for lookup keys management operations
  * 
- * Used for:
- * - Search and filter components
- * - React Query filter parameters
- * - URL search params integration
- * - Advanced filtering UI
+ * Defines the interface returned by custom React hooks that handle
+ * lookup key CRUD operations and state management.
+ */
+export interface UseLookupKeysReturn {
+  /** Current lookup keys data */
+  lookupKeys: LookupKeyType[];
+  
+  /** Loading state for data fetching */
+  loading: boolean;
+  
+  /** Error state for operation failures */
+  error: string | null;
+  
+  /** Function to create new lookup keys */
+  createLookupKeys: (keys: Omit<LookupKeyType, 'id'>[]) => Promise<void>;
+  
+  /** Function to update existing lookup keys */
+  updateLookupKey: (id: number, key: Partial<LookupKeyType>) => Promise<void>;
+  
+  /** Function to delete lookup keys */
+  deleteLookupKey: (id: number) => Promise<void>;
+  
+  /** Function to validate unique name constraint */
+  validateUniqueName: (name: string, excludeId?: number) => Promise<boolean>;
+  
+  /** Function to refresh lookup keys data */
+  refetch: () => Promise<void>;
+  
+  /** Optimistic update state tracking */
+  isUpdating: boolean;
+}
+
+/**
+ * Lookup key search and filter options
  * 
- * @interface LookupKeyFilters
- * @example
- * ```typescript
- * // Filter integration
- * const useLookupKeyFilters = () => {
- *   const [filters, setFilters] = useState<LookupKeyFilters>({});
- * 
- *   const { data: lookupKeys } = useQuery({
- *     queryKey: ['lookupKeys', filters],
- *     queryFn: () => fetchLookupKeys(filters)
- *   });
- * 
- *   return { lookupKeys, filters, setFilters };
- * };
- * ```
+ * Defines the interface for searching and filtering lookup keys
+ * in management interfaces with support for various criteria.
  */
 export interface LookupKeyFilters {
-  /** Text search across name, value, and description */
+  /** Text search across name, value, and description fields */
   search?: string;
   
-  /** Filter by privacy setting */
-  private?: boolean;
+  /** Filter by private flag status */
+  private?: boolean | null;
   
   /** Filter by creation date range */
-  createdAfter?: string;
-  createdBefore?: string;
+  createdDateRange?: {
+    start: string;
+    end: string;
+  };
   
-  /** Filter by last modified date range */
-  modifiedAfter?: string;
-  modifiedBefore?: string;
-  
-  /** Filter by creator user ID */
+  /** Filter by specific user who created the keys */
   createdBy?: number;
   
-  /** Filter by last modifier user ID */
-  lastModifiedBy?: number;
+  /** Sort configuration */
+  sort?: {
+    field: keyof LookupKeyType;
+    direction: 'asc' | 'desc';
+  };
   
-  /** Sort field and direction */
-  sortBy?: 'name' | 'value' | 'created_date' | 'last_modified_date';
-  sortDirection?: 'asc' | 'desc';
-  
-  /** Pagination parameters */
-  page?: number;
-  pageSize?: number;
+  /** Pagination configuration */
+  pagination?: {
+    page: number;
+    limit: number;
+  };
 }
 
 /**
- * Lookup Key Validation Rules
+ * Bulk operations interface for lookup key management
  * 
- * Validation configuration for React Hook Form and Zod schema
- * integration. Defines business rules and constraints for
- * lookup key data validation.
- * 
- * Used for:
- * - React Hook Form validation rules
- * - Zod schema definitions
- * - Client-side validation
- * - Form error messages
- * 
- * @interface LookupKeyValidationRules
- * @example
- * ```typescript
- * // React Hook Form validation
- * const validationRules: LookupKeyValidationRules = {
- *   name: {
- *     required: 'Name is required',
- *     maxLength: { value: 255, message: 'Name must be 255 characters or less' },
- *     pattern: {
- *       value: /^[a-zA-Z0-9_-]+$/,
- *       message: 'Name can only contain letters, numbers, underscores, and hyphens'
- *     }
- *   },
- *   value: {
- *     required: 'Value is required',
- *     maxLength: { value: 4000, message: 'Value must be 4000 characters or less' }
- *   }
- * };
- * 
- * // Usage in form
- * <input {...register('name', validationRules.name)} />
- * ```
+ * Defines the structure for performing bulk operations on multiple
+ * lookup keys simultaneously with proper error handling.
  */
-export interface LookupKeyValidationRules {
+export interface LookupKeyBulkOperations {
+  /** Export selected lookup keys to various formats */
+  export: (ids: number[], format: 'json' | 'csv' | 'yaml') => Promise<Blob>;
+  
+  /** Import lookup keys from file upload */
+  import: (file: File, options?: { overwrite?: boolean }) => Promise<{
+    success: number;
+    errors: Array<{ row: number; error: string }>;
+  }>;
+  
+  /** Delete multiple lookup keys */
+  bulkDelete: (ids: number[]) => Promise<void>;
+  
+  /** Update multiple lookup keys with same values */
+  bulkUpdate: (ids: number[], updates: Partial<LookupKeyType>) => Promise<void>;
+}
+
+/**
+ * Type guards for runtime type checking
+ * 
+ * Utility functions to verify object types at runtime for enhanced
+ * type safety in React components and API interactions.
+ */
+export const isLookupKeyType = (obj: any): obj is LookupKeyType => {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    typeof obj.name === 'string' &&
+    typeof obj.value === 'string' &&
+    typeof obj.private === 'boolean'
+  );
+};
+
+export const isLookupKeyFormData = (obj: any): obj is LookupKeyFormData => {
+  return isLookupKeyType(obj);
+};
+
+/**
+ * Default values for new lookup key creation
+ * 
+ * Provides sensible defaults for creating new lookup key entries
+ * in React forms and components.
+ */
+export const DEFAULT_LOOKUP_KEY: Omit<LookupKeyType, 'id'> = {
+  name: '',
+  value: '',
+  private: false,
+  description: ''
+} as const;
+
+/**
+ * Validation schema configuration for React Hook Form integration
+ * 
+ * Defines the validation rules that can be used with libraries like
+ * Zod or Yup for comprehensive form validation in React components.
+ */
+export const LOOKUP_KEY_VALIDATION_SCHEMA = {
   name: {
-    required: string;
-    maxLength: { value: number; message: string };
-    pattern?: { value: RegExp; message: string };
-  };
+    required: 'Name is required',
+    minLength: { value: 1, message: 'Name must not be empty' },
+    maxLength: { value: 255, message: 'Name must be less than 255 characters' },
+    pattern: {
+      value: /^[a-zA-Z][a-zA-Z0-9_-]*$/,
+      message: 'Name must start with a letter and contain only letters, numbers, underscores, and hyphens'
+    }
+  },
   value: {
-    required: string;
-    maxLength: { value: number; message: string };
-  };
-  description?: {
-    maxLength: { value: number; message: string };
-  };
-}
+    maxLength: { value: 65535, message: 'Value must be less than 65535 characters' }
+  },
+  description: {
+    maxLength: { value: 1000, message: 'Description must be less than 1000 characters' }
+  }
+} as const;
 
 /**
- * Type alias for backward compatibility with existing code.
- * Maintains the original interface name while supporting the
- * new type system architecture.
+ * API endpoint constants for lookup key operations
  * 
- * @deprecated Use LookupKeyType instead for new code
+ * Centralized endpoint definitions for consistent API communication
+ * across React components and services.
  */
-export type GlobalLookupKey = LookupKeyType;
-
-/**
- * Type alias for React Query cache keys.
- * Provides type safety for React Query key management
- * and cache invalidation operations.
- * 
- * @example
- * ```typescript
- * // React Query usage
- * const queryKey: LookupKeyQueryKey = ['lookupKeys', { search: 'test' }];
- * 
- * const { data } = useQuery({
- *   queryKey,
- *   queryFn: () => fetchLookupKeys(queryKey[1])
- * });
- * 
- * // Cache invalidation
- * queryClient.invalidateQueries({ queryKey: ['lookupKeys'] });
- * ```
- */
-export type LookupKeyQueryKey = [
-  'lookupKeys',
-  LookupKeyFilters?
-] | [
-  'lookupKey',
-  number
-];
-
-/**
- * Union type for lookup key-related API operations.
- * Provides type safety for API client methods and
- * React Query mutation operations.
- * 
- * @example
- * ```typescript
- * // API client method
- * const performLookupKeyOperation = async (
- *   operation: LookupKeyOperation,
- *   data?: CreateLookupKeyPayload | UpdateLookupKeyPayload
- * ) => {
- *   switch (operation) {
- *     case 'create':
- *       return createLookupKey(data as CreateLookupKeyPayload);
- *     case 'update':
- *       return updateLookupKey(id, data as UpdateLookupKeyPayload);
- *     // ... other operations
- *   }
- * };
- * ```
- */
-export type LookupKeyOperation = 
-  | 'create'
-  | 'read'
-  | 'update'
-  | 'delete'
-  | 'list'
-  | 'search';
+export const LOOKUP_KEY_ENDPOINTS = {
+  BASE: '/system/global_lookup',
+  CREATE: '/system/global_lookup',
+  UPDATE: (id: number) => `/system/global_lookup/${id}`,
+  DELETE: (id: number) => `/system/global_lookup/${id}`,
+  BATCH: '/system/global_lookup'
+} as const;
