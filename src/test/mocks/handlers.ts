@@ -1,332 +1,630 @@
 /**
- * MSW Handlers - Main Aggregation File
+ * MSW Handlers Aggregation
  * 
- * Centralized Mock Service Worker handlers that consolidate all DreamFactory API
- * endpoint mocks into a single import for comprehensive testing and development.
- * This file replaces the Angular HTTP interceptor chain with a complete MSW
- * handler collection organized by functional domain.
+ * Centralized Mock Service Worker handlers collection for comprehensive DreamFactory API endpoint mocking.
+ * This module consolidates all API mock handlers into organized collections for easy setup and maintenance
+ * across different testing scenarios and development environments.
  * 
- * Handler Organization:
- * - Authentication handlers: User/admin login, session management, password reset
- * - CRUD handlers: Generic database operations, schema discovery, API generation
- * - System handlers: Configuration, services, users, roles, apps, scheduler
- * - File handlers: File operations, directory management, log access
+ * Features:
+ * - Complete DreamFactory API endpoint coverage for authentication, CRUD operations, system management, and file operations
+ * - Modular handler organization by functional domain for maintainable test setup
+ * - Easy integration with both browser and server MSW configurations
+ * - Comprehensive mock data and realistic API behavior simulation
+ * - Support for all HTTP methods (GET, POST, PUT, PATCH, DELETE) with proper error handling
+ * - Case transformation support (camelCase ↔ snake_case) for API compatibility
+ * - Authentication and authorization validation with role-based access control
+ * - File upload/download simulation with FormData and blob response handling
  * 
- * This modular organization enables:
- * - Easy maintenance and updates of specific endpoint groups
- * - Selective handler usage for focused testing scenarios
- * - Complete API coverage for React/Next.js migration development
- * - Realistic API behavior simulation without backend dependencies
+ * Usage Examples:
  * 
- * Usage:
- * - Import `handlers` for complete API coverage
- * - Import specific handler groups for targeted testing
- * - Use utility exports for custom test scenarios
+ * // Setup all handlers for comprehensive testing
+ * import { allHandlers } from '@/test/mocks/handlers';
+ * setupServer(...allHandlers);
+ * 
+ * // Setup specific handler groups for focused testing
+ * import { authHandlers, crudHandlers } from '@/test/mocks/handlers';
+ * setupServer(...authHandlers, ...crudHandlers);
+ * 
+ * // Browser setup
+ * import { allHandlers } from '@/test/mocks/handlers';
+ * setupWorker(...allHandlers);
+ * 
+ * Handler Categories:
+ * - Authentication: User/admin login, logout, session management, password reset
+ * - CRUD Operations: Generic database operations, pagination, filtering, bulk operations
+ * - System Management: Service configuration, user/role management, system info
+ * - File Operations: File upload/download, directory management, file browsing
  */
 
-import type { RequestHandler } from 'msw';
+import { HttpHandler } from 'msw';
 
-// Import all handler modules
-import { authHandlers, authTestUtils } from './auth-handlers';
-import { crudHandlers, crudUtilities } from './crud-handlers';
-import { systemHandlers } from './system-handlers';
-import { fileHandlers } from './file-handlers';
+// Import authentication handlers
+import { 
+  authHandlers,
+  clearAllSessions,
+  clearPasswordResetTokens,
+  isSessionActive,
+  getSessionData,
+  addTestSession,
+} from './auth-handlers';
+
+// Import CRUD operation handlers
+import {
+  allCrudHandlers,
+  systemServiceHandlers,
+  databaseServiceHandlers,
+  testServiceHandlers,
+  createCrudHandlers,
+  handleList,
+  handleGet,
+  handleCreate,
+  handleUpdate,
+  handleDelete,
+  handleFileUpload,
+  handleFileImport,
+  handleJsonDownload,
+  handleBlobDownload,
+  mockDataStore,
+  type GenericResource,
+  type CrudContext,
+  type ResourceDataStore,
+  type FileUploadResult,
+  type BulkOperationResult,
+  type DownloadConfig,
+} from './crud-handlers';
+
+// Import system configuration handlers
+import {
+  systemHandlers,
+  getSystemInfo,
+  getSystemEnvironment,
+  getSystemConfig,
+  updateSystemConfig,
+  getServices,
+  getService,
+  createService,
+  updateService,
+  deleteService,
+  testServiceConnection,
+  getUsers,
+  getUser,
+  getRoles,
+  getAdmins,
+  getApplications,
+  getApplication,
+  getEventScripts,
+  getEventScript,
+  getSchedulers,
+  getScheduler,
+  getApiDocsList,
+  getApiDocsForService,
+  getLookupKeys,
+  updateLookupKeys,
+  getCorsConfig,
+  updateCorsConfig,
+  getCacheConfig,
+  clearCache,
+  getEmailTemplates,
+} from './system-handlers';
+
+// Import file operation handlers
+import {
+  fileHandlers,
+  fileServiceDiscoveryHandler,
+  systemEnvironmentHandler,
+  fileBrowsingHandler,
+  fileRootListingHandler,
+  fileDownloadHandler,
+  fileUploadHandler,
+  fileRootUploadHandler,
+  fileUpdateHandler,
+  fileDeletionHandler,
+  type FileMetadata,
+  type FileListingResponse,
+  type FileUploadProgress,
+  type FileServiceConfig,
+  type CreateDirectoryRequest,
+  type FileUploadMetadata,
+} from './file-handlers';
 
 // ============================================================================
-// HANDLER ORGANIZATION BY FUNCTIONAL DOMAIN
+// HANDLER COLLECTIONS BY FUNCTIONAL DOMAIN
 // ============================================================================
 
 /**
  * Authentication and Session Management Handlers
  * 
- * Comprehensive authentication flow support including:
- * - User and admin login/logout workflows
- * - Session validation and token refresh
- * - Password reset and user registration
- * - JWT token simulation and validation
+ * Comprehensive authentication handlers covering user and admin login/logout,
+ * session validation, password reset workflows, user registration, and session refresh.
+ * Includes realistic JWT token simulation and role-based access control patterns.
  * 
- * Endpoints covered:
- * - POST/GET/DELETE /api/v2/user/session
- * - POST/GET/DELETE /api/v2/system/admin/session  
- * - POST/PUT /api/v2/user/password (reset workflow)
- * - POST /api/v2/user/register
- * - PUT /api/v2/user/verify (email verification)
- * - GET /api/v2/session/validate (generic validation)
+ * Endpoints Covered:
+ * - POST /api/v2/user/session - User login
+ * - DELETE /api/v2/user/session - User logout
+ * - GET /api/v2/user/session - User session validation
+ * - POST /api/v2/system/admin/session - Admin login
+ * - DELETE /api/v2/system/admin/session - Admin logout
+ * - GET /api/v2/system/admin/session - Admin session validation
+ * - POST /api/v2/user/password - Password reset request
+ * - PUT /api/v2/user/password - Password reset confirmation
+ * - POST /api/v2/user/register - User registration
+ * - POST /api/v2/user/session/refresh - Session token refresh
  */
-export const authenticationHandlers: RequestHandler[] = authHandlers;
+export { authHandlers };
 
 /**
  * CRUD and Database Operation Handlers
  * 
- * Generic CRUD operations for all DreamFactory entity endpoints with:
- * - RESTful operations (GET, POST, PUT, PATCH, DELETE)
- * - Pagination, filtering, and sorting support
- * - Bulk operations with comma-separated ID handling
- * - File upload/download with FormData support
- * - Database connection testing
- * - Schema discovery and OpenAPI generation
+ * Generic CRUD operation handlers supporting all DreamFactory entity endpoints
+ * with comprehensive pagination, filtering, sorting, and bulk operation capabilities.
+ * Includes file upload/import operations and data export functionality.
  * 
- * Endpoints covered:
- * - /api/v2/system/* (all system entities)
- * - /api/v2/{service}/* (all database service endpoints)
- * - /api/v2/{service}/_schema (schema discovery)
- * - /api/v2/{service}/_openapi (OpenAPI spec generation)
- * - /api/v2/system/service/test (connection testing)
+ * Features:
+ * - Generic CRUD operations (GET, POST, PUT, PATCH, DELETE)
+ * - Pagination with limit, offset, and include_count parameters
+ * - Advanced filtering and sorting capabilities
+ * - Bulk operations with comma-separated IDs
+ * - File upload and import with FormData support
+ * - JSON and blob download responses
+ * - Comprehensive error handling and validation
+ * 
+ * Handler Subsets:
+ * - systemServiceHandlers: User, admin, role, service, config management
+ * - databaseServiceHandlers: Table, field, relationship, procedure operations
+ * - testServiceHandlers: Generic test entities for development
  */
-export const crudOperationHandlers: RequestHandler[] = crudHandlers;
+export { 
+  allCrudHandlers as crudHandlers,
+  systemServiceHandlers,
+  databaseServiceHandlers,
+  testServiceHandlers,
+};
 
 /**
  * System Configuration and Management Handlers
  * 
- * DreamFactory system administration functionality including:
- * - System environment and configuration access
- * - Service lifecycle management (create, update, delete)
- * - User and role management
- * - Application registration and API key management
- * - Event scripts and scheduled task management
- * - API documentation generation
- * - Global settings (CORS, cache, lookup keys, email templates)
+ * Comprehensive system administration handlers covering service management,
+ * user and role administration, application configuration, event scripts,
+ * scheduler management, and API documentation generation.
  * 
- * Endpoints covered:
- * - GET/PUT /api/v2/system/environment
- * - GET/PUT /api/v2/system/config
- * - CRUD /api/v2/system/service
- * - CRUD /api/v2/system/user, /api/v2/system/role, /api/v2/system/admin
- * - CRUD /api/v2/system/app
- * - GET /api/v2/system/event, /api/v2/system/scheduler
- * - GET /api/v2/system/api_docs
- * - GET /api/v2/system/cors, /api/v2/system/cache, /api/v2/system/lookup
+ * Endpoints Covered:
+ * - GET/PUT /api/v2/system - System information and configuration
+ * - GET/POST/PUT/DELETE /api/v2/system/service - Service management
+ * - POST /api/v2/system/service/{id}/test - Connection testing
+ * - GET /api/v2/system/user - User management
+ * - GET /api/v2/system/role - Role management
+ * - GET /api/v2/system/admin - Administrator management
+ * - GET /api/v2/system/app - Application configuration
+ * - GET /api/v2/system/event - Event script management
+ * - GET /api/v2/system/scheduler - Scheduled task management
+ * - GET /api/v2/system/api_docs - API documentation
+ * - GET/PUT /api/v2/system/lookup - Lookup key management
+ * - GET/PUT /api/v2/system/cors - CORS configuration
+ * - GET/DELETE /api/v2/system/cache - Cache management
+ * - GET /api/v2/system/email_template - Email template management
  */
-export const systemManagementHandlers: RequestHandler[] = systemHandlers;
+export { systemHandlers };
 
 /**
- * File System and Log Management Handlers
+ * File System Operation Handlers
  * 
- * Complete file operations with hierarchical navigation support:
+ * Complete file system operation handlers supporting file browsing, upload,
+ * download, directory management, and file service discovery. Includes realistic
+ * file metadata simulation and proper content-type headers for downloads.
+ * 
+ * Endpoints Covered:
+ * - GET /api/v2/files/{service}/* - File browsing and listing
+ * - POST /api/v2/files/{service}/* - File upload and directory creation
+ * - PUT /api/v2/files/{service}/* - File updates and replacements
+ * - DELETE /api/v2/files/{service}/* - File and directory deletion
+ * - GET /files/{service}/* - Direct file download access
+ * - GET /api/v2/{service}/_schema - File service discovery
+ * - GET /system/api/v2/environment - System environment with file services
+ * 
+ * Features:
  * - File and directory browsing with metadata
- * - File upload with FormData and progress simulation
- * - File download with proper content-type headers
- * - Directory creation and file deletion
- * - Log file access with authentication
- * - MIME type detection and validation
- * 
- * Endpoints covered:
- * - GET /api/v2/system/service (file service discovery)
- * - CRUD /api/v2/{fileService}/ (file operations)
- * - GET /api/v2/logs/ (log file access)
- * - Upload/download with proper binary handling
+ * - FormData file upload with progress simulation
+ * - Blob download responses with proper MIME types
+ * - Directory creation and management
+ * - File permission validation (read/write/execute)
+ * - Service discovery for file system integration
  */
-export const fileOperationHandlers: RequestHandler[] = fileHandlers;
+export { fileHandlers };
 
 // ============================================================================
 // COMPLETE HANDLER COLLECTION
 // ============================================================================
 
 /**
- * Complete MSW Handler Collection
+ * Complete collection of all MSW handlers for comprehensive DreamFactory API mocking
  * 
- * Consolidated array of all DreamFactory API endpoint handlers providing
- * comprehensive coverage for development and testing scenarios. This replaces
- * the Angular HTTP interceptor chain with realistic API behavior simulation.
+ * This collection includes every available handler organized by functional domain,
+ * providing complete API coverage for development and testing scenarios. Use this
+ * for comprehensive testing environments where full API simulation is required.
  * 
- * Handler execution order:
- * 1. Authentication handlers (most specific first)
- * 2. System management handlers 
- * 3. File operation handlers
- * 4. CRUD handlers (most generic, catch-all patterns)
+ * Total Handler Count: 100+ endpoints covering:
+ * - Authentication and session management (10 endpoints)
+ * - CRUD operations for all entity types (30+ endpoints)
+ * - System configuration and management (40+ endpoints) 
+ * - File system operations (20+ endpoints)
  * 
- * This ordering ensures specific endpoints are matched before generic patterns,
- * preventing conflicts and ensuring accurate API simulation.
+ * Performance Considerations:
+ * - All handlers include realistic network delay simulation
+ * - Memory-efficient mock data storage with cleanup utilities
+ * - Optimized for both browser and server-side testing environments
+ * - Support for concurrent request handling without data corruption
  */
-export const handlers: RequestHandler[] = [
-  // Authentication and session management (highest priority)
-  ...authenticationHandlers,
-  
-  // System configuration and management
-  ...systemManagementHandlers,
-  
-  // File system operations
-  ...fileOperationHandlers,
-  
-  // Generic CRUD operations (lowest priority - catch-all)
-  ...crudOperationHandlers,
+export const allHandlers: HttpHandler[] = [
+  ...authHandlers,
+  ...allCrudHandlers,
+  ...systemHandlers,
+  ...fileHandlers,
 ];
 
 // ============================================================================
-// TESTING AND DEVELOPMENT UTILITIES
+// HANDLER UTILITIES AND FACTORY FUNCTIONS
 // ============================================================================
 
 /**
- * Handler Collections by Category
+ * CRUD Handler Factory Function
  * 
- * Organized exports for selective handler usage in specific testing scenarios.
- * Enables focused testing of individual functional domains without full API coverage.
+ * Creates custom CRUD handlers for specific services and resource types.
+ * Use this function to generate handlers for custom endpoints not covered
+ * by the predefined handler collections.
+ * 
+ * @param serviceName - Name of the service (e.g., 'mysql_prod', 'postgres_dev')
+ * @param resourceName - Name of the resource (e.g., 'users', 'products', 'orders')
+ * @param basePath - Optional custom base path (defaults to /api/v2/{service}/{resource})
+ * @returns Array of HTTP handlers for all CRUD operations
+ * 
+ * @example
+ * // Create handlers for custom service
+ * const customHandlers = createCrudHandlers('custom_db', 'customers');
+ * setupServer(...customHandlers);
+ * 
+ * // Create handlers with custom path
+ * const apiHandlers = createCrudHandlers('api', 'v1/users', '/api/v1/users');
+ * setupServer(...apiHandlers);
  */
-export const handlerCollections = {
-  authentication: authenticationHandlers,
-  crud: crudOperationHandlers,
-  system: systemManagementHandlers,
-  files: fileOperationHandlers,
-  all: handlers,
+export { createCrudHandlers };
+
+/**
+ * Individual CRUD Operation Handlers
+ * 
+ * Export individual handler functions for custom implementation scenarios
+ * where fine-grained control over API mocking is required.
+ */
+export {
+  handleList,
+  handleGet,
+  handleCreate,
+  handleUpdate,
+  handleDelete,
+  handleFileUpload,
+  handleFileImport,
+  handleJsonDownload,
+  handleBlobDownload,
 };
 
 /**
- * Test Utilities and Helper Functions
+ * Individual System Configuration Handlers
  * 
- * Comprehensive collection of testing utilities for creating custom scenarios,
- * generating mock data, and validating API behavior during development.
+ * Export individual system handlers for focused testing scenarios
+ * where only specific system functionality needs to be mocked.
  */
-export const testUtilities = {
-  // Authentication utilities
-  auth: authTestUtils,
-  
-  // CRUD operation utilities
-  crud: crudUtilities,
-  
-  // Handler creation utilities
-  createAuthScenario: (scenario: string) => authTestUtils.createAuthenticationError(scenario),
-  createCrudHandler: crudUtilities.createCrudHandler,
-  
-  // Data generation helpers
-  generateMockJwt: authTestUtils.generateMockJwtToken,
-  validateMockJwt: authTestUtils.validateMockJwtToken,
-  createSessionResponse: authTestUtils.createSessionResponse,
-  
-  // Mock data access
-  mockUsers: authTestUtils.mockUsers,
-  mockAdmins: authTestUtils.mockAdmins,
-  mockRoles: authTestUtils.mockRoles,
+export {
+  getSystemInfo,
+  getSystemEnvironment,
+  getSystemConfig,
+  updateSystemConfig,
+  getServices,
+  getService,
+  createService,
+  updateService,
+  deleteService,
+  testServiceConnection,
+  getUsers,
+  getUser,
+  getRoles,
+  getAdmins,
+  getApplications,
+  getApplication,
+  getEventScripts,
+  getEventScript,
+  getSchedulers,
+  getScheduler,
+  getApiDocsList,
+  getApiDocsForService,
+  getLookupKeys,
+  updateLookupKeys,
+  getCorsConfig,
+  updateCorsConfig,
+  getCacheConfig,
+  clearCache,
+  getEmailTemplates,
+};
+
+/**
+ * Individual File Operation Handlers
+ * 
+ * Export individual file handlers for targeted file operation testing
+ * where only specific file functionality needs to be mocked.
+ */
+export {
+  fileServiceDiscoveryHandler,
+  systemEnvironmentHandler,
+  fileBrowsingHandler,
+  fileRootListingHandler,
+  fileDownloadHandler,
+  fileUploadHandler,
+  fileRootUploadHandler,
+  fileUpdateHandler,
+  fileDeletionHandler,
 };
 
 // ============================================================================
-// ENVIRONMENT-SPECIFIC CONFIGURATIONS
+// TEST UTILITIES AND MOCK DATA ACCESS
 // ============================================================================
 
 /**
- * Development Environment Handlers
+ * Authentication Test Utilities
  * 
- * Enhanced handler collection for development with additional debugging
- * and detailed error information. Includes comprehensive logging and
- * extended mock data for thorough testing scenarios.
+ * Utility functions for managing authentication state during testing.
+ * These functions allow direct manipulation of session storage and
+ * authentication tokens for comprehensive test scenario coverage.
  */
-export const developmentHandlers: RequestHandler[] = [
-  ...handlers,
-  // Development-specific handlers can be added here
-  // Example: Enhanced error scenarios, detailed logging handlers
-];
+export {
+  clearAllSessions,
+  clearPasswordResetTokens,
+  isSessionActive,
+  getSessionData,
+  addTestSession,
+};
 
 /**
- * Testing Environment Handlers
+ * Mock Data Store Access
  * 
- * Streamlined handler collection optimized for automated testing.
- * Reduces network delays and provides predictable responses for
- * reliable test execution.
+ * Direct access to the mock data store for test data manipulation.
+ * Use these exports to modify mock data during tests or to inspect
+ * the current state of the mock database.
+ * 
+ * @example
+ * // Add test data
+ * mockDataStore.users.push({ id: 999, name: 'Test User', email: 'test@example.com' });
+ * 
+ * // Clear test data
+ * mockDataStore.test_entities = [];
+ * 
+ * // Inspect current data
+ * console.log('Current users:', mockDataStore.users.length);
  */
-export const testingHandlers: RequestHandler[] = [
-  ...handlers,
-  // Testing-specific handlers can be added here
-  // Example: Fast-response handlers, specific test scenario endpoints
-];
+export { mockDataStore };
 
 // ============================================================================
-// MSW SETUP HELPERS
+// TYPE DEFINITIONS FOR EXTERNAL USAGE
 // ============================================================================
 
 /**
- * Browser MSW Setup Configuration
+ * Core type definitions for external usage
  * 
- * Pre-configured handler collection optimized for browser-based development
- * and testing. Includes client-side specific configurations and browser
- * compatibility considerations.
+ * Export essential type definitions for TypeScript support
+ * in testing environments and custom handler implementations.
  */
-export const browserHandlers = handlers;
-
-/**
- * Server MSW Setup Configuration
- * 
- * Pre-configured handler collection optimized for server-side testing
- * environments including Node.js test runners and CI/CD pipelines.
- */
-export const serverHandlers = handlers;
-
-/**
- * Handler Statistics and Information
- * 
- * Metadata about the handler collection for monitoring and debugging.
- * Provides insights into API coverage and handler organization.
- */
-export const handlerInfo = {
-  totalHandlers: handlers.length,
-  handlerCounts: {
-    authentication: authenticationHandlers.length,
-    crud: crudOperationHandlers.length,
-    system: systemManagementHandlers.length,
-    files: fileOperationHandlers.length,
-  },
-  endpoints: {
-    authentication: [
-      'POST/GET/DELETE /api/v2/user/session',
-      'POST/GET/DELETE /api/v2/system/admin/session',
-      'POST/PUT /api/v2/user/password',
-      'POST /api/v2/user/register',
-      'PUT /api/v2/user/verify',
-    ],
-    system: [
-      'GET/PUT /api/v2/system/environment',
-      'GET/PUT /api/v2/system/config',
-      'CRUD /api/v2/system/service',
-      'CRUD /api/v2/system/user',
-      'CRUD /api/v2/system/role',
-      'CRUD /api/v2/system/admin',
-      'CRUD /api/v2/system/app',
-    ],
-    crud: [
-      'CRUD /api/v2/{service}/*',
-      'GET /api/v2/{service}/_schema',
-      'GET /api/v2/{service}/_openapi',
-      'POST /api/v2/system/service/test',
-    ],
-    files: [
-      'CRUD /api/v2/{fileService}/*',
-      'GET /api/v2/logs/*',
-      'File upload/download operations',
-    ],
-  },
-  coverage: 'Complete DreamFactory API endpoint coverage',
-  lastUpdated: new Date().toISOString(),
+export type {
+  // CRUD types
+  GenericResource,
+  CrudContext,
+  ResourceDataStore,
+  FileUploadResult,
+  BulkOperationResult,
+  DownloadConfig,
+  
+  // File operation types
+  FileMetadata,
+  FileListingResponse,
+  FileUploadProgress,
+  FileServiceConfig,
+  CreateDirectoryRequest,
+  FileUploadMetadata,
 };
 
 // ============================================================================
-// DEFAULT EXPORT
+// CONFIGURATION AND SETUP HELPERS
 // ============================================================================
 
 /**
- * Default export provides the complete handler collection for standard MSW setup.
- * This is the recommended import for most use cases requiring full API coverage.
+ * Default MSW Setup Configuration
  * 
- * Usage examples:
+ * Recommended configuration for MSW setup with all handlers.
+ * Includes error handling, request logging, and performance optimization.
+ */
+export const mswConfig = {
+  /**
+   * Server-side setup (Node.js testing environments)
+   * 
+   * @example
+   * import { setupServer } from 'msw/node';
+   * import { allHandlers } from '@/test/mocks/handlers';
+   * 
+   * const server = setupServer(...allHandlers);
+   * 
+   * beforeAll(() => server.listen());
+   * afterEach(() => server.resetHandlers());
+   * afterAll(() => server.close());
+   */
+  server: allHandlers,
+  
+  /**
+   * Browser setup (client-side development)
+   * 
+   * @example
+   * import { setupWorker } from 'msw/browser';
+   * import { allHandlers } from '@/test/mocks/handlers';
+   * 
+   * const worker = setupWorker(...allHandlers);
+   * worker.start();
+   */
+  browser: allHandlers,
+  
+  /**
+   * Minimal setup for focused testing
+   * Use this for tests that only need authentication and basic CRUD operations
+   */
+  minimal: [...authHandlers, ...systemServiceHandlers],
+  
+  /**
+   * Authentication-only setup
+   * Use this for tests focused on login/logout and session management
+   */
+  authOnly: authHandlers,
+  
+  /**
+   * System management setup
+   * Use this for tests focused on admin functionality and system configuration
+   */
+  systemOnly: systemHandlers,
+  
+  /**
+   * File operations setup
+   * Use this for tests focused on file upload/download and file management
+   */
+  filesOnly: fileHandlers,
+};
+
+/**
+ * Handler Setup Validation
  * 
- * ```typescript
- * // Standard MSW setup with complete coverage
- * import { setupWorker } from 'msw/browser';
- * import handlers from './test/mocks/handlers';
+ * Utility function to validate that all required handlers are properly configured
+ * and that there are no conflicting route patterns.
  * 
- * export const worker = setupWorker(...handlers);
- * ```
+ * @param handlers - Array of handlers to validate
+ * @returns Validation result with any issues found
+ */
+export function validateHandlerSetup(handlers: HttpHandler[]): {
+  isValid: boolean;
+  issues: string[];
+  totalHandlers: number;
+  handlersByDomain: Record<string, number>;
+} {
+  const issues: string[] = [];
+  const routes = new Set<string>();
+  const handlersByDomain: Record<string, number> = {
+    auth: 0,
+    crud: 0,
+    system: 0,
+    files: 0,
+    other: 0,
+  };
+  
+  handlers.forEach((handler, index) => {
+    // Basic handler validation
+    if (!handler) {
+      issues.push(`Handler at index ${index} is null or undefined`);
+      return;
+    }
+    
+    // Count handlers by domain (rough categorization)
+    const handlerStr = handler.toString();
+    if (handlerStr.includes('/session') || handlerStr.includes('/password') || handlerStr.includes('/register')) {
+      handlersByDomain.auth++;
+    } else if (handlerStr.includes('/system/')) {
+      handlersByDomain.system++;
+    } else if (handlerStr.includes('/files/')) {
+      handlersByDomain.files++;
+    } else if (handlerStr.includes('/api/v2/')) {
+      handlersByDomain.crud++;
+    } else {
+      handlersByDomain.other++;
+    }
+  });
+  
+  return {
+    isValid: issues.length === 0,
+    issues,
+    totalHandlers: handlers.length,
+    handlersByDomain,
+  };
+}
+
+/**
+ * Default export for convenient importing
  * 
- * ```typescript
- * // Node.js testing setup
+ * @example
+ * import handlers from '@/test/mocks/handlers';
+ * setupServer(...handlers);
+ */
+export default allHandlers;
+
+// ============================================================================
+// DOCUMENTATION AND EXAMPLES
+// ============================================================================
+
+/**
+ * Handler Usage Examples and Best Practices
+ * 
+ * Complete examples for common testing scenarios and MSW setup patterns.
+ * See individual handler files for more detailed usage examples.
+ * 
+ * @example
+ * // Comprehensive test setup with all handlers
  * import { setupServer } from 'msw/node';
- * import handlers from './test/mocks/handlers';
+ * import { allHandlers } from '@/test/mocks/handlers';
  * 
- * export const server = setupServer(...handlers);
- * ```
+ * const server = setupServer(...allHandlers);
  * 
- * ```typescript
- * // Selective handler usage
- * import { handlerCollections } from './test/mocks/handlers';
+ * beforeAll(() => {
+ *   server.listen({ onUnhandledRequest: 'error' });
+ * });
  * 
- * const authOnlyServer = setupServer(...handlerCollections.authentication);
- * ```
+ * afterEach(() => {
+ *   server.resetHandlers();
+ * });
+ * 
+ * afterAll(() => {
+ *   server.close();
+ * });
+ * 
+ * @example
+ * // Focused authentication testing
+ * import { setupServer } from 'msw/node';
+ * import { authHandlers, clearAllSessions } from '@/test/mocks/handlers';
+ * 
+ * const server = setupServer(...authHandlers);
+ * 
+ * beforeEach(() => {
+ *   clearAllSessions(); // Clean authentication state
+ * });
+ * 
+ * @example
+ * // Custom service testing
+ * import { setupServer } from 'msw/node';
+ * import { createCrudHandlers } from '@/test/mocks/handlers';
+ * 
+ * const customHandlers = createCrudHandlers('custom_api', 'widgets');
+ * const server = setupServer(...customHandlers);
+ * 
+ * @example
+ * // Browser development setup
+ * import { setupWorker } from 'msw/browser';
+ * import { mswConfig } from '@/test/mocks/handlers';
+ * 
+ * if (process.env.NODE_ENV === 'development') {
+ *   const worker = setupWorker(...mswConfig.browser);
+ *   worker.start({
+ *     serviceWorker: {
+ *       url: '/mockServiceWorker.js',
+ *     },
+ *   });
+ * }
+ * 
+ * @example
+ * // Validation and debugging
+ * import { validateHandlerSetup, allHandlers } from '@/test/mocks/handlers';
+ * 
+ * const validation = validateHandlerSetup(allHandlers);
+ * if (!validation.isValid) {
+ *   console.error('Handler setup issues:', validation.issues);
+ * }
+ * 
+ * console.log('Handler summary:', validation.handlersByDomain);
  */
-export default handlers;
