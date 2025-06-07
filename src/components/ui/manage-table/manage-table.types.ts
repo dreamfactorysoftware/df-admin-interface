@@ -1,849 +1,1395 @@
 /**
- * ManageTable Component Type Definitions
+ * TypeScript type definitions for the manage-table component system.
  * 
- * Comprehensive TypeScript interfaces for the ManageTable component system
- * featuring TanStack Table integration, React Query data fetching, and WCAG 2.1 AA
- * accessibility compliance. Replaces Angular Material table types with modern 
- * React 19 patterns optimized for DreamFactory's database schema management.
+ * Provides comprehensive type-safe interfaces for TanStack Table integration,
+ * React Hook Form compatibility, TanStack React Query data fetching,
+ * accessibility compliance (WCAG 2.1 AA), and Tailwind CSS theming.
  * 
- * @fileoverview Type definitions for accessible, performant React data tables
+ * Supports enterprise-grade table functionality for DreamFactory Admin Interface
+ * including database schema management, user administration, API documentation,
+ * and system configuration with React 19 compatibility.
+ * 
+ * @fileoverview Manage table component type definitions
  * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+ / TanStack Table v8
  */
 
-import { type ReactNode, type HTMLAttributes, type MouseEvent, type KeyboardEvent, type ComponentPropsWithoutRef } from 'react';
-import { type UseQueryResult, type QueryKey, type UseInfiniteQueryResult } from '@tanstack/react-query';
-import { type ColumnDef, type Table, type Column, type Row, type Cell, type SortingState, type ColumnFiltersState, type PaginationState, type RowSelectionState, type VisibilityState, type ColumnOrderState } from '@tanstack/react-table';
-import { type Virtualizer } from '@tanstack/react-virtual';
-import { type UseFormRegister, type UseFormReturn, type FieldValues, type Control } from 'react-hook-form';
-import { type AccessibilityProps, type ThemeProps, type ResponsiveProps, type AnimationProps, type BaseComponentProps, type LoadingState, type ValidationState } from '@/types/ui';
+import { ReactNode, ReactElement, ComponentType, Key, CSSProperties } from 'react';
+import { 
+  BaseComponent, 
+  ComponentVariant, 
+  ComponentSize, 
+  ComponentState,
+  FormFieldComponent,
+  SelectOption,
+  ButtonComponent,
+  LoadingState,
+  DataState,
+  ResponsiveValue,
+  ComponentVariantConfig
+} from '@/types/ui';
+import { 
+  ApiResponse, 
+  ApiListResponse, 
+  PaginationMeta, 
+  ApiRequestOptions,
+  HttpMethod
+} from '@/types/api';
 
-// =============================================================================
-// API Integration Types
-// =============================================================================
+// ============================================================================
+// TANSTACK TABLE INTEGRATION TYPES
+// ============================================================================
 
 /**
- * Base API response structure for table data
- * Follows DreamFactory REST API conventions
+ * TanStack Table column definition with enhanced React 19 type safety
+ * Supports custom cell renderers, sorting, filtering, and accessibility
  */
-export interface TableApiResponse<T = unknown> {
-  /** Array of data records */
-  resource: T[];
-  /** Metadata about the response */
-  meta?: {
-    /** Total number of records available */
-    count?: number;
-    /** Number of records in current response */
-    limit?: number;
-    /** Offset for pagination */
-    offset?: number;
-    /** Has more records available */
-    has_more?: boolean;
-    /** Next page token for cursor pagination */
-    next_token?: string;
+export interface TableColumnDef<TData = any, TValue = any> {
+  /** Unique column identifier */
+  id: string;
+  
+  /** Data accessor key or function */
+  accessorKey?: keyof TData;
+  accessorFn?: (row: TData) => TValue;
+  
+  /** Column header content */
+  header: string | ((props: TableHeaderProps<TData>) => ReactNode);
+  
+  /** Cell renderer function */
+  cell?: (props: TableCellProps<TData, TValue>) => ReactNode;
+  
+  /** Footer content */
+  footer?: string | ((props: TableFooterProps<TData>) => ReactNode);
+  
+  /** Column metadata */
+  meta?: TableColumnMeta;
+  
+  /** Column sizing configuration */
+  size?: number;
+  minSize?: number;
+  maxSize?: number;
+  
+  /** Enable/disable features */
+  enableSorting?: boolean;
+  enableColumnFilter?: boolean;
+  enableGlobalFilter?: boolean;
+  enableGrouping?: boolean;
+  enableHiding?: boolean;
+  enablePinning?: boolean;
+  enableResizing?: boolean;
+  
+  /** Sort configuration */
+  sortingFn?: TableSortingFn<TData>;
+  sortDescFirst?: boolean;
+  invertSorting?: boolean;
+  
+  /** Filter configuration */
+  filterFn?: TableFilterFn<TData>;
+  
+  /** Grouping configuration */
+  getGroupingValue?: (row: TData) => any;
+  aggregationFn?: TableAggregationFn<TData>;
+  
+  /** Accessibility configuration */
+  'aria-label'?: string;
+  'aria-description'?: string;
+}
+
+/**
+ * Column metadata for additional configuration
+ */
+export interface TableColumnMeta {
+  /** Display name for column toggles */
+  displayName?: string;
+  
+  /** Column description for tooltips */
+  description?: string;
+  
+  /** Data type for filtering and formatting */
+  dataType?: TableDataType;
+  
+  /** Format configuration */
+  format?: TableCellFormat;
+  
+  /** Validation configuration */
+  validation?: TableCellValidation;
+  
+  /** Styling configuration */
+  className?: string;
+  style?: CSSProperties;
+  
+  /** Responsive configuration */
+  responsive?: ResponsiveTableColumn;
+  
+  /** Export configuration */
+  exportable?: boolean;
+  exportFormat?: (value: any) => string;
+}
+
+/**
+ * Data types supported by table columns
+ */
+export type TableDataType = 
+  | 'string'
+  | 'number'
+  | 'boolean'
+  | 'date'
+  | 'datetime'
+  | 'time'
+  | 'email'
+  | 'url'
+  | 'json'
+  | 'array'
+  | 'object'
+  | 'enum'
+  | 'currency'
+  | 'percentage';
+
+/**
+ * Cell formatting configuration
+ */
+export interface TableCellFormat {
+  type: TableDataType;
+  options?: {
+    /** Date/time formatting */
+    dateFormat?: string;
+    timezone?: string;
+    
+    /** Number formatting */
+    decimals?: number;
+    currency?: string;
+    locale?: string;
+    
+    /** String formatting */
+    maxLength?: number;
+    truncate?: boolean;
+    
+    /** Boolean formatting */
+    truthyValue?: string;
+    falsyValue?: string;
+    
+    /** Array/object formatting */
+    separator?: string;
+    preview?: boolean;
   };
-  /** Links for pagination navigation */
-  links?: {
+}
+
+/**
+ * Cell validation configuration
+ */
+export interface TableCellValidation {
+  required?: boolean;
+  pattern?: RegExp;
+  min?: number;
+  max?: number;
+  custom?: (value: any) => boolean | string;
+}
+
+/**
+ * Responsive column configuration
+ */
+export interface ResponsiveTableColumn {
+  hideBelow?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+  showOnly?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+  priority?: number; // Higher priority shown first on small screens
+}
+
+// ============================================================================
+// TABLE COMPONENT PROPS
+// ============================================================================
+
+/**
+ * Main table component props with comprehensive configuration
+ * Integrates TanStack Table with React Query and accessibility features
+ */
+export interface ManageTableProps<TData = any> extends BaseComponent {
+  /** Table data */
+  data: TData[];
+  
+  /** Column definitions */
+  columns: TableColumnDef<TData>[];
+  
+  /** Loading state */
+  loading?: boolean;
+  
+  /** Error state */
+  error?: string | null;
+  
+  /** Empty state configuration */
+  emptyState?: TableEmptyState;
+  
+  /** Pagination configuration */
+  pagination?: TablePagination;
+  
+  /** Sorting configuration */
+  sorting?: TableSorting<TData>;
+  
+  /** Filtering configuration */
+  filtering?: TableFiltering<TData>;
+  
+  /** Row selection configuration */
+  selection?: TableSelection<TData>;
+  
+  /** Row actions configuration */
+  actions?: TableActions<TData>;
+  
+  /** Bulk operations configuration */
+  bulkActions?: TableBulkActions<TData>;
+  
+  /** Table layout and styling */
+  layout?: TableLayout;
+  
+  /** Export functionality */
+  export?: TableExport<TData>;
+  
+  /** Accessibility configuration */
+  accessibility?: TableAccessibility;
+  
+  /** Performance optimization */
+  virtualization?: TableVirtualization;
+  
+  /** Event handlers */
+  onRowClick?: (row: TData, event: React.MouseEvent) => void;
+  onRowDoubleClick?: (row: TData, event: React.MouseEvent) => void;
+  onRowSelect?: (selectedRows: TData[]) => void;
+  onColumnSort?: (columnId: string, direction: 'asc' | 'desc') => void;
+  onColumnFilter?: (columnId: string, value: any) => void;
+  onPageChange?: (page: number) => void;
+  onPageSizeChange?: (pageSize: number) => void;
+  
+  /** React Query integration */
+  queryKey?: string[];
+  queryOptions?: TableQueryOptions;
+  
+  /** Form integration */
+  formIntegration?: TableFormIntegration;
+}
+
+/**
+ * Empty state configuration
+ */
+export interface TableEmptyState {
+  /** Empty state content */
+  title: string;
+  description?: string;
+  icon?: ComponentType<{ className?: string }>;
+  action?: {
+    label: string;
+    handler: () => void;
+    variant?: ComponentVariant;
+  };
+  
+  /** Custom empty state component */
+  component?: ComponentType<{ className?: string }>;
+}
+
+/**
+ * Pagination configuration with accessibility
+ */
+export interface TablePagination {
+  /** Current page (0-based) */
+  pageIndex: number;
+  
+  /** Items per page */
+  pageSize: number;
+  
+  /** Total number of items */
+  totalItems?: number;
+  
+  /** Total number of pages */
+  totalPages?: number;
+  
+  /** Page size options */
+  pageSizeOptions?: number[];
+  
+  /** Show page size selector */
+  showPageSizeSelector?: boolean;
+  
+  /** Show page info */
+  showPageInfo?: boolean;
+  
+  /** Show first/last buttons */
+  showFirstLast?: boolean;
+  
+  /** Server-side pagination */
+  serverSide?: boolean;
+  
+  /** Event handlers */
+  onPageChange: (page: number) => void;
+  onPageSizeChange?: (pageSize: number) => void;
+  
+  /** Accessibility labels */
+  labels?: {
+    page?: (page: number) => string;
+    pageSize?: string;
+    totalItems?: (total: number) => string;
+    previous?: string;
+    next?: string;
     first?: string;
     last?: string;
-    next?: string;
-    prev?: string;
   };
 }
 
 /**
- * Table data fetching configuration for React Query integration
+ * Sorting configuration
  */
-export interface TableDataFetchConfig {
-  /** React Query key for caching */
-  queryKey: QueryKey;
-  /** Query function to fetch data */
-  queryFn: (params: TableQueryParams) => Promise<TableApiResponse>;
-  /** Enable/disable the query */
-  enabled?: boolean;
-  /** Stale time for caching (default: 300 seconds for schema data) */
-  staleTime?: number;
-  /** Cache time for inactive queries */
-  cacheTime?: number;
-  /** Enable real-time updates */
-  refetchOnWindowFocus?: boolean;
-  /** Refetch interval for live data */
-  refetchInterval?: number;
-  /** Error retry configuration */
-  retry?: number | boolean;
-  /** Initial data to use while loading */
-  initialData?: TableApiResponse;
+export interface TableSorting<TData = any> {
+  /** Current sort state */
+  state: TableSortState[];
+  
+  /** Enable multi-column sorting */
+  multiSort?: boolean;
+  
+  /** Sort state change handler */
+  onSortingChange: (sorting: TableSortState[]) => void;
+  
+  /** Server-side sorting */
+  serverSide?: boolean;
+  
+  /** Default sort state */
+  defaultSort?: TableSortState[];
+  
+  /** Custom sorting functions */
+  sortingFns?: Record<string, TableSortingFn<TData>>;
 }
 
 /**
- * Query parameters for table data fetching
+ * Sort state definition
  */
-export interface TableQueryParams {
-  /** Current page number (1-based) */
-  page?: number;
-  /** Number of records per page */
-  limit?: number;
-  /** Offset for pagination */
-  offset?: number;
-  /** Sorting configuration */
-  sort?: string;
-  /** Sorting direction */
-  order?: 'asc' | 'desc';
-  /** Filter parameters */
-  filter?: Record<string, unknown>;
-  /** Search query string */
-  search?: string;
-  /** Fields to include in response */
-  fields?: string[];
-  /** Related data to include */
-  include?: string[];
-}
-
-// =============================================================================
-// Column Configuration Types
-// =============================================================================
-
-/**
- * Extended column definition with DreamFactory-specific features
- */
-export interface ManageTableColumnDef<TData = unknown, TValue = unknown> extends ColumnDef<TData, TValue> {
-  /** Column unique identifier */
+export interface TableSortState {
   id: string;
-  /** Human-readable column header */
-  header: string | ReactNode | ((props: { column: Column<TData, TValue> }) => ReactNode);
-  /** Data accessor key or function */
-  accessorKey?: keyof TData | string;
-  /** Custom cell renderer */
-  cell?: (info: { getValue: () => TValue; row: Row<TData>; column: Column<TData, TValue>; table: Table<TData> }) => ReactNode;
-  /** Enable sorting for this column */
-  enableSorting?: boolean;
-  /** Enable filtering for this column */
-  enableColumnFilter?: boolean;
-  /** Enable hiding/showing this column */
-  enableHiding?: boolean;
-  /** Enable resizing this column */
-  enableResizing?: boolean;
-  /** Column size configuration */
-  size?: number;
-  /** Minimum column width */
-  minSize?: number;
-  /** Maximum column width */
-  maxSize?: number;
-  /** Custom filter component */
-  filterFn?: string | ((row: Row<TData>, columnId: string, filterValue: unknown) => boolean);
-  /** Column metadata for tooltips and descriptions */
-  meta?: {
-    /** Column description for tooltips */
-    description?: string;
-    /** Data type for styling and validation */
-    dataType?: 'text' | 'number' | 'date' | 'boolean' | 'email' | 'url' | 'phone' | 'json';
-    /** Field validation rules */
-    validation?: ValidationState;
-    /** Column grouping for organization */
-    group?: string;
-    /** Is this a system/internal field */
-    internal?: boolean;
-    /** Required field indicator */
-    required?: boolean;
-    /** Primary key indicator */
-    isPrimaryKey?: boolean;
-    /** Foreign key relationship */
-    foreignKey?: {
-      table: string;
-      column: string;
-      displayField?: string;
-    };
+  desc: boolean;
+}
+
+/**
+ * Filtering configuration with React Hook Form integration
+ */
+export interface TableFiltering<TData = any> {
+  /** Global filter value */
+  globalFilter?: string;
+  
+  /** Column-specific filters */
+  columnFilters?: TableColumnFilter[];
+  
+  /** Filter change handlers */
+  onGlobalFilterChange?: (value: string) => void;
+  onColumnFiltersChange?: (filters: TableColumnFilter[]) => void;
+  
+  /** Server-side filtering */
+  serverSide?: boolean;
+  
+  /** Filter UI configuration */
+  ui?: {
+    /** Show global search */
+    showGlobalSearch?: boolean;
+    
+    /** Global search placeholder */
+    globalSearchPlaceholder?: string;
+    
+    /** Show column filters */
+    showColumnFilters?: boolean;
+    
+    /** Filter placement */
+    filterPlacement?: 'header' | 'toolbar' | 'sidebar';
+    
+    /** Advanced filters */
+    advancedFilters?: boolean;
+  };
+  
+  /** Custom filter functions */
+  filterFns?: Record<string, TableFilterFn<TData>>;
+  
+  /** React Hook Form integration */
+  formIntegration?: {
+    control?: any;
+    register?: any;
+    setValue?: any;
+    watch?: any;
   };
 }
 
 /**
- * Column visibility configuration
+ * Column filter definition
  */
-export interface ColumnVisibilityConfig {
-  /** Default visible columns */
-  defaultVisible: string[];
-  /** Columns hidden by default */
-  defaultHidden: string[];
-  /** Minimum required visible columns */
-  minimumVisible: string[];
-  /** Columns that cannot be hidden */
-  alwaysVisible: string[];
-  /** User preference storage key */
-  storageKey?: string;
+export interface TableColumnFilter {
+  id: string;
+  value: any;
+  operator?: TableFilterOperator;
 }
 
 /**
- * Column grouping configuration
+ * Filter operators
  */
-export interface ColumnGroupConfig {
-  /** Group identifier */
-  id: string;
-  /** Group display name */
-  name: string;
-  /** Group description */
-  description?: string;
-  /** Columns in this group */
-  columns: string[];
-  /** Default expanded state */
-  defaultExpanded?: boolean;
-  /** Group color theme */
-  theme?: 'primary' | 'secondary' | 'success' | 'warning' | 'error';
-}
-
-// =============================================================================
-// Row Action Types
-// =============================================================================
+export type TableFilterOperator = 
+  | 'equals'
+  | 'notEquals'
+  | 'contains'
+  | 'notContains'
+  | 'startsWith'
+  | 'endsWith'
+  | 'greaterThan'
+  | 'lessThan'
+  | 'greaterThanOrEqual'
+  | 'lessThanOrEqual'
+  | 'between'
+  | 'in'
+  | 'notIn'
+  | 'isEmpty'
+  | 'isNotEmpty'
+  | 'isNull'
+  | 'isNotNull';
 
 /**
- * Individual row action configuration
+ * Row selection configuration
  */
-export interface RowAction<TData = unknown> {
-  /** Action unique identifier */
+export interface TableSelection<TData = any> {
+  /** Selection mode */
+  mode: 'single' | 'multiple' | 'none';
+  
+  /** Selected row IDs */
+  selectedRowIds: Set<string>;
+  
+  /** Selection change handler */
+  onSelectionChange: (selectedRowIds: Set<string>) => void;
+  
+  /** Row ID accessor */
+  getRowId?: (row: TData) => string;
+  
+  /** Enable row selection */
+  enableRowSelection?: boolean | ((row: TData) => boolean);
+  
+  /** Enable select all */
+  enableSelectAll?: boolean;
+  
+  /** Selection persistence */
+  persistSelection?: boolean;
+  
+  /** Accessibility configuration */
+  accessibility?: {
+    selectRowLabel?: (row: TData) => string;
+    selectAllLabel?: string;
+    selectedCountLabel?: (count: number) => string;
+  };
+}
+
+/**
+ * Row actions configuration
+ */
+export interface TableActions<TData = any> {
+  /** Action items */
+  items: TableActionItem<TData>[];
+  
+  /** Action trigger */
+  trigger?: 'click' | 'hover' | 'menu';
+  
+  /** Action placement */
+  placement?: 'start' | 'end' | 'dropdown';
+  
+  /** Sticky actions column */
+  sticky?: boolean;
+  
+  /** Action column width */
+  width?: number;
+  
+  /** Accessibility label */
+  label?: string;
+}
+
+/**
+ * Individual action item
+ */
+export interface TableActionItem<TData = any> {
+  /** Action identifier */
   id: string;
-  /** Action display label */
+  
+  /** Action label */
   label: string;
-  /** Action icon (Lucide React icon name or component) */
-  icon?: ReactNode | string;
-  /** Action handler function */
-  onClick: (row: Row<TData>, event: MouseEvent<HTMLElement>) => void | Promise<void>;
-  /** Show action conditionally based on row data */
-  show?: (row: Row<TData>) => boolean;
-  /** Disable action conditionally based on row data */
-  disabled?: (row: Row<TData>) => boolean;
-  /** Action variant styling */
-  variant?: 'default' | 'primary' | 'secondary' | 'destructive' | 'ghost' | 'outline';
-  /** Action size */
-  size?: 'sm' | 'md' | 'lg';
-  /** Confirmation dialog configuration */
+  
+  /** Action icon */
+  icon?: ComponentType<{ className?: string }>;
+  
+  /** Action variant */
+  variant?: ComponentVariant;
+  
+  /** Action handler */
+  handler: (row: TData) => void | Promise<void>;
+  
+  /** Visibility condition */
+  visible?: boolean | ((row: TData) => boolean);
+  
+  /** Disabled condition */
+  disabled?: boolean | ((row: TData) => boolean);
+  
+  /** Confirmation dialog */
   confirmation?: {
     title: string;
     message: string;
     confirmLabel?: string;
     cancelLabel?: string;
-    variant?: 'default' | 'destructive';
   };
-  /** Keyboard shortcut */
-  shortcut?: string;
-  /** Loading state during async operations */
-  loading?: boolean;
-  /** Tooltip text */
-  tooltip?: string;
-  /** Accessibility label */
-  ariaLabel?: string;
+  
+  /** Loading state */
+  loading?: boolean | ((row: TData) => boolean);
+  
+  /** Accessibility */
+  'aria-label'?: string | ((row: TData) => string);
 }
 
 /**
- * Bulk actions configuration for selected rows
+ * Bulk actions configuration
  */
-export interface BulkAction<TData = unknown> {
-  /** Bulk action unique identifier */
+export interface TableBulkActions<TData = any> {
+  /** Bulk action items */
+  items: TableBulkActionItem<TData>[];
+  
+  /** Toolbar placement */
+  placement?: 'top' | 'bottom' | 'both';
+  
+  /** Selection threshold */
+  threshold?: number;
+  
+  /** Hide when no selection */
+  hideWhenEmpty?: boolean;
+}
+
+/**
+ * Individual bulk action item
+ */
+export interface TableBulkActionItem<TData = any> {
+  /** Action identifier */
   id: string;
-  /** Action display label */
+  
+  /** Action label */
   label: string;
+  
   /** Action icon */
-  icon?: ReactNode | string;
-  /** Bulk action handler */
-  onClick: (rows: Row<TData>[], clearSelection: () => void) => void | Promise<void>;
-  /** Show action conditionally based on selected rows */
-  show?: (rows: Row<TData>[]) => boolean;
-  /** Disable action conditionally based on selected rows */
-  disabled?: (rows: Row<TData>[]) => boolean;
-  /** Action variant styling */
-  variant?: 'default' | 'primary' | 'secondary' | 'destructive' | 'ghost' | 'outline';
-  /** Confirmation dialog for destructive actions */
+  icon?: ComponentType<{ className?: string }>;
+  
+  /** Action variant */
+  variant?: ComponentVariant;
+  
+  /** Action handler */
+  handler: (selectedRows: TData[]) => void | Promise<void>;
+  
+  /** Visibility condition */
+  visible?: boolean | ((selectedRows: TData[]) => boolean);
+  
+  /** Disabled condition */
+  disabled?: boolean | ((selectedRows: TData[]) => boolean);
+  
+  /** Confirmation dialog */
   confirmation?: {
     title: string;
     message: (count: number) => string;
     confirmLabel?: string;
     cancelLabel?: string;
   };
-  /** Loading state during bulk operations */
+  
+  /** Loading state */
   loading?: boolean;
-  /** Accessibility label */
-  ariaLabel?: string;
 }
 
-/**
- * Row selection configuration
- */
-export interface RowSelectionConfig<TData = unknown> {
-  /** Enable row selection */
-  enabled: boolean;
-  /** Selection mode */
-  mode: 'single' | 'multiple';
-  /** Row identifier function */
-  getRowId?: (row: TData) => string;
-  /** Enable select all functionality */
-  enableSelectAll?: boolean;
-  /** Custom selection column configuration */
-  selectionColumn?: {
-    header?: string | ReactNode;
-    size?: number;
-    position?: 'start' | 'end';
-  };
-  /** Selection change handler */
-  onSelectionChange?: (selectedRows: Row<TData>[]) => void;
-  /** Maximum allowed selections */
-  maxSelections?: number;
-  /** Preserve selection across page changes */
-  preserveSelection?: boolean;
-}
-
-// =============================================================================
-// Pagination and Virtualization Types
-// =============================================================================
+// ============================================================================
+// TABLE LAYOUT AND STYLING
+// ============================================================================
 
 /**
- * Pagination configuration
+ * Table layout configuration
  */
-export interface PaginationConfig {
-  /** Enable pagination */
-  enabled: boolean;
-  /** Pagination mode */
-  mode: 'client' | 'server' | 'infinite';
-  /** Page size options */
-  pageSizeOptions: number[];
-  /** Default page size */
-  defaultPageSize: number;
-  /** Maximum page size allowed */
-  maxPageSize?: number;
-  /** Show pagination info */
-  showInfo?: boolean;
-  /** Show page size selector */
-  showPageSizeSelector?: boolean;
-  /** Show quick navigation buttons */
-  showQuickNavigation?: boolean;
-  /** Pagination position */
-  position: 'top' | 'bottom' | 'both';
-  /** Custom pagination component */
-  customPagination?: ReactNode;
-}
-
-/**
- * Infinite scroll configuration for large datasets
- */
-export interface InfiniteScrollConfig {
-  /** Enable infinite scrolling */
-  enabled: boolean;
-  /** Threshold for loading next page (in pixels) */
-  threshold?: number;
-  /** Loading indicator component */
-  loadingIndicator?: ReactNode;
-  /** End of data indicator */
-  endIndicator?: ReactNode;
-  /** Error retry component */
-  errorRetry?: ReactNode;
-  /** Enable manual load more button */
-  enableLoadMore?: boolean;
-}
-
-/**
- * Virtualization configuration for performance optimization
- */
-export interface VirtualizationConfig {
-  /** Enable virtualization */
-  enabled: boolean;
-  /** Estimated row height in pixels */
-  estimateSize: number;
-  /** Overscan count for smooth scrolling */
-  overscan?: number;
-  /** Enable horizontal virtualization */
-  horizontal?: boolean;
-  /** Custom virtualizer configuration */
-  getScrollElement?: () => HTMLElement | null;
-  /** Debug virtualization */
-  debug?: boolean;
-}
-
-// =============================================================================
-// Filtering and Sorting Types
-// =============================================================================
-
-/**
- * Column filter configuration
- */
-export interface ColumnFilterConfig {
-  /** Filter type */
-  type: 'text' | 'select' | 'multi-select' | 'range' | 'date' | 'boolean' | 'number' | 'custom';
-  /** Filter placeholder text */
-  placeholder?: string;
-  /** Options for select filters */
-  options?: Array<{
-    label: string;
-    value: unknown;
-    disabled?: boolean;
-  }>;
-  /** Custom filter component */
-  component?: ReactNode;
-  /** Filter debounce delay in milliseconds */
-  debounceMs?: number;
-  /** Default filter value */
-  defaultValue?: unknown;
-  /** Filter validation */
-  validation?: (value: unknown) => boolean | string;
-}
-
-/**
- * Global filtering configuration
- */
-export interface GlobalFilterConfig {
-  /** Enable global search */
-  enabled: boolean;
-  /** Search placeholder text */
-  placeholder?: string;
-  /** Columns to include in global search */
-  includeColumns?: string[];
-  /** Columns to exclude from global search */
-  excludeColumns?: string[];
-  /** Search debounce delay */
-  debounceMs?: number;
-  /** Custom filter function */
-  filterFn?: (row: Row<unknown>, columnId: string, filterValue: string) => boolean;
-  /** Search input component customization */
-  searchComponent?: ReactNode;
-}
-
-/**
- * Sorting configuration
- */
-export interface SortingConfig {
-  /** Enable sorting */
-  enabled: boolean;
-  /** Allow multiple column sorting */
-  enableMultiSort?: boolean;
-  /** Default sorting state */
-  defaultSorting?: SortingState;
-  /** Maximum number of sortable columns */
-  maxSortColumns?: number;
-  /** Sort modes for columns */
-  sortModes?: Array<'asc' | 'desc' | false>;
-  /** Custom sort functions */
-  sortingFns?: Record<string, (rowA: Row<unknown>, rowB: Row<unknown>, columnId: string) => number>;
-}
-
-// =============================================================================
-// State Management Types
-// =============================================================================
-
-/**
- * Table state configuration for controlled/uncontrolled mode
- */
-export interface TableStateConfig<TData = unknown> {
-  /** Sorting state */
-  sorting?: {
-    state?: SortingState;
-    onStateChange?: (state: SortingState) => void;
-  };
-  /** Column filters state */
-  columnFilters?: {
-    state?: ColumnFiltersState;
-    onStateChange?: (state: ColumnFiltersState) => void;
-  };
-  /** Global filter state */
-  globalFilter?: {
-    state?: string;
-    onStateChange?: (state: string) => void;
-  };
-  /** Pagination state */
-  pagination?: {
-    state?: PaginationState;
-    onStateChange?: (state: PaginationState) => void;
-  };
-  /** Row selection state */
-  rowSelection?: {
-    state?: RowSelectionState;
-    onStateChange?: (state: RowSelectionState) => void;
-  };
-  /** Column visibility state */
-  columnVisibility?: {
-    state?: VisibilityState;
-    onStateChange?: (state: VisibilityState) => void;
-  };
-  /** Column order state */
-  columnOrder?: {
-    state?: ColumnOrderState;
-    onStateChange?: (state: ColumnOrderState) => void;
-  };
-  /** Expanded rows state */
-  expanded?: {
-    state?: Record<string, boolean>;
-    onStateChange?: (state: Record<string, boolean>) => void;
-  };
-}
-
-/**
- * Table persistence configuration
- */
-export interface TablePersistenceConfig {
-  /** Enable state persistence */
-  enabled: boolean;
-  /** Storage key for persistence */
-  storageKey: string;
-  /** Storage type */
-  storageType: 'localStorage' | 'sessionStorage' | 'indexedDB' | 'url';
-  /** States to persist */
-  persistStates: Array<'sorting' | 'columnFilters' | 'pagination' | 'rowSelection' | 'columnVisibility' | 'columnOrder' | 'expanded'>;
-  /** Encryption for sensitive data */
-  encrypt?: boolean;
-  /** Version for migration handling */
-  version?: string;
-}
-
-// =============================================================================
-// Theme and Styling Types
-// =============================================================================
-
-/**
- * Table theme configuration
- */
-export interface TableThemeConfig extends ThemeProps {
+export interface TableLayout {
+  /** Table variant */
+  variant?: 'default' | 'striped' | 'bordered' | 'minimal' | 'card';
+  
+  /** Table size */
+  size?: ComponentSize;
+  
   /** Table density */
-  density?: 'compact' | 'default' | 'comfortable';
-  /** Border style */
-  borders?: 'none' | 'horizontal' | 'vertical' | 'all';
-  /** Striped rows */
-  striped?: boolean;
-  /** Hover effects */
-  hover?: boolean;
-  /** Selection highlighting */
-  selectionHighlight?: boolean;
-  /** Loading overlay style */
-  loadingOverlay?: 'spinner' | 'skeleton' | 'blur' | 'custom';
-  /** Empty state styling */
-  emptyState?: {
-    icon?: ReactNode;
-    title?: string;
-    description?: string;
-    action?: ReactNode;
+  density?: 'compact' | 'normal' | 'comfortable';
+  
+  /** Sticky header */
+  stickyHeader?: boolean;
+  
+  /** Sticky columns */
+  stickyColumns?: {
+    left?: number;
+    right?: number;
   };
-  /** Error state styling */
-  errorState?: {
-    icon?: ReactNode;
-    title?: string;
-    description?: string;
-    retry?: ReactNode;
-  };
+  
+  /** Fixed height */
+  height?: string | number;
+  
+  /** Maximum height */
+  maxHeight?: string | number;
+  
+  /** Responsive behavior */
+  responsive?: TableResponsive;
+  
+  /** Custom styling */
+  className?: string;
+  style?: CSSProperties;
+  
+  /** Theme integration */
+  theme?: TableTheme;
 }
 
 /**
  * Responsive table configuration
  */
-export interface ResponsiveTableConfig extends ResponsiveProps {
-  /** Breakpoint configurations */
-  breakpoints?: {
-    mobile?: {
-      hiddenColumns?: string[];
-      stackedView?: boolean;
-      cardView?: boolean;
-    };
-    tablet?: {
-      hiddenColumns?: string[];
-      horizontalScroll?: boolean;
-    };
-    desktop?: {
-      visibleColumns?: string[];
-      fullWidth?: boolean;
-    };
-  };
-  /** Mobile-specific configurations */
-  mobileConfig?: {
-    /** Enable card view on mobile */
-    cardView?: boolean;
-    /** Enable stacked view on mobile */
-    stackedView?: boolean;
-    /** Custom mobile renderer */
-    mobileRenderer?: (row: Row<unknown>) => ReactNode;
-  };
-}
-
-// =============================================================================
-// Form Integration Types
-// =============================================================================
-
-/**
- * Form integration for inline editing
- */
-export interface TableFormConfig<TData = FieldValues> {
-  /** Enable inline editing */
-  enableInlineEdit?: boolean;
-  /** Form control instance */
-  control?: Control<TData>;
-  /** Register function for form fields */
-  register?: UseFormRegister<TData>;
-  /** Form submission handler */
-  onSubmit?: (data: TData, row: Row<TData>) => void | Promise<void>;
-  /** Form validation rules */
-  validationRules?: Record<string, unknown>;
-  /** Edit mode */
-  editMode?: 'inline' | 'modal' | 'drawer';
-  /** Custom form components */
-  formComponents?: Record<string, ReactNode>;
-}
-
-// =============================================================================
-// Main Component Props
-// =============================================================================
-
-/**
- * Core ManageTable component props
- */
-export interface ManageTableProps<TData = unknown> extends 
-  BaseComponentProps<HTMLDivElement>,
-  AccessibilityProps,
-  ThemeProps,
-  ResponsiveProps,
-  AnimationProps {
+export interface TableResponsive {
+  /** Enable responsive behavior */
+  enabled?: boolean;
   
-  // Data Configuration
-  /** Table data - can be static data or React Query result */
-  data?: TData[] | UseQueryResult<TableApiResponse<TData>> | UseInfiniteQueryResult<TableApiResponse<TData>>;
-  /** Column definitions */
-  columns: ManageTableColumnDef<TData>[];
-  /** Data fetching configuration for React Query */
-  dataFetch?: TableDataFetchConfig;
-  /** Loading state override */
-  loading?: boolean;
-  /** Error state override */
-  error?: Error | null;
-  /** Empty state configuration */
-  emptyState?: {
-    title?: string;
-    description?: string;
-    icon?: ReactNode;
-    action?: ReactNode;
-  };
-
-  // Features Configuration
-  /** Pagination configuration */
-  pagination?: PaginationConfig;
-  /** Infinite scroll configuration */
-  infiniteScroll?: InfiniteScrollConfig;
-  /** Virtualization configuration */
-  virtualization?: VirtualizationConfig;
-  /** Sorting configuration */
-  sorting?: SortingConfig;
-  /** Global filter configuration */
-  globalFilter?: GlobalFilterConfig;
-  /** Column filter configurations */
-  columnFilters?: Record<string, ColumnFilterConfig>;
-  /** Row selection configuration */
-  rowSelection?: RowSelectionConfig<TData>;
-  /** Column visibility configuration */
-  columnVisibility?: ColumnVisibilityConfig;
-  /** Column grouping configuration */
-  columnGroups?: ColumnGroupConfig[];
-
-  // Actions Configuration
-  /** Individual row actions */
-  rowActions?: RowAction<TData>[];
-  /** Bulk actions for selected rows */
-  bulkActions?: BulkAction<TData>[];
-  /** Table-level actions */
-  tableActions?: Array<{
-    id: string;
-    label: string;
-    icon?: ReactNode;
-    onClick: () => void | Promise<void>;
-    variant?: 'default' | 'primary' | 'secondary' | 'destructive';
-    loading?: boolean;
-  }>;
-
-  // State Management
-  /** Table state configuration */
-  state?: TableStateConfig<TData>;
-  /** State persistence configuration */
-  persistence?: TablePersistenceConfig;
-
-  // Styling and Theming
-  /** Theme configuration */
-  theme?: TableThemeConfig;
-  /** Responsive configuration */
-  responsive?: ResponsiveTableConfig;
-
-  // Form Integration
-  /** Form integration configuration */
-  form?: TableFormConfig<TData>;
-
-  // Event Handlers
-  /** Row click handler */
-  onRowClick?: (row: Row<TData>, event: MouseEvent<HTMLTableRowElement>) => void;
-  /** Row double click handler */
-  onRowDoubleClick?: (row: Row<TData>, event: MouseEvent<HTMLTableRowElement>) => void;
-  /** Cell click handler */
-  onCellClick?: (cell: Cell<TData, unknown>, event: MouseEvent<HTMLTableCellElement>) => void;
-  /** Table state change handler */
-  onStateChange?: (state: Partial<TableStateConfig<TData>>) => void;
-
-  // Accessibility
-  /** Table caption for screen readers */
-  caption?: string;
-  /** Table summary for complex tables */
-  summary?: string;
-  /** ARIA label override */
-  'aria-label'?: string;
-  /** ARIA labelledby reference */
-  'aria-labelledby'?: string;
-  /** ARIA describedby reference */
-  'aria-describedby'?: string;
-
-  // Performance
-  /** Enable performance monitoring */
-  enablePerformanceMonitoring?: boolean;
-  /** Row height optimization */
-  getRowHeight?: (index: number) => number;
-  /** Memory optimization for large datasets */
-  memoryOptimization?: {
-    /** Maximum rows to keep in memory */
-    maxRowsInMemory?: number;
-    /** Cleanup interval in milliseconds */
-    cleanupInterval?: number;
-  };
-
-  // Testing and Development
-  /** Test ID for automated testing */
-  'data-testid'?: string;
-  /** Debug mode for development */
-  debug?: boolean;
-}
-
-// =============================================================================
-// Utility Types
-// =============================================================================
-
-/**
- * Table instance type for ref access
- */
-export interface ManageTableRef<TData = unknown> {
-  /** TanStack Table instance */
-  table: Table<TData>;
-  /** Virtualizer instance (if enabled) */
-  virtualizer?: Virtualizer<HTMLDivElement, Element>;
-  /** Export data function */
-  exportData: (format: 'csv' | 'json' | 'xlsx') => void;
-  /** Refresh data function */
-  refreshData: () => void;
-  /** Clear all filters */
-  clearFilters: () => void;
-  /** Clear all sorting */
-  clearSorting: () => void;
-  /** Clear selection */
-  clearSelection: () => void;
-  /** Reset table state */
-  resetState: () => void;
-  /** Get current table state */
-  getState: () => TableStateConfig<TData>;
-  /** Set table state */
-  setState: (state: Partial<TableStateConfig<TData>>) => void;
-}
-
-/**
- * Table context type for provider pattern
- */
-export interface ManageTableContext<TData = unknown> {
-  /** Table instance */
-  table: Table<TData>;
-  /** Theme configuration */
-  theme: TableThemeConfig;
-  /** Loading state */
-  isLoading: boolean;
-  /** Error state */
-  error: Error | null;
-  /** Selected rows */
-  selectedRows: Row<TData>[];
-  /** Actions configuration */
-  actions: {
-    rowActions: RowAction<TData>[];
-    bulkActions: BulkAction<TData>[];
-  };
-  /** Event handlers */
-  handlers: {
-    onRowClick?: (row: Row<TData>, event: MouseEvent<HTMLTableRowElement>) => void;
-    onCellClick?: (cell: Cell<TData, unknown>, event: MouseEvent<HTMLTableCellElement>) => void;
+  /** Breakpoint for stacking */
+  stackAt?: 'xs' | 'sm' | 'md' | 'lg';
+  
+  /** Horizontal scroll */
+  horizontalScroll?: boolean;
+  
+  /** Column priorities */
+  columnPriorities?: Record<string, number>;
+  
+  /** Mobile card layout */
+  cardLayout?: {
+    enabled?: boolean;
+    template?: ComponentType<{ row: any; columns: TableColumnDef[] }>;
   };
 }
 
 /**
- * Export configuration for table data
+ * Table theme configuration
  */
-export interface TableExportConfig {
+export interface TableTheme {
+  /** Color scheme */
+  colors?: {
+    header?: string;
+    row?: string;
+    alternateRow?: string;
+    border?: string;
+    selected?: string;
+    hover?: string;
+  };
+  
+  /** Typography */
+  typography?: {
+    header?: string;
+    cell?: string;
+    caption?: string;
+  };
+  
+  /** Spacing */
+  spacing?: {
+    cell?: string;
+    row?: string;
+  };
+  
+  /** Borders */
+  borders?: {
+    width?: string;
+    style?: string;
+    radius?: string;
+  };
+}
+
+// ============================================================================
+// EXPORT FUNCTIONALITY
+// ============================================================================
+
+/**
+ * Table export configuration
+ */
+export interface TableExport<TData = any> {
+  /** Enable export */
+  enabled?: boolean;
+  
   /** Export formats */
-  formats: Array<'csv' | 'json' | 'xlsx' | 'pdf'>;
-  /** Include headers */
+  formats?: TableExportFormat[];
+  
+  /** Export options */
+  options?: TableExportOptions<TData>;
+  
+  /** Custom export handlers */
+  customHandlers?: Record<string, (data: TData[], columns: TableColumnDef<TData>[]) => void>;
+}
+
+/**
+ * Available export formats
+ */
+export type TableExportFormat = 'csv' | 'excel' | 'pdf' | 'json' | 'xml';
+
+/**
+ * Export options
+ */
+export interface TableExportOptions<TData = any> {
+  /** Filename template */
+  filename?: string | ((format: TableExportFormat) => string);
+  
+  /** Include column headers */
   includeHeaders?: boolean;
-  /** Include selected rows only */
+  
+  /** Export selected rows only */
   selectedOnly?: boolean;
-  /** Custom filename */
-  filename?: string;
-  /** Columns to include */
-  includeColumns?: string[];
-  /** Columns to exclude */
-  excludeColumns?: string[];
-  /** Custom export function */
-  customExport?: (data: unknown[], format: string) => void;
+  
+  /** Column selection */
+  columns?: string[] | 'all' | 'visible';
+  
+  /** Data transformation */
+  transform?: (data: TData[]) => any[];
+  
+  /** Format-specific options */
+  csv?: {
+    delimiter?: string;
+    quote?: string;
+    escape?: string;
+  };
+  
+  excel?: {
+    sheetName?: string;
+    author?: string;
+  };
+  
+  pdf?: {
+    orientation?: 'portrait' | 'landscape';
+    pageSize?: string;
+    title?: string;
+  };
+}
+
+// ============================================================================
+// ACCESSIBILITY CONFIGURATION
+// ============================================================================
+
+/**
+ * Comprehensive accessibility configuration for WCAG 2.1 AA compliance
+ */
+export interface TableAccessibility {
+  /** Table caption */
+  caption?: string;
+  
+  /** Table summary */
+  summary?: string;
+  
+  /** Screen reader announcements */
+  announcements?: {
+    sortChange?: (column: string, direction: 'ascending' | 'descending') => string;
+    filterChange?: (column: string, value: any) => string;
+    selectionChange?: (count: number, total: number) => string;
+    pageChange?: (page: number, total: number) => string;
+  };
+  
+  /** Keyboard navigation */
+  keyboard?: {
+    enabled?: boolean;
+    rowNavigation?: boolean;
+    cellNavigation?: boolean;
+    shortcuts?: Record<string, () => void>;
+  };
+  
+  /** Focus management */
+  focus?: {
+    skipLink?: string;
+    focusOnSort?: boolean;
+    focusOnFilter?: boolean;
+    initialFocus?: string;
+  };
+  
+  /** ARIA labels */
+  labels?: {
+    table?: string;
+    sort?: (column: string) => string;
+    filter?: (column: string) => string;
+    select?: (row: any) => string;
+    selectAll?: string;
+    actions?: (row: any) => string;
+  };
+  
+  /** Live regions */
+  liveRegions?: {
+    enabled?: boolean;
+    polite?: boolean;
+    atomic?: boolean;
+  };
+}
+
+// ============================================================================
+// VIRTUALIZATION AND PERFORMANCE
+// ============================================================================
+
+/**
+ * Table virtualization for large datasets
+ */
+export interface TableVirtualization {
+  /** Enable virtualization */
+  enabled?: boolean;
+  
+  /** Estimated row height */
+  estimatedRowHeight?: number;
+  
+  /** Overscan count */
+  overscan?: number;
+  
+  /** Virtualization strategy */
+  strategy?: 'fixed' | 'dynamic' | 'variable';
+  
+  /** Scrolling configuration */
+  scrolling?: {
+    horizontal?: boolean;
+    vertical?: boolean;
+    smooth?: boolean;
+  };
+  
+  /** Performance thresholds */
+  thresholds?: {
+    enableAt?: number;
+    disableAt?: number;
+  };
+}
+
+// ============================================================================
+// REACT QUERY INTEGRATION
+// ============================================================================
+
+/**
+ * React Query integration options
+ */
+export interface TableQueryOptions {
+  /** Query key factory */
+  keyFactory?: (params: TableQueryParams) => string[];
+  
+  /** Cache time */
+  cacheTime?: number;
+  
+  /** Stale time */
+  staleTime?: number;
+  
+  /** Refetch intervals */
+  refetchInterval?: number;
+  
+  /** Background refetch */
+  refetchOnWindowFocus?: boolean;
+  refetchOnReconnect?: boolean;
+  
+  /** Optimistic updates */
+  optimisticUpdates?: boolean;
+  
+  /** Error handling */
+  errorHandler?: (error: any) => void;
+  
+  /** Success handler */
+  successHandler?: (data: any) => void;
+  
+  /** Loading states */
+  suspense?: boolean;
+  
+  /** Retry configuration */
+  retry?: boolean | number | ((failureCount: number, error: any) => boolean);
 }
 
 /**
- * Table analytics and monitoring
+ * Query parameters for table data fetching
  */
-export interface TableAnalytics {
-  /** Performance metrics */
+export interface TableQueryParams {
+  /** Pagination */
+  page?: number;
+  pageSize?: number;
+  
+  /** Sorting */
+  sort?: TableSortState[];
+  
+  /** Filtering */
+  filters?: TableColumnFilter[];
+  globalFilter?: string;
+  
+  /** Search */
+  search?: string;
+  
+  /** Additional parameters */
+  [key: string]: any;
+}
+
+// ============================================================================
+// FORM INTEGRATION
+// ============================================================================
+
+/**
+ * React Hook Form integration for table configuration
+ */
+export interface TableFormIntegration {
+  /** Form control */
+  control?: any;
+  
+  /** Registration function */
+  register?: any;
+  
+  /** Set value function */
+  setValue?: any;
+  
+  /** Watch function */
+  watch?: any;
+  
+  /** Form state */
+  formState?: any;
+  
+  /** Field configuration */
+  fields?: {
+    /** Page size field */
+    pageSize?: string;
+    
+    /** Sort field */
+    sort?: string;
+    
+    /** Filter fields */
+    filters?: Record<string, string>;
+    
+    /** Global search field */
+    globalSearch?: string;
+  };
+  
+  /** Validation schemas */
+  validation?: {
+    pageSize?: any; // Zod schema
+    sort?: any; // Zod schema
+    filters?: any; // Zod schema
+  };
+}
+
+// ============================================================================
+// FUNCTION TYPE DEFINITIONS
+// ============================================================================
+
+/**
+ * Table sorting function
+ */
+export type TableSortingFn<TData = any> = (
+  rowA: TData,
+  rowB: TData,
+  columnId: string
+) => number;
+
+/**
+ * Table filter function
+ */
+export type TableFilterFn<TData = any> = (
+  row: TData,
+  columnId: string,
+  value: any,
+  addMeta: (meta: any) => void
+) => boolean;
+
+/**
+ * Table aggregation function
+ */
+export type TableAggregationFn<TData = any> = (
+  getLeafValues: () => any[],
+  getChildRows: () => TData[]
+) => any;
+
+// ============================================================================
+// COMPONENT PROP TYPES
+// ============================================================================
+
+/**
+ * Table header component props
+ */
+export interface TableHeaderProps<TData = any> {
+  column: TableColumnDef<TData>;
+  header: any; // TanStack header object
+  table: any; // TanStack table instance
+}
+
+/**
+ * Table cell component props
+ */
+export interface TableCellProps<TData = any, TValue = any> {
+  getValue: () => TValue;
+  row: any; // TanStack row object
+  column: TableColumnDef<TData>;
+  cell: any; // TanStack cell object
+  table: any; // TanStack table instance
+}
+
+/**
+ * Table footer component props
+ */
+export interface TableFooterProps<TData = any> {
+  column: TableColumnDef<TData>;
+  header: any; // TanStack header object
+  table: any; // TanStack table instance
+}
+
+// ============================================================================
+// SPECIALIZED TABLE TYPES FOR DREAMFACTORY USE CASES
+// ============================================================================
+
+/**
+ * Database schema table configuration
+ */
+export interface DatabaseSchemaTableProps extends Omit<ManageTableProps, 'data' | 'columns'> {
+  /** Database service ID */
+  serviceId: string;
+  
+  /** Schema name */
+  schemaName?: string;
+  
+  /** Table type filter */
+  tableTypes?: ('table' | 'view' | 'procedure')[];
+  
+  /** Enhanced schema data */
+  data: DatabaseTableInfo[];
+  
+  /** Schema-specific columns */
+  columns: TableColumnDef<DatabaseTableInfo>[];
+  
+  /** Schema actions */
+  schemaActions?: {
+    viewSchema?: (table: DatabaseTableInfo) => void;
+    generateAPI?: (table: DatabaseTableInfo) => void;
+    editTable?: (table: DatabaseTableInfo) => void;
+    dropTable?: (table: DatabaseTableInfo) => void;
+  };
+}
+
+/**
+ * Database table information
+ */
+export interface DatabaseTableInfo {
+  id: string;
+  name: string;
+  type: 'table' | 'view' | 'procedure';
+  schema?: string;
+  description?: string;
+  rowCount?: number;
+  columns?: DatabaseColumnInfo[];
+  indexes?: DatabaseIndexInfo[];
+  relationships?: DatabaseRelationshipInfo[];
+  permissions?: string[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/**
+ * Database column information
+ */
+export interface DatabaseColumnInfo {
+  name: string;
+  type: string;
+  nullable: boolean;
+  primaryKey: boolean;
+  foreignKey?: {
+    table: string;
+    column: string;
+  };
+  defaultValue?: any;
+  autoIncrement?: boolean;
+  length?: number;
+  precision?: number;
+  scale?: number;
+}
+
+/**
+ * Database index information
+ */
+export interface DatabaseIndexInfo {
+  name: string;
+  columns: string[];
+  unique: boolean;
+  type: string;
+}
+
+/**
+ * Database relationship information
+ */
+export interface DatabaseRelationshipInfo {
+  type: 'one-to-one' | 'one-to-many' | 'many-to-many';
+  localColumn: string;
+  foreignTable: string;
+  foreignColumn: string;
+  name?: string;
+}
+
+/**
+ * User management table configuration
+ */
+export interface UserManagementTableProps extends Omit<ManageTableProps, 'data' | 'columns'> {
+  /** User data */
+  data: UserInfo[];
+  
+  /** User-specific columns */
+  columns: TableColumnDef<UserInfo>[];
+  
+  /** User actions */
+  userActions?: {
+    editUser?: (user: UserInfo) => void;
+    deleteUser?: (user: UserInfo) => void;
+    resetPassword?: (user: UserInfo) => void;
+    toggleStatus?: (user: UserInfo) => void;
+    viewProfile?: (user: UserInfo) => void;
+  };
+  
+  /** Role management */
+  roleManagement?: {
+    availableRoles: RoleInfo[];
+    assignRole?: (user: UserInfo, role: RoleInfo) => void;
+    removeRole?: (user: UserInfo, role: RoleInfo) => void;
+  };
+}
+
+/**
+ * User information
+ */
+export interface UserInfo {
+  id: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  displayName?: string;
+  status: 'active' | 'inactive' | 'suspended';
+  roles: RoleInfo[];
+  lastLogin?: string;
+  createdAt: string;
+  updatedAt?: string;
+  permissions?: string[];
+  avatar?: string;
+}
+
+/**
+ * Role information
+ */
+export interface RoleInfo {
+  id: string;
+  name: string;
+  description?: string;
+  permissions: string[];
+  isDefault?: boolean;
+  isSystemRole?: boolean;
+}
+
+/**
+ * API documentation table configuration
+ */
+export interface APIDocumentationTableProps extends Omit<ManageTableProps, 'data' | 'columns'> {
+  /** API endpoint data */
+  data: APIEndpointInfo[];
+  
+  /** API-specific columns */
+  columns: TableColumnDef<APIEndpointInfo>[];
+  
+  /** API actions */
+  apiActions?: {
+    testEndpoint?: (endpoint: APIEndpointInfo) => void;
+    viewDocs?: (endpoint: APIEndpointInfo) => void;
+    editEndpoint?: (endpoint: APIEndpointInfo) => void;
+    generateCode?: (endpoint: APIEndpointInfo) => void;
+  };
+}
+
+/**
+ * API endpoint information
+ */
+export interface APIEndpointInfo {
+  id: string;
+  path: string;
+  method: HttpMethod;
+  service: string;
+  resource?: string;
+  description?: string;
+  parameters?: APIParameterInfo[];
+  responses?: APIResponseInfo[];
+  security?: APISecurityInfo[];
+  tags?: string[];
+  deprecated?: boolean;
+  version?: string;
+}
+
+/**
+ * API parameter information
+ */
+export interface APIParameterInfo {
+  name: string;
+  in: 'query' | 'path' | 'header' | 'body';
+  type: string;
+  required: boolean;
+  description?: string;
+  example?: any;
+}
+
+/**
+ * API response information
+ */
+export interface APIResponseInfo {
+  status: number;
+  description: string;
+  schema?: any;
+  examples?: Record<string, any>;
+}
+
+/**
+ * API security information
+ */
+export interface APISecurityInfo {
+  type: 'apiKey' | 'bearer' | 'oauth2' | 'basic';
+  name?: string;
+  in?: 'header' | 'query';
+  flows?: any;
+}
+
+// ============================================================================
+// UTILITY TYPES
+// ============================================================================
+
+/**
+ * Extract row data type from table props
+ */
+export type ExtractTableData<T> = T extends ManageTableProps<infer U> ? U : never;
+
+/**
+ * Extract column value type from column definition
+ */
+export type ExtractColumnValue<T> = T extends TableColumnDef<any, infer U> ? U : never;
+
+/**
+ * Table state for external state management
+ */
+export interface TableState<TData = any> {
+  /** Pagination state */
+  pagination: {
+    pageIndex: number;
+    pageSize: number;
+  };
+  
+  /** Sorting state */
+  sorting: TableSortState[];
+  
+  /** Filtering state */
+  columnFilters: TableColumnFilter[];
+  globalFilter: string;
+  
+  /** Selection state */
+  rowSelection: Record<string, boolean>;
+  
+  /** Column visibility */
+  columnVisibility: Record<string, boolean>;
+  
+  /** Column order */
+  columnOrder: string[];
+  
+  /** Column sizing */
+  columnSizing: Record<string, number>;
+  
+  /** Grouping state */
+  grouping: string[];
+  
+  /** Expanded state */
+  expanded: Record<string, boolean>;
+}
+
+/**
+ * Table configuration for persistence
+ */
+export interface TableConfig {
+  /** Configuration ID */
+  id: string;
+  
+  /** Configuration name */
+  name: string;
+  
+  /** User ID */
+  userId?: string;
+  
+  /** Table state */
+  state: Partial<TableState>;
+  
+  /** Timestamps */
+  createdAt: string;
+  updatedAt?: string;
+  
+  /** Configuration metadata */
+  metadata?: {
+    description?: string;
+    tags?: string[];
+    shared?: boolean;
+    version?: number;
+  };
+}
+
+// ============================================================================
+// TYPE EXPORTS
+// ============================================================================
+
+// Main component types
+export type {
+  ManageTableProps,
+  TableColumnDef,
+  TableColumnMeta,
+  TableDataType,
+  TableCellFormat,
+  TableCellValidation,
+  ResponsiveTableColumn
+};
+
+// Configuration types
+export type {
+  TablePagination,
+  TableSorting,
+  TableFiltering,
+  TableSelection,
+  TableActions,
+  TableBulkActions,
+  TableLayout,
+  TableExport,
+  TableAccessibility,
+  TableVirtualization
+};
+
+// Integration types
+export type {
+  TableQueryOptions,
+  TableFormIntegration,
+  TableState,
+  TableConfig
+};
+
+// Specialized table types
+export type {
+  DatabaseSchemaTableProps,
+  UserManagementTableProps,
+  APIDocumentationTableProps
+};
+
+// Data types
+export type {
+  DatabaseTableInfo,
+  UserInfo,
+  APIEndpointInfo
+};
+
+// Function types
+export type {
+  TableSortingFn,
+  TableFilterFn,
+  TableAggregationFn
+};
+
+// Default export for main table configuration
+export interface ManageTableConfig {
+  /** Default page size options */
+  defaultPageSizes: number[];
+  
+  /** Default theme */
+  defaultTheme: TableTheme;
+  
+  /** Default accessibility settings */
+  defaultAccessibility: TableAccessibility;
+  
+  /** Default virtualization threshold */
+  virtualizationThreshold: number;
+  
+  /** Default export formats */
+  defaultExportFormats: TableExportFormat[];
+  
+  /** Performance settings */
   performance: {
-    renderTime: number;
-    dataFetchTime: number;
-    totalRows: number;
-    visibleRows: number;
+    debounceDelay: number;
+    cacheTimeout: number;
+    maxCacheSize: number;
   };
-  /** User interaction tracking */
-  interactions: {
-    sortingEvents: number;
-    filteringEvents: number;
-    selectionEvents: number;
-    exportEvents: number;
-  };
-  /** Error tracking */
-  errors: Array<{
-    timestamp: Date;
-    error: Error;
-    context: string;
-  }>;
-}
-
-// =============================================================================
-// Hook Types
-// =============================================================================
-
-/**
- * useManageTable hook return type
- */
-export interface UseManageTableReturn<TData = unknown> {
-  /** TanStack Table instance */
-  table: Table<TData>;
-  /** Loading state */
-  isLoading: boolean;
-  /** Error state */
-  error: Error | null;
-  /** Selected rows */
-  selectedRows: Row<TData>[];
-  /** Table utilities */
-  utils: {
-    exportData: (config: TableExportConfig) => void;
-    refreshData: () => void;
-    clearFilters: () => void;
-    clearSorting: () => void;
-    clearSelection: () => void;
-    resetState: () => void;
-  };
-  /** Analytics data */
-  analytics: TableAnalytics;
-}
-
-/**
- * Table state hook options
- */
-export interface UseTableStateOptions<TData = unknown> {
-  /** Initial state */
-  initialState?: Partial<TableStateConfig<TData>>;
-  /** Persistence configuration */
-  persistence?: TablePersistenceConfig;
-  /** State change callback */
-  onStateChange?: (state: TableStateConfig<TData>) => void;
 }
