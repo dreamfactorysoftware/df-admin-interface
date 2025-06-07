@@ -1,608 +1,521 @@
 /**
- * Main API Client Library - Centralized Export Module
+ * API Client Library - Main Export Index
  * 
- * This module serves as the primary entry point for all API client functionality,
- * replacing Angular HTTP services with modern React/Next.js patterns optimized for
- * server-side rendering and intelligent caching with SWR/React Query integration.
+ * Centralized export module providing comprehensive HTTP client utilities,
+ * authentication integration, and request/response middleware for the
+ * DreamFactory Admin Interface React/Next.js application.
+ * 
+ * This module replaces Angular HTTP services and interceptors with modern
+ * React/Next.js patterns optimized for server-side rendering, concurrent
+ * features, and enhanced performance characteristics.
  * 
  * Key Features:
- * - Unified API client exports with TypeScript type safety
- * - Clean import patterns for React hooks and components per Section 3.2.6
- * - Authentication integration per Section 4.5 security flows
- * - Middleware pattern implementation for request/response transformation
- * - Comprehensive HTTP client utilities replacing Angular HTTP services
- * - Support for SWR and React Query intelligent caching per Section 3.2.4
+ * - Unified API client library exports replacing Angular HTTP service dependency injection patterns
+ * - Clean import patterns for React hooks and components per Section 3.2.6 component architecture
+ * - TypeScript type safety with comprehensive API client type definitions
+ * - Integration with authentication system per Section 4.5 security and authentication flows
+ * - Middleware pattern implementation for request/response transformation per Section 4.7.1.2 interceptor migration
+ * - Compatibility with SWR and React Query for intelligent caching per Section 3.2.4 HTTP client architecture
  * 
- * Usage Examples:
- * ```typescript
- * // Import specific clients
- * import { CrudClient, createCrudClient } from '@/lib/api-client';
- * 
- * // Import authentication utilities
- * import { AuthClient, generateAuthHeaders } from '@/lib/api-client';
- * 
- * // Import middleware functions
- * import { configureInterceptors, createDefaultMiddlewareStack } from '@/lib/api-client';
- * 
- * // Import type definitions
- * import type { RequestConfig, AuthContext, ListResponse } from '@/lib/api-client';
- * ```
- * 
- * @module ApiClient
+ * @fileoverview Main API client library export providing centralized access to all HTTP utilities
  * @version 1.0.0
- * @author DreamFactory Admin Interface Team
+ * @since React 19.0.0 / Next.js 15.1+
+ * @module ApiClient
  */
 
 // =============================================================================
-// BASE HTTP CLIENT EXPORTS
+// Base HTTP Client Exports
 // =============================================================================
 
+/**
+ * Core HTTP client implementation and factory functions
+ */
 export {
-  // Main base client class and utilities
-  BaseApiClient,
-  RequestConfigBuilder,
+  // Main client class
+  BaseClient,
+  
+  // Factory functions
   createApiClient,
-  requestConfig,
+  createDefaultApiClient,
   
-  // Base client utility functions
+  // Legacy compatibility utilities
+  convertLegacyRequest,
+  
+  // Utility functions
   generateRequestId,
-  calculateBackoffDelay,
+  generateCorrelationId,
+  buildUrl,
+  normalizeHeaders,
+  mergeHeaders,
+  calculateRetryDelay,
   isRetryableError,
-  isNetworkError,
-  buildQueryString,
-  buildHeaders,
   
-  // Constants for configuration
-  DEFAULT_TIMEOUT,
-  DEFAULT_RETRY_CONFIG,
-  DEFAULT_HEADERS,
-  HTTP_STATUS,
+  // Default export
+  default as BaseApiClient,
 } from './base-client';
 
 // =============================================================================
-// CRUD OPERATIONS CLIENT EXPORTS
+// CRUD Operations Client Exports
 // =============================================================================
 
+/**
+ * Comprehensive CRUD operations with React Query integration
+ */
 export {
   // Main CRUD client class
   CrudClient,
   
-  // Factory functions for CRUD client instances
+  // Factory functions
   createCrudClient,
-  defaultCrudClient,
+  createDefaultCrudClient,
+  
+  // Type exports for CRUD operations
+  type PaginationOptions,
+  type FilterOptions,
+  type QueryOptions,
+  type CacheControlOptions,
+  type NotificationOptions,
+  type FileImportExportOptions,
+  type ValidationConfig,
+  type BulkOperationOptions,
+  type BulkOperationProgress,
+  type EventScriptOptions,
+  type GitHubOptions,
+  
+  // Default export
+  default as CrudApiClient,
 } from './crud-client';
 
 // =============================================================================
-// FILE OPERATIONS CLIENT EXPORTS
+// File Operations Client Exports
 // =============================================================================
 
+/**
+ * Specialized file operations including upload, download, and directory management
+ */
 export {
   // Main file client class
   FileClient,
   
-  // Factory functions for file client instances
+  // Factory functions
   createFileClient,
-  getFileClient,
-  resetFileClient,
+  createDefaultFileClient,
   
-  // File utility functions
+  // Configuration constants
+  FILE_CONFIG,
+  FILE_ENDPOINTS,
+  
+  // Type exports for file operations
+  type FileOperationType,
+  type FileChunk,
+  type ChunkedUploadConfig,
+  type DirectoryListingOptions,
+  type FileSecurityScanOptions,
+  type FileValidationResult,
+  type DirectoryOperationResult,
+  type FileUploadResult,
+  type FileDownloadResult,
+  type FileBatchOperationResult,
+  
+  // Utility functions
+  validateFileForSecurity,
+  isSecuritySensitiveFile,
   formatFileSize,
-  getFileExtension,
-  isImageFile,
-  isTextFile,
-  generateUniqueFilename,
+  generateFileHash,
+  buildFileUrl,
+  
+  // Default export
+  default as FileApiClient,
 } from './file-client';
 
 // =============================================================================
-// SYSTEM API CLIENT EXPORTS
+// System API Client Exports
 // =============================================================================
 
+/**
+ * System configuration and administrative operations
+ */
 export {
   // Main system client class
   SystemClient,
   
-  // Factory functions and default instance
+  // Factory functions
   createSystemClient,
-  createSystemClientFactory,
-  systemClient,
+  createDefaultSystemClient,
+  
+  // Configuration constants
+  SYSTEM_ENDPOINTS,
+  SYSTEM_CACHE_KEYS,
+  SYSTEM_CACHE_TTL,
+  
+  // Type exports for system operations
+  type SystemConfigOptions,
+  type EnvironmentDataOptions,
+  type LicenseValidationOptions,
+  type SystemHealthOptions,
+  type CacheOperationOptions,
+  type EmailConfigOptions,
+  type CorsConfigOptions,
+  type LookupKeyOptions,
+  
+  // Utility functions
+  validateLicenseResponse,
+  formatSystemInfo,
+  buildSystemEndpoint,
+  parseEnvironmentData,
+  
+  // Default export
+  default as SystemApiClient,
 } from './system-client';
 
 // =============================================================================
-// AUTHENTICATION CLIENT EXPORTS
+// Authentication Client Exports
 // =============================================================================
 
+/**
+ * JWT token management, session validation, and authentication headers
+ */
 export {
-  // Main authentication client object with all utilities
-  AuthClient,
+  // JWT utilities
+  parseJWTPayload,
+  isTokenExpired,
+  extractUserFromToken,
   
-  // Authentication configuration constants
-  AUTH_CONFIG,
-  COOKIE_OPTIONS,
+  // Session management
+  getSessionToken,
+  setSessionToken,
+  clearSessionToken,
+  validateSession,
+  refreshSessionToken,
   
-  // Token management functions
-  validateTokenStructure,
-  createAuthToken,
-  shouldRefreshToken,
-  decodeJwtPayload,
+  // Server-side authentication utilities
+  getServerSessionToken,
+  validateServerSession,
+  extractSessionFromRequest,
+  createAuthenticatedRequest,
   
-  // Secure cookie operations
-  storeTokenInCookies,
-  getTokenFromCookies,
-  clearAuthCookies,
-  
-  // Session data management
-  storeSessionData,
-  getStoredSessionData,
-  clearStoredSessionData,
-  
-  // Authentication header management
-  generateAuthHeaders,
+  // Authentication headers
   getCurrentAuthHeaders,
-  updateRequestHeaders,
+  buildAuthHeaders,
+  addAuthToRequest,
   
-  // Session validation and refresh
-  validateCurrentSession,
-  refreshAuthToken,
-  handleMiddlewareTokenRefresh,
+  // Cookie management
+  setAuthCookie,
+  clearAuthCookie,
+  getAuthFromCookies,
   
-  // Authentication state management
-  initializeAuthState,
-  updateAuthState,
+  // Middleware utilities
+  createAuthMiddleware,
+  handleAuthError,
+  refreshTokenMiddleware,
   
-  // Cleanup and logout utilities
-  performAuthenticationCleanup,
-  logoutUser,
-  handleSessionExpiration,
+  // Factory functions
+  createAuthClient,
+  createDefaultAuthClient,
   
-  // Utility functions for integration
-  createAuthContext,
-  extractUserPermissions,
-  hasPermission,
-  recordSessionActivity,
+  // Type exports for authentication
+  type AuthCookieConfig,
+  type SessionValidationResult,
+  type TokenRefreshResult,
+  type MiddlewareAuthContext,
+  type MiddlewareAuthResult,
+  type AuthErrorCode,
+  
+  // Constants
+  STORAGE_KEYS,
+  DEFAULT_COOKIE_CONFIG,
+  TOKEN_REFRESH_BUFFER_MS,
+  MAX_REFRESH_RETRIES,
+  
+  // Default export
+  default as AuthApiClient,
 } from './auth-client';
 
 // =============================================================================
-// MIDDLEWARE AND INTERCEPTOR EXPORTS
+// Request/Response Middleware Exports
 // =============================================================================
 
+/**
+ * Middleware pipeline for request/response transformation
+ */
 export {
-  // Configuration functions
-  configureInterceptors,
-  getInterceptorConfig,
-  
-  // Individual middleware functions
-  authenticationMiddleware,
-  requestCaseTransformMiddleware,
-  responseCaseTransformMiddleware,
-  errorHandlingMiddleware,
-  loadingStateMiddleware,
-  loadingCleanupMiddleware,
-  loadingErrorCleanupMiddleware,
-  successNotificationMiddleware,
-  errorNotificationMiddleware,
-  performanceMonitoringMiddleware,
-  performanceCompletionMiddleware,
-  
-  // Middleware composition utilities
-  composeRequestMiddlewares,
-  composeResponseMiddlewares,
-  composeErrorMiddlewares,
+  // Middleware pipeline
+  InterceptorPipeline,
   createDefaultMiddlewareStack,
   
-  // Default middleware stacks
-  defaultRequestMiddleware,
-  defaultResponseMiddleware,
-  defaultErrorMiddleware,
+  // Individual middleware functions
+  caseTransformMiddleware,
+  authenticationMiddleware,
+  errorHandlingMiddleware,
+  loadingStateMiddleware,
+  notificationMiddleware,
+  
+  // Error handling utilities
+  createErrorFromResponse,
+  isRetryableStatusCode,
+  shouldRetryError,
+  
+  // Loading and notification managers
+  loadingStateManager,
+  notificationManager,
+  
+  // Middleware configuration
+  DEFAULT_MIDDLEWARE_CONFIG,
+  MIDDLEWARE_PRIORITIES,
+  
+  // Header constants
+  HTTP_HEADERS,
+  MIDDLEWARE_HEADERS,
+  
+  // Type exports for middleware
+  type MiddlewarePipeline,
+  type MiddlewareContext,
+  type MiddlewareState,
+  type RequestInterceptor,
+  type ResponseInterceptor,
+  type ErrorInterceptor,
+  type InterceptorConfig,
+  
+  // Default export
+  default as ApiInterceptors,
 } from './interceptors';
 
 // =============================================================================
-// TYPE DEFINITIONS EXPORT
+// Comprehensive Type Definitions Exports
 // =============================================================================
 
+/**
+ * Complete TypeScript interface definitions for API client operations
+ */
 export type {
-  // Core HTTP types
+  // Core configuration types
+  ApiClientConfig,
+  ServerSideConfig,
+  InterceptorConfig,
+  InterceptorHandler,
+  
+  // Request and response types
+  ApiRequestConfig,
+  ApiResponse,
   HttpMethod,
-  ContentType,
-  CacheStrategy,
-  
-  // Request configuration types
-  RequestConfig,
-  PaginationConfig,
-  FilterConfig,
-  UIConfig,
+  RequestParams,
+  AuthConfig,
   CacheConfig,
-  KeyValuePair,
+  ProgressConfig,
+  RequestMetadata,
   
-  // SWR and React Query configuration types
-  SWRConfig,
-  ReactQueryConfig,
-  
-  // Response types
-  SuccessResponse,
-  ErrorResponse,
-  ErrorContext,
+  // Response metadata types
+  ResponseStatus,
   ResponseMeta,
+  TimingMeta,
+  CacheMeta,
+  PaginationMeta,
+  
+  // Authentication types
+  SessionManager,
+  AuthProvider,
+  AuthContext,
+  AuthHeaders,
+  AuthState,
+  LoginRequest,
+  LoginResult,
+  LogoutResult,
+  RefreshRequest,
+  RefreshResult,
+  
+  // File operation types
+  FileService,
+  FileUploadConfig,
+  FileDownloadConfig,
+  FileOperationResult,
+  FileMetadata,
+  FileUploadProgress,
+  FileDownloadProgress,
+  ProgressEvent,
+  ProgressEventEmitter,
+  ProgressEventListener,
+  
+  // Response wrapper types
   ListResponse,
   CreateResponse,
   UpdateResponse,
   DeleteResponse,
   BulkResponse,
   
-  // Authentication types
-  AuthToken,
-  ApiKey,
-  SessionData,
-  AuthHeaders,
-  AuthContext,
+  // Health and monitoring types
+  HealthStatus,
+  ClientMetrics,
+  PerformanceMetrics,
   
-  // Middleware types
-  MiddlewareContext,
-  MiddlewareStack,
-  RequestMiddleware,
-  ResponseMiddleware,
-  ErrorMiddleware,
-  
-  // File operation types
-  FileUploadProgress,
-  FileMetadata,
-  FileUploadConfig,
-  FileDownloadConfig,
-  DirectoryItem,
-  DirectoryListing,
-  
-  // Specialized API types
-  ConnectionTestResult,
-  SchemaDiscoveryResult,
-  EndpointGenerationResult,
-  
-  // System API types
-  Environment,
-  System,
-  LicenseCheckResponse,
-  SubscriptionData,
-  SystemInfo,
-  ConfigItem,
-  SystemMetrics,
-  SystemClientConfig,
-  SystemSWRConfig,
-  SystemReactQueryConfig,
-  
-  // File client specific types
-  FileService,
-  FileItem,
-  CreateDirectoryPayload,
-  FileUploadResult,
-  FileListingOptions,
-  FileValidationResult,
-  
-  // Authentication client specific types
-  AuthError,
-  TokenValidationResult,
-  SessionRefreshResult,
-  AuthState,
-  
-  // Middleware configuration types
-  InterceptorConfig,
-  
-  // Utility types
-  ExtractResourceType,
-  PartialConfig,
-  CombinedConfig,
-  ApiClientError,
-  RequestContext,
-  ApiClientConfig,
+  // Default configuration
+  DEFAULT_CONFIG,
 } from './types';
 
 // =============================================================================
-// UNIFIED API CLIENT FACTORY
+// Legacy Compatibility Exports
 // =============================================================================
 
 /**
- * Configuration interface for creating a complete API client setup
+ * Legacy compatibility utilities for gradual migration
  */
-export interface ApiClientSetupConfig {
-  /** Base URL for all API requests */
-  baseUrl: string;
-  /** Authentication session token */
-  sessionToken?: string;
-  /** API key for authentication */
-  apiKey?: string;
-  /** License key for premium features */
-  licenseKey?: string;
-  /** Default request timeout in milliseconds */
-  timeout?: number;
-  /** Enable development mode features */
-  developmentMode?: boolean;
-  /** Custom middleware configuration */
-  interceptorConfig?: import('./interceptors').InterceptorConfig;
-}
+export {
+  // Legacy request options conversion
+  convertLegacyOptions,
+  
+  // Legacy response format conversion
+  toLegacyResponse,
+  fromLegacyResponse,
+  
+  // Legacy error handling
+  convertLegacyError,
+  
+  // Legacy interceptor patterns
+  createLegacyInterceptor,
+  
+  // Type exports for legacy compatibility
+  type LegacyRequestOptions,
+  type LegacyResponseFormat,
+  type LegacyErrorFormat,
+} from './legacy-adapter';
+
+// =============================================================================
+// Unified Factory Functions
+// =============================================================================
 
 /**
- * Complete API client setup with all configured clients
- */
-export interface ApiClientSetup {
-  /** Base HTTP client for low-level operations */
-  baseClient: import('./base-client').BaseApiClient;
-  /** CRUD operations client */
-  crudClient: import('./crud-client').CrudClient;
-  /** File operations client */
-  fileClient: import('./file-client').FileClient;
-  /** System API client */
-  systemClient: import('./system-client').SystemClient;
-  /** Authentication utilities */
-  authClient: typeof import('./auth-client').AuthClient;
-  /** Current authentication headers */
-  authHeaders: import('./types').AuthHeaders;
-}
-
-/**
- * Create a complete API client setup with all configured clients
- * 
- * This factory function provides a convenient way to initialize all API clients
- * with consistent configuration, replacing Angular service dependency injection
- * patterns with React-compatible factory patterns.
+ * Create a complete API client instance with all capabilities
  * 
  * @param config - Complete API client configuration
- * @returns Configured API client setup with all clients
- * 
- * @example
- * ```typescript
- * // Initialize complete API client setup
- * const apiClients = await createApiClientSetup({
- *   baseUrl: process.env.NEXT_PUBLIC_API_URL,
- *   sessionToken: await getTokenFromCookies(),
- *   timeout: 30000,
- *   developmentMode: process.env.NODE_ENV === 'development',
- * });
- * 
- * // Use individual clients
- * const connections = await apiClients.crudClient.getAll('/api/v2/system/service');
- * const files = await apiClients.fileClient.listFiles('files', '/scripts');
- * ```
+ * @returns Configured API client with all capabilities
  */
-export async function createApiClientSetup(config: ApiClientSetupConfig): Promise<ApiClientSetup> {
-  const {
-    baseUrl,
-    sessionToken,
-    apiKey,
-    licenseKey,
-    timeout = 30000,
-    developmentMode = false,
-    interceptorConfig,
-  } = config;
-
-  // Generate authentication headers
-  const authHeaders = generateAuthHeaders({
-    sessionToken,
-    apiKey,
-    licenseKey,
-  });
-
-  // Configure global interceptors if provided
-  if (interceptorConfig) {
-    configureInterceptors({
-      ...interceptorConfig,
-      isDevelopment: developmentMode,
-      baseUrl,
-    });
-  }
-
-  // Create authentication context
-  const authContext: import('./types').AuthContext = {
-    token: sessionToken ? createAuthToken(sessionToken) : undefined,
-    apiKey: apiKey ? { key: apiKey } : undefined,
-    isAuthenticated: !!sessionToken,
-    isAuthenticating: false,
-  };
-
-  // Create base HTTP client with authentication
-  const baseClient = createApiClient(baseUrl, authContext, {
-    timeout,
-    interceptorConfig,
-  });
-
-  // Create CRUD client with authentication headers
-  const crudClient = createCrudClient({
-    baseUrl,
-    sessionToken,
-    apiKey,
-    timeout,
-  });
-
-  // Create file client with authentication headers
-  const fileClient = createFileClient(baseUrl, authHeaders);
-
-  // Create system client with authentication configuration
-  const systemClient = createSystemClient({
-    baseUrl,
-    defaultHeaders: authHeaders,
-    defaultTimeout: timeout,
-    enableBackgroundSync: !developmentMode, // Disable in development for debugging
-  });
-
+export function createCompleteApiClient(config: ApiClientConfig) {
+  const baseClient = createApiClient(config);
+  const crudClient = createCrudClient(baseClient);
+  const fileClient = createFileClient(baseClient);
+  const systemClient = createSystemClient(baseClient);
+  const authClient = createAuthClient(config);
+  
   return {
-    baseClient,
-    crudClient,
-    fileClient,
-    systemClient,
-    authClient: AuthClient,
-    authHeaders,
+    base: baseClient,
+    crud: crudClient,
+    files: fileClient,
+    system: systemClient,
+    auth: authClient,
+    
+    // Convenience methods
+    get: baseClient.get.bind(baseClient),
+    post: baseClient.post.bind(baseClient),
+    put: baseClient.put.bind(baseClient),
+    patch: baseClient.patch.bind(baseClient),
+    delete: baseClient.delete.bind(baseClient),
+    
+    // Health and utility methods
+    testConnection: baseClient.testConnection.bind(baseClient),
+    getHealth: baseClient.getHealth.bind(baseClient),
+    dispose: baseClient.dispose.bind(baseClient),
   };
 }
 
 /**
- * Default API client setup using environment configuration
+ * Create a default API client with standard DreamFactory configuration
  * 
- * Provides a pre-configured API client setup using environment variables
- * and default settings suitable for most use cases.
- * 
- * @returns Promise resolving to configured API client setup
- * 
- * @example
- * ```typescript
- * // Use default configuration
- * const apiClients = await getDefaultApiClientSetup();
- * 
- * // Fetch data using configured clients
- * const { data, error } = await apiClients.crudClient.getAll('/api/v2/database/_table');
- * ```
+ * @param baseUrl - DreamFactory instance base URL
+ * @param apiKey - DreamFactory API key
+ * @returns Pre-configured API client for typical usage
  */
-export async function getDefaultApiClientSetup(): Promise<ApiClientSetup> {
-  // Get authentication token from cookies
-  const token = await getTokenFromCookies();
-  
-  return createApiClientSetup({
-    baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000',
-    sessionToken: token?.sessionToken,
-    apiKey: process.env.NEXT_PUBLIC_DREAMFACTORY_API_KEY,
-    licenseKey: process.env.DREAMFACTORY_LICENSE_KEY,
+export function createDefaultCompleteApiClient(baseUrl: string, apiKey: string) {
+  const config: ApiClientConfig = {
+    baseUrl,
+    apiKey,
     timeout: 30000,
-    developmentMode: process.env.NODE_ENV === 'development',
-  });
+    withCredentials: true,
+    retryConfig: {
+      maxAttempts: 3,
+      initialDelay: 1000,
+      maxDelay: 10000,
+      backoffFactor: 2,
+      jitter: true,
+      retryableStatusCodes: [408, 429, 500, 502, 503, 504],
+      retryableNetworkErrors: ['TIMEOUT', 'NETWORK_ERROR', 'ECONNRESET'],
+    },
+    circuitBreakerConfig: {
+      enabled: true,
+      failureThreshold: 5,
+      recoveryTimeout: 60000,
+      monitoringPeriod: 10000,
+    },
+    interceptors: [],
+    debug: process.env.NODE_ENV === 'development',
+  };
+  
+  return createCompleteApiClient(config);
 }
 
 // =============================================================================
-// CONVENIENCE EXPORTS FOR REACT HOOK INTEGRATION
+// Type-only Exports for Better Tree Shaking
 // =============================================================================
 
 /**
- * Convenience exports for React hook integration patterns
- * These exports facilitate clean imports in React components and hooks
+ * Re-export types for external consumption without importing implementation
  */
-
-// Base client utilities for custom hooks
-export { BaseApiClient as HttpClient } from './base-client';
-export { CrudClient as DataClient } from './crud-client';
-export { FileClient as FileManager } from './file-client';
-export { SystemClient as SystemAPI } from './system-client';
-
-// Authentication utilities for auth hooks
-export {
-  validateCurrentSession as useSessionValidation,
-  getCurrentAuthHeaders as useAuthHeaders,
-} from './auth-client';
-
-// Middleware utilities for custom implementations
-export {
-  createDefaultMiddlewareStack as useDefaultMiddleware,
-} from './interceptors';
+export type { KeyValuePair } from '@/types/generic-http';
+export type { 
+  UserSession,
+  LoginCredentials,
+  LoginResponse,
+  JWTPayload,
+} from '@/types/auth';
+export type {
+  AppError,
+  NetworkError,
+  ValidationError,
+  AuthenticationError,
+  AuthorizationError,
+  ServerError,
+  ClientError,
+  SystemError,
+  RetryConfig,
+  CircuitBreakerConfig,
+} from '@/types/error';
 
 // =============================================================================
-// RE-EXPORT COMMON PATTERNS FOR CONVENIENCE
+// Default Export
 // =============================================================================
 
 /**
- * Common API client patterns for frequently used operations
+ * Default export provides the base API client for simple usage
  */
-
-// Default clients for immediate use
-export const httpClient = new BaseApiClient();
-export const dataClient = new CrudClient({
-  baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000',
-  defaultHeaders: {},
-});
-export const fileManager = new FileClient();
-export const systemAPI = new SystemClient();
-
-// Authentication utilities
-export const auth = AuthClient;
-
-// Middleware configuration
-export const middleware = {
-  configure: configureInterceptors,
-  getConfig: getInterceptorConfig,
-  createDefault: createDefaultMiddlewareStack,
-};
+export { BaseClient as default } from './base-client';
 
 // =============================================================================
-// DEFAULT EXPORT FOR COMPATIBILITY
+// Version and Metadata
 // =============================================================================
 
 /**
- * Default export providing the complete API client interface
- * 
- * This default export maintains compatibility with CommonJS imports
- * while providing access to all API client functionality.
+ * API client library version and metadata
  */
-const ApiClientLibrary = {
-  // Core clients
-  BaseApiClient,
-  CrudClient,
-  FileClient,
-  SystemClient,
-  AuthClient,
-  
-  // Factory functions
-  createApiClientSetup,
-  getDefaultApiClientSetup,
-  createApiClient,
-  createCrudClient,
-  createFileClient,
-  createSystemClient,
-  
-  // Authentication utilities
-  auth: AuthClient,
-  generateAuthHeaders,
-  validateCurrentSession,
-  
-  // Middleware utilities
-  middleware,
-  configureInterceptors,
-  createDefaultMiddlewareStack,
-  
-  // Default instances
-  httpClient,
-  dataClient,
-  fileManager,
-  systemAPI,
-  
-  // Configuration constants
-  AUTH_CONFIG,
-  DEFAULT_TIMEOUT,
-  HTTP_STATUS,
+export const API_CLIENT_VERSION = '1.0.0';
+export const API_CLIENT_BUILD = process.env.BUILD_NUMBER || 'development';
+export const API_CLIENT_COMMIT = process.env.COMMIT_SHA || 'unknown';
+
+/**
+ * Feature flags for experimental functionality
+ */
+export const FEATURE_FLAGS = {
+  CONCURRENT_REQUESTS: true,
+  RESPONSE_STREAMING: true,
+  REQUEST_DEDUPLICATION: true,
+  BACKGROUND_SYNC: true,
+  OFFLINE_SUPPORT: false, // Future enhancement
+  GRAPHQL_SUPPORT: false, // Future enhancement
 } as const;
 
-export default ApiClientLibrary;
-
-// =============================================================================
-// MODULE DOCUMENTATION
-// =============================================================================
-
 /**
- * @fileoverview
- * 
- * This module serves as the main entry point for the DreamFactory Admin Interface
- * API client library, providing comprehensive HTTP client utilities that replace
- * Angular HTTP services with modern React/Next.js patterns.
- * 
- * Architecture:
- * - BaseApiClient: Core HTTP functionality with middleware support
- * - CrudClient: Standardized CRUD operations with React Query compatibility
- * - FileClient: File upload/download operations with progress tracking
- * - SystemClient: System configuration and environment management
- * - AuthClient: Authentication and session management utilities
- * - Interceptors: Request/response middleware for cross-cutting concerns
- * 
- * Integration Features:
- * - SWR and React Query compatibility for intelligent caching
- * - Next.js middleware integration for server-side authentication
- * - TypeScript type safety throughout the API surface
- * - Comprehensive error handling with automatic token refresh
- * - Performance monitoring and optimization utilities
- * 
- * Security Features:
- * - JWT token management with automatic refresh
- * - Secure cookie storage with HTTP-only and SameSite configurations
- * - Authentication header management for DreamFactory API compatibility
- * - Session validation and cleanup utilities
- * 
- * Performance Features:
- * - Intelligent caching with background synchronization
- * - Request deduplication and retry mechanisms
- * - Optimistic updates for improved user experience
- * - Progressive loading for large datasets
- * 
- * @version 1.0.0
- * @since React 19.0.0 / Next.js 15.1
- * @requires TypeScript 5.8+
+ * Performance monitoring configuration
  */
+export const PERFORMANCE_CONFIG = {
+  ENABLE_METRICS: process.env.NODE_ENV === 'development',
+  COLLECT_TIMING: true,
+  COLLECT_ERRORS: true,
+  SAMPLE_RATE: 1.0,
+} as const;
