@@ -1,674 +1,1098 @@
 /**
- * TypeScript type definitions for the React Dynamic Field Component
+ * TypeScript type definitions for React Dynamic Field Component
  * 
- * This file provides comprehensive type definitions for the dynamic field component
- * that replaced Angular Input decorators with React Hook Form integration.
- * Supports all DreamFactory service configuration field types with Zod validation.
+ * Comprehensive type definitions for a flexible, reusable field component that supports
+ * multiple input types, React Hook Form integration, Zod validation, accessibility compliance,
+ * and dynamic configuration based on database schema requirements.
  * 
- * @fileoverview Dynamic field types supporting React Hook Form + Zod validation
- * @version 1.0.0
- * @since React 19/Next.js 15.1 migration
+ * Supports all DreamFactory service configuration field types including database connections,
+ * API generation configurations, and admin settings with full type safety.
  */
 
-import type { ReactNode, ComponentType, HTMLAttributes, AriaAttributes } from 'react';
-import type { 
-  UseFormRegister,
-  FieldPath,
-  FieldValues,
-  Control,
-  FieldError,
-  RegisterOptions,
-  ControllerProps 
-} from 'react-hook-form';
-import type { ZodSchema, ZodType } from 'zod';
-import type { VariantProps } from 'class-variance-authority';
+import { ReactNode, ComponentType, InputHTMLAttributes, TextareaHTMLAttributes, SelectHTMLAttributes } from 'react';
+import { Control, FieldValues, RegisterOptions, UseFormRegister, FieldError } from 'react-hook-form';
+import { z } from 'zod';
+import { BaseComponent, SelectOption, ComponentVariant, ComponentSize } from '@/types/ui';
+import { SchemaField, FieldValidation } from '@/types/schema';
 
 // ============================================================================
-// Field Type Definitions
+// FIELD TYPE DEFINITIONS
 // ============================================================================
 
 /**
- * Supported dynamic field types for DreamFactory service configuration
- * Migrated from Angular service types to React component types
+ * Supported dynamic field types for all DreamFactory configurations
+ * Covers database connections, API generation, security settings, and admin configurations
  */
 export type DynamicFieldType = 
-  | 'string'              // Basic text input
-  | 'integer'             // Numeric input with integer validation
+  | 'string'              // Text input for names, labels, URLs
+  | 'integer'             // Numeric input for ports, timeouts, counts
   | 'password'            // Password input with masking
-  | 'text'                // Textarea for longer content
-  | 'boolean'             // Checkbox or toggle switch
+  | 'text'                // Textarea for descriptions, scripts, JSON
+  | 'boolean'             // Checkbox/toggle for enable/disable flags
   | 'picklist'            // Single select dropdown
-  | 'multi_picklist'      // Multi-select dropdown
-  | 'file_certificate'    // File upload for certificates
-  | 'file_certificate_api' // API-based certificate handling
-  | 'event_picklist';     // Autocomplete with event filtering
+  | 'multi_picklist'      // Multiple select dropdown
+  | 'file_certificate'    // File upload for SSL certificates
+  | 'file_certificate_api' // File upload with API validation
+  | 'event_picklist';     // Autocomplete select with dynamic options
 
 /**
- * Field value types supporting all variations of input data
- * Handles strings, numbers, booleans, files, and arrays
+ * Field value types corresponding to each field type
+ * Ensures type safety when handling field values in forms
  */
-export type DynamicFieldValue = 
-  | string
-  | number
-  | boolean
-  | File
-  | File[]
-  | string[]
-  | null
-  | undefined;
+export type DynamicFieldValue<T extends DynamicFieldType = DynamicFieldType> = 
+  T extends 'string' ? string :
+  T extends 'integer' ? number :
+  T extends 'password' ? string :
+  T extends 'text' ? string :
+  T extends 'boolean' ? boolean :
+  T extends 'picklist' ? string :
+  T extends 'multi_picklist' ? string[] :
+  T extends 'file_certificate' ? File | string | null :
+  T extends 'file_certificate_api' ? File | string | null :
+  T extends 'event_picklist' ? string :
+  unknown;
 
 /**
- * File upload value types for certificate handling
- * Supports both File objects and file path strings
+ * Union type for all possible field values
  */
-export type FileValue = File | string | null;
-export type MultiFileValue = File[] | string[] | null;
+export type AnyFieldValue = DynamicFieldValue<DynamicFieldType>;
 
 // ============================================================================
-// Component Props Interfaces
+// FIELD CONFIGURATION TYPES
 // ============================================================================
 
 /**
- * Base interface for dynamic field component props
- * Includes accessibility attributes and ARIA support
+ * Base field configuration interface
+ * Provides common properties for all field types
  */
-export interface DynamicFieldBaseProps extends AriaAttributes {
-  // Core field identification
+export interface BaseFieldConfig {
+  /** Unique field identifier */
   name: string;
+  
+  /** Field type determining input component and validation */
   type: DynamicFieldType;
   
-  // Display properties
-  label?: string;
-  placeholder?: string;
+  /** Human-readable field label */
+  label: string;
+  
+  /** Optional field description for help text */
   description?: string;
+  
+  /** Placeholder text for input fields */
+  placeholder?: string;
+  
+  /** Whether the field is required */
+  required?: boolean;
+  
+  /** Whether the field is disabled */
+  disabled?: boolean;
+  
+  /** Whether the field is read-only */
+  readonly?: boolean;
+  
+  /** Whether the field is hidden */
+  hidden?: boolean;
+  
+  /** Default value for the field */
+  defaultValue?: AnyFieldValue;
+  
+  /** Field validation rules */
+  validation?: FieldValidationConfig;
+  
+  /** Conditional logic for showing/hiding field */
+  conditional?: ConditionalConfig;
+  
+  /** Field help text for accessibility */
   helpText?: string;
   
-  // Validation and state
-  required?: boolean;
-  disabled?: boolean;
-  readonly?: boolean;
-  loading?: boolean;
-  
-  // Accessibility support
-  'aria-label'?: string;
-  'aria-describedby'?: string;
-  'aria-invalid'?: boolean;
-  'aria-required'?: boolean;
-  
-  // Styling and theme
+  /** Additional CSS classes */
   className?: string;
-  variant?: ComponentVariant;
-  size?: ComponentSize;
   
-  // Test support
+  /** Test identifier for testing */
   'data-testid'?: string;
 }
 
 /**
- * React Hook Form compatible field registration props
- * Supports both controlled and uncontrolled component modes
+ * String field specific configuration
  */
-export interface DynamicFieldFormProps<TFieldValues extends FieldValues = FieldValues> {
-  // React Hook Form integration
-  control?: Control<TFieldValues>;
-  register?: UseFormRegister<TFieldValues>;
-  name: FieldPath<TFieldValues>;
-  rules?: RegisterOptions<TFieldValues>;
+export interface StringFieldConfig extends BaseFieldConfig {
+  type: 'string';
+  defaultValue?: string;
   
-  // Field state
-  error?: FieldError;
-  isDirty?: boolean;
-  isTouched?: boolean;
-  isValidating?: boolean;
+  /** Input mask for formatted input */
+  mask?: string;
   
-  // Value handling for controlled mode
-  value?: DynamicFieldValue;
-  defaultValue?: DynamicFieldValue;
-  onChange?: (value: DynamicFieldValue) => void;
-  onBlur?: () => void;
-}
-
-/**
- * Configuration schema interface maintaining backward compatibility
- * with existing service definitions
- */
-export interface ConfigSchema {
-  // Field metadata
-  name: string;
-  type: DynamicFieldType;
-  label?: string;
-  description?: string;
+  /** Text transformation */
+  transform?: TextTransform;
   
-  // Validation rules
-  required?: boolean;
-  validation?: FieldValidationSchema;
+  /** Input mode for mobile keyboards */
+  inputMode?: 'text' | 'email' | 'url' | 'tel' | 'search';
   
-  // Field-specific configuration
-  options?: SelectOption[];
-  multiple?: boolean;
-  searchable?: boolean;
-  
-  // File upload specific
-  accept?: string;
-  maxSize?: number;
-  maxFiles?: number;
-  
-  // Event autocomplete specific
-  eventSource?: string;
-  filterProperty?: string;
-  displayProperty?: string;
-  
-  // Layout and styling
-  grid?: GridConfig;
-  conditional?: ConditionalConfig;
-  formatting?: FieldFormatting;
-}
-
-// ============================================================================
-// Field-Specific Props
-// ============================================================================
-
-/**
- * Text input field props (string, password types)
- */
-export interface TextFieldProps extends DynamicFieldBaseProps {
-  type: 'string' | 'password';
-  minLength?: number;
-  maxLength?: number;
-  pattern?: string;
+  /** Auto-complete attribute */
   autoComplete?: string;
-  autoFocus?: boolean;
-}
-
-/**
- * Numeric input field props (integer type)
- */
-export interface NumberFieldProps extends DynamicFieldBaseProps {
-  type: 'integer';
-  min?: number;
-  max?: number;
-  step?: number;
-  precision?: number;
-}
-
-/**
- * Textarea field props (text type)
- */
-export interface TextAreaFieldProps extends DynamicFieldBaseProps {
-  type: 'text';
-  rows?: number;
-  cols?: number;
-  resize?: 'none' | 'both' | 'horizontal' | 'vertical';
-  autoResize?: boolean;
-}
-
-/**
- * Boolean field props (boolean type)
- */
-export interface BooleanFieldProps extends DynamicFieldBaseProps {
-  type: 'boolean';
-  displayAs?: 'checkbox' | 'switch' | 'toggle';
-  checkedLabel?: string;
-  uncheckedLabel?: string;
-}
-
-/**
- * Select field props (picklist, multi_picklist types)
- */
-export interface SelectFieldProps extends DynamicFieldBaseProps {
-  type: 'picklist' | 'multi_picklist';
-  options: SelectOption[];
-  multiple?: boolean;
-  searchable?: boolean;
-  clearable?: boolean;
-  loading?: boolean;
-  loadingMessage?: string;
-  noOptionsMessage?: string;
-  placeholder?: string;
-}
-
-/**
- * File upload field props (file_certificate, file_certificate_api types)
- */
-export interface FileFieldProps extends DynamicFieldBaseProps {
-  type: 'file_certificate' | 'file_certificate_api';
-  accept?: string;
-  multiple?: boolean;
-  maxSize?: number;
-  maxFiles?: number;
-  showPreview?: boolean;
-  allowedExtensions?: string[];
-  uploadEndpoint?: string;
-  onFileValidation?: (file: File) => Promise<boolean>;
-}
-
-/**
- * Event autocomplete field props (event_picklist type)
- */
-export interface EventFieldProps extends DynamicFieldBaseProps {
-  type: 'event_picklist';
-  eventSource: string;
-  filterProperty?: string;
-  displayProperty?: string;
-  searchThreshold?: number;
-  debounceMs?: number;
-  maxResults?: number;
-  onSearch?: (query: string) => Promise<EventOption[]>;
-  onSelection?: (option: EventOption) => void;
-}
-
-// ============================================================================
-// Supporting Type Definitions
-// ============================================================================
-
-/**
- * Select option interface for dropdown fields
- */
-export interface SelectOption {
-  value: string | number;
-  label: string;
-  description?: string;
-  icon?: ComponentType<{ className?: string }>;
-  disabled?: boolean;
-  group?: string;
-  metadata?: Record<string, unknown>;
-}
-
-/**
- * Event data structures for autocomplete functionality
- */
-export interface EventOption {
-  id: string | number;
-  label: string;
-  value: string;
-  description?: string;
-  category?: string;
-  metadata?: Record<string, unknown>;
-  isSelectable?: boolean;
-}
-
-/**
- * Event autocomplete response structure
- */
-export interface EventSearchResponse {
-  options: EventOption[];
-  hasMore?: boolean;
-  total?: number;
-  query?: string;
-}
-
-/**
- * Component variant types for styling
- */
-export type ComponentVariant = 
-  | 'default'
-  | 'primary'
-  | 'secondary'
-  | 'success'
-  | 'warning'
-  | 'error'
-  | 'ghost'
-  | 'outline';
-
-/**
- * Component size types
- */
-export type ComponentSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
-
-// ============================================================================
-// Validation Schema Types
-// ============================================================================
-
-/**
- * Zod validation schema types for runtime type checking
- */
-export interface FieldValidationSchema {
-  schema?: ZodType<any>;
-  required?: boolean;
-  minLength?: number;
+  
+  /** Spell check */
+  spellCheck?: boolean;
+  
+  /** Maximum length */
   maxLength?: number;
+  
+  /** Minimum length */
+  minLength?: number;
+}
+
+/**
+ * Integer field specific configuration
+ */
+export interface IntegerFieldConfig extends BaseFieldConfig {
+  type: 'integer';
+  defaultValue?: number;
+  
+  /** Minimum value */
   min?: number;
+  
+  /** Maximum value */
   max?: number;
-  pattern?: RegExp;
-  custom?: (value: any) => boolean | string;
-  messages?: ValidationMessages;
+  
+  /** Step increment */
+  step?: number;
+  
+  /** Number formatting options */
+  formatting?: NumberFormatting;
+  
+  /** Show spinner controls */
+  showSpinner?: boolean;
 }
 
 /**
- * Validation error messages
+ * Password field specific configuration
  */
-export interface ValidationMessages {
-  required?: string;
-  minLength?: string;
-  maxLength?: string;
-  min?: string;
-  max?: string;
-  pattern?: string;
-  custom?: string;
-  invalid?: string;
+export interface PasswordFieldConfig extends BaseFieldConfig {
+  type: 'password';
+  defaultValue?: string;
+  
+  /** Show/hide password toggle */
+  showToggle?: boolean;
+  
+  /** Password strength indicator */
+  showStrength?: boolean;
+  
+  /** Password requirements */
+  requirements?: PasswordRequirements;
+  
+  /** Auto-generate password option */
+  allowGenerate?: boolean;
 }
 
-// ============================================================================
-// Layout and Styling Types
-// ============================================================================
+/**
+ * Text field (textarea) specific configuration
+ */
+export interface TextFieldConfig extends BaseFieldConfig {
+  type: 'text';
+  defaultValue?: string;
+  
+  /** Number of visible rows */
+  rows?: number;
+  
+  /** Resize behavior */
+  resize?: 'none' | 'both' | 'horizontal' | 'vertical';
+  
+  /** Syntax highlighting for code */
+  syntax?: CodeSyntax;
+  
+  /** Auto-expand to content */
+  autoExpand?: boolean;
+  
+  /** Rich text editor */
+  richText?: boolean;
+}
 
 /**
- * Grid configuration for responsive layouts
+ * Boolean field specific configuration
  */
-export interface GridConfig {
-  xs?: number;
-  sm?: number;
-  md?: number;
-  lg?: number;
-  xl?: number;
-  offset?: {
-    xs?: number;
-    sm?: number;
-    md?: number;
-    lg?: number;
-    xl?: number;
+export interface BooleanFieldConfig extends BaseFieldConfig {
+  type: 'boolean';
+  defaultValue?: boolean;
+  
+  /** Display style */
+  variant?: 'checkbox' | 'switch' | 'toggle';
+  
+  /** Label position */
+  labelPosition?: 'left' | 'right' | 'top' | 'bottom';
+  
+  /** True/false labels */
+  labels?: {
+    true: string;
+    false: string;
   };
 }
 
 /**
- * Conditional field logic configuration
+ * Picklist (single select) field specific configuration
  */
-export interface ConditionalConfig {
-  conditions: FieldCondition[];
-  operator: 'AND' | 'OR';
-  action: ConditionalAction;
+export interface PicklistFieldConfig extends BaseFieldConfig {
+  type: 'picklist';
+  defaultValue?: string;
+  
+  /** Available options */
+  options: SelectOption[];
+  
+  /** Allow custom values */
+  allowCustom?: boolean;
+  
+  /** Search functionality */
+  searchable?: boolean;
+  
+  /** Clear selection option */
+  clearable?: boolean;
+  
+  /** Option groups */
+  grouped?: boolean;
+  
+  /** Remote data source */
+  remote?: RemoteDataConfig;
 }
 
 /**
- * Field condition for conditional logic
+ * Multi-picklist (multiple select) field specific configuration
  */
-export interface FieldCondition {
-  field: string;
-  operator: ComparisonOperator;
-  value: any;
+export interface MultiPicklistFieldConfig extends BaseFieldConfig {
+  type: 'multi_picklist';
+  defaultValue?: string[];
+  
+  /** Available options */
+  options: SelectOption[];
+  
+  /** Maximum selections */
+  maxSelections?: number;
+  
+  /** Search functionality */
+  searchable?: boolean;
+  
+  /** Tag display style */
+  tagStyle?: 'chips' | 'badges' | 'list';
+  
+  /** Allow custom values */
+  allowCustom?: boolean;
+  
+  /** Remote data source */
+  remote?: RemoteDataConfig;
 }
 
 /**
- * Comparison operators for conditional logic
+ * File certificate field specific configuration
  */
-export type ComparisonOperator = 
-  | 'equals'
-  | 'notEquals'
-  | 'contains'
-  | 'notContains'
-  | 'startsWith'
-  | 'endsWith'
-  | 'greaterThan'
-  | 'lessThan'
-  | 'isEmpty'
-  | 'isNotEmpty';
-
-/**
- * Conditional actions
- */
-export type ConditionalAction = 
-  | 'show'
-  | 'hide'
-  | 'enable'
-  | 'disable'
-  | 'require'
-  | 'optional';
-
-/**
- * Field formatting options
- */
-export interface FieldFormatting {
-  mask?: string;
-  transform?: TextTransform;
-  prefix?: string;
-  suffix?: string;
-  currency?: CurrencyConfig;
-  number?: NumberConfig;
-  date?: DateConfig;
+export interface FileCertificateFieldConfig extends BaseFieldConfig {
+  type: 'file_certificate';
+  defaultValue?: File | string | null;
+  
+  /** Accepted file types */
+  accept?: string;
+  
+  /** Maximum file size in bytes */
+  maxSize?: number;
+  
+  /** File validation */
+  fileValidation?: FileValidationConfig;
+  
+  /** Upload progress display */
+  showProgress?: boolean;
+  
+  /** Preview functionality */
+  allowPreview?: boolean;
+  
+  /** Drag and drop */
+  dragDrop?: boolean;
 }
+
+/**
+ * File certificate API field specific configuration
+ */
+export interface FileCertificateApiFieldConfig extends BaseFieldConfig {
+  type: 'file_certificate_api';
+  defaultValue?: File | string | null;
+  
+  /** API validation endpoint */
+  validationEndpoint?: string;
+  
+  /** Accepted file types */
+  accept?: string;
+  
+  /** Maximum file size in bytes */
+  maxSize?: number;
+  
+  /** File validation */
+  fileValidation?: FileValidationConfig;
+  
+  /** Upload progress display */
+  showProgress?: boolean;
+  
+  /** Real-time validation */
+  realtimeValidation?: boolean;
+  
+  /** Certificate parsing */
+  parseCertificate?: boolean;
+}
+
+/**
+ * Event picklist field specific configuration
+ */
+export interface EventPicklistFieldConfig extends BaseFieldConfig {
+  type: 'event_picklist';
+  defaultValue?: string;
+  
+  /** Event data source configuration */
+  eventSource: EventSourceConfig;
+  
+  /** Search functionality */
+  searchable?: boolean;
+  
+  /** Minimum characters to trigger search */
+  minSearchLength?: number;
+  
+  /** Search debounce delay */
+  searchDelay?: number;
+  
+  /** Custom option renderer */
+  optionRenderer?: ComponentType<{ option: EventOption }>;
+  
+  /** Group events by category */
+  groupBy?: string;
+  
+  /** Filter configuration */
+  filters?: EventFilter[];
+}
+
+/**
+ * Union type for all field configurations
+ */
+export type FieldConfig = 
+  | StringFieldConfig
+  | IntegerFieldConfig
+  | PasswordFieldConfig
+  | TextFieldConfig
+  | BooleanFieldConfig
+  | PicklistFieldConfig
+  | MultiPicklistFieldConfig
+  | FileCertificateFieldConfig
+  | FileCertificateApiFieldConfig
+  | EventPicklistFieldConfig;
+
+// ============================================================================
+// COMPONENT PROPS INTERFACES
+// ============================================================================
+
+/**
+ * Base dynamic field component props
+ * Supports both controlled and uncontrolled modes
+ */
+export interface BaseDynamicFieldProps extends BaseComponent {
+  /** Field configuration */
+  config: FieldConfig;
+  
+  /** Field value (controlled mode) */
+  value?: AnyFieldValue;
+  
+  /** Change handler (controlled mode) */
+  onChange?: (value: AnyFieldValue) => void;
+  
+  /** Blur handler */
+  onBlur?: (event: React.FocusEvent) => void;
+  
+  /** Focus handler */
+  onFocus?: (event: React.FocusEvent) => void;
+  
+  /** Error state */
+  error?: string | FieldError;
+  
+  /** Component size */
+  size?: ComponentSize;
+  
+  /** Component variant */
+  variant?: ComponentVariant;
+  
+  /** Full width */
+  fullWidth?: boolean;
+}
+
+/**
+ * React Hook Form integration props
+ */
+export interface ReactHookFormProps<T extends FieldValues = FieldValues> {
+  /** React Hook Form control object */
+  control?: Control<T>;
+  
+  /** React Hook Form register function */
+  register?: UseFormRegister<T>;
+  
+  /** Field registration options */
+  registerOptions?: RegisterOptions<T>;
+  
+  /** Form field name */
+  name?: string;
+}
+
+/**
+ * Accessibility props for WCAG 2.1 AA compliance
+ */
+export interface AccessibilityProps {
+  /** ARIA label */
+  'aria-label'?: string;
+  
+  /** ARIA described by */
+  'aria-describedby'?: string;
+  
+  /** ARIA labelled by */
+  'aria-labelledby'?: string;
+  
+  /** ARIA required */
+  'aria-required'?: boolean;
+  
+  /** ARIA invalid */
+  'aria-invalid'?: boolean;
+  
+  /** ARIA expanded (for select fields) */
+  'aria-expanded'?: boolean;
+  
+  /** ARIA owns (for select fields) */
+  'aria-owns'?: string;
+  
+  /** ARIA activedescendant (for select fields) */
+  'aria-activedescendant'?: string;
+  
+  /** Tab index */
+  tabIndex?: number;
+  
+  /** Role */
+  role?: string;
+}
+
+/**
+ * Complete dynamic field component props
+ */
+export interface DynamicFieldProps<T extends FieldValues = FieldValues> 
+  extends BaseDynamicFieldProps, ReactHookFormProps<T>, AccessibilityProps {
+  
+  /** Theme configuration */
+  theme?: FieldThemeConfig;
+  
+  /** Custom components */
+  components?: CustomComponentOverrides;
+  
+  /** Event handlers */
+  onValidate?: (value: AnyFieldValue) => string | undefined;
+  
+  /** Custom validation */
+  customValidation?: (value: AnyFieldValue) => boolean | string;
+  
+  /** Loading state */
+  loading?: boolean;
+  
+  /** Debug mode */
+  debug?: boolean;
+}
+
+// ============================================================================
+// SUPPORTING TYPE DEFINITIONS
+// ============================================================================
 
 /**
  * Text transformation options
  */
 export type TextTransform = 
+  | 'none'
   | 'uppercase'
   | 'lowercase'
   | 'capitalize'
-  | 'camelCase'
-  | 'pascalCase'
-  | 'kebabCase'
-  | 'snakeCase';
-
-/**
- * Currency formatting configuration
- */
-export interface CurrencyConfig {
-  currency: string;
-  locale?: string;
-  minimumFractionDigits?: number;
-  maximumFractionDigits?: number;
-}
+  | 'titlecase';
 
 /**
  * Number formatting configuration
  */
-export interface NumberConfig {
+export interface NumberFormatting {
+  /** Locale for formatting */
   locale?: string;
-  minimumIntegerDigits?: number;
-  minimumFractionDigits?: number;
-  maximumFractionDigits?: number;
+  
+  /** Use thousand separators */
   useGrouping?: boolean;
+  
+  /** Minimum fraction digits */
+  minimumFractionDigits?: number;
+  
+  /** Maximum fraction digits */
+  maximumFractionDigits?: number;
+  
+  /** Currency formatting */
+  currency?: string;
+  
+  /** Percentage formatting */
+  percentage?: boolean;
 }
 
 /**
- * Date formatting configuration
+ * Password requirements configuration
  */
-export interface DateConfig {
-  format: string;
-  locale?: string;
-  timezone?: string;
-  minDate?: string;
-  maxDate?: string;
+export interface PasswordRequirements {
+  /** Minimum length */
+  minLength?: number;
+  
+  /** Require uppercase */
+  requireUppercase?: boolean;
+  
+  /** Require lowercase */
+  requireLowercase?: boolean;
+  
+  /** Require numbers */
+  requireNumbers?: boolean;
+  
+  /** Require special characters */
+  requireSpecial?: boolean;
+  
+  /** Forbidden patterns */
+  forbiddenPatterns?: string[];
+  
+  /** Custom validation function */
+  customValidator?: (password: string) => string | undefined;
 }
 
-// ============================================================================
-// Theme and Accessibility Interfaces
-// ============================================================================
+/**
+ * Code syntax highlighting options
+ */
+export type CodeSyntax = 
+  | 'javascript'
+  | 'typescript'
+  | 'json'
+  | 'sql'
+  | 'php'
+  | 'python'
+  | 'xml'
+  | 'yaml'
+  | 'markdown'
+  | 'text';
 
 /**
- * Theme configuration for dynamic fields
+ * Remote data configuration for select fields
  */
-export interface DynamicFieldTheme {
-  colors: {
-    primary: string;
-    secondary: string;
-    success: string;
-    warning: string;
-    error: string;
-    background: string;
-    surface: string;
-    text: string;
-    muted: string;
+export interface RemoteDataConfig {
+  /** API endpoint URL */
+  url: string;
+  
+  /** HTTP method */
+  method?: 'GET' | 'POST';
+  
+  /** Request headers */
+  headers?: Record<string, string>;
+  
+  /** Request body (for POST) */
+  body?: any;
+  
+  /** Response data path */
+  dataPath?: string;
+  
+  /** Option value path */
+  valuePath?: string;
+  
+  /** Option label path */
+  labelPath?: string;
+  
+  /** Search parameter name */
+  searchParam?: string;
+  
+  /** Cache duration in seconds */
+  cacheDuration?: number;
+}
+
+/**
+ * File validation configuration
+ */
+export interface FileValidationConfig {
+  /** Allowed MIME types */
+  allowedTypes?: string[];
+  
+  /** Maximum file size in bytes */
+  maxSize?: number;
+  
+  /** Minimum file size in bytes */
+  minSize?: number;
+  
+  /** Custom validation function */
+  customValidator?: (file: File) => string | undefined;
+  
+  /** Virus scanning */
+  virusScan?: boolean;
+  
+  /** Image validation (for image files) */
+  imageValidation?: {
+    maxWidth?: number;
+    maxHeight?: number;
+    minWidth?: number;
+    minHeight?: number;
+    aspectRatio?: number;
   };
-  spacing: {
-    xs: string;
-    sm: string;
-    md: string;
-    lg: string;
-    xl: string;
+}
+
+/**
+ * Event source configuration
+ */
+export interface EventSourceConfig {
+  /** Service name */
+  serviceName?: string;
+  
+  /** Table name */
+  tableName?: string;
+  
+  /** API endpoint */
+  endpoint?: string;
+  
+  /** Filter parameters */
+  filters?: Record<string, any>;
+  
+  /** Search fields */
+  searchFields?: string[];
+  
+  /** Sort configuration */
+  sort?: {
+    field: string;
+    direction: 'asc' | 'desc';
   };
-  borderRadius: {
-    sm: string;
-    md: string;
-    lg: string;
-  };
-  typography: {
-    fontSize: Record<ComponentSize, string>;
-    fontWeight: {
-      normal: string;
-      medium: string;
-      semibold: string;
-      bold: string;
-    };
+  
+  /** Pagination */
+  pagination?: {
+    limit: number;
+    offset?: number;
   };
 }
 
 /**
- * Accessibility configuration
+ * Event option interface
  */
-export interface AccessibilityConfig {
-  // Screen reader support
-  announceChanges?: boolean;
-  announceErrors?: boolean;
+export interface EventOption extends SelectOption {
+  /** Event category */
+  category?: string;
   
-  // Keyboard navigation
-  keyboardNavigable?: boolean;
-  tabIndex?: number;
+  /** Event type */
+  eventType?: string;
   
-  // Focus management
-  autoFocus?: boolean;
-  focusOnError?: boolean;
+  /** Event metadata */
+  metadata?: Record<string, any>;
   
-  // ARIA attributes
-  role?: string;
-  ariaLabel?: string;
-  ariaDescribedBy?: string;
-  ariaLabelledBy?: string;
+  /** Event parameters */
+  parameters?: Array<{
+    name: string;
+    type: string;
+    required: boolean;
+  }>;
+}
+
+/**
+ * Event filter configuration
+ */
+export interface EventFilter {
+  /** Filter field */
+  field: string;
   
-  // High contrast support
-  highContrastMode?: boolean;
+  /** Filter operator */
+  operator: 'equals' | 'contains' | 'startsWith' | 'in';
   
-  // Reduced motion support
-  respectReducedMotion?: boolean;
-}
-
-// ============================================================================
-// Component Union Types
-// ============================================================================
-
-/**
- * Union type for all dynamic field props based on type
- */
-export type DynamicFieldProps<TFieldValues extends FieldValues = FieldValues> = 
-  & DynamicFieldFormProps<TFieldValues>
-  & (
-    | TextFieldProps
-    | NumberFieldProps
-    | TextAreaFieldProps
-    | BooleanFieldProps
-    | SelectFieldProps
-    | FileFieldProps
-    | EventFieldProps
-  );
-
-/**
- * Dynamic field component ref interface
- */
-export interface DynamicFieldRef {
-  focus: () => void;
-  blur: () => void;
-  clear: () => void;
-  validate: () => Promise<boolean>;
-  getValue: () => DynamicFieldValue;
-  setValue: (value: DynamicFieldValue) => void;
-}
-
-// ============================================================================
-// Event Handler Types
-// ============================================================================
-
-/**
- * Field event handlers
- */
-export interface DynamicFieldEventHandlers {
-  onChange?: (value: DynamicFieldValue, name: string) => void;
-  onBlur?: (event: FocusEvent, name: string) => void;
-  onFocus?: (event: FocusEvent, name: string) => void;
-  onKeyDown?: (event: KeyboardEvent, name: string) => void;
-  onKeyUp?: (event: KeyboardEvent, name: string) => void;
-  onValidation?: (isValid: boolean, errors: string[], name: string) => void;
+  /** Filter value */
+  value: any;
+  
+  /** Filter label */
+  label?: string;
 }
 
 /**
- * File upload event handlers
+ * Field validation configuration
  */
-export interface FileUploadEventHandlers {
-  onFileSelect?: (files: File[]) => void;
-  onFileRemove?: (file: File | string) => void;
-  onFileError?: (error: FileUploadError) => void;
-  onUploadProgress?: (progress: number) => void;
-  onUploadComplete?: (result: FileUploadResult) => void;
+export interface FieldValidationConfig extends FieldValidation {
+  /** Async validation function */
+  asyncValidator?: (value: AnyFieldValue) => Promise<string | undefined>;
+  
+  /** Cross-field validation */
+  dependsOn?: string[];
+  
+  /** Validation trigger */
+  trigger?: 'change' | 'blur' | 'submit';
+  
+  /** Debounce delay for async validation */
+  debounce?: number;
 }
 
 /**
- * File upload error structure
+ * Conditional logic configuration
  */
-export interface FileUploadError {
-  code: string;
-  message: string;
-  file?: File;
-  details?: Record<string, unknown>;
+export interface ConditionalConfig {
+  /** Conditions to evaluate */
+  conditions: Array<{
+    /** Field to check */
+    field: string;
+    
+    /** Comparison operator */
+    operator: 'equals' | 'notEquals' | 'contains' | 'isEmpty' | 'isNotEmpty';
+    
+    /** Value to compare against */
+    value: any;
+  }>;
+  
+  /** Logic operator */
+  logic?: 'AND' | 'OR';
+  
+  /** Action to take when conditions are met */
+  action: 'show' | 'hide' | 'enable' | 'disable' | 'require';
+  
+  /** Animation settings */
+  animation?: {
+    duration: number;
+    easing: string;
+  };
 }
 
 /**
- * File upload result structure
+ * Field theme configuration
  */
-export interface FileUploadResult {
-  success: boolean;
-  file: File;
-  url?: string;
-  metadata?: Record<string, unknown>;
+export interface FieldThemeConfig {
+  /** Primary color */
+  primaryColor?: string;
+  
+  /** Error color */
+  errorColor?: string;
+  
+  /** Success color */
+  successColor?: string;
+  
+  /** Border radius */
+  borderRadius?: string;
+  
+  /** Focus ring configuration */
+  focusRing?: {
+    color: string;
+    width: string;
+    offset: string;
+  };
+  
+  /** Custom CSS variables */
+  cssVariables?: Record<string, string>;
+}
+
+/**
+ * Custom component overrides
+ */
+export interface CustomComponentOverrides {
+  /** Custom input component */
+  Input?: ComponentType<any>;
+  
+  /** Custom textarea component */
+  Textarea?: ComponentType<any>;
+  
+  /** Custom select component */
+  Select?: ComponentType<any>;
+  
+  /** Custom checkbox component */
+  Checkbox?: ComponentType<any>;
+  
+  /** Custom file upload component */
+  FileUpload?: ComponentType<any>;
+  
+  /** Custom label component */
+  Label?: ComponentType<any>;
+  
+  /** Custom error message component */
+  ErrorMessage?: ComponentType<any>;
+  
+  /** Custom help text component */
+  HelpText?: ComponentType<any>;
 }
 
 // ============================================================================
-// Utility Types
+// SCHEMA INTEGRATION TYPES
 // ============================================================================
 
 /**
- * Extract field value type based on field type
+ * Configuration schema interface for backward compatibility
+ * Maintains compatibility with existing DreamFactory service definitions
  */
-export type ExtractFieldValue<T extends DynamicFieldType> = 
-  T extends 'string' | 'password' | 'text' ? string :
-  T extends 'integer' ? number :
-  T extends 'boolean' ? boolean :
-  T extends 'picklist' | 'event_picklist' ? string :
-  T extends 'multi_picklist' ? string[] :
-  T extends 'file_certificate' ? FileValue :
-  T extends 'file_certificate_api' ? FileValue :
+export interface ConfigSchema {
+  /** Schema version */
+  version: string;
+  
+  /** Schema title */
+  title: string;
+  
+  /** Schema description */
+  description?: string;
+  
+  /** Field definitions */
+  fields: FieldConfig[];
+  
+  /** Field groups */
+  groups?: Array<{
+    id: string;
+    title: string;
+    description?: string;
+    fields: string[];
+    collapsible?: boolean;
+    defaultExpanded?: boolean;
+  }>;
+  
+  /** Form layout */
+  layout?: {
+    type: 'single' | 'two-column' | 'grid';
+    spacing?: ComponentSize;
+    responsive?: boolean;
+  };
+  
+  /** Validation schema */
+  validation?: z.ZodSchema;
+  
+  /** Default values */
+  defaults?: Record<string, AnyFieldValue>;
+  
+  /** Metadata */
+  metadata?: Record<string, any>;
+}
+
+/**
+ * Schema field mapping for database schema integration
+ */
+export interface SchemaFieldMapping {
+  /** Original schema field */
+  schemaField: SchemaField;
+  
+  /** Dynamic field configuration */
+  fieldConfig: FieldConfig;
+  
+  /** Mapping rules */
+  mappingRules: {
+    /** Type conversion rules */
+    typeMapping: Record<string, DynamicFieldType>;
+    
+    /** Default value conversion */
+    defaultValueMapping?: (value: any) => AnyFieldValue;
+    
+    /** Validation mapping */
+    validationMapping?: (validation: FieldValidation) => FieldValidationConfig;
+  };
+}
+
+// ============================================================================
+// ZOD VALIDATION SCHEMAS
+// ============================================================================
+
+/**
+ * Zod schema for field validation configuration
+ */
+export const FieldValidationConfigSchema = z.object({
+  required: z.boolean().optional(),
+  minLength: z.number().min(0).optional(),
+  maxLength: z.number().min(1).optional(),
+  pattern: z.string().optional(),
+  min: z.number().optional(),
+  max: z.number().optional(),
+  enum: z.array(z.string()).optional(),
+  format: z.string().optional(),
+  customValidator: z.string().optional(),
+  messages: z.object({
+    required: z.string().optional(),
+    minLength: z.string().optional(),
+    maxLength: z.string().optional(),
+    pattern: z.string().optional(),
+    min: z.string().optional(),
+    max: z.string().optional(),
+    format: z.string().optional(),
+    custom: z.string().optional(),
+  }).optional(),
+  validateOnChange: z.boolean().optional(),
+  validateOnBlur: z.boolean().optional(),
+  debounceMs: z.number().min(0).optional(),
+  asyncValidator: z.function().optional(),
+  dependsOn: z.array(z.string()).optional(),
+  trigger: z.enum(['change', 'blur', 'submit']).optional(),
+  debounce: z.number().min(0).optional(),
+});
+
+/**
+ * Zod schema for base field configuration
+ */
+export const BaseFieldConfigSchema = z.object({
+  name: z.string().min(1),
+  type: z.enum(['string', 'integer', 'password', 'text', 'boolean', 'picklist', 'multi_picklist', 'file_certificate', 'file_certificate_api', 'event_picklist']),
+  label: z.string().min(1),
+  description: z.string().optional(),
+  placeholder: z.string().optional(),
+  required: z.boolean().optional(),
+  disabled: z.boolean().optional(),
+  readonly: z.boolean().optional(),
+  hidden: z.boolean().optional(),
+  defaultValue: z.any().optional(),
+  validation: FieldValidationConfigSchema.optional(),
+  conditional: z.object({
+    conditions: z.array(z.object({
+      field: z.string(),
+      operator: z.enum(['equals', 'notEquals', 'contains', 'isEmpty', 'isNotEmpty']),
+      value: z.any(),
+    })),
+    logic: z.enum(['AND', 'OR']).optional(),
+    action: z.enum(['show', 'hide', 'enable', 'disable', 'require']),
+    animation: z.object({
+      duration: z.number(),
+      easing: z.string(),
+    }).optional(),
+  }).optional(),
+  helpText: z.string().optional(),
+  className: z.string().optional(),
+  'data-testid': z.string().optional(),
+});
+
+/**
+ * Zod schema for complete configuration schema
+ */
+export const ConfigSchemaSchema = z.object({
+  version: z.string(),
+  title: z.string().min(1),
+  description: z.string().optional(),
+  fields: z.array(z.any()), // Will be refined based on specific field types
+  groups: z.array(z.object({
+    id: z.string(),
+    title: z.string(),
+    description: z.string().optional(),
+    fields: z.array(z.string()),
+    collapsible: z.boolean().optional(),
+    defaultExpanded: z.boolean().optional(),
+  })).optional(),
+  layout: z.object({
+    type: z.enum(['single', 'two-column', 'grid']),
+    spacing: z.enum(['xs', 'sm', 'md', 'lg', 'xl']).optional(),
+    responsive: z.boolean().optional(),
+  }).optional(),
+  validation: z.any().optional(), // ZodSchema
+  defaults: z.record(z.any()).optional(),
+  metadata: z.record(z.any()).optional(),
+});
+
+// ============================================================================
+// UTILITY TYPES
+// ============================================================================
+
+/**
+ * Extract field configuration by type
+ */
+export type ExtractFieldConfig<T extends DynamicFieldType> = 
+  T extends 'string' ? StringFieldConfig :
+  T extends 'integer' ? IntegerFieldConfig :
+  T extends 'password' ? PasswordFieldConfig :
+  T extends 'text' ? TextFieldConfig :
+  T extends 'boolean' ? BooleanFieldConfig :
+  T extends 'picklist' ? PicklistFieldConfig :
+  T extends 'multi_picklist' ? MultiPicklistFieldConfig :
+  T extends 'file_certificate' ? FileCertificateFieldConfig :
+  T extends 'file_certificate_api' ? FileCertificateApiFieldConfig :
+  T extends 'event_picklist' ? EventPicklistFieldConfig :
   never;
 
 /**
- * Make certain properties required
+ * Type-safe field value getter
  */
-export type RequiredProps<T, K extends keyof T> = T & Required<Pick<T, K>>;
+export type FieldValueGetter<T extends DynamicFieldType> = (config: ExtractFieldConfig<T>) => DynamicFieldValue<T>;
 
 /**
- * Partial configuration for optional field setup
+ * Type-safe field value setter
  */
-export type PartialConfig<T> = Partial<T> & Pick<T, 'name' | 'type'>;
-
-// ============================================================================
-// Default Export Type
-// ============================================================================
+export type FieldValueSetter<T extends DynamicFieldType> = (
+  config: ExtractFieldConfig<T>, 
+  value: DynamicFieldValue<T>
+) => void;
 
 /**
- * Main dynamic field component type export
+ * Field change event type
  */
-export interface DynamicFieldComponent<TFieldValues extends FieldValues = FieldValues> {
-  (props: DynamicFieldProps<TFieldValues>): JSX.Element;
-  displayName?: string;
+export interface FieldChangeEvent<T extends DynamicFieldType = DynamicFieldType> {
+  /** Field name */
+  name: string;
+  
+  /** Field type */
+  type: T;
+  
+  /** New value */
+  value: DynamicFieldValue<T>;
+  
+  /** Previous value */
+  previousValue?: DynamicFieldValue<T>;
+  
+  /** Validation result */
+  isValid: boolean;
+  
+  /** Validation error */
+  error?: string;
 }
 
-// Re-export commonly used React Hook Form types for convenience
-export type {
-  UseFormRegister,
-  Control,
-  FieldError,
-  FieldValues,
-  FieldPath,
-  RegisterOptions,
-  ControllerProps
-} from 'react-hook-form';
+/**
+ * Type guard to check field type
+ */
+export const isFieldType = <T extends DynamicFieldType>(
+  config: FieldConfig,
+  type: T
+): config is ExtractFieldConfig<T> => {
+  return config.type === type;
+};
 
-// Re-export Zod types for validation
-export type { ZodSchema, ZodType } from 'zod';
+/**
+ * Type guard to check if field supports multiple values
+ */
+export const isMultiValueField = (type: DynamicFieldType): boolean => {
+  return type === 'multi_picklist';
+};
+
+/**
+ * Type guard to check if field supports file upload
+ */
+export const isFileField = (type: DynamicFieldType): boolean => {
+  return type === 'file_certificate' || type === 'file_certificate_api';
+};
+
+/**
+ * Type guard to check if field supports remote data
+ */
+export const isRemoteField = (type: DynamicFieldType): boolean => {
+  return type === 'picklist' || type === 'multi_picklist' || type === 'event_picklist';
+};
+
+// ============================================================================
+// EXPORT TYPES
+// ============================================================================
+
+export type {
+  // Main interfaces
+  DynamicFieldProps,
+  FieldConfig,
+  ConfigSchema,
+  
+  // Field configurations
+  StringFieldConfig,
+  IntegerFieldConfig,
+  PasswordFieldConfig,
+  TextFieldConfig,
+  BooleanFieldConfig,
+  PicklistFieldConfig,
+  MultiPicklistFieldConfig,
+  FileCertificateFieldConfig,
+  FileCertificateApiFieldConfig,
+  EventPicklistFieldConfig,
+  
+  // Supporting types
+  FieldValidationConfig,
+  ConditionalConfig,
+  EventSourceConfig,
+  EventOption,
+  RemoteDataConfig,
+  FileValidationConfig,
+  
+  // React Hook Form integration
+  ReactHookFormProps,
+  AccessibilityProps,
+  
+  // Utility types
+  ExtractFieldConfig,
+  FieldChangeEvent,
+  FieldValueGetter,
+  FieldValueSetter,
+};
