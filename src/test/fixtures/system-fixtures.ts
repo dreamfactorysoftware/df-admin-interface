@@ -1,803 +1,1256 @@
 /**
- * System configuration fixture factory functions that generate realistic system settings 
- * and environment data for testing React components and Next.js middleware.
+ * System Configuration Fixture Factory Functions
  * 
- * These factories provide comprehensive test data for system management interfaces,
- * environment configuration, email templates, CORS settings, and caching configurations.
+ * Provides comprehensive factory functions for creating realistic system settings
+ * and environment data for testing React components and Next.js middleware.
+ * These fixtures support testing of system management interfaces, configuration
+ * workflows, and deployment scenarios per Feature F-007 specifications.
+ * 
+ * @fileoverview System configuration test fixtures
+ * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-import { faker } from '@faker-js/faker';
+import {
+  Environment,
+  System,
+  SystemInfo,
+  ServerInfo,
+  AuthenticationConfig,
+  ADLDAPConfig,
+  OAuthConfig,
+  SAMLConfig,
+  EmailConfig,
+  CORSConfig,
+  LookupKey,
+  CacheConfig,
+  SystemHealth,
+  ComponentHealth,
+  PerformanceMetrics,
+  SystemOperationResult,
+  SystemConfigUpdate,
+  LicenseValidationResponse,
+  SystemResource,
+  DEFAULT_ENVIRONMENT,
+  DEFAULT_SYSTEM,
+} from '../../types/system';
 
-// ===================
-// Type Definitions
-// ===================
-
-export interface SystemConfig {
-  id: string;
-  environment: 'development' | 'staging' | 'production';
-  version: string;
-  debug: boolean;
-  logLevel: 'error' | 'warn' | 'info' | 'debug';
-  apiVersion: string;
-  maxRequestSize: number;
-  timeZone: string;
-  locale: string;
-  features: Record<string, boolean>;
-  maintenance: {
-    enabled: boolean;
-    message?: string;
-    allowedIps?: string[];
-  };
-  performance: {
-    enableCaching: boolean;
-    cacheTimeout: number;
-    enableCompression: boolean;
-    enableMinification: boolean;
-  };
-}
-
-export interface EnvironmentConfig {
-  NODE_ENV: string;
-  NEXT_PUBLIC_API_URL: string;
-  NEXT_PUBLIC_VERSION: string;
-  NEXT_PUBLIC_DEBUG: string;
-  API_BASE_URL: string;
-  SESSION_SECRET: string;
-  ANALYTICS_ID?: string;
-  SENTRY_DSN?: string;
-  DATABASE_URL?: string;
-  REDIS_URL?: string;
-  LOG_LEVEL: string;
-  ENABLE_TELEMETRY: string;
-  CDN_URL?: string;
-  UPLOAD_MAX_SIZE: string;
-}
-
-export interface GlobalLookupKey {
-  id: string;
-  key: string;
-  value: string;
-  description: string;
-  category: 'system' | 'ui' | 'api' | 'security' | 'performance';
-  isActive: boolean;
-  isReadonly: boolean;
-  dataType: 'string' | 'number' | 'boolean' | 'json';
-  validationRule?: string;
-  defaultValue?: string;
-  lastModified: string;
-  modifiedBy: string;
-}
-
-export interface EmailTemplate {
-  id: string;
-  name: string;
-  subject: string;
-  bodyText: string;
-  bodyHtml: string;
-  type: 'welcome' | 'password_reset' | 'invitation' | 'notification' | 'alert';
-  isActive: boolean;
-  variables: string[];
-  createdDate: string;
-  modifiedDate: string;
-  createdBy: string;
-  modifiedBy: string;
-}
-
-export interface SmtpConfig {
-  id: string;
-  host: string;
-  port: number;
-  secure: boolean;
-  username: string;
-  password: string;
-  fromEmail: string;
-  fromName: string;
-  replyToEmail?: string;
-  maxConnections: number;
-  rateDelta: number;
-  rateLimit: number;
-  isActive: boolean;
-  testMode: boolean;
-}
-
-export interface CorsConfig {
-  id: string;
-  enabled: boolean;
-  allowedOrigins: string[];
-  allowedMethods: string[];
-  allowedHeaders: string[];
-  exposedHeaders: string[];
-  allowCredentials: boolean;
-  maxAge: number;
-  preflightContinue: boolean;
-  optionsSuccessStatus: number;
-  isActive: boolean;
-  description?: string;
-}
-
-export interface CacheConfig {
-  id: string;
-  provider: 'memory' | 'redis' | 'file' | 'database';
-  enabled: boolean;
-  defaultTtl: number;
-  maxKeys: number;
-  keyPrefix: string;
-  compression: {
-    enabled: boolean;
-    algorithm: 'gzip' | 'deflate' | 'br';
-  };
-  persistence: {
-    enabled: boolean;
-    interval: number;
-  };
-  statistics: {
-    hits: number;
-    misses: number;
-    hitRatio: number;
-    keyCount: number;
-    memoryUsage: number;
-  };
-  config: Record<string, any>;
-}
-
-export interface SystemInfo {
-  id: string;
-  timestamp: string;
-  platform: string;
-  serverName: string;
-  version: {
-    application: string;
-    framework: string;
-    node: string;
-    platform: string;
-  };
-  resources: {
-    memory: {
-      total: number;
-      used: number;
-      free: number;
-      percentage: number;
-    };
-    disk: {
-      total: number;
-      used: number;
-      free: number;
-      percentage: number;
-    };
-    cpu: {
-      cores: number;
-      usage: number;
-      loadAverage: number[];
-    };
-  };
-  database: {
-    connected: boolean;
-    version?: string;
-    connectionCount: number;
-    maxConnections: number;
-  };
-  uptime: number;
-  environment: string;
-  debugMode: boolean;
-}
-
-export interface HealthCheck {
-  id: string;
-  timestamp: string;
-  status: 'healthy' | 'degraded' | 'unhealthy';
-  services: {
-    name: string;
-    status: 'up' | 'down' | 'degraded';
-    responseTime: number;
-    lastCheck: string;
-    message?: string;
-  }[];
-  overallHealth: {
-    score: number;
-    status: 'healthy' | 'degraded' | 'unhealthy';
-    message: string;
-  };
-  checks: {
-    database: boolean;
-    cache: boolean;
-    storage: boolean;
-    email: boolean;
-    external_apis: boolean;
-  };
-}
-
-// ===================
-// Factory Options
-// ===================
-
-export interface SystemConfigFactoryOptions {
-  environment?: 'development' | 'staging' | 'production';
-  debug?: boolean;
-  features?: Record<string, boolean>;
-  maintenanceMode?: boolean;
-  version?: string;
-}
-
-export interface EnvironmentConfigFactoryOptions {
-  environment?: string;
-  enableDebug?: boolean;
-  includeOptional?: boolean;
-  apiUrl?: string;
-}
-
-export interface GlobalLookupFactoryOptions {
-  category?: 'system' | 'ui' | 'api' | 'security' | 'performance';
-  count?: number;
-  includeInactive?: boolean;
-  includeReadonly?: boolean;
-}
-
-export interface EmailTemplateFactoryOptions {
-  type?: 'welcome' | 'password_reset' | 'invitation' | 'notification' | 'alert';
-  includeInactive?: boolean;
-  withHtml?: boolean;
-}
-
-export interface CorsConfigFactoryOptions {
-  enabled?: boolean;
-  restrictive?: boolean;
-  includeCredentials?: boolean;
-}
-
-export interface CacheConfigFactoryOptions {
-  provider?: 'memory' | 'redis' | 'file' | 'database';
-  enabled?: boolean;
-  withStatistics?: boolean;
-}
-
-export interface SystemInfoFactoryOptions {
-  includeResources?: boolean;
-  highLoad?: boolean;
-  connectedDatabase?: boolean;
-}
-
-export interface HealthCheckFactoryOptions {
-  status?: 'healthy' | 'degraded' | 'unhealthy';
-  failingServices?: string[];
-  includeAllServices?: boolean;
-}
-
-// ===================
-// Factory Functions
-// ===================
+// =============================================================================
+// SYSTEM CONFIGURATION FACTORY FUNCTIONS
+// =============================================================================
 
 /**
- * Creates system-wide configuration settings with environment-specific values
+ * Creates comprehensive system-wide configuration settings with environment-specific values
+ * Supports testing of system management interfaces and configuration workflows
  */
-export function systemConfigFactory(
-  options: SystemConfigFactoryOptions = {}
-): SystemConfig {
-  const {
-    environment = faker.helpers.arrayElement(['development', 'staging', 'production']),
-    debug = environment === 'development',
-    features = {},
-    maintenanceMode = false,
-    version = faker.system.semver()
-  } = options;
-
-  return {
-    id: faker.string.uuid(),
-    environment,
-    version,
-    debug,
-    logLevel: debug ? 'debug' : 'info',
-    apiVersion: 'v2',
-    maxRequestSize: faker.number.int({ min: 1024 * 1024, max: 10 * 1024 * 1024 }), // 1MB to 10MB
-    timeZone: faker.location.timeZone(),
-    locale: faker.location.countryCode(),
-    features: {
-      enableAnalytics: faker.datatype.boolean(),
-      enableMetrics: faker.datatype.boolean(),
-      enableTelemetry: environment !== 'development',
-      enableDebugLogging: debug,
-      enableApiDocs: true,
-      enableSwagger: true,
-      enableCors: true,
-      enableRateLimit: environment === 'production',
-      ...features
+export const systemConfigFactory = (
+  environment: 'development' | 'staging' | 'production' = 'development',
+  overrides: Partial<Environment> = {}
+): Environment => {
+  const environmentConfigs = {
+    development: {
+      authentication: {
+        allowOpenRegistration: true,
+        openRegEmailServiceId: 1,
+        allowForeverSessions: true,
+        loginAttribute: 'email',
+        adldap: [],
+        oauth: [
+          createOAuthConfig({
+            name: 'google-dev',
+            label: 'Google OAuth (Development)',
+            type: 'google',
+            config: {
+              client_id: 'dev-google-client-id',
+              client_secret: 'dev-google-client-secret',
+              redirect_url: 'http://localhost:3000/auth/google/callback',
+              scope: ['openid', 'email', 'profile'],
+            },
+          }),
+        ],
+        saml: [],
+      } as AuthenticationConfig,
+      server: {
+        host: 'localhost',
+        machine: 'dev-machine-001',
+        release: 'Ubuntu 22.04 LTS',
+        serverOs: 'Linux',
+        version: '5.0.0-dev',
+        uptime: 3600,
+        hosted: false,
+      } as ServerInfo,
+      license: false, // Open source development
     },
-    maintenance: {
-      enabled: maintenanceMode,
-      message: maintenanceMode ? faker.lorem.sentence() : undefined,
-      allowedIps: maintenanceMode ? [faker.internet.ip(), faker.internet.ip()] : undefined
+    staging: {
+      authentication: {
+        allowOpenRegistration: false,
+        openRegEmailServiceId: 2,
+        allowForeverSessions: false,
+        loginAttribute: 'email',
+        adldap: [
+          createADLDAPConfig({
+            name: 'company-ldap',
+            label: 'Company LDAP',
+            config: {
+              host: 'ldap.staging.company.com',
+              port: 389,
+              base_dn: 'DC=staging,DC=company,DC=com',
+              account_suffix: '@staging.company.com',
+              username: 'uid',
+              password: 'password',
+            },
+          }),
+        ],
+        oauth: [
+          createOAuthConfig({
+            name: 'google-staging',
+            label: 'Google OAuth (Staging)',
+            type: 'google',
+            config: {
+              client_id: 'staging-google-client-id',
+              client_secret: 'staging-google-client-secret',
+              redirect_url: 'https://staging.company.com/auth/google/callback',
+              scope: ['openid', 'email', 'profile'],
+            },
+          }),
+        ],
+        saml: [],
+      } as AuthenticationConfig,
+      server: {
+        host: 'staging.company.com',
+        machine: 'staging-web-001',
+        release: 'Ubuntu 22.04 LTS',
+        serverOs: 'Linux',
+        version: '5.0.0-staging',
+        uptime: 86400,
+        hosted: true,
+      } as ServerInfo,
+      license: 'STAGING-LICENSE-KEY-12345',
     },
-    performance: {
-      enableCaching: environment === 'production',
-      cacheTimeout: faker.number.int({ min: 300, max: 3600 }), // 5 minutes to 1 hour
-      enableCompression: environment === 'production',
-      enableMinification: environment === 'production'
-    }
+    production: {
+      authentication: {
+        allowOpenRegistration: false,
+        openRegEmailServiceId: 3,
+        allowForeverSessions: false,
+        loginAttribute: 'email',
+        adldap: [
+          createADLDAPConfig({
+            name: 'enterprise-ad',
+            label: 'Enterprise Active Directory',
+            config: {
+              host: 'ad.company.com',
+              port: 636,
+              base_dn: 'DC=company,DC=com',
+              account_suffix: '@company.com',
+              username: 'sAMAccountName',
+              password: 'password',
+            },
+          }),
+        ],
+        oauth: [
+          createOAuthConfig({
+            name: 'azure-ad',
+            label: 'Azure Active Directory',
+            type: 'azure',
+            config: {
+              client_id: 'prod-azure-client-id',
+              client_secret: 'prod-azure-client-secret',
+              redirect_url: 'https://api.company.com/auth/azure/callback',
+              scope: ['openid', 'email', 'profile'],
+              authority: 'https://login.microsoftonline.com/tenant-id',
+            },
+          }),
+        ],
+        saml: [
+          createSAMLConfig({
+            name: 'okta-saml',
+            label: 'Okta SAML',
+            config: {
+              idp_entity_id: 'http://www.okta.com/exk1234567890',
+              sso_service_url: 'https://company.okta.com/app/company_dreamfactory_1/exk1234567890/sso/saml',
+              sls_service_url: 'https://company.okta.com/app/company_dreamfactory_1/exk1234567890/sls/saml',
+              x509_cert: '-----BEGIN CERTIFICATE-----\nMIIC...CERTIFICATE_DATA_HERE...==\n-----END CERTIFICATE-----',
+            },
+          }),
+        ],
+      } as AuthenticationConfig,
+      server: {
+        host: 'api.company.com',
+        machine: 'prod-api-cluster-001',
+        release: 'Ubuntu 22.04 LTS',
+        serverOs: 'Linux',
+        version: '5.0.0',
+        uptime: 2592000, // 30 days
+        hosted: true,
+      } as ServerInfo,
+      license: 'PROD-ENTERPRISE-LICENSE-ABCDEF123456',
+    },
   };
-}
+
+  const baseConfig = {
+    ...DEFAULT_ENVIRONMENT,
+    ...environmentConfigs[environment],
+  };
+
+  return { ...baseConfig, ...overrides };
+};
 
 /**
  * Creates Next.js environment variable configurations for testing runtime settings
+ * and deployment scenarios
  */
-export function environmentConfigFactory(
-  options: EnvironmentConfigFactoryOptions = {}
-): EnvironmentConfig {
-  const {
-    environment = 'development',
-    enableDebug = environment === 'development',
-    includeOptional = true,
-    apiUrl = 'http://localhost:80'
-  } = options;
-
-  const config: EnvironmentConfig = {
-    NODE_ENV: environment,
-    NEXT_PUBLIC_API_URL: `${apiUrl}/api/v2`,
-    NEXT_PUBLIC_VERSION: faker.system.semver(),
-    NEXT_PUBLIC_DEBUG: enableDebug.toString(),
-    API_BASE_URL: `${apiUrl}/api/v2`,
-    SESSION_SECRET: faker.string.alphanumeric(32),
-    LOG_LEVEL: enableDebug ? 'debug' : 'info',
-    ENABLE_TELEMETRY: (environment === 'production').toString(),
-    UPLOAD_MAX_SIZE: faker.helpers.arrayElement(['5MB', '10MB', '50MB', '100MB'])
-  };
-
-  if (includeOptional) {
-    config.ANALYTICS_ID = faker.string.alphanumeric(20);
-    config.SENTRY_DSN = `https://${faker.string.alphanumeric(32)}@sentry.io/${faker.number.int(1000000)}`;
-    config.DATABASE_URL = `postgresql://${faker.internet.userName()}:${faker.internet.password()}@${faker.internet.domainName()}:5432/${faker.database.collation()}`;
-    config.REDIS_URL = `redis://:${faker.internet.password()}@${faker.internet.domainName()}:6379`;
-    config.CDN_URL = `https://${faker.internet.domainName()}`;
-  }
-
-  return config;
-}
-
-/**
- * Creates system lookup keys and global configuration values
- */
-export function globalLookupFactory(
-  options: GlobalLookupFactoryOptions = {}
-): GlobalLookupKey {
-  const {
-    category = faker.helpers.arrayElement(['system', 'ui', 'api', 'security', 'performance']),
-    includeInactive = false,
-    includeReadonly = true
-  } = options;
-
-  const dataType = faker.helpers.arrayElement(['string', 'number', 'boolean', 'json']);
-  
-  let value: string;
-  let defaultValue: string;
-  
-  switch (dataType) {
-    case 'number':
-      value = faker.number.int({ min: 1, max: 1000 }).toString();
-      defaultValue = '0';
-      break;
-    case 'boolean':
-      value = faker.datatype.boolean().toString();
-      defaultValue = 'false';
-      break;
-    case 'json':
-      value = JSON.stringify({ [faker.hacker.noun()]: faker.hacker.phrase() });
-      defaultValue = '{}';
-      break;
-    default:
-      value = faker.hacker.phrase();
-      defaultValue = faker.lorem.word();
-  }
-
-  return {
-    id: faker.string.uuid(),
-    key: `${category.toUpperCase()}_${faker.hacker.noun().toUpperCase()}`,
-    value,
-    description: faker.lorem.sentence(),
-    category,
-    isActive: includeInactive ? faker.datatype.boolean() : true,
-    isReadonly: includeReadonly ? faker.datatype.boolean() : false,
-    dataType,
-    validationRule: dataType === 'number' ? 'min:0,max:1000' : undefined,
-    defaultValue,
-    lastModified: faker.date.recent().toISOString(),
-    modifiedBy: faker.person.fullName()
-  };
-}
-
-/**
- * Creates multiple global lookup keys for testing list scenarios
- */
-export function globalLookupListFactory(
-  options: GlobalLookupFactoryOptions & { count?: number } = {}
-): GlobalLookupKey[] {
-  const { count = faker.number.int({ min: 5, max: 20 }) } = options;
-  
-  return Array.from({ length: count }, () => globalLookupFactory(options));
-}
-
-/**
- * Creates email template configurations for testing notification workflows
- */
-export function emailTemplateFactory(
-  options: EmailTemplateFactoryOptions = {}
-): EmailTemplate {
-  const {
-    type = faker.helpers.arrayElement(['welcome', 'password_reset', 'invitation', 'notification', 'alert']),
-    includeInactive = false,
-    withHtml = true
-  } = options;
-
-  const subject = `${type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}: ${faker.lorem.words(3)}`;
-  const variables = ['{{user.name}}', '{{user.email}}', '{{app.name}}', '{{system.url}}'];
-
-  return {
-    id: faker.string.uuid(),
-    name: `${type}_template_${faker.lorem.word()}`,
-    subject,
-    bodyText: faker.lorem.paragraphs(3),
-    bodyHtml: withHtml ? `<h1>${subject}</h1>\n<p>${faker.lorem.paragraphs(2, '</p>\n<p>')}</p>` : '',
-    type,
-    isActive: includeInactive ? faker.datatype.boolean() : true,
-    variables,
-    createdDate: faker.date.past().toISOString(),
-    modifiedDate: faker.date.recent().toISOString(),
-    createdBy: faker.person.fullName(),
-    modifiedBy: faker.person.fullName()
-  };
-}
-
-/**
- * Creates SMTP configuration for email services
- */
-export function smtpConfigFactory(): SmtpConfig {
-  return {
-    id: faker.string.uuid(),
-    host: faker.helpers.arrayElement(['smtp.gmail.com', 'smtp.sendgrid.net', 'smtp.mailgun.org', 'localhost']),
-    port: faker.helpers.arrayElement([25, 465, 587, 2525]),
-    secure: faker.datatype.boolean(),
-    username: faker.internet.email(),
-    password: faker.internet.password(),
-    fromEmail: faker.internet.email(),
-    fromName: faker.company.name(),
-    replyToEmail: faker.internet.email(),
-    maxConnections: faker.number.int({ min: 1, max: 10 }),
-    rateDelta: faker.number.int({ min: 1000, max: 60000 }), // 1 second to 1 minute
-    rateLimit: faker.number.int({ min: 10, max: 100 }),
-    isActive: faker.datatype.boolean(),
-    testMode: faker.datatype.boolean()
-  };
-}
-
-/**
- * Creates CORS policy configurations and security headers
- */
-export function corsConfigFactory(
-  options: CorsConfigFactoryOptions = {}
-): CorsConfig {
-  const {
-    enabled = true,
-    restrictive = false,
-    includeCredentials = true
-  } = options;
-
-  const allowedOrigins = restrictive 
-    ? ['https://localhost:3000', 'https://admin.dreamfactory.com']
-    : ['*'];
-
-  return {
-    id: faker.string.uuid(),
-    enabled,
-    allowedOrigins,
-    allowedMethods: restrictive 
-      ? ['GET', 'POST'] 
-      : ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: [
-      'Origin',
-      'X-Requested-With',
-      'Content-Type',
-      'Accept',
-      'Authorization',
-      'X-DreamFactory-API-Key',
-      'X-DreamFactory-Session-Token'
-    ],
-    exposedHeaders: ['X-Total-Count', 'X-Response-Time'],
-    allowCredentials: includeCredentials,
-    maxAge: faker.number.int({ min: 3600, max: 86400 }), // 1 hour to 1 day
-    preflightContinue: false,
-    optionsSuccessStatus: 204,
-    isActive: enabled,
-    description: faker.lorem.sentence()
-  };
-}
-
-/**
- * Creates system caching configurations and performance settings
- */
-export function cacheConfigFactory(
-  options: CacheConfigFactoryOptions = {}
-): CacheConfig {
-  const {
-    provider = faker.helpers.arrayElement(['memory', 'redis', 'file', 'database']),
-    enabled = true,
-    withStatistics = true
-  } = options;
-
-  const hits = faker.number.int({ min: 1000, max: 100000 });
-  const misses = faker.number.int({ min: 100, max: 10000 });
-
-  return {
-    id: faker.string.uuid(),
-    provider,
-    enabled,
-    defaultTtl: faker.number.int({ min: 300, max: 3600 }), // 5 minutes to 1 hour
-    maxKeys: faker.number.int({ min: 1000, max: 100000 }),
-    keyPrefix: `df_cache_${faker.lorem.word()}_`,
-    compression: {
-      enabled: faker.datatype.boolean(),
-      algorithm: faker.helpers.arrayElement(['gzip', 'deflate', 'br'])
+export const environmentConfigFactory = (
+  environment: 'development' | 'staging' | 'production' = 'development',
+  overrides: Record<string, string> = {}
+): Record<string, string> => {
+  const environmentConfigs = {
+    development: {
+      NODE_ENV: 'development',
+      NEXT_PUBLIC_API_URL: 'http://localhost:8000/api/v2',
+      NEXT_PUBLIC_APP_URL: 'http://localhost:3000',
+      NEXT_PUBLIC_WS_URL: 'ws://localhost:8000',
+      DATABASE_URL: 'mysql://root:password@localhost:3306/dreamfactory_dev',
+      REDIS_URL: 'redis://localhost:6379',
+      SESSION_SECRET: 'dev-session-secret-12345',
+      JWT_SECRET: 'dev-jwt-secret-67890',
+      SMTP_HOST: 'localhost',
+      SMTP_PORT: '1025',
+      SMTP_USER: '',
+      SMTP_PASS: '',
+      LOG_LEVEL: 'debug',
+      CACHE_DRIVER: 'memory',
+      CACHE_TTL: '300',
+      CORS_ORIGINS: 'http://localhost:3000,http://localhost:8000',
+      RATE_LIMIT_ENABLED: 'false',
+      ANALYTICS_ENABLED: 'false',
+      DEBUG_MODE: 'true',
     },
-    persistence: {
-      enabled: provider !== 'memory',
-      interval: faker.number.int({ min: 60, max: 300 }) // 1 to 5 minutes
+    staging: {
+      NODE_ENV: 'staging',
+      NEXT_PUBLIC_API_URL: 'https://staging-api.company.com/api/v2',
+      NEXT_PUBLIC_APP_URL: 'https://staging.company.com',
+      NEXT_PUBLIC_WS_URL: 'wss://staging-api.company.com',
+      DATABASE_URL: 'mysql://df_user:staging_password@staging-db.company.com:3306/dreamfactory_staging',
+      REDIS_URL: 'redis://staging-redis.company.com:6379',
+      SESSION_SECRET: 'staging-session-secret-randomized',
+      JWT_SECRET: 'staging-jwt-secret-randomized',
+      SMTP_HOST: 'smtp.company.com',
+      SMTP_PORT: '587',
+      SMTP_USER: 'noreply@company.com',
+      SMTP_PASS: 'staging-smtp-password',
+      LOG_LEVEL: 'info',
+      CACHE_DRIVER: 'redis',
+      CACHE_TTL: '1800',
+      CORS_ORIGINS: 'https://staging.company.com',
+      RATE_LIMIT_ENABLED: 'true',
+      ANALYTICS_ENABLED: 'true',
+      DEBUG_MODE: 'false',
     },
-    statistics: withStatistics ? {
-      hits,
-      misses,
-      hitRatio: Number((hits / (hits + misses) * 100).toFixed(2)),
-      keyCount: faker.number.int({ min: 100, max: 10000 }),
-      memoryUsage: faker.number.int({ min: 1024 * 1024, max: 100 * 1024 * 1024 }) // 1MB to 100MB
-    } : {
-      hits: 0,
-      misses: 0,
-      hitRatio: 0,
-      keyCount: 0,
-      memoryUsage: 0
+    production: {
+      NODE_ENV: 'production',
+      NEXT_PUBLIC_API_URL: 'https://api.company.com/api/v2',
+      NEXT_PUBLIC_APP_URL: 'https://app.company.com',
+      NEXT_PUBLIC_WS_URL: 'wss://api.company.com',
+      DATABASE_URL: 'mysql://df_prod_user:${DB_PASSWORD}@prod-db-cluster.company.com:3306/dreamfactory_prod',
+      REDIS_URL: 'redis://prod-redis-cluster.company.com:6379',
+      SESSION_SECRET: '${SESSION_SECRET}',
+      JWT_SECRET: '${JWT_SECRET}',
+      SMTP_HOST: 'smtp.company.com',
+      SMTP_PORT: '587',
+      SMTP_USER: 'noreply@company.com',
+      SMTP_PASS: '${SMTP_PASSWORD}',
+      LOG_LEVEL: 'warn',
+      CACHE_DRIVER: 'redis',
+      CACHE_TTL: '3600',
+      CORS_ORIGINS: 'https://app.company.com',
+      RATE_LIMIT_ENABLED: 'true',
+      ANALYTICS_ENABLED: 'true',
+      DEBUG_MODE: 'false',
     },
-    config: provider === 'redis' ? {
-      host: faker.internet.domainName(),
-      port: 6379,
-      password: faker.internet.password(),
-      database: faker.number.int({ min: 0, max: 15 })
-    } : {}
   };
-}
+
+  return { ...environmentConfigs[environment], ...overrides };
+};
 
 /**
- * Creates system information and health check scenarios
+ * Creates system lookup keys and global configuration values for testing
+ * system-wide settings and configuration management
  */
-export function systemInfoFactory(
-  options: SystemInfoFactoryOptions = {}
-): SystemInfo {
-  const {
-    includeResources = true,
-    highLoad = false,
-    connectedDatabase = true
-  } = options;
-
-  const memoryTotal = faker.number.int({ min: 1024 * 1024 * 1024, max: 16 * 1024 * 1024 * 1024 }); // 1GB to 16GB
-  const memoryUsed = highLoad 
-    ? faker.number.int({ min: memoryTotal * 0.8, max: memoryTotal * 0.95 })
-    : faker.number.int({ min: memoryTotal * 0.3, max: memoryTotal * 0.7 });
-
-  const diskTotal = faker.number.int({ min: 100 * 1024 * 1024 * 1024, max: 1024 * 1024 * 1024 * 1024 }); // 100GB to 1TB
-  const diskUsed = faker.number.int({ min: diskTotal * 0.2, max: diskTotal * 0.8 });
-
-  return {
-    id: faker.string.uuid(),
-    timestamp: faker.date.recent().toISOString(),
-    platform: faker.helpers.arrayElement(['linux', 'darwin', 'win32']),
-    serverName: faker.internet.domainName(),
-    version: {
-      application: faker.system.semver(),
-      framework: 'Next.js 15.1.0',
-      node: 'v20.10.0',
-      platform: faker.system.semver()
+export const globalLookupFactory = (overrides: Partial<LookupKey>[] = []): LookupKey[] => {
+  const baseLookupKeys: LookupKey[] = [
+    {
+      id: 1,
+      name: 'app.name',
+      value: 'DreamFactory Admin Interface',
+      description: 'Application display name',
+      private: false,
+      created_date: '2024-01-01T00:00:00.000Z',
+      last_modified_date: '2024-01-01T00:00:00.000Z',
     },
-    resources: includeResources ? {
-      memory: {
-        total: memoryTotal,
-        used: memoryUsed,
-        free: memoryTotal - memoryUsed,
-        percentage: Number((memoryUsed / memoryTotal * 100).toFixed(2))
-      },
-      disk: {
-        total: diskTotal,
-        used: diskUsed,
-        free: diskTotal - diskUsed,
-        percentage: Number((diskUsed / diskTotal * 100).toFixed(2))
-      },
-      cpu: {
-        cores: faker.number.int({ min: 2, max: 16 }),
-        usage: highLoad ? faker.number.float({ min: 80, max: 95 }) : faker.number.float({ min: 10, max: 60 }),
-        loadAverage: Array.from({ length: 3 }, () => 
-          highLoad ? faker.number.float({ min: 2, max: 8 }) : faker.number.float({ min: 0.1, max: 1.5 })
-        )
-      }
-    } : {
-      memory: { total: 0, used: 0, free: 0, percentage: 0 },
-      disk: { total: 0, used: 0, free: 0, percentage: 0 },
-      cpu: { cores: 0, usage: 0, loadAverage: [] }
+    {
+      id: 2,
+      name: 'app.version',
+      value: '5.0.0',
+      description: 'Application version number',
+      private: false,
+      created_date: '2024-01-01T00:00:00.000Z',
+      last_modified_date: '2024-01-01T00:00:00.000Z',
     },
-    database: {
-      connected: connectedDatabase,
-      version: connectedDatabase ? faker.system.semver() : undefined,
-      connectionCount: connectedDatabase ? faker.number.int({ min: 1, max: 50 }) : 0,
-      maxConnections: 100
+    {
+      id: 3,
+      name: 'app.debug',
+      value: 'false',
+      description: 'Enable debug mode',
+      private: false,
+      created_date: '2024-01-01T00:00:00.000Z',
+      last_modified_date: '2024-01-01T00:00:00.000Z',
     },
-    uptime: faker.number.int({ min: 3600, max: 2592000 }), // 1 hour to 30 days
-    environment: faker.helpers.arrayElement(['development', 'staging', 'production']),
-    debugMode: faker.datatype.boolean()
-  };
-}
+    {
+      id: 4,
+      name: 'api.default_limit',
+      value: '100',
+      description: 'Default API response limit',
+      private: false,
+      created_date: '2024-01-01T00:00:00.000Z',
+      last_modified_date: '2024-01-01T00:00:00.000Z',
+    },
+    {
+      id: 5,
+      name: 'api.max_limit',
+      value: '1000',
+      description: 'Maximum API response limit',
+      private: false,
+      created_date: '2024-01-01T00:00:00.000Z',
+      last_modified_date: '2024-01-01T00:00:00.000Z',
+    },
+    {
+      id: 6,
+      name: 'security.session_timeout',
+      value: '3600',
+      description: 'Session timeout in seconds',
+      private: false,
+      created_date: '2024-01-01T00:00:00.000Z',
+      last_modified_date: '2024-01-01T00:00:00.000Z',
+    },
+    {
+      id: 7,
+      name: 'security.password_min_length',
+      value: '8',
+      description: 'Minimum password length',
+      private: false,
+      created_date: '2024-01-01T00:00:00.000Z',
+      last_modified_date: '2024-01-01T00:00:00.000Z',
+    },
+    {
+      id: 8,
+      name: 'security.api_key',
+      value: 'abcdef123456789',
+      description: 'Master API key for system operations',
+      private: true,
+      created_date: '2024-01-01T00:00:00.000Z',
+      last_modified_date: '2024-01-01T00:00:00.000Z',
+    },
+    {
+      id: 9,
+      name: 'smtp.from_name',
+      value: 'DreamFactory Notifications',
+      description: 'Default sender name for emails',
+      private: false,
+      created_date: '2024-01-01T00:00:00.000Z',
+      last_modified_date: '2024-01-01T00:00:00.000Z',
+    },
+    {
+      id: 10,
+      name: 'ui.theme',
+      value: 'light',
+      description: 'Default UI theme',
+      private: false,
+      created_date: '2024-01-01T00:00:00.000Z',
+      last_modified_date: '2024-01-01T00:00:00.000Z',
+    },
+  ];
 
-/**
- * Creates health check scenarios for system monitoring
- */
-export function healthCheckFactory(
-  options: HealthCheckFactoryOptions = {}
-): HealthCheck {
-  const {
-    status = faker.helpers.arrayElement(['healthy', 'degraded', 'unhealthy']),
-    failingServices = [],
-    includeAllServices = true
-  } = options;
-
-  const serviceNames = includeAllServices 
-    ? ['database', 'cache', 'storage', 'email', 'api', 'auth', 'queue']
-    : ['database', 'cache', 'storage'];
-
-  const services = serviceNames.map(name => {
-    const isFailingService = failingServices.includes(name);
-    const serviceStatus = isFailingService 
-      ? faker.helpers.arrayElement(['down', 'degraded'])
-      : status === 'unhealthy' 
-        ? faker.helpers.arrayElement(['up', 'degraded'])
-        : 'up';
-
-    return {
-      name,
-      status: serviceStatus as 'up' | 'down' | 'degraded',
-      responseTime: serviceStatus === 'down' 
-        ? 0 
-        : faker.number.int({ min: 10, max: serviceStatus === 'degraded' ? 5000 : 500 }),
-      lastCheck: faker.date.recent().toISOString(),
-      message: serviceStatus !== 'up' ? faker.lorem.sentence() : undefined
-    };
+  // Apply overrides to existing keys or add new ones
+  const mergedKeys = [...baseLookupKeys];
+  overrides.forEach((override, index) => {
+    if (index < baseLookupKeys.length) {
+      mergedKeys[index] = { ...baseLookupKeys[index], ...override };
+    } else {
+      mergedKeys.push({
+        id: baseLookupKeys.length + index + 1,
+        name: `custom.key.${index}`,
+        value: 'custom_value',
+        description: 'Custom lookup key',
+        private: false,
+        created_date: new Date().toISOString(),
+        last_modified_date: new Date().toISOString(),
+        ...override,
+      });
+    }
   });
 
-  const healthyServices = services.filter(s => s.status === 'up').length;
-  const totalServices = services.length;
-  const healthScore = Math.round((healthyServices / totalServices) * 100);
+  return mergedKeys;
+};
 
-  return {
-    id: faker.string.uuid(),
-    timestamp: faker.date.recent().toISOString(),
-    status,
-    services,
-    overallHealth: {
-      score: healthScore,
-      status,
-      message: status === 'healthy' 
-        ? 'All systems operational'
-        : status === 'degraded'
-          ? 'Some services experiencing issues'
-          : 'Critical system failures detected'
+/**
+ * Creates email template configurations and SMTP settings for testing
+ * notification and communication workflows
+ */
+export const emailTemplateFactory = (
+  template: 'welcome' | 'password_reset' | 'invitation' | 'notification' = 'welcome',
+  overrides: Partial<EmailConfig> = {}
+): EmailConfig => {
+  const templateConfigs = {
+    welcome: {
+      host: 'smtp.gmail.com',
+      port: 587,
+      encryption: 'tls' as const,
+      username: 'noreply@company.com',
+      password: 'app-specific-password',
+      from_address: 'noreply@company.com',
+      from_name: 'Welcome Team',
     },
-    checks: {
-      database: !failingServices.includes('database'),
-      cache: !failingServices.includes('cache'),
-      storage: !failingServices.includes('storage'),
-      email: !failingServices.includes('email'),
-      external_apis: !failingServices.includes('api')
-    }
+    password_reset: {
+      host: 'smtp.sendgrid.net',
+      port: 587,
+      encryption: 'tls' as const,
+      username: 'apikey',
+      password: 'sendgrid-api-key',
+      from_address: 'security@company.com',
+      from_name: 'Security Team',
+    },
+    invitation: {
+      host: 'smtp.mailgun.org',
+      port: 587,
+      encryption: 'tls' as const,
+      username: 'postmaster@mg.company.com',
+      password: 'mailgun-password',
+      from_address: 'invitations@company.com',
+      from_name: 'Invitation Team',
+    },
+    notification: {
+      host: 'localhost',
+      port: 1025,
+      encryption: null,
+      username: '',
+      password: '',
+      from_address: 'notifications@localhost',
+      from_name: 'Local Notifications',
+    },
   };
-}
 
-// ===================
-// Preset Configurations
-// ===================
+  return { ...templateConfigs[template], ...overrides };
+};
 
 /**
- * Creates a complete system configuration for development environment
+ * Creates CORS policy configurations and security headers for testing
+ * API security and cross-origin policy management
  */
-export function developmentSystemPreset(): {
-  systemConfig: SystemConfig;
-  environmentConfig: EnvironmentConfig;
-  corsConfig: CorsConfig;
-  cacheConfig: CacheConfig;
-} {
-  return {
-    systemConfig: systemConfigFactory({ 
-      environment: 'development', 
-      debug: true,
-      maintenanceMode: false
-    }),
-    environmentConfig: environmentConfigFactory({ 
-      environment: 'development', 
-      enableDebug: true 
-    }),
-    corsConfig: corsConfigFactory({ 
-      enabled: true, 
-      restrictive: false 
-    }),
-    cacheConfig: cacheConfigFactory({ 
-      provider: 'memory', 
-      enabled: true 
-    })
+export const corsConfigFactory = (
+  environment: 'development' | 'staging' | 'production' = 'development',
+  overrides: Partial<CORSConfig> = {}
+): CORSConfig => {
+  const environmentConfigs = {
+    development: {
+      origins: [
+        'http://localhost:3000',
+        'http://localhost:8000',
+        'http://127.0.0.1:3000',
+        'http://127.0.0.1:8000',
+      ],
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
+      headers: [
+        'Origin',
+        'Content-Type',
+        'Accept',
+        'Authorization',
+        'X-Requested-With',
+        'X-DreamFactory-API-Key',
+        'X-DreamFactory-Session-Token',
+        'Content-Length',
+        'Accept-Encoding',
+        'X-CSRF-Token',
+      ],
+      credentials: true,
+      maxAge: 86400, // 24 hours
+    },
+    staging: {
+      origins: [
+        'https://staging.company.com',
+        'https://staging-admin.company.com',
+      ],
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      headers: [
+        'Origin',
+        'Content-Type',
+        'Accept',
+        'Authorization',
+        'X-Requested-With',
+        'X-DreamFactory-API-Key',
+        'X-DreamFactory-Session-Token',
+      ],
+      credentials: true,
+      maxAge: 3600, // 1 hour
+    },
+    production: {
+      origins: [
+        'https://app.company.com',
+        'https://admin.company.com',
+      ],
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+      headers: [
+        'Content-Type',
+        'Authorization',
+        'X-DreamFactory-API-Key',
+        'X-DreamFactory-Session-Token',
+      ],
+      credentials: false,
+      maxAge: 600, // 10 minutes
+    },
   };
-}
+
+  return { ...environmentConfigs[environment], ...overrides };
+};
 
 /**
- * Creates a complete system configuration for production environment
+ * Creates system caching configurations and performance settings for testing
+ * cache management and optimization workflows
  */
-export function productionSystemPreset(): {
-  systemConfig: SystemConfig;
-  environmentConfig: EnvironmentConfig;
-  corsConfig: CorsConfig;
-  cacheConfig: CacheConfig;
-} {
-  return {
-    systemConfig: systemConfigFactory({ 
-      environment: 'production', 
-      debug: false,
-      maintenanceMode: false
-    }),
-    environmentConfig: environmentConfigFactory({ 
-      environment: 'production', 
-      enableDebug: false 
-    }),
-    corsConfig: corsConfigFactory({ 
-      enabled: true, 
-      restrictive: true,
-      includeCredentials: true
-    }),
-    cacheConfig: cacheConfigFactory({ 
-      provider: 'redis', 
+export const cacheConfigFactory = (
+  driver: 'memory' | 'redis' | 'memcached' | 'file' = 'memory',
+  overrides: Partial<CacheConfig> = {}
+): CacheConfig => {
+  const driverConfigs = {
+    memory: {
       enabled: true,
-      withStatistics: true
-    })
-  };
-}
-
-/**
- * Creates system configuration in maintenance mode
- */
-export function maintenanceModePreset(): {
-  systemConfig: SystemConfig;
-  healthCheck: HealthCheck;
-} {
-  return {
-    systemConfig: systemConfigFactory({ 
-      maintenanceMode: true,
-      environment: 'production'
-    }),
-    healthCheck: healthCheckFactory({ 
-      status: 'degraded',
-      failingServices: ['api'] 
-    })
-  };
-}
-
-/**
- * Creates system configuration with high load scenario
- */
-export function highLoadSystemPreset(): {
-  systemInfo: SystemInfo;
-  healthCheck: HealthCheck;
-  cacheConfig: CacheConfig;
-} {
-  return {
-    systemInfo: systemInfoFactory({ 
-      highLoad: true,
-      includeResources: true,
-      connectedDatabase: true
-    }),
-    healthCheck: healthCheckFactory({ 
-      status: 'degraded',
-      failingServices: ['cache']
-    }),
-    cacheConfig: cacheConfigFactory({ 
-      provider: 'redis',
+      driver: 'memory',
+      stats: {
+        hits: 1250,
+        misses: 150,
+        hitRatio: 0.893,
+      },
+    },
+    redis: {
       enabled: true,
-      withStatistics: true
-    })
+      driver: 'redis',
+      stats: {
+        hits: 5400,
+        misses: 600,
+        hitRatio: 0.9,
+      },
+    },
+    memcached: {
+      enabled: true,
+      driver: 'memcached',
+      stats: {
+        hits: 3200,
+        misses: 400,
+        hitRatio: 0.889,
+      },
+    },
+    file: {
+      enabled: true,
+      driver: 'file',
+      stats: {
+        hits: 800,
+        misses: 200,
+        hitRatio: 0.8,
+      },
+    },
   };
-}
+
+  return { ...driverConfigs[driver], ...overrides };
+};
+
+// =============================================================================
+// AUTHENTICATION CONFIGURATION FACTORIES
+// =============================================================================
+
+/**
+ * Creates LDAP/Active Directory authentication configuration for testing
+ */
+export const createADLDAPConfig = (overrides: Partial<ADLDAPConfig> = {}): ADLDAPConfig => {
+  return {
+    id: 1,
+    name: 'test-ldap',
+    label: 'Test LDAP Service',
+    description: 'Test LDAP authentication service',
+    is_active: true,
+    type: 'ldap',
+    config: {
+      host: 'ldap.test.com',
+      port: 389,
+      base_dn: 'DC=test,DC=com',
+      account_suffix: '@test.com',
+      username: 'uid',
+      password: 'password',
+    },
+    ...overrides,
+  };
+};
+
+/**
+ * Creates OAuth provider configuration for testing
+ */
+export const createOAuthConfig = (overrides: Partial<OAuthConfig> = {}): OAuthConfig => {
+  return {
+    id: 1,
+    name: 'test-oauth',
+    label: 'Test OAuth Provider',
+    description: 'Test OAuth authentication provider',
+    is_active: true,
+    type: 'google',
+    config: {
+      client_id: 'test-client-id',
+      client_secret: 'test-client-secret',
+      redirect_url: 'http://localhost:3000/auth/callback',
+      scope: ['openid', 'email', 'profile'],
+    },
+    ...overrides,
+  };
+};
+
+/**
+ * Creates SAML provider configuration for testing
+ */
+export const createSAMLConfig = (overrides: Partial<SAMLConfig> = {}): SAMLConfig => {
+  return {
+    id: 1,
+    name: 'test-saml',
+    label: 'Test SAML Provider',
+    description: 'Test SAML authentication provider',
+    is_active: true,
+    config: {
+      idp_entity_id: 'http://test.com/saml/metadata',
+      sso_service_url: 'http://test.com/saml/sso',
+      sls_service_url: 'http://test.com/saml/sls',
+      x509_cert: '-----BEGIN CERTIFICATE-----\nTEST_CERT_DATA\n-----END CERTIFICATE-----',
+    },
+    ...overrides,
+  };
+};
+
+// =============================================================================
+// SYSTEM INFORMATION AND HEALTH CHECK FACTORIES
+// =============================================================================
+
+/**
+ * Creates system information for testing system status and health check scenarios
+ */
+export const systemInfoFactory = (
+  status: 'healthy' | 'warning' | 'critical' = 'healthy',
+  overrides: Partial<SystemInfo> = {}
+): SystemInfo => {
+  const statusConfigs = {
+    healthy: {
+      version: '5.0.0',
+      build: '2024.01.15.001',
+      database: {
+        connected: true,
+        driver: 'mysql',
+        version: '8.0.35',
+        pool: {
+          active: 5,
+          max: 20,
+          idle: 10,
+        },
+      },
+      cache: {
+        enabled: true,
+        driver: 'redis',
+        stats: {
+          hits: 1500,
+          misses: 100,
+          hitRatio: 0.938,
+        },
+      },
+      phpVersion: '8.3.2',
+      memory: {
+        used: 536870912, // 512 MB
+        total: 2147483648, // 2 GB
+        free: 1610612736, // 1.5 GB
+      },
+      disk: {
+        used: 21474836480, // 20 GB
+        total: 107374182400, // 100 GB
+        free: 85899345920, // 80 GB
+      },
+    },
+    warning: {
+      version: '5.0.0',
+      build: '2024.01.15.001',
+      database: {
+        connected: true,
+        driver: 'mysql',
+        version: '8.0.35',
+        pool: {
+          active: 18,
+          max: 20,
+          idle: 1,
+        },
+      },
+      cache: {
+        enabled: true,
+        driver: 'redis',
+        stats: {
+          hits: 800,
+          misses: 200,
+          hitRatio: 0.8,
+        },
+      },
+      phpVersion: '8.3.2',
+      memory: {
+        used: 1717986918, // 1.6 GB
+        total: 2147483648, // 2 GB
+        free: 429496730, // 400 MB
+      },
+      disk: {
+        used: 85899345920, // 80 GB
+        total: 107374182400, // 100 GB
+        free: 21474836480, // 20 GB
+      },
+    },
+    critical: {
+      version: '5.0.0',
+      build: '2024.01.15.001',
+      database: {
+        connected: false,
+        driver: 'mysql',
+        version: undefined,
+        pool: undefined,
+      },
+      cache: {
+        enabled: false,
+        driver: 'redis',
+        stats: {
+          hits: 0,
+          misses: 100,
+          hitRatio: 0,
+        },
+      },
+      phpVersion: '8.3.2',
+      memory: {
+        used: 2097152000, // 1.95 GB
+        total: 2147483648, // 2 GB
+        free: 50331648, // 48 MB
+      },
+      disk: {
+        used: 103079215104, // 96 GB
+        total: 107374182400, // 100 GB
+        free: 4294967296, // 4 GB
+      },
+    },
+  };
+
+  return { ...statusConfigs[status], ...overrides };
+};
+
+/**
+ * Creates system health status for testing health monitoring scenarios
+ */
+export const systemHealthFactory = (
+  status: 'healthy' | 'warning' | 'critical' = 'healthy',
+  overrides: Partial<SystemHealth> = {}
+): SystemHealth => {
+  const timestamp = Date.now();
+  
+  const statusConfigs = {
+    healthy: {
+      status: 'healthy' as const,
+      timestamp,
+      components: {
+        database: {
+          status: 'healthy' as const,
+          message: 'Database connection stable',
+          metrics: {
+            connection_time: '45ms',
+            active_connections: '5',
+            max_connections: '20',
+          },
+          lastCheck: timestamp - 30000,
+        },
+        cache: {
+          status: 'healthy' as const,
+          message: 'Cache performance optimal',
+          metrics: {
+            hit_ratio: '0.938',
+            memory_usage: '45%',
+            eviction_rate: '0.001',
+          },
+          lastCheck: timestamp - 15000,
+        },
+        filesystem: {
+          status: 'healthy' as const,
+          message: 'Disk space sufficient',
+          metrics: {
+            disk_usage: '75%',
+            free_space: '80GB',
+            inode_usage: '12%',
+          },
+          lastCheck: timestamp - 60000,
+        },
+        memory: {
+          status: 'healthy' as const,
+          message: 'Memory usage normal',
+          metrics: {
+            memory_usage: '25%',
+            free_memory: '1.5GB',
+            swap_usage: '0%',
+          },
+          lastCheck: timestamp - 45000,
+        },
+      },
+    },
+    warning: {
+      status: 'warning' as const,
+      timestamp,
+      components: {
+        database: {
+          status: 'warning' as const,
+          message: 'High connection usage',
+          metrics: {
+            connection_time: '120ms',
+            active_connections: '18',
+            max_connections: '20',
+          },
+          lastCheck: timestamp - 30000,
+        },
+        cache: {
+          status: 'warning' as const,
+          message: 'Cache hit ratio below optimal',
+          metrics: {
+            hit_ratio: '0.75',
+            memory_usage: '85%',
+            eviction_rate: '0.05',
+          },
+          lastCheck: timestamp - 15000,
+        },
+        filesystem: {
+          status: 'warning' as const,
+          message: 'Disk space running low',
+          metrics: {
+            disk_usage: '90%',
+            free_space: '10GB',
+            inode_usage: '75%',
+          },
+          lastCheck: timestamp - 60000,
+        },
+        memory: {
+          status: 'healthy' as const,
+          message: 'Memory usage normal',
+          metrics: {
+            memory_usage: '75%',
+            free_memory: '512MB',
+            swap_usage: '15%',
+          },
+          lastCheck: timestamp - 45000,
+        },
+      },
+    },
+    critical: {
+      status: 'critical' as const,
+      timestamp,
+      components: {
+        database: {
+          status: 'critical' as const,
+          message: 'Database connection failed',
+          metrics: {
+            connection_time: 'timeout',
+            active_connections: '0',
+            max_connections: '20',
+          },
+          lastCheck: timestamp - 300000,
+        },
+        cache: {
+          status: 'critical' as const,
+          message: 'Cache service unavailable',
+          metrics: {
+            hit_ratio: '0',
+            memory_usage: '0%',
+            eviction_rate: '0',
+          },
+          lastCheck: timestamp - 300000,
+        },
+        filesystem: {
+          status: 'critical' as const,
+          message: 'Disk space critically low',
+          metrics: {
+            disk_usage: '98%',
+            free_space: '2GB',
+            inode_usage: '95%',
+          },
+          lastCheck: timestamp - 60000,
+        },
+        memory: {
+          status: 'critical' as const,
+          message: 'Out of memory',
+          metrics: {
+            memory_usage: '98%',
+            free_memory: '48MB',
+            swap_usage: '90%',
+          },
+          lastCheck: timestamp - 45000,
+        },
+      },
+    },
+  };
+
+  return { ...statusConfigs[status], ...overrides };
+};
+
+/**
+ * Creates performance metrics for testing system performance monitoring
+ */
+export const performanceMetricsFactory = (
+  load: 'low' | 'medium' | 'high' = 'medium',
+  overrides: Partial<PerformanceMetrics> = {}
+): PerformanceMetrics => {
+  const loadConfigs = {
+    low: {
+      requests: {
+        total: 1500,
+        rps: 5.2,
+        avgResponseTime: 120,
+      },
+      memory: {
+        used: 536870912, // 512 MB
+        peak: 805306368, // 768 MB
+        limit: 2147483648, // 2 GB
+      },
+      cache: {
+        hitRatio: 0.95,
+        entries: 1200,
+        size: 104857600, // 100 MB
+      },
+    },
+    medium: {
+      requests: {
+        total: 15000,
+        rps: 25.8,
+        avgResponseTime: 280,
+      },
+      memory: {
+        used: 1073741824, // 1 GB
+        peak: 1342177280, // 1.25 GB
+        limit: 2147483648, // 2 GB
+      },
+      cache: {
+        hitRatio: 0.85,
+        entries: 5000,
+        size: 524288000, // 500 MB
+      },
+    },
+    high: {
+      requests: {
+        total: 50000,
+        rps: 95.4,
+        avgResponseTime: 650,
+      },
+      memory: {
+        used: 1932735283, // 1.8 GB
+        peak: 2042109440, // 1.9 GB
+        limit: 2147483648, // 2 GB
+      },
+      cache: {
+        hitRatio: 0.72,
+        entries: 15000,
+        size: 1073741824, // 1 GB
+      },
+    },
+  };
+
+  return { ...loadConfigs[load], ...overrides };
+};
+
+/**
+ * Creates system operation results for testing operation success/failure scenarios
+ */
+export const systemOperationResultFactory = <T = any>(
+  success: boolean = true,
+  data?: T,
+  overrides: Partial<SystemOperationResult<T>> = {}
+): SystemOperationResult<T> => {
+  const baseResult = {
+    success,
+    timestamp: Date.now(),
+    data: success ? data : undefined,
+    errors: success ? undefined : [
+      {
+        field: 'system',
+        message: 'Operation failed due to system error',
+        code: 'SYSTEM_ERROR',
+        context: { operation: 'test_operation' },
+      },
+    ],
+    message: success ? 'Operation completed successfully' : 'Operation failed',
+  };
+
+  return { ...baseResult, ...overrides };
+};
+
+/**
+ * Creates license validation responses for testing license management scenarios
+ */
+export const licenseValidationFactory = (
+  valid: boolean = true,
+  overrides: Partial<LicenseValidationResponse> = {}
+): LicenseValidationResponse => {
+  const validResponse = {
+    disableUi: 'false',
+    msg: 'License is valid and active',
+    renewalDate: new Date(Date.now() + 31536000000).toISOString(), // 1 year from now
+    statusCode: '200',
+  };
+
+  const invalidResponse = {
+    disableUi: 'true',
+    msg: 'License has expired or is invalid',
+    renewalDate: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+    statusCode: '403',
+  };
+
+  return { ...(valid ? validResponse : invalidResponse), ...overrides };
+};
+
+/**
+ * Creates system resources for testing resource management scenarios
+ */
+export const systemResourceFactory = (
+  type: 'database' | 'email' | 'file' | 'script' | 'oauth' | 'saml' | 'ldap' | 'custom' = 'database',
+  overrides: Partial<SystemResource> = {}
+): SystemResource => {
+  const typeConfigs = {
+    database: {
+      name: 'mysql-db',
+      label: 'MySQL Database Service',
+      description: 'MySQL database connection service',
+      type: 'database',
+      is_active: true,
+      config: {
+        driver: 'mysql',
+        host: 'localhost',
+        port: 3306,
+        database: 'test_db',
+      },
+      metadata: {
+        created_by: 'admin',
+        version: '8.0.35',
+      },
+    },
+    email: {
+      name: 'smtp-email',
+      label: 'SMTP Email Service',
+      description: 'SMTP email service configuration',
+      type: 'email',
+      is_active: true,
+      config: {
+        host: 'smtp.gmail.com',
+        port: 587,
+        encryption: 'tls',
+      },
+      metadata: {
+        provider: 'gmail',
+        daily_limit: 500,
+      },
+    },
+    file: {
+      name: 'local-files',
+      label: 'Local File Service',
+      description: 'Local filesystem access service',
+      type: 'file',
+      is_active: true,
+      config: {
+        root: '/var/www/storage',
+        public_path: '/storage',
+      },
+      metadata: {
+        storage_type: 'local',
+        quota: '10GB',
+      },
+    },
+    script: {
+      name: 'nodejs-script',
+      label: 'Node.js Script Service',
+      description: 'Server-side script execution service',
+      type: 'script',
+      is_active: true,
+      config: {
+        type: 'nodejs',
+        timeout: 30,
+      },
+      metadata: {
+        runtime: 'node:18',
+        max_memory: '256MB',
+      },
+    },
+    oauth: {
+      name: 'google-oauth',
+      label: 'Google OAuth Service',
+      description: 'Google OAuth authentication service',
+      type: 'oauth',
+      is_active: true,
+      config: {
+        provider: 'google',
+        client_id: 'google-client-id',
+      },
+      metadata: {
+        scope: ['email', 'profile'],
+        redirect_url: '/auth/google/callback',
+      },
+    },
+    saml: {
+      name: 'enterprise-saml',
+      label: 'Enterprise SAML Service',
+      description: 'Enterprise SAML SSO service',
+      type: 'saml',
+      is_active: true,
+      config: {
+        idp_entity_id: 'enterprise-idp',
+        sso_url: 'https://sso.enterprise.com',
+      },
+      metadata: {
+        provider: 'okta',
+        certificate_expires: '2025-12-31',
+      },
+    },
+    ldap: {
+      name: 'company-ldap',
+      label: 'Company LDAP Service',
+      description: 'Company LDAP directory service',
+      type: 'ldap',
+      is_active: true,
+      config: {
+        host: 'ldap.company.com',
+        port: 389,
+        base_dn: 'DC=company,DC=com',
+      },
+      metadata: {
+        users_count: 1500,
+        last_sync: '2024-01-15T10:30:00Z',
+      },
+    },
+    custom: {
+      name: 'custom-service',
+      label: 'Custom Service',
+      description: 'Custom service implementation',
+      type: 'custom',
+      is_active: true,
+      config: {
+        endpoint: 'https://api.custom.com',
+        api_key: 'custom-api-key',
+      },
+      metadata: {
+        version: '1.0.0',
+        vendor: 'Custom Corp',
+      },
+    },
+  };
+
+  return { ...typeConfigs[type], ...overrides };
+};
+
+/**
+ * Creates complete system configuration for comprehensive testing scenarios
+ */
+export const createCompleteSystemConfig = (
+  environment: 'development' | 'staging' | 'production' = 'development'
+) => {
+  return {
+    environment: systemConfigFactory(environment),
+    envVars: environmentConfigFactory(environment),
+    lookupKeys: globalLookupFactory(),
+    emailConfig: emailTemplateFactory('welcome'),
+    corsConfig: corsConfigFactory(environment),
+    cacheConfig: cacheConfigFactory('redis'),
+    systemInfo: systemInfoFactory('healthy'),
+    systemHealth: systemHealthFactory('healthy'),
+    performanceMetrics: performanceMetricsFactory('medium'),
+    licenseValidation: licenseValidationFactory(true),
+    resources: [
+      systemResourceFactory('database'),
+      systemResourceFactory('email'),
+      systemResourceFactory('oauth'),
+    ],
+  };
+};
+
+/**
+ * Creates test scenarios for specific system configuration testing needs
+ */
+export const createSystemConfigScenario = (scenario: string) => {
+  const scenarios = {
+    'system-healthy': () => ({
+      systemInfo: systemInfoFactory('healthy'),
+      systemHealth: systemHealthFactory('healthy'),
+      performanceMetrics: performanceMetricsFactory('low'),
+    }),
+    
+    'system-under-load': () => ({
+      systemInfo: systemInfoFactory('warning'),
+      systemHealth: systemHealthFactory('warning'),
+      performanceMetrics: performanceMetricsFactory('high'),
+    }),
+    
+    'system-critical': () => ({
+      systemInfo: systemInfoFactory('critical'),
+      systemHealth: systemHealthFactory('critical'),
+      performanceMetrics: performanceMetricsFactory('high'),
+    }),
+    
+    'license-expired': () => ({
+      licenseValidation: licenseValidationFactory(false, {
+        msg: 'License has expired',
+        statusCode: '403',
+        disableUi: 'true',
+      }),
+      systemInfo: systemInfoFactory('warning'),
+    }),
+    
+    'email-configuration': () => ({
+      emailConfig: emailTemplateFactory('welcome'),
+      lookupKeys: globalLookupFactory([
+        { name: 'smtp.enabled', value: 'true' },
+        { name: 'email.queue.enabled', value: 'true' },
+      ]),
+    }),
+    
+    'cors-strict': () => ({
+      corsConfig: corsConfigFactory('production', {
+        origins: ['https://app.company.com'],
+        methods: ['GET', 'POST'],
+        credentials: false,
+      }),
+    }),
+    
+    'development-setup': () => createCompleteSystemConfig('development'),
+    'production-setup': () => createCompleteSystemConfig('production'),
+  };
+
+  const scenarioFn = scenarios[scenario as keyof typeof scenarios];
+  if (!scenarioFn) {
+    throw new Error(`Unknown system configuration scenario: ${scenario}`);
+  }
+
+  return scenarioFn();
+};
+
+// Export all factory functions for comprehensive system testing
+export default {
+  systemConfigFactory,
+  environmentConfigFactory,
+  globalLookupFactory,
+  emailTemplateFactory,
+  corsConfigFactory,
+  cacheConfigFactory,
+  systemInfoFactory,
+  systemHealthFactory,
+  performanceMetricsFactory,
+  systemOperationResultFactory,
+  licenseValidationFactory,
+  systemResourceFactory,
+  createCompleteSystemConfig,
+  createSystemConfigScenario,
+  createADLDAPConfig,
+  createOAuthConfig,
+  createSAMLConfig,
+};
