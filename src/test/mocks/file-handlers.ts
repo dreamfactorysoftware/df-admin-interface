@@ -1,645 +1,668 @@
 /**
  * MSW File System Operation Handlers
  * 
- * Comprehensive Mock Service Worker handlers for file system operations including
+ * Mock Service Worker handlers for comprehensive file system operations including
  * file browsing, upload, download, and directory management. Replicates the behavior
- * of DfFileApiService for testing file management features in the React/Next.js
- * implementation.
+ * of DfFileApiService for testing file management features with realistic responses
+ * and proper content-type headers.
  * 
- * This module provides complete file service mocking capabilities that simulate:
- * - File and directory browsing with hierarchical navigation
- * - File upload operations with FormData handling and progress simulation
- * - File download operations with proper blob responses and content-type headers
+ * This module provides:
+ * - File system endpoint mocking for directory listing and file browsing
+ * - File upload functionality with FormData handling and progress simulation
+ * - File download operations returning appropriate blob responses
  * - Directory creation and file deletion operations
- * - File metadata retrieval with MIME type detection
- * - Log file service discovery and content access
- * - Error scenarios for comprehensive error handling testing
+ * - File content retrieval with metadata and content-type headers
+ * - File service discovery with fallback handling for log services
+ * - Progress tracking simulation for upload operations
+ * - Comprehensive error handling for file operation failures
  * 
- * All handlers maintain compatibility with DreamFactory API patterns while
- * providing realistic testing data for the F-008 File and Log Management feature.
+ * File API Endpoints Covered:
+ * - GET /api/v2/files/{service}/* - File browsing and listing
+ * - POST /api/v2/files/{service}/* - File upload and directory creation
+ * - PUT /api/v2/files/{service}/* - File updates and replacements
+ * - DELETE /api/v2/files/{service}/* - File and directory deletion
+ * - GET /api/v2/{service}/_schema - File service discovery
+ * - GET /system/api/v2/environment - Service configuration retrieval
  */
 
 import { http, HttpResponse } from 'msw';
-import type { RequestHandler } from 'msw';
 import {
-  createJsonResponse,
-  createErrorResponse,
-  createNotFoundError,
-  createForbiddenError,
-  createBadRequestError,
-  createServerError,
   validateAuthHeaders,
   extractQueryParams,
-  paginateData,
-  createPaginationMeta,
+  applyPagination,
+  applyFilter,
+  createJsonResponse,
+  createListResponse,
+  createBlobResponse,
+  createNotFoundError,
+  createValidationError,
+  createForbiddenError,
+  createInternalServerError,
   simulateNetworkDelay,
+  processRequestBody,
   logRequest,
-  extractServiceName,
-  extractResourcePath,
-  isServiceApiPath,
+  extractIdFromPath,
+  formDataToObject,
+  applyCaseTransformation,
+  PaginationMeta,
 } from './utils';
 import {
-  createFieldValidationError,
-  createMultipleFieldValidationErrors,
-  errorScenarios,
+  createDreamFactoryError,
+  createResourceNotFoundError,
+  createServiceNotFoundError,
+  createFormValidationError,
+  createInsufficientPermissionsError,
+  createDatabaseConnectionError,
+  ERROR_CODES,
 } from './error-responses';
-import { mockData } from './mock-data';
 
 // ============================================================================
-// FILE SYSTEM MOCK DATA
+// TYPES & INTERFACES
 // ============================================================================
 
 /**
- * File system entry interface matching DreamFactory file service responses
+ * File metadata structure from DreamFactory file services
  */
-interface FileSystemEntry {
+export interface FileMetadata {
   name: string;
   path: string;
   type: 'file' | 'folder';
-  size?: number;
   content_type?: string;
-  last_modified?: string;
-  is_base64?: boolean;
-  content?: string;
-  metadata?: {
-    owner?: string;
-    permissions?: string;
-    created?: string;
-    modified?: string;
-    accessed?: string;
-    [key: string]: any;
-  };
+  last_modified: string;
+  content_length?: number;
+  is_readable?: boolean;
+  is_writable?: boolean;
+  is_executable?: boolean;
+  md5_checksum?: string;
+  etag?: string;
+  url?: string;
 }
 
 /**
- * Directory listing response structure
+ * File listing response structure
  */
-interface DirectoryListing {
-  resource: FileSystemEntry[];
-  meta?: {
-    count: number;
-    total: number;
-    path: string;
-    container?: string;
-  };
+export interface FileListingResponse {
+  resource: FileMetadata[];
+  count?: number;
+  meta?: PaginationMeta;
 }
 
 /**
- * File upload progress simulation
+ * File upload progress tracking
  */
-interface UploadProgress {
+export interface FileUploadProgress {
   loaded: number;
   total: number;
   percentage: number;
-  status: 'uploading' | 'processing' | 'complete' | 'error';
-  message?: string;
+  speed?: number;
+  timeRemaining?: number;
 }
 
 /**
- * Mock file system data structure
+ * File service configuration
  */
-const mockFileSystem: Record<string, FileSystemEntry[]> = {
-  // Root directory for file service
-  '/': [
-    {
-      name: 'applications',
-      path: '/applications',
-      type: 'folder',
-      last_modified: '2024-03-15T10:30:00Z',
-      metadata: {
-        owner: 'admin',
-        permissions: 'drwxr-xr-x',
-        created: '2024-01-01T00:00:00Z',
-        modified: '2024-03-15T10:30:00Z',
-        accessed: '2024-03-15T12:00:00Z',
-      },
-    },
-    {
-      name: 'logs',
-      path: '/logs',
-      type: 'folder',
-      last_modified: '2024-03-15T11:45:00Z',
-      metadata: {
-        owner: 'system',
-        permissions: 'drwxr--r--',
-        created: '2024-01-01T00:00:00Z',
-        modified: '2024-03-15T11:45:00Z',
-        accessed: '2024-03-15T12:00:00Z',
-      },
-    },
-    {
-      name: 'uploads',
-      path: '/uploads',
-      type: 'folder',
-      last_modified: '2024-03-15T12:00:00Z',
-      metadata: {
-        owner: 'admin',
-        permissions: 'drwxrwxrwx',
-        created: '2024-02-01T00:00:00Z',
-        modified: '2024-03-15T12:00:00Z',
-        accessed: '2024-03-15T12:00:00Z',
-      },
-    },
-    {
-      name: 'config.json',
-      path: '/config.json',
-      type: 'file',
-      size: 2048,
-      content_type: 'application/json',
-      last_modified: '2024-03-10T14:30:00Z',
-      content: JSON.stringify({
-        version: '5.2.1',
-        environment: 'production',
-        features: ['api_generation', 'file_management', 'user_management'],
-        last_updated: '2024-03-10T14:30:00Z',
-      }, null, 2),
-      metadata: {
-        owner: 'admin',
-        permissions: '-rw-r--r--',
-        created: '2024-01-01T00:00:00Z',
-        modified: '2024-03-10T14:30:00Z',
-        accessed: '2024-03-15T10:00:00Z',
-      },
-    },
-    {
-      name: 'README.md',
-      path: '/README.md',
-      type: 'file',
-      size: 1536,
-      content_type: 'text/markdown',
-      last_modified: '2024-02-15T09:00:00Z',
-      content: `# DreamFactory File System
-
-This directory contains application files, configuration, and system logs.
-
-## Directory Structure
-
-- \`/applications\` - Application deployment files
-- \`/logs\` - System and application logs  
-- \`/uploads\` - User uploaded files
-
-## File Management
-
-Use the DreamFactory admin interface to manage files and directories.
-For more information, visit: https://www.dreamfactory.com/docs/
-`,
-      metadata: {
-        owner: 'admin',
-        permissions: '-rw-r--r--',
-        created: '2024-02-15T09:00:00Z',
-        modified: '2024-02-15T09:00:00Z',
-        accessed: '2024-03-15T10:00:00Z',
-      },
-    },
-  ],
-
-  // Applications directory
-  '/applications': [
-    {
-      name: 'web-app',
-      path: '/applications/web-app',
-      type: 'folder',
-      last_modified: '2024-03-14T16:20:00Z',
-      metadata: {
-        owner: 'developer',
-        permissions: 'drwxr-xr-x',
-        created: '2024-02-01T10:00:00Z',
-        modified: '2024-03-14T16:20:00Z',
-        accessed: '2024-03-15T11:00:00Z',
-      },
-    },
-    {
-      name: 'mobile-app',
-      path: '/applications/mobile-app',
-      type: 'folder',
-      last_modified: '2024-03-12T14:15:00Z',
-      metadata: {
-        owner: 'developer',
-        permissions: 'drwxr-xr-x',
-        created: '2024-02-10T15:30:00Z',
-        modified: '2024-03-12T14:15:00Z',
-        accessed: '2024-03-15T09:30:00Z',
-      },
-    },
-  ],
-
-  // Web application directory
-  '/applications/web-app': [
-    {
-      name: 'index.html',
-      path: '/applications/web-app/index.html',
-      type: 'file',
-      size: 3072,
-      content_type: 'text/html',
-      last_modified: '2024-03-14T16:20:00Z',
-      content: `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DreamFactory Web Application</title>
-</head>
-<body>
-    <h1>Welcome to DreamFactory</h1>
-    <p>Your API is ready!</p>
-    <script src="app.js"></script>
-</body>
-</html>`,
-      metadata: {
-        owner: 'developer',
-        permissions: '-rw-r--r--',
-        created: '2024-02-01T10:00:00Z',
-        modified: '2024-03-14T16:20:00Z',
-        accessed: '2024-03-15T11:00:00Z',
-      },
-    },
-    {
-      name: 'app.js',
-      path: '/applications/web-app/app.js',
-      type: 'file',
-      size: 4096,
-      content_type: 'application/javascript',
-      last_modified: '2024-03-14T16:18:00Z',
-      content: `// DreamFactory Web Application
-const API_BASE = 'https://api.dreamfactory.local/api/v2';
-const API_KEY = 'your-api-key-here';
-
-async function fetchData() {
-    try {
-        const response = await fetch(\`\${API_BASE}/mysql/users\`, {
-            headers: {
-                'X-DreamFactory-API-Key': API_KEY,
-                'Content-Type': 'application/json'
-            }
-        });
-        const data = await response.json();
-        console.log('Users data:', data);
-    } catch (error) {
-        console.error('Error fetching data:', error);
-    }
+export interface FileServiceConfig {
+  name: string;
+  label: string;
+  description: string;
+  type: 'file';
+  config: {
+    container?: string;
+    path?: string;
+    public_path?: string;
+    url?: string;
+    credentials?: Record<string, unknown>;
+  };
+  is_active: boolean;
 }
-
-document.addEventListener('DOMContentLoaded', fetchData);`,
-      metadata: {
-        owner: 'developer',
-        permissions: '-rw-r--r--',
-        created: '2024-02-01T10:15:00Z',
-        modified: '2024-03-14T16:18:00Z',
-        accessed: '2024-03-15T11:00:00Z',
-      },
-    },
-    {
-      name: 'styles.css',
-      path: '/applications/web-app/styles.css',
-      type: 'file',
-      size: 1024,
-      content_type: 'text/css',
-      last_modified: '2024-03-12T11:30:00Z',
-      content: `/* DreamFactory Web Application Styles */
-body {
-    font-family: Arial, sans-serif;
-    margin: 0;
-    padding: 20px;
-    background-color: #f5f5f5;
-}
-
-h1 {
-    color: #5b39f3;
-    text-align: center;
-}
-
-p {
-    text-align: center;
-    font-size: 18px;
-    color: #666;
-}`,
-      metadata: {
-        owner: 'developer',
-        permissions: '-rw-r--r--',
-        created: '2024-02-01T10:30:00Z',
-        modified: '2024-03-12T11:30:00Z',
-        accessed: '2024-03-15T11:00:00Z',
-      },
-    },
-  ],
-
-  // Logs directory
-  '/logs': [
-    {
-      name: 'application.log',
-      path: '/logs/application.log',
-      type: 'file',
-      size: 15360,
-      content_type: 'text/plain',
-      last_modified: '2024-03-15T11:45:00Z',
-      content: `[2024-03-15 11:45:00] INFO: Application started successfully
-[2024-03-15 11:44:30] INFO: Database connection established
-[2024-03-15 11:44:25] INFO: Loading configuration from /config.json
-[2024-03-15 11:44:20] INFO: DreamFactory initializing...
-[2024-03-15 11:30:15] INFO: User 'admin' logged in successfully
-[2024-03-15 11:25:42] INFO: API endpoint /api/v2/mysql/users accessed
-[2024-03-15 11:20:18] INFO: File upload completed: /uploads/document.pdf
-[2024-03-15 11:15:33] WARN: High memory usage detected: 85%
-[2024-03-15 11:10:27] INFO: Schema discovery completed for service 'mysql_production'
-[2024-03-15 11:05:45] INFO: Service 'mysql_production' connection tested successfully`,
-      metadata: {
-        owner: 'system',
-        permissions: '-rw-r--r--',
-        created: '2024-03-15T00:00:00Z',
-        modified: '2024-03-15T11:45:00Z',
-        accessed: '2024-03-15T11:45:00Z',
-      },
-    },
-    {
-      name: 'error.log',
-      path: '/logs/error.log',
-      type: 'file',
-      size: 8192,
-      content_type: 'text/plain',
-      last_modified: '2024-03-15T09:30:00Z',
-      content: `[2024-03-15 09:30:15] ERROR: Database connection timeout for service 'mysql_staging'
-[2024-03-15 09:25:42] ERROR: Invalid API key provided in request header
-[2024-03-15 09:20:18] ERROR: File upload failed: insufficient disk space
-[2024-03-15 09:15:33] WARN: Rate limit exceeded for IP 192.168.1.100
-[2024-03-15 09:10:27] ERROR: Schema discovery failed: table 'users' not found
-[2024-03-15 09:05:45] ERROR: Authentication failed for user 'test@example.com'`,
-      metadata: {
-        owner: 'system',
-        permissions: '-rw-r--r--',
-        created: '2024-03-15T00:00:00Z',
-        modified: '2024-03-15T09:30:00Z',
-        accessed: '2024-03-15T09:30:00Z',
-      },
-    },
-    {
-      name: 'access.log',
-      path: '/logs/access.log',
-      type: 'file',
-      size: 25600,
-      content_type: 'text/plain',
-      last_modified: '2024-03-15T11:45:00Z',
-      content: `192.168.1.100 - admin [15/Mar/2024:11:45:00 +0000] "GET /api/v2/mysql/users HTTP/1.1" 200 2048
-192.168.1.101 - developer [15/Mar/2024:11:40:30 +0000] "POST /api/v2/system/service HTTP/1.1" 201 1024
-192.168.1.102 - user1 [15/Mar/2024:11:35:15 +0000] "GET /api/v2/files/ HTTP/1.1" 200 4096
-192.168.1.100 - admin [15/Mar/2024:11:30:45 +0000] "GET /api/v2/mysql/_schema HTTP/1.1" 200 8192
-192.168.1.103 - analyst [15/Mar/2024:11:25:20 +0000] "GET /api/v2/postgresql/products HTTP/1.1" 200 3072`,
-      metadata: {
-        owner: 'system',
-        permissions: '-rw-r--r--',
-        created: '2024-03-15T00:00:00Z',
-        modified: '2024-03-15T11:45:00Z',
-        accessed: '2024-03-15T11:45:00Z',
-      },
-    },
-  ],
-
-  // Uploads directory
-  '/uploads': [
-    {
-      name: 'document.pdf',
-      path: '/uploads/document.pdf',
-      type: 'file',
-      size: 204800,
-      content_type: 'application/pdf',
-      last_modified: '2024-03-15T11:20:00Z',
-      is_base64: true,
-      metadata: {
-        owner: 'user1',
-        permissions: '-rw-r--r--',
-        created: '2024-03-15T11:20:00Z',
-        modified: '2024-03-15T11:20:00Z',
-        accessed: '2024-03-15T11:20:00Z',
-        original_name: 'User Manual.pdf',
-        upload_session: 'session_12345',
-      },
-    },
-    {
-      name: 'image.jpg',
-      path: '/uploads/image.jpg',
-      type: 'file',
-      size: 153600,
-      content_type: 'image/jpeg',
-      last_modified: '2024-03-14T15:30:00Z',
-      is_base64: true,
-      metadata: {
-        owner: 'user2',
-        permissions: '-rw-r--r--',
-        created: '2024-03-14T15:30:00Z',
-        modified: '2024-03-14T15:30:00Z',
-        accessed: '2024-03-15T10:00:00Z',
-        original_name: 'product_photo.jpg',
-        upload_session: 'session_67890',
-        image_dimensions: '1920x1080',
-      },
-    },
-    {
-      name: 'data.csv',
-      path: '/uploads/data.csv',
-      type: 'file',
-      size: 8192,
-      content_type: 'text/csv',
-      last_modified: '2024-03-13T14:45:00Z',
-      content: `id,name,email,role
-1,John Doe,john@example.com,admin
-2,Jane Smith,jane@example.com,developer
-3,Bob Wilson,bob@example.com,analyst
-4,Alice Brown,alice@example.com,user`,
-      metadata: {
-        owner: 'analyst',
-        permissions: '-rw-r--r--',
-        created: '2024-03-13T14:45:00Z',
-        modified: '2024-03-13T14:45:00Z',
-        accessed: '2024-03-15T09:00:00Z',
-        original_name: 'user_export.csv',
-        upload_session: 'session_54321',
-      },
-    },
-  ],
-};
 
 /**
- * File service types and their configurations
+ * Directory creation request
  */
-const fileServices = {
-  files: {
-    name: 'files',
-    label: 'Local File Storage',
-    description: 'Local file system storage service',
+export interface CreateDirectoryRequest {
+  name: string;
+  path?: string;
+  resource?: { name: string; path?: string }[];
+}
+
+/**
+ * File upload metadata
+ */
+export interface FileUploadMetadata {
+  name: string;
+  size: number;
+  type: string;
+  lastModified: number;
+  path?: string;
+  extract?: boolean;
+  clean?: boolean;
+  check_exist?: boolean;
+  exclude_pattern?: string;
+  include_pattern?: string;
+}
+
+// ============================================================================
+// MOCK DATA
+// ============================================================================
+
+/**
+ * Mock file service configurations
+ */
+const mockFileServices: FileServiceConfig[] = [
+  {
+    name: 'local_files',
+    label: 'Local File System',
+    description: 'Local server file system access',
     type: 'file',
     config: {
-      container: 'local',
-      public_path: '/storage/app/public',
-      path: '/storage/app',
+      container: 'app',
+      path: '/app/storage/app',
+      public_path: '/storage',
+      url: '/files/local_files',
     },
     is_active: true,
   },
-  logs: {
+  {
     name: 'logs',
     label: 'System Logs',
-    description: 'System and application log files',
+    description: 'Application and system log files',
     type: 'file',
     config: {
       container: 'logs',
-      public_path: '/var/log/dreamfactory',
-      path: '/var/log/dreamfactory',
-      read_only: true,
+      path: '/app/storage/logs',
+      public_path: '/logs',
+      url: '/files/logs',
     },
     is_active: true,
   },
-  uploads: {
+  {
     name: 'uploads',
     label: 'User Uploads',
-    description: 'User uploaded files storage',
+    description: 'User uploaded files and documents',
     type: 'file',
     config: {
       container: 'uploads',
-      public_path: '/storage/uploads',
-      path: '/storage/uploads',
-      max_file_size: '50MB',
-      allowed_extensions: ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx', 'csv', 'txt'],
+      path: '/app/storage/uploads',
+      public_path: '/uploads',
+      url: '/files/uploads',
     },
     is_active: true,
   },
+];
+
+/**
+ * Mock file system structure
+ */
+const mockFileSystem: Record<string, FileMetadata[]> = {
+  'local_files': [
+    {
+      name: 'documents',
+      path: 'documents/',
+      type: 'folder',
+      last_modified: '2024-03-15T10:30:00Z',
+      is_readable: true,
+      is_writable: true,
+      is_executable: true,
+    },
+    {
+      name: 'images',
+      path: 'images/',
+      type: 'folder',
+      last_modified: '2024-03-14T15:20:00Z',
+      is_readable: true,
+      is_writable: true,
+      is_executable: true,
+    },
+    {
+      name: 'scripts',
+      path: 'scripts/',
+      type: 'folder',
+      last_modified: '2024-03-13T09:45:00Z',
+      is_readable: true,
+      is_writable: true,
+      is_executable: true,
+    },
+    {
+      name: 'readme.txt',
+      path: 'readme.txt',
+      type: 'file',
+      content_type: 'text/plain',
+      content_length: 1245,
+      last_modified: '2024-03-15T08:00:00Z',
+      is_readable: true,
+      is_writable: true,
+      is_executable: false,
+      md5_checksum: 'a1b2c3d4e5f6789012345678901234567890',
+      etag: '"1245-60f8a7b2c3d4e5f6"',
+    },
+    {
+      name: 'config.json',
+      path: 'config.json',
+      type: 'file',
+      content_type: 'application/json',
+      content_length: 892,
+      last_modified: '2024-03-14T16:30:00Z',
+      is_readable: true,
+      is_writable: true,
+      is_executable: false,
+      md5_checksum: 'b2c3d4e5f67890123456789012345678901a',
+      etag: '"892-70f9a8b3c4d5e6f7"',
+    },
+  ],
+  'local_files/documents': [
+    {
+      name: 'manual.pdf',
+      path: 'documents/manual.pdf',
+      type: 'file',
+      content_type: 'application/pdf',
+      content_length: 2048576,
+      last_modified: '2024-03-15T10:15:00Z',
+      is_readable: true,
+      is_writable: false,
+      is_executable: false,
+      md5_checksum: 'c3d4e5f678901234567890123456789012ab',
+      etag: '"2048576-80faa9b4c5d6e7f8"',
+    },
+    {
+      name: 'report.docx',
+      path: 'documents/report.docx',
+      type: 'file',
+      content_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      content_length: 524288,
+      last_modified: '2024-03-14T14:20:00Z',
+      is_readable: true,
+      is_writable: true,
+      is_executable: false,
+      md5_checksum: 'd4e5f67890123456789012345678901234bc',
+      etag: '"524288-90fbaa5c6d7e8f90"',
+    },
+    {
+      name: 'data.xlsx',
+      path: 'documents/data.xlsx',
+      type: 'file',
+      content_type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      content_length: 1048576,
+      last_modified: '2024-03-13T11:45:00Z',
+      is_readable: true,
+      is_writable: true,
+      is_executable: false,
+      md5_checksum: 'e5f678901234567890123456789012345cd',
+      etag: '"1048576-a0fcbb6d7e8f9012"',
+    },
+  ],
+  'local_files/images': [
+    {
+      name: 'logo.png',
+      path: 'images/logo.png',
+      type: 'file',
+      content_type: 'image/png',
+      content_length: 65536,
+      last_modified: '2024-03-14T15:10:00Z',
+      is_readable: true,
+      is_writable: true,
+      is_executable: false,
+      md5_checksum: 'f6789012345678901234567890123456de',
+      etag: '"65536-b0fdcc7e8f901234"',
+    },
+    {
+      name: 'banner.jpg',
+      path: 'images/banner.jpg',
+      type: 'file',
+      content_type: 'image/jpeg',
+      content_length: 131072,
+      last_modified: '2024-03-13T09:30:00Z',
+      is_readable: true,
+      is_writable: true,
+      is_executable: false,
+      md5_checksum: '67890123456789012345678901234567ef',
+      etag: '"131072-c0fedd8f90123456"',
+    },
+    {
+      name: 'thumbnails',
+      path: 'images/thumbnails/',
+      type: 'folder',
+      last_modified: '2024-03-12T16:00:00Z',
+      is_readable: true,
+      is_writable: true,
+      is_executable: true,
+    },
+  ],
+  'local_files/scripts': [
+    {
+      name: 'backup.sh',
+      path: 'scripts/backup.sh',
+      type: 'file',
+      content_type: 'application/x-sh',
+      content_length: 2048,
+      last_modified: '2024-03-13T09:40:00Z',
+      is_readable: true,
+      is_writable: true,
+      is_executable: true,
+      md5_checksum: '789012345678901234567890123456780f',
+      etag: '"2048-d0feee901234567a"',
+    },
+    {
+      name: 'deploy.py',
+      path: 'scripts/deploy.py',
+      type: 'file',
+      content_type: 'text/x-python',
+      content_length: 4096,
+      last_modified: '2024-03-12T14:15:00Z',
+      is_readable: true,
+      is_writable: true,
+      is_executable: true,
+      md5_checksum: '8901234567890123456789012345678901',
+      etag: '"4096-e0ffff01234567ab"',
+    },
+  ],
+  'logs': [
+    {
+      name: 'application.log',
+      path: 'application.log',
+      type: 'file',
+      content_type: 'text/plain',
+      content_length: 8388608,
+      last_modified: '2024-03-15T11:45:00Z',
+      is_readable: true,
+      is_writable: false,
+      is_executable: false,
+      md5_checksum: '901234567890123456789012345678902',
+      etag: '"8388608-f01001234567abc"',
+    },
+    {
+      name: 'error.log',
+      path: 'error.log',
+      type: 'file',
+      content_type: 'text/plain',
+      content_length: 1048576,
+      last_modified: '2024-03-15T11:30:00Z',
+      is_readable: true,
+      is_writable: false,
+      is_executable: false,
+      md5_checksum: '012345678901234567890123456789013',
+      etag: '"1048576-01234567abcdef"',
+    },
+    {
+      name: 'access.log',
+      path: 'access.log',
+      type: 'file',
+      content_type: 'text/plain',
+      content_length: 16777216,
+      last_modified: '2024-03-15T11:40:00Z',
+      is_readable: true,
+      is_writable: false,
+      is_executable: false,
+      md5_checksum: '123456789012345678901234567890124',
+      etag: '"16777216-123456789abcdef0"',
+    },
+    {
+      name: 'archived',
+      path: 'archived/',
+      type: 'folder',
+      last_modified: '2024-03-10T08:00:00Z',
+      is_readable: true,
+      is_writable: false,
+      is_executable: true,
+    },
+  ],
+  'uploads': [
+    {
+      name: 'user_1',
+      path: 'user_1/',
+      type: 'folder',
+      last_modified: '2024-03-15T09:00:00Z',
+      is_readable: true,
+      is_writable: true,
+      is_executable: true,
+    },
+    {
+      name: 'user_2',
+      path: 'user_2/',
+      type: 'folder',
+      last_modified: '2024-03-14T16:30:00Z',
+      is_readable: true,
+      is_writable: true,
+      is_executable: true,
+    },
+    {
+      name: 'shared',
+      path: 'shared/',
+      type: 'folder',
+      last_modified: '2024-03-13T12:00:00Z',
+      is_readable: true,
+      is_writable: true,
+      is_executable: true,
+    },
+  ],
 };
+
+/**
+ * Mock file content data for testing downloads
+ */
+const mockFileContent: Record<string, string | Uint8Array> = {
+  'readme.txt': 'Welcome to DreamFactory!\n\nThis is a comprehensive REST API generation platform.\n\nGetting Started:\n1. Configure database connections\n2. Discover database schemas\n3. Generate REST endpoints\n4. Configure security\n5. Test your APIs\n\nFor more information, visit https://www.dreamfactory.com\n\nVersion: 5.2.1\nBuild: 2024.03.15\n\nSupport: support@dreamfactory.com',
+  'config.json': JSON.stringify({
+    app: {
+      name: 'DreamFactory Admin Interface',
+      version: '5.2.1',
+      environment: 'production',
+      debug: false,
+      timezone: 'UTC',
+      locale: 'en',
+    },
+    database: {
+      default: 'mysql',
+      connections: {
+        mysql: {
+          driver: 'mysql',
+          host: 'localhost',
+          port: 3306,
+          database: 'dreamfactory',
+          username: 'df_admin',
+          charset: 'utf8mb4',
+          collation: 'utf8mb4_unicode_ci',
+        },
+      },
+    },
+    security: {
+      jwt_ttl: 60,
+      jwt_refresh_ttl: 20160,
+      password_min_length: 8,
+      max_login_attempts: 5,
+      lockout_duration: 900,
+    },
+    cache: {
+      default: 'redis',
+      prefix: 'df',
+      default_ttl: 3600,
+    },
+  }, null, 2),
+  'documents/manual.pdf': new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2D]), // PDF header bytes
+  'images/logo.png': new Uint8Array([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]), // PNG header bytes
+  'scripts/backup.sh': '#!/bin/bash\n\n# DreamFactory backup script\n\necho "Starting backup..."\n\n# Database backup\nmysqldump -u $DB_USER -p$DB_PASS $DB_NAME > backup_$(date +%Y%m%d_%H%M%S).sql\n\n# File backup\ntar -czf files_backup_$(date +%Y%m%d_%H%M%S).tar.gz /app/storage\n\necho "Backup completed successfully!"',
+  'application.log': generateMockLogContent('application'),
+  'error.log': generateMockLogContent('error'),
+  'access.log': generateMockLogContent('access'),
+};
+
+/**
+ * Generates mock log content for testing
+ */
+function generateMockLogContent(type: string): string {
+  const now = new Date();
+  const lines: string[] = [];
+  
+  for (let i = 0; i < 100; i++) {
+    const timestamp = new Date(now.getTime() - (i * 60000)).toISOString();
+    
+    switch (type) {
+      case 'application':
+        lines.push(`[${timestamp}] INFO: Application started successfully`);
+        lines.push(`[${timestamp}] INFO: Database connection established`);
+        lines.push(`[${timestamp}] INFO: Cache system initialized`);
+        break;
+      case 'error':
+        lines.push(`[${timestamp}] ERROR: Failed to connect to external service`);
+        lines.push(`[${timestamp}] WARNING: High memory usage detected`);
+        lines.push(`[${timestamp}] ERROR: Database query timeout`);
+        break;
+      case 'access':
+        lines.push(`[${timestamp}] GET /api/v2/system/service - 200 - 125ms`);
+        lines.push(`[${timestamp}] POST /api/v2/mysql_prod/users - 201 - 45ms`);
+        lines.push(`[${timestamp}] GET /api/v2/files/local_files - 200 - 23ms`);
+        break;
+    }
+  }
+  
+  return lines.join('\n');
+}
 
 // ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
 
 /**
- * Get MIME type based on file extension
+ * Parses file path from URL and extracts service name and path
  */
-function getMimeType(filename: string): string {
-  const ext = filename.toLowerCase().split('.').pop();
-  const mimeTypes: Record<string, string> = {
-    // Text files
-    txt: 'text/plain',
-    md: 'text/markdown',
-    csv: 'text/csv',
-    log: 'text/plain',
-    
-    // Web files
-    html: 'text/html',
-    css: 'text/css',
-    js: 'application/javascript',
-    json: 'application/json',
-    xml: 'application/xml',
-    
-    // Images
-    jpg: 'image/jpeg',
-    jpeg: 'image/jpeg',
-    png: 'image/png',
-    gif: 'image/gif',
-    svg: 'image/svg+xml',
-    webp: 'image/webp',
-    
-    // Documents
-    pdf: 'application/pdf',
-    doc: 'application/msword',
-    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    xls: 'application/vnd.ms-excel',
-    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    
-    // Archives
-    zip: 'application/zip',
-    tar: 'application/x-tar',
-    gz: 'application/gzip',
-    
-    // Audio/Video
-    mp3: 'audio/mpeg',
-    mp4: 'video/mp4',
-    avi: 'video/x-msvideo',
-    
-    // Default
-    default: 'application/octet-stream',
-  };
+function parseFilePath(url: string): { serviceName: string; filePath: string } {
+  const urlObj = new URL(url);
+  const pathSegments = urlObj.pathname.split('/');
   
-  return mimeTypes[ext || ''] || mimeTypes.default;
-}
-
-/**
- * Get file system entries for a given path
- */
-function getFileSystemEntries(path: string): FileSystemEntry[] {
-  // Normalize path - remove trailing slash except for root
-  const normalizedPath = path === '/' ? '/' : path.replace(/\/$/, '');
-  return mockFileSystem[normalizedPath] || [];
-}
-
-/**
- * Find a specific file or directory by path
- */
-function findFileSystemEntry(path: string): FileSystemEntry | null {
-  // Check if path exists in our mock data
-  const entries = getFileSystemEntries(path);
-  if (entries.length > 0) {
-    // This is a directory
-    return {
-      name: path.split('/').pop() || path,
-      path,
-      type: 'folder',
-      last_modified: new Date().toISOString(),
-      metadata: {
-        owner: 'system',
-        permissions: 'drwxr-xr-x',
-      },
-    };
+  // Handle both /api/v2/files/{service} and /{service} patterns
+  let serviceIndex = pathSegments.findIndex(segment => segment === 'files');
+  if (serviceIndex === -1) {
+    // Direct service access pattern
+    serviceIndex = pathSegments.findIndex(segment => segment === 'api') + 2; // Skip 'api', 'v2'
+  } else {
+    serviceIndex += 1; // Move to service name after 'files'
   }
   
-  // Look for the file in parent directories
-  const pathParts = path.split('/');
-  const fileName = pathParts.pop();
-  const parentPath = pathParts.join('/') || '/';
-  const parentEntries = getFileSystemEntries(parentPath);
+  const serviceName = pathSegments[serviceIndex] || '';
+  const filePath = pathSegments.slice(serviceIndex + 1).join('/');
   
-  return parentEntries.find(entry => entry.name === fileName) || null;
+  return { serviceName, filePath };
 }
 
 /**
- * Create a new file entry
+ * Gets file metadata from mock file system
  */
-function createFileEntry(
-  path: string,
-  content: string | Buffer,
-  contentType?: string,
-  metadata?: any
-): FileSystemEntry {
-  const fileName = path.split('/').pop() || path;
-  const size = typeof content === 'string' ? content.length : content.length;
-  const now = new Date().toISOString();
+function getFileMetadata(serviceName: string, filePath: string): FileMetadata | null {
+  const key = filePath ? `${serviceName}/${filePath}` : serviceName;
+  const files = mockFileSystem[key];
   
-  return {
-    name: fileName,
-    path,
-    type: 'file',
-    size,
-    content_type: contentType || getMimeType(fileName),
-    last_modified: now,
-    content: typeof content === 'string' ? content : undefined,
-    is_base64: typeof content !== 'string',
-    metadata: {
-      owner: 'user',
-      permissions: '-rw-r--r--',
-      created: now,
-      modified: now,
-      accessed: now,
-      ...metadata,
-    },
+  if (!files) return null;
+  
+  // If requesting a specific file
+  if (filePath && !filePath.endsWith('/')) {
+    const fileName = filePath.split('/').pop();
+    return files.find(file => file.name === fileName) || null;
+  }
+  
+  return null;
+}
+
+/**
+ * Gets directory listing from mock file system
+ */
+function getDirectoryListing(serviceName: string, filePath: string = ''): FileMetadata[] {
+  const key = filePath ? `${serviceName}/${filePath}`.replace(/\/$/, '') : serviceName;
+  return mockFileSystem[key] || [];
+}
+
+/**
+ * Generates file URL for download
+ */
+function generateFileUrl(serviceName: string, filePath: string): string {
+  const service = mockFileServices.find(s => s.name === serviceName);
+  if (!service) return '';
+  
+  const baseUrl = service.config.url || `/files/${serviceName}`;
+  return `${baseUrl}/${filePath}`;
+}
+
+/**
+ * Determines content type from file extension
+ */
+function getContentTypeFromExtension(filename: string): string {
+  const ext = filename.split('.').pop()?.toLowerCase();
+  
+  const mimeTypes: Record<string, string> = {
+    txt: 'text/plain',
+    json: 'application/json',
+    pdf: 'application/pdf',
+    png: 'image/png',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    gif: 'image/gif',
+    svg: 'image/svg+xml',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    zip: 'application/zip',
+    sh: 'application/x-sh',
+    py: 'text/x-python',
+    js: 'text/javascript',
+    css: 'text/css',
+    html: 'text/html',
+    xml: 'application/xml',
+    csv: 'text/csv',
+    log: 'text/plain',
   };
+  
+  return mimeTypes[ext || ''] || 'application/octet-stream';
 }
 
 /**
- * Simulate file upload progress
+ * Simulates file upload progress
  */
-function simulateUploadProgress(): UploadProgress[] {
-  return [
-    { loaded: 0, total: 100, percentage: 0, status: 'uploading', message: 'Starting upload...' },
-    { loaded: 25, total: 100, percentage: 25, status: 'uploading', message: 'Uploading...' },
-    { loaded: 50, total: 100, percentage: 50, status: 'uploading', message: 'Uploading...' },
-    { loaded: 75, total: 100, percentage: 75, status: 'uploading', message: 'Uploading...' },
-    { loaded: 90, total: 100, percentage: 90, status: 'processing', message: 'Processing file...' },
-    { loaded: 100, total: 100, percentage: 100, status: 'complete', message: 'Upload complete!' },
-  ];
+async function simulateFileUploadProgress(
+  fileSize: number,
+  onProgress?: (progress: FileUploadProgress) => void
+): Promise<void> {
+  const totalChunks = Math.ceil(fileSize / 1024); // 1KB chunks
+  let loaded = 0;
+  const startTime = Date.now();
+  
+  for (let i = 0; i < totalChunks; i++) {
+    const chunkSize = Math.min(1024, fileSize - loaded);
+    loaded += chunkSize;
+    
+    const elapsed = Date.now() - startTime;
+    const speed = loaded / (elapsed / 1000); // bytes per second
+    const percentage = (loaded / fileSize) * 100;
+    const timeRemaining = speed > 0 ? (fileSize - loaded) / speed : 0;
+    
+    if (onProgress) {
+      onProgress({
+        loaded,
+        total: fileSize,
+        percentage,
+        speed,
+        timeRemaining,
+      });
+    }
+    
+    // Simulate chunk upload delay
+    await simulateNetworkDelay(50);
+  }
+}
+
+/**
+ * Validates file operation permissions
+ */
+function validateFilePermissions(
+  operation: 'read' | 'write' | 'delete',
+  metadata: FileMetadata
+): boolean {
+  switch (operation) {
+    case 'read':
+      return metadata.is_readable || false;
+    case 'write':
+      return metadata.is_writable || false;
+    case 'delete':
+      return metadata.is_writable || false;
+    default:
+      return false;
+  }
 }
 
 // ============================================================================
@@ -647,89 +670,132 @@ function simulateUploadProgress(): UploadProgress[] {
 // ============================================================================
 
 /**
- * Handler for file service discovery
- * GET /api/v2/system/service - Returns available file services
+ * GET /api/v2/{service}/_schema - File service discovery
+ * Returns file service schema for service discovery
  */
-export const getFileServicesHandler: RequestHandler = http.get(
-  '/api/v2/system/service',
-  async ({ request }) => {
-    await simulateNetworkDelay();
-    logRequest(request, 'File Services Discovery');
+export const fileServiceDiscoveryHandler = http.get(
+  '*/api/v2/:service/_schema',
+  async ({ request, params }) => {
+    await simulateNetworkDelay(100);
+    logRequest(request, { handler: 'fileServiceDiscovery', params });
 
+    const { service } = params as { service: string };
+    
     // Validate authentication
-    const authValidation = validateAuthHeaders(request);
-    if (!authValidation.isValid) {
-      return authValidation.hasApiKey 
-        ? errorScenarios.auth.invalidSession()
-        : errorScenarios.auth.missingApiKey();
+    const authResult = validateAuthHeaders(request);
+    if (!authResult.isValid) {
+      return createDreamFactoryError(
+        ERROR_CODES.AUTHENTICATION_REQUIRED,
+        'Authentication required for file service discovery',
+        401
+      );
     }
 
-    // Extract query parameters
-    const url = new URL(request.url);
-    const queryParams = extractQueryParams(url.toString());
-    const { filter, limit, offset } = queryParams;
-
-    try {
-      // Get all services and filter for file services
-      let services = Object.values(fileServices);
-
-      // Apply filter if provided
-      if (filter) {
-        const filterLower = filter.toLowerCase();
-        services = services.filter(service => 
-          service.name.toLowerCase().includes(filterLower) ||
-          service.label.toLowerCase().includes(filterLower) ||
-          service.type.toLowerCase().includes(filterLower)
-        );
-      }
-
-      // Apply pagination
-      const paginatedServices = paginateData(services, limit, offset);
-      const meta = createPaginationMeta(services.length, limit, offset);
-
+    // Check if service is a file service
+    const fileService = mockFileServices.find(s => s.name === service);
+    if (!fileService) {
+      // Return empty schema for non-file services (fallback behavior)
       return createJsonResponse({
-        resource: paginatedServices,
-        meta,
+        table: [],
+        view: [],
+        procedure: [],
+        function: [],
+        sequence: [],
       });
-
-    } catch (error) {
-      return createServerError('Failed to retrieve file services');
     }
+
+    // Return file service schema
+    const schema = {
+      table: [
+        {
+          name: '_files',
+          label: 'Files',
+          description: 'File system access',
+          access: fileService.is_active ? ['GET', 'POST', 'PUT', 'DELETE'] : ['GET'],
+          fields: [
+            {
+              name: 'name',
+              label: 'File Name',
+              type: 'string',
+              required: true,
+            },
+            {
+              name: 'path',
+              label: 'File Path',
+              type: 'string',
+              required: true,
+            },
+            {
+              name: 'type',
+              label: 'Type',
+              type: 'string',
+              enum: ['file', 'folder'],
+            },
+            {
+              name: 'content_type',
+              label: 'Content Type',
+              type: 'string',
+            },
+            {
+              name: 'content_length',
+              label: 'Size',
+              type: 'integer',
+            },
+            {
+              name: 'last_modified',
+              label: 'Last Modified',
+              type: 'datetime',
+            },
+          ],
+        },
+      ],
+      view: [],
+      procedure: [],
+      function: [],
+      sequence: [],
+    };
+
+    return createJsonResponse(schema);
   }
 );
 
 /**
- * Handler for specific file service information
- * GET /api/v2/system/service/{serviceName} - Returns specific file service details
+ * GET /system/api/v2/environment - Get system environment including file services
  */
-export const getFileServiceHandler: RequestHandler = http.get(
-  '/api/v2/system/service/:serviceName',
-  async ({ request, params }) => {
-    await simulateNetworkDelay();
-    logRequest(request, 'File Service Details');
-
-    const serviceName = params.serviceName as string;
+export const systemEnvironmentHandler = http.get(
+  '*/system/api/v2/environment',
+  async ({ request }) => {
+    await simulateNetworkDelay(50);
+    logRequest(request, { handler: 'systemEnvironment' });
 
     // Validate authentication
-    const authValidation = validateAuthHeaders(request);
-    if (!authValidation.isValid) {
-      return authValidation.hasApiKey 
-        ? errorScenarios.auth.invalidSession()
-        : errorScenarios.auth.missingApiKey();
+    const authResult = validateAuthHeaders(request);
+    if (!authResult.isValid) {
+      return createDreamFactoryError(
+        ERROR_CODES.AUTHENTICATION_REQUIRED,
+        'Authentication required for system environment',
+        401
+      );
     }
 
-    try {
-      const service = fileServices[serviceName as keyof typeof fileServices];
-      
-      if (!service) {
-        return errorScenarios.resources.serviceNotFound(serviceName);
-      }
+    const environment = {
+      platform: {
+        version: '5.2.1',
+        build: '2024.03.15',
+        edition: 'Silver',
+        license_key: 'DF-SLV-XXXX-XXXX-XXXX-XXXX',
+      },
+      app: {
+        name: 'DreamFactory Admin Interface',
+        environment: 'testing',
+        debug: true,
+      },
+      services: {
+        file: mockFileServices.filter(service => service.is_active),
+      },
+    };
 
-      return createJsonResponse(service);
-
-    } catch (error) {
-      return createServerError(`Failed to retrieve service '${serviceName}'`);
-    }
+    return createJsonResponse(environment);
   }
 );
 
@@ -738,321 +804,148 @@ export const getFileServiceHandler: RequestHandler = http.get(
 // ============================================================================
 
 /**
- * Handler for directory listing and file browsing
- * GET /api/v2/{serviceName}/ - List files and directories in root
- * GET /api/v2/{serviceName}/{path} - List files and directories in specific path
+ * GET /api/v2/files/{service}/* - File browsing and listing
+ * Returns directory listings or file metadata
  */
-export const fileBrowsingHandler: RequestHandler = http.get(
-  '/api/v2/:serviceName/*',
+export const fileBrowsingHandler = http.get(
+  '*/api/v2/files/:service/*',
   async ({ request, params }) => {
-    await simulateNetworkDelay();
-    logRequest(request, 'File Browsing');
-
-    const serviceName = params.serviceName as string;
-    const pathParam = params['*'] as string;
+    await simulateNetworkDelay(150);
     
-    // Determine the path - default to root if not provided
-    const requestedPath = pathParam ? `/${pathParam}` : '/';
+    const { service } = params as { service: string };
+    const { serviceName, filePath } = parseFilePath(request.url);
+    
+    logRequest(request, { 
+      handler: 'fileBrowsing', 
+      serviceName, 
+      filePath,
+      params 
+    });
 
     // Validate authentication
-    const authValidation = validateAuthHeaders(request);
-    if (!authValidation.isValid) {
-      return authValidation.hasApiKey 
-        ? errorScenarios.auth.invalidSession()
-        : errorScenarios.auth.missingApiKey();
+    const authResult = validateAuthHeaders(request);
+    if (!authResult.isValid) {
+      return createDreamFactoryError(
+        ERROR_CODES.AUTHENTICATION_REQUIRED,
+        'Authentication required for file access',
+        401
+      );
     }
 
-    try {
-      // Check if service exists
-      if (!fileServices[serviceName as keyof typeof fileServices]) {
-        return errorScenarios.resources.serviceNotFound(serviceName);
-      }
-
-      // Extract query parameters
-      const url = new URL(request.url);
-      const queryParams = extractQueryParams(url.toString());
-      const { include_files = true, include_folders = true, limit, offset } = queryParams;
-
-      // Get entries for the requested path
-      let entries = getFileSystemEntries(requestedPath);
-
-      // Filter by type if requested
-      if (!include_files) {
-        entries = entries.filter(entry => entry.type === 'folder');
-      }
-      if (!include_folders) {
-        entries = entries.filter(entry => entry.type === 'file');
-      }
-
-      // Apply pagination
-      const paginatedEntries = paginateData(entries, limit, offset);
-      const meta = {
-        ...createPaginationMeta(entries.length, limit, offset),
-        path: requestedPath,
-        container: serviceName,
-      };
-
-      const response: DirectoryListing = {
-        resource: paginatedEntries,
-        meta,
-      };
-
-      return createJsonResponse(response);
-
-    } catch (error) {
-      return createServerError('Failed to retrieve directory listing');
-    }
-  }
-);
-
-/**
- * Handler for specific file content retrieval
- * GET /api/v2/{serviceName}/{filePath} - Get file content with metadata
- */
-export const fileContentHandler: RequestHandler = http.get(
-  '/api/v2/:serviceName/:filePath+',
-  async ({ request, params }) => {
-    await simulateNetworkDelay();
-    logRequest(request, 'File Content Retrieval');
-
-    const serviceName = params.serviceName as string;
-    const filePath = `/${params.filePath}`;
-
-    // Validate authentication
-    const authValidation = validateAuthHeaders(request);
-    if (!authValidation.isValid) {
-      return authValidation.hasApiKey 
-        ? errorScenarios.auth.invalidSession()
-        : errorScenarios.auth.missingApiKey();
+    // Check if service exists
+    const fileService = mockFileServices.find(s => s.name === serviceName);
+    if (!fileService) {
+      return createServiceNotFoundError(serviceName);
     }
 
-    try {
-      // Check if service exists
-      if (!fileServices[serviceName as keyof typeof fileServices]) {
-        return errorScenarios.resources.serviceNotFound(serviceName);
+    // Extract query parameters
+    const queryParams = extractQueryParams(request);
+    const { limit = 25, offset = 0, filter, fields, include_count = true } = queryParams;
+
+    // Check if requesting specific file
+    if (filePath && !filePath.endsWith('/')) {
+      const metadata = getFileMetadata(serviceName, filePath);
+      if (!metadata) {
+        return createResourceNotFoundError('File', filePath);
       }
 
-      // Find the file
-      const fileEntry = findFileSystemEntry(filePath);
-      
-      if (!fileEntry) {
-        return errorScenarios.resources.recordNotFound(filePath, 'file system');
+      // Check read permissions
+      if (!validateFilePermissions('read', metadata)) {
+        return createForbiddenError('Insufficient permissions to read file');
       }
 
-      if (fileEntry.type === 'folder') {
-        // If it's a folder, return directory listing
-        const entries = getFileSystemEntries(filePath);
-        return createJsonResponse({
-          resource: entries,
-          meta: {
-            count: entries.length,
-            total: entries.length,
-            path: filePath,
-            container: serviceName,
-          },
+      // Add download URL
+      metadata.url = generateFileUrl(serviceName, filePath);
+
+      return createJsonResponse(metadata);
+    }
+
+    // Get directory listing
+    let files = getDirectoryListing(serviceName, filePath);
+
+    // Apply filtering
+    if (filter) {
+      files = applyFilter(files, filter);
+    }
+
+    // Apply pagination
+    const { data: paginatedFiles, meta } = applyPagination(files, limit, offset);
+
+    // Filter fields if specified
+    if (fields) {
+      const fieldList = fields.split(',').map(f => f.trim());
+      const filteredFiles = paginatedFiles.map(file => {
+        const filtered: Partial<FileMetadata> = {};
+        fieldList.forEach(field => {
+          if (field in file) {
+            (filtered as any)[field] = (file as any)[field];
+          }
         });
-      }
-
-      // For file content, check if we should return content or metadata
-      const url = new URL(request.url);
-      const includeContent = url.searchParams.get('include_content') !== 'false';
-
-      if (includeContent && fileEntry.content) {
-        // Return file with content
-        return createJsonResponse(fileEntry);
-      } else {
-        // Return file metadata only
-        const { content, ...metadata } = fileEntry;
-        return createJsonResponse(metadata);
-      }
-
-    } catch (error) {
-      return createServerError('Failed to retrieve file content');
+        return filtered as FileMetadata;
+      });
+      return createListResponse(filteredFiles, meta);
     }
+
+    // Add URLs to files
+    const filesWithUrls = paginatedFiles.map(file => ({
+      ...file,
+      url: file.type === 'file' ? generateFileUrl(serviceName, file.path) : undefined,
+    }));
+
+    return createListResponse(filesWithUrls, meta);
   }
 );
 
-// ============================================================================
-// FILE UPLOAD HANDLERS
-// ============================================================================
-
 /**
- * Handler for file uploads
- * POST /api/v2/{serviceName}/ - Upload files to root directory
- * POST /api/v2/{serviceName}/{path} - Upload files to specific directory
+ * GET /api/v2/files/{service} - Root directory listing
  */
-export const fileUploadHandler: RequestHandler = http.post(
-  '/api/v2/:serviceName/*',
+export const fileRootListingHandler = http.get(
+  '*/api/v2/files/:service',
   async ({ request, params }) => {
-    await simulateNetworkDelay();
-    logRequest(request, 'File Upload');
-
-    const serviceName = params.serviceName as string;
-    const pathParam = params['*'] as string;
-    const uploadPath = pathParam ? `/${pathParam}` : '/';
+    await simulateNetworkDelay(100);
+    
+    const { service } = params as { service: string };
+    
+    logRequest(request, { handler: 'fileRootListing', service });
 
     // Validate authentication
-    const authValidation = validateAuthHeaders(request);
-    if (!authValidation.isValid) {
-      return authValidation.hasApiKey 
-        ? errorScenarios.auth.invalidSession()
-        : errorScenarios.auth.missingApiKey();
+    const authResult = validateAuthHeaders(request);
+    if (!authResult.isValid) {
+      return createDreamFactoryError(
+        ERROR_CODES.AUTHENTICATION_REQUIRED,
+        'Authentication required for file access',
+        401
+      );
     }
 
-    try {
-      // Check if service exists
-      const service = fileServices[serviceName as keyof typeof fileServices];
-      if (!service) {
-        return errorScenarios.resources.serviceNotFound(serviceName);
-      }
-
-      // Check if service is read-only
-      if (service.config.read_only) {
-        return createForbiddenError('Service is read-only');
-      }
-
-      // Handle FormData uploads
-      const contentType = request.headers.get('content-type') || '';
-      
-      if (contentType.includes('multipart/form-data')) {
-        try {
-          const formData = await request.formData();
-          const uploadedFiles: FileSystemEntry[] = [];
-
-          // Process each file in the form data
-          for (const [fieldName, file] of formData.entries()) {
-            if (file instanceof File) {
-              // Validate file size (mock 50MB limit)
-              if (file.size > 50 * 1024 * 1024) {
-                return createBadRequestError(
-                  `File '${file.name}' exceeds maximum size limit of 50MB`,
-                  { max_size: '50MB', file_size: file.size }
-                );
-              }
-
-              // Validate file extension if service has restrictions
-              if (service.config.allowed_extensions) {
-                const ext = file.name.toLowerCase().split('.').pop();
-                if (ext && !service.config.allowed_extensions.includes(ext)) {
-                  return createBadRequestError(
-                    `File type '.${ext}' is not allowed`,
-                    { 
-                      allowed_extensions: service.config.allowed_extensions,
-                      file_extension: ext 
-                    }
-                  );
-                }
-              }
-
-              // Create file entry
-              const filePath = `${uploadPath}/${file.name}`.replace(/\/+/g, '/');
-              const fileContent = await file.arrayBuffer();
-              
-              const fileEntry = createFileEntry(
-                filePath,
-                Buffer.from(fileContent),
-                file.type || getMimeType(file.name),
-                {
-                  original_name: file.name,
-                  upload_session: `session_${Date.now()}`,
-                  upload_time: new Date().toISOString(),
-                  field_name: fieldName,
-                }
-              );
-
-              uploadedFiles.push(fileEntry);
-
-              // Add to mock file system (in a real implementation, this would persist)
-              const parentPath = uploadPath === '/' ? '/' : uploadPath;
-              if (!mockFileSystem[parentPath]) {
-                mockFileSystem[parentPath] = [];
-              }
-              
-              // Remove existing file with same name
-              mockFileSystem[parentPath] = mockFileSystem[parentPath].filter(
-                entry => entry.name !== file.name
-              );
-              
-              // Add new file
-              mockFileSystem[parentPath].push(fileEntry);
-            }
-          }
-
-          if (uploadedFiles.length === 0) {
-            return createBadRequestError('No files found in upload request');
-          }
-
-          // Simulate upload progress completion
-          const progressData = simulateUploadProgress();
-          const finalProgress = progressData[progressData.length - 1];
-
-          return createJsonResponse({
-            resource: uploadedFiles,
-            meta: {
-              uploaded_count: uploadedFiles.length,
-              upload_path: uploadPath,
-              progress: finalProgress,
-              message: `Successfully uploaded ${uploadedFiles.length} file(s)`,
-            },
-          }, { status: 201 });
-
-        } catch (error) {
-          return createServerError('Failed to process file upload');
-        }
-
-      } else if (contentType.includes('application/json')) {
-        // Handle JSON-based file creation (with base64 content)
-        try {
-          const jsonData = await request.json();
-          
-          if (!jsonData.name) {
-            return createFieldValidationError('name', 'File name is required');
-          }
-
-          if (!jsonData.content && !jsonData.url) {
-            return createFieldValidationError('content', 'File content or URL is required');
-          }
-
-          const filePath = `${uploadPath}/${jsonData.name}`.replace(/\/+/g, '/');
-          
-          const fileEntry = createFileEntry(
-            filePath,
-            jsonData.content || '',
-            jsonData.content_type || getMimeType(jsonData.name),
-            {
-              description: jsonData.description,
-              tags: jsonData.tags,
-              source_url: jsonData.url,
-            }
-          );
-
-          // Add to mock file system
-          const parentPath = uploadPath === '/' ? '/' : uploadPath;
-          if (!mockFileSystem[parentPath]) {
-            mockFileSystem[parentPath] = [];
-          }
-          
-          // Remove existing file with same name
-          mockFileSystem[parentPath] = mockFileSystem[parentPath].filter(
-            entry => entry.name !== jsonData.name
-          );
-          
-          // Add new file
-          mockFileSystem[parentPath].push(fileEntry);
-
-          return createJsonResponse(fileEntry, { status: 201 });
-
-        } catch (error) {
-          return createBadRequestError('Invalid JSON in request body');
-        }
-
-      } else {
-        return createBadRequestError('Unsupported content type for file upload');
-      }
-
-    } catch (error) {
-      return createServerError('Failed to upload file');
+    // Check if service exists
+    const fileService = mockFileServices.find(s => s.name === service);
+    if (!fileService) {
+      return createServiceNotFoundError(service);
     }
+
+    // Extract query parameters
+    const queryParams = extractQueryParams(request);
+    const { limit = 25, offset = 0, filter } = queryParams;
+
+    // Get root directory listing
+    let files = getDirectoryListing(service);
+
+    // Apply filtering
+    if (filter) {
+      files = applyFilter(files, filter);
+    }
+
+    // Apply pagination
+    const { data: paginatedFiles, meta } = applyPagination(files, limit, offset);
+
+    // Add URLs to files
+    const filesWithUrls = paginatedFiles.map(file => ({
+      ...file,
+      url: file.type === 'file' ? generateFileUrl(service, file.path) : undefined,
+    }));
+
+    return createListResponse(filesWithUrls, meta);
   }
 );
 
@@ -1061,509 +954,467 @@ export const fileUploadHandler: RequestHandler = http.post(
 // ============================================================================
 
 /**
- * Handler for file downloads
- * GET /api/v2/{serviceName}/{filePath}?download=true - Download file as blob
+ * GET /files/{service}/* - File download (direct file access)
+ * Returns file content as blob response
  */
-export const fileDownloadHandler: RequestHandler = http.get(
-  '/api/v2/:serviceName/:filePath+',
+export const fileDownloadHandler = http.get(
+  '*/files/:service/*',
   async ({ request, params }) => {
-    const url = new URL(request.url);
-    const isDownload = url.searchParams.get('download') === 'true';
+    await simulateNetworkDelay(200);
     
-    // Only handle download requests in this handler
-    if (!isDownload) {
-      return; // Let other handlers process this request
+    const { service } = params as { service: string };
+    const { serviceName, filePath } = parseFilePath(request.url.replace('/files/', '/api/v2/files/'));
+    
+    logRequest(request, { 
+      handler: 'fileDownload', 
+      serviceName, 
+      filePath 
+    });
+
+    // Check if service exists
+    const fileService = mockFileServices.find(s => s.name === serviceName);
+    if (!fileService) {
+      return createServiceNotFoundError(serviceName);
     }
 
-    await simulateNetworkDelay();
-    logRequest(request, 'File Download');
-
-    const serviceName = params.serviceName as string;
-    const filePath = `/${params.filePath}`;
-
-    // Validate authentication
-    const authValidation = validateAuthHeaders(request);
-    if (!authValidation.isValid) {
-      return authValidation.hasApiKey 
-        ? errorScenarios.auth.invalidSession()
-        : errorScenarios.auth.missingApiKey();
+    // Get file metadata
+    const metadata = getFileMetadata(serviceName, filePath);
+    if (!metadata || metadata.type !== 'file') {
+      return createResourceNotFoundError('File', filePath);
     }
 
-    try {
-      // Check if service exists
-      if (!fileServices[serviceName as keyof typeof fileServices]) {
-        return errorScenarios.resources.serviceNotFound(serviceName);
-      }
-
-      // Find the file
-      const fileEntry = findFileSystemEntry(filePath);
-      
-      if (!fileEntry) {
-        return errorScenarios.resources.recordNotFound(filePath, 'file system');
-      }
-
-      if (fileEntry.type === 'folder') {
-        return createBadRequestError('Cannot download a directory');
-      }
-
-      // Generate mock file content if not present
-      let content = fileEntry.content || '';
-      if (!content && fileEntry.is_base64) {
-        // Generate dummy binary content for binary files
-        content = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
-      } else if (!content) {
-        content = `Mock content for ${fileEntry.name}`;
-      }
-
-      // Create appropriate response based on file type
-      const contentType = fileEntry.content_type || 'application/octet-stream';
-      const fileName = fileEntry.name;
-
-      if (fileEntry.is_base64) {
-        // Handle binary files
-        try {
-          const binaryData = Buffer.from(content, 'base64');
-          return new HttpResponse(binaryData, {
-            status: 200,
-            headers: {
-              'Content-Type': contentType,
-              'Content-Disposition': `attachment; filename="${fileName}"`,
-              'Content-Length': binaryData.length.toString(),
-              'Cache-Control': 'no-cache',
-            },
-          });
-        } catch (error) {
-          return createServerError('Failed to decode file content');
-        }
-      } else {
-        // Handle text files
-        return new HttpResponse(content, {
-          status: 200,
-          headers: {
-            'Content-Type': contentType,
-            'Content-Disposition': `attachment; filename="${fileName}"`,
-            'Content-Length': content.length.toString(),
-            'Cache-Control': 'no-cache',
-          },
-        });
-      }
-
-    } catch (error) {
-      return createServerError('Failed to download file');
+    // Check read permissions
+    if (!validateFilePermissions('read', metadata)) {
+      return createForbiddenError('Insufficient permissions to download file');
     }
+
+    // Get file content
+    const contentKey = filePath;
+    const content = mockFileContent[contentKey] || mockFileContent[metadata.name];
+    
+    if (!content) {
+      return createInternalServerError('File content not available');
+    }
+
+    // Return blob response with appropriate headers
+    return createBlobResponse(
+      content,
+      metadata.content_type,
+      metadata.name
+    );
   }
 );
 
 // ============================================================================
-// FILE MANAGEMENT HANDLERS
+// FILE UPLOAD HANDLERS
 // ============================================================================
 
 /**
- * Handler for file updates
- * PUT /api/v2/{serviceName}/{filePath} - Update file content
+ * POST /api/v2/files/{service}/* - File upload and directory creation
+ * Handles FormData uploads and directory creation requests
  */
-export const fileUpdateHandler: RequestHandler = http.put(
-  '/api/v2/:serviceName/:filePath+',
+export const fileUploadHandler = http.post(
+  '*/api/v2/files/:service/*',
   async ({ request, params }) => {
-    await simulateNetworkDelay();
-    logRequest(request, 'File Update');
-
-    const serviceName = params.serviceName as string;
-    const filePath = `/${params.filePath}`;
+    await simulateNetworkDelay(300);
+    
+    const { service } = params as { service: string };
+    const { serviceName, filePath } = parseFilePath(request.url);
+    
+    logRequest(request, { 
+      handler: 'fileUpload', 
+      serviceName, 
+      filePath,
+      contentType: request.headers.get('content-type')
+    });
 
     // Validate authentication
-    const authValidation = validateAuthHeaders(request);
-    if (!authValidation.isValid) {
-      return authValidation.hasApiKey 
-        ? errorScenarios.auth.invalidSession()
-        : errorScenarios.auth.missingApiKey();
+    const authResult = validateAuthHeaders(request);
+    if (!authResult.isValid) {
+      return createDreamFactoryError(
+        ERROR_CODES.AUTHENTICATION_REQUIRED,
+        'Authentication required for file upload',
+        401
+      );
     }
 
-    try {
-      // Check if service exists
-      const service = fileServices[serviceName as keyof typeof fileServices];
-      if (!service) {
-        return errorScenarios.resources.serviceNotFound(serviceName);
-      }
+    // Check if service exists
+    const fileService = mockFileServices.find(s => s.name === serviceName);
+    if (!fileService) {
+      return createServiceNotFoundError(serviceName);
+    }
 
-      // Check if service is read-only
-      if (service.config.read_only) {
-        return createForbiddenError('Service is read-only');
-      }
+    // Check if service is writable
+    if (!fileService.is_active) {
+      return createForbiddenError('File service is not active');
+    }
 
-      // Find the existing file
-      const existingFile = findFileSystemEntry(filePath);
-      if (!existingFile || existingFile.type === 'folder') {
-        return errorScenarios.resources.recordNotFound(filePath, 'file system');
-      }
+    const contentType = request.headers.get('content-type') || '';
 
+    // Handle FormData uploads
+    if (contentType.includes('multipart/form-data')) {
       try {
-        const updateData = await request.json();
-        
-        // Update file content and metadata
-        const updatedFile: FileSystemEntry = {
-          ...existingFile,
-          content: updateData.content || existingFile.content,
-          content_type: updateData.content_type || existingFile.content_type,
-          last_modified: new Date().toISOString(),
-          size: updateData.content ? updateData.content.length : existingFile.size,
-          metadata: {
-            ...existingFile.metadata,
-            modified: new Date().toISOString(),
-            editor: authValidation.sessionToken ? 'authenticated_user' : 'api_user',
-            ...updateData.metadata,
-          },
-        };
+        const formData = await request.formData();
+        const uploadedFiles: FileMetadata[] = [];
 
-        // Update in mock file system
-        const pathParts = filePath.split('/');
-        const fileName = pathParts.pop();
-        const parentPath = pathParts.join('/') || '/';
-        
-        if (mockFileSystem[parentPath]) {
-          const fileIndex = mockFileSystem[parentPath].findIndex(entry => entry.name === fileName);
-          if (fileIndex !== -1) {
-            mockFileSystem[parentPath][fileIndex] = updatedFile;
+        // Process each file in the FormData
+        for (const [key, value] of formData.entries()) {
+          if (value instanceof File) {
+            // Simulate upload progress
+            await simulateFileUploadProgress(value.size);
+
+            // Create file metadata
+            const uploadPath = filePath ? `${filePath}/${value.name}` : value.name;
+            const fileMetadata: FileMetadata = {
+              name: value.name,
+              path: uploadPath,
+              type: 'file',
+              content_type: value.type || getContentTypeFromExtension(value.name),
+              content_length: value.size,
+              last_modified: new Date().toISOString(),
+              is_readable: true,
+              is_writable: true,
+              is_executable: value.name.endsWith('.sh') || value.name.endsWith('.py'),
+              md5_checksum: `mock_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              etag: `"${value.size}-${Date.now()}"`,
+              url: generateFileUrl(serviceName, uploadPath),
+            };
+
+            uploadedFiles.push(fileMetadata);
+
+            // Store content for potential download testing
+            const reader = new FileReader();
+            reader.onload = () => {
+              mockFileContent[uploadPath] = new Uint8Array(reader.result as ArrayBuffer);
+            };
+            reader.readAsArrayBuffer(value);
           }
         }
 
-        return createJsonResponse(updatedFile);
+        if (uploadedFiles.length === 0) {
+          return createValidationError('No files found in upload', {
+            files: ['At least one file must be uploaded'],
+          });
+        }
 
+        return createJsonResponse({
+          resource: uploadedFiles,
+          count: uploadedFiles.length,
+        }, 201);
       } catch (error) {
-        return createBadRequestError('Invalid JSON in request body');
+        return createInternalServerError('Failed to process file upload');
       }
-
-    } catch (error) {
-      return createServerError('Failed to update file');
-    }
-  }
-);
-
-/**
- * Handler for file and directory deletion
- * DELETE /api/v2/{serviceName}/{path} - Delete file or directory
- */
-export const fileDeleteHandler: RequestHandler = http.delete(
-  '/api/v2/:serviceName/:filePath+',
-  async ({ request, params }) => {
-    await simulateNetworkDelay();
-    logRequest(request, 'File Delete');
-
-    const serviceName = params.serviceName as string;
-    const filePath = `/${params.filePath}`;
-
-    // Validate authentication
-    const authValidation = validateAuthHeaders(request);
-    if (!authValidation.isValid) {
-      return authValidation.hasApiKey 
-        ? errorScenarios.auth.invalidSession()
-        : errorScenarios.auth.missingApiKey();
     }
 
+    // Handle JSON requests for directory creation
     try {
-      // Check if service exists
-      const service = fileServices[serviceName as keyof typeof fileServices];
-      if (!service) {
-        return errorScenarios.resources.serviceNotFound(serviceName);
-      }
+      const body = await processRequestBody(request);
+      const { transformedRequestBody } = applyCaseTransformation(request, body);
+      const requestData = transformedRequestBody as CreateDirectoryRequest;
 
-      // Check if service is read-only
-      if (service.config.read_only) {
-        return createForbiddenError('Service is read-only');
-      }
-
-      // Find the file or directory
-      const entry = findFileSystemEntry(filePath);
-      if (!entry) {
-        return errorScenarios.resources.recordNotFound(filePath, 'file system');
-      }
-
-      // Check if it's a directory with contents
-      if (entry.type === 'folder') {
-        const url = new URL(request.url);
-        const force = url.searchParams.get('force') === 'true';
-        
-        const contents = getFileSystemEntries(filePath);
-        if (contents.length > 0 && !force) {
-          return createBadRequestError(
-            'Directory is not empty. Use force=true to delete recursively.',
-            { 
-              path: filePath,
-              contents_count: contents.length,
-              suggestion: 'Add ?force=true to delete recursively'
-            }
-          );
-        }
-
-        // Delete directory and its contents
-        delete mockFileSystem[filePath];
-        
-        // Remove from parent directory listing
-        const pathParts = filePath.split('/');
-        const dirName = pathParts.pop();
-        const parentPath = pathParts.join('/') || '/';
-        
-        if (mockFileSystem[parentPath]) {
-          mockFileSystem[parentPath] = mockFileSystem[parentPath].filter(
-            e => e.name !== dirName
-          );
-        }
-      } else {
-        // Delete file
-        const pathParts = filePath.split('/');
-        const fileName = pathParts.pop();
-        const parentPath = pathParts.join('/') || '/';
-        
-        if (mockFileSystem[parentPath]) {
-          mockFileSystem[parentPath] = mockFileSystem[parentPath].filter(
-            e => e.name !== fileName
-          );
-        }
-      }
-
-      return createJsonResponse({
-        message: `${entry.type === 'folder' ? 'Directory' : 'File'} deleted successfully`,
-        path: filePath,
-        type: entry.type,
-        deleted_at: new Date().toISOString(),
-      });
-
-    } catch (error) {
-      return createServerError('Failed to delete file or directory');
-    }
-  }
-);
-
-/**
- * Handler for directory creation
- * POST /api/v2/{serviceName}/ with folder=true - Create directory
- */
-export const directoryCreateHandler: RequestHandler = http.post(
-  '/api/v2/:serviceName/*',
-  async ({ request, params }) => {
-    const url = new URL(request.url);
-    const isFolder = url.searchParams.get('folder') === 'true';
-    
-    // Only handle directory creation requests
-    if (!isFolder) {
-      return; // Let file upload handler process this
-    }
-
-    await simulateNetworkDelay();
-    logRequest(request, 'Directory Creation');
-
-    const serviceName = params.serviceName as string;
-    const pathParam = params['*'] as string;
-    const basePath = pathParam ? `/${pathParam}` : '/';
-
-    // Validate authentication
-    const authValidation = validateAuthHeaders(request);
-    if (!authValidation.isValid) {
-      return authValidation.hasApiKey 
-        ? errorScenarios.auth.invalidSession()
-        : errorScenarios.auth.missingApiKey();
-    }
-
-    try {
-      // Check if service exists
-      const service = fileServices[serviceName as keyof typeof fileServices];
-      if (!service) {
-        return errorScenarios.resources.serviceNotFound(serviceName);
-      }
-
-      // Check if service is read-only
-      if (service.config.read_only) {
-        return createForbiddenError('Service is read-only');
-      }
-
-      try {
-        const requestData = await request.json();
-        
-        if (!requestData.name) {
-          return createFieldValidationError('name', 'Directory name is required');
-        }
-
-        const dirPath = `${basePath}/${requestData.name}`.replace(/\/+/g, '/');
-        
-        // Check if directory already exists
-        const existingEntry = findFileSystemEntry(dirPath);
-        if (existingEntry) {
-          return createBadRequestError(
-            `Directory '${requestData.name}' already exists`,
-            { path: dirPath, existing_type: existingEntry.type }
-          );
-        }
-
-        // Create directory entry
-        const now = new Date().toISOString();
-        const dirEntry: FileSystemEntry = {
+      if (requestData.name) {
+        // Single directory creation
+        const dirPath = filePath ? `${filePath}/${requestData.name}/` : `${requestData.name}/`;
+        const directoryMetadata: FileMetadata = {
           name: requestData.name,
           path: dirPath,
           type: 'folder',
-          last_modified: now,
-          metadata: {
-            owner: authValidation.sessionToken ? 'authenticated_user' : 'api_user',
-            permissions: 'drwxr-xr-x',
-            created: now,
-            modified: now,
-            accessed: now,
-            description: requestData.description,
-          },
+          last_modified: new Date().toISOString(),
+          is_readable: true,
+          is_writable: true,
+          is_executable: true,
         };
 
-        // Add to mock file system
-        mockFileSystem[dirPath] = [];
-        
-        // Add to parent directory listing
-        if (!mockFileSystem[basePath]) {
-          mockFileSystem[basePath] = [];
-        }
-        mockFileSystem[basePath].push(dirEntry);
-
-        return createJsonResponse(dirEntry, { status: 201 });
-
-      } catch (error) {
-        return createBadRequestError('Invalid JSON in request body');
+        return createJsonResponse(directoryMetadata, 201);
       }
 
+      if (requestData.resource && Array.isArray(requestData.resource)) {
+        // Bulk directory creation
+        const createdDirectories: FileMetadata[] = [];
+
+        for (const dir of requestData.resource) {
+          const dirPath = filePath ? `${filePath}/${dir.name}/` : `${dir.name}/`;
+          const directoryMetadata: FileMetadata = {
+            name: dir.name,
+            path: dirPath,
+            type: 'folder',
+            last_modified: new Date().toISOString(),
+            is_readable: true,
+            is_writable: true,
+            is_executable: true,
+          };
+          createdDirectories.push(directoryMetadata);
+        }
+
+        return createJsonResponse({
+          resource: createdDirectories,
+          count: createdDirectories.length,
+        }, 201);
+      }
+
+      return createValidationError('Invalid request format', {
+        name: ['Directory name is required'],
+      });
     } catch (error) {
-      return createServerError('Failed to create directory');
+      return createInternalServerError('Failed to create directory');
     }
   }
 );
 
-// ============================================================================
-// LOG FILE HANDLERS
-// ============================================================================
-
 /**
- * Handler for log file operations with fallback handling
- * GET /api/v2/logs/ - List log files
- * GET /api/v2/logs/{logFile} - Get log file content
+ * POST /api/v2/files/{service} - Root level upload
  */
-export const logFileHandler: RequestHandler = http.get(
-  '/api/v2/logs/*',
+export const fileRootUploadHandler = http.post(
+  '*/api/v2/files/:service',
   async ({ request, params }) => {
-    await simulateNetworkDelay();
-    logRequest(request, 'Log File Access');
-
-    const pathParam = params['*'] as string;
-    const logPath = pathParam ? `/logs/${pathParam}` : '/logs';
+    await simulateNetworkDelay(250);
+    
+    const { service } = params as { service: string };
+    
+    logRequest(request, { 
+      handler: 'fileRootUpload', 
+      service,
+      contentType: request.headers.get('content-type')
+    });
 
     // Validate authentication
-    const authValidation = validateAuthHeaders(request);
-    if (!authValidation.isValid) {
-      return authValidation.hasApiKey 
-        ? errorScenarios.auth.invalidSession()
-        : errorScenarios.auth.missingApiKey();
+    const authResult = validateAuthHeaders(request);
+    if (!authResult.isValid) {
+      return createDreamFactoryError(
+        ERROR_CODES.AUTHENTICATION_REQUIRED,
+        'Authentication required for file upload',
+        401
+      );
     }
 
-    try {
-      // Check for read permissions
-      if (!authValidation.isAuthenticated) {
-        return createForbiddenError('Log file access requires authentication');
-      }
+    // Check if service exists
+    const fileService = mockFileServices.find(s => s.name === service);
+    if (!fileService) {
+      return createServiceNotFoundError(service);
+    }
 
-      if (!pathParam) {
-        // List log files
-        const logEntries = getFileSystemEntries('/logs');
+    // Check if service is writable
+    if (!fileService.is_active) {
+      return createForbiddenError('File service is not active');
+    }
+
+    const contentType = request.headers.get('content-type') || '';
+
+    // Handle FormData uploads
+    if (contentType.includes('multipart/form-data')) {
+      try {
+        const formData = await request.formData();
+        const uploadedFiles: FileMetadata[] = [];
+
+        // Process each file in the FormData
+        for (const [key, value] of formData.entries()) {
+          if (value instanceof File) {
+            // Simulate upload progress
+            await simulateFileUploadProgress(value.size);
+
+            // Create file metadata
+            const fileMetadata: FileMetadata = {
+              name: value.name,
+              path: value.name,
+              type: 'file',
+              content_type: value.type || getContentTypeFromExtension(value.name),
+              content_length: value.size,
+              last_modified: new Date().toISOString(),
+              is_readable: true,
+              is_writable: true,
+              is_executable: value.name.endsWith('.sh') || value.name.endsWith('.py'),
+              md5_checksum: `mock_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              etag: `"${value.size}-${Date.now()}"`,
+              url: generateFileUrl(service, value.name),
+            };
+
+            uploadedFiles.push(fileMetadata);
+          }
+        }
+
+        if (uploadedFiles.length === 0) {
+          return createValidationError('No files found in upload', {
+            files: ['At least one file must be uploaded'],
+          });
+        }
+
         return createJsonResponse({
-          resource: logEntries,
-          meta: {
-            count: logEntries.length,
-            total: logEntries.length,
-            path: '/logs',
-            container: 'logs',
-          },
-        });
-      } else {
-        // Get specific log file content
-        const logFile = findFileSystemEntry(logPath);
-        
-        if (!logFile) {
-          return errorScenarios.resources.recordNotFound(pathParam, 'log files');
-        }
-
-        if (logFile.type === 'folder') {
-          return createBadRequestError('Cannot retrieve directory as log file');
-        }
-
-        // Return log file with content
-        return createJsonResponse(logFile);
+          resource: uploadedFiles,
+          count: uploadedFiles.length,
+        }, 201);
+      } catch (error) {
+        return createInternalServerError('Failed to process file upload');
       }
-
-    } catch (error) {
-      return createServerError('Failed to access log files');
     }
+
+    return createValidationError('Unsupported content type for file upload');
   }
 );
 
 // ============================================================================
-// EXPORT ALL FILE HANDLERS
+// FILE UPDATE HANDLERS
 // ============================================================================
 
 /**
- * Complete collection of file operation handlers for MSW setup
+ * PUT /api/v2/files/{service}/* - File replacement and updates
  */
-export const fileHandlers: RequestHandler[] = [
-  // Service discovery
-  getFileServicesHandler,
-  getFileServiceHandler,
-  
-  // Directory operations
-  directoryCreateHandler,
-  
-  // File operations (order matters - more specific first)
-  fileDownloadHandler,
-  fileUpdateHandler,
-  fileDeleteHandler,
-  fileUploadHandler,
-  fileContentHandler,
+export const fileUpdateHandler = http.put(
+  '*/api/v2/files/:service/*',
+  async ({ request, params }) => {
+    await simulateNetworkDelay(200);
+    
+    const { service } = params as { service: string };
+    const { serviceName, filePath } = parseFilePath(request.url);
+    
+    logRequest(request, { 
+      handler: 'fileUpdate', 
+      serviceName, 
+      filePath 
+    });
+
+    // Validate authentication
+    const authResult = validateAuthHeaders(request);
+    if (!authResult.isValid) {
+      return createDreamFactoryError(
+        ERROR_CODES.AUTHENTICATION_REQUIRED,
+        'Authentication required for file update',
+        401
+      );
+    }
+
+    // Check if service exists
+    const fileService = mockFileServices.find(s => s.name === serviceName);
+    if (!fileService) {
+      return createServiceNotFoundError(serviceName);
+    }
+
+    // Check if file exists
+    const metadata = getFileMetadata(serviceName, filePath);
+    if (!metadata) {
+      return createResourceNotFoundError('File', filePath);
+    }
+
+    // Check write permissions
+    if (!validateFilePermissions('write', metadata)) {
+      return createForbiddenError('Insufficient permissions to update file');
+    }
+
+    const contentType = request.headers.get('content-type') || '';
+
+    // Handle FormData uploads
+    if (contentType.includes('multipart/form-data')) {
+      try {
+        const formData = await request.formData();
+        const file = formData.get('file') as File;
+
+        if (!file) {
+          return createValidationError('No file provided for update');
+        }
+
+        // Simulate upload progress
+        await simulateFileUploadProgress(file.size);
+
+        // Update file metadata
+        const updatedMetadata: FileMetadata = {
+          ...metadata,
+          content_type: file.type || getContentTypeFromExtension(file.name),
+          content_length: file.size,
+          last_modified: new Date().toISOString(),
+          md5_checksum: `updated_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          etag: `"${file.size}-${Date.now()}"`,
+          url: generateFileUrl(serviceName, filePath),
+        };
+
+        return createJsonResponse(updatedMetadata);
+      } catch (error) {
+        return createInternalServerError('Failed to update file');
+      }
+    }
+
+    return createValidationError('Unsupported content type for file update');
+  }
+);
+
+// ============================================================================
+// FILE DELETION HANDLERS
+// ============================================================================
+
+/**
+ * DELETE /api/v2/files/{service}/* - File and directory deletion
+ */
+export const fileDeletionHandler = http.delete(
+  '*/api/v2/files/:service/*',
+  async ({ request, params }) => {
+    await simulateNetworkDelay(100);
+    
+    const { service } = params as { service: string };
+    const { serviceName, filePath } = parseFilePath(request.url);
+    
+    logRequest(request, { 
+      handler: 'fileDeletion', 
+      serviceName, 
+      filePath 
+    });
+
+    // Validate authentication
+    const authResult = validateAuthHeaders(request);
+    if (!authResult.isValid) {
+      return createDreamFactoryError(
+        ERROR_CODES.AUTHENTICATION_REQUIRED,
+        'Authentication required for file deletion',
+        401
+      );
+    }
+
+    // Check if service exists
+    const fileService = mockFileServices.find(s => s.name === serviceName);
+    if (!fileService) {
+      return createServiceNotFoundError(serviceName);
+    }
+
+    // Check if file/directory exists
+    const metadata = getFileMetadata(serviceName, filePath);
+    if (!metadata) {
+      return createResourceNotFoundError('File', filePath);
+    }
+
+    // Check delete permissions
+    if (!validateFilePermissions('delete', metadata)) {
+      return createForbiddenError('Insufficient permissions to delete file');
+    }
+
+    // For log service, prevent deletion of log files
+    if (serviceName === 'logs' && metadata.type === 'file') {
+      return createForbiddenError('Log files cannot be deleted');
+    }
+
+    // Return success response
+    return createJsonResponse({
+      name: metadata.name,
+      path: metadata.path,
+      deleted: true,
+      timestamp: new Date().toISOString(),
+    });
+  }
+);
+
+// ============================================================================
+// EXPORT HANDLERS
+// ============================================================================
+
+/**
+ * All file operation handlers for MSW
+ */
+export const fileHandlers = [
+  fileServiceDiscoveryHandler,
+  systemEnvironmentHandler,
   fileBrowsingHandler,
-  
-  // Log file operations
-  logFileHandler,
+  fileRootListingHandler,
+  fileDownloadHandler,
+  fileUploadHandler,
+  fileRootUploadHandler,
+  fileUpdateHandler,
+  fileDeletionHandler,
 ];
 
-/**
- * Export individual handlers for testing
- */
-export {
-  getFileServicesHandler,
-  getFileServiceHandler,
-  fileBrowsingHandler,
-  fileContentHandler,
-  fileUploadHandler,
-  fileDownloadHandler,
-  fileUpdateHandler,
-  fileDeleteHandler,
-  directoryCreateHandler,
-  logFileHandler,
-};
-
-/**
- * Export utility functions for testing
- */
-export {
-  getMimeType,
-  getFileSystemEntries,
-  findFileSystemEntry,
-  createFileEntry,
-  simulateUploadProgress,
-  mockFileSystem,
-  fileServices,
-};
-
-/**
- * Export type definitions
- */
-export type {
-  FileSystemEntry,
-  DirectoryListing,
-  UploadProgress,
-};
-
-/**
- * Default export for easy importing
- */
 export default fileHandlers;
