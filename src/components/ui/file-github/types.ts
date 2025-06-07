@@ -1,551 +1,842 @@
 /**
- * File GitHub Component Type Definitions
+ * TypeScript interface definitions for the file-github component
  * 
- * TypeScript 5.8+ interface definitions for the file-github component including
- * component props, file upload events, GitHub import configuration, and storage 
- * service types. Migrated from Angular types to React-specific patterns with proper
- * typing for controlled components, callback functions, and form integration.
+ * Provides comprehensive type safety for file operations, GitHub integration,
+ * editor mode configurations, and React-specific patterns including controlled
+ * components, callback functions, and form integration.
  * 
- * @fileoverview React component types for file operations and GitHub integration
+ * Migrated from Angular service types to React Query compatibility with
+ * enhanced TypeScript 5.8+ template literal types and improved inference.
+ * 
+ * @fileoverview File GitHub component type definitions
  * @version 1.0.0
+ * @since React 19.0.0 / Next.js 15.1+
  */
 
-import { type ReactNode, type RefObject, type ChangeEvent } from 'react';
-import { type FieldValues, type Path, type UseFormRegister, type FieldError } from 'react-hook-form';
-import { type AccessibilityProps, type ThemeProps, type ValidationState, type LoadingState } from '@/types/ui';
+import { ChangeEvent, FocusEvent, KeyboardEvent, MouseEvent, RefObject } from 'react';
+import { FieldPath, FieldValues, UseFormRegister, Control, FieldError } from 'react-hook-form';
+import { AceEditorMode, AceEditorTheme } from '../ace-editor/types';
+import { ApiResponse, ApiErrorResponse, KeyValuePair } from '@/types/api';
+
+// ============================================================================
+// Core File Operation Types
+// ============================================================================
 
 /**
- * ACE Editor mode enumeration for syntax highlighting
- * Reference to ace-editor component modes for consistent typing
+ * Supported file types for GitHub import and local file operations
+ * Enhanced with TypeScript 5.8+ template literal types for type safety
  */
-export enum AceEditorMode {
-  JSON = 'json',
-  YAML = 'yaml', 
-  TEXT = 'text',
-  JAVASCRIPT = 'javascript',
-  NODEJS = 'nodejs',
-  PHP = 'php',
-  PYTHON = 'python',
-  PYTHON3 = 'python3',
-  XML = 'xml',
-  HTML = 'html',
-  CSS = 'css',
-  SQL = 'sql',
-  MARKDOWN = 'markdown'
+export type SupportedFileType = 
+  | 'text/plain'
+  | 'application/json'
+  | 'application/x-yaml'
+  | 'text/yaml'
+  | 'application/javascript'
+  | 'text/javascript'
+  | 'application/typescript'
+  | 'text/x-php'
+  | 'text/x-python'
+  | 'text/x-python3'
+  | 'text/xml'
+  | 'application/xml'
+  | 'text/html'
+  | 'text/css'
+  | 'text/markdown';
+
+/**
+ * File size constraints and validation parameters
+ */
+export interface FileSizeConstraints {
+  /** Maximum file size in bytes (default: 5MB) */
+  maxSize: number;
+  /** Minimum file size in bytes (default: 0) */
+  minSize: number;
+  /** Warning threshold for large files (default: 1MB) */
+  warningThreshold: number;
 }
 
 /**
- * File upload event interface for type-safe event handling
- * Replaces Angular event types with React-specific patterns
+ * File metadata for uploaded or imported files
  */
-export interface FileUploadEvent {
-  /** Original file object from input element */
-  file: File;
-  /** File name for display */
-  fileName: string;
-  /** File size in bytes */
-  fileSize: number;
-  /** MIME type of the uploaded file */
-  mimeType: string;
-  /** File content as string */
-  content: string;
-  /** Upload timestamp */
-  timestamp: Date;
-  /** Optional file metadata */
-  metadata?: {
-    encoding?: string;
-    lastModified?: Date;
-    originalPath?: string;
-  };
-}
-
-/**
- * GitHub import result interface for successful imports
- */
-export interface GitHubImportResult {
-  /** GitHub repository URL */
-  repositoryUrl: string;
-  /** Imported file path within repository */
-  filePath: string;
-  /** File content retrieved from GitHub */
-  content: string;
-  /** Repository branch or commit hash */
-  ref: string;
-  /** GitHub API metadata */
-  metadata: {
-    sha: string;
-    size: number;
-    downloadUrl: string;
-    lastModified: Date;
-    author?: {
-      name: string;
-      email: string;
-      date: Date;
-    };
-  };
-  /** Import timestamp */
-  importedAt: Date;
-}
-
-/**
- * GitHub configuration for repository access
- */
-export interface GitHubConfig {
-  /** GitHub personal access token */
-  accessToken?: string;
-  /** Default repository owner/username */
-  defaultOwner?: string;
-  /** Default repository name */
-  defaultRepo?: string;
-  /** Default branch */
-  defaultBranch?: string;
-  /** API base URL for GitHub Enterprise */
-  apiBaseUrl?: string;
-  /** Rate limiting configuration */
-  rateLimit?: {
-    requestsPerHour: number;
-    retryAfter: number;
-  };
-}
-
-/**
- * Storage service interface migrated from Angular service types
- * with React Query compatibility for data synchronization
- */
-export interface StorageService {
-  /** Upload file to storage */
-  uploadFile: (file: File, options?: UploadOptions) => Promise<UploadResult>;
-  /** Download file from storage */
-  downloadFile: (filePath: string) => Promise<Blob>;
-  /** Delete file from storage */
-  deleteFile: (filePath: string) => Promise<void>;
-  /** List files in directory */
-  listFiles: (directory?: string) => Promise<FileInfo[]>;
-  /** Get file metadata */
-  getFileInfo: (filePath: string) => Promise<FileInfo>;
-  /** Check if file exists */
-  fileExists: (filePath: string) => Promise<boolean>;
-}
-
-/**
- * Upload options for storage service
- */
-export interface UploadOptions {
-  /** Target directory path */
-  directory?: string;
-  /** Overwrite existing file */
-  overwrite?: boolean;
-  /** File access permissions */
-  permissions?: 'public' | 'private' | 'restricted';
-  /** Additional metadata */
-  metadata?: Record<string, any>;
-  /** Progress callback */
-  onProgress?: (progress: UploadProgress) => void;
-}
-
-/**
- * Upload result from storage service
- */
-export interface UploadResult {
-  /** File path in storage */
-  filePath: string;
-  /** File URL if publicly accessible */
-  fileUrl?: string;
-  /** File size in bytes */
-  size: number;
-  /** Content type */
-  contentType: string;
-  /** Upload timestamp */
-  uploadedAt: Date;
-  /** Storage metadata */
-  metadata?: Record<string, any>;
-}
-
-/**
- * Upload progress information
- */
-export interface UploadProgress {
-  /** Bytes uploaded */
-  loaded: number;
-  /** Total bytes to upload */
-  total: number;
-  /** Upload percentage (0-100) */
-  percentage: number;
-  /** Upload speed in bytes per second */
-  speed?: number;
-  /** Estimated time remaining in seconds */
-  timeRemaining?: number;
-}
-
-/**
- * File information interface
- */
-export interface FileInfo {
-  /** File name */
+export interface FileMetadata {
+  /** Original filename */
   name: string;
-  /** Full file path */
-  path: string;
   /** File size in bytes */
   size: number;
   /** MIME type */
-  type: string;
-  /** Creation timestamp */
-  createdAt: Date;
+  type: SupportedFileType;
   /** Last modified timestamp */
-  modifiedAt: Date;
-  /** File permissions */
-  permissions?: {
-    read: boolean;
-    write: boolean;
-    execute: boolean;
-  };
-  /** Additional metadata */
-  metadata?: Record<string, any>;
+  lastModified: number;
+  /** File encoding (default: 'utf-8') */
+  encoding?: string;
+  /** GitHub-specific metadata if imported from GitHub */
+  github?: GitHubFileMetadata;
+  /** File content preview (first 500 characters) */
+  preview?: string;
+  /** File hash for content validation */
+  hash?: string;
 }
 
 /**
- * File selection mode enumeration
+ * GitHub-specific file metadata
  */
-export enum FileSelectionMode {
-  SINGLE = 'single',
-  MULTIPLE = 'multiple'
-}
-
-/**
- * Import source enumeration
- */
-export enum ImportSource {
-  LOCAL = 'local',
-  GITHUB = 'github',
-  URL = 'url'
-}
-
-/**
- * Main FileGithub component props interface
- * React component props with controlled component pattern replacing Angular @Input decorators
- */
-export interface FileGithubProps<T extends FieldValues = FieldValues> 
-  extends AccessibilityProps, ThemeProps {
-  
-  // Core component props
-  /** Unique component identifier */
-  id?: string;
-  /** Component name for form submission */
-  name?: string;
-  /** Custom CSS classes */
-  className?: string;
-  /** Component test identifier */
-  'data-testid'?: string;
-  
-  // File handling props
-  /** Current file content value */
-  value?: string;
-  /** Default file content for uncontrolled usage */
-  defaultValue?: string;
-  /** Accepted file types (MIME types or extensions) */
-  accept?: string;
-  /** Maximum file size in bytes */
-  maxFileSize?: number;
-  /** File selection mode */
-  selectionMode?: FileSelectionMode;
-  /** Import source options available */
-  importSources?: ImportSource[];
-  
-  // Editor configuration
-  /** ACE editor mode for syntax highlighting */
-  editorMode?: AceEditorMode;
-  /** Editor theme (auto-detected from app theme) */
-  editorTheme?: 'light' | 'dark' | 'auto';
-  /** Read-only editor state */
-  readOnly?: boolean;
-  /** Show line numbers */
-  showLineNumbers?: boolean;
-  /** Enable code folding */
-  enableCodeFolding?: boolean;
-  /** Enable autocomplete */
-  enableAutocomplete?: boolean;
-  /** Tab size for indentation */
-  tabSize?: number;
-  /** Use soft tabs (spaces) */
-  useSoftTabs?: boolean;
-  
-  // GitHub integration
-  /** GitHub configuration */
-  githubConfig?: GitHubConfig;
-  /** Enable GitHub import functionality */
-  enableGitHubImport?: boolean;
-  /** Default GitHub repository URL */
-  defaultGitHubRepo?: string;
-  /** GitHub file path suggestions */
-  githubFileSuggestions?: string[];
-  
-  // Storage integration
-  /** Storage service instance */
-  storageService?: StorageService;
-  /** Enable file upload to storage */
-  enableStorageUpload?: boolean;
-  /** Storage upload options */
-  storageOptions?: UploadOptions;
-  
-  // Form integration (React Hook Form)
-  /** Form register function for React Hook Form integration */
-  register?: UseFormRegister<T>;
-  /** Field name for React Hook Form */
-  fieldName?: Path<T>;
-  /** Validation rules for React Hook Form */
-  rules?: Parameters<UseFormRegister<T>>[1];
-  /** Field error from React Hook Form */
-  error?: FieldError;
-  
-  // Event handlers - React-specific callback function types
-  /** File content change handler */
-  onChange?: (content: string) => void;
-  /** File selection handler */
-  onFileSelect?: (event: FileUploadEvent) => void;
-  /** GitHub import success handler */
-  onGitHubImport?: (result: GitHubImportResult) => void;
-  /** GitHub import error handler */
-  onGitHubImportError?: (error: Error) => void;
-  /** Storage upload success handler */
-  onStorageUpload?: (result: UploadResult) => void;
-  /** Storage upload error handler */
-  onStorageUploadError?: (error: Error) => void;
-  /** Upload progress handler */
-  onUploadProgress?: (progress: UploadProgress) => void;
-  /** Editor focus handler */
-  onEditorFocus?: () => void;
-  /** Editor blur handler */
-  onEditorBlur?: () => void;
-  /** Validation change handler */
-  onValidationChange?: (validation: ValidationState) => void;
-  
-  // State management
-  /** Component loading state */
-  loading?: boolean;
-  /** Component disabled state */
-  disabled?: boolean;
-  /** Validation state */
-  validation?: ValidationState;
-  /** Loading state details */
-  loadingState?: LoadingState;
-  
-  // UI customization
-  /** Component label */
-  label?: string;
-  /** Helper text */
-  helperText?: string;
-  /** Placeholder text for empty state */
-  placeholder?: string;
-  /** Error message override */
-  errorMessage?: string;
-  /** Success message */
-  successMessage?: string;
-  /** Show file type indicator */
-  showFileType?: boolean;
-  /** Show file size indicator */
-  showFileSize?: boolean;
-  /** Show import buttons */
-  showImportButtons?: boolean;
-  /** Show editor toolbar */
-  showEditorToolbar?: boolean;
-  /** Compact layout mode */
-  compact?: boolean;
-  
-  // Advanced features
-  /** Enable drag and drop */
-  enableDragDrop?: boolean;
-  /** Enable paste from clipboard */
-  enableClipboardPaste?: boolean;
-  /** Enable undo/redo */
-  enableUndoRedo?: boolean;
-  /** Enable search and replace */
-  enableSearchReplace?: boolean;
-  /** Enable syntax validation */
-  enableSyntaxValidation?: boolean;
-  /** Custom validation function */
-  customValidator?: (content: string) => ValidationState;
-  
-  // Accessibility props (extended from AccessibilityProps)
-  /** Detailed aria-label for screen readers */
-  'aria-label'?: string;
-  /** Description reference for screen readers */
-  'aria-describedby'?: string;
-  /** Label reference for screen readers */
-  'aria-labelledby'?: string;
-  /** Invalid state for screen readers */
-  'aria-invalid'?: boolean;
-  /** Required state for screen readers */
-  'aria-required'?: boolean;
-  /** Screen reader announcements */
-  announcements?: {
-    onFileSelect?: string;
-    onGitHubImport?: string;
-    onUploadSuccess?: string;
-    onError?: string;
-  };
-  
-  // Theme integration (extended from ThemeProps)
-  /** Component color variant */
-  variant?: 'default' | 'primary' | 'secondary' | 'outline';
-  /** Component size variant */
-  size?: 'sm' | 'md' | 'lg';
-  /** Force light/dark theme */
-  forcedTheme?: 'light' | 'dark';
-  
-  // Advanced editor props
-  /** Editor reference for imperative access */
-  editorRef?: RefObject<any>;
-  /** Enable vim key bindings */
-  vimMode?: boolean;
-  /** Enable emacs key bindings */
-  emacsMode?: boolean;
-  /** Custom editor commands */
-  customCommands?: Array<{
-    name: string;
-    bindKey: string;
-    exec: (editor: any) => void;
-  }>;
-  /** Editor completions */
-  completions?: Array<{
-    caption: string;
-    value: string;
-    meta?: string;
-  }>;
-}
-
-/**
- * Component ref interface for imperative access
- */
-export interface FileGithubRef {
-  /** Focus the editor */
-  focus: () => void;
-  /** Blur the editor */
-  blur: () => void;
-  /** Get current editor content */
-  getContent: () => string;
-  /** Set editor content */
-  setContent: (content: string) => void;
-  /** Clear editor content */
-  clear: () => void;
-  /** Trigger file selection */
-  selectFile: () => void;
-  /** Get editor instance */
-  getEditor: () => any;
-  /** Insert text at cursor */
-  insertText: (text: string) => void;
-  /** Get current cursor position */
-  getCursorPosition: () => { row: number; column: number };
-  /** Set cursor position */
-  setCursorPosition: (row: number, column: number) => void;
-  /** Validate current content */
-  validate: () => ValidationState;
-}
-
-/**
- * GitHub API error types
- */
-export interface GitHubApiError extends Error {
-  status: number;
-  statusText: string;
-  response?: {
+export interface GitHubFileMetadata {
+  /** Repository owner/organization */
+  owner: string;
+  /** Repository name */
+  repo: string;
+  /** File path within repository */
+  path: string;
+  /** Git SHA hash */
+  sha: string;
+  /** Branch or tag reference */
+  ref: string;
+  /** File URL on GitHub */
+  htmlUrl: string;
+  /** Raw file download URL */
+  downloadUrl: string;
+  /** Commit information */
+  commit?: {
+    sha: string;
     message: string;
-    documentation_url?: string;
+    author: string;
+    date: string;
   };
 }
 
+// ============================================================================
+// Event and Callback Types
+// ============================================================================
+
 /**
- * File validation result
+ * File upload event data for type-safe event handling
+ * Replaces Angular EventEmitter patterns with React callback functions
+ */
+export interface FileUploadEvent {
+  /** Uploaded file with metadata */
+  file: File;
+  /** File metadata including size and type validation */
+  metadata: FileMetadata;
+  /** File content as string */
+  content: string;
+  /** Upload success status */
+  success: boolean;
+  /** Error information if upload failed */
+  error?: {
+    code: string;
+    message: string;
+    details?: any;
+  };
+  /** Upload progress percentage (0-100) */
+  progress?: number;
+  /** Timestamp of upload completion */
+  timestamp: number;
+}
+
+/**
+ * GitHub import result interface for GitHub API integration
+ * Enhanced with React Query compatibility for async operations
+ */
+export interface GitHubImportResult {
+  /** Import operation success status */
+  success: boolean;
+  /** Imported file content */
+  content: string;
+  /** GitHub file metadata */
+  metadata: GitHubFileMetadata;
+  /** Error information if import failed */
+  error?: ApiErrorResponse;
+  /** Import duration in milliseconds */
+  duration?: number;
+  /** Cached result indicator for React Query */
+  fromCache?: boolean;
+}
+
+/**
+ * File selection event for file picker interactions
+ */
+export interface FileSelectionEvent {
+  /** Selected files array */
+  files: File[];
+  /** File input element reference */
+  target: HTMLInputElement;
+  /** Selection method (click, drag, keyboard) */
+  method: 'click' | 'drag' | 'keyboard';
+  /** Event timestamp */
+  timestamp: number;
+}
+
+/**
+ * File validation result for content and metadata validation
  */
 export interface FileValidationResult {
-  /** Is file valid */
-  isValid: boolean;
-  /** Validation errors */
-  errors: string[];
-  /** Validation warnings */
-  warnings: string[];
-  /** File metadata */
-  metadata: {
-    encoding: string;
-    lineCount: number;
-    charCount: number;
-    hasUtfBom: boolean;
+  /** Validation success status */
+  valid: boolean;
+  /** Validation errors array */
+  errors: Array<{
+    code: string;
+    message: string;
+    field?: string;
+  }>;
+  /** Validation warnings array */
+  warnings: Array<{
+    code: string;
+    message: string;
+    field?: string;
+  }>;
+  /** Suggested fixes for validation issues */
+  suggestions?: string[];
+}
+
+// ============================================================================
+// Storage Service Interface
+// ============================================================================
+
+/**
+ * Storage service interface migrated from Angular service types
+ * Enhanced with React Query compatibility and SWR integration patterns
+ */
+export interface StorageService {
+  /** Upload file to storage backend */
+  uploadFile: (
+    file: File,
+    options?: {
+      folder?: string;
+      overwrite?: boolean;
+      metadata?: Record<string, any>;
+    }
+  ) => Promise<ApiResponse<{ id: string; url: string }>>;
+
+  /** Download file from storage */
+  downloadFile: (
+    fileId: string,
+    options?: {
+      inline?: boolean;
+      filename?: string;
+    }
+  ) => Promise<Blob>;
+
+  /** Get file metadata */
+  getFileMetadata: (fileId: string) => Promise<ApiResponse<FileMetadata>>;
+
+  /** Delete file from storage */
+  deleteFile: (fileId: string) => Promise<ApiResponse<{ success: boolean }>>;
+
+  /** List files in folder */
+  listFiles: (
+    folder?: string,
+    options?: {
+      limit?: number;
+      offset?: number;
+      filter?: string;
+    }
+  ) => Promise<ApiResponse<FileMetadata[]>>;
+
+  /** Validate file before upload */
+  validateFile: (file: File) => Promise<FileValidationResult>;
+
+  /** Generate signed upload URL */
+  generateUploadUrl: (
+    filename: string,
+    contentType: string
+  ) => Promise<ApiResponse<{ uploadUrl: string; fileId: string }>>;
+}
+
+// ============================================================================
+// GitHub Service Interface
+// ============================================================================
+
+/**
+ * GitHub service interface for repository file operations
+ * Integrates with GitHub API v4 (GraphQL) and v3 (REST) endpoints
+ */
+export interface GitHubService {
+  /** Import file from GitHub repository */
+  importFile: (
+    owner: string,
+    repo: string,
+    path: string,
+    ref?: string
+  ) => Promise<GitHubImportResult>;
+
+  /** Search repositories by name or topic */
+  searchRepositories: (
+    query: string,
+    options?: {
+      sort?: 'stars' | 'forks' | 'updated';
+      order?: 'asc' | 'desc';
+      limit?: number;
+    }
+  ) => Promise<ApiResponse<Array<{
+    id: number;
+    name: string;
+    fullName: string;
+    description: string;
+    stars: number;
+    language: string;
+    updatedAt: string;
+  }>>>;
+
+  /** Get repository file tree */
+  getFileTree: (
+    owner: string,
+    repo: string,
+    ref?: string,
+    recursive?: boolean
+  ) => Promise<ApiResponse<Array<{
+    path: string;
+    type: 'file' | 'directory';
+    size?: number;
+    sha: string;
+  }>>>;
+
+  /** Validate GitHub repository access */
+  validateRepository: (
+    owner: string,
+    repo: string
+  ) => Promise<{ accessible: boolean; public: boolean }>;
+
+  /** Get file content with syntax highlighting hints */
+  getFileWithLanguage: (
+    owner: string,
+    repo: string,
+    path: string,
+    ref?: string
+  ) => Promise<GitHubImportResult & { language: string }>;
+}
+
+// ============================================================================
+// React Component Props and Callbacks
+// ============================================================================
+
+/**
+ * React-specific callback function types for controlled component behavior
+ * Replaces Angular @Output decorators with modern React patterns
+ */
+export interface FileGithubCallbacks {
+  /** Called when file content changes (controlled component) */
+  onChange?: (content: string, metadata?: FileMetadata) => void;
+
+  /** Called when file is selected from file picker */
+  onFileSelect?: (event: FileSelectionEvent) => void;
+
+  /** Called when file upload completes */
+  onFileUpload?: (event: FileUploadEvent) => void;
+
+  /** Called when GitHub import completes */
+  onGitHubImport?: (result: GitHubImportResult) => void;
+
+  /** Called when editor mode changes */
+  onModeChange?: (mode: AceEditorMode) => void;
+
+  /** Called when editor theme changes */
+  onThemeChange?: (theme: AceEditorTheme) => void;
+
+  /** Called when file validation completes */
+  onValidation?: (result: FileValidationResult) => void;
+
+  /** Called when component gains focus */
+  onFocus?: (event: FocusEvent<HTMLElement>) => void;
+
+  /** Called when component loses focus */
+  onBlur?: (event: FocusEvent<HTMLElement>) => void;
+
+  /** Called on keyboard interactions */
+  onKeyDown?: (event: KeyboardEvent<HTMLElement>) => void;
+
+  /** Called on error conditions */
+  onError?: (error: ApiErrorResponse) => void;
+
+  /** Called when loading state changes */
+  onLoadingChange?: (loading: boolean) => void;
+}
+
+/**
+ * React Hook Form integration types for form control
+ * Enhanced with TypeScript 5.8+ conditional type patterns
+ */
+export interface FileGithubFormControl<T extends FieldValues = FieldValues> {
+  /** React Hook Form field name */
+  name?: FieldPath<T>;
+
+  /** React Hook Form register function */
+  register?: UseFormRegister<T>;
+
+  /** React Hook Form control instance */
+  control?: Control<T>;
+
+  /** Field validation rules */
+  rules?: {
+    required?: boolean | string;
+    validate?: (value: string) => string | boolean | undefined;
+    maxLength?: number | { value: number; message: string };
+    minLength?: number | { value: number; message: string };
+  };
+
+  /** Default value for the field */
+  defaultValue?: string;
+
+  /** Field error from React Hook Form */
+  error?: FieldError;
+
+  /** Whether field is touched */
+  touched?: boolean;
+
+  /** Whether field is dirty (value changed from default) */
+  dirty?: boolean;
+}
+
+/**
+ * Accessibility props for WCAG 2.1 AA compliance
+ * Enhanced with comprehensive screen reader support
+ */
+export interface FileGithubAccessibilityProps {
+  /** Accessible label for screen readers */
+  'aria-label'?: string;
+
+  /** ID of element that labels this component */
+  'aria-labelledby'?: string;
+
+  /** ID of element that describes this component */
+  'aria-describedby'?: string;
+
+  /** Whether file selection is required */
+  'aria-required'?: boolean;
+
+  /** Whether component has invalid input */
+  'aria-invalid'?: boolean;
+
+  /** Current file information for screen readers */
+  'aria-valuetext'?: string;
+
+  /** Role override for the component */
+  role?: string;
+
+  /** Tab index for keyboard navigation */
+  tabIndex?: number;
+
+  /** Additional ARIA attributes */
+  'aria-expanded'?: boolean;
+  'aria-haspopup'?: boolean | 'true' | 'false' | 'menu' | 'listbox' | 'tree' | 'grid' | 'dialog';
+  'aria-live'?: 'polite' | 'assertive' | 'off';
+  'aria-atomic'?: boolean;
+  'aria-busy'?: boolean;
+  'aria-disabled'?: boolean;
+  'aria-hidden'?: boolean;
+
+  /** Keyboard shortcuts announcement */
+  'aria-keyshortcuts'?: string;
+
+  /** Roledescription for complex components */
+  'aria-roledescription'?: string;
+}
+
+/**
+ * Component state and configuration props
+ */
+export interface FileGithubStateProps {
+  /** Whether component is in loading state */
+  loading?: boolean;
+
+  /** Whether component is disabled */
+  disabled?: boolean;
+
+  /** Whether component is read-only */
+  readOnly?: boolean;
+
+  /** Placeholder text when no file is selected */
+  placeholder?: string;
+
+  /** Whether to auto-focus on mount */
+  autoFocus?: boolean;
+
+  /** Maximum number of files to accept */
+  maxFiles?: number;
+
+  /** File size constraints */
+  sizeConstraints?: FileSizeConstraints;
+
+  /** Accepted file types */
+  acceptedFileTypes?: SupportedFileType[];
+
+  /** Whether to show file preview */
+  showPreview?: boolean;
+
+  /** Whether to enable drag and drop */
+  enableDragDrop?: boolean;
+
+  /** Whether to show GitHub import option */
+  enableGitHubImport?: boolean;
+
+  /** GitHub repository suggestions */
+  githubSuggestions?: Array<{
+    owner: string;
+    repo: string;
+    description: string;
+  }>;
+}
+
+/**
+ * Theme and styling props for Tailwind CSS integration
+ */
+export interface FileGithubThemeProps {
+  /** Theme mode (integrates with Tailwind CSS dark mode) */
+  theme?: AceEditorTheme;
+
+  /** Component size variant */
+  size?: 'sm' | 'md' | 'lg' | 'xl';
+
+  /** Color variant */
+  variant?: 'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'error';
+
+  /** Border radius variant */
+  rounded?: 'none' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
+
+  /** Shadow variant */
+  shadow?: 'none' | 'sm' | 'md' | 'lg' | 'xl';
+
+  /** Whether to show border */
+  bordered?: boolean;
+
+  /** Custom CSS classes */
+  className?: string;
+
+  /** Inline styles override */
+  style?: React.CSSProperties;
+}
+
+// ============================================================================
+// Main Component Props Interface
+// ============================================================================
+
+/**
+ * Comprehensive FileGithub component props interface
+ * Created for React component props with controlled component pattern
+ * replacing Angular @Input decorators with modern React patterns
+ */
+export interface FileGithubProps<T extends FieldValues = FieldValues>
+  extends FileGithubCallbacks,
+    FileGithubFormControl<T>,
+    FileGithubAccessibilityProps,
+    FileGithubStateProps,
+    FileGithubThemeProps {
+  /** Unique identifier for the component */
+  id?: string;
+
+  /** Current file content value (controlled component) */
+  value?: string;
+
+  /** Default value for uncontrolled component */
+  defaultValue?: string;
+
+  /** Editor syntax highlighting mode */
+  mode?: AceEditorMode;
+
+  /** Storage service instance */
+  storageService?: StorageService;
+
+  /** GitHub service instance */
+  githubService?: GitHubService;
+
+  /** Component container ref */
+  containerRef?: RefObject<HTMLDivElement>;
+
+  /** File input element ref */
+  fileInputRef?: RefObject<HTMLInputElement>;
+
+  /** Editor element ref */
+  editorRef?: RefObject<any>;
+
+  /** Data test ID for testing */
+  'data-testid'?: string;
+
+  /** Additional data attributes for testing and tracking */
+  [key: `data-${string}`]: any;
+}
+
+// ============================================================================
+// Component Reference Interface
+// ============================================================================
+
+/**
+ * FileGithub component imperative handle methods
+ * Exposed via useImperativeHandle for parent component access
+ */
+export interface FileGithubRef {
+  /** Get current file content */
+  getValue(): string;
+
+  /** Set file content programmatically */
+  setValue(content: string, metadata?: FileMetadata): void;
+
+  /** Trigger file picker dialog */
+  openFilePicker(): void;
+
+  /** Clear current file content */
+  clear(): void;
+
+  /** Validate current file content */
+  validate(): Promise<FileValidationResult>;
+
+  /** Focus the component */
+  focus(): void;
+
+  /** Blur the component */
+  blur(): void;
+
+  /** Get current file metadata */
+  getMetadata(): FileMetadata | null;
+
+  /** Import file from GitHub */
+  importFromGitHub(owner: string, repo: string, path: string, ref?: string): Promise<GitHubImportResult>;
+
+  /** Upload current content to storage */
+  uploadToStorage(filename?: string): Promise<ApiResponse<{ id: string; url: string }>>;
+
+  /** Get editor instance (if using ACE editor) */
+  getEditor(): any;
+
+  /** Set editor mode */
+  setMode(mode: AceEditorMode): void;
+
+  /** Set editor theme */
+  setTheme(theme: AceEditorTheme): void;
+
+  /** Export current content as file */
+  exportAsFile(filename?: string, mimeType?: SupportedFileType): void;
+}
+
+// ============================================================================
+// Utility Types and Template Literals
+// ============================================================================
+
+/**
+ * GitHub repository URL pattern validation
+ * Enhanced with TypeScript 5.8+ template literal types
+ */
+export type GitHubRepoUrl = `https://github.com/${string}/${string}`;
+
+/**
+ * GitHub file path pattern validation
+ */
+export type GitHubFilePath = `${string}/${'main' | 'master' | 'develop' | string}/${string}`;
+
+/**
+ * File extension to MIME type mapping
+ */
+export type FileExtensionMap = {
+  '.txt': 'text/plain';
+  '.json': 'application/json';
+  '.yaml': 'text/yaml';
+  '.yml': 'text/yaml';
+  '.js': 'application/javascript';
+  '.ts': 'application/typescript';
+  '.php': 'text/x-php';
+  '.py': 'text/x-python';
+  '.xml': 'application/xml';
+  '.html': 'text/html';
+  '.css': 'text/css';
+  '.md': 'text/markdown';
+};
+
+/**
+ * Editor mode to file extension mapping
+ */
+export type ModeToExtensionMap = {
+  [K in AceEditorMode]: string;
+};
+
+/**
+ * Component configuration with enhanced TypeScript 5.8+ patterns
+ */
+export interface FileGithubConfig {
+  /** Default file size constraints */
+  defaultSizeConstraints: FileSizeConstraints;
+
+  /** Default accepted file types */
+  defaultAcceptedTypes: SupportedFileType[];
+
+  /** GitHub API configuration */
+  github: {
+    /** API base URL */
+    apiUrl: string;
+    /** Default branch for repository operations */
+    defaultBranch: string;
+    /** Request timeout in milliseconds */
+    timeout: number;
+    /** Rate limit configuration */
+    rateLimit: {
+      requests: number;
+      windowMs: number;
+    };
+  };
+
+  /** Storage configuration */
+  storage: {
+    /** Default upload folder */
+    defaultFolder: string;
+    /** Chunk size for large file uploads */
+    chunkSize: number;
+    /** Maximum concurrent uploads */
+    maxConcurrent: number;
+  };
+
+  /** Editor configuration */
+  editor: {
+    /** Default editor mode */
+    defaultMode: AceEditorMode;
+    /** Default theme */
+    defaultTheme: AceEditorTheme;
+    /** Auto-detect mode from file extension */
+    autoDetectMode: boolean;
+  };
+
+  /** Validation configuration */
+  validation: {
+    /** Enable content validation */
+    enableContentValidation: boolean;
+    /** Enable size validation */
+    enableSizeValidation: boolean;
+    /** Enable type validation */
+    enableTypeValidation: boolean;
   };
 }
 
-/**
- * Export utility types for component variants and props
- */
-export type FileGithubVariant = NonNullable<FileGithubProps['variant']>;
-export type FileGithubSize = NonNullable<FileGithubProps['size']>;
-export type FileGithubTheme = NonNullable<FileGithubProps['forcedTheme']>;
+// ============================================================================
+// Error Types
+// ============================================================================
 
 /**
- * Type guard for checking if upload event is valid
+ * FileGithub-specific error types
  */
-export function isValidFileUploadEvent(event: any): event is FileUploadEvent {
-  return (
-    event &&
-    typeof event === 'object' &&
-    event.file instanceof File &&
-    typeof event.fileName === 'string' &&
-    typeof event.fileSize === 'number' &&
-    typeof event.content === 'string'
-  );
+export interface FileGithubError extends ApiErrorResponse {
+  error: {
+    code: 'FILE_TOO_LARGE' | 'INVALID_FILE_TYPE' | 'UPLOAD_FAILED' | 'GITHUB_IMPORT_FAILED' | 'VALIDATION_FAILED' | 'NETWORK_ERROR';
+    message: string;
+    status_code: number;
+    context?: {
+      filename?: string;
+      fileSize?: number;
+      maxSize?: number;
+      fileType?: string;
+      acceptedTypes?: SupportedFileType[];
+      githubRepo?: string;
+      githubPath?: string;
+      validationErrors?: FileValidationResult;
+    };
+  };
 }
 
-/**
- * Type guard for checking if GitHub import result is valid
- */
-export function isValidGitHubImportResult(result: any): result is GitHubImportResult {
-  return (
-    result &&
-    typeof result === 'object' &&
-    typeof result.repositoryUrl === 'string' &&
-    typeof result.filePath === 'string' &&
-    typeof result.content === 'string' &&
-    result.metadata &&
-    typeof result.metadata.sha === 'string'
-  );
-}
+// ============================================================================
+// Testing Utilities
+// ============================================================================
 
 /**
- * Type guard for checking if storage service implements required interface
+ * Mock data factory for testing
  */
-export function isValidStorageService(service: any): service is StorageService {
-  return (
-    service &&
-    typeof service === 'object' &&
-    typeof service.uploadFile === 'function' &&
-    typeof service.downloadFile === 'function' &&
-    typeof service.deleteFile === 'function' &&
-    typeof service.listFiles === 'function' &&
-    typeof service.getFileInfo === 'function' &&
-    typeof service.fileExists === 'function'
-  );
+export interface FileGithubTestUtils {
+  /** Create mock file object */
+  createMockFile: (
+    name: string,
+    content: string,
+    type?: SupportedFileType
+  ) => File;
+
+  /** Create mock file metadata */
+  createMockMetadata: (overrides?: Partial<FileMetadata>) => FileMetadata;
+
+  /** Create mock GitHub import result */
+  createMockGitHubResult: (overrides?: Partial<GitHubImportResult>) => GitHubImportResult;
+
+  /** Create mock storage service */
+  createMockStorageService: () => StorageService;
+
+  /** Create mock GitHub service */
+  createMockGitHubService: () => GitHubService;
 }
 
+// ============================================================================
+// Type Exports
+// ============================================================================
+
 /**
- * Default component props for consistent behavior
+ * Component type with forwardRef support
  */
-export const DEFAULT_FILE_GITHUB_PROPS: Partial<FileGithubProps> = {
-  variant: 'default',
-  size: 'md',
-  editorMode: AceEditorMode.TEXT,
-  editorTheme: 'auto',
-  selectionMode: FileSelectionMode.SINGLE,
-  importSources: [ImportSource.LOCAL, ImportSource.GITHUB],
-  maxFileSize: 10 * 1024 * 1024, // 10MB
-  showLineNumbers: true,
-  enableCodeFolding: true,
-  enableAutocomplete: true,
-  tabSize: 2,
-  useSoftTabs: true,
-  enableDragDrop: true,
-  enableClipboardPaste: true,
-  enableUndoRedo: true,
-  enableSearchReplace: true,
-  showImportButtons: true,
-  showEditorToolbar: true,
-  showFileType: true,
-  showFileSize: true,
-} as const;
+export type FileGithubComponent = React.ForwardRefExoticComponent<
+  FileGithubProps & React.RefAttributes<FileGithubRef>
+>;
+
+/**
+ * Export all types for external usage
+ */
+export type {
+  SupportedFileType,
+  FileSizeConstraints,
+  FileMetadata,
+  GitHubFileMetadata,
+  FileUploadEvent,
+  GitHubImportResult,
+  FileSelectionEvent,
+  FileValidationResult,
+  StorageService,
+  GitHubService,
+  FileGithubCallbacks,
+  FileGithubFormControl,
+  FileGithubAccessibilityProps,
+  FileGithubStateProps,
+  FileGithubThemeProps,
+  FileGithubRef,
+  FileGithubConfig,
+  FileGithubError,
+  FileGithubTestUtils,
+};
+
+/**
+ * Re-export AceEditorMode for convenience
+ */
+export { AceEditorMode };
+
+/**
+ * Default configuration values
+ */
+export const DEFAULT_FILE_GITHUB_CONFIG: FileGithubConfig = {
+  defaultSizeConstraints: {
+    maxSize: 5 * 1024 * 1024, // 5MB
+    minSize: 0,
+    warningThreshold: 1024 * 1024, // 1MB
+  },
+  defaultAcceptedTypes: [
+    'text/plain',
+    'application/json',
+    'text/yaml',
+    'application/javascript',
+    'application/typescript',
+    'text/x-php',
+    'text/x-python',
+    'text/markdown',
+  ],
+  github: {
+    apiUrl: 'https://api.github.com',
+    defaultBranch: 'main',
+    timeout: 30000,
+    rateLimit: {
+      requests: 5000,
+      windowMs: 3600000, // 1 hour
+    },
+  },
+  storage: {
+    defaultFolder: 'uploads',
+    chunkSize: 1024 * 1024, // 1MB chunks
+    maxConcurrent: 3,
+  },
+  editor: {
+    defaultMode: AceEditorMode.TEXT,
+    defaultTheme: 'light',
+    autoDetectMode: true,
+  },
+  validation: {
+    enableContentValidation: true,
+    enableSizeValidation: true,
+    enableTypeValidation: true,
+  },
+};
