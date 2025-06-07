@@ -1,822 +1,1383 @@
 /**
  * File Selector State Management Hook
  * 
- * React hook that manages comprehensive file selector component state including 
- * selected files, navigation history, loading states, and user interactions.
+ * React hook that manages file selector component state including selected files,
+ * navigation history, loading states, and user interactions. Provides stateful file
+ * selection logic with folder navigation, file filtering, and selection validation.
  * 
- * Provides stateful file selection logic with folder navigation, file filtering,
- * selection validation, and seamless integration with React Hook Form patterns.
- * Coordinates with useFileApi hook for server operations while maintaining
- * optimized local UI state management.
+ * Integrates with useFileApi hook for server operations while maintaining local UI state.
+ * Supports React Hook Form integration, file validation, and comprehensive navigation
+ * history management for optimal user experience.
  * 
  * @fileoverview File selector state management hook with React 19 patterns
  * @version 1.0.0
+ * @migrated_from Angular reactive forms and services
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useForm, type UseFormReturn } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useFormContext, useController } from 'react-hook-form';
 import { z } from 'zod';
-
 import type {
-  FileApiInfo,
   SelectedFile,
-  FileItem,
-  FileValidationOptions,
-  FileSelectorProps,
-  UseFileSelectorReturn,
-  FileError,
-  FileErrorType,
-  FileUploadProgress,
+  FileMetadata,
+  FileApiInfo,
+  FileValidationResult,
+  FileValidationError,
+  FileValidationErrorCode,
+  FileSelectionMode,
+  UploadMode,
+  FileSelectorVariant,
+  FileEventHandlers,
+  UploadOptions,
+  FileFilter,
+  LoadingState,
 } from '../types';
-import type { ValidationState, LoadingState } from '@/types/ui';
+import {
+  SelectedFileSchema,
+  FileMetadataSchema,
+  isSelectedFile,
+  isFileMetadata,
+} from '../types';
+import { useFileApi, useFileList } from './useFileApi';
+import type { LoadingState as UILoadingState } from '../../../types/ui';
 
-// =============================================================================
-// HOOK STATE INTERFACES
-// =============================================================================
-
-/**
- * Navigation history entry for folder browsing
- */
-interface NavigationHistoryEntry {
-  /** Directory path */
-  path: string;
-  /** Service name */
-  serviceName: string;
-  /** Display label for breadcrumb */
-  label: string;
-  /** Timestamp of navigation */
-  timestamp: Date;
-  /** Whether this is the root directory */
-  isRoot?: boolean;
-}
+// ============================================================================
+// CONSTANTS & CONFIGURATION
+// ============================================================================
 
 /**
- * Internal hook state interface
+ * Default file validation configuration
  */
-interface FileSelectorState {
-  /** Currently selected file */
-  selectedFile: SelectedFile | undefined;
-  /** Current directory path */
-  currentPath: string;
-  /** Current service name */
-  currentServiceName: string;
-  /** Available file services */
-  fileServices: FileApiInfo[];
-  /** Current files in directory */
-  currentFiles: FileItem[];
-  /** Navigation history stack */
-  navigationHistory: NavigationHistoryEntry[];
-  /** Current history index */
-  historyIndex: number;
-  /** Upload progress tracking */
-  uploadProgress: FileUploadProgress[];
-  /** Loading states for different operations */
-  loadingStates: Record<string, boolean>;
-  /** Error state */
-  error: FileError | null;
-  /** Validation state */
-  validationState: ValidationState;
-  /** Filter text for file search */
-  filterText: string;
-  /** File type filter */
-  fileTypeFilter: string[];
-  /** Whether drag and drop is active */
-  isDragActive: boolean;
-  /** Whether the selector is in upload mode */
-  isUploadMode: boolean;
-}
+const DEFAULT_VALIDATION_CONFIG = {
+  maxFileSize: 50 * 1024 * 1024, // 50MB
+  maxFiles: 10,
+  allowedExtensions: [] as string[], // Empty means all allowed
+  allowedMimeTypes: [] as string[], // Empty means all allowed
+  validateOnSelection: true,
+  validateOnNavigation: false,
+} as const;
 
 /**
- * Hook configuration options
+ * Default navigation configuration
  */
-interface UseFileSelectorOptions {
-  /** Initial selected file path */
-  initialValue?: string;
-  /** Validation options */
-  validation?: FileValidationOptions;
-  /** Allowed file extensions */
-  allowedExtensions?: string[];
-  /** Maximum file size in bytes */
-  maxFileSize?: number;
-  /** Whether to allow multiple file selection */
-  multiple?: boolean;
-  /** Whether to enable drag and drop */
-  dragAndDrop?: boolean;
-  /** Initial directory path */
-  initialPath?: string;
-  /** Initial service name */
-  initialServiceName?: string;
-  /** File selection callback */
-  onFileSelected?: (file: SelectedFile | undefined) => void;
-  /** Navigation callback */
-  onNavigate?: (path: string, serviceName: string) => void;
-  /** Error callback */
-  onError?: (error: FileError) => void;
-}
+const DEFAULT_NAVIGATION_CONFIG = {
+  maxHistorySize: 50,
+  enableBackButton: true,
+  enableForwardButton: true,
+  enableBreadcrumbs: true,
+  rememberLastPath: true,
+} as const;
 
 /**
- * Form schema for file selection validation
+ * Default upload configuration
  */
-const fileSelectionSchema = z.object({
-  selectedFile: z.object({
-    path: z.string().min(1, 'File path is required'),
-    fileName: z.string().min(1, 'File name is required'),
+const DEFAULT_UPLOAD_CONFIG: UploadOptions = {
+  overwrite: false,
+  generateThumbnails: true,
+  extractMetadata: true,
+  chunked: true,
+  chunkSize: 1024 * 1024, // 1MB chunks
+  timeout: 30000, // 30 seconds
+} as const;
+
+/**
+ * File size units for human-readable display
+ */
+const FILE_SIZE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'] as const;
+
+// ============================================================================
+// VALIDATION SCHEMAS
+// ============================================================================
+
+/**
+ * Schema for file selector configuration validation
+ */
+const FileSelectorConfigSchema = z.object({
+  apiInfo: z.object({
     serviceName: z.string().min(1, 'Service name is required'),
-    serviceId: z.number().int().positive(),
+    basePath: z.string(),
+    maxFileSize: z.number().int().positive(),
+    allowedExtensions: z.array(z.string()).optional(),
+    allowedMimeTypes: z.array(z.string()).optional(),
+    permissions: z.object({
+      canRead: z.boolean(),
+      canWrite: z.boolean(),
+      canUpload: z.boolean(),
+      canCreateFolders: z.boolean(),
+    }),
+  }),
+  selectionMode: z.enum(['single', 'multiple', 'directory', 'mixed']),
+  uploadMode: z.enum(['manual', 'automatic', 'queue', 'disabled']),
+  maxFiles: z.number().int().positive().optional(),
+  validation: z.object({
+    maxFileSize: z.number().int().positive(),
+    allowedExtensions: z.array(z.string()),
+    allowedMimeTypes: z.array(z.string()),
+    validateOnSelection: z.boolean(),
   }).optional(),
-  currentPath: z.string().default(''),
-  currentServiceName: z.string().min(1, 'Service must be selected'),
 });
 
-type FileSelectionFormData = z.infer<typeof fileSelectionSchema>;
+/**
+ * Navigation history entry schema
+ */
+const NavigationHistoryEntrySchema = z.object({
+  path: z.string(),
+  timestamp: z.number(),
+  files: z.array(FileMetadataSchema).optional(),
+  selectedFiles: z.array(z.string()).optional(),
+});
 
-// =============================================================================
+// ============================================================================
 // UTILITY FUNCTIONS
-// =============================================================================
+// ============================================================================
 
 /**
- * Creates error object with consistent structure
- */
-function createFileError(
-  type: FileErrorType,
-  message: string,
-  details?: Record<string, any>
-): FileError {
-  return {
-    type,
-    message,
-    details,
-    timestamp: new Date(),
-    retryable: type === 'NETWORK_ERROR' || type === 'SERVER_ERROR',
-  };
-}
-
-/**
- * Validates file against configured restrictions
- */
-function validateFile(
-  file: File | SelectedFile,
-  options: FileValidationOptions = {}
-): string | undefined {
-  const {
-    maxSize,
-    minSize,
-    allowedExtensions,
-    allowedMimeTypes,
-    customValidator,
-  } = options;
-
-  // File size validation
-  if (file instanceof File) {
-    if (maxSize && file.size > maxSize) {
-      return `File size ${formatFileSize(file.size)} exceeds maximum allowed size ${formatFileSize(maxSize)}`;
-    }
-    if (minSize && file.size < minSize) {
-      return `File size ${formatFileSize(file.size)} is below minimum required size ${formatFileSize(minSize)}`;
-    }
-  } else if ('size' in file && file.size) {
-    if (maxSize && file.size > maxSize) {
-      return `File size ${formatFileSize(file.size)} exceeds maximum allowed size ${formatFileSize(maxSize)}`;
-    }
-    if (minSize && file.size < minSize) {
-      return `File size ${formatFileSize(file.size)} is below minimum required size ${formatFileSize(minSize)}`;
-    }
-  }
-
-  // Extension validation
-  if (allowedExtensions && allowedExtensions.length > 0) {
-    const fileName = file instanceof File ? file.name : file.fileName;
-    const extension = fileName.split('.').pop()?.toLowerCase();
-    
-    if (!extension || !allowedExtensions.some(ext => 
-      ext.toLowerCase() === extension || ext.toLowerCase() === `.${extension}`
-    )) {
-      return `File type .${extension} is not allowed. Allowed types: ${allowedExtensions.join(', ')}`;
-    }
-  }
-
-  // MIME type validation
-  if (allowedMimeTypes && allowedMimeTypes.length > 0) {
-    const mimeType = file instanceof File ? file.type : (file.contentType || '');
-    
-    if (!allowedMimeTypes.includes(mimeType)) {
-      return `File type ${mimeType} is not allowed. Allowed types: ${allowedMimeTypes.join(', ')}`;
-    }
-  }
-
-  // Custom validation
-  if (customValidator) {
-    const customError = customValidator(file instanceof File ? file : file as any);
-    if (customError) {
-      return customError;
-    }
-  }
-
-  return undefined;
-}
-
-/**
- * Formats file size in human readable format
+ * Format file size for human-readable display
  */
 function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 Bytes';
+  if (bytes === 0) return '0 B';
   
   const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+  const dm = 2;
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${FILE_SIZE_UNITS[i]}`;
 }
 
 /**
- * Parses initial file path to extract service and path components
+ * Extract file extension from filename
  */
-function parseInitialValue(initialValue: string): {
-  serviceName: string;
-  path: string;
-} | null {
-  if (!initialValue) return null;
+function getFileExtension(filename: string): string {
+  const lastDot = filename.lastIndexOf('.');
+  return lastDot > 0 ? filename.substring(lastDot).toLowerCase() : '';
+}
 
-  // Handle different path formats:
-  // - service_name:path/to/file.txt
-  // - /service_name/path/to/file.txt
-  // - path/to/file.txt (default service)
+/**
+ * Check if file extension is allowed
+ */
+function isExtensionAllowed(filename: string, allowedExtensions: string[]): boolean {
+  if (allowedExtensions.length === 0) return true;
   
-  if (initialValue.includes(':')) {
-    const [serviceName, ...pathParts] = initialValue.split(':');
-    return {
-      serviceName: serviceName.trim(),
-      path: pathParts.join(':').trim(),
-    };
-  }
-
-  if (initialValue.startsWith('/')) {
-    const parts = initialValue.substring(1).split('/');
-    if (parts.length > 1) {
-      return {
-        serviceName: parts[0],
-        path: parts.slice(1).join('/'),
-      };
-    }
-  }
-
-  return {
-    serviceName: '',
-    path: initialValue,
-  };
+  const extension = getFileExtension(filename);
+  return allowedExtensions.some(allowed => 
+    allowed.toLowerCase() === extension || 
+    allowed.toLowerCase() === extension.substring(1) // Handle both ".jpg" and "jpg"
+  );
 }
 
 /**
- * Creates navigation history entry
+ * Check if MIME type is allowed
  */
-function createNavigationEntry(
-  path: string,
-  serviceName: string,
-  label?: string,
-  isRoot = false
-): NavigationHistoryEntry {
+function isMimeTypeAllowed(mimeType: string, allowedMimeTypes: string[]): boolean {
+  if (allowedMimeTypes.length === 0) return true;
+  
+  return allowedMimeTypes.some(allowed => {
+    // Support wildcards like "image/*"
+    if (allowed.endsWith('/*')) {
+      const baseType = allowed.substring(0, allowed.length - 2);
+      return mimeType.startsWith(baseType);
+    }
+    return allowed.toLowerCase() === mimeType.toLowerCase();
+  });
+}
+
+/**
+ * Create a file validation error
+ */
+function createValidationError(
+  code: FileValidationErrorCode,
+  message: string,
+  context?: Record<string, any>,
+  suggestion?: string
+): FileValidationError {
   return {
-    path,
-    serviceName,
-    label: label || (isRoot ? 'Root' : path.split('/').pop() || path),
-    timestamp: new Date(),
-    isRoot,
+    code,
+    message,
+    context,
+    suggestion,
   };
 }
 
-// =============================================================================
-// MAIN HOOK IMPLEMENTATION
-// =============================================================================
+/**
+ * Convert File object to SelectedFile
+ */
+function fileToSelectedFile(
+  file: File,
+  serviceName: string,
+  path: string = '',
+  uploadOptions?: UploadOptions
+): SelectedFile {
+  const relativePath = path ? `${path}/${file.name}` : file.name;
+  
+  return {
+    file,
+    path: relativePath,
+    name: file.name,
+    size: file.size,
+    mimeType: file.type || 'application/octet-stream',
+    extension: getFileExtension(file.name),
+    type: determineFileType(file.type),
+    isDirectory: false,
+    uploadState: 'pending',
+    validation: {
+      isValid: true,
+      errors: [],
+      warnings: [],
+      validatedAt: new Date().toISOString(),
+      appliedRules: [],
+    },
+    uploadOptions,
+    createdAt: new Date().toISOString(),
+    modifiedAt: new Date(file.lastModified).toISOString(),
+  };
+}
 
 /**
- * File selector state management hook
+ * Determine file type category from MIME type
+ */
+function determineFileType(mimeType: string): SelectedFile['type'] {
+  if (mimeType.startsWith('image/')) return 'image';
+  if (mimeType.startsWith('video/')) return 'video';
+  if (mimeType.startsWith('audio/')) return 'audio';
+  if (mimeType === 'application/pdf') return 'pdf';
+  if (mimeType.includes('text/') || mimeType.includes('application/json')) return 'text';
+  if (mimeType.includes('application/vnd.ms-excel') || mimeType.includes('spreadsheet')) return 'spreadsheet';
+  if (mimeType.includes('application/vnd.ms-powerpoint') || mimeType.includes('presentation')) return 'presentation';
+  if (mimeType.includes('application/msword') || mimeType.includes('document')) return 'document';
+  if (mimeType.includes('application/zip') || mimeType.includes('compressed')) return 'archive';
+  if (mimeType.includes('application/javascript') || mimeType.includes('text/x-')) return 'code';
+  if (mimeType.includes('font/')) return 'font';
+  if (mimeType.includes('application/octet-stream')) return 'executable';
+  
+  return 'other';
+}
+
+// ============================================================================
+// INTERFACE DEFINITIONS
+// ============================================================================
+
+/**
+ * File selector configuration interface
+ */
+export interface FileSelectorConfig {
+  /** File API information and constraints */
+  apiInfo: FileApiInfo;
+  
+  /** File selection mode */
+  selectionMode: FileSelectionMode;
+  
+  /** Upload mode behavior */
+  uploadMode: UploadMode;
+  
+  /** Maximum number of files that can be selected */
+  maxFiles?: number;
+  
+  /** File validation configuration */
+  validation?: {
+    maxFileSize: number;
+    allowedExtensions: string[];
+    allowedMimeTypes: string[];
+    validateOnSelection: boolean;
+  };
+  
+  /** Navigation configuration */
+  navigation?: {
+    maxHistorySize: number;
+    enableBackButton: boolean;
+    enableForwardButton: boolean;
+    enableBreadcrumbs: boolean;
+    rememberLastPath: boolean;
+  };
+  
+  /** Upload configuration */
+  uploadOptions?: UploadOptions;
+  
+  /** Initial path to open */
+  initialPath?: string;
+  
+  /** Initial selected files */
+  initialValue?: string | string[] | SelectedFile | SelectedFile[];
+  
+  /** Custom file filters */
+  customFilters?: FileFilter[];
+  
+  /** Event handlers */
+  eventHandlers?: Partial<FileEventHandlers>;
+}
+
+/**
+ * Navigation history entry
+ */
+export interface NavigationHistoryEntry {
+  path: string;
+  timestamp: number;
+  files?: FileMetadata[];
+  selectedFiles?: string[];
+}
+
+/**
+ * File selector state interface
+ */
+export interface FileSelectorState {
+  // Selection state
+  selectedFiles: SelectedFile[];
+  currentPath: string;
+  
+  // Navigation state
+  navigationHistory: NavigationHistoryEntry[];
+  historyIndex: number;
+  canGoBack: boolean;
+  canGoForward: boolean;
+  
+  // UI state
+  loading: UILoadingState;
+  isDialogOpen: boolean;
+  viewMode: 'grid' | 'list' | 'table';
+  searchTerm: string;
+  activeFilters: FileFilter[];
+  
+  // Validation state
+  validationErrors: Record<string, FileValidationError[]>;
+  hasValidationErrors: boolean;
+  
+  // Upload state
+  uploadProgress: Record<string, number>;
+  activeUploads: string[];
+}
+
+/**
+ * File selector actions interface
+ */
+export interface FileSelectorActions {
+  // File selection
+  selectFile: (file: FileMetadata | File) => void;
+  deselectFile: (fileId: string) => void;
+  selectMultipleFiles: (files: (FileMetadata | File)[]) => void;
+  clearSelection: () => void;
+  selectAll: (files: FileMetadata[]) => void;
+  
+  // Navigation
+  navigateTo: (path: string) => void;
+  navigateBack: () => void;
+  navigateForward: () => void;
+  refreshCurrentPath: () => void;
+  
+  // File operations
+  uploadSelectedFiles: () => Promise<void>;
+  removeFile: (fileId: string) => void;
+  createFolder: (name: string) => Promise<void>;
+  deleteFile: (path: string) => Promise<void>;
+  
+  // UI operations
+  openDialog: () => void;
+  closeDialog: () => void;
+  setViewMode: (mode: 'grid' | 'list' | 'table') => void;
+  setSearchTerm: (term: string) => void;
+  toggleFilter: (filter: FileFilter) => void;
+  
+  // Validation
+  validateFile: (file: File) => FileValidationResult;
+  validateSelection: () => boolean;
+  
+  // Form integration
+  setValue: (value: string | string[] | SelectedFile | SelectedFile[]) => void;
+  getValue: () => string | string[] | SelectedFile | SelectedFile[];
+  
+  // Programmatic control
+  setInitialValue: (value: string | string[] | SelectedFile | SelectedFile[]) => void;
+  resetToInitial: () => void;
+}
+
+/**
+ * useFileSelector hook return type
+ */
+export interface UseFileSelectorReturn extends FileSelectorState, FileSelectorActions {
+  // File listing from API
+  files: FileMetadata[];
+  isLoadingFiles: boolean;
+  filesError: Error | null;
+  
+  // File services
+  fileServices: FileApiInfo[];
+  isLoadingServices: boolean;
+  
+  // Hook configuration
+  config: FileSelectorConfig;
+}
+
+// ============================================================================
+// HOOK IMPLEMENTATION
+// ============================================================================
+
+/**
+ * useFileSelector Hook
  * 
- * Provides comprehensive file selection state management including navigation
- * history, file validation, loading states, and React Hook Form integration.
- * 
- * @param options Configuration options for the file selector
- * @returns File selector state and control functions
+ * Comprehensive file selector state management with React 19 patterns,
+ * navigation history, validation, and React Hook Form integration.
  */
 export function useFileSelector(
-  options: UseFileSelectorOptions = {}
-): UseFileSelectorReturn & {
-  // Extended return interface with additional state management
-  form: UseFormReturn<FileSelectionFormData>;
-  state: FileSelectorState;
-  actions: {
-    navigateToPath: (path: string, serviceName?: string) => void;
-    navigateUp: () => void;
-    navigateBack: () => void;
-    navigateForward: () => void;
-    setCurrentService: (serviceName: string) => void;
-    setFilter: (filter: string) => void;
-    setFileTypeFilter: (types: string[]) => void;
-    addToUploadProgress: (progress: FileUploadProgress) => void;
-    updateUploadProgress: (fileId: string, updates: Partial<FileUploadProgress>) => void;
-    removeFromUploadProgress: (fileId: string) => void;
-    setDragActive: (active: boolean) => void;
-    setUploadMode: (mode: boolean) => void;
-    setError: (error: FileError | null) => void;
-    setLoading: (operation: string, loading: boolean) => void;
-    refreshCurrentDirectory: () => void;
-  };
-} {
-  const {
-    initialValue,
-    validation = {},
-    allowedExtensions = [],
-    maxFileSize,
-    multiple = false,
-    dragAndDrop = true,
-    initialPath = '',
-    initialServiceName = '',
-    onFileSelected,
-    onNavigate,
-    onError,
-  } = options;
-
-  // Parse initial value
-  const initialParsed = useMemo(() => {
-    if (initialValue) {
-      return parseInitialValue(initialValue);
+  config: FileSelectorConfig,
+  formFieldName?: string
+): UseFileSelectorReturn {
+  
+  // =========================================================================
+  // CONFIGURATION VALIDATION
+  // =========================================================================
+  
+  const validatedConfig = useMemo(() => {
+    try {
+      return FileSelectorConfigSchema.parse(config);
+    } catch (error) {
+      console.error('Invalid file selector configuration:', error);
+      throw new Error('File selector configuration validation failed');
     }
-    return null;
-  }, [initialValue]);
+  }, [config]);
 
-  // Initialize state
-  const [state, setState] = useState<FileSelectorState>(() => ({
-    selectedFile: undefined,
-    currentPath: initialParsed?.path || initialPath || '',
-    currentServiceName: initialParsed?.serviceName || initialServiceName || '',
-    fileServices: [],
-    currentFiles: [],
-    navigationHistory: [],
-    historyIndex: -1,
-    uploadProgress: [],
-    loadingStates: {},
+  // =========================================================================
+  // EXTERNAL DEPENDENCIES
+  // =========================================================================
+  
+  const {
+    fileServices,
+    isLoadingServices,
+    createFileListQuery,
+    uploadFile,
+    uploadFileAsync,
+    isUploading,
+    uploadError,
+    createDirectory,
+    createDirectoryAsync,
+    isCreatingDirectory,
+    deleteFile: deleteFileApi,
+    deleteFileAsync,
+    isDeletingFile,
+    invalidateFileList,
+  } = useFileApi();
+
+  // React Hook Form integration (optional)
+  const formContext = useFormContext();
+  const controller = formFieldName && formContext 
+    ? useController({ 
+        name: formFieldName,
+        control: formContext.control,
+        defaultValue: config.initialValue || (config.selectionMode === 'single' ? '' : []),
+      })
+    : null;
+
+  // =========================================================================
+  // STATE MANAGEMENT
+  // =========================================================================
+  
+  const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
+  const [currentPath, setCurrentPath] = useState(config.initialPath || '');
+  const [navigationHistory, setNavigationHistory] = useState<NavigationHistoryEntry[]>([
+    { path: config.initialPath || '', timestamp: Date.now() }
+  ]);
+  const [historyIndex, setHistoryIndex] = useState(0);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [viewMode, setViewModeState] = useState<'grid' | 'list' | 'table'>('grid');
+  const [searchTerm, setSearchTermState] = useState('');
+  const [activeFilters, setActiveFilters] = useState<FileFilter[]>([]);
+  const [validationErrors, setValidationErrors] = useState<Record<string, FileValidationError[]>>({});
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
+  const [loading, setLoading] = useState<UILoadingState>({
+    loading: false,
     error: null,
-    validationState: {
-      isValid: true,
-      isDirty: false,
-      isTouched: false,
-    },
-    filterText: '',
-    fileTypeFilter: [],
-    isDragActive: false,
-    isUploadMode: false,
-  }));
-
-  // React Hook Form integration
-  const form = useForm<FileSelectionFormData>({
-    resolver: zodResolver(fileSelectionSchema),
-    defaultValues: {
-      selectedFile: undefined,
-      currentPath: state.currentPath,
-      currentServiceName: state.currentServiceName,
-    },
-    mode: 'onChange',
+    progress: 0,
+    message: '',
   });
 
   // Refs for stable callbacks
-  const onFileSelectedRef = useRef(onFileSelected);
-  const onNavigateRef = useRef(onNavigate);
-  const onErrorRef = useRef(onError);
+  const eventHandlersRef = useRef(config.eventHandlers || {});
+  const uploadOptionsRef = useRef(config.uploadOptions || DEFAULT_UPLOAD_CONFIG);
+  const validationConfigRef = useRef(config.validation || DEFAULT_VALIDATION_CONFIG);
+  const navigationConfigRef = useRef(config.navigation || DEFAULT_NAVIGATION_CONFIG);
 
-  // Update refs when callbacks change
+  // Update refs when config changes
   useEffect(() => {
-    onFileSelectedRef.current = onFileSelected;
-    onNavigateRef.current = onNavigate;
-    onErrorRef.current = onError;
-  }, [onFileSelected, onNavigate, onError]);
+    eventHandlersRef.current = config.eventHandlers || {};
+    uploadOptionsRef.current = config.uploadOptions || DEFAULT_UPLOAD_CONFIG;
+    validationConfigRef.current = config.validation || DEFAULT_VALIDATION_CONFIG;
+    navigationConfigRef.current = config.navigation || DEFAULT_NAVIGATION_CONFIG;
+  }, [config]);
 
-  // =============================================================================
-  // STATE MANAGEMENT ACTIONS
-  // =============================================================================
+  // =========================================================================
+  // FILE LISTING INTEGRATION
+  // =========================================================================
+  
+  const fileListQuery = useFileList(config.apiInfo.serviceName, currentPath);
+  
+  const files = useMemo(() => {
+    return fileListQuery.data?.resource || [];
+  }, [fileListQuery.data]);
 
-  const setSelectedFile = useCallback((file: SelectedFile | undefined) => {
-    setState(prev => ({ ...prev, selectedFile: file }));
-    
-    // Update form state
-    form.setValue('selectedFile', file ? {
-      path: file.path,
-      fileName: file.fileName,
-      serviceName: file.serviceName,
-      serviceId: file.serviceId,
-    } : undefined);
+  const isLoadingFiles = fileListQuery.isLoading;
+  const filesError = fileListQuery.error;
 
-    // Validate file if provided
-    if (file) {
-      const validationError = validateFile(file, {
-        ...validation,
-        allowedExtensions,
-        maxSize: maxFileSize,
-      });
+  // =========================================================================
+  // COMPUTED STATE
+  // =========================================================================
+  
+  const canGoBack = useMemo(() => historyIndex > 0, [historyIndex]);
+  const canGoForward = useMemo(() => historyIndex < navigationHistory.length - 1, [historyIndex, navigationHistory]);
+  
+  const hasValidationErrors = useMemo(() => {
+    return Object.values(validationErrors).some(errors => errors.length > 0);
+  }, [validationErrors]);
 
-      setState(prev => ({
-        ...prev,
-        validationState: {
-          isValid: !validationError,
-          isDirty: true,
-          isTouched: true,
-          error: validationError,
-        },
-      }));
+  const activeUploads = useMemo(() => {
+    return selectedFiles
+      .filter(file => file.uploadState === 'uploading' || file.uploadState === 'pending')
+      .map(file => file.path);
+  }, [selectedFiles]);
+
+  // =========================================================================
+  // VALIDATION FUNCTIONS
+  // =========================================================================
+  
+  const validateFile = useCallback((file: File): FileValidationResult => {
+    const errors: FileValidationError[] = [];
+    const warnings: FileValidationError[] = [];
+    const config = validationConfigRef.current;
+
+    // File size validation
+    if (file.size > config.maxFileSize) {
+      errors.push(createValidationError(
+        'FILE_TOO_LARGE',
+        `File size ${formatFileSize(file.size)} exceeds maximum allowed size of ${formatFileSize(config.maxFileSize)}`,
+        { fileSize: file.size, maxFileSize: config.maxFileSize },
+        `Please select a file smaller than ${formatFileSize(config.maxFileSize)}`
+      ));
     }
 
-    // Notify parent component
-    if (onFileSelectedRef.current) {
-      onFileSelectedRef.current(file);
+    // Extension validation
+    if (!isExtensionAllowed(file.name, config.allowedExtensions)) {
+      errors.push(createValidationError(
+        'INVALID_EXTENSION',
+        `File extension "${getFileExtension(file.name)}" is not allowed`,
+        { fileName: file.name, allowedExtensions: config.allowedExtensions },
+        config.allowedExtensions.length > 0 
+          ? `Allowed extensions: ${config.allowedExtensions.join(', ')}`
+          : 'Please check the allowed file types'
+      ));
     }
-  }, [form, validation, allowedExtensions, maxFileSize]);
 
-  const navigateToPath = useCallback((path: string, serviceName?: string) => {
-    const targetService = serviceName || state.currentServiceName;
+    // MIME type validation
+    if (!isMimeTypeAllowed(file.type, config.allowedMimeTypes)) {
+      errors.push(createValidationError(
+        'INVALID_MIME_TYPE',
+        `File type "${file.type}" is not allowed`,
+        { mimeType: file.type, allowedMimeTypes: config.allowedMimeTypes },
+        config.allowedMimeTypes.length > 0
+          ? `Allowed types: ${config.allowedMimeTypes.join(', ')}`
+          : 'Please check the allowed file types'
+      ));
+    }
+
+    // Duplicate file validation
+    const isDuplicate = selectedFiles.some(selected => 
+      selected.name === file.name && selected.size === file.size
+    );
+    if (isDuplicate) {
+      errors.push(createValidationError(
+        'DUPLICATE_FILE',
+        `File "${file.name}" is already selected`,
+        { fileName: file.name },
+        'Please select a different file or remove the existing one'
+      ));
+    }
+
+    // File count validation
+    const currentCount = selectedFiles.length;
+    const maxFiles = validatedConfig.maxFiles || config.maxFileSize;
+    if (validatedConfig.selectionMode !== 'single' && currentCount >= maxFiles) {
+      errors.push(createValidationError(
+        'QUOTA_EXCEEDED',
+        `Cannot select more than ${maxFiles} files`,
+        { currentCount, maxFiles },
+        `Please remove some files before adding new ones`
+      ));
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      warnings,
+      validatedAt: new Date().toISOString(),
+      appliedRules: ['size', 'extension', 'mime-type', 'duplicate', 'count'],
+    };
+  }, [selectedFiles, validatedConfig]);
+
+  const validateSelection = useCallback((): boolean => {
+    const errors: Record<string, FileValidationError[]> = {};
     
-    if (!targetService) {
-      const error = createFileError(
-        'VALIDATION_ERROR',
-        'Service must be selected before navigation'
+    selectedFiles.forEach(file => {
+      if (file.file) {
+        const validation = validateFile(file.file);
+        if (!validation.isValid) {
+          errors[file.path] = validation.errors;
+        }
+      }
+    });
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  }, [selectedFiles, validateFile]);
+
+  // =========================================================================
+  // NAVIGATION FUNCTIONS
+  // =========================================================================
+  
+  const addToHistory = useCallback((path: string, files?: FileMetadata[]) => {
+    const config = navigationConfigRef.current;
+    const entry: NavigationHistoryEntry = {
+      path,
+      timestamp: Date.now(),
+      files,
+      selectedFiles: selectedFiles.map(f => f.path),
+    };
+
+    setNavigationHistory(prev => {
+      // Remove any forward history when navigating to a new path
+      const newHistory = prev.slice(0, historyIndex + 1);
+      newHistory.push(entry);
+      
+      // Limit history size
+      if (newHistory.length > config.maxHistorySize) {
+        return newHistory.slice(-config.maxHistorySize);
+      }
+      
+      return newHistory;
+    });
+
+    setHistoryIndex(prev => prev + 1);
+  }, [historyIndex, selectedFiles]);
+
+  const navigateTo = useCallback((path: string) => {
+    if (path === currentPath) return;
+    
+    setCurrentPath(path);
+    addToHistory(path);
+    
+    // Clear search when navigating
+    setSearchTermState('');
+    
+    // Trigger navigation event
+    eventHandlersRef.current.onNavigate?.(path);
+  }, [currentPath, addToHistory]);
+
+  const navigateBack = useCallback(() => {
+    if (!canGoBack) return;
+    
+    const newIndex = historyIndex - 1;
+    const entry = navigationHistory[newIndex];
+    
+    setHistoryIndex(newIndex);
+    setCurrentPath(entry.path);
+    
+    // Restore previous selection if available
+    if (entry.selectedFiles) {
+      const restored = selectedFiles.filter(file => 
+        entry.selectedFiles!.includes(file.path)
       );
-      setState(prev => ({ ...prev, error }));
-      if (onErrorRef.current) {
-        onErrorRef.current(error);
+      setSelectedFiles(restored);
+    }
+  }, [canGoBack, historyIndex, navigationHistory, selectedFiles]);
+
+  const navigateForward = useCallback(() => {
+    if (!canGoForward) return;
+    
+    const newIndex = historyIndex + 1;
+    const entry = navigationHistory[newIndex];
+    
+    setHistoryIndex(newIndex);
+    setCurrentPath(entry.path);
+    
+    // Restore selection if available
+    if (entry.selectedFiles) {
+      const restored = selectedFiles.filter(file => 
+        entry.selectedFiles!.includes(file.path)
+      );
+      setSelectedFiles(restored);
+    }
+  }, [canGoForward, historyIndex, navigationHistory, selectedFiles]);
+
+  const refreshCurrentPath = useCallback(() => {
+    invalidateFileList(config.apiInfo.serviceName, currentPath);
+  }, [config.apiInfo.serviceName, currentPath, invalidateFileList]);
+
+  // =========================================================================
+  // FILE SELECTION FUNCTIONS
+  // =========================================================================
+  
+  const selectFile = useCallback((file: FileMetadata | File) => {
+    const isFileObject = file instanceof File;
+    let selectedFile: SelectedFile;
+
+    if (isFileObject) {
+      // Validate file before selection
+      if (validationConfigRef.current.validateOnSelection) {
+        const validation = validateFile(file);
+        if (!validation.isValid) {
+          setValidationErrors(prev => ({
+            ...prev,
+            [file.name]: validation.errors,
+          }));
+          eventHandlersRef.current.onValidationError?.(file, new Error(validation.errors[0]?.message));
+          return;
+        }
+      }
+
+      selectedFile = fileToSelectedFile(
+        file,
+        config.apiInfo.serviceName,
+        currentPath,
+        uploadOptionsRef.current
+      );
+    } else {
+      // Convert FileMetadata to SelectedFile
+      selectedFile = {
+        ...file,
+        uploadState: 'pending',
+        validation: {
+          isValid: true,
+          errors: [],
+          warnings: [],
+          validatedAt: new Date().toISOString(),
+          appliedRules: [],
+        },
+      };
+    }
+
+    setSelectedFiles(prev => {
+      if (config.selectionMode === 'single') {
+        return [selectedFile];
+      } else {
+        // Check for duplicates
+        const exists = prev.some(f => f.path === selectedFile.path || f.name === selectedFile.name);
+        if (exists) return prev;
+        
+        return [...prev, selectedFile];
+      }
+    });
+
+    // Clear any validation errors for this file
+    setValidationErrors(prev => {
+      const updated = { ...prev };
+      delete updated[selectedFile.path];
+      delete updated[selectedFile.name];
+      return updated;
+    });
+
+    // Trigger selection event
+    eventHandlersRef.current.onFileSelect?.(isFileObject ? [file] : [file]);
+    eventHandlersRef.current.onSelectionChange?.(selectedFiles);
+
+    // Auto-upload if configured
+    if (config.uploadMode === 'automatic' && isFileObject) {
+      uploadFile({
+        serviceName: config.apiInfo.serviceName,
+        file,
+        path: currentPath,
+        onProgress: (progress) => {
+          setUploadProgress(prev => ({
+            ...prev,
+            [selectedFile.path]: progress.progress,
+          }));
+        },
+      });
+    }
+  }, [
+    config.selectionMode,
+    config.uploadMode,
+    config.apiInfo.serviceName,
+    currentPath,
+    selectedFiles,
+    validateFile,
+    uploadFile,
+  ]);
+
+  const deselectFile = useCallback((fileId: string) => {
+    setSelectedFiles(prev => prev.filter(file => 
+      file.path !== fileId && file.name !== fileId
+    ));
+
+    // Clear validation errors for this file
+    setValidationErrors(prev => {
+      const updated = { ...prev };
+      delete updated[fileId];
+      return updated;
+    });
+
+    // Clear upload progress
+    setUploadProgress(prev => {
+      const updated = { ...prev };
+      delete updated[fileId];
+      return updated;
+    });
+
+    eventHandlersRef.current.onSelectionChange?.(selectedFiles);
+  }, [selectedFiles]);
+
+  const selectMultipleFiles = useCallback((files: (FileMetadata | File)[]) => {
+    if (config.selectionMode === 'single') {
+      if (files.length > 0) {
+        selectFile(files[0]);
       }
       return;
     }
 
-    // Create navigation entry
-    const navEntry = createNavigationEntry(path, targetService, undefined, path === '');
-
-    setState(prev => {
-      // If we're at the end of history, add new entry
-      if (prev.historyIndex === prev.navigationHistory.length - 1) {
-        return {
-          ...prev,
-          currentPath: path,
-          currentServiceName: targetService,
-          navigationHistory: [...prev.navigationHistory, navEntry],
-          historyIndex: prev.navigationHistory.length,
-          error: null,
-        };
-      } else {
-        // If we're in the middle of history, truncate and add new entry
-        const newHistory = prev.navigationHistory.slice(0, prev.historyIndex + 1);
-        return {
-          ...prev,
-          currentPath: path,
-          currentServiceName: targetService,
-          navigationHistory: [...newHistory, navEntry],
-          historyIndex: newHistory.length,
-          error: null,
-        };
-      }
-    });
-
-    // Update form
-    form.setValue('currentPath', path);
-    form.setValue('currentServiceName', targetService);
-
-    // Notify parent
-    if (onNavigateRef.current) {
-      onNavigateRef.current(path, targetService);
-    }
-  }, [state.currentServiceName, form]);
-
-  const navigateUp = useCallback(() => {
-    const parentPath = state.currentPath.split('/').slice(0, -1).join('/');
-    navigateToPath(parentPath);
-  }, [state.currentPath, navigateToPath]);
-
-  const navigateBack = useCallback(() => {
-    if (state.historyIndex > 0) {
-      const prevEntry = state.navigationHistory[state.historyIndex - 1];
-      setState(prev => ({
-        ...prev,
-        currentPath: prevEntry.path,
-        currentServiceName: prevEntry.serviceName,
-        historyIndex: prev.historyIndex - 1,
-        error: null,
-      }));
-
-      form.setValue('currentPath', prevEntry.path);
-      form.setValue('currentServiceName', prevEntry.serviceName);
-
-      if (onNavigateRef.current) {
-        onNavigateRef.current(prevEntry.path, prevEntry.serviceName);
-      }
-    }
-  }, [state.historyIndex, state.navigationHistory, form]);
-
-  const navigateForward = useCallback(() => {
-    if (state.historyIndex < state.navigationHistory.length - 1) {
-      const nextEntry = state.navigationHistory[state.historyIndex + 1];
-      setState(prev => ({
-        ...prev,
-        currentPath: nextEntry.path,
-        currentServiceName: nextEntry.serviceName,
-        historyIndex: prev.historyIndex + 1,
-        error: null,
-      }));
-
-      form.setValue('currentPath', nextEntry.path);
-      form.setValue('currentServiceName', nextEntry.serviceName);
-
-      if (onNavigateRef.current) {
-        onNavigateRef.current(nextEntry.path, nextEntry.serviceName);
-      }
-    }
-  }, [state.historyIndex, state.navigationHistory, form]);
-
-  const setCurrentService = useCallback((serviceName: string) => {
-    setState(prev => ({
-      ...prev,
-      currentServiceName: serviceName,
-      currentPath: '', // Reset to root when changing service
-      error: null,
-    }));
-
-    form.setValue('currentServiceName', serviceName);
-    form.setValue('currentPath', '');
-
-    // Navigate to root of new service
-    navigateToPath('', serviceName);
-  }, [form, navigateToPath]);
-
-  const setFilter = useCallback((filter: string) => {
-    setState(prev => ({ ...prev, filterText: filter }));
-  }, []);
-
-  const setFileTypeFilter = useCallback((types: string[]) => {
-    setState(prev => ({ ...prev, fileTypeFilter: types }));
-  }, []);
-
-  const addToUploadProgress = useCallback((progress: FileUploadProgress) => {
-    setState(prev => ({
-      ...prev,
-      uploadProgress: [...prev.uploadProgress, progress],
-    }));
-  }, []);
-
-  const updateUploadProgress = useCallback((
-    fileId: string,
-    updates: Partial<FileUploadProgress>
-  ) => {
-    setState(prev => ({
-      ...prev,
-      uploadProgress: prev.uploadProgress.map(item =>
-        item.file.name === fileId ? { ...item, ...updates } : item
-      ),
-    }));
-  }, []);
-
-  const removeFromUploadProgress = useCallback((fileId: string) => {
-    setState(prev => ({
-      ...prev,
-      uploadProgress: prev.uploadProgress.filter(item => item.file.name !== fileId),
-    }));
-  }, []);
-
-  const setDragActive = useCallback((active: boolean) => {
-    setState(prev => ({ ...prev, isDragActive: active }));
-  }, []);
-
-  const setUploadMode = useCallback((mode: boolean) => {
-    setState(prev => ({ ...prev, isUploadMode: mode }));
-  }, []);
-
-  const setError = useCallback((error: FileError | null) => {
-    setState(prev => ({ ...prev, error }));
-    
-    if (error && onErrorRef.current) {
-      onErrorRef.current(error);
-    }
-  }, []);
-
-  const setLoading = useCallback((operation: string, loading: boolean) => {
-    setState(prev => ({
-      ...prev,
-      loadingStates: {
-        ...prev.loadingStates,
-        [operation]: loading,
-      },
-    }));
-  }, []);
-
-  const refreshCurrentDirectory = useCallback(() => {
-    // This would typically trigger a refetch of the current directory
-    // Implementation depends on the useFileApi hook integration
-    setLoading('refresh', true);
-    
-    // Simulate async operation
-    setTimeout(() => {
-      setLoading('refresh', false);
-    }, 1000);
-  }, [setLoading]);
+    files.forEach(file => selectFile(file));
+  }, [config.selectionMode, selectFile]);
 
   const clearSelection = useCallback(() => {
-    setSelectedFile(undefined);
-  }, [setSelectedFile]);
+    setSelectedFiles([]);
+    setValidationErrors({});
+    setUploadProgress({});
+    
+    eventHandlersRef.current.onDeselectAll?.();
+    eventHandlersRef.current.onSelectionChange?.([]);
+  }, []);
 
-  // =============================================================================
-  // COMPUTED VALUES
-  // =============================================================================
+  const selectAll = useCallback((files: FileMetadata[]) => {
+    if (config.selectionMode === 'single') return;
+    
+    const newSelected = files.map(file => ({
+      ...file,
+      uploadState: 'pending' as const,
+      validation: {
+        isValid: true,
+        errors: [],
+        warnings: [],
+        validatedAt: new Date().toISOString(),
+        appliedRules: [],
+      },
+    }));
 
-  const isLoading = useMemo(() => {
-    return Object.values(state.loadingStates).some(loading => loading);
-  }, [state.loadingStates]);
+    setSelectedFiles(newSelected);
+    eventHandlersRef.current.onSelectAll?.();
+    eventHandlersRef.current.onSelectionChange?.(newSelected);
+  }, [config.selectionMode]);
 
-  const canNavigateBack = useMemo(() => {
-    return state.historyIndex > 0;
-  }, [state.historyIndex]);
+  // =========================================================================
+  // FILE OPERATION FUNCTIONS
+  // =========================================================================
+  
+  const uploadSelectedFiles = useCallback(async () => {
+    if (selectedFiles.length === 0) return;
 
-  const canNavigateForward = useMemo(() => {
-    return state.historyIndex < state.navigationHistory.length - 1;
-  }, [state.historyIndex, state.navigationHistory.length]);
+    setLoading({
+      loading: true,
+      error: null,
+      progress: 0,
+      message: 'Uploading files...',
+    });
 
-  const canNavigateUp = useMemo(() => {
-    return state.currentPath !== '';
-  }, [state.currentPath]);
+    try {
+      const fileUploads = selectedFiles
+        .filter(file => file.file && file.uploadState === 'pending')
+        .map(async (selectedFile, index) => {
+          const { file } = selectedFile;
+          if (!file) return;
 
-  const filteredFiles = useMemo(() => {
-    let files = state.currentFiles;
+          try {
+            await uploadFileAsync({
+              serviceName: config.apiInfo.serviceName,
+              file,
+              path: currentPath,
+              onProgress: (progress) => {
+                setUploadProgress(prev => ({
+                  ...prev,
+                  [selectedFile.path]: progress.progress,
+                }));
+              },
+            });
 
-    // Apply text filter
-    if (state.filterText) {
-      const filter = state.filterText.toLowerCase();
-      files = files.filter(file =>
-        file.name.toLowerCase().includes(filter)
-      );
-    }
+            // Update file state to completed
+            setSelectedFiles(prev => prev.map(f => 
+              f.path === selectedFile.path 
+                ? { ...f, uploadState: 'completed' as const }
+                : f
+            ));
 
-    // Apply file type filter
-    if (state.fileTypeFilter.length > 0) {
-      files = files.filter(file => {
-        if (file.type === 'folder') return true;
-        
-        const extension = file.name.split('.').pop()?.toLowerCase();
-        return extension && state.fileTypeFilter.some(type =>
-          type.toLowerCase() === extension || type.toLowerCase() === `.${extension}`
-        );
+            eventHandlersRef.current.onUploadComplete?.(selectedFile);
+          } catch (error) {
+            console.error(`Upload failed for ${file.name}:`, error);
+            
+            // Update file state to failed
+            setSelectedFiles(prev => prev.map(f => 
+              f.path === selectedFile.path 
+                ? { 
+                    ...f, 
+                    uploadState: 'failed' as const,
+                    error: {
+                      code: 'UPLOAD_FAILED',
+                      message: error instanceof Error ? error.message : 'Upload failed',
+                      retryable: true,
+                    },
+                  }
+                : f
+            ));
+
+            eventHandlersRef.current.onUploadError?.(selectedFile, {
+              code: 'UPLOAD_FAILED',
+              message: error instanceof Error ? error.message : 'Upload failed',
+              retryable: true,
+            });
+          }
+        });
+
+      await Promise.allSettled(fileUploads);
+      
+      // Refresh file list after uploads
+      refreshCurrentPath();
+      
+    } catch (error) {
+      console.error('Batch upload failed:', error);
+      setLoading({
+        loading: false,
+        error: error instanceof Error ? error.message : 'Upload failed',
+        progress: 0,
+        message: '',
+      });
+    } finally {
+      setLoading({
+        loading: false,
+        error: null,
+        progress: 100,
+        message: '',
       });
     }
+  }, [selectedFiles, config.apiInfo.serviceName, currentPath, uploadFileAsync, refreshCurrentPath]);
 
-    return files;
-  }, [state.currentFiles, state.filterText, state.fileTypeFilter]);
+  const removeFile = useCallback((fileId: string) => {
+    deselectFile(fileId);
+    eventHandlersRef.current.onFileRemove?.(
+      selectedFiles.find(f => f.path === fileId || f.name === fileId)!
+    );
+  }, [deselectFile, selectedFiles]);
 
-  // =============================================================================
-  // INITIALIZATION EFFECTS
-  // =============================================================================
+  const createFolder = useCallback(async (name: string) => {
+    if (!name.trim()) return;
 
-  // Initialize navigation history
-  useEffect(() => {
-    if (state.navigationHistory.length === 0 && state.currentServiceName) {
-      const rootEntry = createNavigationEntry('', state.currentServiceName, 'Root', true);
-      setState(prev => ({
-        ...prev,
-        navigationHistory: [rootEntry],
-        historyIndex: 0,
-      }));
+    setLoading({
+      loading: true,
+      error: null,
+      progress: 0,
+      message: 'Creating folder...',
+    });
+
+    try {
+      await createDirectoryAsync({
+        serviceName: config.apiInfo.serviceName,
+        path: currentPath,
+        name: name.trim(),
+      });
+
+      refreshCurrentPath();
+      
+      setLoading({
+        loading: false,
+        error: null,
+        progress: 100,
+        message: 'Folder created successfully',
+      });
+    } catch (error) {
+      console.error('Folder creation failed:', error);
+      setLoading({
+        loading: false,
+        error: error instanceof Error ? error.message : 'Failed to create folder',
+        progress: 0,
+        message: '',
+      });
     }
-  }, [state.currentServiceName, state.navigationHistory.length]);
+  }, [config.apiInfo.serviceName, currentPath, createDirectoryAsync, refreshCurrentPath]);
 
-  // =============================================================================
-  // RETURN INTERFACE
-  // =============================================================================
+  const deleteFile = useCallback(async (path: string) => {
+    setLoading({
+      loading: true,
+      error: null,
+      progress: 0,
+      message: 'Deleting file...',
+    });
 
-  return {
-    // Core UseFileSelectorReturn interface
-    selectedFile: state.selectedFile,
-    setSelectedFile,
-    uploadProgress: state.uploadProgress,
-    isLoading,
-    error: state.error?.message || null,
-    clearSelection,
-    validationState: state.validationState,
+    try {
+      await deleteFileAsync({
+        serviceName: config.apiInfo.serviceName,
+        path,
+      });
 
-    // Extended interface
-    form,
-    state,
-    actions: {
-      navigateToPath,
-      navigateUp,
-      navigateBack,
-      navigateForward,
-      setCurrentService,
-      setFilter,
-      setFileTypeFilter,
-      addToUploadProgress,
-      updateUploadProgress,
-      removeFromUploadProgress,
-      setDragActive,
-      setUploadMode,
-      setError,
-      setLoading,
-      refreshCurrentDirectory,
-    },
-  };
-}
+      // Remove from selection if selected
+      deselectFile(path);
+      refreshCurrentPath();
+      
+      setLoading({
+        loading: false,
+        error: null,
+        progress: 100,
+        message: 'File deleted successfully',
+      });
+    } catch (error) {
+      console.error('File deletion failed:', error);
+      setLoading({
+        loading: false,
+        error: error instanceof Error ? error.message : 'Failed to delete file',
+        progress: 0,
+        message: '',
+      });
+    }
+  }, [config.apiInfo.serviceName, deleteFileAsync, deselectFile, refreshCurrentPath]);
 
-// =============================================================================
-// ADDITIONAL HOOK EXPORTS
-// =============================================================================
+  // =========================================================================
+  // UI OPERATION FUNCTIONS
+  // =========================================================================
+  
+  const openDialog = useCallback(() => {
+    setIsDialogOpen(true);
+  }, []);
 
-/**
- * Hook for managing file selector navigation state only
- */
-export function useFileSelectorNavigation(
-  initialPath = '',
-  initialServiceName = ''
-) {
-  const [currentPath, setCurrentPath] = useState(initialPath);
-  const [currentServiceName, setCurrentServiceName] = useState(initialServiceName);
-  const [history, setHistory] = useState<NavigationHistoryEntry[]>([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
+  const closeDialog = useCallback(() => {
+    setIsDialogOpen(false);
+  }, []);
 
-  const navigate = useCallback((path: string, serviceName?: string) => {
-    const targetService = serviceName || currentServiceName;
-    const entry = createNavigationEntry(path, targetService);
-    
-    setCurrentPath(path);
-    setCurrentServiceName(targetService);
-    
-    setHistory(prev => {
-      if (historyIndex === prev.length - 1) {
-        return [...prev, entry];
+  const setViewMode = useCallback((mode: 'grid' | 'list' | 'table') => {
+    setViewModeState(mode);
+  }, []);
+
+  const setSearchTerm = useCallback((term: string) => {
+    setSearchTermState(term);
+  }, []);
+
+  const toggleFilter = useCallback((filter: FileFilter) => {
+    setActiveFilters(prev => {
+      const exists = prev.find(f => f.id === filter.id);
+      if (exists) {
+        return prev.filter(f => f.id !== filter.id);
       } else {
-        return [...prev.slice(0, historyIndex + 1), entry];
+        return [...prev, filter];
       }
-    });
-    
-    setHistoryIndex(prev => prev + 1);
-  }, [currentServiceName, historyIndex]);
-
-  const goBack = useCallback(() => {
-    if (historyIndex > 0) {
-      const prevEntry = history[historyIndex - 1];
-      setCurrentPath(prevEntry.path);
-      setCurrentServiceName(prevEntry.serviceName);
-      setHistoryIndex(prev => prev - 1);
-    }
-  }, [history, historyIndex]);
-
-  const goForward = useCallback(() => {
-    if (historyIndex < history.length - 1) {
-      const nextEntry = history[historyIndex + 1];
-      setCurrentPath(nextEntry.path);
-      setCurrentServiceName(nextEntry.serviceName);
-      setHistoryIndex(prev => prev + 1);
-    }
-  }, [history, historyIndex]);
-
-  return {
-    currentPath,
-    currentServiceName,
-    history,
-    canGoBack: historyIndex > 0,
-    canGoForward: historyIndex < history.length - 1,
-    navigate,
-    goBack,
-    goForward,
-  };
-}
-
-/**
- * Hook for managing file validation state
- */
-export function useFileValidation(options: FileValidationOptions = {}) {
-  const [validationState, setValidationState] = useState<ValidationState>({
-    isValid: true,
-    isDirty: false,
-    isTouched: false,
-  });
-
-  const validateFile = useCallback((file: File | SelectedFile) => {
-    const error = validateFile(file, options);
-    
-    setValidationState({
-      isValid: !error,
-      isDirty: true,
-      isTouched: true,
-      error,
-    });
-
-    return error;
-  }, [options]);
-
-  const clearValidation = useCallback(() => {
-    setValidationState({
-      isValid: true,
-      isDirty: false,
-      isTouched: false,
     });
   }, []);
 
-  return {
-    validationState,
+  // =========================================================================
+  // FORM INTEGRATION FUNCTIONS
+  // =========================================================================
+  
+  const setValue = useCallback((value: string | string[] | SelectedFile | SelectedFile[]) => {
+    if (typeof value === 'string') {
+      if (config.selectionMode === 'single') {
+        // Find file by path and select it
+        const file = files.find(f => f.path === value);
+        if (file) {
+          selectFile(file);
+        }
+      } else {
+        // Parse multiple paths
+        const paths = value.split(',').map(p => p.trim());
+        const matchingFiles = files.filter(f => paths.includes(f.path));
+        selectMultipleFiles(matchingFiles);
+      }
+    } else if (Array.isArray(value)) {
+      if (typeof value[0] === 'string') {
+        const matchingFiles = files.filter(f => (value as string[]).includes(f.path));
+        selectMultipleFiles(matchingFiles);
+      } else {
+        setSelectedFiles(value as SelectedFile[]);
+      }
+    } else if (isSelectedFile(value)) {
+      setSelectedFiles([value]);
+    } else if (isFileMetadata(value)) {
+      selectFile(value);
+    }
+
+    // Update form value if integrated
+    if (controller) {
+      controller.field.onChange(value);
+    }
+  }, [config.selectionMode, files, selectFile, selectMultipleFiles, controller]);
+
+  const getValue = useCallback((): string | string[] | SelectedFile | SelectedFile[] => {
+    if (config.selectionMode === 'single') {
+      return selectedFiles.length > 0 ? selectedFiles[0] : '';
+    } else {
+      return selectedFiles;
+    }
+  }, [config.selectionMode, selectedFiles]);
+
+  const setInitialValue = useCallback((value: string | string[] | SelectedFile | SelectedFile[]) => {
+    setValue(value);
+  }, [setValue]);
+
+  const resetToInitial = useCallback(() => {
+    if (config.initialValue) {
+      setValue(config.initialValue);
+    } else {
+      clearSelection();
+    }
+  }, [config.initialValue, setValue, clearSelection]);
+
+  // =========================================================================
+  // EFFECTS
+  // =========================================================================
+  
+  // Initialize with initial value
+  useEffect(() => {
+    if (config.initialValue && selectedFiles.length === 0) {
+      setInitialValue(config.initialValue);
+    }
+  }, [config.initialValue, selectedFiles.length, setInitialValue]);
+
+  // Update form value when selection changes
+  useEffect(() => {
+    if (controller) {
+      const value = getValue();
+      controller.field.onChange(value);
+    }
+  }, [selectedFiles, controller, getValue]);
+
+  // Auto-validate selection when it changes
+  useEffect(() => {
+    if (validationConfigRef.current.validateOnSelection && selectedFiles.length > 0) {
+      validateSelection();
+    }
+  }, [selectedFiles, validateSelection]);
+
+  // Update loading state based on external operations
+  useEffect(() => {
+    const isLoading = isUploading || isCreatingDirectory || isDeletingFile || isLoadingFiles;
+    
+    setLoading(prev => ({
+      ...prev,
+      loading: isLoading,
+      message: isUploading 
+        ? 'Uploading files...'
+        : isCreatingDirectory 
+        ? 'Creating folder...'
+        : isDeletingFile
+        ? 'Deleting file...'
+        : isLoadingFiles
+        ? 'Loading files...'
+        : '',
+    }));
+  }, [isUploading, isCreatingDirectory, isDeletingFile, isLoadingFiles]);
+
+  // =========================================================================
+  // RETURN HOOK API
+  // =========================================================================
+  
+  return useMemo(() => ({
+    // State
+    selectedFiles,
+    currentPath,
+    navigationHistory,
+    historyIndex,
+    canGoBack,
+    canGoForward,
+    loading,
+    isDialogOpen,
+    viewMode,
+    searchTerm,
+    activeFilters,
+    validationErrors,
+    hasValidationErrors,
+    uploadProgress,
+    activeUploads,
+
+    // External data
+    files,
+    isLoadingFiles,
+    filesError,
+    fileServices,
+    isLoadingServices,
+
+    // Configuration
+    config: validatedConfig,
+
+    // Actions
+    selectFile,
+    deselectFile,
+    selectMultipleFiles,
+    clearSelection,
+    selectAll,
+    navigateTo,
+    navigateBack,
+    navigateForward,
+    refreshCurrentPath,
+    uploadSelectedFiles,
+    removeFile,
+    createFolder,
+    deleteFile,
+    openDialog,
+    closeDialog,
+    setViewMode,
+    setSearchTerm,
+    toggleFilter,
     validateFile,
-    clearValidation,
+    validateSelection,
+    setValue,
+    getValue,
+    setInitialValue,
+    resetToInitial,
+  }), [
+    // State dependencies
+    selectedFiles,
+    currentPath,
+    navigationHistory,
+    historyIndex,
+    canGoBack,
+    canGoForward,
+    loading,
+    isDialogOpen,
+    viewMode,
+    searchTerm,
+    activeFilters,
+    validationErrors,
+    hasValidationErrors,
+    uploadProgress,
+    activeUploads,
+    files,
+    isLoadingFiles,
+    filesError,
+    fileServices,
+    isLoadingServices,
+    validatedConfig,
+    
+    // Action dependencies
+    selectFile,
+    deselectFile,
+    selectMultipleFiles,
+    clearSelection,
+    selectAll,
+    navigateTo,
+    navigateBack,
+    navigateForward,
+    refreshCurrentPath,
+    uploadSelectedFiles,
+    removeFile,
+    createFolder,
+    deleteFile,
+    openDialog,
+    closeDialog,
+    setViewMode,
+    setSearchTerm,
+    toggleFilter,
+    validateFile,
+    validateSelection,
+    setValue,
+    getValue,
+    setInitialValue,
+    resetToInitial,
+  ]);
+}
+
+// ============================================================================
+// UTILITY HOOKS
+// ============================================================================
+
+/**
+ * useFileSelectorForm Hook
+ * 
+ * Specialized hook for React Hook Form integration with automatic registration
+ */
+export function useFileSelectorForm(
+  name: string,
+  config: FileSelectorConfig,
+  options?: {
+    rules?: any;
+    defaultValue?: any;
+  }
+) {
+  const formContext = useFormContext();
+  
+  if (!formContext) {
+    throw new Error('useFileSelectorForm must be used within a FormProvider');
+  }
+
+  const fileSelector = useFileSelector(
+    {
+      ...config,
+      initialValue: options?.defaultValue || config.initialValue,
+    },
+    name
+  );
+
+  // Register field with form
+  const { field, fieldState } = useController({
+    name,
+    control: formContext.control,
+    rules: options?.rules,
+    defaultValue: options?.defaultValue || config.initialValue,
+  });
+
+  return {
+    ...fileSelector,
+    field,
+    fieldState,
+    formError: fieldState.error?.message,
   };
 }
 
-export default useFileSelector;
+/**
+ * useFileSelectorValidation Hook
+ * 
+ * Specialized hook for file validation with custom rules
+ */
+export function useFileSelectorValidation(
+  customRules?: Array<(file: File) => FileValidationResult>
+) {
+  const validateFileWithCustomRules = useCallback((file: File): FileValidationResult => {
+    if (!customRules || customRules.length === 0) {
+      return {
+        isValid: true,
+        errors: [],
+        warnings: [],
+        validatedAt: new Date().toISOString(),
+        appliedRules: [],
+      };
+    }
+
+    const allErrors: FileValidationError[] = [];
+    const allWarnings: FileValidationError[] = [];
+    const appliedRules: string[] = [];
+
+    customRules.forEach((rule, index) => {
+      try {
+        const result = rule(file);
+        allErrors.push(...result.errors);
+        allWarnings.push(...result.warnings);
+        appliedRules.push(...result.appliedRules);
+      } catch (error) {
+        console.error(`Custom validation rule ${index} failed:`, error);
+        allErrors.push(createValidationError(
+          'UNKNOWN_ERROR',
+          `Custom validation rule failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          { ruleIndex: index, error }
+        ));
+      }
+    });
+
+    return {
+      isValid: allErrors.length === 0,
+      errors: allErrors,
+      warnings: allWarnings,
+      validatedAt: new Date().toISOString(),
+      appliedRules: Array.from(new Set(appliedRules)),
+    };
+  }, [customRules]);
+
+  return {
+    validateFileWithCustomRules,
+  };
+}
+
+// ============================================================================
+// TYPE EXPORTS
+// ============================================================================
+
+export type {
+  FileSelectorConfig,
+  NavigationHistoryEntry,
+  FileSelectorState,
+  FileSelectorActions,
+  UseFileSelectorReturn,
+};
