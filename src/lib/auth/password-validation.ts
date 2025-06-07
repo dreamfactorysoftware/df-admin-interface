@@ -1,542 +1,725 @@
 /**
- * Password Validation Utilities
+ * Password Validation Utilities for DreamFactory Admin Interface
  * 
- * Provides comprehensive password validation with enterprise security features
- * including strength checking, policy enforcement, and security requirements validation.
- * Implements 16-character minimum requirement per security specifications.
+ * Provides comprehensive password validation including strength checking, policy enforcement,
+ * and security requirements validation for React/Next.js authentication forms.
+ * 
+ * Key features:
+ * - 16-character minimum password requirements per security specifications
+ * - Configurable password complexity validation with character class requirements
+ * - Real-time password matching validation for confirmation fields
+ * - User-friendly error messages and validation feedback
+ * - Security scoring and strength indicators for user guidance
+ * - Enterprise security features including password rotation and expiration
+ * - Integration with React Hook Form and Zod validation schemas
+ * 
+ * @version 1.0.0
+ * @author DreamFactory Platform Team
  */
 
-import { z } from 'zod'
+import { z } from 'zod';
+import type { 
+  UpdatePasswordRequest, 
+  ResetFormData, 
+  SecurityQuestion,
+  AuthError 
+} from '@/types/auth';
 
-// Types for password validation results and configuration
-export interface PasswordValidationResult {
-  isValid: boolean
-  score: number
-  strength: PasswordStrength
-  errors: string[]
-  feedback: string[]
-  entropy: number
+// =============================================================================
+// PASSWORD POLICY CONFIGURATION
+// =============================================================================
+
+/**
+ * Password complexity requirements configuration
+ * Defines character class requirements and validation rules per security specifications
+ */
+export interface PasswordPolicy {
+  /** Minimum password length (16 characters per security specifications) */
+  minLength: number;
+  /** Maximum password length to prevent DoS attacks */
+  maxLength: number;
+  /** Require uppercase letters */
+  requireUppercase: boolean;
+  /** Require lowercase letters */
+  requireLowercase: boolean;
+  /** Require numeric digits */
+  requireNumbers: boolean;
+  /** Require special characters */
+  requireSpecialChars: boolean;
+  /** Minimum number of character classes required */
+  minCharacterClasses: number;
+  /** Prevent common passwords */
+  preventCommonPasswords: boolean;
+  /** Prevent username/email in password */
+  preventPersonalInfo: boolean;
+  /** Maximum consecutive repeated characters */
+  maxConsecutiveChars: number;
+  /** Password expiration in days (0 = no expiration) */
+  expirationDays: number;
+  /** Password history count to prevent reuse */
+  historyCount: number;
 }
 
-export interface PasswordMatchResult {
-  isMatch: boolean
-  errors: string[]
-}
-
-export interface PasswordPolicyConfig {
-  minLength: number
-  maxLength: number
-  requireUppercase: boolean
-  requireLowercase: boolean
-  requireNumbers: boolean
-  requireSpecialChars: boolean
-  minSpecialChars: number
-  forbiddenPatterns: string[]
-  preventCommonPasswords: boolean
-  preventUserInfo: boolean
-  maxRepeatingChars: number
-  preventSequentialChars: boolean
-}
-
-export interface PasswordExpirationConfig {
-  maxAgeInDays: number
-  warningThresholdInDays: number
-  enforceRotation: boolean
-  preventReuse: number
-}
-
-export interface UserPasswordContext {
-  email?: string
-  firstName?: string
-  lastName?: string
-  username?: string
-  previousPasswords?: string[]
-  lastPasswordChange?: Date
-}
-
-export type PasswordStrength = 'very-weak' | 'weak' | 'fair' | 'good' | 'strong' | 'very-strong'
-
-// Default security policy configuration per DreamFactory specifications
-export const DEFAULT_PASSWORD_POLICY: PasswordPolicyConfig = {
-  minLength: 16, // Per security specifications
+/**
+ * Default password policy based on enterprise security requirements
+ * Implements 16-character minimum with comprehensive complexity requirements
+ */
+export const DEFAULT_PASSWORD_POLICY: PasswordPolicy = {
+  minLength: 16,
   maxLength: 128,
   requireUppercase: true,
   requireLowercase: true,
   requireNumbers: true,
   requireSpecialChars: true,
-  minSpecialChars: 2,
-  forbiddenPatterns: [
-    'password',
-    'admin',
-    'dreamfactory',
-    'qwerty',
-    '123456',
-    'letmein',
-    'welcome',
-    'changeme'
-  ],
+  minCharacterClasses: 3,
   preventCommonPasswords: true,
-  preventUserInfo: true,
-  maxRepeatingChars: 2,
-  preventSequentialChars: true
+  preventPersonalInfo: true,
+  maxConsecutiveChars: 3,
+  expirationDays: 90,
+  historyCount: 12,
+};
+
+/**
+ * Password strength levels for user guidance
+ */
+export enum PasswordStrength {
+  VERY_WEAK = 0,
+  WEAK = 1,
+  FAIR = 2,
+  GOOD = 3,
+  STRONG = 4,
+  VERY_STRONG = 5,
 }
 
-export const DEFAULT_EXPIRATION_CONFIG: PasswordExpirationConfig = {
-  maxAgeInDays: 90,
-  warningThresholdInDays: 14,
-  enforceRotation: true,
-  preventReuse: 12
+/**
+ * Password validation result interface
+ * Provides comprehensive validation feedback for forms
+ */
+export interface PasswordValidationResult {
+  /** Overall validation result */
+  isValid: boolean;
+  /** Password strength score (0-5) */
+  strength: PasswordStrength;
+  /** Strength percentage for progress indicators */
+  strengthPercentage: number;
+  /** User-friendly error messages */
+  errors: string[];
+  /** Helpful suggestions for improvement */
+  suggestions: string[];
+  /** Character class requirements met */
+  requirements: {
+    minLength: boolean;
+    hasUppercase: boolean;
+    hasLowercase: boolean;
+    hasNumbers: boolean;
+    hasSpecialChars: boolean;
+    noCommonPassword: boolean;
+    noPersonalInfo: boolean;
+    noConsecutiveChars: boolean;
+  };
+  /** Security score breakdown */
+  scoreBreakdown: {
+    lengthScore: number;
+    complexityScore: number;
+    diversityScore: number;
+    securityScore: number;
+  };
 }
 
-// Common weak passwords list (subset for security)
+/**
+ * Password matching validation result
+ */
+export interface PasswordMatchResult {
+  /** Passwords match */
+  matches: boolean;
+  /** Error message if passwords don't match */
+  error?: string;
+}
+
+/**
+ * Password expiration check result
+ */
+export interface PasswordExpirationResult {
+  /** Password is expired */
+  isExpired: boolean;
+  /** Days until expiration (negative if expired) */
+  daysUntilExpiration: number;
+  /** Warning threshold reached */
+  warningThreshold: boolean;
+  /** Human-readable expiration message */
+  message: string;
+}
+
+// =============================================================================
+// COMMON PASSWORD DETECTION
+// =============================================================================
+
+/**
+ * Common passwords to prevent usage
+ * Limited set for security - comprehensive list should be server-side
+ */
 const COMMON_PASSWORDS = new Set([
-  'password123456789',
-  '1234567890123456',
-  'qwertyuiopasdfgh',
-  'passwordpassword',
-  'adminadminadmin',
-  'letmeinletmein12',
-  'welcome123456789',
-  'changemechangeme',
-  '!@#$%^&*()123456',
-  'abcdefghijklmnop'
-])
-
-// Character sets for complexity validation
-const CHARACTER_SETS = {
-  lowercase: /[a-z]/,
-  uppercase: /[A-Z]/,
-  numbers: /[0-9]/,
-  specialChars: /[!@#$%^&*(),.?":{}|<>]/,
-  extendedSpecial: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/
-}
-
-// Sequential patterns to detect
-const SEQUENTIAL_PATTERNS = [
-  'abcdefghijklmnopqrstuvwxyz',
-  'qwertyuiopasdfghjklzxcvbnm',
-  '1234567890',
-  '0987654321'
-]
+  'password', 'password123', '123456789', 'qwertyuiop',
+  'administrator', 'dreamfactory', 'admin123456',
+  'letmein123456789', 'welcome123456789', 'password1234567890',
+  '1234567890123456', 'abcdefghijklmnop', 'qwertyuiopasdfgh',
+]);
 
 /**
- * Zod schema for password validation
+ * Special characters allowed in passwords
  */
-export const passwordSchema = z.string()
-  .min(16, 'Password must be at least 16 characters long per security requirements')
-  .max(128, 'Password must not exceed 128 characters')
-  .refine(
-    (password) => /[a-z]/.test(password),
-    'Password must contain at least one lowercase letter'
-  )
-  .refine(
-    (password) => /[A-Z]/.test(password),
-    'Password must contain at least one uppercase letter'
-  )
-  .refine(
-    (password) => /[0-9]/.test(password),
-    'Password must contain at least one number'
-  )
-  .refine(
-    (password) => /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(password),
-    'Password must contain at least one special character'
-  )
+const SPECIAL_CHARS = '!@#$%^&*()_+-=[]{}|;:,.<>?';
+
+// =============================================================================
+// CORE VALIDATION FUNCTIONS
+// =============================================================================
 
 /**
- * Calculate password entropy for strength assessment
+ * Validates password strength and complexity according to policy
+ * 
+ * @param password - Password to validate
+ * @param policy - Password policy configuration (optional, uses default)
+ * @param personalInfo - Personal information to check against (email, username, name)
+ * @returns Comprehensive validation result with strength scoring
  */
-function calculateEntropy(password: string): number {
-  const charsetSize = getCharsetSize(password)
-  return Math.log2(Math.pow(charsetSize, password.length))
-}
-
-/**
- * Determine character set size for entropy calculation
- */
-function getCharsetSize(password: string): number {
-  let size = 0
-  
-  if (CHARACTER_SETS.lowercase.test(password)) size += 26
-  if (CHARACTER_SETS.uppercase.test(password)) size += 26
-  if (CHARACTER_SETS.numbers.test(password)) size += 10
-  if (CHARACTER_SETS.extendedSpecial.test(password)) size += 32
-  
-  return Math.max(size, 10) // Minimum charset size
-}
-
-/**
- * Determine password strength based on entropy and other factors
- */
-function determineStrength(
-  password: string, 
-  entropy: number, 
-  policyViolations: number
-): PasswordStrength {
-  const length = password.length
-  const hasVariety = getUniqueCharCount(password) > length * 0.5
-  
-  // Adjust entropy based on policy violations
-  const adjustedEntropy = entropy - (policyViolations * 10)
-  
-  if (adjustedEntropy < 40 || length < 12) return 'very-weak'
-  if (adjustedEntropy < 60 || length < 16) return 'weak'
-  if (adjustedEntropy < 80 || !hasVariety) return 'fair'
-  if (adjustedEntropy < 100) return 'good'
-  if (adjustedEntropy < 120) return 'strong'
-  return 'very-strong'
-}
-
-/**
- * Count unique characters in password
- */
-function getUniqueCharCount(password: string): number {
-  return new Set(password.split('')).size
-}
-
-/**
- * Check for repeating character patterns
- */
-function hasExcessiveRepeating(password: string, maxRepeating: number): boolean {
-  for (let i = 0; i <= password.length - maxRepeating - 1; i++) {
-    const char = password[i]
-    let count = 1
-    
-    for (let j = i + 1; j < password.length && password[j] === char; j++) {
-      count++
-      if (count > maxRepeating) return true
-    }
-  }
-  return false
-}
-
-/**
- * Check for sequential character patterns
- */
-function hasSequentialChars(password: string): boolean {
-  const lowerPassword = password.toLowerCase()
-  
-  for (const pattern of SEQUENTIAL_PATTERNS) {
-    for (let i = 0; i <= pattern.length - 4; i++) {
-      const sequence = pattern.substring(i, i + 4)
-      const reverseSequence = sequence.split('').reverse().join('')
-      
-      if (lowerPassword.includes(sequence) || lowerPassword.includes(reverseSequence)) {
-        return true
-      }
-    }
-  }
-  return false
-}
-
-/**
- * Check if password contains user-related information
- */
-function containsUserInfo(password: string, userContext?: UserPasswordContext): boolean {
-  if (!userContext) return false
-  
-  const lowerPassword = password.toLowerCase()
-  const userInfo = [
-    userContext.email?.split('@')[0],
-    userContext.firstName,
-    userContext.lastName,
-    userContext.username
-  ].filter(Boolean).map(info => info!.toLowerCase())
-  
-  return userInfo.some(info => 
-    info.length >= 3 && lowerPassword.includes(info)
-  )
-}
-
-/**
- * Check if password was previously used
- */
-function isPreviouslyUsed(password: string, userContext?: UserPasswordContext): boolean {
-  if (!userContext?.previousPasswords) return false
-  
-  // In production, this should use hashed comparison
-  return userContext.previousPasswords.some(prevPassword => 
-    prevPassword === password
-  )
-}
-
-/**
- * Main password validation function
- */
-export function validatePassword(
+export function validatePasswordStrength(
   password: string,
-  config: Partial<PasswordPolicyConfig> = {},
-  userContext?: UserPasswordContext
+  policy: Partial<PasswordPolicy> = {},
+  personalInfo: { email?: string; username?: string; name?: string } = {}
 ): PasswordValidationResult {
-  const policy = { ...DEFAULT_PASSWORD_POLICY, ...config }
-  const errors: string[] = []
-  const feedback: string[] = []
+  const appliedPolicy = { ...DEFAULT_PASSWORD_POLICY, ...policy };
+  const errors: string[] = [];
+  const suggestions: string[] = [];
   
-  // Basic length validation
-  if (password.length < policy.minLength) {
-    errors.push(`Password must be at least ${policy.minLength} characters long`)
+  // Initialize requirements tracking
+  const requirements = {
+    minLength: password.length >= appliedPolicy.minLength,
+    hasUppercase: /[A-Z]/.test(password),
+    hasLowercase: /[a-z]/.test(password),
+    hasNumbers: /\d/.test(password),
+    hasSpecialChars: new RegExp(`[${SPECIAL_CHARS.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}]`).test(password),
+    noCommonPassword: !COMMON_PASSWORDS.has(password.toLowerCase()),
+    noPersonalInfo: !containsPersonalInfo(password, personalInfo),
+    noConsecutiveChars: !hasConsecutiveChars(password, appliedPolicy.maxConsecutiveChars),
+  };
+
+  // Check minimum length requirement
+  if (!requirements.minLength) {
+    errors.push(`Password must be at least ${appliedPolicy.minLength} characters long`);
+    suggestions.push(`Add ${appliedPolicy.minLength - password.length} more characters`);
   }
-  
-  if (password.length > policy.maxLength) {
-    errors.push(`Password must not exceed ${policy.maxLength} characters`)
+
+  // Check maximum length
+  if (password.length > appliedPolicy.maxLength) {
+    errors.push(`Password must not exceed ${appliedPolicy.maxLength} characters`);
   }
-  
-  // Character class requirements
-  if (policy.requireLowercase && !CHARACTER_SETS.lowercase.test(password)) {
-    errors.push('Password must contain at least one lowercase letter')
+
+  // Check character class requirements
+  if (appliedPolicy.requireUppercase && !requirements.hasUppercase) {
+    errors.push('Password must contain at least one uppercase letter');
+    suggestions.push('Add an uppercase letter (A-Z)');
   }
-  
-  if (policy.requireUppercase && !CHARACTER_SETS.uppercase.test(password)) {
-    errors.push('Password must contain at least one uppercase letter')
+
+  if (appliedPolicy.requireLowercase && !requirements.hasLowercase) {
+    errors.push('Password must contain at least one lowercase letter');
+    suggestions.push('Add a lowercase letter (a-z)');
   }
-  
-  if (policy.requireNumbers && !CHARACTER_SETS.numbers.test(password)) {
-    errors.push('Password must contain at least one number')
+
+  if (appliedPolicy.requireNumbers && !requirements.hasNumbers) {
+    errors.push('Password must contain at least one number');
+    suggestions.push('Add a number (0-9)');
   }
-  
-  if (policy.requireSpecialChars) {
-    const specialCharCount = (password.match(CHARACTER_SETS.extendedSpecial) || []).length
-    if (specialCharCount === 0) {
-      errors.push('Password must contain at least one special character')
-    } else if (specialCharCount < policy.minSpecialChars) {
-      errors.push(`Password must contain at least ${policy.minSpecialChars} special characters`)
-    }
+
+  if (appliedPolicy.requireSpecialChars && !requirements.hasSpecialChars) {
+    errors.push('Password must contain at least one special character');
+    suggestions.push(`Add a special character (${SPECIAL_CHARS})`);
   }
-  
-  // Pattern and complexity checks
-  if (policy.preventCommonPasswords && COMMON_PASSWORDS.has(password.toLowerCase())) {
-    errors.push('Password is too common and easily guessable')
+
+  // Check character class diversity
+  const characterClasses = [
+    requirements.hasUppercase,
+    requirements.hasLowercase,
+    requirements.hasNumbers,
+    requirements.hasSpecialChars,
+  ].filter(Boolean).length;
+
+  if (characterClasses < appliedPolicy.minCharacterClasses) {
+    errors.push(`Password must use at least ${appliedPolicy.minCharacterClasses} different character types`);
+    suggestions.push('Mix uppercase, lowercase, numbers, and special characters');
   }
-  
-  // Check forbidden patterns
-  const lowerPassword = password.toLowerCase()
-  for (const pattern of policy.forbiddenPatterns) {
-    if (lowerPassword.includes(pattern.toLowerCase())) {
-      errors.push(`Password cannot contain the word "${pattern}"`)
-    }
+
+  // Check common password prevention
+  if (appliedPolicy.preventCommonPasswords && !requirements.noCommonPassword) {
+    errors.push('Password is too common and easily guessed');
+    suggestions.push('Choose a more unique password');
   }
-  
-  // Repeating characters check
-  if (hasExcessiveRepeating(password, policy.maxRepeatingChars)) {
-    errors.push(`Password cannot have more than ${policy.maxRepeatingChars} repeating characters`)
+
+  // Check personal information prevention
+  if (appliedPolicy.preventPersonalInfo && !requirements.noPersonalInfo) {
+    errors.push('Password must not contain personal information');
+    suggestions.push('Avoid using your email, username, or name in the password');
   }
-  
-  // Sequential characters check
-  if (policy.preventSequentialChars && hasSequentialChars(password)) {
-    errors.push('Password cannot contain sequential characters (e.g., "abcd", "1234")')
+
+  // Check consecutive characters
+  if (!requirements.noConsecutiveChars) {
+    errors.push(`Password must not have more than ${appliedPolicy.maxConsecutiveChars} consecutive identical characters`);
+    suggestions.push('Avoid repeating the same character multiple times');
   }
-  
-  // User information check
-  if (policy.preventUserInfo && containsUserInfo(password, userContext)) {
-    errors.push('Password cannot contain personal information')
-  }
-  
-  // Previous password check
-  if (isPreviouslyUsed(password, userContext)) {
-    errors.push('Password has been used previously and cannot be reused')
-  }
-  
-  // Calculate entropy and strength
-  const entropy = calculateEntropy(password)
-  const strength = determineStrength(password, entropy, errors.length)
-  const score = Math.min(Math.round((entropy / 120) * 100), 100)
-  
-  // Generate feedback
-  if (strength === 'very-weak' || strength === 'weak') {
-    feedback.push('Consider using a longer password with more character variety')
-  }
-  
-  if (getUniqueCharCount(password) < password.length * 0.5) {
-    feedback.push('Use more unique characters for better security')
-  }
-  
-  if (password.length < 20) {
-    feedback.push('Longer passwords provide better security')
-  }
-  
+
+  // Calculate strength scores
+  const scoreBreakdown = calculatePasswordScore(password, requirements, appliedPolicy);
+  const overallScore = (
+    scoreBreakdown.lengthScore +
+    scoreBreakdown.complexityScore +
+    scoreBreakdown.diversityScore +
+    scoreBreakdown.securityScore
+  ) / 4;
+
+  const strength = getPasswordStrength(overallScore);
+  const strengthPercentage = Math.round(overallScore * 20); // Convert to 0-100%
+
   return {
-    isValid: errors.length === 0,
-    score,
+    isValid: errors.length === 0 && strength >= PasswordStrength.GOOD,
     strength,
+    strengthPercentage,
     errors,
-    feedback,
-    entropy
-  }
+    suggestions,
+    requirements,
+    scoreBreakdown,
+  };
 }
 
 /**
- * Validate password confirmation match
+ * Validates that two passwords match
+ * 
+ * @param password - Primary password
+ * @param confirmPassword - Confirmation password
+ * @returns Password match validation result
  */
 export function validatePasswordMatch(
   password: string,
   confirmPassword: string
 ): PasswordMatchResult {
-  const errors: string[] = []
-  
-  if (!confirmPassword) {
-    errors.push('Password confirmation is required')
-  } else if (password !== confirmPassword) {
-    errors.push('Passwords do not match')
-  }
+  const matches = password === confirmPassword;
   
   return {
-    isMatch: password === confirmPassword && password.length > 0,
-    errors
-  }
+    matches,
+    error: matches ? undefined : 'Passwords do not match',
+  };
 }
 
 /**
- * Check password expiration status
+ * Checks if password has expired based on policy and last change date
+ * 
+ * @param lastPasswordChange - Date of last password change
+ * @param policy - Password policy with expiration settings
+ * @returns Password expiration status
  */
 export function checkPasswordExpiration(
   lastPasswordChange: Date,
-  config: Partial<PasswordExpirationConfig> = {}
-): {
-  isExpired: boolean
-  daysUntilExpiration: number
-  requiresWarning: boolean
-  daysSinceChange: number
-} {
-  const expirationConfig = { ...DEFAULT_EXPIRATION_CONFIG, ...config }
-  const now = new Date()
-  const daysSinceChange = Math.floor(
-    (now.getTime() - lastPasswordChange.getTime()) / (1000 * 60 * 60 * 24)
-  )
+  policy: Partial<PasswordPolicy> = {}
+): PasswordExpirationResult {
+  const appliedPolicy = { ...DEFAULT_PASSWORD_POLICY, ...policy };
   
-  const daysUntilExpiration = expirationConfig.maxAgeInDays - daysSinceChange
-  const isExpired = daysUntilExpiration <= 0
-  const requiresWarning = daysUntilExpiration <= expirationConfig.warningThresholdInDays
+  // If no expiration policy, password never expires
+  if (appliedPolicy.expirationDays === 0) {
+    return {
+      isExpired: false,
+      daysUntilExpiration: Infinity,
+      warningThreshold: false,
+      message: 'Password does not expire',
+    };
+  }
+
+  const now = new Date();
+  const expirationDate = new Date(lastPasswordChange);
+  expirationDate.setDate(expirationDate.getDate() + appliedPolicy.expirationDays);
   
+  const daysUntilExpiration = Math.ceil((expirationDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  const isExpired = daysUntilExpiration <= 0;
+  const warningThreshold = daysUntilExpiration <= 7 && daysUntilExpiration > 0;
+
+  let message: string;
+  if (isExpired) {
+    message = `Password expired ${Math.abs(daysUntilExpiration)} day(s) ago`;
+  } else if (warningThreshold) {
+    message = `Password expires in ${daysUntilExpiration} day(s)`;
+  } else {
+    message = `Password expires on ${expirationDate.toLocaleDateString()}`;
+  }
+
   return {
     isExpired,
-    daysUntilExpiration: Math.max(0, daysUntilExpiration),
-    requiresWarning: requiresWarning && !isExpired,
-    daysSinceChange
-  }
+    daysUntilExpiration,
+    warningThreshold,
+    message,
+  };
 }
 
 /**
- * Generate password strength meter display data
+ * Validates password rotation requirements
+ * Checks if password was used recently based on history
+ * 
+ * @param newPassword - New password to validate
+ * @param passwordHistory - Array of recent password hashes
+ * @param policy - Password policy with history settings
+ * @returns Validation result for password reuse
  */
-export function getPasswordStrengthMeter(result: PasswordValidationResult): {
-  percentage: number
-  color: string
-  label: string
-  description: string
-} {
-  const strengthConfig = {
-    'very-weak': { color: '#dc2626', label: 'Very Weak', description: 'Easily guessable' },
-    'weak': { color: '#ea580c', label: 'Weak', description: 'Could be guessed' },
-    'fair': { color: '#ca8a04', label: 'Fair', description: 'Somewhat secure' },
-    'good': { color: '#65a30d', label: 'Good', description: 'Secure' },
-    'strong': { color: '#16a34a', label: 'Strong', description: 'Very secure' },
-    'very-strong': { color: '#059669', label: 'Very Strong', description: 'Extremely secure' }
-  }
+export function validatePasswordRotation(
+  newPassword: string,
+  passwordHistory: string[] = [],
+  policy: Partial<PasswordPolicy> = {}
+): { isValid: boolean; error?: string } {
+  const appliedPolicy = { ...DEFAULT_PASSWORD_POLICY, ...policy };
   
-  const config = strengthConfig[result.strength]
-  
-  return {
-    percentage: result.score,
-    color: config.color,
-    label: config.label,
-    description: config.description
+  // If no history policy, allow any password
+  if (appliedPolicy.historyCount === 0) {
+    return { isValid: true };
   }
+
+  // Note: In production, this should hash the password and compare hashes
+  // For security reasons, we're providing a placeholder implementation
+  const hashedNewPassword = hashPassword(newPassword);
+  const recentPasswords = passwordHistory.slice(-appliedPolicy.historyCount);
+  
+  if (recentPasswords.includes(hashedNewPassword)) {
+    return {
+      isValid: false,
+      error: `Password cannot be the same as your last ${appliedPolicy.historyCount} passwords`,
+    };
+  }
+
+  return { isValid: true };
 }
 
-/**
- * Real-time password validation for form integration
- */
-export function validatePasswordRealTime(
-  password: string,
-  confirmPassword?: string,
-  config?: Partial<PasswordPolicyConfig>,
-  userContext?: UserPasswordContext
-): {
-  password: PasswordValidationResult
-  match?: PasswordMatchResult
-  realTimeErrors: string[]
-  canSubmit: boolean
-} {
-  const passwordResult = validatePassword(password, config, userContext)
-  const matchResult = confirmPassword !== undefined 
-    ? validatePasswordMatch(password, confirmPassword)
-    : undefined
-  
-  // Collect real-time errors (show only critical ones during typing)
-  const realTimeErrors: string[] = []
-  
-  if (password.length > 0 && password.length < (config?.minLength || DEFAULT_PASSWORD_POLICY.minLength)) {
-    realTimeErrors.push(`Minimum ${config?.minLength || DEFAULT_PASSWORD_POLICY.minLength} characters required`)
-  }
-  
-  if (matchResult && !matchResult.isMatch && confirmPassword && confirmPassword.length > 0) {
-    realTimeErrors.push('Passwords do not match')
-  }
-  
-  const canSubmit = passwordResult.isValid && (!matchResult || matchResult.isMatch)
-  
-  return {
-    password: passwordResult,
-    match: matchResult,
-    realTimeErrors,
-    canSubmit
-  }
-}
+// =============================================================================
+// ZOD VALIDATION SCHEMAS
+// =============================================================================
 
 /**
- * Create password validation schema for forms
+ * Creates a Zod schema for password validation with configurable policy
+ * 
+ * @param policy - Password policy configuration
+ * @param personalInfo - Personal information for validation
+ * @returns Zod schema for password validation
  */
-export function createPasswordValidationSchema(
-  config?: Partial<PasswordPolicyConfig>,
-  userContext?: UserPasswordContext
+export function createPasswordSchema(
+  policy: Partial<PasswordPolicy> = {},
+  personalInfo: { email?: string; username?: string; name?: string } = {}
 ) {
-  const policy = { ...DEFAULT_PASSWORD_POLICY, ...config }
-  
-  return z.object({
-    password: z.string()
-      .min(policy.minLength, `Password must be at least ${policy.minLength} characters long`)
-      .max(policy.maxLength, `Password must not exceed ${policy.maxLength} characters`)
-      .refine(
-        (password) => !policy.requireLowercase || CHARACTER_SETS.lowercase.test(password),
-        'Password must contain at least one lowercase letter'
-      )
-      .refine(
-        (password) => !policy.requireUppercase || CHARACTER_SETS.uppercase.test(password),
-        'Password must contain at least one uppercase letter'
-      )
-      .refine(
-        (password) => !policy.requireNumbers || CHARACTER_SETS.numbers.test(password),
-        'Password must contain at least one number'
-      )
-      .refine(
-        (password) => !policy.requireSpecialChars || CHARACTER_SETS.extendedSpecial.test(password),
-        'Password must contain at least one special character'
-      )
-      .refine(
-        (password) => !policy.preventCommonPasswords || !COMMON_PASSWORDS.has(password.toLowerCase()),
-        'Password is too common and easily guessable'
-      )
-      .refine(
-        (password) => !hasExcessiveRepeating(password, policy.maxRepeatingChars),
-        `Password cannot have more than ${policy.maxRepeatingChars} repeating characters`
-      )
-      .refine(
-        (password) => !policy.preventSequentialChars || !hasSequentialChars(password),
-        'Password cannot contain sequential characters'
-      )
-      .refine(
-        (password) => !policy.preventUserInfo || !containsUserInfo(password, userContext),
-        'Password cannot contain personal information'
-      )
-      .refine(
-        (password) => !isPreviouslyUsed(password, userContext),
-        'Password has been used previously and cannot be reused'
-      ),
-    confirmPassword: z.string()
-  }).refine(
-    (data) => data.password === data.confirmPassword,
-    {
-      message: 'Passwords do not match',
-      path: ['confirmPassword']
-    }
-  )
+  return z.string()
+    .min(1, 'Password is required')
+    .refine((password) => {
+      const result = validatePasswordStrength(password, policy, personalInfo);
+      return result.isValid;
+    }, (password) => {
+      const result = validatePasswordStrength(password, policy, personalInfo);
+      return {
+        message: result.errors[0] || 'Password does not meet security requirements',
+      };
+    });
 }
+
+/**
+ * Creates a Zod schema for password confirmation fields
+ * 
+ * @param passwordField - Name of the password field to match against
+ * @returns Zod schema for password confirmation
+ */
+export function createPasswordConfirmSchema(passwordField: string = 'password') {
+  return z.string()
+    .min(1, 'Password confirmation is required')
+    .refine((confirmPassword, ctx) => {
+      const password = ctx.path.length > 0 ? 
+        (ctx as any).parent?.[passwordField] : 
+        undefined;
+      
+      if (!password) return true; // Let password field handle its own validation
+      
+      const result = validatePasswordMatch(password, confirmPassword);
+      return result.matches;
+    }, 'Passwords do not match');
+}
+
+/**
+ * Password update request schema with current password verification
+ */
+export const updatePasswordSchema = z.object({
+  oldPassword: z.string().min(1, 'Current password is required'),
+  newPassword: createPasswordSchema(),
+  confirmPassword: z.string().min(1, 'Password confirmation is required'),
+}).refine((data) => {
+  const result = validatePasswordMatch(data.newPassword, data.confirmPassword);
+  return result.matches;
+}, {
+  message: 'New password and confirmation do not match',
+  path: ['confirmPassword'],
+});
+
+/**
+ * Password reset form schema with security question validation
+ */
+export const resetPasswordSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  username: z.string().min(1, 'Username is required'),
+  code: z.string().min(1, 'Verification code is required'),
+  newPassword: createPasswordSchema(),
+  confirmPassword: z.string().min(1, 'Password confirmation is required'),
+  securityQuestion: z.string().optional(),
+  securityAnswer: z.string().optional(),
+}).refine((data) => {
+  const result = validatePasswordMatch(data.newPassword, data.confirmPassword);
+  return result.matches;
+}, {
+  message: 'New password and confirmation do not match',
+  path: ['confirmPassword'],
+});
+
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
+
+/**
+ * Checks if password contains personal information
+ * 
+ * @param password - Password to check
+ * @param personalInfo - Personal information to check against
+ * @returns True if password contains personal information
+ */
+function containsPersonalInfo(
+  password: string,
+  personalInfo: { email?: string; username?: string; name?: string }
+): boolean {
+  const lowerPassword = password.toLowerCase();
+  
+  // Check email (remove domain)
+  if (personalInfo.email) {
+    const emailLocal = personalInfo.email.split('@')[0].toLowerCase();
+    if (emailLocal.length >= 3 && lowerPassword.includes(emailLocal)) {
+      return true;
+    }
+  }
+
+  // Check username
+  if (personalInfo.username && personalInfo.username.length >= 3) {
+    if (lowerPassword.includes(personalInfo.username.toLowerCase())) {
+      return true;
+    }
+  }
+
+  // Check name parts
+  if (personalInfo.name) {
+    const nameParts = personalInfo.name.toLowerCase().split(/\s+/);
+    for (const part of nameParts) {
+      if (part.length >= 3 && lowerPassword.includes(part)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Checks for consecutive repeated characters
+ * 
+ * @param password - Password to check
+ * @param maxConsecutive - Maximum allowed consecutive characters
+ * @returns True if password has too many consecutive characters
+ */
+function hasConsecutiveChars(password: string, maxConsecutive: number): boolean {
+  let consecutiveCount = 1;
+  let previousChar = '';
+
+  for (const char of password) {
+    if (char === previousChar) {
+      consecutiveCount++;
+      if (consecutiveCount > maxConsecutive) {
+        return true;
+      }
+    } else {
+      consecutiveCount = 1;
+    }
+    previousChar = char;
+  }
+
+  return false;
+}
+
+/**
+ * Calculates detailed password strength scores
+ * 
+ * @param password - Password to score
+ * @param requirements - Requirements validation results
+ * @param policy - Password policy configuration
+ * @returns Detailed score breakdown
+ */
+function calculatePasswordScore(
+  password: string,
+  requirements: PasswordValidationResult['requirements'],
+  policy: PasswordPolicy
+): PasswordValidationResult['scoreBreakdown'] {
+  // Length score (0-5)
+  const lengthScore = Math.min(5, Math.max(0, (password.length - 8) / 4));
+
+  // Complexity score (0-5) based on character classes
+  const complexityScore = [
+    requirements.hasUppercase,
+    requirements.hasLowercase,
+    requirements.hasNumbers,
+    requirements.hasSpecialChars,
+  ].filter(Boolean).length * 1.25;
+
+  // Diversity score (0-5) based on unique characters and patterns
+  const uniqueChars = new Set(password).size;
+  const diversityScore = Math.min(5, (uniqueChars / password.length) * 10);
+
+  // Security score (0-5) based on security requirements
+  let securityScore = 5;
+  if (!requirements.noCommonPassword) securityScore -= 2;
+  if (!requirements.noPersonalInfo) securityScore -= 1.5;
+  if (!requirements.noConsecutiveChars) securityScore -= 1;
+  securityScore = Math.max(0, securityScore);
+
+  return {
+    lengthScore,
+    complexityScore,
+    diversityScore,
+    securityScore,
+  };
+}
+
+/**
+ * Converts numeric score to password strength enum
+ * 
+ * @param score - Numeric score (0-5)
+ * @returns Password strength level
+ */
+function getPasswordStrength(score: number): PasswordStrength {
+  if (score < 1) return PasswordStrength.VERY_WEAK;
+  if (score < 2) return PasswordStrength.WEAK;
+  if (score < 3) return PasswordStrength.FAIR;
+  if (score < 4) return PasswordStrength.GOOD;
+  if (score < 4.5) return PasswordStrength.STRONG;
+  return PasswordStrength.VERY_STRONG;
+}
+
+/**
+ * Simple password hashing for demonstration
+ * Note: In production, use a proper password hashing library like bcrypt
+ * 
+ * @param password - Password to hash
+ * @returns Hashed password
+ */
+function hashPassword(password: string): string {
+  // This is a placeholder implementation
+  // In production, use bcrypt or similar secure hashing
+  return Buffer.from(password).toString('base64');
+}
+
+// =============================================================================
+// UTILITY FUNCTIONS FOR FORMS
+// =============================================================================
+
+/**
+ * Gets user-friendly password strength label
+ * 
+ * @param strength - Password strength level
+ * @returns Human-readable strength description
+ */
+export function getPasswordStrengthLabel(strength: PasswordStrength): string {
+  switch (strength) {
+    case PasswordStrength.VERY_WEAK:
+      return 'Very Weak';
+    case PasswordStrength.WEAK:
+      return 'Weak';
+    case PasswordStrength.FAIR:
+      return 'Fair';
+    case PasswordStrength.GOOD:
+      return 'Good';
+    case PasswordStrength.STRONG:
+      return 'Strong';
+    case PasswordStrength.VERY_STRONG:
+      return 'Very Strong';
+    default:
+      return 'Unknown';
+  }
+}
+
+/**
+ * Gets color code for password strength visualization
+ * 
+ * @param strength - Password strength level
+ * @returns CSS color class or hex color
+ */
+export function getPasswordStrengthColor(strength: PasswordStrength): string {
+  switch (strength) {
+    case PasswordStrength.VERY_WEAK:
+      return '#ef4444'; // red-500
+    case PasswordStrength.WEAK:
+      return '#f97316'; // orange-500
+    case PasswordStrength.FAIR:
+      return '#eab308'; // yellow-500
+    case PasswordStrength.GOOD:
+      return '#22c55e'; // green-500
+    case PasswordStrength.STRONG:
+      return '#059669'; // emerald-600
+    case PasswordStrength.VERY_STRONG:
+      return '#047857'; // emerald-700
+    default:
+      return '#6b7280'; // gray-500
+  }
+}
+
+/**
+ * Creates password strength progress bar data
+ * 
+ * @param result - Password validation result
+ * @returns Progress bar configuration
+ */
+export function getPasswordStrengthProgress(result: PasswordValidationResult) {
+  return {
+    percentage: result.strengthPercentage,
+    color: getPasswordStrengthColor(result.strength),
+    label: getPasswordStrengthLabel(result.strength),
+    showPercentage: result.strength >= PasswordStrength.FAIR,
+  };
+}
+
+/**
+ * Debounced password validation for real-time feedback
+ * 
+ * @param password - Password to validate
+ * @param policy - Password policy configuration
+ * @param personalInfo - Personal information for validation
+ * @param debounceMs - Debounce delay in milliseconds
+ * @returns Promise with validation result
+ */
+export function debouncePasswordValidation(
+  password: string,
+  policy: Partial<PasswordPolicy> = {},
+  personalInfo: { email?: string; username?: string; name?: string } = {},
+  debounceMs: number = 300
+): Promise<PasswordValidationResult> {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      const result = validatePasswordStrength(password, policy, personalInfo);
+      resolve(result);
+    }, debounceMs);
+  });
+}
+
+// =============================================================================
+// EXPORTS
+// =============================================================================
+
+export {
+  type PasswordPolicy,
+  type PasswordValidationResult,
+  type PasswordMatchResult,
+  type PasswordExpirationResult,
+  PasswordStrength,
+  DEFAULT_PASSWORD_POLICY,
+  updatePasswordSchema,
+  resetPasswordSchema,
+};
