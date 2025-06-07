@@ -1,366 +1,687 @@
 /**
- * LicenseExpired Component Type Definitions
+ * LicenseExpired Component Types for DreamFactory Admin Interface
  * 
- * TypeScript interfaces for the LicenseExpired component system following
- * React 19/Next.js 15.1 patterns with WCAG 2.1 AA accessibility compliance.
+ * TypeScript 5.8+ type definitions providing full type safety for React component props
+ * in the license expiration notification system. Supports theme variants, accessibility
+ * compliance, and responsive design patterns per React 19 migration requirements.
  * 
- * @fileoverview Type definitions for accessible, theme-aware LicenseExpired component
- * @version 1.0.0
+ * Replaces Angular @Input decorators with modern React props pattern while maintaining
+ * WCAG 2.1 AA compliance and Tailwind CSS integration.
+ * 
+ * @fileoverview License expiration UI component type definitions
+ * @version 2.0.0
+ * @since React 19 migration
  */
 
-import { type ReactNode, type ComponentPropsWithoutRef } from 'react';
-import { type VariantProps } from 'class-variance-authority';
+import { ReactNode, ComponentProps } from 'react';
+import { VariantProps } from 'class-variance-authority';
 import { 
-  type BaseComponentProps,
-  type AccessibilityProps,
-  type ThemeProps,
-  type ResponsiveProps,
-  type AnimationProps,
-  type InteractionProps,
-  type FocusProps
+  BaseComponent, 
+  ComponentVariant, 
+  ComponentSize, 
+  ResponsiveValue,
+  ComponentState,
+  ButtonComponent
 } from '@/types/ui';
 
-/**
- * Theme variant types for LicenseExpired component
- * Supports Tailwind CSS dark mode implementation with system preference detection
- */
-export type LicenseExpiredTheme = 'light' | 'dark' | 'system';
+// ============================================================================
+// CORE COMPONENT TYPES
+// ============================================================================
 
 /**
- * Visual variant types for different license expiration states
- * WCAG 2.1 AA compliant with proper contrast ratios
+ * Theme variant types supporting Tailwind CSS dark mode implementation
+ * per Section 7.1.2 styling specifications with WCAG 2.1 AA compliance
  */
-export type LicenseExpiredVariant = 
-  | 'warning'     // License expiring soon (amber/yellow theme)
-  | 'expired'     // License has expired (red/error theme)
-  | 'grace'       // Grace period active (orange theme)
-  | 'renewal'     // Renewal available (blue/info theme)
-  | 'suspended';  // Service suspended (gray/neutral theme)
+export type LicenseThemeVariant = 'light' | 'dark' | 'system';
 
 /**
- * Size variants for different layout contexts
- * Maintains minimum 44px touch targets for accessibility
+ * License expiration severity levels affecting visual presentation
+ * and user interaction patterns for progressive disclosure
  */
-export type LicenseExpiredSize = 
-  | 'compact'     // Minimal space, sidebar or banner
-  | 'default'     // Standard modal or page section
-  | 'expanded';   // Full-page or prominent display
+export type LicenseExpiredSeverity = 'warning' | 'critical' | 'blocked';
 
 /**
- * Action button configuration for license-related actions
+ * License expiration context providing semantic meaning
+ * for different licensing scenarios and user actions
+ */
+export type LicenseExpiredContext = 
+  | 'trial-expired'
+  | 'subscription-lapsed' 
+  | 'feature-restricted'
+  | 'enterprise-required'
+  | 'maintenance-expired'
+  | 'user-limit-exceeded';
+
+/**
+ * Display mode configuration for different UI presentation patterns
+ * supporting responsive design with Tailwind CSS utilities
+ */
+export type LicenseDisplayMode = 
+  | 'modal'        // Full overlay dialog for critical blocking
+  | 'banner'       // Top-of-page notification bar
+  | 'card'         // Inline card component for dashboard
+  | 'tooltip'      // Contextual hover information
+  | 'sidebar'      // Side panel for non-intrusive notifications
+  | 'inline';      // Embedded content within forms/sections
+
+/**
+ * Action button configuration for license-related user actions
+ * with accessibility and responsive design considerations
  */
 export interface LicenseAction {
-  /** Action identifier */
+  /** Unique identifier for the action */
   id: string;
-  /** Button text label */
+  
+  /** Action label text displayed to users */
   label: string;
-  /** Action type affecting button styling */
-  type: 'primary' | 'secondary' | 'outline' | 'ghost';
-  /** Click handler for the action */
-  onClick: () => void;
-  /** Disable the action button */
-  disabled?: boolean;
+  
+  /** Optional secondary description for complex actions */
+  description?: string;
+  
+  /** Visual variant following component design system */
+  variant?: ComponentVariant;
+  
+  /** Action priority affecting visual prominence */
+  priority: 'primary' | 'secondary' | 'tertiary';
+  
+  /** Action handler function */
+  onClick: () => void | Promise<void>;
+  
   /** Loading state for async actions */
   loading?: boolean;
-  /** ARIA label for enhanced accessibility */
-  ariaLabel?: string;
-  /** Icon to display with the action */
-  icon?: ReactNode;
+  
+  /** Disabled state with optional reason */
+  disabled?: boolean;
+  disabledReason?: string;
+  
+  /** Icon component for visual enhancement */
+  icon?: React.ComponentType<{ className?: string }>;
+  
+  /** External link indicator for navigation actions */
+  external?: boolean;
+  
+  // WCAG 2.1 AA Accessibility props
+  /** Accessible label for screen readers */
+  'aria-label'?: string;
+  
+  /** ARIA description for complex actions */
+  'aria-describedby'?: string;
+  
+  /** Screen reader announcement on action completion */
+  announceOnComplete?: string;
 }
 
 /**
- * License information structure
+ * License information structure providing context
+ * for expiration scenarios and user guidance
  */
 export interface LicenseInfo {
-  /** License type/plan name */
-  planName: string;
-  /** Current license status */
-  status: 'active' | 'expiring' | 'expired' | 'suspended' | 'grace';
+  /** License type identifier */
+  type: string;
+  
+  /** Human-readable license name */
+  name: string;
+  
   /** License expiration date */
-  expirationDate: Date;
+  expirationDate?: Date | string;
+  
   /** Days remaining until expiration (negative if expired) */
-  daysRemaining: number;
-  /** Grace period end date if applicable */
-  gracePeriodEnd?: Date;
+  daysRemaining?: number;
+  
+  /** Current license status */
+  status: 'active' | 'warning' | 'expired' | 'suspended';
+  
   /** Features affected by license status */
   affectedFeatures?: string[];
-  /** Support contact information */
-  supportContact?: string;
-  /** Renewal URL or contact */
-  renewalUrl?: string;
+  
+  /** User limits and current usage */
+  userLimits?: {
+    max: number;
+    current: number;
+    unit: 'users' | 'admins' | 'connections' | 'api-calls';
+  };
+  
+  /** Renewal or upgrade information */
+  renewalInfo?: {
+    url?: string;
+    contactEmail?: string;
+    phoneNumber?: string;
+    supportUrl?: string;
+  };
 }
 
-/**
- * Responsive behavior configuration for license component
- */
-export interface LicenseExpiredResponsiveProps extends ResponsiveProps {
-  /** Stack layout on mobile devices */
-  stackOnMobile?: boolean;
-  /** Hide detailed information on small screens */
-  hideDetailsOnMobile?: boolean;
-  /** Compact action layout for mobile */
-  compactActionsOnMobile?: boolean;
-}
+// ============================================================================
+// MAIN COMPONENT INTERFACE
+// ============================================================================
 
 /**
- * Enhanced accessibility props for LicenseExpired component
- * Ensures WCAG 2.1 AA compliance with proper ARIA support
+ * LicenseExpiredProps interface replacing Angular @Input decorators
+ * with React props pattern per React 19 migration requirements.
+ * 
+ * Provides comprehensive type safety for license expiration notifications
+ * with theme support, accessibility compliance, and responsive design.
  */
-export interface LicenseExpiredAccessibilityProps extends AccessibilityProps {
-  /** Announce urgency level to screen readers */
-  urgencyLevel?: 'low' | 'medium' | 'high' | 'critical';
-  /** Announce remaining time to screen readers */
-  announceTimeRemaining?: boolean;
-  /** Custom announcement text override */
-  customAnnouncement?: string;
-  /** Skip to action buttons shortcut */
-  skipToActions?: boolean;
-  /** Provide alternative text for visual elements */
-  alternativeText?: string;
-}
-
-/**
- * Animation configuration for state transitions
- */
-export interface LicenseExpiredAnimationProps extends AnimationProps {
-  /** Animate countdown changes */
-  animateCountdown?: boolean;
-  /** Pulse animation for urgent states */
-  pulseOnUrgent?: boolean;
-  /** Fade in animation duration */
-  fadeInDuration?: 'fast' | 'normal' | 'slow';
-  /** Enable reduced motion compliance */
-  respectReducedMotion?: boolean;
-}
-
-/**
- * Content customization options
- */
-export interface LicenseExpiredContent {
-  /** Primary heading text */
+export interface LicenseExpiredProps extends BaseComponent {
+  // ========================================================================
+  // CORE CONFIGURATION
+  // ========================================================================
+  
+  /**
+   * Theme variant supporting Tailwind CSS dark mode implementation
+   * per Section 7.1.2 styling specifications
+   * @default 'system'
+   */
+  theme?: LicenseThemeVariant;
+  
+  /**
+   * Severity level affecting visual presentation and user interaction
+   * @default 'warning'
+   */
+  severity?: LicenseExpiredSeverity;
+  
+  /**
+   * License context providing semantic meaning for the expiration
+   * @default 'trial-expired'
+   */
+  context?: LicenseExpiredContext;
+  
+  /**
+   * Display mode configuration for UI presentation pattern
+   * @default 'modal'
+   */
+  displayMode?: LicenseDisplayMode;
+  
+  /**
+   * License information object providing expiration context
+   */
+  licenseInfo?: LicenseInfo;
+  
+  // ========================================================================
+  // CONTENT CONFIGURATION
+  // ========================================================================
+  
+  /**
+   * Primary title text for the license expiration notification
+   * @default Auto-generated based on context and severity
+   */
   title?: string;
-  /** Detailed description */
-  description?: string;
-  /** Custom message based on license state */
-  customMessage?: ReactNode;
-  /** Show countdown timer */
-  showCountdown?: boolean;
-  /** Show affected features list */
-  showAffectedFeatures?: boolean;
-  /** Custom footer content */
-  footer?: ReactNode;
-}
-
-/**
- * Complete props interface for LicenseExpired component
- * Combines all prop types with React 19 compatibility
- */
-export interface LicenseExpiredProps 
-  extends BaseComponentProps<HTMLDivElement>,
-          LicenseExpiredAccessibilityProps,
-          LicenseExpiredResponsiveProps,
-          LicenseExpiredAnimationProps,
-          Omit<InteractionProps, 'onClick'>,
-          FocusProps {
   
-  /** License information to display */
-  licenseInfo: LicenseInfo;
+  /**
+   * Detailed message explaining the license expiration impact
+   * @default Auto-generated based on license info and context
+   */
+  message?: string | ReactNode;
   
-  /** Visual variant based on license state */
-  variant?: LicenseExpiredVariant;
+  /**
+   * Additional help text or instructions for users
+   */
+  helpText?: string | ReactNode;
   
-  /** Component size variant */
-  size?: LicenseExpiredSize;
+  /**
+   * Custom content to render within the component
+   */
+  children?: ReactNode;
   
-  /** Theme preference (overrides system theme) */
-  theme?: LicenseExpiredTheme;
-  
-  /** Available actions for license management */
+  /**
+   * Action buttons for license-related user interactions
+   * @default Auto-generated renewal/contact actions
+   */
   actions?: LicenseAction[];
   
-  /** Content customization options */
-  content?: LicenseExpiredContent;
+  /**
+   * Whether to show automatic action suggestions
+   * @default true
+   */
+  showSuggestedActions?: boolean;
   
-  /** Enable dismissible behavior */
+  // ========================================================================
+  // VISUAL CONFIGURATION
+  // ========================================================================
+  
+  /**
+   * Component size affecting spacing and typography
+   * @default 'md'
+   */
+  size?: ComponentSize;
+  
+  /**
+   * Visual variant for consistent design system integration
+   * @default 'warning' for severity warning, 'error' for critical/blocked
+   */
+  variant?: ComponentVariant;
+  
+  /**
+   * Whether to show an icon representing the license status
+   * @default true
+   */
+  showIcon?: boolean;
+  
+  /**
+   * Custom icon component to override default severity icon
+   */
+  customIcon?: React.ComponentType<{ className?: string }>;
+  
+  /**
+   * Whether to animate the component entrance
+   * @default true for modal/banner, false for card/inline
+   */
+  animated?: boolean;
+  
+  /**
+   * Animation duration in milliseconds
+   * @default 300
+   */
+  animationDuration?: number;
+  
+  // ========================================================================
+  // RESPONSIVE DESIGN SUPPORT
+  // ========================================================================
+  
+  /**
+   * Responsive size configuration for different breakpoints
+   * Supporting mobile, tablet, and desktop layouts per Tailwind CSS utilities
+   */
+  responsiveSize?: ResponsiveValue<ComponentSize>;
+  
+  /**
+   * Responsive display mode for different screen sizes
+   * Enables progressive enhancement and mobile-first design
+   */
+  responsiveMode?: ResponsiveValue<LicenseDisplayMode>;
+  
+  /**
+   * Mobile-specific configuration overrides
+   */
+  mobileConfig?: {
+    /** Whether to use fullscreen modal on mobile */
+    fullscreen?: boolean;
+    /** Mobile-specific action layout */
+    stackActions?: boolean;
+    /** Simplified content for small screens */
+    compactContent?: boolean;
+  };
+  
+  // ========================================================================
+  // BEHAVIOR CONFIGURATION
+  // ========================================================================
+  
+  /**
+   * Whether the component can be dismissed by the user
+   * @default true for banner/card, false for modal with critical severity
+   */
   dismissible?: boolean;
   
-  /** Dismiss handler for dismissible component */
+  /**
+   * Auto-dismiss configuration for non-critical notifications
+   */
+  autoDismiss?: {
+    /** Enable automatic dismissal after timeout */
+    enabled: boolean;
+    /** Timeout in milliseconds */
+    timeout: number;
+    /** Whether to show countdown timer */
+    showCountdown?: boolean;
+  };
+  
+  /**
+   * Whether to persist dismissal across sessions
+   * @default false
+   */
+  persistDismissal?: boolean;
+  
+  /**
+   * Local storage key for dismissal persistence
+   * @default 'df-license-dismissed-{context}'
+   */
+  dismissalStorageKey?: string;
+  
+  // ========================================================================
+  // INTERACTION HANDLERS
+  // ========================================================================
+  
+  /**
+   * Handler called when component is dismissed
+   */
   onDismiss?: () => void;
   
-  /** Custom className for Tailwind utility composition */
+  /**
+   * Handler called when an action is triggered
+   */
+  onActionClick?: (action: LicenseAction) => void;
+  
+  /**
+   * Handler called when component mounts (for analytics)
+   */
+  onShow?: () => void;
+  
+  /**
+   * Handler called for external link clicks (for tracking)
+   */
+  onExternalLinkClick?: (url: string, action: LicenseAction) => void;
+  
+  // ========================================================================
+  // ACCESSIBILITY CONFIGURATION (WCAG 2.1 AA COMPLIANCE)
+  // ========================================================================
+  
+  /**
+   * ARIA role for the component container
+   * @default 'alert' for critical, 'status' for warning
+   */
+  role?: 'alert' | 'alertdialog' | 'status' | 'banner' | 'region';
+  
+  /**
+   * ARIA live region politeness for screen reader announcements
+   * @default 'assertive' for critical, 'polite' for warning
+   */
+  'aria-live'?: 'off' | 'polite' | 'assertive';
+  
+  /**
+   * Whether the announcement should be atomic (read as single unit)
+   * @default true
+   */
+  'aria-atomic'?: boolean;
+  
+  /**
+   * ARIA label for the entire component (overrides auto-generated)
+   */
+  'aria-label'?: string;
+  
+  /**
+   * ARIA description providing detailed context
+   */
+  'aria-describedby'?: string;
+  
+  /**
+   * Whether to announce the license expiration to screen readers
+   * @default true
+   */
+  announceToScreenReader?: boolean;
+  
+  /**
+   * Custom screen reader announcement text
+   * @default Auto-generated based on severity and context
+   */
+  screenReaderText?: string;
+  
+  /**
+   * Focus management configuration for modal display modes
+   */
+  focusManagement?: {
+    /** Element to focus when component appears */
+    initialFocus?: React.RefObject<HTMLElement>;
+    /** Element to focus when component is dismissed */
+    returnFocus?: React.RefObject<HTMLElement>;
+    /** Whether to trap focus within component (for modals) */
+    trapFocus?: boolean;
+  };
+  
+  // ========================================================================
+  // STYLING AND CUSTOMIZATION
+  // ========================================================================
+  
+  /**
+   * Custom CSS classes for Tailwind utility composition
+   * Supports class-variance-authority integration for dynamic styling
+   */
   className?: string;
   
-  /** Additional container styling */
-  containerClassName?: string;
+  /**
+   * Custom classes for different component parts
+   */
+  classNames?: {
+    /** Container/root element classes */
+    container?: string;
+    /** Icon container classes */
+    icon?: string;
+    /** Content area classes */
+    content?: string;
+    /** Title/heading classes */
+    title?: string;
+    /** Message/body text classes */
+    message?: string;
+    /** Actions container classes */
+    actions?: string;
+    /** Individual action button classes */
+    action?: string;
+    /** Dismiss button classes */
+    dismiss?: string;
+  };
   
-  /** Header section styling */
-  headerClassName?: string;
+  /**
+   * Custom styles for component parts (escape hatch for non-Tailwind styling)
+   */
+  styles?: {
+    container?: React.CSSProperties;
+    content?: React.CSSProperties;
+    actions?: React.CSSProperties;
+  };
   
-  /** Content section styling */
-  contentClassName?: string;
+  // ========================================================================
+  // TESTING AND DEVELOPMENT
+  // ========================================================================
   
-  /** Actions section styling */
-  actionsClassName?: string;
-  
-  /** Override default icon for the license state */
-  customIcon?: ReactNode;
-  
-  /** Show close button for dismissible component */
-  showCloseButton?: boolean;
-  
-  /** Position variant for overlay scenarios */
-  position?: 'center' | 'top' | 'bottom' | 'banner';
-  
-  /** Z-index for overlay positioning */
-  zIndex?: number;
-  
-  /** Enable backdrop for modal-like behavior */
-  backdrop?: boolean;
-  
-  /** Close on backdrop click */
-  closeOnBackdrop?: boolean;
-  
-  /** Close on escape key */
-  closeOnEscape?: boolean;
-  
-  /** Prevent interaction with background content */
-  modal?: boolean;
-  
-  /** Auto-dismiss after specified time (in seconds) */
-  autoDissmissAfter?: number;
-  
-  /** Callback when component mounts */
-  onMount?: () => void;
-  
-  /** Callback when component unmounts */
-  onUnmount?: () => void;
-  
-  /** Callback when license status changes */
-  onStatusChange?: (status: LicenseInfo['status']) => void;
-  
-  /** Test identifier for automated testing */
+  /**
+   * Test identifier for automated testing
+   * @default 'license-expired'
+   */
   'data-testid'?: string;
+  
+  /**
+   * Development mode flag for enhanced debugging
+   * @default false
+   */
+  debug?: boolean;
+}
+
+// ============================================================================
+// VARIANT CONFIGURATION TYPES
+// ============================================================================
+
+/**
+ * Class-variance-authority configuration for dynamic styling
+ * supporting Tailwind CSS utility composition with theme variants
+ */
+export interface LicenseExpiredVariantConfig {
+  base: string;
+  variants: {
+    /** Theme variant styles */
+    theme?: Record<LicenseThemeVariant, string>;
+    
+    /** Severity level styles */
+    severity?: Record<LicenseExpiredSeverity, string>;
+    
+    /** Display mode styles */
+    displayMode?: Record<LicenseDisplayMode, string>;
+    
+    /** Component size styles */
+    size?: Record<ComponentSize, string>;
+    
+    /** Component state styles */
+    state?: Record<ComponentState, string>;
+  };
+  
+  /** Compound variants for complex styling combinations */
+  compoundVariants?: Array<{
+    theme?: LicenseThemeVariant;
+    severity?: LicenseExpiredSeverity;
+    displayMode?: LicenseDisplayMode;
+    size?: ComponentSize;
+    className: string;
+  }>;
+  
+  /** Default variant values */
+  defaultVariants?: {
+    theme?: LicenseThemeVariant;
+    severity?: LicenseExpiredSeverity;
+    displayMode?: LicenseDisplayMode;
+    size?: ComponentSize;
+  };
 }
 
 /**
- * Variant props type for class-variance-authority integration
- * Enables dynamic Tailwind class composition
+ * Extended component props with variant support
+ * for class-variance-authority integration
  */
-export type LicenseExpiredVariantProps = VariantProps<any> & {
-  variant?: LicenseExpiredVariant;
-  size?: LicenseExpiredSize;
-  theme?: LicenseExpiredTheme;
+export type LicenseExpiredVariantProps = VariantProps<LicenseExpiredVariantConfig> & LicenseExpiredProps;
+
+// ============================================================================
+// UTILITY TYPES
+// ============================================================================
+
+/**
+ * Action button props extending base button component
+ * with license-specific enhancements and accessibility
+ */
+export interface LicenseActionButtonProps extends ButtonComponent {
+  /** License action configuration */
+  action: LicenseAction;
+  
+  /** Whether this is the primary action */
+  primary?: boolean;
+  
+  /** Responsive behavior for mobile layouts */
+  responsive?: boolean;
+  
+  /** Custom loading state for async operations */
+  asyncLoading?: boolean;
+}
+
+/**
+ * License expiration event data for analytics and tracking
+ */
+export interface LicenseExpiredEvent {
+  /** Event type identifier */
+  type: 'shown' | 'dismissed' | 'action-clicked' | 'external-link';
+  
+  /** License context that triggered the event */
+  context: LicenseExpiredContext;
+  
+  /** Severity level at time of event */
+  severity: LicenseExpiredSeverity;
+  
+  /** Display mode when event occurred */
+  displayMode: LicenseDisplayMode;
+  
+  /** Action details for action-related events */
+  action?: {
+    id: string;
+    label: string;
+    priority: 'primary' | 'secondary' | 'tertiary';
+  };
+  
+  /** Timestamp of the event */
+  timestamp: number;
+  
+  /** User agent and device information */
+  userAgent?: string;
+  
+  /** Screen size category at time of event */
+  screenSize?: 'mobile' | 'tablet' | 'desktop';
+}
+
+/**
+ * License status hook return type for component integration
+ */
+export interface LicenseStatus {
+  /** Whether license is currently expired */
+  isExpired: boolean;
+  
+  /** Whether license is in warning period */
+  isWarning: boolean;
+  
+  /** Days until expiration (negative if expired) */
+  daysRemaining: number;
+  
+  /** Current license information */
+  licenseInfo: LicenseInfo;
+  
+  /** Suggested actions for current status */
+  suggestedActions: LicenseAction[];
+  
+  /** Whether to show license notification */
+  shouldShowNotification: boolean;
+  
+  /** Recommended severity level */
+  recommendedSeverity: LicenseExpiredSeverity;
+  
+  /** Recommended display mode */
+  recommendedDisplayMode: LicenseDisplayMode;
+}
+
+/**
+ * Configuration object for license expiration behavior
+ */
+export interface LicenseExpiredConfig {
+  /** Days before expiration to start showing warnings */
+  warningThreshold: number;
+  
+  /** Days before expiration to show critical warnings */
+  criticalThreshold: number;
+  
+  /** Whether to persist user dismissals */
+  persistDismissals: boolean;
+  
+  /** Default auto-dismiss timeouts by severity */
+  autoDismissTimeouts: Record<LicenseExpiredSeverity, number>;
+  
+  /** Default display modes by context */
+  defaultDisplayModes: Record<LicenseExpiredContext, LicenseDisplayMode>;
+  
+  /** Analytics tracking configuration */
+  analytics: {
+    enabled: boolean;
+    trackDismissals: boolean;
+    trackActions: boolean;
+    trackExternalLinks: boolean;
+  };
+  
+  /** Accessibility enhancements */
+  accessibility: {
+    announceExpirations: boolean;
+    focusTrapInModals: boolean;
+    respectReducedMotion: boolean;
+    highContrastMode: boolean;
+  };
+}
+
+// ============================================================================
+// TYPE EXPORTS
+// ============================================================================
+
+export type {
+  // Re-export common React types for convenience
+  ReactNode,
+  ComponentProps,
 };
 
-/**
- * Component state type for internal state management
- */
-export interface LicenseExpiredState {
-  /** Current theme resolved from system/preference */
-  resolvedTheme: 'light' | 'dark';
-  /** Component is mounted and ready */
-  mounted: boolean;
-  /** Component is in dismissed state */
-  dismissed: boolean;
-  /** Countdown timer is running */
-  countdownActive: boolean;
-  /** Current countdown value */
-  countdownValue: number;
-  /** Component is in focus state */
-  focused: boolean;
-}
-
-/**
- * Context type for nested component communication
- */
-export interface LicenseExpiredContext {
-  /** Current component state */
-  state: LicenseExpiredState;
-  /** Update component state */
-  setState: (updates: Partial<LicenseExpiredState>) => void;
-  /** License information */
-  licenseInfo: LicenseInfo;
-  /** Resolved variant based on license status */
-  resolvedVariant: LicenseExpiredVariant;
-  /** Accessibility helpers */
+// Default configuration export
+export const defaultLicenseExpiredConfig: LicenseExpiredConfig = {
+  warningThreshold: 14, // 2 weeks
+  criticalThreshold: 3,  // 3 days
+  persistDismissals: false,
+  autoDismissTimeouts: {
+    warning: 10000,   // 10 seconds
+    critical: 0,      // No auto-dismiss
+    blocked: 0,       // No auto-dismiss
+  },
+  defaultDisplayModes: {
+    'trial-expired': 'modal',
+    'subscription-lapsed': 'banner',
+    'feature-restricted': 'card',
+    'enterprise-required': 'modal',
+    'maintenance-expired': 'banner',
+    'user-limit-exceeded': 'modal',
+  },
+  analytics: {
+    enabled: true,
+    trackDismissals: true,
+    trackActions: true,
+    trackExternalLinks: true,
+  },
   accessibility: {
-    /** Generate ARIA description */
-    getAriaDescription: () => string;
-    /** Generate urgency announcement */
-    getUrgencyAnnouncement: () => string;
-    /** Focus first action button */
-    focusFirstAction: () => void;
-  };
-}
-
-/**
- * Hook return type for useLicenseExpired
- */
-export interface UseLicenseExpiredReturn {
-  /** Current component state */
-  state: LicenseExpiredState;
-  /** Actions to update state */
-  actions: {
-    dismiss: () => void;
-    focus: () => void;
-    blur: () => void;
-    startCountdown: () => void;
-    stopCountdown: () => void;
-  };
-  /** Computed values */
-  computed: {
-    isUrgent: boolean;
-    isCritical: boolean;
-    shouldShowActions: boolean;
-    timeRemainingText: string;
-    ariaDescription: string;
-  };
-}
-
-/**
- * Configuration type for license expiration detection
- */
-export interface LicenseExpirationConfig {
-  /** Days before expiration to show warning */
-  warningThreshold: number;
-  /** Days before expiration to show critical warning */
-  criticalThreshold: number;
-  /** Grace period length in days */
-  gracePeriodDays: number;
-  /** Auto-refresh interval for license status (minutes) */
-  refreshInterval: number;
-  /** Enable browser notifications */
-  browserNotifications: boolean;
-}
-
-/**
- * Type for license status change events
- */
-export interface LicenseStatusChangeEvent {
-  /** Previous license status */
-  previousStatus: LicenseInfo['status'];
-  /** New license status */
-  currentStatus: LicenseInfo['status'];
-  /** Days remaining until expiration */
-  daysRemaining: number;
-  /** Timestamp of the change */
-  timestamp: Date;
-  /** Whether this is an automatic status update */
-  automatic: boolean;
-}
-
-/**
- * Export utility types for external consumption
- */
-export type LicenseExpiredPropsKeys = keyof LicenseExpiredProps;
-export type LicenseExpiredVariantKeys = keyof typeof LicenseExpiredVariant;
-export type LicenseExpiredSizeKeys = keyof typeof LicenseExpiredSize;
-export type LicenseExpiredThemeKeys = keyof typeof LicenseExpiredTheme;
-
-/**
- * Default props type for component initialization
- */
-export type LicenseExpiredDefaultProps = Required<Pick<
-  LicenseExpiredProps,
-  'variant' | 'size' | 'theme' | 'dismissible' | 'showCountdown' | 'respectReducedMotion'
->>;
+    announceExpirations: true,
+    focusTrapInModals: true,
+    respectReducedMotion: true,
+    highContrastMode: false,
+  },
+};
