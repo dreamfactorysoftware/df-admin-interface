@@ -1,471 +1,577 @@
 /**
  * @fileoverview Specialized utilities for testing React Hook Form components
  * 
- * Provides comprehensive testing utilities for React Hook Form components including
- * validation scenarios, field interaction patterns, and form submission workflows.
- * Replaces Angular reactive form testing patterns with React-specific form testing utilities.
+ * Provides comprehensive testing patterns for React Hook Form integration with Zod schema validation,
+ * replacing Angular reactive form testing patterns with React-specific form testing utilities.
+ * Supports database configuration forms, multi-step wizards, dynamic field structures, file uploads,
+ * and complex validation scenarios required for the DreamFactory Admin Interface.
  * 
- * Performance Requirements:
- * - All form interaction simulations must complete under 100ms per Section 3.2.3
- * - Test utilities must support 90%+ code coverage targets per Section 3.6
- * - Form validation testing must maintain sub-100ms validation performance
- * - Complete test suite execution under 30 seconds per Section 3.6
- * 
- * Features:
+ * Key Features:
  * - React Hook Form testing patterns with comprehensive validation scenarios
  * - Field interaction and validation error testing utilities
  * - Form submission workflow testing for database configuration
  * - File upload and dynamic form structure testing support
- * - Form reset and default value testing helpers for complex configurations
+ * - Multi-step wizard navigation testing utilities
+ * - Conditional field visibility and dynamic form structure testing
+ * - Form reset and default value testing helpers
+ * 
+ * Performance Requirements:
+ * - All form validation testing must complete under 100ms per Section 3.2.3
+ * - Field interaction testing optimized for real-time validation feedback
+ * - Wizard navigation testing with state persistence validation
  * 
  * @version 1.0.0
  * @since React 19 / Next.js 15.1 migration
  */
 
-import { render, screen, fireEvent, waitFor, within, type RenderResult } from '@testing-library/react';
+import React, { ReactElement } from 'react';
+import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { act } from 'react';
-import type { ReactElement, ReactNode } from 'react';
-import type { UseFormReturn, FieldPath, FieldValues, Control } from 'react-hook-form';
-import type { ZodSchema, ZodError } from 'zod';
-import type { MockedFunction } from 'vitest';
+import { 
+  useForm, 
+  UseFormReturn, 
+  FieldValues, 
+  Path, 
+  Control,
+  FormProvider,
+  useFormContext,
+  FieldPath,
+  PathValue
+} from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { renderWithProviders, type CustomRenderOptions } from './test-utils';
 
 // =============================================================================
 // TYPE DEFINITIONS FOR FORM TESTING
 // =============================================================================
 
 /**
- * Configuration for form testing scenarios
+ * Configuration options for form testing utilities
  */
-export interface FormTestConfig<TFormData extends FieldValues = FieldValues> {
-  /** Form component to render */
-  component: ReactElement;
-  /** Initial form data */
-  initialData?: Partial<TFormData>;
-  /** Expected form validation schema */
-  validationSchema?: ZodSchema<TFormData>;
-  /** Mock submit handler */
-  onSubmit?: MockedFunction<(data: TFormData) => void | Promise<void>>;
-  /** Mock change handler for specific fields */
-  onChange?: MockedFunction<(fieldName: string, value: any) => void>;
-  /** Additional props to pass to form component */
-  props?: Record<string, any>;
-  /** Test environment configuration */
-  environment?: {
-    /** Whether to mock file upload APIs */
-    mockFileUploads?: boolean;
-    /** API response delay in ms */
-    apiDelay?: number;
-    /** Mock network errors */
-    simulateNetworkErrors?: boolean;
+interface FormTestOptions<T extends FieldValues = FieldValues> extends CustomRenderOptions {
+  /** Default values to populate the form with */
+  defaultValues?: Partial<T>;
+  /** Validation mode for React Hook Form */
+  mode?: 'onBlur' | 'onChange' | 'onSubmit' | 'onTouched' | 'all';
+  /** Whether to validate on mount */
+  shouldValidateOnMount?: boolean;
+  /** Custom validation schema */
+  schema?: z.ZodSchema<T>;
+  /** Whether to enable form state debugging */
+  debug?: boolean;
+}
+
+/**
+ * Field interaction test configuration
+ */
+interface FieldTestConfig {
+  /** Field name/identifier */
+  name: string;
+  /** Test ID or selector for the field */
+  selector?: string;
+  /** Field type for appropriate interaction */
+  type?: 'text' | 'email' | 'password' | 'number' | 'select' | 'checkbox' | 'radio' | 'file' | 'textarea';
+  /** Expected validation errors for various inputs */
+  validationTests?: Array<{
+    /** Input value to test */
+    value: any;
+    /** Expected error message(s) */
+    expectedErrors?: string[];
+    /** Whether this value should be valid */
+    shouldBeValid?: boolean;
+    /** Additional context for the test */
+    description?: string;
+  }>;
+  /** Whether the field is required */
+  required?: boolean;
+  /** Conditional visibility test */
+  conditionalVisibility?: {
+    /** Field that controls visibility */
+    dependsOn: string;
+    /** Value that triggers visibility */
+    triggerValue: any;
+    /** Whether field should be visible when triggered */
+    shouldBeVisible: boolean;
   };
 }
 
 /**
- * Field interaction testing configuration
+ * Form submission test configuration
  */
-export interface FieldTestConfig {
-  /** Field name or data-testid */
-  field: string;
-  /** Value to input */
-  value: any;
-  /** Expected validation error message */
-  expectedError?: string;
-  /** Whether field should be valid after input */
-  shouldBeValid?: boolean;
-  /** Additional interaction options */
-  options?: {
-    /** Trigger blur event after input */
-    triggerBlur?: boolean;
-    /** Clear field before input */
-    clearFirst?: boolean;
-    /** Delay between keystrokes for realistic typing */
-    typeDelay?: number;
-    /** Use paste instead of typing for large text */
-    usePaste?: boolean;
+interface FormSubmissionTestConfig<T extends FieldValues = FieldValues> {
+  /** Form data to submit */
+  formData: Partial<T>;
+  /** Expected validation errors */
+  expectedErrors?: Record<string, string[]>;
+  /** Whether submission should succeed */
+  shouldSucceed?: boolean;
+  /** Custom submission handler for testing */
+  onSubmit?: (data: T) => Promise<void> | void;
+  /** API response to mock */
+  mockResponse?: {
+    success: boolean;
+    data?: any;
+    errors?: Record<string, string[]>;
   };
+  /** Time to wait for submission to complete */
+  timeout?: number;
 }
 
 /**
- * Form submission testing result
+ * Multi-step wizard test configuration
  */
-export interface FormSubmissionResult {
-  /** Whether submission was successful */
-  success: boolean;
-  /** Submitted form data */
-  data?: any;
-  /** Validation errors if any */
-  errors?: Record<string, string>;
-  /** API response or error */
-  response?: any;
-  /** Submission duration in milliseconds */
-  duration: number;
+interface WizardTestConfig<T extends FieldValues = FieldValues> {
+  /** Steps configuration */
+  steps: Array<{
+    /** Step identifier */
+    id: string;
+    /** Step title/label */
+    title: string;
+    /** Fields to test in this step */
+    fields: FieldTestConfig[];
+    /** Data to fill in this step */
+    data?: Partial<T>;
+    /** Whether this step should be skippable */
+    optional?: boolean;
+    /** Custom validation for step completion */
+    stepValidation?: (formData: Partial<T>) => boolean;
+  }>;
+  /** Whether wizard should preserve state between steps */
+  preserveState?: boolean;
+  /** Overall form completion test data */
+  completionData?: T;
 }
 
 /**
- * File upload testing configuration
+ * File upload test configuration
  */
-export interface FileUploadTestConfig {
-  /** Field name or data-testid for file input */
-  field: string;
-  /** Mock file to upload */
-  file: File | File[];
-  /** Expected upload progress events */
-  expectProgress?: boolean;
+interface FileUploadTestConfig {
+  /** Field name for file upload */
+  fieldName: string;
+  /** Files to upload */
+  files: Array<{
+    /** File name */
+    name: string;
+    /** File content */
+    content: string | Buffer;
+    /** MIME type */
+    type: string;
+    /** File size in bytes */
+    size?: number;
+  }>;
   /** Expected validation behavior */
   validation?: {
-    /** Should file be accepted */
-    shouldAccept?: boolean;
-    /** Expected error message if rejected */
-    expectedError?: string;
+    /** Maximum file size allowed */
+    maxSize?: number;
+    /** Allowed file types */
+    allowedTypes?: string[];
+    /** Maximum number of files */
+    maxFiles?: number;
+    /** Whether files are required */
+    required?: boolean;
   };
-  /** Upload simulation options */
-  options?: {
-    /** Simulate upload progress */
-    simulateProgress?: boolean;
-    /** Upload duration in ms */
-    uploadDuration?: number;
-    /** Simulate upload failure */
-    simulateFailure?: boolean;
+  /** Expected upload behavior */
+  uploadBehavior?: {
+    /** Should upload succeed */
+    shouldSucceed?: boolean;
+    /** Expected progress updates */
+    progressUpdates?: number[];
+    /** Upload timeout */
+    timeout?: number;
   };
 }
 
 /**
- * Dynamic form structure testing configuration
+ * Dynamic form structure test configuration
  */
-export interface DynamicFormTestConfig {
-  /** Form array field name */
-  arrayField: string;
-  /** Initial number of items */
-  initialItems?: number;
-  /** Actions to test */
-  actions?: {
-    /** Test adding new items */
-    testAdd?: boolean;
-    /** Test removing items */
-    testRemove?: boolean;
-    /** Test reordering items */
-    testReorder?: boolean;
-  };
-  /** Item template for new items */
-  itemTemplate?: Record<string, any>;
-}
-
-/**
- * Conditional field testing configuration
- */
-export interface ConditionalFieldTestConfig {
-  /** Condition trigger field */
-  triggerField: string;
-  /** Value that triggers condition */
-  triggerValue: any;
-  /** Fields that should appear/disappear */
-  conditionalFields: string[];
-  /** Expected visibility state */
-  expectedVisible: boolean;
-  /** Additional test scenarios */
-  scenarios?: Array<{
-    triggerValue: any;
-    expectedVisible: boolean;
-    description: string;
+interface DynamicFormTestConfig {
+  /** Initial form structure */
+  initialStructure: Array<{
+    /** Field configuration */
+    field: FieldTestConfig;
+    /** Initial visibility */
+    visible: boolean;
+  }>;
+  /** Structure changes to test */
+  structureChanges: Array<{
+    /** Trigger that causes the change */
+    trigger: {
+      /** Field to interact with */
+      fieldName: string;
+      /** Value to set */
+      value: any;
+    };
+    /** Expected structure after change */
+    expectedStructure: Array<{
+      /** Field name */
+      fieldName: string;
+      /** Should be visible */
+      visible: boolean;
+      /** Should be required */
+      required?: boolean;
+    }>;
+    /** Description of the change */
+    description?: string;
   }>;
 }
 
 // =============================================================================
-// CORE FORM TESTING UTILITIES
+// FORM RENDERING AND SETUP UTILITIES
 // =============================================================================
 
 /**
- * Enhanced form rendering utility with React Hook Form context setup
- * 
- * @param config - Form test configuration
- * @returns Rendered form with testing utilities
+ * Enhanced form testing wrapper component
  */
-export const renderForm = async <TFormData extends FieldValues = FieldValues>(
-  config: FormTestConfig<TFormData>
-): Promise<RenderResult & {
-  formUtils: FormTestingUtils<TFormData>;
-  user: ReturnType<typeof userEvent.setup>;
-}> => {
+const FormTestWrapper = <T extends FieldValues>({
+  children,
+  formMethods,
+  onSubmit,
+  debug = false
+}: {
+  children: React.ReactNode;
+  formMethods: UseFormReturn<T>;
+  onSubmit?: (data: T) => void;
+  debug?: boolean;
+}) => {
+  const handleSubmit = formMethods.handleSubmit((data) => {
+    if (debug) {
+      console.log('Form submitted with data:', data);
+      console.log('Form state:', formMethods.formState);
+    }
+    onSubmit?.(data);
+  });
+
+  return (
+    <FormProvider {...formMethods}>
+      <form onSubmit={handleSubmit} data-testid="test-form">
+        {children}
+        {debug && (
+          <div data-testid="form-debug-info">
+            <pre>{JSON.stringify(formMethods.formState, null, 2)}</pre>
+            <pre>{JSON.stringify(formMethods.getValues(), null, 2)}</pre>
+          </div>
+        )}
+      </form>
+    </FormProvider>
+  );
+};
+
+/**
+ * Renders a form component with React Hook Form integration for testing
+ * 
+ * @param component - React component to render
+ * @param options - Form testing configuration options
+ * @returns Enhanced render result with form testing utilities
+ */
+export const renderWithForm = <T extends FieldValues = FieldValues>(
+  component: ReactElement,
+  options: FormTestOptions<T> = {}
+) => {
+  const {
+    defaultValues = {} as Partial<T>,
+    mode = 'onChange',
+    shouldValidateOnMount = false,
+    schema,
+    debug = false,
+    providerOptions,
+    ...renderOptions
+  } = options;
+
+  // Create form methods with configuration
+  const formMethods = useForm<T>({
+    defaultValues,
+    mode,
+    resolver: schema ? zodResolver(schema) : undefined,
+    shouldValidateOnMount
+  });
+
   const user = userEvent.setup();
-  
-  // Performance tracking for form rendering
-  const startTime = performance.now();
-  
-  const result = render(config.component);
-  
-  const endTime = performance.now();
-  const renderDuration = endTime - startTime;
-  
-  // Warn if rendering takes too long
-  if (renderDuration > 100) {
-    console.warn(`Form rendering took ${renderDuration}ms, exceeding 100ms target`);
-  }
-  
-  // Wait for form to be fully rendered and hydrated
-  await waitFor(() => {
-    expect(screen.getByRole('form', { hidden: true }) || document.querySelector('form')).toBeInTheDocument();
-  });
-  
-  const formUtils = createFormTestingUtils<TFormData>(config, user);
-  
-  return {
-    ...result,
-    formUtils,
-    user
+  let onSubmitData: T | null = null;
+  let submitPromise: Promise<void> | null = null;
+
+  const onSubmit = (data: T) => {
+    onSubmitData = data;
   };
-};
 
-/**
- * Creates comprehensive form testing utilities for a specific form instance
- * 
- * @param config - Form test configuration
- * @param user - UserEvent instance for interactions
- * @returns Form testing utilities
- */
-export const createFormTestingUtils = <TFormData extends FieldValues = FieldValues>(
-  config: FormTestConfig<TFormData>,
-  user: ReturnType<typeof userEvent.setup>
-): FormTestingUtils<TFormData> => {
-  return {
-    // Field interaction utilities
-    fillField: async (fieldConfig: FieldTestConfig) => {
-      return fillFormField(fieldConfig, user);
-    },
-    
-    clearField: async (field: string) => {
-      return clearFormField(field, user);
-    },
-    
-    triggerValidation: async (field?: string) => {
-      return triggerFieldValidation(field, user);
-    },
-    
-    // Form submission utilities
-    submitForm: async (expectedData?: Partial<TFormData>) => {
-      return submitFormAndValidate(config, expectedData, user);
-    },
-    
-    submitWithErrors: async (expectedErrors: Record<string, string>) => {
-      return submitFormWithValidationErrors(expectedErrors, user);
-    },
-    
-    // File upload utilities
-    uploadFile: async (uploadConfig: FileUploadTestConfig) => {
-      return testFileUpload(uploadConfig, user);
-    },
-    
-    // Dynamic form utilities
-    addFormArrayItem: async (arrayField: string, itemData?: Record<string, any>) => {
-      return addDynamicFormItem(arrayField, itemData, user);
-    },
-    
-    removeFormArrayItem: async (arrayField: string, index: number) => {
-      return removeDynamicFormItem(arrayField, index, user);
-    },
-    
-    // Conditional field utilities
-    testConditionalField: async (conditionalConfig: ConditionalFieldTestConfig) => {
-      return testConditionalFieldVisibility(conditionalConfig, user);
-    },
-    
-    // Form state utilities
-    resetForm: async () => {
-      return resetFormToDefaults(user);
-    },
-    
-    getFormData: async () => {
-      return getCurrentFormData();
-    },
-    
-    getFieldErrors: () => {
-      return getCurrentFieldErrors();
-    },
-    
-    // Validation utilities
-    validateForm: async () => {
-      return validateCurrentFormState(config.validationSchema);
-    },
-    
-    expectFieldError: (field: string, error: string) => {
-      return expectFieldToHaveError(field, error);
-    },
-    
-    expectFieldValid: (field: string) => {
-      return expectFieldToBeValid(field);
-    },
-    
-    // Performance utilities
-    measureInteractionTime: async (interaction: () => Promise<void>) => {
-      return measureFormInteractionPerformance(interaction);
-    }
-  };
-};
+  const WrappedComponent = () => (
+    <FormTestWrapper
+      formMethods={formMethods}
+      onSubmit={onSubmit}
+      debug={debug}
+    >
+      {component}
+    </FormTestWrapper>
+  );
 
-/**
- * Form testing utilities interface
- */
-export interface FormTestingUtils<TFormData extends FieldValues = FieldValues> {
-  // Field interactions
-  fillField: (config: FieldTestConfig) => Promise<void>;
-  clearField: (field: string) => Promise<void>;
-  triggerValidation: (field?: string) => Promise<void>;
-  
-  // Form submission
-  submitForm: (expectedData?: Partial<TFormData>) => Promise<FormSubmissionResult>;
-  submitWithErrors: (expectedErrors: Record<string, string>) => Promise<FormSubmissionResult>;
-  
-  // File uploads
-  uploadFile: (config: FileUploadTestConfig) => Promise<void>;
-  
-  // Dynamic forms
-  addFormArrayItem: (arrayField: string, itemData?: Record<string, any>) => Promise<void>;
-  removeFormArrayItem: (arrayField: string, index: number) => Promise<void>;
-  
-  // Conditional fields
-  testConditionalField: (config: ConditionalFieldTestConfig) => Promise<void>;
-  
-  // Form state
-  resetForm: () => Promise<void>;
-  getFormData: () => Promise<TFormData>;
-  getFieldErrors: () => Record<string, string>;
-  
-  // Validation
-  validateForm: () => Promise<{ isValid: boolean; errors: Record<string, string> }>;
-  expectFieldError: (field: string, error: string) => void;
-  expectFieldValid: (field: string) => void;
-  
-  // Performance
-  measureInteractionTime: (interaction: () => Promise<void>) => Promise<number>;
-}
-
-// =============================================================================
-// FIELD INTERACTION UTILITIES
-// =============================================================================
-
-/**
- * Fills a form field with comprehensive validation testing
- * 
- * @param config - Field test configuration
- * @param user - UserEvent instance
- */
-export const fillFormField = async (
-  config: FieldTestConfig,
-  user: ReturnType<typeof userEvent.setup>
-): Promise<void> => {
-  const startTime = performance.now();
-  
-  // Find the field element
-  const field = findFormField(config.field);
-  
-  // Clear field if requested
-  if (config.options?.clearFirst) {
-    await user.clear(field);
-  }
-  
-  // Handle different input types
-  if (field.type === 'checkbox' || field.type === 'radio') {
-    if (config.value) {
-      await user.click(field);
-    }
-  } else if (field.type === 'file') {
-    const file = Array.isArray(config.value) ? config.value : [config.value];
-    await user.upload(field, file);
-  } else if (field.tagName === 'SELECT') {
-    await user.selectOptions(field, config.value);
-  } else {
-    // Text-based inputs
-    if (config.options?.usePaste) {
-      await user.paste(config.value);
-    } else {
-      const typeOptions = config.options?.typeDelay ? { delay: config.options.typeDelay } : undefined;
-      await user.type(field, config.value.toString(), typeOptions);
-    }
-  }
-  
-  // Trigger blur if requested
-  if (config.options?.triggerBlur) {
-    await user.tab(); // Tab away to trigger blur
-  }
-  
-  // Wait for validation to complete
-  await waitFor(() => {
-    // Check if validation has been triggered
-    const errorElement = screen.queryByRole('alert');
-    if (config.expectedError) {
-      if (config.shouldBeValid === false) {
-        expect(errorElement).toBeInTheDocument();
-      }
-    }
+  const renderResult = renderWithProviders(<WrappedComponent />, {
+    providerOptions,
+    ...renderOptions
   });
-  
-  // Validate expected error state
-  if (config.expectedError) {
-    if (config.shouldBeValid === false) {
+
+  return {
+    ...renderResult,
+    user,
+    formMethods,
+    
+    // Form testing utilities
+    
+    /**
+     * Get the current form data
+     */
+    getFormData: () => formMethods.getValues(),
+    
+    /**
+     * Get the current form state
+     */
+    getFormState: () => formMethods.formState,
+    
+    /**
+     * Submit the form and wait for completion
+     */
+    submitForm: async (): Promise<T | null> => {
+      const submitButton = screen.getByRole('button', { name: /submit/i });
+      await user.click(submitButton);
+      
       await waitFor(() => {
-        expect(screen.getByText(config.expectedError!)).toBeInTheDocument();
+        expect(formMethods.formState.isSubmitting).toBe(false);
+      });
+      
+      return onSubmitData;
+    },
+    
+    /**
+     * Get submitted form data (if form was submitted)
+     */
+    getSubmittedData: () => onSubmitData,
+    
+    /**
+     * Reset the form to initial state
+     */
+    resetForm: (data?: Partial<T>) => {
+      formMethods.reset(data);
+      onSubmitData = null;
+    },
+    
+    /**
+     * Set form values programmatically
+     */
+    setFormValues: (values: Partial<T>) => {
+      Object.entries(values).forEach(([key, value]) => {
+        formMethods.setValue(key as Path<T>, value);
+      });
+    },
+    
+    /**
+     * Trigger form validation manually
+     */
+    triggerValidation: async (fieldName?: Path<T>) => {
+      if (fieldName) {
+        return await formMethods.trigger(fieldName);
+      }
+      return await formMethods.trigger();
+    },
+    
+    /**
+     * Clear all form errors
+     */
+    clearErrors: () => {
+      formMethods.clearErrors();
+    },
+    
+    /**
+     * Set form errors manually
+     */
+    setErrors: (errors: Record<Path<T>, { type: string; message: string }>) => {
+      Object.entries(errors).forEach(([fieldName, error]) => {
+        formMethods.setError(fieldName as Path<T>, error);
       });
     }
-  } else if (config.shouldBeValid !== false) {
-    // Ensure no error is shown
+  };
+};
+
+// =============================================================================
+// FIELD INTERACTION TESTING UTILITIES
+// =============================================================================
+
+/**
+ * Tests field interactions including input, validation, and error handling
+ * 
+ * @param fieldConfig - Configuration for field testing
+ * @param user - User event instance from testing library
+ * @returns Promise that resolves when all field tests complete
+ */
+export const testFieldInteractions = async (
+  fieldConfig: FieldTestConfig,
+  user: ReturnType<typeof userEvent.setup>
+) => {
+  const { name, selector, type = 'text', validationTests = [], required } = fieldConfig;
+  
+  // Find the field element
+  const fieldElement = selector 
+    ? screen.getByTestId(selector)
+    : screen.getByRole(getFieldRole(type), { name: new RegExp(name, 'i') });
+  
+  expect(fieldElement).toBeInTheDocument();
+  
+  // Test required field validation if applicable
+  if (required) {
+    await testRequiredFieldValidation(fieldElement, user, type);
+  }
+  
+  // Run validation tests
+  for (const validationTest of validationTests) {
+    await runFieldValidationTest(fieldElement, validationTest, user, type);
+  }
+  
+  return {
+    fieldElement,
+    isValid: () => !fieldElement.getAttribute('aria-invalid'),
+    getErrorMessage: () => {
+      const errorId = fieldElement.getAttribute('aria-describedby');
+      return errorId ? screen.queryByText(errorId)?.textContent : null;
+    },
+    getValue: () => getFieldValue(fieldElement, type),
+    setValue: async (value: any) => {
+      await setFieldValue(fieldElement, value, user, type);
+    }
+  };
+};
+
+/**
+ * Tests conditional field visibility based on form state
+ * 
+ * @param fieldConfig - Field configuration with conditional visibility rules
+ * @param formMethods - React Hook Form methods
+ * @param user - User event instance
+ * @returns Promise that resolves when visibility tests complete
+ */
+export const testConditionalFieldVisibility = async <T extends FieldValues>(
+  fieldConfig: FieldTestConfig,
+  formMethods: UseFormReturn<T>,
+  user: ReturnType<typeof userEvent.setup>
+) => {
+  const { name, conditionalVisibility } = fieldConfig;
+  
+  if (!conditionalVisibility) {
+    throw new Error('Field configuration must include conditionalVisibility for this test');
+  }
+  
+  const { dependsOn, triggerValue, shouldBeVisible } = conditionalVisibility;
+  
+  // Find the controlling field
+  const controlField = screen.getByRole('textbox', { name: new RegExp(dependsOn, 'i') });
+  
+  // Set the trigger value
+  await user.clear(controlField);
+  await user.type(controlField, String(triggerValue));
+  
+  // Wait for form to update
+  await waitFor(() => {
+    expect(formMethods.getValues(dependsOn as Path<T>)).toBe(triggerValue);
+  });
+  
+  // Check field visibility
+  const targetField = screen.queryByRole('textbox', { name: new RegExp(name, 'i') });
+  
+  if (shouldBeVisible) {
+    expect(targetField).toBeInTheDocument();
+    expect(targetField).toBeVisible();
+  } else {
+    expect(targetField).not.toBeInTheDocument();
+  }
+  
+  return {
+    controlField,
+    targetField,
+    isVisible: () => !!targetField && targetField.style.display !== 'none'
+  };
+};
+
+/**
+ * Tests dynamic form array fields (add/remove functionality)
+ * 
+ * @param arrayFieldName - Name of the array field
+ * @param itemTemplate - Template for array items
+ * @param user - User event instance
+ * @returns Promise with array field testing utilities
+ */
+export const testDynamicArrayFields = async (
+  arrayFieldName: string,
+  itemTemplate: Record<string, any>,
+  user: ReturnType<typeof userEvent.setup>
+) => {
+  const addButton = screen.getByRole('button', { name: new RegExp(`add.*${arrayFieldName}`, 'i') });
+  const initialItems = screen.getAllByTestId(new RegExp(`${arrayFieldName}-item`, 'i'));
+  const initialCount = initialItems.length;
+  
+  // Test adding an item
+  await user.click(addButton);
+  
+  await waitFor(() => {
+    const updatedItems = screen.getAllByTestId(new RegExp(`${arrayFieldName}-item`, 'i'));
+    expect(updatedItems).toHaveLength(initialCount + 1);
+  });
+  
+  // Test removing an item
+  const removeButtons = screen.getAllByRole('button', { name: new RegExp(`remove.*${arrayFieldName}`, 'i') });
+  if (removeButtons.length > 0) {
+    await user.click(removeButtons[0]);
+    
     await waitFor(() => {
-      const errorText = screen.queryByText(/error|invalid|required/i);
-      expect(errorText).not.toBeInTheDocument();
+      const updatedItems = screen.getAllByTestId(new RegExp(`${arrayFieldName}-item`, 'i'));
+      expect(updatedItems).toHaveLength(initialCount);
     });
   }
   
-  const endTime = performance.now();
-  const duration = endTime - startTime;
+  // Test filling array items
+  const fillArrayItems = async (data: Array<Record<string, any>>) => {
+    for (let i = 0; i < data.length; i++) {
+      const itemData = data[i];
+      const itemContainer = screen.getByTestId(`${arrayFieldName}-item-${i}`);
+      
+      for (const [fieldName, value] of Object.entries(itemData)) {
+        const field = within(itemContainer).getByRole('textbox', { name: new RegExp(fieldName, 'i') });
+        await user.clear(field);
+        await user.type(field, String(value));
+      }
+    }
+  };
   
-  // Performance validation
-  if (duration > 100) {
-    console.warn(`Field interaction took ${duration}ms, exceeding 100ms target`);
-  }
-};
-
-/**
- * Clears a form field completely
- * 
- * @param field - Field selector or name
- * @param user - UserEvent instance
- */
-export const clearFormField = async (
-  field: string,
-  user: ReturnType<typeof userEvent.setup>
-): Promise<void> => {
-  const fieldElement = findFormField(field);
-  await user.clear(fieldElement);
-  
-  // Trigger validation after clearing
-  await user.tab();
-  await user.tab(); // Tab back to trigger validation
-};
-
-/**
- * Triggers validation on a specific field or entire form
- * 
- * @param field - Optional field to validate, or entire form if not specified
- * @param user - UserEvent instance
- */
-export const triggerFieldValidation = async (
-  field: string | undefined,
-  user: ReturnType<typeof userEvent.setup>
-): Promise<void> => {
-  if (field) {
-    const fieldElement = findFormField(field);
-    await user.click(fieldElement);
-    await user.tab(); // Tab away to trigger blur validation
-  } else {
-    // Trigger form-level validation by attempting submit
-    const submitButton = screen.getByRole('button', { name: /submit|save|create|update/i });
-    await user.click(submitButton);
-  }
-  
-  // Wait for validation to complete
-  await waitFor(() => {
-    // Validation should have run (either showing errors or clearing them)
-    expect(document.querySelector('[data-testid], [role="alert"]')).toBeTruthy();
-  }, { timeout: 1000 });
+  return {
+    addItem: async () => {
+      await user.click(addButton);
+      await waitFor(() => {
+        const items = screen.getAllByTestId(new RegExp(`${arrayFieldName}-item`, 'i'));
+        expect(items.length).toBeGreaterThan(initialCount);
+      });
+    },
+    
+    removeItem: async (index: number) => {
+      const removeButton = screen.getByTestId(`${arrayFieldName}-remove-${index}`);
+      await user.click(removeButton);
+      await waitFor(() => {
+        expect(screen.queryByTestId(`${arrayFieldName}-item-${index}`)).not.toBeInTheDocument();
+      });
+    },
+    
+    fillItems: fillArrayItems,
+    
+    getItemCount: () => screen.getAllByTestId(new RegExp(`${arrayFieldName}-item`, 'i')).length,
+    
+    getItemData: (index: number) => {
+      const itemContainer = screen.getByTestId(`${arrayFieldName}-item-${index}`);
+      const fields = within(itemContainer).getAllByRole('textbox');
+      const data: Record<string, string> = {};
+      
+      fields.forEach(field => {
+        const name = field.getAttribute('name') || field.getAttribute('data-testid') || 'unknown';
+        data[name] = (field as HTMLInputElement).value;
+      });
+      
+      return data;
+    }
+  };
 };
 
 // =============================================================================
@@ -473,93 +579,288 @@ export const triggerFieldValidation = async (
 // =============================================================================
 
 /**
- * Submits form and validates the submission process
+ * Tests form submission workflow with validation and error handling
  * 
- * @param config - Form test configuration
- * @param expectedData - Expected form data to be submitted
- * @param user - UserEvent instance
- * @returns Submission result
+ * @param config - Form submission test configuration
+ * @param formMethods - React Hook Form methods
+ * @param user - User event instance
+ * @returns Promise with submission test results
  */
-export const submitFormAndValidate = async <TFormData extends FieldValues>(
-  config: FormTestConfig<TFormData>,
-  expectedData: Partial<TFormData> | undefined,
+export const testFormSubmission = async <T extends FieldValues>(
+  config: FormSubmissionTestConfig<T>,
+  formMethods: UseFormReturn<T>,
   user: ReturnType<typeof userEvent.setup>
-): Promise<FormSubmissionResult> => {
-  const startTime = performance.now();
+) => {
+  const {
+    formData,
+    expectedErrors,
+    shouldSucceed = true,
+    onSubmit,
+    mockResponse,
+    timeout = 5000
+  } = config;
   
-  // Find and click submit button
-  const submitButton = screen.getByRole('button', { name: /submit|save|create|update|connect|test/i });
+  // Fill form with test data
+  await fillFormData(formData, user);
   
-  expect(submitButton).toBeEnabled();
+  // Set up submission handler
+  let submissionResult: any = null;
+  let submissionError: any = null;
   
-  // Click submit
+  const handleSubmit = async (data: T) => {
+    try {
+      if (onSubmit) {
+        submissionResult = await onSubmit(data);
+      } else if (mockResponse) {
+        if (mockResponse.success) {
+          submissionResult = mockResponse.data;
+        } else {
+          throw new Error('Submission failed');
+        }
+      }
+    } catch (error) {
+      submissionError = error;
+    }
+  };
+  
+  // Trigger form submission
+  const submitButton = screen.getByRole('button', { name: /submit/i });
   await user.click(submitButton);
   
   // Wait for submission to complete
-  let submissionData: any = null;
-  let submissionError: any = null;
-  
-  try {
-    await waitFor(async () => {
-      // Check if onSubmit was called
-      if (config.onSubmit) {
-        expect(config.onSubmit).toHaveBeenCalled();
-        submissionData = config.onSubmit.mock.calls[config.onSubmit.mock.calls.length - 1][0];
+  await waitFor(
+    () => {
+      if (shouldSucceed) {
+        expect(formMethods.formState.isSubmitSuccessful).toBe(true);
+      } else {
+        expect(formMethods.formState.isSubmitSuccessful).toBe(false);
       }
-    }, { timeout: 5000 });
-  } catch (error) {
-    submissionError = error;
-  }
+    },
+    { timeout }
+  );
   
-  const endTime = performance.now();
-  const duration = endTime - startTime;
-  
-  // Validate expected data if provided
-  if (expectedData && submissionData) {
-    Object.keys(expectedData).forEach(key => {
-      expect(submissionData).toHaveProperty(key, expectedData[key]);
-    });
+  // Validate expected errors
+  if (expectedErrors) {
+    for (const [fieldName, errors] of Object.entries(expectedErrors)) {
+      const fieldError = formMethods.formState.errors[fieldName as keyof T];
+      if (errors.length > 0) {
+        expect(fieldError).toBeDefined();
+        expect(fieldError?.message).toBe(errors[0]);
+      }
+    }
   }
   
   return {
-    success: !submissionError && !!submissionData,
-    data: submissionData,
-    errors: submissionError ? extractFormErrors() : undefined,
-    response: submissionData,
-    duration
+    submissionResult,
+    submissionError,
+    isSuccessful: formMethods.formState.isSubmitSuccessful,
+    errors: formMethods.formState.errors,
+    submittedData: formMethods.getValues()
   };
 };
 
 /**
- * Submits form expecting validation errors
+ * Tests database connection form submission with connection testing
  * 
- * @param expectedErrors - Expected validation errors
- * @param user - UserEvent instance
- * @returns Submission result
+ * @param connectionData - Database connection configuration
+ * @param user - User event instance
+ * @returns Promise with connection test results
  */
-export const submitFormWithValidationErrors = async (
-  expectedErrors: Record<string, string>,
+export const testDatabaseConnectionSubmission = async (
+  connectionData: {
+    name: string;
+    type: 'mysql' | 'postgresql' | 'oracle' | 'mongodb' | 'snowflake';
+    host: string;
+    port: number;
+    database: string;
+    username: string;
+    password: string;
+    ssl?: boolean;
+  },
   user: ReturnType<typeof userEvent.setup>
-): Promise<FormSubmissionResult> => {
-  const startTime = performance.now();
+) => {
+  // Fill connection form
+  await user.type(screen.getByLabelText(/connection name/i), connectionData.name);
+  await user.selectOptions(screen.getByLabelText(/database type/i), connectionData.type);
+  await user.type(screen.getByLabelText(/host/i), connectionData.host);
+  await user.type(screen.getByLabelText(/port/i), String(connectionData.port));
+  await user.type(screen.getByLabelText(/database/i), connectionData.database);
+  await user.type(screen.getByLabelText(/username/i), connectionData.username);
+  await user.type(screen.getByLabelText(/password/i), connectionData.password);
   
-  const submitButton = screen.getByRole('button', { name: /submit|save|create|update/i });
+  if (connectionData.ssl !== undefined) {
+    const sslCheckbox = screen.getByLabelText(/ssl/i);
+    if (connectionData.ssl) {
+      await user.check(sslCheckbox);
+    } else {
+      await user.uncheck(sslCheckbox);
+    }
+  }
   
-  await user.click(submitButton);
+  // Test connection button
+  const testConnectionButton = screen.getByRole('button', { name: /test connection/i });
+  expect(testConnectionButton).toBeInTheDocument();
   
-  // Wait for validation errors to appear
+  await user.click(testConnectionButton);
+  
+  // Wait for connection test to complete
   await waitFor(() => {
-    Object.entries(expectedErrors).forEach(([field, error]) => {
-      expect(screen.getByText(error)).toBeInTheDocument();
-    });
-  });
+    const resultElement = screen.queryByTestId('connection-test-result');
+    expect(resultElement).toBeInTheDocument();
+  }, { timeout: 10000 }); // Connection tests may take longer
   
-  const endTime = performance.now();
+  const testResult = screen.getByTestId('connection-test-result');
+  const isSuccess = testResult.textContent?.includes('success') || testResult.classList.contains('success');
   
   return {
-    success: false,
-    errors: expectedErrors,
-    duration: endTime - startTime
+    connectionData,
+    testResult: testResult.textContent,
+    isConnectionSuccessful: isSuccess,
+    
+    // Submit the form after successful connection test
+    submitConnection: async () => {
+      const submitButton = screen.getByRole('button', { name: /create.*connection|save.*connection/i });
+      await user.click(submitButton);
+      
+      await waitFor(() => {
+        expect(screen.queryByText(/connection.*created|connection.*saved/i)).toBeInTheDocument();
+      });
+    }
+  };
+};
+
+// =============================================================================
+// WIZARD TESTING UTILITIES
+// =============================================================================
+
+/**
+ * Tests multi-step wizard navigation and form state persistence
+ * 
+ * @param config - Wizard test configuration
+ * @param user - User event instance
+ * @returns Promise with wizard testing utilities
+ */
+export const testWizardNavigation = async <T extends FieldValues>(
+  config: WizardTestConfig<T>,
+  user: ReturnType<typeof userEvent.setup>
+) => {
+  const { steps, preserveState = true, completionData } = config;
+  
+  let currentStepIndex = 0;
+  const stepResults: Array<{
+    stepId: string;
+    completed: boolean;
+    data: Partial<T>;
+    errors: string[];
+  }> = [];
+  
+  // Navigate through each step
+  for (const step of steps) {
+    const stepResult = await testWizardStep(step, user, currentStepIndex);
+    stepResults.push(stepResult);
+    
+    // Check if we can proceed to next step
+    if (stepResult.completed && currentStepIndex < steps.length - 1) {
+      await goToNextStep(user);
+      currentStepIndex++;
+    }
+  }
+  
+  // Test wizard completion
+  let completionResult: any = null;
+  if (completionData) {
+    completionResult = await completeWizard(completionData, user);
+  }
+  
+  return {
+    steps: stepResults,
+    currentStep: currentStepIndex,
+    isCompleted: completionResult !== null,
+    completionResult,
+    
+    // Navigation utilities
+    goToStep: async (stepIndex: number) => {
+      const stepButton = screen.getByTestId(`wizard-step-${stepIndex}`);
+      await user.click(stepButton);
+      
+      await waitFor(() => {
+        expect(screen.getByTestId(`wizard-step-content-${stepIndex}`)).toBeVisible();
+      });
+      
+      currentStepIndex = stepIndex;
+    },
+    
+    goToNextStep: () => goToNextStep(user),
+    goToPreviousStep: () => goToPreviousStep(user),
+    
+    // State validation
+    validateStepCompletion: (stepIndex: number) => {
+      const step = stepResults[stepIndex];
+      return step && step.completed;
+    },
+    
+    getStepData: (stepIndex: number) => {
+      return stepResults[stepIndex]?.data || {};
+    },
+    
+    // Overall wizard state
+    getWizardProgress: () => {
+      const completedSteps = stepResults.filter(step => step.completed).length;
+      return {
+        completedSteps,
+        totalSteps: steps.length,
+        progress: (completedSteps / steps.length) * 100
+      };
+    }
+  };
+};
+
+/**
+ * Tests individual wizard step
+ */
+const testWizardStep = async <T extends FieldValues>(
+  step: WizardTestConfig<T>['steps'][0],
+  user: ReturnType<typeof userEvent.setup>,
+  stepIndex: number
+) => {
+  const { id, title, fields, data, optional, stepValidation } = step;
+  
+  // Verify step is visible
+  const stepContainer = screen.getByTestId(`wizard-step-content-${stepIndex}`);
+  expect(stepContainer).toBeVisible();
+  
+  // Verify step title
+  expect(screen.getByText(title)).toBeInTheDocument();
+  
+  const errors: string[] = [];
+  let stepData: Partial<T> = {};
+  
+  // Fill step data if provided
+  if (data) {
+    stepData = { ...data };
+    await fillFormData(data, user);
+  }
+  
+  // Test each field in the step
+  for (const fieldConfig of fields) {
+    try {
+      await testFieldInteractions(fieldConfig, user);
+    } catch (error) {
+      errors.push(`Field ${fieldConfig.name}: ${(error as Error).message}`);
+    }
+  }
+  
+  // Validate step completion
+  let completed = errors.length === 0;
+  if (stepValidation && data) {
+    completed = completed && stepValidation(data);
+  }
+  
+  return {
+    stepId: id,
+    completed,
+    data: stepData,
+    errors
   };
 };
 
@@ -571,881 +872,585 @@ export const submitFormWithValidationErrors = async (
  * Tests file upload functionality with validation and progress tracking
  * 
  * @param config - File upload test configuration
- * @param user - UserEvent instance
+ * @param user - User event instance
+ * @returns Promise with upload test results
  */
 export const testFileUpload = async (
   config: FileUploadTestConfig,
   user: ReturnType<typeof userEvent.setup>
-): Promise<void> => {
-  const fileInput = findFormField(config.field) as HTMLInputElement;
+) => {
+  const { fieldName, files, validation, uploadBehavior } = config;
   
-  expect(fileInput.type).toBe('file');
+  // Find file input
+  const fileInput = screen.getByLabelText(new RegExp(fieldName, 'i'));
+  expect(fileInput).toBeInTheDocument();
+  expect(fileInput).toHaveAttribute('type', 'file');
   
-  // Handle single or multiple files
-  const files = Array.isArray(config.file) ? config.file : [config.file];
-  
-  // Upload files
-  await user.upload(fileInput, files);
-  
-  // Wait for upload to be processed
-  await waitFor(() => {
-    expect(fileInput.files).toHaveLength(files.length);
-  });
-  
-  // Check validation if specified
-  if (config.validation) {
-    if (config.validation.shouldAccept === false && config.validation.expectedError) {
-      await waitFor(() => {
-        expect(screen.getByText(config.validation!.expectedError!)).toBeInTheDocument();
-      });
-    } else if (config.validation.shouldAccept !== false) {
-      // Ensure no error is shown
-      const errorElements = screen.queryAllByRole('alert');
-      expect(errorElements).toHaveLength(0);
-    }
-  }
-  
-  // Simulate upload progress if requested
-  if (config.options?.simulateProgress && config.expectProgress) {
-    const progressElement = screen.queryByRole('progressbar');
-    expect(progressElement).toBeInTheDocument();
+  // Create File objects for testing
+  const testFiles = files.map(file => {
+    const content = typeof file.content === 'string' 
+      ? new TextEncoder().encode(file.content)
+      : file.content;
     
-    // Wait for progress to complete
-    await waitFor(() => {
-      const progressElement = screen.queryByRole('progressbar');
-      expect(progressElement).not.toBeInTheDocument();
-    }, { timeout: config.options.uploadDuration || 2000 });
-  }
-  
-  // Handle upload failure simulation
-  if (config.options?.simulateFailure) {
-    await waitFor(() => {
-      expect(screen.getByText(/upload failed|error uploading/i)).toBeInTheDocument();
-    });
-  }
-};
-
-/**
- * Creates a mock file for testing file uploads
- * 
- * @param options - File creation options
- * @returns Mock File object
- */
-export const createMockFile = (options: {
-  name?: string;
-  size?: number;
-  type?: string;
-  content?: string;
-}): File => {
-  const {
-    name = 'test-file.txt',
-    size = 1024,
-    type = 'text/plain',
-    content = 'test file content'
-  } = options;
-  
-  const blob = new Blob([content], { type });
-  const file = new File([blob], name, { type });
-  
-  // Mock the size property
-  Object.defineProperty(file, 'size', { value: size });
-  
-  return file;
-};
-
-/**
- * Tests schema import file upload with validation
- * 
- * @param fileContent - Schema content to test
- * @param expectedValidation - Expected validation result
- * @param user - UserEvent instance
- */
-export const testSchemaImportUpload = async (
-  fileContent: string,
-  expectedValidation: { isValid: boolean; errors?: string[] },
-  user: ReturnType<typeof userEvent.setup>
-): Promise<void> => {
-  const schemaFile = createMockFile({
-    name: 'schema.json',
-    type: 'application/json',
-    content: fileContent
-  });
-  
-  await testFileUpload({
-    field: 'schema-import',
-    file: schemaFile,
-    validation: {
-      shouldAccept: expectedValidation.isValid,
-      expectedError: expectedValidation.errors?.[0]
-    },
-    expectProgress: true,
-    options: {
-      simulateProgress: true,
-      uploadDuration: 1000
-    }
-  }, user);
-};
-
-// =============================================================================
-// DYNAMIC FORM STRUCTURE TESTING UTILITIES
-// =============================================================================
-
-/**
- * Tests dynamic form array functionality
- * 
- * @param config - Dynamic form test configuration
- * @param user - UserEvent instance
- */
-export const testDynamicFormArray = async (
-  config: DynamicFormTestConfig,
-  user: ReturnType<typeof userEvent.setup>
-): Promise<void> => {
-  const arrayContainer = screen.getByTestId(config.arrayField) || 
-                        screen.getByRole('group', { name: new RegExp(config.arrayField, 'i') });
-  
-  // Test initial state
-  if (config.initialItems) {
-    const initialItems = within(arrayContainer).getAllByRole('group');
-    expect(initialItems).toHaveLength(config.initialItems);
-  }
-  
-  // Test adding items
-  if (config.actions?.testAdd) {
-    const addButton = within(arrayContainer).getByRole('button', { name: /add|new|\+/i });
-    await user.click(addButton);
-    
-    await waitFor(() => {
-      const items = within(arrayContainer).getAllByRole('group');
-      expect(items.length).toBeGreaterThan(config.initialItems || 0);
-    });
-  }
-  
-  // Test removing items
-  if (config.actions?.testRemove) {
-    const removeButtons = within(arrayContainer).getAllByRole('button', { name: /remove|delete|×/i });
-    if (removeButtons.length > 0) {
-      await user.click(removeButtons[0]);
-      
-      await waitFor(() => {
-        const updatedRemoveButtons = within(arrayContainer).queryAllByRole('button', { name: /remove|delete|×/i });
-        expect(updatedRemoveButtons.length).toBeLessThan(removeButtons.length);
-      });
-    }
-  }
-  
-  // Test reordering if requested
-  if (config.actions?.testReorder) {
-    const items = within(arrayContainer).getAllByRole('group');
-    if (items.length >= 2) {
-      // Find drag handles or move buttons
-      const moveUpButton = within(items[1]).queryByRole('button', { name: /move up|↑/i });
-      if (moveUpButton) {
-        await user.click(moveUpButton);
-        
-        await waitFor(() => {
-          // Verify the item order has changed
-          const updatedItems = within(arrayContainer).getAllByRole('group');
-          expect(updatedItems).toHaveLength(items.length);
-        });
-      }
-    }
-  }
-};
-
-/**
- * Adds a new item to a dynamic form array
- * 
- * @param arrayField - Array field name
- * @param itemData - Data for the new item
- * @param user - UserEvent instance
- */
-export const addDynamicFormItem = async (
-  arrayField: string,
-  itemData: Record<string, any> | undefined,
-  user: ReturnType<typeof userEvent.setup>
-): Promise<void> => {
-  const arrayContainer = screen.getByTestId(arrayField);
-  const addButton = within(arrayContainer).getByRole('button', { name: /add|new|\+/i });
-  
-  const initialItems = within(arrayContainer).queryAllByRole('group');
-  const initialCount = initialItems.length;
-  
-  await user.click(addButton);
-  
-  // Wait for new item to be added
-  await waitFor(() => {
-    const updatedItems = within(arrayContainer).getAllByRole('group');
-    expect(updatedItems).toHaveLength(initialCount + 1);
-  });
-  
-  // Fill in data if provided
-  if (itemData) {
-    const newItems = within(arrayContainer).getAllByRole('group');
-    const newItem = newItems[newItems.length - 1];
-    
-    for (const [fieldName, value] of Object.entries(itemData)) {
-      const field = within(newItem).getByRole('textbox', { name: new RegExp(fieldName, 'i') });
-      await user.clear(field);
-      await user.type(field, value.toString());
-    }
-  }
-};
-
-/**
- * Removes an item from a dynamic form array
- * 
- * @param arrayField - Array field name
- * @param index - Index of item to remove
- * @param user - UserEvent instance
- */
-export const removeDynamicFormItem = async (
-  arrayField: string,
-  index: number,
-  user: ReturnType<typeof userEvent.setup>
-): Promise<void> => {
-  const arrayContainer = screen.getByTestId(arrayField);
-  const items = within(arrayContainer).getAllByRole('group');
-  
-  expect(items).toHaveLength(index + 1);
-  
-  const itemToRemove = items[index];
-  const removeButton = within(itemToRemove).getByRole('button', { name: /remove|delete|×/i });
-  
-  await user.click(removeButton);
-  
-  // Wait for item to be removed
-  await waitFor(() => {
-    const updatedItems = within(arrayContainer).getAllByRole('group');
-    expect(updatedItems).toHaveLength(items.length - 1);
-  });
-};
-
-// =============================================================================
-// CONDITIONAL FIELD TESTING UTILITIES
-// =============================================================================
-
-/**
- * Tests conditional field visibility based on form state
- * 
- * @param config - Conditional field test configuration
- * @param user - UserEvent instance
- */
-export const testConditionalFieldVisibility = async (
-  config: ConditionalFieldTestConfig,
-  user: ReturnType<typeof userEvent.setup>
-): Promise<void> => {
-  const triggerField = findFormField(config.triggerField);
-  
-  // Test initial state
-  config.conditionalFields.forEach(fieldName => {
-    const field = screen.queryByTestId(fieldName) || screen.queryByLabelText(new RegExp(fieldName, 'i'));
-    if (config.expectedVisible) {
-      expect(field).toBeInTheDocument();
-    } else {
-      expect(field).not.toBeInTheDocument();
-    }
-  });
-  
-  // Change trigger field value
-  await fillFormField({
-    field: config.triggerField,
-    value: config.triggerValue,
-    options: { triggerBlur: true }
-  }, user);
-  
-  // Wait for conditional fields to update
-  await waitFor(() => {
-    config.conditionalFields.forEach(fieldName => {
-      const field = screen.queryByTestId(fieldName) || screen.queryByLabelText(new RegExp(fieldName, 'i'));
-      if (config.expectedVisible) {
-        expect(field).toBeInTheDocument();
-      } else {
-        expect(field).not.toBeInTheDocument();
-      }
+    return new File([content], file.name, {
+      type: file.type,
+      lastModified: Date.now()
     });
   });
   
-  // Test additional scenarios if provided
-  if (config.scenarios) {
-    for (const scenario of config.scenarios) {
-      await fillFormField({
-        field: config.triggerField,
-        value: scenario.triggerValue,
-        options: { triggerBlur: true, clearFirst: true }
-      }, user);
-      
-      await waitFor(() => {
-        config.conditionalFields.forEach(fieldName => {
-          const field = screen.queryByTestId(fieldName) || screen.queryByLabelText(new RegExp(fieldName, 'i'));
-          if (scenario.expectedVisible) {
-            expect(field).toBeInTheDocument();
-          } else {
-            expect(field).not.toBeInTheDocument();
-          }
-        });
-      });
-    }
-  }
-};
-
-// =============================================================================
-// DATABASE CONNECTION FORM TESTING UTILITIES
-// =============================================================================
-
-/**
- * Specialized testing utilities for database connection forms
- */
-export const databaseConnectionFormUtils = {
-  /**
-   * Tests complete database connection workflow
-   */
-  testConnectionWorkflow: async (
-    connectionData: {
-      name: string;
-      type: string;
-      host: string;
-      port: number;
-      database: string;
-      username: string;
-      password: string;
-    },
-    user: ReturnType<typeof userEvent.setup>
-  ): Promise<void> => {
-    // Fill connection form fields
-    await fillFormField({ field: 'name', value: connectionData.name }, user);
-    await fillFormField({ field: 'type', value: connectionData.type }, user);
-    await fillFormField({ field: 'host', value: connectionData.host }, user);
-    await fillFormField({ field: 'port', value: connectionData.port.toString() }, user);
-    await fillFormField({ field: 'database', value: connectionData.database }, user);
-    await fillFormField({ field: 'username', value: connectionData.username }, user);
-    await fillFormField({ field: 'password', value: connectionData.password }, user);
-    
-    // Test connection
-    const testButton = screen.getByRole('button', { name: /test connection/i });
-    await user.click(testButton);
-    
-    // Wait for test result
-    await waitFor(() => {
-      expect(screen.getByText(/connection successful|connection failed/i)).toBeInTheDocument();
-    }, { timeout: 10000 });
-  },
+  // Test file selection
+  await user.upload(fileInput, testFiles);
   
-  /**
-   * Tests database type-specific field visibility
-   */
-  testDatabaseTypeFields: async (
-    databaseType: string,
-    expectedFields: string[],
-    hiddenFields: string[],
-    user: ReturnType<typeof userEvent.setup>
-  ): Promise<void> => {
-    // Select database type
-    await fillFormField({ field: 'type', value: databaseType }, user);
-    
-    // Wait for conditional fields to update
-    await waitFor(() => {
-      expectedFields.forEach(field => {
-        expect(screen.getByTestId(field)).toBeInTheDocument();
-      });
-      
-      hiddenFields.forEach(field => {
-        expect(screen.queryByTestId(field)).not.toBeInTheDocument();
-      });
-    });
-  },
+  // Verify files were selected
+  expect(fileInput.files).toHaveLength(testFiles.length);
   
-  /**
-   * Tests SSL configuration options
-   */
-  testSSLConfiguration: async (
-    enableSSL: boolean,
-    user: ReturnType<typeof userEvent.setup>
-  ): Promise<void> => {
-    const sslCheckbox = screen.getByRole('checkbox', { name: /enable ssl|ssl/i });
-    
-    if (enableSSL) {
-      await user.click(sslCheckbox);
-      
-      // SSL options should become visible
-      await waitFor(() => {
-        expect(screen.getByTestId('ssl-mode')).toBeInTheDocument();
-      });
-    } else {
-      if (sslCheckbox.checked) {
-        await user.click(sslCheckbox);
-      }
-      
-      // SSL options should be hidden
-      await waitFor(() => {
-        expect(screen.queryByTestId('ssl-mode')).not.toBeInTheDocument();
-      });
-    }
-  }
-};
-
-// =============================================================================
-// FORM STATE AND VALIDATION UTILITIES
-// =============================================================================
-
-/**
- * Resets form to default values
- * 
- * @param user - UserEvent instance
- */
-export const resetFormToDefaults = async (
-  user: ReturnType<typeof userEvent.setup>
-): Promise<void> => {
-  const resetButton = screen.queryByRole('button', { name: /reset|clear|cancel/i });
+  const uploadResults: Array<{
+    file: File;
+    uploaded: boolean;
+    error?: string;
+    progress?: number;
+  }> = [];
   
-  if (resetButton) {
-    await user.click(resetButton);
-  } else {
-    // Manually clear all form fields
-    const formInputs = screen.getAllByRole('textbox');
-    for (const input of formInputs) {
-      await user.clear(input);
-    }
-    
-    const checkboxes = screen.getAllByRole('checkbox');
-    for (const checkbox of checkboxes) {
-      if (checkbox.checked) {
-        await user.click(checkbox);
-      }
-    }
-  }
-  
-  // Wait for form to reset
-  await waitFor(() => {
-    const formInputs = screen.getAllByRole('textbox');
-    formInputs.forEach(input => {
-      expect(input.value).toBe('');
-    });
-  });
-};
-
-/**
- * Gets current form data from the DOM
- * 
- * @returns Current form data
- */
-export const getCurrentFormData = async (): Promise<any> => {
-  const form = screen.getByRole('form', { hidden: true }) || document.querySelector('form');
-  
-  if (!form) {
-    throw new Error('No form found in the document');
-  }
-  
-  const formData = new FormData(form);
-  const data: Record<string, any> = {};
-  
-  for (const [key, value] of formData.entries()) {
-    data[key] = value;
-  }
-  
-  return data;
-};
-
-/**
- * Gets current field errors from the DOM
- * 
- * @returns Field errors
- */
-export const getCurrentFieldErrors = (): Record<string, string> => {
-  const errorElements = screen.getAllByRole('alert');
-  const errors: Record<string, string> = {};
-  
-  errorElements.forEach(element => {
-    const fieldName = element.getAttribute('data-field') || 
-                     element.closest('[data-testid]')?.getAttribute('data-testid') ||
-                     'unknown';
-    errors[fieldName] = element.textContent || '';
-  });
-  
-  return errors;
-};
-
-/**
- * Validates current form state against schema
- * 
- * @param schema - Zod validation schema
- * @returns Validation result
- */
-export const validateCurrentFormState = async (
-  schema: ZodSchema | undefined
-): Promise<{ isValid: boolean; errors: Record<string, string> }> => {
-  if (!schema) {
-    return { isValid: true, errors: {} };
-  }
-  
-  const formData = await getCurrentFormData();
-  
-  try {
-    schema.parse(formData);
-    return { isValid: true, errors: {} };
-  } catch (error) {
-    if (error instanceof ZodError) {
-      const errors: Record<string, string> = {};
-      error.errors.forEach(err => {
-        const path = err.path.join('.');
-        errors[path] = err.message;
-      });
-      return { isValid: false, errors };
-    }
-    return { isValid: false, errors: { general: 'Validation failed' } };
-  }
-};
-
-/**
- * Expects a field to have a specific error
- * 
- * @param field - Field name or selector
- * @param error - Expected error message
- */
-export const expectFieldToHaveError = (field: string, error: string): void => {
-  const errorElement = screen.getByText(error);
-  expect(errorElement).toBeInTheDocument();
-  
-  // Verify error is associated with the correct field
-  const fieldElement = findFormField(field);
-  const fieldContainer = fieldElement.closest('[data-testid], .form-field, .field-container');
-  
-  if (fieldContainer) {
-    expect(within(fieldContainer as HTMLElement).getByText(error)).toBeInTheDocument();
-  }
-};
-
-/**
- * Expects a field to be valid (no errors)
- * 
- * @param field - Field name or selector
- */
-export const expectFieldToBeValid = (field: string): void => {
-  const fieldElement = findFormField(field);
-  const fieldContainer = fieldElement.closest('[data-testid], .form-field, .field-container');
-  
-  if (fieldContainer) {
-    const errorElements = within(fieldContainer as HTMLElement).queryAllByRole('alert');
-    expect(errorElements).toHaveLength(0);
-  }
-  
-  // Check for aria-invalid attribute
-  expect(fieldElement).not.toHaveAttribute('aria-invalid', 'true');
-};
-
-// =============================================================================
-// PERFORMANCE TESTING UTILITIES
-// =============================================================================
-
-/**
- * Measures the performance of form interactions
- * 
- * @param interaction - Interaction function to measure
- * @returns Duration in milliseconds
- */
-export const measureFormInteractionPerformance = async (
-  interaction: () => Promise<void>
-): Promise<number> => {
-  const startTime = performance.now();
-  
-  await interaction();
-  
-  const endTime = performance.now();
-  const duration = endTime - startTime;
-  
-  // Log performance warning if needed
-  if (duration > 100) {
-    console.warn(`Form interaction took ${duration}ms, exceeding 100ms performance target`);
-  }
-  
-  return duration;
-};
-
-/**
- * Tests form validation performance
- * 
- * @param schema - Validation schema to test
- * @param testData - Test data for validation
- * @returns Performance metrics
- */
-export const testValidationPerformance = async (
-  schema: ZodSchema,
-  testData: any[]
-): Promise<{ averageTime: number; maxTime: number; passedPerformanceTarget: boolean }> => {
-  const times: number[] = [];
-  
-  for (const data of testData) {
-    const startTime = performance.now();
+  // Test each file
+  for (let i = 0; i < testFiles.length; i++) {
+    const file = testFiles[i];
+    const result: typeof uploadResults[0] = {
+      file,
+      uploaded: false
+    };
     
     try {
-      schema.parse(data);
-    } catch {
-      // Ignore validation errors for performance testing
+      // Test file validation
+      if (validation) {
+        await validateUploadedFile(file, validation);
+      }
+      
+      // Test upload behavior
+      if (uploadBehavior) {
+        result.uploaded = uploadBehavior.shouldSucceed !== false;
+        
+        if (uploadBehavior.progressUpdates) {
+          // Simulate progress updates
+          for (const progress of uploadBehavior.progressUpdates) {
+            result.progress = progress;
+            await waitFor(() => {
+              const progressElement = screen.queryByTestId(`upload-progress-${i}`);
+              if (progressElement) {
+                expect(progressElement).toHaveTextContent(`${progress}%`);
+              }
+            });
+          }
+        }
+      } else {
+        result.uploaded = true;
+      }
+    } catch (error) {
+      result.error = (error as Error).message;
     }
     
-    const endTime = performance.now();
-    times.push(endTime - startTime);
+    uploadResults.push(result);
   }
   
-  const averageTime = times.reduce((sum, time) => sum + time, 0) / times.length;
-  const maxTime = Math.max(...times);
-  const passedPerformanceTarget = maxTime <= 100;
+  return {
+    uploadResults,
+    selectedFiles: testFiles,
+    
+    // File validation utilities
+    validateFileSize: (file: File, maxSize: number) => {
+      return file.size <= maxSize;
+    },
+    
+    validateFileType: (file: File, allowedTypes: string[]) => {
+      return allowedTypes.includes(file.type);
+    },
+    
+    // Upload progress utilities
+    getUploadProgress: (fileIndex: number) => {
+      const progressElement = screen.queryByTestId(`upload-progress-${fileIndex}`);
+      return progressElement ? parseInt(progressElement.textContent || '0') : 0;
+    },
+    
+    // Upload completion utilities
+    waitForUploadCompletion: async (timeout = 10000) => {
+      await waitFor(() => {
+        const allFiles = uploadResults.every(result => result.uploaded || result.error);
+        expect(allFiles).toBe(true);
+      }, { timeout });
+    },
+    
+    getUploadErrors: () => {
+      return uploadResults
+        .filter(result => result.error)
+        .map(result => ({ file: result.file.name, error: result.error }));
+    }
+  };
+};
+
+/**
+ * Tests schema import/export file upload workflow
+ * 
+ * @param operation - 'import' or 'export'
+ * @param schemaData - Schema data for testing
+ * @param user - User event instance
+ * @returns Promise with schema operation results
+ */
+export const testSchemaFileUpload = async (
+  operation: 'import' | 'export',
+  schemaData: any,
+  user: ReturnType<typeof userEvent.setup>
+) => {
+  if (operation === 'import') {
+    // Test schema import
+    const importButton = screen.getByRole('button', { name: /import.*schema/i });
+    await user.click(importButton);
+    
+    const fileInput = screen.getByLabelText(/select.*schema.*file/i);
+    const schemaFile = new File([JSON.stringify(schemaData)], 'schema.json', {
+      type: 'application/json'
+    });
+    
+    await user.upload(fileInput, schemaFile);
+    
+    // Wait for schema to be processed
+    await waitFor(() => {
+      expect(screen.getByText(/schema.*imported/i)).toBeInTheDocument();
+    });
+    
+    return {
+      operation: 'import',
+      file: schemaFile,
+      imported: true,
+      processedSchema: schemaData
+    };
+  } else {
+    // Test schema export
+    const exportButton = screen.getByRole('button', { name: /export.*schema/i });
+    await user.click(exportButton);
+    
+    // Wait for download to be triggered
+    await waitFor(() => {
+      expect(screen.getByText(/schema.*exported/i)).toBeInTheDocument();
+    });
+    
+    return {
+      operation: 'export',
+      exported: true,
+      exportedSchema: schemaData
+    };
+  }
+};
+
+// =============================================================================
+// FORM RESET AND DEFAULT VALUE UTILITIES
+// =============================================================================
+
+/**
+ * Tests form reset functionality and default value handling
+ * 
+ * @param formMethods - React Hook Form methods
+ * @param defaultValues - Expected default values
+ * @param user - User event instance
+ * @returns Promise with reset test results
+ */
+export const testFormReset = async <T extends FieldValues>(
+  formMethods: UseFormReturn<T>,
+  defaultValues: Partial<T>,
+  user: ReturnType<typeof userEvent.setup>
+) => {
+  // Get initial form state
+  const initialValues = formMethods.getValues();
+  const initialState = formMethods.formState;
+  
+  // Make some changes to the form
+  const testData = {
+    field1: 'modified value 1',
+    field2: 'modified value 2'
+  } as Partial<T>;
+  
+  await fillFormData(testData, user);
+  
+  // Verify form was modified
+  const modifiedValues = formMethods.getValues();
+  expect(modifiedValues).not.toEqual(initialValues);
+  
+  // Test reset button
+  const resetButton = screen.getByRole('button', { name: /reset|clear/i });
+  await user.click(resetButton);
+  
+  // Wait for reset to complete
+  await waitFor(() => {
+    const resetValues = formMethods.getValues();
+    Object.entries(defaultValues).forEach(([key, value]) => {
+      expect(resetValues[key as keyof T]).toEqual(value);
+    });
+  });
+  
+  // Verify form state was reset
+  expect(formMethods.formState.isDirty).toBe(false);
+  expect(formMethods.formState.isValid).toBe(true);
   
   return {
-    averageTime,
-    maxTime,
-    passedPerformanceTarget
+    initialValues,
+    modifiedValues,
+    resetValues: formMethods.getValues(),
+    wasReset: !formMethods.formState.isDirty,
+    
+    // Reset with specific data
+    resetWithData: async (data: Partial<T>) => {
+      formMethods.reset(data);
+      await waitFor(() => {
+        const newValues = formMethods.getValues();
+        Object.entries(data).forEach(([key, value]) => {
+          expect(newValues[key as keyof T]).toEqual(value);
+        });
+      });
+    },
+    
+    // Test dirty state
+    testDirtyState: async () => {
+      // Make a change
+      const firstField = screen.getAllByRole('textbox')[0];
+      await user.type(firstField, 'test');
+      
+      await waitFor(() => {
+        expect(formMethods.formState.isDirty).toBe(true);
+      });
+      
+      // Reset
+      formMethods.reset();
+      
+      await waitFor(() => {
+        expect(formMethods.formState.isDirty).toBe(false);
+      });
+    }
+  };
+};
+
+/**
+ * Tests default value population for complex form configurations
+ * 
+ * @param schema - Form schema with default values
+ * @param formMethods - React Hook Form methods
+ * @returns Promise with default value test results
+ */
+export const testDefaultValues = async <T extends FieldValues>(
+  schema: z.ZodSchema<T>,
+  formMethods: UseFormReturn<T>
+) => {
+  // Parse schema to extract default values
+  const schemaDefaults = extractDefaultsFromSchema(schema);
+  const formDefaults = formMethods.getValues();
+  
+  // Verify all default values are correctly set
+  const defaultValueTests = Object.entries(schemaDefaults).map(([key, expectedValue]) => {
+    const actualValue = formDefaults[key as keyof T];
+    return {
+      field: key,
+      expected: expectedValue,
+      actual: actualValue,
+      matches: actualValue === expectedValue
+    };
+  });
+  
+  const allDefaultsMatch = defaultValueTests.every(test => test.matches);
+  
+  return {
+    schemaDefaults,
+    formDefaults,
+    defaultValueTests,
+    allDefaultsMatch,
+    
+    // Verify specific field defaults
+    verifyFieldDefault: (fieldName: keyof T, expectedValue: any) => {
+      const actualValue = formDefaults[fieldName];
+      expect(actualValue).toEqual(expectedValue);
+    },
+    
+    // Test default value override
+    testDefaultOverride: async (overrides: Partial<T>) => {
+      formMethods.reset(overrides);
+      
+      await waitFor(() => {
+        const newValues = formMethods.getValues();
+        Object.entries(overrides).forEach(([key, value]) => {
+          expect(newValues[key as keyof T]).toEqual(value);
+        });
+      });
+    }
   };
 };
 
 // =============================================================================
-// UTILITY HELPER FUNCTIONS
+// HELPER FUNCTIONS
 // =============================================================================
 
 /**
- * Finds a form field by various selectors
- * 
- * @param selector - Field selector (name, data-testid, label, etc.)
- * @returns Field element
+ * Gets the appropriate ARIA role for a field type
  */
-export const findFormField = (selector: string): HTMLElement => {
-  // Try data-testid first
-  let field = screen.queryByTestId(selector);
-  
-  if (!field) {
-    // Try by name attribute
-    field = screen.queryByRole('textbox', { name: new RegExp(selector, 'i') }) ||
-           screen.queryByRole('combobox', { name: new RegExp(selector, 'i') }) ||
-           screen.queryByRole('checkbox', { name: new RegExp(selector, 'i') }) ||
-           screen.queryByRole('radio', { name: new RegExp(selector, 'i') });
+const getFieldRole = (type: string): string => {
+  switch (type) {
+    case 'text':
+    case 'email':
+    case 'password':
+    case 'number':
+      return 'textbox';
+    case 'select':
+      return 'combobox';
+    case 'checkbox':
+      return 'checkbox';
+    case 'radio':
+      return 'radio';
+    case 'textarea':
+      return 'textbox';
+    default:
+      return 'textbox';
   }
-  
-  if (!field) {
-    // Try by label text
-    field = screen.queryByLabelText(new RegExp(selector, 'i'));
-  }
-  
-  if (!field) {
-    // Try by placeholder
-    field = screen.queryByPlaceholderText(new RegExp(selector, 'i'));
-  }
-  
-  if (!field) {
-    // Try by name attribute directly
-    field = document.querySelector(`[name="${selector}"]`);
-  }
-  
-  if (!field) {
-    throw new Error(`Could not find form field with selector: ${selector}`);
-  }
-  
-  return field as HTMLElement;
 };
 
 /**
- * Extracts form errors from the current DOM state
- * 
- * @returns Form errors by field name
+ * Tests required field validation
  */
-export const extractFormErrors = (): Record<string, string> => {
-  const errors: Record<string, string> = {};
+const testRequiredFieldValidation = async (
+  fieldElement: HTMLElement,
+  user: ReturnType<typeof userEvent.setup>,
+  type: string
+) => {
+  // Focus and blur without entering data
+  await user.click(fieldElement);
+  await user.tab();
   
-  // Find all error elements
-  const errorElements = document.querySelectorAll('[role="alert"], .error-message, .field-error');
-  
-  errorElements.forEach(element => {
-    const fieldName = element.getAttribute('data-field') ||
-                     element.closest('[data-testid]')?.getAttribute('data-testid') ||
-                     element.closest('.form-field')?.querySelector('input, select, textarea')?.getAttribute('name') ||
-                     'unknown';
-    
-    errors[fieldName] = element.textContent?.trim() || '';
+  await waitFor(() => {
+    expect(fieldElement).toHaveAttribute('aria-invalid', 'true');
   });
   
-  return errors;
+  // Check for error message
+  const errorId = fieldElement.getAttribute('aria-describedby');
+  if (errorId) {
+    const errorElement = screen.getByTestId(errorId);
+    expect(errorElement).toBeInTheDocument();
+    expect(errorElement.textContent).toMatch(/required/i);
+  }
 };
 
 /**
- * Waits for form validation to complete
- * 
- * @param timeout - Maximum wait time in milliseconds
+ * Runs a single field validation test
  */
-export const waitForValidation = async (timeout: number = 1000): Promise<void> => {
+const runFieldValidationTest = async (
+  fieldElement: HTMLElement,
+  validationTest: FieldTestConfig['validationTests'][0],
+  user: ReturnType<typeof userEvent.setup>,
+  type: string
+) => {
+  const { value, expectedErrors, shouldBeValid, description } = validationTest;
+  
+  // Clear field and enter test value
+  await user.clear(fieldElement);
+  await setFieldValue(fieldElement, value, user, type);
+  
+  // Trigger validation by blurring
+  await user.tab();
+  
   await waitFor(() => {
-    // Look for loading states to disappear
-    const loadingElements = screen.queryAllByText(/validating|checking/i);
-    expect(loadingElements).toHaveLength(0);
-  }, { timeout });
+    if (shouldBeValid) {
+      expect(fieldElement).not.toHaveAttribute('aria-invalid', 'true');
+    } else {
+      expect(fieldElement).toHaveAttribute('aria-invalid', 'true');
+    }
+  });
   
-  // Wait a bit more for any async validation to complete
-  await new Promise(resolve => setTimeout(resolve, 50));
+  // Check for expected error messages
+  if (expectedErrors && expectedErrors.length > 0) {
+    const errorId = fieldElement.getAttribute('aria-describedby');
+    if (errorId) {
+      const errorElement = screen.getByTestId(errorId);
+      expect(errorElement.textContent).toMatch(new RegExp(expectedErrors[0], 'i'));
+    }
+  }
+};
+
+/**
+ * Sets a field value based on its type
+ */
+const setFieldValue = async (
+  fieldElement: HTMLElement,
+  value: any,
+  user: ReturnType<typeof userEvent.setup>,
+  type: string
+) => {
+  switch (type) {
+    case 'checkbox':
+      if (value) {
+        await user.check(fieldElement as HTMLInputElement);
+      } else {
+        await user.uncheck(fieldElement as HTMLInputElement);
+      }
+      break;
+    case 'select':
+      await user.selectOptions(fieldElement, String(value));
+      break;
+    case 'file':
+      const files = Array.isArray(value) ? value : [value];
+      await user.upload(fieldElement as HTMLInputElement, files);
+      break;
+    default:
+      await user.type(fieldElement, String(value));
+      break;
+  }
+};
+
+/**
+ * Gets a field value based on its type
+ */
+const getFieldValue = (fieldElement: HTMLElement, type: string): any => {
+  switch (type) {
+    case 'checkbox':
+      return (fieldElement as HTMLInputElement).checked;
+    case 'file':
+      return (fieldElement as HTMLInputElement).files;
+    default:
+      return (fieldElement as HTMLInputElement).value;
+  }
+};
+
+/**
+ * Fills form data for testing
+ */
+const fillFormData = async <T extends FieldValues>(
+  data: Partial<T>,
+  user: ReturnType<typeof userEvent.setup>
+) => {
+  for (const [fieldName, value] of Object.entries(data)) {
+    const field = screen.getByRole('textbox', { name: new RegExp(fieldName, 'i') });
+    await user.clear(field);
+    await user.type(field, String(value));
+  }
+};
+
+/**
+ * Navigate to next wizard step
+ */
+const goToNextStep = async (user: ReturnType<typeof userEvent.setup>) => {
+  const nextButton = screen.getByRole('button', { name: /next|continue/i });
+  await user.click(nextButton);
+  
+  await waitFor(() => {
+    expect(nextButton).not.toBeDisabled();
+  });
+};
+
+/**
+ * Navigate to previous wizard step
+ */
+const goToPreviousStep = async (user: ReturnType<typeof userEvent.setup>) => {
+  const prevButton = screen.getByRole('button', { name: /previous|back/i });
+  await user.click(prevButton);
+  
+  await waitFor(() => {
+    expect(prevButton).not.toBeDisabled();
+  });
+};
+
+/**
+ * Complete wizard form
+ */
+const completeWizard = async <T extends FieldValues>(
+  completionData: T,
+  user: ReturnType<typeof userEvent.setup>
+) => {
+  await fillFormData(completionData, user);
+  
+  const finishButton = screen.getByRole('button', { name: /finish|complete|submit/i });
+  await user.click(finishButton);
+  
+  await waitFor(() => {
+    expect(screen.getByText(/completed|success/i)).toBeInTheDocument();
+  });
+  
+  return completionData;
+};
+
+/**
+ * Validates uploaded file against configuration
+ */
+const validateUploadedFile = async (
+  file: File,
+  validation: FileUploadTestConfig['validation']
+) => {
+  if (!validation) return;
+  
+  const { maxSize, allowedTypes, required } = validation;
+  
+  if (required && !file) {
+    throw new Error('File is required');
+  }
+  
+  if (maxSize && file.size > maxSize) {
+    throw new Error(`File size ${file.size} exceeds maximum ${maxSize}`);
+  }
+  
+  if (allowedTypes && !allowedTypes.includes(file.type)) {
+    throw new Error(`File type ${file.type} is not allowed`);
+  }
+};
+
+/**
+ * Extracts default values from Zod schema
+ */
+const extractDefaultsFromSchema = (schema: z.ZodSchema<any>): Record<string, any> => {
+  // This is a simplified implementation
+  // In practice, you might need to walk the schema more thoroughly
+  const defaults: Record<string, any> = {};
+  
+  try {
+    const parsed = schema.parse({});
+    return parsed;
+  } catch {
+    // Return empty defaults if parsing fails
+    return defaults;
+  }
 };
 
 // =============================================================================
-// FORM TEST UTILITIES FOR COMMON PATTERNS
-// =============================================================================
-
-/**
- * Database connection form testing patterns
- */
-export const createDatabaseConnectionFormTests = () => ({
-  /**
-   * Test MySQL connection form
-   */
-  testMySQLConnection: async (user: ReturnType<typeof userEvent.setup>) => {
-    return databaseConnectionFormUtils.testConnectionWorkflow({
-      name: 'Test MySQL',
-      type: 'mysql',
-      host: 'localhost',
-      port: 3306,
-      database: 'test_db',
-      username: 'test_user',
-      password: 'test_password'
-    }, user);
-  },
-  
-  /**
-   * Test PostgreSQL connection form
-   */
-  testPostgreSQLConnection: async (user: ReturnType<typeof userEvent.setup>) => {
-    return databaseConnectionFormUtils.testConnectionWorkflow({
-      name: 'Test PostgreSQL',
-      type: 'postgresql',
-      host: 'localhost',
-      port: 5432,
-      database: 'test_db',
-      username: 'test_user',
-      password: 'test_password'
-    }, user);
-  },
-  
-  /**
-   * Test MongoDB connection form
-   */
-  testMongoDBConnection: async (user: ReturnType<typeof userEvent.setup>) => {
-    return databaseConnectionFormUtils.testConnectionWorkflow({
-      name: 'Test MongoDB',
-      type: 'mongodb',
-      host: 'localhost',
-      port: 27017,
-      database: 'test_db',
-      username: 'test_user',
-      password: 'test_password'
-    }, user);
-  }
-});
-
-/**
- * User profile form testing patterns
- */
-export const createUserProfileFormTests = () => ({
-  /**
-   * Test complete user profile form
-   */
-  testUserProfileForm: async (
-    userData: {
-      firstName: string;
-      lastName: string;
-      email: string;
-      phone?: string;
-      company?: string;
-    },
-    user: ReturnType<typeof userEvent.setup>
-  ) => {
-    await fillFormField({ field: 'firstName', value: userData.firstName }, user);
-    await fillFormField({ field: 'lastName', value: userData.lastName }, user);
-    await fillFormField({ field: 'email', value: userData.email }, user);
-    
-    if (userData.phone) {
-      await fillFormField({ field: 'phone', value: userData.phone }, user);
-    }
-    
-    if (userData.company) {
-      await fillFormField({ field: 'company', value: userData.company }, user);
-    }
-  },
-  
-  /**
-   * Test email validation scenarios
-   */
-  testEmailValidation: async (user: ReturnType<typeof userEvent.setup>) => {
-    // Test invalid email
-    await fillFormField({
-      field: 'email',
-      value: 'invalid-email',
-      expectedError: 'Please enter a valid email address',
-      shouldBeValid: false,
-      options: { triggerBlur: true }
-    }, user);
-    
-    // Test valid email
-    await fillFormField({
-      field: 'email',
-      value: 'test@example.com',
-      shouldBeValid: true,
-      options: { clearFirst: true, triggerBlur: true }
-    }, user);
-  }
-});
-
-// =============================================================================
-// EXPORTS
+// EXPORTED UTILITIES
 // =============================================================================
 
 /**
  * Main form testing utilities export
  */
-export const formTestUtils = {
-  // Core utilities
-  renderForm,
-  createFormTestingUtils,
+export const formTestHelpers = {
+  // Core rendering
+  renderWithForm,
   
-  // Field interactions
-  fillFormField,
-  clearFormField,
-  triggerFieldValidation,
+  // Field testing
+  testFieldInteractions,
+  testConditionalFieldVisibility,
+  testDynamicArrayFields,
   
   // Form submission
-  submitFormAndValidate,
-  submitFormWithValidationErrors,
+  testFormSubmission,
+  testDatabaseConnectionSubmission,
   
-  // File uploads
+  // Wizard testing
+  testWizardNavigation,
+  
+  // File upload
   testFileUpload,
-  createMockFile,
-  testSchemaImportUpload,
+  testSchemaFileUpload,
   
-  // Dynamic forms
-  testDynamicFormArray,
-  addDynamicFormItem,
-  removeDynamicFormItem,
+  // Reset and defaults
+  testFormReset,
+  testDefaultValues,
   
-  // Conditional fields
-  testConditionalFieldVisibility,
-  
-  // Database connections
-  databaseConnectionFormUtils,
-  
-  // Form state
-  resetFormToDefaults,
-  getCurrentFormData,
-  getCurrentFieldErrors,
-  validateCurrentFormState,
-  
-  // Validation utilities
-  expectFieldToHaveError,
-  expectFieldToBeValid,
-  waitForValidation,
-  
-  // Performance
-  measureFormInteractionPerformance,
-  testValidationPerformance,
-  
-  // Common patterns
-  createDatabaseConnectionFormTests,
-  createUserProfileFormTests,
-  
-  // Helpers
-  findFormField,
-  extractFormErrors
+  // Type definitions
+  types: {
+    FormTestOptions,
+    FieldTestConfig,
+    FormSubmissionTestConfig,
+    WizardTestConfig,
+    FileUploadTestConfig,
+    DynamicFormTestConfig
+  }
 };
 
-export default formTestUtils;
+// Re-export everything for convenience
+export * from './test-utils';
