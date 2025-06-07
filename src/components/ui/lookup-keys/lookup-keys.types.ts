@@ -1,529 +1,751 @@
 /**
- * TypeScript type definitions for the LookupKeys component system
+ * TypeScript Type Definitions for LookupKeys Component System
  * 
- * This file provides comprehensive type safety for the LookupKeys component,
- * ensuring proper React Hook Form integration, Zod validation compatibility,
- * and WCAG 2.1 AA accessibility compliance per technical specification.
+ * Comprehensive type definitions for the LookupKeys component that manages
+ * dynamic key-value pairs with React Hook Form useFieldArray integration.
+ * Provides type-safe interfaces for lookup key entries, component props,
+ * form integration patterns, and accessibility compliance.
  * 
- * @version React 19.0.0 / Next.js 15.1+ / TypeScript 5.8+
+ * Replaces Angular df-lookup-keys component types with modern React equivalents
+ * supporting React Hook Form, Zod validation, and WCAG 2.1 AA accessibility.
+ * 
+ * @fileoverview LookupKeys component type definitions with React Hook Form integration
+ * @version 1.0.0
  */
 
-import type { ReactNode, AriaAttributes, HTMLAttributes } from 'react';
-import type { 
-  FieldPath, 
-  FieldValues, 
-  Control, 
-  FieldArrayWithId,
-  UseFieldArrayReturn,
-  FieldError,
-  Path
+import { type ReactNode, type ComponentType, type RefObject } from 'react';
+import { 
+  type UseFieldArrayReturn, 
+  type Control, 
+  type FieldErrors, 
+  type FieldValues, 
+  type Path,
+  type UseFormRegister,
+  type UseFormSetValue,
+  type UseFormWatch,
+  type UseFormTrigger 
 } from 'react-hook-form';
-import type { z } from 'zod';
+import { type ZodSchema, type ZodType, type infer as ZodInfer } from 'zod';
+import { 
+  type BaseComponentProps,
+  type FormComponentProps,
+  type ComponentAccessibilityProps,
+  type ThemeComponentProps,
+  type FieldArrayComponentProps,
+  type ComponentVariant,
+  type ComponentSize,
+  type AnimationConfig
+} from '../../types/components';
+import { 
+  type FormFieldConfig,
+  type FormFieldValidation,
+  type EnhancedValidationState,
+  type FormEventHandlers
+} from '../../types/forms';
 
-// =============================================================================
-// Core Lookup Key Types
-// =============================================================================
+// ============================================================================
+// LOOKUP KEY ENTRY TYPES
+// ============================================================================
 
 /**
- * Core lookup key entry object structure
- * Represents a single key-value pair with privacy controls
+ * Individual lookup key entry interface
+ * Represents a single key-value pair with privacy and metadata properties
  */
 export interface LookupKeyEntry {
-  /** Unique identifier for the lookup key entry */
+  /** Unique identifier for the entry */
   id?: string;
-  /** The key name - used as the lookup identifier */
+  
+  /** The key name */
   name: string;
-  /** The associated value for the key */
+  
+  /** The key value */
   value: string;
-  /** Whether this key-value pair should be treated as private/sensitive */
+  
+  /** Whether this key should be private/hidden */
   private: boolean;
+  
+  /** Optional description or help text */
+  description?: string;
+  
+  /** Entry creation timestamp */
+  createdAt?: Date;
+  
+  /** Entry last modified timestamp */
+  updatedAt?: Date;
+  
+  /** Whether entry is system-generated and read-only */
+  readonly?: boolean;
+  
+  /** Entry validation errors */
+  errors?: LookupKeyEntryErrors;
+  
+  /** Custom metadata */
+  metadata?: Record<string, any>;
 }
 
 /**
- * Lookup key entry creation payload (without ID)
- * Used for creating new entries before they're persisted
+ * Validation errors for lookup key entries
  */
-export type LookupKeyCreatePayload = Omit<LookupKeyEntry, 'id'>;
-
-/**
- * Lookup key entry update payload (partial updates allowed)
- * Used for updating existing entries with only changed fields
- */
-export type LookupKeyUpdatePayload = Partial<LookupKeyEntry> & { id: string };
-
-// =============================================================================
-// Form Integration Types
-// =============================================================================
-
-/**
- * Form values structure for lookup keys integration
- * Generic type to support different form contexts
- */
-export interface LookupKeysFormValues extends FieldValues {
-  /** Array of lookup key entries managed by useFieldArray */
-  lookupKeys: LookupKeyEntry[];
+export interface LookupKeyEntryErrors {
+  /** Name field validation error */
+  name?: string;
+  
+  /** Value field validation error */
+  value?: string;
+  
+  /** General entry validation error */
+  entry?: string;
 }
 
 /**
- * React Hook Form field array configuration for lookup keys
- * Provides type safety for useFieldArray integration
+ * Lookup key entry creation/update payload
  */
-export interface LookupKeysFieldArrayConfig<
-  TFieldValues extends FieldValues = LookupKeysFormValues,
-  TFieldArrayName extends FieldPath<TFieldValues> = 'lookupKeys',
-  TKeyName extends string = 'id'
-> {
-  /** The field array name in the form */
-  name: TFieldArrayName;
-  /** Control instance from React Hook Form */
-  control: Control<TFieldValues>;
-  /** Optional key name for field identification */
-  keyName?: TKeyName;
+export interface LookupKeyEntryInput {
+  /** The key name */
+  name: string;
+  
+  /** The key value */
+  value: string;
+  
+  /** Whether this key should be private/hidden */
+  private?: boolean;
+  
+  /** Optional description */
+  description?: string;
+  
+  /** Custom metadata */
+  metadata?: Record<string, any>;
 }
 
 /**
- * Enhanced useFieldArray return type with lookup keys specifics
- * Extends React Hook Form's UseFieldArrayReturn with lookup key operations
+ * Lookup key entry validation schema types
  */
-export interface LookupKeysFieldArrayReturn<
-  TFieldValues extends FieldValues = LookupKeysFormValues,
-  TFieldArrayName extends FieldPath<TFieldValues> = 'lookupKeys',
-  TKeyName extends string = 'id'
-> extends UseFieldArrayReturn<TFieldValues, TFieldArrayName, TKeyName> {
-  /** Array of field entries with React Hook Form metadata */
-  fields: FieldArrayWithId<TFieldValues, TFieldArrayName, TKeyName>[];
-  /** Add a new lookup key entry */
-  append: (value: LookupKeyEntry | LookupKeyEntry[]) => void;
-  /** Remove lookup key entry at specified index */
-  remove: (index?: number | number[]) => void;
-  /** Insert lookup key entry at specified position */
-  insert: (index: number, value: LookupKeyEntry | LookupKeyEntry[]) => void;
-  /** Update specific lookup key entry */
-  update: (index: number, value: LookupKeyEntry) => void;
-  /** Replace entire field array */
-  replace: (value: LookupKeyEntry[]) => void;
+export interface LookupKeyValidationSchemas {
+  /** Individual entry validation schema */
+  entrySchema: ZodSchema<LookupKeyEntry>;
+  
+  /** Entry input validation schema */
+  entryInputSchema: ZodSchema<LookupKeyEntryInput>;
+  
+  /** Array of entries validation schema */
+  entriesSchema: ZodSchema<LookupKeyEntry[]>;
+  
+  /** Key name validation schema */
+  nameSchema: ZodSchema<string>;
+  
+  /** Key value validation schema */
+  valueSchema: ZodSchema<string>;
 }
 
-// =============================================================================
-// Validation Schema Types
-// =============================================================================
+// ============================================================================
+// COMPONENT PROPS INTERFACES
+// ============================================================================
 
 /**
- * Zod validation schema type for individual lookup key entries
- * Ensures runtime type checking and compile-time inference
- */
-export type LookupKeyEntrySchema = z.ZodObject<{
-  id: z.ZodOptional<z.ZodString>;
-  name: z.ZodString;
-  value: z.ZodString;
-  private: z.ZodBoolean;
-}>;
-
-/**
- * Zod validation schema type for the complete lookup keys array
- * Provides array-level validation and constraints
- */
-export type LookupKeysArraySchema = z.ZodArray<LookupKeyEntrySchema>;
-
-/**
- * Zod validation schema type for forms containing lookup keys
- * Generic type for broader form integration
- */
-export type LookupKeysFormSchema<T extends Record<string, any> = {}> = z.ZodObject<{
-  lookupKeys: LookupKeysArraySchema;
-} & T>;
-
-/**
- * Validation error structure for lookup keys
- * Maps field paths to error messages for display
- */
-export interface LookupKeysValidationErrors {
-  /** Root-level errors for the entire array */
-  root?: FieldError;
-  /** Index-specific errors for individual entries */
-  [index: number]: {
-    id?: FieldError;
-    name?: FieldError;
-    value?: FieldError;
-    private?: FieldError;
-  };
-}
-
-// =============================================================================
-// Component Props & Styling Types
-// =============================================================================
-
-/**
- * Display layout variants for the lookup keys component
- * Supports different presentation modes based on context
- */
-export type LookupKeysLayoutVariant = 'table' | 'accordion' | 'cards';
-
-/**
- * Size variants for the lookup keys component
- * Provides consistent sizing across different use cases
- */
-export type LookupKeysSize = 'sm' | 'md' | 'lg';
-
-/**
- * Color theme variants for consistent component theming
- * Aligns with design system color tokens
- */
-export type LookupKeysColorVariant = 'default' | 'primary' | 'secondary';
-
-/**
- * Styling configuration for lookup keys component
- * Provides granular control over component appearance
- */
-export interface LookupKeysStyling {
-  /** Layout variant selection */
-  variant?: LookupKeysLayoutVariant;
-  /** Component size */
-  size?: LookupKeysSize;
-  /** Color theme */
-  colorVariant?: LookupKeysColorVariant;
-  /** Additional CSS classes */
-  className?: string;
-  /** Inline styles override */
-  style?: React.CSSProperties;
-  /** Enable dark mode styling */
-  darkMode?: boolean;
-}
-
-// =============================================================================
-// Accessibility Types (WCAG 2.1 AA Compliance)
-// =============================================================================
-
-/**
- * Accessibility configuration for WCAG 2.1 AA compliance
- * Ensures proper screen reader support and keyboard navigation
- */
-export interface LookupKeysAccessibility extends AriaAttributes {
-  /** Descriptive label for the entire lookup keys section */
-  'aria-label'?: string;
-  /** Reference to element describing the lookup keys purpose */
-  'aria-describedby'?: string;
-  /** Indicate if the section is required */
-  'aria-required'?: boolean;
-  /** Current validation state */
-  'aria-invalid'?: boolean;
-  /** Live region for announcing changes */
-  'aria-live'?: 'off' | 'polite' | 'assertive';
-  /** Atomic updates for screen readers */
-  'aria-atomic'?: boolean;
-  /** Role override for semantic meaning */
-  role?: string;
-  /** Tab index for keyboard navigation */
-  tabIndex?: number;
-}
-
-/**
- * Focus management configuration for keyboard navigation
- * Ensures proper focus behavior per WCAG guidelines
- */
-export interface LookupKeysFocusConfig {
-  /** Enable automatic focus management */
-  autoFocus?: boolean;
-  /** Focus trap within component */
-  trapFocus?: boolean;
-  /** Return focus to trigger element */
-  restoreFocus?: boolean;
-  /** Focus ring visibility control */
-  showFocusRing?: boolean;
-  /** Focus ring color variant */
-  focusRingColor?: 'primary' | 'error' | 'success';
-}
-
-// =============================================================================
-// Event Handler Types
-// =============================================================================
-
-/**
- * Lookup key entry event data
- * Provides context for event handlers
- */
-export interface LookupKeyEntryEventData {
-  /** The entry that triggered the event */
-  entry: LookupKeyEntry;
-  /** Index in the array */
-  index: number;
-  /** Field name for form integration */
-  fieldName: string;
-}
-
-/**
- * Event handler function types for lookup key operations
- * Provides type safety for callback functions
- */
-export interface LookupKeysEventHandlers {
-  /** Called when a new entry is added */
-  onAdd?: (entry: LookupKeyCreatePayload) => void | Promise<void>;
-  /** Called when an entry is removed */
-  onRemove?: (data: LookupKeyEntryEventData) => void | Promise<void>;
-  /** Called when an entry is updated */
-  onChange?: (data: LookupKeyEntryEventData) => void | Promise<void>;
-  /** Called when validation fails */
-  onValidationError?: (errors: LookupKeysValidationErrors) => void;
-  /** Called when the privacy toggle is changed */
-  onPrivacyToggle?: (data: LookupKeyEntryEventData & { private: boolean }) => void;
-  /** Called on focus events for accessibility */
-  onFocus?: (data: LookupKeyEntryEventData) => void;
-  /** Called on blur events for validation */
-  onBlur?: (data: LookupKeyEntryEventData) => void;
-  /** Called when keyboard shortcuts are triggered */
-  onKeyboardShortcut?: (key: string, data: LookupKeyEntryEventData) => void;
-}
-
-// =============================================================================
-// Main Component Props Interface
-// =============================================================================
-
-/**
- * Comprehensive props interface for the LookupKeys component
- * Combines all configuration options with proper type safety
+ * Core LookupKeys component props interface
+ * Extends form component props with field array integration
  */
 export interface LookupKeysProps<
-  TFieldValues extends FieldValues = LookupKeysFormValues,
-  TFieldArrayName extends FieldPath<TFieldValues> = 'lookupKeys'
-> extends HTMLAttributes<HTMLDivElement> {
-  // Form Integration
-  /** React Hook Form field array configuration */
-  fieldArray: LookupKeysFieldArrayConfig<TFieldValues, TFieldArrayName>;
-  /** Default values for new entries */
-  defaultEntry?: Partial<LookupKeyCreatePayload>;
-  /** Enable form validation */
-  enableValidation?: boolean;
-  /** Custom validation schema override */
-  validationSchema?: LookupKeysFormSchema;
-
-  // Display Configuration
-  /** Styling and layout configuration */
+  TFieldValues extends FieldValues = FieldValues,
+  TFieldName extends Path<TFieldValues> = Path<TFieldValues>
+> extends FormComponentProps, ThemeComponentProps {
+  /** Field array return object from useFieldArray hook */
+  fieldArray: UseFieldArrayReturn<TFieldValues, TFieldName>;
+  
+  /** Form control object */
+  control: Control<TFieldValues>;
+  
+  /** Form register function */
+  register: UseFormRegister<TFieldValues>;
+  
+  /** Form setValue function */
+  setValue: UseFormSetValue<TFieldValues>;
+  
+  /** Form watch function */
+  watch: UseFormWatch<TFieldValues>;
+  
+  /** Form trigger validation function */
+  trigger: UseFormTrigger<TFieldValues>;
+  
+  /** Field errors */
+  errors?: FieldErrors<TFieldValues>;
+  
+  /** Component configuration */
+  config?: LookupKeysConfig;
+  
+  /** Display layout variant */
+  layout?: LookupKeysLayout;
+  
+  /** Component size */
+  size?: ComponentSize;
+  
+  /** Component variant */
+  variant?: ComponentVariant;
+  
+  /** Event handlers */
+  handlers?: LookupKeysEventHandlers<TFieldValues>;
+  
+  /** Accessibility configuration */
+  accessibility?: LookupKeysAccessibility;
+  
+  /** Validation configuration */
+  validation?: LookupKeysValidation;
+  
+  /** Styling configuration */
   styling?: LookupKeysStyling;
-  /** Show/hide the accordion layout option */
-  showAccordion?: boolean;
-  /** Enable privacy toggle controls */
-  enablePrivacyToggle?: boolean;
-  /** Allow empty entries */
-  allowEmpty?: boolean;
+  
+  /** Performance optimization settings */
+  performance?: LookupKeysPerformance;
+}
+
+/**
+ * LookupKeys component configuration
+ */
+export interface LookupKeysConfig {
+  /** Minimum number of entries allowed */
+  minEntries?: number;
+  
   /** Maximum number of entries allowed */
   maxEntries?: number;
-  /** Minimum number of entries required */
-  minEntries?: number;
-
-  // Accessibility
-  /** WCAG 2.1 AA accessibility configuration */
-  accessibility?: LookupKeysAccessibility;
-  /** Focus management configuration */
-  focusConfig?: LookupKeysFocusConfig;
-  /** Enable keyboard shortcuts */
-  enableKeyboardShortcuts?: boolean;
-
-  // Event Handlers
-  /** Event handler callbacks */
-  eventHandlers?: LookupKeysEventHandlers;
-
-  // Content Configuration
-  /** Custom labels for internationalization */
-  labels?: {
-    addButton?: string;
-    removeButton?: string;
-    nameLabel?: string;
-    valueLabel?: string;
-    privateLabel?: string;
-    nameTooltip?: string;
-    valueTooltip?: string;
-    privateTooltip?: string;
-    emptyStateMessage?: string;
-    validationMessages?: {
-      required?: string;
-      duplicate?: string;
-      invalid?: string;
-    };
-  };
-
-  // Loading & States
-  /** Loading state indicator */
-  isLoading?: boolean;
-  /** Disabled state */
-  disabled?: boolean;
+  
+  /** Default entry template */
+  defaultEntry?: Partial<LookupKeyEntry>;
+  
+  /** Allow duplicate key names */
+  allowDuplicateNames?: boolean;
+  
+  /** Show entry indices */
+  showIndices?: boolean;
+  
+  /** Show entry timestamps */
+  showTimestamps?: boolean;
+  
+  /** Enable drag and drop reordering */
+  enableReordering?: boolean;
+  
+  /** Enable bulk operations */
+  enableBulkOperations?: boolean;
+  
+  /** Show privacy toggle for all entries */
+  showPrivacyToggle?: boolean;
+  
+  /** Default privacy state for new entries */
+  defaultPrivate?: boolean;
+  
+  /** Enable entry descriptions */
+  enableDescriptions?: boolean;
+  
   /** Read-only mode */
   readOnly?: boolean;
-  /** Error state */
-  hasError?: boolean;
-  /** Error message to display */
-  errorMessage?: string;
-
-  // Advanced Configuration
-  /** Custom row renderer */
-  renderEntry?: (
-    entry: LookupKeyEntry,
-    index: number,
-    helpers: LookupKeysFieldArrayReturn<TFieldValues, TFieldArrayName>
-  ) => ReactNode;
-  /** Custom add button renderer */
-  renderAddButton?: (onClick: () => void) => ReactNode;
-  /** Custom empty state renderer */
-  renderEmptyState?: () => ReactNode;
-  /** Custom validation message renderer */
-  renderValidationMessage?: (error: FieldError) => ReactNode;
-
-  // Theme Integration
-  /** Theme context override */
-  theme?: 'light' | 'dark' | 'auto';
-  /** Custom CSS variables */
-  cssVariables?: Record<string, string>;
+  
+  /** Dense mode for compact display */
+  dense?: boolean;
 }
 
-// =============================================================================
-// Utility Types
-// =============================================================================
+/**
+ * LookupKeys display layout options
+ */
+export type LookupKeysLayout = 
+  | 'table'      // Table layout with columns
+  | 'accordion'  // Accordion layout with collapsible sections
+  | 'cards'      // Card-based layout
+  | 'list'       // Simple list layout
+  | 'grid';      // Grid layout for large datasets
 
 /**
- * Extract lookup keys from form values
- * Utility type for working with nested form structures
+ * LookupKeys event handlers interface
  */
-export type ExtractLookupKeys<T extends FieldValues> = T extends { lookupKeys: infer U }
-  ? U extends LookupKeyEntry[]
-    ? U
-    : never
-  : never;
-
-/**
- * Form path type for lookup key fields
- * Provides type-safe path references for form operations
- */
-export type LookupKeyFieldPath<
-  TFieldValues extends FieldValues = LookupKeysFormValues,
-  TFieldArrayName extends FieldPath<TFieldValues> = 'lookupKeys'
-> = `${TFieldArrayName}.${number}.${'name' | 'value' | 'private'}`;
-
-/**
- * Component ref type for imperative operations
- * Supports direct component manipulation when needed
- */
-export interface LookupKeysRef {
-  /** Add a new entry programmatically */
-  addEntry: (entry?: Partial<LookupKeyCreatePayload>) => void;
-  /** Remove entry at index */
-  removeEntry: (index: number) => void;
-  /** Focus specific entry field */
-  focusEntry: (index: number, field?: 'name' | 'value' | 'private') => void;
-  /** Validate all entries */
-  validate: () => Promise<boolean>;
-  /** Reset to default state */
-  reset: () => void;
-  /** Get current entries */
-  getEntries: () => LookupKeyEntry[];
+export interface LookupKeysEventHandlers<TFieldValues extends FieldValues = FieldValues> 
+  extends FormEventHandlers {
+  /** Entry addition handler */
+  onAddEntry?: (entry: LookupKeyEntryInput) => void | Promise<void>;
+  
+  /** Entry removal handler */
+  onRemoveEntry?: (index: number, entry: LookupKeyEntry) => void | Promise<void>;
+  
+  /** Entry update handler */
+  onUpdateEntry?: (index: number, entry: LookupKeyEntry, changes: Partial<LookupKeyEntry>) => void | Promise<void>;
+  
+  /** Entry reorder handler */
+  onReorderEntries?: (fromIndex: number, toIndex: number) => void | Promise<void>;
+  
+  /** Privacy toggle handler */
+  onTogglePrivacy?: (index: number, isPrivate: boolean) => void | Promise<void>;
+  
+  /** Bulk operation handler */
+  onBulkOperation?: (operation: BulkOperation, indices: number[]) => void | Promise<void>;
+  
+  /** Entry validation handler */
+  onValidateEntry?: (entry: LookupKeyEntry, index: number) => Promise<LookupKeyEntryErrors | null>;
+  
+  /** Duplicate detection handler */
+  onDuplicateDetected?: (duplicates: DuplicateEntry[]) => void;
+  
+  /** Import handler */
+  onImport?: (entries: LookupKeyEntry[]) => void | Promise<void>;
+  
+  /** Export handler */
+  onExport?: (format: ExportFormat) => void | Promise<void>;
 }
 
-// =============================================================================
-// Context Types
-// =============================================================================
+/**
+ * Bulk operation types
+ */
+export type BulkOperation = 
+  | 'delete'
+  | 'toggle-privacy'
+  | 'mark-private'
+  | 'mark-public'
+  | 'duplicate'
+  | 'export';
 
 /**
- * Context type for lookup keys component configuration
- * Enables nested component communication and shared state
+ * Duplicate entry detection result
  */
-export interface LookupKeysContextValue {
-  /** Current entries */
-  entries: LookupKeyEntry[];
-  /** Field array helpers */
-  fieldArrayHelpers: LookupKeysFieldArrayReturn;
-  /** Styling configuration */
-  styling: Required<LookupKeysStyling>;
-  /** Accessibility configuration */
-  accessibility: Required<LookupKeysAccessibility>;
+export interface DuplicateEntry {
+  /** Index of the duplicate entry */
+  index: number;
+  
+  /** The duplicate entry */
+  entry: LookupKeyEntry;
+  
+  /** Indices of other entries with the same name */
+  duplicateIndices: number[];
+}
+
+/**
+ * Export format options
+ */
+export type ExportFormat = 
+  | 'json'
+  | 'csv'
+  | 'yaml'
+  | 'env'
+  | 'properties';
+
+// ============================================================================
+// ACCESSIBILITY INTERFACES
+// ============================================================================
+
+/**
+ * LookupKeys accessibility configuration for WCAG 2.1 AA compliance
+ */
+export interface LookupKeysAccessibility extends ComponentAccessibilityProps {
+  /** Table caption for screen readers */
+  tableCaption?: string;
+  
+  /** Column headers for screen readers */
+  columnHeaders?: {
+    name: string;
+    value: string;
+    private: string;
+    actions: string;
+  };
+  
+  /** Screen reader announcements */
+  announcements?: {
+    entryAdded: string;
+    entryRemoved: string;
+    entryUpdated: string;
+    privacyToggled: string;
+    validationError: string;
+  };
+  
+  /** Keyboard navigation configuration */
+  keyboardNavigation?: {
+    enableArrowKeys: boolean;
+    enableHomeEnd: boolean;
+    enablePageUpDown: boolean;
+    trapFocus: boolean;
+  };
+  
+  /** Focus management */
+  focusManagement?: {
+    autoFocusNewEntry: boolean;
+    focusOnError: boolean;
+    preserveFocusOnUpdate: boolean;
+  };
+  
+  /** ARIA live region configuration */
+  liveRegion?: {
+    politeness: 'off' | 'polite' | 'assertive';
+    atomic: boolean;
+    relevant: string;
+  };
+  
+  /** High contrast mode support */
+  highContrast?: {
+    enabled: boolean;
+    customColors?: Record<string, string>;
+  };
+}
+
+// ============================================================================
+// VALIDATION INTERFACES
+// ============================================================================
+
+/**
+ * LookupKeys validation configuration
+ */
+export interface LookupKeysValidation {
+  /** Validation schemas */
+  schemas: LookupKeyValidationSchemas;
+  
+  /** Real-time validation settings */
+  realTime?: {
+    enabled: boolean;
+    debounceMs: number;
+    validateOnChange: boolean;
+    validateOnBlur: boolean;
+  };
+  
+  /** Custom validation rules */
+  customRules?: {
+    nameValidation?: (name: string, entries: LookupKeyEntry[], index?: number) => string | null;
+    valueValidation?: (value: string, name: string, entries: LookupKeyEntry[], index?: number) => string | null;
+    entryValidation?: (entry: LookupKeyEntry, entries: LookupKeyEntry[], index: number) => LookupKeyEntryErrors | null;
+  };
+  
+  /** Validation timing */
+  timing?: {
+    debounceMs: number;
+    maxValidationTime: number;
+    batchValidation: boolean;
+  };
+  
+  /** Error display configuration */
+  errorDisplay?: {
+    showInline: boolean;
+    showSummary: boolean;
+    groupSimilarErrors: boolean;
+    maxErrorsDisplayed: number;
+  };
+}
+
+// ============================================================================
+// STYLING INTERFACES
+// ============================================================================
+
+/**
+ * LookupKeys styling configuration
+ */
+export interface LookupKeysStyling {
+  /** Table styling options */
+  table?: {
+    striped: boolean;
+    bordered: boolean;
+    hoverable: boolean;
+    compact: boolean;
+    stickyHeader: boolean;
+  };
+  
+  /** Input field styling */
+  inputs?: {
+    variant: 'outline' | 'filled' | 'ghost';
+    size: ComponentSize;
+    rounded: boolean;
+  };
+  
+  /** Button styling */
+  buttons?: {
+    variant: ComponentVariant;
+    size: ComponentSize;
+    iconOnly: boolean;
+  };
+  
+  /** Privacy indicator styling */
+  privacyIndicator?: {
+    showIcon: boolean;
+    showText: boolean;
+    position: 'left' | 'right' | 'inline';
+  };
+  
+  /** Animation configuration */
+  animations?: {
+    entryAdd: AnimationConfig;
+    entryRemove: AnimationConfig;
+    entryUpdate: AnimationConfig;
+    reorder: AnimationConfig;
+  };
+  
+  /** Color scheme */
+  colors?: {
+    primary: string;
+    secondary: string;
+    success: string;
+    warning: string;
+    error: string;
+    private: string;
+    public: string;
+  };
+  
+  /** Spacing configuration */
+  spacing?: {
+    compact: boolean;
+    cellPadding: string;
+    rowGap: string;
+    columnGap: string;
+  };
+}
+
+// ============================================================================
+// PERFORMANCE INTERFACES
+// ============================================================================
+
+/**
+ * LookupKeys performance optimization settings
+ */
+export interface LookupKeysPerformance {
+  /** Virtualization settings for large datasets */
+  virtualization?: {
+    enabled: boolean;
+    threshold: number;
+    itemHeight: number;
+    overscan: number;
+  };
+  
+  /** Debouncing configuration */
+  debouncing?: {
+    validation: number;
+    search: number;
+    reorder: number;
+  };
+  
+  /** Memoization settings */
+  memoization?: {
+    entries: boolean;
+    validation: boolean;
+    rendering: boolean;
+  };
+  
+  /** Lazy loading configuration */
+  lazyLoading?: {
+    enabled: boolean;
+    pageSize: number;
+    preloadPages: number;
+  };
+  
+  /** Performance monitoring */
+  monitoring?: {
+    enabled: boolean;
+    logSlowOperations: boolean;
+    maxRenderTime: number;
+    maxValidationTime: number;
+  };
+}
+
+// ============================================================================
+// FORM INTEGRATION INTERFACES
+// ============================================================================
+
+/**
+ * React Hook Form field array integration types
+ */
+export interface LookupKeysFieldArrayIntegration<
+  TFieldValues extends FieldValues = FieldValues,
+  TFieldName extends Path<TFieldValues> = Path<TFieldValues>
+> {
+  /** Field array methods */
+  methods: UseFieldArrayReturn<TFieldValues, TFieldName>;
+  
+  /** Field name path */
+  name: TFieldName;
+  
+  /** Field array validation */
+  validation: {
+    minLength?: number;
+    maxLength?: number;
+    uniqueNames?: boolean;
+    requiredFields?: (keyof LookupKeyEntry)[];
+  };
+  
+  /** Default values factory */
+  defaultValues: () => LookupKeyEntry;
+  
+  /** Value transformer functions */
+  transformers?: {
+    input?: (value: any) => LookupKeyEntry;
+    output?: (entry: LookupKeyEntry) => any;
+  };
+}
+
+/**
+ * Form state integration interface
+ */
+export interface LookupKeysFormState<TFieldValues extends FieldValues = FieldValues> {
+  /** Current form values */
+  values: TFieldValues;
+  
+  /** Form validation errors */
+  errors: FieldErrors<TFieldValues>;
+  
+  /** Form dirty state */
+  isDirty: boolean;
+  
+  /** Form touched state */
+  isTouched: boolean;
+  
+  /** Form validation state */
+  isValid: boolean;
+  
+  /** Form submission state */
+  isSubmitting: boolean;
+  
+  /** Field-specific validation states */
+  fieldStates: Map<string, EnhancedValidationState>;
+}
+
+// ============================================================================
+// CONTEXT INTERFACES
+// ============================================================================
+
+/**
+ * LookupKeys context interface for provider pattern
+ */
+export interface LookupKeysContextValue<
+  TFieldValues extends FieldValues = FieldValues,
+  TFieldName extends Path<TFieldValues> = Path<TFieldValues>
+> {
+  /** Component configuration */
+  config: LookupKeysConfig;
+  
+  /** Field array integration */
+  fieldArray: LookupKeysFieldArrayIntegration<TFieldValues, TFieldName>;
+  
+  /** Form state */
+  formState: LookupKeysFormState<TFieldValues>;
+  
   /** Event handlers */
-  eventHandlers: LookupKeysEventHandlers;
-  /** Validation state */
-  validationState: {
-    isValid: boolean;
-    errors: LookupKeysValidationErrors;
-    touchedFields: Set<string>;
-  };
-  /** Theme configuration */
-  theme: {
-    mode: 'light' | 'dark';
-    cssVariables: Record<string, string>;
+  handlers: LookupKeysEventHandlers<TFieldValues>;
+  
+  /** Accessibility configuration */
+  accessibility: LookupKeysAccessibility;
+  
+  /** Validation configuration */
+  validation: LookupKeysValidation;
+  
+  /** Styling configuration */
+  styling: LookupKeysStyling;
+  
+  /** Performance settings */
+  performance: LookupKeysPerformance;
+  
+  /** Component references */
+  refs: {
+    container: RefObject<HTMLDivElement>;
+    table: RefObject<HTMLTableElement>;
+    addButton: RefObject<HTMLButtonElement>;
   };
 }
 
-// =============================================================================
-// Export Type Guards
-// =============================================================================
+/**
+ * LookupKeys provider props
+ */
+export interface LookupKeysProviderProps<
+  TFieldValues extends FieldValues = FieldValues,
+  TFieldName extends Path<TFieldValues> = Path<TFieldValues>
+> extends BaseComponentProps {
+  /** Initial configuration */
+  config?: Partial<LookupKeysConfig>;
+  
+  /** Field array integration */
+  fieldArray: LookupKeysFieldArrayIntegration<TFieldValues, TFieldName>;
+  
+  /** Event handlers */
+  handlers?: Partial<LookupKeysEventHandlers<TFieldValues>>;
+  
+  /** Custom validation schemas */
+  schemas?: Partial<LookupKeyValidationSchemas>;
+}
+
+// ============================================================================
+// UTILITY TYPES
+// ============================================================================
 
 /**
- * Type guard to check if value is a valid lookup key entry
+ * Lookup key entry with form field metadata
  */
-export const isLookupKeyEntry = (value: any): value is LookupKeyEntry => {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    typeof value.name === 'string' &&
-    typeof value.value === 'string' &&
-    typeof value.private === 'boolean'
-  );
+export type LookupKeyEntryWithField<T = any> = LookupKeyEntry & {
+  /** React Hook Form field metadata */
+  field: T;
+  
+  /** Field index in array */
+  index: number;
+  
+  /** Field validation state */
+  validationState: EnhancedValidationState;
 };
 
 /**
- * Type guard to check if array contains valid lookup key entries
+ * Lookup keys operation result
  */
-export const isLookupKeyEntryArray = (value: any): value is LookupKeyEntry[] => {
-  return Array.isArray(value) && value.every(isLookupKeyEntry);
-};
-
-// =============================================================================
-// Default Values & Constants
-// =============================================================================
-
-/**
- * Default lookup key entry for new entries
- */
-export const DEFAULT_LOOKUP_KEY_ENTRY: LookupKeyCreatePayload = {
-  name: '',
-  value: '',
-  private: false,
-} as const;
-
-/**
- * Default styling configuration
- */
-export const DEFAULT_LOOKUP_KEYS_STYLING: Required<LookupKeysStyling> = {
-  variant: 'table',
-  size: 'md',
-  colorVariant: 'default',
-  className: '',
-  style: {},
-  darkMode: false,
-} as const;
+export interface LookupKeysOperationResult<T = any> {
+  /** Operation success status */
+  success: boolean;
+  
+  /** Operation result data */
+  data?: T;
+  
+  /** Operation error */
+  error?: Error;
+  
+  /** Validation errors */
+  validationErrors?: LookupKeyEntryErrors[];
+  
+  /** Performance metrics */
+  metrics?: {
+    duration: number;
+    memoryUsage: number;
+    validationTime: number;
+  };
+}
 
 /**
- * Default accessibility configuration
+ * Lookup keys hook return type
  */
-export const DEFAULT_LOOKUP_KEYS_ACCESSIBILITY: Required<LookupKeysAccessibility> = {
-  'aria-label': 'Lookup Keys Configuration',
-  'aria-live': 'polite',
-  'aria-atomic': false,
-  role: 'region',
-  tabIndex: -1,
-} as const;
+export interface UseLookupKeysReturn<
+  TFieldValues extends FieldValues = FieldValues,
+  TFieldName extends Path<TFieldValues> = Path<TFieldValues>
+> {
+  /** Field array methods */
+  fieldArray: UseFieldArrayReturn<TFieldValues, TFieldName>;
+  
+  /** Add entry function */
+  addEntry: (entry?: Partial<LookupKeyEntry>) => Promise<LookupKeysOperationResult>;
+  
+  /** Remove entry function */
+  removeEntry: (index: number) => Promise<LookupKeysOperationResult>;
+  
+  /** Update entry function */
+  updateEntry: (index: number, changes: Partial<LookupKeyEntry>) => Promise<LookupKeysOperationResult>;
+  
+  /** Toggle privacy function */
+  togglePrivacy: (index: number) => Promise<LookupKeysOperationResult>;
+  
+  /** Validate entries function */
+  validateEntries: () => Promise<LookupKeysOperationResult<FieldErrors<TFieldValues>>>;
+  
+  /** Get duplicate entries */
+  getDuplicates: () => DuplicateEntry[];
+  
+  /** Form state */
+  formState: LookupKeysFormState<TFieldValues>;
+  
+  /** Configuration */
+  config: LookupKeysConfig;
+}
 
-/**
- * Default labels for internationalization
- */
-export const DEFAULT_LOOKUP_KEYS_LABELS = {
-  addButton: 'Add Key',
-  removeButton: 'Remove Key',
-  nameLabel: 'Key Name',
-  valueLabel: 'Key Value',
-  privateLabel: 'Private',
-  nameTooltip: 'Enter the lookup key name',
-  valueTooltip: 'Enter the lookup key value',
-  privateTooltip: 'Mark as private to exclude from public API responses',
-  emptyStateMessage: 'No lookup keys configured. Click "Add Key" to create your first entry.',
-  validationMessages: {
-    required: 'This field is required',
-    duplicate: 'Key name must be unique',
-    invalid: 'Invalid key format',
-  },
-} as const;
+// ============================================================================
+// EXPORT TYPES
+// ============================================================================
+
+export type {
+  // Zod schema inference
+  ZodInfer
+} from 'zod';
+
+// Default export for main component props
+export type LookupKeysComponentProps<
+  TFieldValues extends FieldValues = FieldValues,
+  TFieldName extends Path<TFieldValues> = Path<TFieldValues>
+> = LookupKeysProps<TFieldValues, TFieldName>;
