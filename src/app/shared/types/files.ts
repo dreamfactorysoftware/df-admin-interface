@@ -36,3 +36,24 @@ export interface FileType {
 }
 
 type EntityType = 'file' | 'folder';
+
+export interface ApiDocJson {
+  info: {
+    description?: string;
+    title: string;
+    version?: string;
+    group: string;
+  };
+  paths: {
+    [endpoint: string]: {
+      [method: string]: {
+        operationId: string;
+        description: string;
+        summary: string;
+        tags: string[];
+        [key: string]: any;
+      };
+    };
+  };
+  [key: string]: any;
+}

@@ -126,8 +126,10 @@
     "warningDefault": "Warning: This type of API currently does not support automatic health checks."
   },
   "apiBasicCurlCommands": {
-    "title": "Test api yourself with this simple curl commads here:",
-    "copyTooltip": "Copy"
+    "title": "Quickstart: Test Your API Connection:",
+    "quickStartDetails": "Start by testing your API with these sample curl commands. They return real data and confirm your connection is active.",
+    "copyTooltip": "Copy",
+    "nextStepFooter": {"header": "Next Step:", "body": "Scroll below to explore more endpoints that allow you to read, write, and filter your data via generated REST"}
   },
   "nav": {
     "error": {

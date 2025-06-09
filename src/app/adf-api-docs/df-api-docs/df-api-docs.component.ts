@@ -48,6 +48,8 @@ import {
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { BASE_URL } from 'src/app/shared/constants/urls';
 import { Subscription, of, forkJoin } from 'rxjs';
+import { DfCurlCommandComponent } from '../df-curl-command/df-curl-command.component';
+import { ApiDocJson } from '../../shared/types/files';
 
 interface ServiceResponse {
   resource: Array<{
@@ -55,19 +57,6 @@ interface ServiceResponse {
     name: string;
     [key: string]: any;
   }>;
-}
-
-interface ApiDocJson {
-  info: {
-    description: string | undefined;
-    title: string;
-    version: string | undefined;
-    group: string;
-  };
-  paths: {
-    [key: string]: any;
-  };
-  [key: string]: any;
 }
 
 interface HealthCheckResult {
@@ -98,6 +87,7 @@ interface HealthCheckResult {
     MatTooltipModule,
     MatExpansionModule,
     MatCardModule,
+    DfCurlCommandComponent,
   ],
 })
 export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
@@ -113,16 +103,37 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
   apiDocJson: ApiDocJson;
   apiKeys: ApiKeyInfo[] = [];
   faCopy = faCopy;
-  curlCommands: { text: string }[] = []; // Will be populated dynamically
+
   private subscriptions: Subscription[] = [];
   healthStatus: 'loading' | 'healthy' | 'unhealthy' | 'warning' = 'loading';
   healthError: string | null = null;
   serviceName: string | null = null;
   showUnhealthyErrorDetails = false;
   // Mapping of service types to their corresponding endpoints, probably would be better to move to the back-end
-  healthCheckEndpointsMap: { [key: string]: string[] } = {
-    Database: ['/_schema', '/_table'],
-    File: ['/'],
+  healthCheckEndpointsInfo: {
+    [key: string]: { endpoint: string; title: string; description: string }[];
+  } = {
+    Database: [
+      {
+        endpoint: '/_schema',
+        title: 'View Available Schemas',
+        description:
+          'This command fetches a list of schemas from your connected database',
+      },
+      {
+        endpoint: '/_table',
+        title: 'View Tables in Your Database',
+        description: 'This command lists all tables in your database',
+      },
+    ],
+    File: [
+      {
+        endpoint: '/',
+        title: 'View Available Folders',
+        description:
+          'This command fetches a list of folders from your connected file storage',
+      },
+    ],
   };
 
   constructor(
@@ -213,8 +224,6 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
       },
       showMutatedRequest: true,
       onComplete: () => {
-        this.prepareCurlCommands();
-
         if (
           this.apiDocElement &&
           this.apiDocElement.nativeElement &&
@@ -245,11 +254,11 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
   }
 
   private checkApiHealth(): void {
-    let endpointsToValidate =
-      this.healthCheckEndpointsMap[this.apiDocJson.info.group];
-    if (this.serviceName && endpointsToValidate) {
+    let endpointsInfoToValidate =
+      this.healthCheckEndpointsInfo[this.apiDocJson.info.group];
+    if (this.serviceName && endpointsInfoToValidate) {
       // Perform health check
-      this.performHealthCheck(endpointsToValidate[0]);
+      this.performHealthCheck(endpointsInfoToValidate[0].endpoint);
     } else {
       this.setHealthState('warning');
     }
@@ -309,30 +318,8 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
     });
   }
 
-  copyCurlCommand(commandText: string) {
-    this.clipboard.copy(commandText);
-  }
-
   toggleUnhealthyErrorDetails(): void {
     this.showUnhealthyErrorDetails = !this.showUnhealthyErrorDetails;
-  }
-
-  private prepareCurlCommands(): void {
-    this.curlCommands = [];
-    if (!this.serviceName || !this.apiDocJson?.info?.group) {
-      return;
-    }
-
-    const endpoints = this.healthCheckEndpointsMap[this.apiDocJson.info.group];
-    if (endpoints && endpoints.length > 0) {
-      endpoints.forEach(endpoint => {
-        const sessionToken = this.userDataService.token
-          ? this.userDataService.token
-          : 'YOUR_SESSION_TOKEN';
-        const command = `curl -X 'GET' '${window.location.origin}${BASE_URL}/${this.serviceName}${endpoint}' -H 'accept: application/json' -H '${SESSION_TOKEN_HEADER}: ${sessionToken}'`;
-        this.curlCommands.push({ text: command });
-      });
-    }
   }
 
   private injectCustomContent(
