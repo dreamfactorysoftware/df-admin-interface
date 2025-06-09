@@ -31,9 +31,7 @@
             <button
               mat-icon-button
               (click)="$event.stopPropagation(); copyCurlCommand(command.text)"
-              matTooltip="{{
-                'apiBasicCurlCommands.copyTooltip' | transloco
-              }}">
+              matTooltip="{{ 'apiBasicCurlCommands.copyTooltip' | transloco }}">
               <fa-icon size="xs" [icon]="faCopy"></fa-icon>
             </button>
           </mat-card-actions>
@@ -49,4 +47,4 @@
       </p>
     </ng-template>
   </mat-expansion-panel>
-</mat-accordion> 
+</mat-accordion>

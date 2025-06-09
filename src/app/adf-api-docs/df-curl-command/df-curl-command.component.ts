@@ -63,7 +63,7 @@ const healthCheckEndpointsInfo: {
     MatTooltipModule,
     FontAwesomeModule,
     MatDividerModule,
-    MatButtonModule
+    MatButtonModule,
   ],
 })
 export class DfCurlCommandComponent implements OnChanges {
@@ -102,12 +102,10 @@ export class DfCurlCommandComponent implements OnChanges {
       return;
     }
 
-    const endpointsInfo =
-      healthCheckEndpointsInfo[this.apiDocJson.info.group];
+    const endpointsInfo = healthCheckEndpointsInfo[this.apiDocJson.info.group];
     if (endpointsInfo?.length > 0) {
       endpointsInfo.forEach(endpointInfo => {
-        const sessionToken =
-          this.userDataService.token || 'YOUR_SESSION_TOKEN';
+        const sessionToken = this.userDataService.token || 'YOUR_SESSION_TOKEN';
         const command = `curl -X 'GET' '${window.location.origin}${BASE_URL}/${this.serviceName}${endpointInfo.endpoint}' -H 'accept: application/json' -H '${SESSION_TOKEN_HEADER}: ${sessionToken}'`;
 
         this.curlCommands.push({
@@ -123,4 +121,4 @@ export class DfCurlCommandComponent implements OnChanges {
   trackByCommand(index: number, item: CurlCommand): string {
     return item.text;
   }
-} 
+}
