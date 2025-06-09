@@ -9,17 +9,18 @@ import { MatButtonModule } from '@angular/material/button';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faCopy } from '@fortawesome/free-solid-svg-icons';
 import { Clipboard } from '@angular/cdk/clipboard';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { DfUserDataService } from 'src/app/shared/services/df-user-data.service';
 import { BASE_URL } from 'src/app/shared/constants/urls';
 import { SESSION_TOKEN_HEADER } from 'src/app/shared/constants/http-headers';
 import { ApiDocJson } from 'src/app/shared/types/files';
 import { MatDividerModule } from '@angular/material/divider';
+import { MatSnackBar } from '@angular/material/snack-bar';
 
 interface CurlCommand {
   title: string;
   description: string;
-  text: string;
+  textForDisplay: string;
+  textForCopy: string;
   note: string;
 }
 
@@ -50,9 +51,9 @@ const healthCheckEndpointsInfo: {
 };
 
 @Component({
-  selector: 'df-curl-command',
-  templateUrl: './df-curl-command.component.html',
-  styleUrls: ['./df-curl-command.component.scss'],
+  selector: 'df-api-quickstart',
+  templateUrl: './df-api-quickstart.component.html',
+  styleUrls: ['./df-api-quickstart.component.scss'],
   standalone: true,
   imports: [
     CommonModule,
@@ -66,7 +67,7 @@ const healthCheckEndpointsInfo: {
     MatButtonModule,
   ],
 })
-export class DfCurlCommandComponent implements OnChanges {
+export class DfApiQuickstartComponent implements OnChanges {
   @Input() apiDocJson: ApiDocJson;
   @Input() serviceName: string;
 
@@ -75,8 +76,8 @@ export class DfCurlCommandComponent implements OnChanges {
 
   constructor(
     private clipboard: Clipboard,
-    private snackBar: MatSnackBar,
-    private userDataService: DfUserDataService
+    private userDataService: DfUserDataService,
+    private snackBar: MatSnackBar
   ) {}
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -91,9 +92,6 @@ export class DfCurlCommandComponent implements OnChanges {
 
   copyCurlCommand(commandText: string) {
     this.clipboard.copy(commandText);
-    this.snackBar.open('CURL command copied to clipboard.', 'Close', {
-      duration: 2000,
-    });
   }
 
   private prepareCurlCommands(): void {
@@ -106,12 +104,17 @@ export class DfCurlCommandComponent implements OnChanges {
     if (endpointsInfo?.length > 0) {
       endpointsInfo.forEach(endpointInfo => {
         const sessionToken = this.userDataService.token || 'YOUR_SESSION_TOKEN';
-        const command = `curl -X 'GET' '${window.location.origin}${BASE_URL}/${this.serviceName}${endpointInfo.endpoint}' -H 'accept: application/json' -H '${SESSION_TOKEN_HEADER}: ${sessionToken}'`;
+        const baseUrl = `${window.location.origin}${BASE_URL}/${this.serviceName}${endpointInfo.endpoint}`;
+        const headers = `-H 'accept: application/json' -H '${SESSION_TOKEN_HEADER}: ${sessionToken}'`;
+
+        const commandForDisplay = `curl -X 'GET' '${baseUrl}' \\\n ${headers}`;
+        const commandForCopy = `curl -X 'GET' '${baseUrl}' ${headers}`;
 
         this.curlCommands.push({
           title: endpointInfo.title,
           description: endpointInfo.description,
-          text: command,
+          textForDisplay: commandForDisplay,
+          textForCopy: commandForCopy,
           note: this.apiDocJson.paths[endpointInfo.endpoint]?.['get']?.summary,
         });
       });
@@ -119,6 +122,6 @@ export class DfCurlCommandComponent implements OnChanges {
   }
 
   trackByCommand(index: number, item: CurlCommand): string {
-    return item.text;
+    return item.textForCopy;
   }
 }

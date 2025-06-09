@@ -48,8 +48,8 @@ import {
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { BASE_URL } from 'src/app/shared/constants/urls';
 import { Subscription, of, forkJoin } from 'rxjs';
-import { DfCurlCommandComponent } from '../df-curl-command/df-curl-command.component';
-import { ApiDocJson } from '../../shared/types/files';
+import { DfApiQuickstartComponent } from '../df-api-quickstart/df-api-quickstart.component';
+import { ApiDocJson } from 'src/app/shared/types/files';
 
 interface ServiceResponse {
   resource: Array<{
@@ -87,7 +87,7 @@ interface HealthCheckResult {
     MatTooltipModule,
     MatExpansionModule,
     MatCardModule,
-    DfCurlCommandComponent,
+    DfApiQuickstartComponent,
   ],
 })
 export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {

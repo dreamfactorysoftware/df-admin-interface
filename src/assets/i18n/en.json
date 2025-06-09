@@ -129,7 +129,7 @@
     "title": "Quickstart: Test Your API Connection:",
     "quickStartDetails": "Start by testing your API with these sample curl commands. They return real data and confirm your connection is active.",
     "copyTooltip": "Copy",
-    "nextStepFooter": {"header": "Next Step:", "body": "Scroll below to explore more endpoints that allow you to read, write, and filter your data via generated REST"}
+    "nextStepFooter": {"header": "Next Step:", "body": "Scroll below to explore generated endpoints that allow you to read, write, and filter your data via REST"}
   },
   "nav": {
     "error": {
