@@ -32,4 +32,54 @@
   </mat-form-field>
 </div>
 
+<div #swaggerInjectedContentContainer class="custom-swagger-content-wrapper">
+  <div
+    #healthBannerElement
+    class="api-health-banner"
+    *ngIf="healthStatus"
+    [ngClass]="{
+      'status-loading': healthStatus === 'loading',
+      'status-healthy': healthStatus === 'healthy',
+      'status-unhealthy': healthStatus === 'unhealthy',
+      'status-warning': healthStatus === 'warning'
+    }">
+    <div *ngIf="healthStatus === 'loading'">
+      <p>{{ 'apiHealthBanner.loading' | transloco }}</p>
+    </div>
+    <div *ngIf="healthStatus === 'healthy'">
+      <p>{{ 'apiHealthBanner.healthy' | transloco }}</p>
+    </div>
+    <div *ngIf="healthStatus === 'unhealthy'">
+      <p>
+        {{ 'apiHealthBanner.unhealthyBase' | transloco }}
+        <button
+          mat-button
+          color="accent"
+          class="view-details-button"
+          (click)="toggleUnhealthyErrorDetails()">
+          {{
+            (showUnhealthyErrorDetails
+              ? 'apiHealthBanner.hideDetails'
+              : 'apiHealthBanner.viewDetails'
+            ) | transloco
+          }}
+        </button>
+      </p>
+      <div *ngIf="showUnhealthyErrorDetails" class="unhealthy-error-details">
+        <pre>{{ healthError }}</pre>
+      </div>
+    </div>
+    <div *ngIf="healthStatus === 'warning'">
+      <p>
+        {{ 'apiHealthBanner.warningDefault' | transloco }}
+      </p>
+    </div>
+  </div>
+
+  <df-api-quickstart
+    *ngIf="serviceName"
+    [apiDocJson]="apiDocJson"
+    [serviceName]="serviceName"></df-api-quickstart>
+</div>
+
 <div #apiDocumentation class="swagger-ui"></div>
