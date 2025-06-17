@@ -82,7 +82,7 @@ export class DfWelcomePageComponent {
   fpNetworkRoute = `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_TYPES}/${ROUTES.NETWORK}/${ROUTES.CREATE}`;
   fpFileRoute = `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_TYPES}/${ROUTES.FILE}/${ROUTES.CREATE}`;
   fpUtilityRoute = `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_TYPES}/${ROUTES.UTILITY}/${ROUTES.CREATE}`;
-  fpApiDocsRoute = `/${ROUTES.API_DOCS}`;
+  fpApiDocsRoute = `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_DOCS}`;
 
   public generateApiCardsData: any[];
 
