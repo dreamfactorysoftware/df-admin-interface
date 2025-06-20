@@ -245,8 +245,9 @@ export class DfRolesAccessComponent implements OnInit {
   }
 
   getExtendOperator(index: number) {
-    const serviceId = this.serviceAccess.at(index).get('extend-operator')
-      ?.value;
+    const serviceId = this.serviceAccess
+      .at(index)
+      .get('extend-operator')?.value;
     const operators = this.componentOptions.find(
       option => option.serviceId === serviceId
     )?.components;

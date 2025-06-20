@@ -627,9 +627,9 @@ export class DfServiceDetailsComponent implements OnInit {
           wsse_username_token: null,
           cache_enabled: false,
           cache_ttl: 0,
-          content: ""
+          content: '',
         },
-        service_doc_by_service_id: null
+        service_doc_by_service_id: null,
       };
     } else if (data.type.toLowerCase().includes('saml')) {
       params = {
@@ -693,9 +693,9 @@ export class DfServiceDetailsComponent implements OnInit {
             wsse_username_token: null,
             cache_enabled: false,
             cache_ttl: 0,
-            content: ""
+            content: '',
           },
-          service_doc_by_service_id: null
+          service_doc_by_service_id: null,
         };
       } else {
         editPayload = {

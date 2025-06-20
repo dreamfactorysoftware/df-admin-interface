@@ -116,7 +116,8 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
       this.activatedRoute.data.subscribe(({ data }) => {
         if (data) {
           // Check if this is a SOAP service
-          const isSoapService = data.paths['/']?.get?.operationId === 'getSoapResources';
+          const isSoapService =
+            data.paths['/']?.get?.operationId === 'getSoapResources';
           if (isSoapService) {
             // For SOAP services, preserve the original paths without case transformation
             this.apiDocJson = { ...data };

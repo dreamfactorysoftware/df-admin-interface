@@ -29,7 +29,10 @@ export function mapSnakeToCamel<T>(obj: T): T {
       }
     }
     return newObj as unknown as T;
-  } else if (typeof obj === 'string' && (obj.startsWith('_') || obj.startsWith('/'))) {
+  } else if (
+    typeof obj === 'string' &&
+    (obj.startsWith('_') || obj.startsWith('/'))
+  ) {
     // Preserve SOAP method paths in string values
     return obj as unknown as T;
   } else {
@@ -107,7 +110,10 @@ export function mapCamelToSnake<T>(obj: T): T {
       }
     }
     return newObj as unknown as T;
-  } else if (typeof obj === 'string' && (obj.startsWith('_') || obj.startsWith('/'))) {
+  } else if (
+    typeof obj === 'string' &&
+    (obj.startsWith('_') || obj.startsWith('/'))
+  ) {
     // Preserve SOAP method paths in string values
     return obj as unknown as T;
   } else {
