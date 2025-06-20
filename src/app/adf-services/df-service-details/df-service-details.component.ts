@@ -116,6 +116,18 @@ interface CategorizedField {
   advanced: ConfigSchema[];
 }
 
+interface ServicePayload {
+  id?: number | null;
+  type: string;
+  name: string;
+  label: string;
+  description: string;
+  isActive?: boolean;
+  config: any;
+  service_doc_by_service_id: any;
+  [key: string]: any; // Allow additional properties for SAML and other service types
+}
+
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-service-details',
@@ -566,14 +578,15 @@ export class DfServiceDetailsComponent implements OnInit {
         fields: '*',
         related: 'service_doc_by_service_id',
       };
-      // if (!data.config.serviceDefinition) {
-      //   data.service_doc_by_service_id = null;
-      // } else {
-      data.service_doc_by_service_id.content = data.config.content;
-      data.service_doc_by_service_id.format = Number(
-        this.serviceDefinitionType
-      );
-      // }
+      // Skip service_doc_by_service_id handling for SOAP services
+      if (data.type.toLowerCase() === 'soap') {
+        data.service_doc_by_service_id = null;
+      } else {
+        data.service_doc_by_service_id.content = data.config.content;
+        data.service_doc_by_service_id.format = Number(
+          this.serviceDefinitionType
+        );
+      }
     } else if (this.isScriptService) {
       params = {
         ...params,
@@ -598,8 +611,27 @@ export class DfServiceDetailsComponent implements OnInit {
     } else {
       delete data.service_doc_by_service_id;
     }
-    let payload;
-    if (data.type.toLowerCase().includes('saml')) {
+    let payload: ServicePayload;
+    if (data.type.toLowerCase() === 'soap') {
+      // For SOAP services, we only need basic fields and wsdl config
+      payload = {
+        type: data.type,
+        name: data.name,
+        label: data.label,
+        description: data.description,
+        isActive: data.isActive,
+        config: {
+          wsdl: data.config.wsdl,
+          options: null,
+          headers: null,
+          wsse_username_token: null,
+          cache_enabled: false,
+          cache_ttl: 0,
+          content: ""
+        },
+        service_doc_by_service_id: null
+      };
+    } else if (data.type.toLowerCase().includes('saml')) {
       params = {
         ...params,
         fields: '*',
@@ -608,7 +640,7 @@ export class DfServiceDetailsComponent implements OnInit {
       // data.service_doc_by_service_id = null;
       payload = {
         ...data,
-        is_active: data.isActive,
+        isActive: data.isActive,
         id: this.edit ? this.serviceData.id : null,
         config: {
           sp_nameIDFormat: data.config.spNameIDFormat,
@@ -642,26 +674,48 @@ export class DfServiceDetailsComponent implements OnInit {
         ...data,
         id: this.edit ? this.serviceData.id : null,
       };
-      payload = { ...data };
     }
     if (this.edit) {
-      const payload = {
-        ...this.serviceData,
-        ...data,
-        config: {
-          ...(this.serviceData.config || {}),
-          ...data.config,
-        },
-        service_doc_by_service_id: data.service_doc_by_service_id
-          ? {
-              ...(this.serviceData.serviceDocByServiceId || {}),
-              ...data.service_doc_by_service_id,
-            }
-          : null,
-      };
-      delete payload.config.serviceDefinition;
+      let editPayload;
+      if (data.type.toLowerCase() === 'soap') {
+        // For SOAP services in edit mode, preserve only necessary fields
+        editPayload = {
+          id: this.serviceData.id,
+          type: data.type,
+          name: data.name,
+          label: data.label,
+          description: data.description,
+          isActive: data.isActive,
+          config: {
+            wsdl: data.config.wsdl,
+            options: null,
+            headers: null,
+            wsse_username_token: null,
+            cache_enabled: false,
+            cache_ttl: 0,
+            content: ""
+          },
+          service_doc_by_service_id: null
+        };
+      } else {
+        editPayload = {
+          ...this.serviceData,
+          ...data,
+          config: {
+            ...(this.serviceData.config || {}),
+            ...data.config,
+          },
+          service_doc_by_service_id: data.service_doc_by_service_id
+            ? {
+                ...(this.serviceData.serviceDocByServiceId || {}),
+                ...data.service_doc_by_service_id,
+              }
+            : null,
+        };
+      }
+      delete editPayload.config.serviceDefinition;
       this.servicesService
-        .update(this.serviceData.id, payload, {
+        .update(this.serviceData.id, editPayload, {
           snackbarError: 'server',
           snackbarSuccess: 'services.updateSuccessMsg',
         })
