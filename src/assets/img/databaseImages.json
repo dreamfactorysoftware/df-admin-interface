@@ -128,5 +128,10 @@
       "src": "assets/img/sap.svg",
       "alt": "hana",
       "label": "hana"
+    },
+    {
+      "src": "assets/img/trino.svg",
+      "alt": "Trino",
+      "label": "trino"
     }
   ]
