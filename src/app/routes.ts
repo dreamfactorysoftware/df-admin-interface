@@ -801,8 +801,7 @@ export const routes: Routes = [
   },
   {
     path: ROUTES.AI,
-    loadComponent: () =>
-      import('./ai/ai.component').then(m => m.AiComponent),
+    loadComponent: () => import('./ai/ai.component').then(m => m.AiComponent),
     canActivate: [loggedInGuard, licenseGuard],
     data: { showPaywall: true },
   },
