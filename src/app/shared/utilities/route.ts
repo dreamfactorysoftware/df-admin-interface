@@ -15,7 +15,6 @@ const filteredFromNav = [
 
 const navIcons = [
   'home',
-  'ai',
   'admin-settings',
   'api-connections',
   'api-security',
@@ -63,7 +62,7 @@ export function accessibleRoutes(
   navs: Array<Nav>,
   allowedTabs: Array<string>
 ): Array<Nav> {
-  const allowed: Array<ROUTES> = [ROUTES.SYSTEM_INFO, ROUTES.AI];
+  const allowed: Array<ROUTES> = [ROUTES.SYSTEM_INFO];
   allowedTabs?.forEach(tab => {
     switch (tab) {
       case 'apps':

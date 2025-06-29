@@ -154,7 +154,6 @@
         class="nav-item"
         [class.active]="isActive(item)"
         [class.commercial-feature]="isFeatureLocked(item.path, licenseType)"
-        [class.ai-nav-item]="item.path === '/ai'"
         (click)="handleNavClick(item)">
         <span class="nav-item">
           <ng-container *ngIf="item?.icon">
