@@ -800,6 +800,13 @@ export const routes: Routes = [
     canActivate: [loggedInGuard, licenseGuard],
   },
   {
+    path: ROUTES.AI,
+    loadComponent: () =>
+      import('./ai/ai.component').then(m => m.AiComponent),
+    canActivate: [loggedInGuard, licenseGuard],
+    data: { showPaywall: true },
+  },
+  {
     path: ROUTES.PROFILE,
     loadComponent: () =>
       import('./adf-profile/df-profile/df-profile.component').then(
