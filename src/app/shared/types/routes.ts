@@ -16,7 +16,6 @@ export enum ROUTES {
   QUICKSTART = 'quickstart',
   RESOURCES = 'resources',
   DOWNLOAD = 'download',
-  AI = 'ai',
   API_CONNECTIONS = 'api-connections',
   API_TYPES = 'api-types',
   DATABASE = 'database',

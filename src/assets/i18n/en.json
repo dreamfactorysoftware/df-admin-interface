@@ -139,10 +139,6 @@
       "nav": "Home",
       "header": "{{nav.home.nav}}"
     },
-    "ai": {
-      "nav": "AI",
-      "header": "{{nav.ai.nav}}"
-    },
     "api-connections": {
       "nav": "API Generation & Connections",
       "api-types": {
