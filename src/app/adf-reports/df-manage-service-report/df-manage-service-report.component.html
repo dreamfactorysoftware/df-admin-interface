@@ -1,4 +1,6 @@
-<df-paywall *ngIf="paywall; else allowed" [serviceName]="'Reporting'"></df-paywall>
+<df-paywall
+  *ngIf="paywall; else allowed"
+  [serviceName]="'Reporting'"></df-paywall>
 <ng-template #allowed>
   <df-manage-service-report-table> </df-manage-service-report-table>
 </ng-template>

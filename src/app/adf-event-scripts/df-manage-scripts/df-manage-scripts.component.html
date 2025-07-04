@@ -1,4 +1,6 @@
-<df-paywall *ngIf="paywall; else allowed" [serviceName]="'Event Scripts'"></df-paywall>
+<df-paywall
+  *ngIf="paywall; else allowed"
+  [serviceName]="'Event Scripts'"></df-paywall>
 <ng-template #allowed>
   <df-manage-services-table></df-manage-services-table>
 </ng-template>
