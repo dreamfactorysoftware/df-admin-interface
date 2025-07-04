@@ -60,6 +60,10 @@ export class DfUserDataService {
     this.isLoggedIn = false;
   }
 
+  get userData(): UserSession | null {
+    return this.userDataSubject.value;
+  }
+
   set userData(userData: UserSession | null) {
     this.userDataSubject.next(userData);
     if (userData) {
