@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { catchError, map, of, switchMap } from 'rxjs';
 import { DfSystemConfigDataService } from './df-system-config-data.service';
 import { DfErrorService } from './df-error.service';
+import { HttpClient } from '@angular/common/http';
 
 @Injectable({
   providedIn: 'root',
@@ -27,7 +28,8 @@ export class DfPaywallService {
 
   constructor(
     private systemConfigDataService: DfSystemConfigDataService,
-    private errorService: DfErrorService
+    private errorService: DfErrorService,
+    private http: HttpClient
   ) {}
 
   activatePaywall(resource?: string | Array<string>) {
@@ -59,5 +61,24 @@ export class DfPaywallService {
     } else {
       return of(false);
     }
+  }
+
+  trackPaywallHit(
+    email: string = 'Unknown. Unable to fetch email',
+    ip_address: string = 'Unknown. Unable to fetch IP address',
+    service_name: string = 'Service name is not specified'
+  ): void {
+    this.http
+      .post('https://updates.dreamfactory.com/api/paywall', {
+        email,
+        ip_address: ip_address,
+        service_name: service_name,
+      })
+      .subscribe({
+        next: () => {},
+        error: err => {
+          console.error('Paywall tracking failed:', err);
+        },
+      });
   }
 }

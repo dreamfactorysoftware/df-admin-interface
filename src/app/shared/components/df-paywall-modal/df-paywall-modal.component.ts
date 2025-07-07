@@ -1,40 +1,39 @@
-import {
-  AfterViewInit,
-  Component,
-  ElementRef,
-  ViewChild,
-  Input,
-  OnInit,
-} from '@angular/core';
+import { Component, ElementRef, ViewChild, OnInit, AfterViewInit, Inject } from '@angular/core';
+import { MatDialogModule, MAT_DIALOG_DATA } from '@angular/material/dialog';
+import { MatButtonModule } from '@angular/material/button';
+import { DfPaywallComponent } from '../df-paywall/df-paywall.component';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { DfUserDataService } from '../../services/df-user-data.service';
 import { DfSystemConfigDataService } from '../../services/df-system-config-data.service';
 import { DfPaywallService } from '../../services/df-paywall.service';
 
 @Component({
-  selector: 'df-paywall',
-  templateUrl: './df-paywall.component.html',
-  styleUrls: ['./df-paywall.component.scss'],
+  selector: 'df-paywall-modal',
+  templateUrl: './df-paywall-modal.component.html',
+  styleUrls: ['./df-paywall-modal.component.scss'],
   standalone: true,
-  imports: [TranslocoPipe],
+  imports: [
+    MatDialogModule,
+    MatButtonModule,
+    DfPaywallComponent,
+    TranslocoPipe,
+  ],
 })
-export class DfPaywallComponent implements AfterViewInit, OnInit {
+export class DfPaywallModal implements OnInit, AfterViewInit {
   @ViewChild('calendlyWidget') calendlyWidget: ElementRef;
-  @Input() serviceName: string;
 
   constructor(
     private userDataService: DfUserDataService,
     private systemConfigService: DfSystemConfigDataService,
-    private dfPaywallService: DfPaywallService
+    private dfPaywallService: DfPaywallService,
+    @Inject(MAT_DIALOG_DATA) public data: { serviceName: string }
   ) {}
 
   ngOnInit(): void {
     const user = this.userDataService.userData;
     const email = user?.email;
     const ip = this.systemConfigService?.environment?.client?.ipAddress;
-    const serviceName = this.serviceName;
-
-    this.dfPaywallService.trackPaywallHit(email, ip, serviceName);
+    this.dfPaywallService.trackPaywallHit(email, ip, this.data.serviceName);
   }
 
   ngAfterViewInit(): void {
@@ -44,4 +43,4 @@ export class DfPaywallComponent implements AfterViewInit, OnInit {
       autoLoad: false,
     });
   }
-}
+} 

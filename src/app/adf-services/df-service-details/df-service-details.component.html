@@ -51,7 +51,7 @@
                   formControlName="type"
                   type="radio"
                   [value]="type.name"
-                  (input)="nextStep(stepper)" />
+                  (input)="onServiceTypeSelect(type.label || type.name)" />
                 <div class="card-content-wrapper" [class]="type.class">
                   <span class="check-icon"></span>
                   <div class="card-content">
@@ -87,7 +87,10 @@
                   </div>
                 </div>
                 <ng-container *ngIf="type.class === 'not-included'">
-                  <button mat-button (click)="openDialog()" class="unlock-btn">
+                  <button
+                    mat-button
+                    (click)="openDialog(type.label || type.name)"
+                    class="unlock-btn">
                     Unlock Now
                   </button>
                 </ng-container>
@@ -569,7 +572,11 @@
       <mat-label>{{
         'services.controls.serviceType.label' | transloco
       }}</mat-label>
-      <mat-select formControlName="type">
+      <mat-select
+        formControlName="type"
+        (selectionChange)="
+          onServiceTypeSelect(getServiceTypeLabel($event.value))
+        ">
         <mat-option *ngFor="let type of serviceTypes" [value]="type.name">
           {{ type.label }}
         </mat-option>
@@ -821,4 +828,7 @@
     </div>
   </ng-template>
 </form>
-<df-paywall *ngIf="subscriptionRequired"></df-paywall>
+<df-paywall
+  *ngIf="subscriptionRequired"
+  [serviceName]="selectedServiceTypeLable || 'Unable to fetch service name'">
+</df-paywall>
