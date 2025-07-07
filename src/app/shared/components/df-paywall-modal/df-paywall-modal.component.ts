@@ -1,4 +1,11 @@
-import { Component, ElementRef, ViewChild, OnInit, AfterViewInit, Inject } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  ViewChild,
+  OnInit,
+  AfterViewInit,
+  Inject,
+} from '@angular/core';
 import { MatDialogModule, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { DfPaywallComponent } from '../df-paywall/df-paywall.component';
@@ -43,4 +50,4 @@ export class DfPaywallModal implements OnInit, AfterViewInit {
       autoLoad: false,
     });
   }
-} 
+}
