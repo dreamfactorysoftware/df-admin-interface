@@ -1,4 +1,6 @@
-<df-paywall *ngIf="paywall; else allowed"></df-paywall>
+<df-paywall
+  *ngIf="paywall; else allowed"
+  [serviceName]="'Scheduler'"></df-paywall>
 <ng-template #allowed>
   <df-manage-scheduler-table> </df-manage-scheduler-table>
 </ng-template>

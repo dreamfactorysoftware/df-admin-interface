@@ -1,0 +1,14 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="ai-icon">
+<g>
+<!-- Large central sparkle -->
+<path d="M12 3L13.5 8.5L19 10L13.5 11.5L12 17L10.5 11.5L5 10L10.5 8.5L12 3Z" fill="#47464F"/>
+<!-- Small sparkle top right -->
+<path d="M18 5L18.7 6.3L20 7L18.7 7.7L18 9L17.3 7.7L16 7L17.3 6.3L18 5Z" fill="#47464F"/>
+<!-- Small sparkle bottom left -->
+<path d="M6 16L6.7 17.3L8 18L6.7 18.7L6 20L5.3 18.7L4 18L5.3 17.3L6 16Z" fill="#47464F"/>
+<!-- Tiny sparkle top left -->
+<circle cx="7" cy="6" r="1" fill="#47464F"/>
+<!-- Tiny sparkle bottom right -->
+<circle cx="17" cy="18" r="1" fill="#47464F"/>
+</g>
+</svg> 

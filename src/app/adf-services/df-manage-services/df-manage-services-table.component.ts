@@ -124,9 +124,9 @@ export class DfManageServicesTableComponent extends DfManageTableComponent<Servi
     refresh?: true
   ): void {
     if (this.serviceTypes && this.serviceTypes.length !== 0) {
-      filter = `${filter ? `(${filter}) and ` : ''}(type in ("${this.serviceTypes
-        .map(src => src.name)
-        .join('","')}"))`;
+      filter = `${
+        filter ? `(${filter}) and ` : ''
+      }(type in ("${this.serviceTypes.map(src => src.name).join('","')}"))`;
     }
 
     this.serviceService

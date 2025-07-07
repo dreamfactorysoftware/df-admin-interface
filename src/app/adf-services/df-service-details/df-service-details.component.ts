@@ -3,6 +3,7 @@ import {
   Component,
   ElementRef,
   Inject,
+  Input,
   OnInit,
   ViewChild,
 } from '@angular/core';
@@ -85,6 +86,9 @@ import { MatCardModule } from '@angular/material/card';
 import { TitleCasePipe } from '@angular/common';
 import { MatDividerModule } from '@angular/material/divider';
 import { DfSystemService } from 'src/app/shared/services/df-system.service';
+import { DfUserDataService } from 'src/app/shared/services/df-user-data.service';
+import { DfPaywallService } from 'src/app/shared/services/df-paywall.service';
+import { DfPaywallModal } from 'src/app/shared/components/df-paywall-modal/df-paywall-modal.component';
 
 // Add this interface before the @Component decorator
 interface ComponentOption {
@@ -114,6 +118,14 @@ interface AppResponse {
 interface CategorizedField {
   basic: ConfigSchema[];
   advanced: ConfigSchema[];
+}
+
+interface ServiceResponse {
+  resource: Array<{
+    id: number;
+    name: string;
+    [key: string]: any;
+  }>;
 }
 
 @UntilDestroy({ checkProperties: true })
@@ -167,6 +179,7 @@ export class DfServiceDetailsComponent implements OnInit {
   serviceForm: FormGroup;
   faCircleInfo = faCircleInfo;
   serviceData: Service;
+  selectedServiceTypeLable: string;
   configSchema: Array<ConfigSchema>;
   images: Array<ImageObject>;
   search = '';
@@ -800,8 +813,10 @@ export class DfServiceDetailsComponent implements OnInit {
     stepper.next();
   }
 
-  openDialog() {
-    const dialogRef = this.dialog.open(DfPaywallModal);
+  openDialog(serviceTypeName: string) {
+    const dialogRef = this.dialog.open(DfPaywallModal, {
+      data: { serviceName: serviceTypeName },
+    });
     dialogRef.afterClosed().subscribe();
   }
 
@@ -1189,42 +1204,19 @@ export class DfServiceDetailsComponent implements OnInit {
   onAccessLevelSelect(level: string) {
     this.selectedAccessLevel = level;
   }
+
+  getServiceTypeLabel(value: string): string {
+    const selectedType = this.serviceTypes.find(type => type.name === value);
+    return selectedType ? selectedType.label : value;
+  }
+
+  onServiceTypeSelect(selectedServiceTypeLable: string) {
+    this.selectedServiceTypeLable =
+      selectedServiceTypeLable || 'Unknown. Unable to identify Service Type';
+  }
 }
 interface ImageObject {
   alt: string;
   src: string;
   label: string;
-}
-
-@Component({
-  selector: 'df-paywall-modal',
-  templateUrl: 'df-paywall-modal.html',
-  styleUrls: ['./df-service-details.component.scss'],
-  standalone: true,
-  imports: [
-    MatDialogModule,
-    MatButtonModule,
-    DfPaywallComponent,
-    TranslocoPipe,
-  ],
-})
-// eslint-disable-next-line @angular-eslint/component-class-suffix
-export class DfPaywallModal {
-  @ViewChild('calendlyWidget') calendlyWidget: ElementRef;
-
-  ngAfterViewInit(): void {
-    (window as any)['Calendly'].initInlineWidget({
-      url: 'https://calendly.com/dreamfactory-platform/unlock-all-features',
-      parentElement: this.calendlyWidget.nativeElement,
-      autoLoad: false,
-    });
-  }
-}
-
-interface ServiceResponse {
-  resource: Array<{
-    id: number;
-    name: string;
-    [key: string]: any;
-  }>;
 }
