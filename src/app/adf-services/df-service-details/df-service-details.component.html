@@ -51,7 +51,7 @@
                   formControlName="type"
                   type="radio"
                   [value]="type.name"
-                  (input)="onServiceTypeSelect(type.label || type.name)" />
+                  (input)="nextStep(stepper)" />
                 <div class="card-content-wrapper" [class]="type.class">
                   <span class="check-icon"></span>
                   <div class="card-content">
