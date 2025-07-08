@@ -117,6 +117,20 @@
     "python3": "Python3",
     "nodejs": "Node.js"
   },
+  "apiHealthBanner": {
+    "loading": "Checking API status...",
+    "healthy": "API status: Healthy",
+    "unhealthyBase": "API status: Unhealthy.",
+    "viewDetails": "View Details",
+    "hideDetails": "Hide Details",
+    "warningDefault": "Warning: This type of API currently does not support automatic health checks."
+  },
+  "apiBasicCurlCommands": {
+    "title": "Quickstart: Test Your API Connection:",
+    "quickStartDetails": "Start by testing your API with these sample curl commands. They return real data and confirm your connection is active.",
+    "copyTooltip": "Copy",
+    "nextStepFooter": {"header": "Next Step:", "body": "Scroll below to explore generated endpoints that allow you to read, write, and filter your data via REST"}
+  },
   "nav": {
     "error": {
       "header": "Error"
@@ -124,6 +138,10 @@
     "home": {
       "nav": "Home",
       "header": "{{nav.home.nav}}"
+    },
+    "ai": {
+      "nav": "AI",
+      "header": "{{nav.ai.nav}}"
     },
     "api-connections": {
       "nav": "API Generation & Connections",

@@ -18,6 +18,15 @@ describe('String Conversion Utilities', () => {
     expect(result).toBe('hello_world_test_string');
   });
 
+  it('should convert FastAPI field names correctly', () => {
+    expect(camelToSnakeString('radiusKm')).toBe('radius_km');
+    expect(camelToSnakeString('startTimestamp')).toBe('start_timestamp');
+    expect(camelToSnakeString('endTimestamp')).toBe('end_timestamp');
+    expect(snakeToCamelString('radius_km')).toBe('radiusKm');
+    expect(snakeToCamelString('start_timestamp')).toBe('startTimestamp');
+    expect(snakeToCamelString('end_timestamp')).toBe('endTimestamp');
+  });
+
   it('should convert object keys from snake_case to camelCase', () => {
     const input = {
       first_key: 'value1',

@@ -176,9 +176,12 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
       this.activatedRoute.data.subscribe(({ data }) => {
         if (data) {
           if (data.paths['/']?.get?.operationId === 'getSoapResources') {
-            this.apiDocJson = { ...data, paths: mapSnakeToCamel(data.paths) };
+            // For SOAP services, preserve the original paths without case transformation
+            this.apiDocJson = { ...data };
           } else {
-            this.apiDocJson = { ...data, paths: mapCamelToSnake(data.paths) };
+            // For HTTP/RWS services, preserve the original spec structure
+            // The case interceptor will handle field name transformations during API calls
+            this.apiDocJson = { ...data };
           }
         }
       })
@@ -210,6 +213,7 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
       requestInterceptor: (req: SwaggerUI.Request) => {
         req['headers'][SESSION_TOKEN_HEADER] = this.userDataService.token;
         req['headers'][API_KEY_HEADER] = environment.dfApiDocsApiKey;
+        
         // Parse the request URL
         const url = new URL(req['url']);
         const params = new URLSearchParams(url.search);
