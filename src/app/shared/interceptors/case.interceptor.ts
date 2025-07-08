@@ -14,7 +14,11 @@ export const caseInterceptor: HttpInterceptorFn = (
   req: HttpRequest<unknown>,
   next: HttpHandlerFn
 ) => {
-  if (req.url.startsWith('/api') && !(req.body instanceof FormData) && !req.url.includes('/api_docs')) {
+  if (
+    req.url.startsWith('/api') &&
+    !(req.body instanceof FormData) &&
+    !req.url.includes('/api_docs')
+  ) {
     const transformedRequest = req.clone({
       body: mapCamelToSnake(req.body),
     });
