@@ -95,7 +95,8 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   input,
   textarea,
   button,
-  span {
+  span,
+  .themed-text {
     color: white !important;
   }
   .mat-mdc-form-field-required-marker {

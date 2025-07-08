@@ -83,7 +83,7 @@
     </mat-label>
     <mat-select formControlName="refServiceId">
       <mat-option *ngFor="let option of serviceOptions" [value]="option.value">
-        {{ option.label }}
+        {{ option.name }}
       </mat-option>
     </mat-select>
     <mat-error

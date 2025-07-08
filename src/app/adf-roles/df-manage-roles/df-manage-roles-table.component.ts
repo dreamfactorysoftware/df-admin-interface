@@ -95,9 +95,9 @@ export class DfManageRolesTableComponent extends DfManageTableComponent<RoleRow>
     });
   }
 
-  refreshTable(limit?: number, offset?: number): void {
+  refreshTable(limit?: number, offset?: number, filter?: string): void {
     this.roleService
-      .getAll<GenericListResponse<RoleType>>({ limit, offset })
+      .getAll<GenericListResponse<RoleType>>({ limit, offset, filter })
       .subscribe(data => {
         this.dataSource.data = this.mapDataToTable(data.resource);
         this.tableLength = data.meta.count;
