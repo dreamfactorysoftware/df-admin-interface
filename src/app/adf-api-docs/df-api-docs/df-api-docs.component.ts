@@ -45,7 +45,12 @@ import {
   distinctUntilChanged,
   catchError,
 } from 'rxjs/operators';
-import { HttpClient, HttpErrorResponse, HttpBackend, HttpHeaders } from '@angular/common/http';
+import {
+  HttpClient,
+  HttpErrorResponse,
+  HttpBackend,
+  HttpHeaders,
+} from '@angular/common/http';
 import { BASE_URL } from 'src/app/shared/constants/urls';
 import { Subscription, of, forkJoin } from 'rxjs';
 import { DfApiQuickstartComponent } from '../df-api-quickstart/df-api-quickstart.component';
@@ -337,10 +342,12 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
     const params = this.expandSchema ? '?expand_schema=true' : '';
     const headers = new HttpHeaders({
       'X-DreamFactory-API-Key': environment.dfApiDocsApiKey,
-      'X-DreamFactory-Session-Token': this.userDataService.token || ''
+      'X-DreamFactory-Session-Token': this.userDataService.token || '',
     });
     this.rawHttp
-      .get<any>(`${BASE_URL}/api_docs/${this.serviceName}${params}`, { headers })
+      .get<any>(`${BASE_URL}/api_docs/${this.serviceName}${params}`, {
+        headers,
+      })
       .subscribe(data => {
         if (data) {
           this.apiDocJson = data;

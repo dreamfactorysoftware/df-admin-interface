@@ -82,11 +82,12 @@
     [apiDocJson]="apiDocJson"
     [serviceName]="serviceName"></df-api-quickstart>
 
-  <div *ngIf="apiDocJson?.info?.group === 'Database'" style="margin: 16px 0 8px 0">
+  <div
+    *ngIf="apiDocJson?.info?.group === 'Database'"
+    style="margin: 16px 0 8px 0">
     <mat-slide-toggle
       [(ngModel)]="expandSchema"
-      (ngModelChange)="reloadApiDocs()"
-    >
+      (ngModelChange)="reloadApiDocs()">
       Populate table/field names in API docs
     </mat-slide-toggle>
     <div style="font-size: 12px; color: #888; margin-left: 40px">
