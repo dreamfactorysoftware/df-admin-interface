@@ -45,11 +45,18 @@ import {
   distinctUntilChanged,
   catchError,
 } from 'rxjs/operators';
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import {
+  HttpClient,
+  HttpErrorResponse,
+  HttpBackend,
+  HttpHeaders,
+} from '@angular/common/http';
 import { BASE_URL } from 'src/app/shared/constants/urls';
 import { Subscription, of, forkJoin } from 'rxjs';
 import { DfApiQuickstartComponent } from '../df-api-quickstart/df-api-quickstart.component';
 import { ApiDocJson } from 'src/app/shared/types/files';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { FormsModule } from '@angular/forms';
 
 interface ServiceResponse {
   resource: Array<{
@@ -88,6 +95,8 @@ interface HealthCheckResult {
     MatExpansionModule,
     MatCardModule,
     DfApiQuickstartComponent,
+    MatSlideToggleModule,
+    FormsModule,
   ],
 })
 export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
@@ -103,6 +112,7 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
   apiDocJson: ApiDocJson;
   apiKeys: ApiKeyInfo[] = [];
   faCopy = faCopy;
+  expandSchema = false;
 
   private subscriptions: Subscription[] = [];
   healthStatus: 'loading' | 'healthy' | 'unhealthy' | 'warning' = 'loading';
@@ -136,6 +146,8 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
     ],
   };
 
+  private rawHttp: HttpClient;
+
   constructor(
     private activatedRoute: ActivatedRoute,
     private router: Router,
@@ -145,14 +157,17 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
     private clipboard: Clipboard,
     private snackBar: MatSnackBar,
     private currentServiceService: DfCurrentServiceService,
-    private http: HttpClient
-  ) {}
+    private http: HttpClient,
+    private httpBackend: HttpBackend
+  ) {
+    this.rawHttp = new HttpClient(httpBackend);
+  }
   isDarkMode = this.themeService.darkMode$;
   ngOnInit(): void {
     // Get the service name from the route
     this.serviceName = this.activatedRoute.snapshot.params['name'];
 
-    // First fetch the service ID by name
+    // First fetch the service ID by name (use normal http)
     if (this.serviceName) {
       this.subscriptions.push(
         this.http
@@ -320,6 +335,25 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
 
   toggleUnhealthyErrorDetails(): void {
     this.showUnhealthyErrorDetails = !this.showUnhealthyErrorDetails;
+  }
+
+  reloadApiDocs() {
+    if (!this.serviceName) return;
+    const params = this.expandSchema ? '?expand_schema=true' : '';
+    const headers = new HttpHeaders({
+      'X-DreamFactory-API-Key': environment.dfApiDocsApiKey,
+      'X-DreamFactory-Session-Token': this.userDataService.token || '',
+    });
+    this.rawHttp
+      .get<any>(`${BASE_URL}/api_docs/${this.serviceName}${params}`, {
+        headers,
+      })
+      .subscribe(data => {
+        if (data) {
+          this.apiDocJson = data;
+        }
+        this.ngAfterContentInit();
+      });
   }
 
   private injectCustomContent(
