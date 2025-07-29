@@ -29,9 +29,9 @@
 
   <div class="action-buttons">
     <button mat-stroked-button (click)="handleGoBack()">Back</button>
-    <button 
-      mat-flat-button 
-      color="primary" 
+    <button
+      mat-flat-button
+      color="primary"
       (click)="saveSecurityConfig()"
       [disabled]="!isSecurityConfigValid()">
       Apply Security Configuration
@@ -40,9 +40,15 @@
 
   <!-- Debug information (can be removed in production) -->
   <div class="debug-info" *ngIf="securityConfigurations.length > 0">
-    <h4>Current Security Configurations ({{ securityConfigurations.length }}):</h4>
-    <div *ngFor="let config of securityConfigurations; let i = index" class="config-item">
-      <p><strong>Configuration {{ i + 1 }}:</strong></p>
+    <h4>
+      Current Security Configurations ({{ securityConfigurations.length }}):
+    </h4>
+    <div
+      *ngFor="let config of securityConfigurations; let i = index"
+      class="config-item">
+      <p>
+        <strong>Configuration {{ i + 1 }}:</strong>
+      </p>
       <p><strong>Access Type:</strong> {{ config.accessType }}</p>
       <p><strong>Access Level:</strong> {{ config.accessLevel }}</p>
       <p><strong>Component:</strong> {{ config.component }}</p>

@@ -17,7 +17,9 @@ h3 {
   padding: 16px;
   cursor: pointer;
   border: 2px solid transparent;
-  transition: border 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border 0.2s ease,
+    box-shadow 0.2s ease;
 
   &.selected {
     border-color: #1976d2;

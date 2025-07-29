@@ -37,19 +37,19 @@ interface SecurityConfigData {
     MatCardModule,
     MatButtonToggleModule,
     MatButtonModule,
-    MatCheckboxModule
-  ]
+    MatCheckboxModule,
+  ],
 })
 export class DfSecurityConfigComponent implements OnInit {
   @Input() serviceName: string = '';
   @Input() serviceId: number | null = null;
   @Input() isDatabase: boolean = false;
-  
+
   @Output() goBack = new EventEmitter<void>();
-  
+
   // Multiple security configurations
   securityConfigurations: SecurityConfigData[] = [];
-  
+
   // Access options for the component design
   accessOptions: AccessOption[] = [];
 
@@ -71,43 +71,43 @@ export class DfSecurityConfigComponent implements OnInit {
         label: 'Full Access',
         description: 'Grant complete access to all database components',
         selected: false,
-        level: 'read'
+        level: 'read',
       },
       {
         key: 'schemaAccess',
         label: 'Schema Access',
         description: 'Configure access to specific database schemas',
         selected: false,
-        level: 'read'
+        level: 'read',
       },
       {
         key: 'tableAccess',
         label: 'Table Access',
         description: 'Manage access to individual database tables',
         selected: false,
-        level: 'read'
+        level: 'read',
       },
       {
         key: 'storedProcedures',
         label: 'Stored Procedures',
         description: 'Control access to stored procedures',
         selected: false,
-        level: 'read'
+        level: 'read',
       },
       {
         key: 'functions',
         label: 'Functions',
         description: 'Set access levels for database functions',
         selected: false,
-        level: 'read'
-      }
+        level: 'read',
+      },
     ];
   }
 
   // Original component methods
   toggleCard(option: AccessOption): void {
     option.selected = !option.selected;
-    
+
     // Update the security configuration based on the selected option
     if (option.selected) {
       // Add new configuration
@@ -122,7 +122,7 @@ export class DfSecurityConfigComponent implements OnInit {
     // Map the access option key to the corresponding access type
     let accessType = '';
     let component = '';
-    
+
     switch (option.key) {
       case 'fullAccess':
         accessType = 'all';
@@ -150,12 +150,12 @@ export class DfSecurityConfigComponent implements OnInit {
     const newConfig: SecurityConfigData = {
       accessType: accessType,
       accessLevel: option.level,
-      component: component
+      component: component,
     };
 
     // Add to configurations array
     this.securityConfigurations.push(newConfig);
-    
+
     console.log('Added security configuration:', newConfig);
     console.log('All configurations:', this.securityConfigurations);
   }
@@ -186,9 +186,12 @@ export class DfSecurityConfigComponent implements OnInit {
     }
   }
 
-  onAccessLevelChange(option: AccessOption, level: 'read' | 'write' | 'full'): void {
+  onAccessLevelChange(
+    option: AccessOption,
+    level: 'read' | 'write' | 'full'
+  ): void {
     option.level = level;
-    
+
     // Update the corresponding configuration in the array
     const configIndex = this.securityConfigurations.findIndex(config => {
       switch (option.key) {
@@ -209,7 +212,10 @@ export class DfSecurityConfigComponent implements OnInit {
 
     if (configIndex !== -1) {
       this.securityConfigurations[configIndex].accessLevel = level;
-      console.log('Updated access level for configuration:', this.securityConfigurations[configIndex]);
+      console.log(
+        'Updated access level for configuration:',
+        this.securityConfigurations[configIndex]
+      );
     }
   }
 
@@ -221,7 +227,7 @@ export class DfSecurityConfigComponent implements OnInit {
   isSecurityConfigValid(): boolean {
     // Check if at least one option is selected
     const hasSelectedOption = this.accessOptions.some(opt => opt.selected);
-    
+
     if (!hasSelectedOption) {
       return false;
     }
@@ -273,14 +279,16 @@ export class DfSecurityConfigComponent implements OnInit {
     const roleName = `${this.serviceName}_auto_role`;
 
     // Create role service access entries for each configuration
-    const roleServiceAccessEntries = this.securityConfigurations.map(config => ({
-      service_id: this.serviceId,
-      component: config.component,
-      verb_mask: this.getAccessLevel(config.accessLevel),
-      requestor_mask: 3,
-      filters: [],
-      filter_op: 'AND',
-    }));
+    const roleServiceAccessEntries = this.securityConfigurations.map(
+      config => ({
+        service_id: this.serviceId,
+        component: config.component,
+        verb_mask: this.getAccessLevel(config.accessLevel),
+        requestor_mask: 3,
+        filters: [],
+        filter_op: 'AND',
+      })
+    );
 
     const rolePayload = {
       resource: [

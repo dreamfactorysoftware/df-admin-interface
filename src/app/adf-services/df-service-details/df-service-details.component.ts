@@ -68,9 +68,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { HttpClient } from '@angular/common/http';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
-import {
-  MatButtonToggleModule,
-} from '@angular/material/button-toggle';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { readAsText } from '../../shared/utilities/file';
 import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
 import { BASE_URL } from 'src/app/shared/constants/urls';
