@@ -1,0 +1,52 @@
+<div class="security-config-wrapper">
+  <h3>Security Configuration</h3>
+
+  <div class="security-cards-grid">
+    <mat-card
+      class="security-option-card"
+      [class.selected]="option.selected"
+      *ngFor="let option of accessOptions"
+      (click)="toggleCard(option)">
+      <div class="card-header">
+        <div class="card-title">{{ option.label }}</div>
+        <div class="card-description">{{ option.description }}</div>
+      </div>
+
+      <div class="toggle-container" *ngIf="option.selected">
+        <mat-button-toggle-group
+          [value]="option.level"
+          (click)="$event.stopPropagation()"
+          (change)="onAccessLevelChange(option, $event.value)"
+          class="access-toggle-group"
+          appearance="legacy">
+          <mat-button-toggle value="read">Read Only</mat-button-toggle>
+          <mat-button-toggle value="write">Read & Write</mat-button-toggle>
+          <mat-button-toggle value="full">Full Access</mat-button-toggle>
+        </mat-button-toggle-group>
+      </div>
+    </mat-card>
+  </div>
+
+  <div class="action-buttons">
+    <button mat-stroked-button (click)="handleGoBack()">Back</button>
+    <button 
+      mat-flat-button 
+      color="primary" 
+      (click)="saveSecurityConfig()"
+      [disabled]="!isSecurityConfigValid()">
+      Apply Security Configuration
+    </button>
+  </div>
+
+  <!-- Debug information (can be removed in production) -->
+  <div class="debug-info" *ngIf="securityConfigurations.length > 0">
+    <h4>Current Security Configurations ({{ securityConfigurations.length }}):</h4>
+    <div *ngFor="let config of securityConfigurations; let i = index" class="config-item">
+      <p><strong>Configuration {{ i + 1 }}:</strong></p>
+      <p><strong>Access Type:</strong> {{ config.accessType }}</p>
+      <p><strong>Access Level:</strong> {{ config.accessLevel }}</p>
+      <p><strong>Component:</strong> {{ config.component }}</p>
+    </div>
+    <p><strong>Valid:</strong> {{ isSecurityConfigValid() ? 'Yes' : 'No' }}</p>
+  </div>
+</div>
