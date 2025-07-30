@@ -11,9 +11,7 @@ import { faCopy } from '@fortawesome/free-solid-svg-icons';
 import { Clipboard } from '@angular/cdk/clipboard';
 import { DfUserDataService } from 'src/app/shared/services/df-user-data.service';
 import { BASE_URL } from 'src/app/shared/constants/urls';
-import {
-  SESSION_TOKEN_HEADER,
-} from 'src/app/shared/constants/http-headers';
+import { SESSION_TOKEN_HEADER } from 'src/app/shared/constants/http-headers';
 import { ApiDocJson } from 'src/app/shared/types/files';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatSnackBar } from '@angular/material/snack-bar';
