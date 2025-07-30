@@ -129,7 +129,9 @@ export class DfSecurityConfigComponent implements OnInit {
       }
     } else {
       // For other options, if full access is selected, unselect it first
-      const fullAccessOption = this.accessOptions.find(opt => opt.key === 'fullAccess');
+      const fullAccessOption = this.accessOptions.find(
+        opt => opt.key === 'fullAccess'
+      );
       if (fullAccessOption && fullAccessOption.selected) {
         fullAccessOption.selected = false;
         this.removeSecurityConfiguration(fullAccessOption.key);
