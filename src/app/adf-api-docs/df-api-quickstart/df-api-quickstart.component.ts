@@ -11,11 +11,13 @@ import { faCopy } from '@fortawesome/free-solid-svg-icons';
 import { Clipboard } from '@angular/cdk/clipboard';
 import { DfUserDataService } from 'src/app/shared/services/df-user-data.service';
 import { BASE_URL } from 'src/app/shared/constants/urls';
-import { SESSION_TOKEN_HEADER } from 'src/app/shared/constants/http-headers';
+import {
+  SESSION_TOKEN_HEADER,
+} from 'src/app/shared/constants/http-headers';
 import { ApiDocJson } from 'src/app/shared/types/files';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { API_KEY_HEADER } from 'src/app/shared/constants/http-headers';
+import { DfApiTesterComponent } from 'src/app/shared/components/df-api-tester/df-api-tester.component';
 
 interface CurlCommand {
   title: string;
@@ -24,32 +26,6 @@ interface CurlCommand {
   textForCopy: string;
   note: string;
 }
-
-const healthCheckEndpointsInfo: {
-  [key: string]: { endpoint: string; title: string; description: string }[];
-} = {
-  Database: [
-    {
-      endpoint: '/_schema',
-      title: 'View Available Schemas',
-      description:
-        'This command fetches a list of schemas from your connected database',
-    },
-    {
-      endpoint: '/_table',
-      title: 'View Tables in Your Database',
-      description: 'This command lists all tables in your database',
-    },
-  ],
-  File: [
-    {
-      endpoint: '/',
-      title: 'View Available Folders',
-      description:
-        'This command fetches a list of folders from your connected file storage',
-    },
-  ],
-};
 
 @Component({
   selector: 'df-api-quickstart',
@@ -66,12 +42,12 @@ const healthCheckEndpointsInfo: {
     FontAwesomeModule,
     MatDividerModule,
     MatButtonModule,
+    DfApiTesterComponent,
   ],
 })
 export class DfApiQuickstartComponent implements OnChanges {
   @Input() apiDocJson: ApiDocJson;
   @Input() serviceName: string;
-  @Input() selectedApiKey: string | null = null;
 
   curlCommands: CurlCommand[] = [];
   faCopy = faCopy;
@@ -84,9 +60,7 @@ export class DfApiQuickstartComponent implements OnChanges {
 
   ngOnChanges(changes: SimpleChanges): void {
     if (
-      (changes['apiDocJson'] ||
-        changes['serviceName'] ||
-        changes['selectedApiKey']) &&
+      (changes['apiDocJson'] || changes['serviceName']) &&
       this.apiDocJson &&
       this.serviceName
     ) {
@@ -100,36 +74,37 @@ export class DfApiQuickstartComponent implements OnChanges {
 
   private prepareCurlCommands(): void {
     this.curlCommands = [];
-    if (!this.serviceName || !this.apiDocJson?.info?.group) {
+    if (!this.serviceName || !this.apiDocJson?.paths) {
       return;
     }
 
-    const endpointsInfo = healthCheckEndpointsInfo[this.apiDocJson.info.group];
-    if (endpointsInfo?.length > 0) {
-      endpointsInfo.forEach(endpointInfo => {
-        const baseUrl = `${window.location.origin}${BASE_URL}/${this.serviceName}${endpointInfo.endpoint}`;
+    // Generate cURL commands for the first few GET endpoints
+    const getEndpoints = Object.keys(this.apiDocJson.paths)
+      .filter(path => {
+        const pathData = this.apiDocJson.paths[path];
+        return pathData['get'] && typeof pathData['get'] === 'object';
+      })
+      .slice(0, 3); // Limit to first 3 GET endpoints for quickstart
 
-        let headers: string;
-        if (this.selectedApiKey) {
-          headers = `-H 'accept: application/json' -H '${API_KEY_HEADER}: ${this.selectedApiKey}'`;
-        } else {
-          const sessionToken =
-            this.userDataService.token || 'YOUR_SESSION_TOKEN';
-          headers = `-H 'accept: application/json' -H '${SESSION_TOKEN_HEADER}: ${sessionToken}'`;
-        }
+    getEndpoints.forEach(endpoint => {
+      const operation = this.apiDocJson.paths[endpoint]['get'];
+      const baseUrl = `${window.location.origin}${BASE_URL}/${this.serviceName}${endpoint}`;
 
-        const commandForDisplay = `curl -X 'GET' '${baseUrl}' \\\n ${headers}`;
-        const commandForCopy = `curl -X 'GET' '${baseUrl}' ${headers}`;
+      let headers: string;
+      const sessionToken = this.userDataService.token || 'YOUR_SESSION_TOKEN';
+      headers = `-H 'accept: application/json' -H '${SESSION_TOKEN_HEADER}: ${sessionToken}'`;
 
-        this.curlCommands.push({
-          title: endpointInfo.title,
-          description: endpointInfo.description,
-          textForDisplay: commandForDisplay,
-          textForCopy: commandForCopy,
-          note: this.apiDocJson.paths[endpointInfo.endpoint]?.['get']?.summary,
-        });
+      const commandForDisplay = `curl -X 'GET' '${baseUrl}' \\\n ${headers}`;
+      const commandForCopy = `curl -X 'GET' '${baseUrl}' ${headers}`;
+
+      this.curlCommands.push({
+        title: operation?.summary || `GET ${endpoint}`,
+        description: operation?.description || `Retrieve data from ${endpoint}`,
+        textForDisplay: commandForDisplay,
+        textForCopy: commandForCopy,
+        note: operation?.summary || '',
       });
-    }
+    });
   }
 
   trackByCommand(index: number, item: CurlCommand): string {

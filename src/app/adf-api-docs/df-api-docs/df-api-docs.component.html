@@ -15,9 +15,7 @@
 <div class="api-keys-container" *ngIf="apiKeys.length">
   <mat-form-field appearance="outline" class="api-keys-select">
     <mat-label>{{ 'apiDocs.apiKeys.label' | transloco }}</mat-label>
-    <mat-select
-      [(ngModel)]="selectedApiKey"
-      (selectionChange)="onApiKeySelectionChange($event.value)">
+    <mat-select>
       <mat-option [value]="null">
         <div class="api-key-option">
           <div class="key-info">
@@ -94,8 +92,7 @@
   <df-api-quickstart
     *ngIf="serviceName"
     [apiDocJson]="apiDocJson"
-    [serviceName]="serviceName"
-    [selectedApiKey]="selectedApiKey"></df-api-quickstart>
+    [serviceName]="serviceName"></df-api-quickstart>
   <div
     *ngIf="apiDocJson?.info?.group === 'Database'"
     style="margin: 16px 0 8px 0">

@@ -112,7 +112,6 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
 
   apiDocJson: ApiDocJson;
   apiKeys: ApiKeyInfo[] = [];
-  selectedApiKey: string | null = null;
   faCopy = faCopy;
   expandSchema = false;
 
@@ -296,23 +295,13 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
     this.showUnhealthyErrorDetails = !this.showUnhealthyErrorDetails;
   }
 
-  onApiKeySelectionChange(selectedKey: string | null): void {
-    this.selectedApiKey = selectedKey;
-    // Regenerate Swagger documentation with the new API key (or null for session token)
-    this.generateSwaggerWithApiKey(this.apiDocJson);
-  }
-
   private generateSwaggerWithApiKey(apiDocumentation: ApiDocJson): void {
     SwaggerUI({
       spec: apiDocumentation,
       domNode: this.apiDocElement?.nativeElement,
       requestInterceptor: (req: SwaggerUI.Request) => {
-        if (this.selectedApiKey == null) {
-          req['headers'][SESSION_TOKEN_HEADER] = this.userDataService.token;
-        }
-        // Use selected API key if available, otherwise fall back to environment key
-        const apiKey = this.selectedApiKey || environment.dfApiDocsApiKey;
-        req['headers'][API_KEY_HEADER] = apiKey;
+        req['headers'][SESSION_TOKEN_HEADER] = this.userDataService.token;
+        req['headers'][API_KEY_HEADER] = environment.dfApiDocsApiKey;
         // Parse the request URL
         const url = new URL(req['url']);
         const params = new URLSearchParams(url.search);

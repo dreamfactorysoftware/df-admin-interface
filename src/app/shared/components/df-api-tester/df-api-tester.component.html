@@ -1,0 +1,183 @@
+<mat-expansion-panel *ngIf="availableEndpoints.length > 0">
+  <mat-expansion-panel-header>
+    <mat-panel-title style="font-size: 18px">
+      Test API Authentication
+    </mat-panel-title>
+    <mat-panel-description>
+      Validate endpoint access with different authentication methods
+    </mat-panel-description>
+  </mat-expansion-panel-header>
+  <ng-template matExpansionPanelContent>
+    <div class="api-tester-container">
+      <p class="description-text">
+        Test your API endpoints to validate authentication and security
+        configurations.
+      </p>
+
+      <!-- Test Controls -->
+      <div class="test-controls">
+        <mat-form-field appearance="outline" class="endpoint-select">
+          <mat-label>Select Endpoint</mat-label>
+          <mat-select
+            [(ngModel)]="selectedEndpointIndex"
+            (selectionChange)="onEndpointChange()">
+            <mat-option
+              *ngFor="let endpoint of availableEndpoints; let i = index"
+              [value]="i">
+              <div class="endpoint-option">
+                <div class="endpoint-header">
+                  <span
+                    class="method-badge"
+                    [style.background-color]="getMethodColor(endpoint.method)">
+                    {{ endpoint.method }}
+                  </span>
+                  <span class="endpoint-path">{{ endpoint.endpoint }}</span>
+                </div>
+                <span class="endpoint-title">{{ endpoint.title }}</span>
+              </div>
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <!-- API Key Selection -->
+        <mat-form-field appearance="outline" class="api-key-select">
+          <mat-label>Authentication Method</mat-label>
+          <mat-select [(ngModel)]="selectedApiKey">
+            <mat-option [value]="null">
+              <div class="auth-option">
+                <span class="auth-name">Session Token</span>
+                <span class="auth-desc">Use current session</span>
+              </div>
+            </mat-option>
+            <mat-option
+              *ngFor="let key of availableApiKeys"
+              [value]="key.apiKey">
+              <div class="auth-option">
+                <span class="auth-name">{{ key.name }}</span>
+                <span class="auth-desc"
+                  >{{ key.apiKey | slice: 0 : 8 }}...</span
+                >
+              </div>
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <!-- Test Button -->
+        <button
+          mat-raised-button
+          color="primary"
+          (click)="testEndpoint()"
+          [disabled]="isTesting || availableEndpoints.length === 0"
+          class="test-button">
+          <fa-icon [icon]="faPlay" *ngIf="!isTesting"></fa-icon>
+          <mat-spinner diameter="16" *ngIf="isTesting"></mat-spinner>
+          {{ isTesting ? 'Testing...' : 'Test Auth' }}
+        </button>
+      </div>
+
+      <!-- Selected Endpoint Info -->
+      <mat-card
+        *ngIf="getSelectedEndpoint()"
+        class="endpoint-info-card"
+        appearance="outlined">
+        <mat-card-content>
+          <div class="endpoint-info-header">
+            <span
+              class="method-badge large"
+              [style.background-color]="
+                getMethodColor(getSelectedEndpoint()!.method)
+              ">
+              {{ getSelectedEndpoint()!.method }}
+            </span>
+            <h4>{{ getSelectedEndpoint()?.title }}</h4>
+          </div>
+          <p>{{ getSelectedEndpoint()?.description }}</p>
+          <div class="test-details">
+            <span
+              ><strong>Endpoint:</strong>
+              {{ getSelectedEndpoint()?.endpoint }}</span
+            >
+            <span
+              ><strong>Method:</strong>
+              {{ getSelectedEndpoint()?.method }}</span
+            >
+            <span
+              ><strong>Authentication:</strong>
+              {{ getAuthenticationMethod() }}</span
+            >
+            <span *ngIf="getSelectedEndpoint()?.operationId"
+              ><strong>Operation ID:</strong>
+              {{ getSelectedEndpoint()?.operationId }}</span
+            >
+          </div>
+        </mat-card-content>
+      </mat-card>
+
+      <!-- Test Results -->
+      <mat-card
+        *ngIf="testResult"
+        class="test-result-card"
+        appearance="outlined"
+        [class.success-result]="testResult.success"
+        [class.error-result]="!testResult.success"
+        [class.auth-error]="isAuthenticationError()">
+        <mat-card-header>
+          <mat-card-title>
+            <fa-icon
+              [icon]="testResult.success ? faCheck : faTimes"
+              [style.color]="
+                testResult.success ? '#4caf50' : '#f44336'
+              "></fa-icon>
+            <span *ngIf="testResult.success">Authentication Successful</span>
+            <span *ngIf="!testResult.success && isAuthenticationError()"
+              >Authentication Failed</span
+            >
+            <span *ngIf="!testResult.success && !isAuthenticationError()"
+              >Request Failed</span
+            >
+          </mat-card-title>
+          <button
+            mat-icon-button
+            (click)="clearTestResult()"
+            class="clear-result-btn">
+            <fa-icon [icon]="faTimes"></fa-icon>
+          </button>
+        </mat-card-header>
+        <mat-card-content>
+          <div class="result-summary">
+            <span><strong>Status Code:</strong> {{ testResult.status }}</span>
+            <span *ngIf="testResult.success">
+              <strong>Result:</strong> Access granted - authentication is
+              working correctly
+            </span>
+            <span *ngIf="!testResult.success && isAuthenticationError()">
+              <strong>Issue:</strong> {{ testResult.error }}
+            </span>
+            <span *ngIf="!testResult.success && !isAuthenticationError()">
+              <strong>Error:</strong> {{ testResult.error }}
+            </span>
+          </div>
+
+          <!-- Authentication guidance -->
+          <div
+            *ngIf="!testResult.success && isAuthenticationError()"
+            class="auth-guidance">
+            <h5>Authentication Help:</h5>
+            <ul>
+              <li *ngIf="!selectedApiKey">
+                Try selecting a different API key from the dropdown above
+              </li>
+              <li *ngIf="selectedApiKey">
+                The selected API key may not have access to this endpoint
+              </li>
+              <li>
+                Check if the service has proper role-based access configured
+              </li>
+              <li>Verify the API key is active and not expired</li>
+            </ul>
+          </div>
+        </mat-card-content>
+      </mat-card>
+    </div>
+  </ng-template>
+</mat-expansion-panel>
