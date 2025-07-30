@@ -15,6 +15,7 @@ import { SESSION_TOKEN_HEADER } from 'src/app/shared/constants/http-headers';
 import { ApiDocJson } from 'src/app/shared/types/files';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { API_KEY_HEADER } from 'src/app/shared/constants/http-headers';
 
 interface CurlCommand {
   title: string;
@@ -70,6 +71,7 @@ const healthCheckEndpointsInfo: {
 export class DfApiQuickstartComponent implements OnChanges {
   @Input() apiDocJson: ApiDocJson;
   @Input() serviceName: string;
+  @Input() selectedApiKey: string | null = null;
 
   curlCommands: CurlCommand[] = [];
   faCopy = faCopy;
@@ -82,7 +84,9 @@ export class DfApiQuickstartComponent implements OnChanges {
 
   ngOnChanges(changes: SimpleChanges): void {
     if (
-      (changes['apiDocJson'] || changes['serviceName']) &&
+      (changes['apiDocJson'] ||
+        changes['serviceName'] ||
+        changes['selectedApiKey']) &&
       this.apiDocJson &&
       this.serviceName
     ) {
@@ -103,9 +107,16 @@ export class DfApiQuickstartComponent implements OnChanges {
     const endpointsInfo = healthCheckEndpointsInfo[this.apiDocJson.info.group];
     if (endpointsInfo?.length > 0) {
       endpointsInfo.forEach(endpointInfo => {
-        const sessionToken = this.userDataService.token || 'YOUR_SESSION_TOKEN';
         const baseUrl = `${window.location.origin}${BASE_URL}/${this.serviceName}${endpointInfo.endpoint}`;
-        const headers = `-H 'accept: application/json' -H '${SESSION_TOKEN_HEADER}: ${sessionToken}'`;
+
+        let headers: string;
+        if (this.selectedApiKey) {
+          headers = `-H 'accept: application/json' -H '${API_KEY_HEADER}: ${this.selectedApiKey}'`;
+        } else {
+          const sessionToken =
+            this.userDataService.token || 'YOUR_SESSION_TOKEN';
+          headers = `-H 'accept: application/json' -H '${SESSION_TOKEN_HEADER}: ${sessionToken}'`;
+        }
 
         const commandForDisplay = `curl -X 'GET' '${baseUrl}' \\\n ${headers}`;
         const commandForCopy = `curl -X 'GET' '${baseUrl}' ${headers}`;

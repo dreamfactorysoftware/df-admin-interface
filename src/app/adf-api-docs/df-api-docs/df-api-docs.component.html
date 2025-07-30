@@ -14,7 +14,17 @@
 <div class="api-keys-container" *ngIf="apiKeys.length">
   <mat-form-field appearance="outline" class="api-keys-select">
     <mat-label>{{ 'apiDocs.apiKeys.label' | transloco }}</mat-label>
-    <mat-select>
+    <mat-select
+      [(ngModel)]="selectedApiKey"
+      (selectionChange)="onApiKeySelectionChange($event.value)">
+      <mat-option [value]="null">
+        <div class="api-key-option">
+          <div class="key-info">
+            <span class="key-name">None (Session token based authentication)</span>
+            <span class="key-preview">Uses session token to build the request</span>
+          </div>
+        </div>
+      </mat-option>
       <mat-option *ngFor="let key of apiKeys" [value]="key.apiKey">
         <div class="api-key-option">
           <div class="key-info">
@@ -79,7 +89,8 @@
   <df-api-quickstart
     *ngIf="serviceName"
     [apiDocJson]="apiDocJson"
-    [serviceName]="serviceName"></df-api-quickstart>
+    [serviceName]="serviceName"
+    [selectedApiKey]="selectedApiKey"></df-api-quickstart>
 </div>
 
 <div #apiDocumentation class="swagger-ui"></div>

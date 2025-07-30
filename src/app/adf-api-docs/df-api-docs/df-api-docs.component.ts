@@ -13,6 +13,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatIconModule } from '@angular/material/icon';
 import { TranslocoModule } from '@ngneat/transloco';
+import { FormsModule } from '@angular/forms';
 import { saveRawAsFile } from 'src/app/shared/utilities/file';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { DfUserDataService } from 'src/app/shared/services/df-user-data.service';
@@ -77,6 +78,7 @@ interface HealthCheckResult {
     MatSelectModule,
     MatIconModule,
     TranslocoModule,
+    FormsModule,
     AsyncPipe,
     NgIf,
     NgFor,
@@ -102,6 +104,7 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
 
   apiDocJson: ApiDocJson;
   apiKeys: ApiKeyInfo[] = [];
+  selectedApiKey: string | null = null;
   faCopy = faCopy;
 
   private subscriptions: Subscription[] = [];
@@ -201,51 +204,8 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
   }
 
   ngAfterContentInit(): void {
-    const apiDocumentation = this.apiDocJson;
     this.checkApiHealth();
-
-    SwaggerUI({
-      spec: apiDocumentation,
-      domNode: this.apiDocElement?.nativeElement,
-      requestInterceptor: (req: SwaggerUI.Request) => {
-        req['headers'][SESSION_TOKEN_HEADER] = this.userDataService.token;
-        req['headers'][API_KEY_HEADER] = environment.dfApiDocsApiKey;
-        // Parse the request URL
-        const url = new URL(req['url']);
-        const params = new URLSearchParams(url.search);
-        // Decode all parameters
-        params.forEach((value, key) => {
-          params.set(key, decodeURIComponent(value));
-        });
-        // Update the URL with decoded parameters
-        url.search = params.toString();
-        req['url'] = url.toString();
-        return req;
-      },
-      showMutatedRequest: true,
-      onComplete: () => {
-        if (
-          this.apiDocElement &&
-          this.apiDocElement.nativeElement &&
-          this.swaggerInjectedContentContainerRef &&
-          this.swaggerInjectedContentContainerRef.nativeElement
-        ) {
-          const swaggerContainer = this.apiDocElement.nativeElement;
-          const customContentNode =
-            this.swaggerInjectedContentContainerRef.nativeElement;
-
-          const infoContainer = swaggerContainer.querySelector(
-            '.information-container .main'
-          );
-
-          this.injectCustomContent(
-            swaggerContainer,
-            infoContainer,
-            customContentNode
-          );
-        }
-      },
-    });
+    this.generateSwaggerWithApiKey(this.apiDocJson);
   }
 
   ngOnDestroy(): void {
@@ -320,6 +280,61 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
 
   toggleUnhealthyErrorDetails(): void {
     this.showUnhealthyErrorDetails = !this.showUnhealthyErrorDetails;
+  }
+
+  onApiKeySelectionChange(selectedKey: string | null): void {
+    this.selectedApiKey = selectedKey;
+    // Regenerate Swagger documentation with the new API key (or null for session token)
+    this.generateSwaggerWithApiKey(this.apiDocJson);
+  }
+
+  private generateSwaggerWithApiKey(apiDocumentation: ApiDocJson): void {
+    SwaggerUI({
+      spec: apiDocumentation,
+      domNode: this.apiDocElement?.nativeElement,
+      requestInterceptor: (req: SwaggerUI.Request) => {
+        if (this.selectedApiKey == null) {
+          req['headers'][SESSION_TOKEN_HEADER] = this.userDataService.token;
+        }
+        // Use selected API key if available, otherwise fall back to environment key
+        const apiKey = this.selectedApiKey || environment.dfApiDocsApiKey;
+        req['headers'][API_KEY_HEADER] = apiKey;
+        // Parse the request URL
+        const url = new URL(req['url']);
+        const params = new URLSearchParams(url.search);
+        // Decode all parameters
+        params.forEach((value, key) => {
+          params.set(key, decodeURIComponent(value));
+        });
+        // Update the URL with decoded parameters
+        url.search = params.toString();
+        req['url'] = url.toString();
+        return req;
+      },
+      showMutatedRequest: true,
+      onComplete: () => {
+        if (
+          this.apiDocElement &&
+          this.apiDocElement.nativeElement &&
+          this.swaggerInjectedContentContainerRef &&
+          this.swaggerInjectedContentContainerRef.nativeElement
+        ) {
+          const swaggerContainer = this.apiDocElement.nativeElement;
+          const customContentNode =
+            this.swaggerInjectedContentContainerRef.nativeElement;
+
+          const infoContainer = swaggerContainer.querySelector(
+            '.information-container .main'
+          );
+
+          this.injectCustomContent(
+            swaggerContainer,
+            infoContainer,
+            customContentNode
+          );
+        }
+      },
+    });
   }
 
   private injectCustomContent(
