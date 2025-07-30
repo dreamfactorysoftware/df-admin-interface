@@ -350,7 +350,7 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
       },
     });
   }
-  
+
   reloadApiDocs() {
     if (!this.serviceName) return;
     const params = this.expandSchema ? '?expand_schema=true' : '';
