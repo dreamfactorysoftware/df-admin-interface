@@ -1,10 +1,13 @@
 <div class="security-config-wrapper">
   <h3>Security Configuration</h3>
 
-  <div class="security-cards-grid">
+  <div class="security-cards-container">
     <mat-card
       class="security-option-card"
       [class.selected]="option.selected"
+      [class.read-level]="option.selected && option.level === 'read'"
+      [class.write-level]="option.selected && option.level === 'write'"
+      [class.full-level]="option.selected && option.level === 'full'"
       *ngFor="let option of accessOptions"
       (click)="toggleCard(option)">
       <div class="card-header">
@@ -12,16 +15,28 @@
         <div class="card-description">{{ option.description }}</div>
       </div>
 
-      <div class="toggle-container" *ngIf="option.selected">
+      <div class="toggle-container" *ngIf="option.key !== 'fullAccess'">
         <mat-button-toggle-group
-          [value]="option.level"
+          [value]="option.selected ? option.level : null"
+          [disabled]="!option.selected"
           (click)="$event.stopPropagation()"
           (change)="onAccessLevelChange(option, $event.value)"
           class="access-toggle-group"
           appearance="legacy">
-          <mat-button-toggle value="read">Read Only</mat-button-toggle>
-          <mat-button-toggle value="write">Read & Write</mat-button-toggle>
-          <mat-button-toggle value="full">Full Access</mat-button-toggle>
+          <mat-button-toggle value="read" class="read-toggle">
+            <span class="toggle-icon"><fa-icon [icon]="faEye"></fa-icon></span>
+            Read Only
+          </mat-button-toggle>
+
+          <mat-button-toggle value="write" class="write-toggle">
+            <span class="toggle-icon"><fa-icon [icon]="faPen"></fa-icon></span>
+            Read & Write
+          </mat-button-toggle>
+
+          <mat-button-toggle value="full" class="full-toggle">
+            <span class="toggle-icon"><fa-icon [icon]="faLockOpen"></fa-icon></span>
+            Full Access
+          </mat-button-toggle>
         </mat-button-toggle-group>
       </div>
     </mat-card>
@@ -32,27 +47,10 @@
     <button
       mat-flat-button
       color="primary"
+      type="button"
       (click)="saveSecurityConfig()"
       [disabled]="!isSecurityConfigValid()">
       Apply Security Configuration
     </button>
-  </div>
-
-  <!-- Debug information (can be removed in production) -->
-  <div class="debug-info" *ngIf="securityConfigurations.length > 0">
-    <h4>
-      Current Security Configurations ({{ securityConfigurations.length }}):
-    </h4>
-    <div
-      *ngFor="let config of securityConfigurations; let i = index"
-      class="config-item">
-      <p>
-        <strong>Configuration {{ i + 1 }}:</strong>
-      </p>
-      <p><strong>Access Type:</strong> {{ config.accessType }}</p>
-      <p><strong>Access Level:</strong> {{ config.accessLevel }}</p>
-      <p><strong>Component:</strong> {{ config.component }}</p>
-    </div>
-    <p><strong>Valid:</strong> {{ isSecurityConfigValid() ? 'Yes' : 'No' }}</p>
   </div>
 </div>

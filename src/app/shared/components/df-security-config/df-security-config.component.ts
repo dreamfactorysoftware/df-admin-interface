@@ -5,12 +5,15 @@ import { MatCardModule } from '@angular/material/card';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatIconModule } from '@angular/material/icon';
 import { Router } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { DfSystemService } from 'src/app/shared/services/df-system.service';
 import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
 import { switchMap, catchError, map } from 'rxjs';
 import { throwError } from 'rxjs';
+import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
+import { faEye, faPen, faLockOpen } from '@fortawesome/free-solid-svg-icons';
 
 interface AccessOption {
   key: string;
@@ -38,6 +41,8 @@ interface SecurityConfigData {
     MatButtonToggleModule,
     MatButtonModule,
     MatCheckboxModule,
+    MatIconModule,
+    FontAwesomeModule,
   ],
 })
 export class DfSecurityConfigComponent implements OnInit {
@@ -46,6 +51,11 @@ export class DfSecurityConfigComponent implements OnInit {
   @Input() isDatabase: boolean = false;
 
   @Output() goBack = new EventEmitter<void>();
+
+  // FontAwesome icons
+  faEye = faEye;
+  faPen = faPen;
+  faLockOpen = faLockOpen;
 
   // Multiple security configurations
   securityConfigurations: SecurityConfigData[] = [];
@@ -106,6 +116,26 @@ export class DfSecurityConfigComponent implements OnInit {
 
   // Original component methods
   toggleCard(option: AccessOption): void {
+    // Special handling for full access
+    if (option.key === 'fullAccess') {
+      if (!option.selected) {
+        // When selecting full access, unselect all other options
+        this.accessOptions.forEach(opt => {
+          if (opt.key !== 'fullAccess' && opt.selected) {
+            opt.selected = false;
+            this.removeSecurityConfiguration(opt.key);
+          }
+        });
+      }
+    } else {
+      // For other options, if full access is selected, unselect it first
+      const fullAccessOption = this.accessOptions.find(opt => opt.key === 'fullAccess');
+      if (fullAccessOption && fullAccessOption.selected) {
+        fullAccessOption.selected = false;
+        this.removeSecurityConfiguration(fullAccessOption.key);
+      }
+    }
+
     option.selected = !option.selected;
 
     // Update the security configuration based on the selected option
