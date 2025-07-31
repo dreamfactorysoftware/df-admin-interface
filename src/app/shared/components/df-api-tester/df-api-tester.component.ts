@@ -240,7 +240,9 @@ export class DfApiTesterComponent implements OnChanges {
           status: error.status || 0,
           error: isAuthError
             ? 'Authentication failed - Access denied'
-            : error.error?.error?.message || error.message || 'Request failed due to non-authentication error',
+            : error.error?.error?.message ||
+              error.message ||
+              'Request failed due to non-authentication error',
         };
         this.isTesting = false;
 

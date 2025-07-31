@@ -121,13 +121,17 @@
         [class.success-result]="testResult.success"
         [class.error-result]="!testResult.success"
         [class.auth-error]="!testResult.success && isAuthenticationError()"
-        [class.non-auth-error]="!testResult.success && !isAuthenticationError()">
+        [class.non-auth-error]="
+          !testResult.success && !isAuthenticationError()
+        ">
         <mat-card-header>
           <mat-card-title>
             <fa-icon
               [icon]="testResult.success ? faCheck : faTimes"
               [style.color]="getResultIconColor()"></fa-icon>
-            <span *ngIf="testResult.success">✅ Authentication & Request Successful</span>
+            <span *ngIf="testResult.success"
+              >✅ Authentication & Request Successful</span
+            >
             <span *ngIf="!testResult.success && isAuthenticationError()"
               >🔒 Authentication Failed</span
             >
@@ -146,13 +150,16 @@
           <div class="result-summary">
             <span><strong>Status Code:</strong> {{ testResult.status }}</span>
             <span *ngIf="testResult.success">
-              <strong>Result:</strong> ✅ Authentication verified and access granted successfully
+              <strong>Result:</strong> ✅ Authentication verified and access
+              granted successfully
             </span>
             <span *ngIf="!testResult.success && isAuthenticationError()">
-              <strong>Authentication Result:</strong> 🔒 Access denied - {{ testResult.error }}
+              <strong>Authentication Result:</strong> 🔒 Access denied -
+              {{ testResult.error }}
             </span>
             <span *ngIf="!testResult.success && !isAuthenticationError()">
-              <strong>Authentication Result:</strong> ✅ Authentication passed, but request failed due to: {{ testResult.error }}
+              <strong>Authentication Result:</strong> ✅ Authentication passed,
+              but request failed due to: {{ testResult.error }}
             </span>
           </div>
 
@@ -180,9 +187,14 @@
             *ngIf="!testResult.success && !isAuthenticationError()"
             class="auth-guidance">
             <h5>✅ Authentication Status: Passed</h5>
-            <p><strong>Good news!</strong> Your authentication is working correctly. The request failed for other reasons:</p>
+            <p>
+              <strong>Good news!</strong> Your authentication is working
+              correctly. The request failed for other reasons:
+            </p>
             <ul>
-              <li>The endpoint might require specific parameters or request body</li>
+              <li>
+                The endpoint might require specific parameters or request body
+              </li>
               <li>The service might be temporarily unavailable</li>
               <li>The endpoint might have validation rules that weren't met</li>
               <li>Check the error message above for specific details</li>

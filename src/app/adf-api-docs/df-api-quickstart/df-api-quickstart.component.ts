@@ -92,7 +92,9 @@ export class DfApiQuickstartComponent implements OnChanges {
           description: endpointInfo.description,
           textForDisplay: commandForDisplay,
           textForCopy: commandForCopy,
-          note: this.apiDocJson.paths[endpointInfo.endpoint]?.['get']?.summary || '',
+          note:
+            this.apiDocJson.paths[endpointInfo.endpoint]?.['get']?.summary ||
+            '',
         });
       });
     }
