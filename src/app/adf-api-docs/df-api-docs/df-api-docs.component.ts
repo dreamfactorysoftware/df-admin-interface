@@ -55,6 +55,7 @@ import { BASE_URL } from 'src/app/shared/constants/urls';
 import { Subscription, of, forkJoin } from 'rxjs';
 import { DfApiQuickstartComponent } from '../df-api-quickstart/df-api-quickstart.component';
 import { ApiDocJson } from 'src/app/shared/types/files';
+import { healthCheckEndpointsInfo } from '../constants/health-check-endpoints';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { FormsModule } from '@angular/forms';
 
@@ -84,6 +85,7 @@ interface HealthCheckResult {
     MatSelectModule,
     MatIconModule,
     TranslocoModule,
+    FormsModule,
     AsyncPipe,
     NgIf,
     NgFor,
@@ -119,32 +121,6 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
   healthError: string | null = null;
   serviceName: string | null = null;
   showUnhealthyErrorDetails = false;
-  // Mapping of service types to their corresponding endpoints, probably would be better to move to the back-end
-  healthCheckEndpointsInfo: {
-    [key: string]: { endpoint: string; title: string; description: string }[];
-  } = {
-    Database: [
-      {
-        endpoint: '/_schema',
-        title: 'View Available Schemas',
-        description:
-          'This command fetches a list of schemas from your connected database',
-      },
-      {
-        endpoint: '/_table',
-        title: 'View Tables in Your Database',
-        description: 'This command lists all tables in your database',
-      },
-    ],
-    File: [
-      {
-        endpoint: '/',
-        title: 'View Available Folders',
-        description:
-          'This command fetches a list of folders from your connected file storage',
-      },
-    ],
-  };
 
   private rawHttp: HttpClient;
 
@@ -216,51 +192,8 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
   }
 
   ngAfterContentInit(): void {
-    const apiDocumentation = this.apiDocJson;
     this.checkApiHealth();
-
-    SwaggerUI({
-      spec: apiDocumentation,
-      domNode: this.apiDocElement?.nativeElement,
-      requestInterceptor: (req: SwaggerUI.Request) => {
-        req['headers'][SESSION_TOKEN_HEADER] = this.userDataService.token;
-        req['headers'][API_KEY_HEADER] = environment.dfApiDocsApiKey;
-        // Parse the request URL
-        const url = new URL(req['url']);
-        const params = new URLSearchParams(url.search);
-        // Decode all parameters
-        params.forEach((value, key) => {
-          params.set(key, decodeURIComponent(value));
-        });
-        // Update the URL with decoded parameters
-        url.search = params.toString();
-        req['url'] = url.toString();
-        return req;
-      },
-      showMutatedRequest: true,
-      onComplete: () => {
-        if (
-          this.apiDocElement &&
-          this.apiDocElement.nativeElement &&
-          this.swaggerInjectedContentContainerRef &&
-          this.swaggerInjectedContentContainerRef.nativeElement
-        ) {
-          const swaggerContainer = this.apiDocElement.nativeElement;
-          const customContentNode =
-            this.swaggerInjectedContentContainerRef.nativeElement;
-
-          const infoContainer = swaggerContainer.querySelector(
-            '.information-container .main'
-          );
-
-          this.injectCustomContent(
-            swaggerContainer,
-            infoContainer,
-            customContentNode
-          );
-        }
-      },
-    });
+    this.generateSwaggerWithApiKey(this.apiDocJson);
   }
 
   ngOnDestroy(): void {
@@ -270,7 +203,7 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
 
   private checkApiHealth(): void {
     let endpointsInfoToValidate =
-      this.healthCheckEndpointsInfo[this.apiDocJson.info.group];
+      healthCheckEndpointsInfo[this.apiDocJson.info.group];
     if (this.serviceName && endpointsInfoToValidate) {
       // Perform health check
       this.performHealthCheck(endpointsInfoToValidate[0].endpoint);
@@ -335,6 +268,51 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
 
   toggleUnhealthyErrorDetails(): void {
     this.showUnhealthyErrorDetails = !this.showUnhealthyErrorDetails;
+  }
+
+  private generateSwaggerWithApiKey(apiDocumentation: ApiDocJson): void {
+    SwaggerUI({
+      spec: apiDocumentation,
+      domNode: this.apiDocElement?.nativeElement,
+      requestInterceptor: (req: SwaggerUI.Request) => {
+        req['headers'][SESSION_TOKEN_HEADER] = this.userDataService.token;
+        req['headers'][API_KEY_HEADER] = environment.dfApiDocsApiKey;
+        // Parse the request URL
+        const url = new URL(req['url']);
+        const params = new URLSearchParams(url.search);
+        // Decode all parameters
+        params.forEach((value, key) => {
+          params.set(key, decodeURIComponent(value));
+        });
+        // Update the URL with decoded parameters
+        url.search = params.toString();
+        req['url'] = url.toString();
+        return req;
+      },
+      showMutatedRequest: true,
+      onComplete: () => {
+        if (
+          this.apiDocElement &&
+          this.apiDocElement.nativeElement &&
+          this.swaggerInjectedContentContainerRef &&
+          this.swaggerInjectedContentContainerRef.nativeElement
+        ) {
+          const swaggerContainer = this.apiDocElement.nativeElement;
+          const customContentNode =
+            this.swaggerInjectedContentContainerRef.nativeElement;
+
+          const infoContainer = swaggerContainer.querySelector(
+            '.information-container .main'
+          );
+
+          this.injectCustomContent(
+            swaggerContainer,
+            infoContainer,
+            customContentNode
+          );
+        }
+      },
+    });
   }
 
   reloadApiDocs() {

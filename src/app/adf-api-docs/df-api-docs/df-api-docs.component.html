@@ -16,6 +16,18 @@
   <mat-form-field appearance="outline" class="api-keys-select">
     <mat-label>{{ 'apiDocs.apiKeys.label' | transloco }}</mat-label>
     <mat-select>
+      <mat-option [value]="null">
+        <div class="api-key-option">
+          <div class="key-info">
+            <span class="key-name"
+              >None (Session token based authentication)</span
+            >
+            <span class="key-preview"
+              >Uses session token to build the request</span
+            >
+          </div>
+        </div>
+      </mat-option>
       <mat-option *ngFor="let key of apiKeys" [value]="key.apiKey">
         <div class="api-key-option">
           <div class="key-info">
@@ -81,7 +93,6 @@
     *ngIf="serviceName"
     [apiDocJson]="apiDocJson"
     [serviceName]="serviceName"></df-api-quickstart>
-
   <div
     *ngIf="apiDocJson?.info?.group === 'Database'"
     style="margin: 16px 0 8px 0">

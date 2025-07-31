@@ -60,3 +60,7 @@ mat-expansion-panel-header {
     background-color: #f93e3e; // red
   }
 }
+
+.themed-text {
+  color: var(--df-primary-text-color);
+}
