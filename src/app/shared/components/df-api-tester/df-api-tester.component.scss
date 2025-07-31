@@ -14,7 +14,9 @@
   gap: 16px;
   align-items: end;
   margin: 16px 0;
-
+  justify-content: center; 
+  align-items: baseline;
+  
   @media (max-width: 768px) {
     grid-template-columns: 1fr;
     gap: 12px;
@@ -131,6 +133,11 @@
   }
 
   &.auth-error {
+    border-left: 4px solid #f44336;
+    background: rgba(244, 67, 54, 0.05);
+  }
+
+  &.non-auth-error {
     border-left: 4px solid #ff9800;
     background: rgba(255, 152, 0, 0.05);
   }

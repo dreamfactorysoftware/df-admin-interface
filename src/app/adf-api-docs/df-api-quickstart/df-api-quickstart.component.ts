@@ -16,6 +16,7 @@ import { ApiDocJson } from 'src/app/shared/types/files';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { DfApiTesterComponent } from 'src/app/shared/components/df-api-tester/df-api-tester.component';
+import { healthCheckEndpointsInfo } from '../constants/health-check-endpoints';
 
 interface CurlCommand {
   title: string;
@@ -72,37 +73,29 @@ export class DfApiQuickstartComponent implements OnChanges {
 
   private prepareCurlCommands(): void {
     this.curlCommands = [];
-    if (!this.serviceName || !this.apiDocJson?.paths) {
+    if (!this.serviceName || !this.apiDocJson?.info?.group) {
       return;
     }
 
-    // Generate cURL commands for the first few GET endpoints
-    const getEndpoints = Object.keys(this.apiDocJson.paths)
-      .filter(path => {
-        const pathData = this.apiDocJson.paths[path];
-        return pathData['get'] && typeof pathData['get'] === 'object';
-      })
-      .slice(0, 3); // Limit to first 3 GET endpoints for quickstart
+    const endpointsInfo = healthCheckEndpointsInfo[this.apiDocJson.info.group];
+    if (endpointsInfo?.length > 0) {
+      endpointsInfo.forEach(endpointInfo => {
+        const sessionToken = this.userDataService.token || 'YOUR_SESSION_TOKEN';
+        const baseUrl = `${window.location.origin}${BASE_URL}/${this.serviceName}${endpointInfo.endpoint}`;
+        const headers = `-H 'accept: application/json' -H '${SESSION_TOKEN_HEADER}: ${sessionToken}'`;
 
-    getEndpoints.forEach(endpoint => {
-      const operation = this.apiDocJson.paths[endpoint]['get'];
-      const baseUrl = `${window.location.origin}${BASE_URL}/${this.serviceName}${endpoint}`;
+        const commandForDisplay = `curl -X 'GET' '${baseUrl}' \\\n ${headers}`;
+        const commandForCopy = `curl -X 'GET' '${baseUrl}' ${headers}`;
 
-      let headers: string;
-      const sessionToken = this.userDataService.token || 'YOUR_SESSION_TOKEN';
-      headers = `-H 'accept: application/json' -H '${SESSION_TOKEN_HEADER}: ${sessionToken}'`;
-
-      const commandForDisplay = `curl -X 'GET' '${baseUrl}' \\\n ${headers}`;
-      const commandForCopy = `curl -X 'GET' '${baseUrl}' ${headers}`;
-
-      this.curlCommands.push({
-        title: operation?.summary || `GET ${endpoint}`,
-        description: operation?.description || `Retrieve data from ${endpoint}`,
-        textForDisplay: commandForDisplay,
-        textForCopy: commandForCopy,
-        note: operation?.summary || '',
+        this.curlCommands.push({
+          title: endpointInfo.title,
+          description: endpointInfo.description,
+          textForDisplay: commandForDisplay,
+          textForCopy: commandForCopy,
+          note: this.apiDocJson.paths[endpointInfo.endpoint]?.['get']?.summary || '',
+        });
       });
-    });
+    }
   }
 
   trackByCommand(index: number, item: CurlCommand): string {

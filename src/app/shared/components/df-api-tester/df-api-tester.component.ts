@@ -226,10 +226,10 @@ export class DfApiTesterComponent implements OnChanges {
         };
         this.isTesting = false;
         this.snackBar.open(
-          `${selectedEndpoint.method} request successful! Authentication verified.`,
+          `✅ Authentication successful! Access granted to ${selectedEndpoint.method} ${selectedEndpoint.endpoint}`,
           'Close',
           {
-            duration: 3000,
+            duration: 4000,
           }
         );
       },
@@ -239,14 +239,14 @@ export class DfApiTesterComponent implements OnChanges {
           success: false,
           status: error.status || 0,
           error: isAuthError
-            ? 'Authentication failed'
-            : error.error?.error?.message || error.message || 'Unknown error',
+            ? 'Authentication failed - Access denied'
+            : error.error?.error?.message || error.message || 'Request failed due to non-authentication error',
         };
         this.isTesting = false;
 
         if (isAuthError) {
           this.snackBar.open(
-            'Authentication failed! Check your API key or session.',
+            '🔒 Authentication failed! Your credentials do not have access to this endpoint.',
             'Close',
             {
               duration: 5000,
@@ -254,10 +254,10 @@ export class DfApiTesterComponent implements OnChanges {
           );
         } else {
           this.snackBar.open(
-            `${selectedEndpoint.method} request failed. Check the results below.`,
+            `✅ Authentication successful, but request failed due to other reasons (Status: ${error.status}).`,
             'Close',
             {
-              duration: 3000,
+              duration: 4000,
             }
           );
         }
@@ -301,5 +301,15 @@ export class DfApiTesterComponent implements OnChanges {
 
   isAuthenticationError(): boolean {
     return this.testResult?.status === 401 || this.testResult?.status === 403;
+  }
+
+  getResultIconColor(): string {
+    if (this.testResult?.success) {
+      return '#4caf50'; // Green for success
+    } else if (this.isAuthenticationError()) {
+      return '#f44336'; // Red for auth failure
+    } else {
+      return '#ff9800'; // Orange for non-auth failure (auth passed but request failed)
+    }
   }
 }

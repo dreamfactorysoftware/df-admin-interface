@@ -55,6 +55,7 @@ import { BASE_URL } from 'src/app/shared/constants/urls';
 import { Subscription, of, forkJoin } from 'rxjs';
 import { DfApiQuickstartComponent } from '../df-api-quickstart/df-api-quickstart.component';
 import { ApiDocJson } from 'src/app/shared/types/files';
+import { healthCheckEndpointsInfo } from '../constants/health-check-endpoints';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { FormsModule } from '@angular/forms';
 
@@ -120,32 +121,6 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
   healthError: string | null = null;
   serviceName: string | null = null;
   showUnhealthyErrorDetails = false;
-  // Mapping of service types to their corresponding endpoints, probably would be better to move to the back-end
-  healthCheckEndpointsInfo: {
-    [key: string]: { endpoint: string; title: string; description: string }[];
-  } = {
-    Database: [
-      {
-        endpoint: '/_schema',
-        title: 'View Available Schemas',
-        description:
-          'This command fetches a list of schemas from your connected database',
-      },
-      {
-        endpoint: '/_table',
-        title: 'View Tables in Your Database',
-        description: 'This command lists all tables in your database',
-      },
-    ],
-    File: [
-      {
-        endpoint: '/',
-        title: 'View Available Folders',
-        description:
-          'This command fetches a list of folders from your connected file storage',
-      },
-    ],
-  };
 
   private rawHttp: HttpClient;
 
@@ -228,7 +203,7 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
 
   private checkApiHealth(): void {
     let endpointsInfoToValidate =
-      this.healthCheckEndpointsInfo[this.apiDocJson.info.group];
+      healthCheckEndpointsInfo[this.apiDocJson.info.group];
     if (this.serviceName && endpointsInfoToValidate) {
       // Perform health check
       this.performHealthCheck(endpointsInfoToValidate[0].endpoint);

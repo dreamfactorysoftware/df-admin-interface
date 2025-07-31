@@ -33,7 +33,7 @@
                   </span>
                   <span class="endpoint-path">{{ endpoint.endpoint }}</span>
                 </div>
-                <span class="endpoint-title">{{ endpoint.title }}</span>
+                <span class="endpoint-title"> {{ endpoint.title }}</span>
               </div>
             </mat-option>
           </mat-select>
@@ -120,20 +120,19 @@
         appearance="outlined"
         [class.success-result]="testResult.success"
         [class.error-result]="!testResult.success"
-        [class.auth-error]="isAuthenticationError()">
+        [class.auth-error]="!testResult.success && isAuthenticationError()"
+        [class.non-auth-error]="!testResult.success && !isAuthenticationError()">
         <mat-card-header>
           <mat-card-title>
             <fa-icon
               [icon]="testResult.success ? faCheck : faTimes"
-              [style.color]="
-                testResult.success ? '#4caf50' : '#f44336'
-              "></fa-icon>
-            <span *ngIf="testResult.success">Authentication Successful</span>
+              [style.color]="getResultIconColor()"></fa-icon>
+            <span *ngIf="testResult.success">✅ Authentication & Request Successful</span>
             <span *ngIf="!testResult.success && isAuthenticationError()"
-              >Authentication Failed</span
+              >🔒 Authentication Failed</span
             >
             <span *ngIf="!testResult.success && !isAuthenticationError()"
-              >Request Failed</span
+              >✅ Authentication OK - Request Failed (Non-Auth Issue)</span
             >
           </mat-card-title>
           <button
@@ -147,14 +146,13 @@
           <div class="result-summary">
             <span><strong>Status Code:</strong> {{ testResult.status }}</span>
             <span *ngIf="testResult.success">
-              <strong>Result:</strong> Access granted - authentication is
-              working correctly
+              <strong>Result:</strong> ✅ Authentication verified and access granted successfully
             </span>
             <span *ngIf="!testResult.success && isAuthenticationError()">
-              <strong>Issue:</strong> {{ testResult.error }}
+              <strong>Authentication Result:</strong> 🔒 Access denied - {{ testResult.error }}
             </span>
             <span *ngIf="!testResult.success && !isAuthenticationError()">
-              <strong>Error:</strong> {{ testResult.error }}
+              <strong>Authentication Result:</strong> ✅ Authentication passed, but request failed due to: {{ testResult.error }}
             </span>
           </div>
 
@@ -162,7 +160,7 @@
           <div
             *ngIf="!testResult.success && isAuthenticationError()"
             class="auth-guidance">
-            <h5>Authentication Help:</h5>
+            <h5>🔒 Authentication Help:</h5>
             <ul>
               <li *ngIf="!selectedApiKey">
                 Try selecting a different API key from the dropdown above
@@ -174,6 +172,20 @@
                 Check if the service has proper role-based access configured
               </li>
               <li>Verify the API key is active and not expired</li>
+            </ul>
+          </div>
+
+          <!-- Non-auth error guidance -->
+          <div
+            *ngIf="!testResult.success && !isAuthenticationError()"
+            class="auth-guidance">
+            <h5>✅ Authentication Status: Passed</h5>
+            <p><strong>Good news!</strong> Your authentication is working correctly. The request failed for other reasons:</p>
+            <ul>
+              <li>The endpoint might require specific parameters or request body</li>
+              <li>The service might be temporarily unavailable</li>
+              <li>The endpoint might have validation rules that weren't met</li>
+              <li>Check the error message above for specific details</li>
             </ul>
           </div>
         </mat-card-content>
