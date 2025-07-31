@@ -15,6 +15,8 @@ import { SESSION_TOKEN_HEADER } from 'src/app/shared/constants/http-headers';
 import { ApiDocJson } from 'src/app/shared/types/files';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { DfApiTesterComponent } from 'src/app/shared/components/df-api-tester/df-api-tester.component';
+import { healthCheckEndpointsInfo } from '../constants/health-check-endpoints';
 
 interface CurlCommand {
   title: string;
@@ -23,32 +25,6 @@ interface CurlCommand {
   textForCopy: string;
   note: string;
 }
-
-const healthCheckEndpointsInfo: {
-  [key: string]: { endpoint: string; title: string; description: string }[];
-} = {
-  Database: [
-    {
-      endpoint: '/_schema',
-      title: 'View Available Schemas',
-      description:
-        'This command fetches a list of schemas from your connected database',
-    },
-    {
-      endpoint: '/_table',
-      title: 'View Tables in Your Database',
-      description: 'This command lists all tables in your database',
-    },
-  ],
-  File: [
-    {
-      endpoint: '/',
-      title: 'View Available Folders',
-      description:
-        'This command fetches a list of folders from your connected file storage',
-    },
-  ],
-};
 
 @Component({
   selector: 'df-api-quickstart',
@@ -65,6 +41,7 @@ const healthCheckEndpointsInfo: {
     FontAwesomeModule,
     MatDividerModule,
     MatButtonModule,
+    DfApiTesterComponent,
   ],
 })
 export class DfApiQuickstartComponent implements OnChanges {
@@ -115,7 +92,9 @@ export class DfApiQuickstartComponent implements OnChanges {
           description: endpointInfo.description,
           textForDisplay: commandForDisplay,
           textForCopy: commandForCopy,
-          note: this.apiDocJson.paths[endpointInfo.endpoint]?.['get']?.summary,
+          note:
+            this.apiDocJson.paths[endpointInfo.endpoint]?.['get']?.summary ||
+            '',
         });
       });
     }

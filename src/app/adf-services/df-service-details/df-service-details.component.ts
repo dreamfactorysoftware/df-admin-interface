@@ -27,6 +27,7 @@ import { TranslocoPipe } from '@ngneat/transloco';
 import { DfArrayFieldComponent } from 'src/app/shared/components/df-field-array/df-array-field.component';
 import { DfDynamicFieldComponent } from 'src/app/shared/components/df-dynamic-field/df-dynamic-field.component';
 import { DfAceEditorComponent } from 'src/app/shared/components/df-ace-editor/df-ace-editor.component';
+import { DfSecurityConfigComponent } from 'src/app/shared/components/df-security-config/df-security-config.component';
 
 import { ConfigSchema, ServiceType } from 'src/app/shared/types/service';
 import {
@@ -67,10 +68,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { HttpClient } from '@angular/common/http';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
-import {
-  MatButtonToggleModule,
-  MatButtonToggleGroup,
-} from '@angular/material/button-toggle';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { readAsText } from '../../shared/utilities/file';
 import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
 import { BASE_URL } from 'src/app/shared/constants/urls';
@@ -86,16 +84,7 @@ import { MatCardModule } from '@angular/material/card';
 import { TitleCasePipe } from '@angular/common';
 import { MatDividerModule } from '@angular/material/divider';
 import { DfSystemService } from 'src/app/shared/services/df-system.service';
-import { DfUserDataService } from 'src/app/shared/services/df-user-data.service';
-import { DfPaywallService } from 'src/app/shared/services/df-paywall.service';
 import { DfPaywallModal } from 'src/app/shared/components/df-paywall-modal/df-paywall-modal.component';
-
-// Add this interface before the @Component decorator
-interface ComponentOption {
-  label: string;
-  value: string;
-  selected: boolean;
-}
 
 // Add these interfaces at the bottom of the file with the other interfaces
 interface RoleResponse {
@@ -113,11 +102,6 @@ interface AppResponse {
     api_key: string;
     [key: string]: any;
   }>;
-}
-
-interface CategorizedField {
-  basic: ConfigSchema[];
-  advanced: ConfigSchema[];
 }
 
 interface ServiceResponse {
@@ -165,6 +149,7 @@ interface ServiceResponse {
     MatCardModule,
     TitleCasePipe,
     MatDividerModule,
+    DfSecurityConfigComponent,
   ],
 })
 export class DfServiceDetailsComponent implements OnInit {
@@ -188,15 +173,7 @@ export class DfServiceDetailsComponent implements OnInit {
   systemEvents: Array<{ label: string; value: string }>;
   content = '';
   @ViewChild('stepper') stepper!: MatStepper;
-  @ViewChild('accessLevelGroup') accessLevelGroup!: MatButtonToggleGroup;
   showSecurityConfig = false;
-  selectedAccessType: string = '';
-  selectedComponent: string = '';
-  selectedAccessLevel: string = '';
-  showComponentSelection = false;
-  componentList: ComponentOption[] = [];
-  componentSearch = '';
-  selectedComponents: ComponentOption[] = [];
   currentServiceId: number | null = null;
   constructor(
     private activatedRoute: ActivatedRoute,
@@ -824,121 +801,6 @@ export class DfServiceDetailsComponent implements OnInit {
     this.serviceDefinitionType = value;
   }
 
-  onAccessTypeChange(event: any) {
-    this.selectedComponent = '';
-    this.showComponentSelection = this.selectedAccessType !== 'all';
-    // Here you would typically load the appropriate components
-    // This is just example data
-    this.componentList = [
-      { label: 'Component 1', value: 'comp1', selected: false },
-      { label: 'Component 2', value: 'comp2', selected: false },
-      { label: 'Component 3', value: 'comp3', selected: false },
-    ];
-  }
-
-  onComponentSelect(component: any) {
-    // If component is a string (from dropdown/select)
-    if (typeof component === 'string') {
-      this.selectedComponent = component;
-      this.componentList.forEach(c => (c.selected = c.value === component));
-    }
-    // If component is an object (from card selection)
-    else {
-      this.selectedComponent = component.value;
-      this.componentList.forEach(
-        c => (c.selected = c.value === component.value)
-      );
-    }
-  }
-
-  isSecurityConfigValid(): boolean {
-    const state = {
-      accessType: this.selectedAccessType,
-      accessLevel: this.selectedAccessLevel,
-      component: this.selectedComponent,
-    };
-
-    if (this.selectedAccessType === 'all') {
-      return (
-        Boolean(this.selectedAccessLevel) && this.selectedComponent === '*'
-      );
-    }
-
-    return (
-      Boolean(this.selectedAccessType) &&
-      Boolean(this.selectedComponent) &&
-      Boolean(this.selectedAccessLevel) &&
-      this.selectedComponent.includes('/*')
-    ); // Ensure wildcard is present
-  }
-
-  selectAccessType(type: string) {
-    this.selectedAccessType = type;
-    this.selectedComponent = '';
-    this.showComponentSelection = type !== 'all';
-
-    if (type === 'all') {
-      this.componentList = [];
-      this.selectedComponent = '*'; // Set a default component for 'all' access
-      this.selectedAccessLevel = 'full'; // Automatically set full access for 'all' type
-      return;
-    }
-
-    const serviceName = this.serviceForm.get('name')?.value;
-    switch (type) {
-      case 'tables':
-        this.selectedComponent = '_table/*';
-        this.componentList = ['_table'].map(suffix => ({
-          label: `${serviceName}${suffix}`,
-          value: `${suffix}/*`,
-          selected: true,
-        }));
-        break;
-      case 'procedures':
-        this.selectedComponent = '_proc/*';
-        this.componentList = ['_proc'].map(suffix => ({
-          label: `${serviceName}${suffix}`,
-          value: `${suffix}/*`,
-          selected: true,
-        }));
-        break;
-      case 'functions':
-        this.selectedComponent = '_func/*';
-        this.componentList = ['_func'].map(suffix => ({
-          label: `${serviceName}${suffix}`,
-          value: `${suffix}/*`,
-          selected: true,
-        }));
-        break;
-      default:
-        this.componentList = [];
-    }
-  }
-
-  onAccessLevelChange(level: string) {
-    this.selectedAccessLevel = level;
-  }
-
-  get filteredComponents() {
-    return this.componentList.filter(comp =>
-      comp.label.toLowerCase().includes(this.componentSearch.toLowerCase())
-    );
-  }
-
-  isComponentSelected(component: any) {
-    return component.selected;
-  }
-
-  onComponentSelectionChange(component: any) {
-    if (component.selected) {
-      this.selectedComponents.push(component);
-    } else {
-      this.selectedComponents = this.selectedComponents.filter(
-        c => c.value !== component.value
-      );
-    }
-  }
-
   navigateToRoles(event: Event) {
     event.preventDefault();
     // Navigate to roles tab
@@ -1022,187 +884,6 @@ export class DfServiceDetailsComponent implements OnInit {
       // Show error message using DfSnackbarService
       this.snackbarService.openSnackBar('Error creating service', 'error');
     }
-  }
-
-  saveSecurityConfig() {
-    if (!this.isSecurityConfigValid()) {
-      return;
-    }
-
-    if (!this.currentServiceId) {
-      this.snackBar.open('No service ID found. Please try again.', 'Close', {
-        duration: 3000,
-      });
-      return;
-    }
-
-    const serviceName = this.serviceForm.get('name')?.value;
-    const formattedName = this.formatServiceName(serviceName);
-    const roleName = `${serviceName}_auto_role`;
-
-    const rolePayload = {
-      resource: [
-        {
-          name: roleName,
-          description: `Auto-generated role for service ${serviceName}`,
-          is_active: true,
-          role_service_access_by_role_id: [
-            {
-              service_id: this.currentServiceId,
-              component: this.selectedComponent,
-              verb_mask: this.getAccessLevel(this.selectedAccessLevel),
-              requestor_mask: 3,
-              filters: [],
-              filter_op: 'AND',
-            },
-          ],
-          user_to_app_to_role_by_role_id: [],
-        },
-      ],
-    };
-
-    // Create role and chain with app creation using proper RxJS operators
-    this.systemService
-      .post('role', rolePayload)
-      .pipe(
-        catchError(error => {
-          return throwError(() => error);
-        }),
-        switchMap((roleResponse: any) => {
-          if (!roleResponse?.resource?.[0]?.id) {
-            return throwError(() => new Error('Invalid role response'));
-          }
-          const createdRoleId = roleResponse.resource[0].id;
-
-          const appPayload = {
-            resource: [
-              {
-                name: `${serviceName}_app`,
-                description: `Auto-generated app for service ${serviceName}`,
-                type: '0',
-                role_id: createdRoleId,
-                is_active: true,
-                url: null,
-                storage_service_id: null,
-                storage_container: null,
-                path: null,
-              },
-            ],
-          };
-
-          return this.systemService
-            .post('app?fields=*&related=role_by_role_id', appPayload)
-            .pipe(
-              catchError(error => {
-                this.snackBar.open(
-                  `Error creating app: ${
-                    error.error?.message || error.message || 'Unknown error'
-                  }`,
-                  'Close',
-                  { duration: 5000 }
-                );
-                return throwError(() => error);
-              }),
-              map((appResponse: any) => {
-                if (!appResponse?.resource?.[0]) {
-                  throw new Error('App response missing resource array');
-                }
-
-                const app = appResponse.resource[0];
-
-                if (!app.apiKey) {
-                  throw new Error('App response missing apiKey');
-                }
-
-                return {
-                  apiKey: app.apiKey,
-                  formattedName: formattedName,
-                };
-              }),
-              catchError(error => {
-                return throwError(() => error);
-              })
-            );
-        }),
-        map((appResponse: any) => {
-          if (!appResponse?.apiKey) {
-            throw new Error('Invalid app response');
-          }
-          return {
-            apiKey: appResponse.apiKey,
-            formattedName: formattedName,
-          };
-        })
-      )
-      .subscribe({
-        next: result => {
-          // Attempt to copy API key to clipboard
-          if (navigator.clipboard) {
-            navigator.clipboard
-              .writeText(result.apiKey)
-              .then(() => {
-                this.snackbarService.openSnackBar(
-                  'API Created and API Key copied to clipboard',
-                  'success'
-                );
-              })
-              .catch(() => {
-                this.snackbarService.openSnackBar(
-                  'API Created, but failed to copy API Key',
-                  'success'
-                );
-              });
-          } else {
-            this.snackbarService.openSnackBar(
-              'API Created, but failed to copy API Key',
-              'success'
-            );
-          }
-
-          // Navigate to API docs
-          this.router
-            .navigateByUrl(
-              `/api-connections/api-docs/${result.formattedName}`,
-              {
-                replaceUrl: true,
-              }
-            )
-            .then(success => {
-              if (!success) {
-                this.router.navigate(
-                  ['api-connections', 'api-docs', result.formattedName],
-                  {
-                    replaceUrl: true,
-                  }
-                );
-              }
-            });
-        },
-        error: error => {
-          // Show error message using DfSnackbarService
-          this.snackbarService.openSnackBar(
-            'Error saving security configuration',
-            'error'
-          );
-        },
-      });
-  }
-
-  private getAccessLevel(level: string): number {
-    switch (level) {
-      case 'read':
-        return 1; // GET
-      case 'write':
-        return 7; // GET (1) + POST (2) + PUT/PATCH (4) = 7
-      case 'full':
-        return 15; // All permissions (GET + POST + PUT + DELETE)
-      default:
-        return 0;
-    }
-  }
-
-  onAccessLevelSelect(level: string) {
-    this.selectedAccessLevel = level;
   }
 
   getServiceTypeLabel(value: string): string {
