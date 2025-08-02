@@ -22,9 +22,6 @@
               [cardFinalHeaderColor]="card.headerColor">
             </df-generate-api-card>
           </div>
-          <p id="need-help-choosing-note">
-            {{ 'home.welcomePage.needHelpChoosing' | transloco }}
-          </p>
           <h3 id="learn-more-heading">
             {{ 'home.welcomePage.learnMoreHeading' | transloco }}
           </h3>
@@ -46,46 +43,6 @@
           </ul>
         </article>
       </article>
-      <aside class="flex-column">
-        <div class="video-link">
-          <a
-            href="https://youtu.be/FOSOm88RxPw"
-            target="_blank"
-            aria-labelledby="video-link-description">
-            <img
-              class="video-image"
-              src="assets/img/macbook-hp-df-1.png"
-              alt="" />
-            <div class="video-overlay">
-              <fa-icon [icon]="faCirclePlay" class="fa-4x play-icon"></fa-icon>
-              <span id="video-link-description">{{
-                'home.welcomePage.watchVideoCta' | transloco
-              }}</span>
-            </div>
-          </a>
-        </div>
-        <!-- <mat-card class="notice-card">
-          <h3>
-            <fa-icon
-              [icon]="faHeart"
-              class="pre-heading-icon"
-              aria-hidden="true"></fa-icon
-            >{{ 'home.welcomePage.ossUsersHeading' | transloco }}
-          </h3>
-          <p [innerHtml]="'home.welcomePage.ossUsersText' | transloco"></p>
-        </mat-card>
-
-        <mat-card class="notice-card">
-          <h3>
-            <fa-icon
-              [icon]="faComment"
-              class="pre-heading-icon"
-              aria-hidden="true"></fa-icon
-            >{{ 'home.welcomePage.hearFromYouHeading' | transloco }}
-          </h3>
-          <p [innerHtml]="'home.welcomePage.hearFromYouText' | transloco"></p>
-        </mat-card> -->
-      </aside>
     </section>
     <section class="platforms-section">
       <div>
