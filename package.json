@@ -34,6 +34,7 @@
     "@ngneat/transloco": "^5.0.7",
     "@ngneat/until-destroy": "^10.0.0",
     "ace-builds": "^1.24.2",
+    "chart.js": "^4.4.1",
     "rxjs": "~7.8.0",
     "source-map-support": "^0.5.21",
     "swagger-ui": "^5.6.1",

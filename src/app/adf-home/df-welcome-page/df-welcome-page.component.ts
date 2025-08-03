@@ -40,6 +40,7 @@ import { SERVICES_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DFStorageService } from 'src/app/shared/services/df-storage.service';
 import { ROUTES } from '../../shared/types/routes';
 import { DfGenerateApiCardComponent } from './df-generate-api-card/df-generate-api-card.component';
+import { DfDashboardComponent } from '../df-dashboard/df-dashboard.component';
 
 @Component({
   selector: 'df-welcome-page',
@@ -63,6 +64,7 @@ import { DfGenerateApiCardComponent } from './df-generate-api-card/df-generate-a
     MatButtonModule,
     MatIconModule,
     DfGenerateApiCardComponent,
+    DfDashboardComponent,
   ],
   providers: [DfBaseCrudService],
 })

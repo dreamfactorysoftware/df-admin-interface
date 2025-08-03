@@ -91,5 +91,27 @@
     "angularJs": "Angular JS",
     "angular2": "Angular 2",
     "react": "React"
+  },
+  "dashboard": {
+    "title": "Quick Stats",
+    "loading": "Loading stats...",
+    "error": "Unable to load stats. Please try again later.",
+    "services": {
+      "title": "API Services",
+      "total": "Your Services",
+      "createPrompt": "Get started! Create your first API using the cards above"
+    },
+    "admins": {
+      "title": "Admins",
+      "total": "Total Admins"
+    },
+    "apiKeys": {
+      "title": "API Keys",
+      "total": "Your API Keys"
+    },
+    "roles": {
+      "title": "Roles",
+      "total": "Your Roles"
+    }
   }
 }
