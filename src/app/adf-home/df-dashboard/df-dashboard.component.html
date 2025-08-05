@@ -1,6 +1,8 @@
-<div class="dashboard-container" [class.dark-theme]="themeService.darkMode$ | async">
+<div
+  class="dashboard-container"
+  [class.dark-theme]="themeService.darkMode$ | async">
   <h2 class="dashboard-title">{{ 'home.dashboard.title' | transloco }}</h2>
-  
+
   <div *ngIf="loading" class="loading-container">
     <mat-card class="loading-card">
       <mat-card-content>
@@ -43,7 +45,6 @@
         color="info">
       </df-dashboard-card>
     </div>
-
   </div>
 
   <div *ngIf="!loading && error" class="error-container">

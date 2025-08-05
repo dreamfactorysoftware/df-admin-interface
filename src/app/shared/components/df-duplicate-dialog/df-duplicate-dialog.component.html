@@ -1,0 +1,38 @@
+<h1 mat-dialog-title>{{ data.title | transloco }}</h1>
+<div mat-dialog-content>
+  <p>{{ data.message | transloco }}</p>
+  <mat-form-field appearance="outline" class="full-width">
+    <mat-label>{{ data.label | transloco }}</mat-label>
+    <input 
+      matInput 
+      [formControl]="nameControl"
+      [placeholder]="data.originalName"
+      cdkFocusInitial
+    />
+    <mat-error *ngIf="nameControl.hasError('required')">
+      {{ 'validation.required' | transloco }}
+    </mat-error>
+    <mat-error *ngIf="nameControl.hasError('nameExists')">
+      {{ 'validation.nameExists' | transloco }}
+    </mat-error>
+    <mat-error *ngIf="nameControl.hasError('sameName')">
+      {{ 'validation.sameAsOriginal' | transloco }}
+    </mat-error>
+  </mat-form-field>
+</div>
+<div mat-dialog-actions>
+  <button 
+    mat-flat-button 
+    (click)="onCancel()"
+    type="button">
+    {{ 'cancel' | transloco }}
+  </button>
+  <button
+    mat-flat-button
+    (click)="onDuplicate()"
+    [disabled]="!nameControl.valid"
+    type="button"
+    color="primary">
+    {{ 'duplicate' | transloco }}
+  </button>
+</div>

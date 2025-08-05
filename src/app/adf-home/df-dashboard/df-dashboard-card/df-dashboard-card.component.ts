@@ -9,11 +9,7 @@ import { IconDefinition } from '@fortawesome/fontawesome-svg-core';
   templateUrl: './df-dashboard-card.component.html',
   styleUrls: ['./df-dashboard-card.component.scss'],
   standalone: true,
-  imports: [
-    CommonModule,
-    MatCardModule,
-    FontAwesomeModule
-  ]
+  imports: [CommonModule, MatCardModule, FontAwesomeModule],
 })
 export class DfDashboardCardComponent {
   @Input() icon!: IconDefinition;
@@ -25,5 +21,6 @@ export class DfDashboardCardComponent {
   @Input() trendClass?: string;
   @Input() footerText?: string;
   @Input() showPrompt?: boolean = false;
-  @Input() color: 'primary' | 'accent' | 'success' | 'info' | 'warn' = 'primary';
+  @Input() color: 'primary' | 'accent' | 'success' | 'info' | 'warn' =
+    'primary';
 }

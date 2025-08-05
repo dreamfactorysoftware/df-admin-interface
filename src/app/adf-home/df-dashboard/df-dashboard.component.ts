@@ -7,13 +7,12 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDividerModule } from '@angular/material/divider';
 import { TranslocoModule } from '@ngneat/transloco';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import {
-  faPlug,
-  faKey,
-  faLock
-} from '@fortawesome/free-solid-svg-icons';
+import { faPlug, faKey, faLock } from '@fortawesome/free-solid-svg-icons';
 import { Subject, takeUntil } from 'rxjs';
-import { DfAnalyticsService, DashboardStats } from '../../shared/services/df-analytics.service';
+import {
+  DfAnalyticsService,
+  DashboardStats,
+} from '../../shared/services/df-analytics.service';
 import { DfThemeService } from '../../shared/services/df-theme.service';
 import { DfBreakpointService } from '../../shared/services/df-breakpoint.service';
 import { DfDashboardCardComponent } from './df-dashboard-card/df-dashboard-card.component';
@@ -32,21 +31,21 @@ import { DfDashboardCardComponent } from './df-dashboard-card/df-dashboard-card.
     MatDividerModule,
     TranslocoModule,
     FontAwesomeModule,
-    DfDashboardCardComponent
-  ]
+    DfDashboardCardComponent,
+  ],
 })
 export class DfDashboardComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
-  
+
   // Icons
-  faPlug = faPlug;        // For API Services
-  faKey = faKey;          // For API Keys
-  faLock = faLock;        // For Roles
+  faPlug = faPlug; // For API Services
+  faKey = faKey; // For API Keys
+  faLock = faLock; // For Roles
 
   stats: DashboardStats = {
     services: { total: 0 },
     apiKeys: { total: 0 },
-    roles: { total: 0 }
+    roles: { total: 0 },
   };
   loading = true;
   error = false;
@@ -71,15 +70,16 @@ export class DfDashboardComponent implements OnInit, OnDestroy {
   private loadDashboardStats(): void {
     this.loading = true;
     this.error = false;
-    
-    this.analyticsService.getDashboardStats()
+
+    this.analyticsService
+      .getDashboardStats()
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: (stats) => {
+        next: stats => {
           this.stats = stats || {
             services: { total: 0 },
             apiKeys: { total: 0 },
-            roles: { total: 0 }
+            roles: { total: 0 },
           };
           this.loading = false;
         },
@@ -90,10 +90,9 @@ export class DfDashboardComponent implements OnInit, OnDestroy {
           this.stats = {
             services: { total: 0 },
             apiKeys: { total: 0 },
-            roles: { total: 0 }
+            roles: { total: 0 },
           };
-        }
+        },
       });
   }
-
 }

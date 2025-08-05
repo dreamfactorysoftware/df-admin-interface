@@ -42,7 +42,6 @@
   padding: 32px;
 }
 
-
 .error-icon {
   font-size: 48px;
   color: #f44336;
@@ -54,8 +53,14 @@
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .stats-grid {
@@ -64,8 +69,6 @@
   gap: 20px;
   margin-bottom: 24px;
 }
-
-
 
 // Mobile responsiveness
 @media (max-width: 768px) {
