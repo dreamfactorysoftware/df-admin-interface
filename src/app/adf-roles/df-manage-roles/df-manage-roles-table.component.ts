@@ -143,6 +143,7 @@ export class DfManageRolesTableComponent extends DfManageTableComponent<RoleRow>
         })
       )
       .subscribe(roleData => {
+        console.log('Role data from API:', roleData);
         // Get all existing role names for validation
         this.roleService
           .getAll<GenericListResponse<RoleType>>({ limit: 1000 })
@@ -163,30 +164,31 @@ export class DfManageRolesTableComponent extends DfManageTableComponent<RoleRow>
             dialogRef.afterClosed().subscribe(newName => {
               if (newName) {
                 // Create a copy of the role with all its configurations
-                // Using camelCase as expected by the API
+                // Using snake_case for the API payload
                 const duplicatedRole = {
                   name: newName,
                   description: `${roleData.description || ''} (copy)`,
-                  isActive: roleData.is_active,
-                  // Copy service access permissions with camelCase
-                  roleServiceAccessByRoleId:
-                    roleData.role_service_access_by_role_id?.map(
+                  is_active: roleData.isActive || roleData.is_active,
+                  // Copy service access permissions - check both camelCase and snake_case
+                  role_service_access_by_role_id:
+                    (roleData.roleServiceAccessByRoleId || roleData.role_service_access_by_role_id)?.map(
                       (access: any) => ({
-                        serviceId: access.service_id,
+                        service_id: access.serviceId || access.service_id,
                         component: access.component,
-                        verbMask: access.verb_mask,
-                        requestorMask: access.requestor_mask,
-                        filters: access.filters?.map((filter: any) => ({
-                          name: filter.name || filter.field,
-                          operator: filter.operator,
-                          value: filter.value,
-                        })) || [],
-                        filterOp: access.filter_op || 'AND',
+                        verb_mask: access.verbMask || access.verb_mask,
+                        requestor_mask: access.requestorMask || access.requestor_mask,
+                        filters:
+                          access.filters?.map((filter: any) => ({
+                            name: filter.name || filter.field,
+                            operator: filter.operator,
+                            value: filter.value,
+                          })) || [],
+                        filter_op: access.filterOp || access.filter_op || 'AND',
                       })
                     ) || [],
-                  // Copy lookup keys with camelCase
-                  lookupByRoleId:
-                    roleData.lookup_by_role_id?.map((lookup: any) => ({
+                  // Copy lookup keys - check both camelCase and snake_case
+                  lookup_by_role_id:
+                    (roleData.lookupByRoleId || roleData.lookup_by_role_id)?.map((lookup: any) => ({
                       name: lookup.name,
                       value: lookup.value,
                       private: lookup.private,
@@ -198,6 +200,8 @@ export class DfManageRolesTableComponent extends DfManageTableComponent<RoleRow>
                 const payload = {
                   resource: [duplicatedRole],
                 };
+
+                console.log('Sending payload:', JSON.stringify(payload, null, 2));
 
                 // Create the new role
                 this.roleService
