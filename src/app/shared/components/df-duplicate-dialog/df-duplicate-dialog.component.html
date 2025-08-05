@@ -3,12 +3,11 @@
   <p>{{ data.message | transloco }}</p>
   <mat-form-field appearance="outline" class="full-width">
     <mat-label>{{ data.label | transloco }}</mat-label>
-    <input 
-      matInput 
+    <input
+      matInput
       [formControl]="nameControl"
       [placeholder]="data.originalName"
-      cdkFocusInitial
-    />
+      cdkFocusInitial />
     <mat-error *ngIf="nameControl.hasError('required')">
       {{ 'validation.required' | transloco }}
     </mat-error>
@@ -21,10 +20,7 @@
   </mat-form-field>
 </div>
 <div mat-dialog-actions>
-  <button 
-    mat-flat-button 
-    (click)="onCancel()"
-    type="button">
+  <button mat-flat-button (click)="onCancel()" type="button">
     {{ 'cancel' | transloco }}
   </button>
   <button

@@ -56,7 +56,7 @@ export class DfManageRolesTableComponent extends DfManageTableComponent<RoleRow>
     dialog: MatDialog
   ) {
     super(router, activatedRoute, liveAnnouncer, translateService, dialog);
-    
+
     // Add duplicate action
     const duplicateAction = {
       label: 'duplicate',
@@ -67,7 +67,7 @@ export class DfManageRolesTableComponent extends DfManageTableComponent<RoleRow>
       },
       icon: faCopy,
     };
-    
+
     if (this.actions.additional) {
       // Insert duplicate action before delete action
       const deleteIndex = this.actions.additional.findIndex(
@@ -132,7 +132,10 @@ export class DfManageRolesTableComponent extends DfManageTableComponent<RoleRow>
 
   duplicateRole(row: RoleRow): void {
     // First, get the full role details with related data
-    this.roleService.get<any>(row.id, { related: 'role_service_access_by_role_id,lookup_by_role_id' })
+    this.roleService
+      .get<any>(row.id, {
+        related: 'role_service_access_by_role_id,lookup_by_role_id',
+      })
       .pipe(
         catchError(error => {
           console.error('Failed to fetch role details:', error);
@@ -140,68 +143,81 @@ export class DfManageRolesTableComponent extends DfManageTableComponent<RoleRow>
         })
       )
       .subscribe(roleData => {
-      // Get all existing role names for validation
-      this.roleService
-        .getAll<GenericListResponse<RoleType>>({ limit: 1000 })
-        .subscribe(allRoles => {
-          const existingNames = allRoles.resource.map(r => r.name);
-          
-          const dialogRef = this.dialog.open(DfDuplicateDialogComponent, {
-            width: '400px',
-            data: {
-              title: 'roles.duplicate.title',
-              message: 'roles.duplicate.message',
-              label: 'roles.duplicate.nameLabel',
-              originalName: roleData.name,
-              existingNames: existingNames,
-            },
-          });
+        // Get all existing role names for validation
+        this.roleService
+          .getAll<GenericListResponse<RoleType>>({ limit: 1000 })
+          .subscribe(allRoles => {
+            const existingNames = allRoles.resource.map(r => r.name);
 
-          dialogRef.afterClosed().subscribe(newName => {
-            if (newName) {
-              // Create a copy of the role with all its configurations
-              const duplicatedRole = {
-                name: newName,
-                description: `${roleData.description || ''} (copy)`,
-                is_active: roleData.is_active,
-                // Copy service access permissions
-                role_service_access_by_role_id: roleData.role_service_access_by_role_id?.map((access: any) => ({
-                  service_id: access.service_id,
-                  component: access.component,
-                  verb_mask: access.verb_mask,
-                  requestor_mask: access.requestor_mask,
-                  filters: access.filters,
-                  filter_op: access.filter_op,
-                })) || [],
-                // Copy lookup keys
-                lookup_by_role_id: roleData.lookup_by_role_id?.map((lookup: any) => ({
-                  name: lookup.name,
-                  value: lookup.value,
-                  private: lookup.private,
-                  description: lookup.description,
-                })) || [],
-              };
-              
-              // Wrap in resource array as expected by the API
-              const payload = {
-                resource: [duplicatedRole]
-              };
-              
-              // Create the new role
-              this.roleService
-                .create(payload, { snackbarSuccess: 'roles.alerts.duplicateSuccess' })
-                .pipe(
-                  catchError(error => {
-                    console.error('Failed to duplicate role:', error);
-                    return throwError(() => error);
+            const dialogRef = this.dialog.open(DfDuplicateDialogComponent, {
+              width: '400px',
+              data: {
+                title: 'roles.duplicate.title',
+                message: 'roles.duplicate.message',
+                label: 'roles.duplicate.nameLabel',
+                originalName: roleData.name,
+                existingNames: existingNames,
+              },
+            });
+
+            dialogRef.afterClosed().subscribe(newName => {
+              if (newName) {
+                // Create a copy of the role with all its configurations
+                // Using camelCase as expected by the API
+                const duplicatedRole = {
+                  name: newName,
+                  description: `${roleData.description || ''} (copy)`,
+                  isActive: roleData.is_active,
+                  // Copy service access permissions with camelCase
+                  roleServiceAccessByRoleId:
+                    roleData.role_service_access_by_role_id?.map(
+                      (access: any) => ({
+                        serviceId: access.service_id,
+                        component: access.component,
+                        verbMask: access.verb_mask,
+                        requestorMask: access.requestor_mask,
+                        filters: access.filters?.map((filter: any) => ({
+                          name: filter.name || filter.field,
+                          operator: filter.operator,
+                          value: filter.value,
+                        })) || [],
+                        filterOp: access.filter_op || 'AND',
+                      })
+                    ) || [],
+                  // Copy lookup keys with camelCase
+                  lookupByRoleId:
+                    roleData.lookup_by_role_id?.map((lookup: any) => ({
+                      name: lookup.name,
+                      value: lookup.value,
+                      private: lookup.private,
+                      description: lookup.description,
+                    })) || [],
+                };
+
+                // Wrap in resource array as expected by the API
+                const payload = {
+                  resource: [duplicatedRole],
+                };
+
+                // Create the new role
+                this.roleService
+                  .create(payload, {
+                    snackbarSuccess: 'roles.alerts.duplicateSuccess',
+                    fields: '*',
+                    related: 'role_service_access_by_role_id,lookup_by_role_id',
                   })
-                )
-                .subscribe(() => {
-                  this.refreshTable();
-                });
-            }
+                  .pipe(
+                    catchError(error => {
+                      console.error('Failed to duplicate role:', error);
+                      return throwError(() => error);
+                    })
+                  )
+                  .subscribe(() => {
+                    this.refreshTable();
+                  });
+              }
+            });
           });
-        });
-    });
+      });
   }
 }

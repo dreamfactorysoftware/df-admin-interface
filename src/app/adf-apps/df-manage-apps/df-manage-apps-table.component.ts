@@ -75,7 +75,7 @@ export class DfManageAppsTableComponent extends DfManageTableComponent<AppRow> {
             row.name
           );
           this.appsService
-            .update(row.id, { apiKey: newKey })
+            .update(row.id, { api_key: newKey })
             .subscribe(() => this.refreshTable());
         },
         ariaLabel: {
@@ -84,7 +84,7 @@ export class DfManageAppsTableComponent extends DfManageTableComponent<AppRow> {
         disabled: row => row.createdById === null,
       },
     ];
-    
+
     // Add duplicate action before delete action
     const duplicateAction = {
       label: 'duplicate',
@@ -95,7 +95,7 @@ export class DfManageAppsTableComponent extends DfManageTableComponent<AppRow> {
       },
       icon: faCopy,
     };
-    
+
     if (this.actions.additional) {
       // Find the delete action index
       const deleteIndex = this.actions.additional.findIndex(
@@ -179,7 +179,8 @@ export class DfManageAppsTableComponent extends DfManageTableComponent<AppRow> {
 
   duplicateApp(row: AppRow): void {
     // First, get the full app details
-    this.appsService.get<AppType>(row.id)
+    this.appsService
+      .get<AppType>(row.id)
       .pipe(
         catchError(error => {
           console.error('Failed to fetch app details:', error);
@@ -187,75 +188,69 @@ export class DfManageAppsTableComponent extends DfManageTableComponent<AppRow> {
         })
       )
       .subscribe(app => {
-      // Get all existing app names for validation
-      this.appsService
-        .getAll<GenericListResponse<AppType>>({ limit: 1000 })
-        .subscribe(allApps => {
-          const existingNames = allApps.resource.map(a => a.name);
-          
-          const dialogRef = this.dialog.open(DfDuplicateDialogComponent, {
-            width: '400px',
-            data: {
-              title: 'apps.duplicate.title',
-              message: 'apps.duplicate.message',
-              label: 'apps.duplicate.nameLabel',
-              originalName: app.name,
-              existingNames: existingNames,
-            },
-          });
+        // Get all existing app names for validation
+        this.appsService
+          .getAll<GenericListResponse<AppType>>({ limit: 1000 })
+          .subscribe(allApps => {
+            const existingNames = allApps.resource.map(a => a.name);
 
-          dialogRef.afterClosed().subscribe(async (newName) => {
-            if (newName) {
-              // Generate a new API key for the duplicated app
-              const newApiKey = await generateApiKey(
-                this.systemConfigDataService.environment.server.host,
-                newName
-              );
-              
-              // Create a copy of the app with the new name and API key
-              // Using snake_case as expected by the API
-              const duplicatedApp = {
-                name: newName,
-                api_key: newApiKey,
-                description: `${app.description || ''} (copy)`,
-                is_active: app.isActive,
-                type: app.type,
-                role_id: app.roleId || null,
-                // Copy app location specific fields
-                url: app.url || null,
-                storage_service_id: app.storageServiceId || null,
-                storage_container: app.storageContainer || null,
-                path: app.path || null,
-                // Copy additional settings
-                requires_fullscreen: app.requiresFullscreen,
-                allow_fullscreen_toggle: app.allowFullscreenToggle,
-                toggle_location: app.toggleLocation,
-              };
-              
-              // Wrap in resource array as expected by the API
-              const payload = {
-                resource: [duplicatedApp]
-              };
-              
-              // Create the new app
-              this.appsService
-                .create(payload, { 
-                  snackbarSuccess: 'apps.alerts.duplicateSuccess',
-                  fields: '*',
-                  related: 'role_by_role_id' 
-                })
-                .pipe(
-                  catchError(error => {
-                    console.error('Failed to duplicate app:', error);
-                    return throwError(() => error);
+            const dialogRef = this.dialog.open(DfDuplicateDialogComponent, {
+              width: '400px',
+              data: {
+                title: 'apps.duplicate.title',
+                message: 'apps.duplicate.message',
+                label: 'apps.duplicate.nameLabel',
+                originalName: app.name,
+                existingNames: existingNames,
+              },
+            });
+
+            dialogRef.afterClosed().subscribe(newName => {
+              if (newName) {
+                // Create a copy of the app with the new name
+                // Using snake_case as expected by the API
+                // Note: API key is generated server-side, not sent in payload
+                const duplicatedApp = {
+                  name: newName,
+                  description: `${app.description || ''} (copy)`,
+                  is_active: app.isActive,
+                  type: app.type,
+                  role_id: app.roleId || null,
+                  // Copy app location specific fields
+                  url: app.url || null,
+                  storage_service_id: app.storageServiceId || null,
+                  storage_container: app.storageContainer || null,
+                  path: app.path || null,
+                  // Copy additional settings
+                  requires_fullscreen: app.requiresFullscreen,
+                  allow_fullscreen_toggle: app.allowFullscreenToggle,
+                  toggle_location: app.toggleLocation,
+                };
+
+                // Wrap in resource array as expected by the API
+                const payload = {
+                  resource: [duplicatedApp],
+                };
+
+                // Create the new app
+                this.appsService
+                  .create(payload, {
+                    snackbarSuccess: 'apps.alerts.duplicateSuccess',
+                    fields: '*',
+                    related: 'role_by_role_id',
                   })
-                )
-                .subscribe(() => {
-                  this.refreshTable();
-                });
-            }
+                  .pipe(
+                    catchError(error => {
+                      console.error('Failed to duplicate app:', error);
+                      return throwError(() => error);
+                    })
+                  )
+                  .subscribe(() => {
+                    this.refreshTable();
+                  });
+              }
+            });
           });
-        });
-    });
+      });
   }
 }
