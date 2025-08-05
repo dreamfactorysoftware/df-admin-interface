@@ -143,7 +143,6 @@ export class DfManageRolesTableComponent extends DfManageTableComponent<RoleRow>
         })
       )
       .subscribe(roleData => {
-        console.log('Role data from API:', roleData);
         // Get all existing role names for validation
         this.roleService
           .getAll<GenericListResponse<RoleType>>({ limit: 1000 })
