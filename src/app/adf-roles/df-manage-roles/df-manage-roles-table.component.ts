@@ -170,24 +170,28 @@ export class DfManageRolesTableComponent extends DfManageTableComponent<RoleRow>
                   is_active: roleData.isActive || roleData.is_active,
                   // Copy service access permissions - check both camelCase and snake_case
                   role_service_access_by_role_id:
-                    (roleData.roleServiceAccessByRoleId || roleData.role_service_access_by_role_id)?.map(
-                      (access: any) => ({
-                        service_id: access.serviceId || access.service_id,
-                        component: access.component,
-                        verb_mask: access.verbMask || access.verb_mask,
-                        requestor_mask: access.requestorMask || access.requestor_mask,
-                        filters:
-                          access.filters?.map((filter: any) => ({
-                            name: filter.name || filter.field,
-                            operator: filter.operator,
-                            value: filter.value,
-                          })) || [],
-                        filter_op: access.filterOp || access.filter_op || 'AND',
-                      })
-                    ) || [],
+                    (
+                      roleData.roleServiceAccessByRoleId ||
+                      roleData.role_service_access_by_role_id
+                    )?.map((access: any) => ({
+                      service_id: access.serviceId || access.service_id,
+                      component: access.component,
+                      verb_mask: access.verbMask || access.verb_mask,
+                      requestor_mask:
+                        access.requestorMask || access.requestor_mask,
+                      filters:
+                        access.filters?.map((filter: any) => ({
+                          name: filter.name || filter.field,
+                          operator: filter.operator,
+                          value: filter.value,
+                        })) || [],
+                      filter_op: access.filterOp || access.filter_op || 'AND',
+                    })) || [],
                   // Copy lookup keys - check both camelCase and snake_case
                   lookup_by_role_id:
-                    (roleData.lookupByRoleId || roleData.lookup_by_role_id)?.map((lookup: any) => ({
+                    (
+                      roleData.lookupByRoleId || roleData.lookup_by_role_id
+                    )?.map((lookup: any) => ({
                       name: lookup.name,
                       value: lookup.value,
                       private: lookup.private,
@@ -200,7 +204,10 @@ export class DfManageRolesTableComponent extends DfManageTableComponent<RoleRow>
                   resource: [duplicatedRole],
                 };
 
-                console.log('Sending payload:', JSON.stringify(payload, null, 2));
+                console.log(
+                  'Sending payload:',
+                  JSON.stringify(payload, null, 2)
+                );
 
                 // Create the new role
                 this.roleService
