@@ -197,7 +197,7 @@ export class DfServiceDetailsComponent implements OnInit {
       description: [''],
       isActive: [true],
       service_doc_by_service_id: this.fb.group({
-        format: [],
+        format: [0],
         content: [''],
       }),
     });
@@ -560,9 +560,9 @@ export class DfServiceDetailsComponent implements OnInit {
       //   data.service_doc_by_service_id = null;
       // } else {
       data.service_doc_by_service_id.content = data.config.content;
-      data.service_doc_by_service_id.format = Number(
-        this.serviceDefinitionType
-      );
+      data.service_doc_by_service_id.format = this.serviceDefinitionType
+        ? Number(this.serviceDefinitionType)
+        : 0;
       // }
     } else if (this.isScriptService) {
       params = {
