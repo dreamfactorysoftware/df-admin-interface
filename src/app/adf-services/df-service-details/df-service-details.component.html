@@ -531,26 +531,47 @@
     </div>
     <ng-container *ngIf="viewSchema && !subscriptionRequired">
       <ng-container formGroupName="config">
-        <ng-container *ngIf="this.isNetworkService || this.isScriptService">
-          <ng-container *ngIf="getConfigControl('storageServiceId')">
-            <df-script-editor
-              [isScript]="this.isScriptService"
-              [type]="getControl('type')"
-              [storageServiceId]="getConfigControl('storageServiceId')"
-              [storagePath]="getConfigControl('storagePath')"
-              [content]="getConfigControl('serviceDefinition')"
-              [cache]="serviceData ? serviceData.name : ''"
-              class="full-width"></df-script-editor>
+        <!-- Network Service Configuration -->
+        <ng-container *ngIf="this.isNetworkService">
+          <!-- Required Fields (Base URL) - Always visible at the top -->
+          <ng-container *ngFor="let item of networkRequiredFields">
+            <df-dynamic-field
+              *ngIf="
+                [
+                  'integer',
+                  'password',
+                  'string',
+                  'text',
+                  'picklist',
+                  'multi_picklist',
+                  'boolean',
+                  'file_certificate',
+                  'file_certificate_api'
+                ].includes(item.type)
+              "
+              color="primary"
+              [schema]="item"
+              [formControl]="getConfigControl(item.name)"
+              [class.dynamic-width]="
+                ['file_certificate', 'file_certificate_api'].indexOf(
+                  item.type
+                ) === -1
+              "
+              [class.full-width]="
+                ['file_certificate', 'file_certificate_api'].indexOf(
+                  item.type
+                ) !== -1
+              "></df-dynamic-field>
           </ng-container>
-        </ng-container>
-        <mat-accordion class="full-width">
-          <mat-expansion-panel [expanded]="serviceForm.getRawValue().type">
-            <mat-expansion-panel-header
-              >{{ 'services.options' | transloco }}
-            </mat-expansion-panel-header>
-            <div class="details-section">
-              <ng-container
-                *ngIf="this.isNetworkService || this.isScriptService">
+
+          <!-- Advanced Options Section for Network Services -->
+          <mat-accordion class="full-width">
+            <mat-expansion-panel [expanded]="false">
+              <mat-expansion-panel-header>
+                Advanced Options
+              </mat-expansion-panel-header>
+              <div class="details-section">
+                <!-- Service Definition Section -->
                 <ng-container *ngIf="serviceForm.getRawValue().type !== 'soap'">
                   <mat-button-toggle-group
                     aria-label="Service Definition Type"
@@ -564,7 +585,7 @@
                   </mat-button-toggle-group>
                 </ng-container>
                 <mat-label class="full-width">Service Definition</mat-label>
-
+                
                 <ng-container *ngIf="serviceForm.getRawValue().type === 'rws'">
                   <df-file-github
                     [type]="getControl('type')"
@@ -573,7 +594,86 @@
                     class="full-width">
                   </df-file-github>
                 </ng-container>
-              </ng-container>
+                
+                <ng-container *ngIf="serviceForm.getRawValue().type === 'soap'">
+                  <df-file-github
+                    [type]="getControl('type')"
+                    [content]="getConfigControl('content')"
+                    [contentText]="content"
+                    class="full-width">
+                  </df-file-github>
+                </ng-container>
+                
+                <ng-container *ngIf="serviceForm.getRawValue().type === 'rest' || serviceForm.getRawValue().type === 'http'">
+                  <df-ace-editor
+                    class="full-width"
+                    [formControl]="getConfigControl('content')"
+                    [mode]="serviceDefinitionMode">
+                  </df-ace-editor>
+                </ng-container>
+
+                <!-- Other Advanced Fields -->
+                <ng-container *ngFor="let item of networkAdvancedFields">
+                  <df-dynamic-field
+                    *ngIf="
+                      [
+                        'integer',
+                        'password',
+                        'string',
+                        'text',
+                        'picklist',
+                        'multi_picklist',
+                        'boolean',
+                        'file_certificate',
+                        'file_certificate_api'
+                      ].includes(item.type)
+                    "
+                    color="primary"
+                    [schema]="item"
+                    [formControl]="getConfigControl(item.name)"
+                    [class.dynamic-width]="
+                      ['file_certificate', 'file_certificate_api'].indexOf(
+                        item.type
+                      ) === -1
+                    "
+                    [class.full-width]="
+                      ['file_certificate', 'file_certificate_api'].indexOf(
+                        item.type
+                      ) !== -1
+                    "></df-dynamic-field>
+                  <df-array-field
+                    *ngIf="item.type === 'array' || item.type === 'object'"
+                    [schema]="item"
+                    [formControl]="getConfigControl(item.name)"
+                    class="full-width"></df-array-field>
+                </ng-container>
+              </div>
+            </mat-expansion-panel>
+          </mat-accordion>
+        </ng-container>
+
+        <!-- Script Service Configuration (unchanged) -->
+        <ng-container *ngIf="this.isScriptService">
+          <ng-container *ngIf="getConfigControl('storageServiceId')">
+            <df-script-editor
+              [isScript]="this.isScriptService"
+              [type]="getControl('type')"
+              [storageServiceId]="getConfigControl('storageServiceId')"
+              [storagePath]="getConfigControl('storagePath')"
+              [content]="getConfigControl('serviceDefinition')"
+              [cache]="serviceData ? serviceData.name : ''"
+              class="full-width"></df-script-editor>
+          </ng-container>
+        </ng-container>
+
+        <!-- Other Service Types (unchanged) -->
+        <ng-container *ngIf="!this.isNetworkService && !this.isScriptService">
+          <mat-accordion class="full-width">
+            <mat-expansion-panel [expanded]="serviceForm.getRawValue().type">
+              <mat-expansion-panel-header
+                >{{ 'services.options' | transloco }}
+              </mat-expansion-panel-header>
+              <div class="details-section">
               <ng-container
                 *ngIf="
                   this.isFile && serviceForm.getRawValue().type === 'local_file'
@@ -596,7 +696,7 @@
                 <df-ace-editor
                   class="full-width"
                   [formControl]="getConfigControl('excelContent')"
-                  [mode]="serviceForm.getRawValue().type"></df-ace-editor>
+                  [mode]="excelMode"></df-ace-editor>
               </ng-container>
               <ng-container *ngFor="let item of viewSchema">
                 <ng-container
@@ -652,6 +752,7 @@
             </div>
           </mat-expansion-panel>
         </mat-accordion>
+        </ng-container>
       </ng-container>
     </ng-container>
     <div class="full-width action-bar" *ngIf="!subscriptionRequired">
