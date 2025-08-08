@@ -87,6 +87,10 @@
   "confirm": "Confirm",
   "label": "Label",
   "confirmDelete": "Are you sure you want to delete this?",
+  "duplicate": "Duplicate",
+  "duplicateService": "Duplicate service {{name}}",
+  "duplicateRole": "Duplicate role {{name}}",
+  "duplicateApp": "Duplicate app {{name}}",
   "origins": "Origins",
   "headers": "Headers",
   "exposedHeaders": "Exposed Headers",
@@ -376,6 +380,41 @@
   "alerts": {
     "duplicateEmail": "Email address already exists",
     "close": "Close alert"
+  },
+  "validation": {
+    "required": "This field is required",
+    "nameExists": "This name already exists",
+    "sameAsOriginal": "Name must be different from original"
+  },
+  "services": {
+    "alerts": {
+      "duplicateSuccess": "Service duplicated successfully"
+    },
+    "duplicate": {
+      "title": "Duplicate Service",
+      "message": "Enter a new name for the duplicated service",
+      "nameLabel": "Service Name"
+    }
+  },
+  "roles": {
+    "alerts": {
+      "duplicateSuccess": "Role duplicated successfully"
+    },
+    "duplicate": {
+      "title": "Duplicate Role",
+      "message": "Enter a new name for the duplicated role",
+      "nameLabel": "Role Name"
+    }
+  },
+  "apps": {
+    "alerts": {
+      "duplicateSuccess": "App duplicated successfully"
+    },
+    "duplicate": {
+      "title": "Duplicate App",
+      "message": "Enter a new name for the duplicated app",
+      "nameLabel": "App Name"
+    }
   },
   "lookupKeys": {
     "label": "Lookup Keys",

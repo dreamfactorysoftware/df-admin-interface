@@ -1,0 +1,86 @@
+.dashboard-container {
+  padding: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+
+  &.dark-theme {
+    .dashboard-title {
+      color: #ffffff;
+    }
+
+    .loading-card,
+    .error-card {
+      background-color: #424242;
+    }
+
+    .performance-card,
+    .storage-card {
+      background-color: #424242;
+      color: #ffffff;
+    }
+  }
+}
+
+.dashboard-title {
+  font-size: 24px;
+  font-weight: 500;
+  margin-bottom: 24px;
+  color: #333;
+}
+
+.loading-container,
+.error-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+}
+
+.loading-card,
+.error-card {
+  text-align: center;
+  padding: 32px;
+}
+
+.error-icon {
+  font-size: 48px;
+  color: #f44336;
+  margin-bottom: 16px;
+}
+
+.dashboard-content {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+// Mobile responsiveness
+@media (max-width: 768px) {
+  .dashboard-container {
+    padding: 16px;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .charts-row {
+    grid-template-columns: 1fr;
+  }
+}

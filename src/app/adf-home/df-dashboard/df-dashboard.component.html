@@ -1,0 +1,57 @@
+<div
+  class="dashboard-container"
+  [class.dark-theme]="themeService.darkMode$ | async">
+  <h2 class="dashboard-title">{{ 'home.dashboard.title' | transloco }}</h2>
+
+  <div *ngIf="loading" class="loading-container">
+    <mat-card class="loading-card">
+      <mat-card-content>
+        <p>{{ 'home.dashboard.loading' | transloco }}</p>
+      </mat-card-content>
+    </mat-card>
+  </div>
+
+  <div *ngIf="!loading && !error" class="dashboard-content">
+    <!-- Quick Stats Cards -->
+    <div class="stats-grid">
+      <!-- Total Services Card -->
+      <df-dashboard-card
+        [icon]="faPlug"
+        [title]="'home.dashboard.services.title' | transloco"
+        [value]="stats.services.total"
+        [subtitle]="'home.dashboard.services.total' | transloco"
+        [showPrompt]="stats.services.total === 0"
+        color="primary">
+        <div prompt class="service-prompt" *ngIf="stats.services.total === 0">
+          <span>{{ 'home.dashboard.services.createPrompt' | transloco }}</span>
+        </div>
+      </df-dashboard-card>
+
+      <!-- API Keys Card -->
+      <df-dashboard-card
+        [icon]="faKey"
+        [title]="'home.dashboard.apiKeys.title' | transloco"
+        [value]="stats.apiKeys.total"
+        [subtitle]="'home.dashboard.apiKeys.total' | transloco"
+        color="success">
+      </df-dashboard-card>
+
+      <!-- Roles Card -->
+      <df-dashboard-card
+        [icon]="faLock"
+        [title]="'home.dashboard.roles.title' | transloco"
+        [value]="stats.roles.total"
+        [subtitle]="'home.dashboard.roles.total' | transloco"
+        color="info">
+      </df-dashboard-card>
+    </div>
+  </div>
+
+  <div *ngIf="!loading && error" class="error-container">
+    <mat-card class="error-card">
+      <mat-card-content>
+        <p>{{ 'home.dashboard.error' | transloco }}</p>
+      </mat-card-content>
+    </mat-card>
+  </div>
+</div>

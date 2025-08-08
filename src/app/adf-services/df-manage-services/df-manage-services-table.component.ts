@@ -13,6 +13,9 @@ import { GenericListResponse } from 'src/app/shared/types/generic-http';
 import { Service, ServiceRow, ServiceType } from 'src/app/shared/types/service';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 import { UntilDestroy } from '@ngneat/until-destroy';
+import { DfDuplicateDialogComponent } from 'src/app/shared/components/df-duplicate-dialog/df-duplicate-dialog.component';
+import { faCopy } from '@fortawesome/free-solid-svg-icons';
+import { catchError, throwError } from 'rxjs';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-manage-services-table',
@@ -49,6 +52,29 @@ export class DfManageServicesTableComponent extends DfManageTableComponent<Servi
               action => action.label !== 'delete'
             ) ?? null,
         };
+      } else {
+        // Add duplicate action for non-system services
+        const duplicateAction = {
+          label: 'duplicate',
+          function: (row: ServiceRow) => this.duplicateService(row),
+          ariaLabel: {
+            key: 'duplicateService',
+            param: 'name',
+          },
+          icon: faCopy,
+        };
+
+        if (this.actions.additional) {
+          // Insert duplicate action before delete action
+          const deleteIndex = this.actions.additional.findIndex(
+            action => action.label === 'delete'
+          );
+          if (deleteIndex !== -1) {
+            this.actions.additional.splice(deleteIndex, 0, duplicateAction);
+          } else {
+            this.actions.additional.push(duplicateAction);
+          }
+        }
       }
     });
   }
@@ -161,6 +187,72 @@ export class DfManageServicesTableComponent extends DfManageTableComponent<Servi
           this.dataSource.data = mappedData;
         }
         this.tableLength = data.meta.count;
+      });
+  }
+
+  duplicateService(row: ServiceRow): void {
+    // First, get the full service details
+    this.serviceService
+      .get<Service>(row.id)
+      .pipe(
+        catchError(error => {
+          console.error('Failed to fetch service details:', error);
+          return throwError(() => error);
+        })
+      )
+      .subscribe(service => {
+        // Get all existing service names for validation
+        this.serviceService
+          .getAll<GenericListResponse<Service>>({ limit: 1000 })
+          .subscribe(allServices => {
+            const existingNames = allServices.resource.map(s => s.name);
+
+            const dialogRef = this.dialog.open(DfDuplicateDialogComponent, {
+              width: '400px',
+              data: {
+                title: 'services.duplicate.title',
+                message: 'services.duplicate.message',
+                label: 'services.duplicate.nameLabel',
+                originalName: service.name,
+                existingNames: existingNames,
+              },
+            });
+
+            dialogRef.afterClosed().subscribe(newName => {
+              if (newName) {
+                // Create a copy of the service with the new name, including all config
+                const duplicatedService = {
+                  name: newName,
+                  label: service.label || newName,
+                  description: `${service.description || ''} (copy)`,
+                  is_active: service.isActive,
+                  type: service.type,
+                  // Copy the entire config object which contains all service-specific settings
+                  config: service.config ? { ...service.config } : {},
+                };
+
+                // Wrap in resource array as expected by the API
+                const payload = {
+                  resource: [duplicatedService],
+                };
+
+                // Create the new service
+                this.serviceService
+                  .create(payload, {
+                    snackbarSuccess: 'services.alerts.duplicateSuccess',
+                  })
+                  .pipe(
+                    catchError(error => {
+                      console.error('Failed to duplicate service:', error);
+                      return throwError(() => error);
+                    })
+                  )
+                  .subscribe(() => {
+                    this.refreshTable();
+                  });
+              }
+            });
+          });
       });
   }
 }

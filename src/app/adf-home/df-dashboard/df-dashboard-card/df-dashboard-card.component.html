@@ -1,0 +1,29 @@
+<mat-card class="dashboard-card" [class]="'card-' + color">
+  <mat-card-content>
+    <div class="card-header">
+      <div class="icon-container" [class]="'icon-' + color">
+        <fa-icon [icon]="icon"></fa-icon>
+      </div>
+      <div class="header-stats" *ngIf="trend !== undefined">
+        <span class="trend" [class]="trendClass">
+          <fa-icon *ngIf="trendIcon" [icon]="trendIcon"></fa-icon>
+          {{ trend }}%
+        </span>
+      </div>
+    </div>
+
+    <div class="card-body">
+      <h3 class="card-title">{{ title }}</h3>
+      <div class="card-value">{{ value }}</div>
+      <p class="card-subtitle" *ngIf="subtitle">{{ subtitle }}</p>
+      <ng-content></ng-content>
+    </div>
+
+    <div class="card-footer" *ngIf="footerText || showPrompt">
+      <span class="footer-text" *ngIf="footerText && !showPrompt">{{
+        footerText
+      }}</span>
+      <ng-content select="[prompt]"></ng-content>
+    </div>
+  </mat-card-content>
+</mat-card>

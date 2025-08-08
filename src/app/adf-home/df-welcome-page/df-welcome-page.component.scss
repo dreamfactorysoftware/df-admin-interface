@@ -24,14 +24,14 @@ $df-coral-palette: mat.define-palette(theme.$df-coral-palette);
 }
 
 .flex-column {
-  flex-basis: 50%;
+  flex-basis: 100%;
 
   &:first-child {
-    padding-right: 25px;
+    padding-right: 0;
   }
 
   &:last-child {
-    padding-left: 25px;
+    padding-left: 0;
   }
 }
 
@@ -119,29 +119,21 @@ mat-card.notice-card {
 
   df-generate-api-card {
     width: 32%;
+    min-height: 180px;
 
-    @media (min-width: 960px) and (max-width: 1480px) {
+    @media (max-width: 959px) {
       width: 48%;
     }
 
     @media (max-width: 600px) {
-      width: 48%;
-    }
-
-    @media (max-width: 350px) {
-      width: 98%;
+      width: 100%;
     }
   }
 }
 
-#need-help-choosing-note,
 #learn-more-heading {
   text-align: center;
   margin: 0;
-}
-
-#need-help-choosing-note {
-  font-size: 12px;
 }
 
 .learn-more-links-list {
@@ -149,4 +141,9 @@ mat-card.notice-card {
   justify-content: space-evenly;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.dashboard-section {
+  margin-top: 48px;
+  margin-bottom: 32px;
 }
