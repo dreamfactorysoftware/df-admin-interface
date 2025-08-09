@@ -4,6 +4,7 @@ import { routes } from './app/routes';
 import { BrowserModule, bootstrapApplication } from '@angular/platform-browser';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { DfSystemConfigDataService } from './app/shared/services/df-system-config-data.service';
+import { DfLicenseInitializerService } from './app/shared/services/df-license-initializer.service';
 import { APP_INITIALIZER, importProvidersFrom, isDevMode } from '@angular/core';
 import { provideRouter, withHashLocation } from '@angular/router';
 import { sessionTokenInterceptor } from './app/shared/interceptors/session-token.interceptor';
@@ -21,6 +22,10 @@ function initEnvironment(systemConfigService: DfSystemConfigDataService) {
   return () => systemConfigService.fetchEnvironmentData();
 }
 
+function initLicenseCheck(licenseInitializer: DfLicenseInitializerService) {
+  return () => licenseInitializer.initializeLicenseCheck();
+}
+
 bootstrapApplication(AppComponent, {
   providers: [
     importProvidersFrom(BrowserModule, MatSnackBarModule),
@@ -28,6 +33,12 @@ bootstrapApplication(AppComponent, {
       provide: APP_INITIALIZER,
       useFactory: initEnvironment,
       deps: [DfSystemConfigDataService],
+      multi: true,
+    },
+    {
+      provide: APP_INITIALIZER,
+      useFactory: initLicenseCheck,
+      deps: [DfLicenseInitializerService],
       multi: true,
     },
     provideAnimations(),

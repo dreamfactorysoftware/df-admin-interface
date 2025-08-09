@@ -305,14 +305,14 @@ export class DfServiceDetailsComponent implements OnInit {
           if (data?.serviceDocByServiceId) {
             this.serviceDefinitionType =
               '' + data?.serviceDocByServiceId.format;
-            
+
             // For network services, set the content field
             if (this.isNetworkService) {
               this.getConfigControl('content')?.setValue(
                 data.serviceDocByServiceId.content
               );
               this.content = data.serviceDocByServiceId.content || '';
-            } 
+            }
             // For script services, set the serviceDefinition field
             else if (this.isScriptService) {
               this.getConfigControl('serviceDefinition')?.setValue(
@@ -402,7 +402,9 @@ export class DfServiceDetailsComponent implements OnInit {
   }
 
   get serviceDefinitionMode(): AceEditorMode {
-    return this.serviceDefinitionType === '0' ? AceEditorMode.JSON : AceEditorMode.YAML;
+    return this.serviceDefinitionType === '0'
+      ? AceEditorMode.JSON
+      : AceEditorMode.YAML;
   }
 
   get excelMode(): AceEditorMode {
@@ -531,7 +533,7 @@ export class DfServiceDetailsComponent implements OnInit {
     if (!this.isNetworkService || !this.viewSchema) {
       return [];
     }
-    
+
     // Base URL is the primary required field for network services
     const requiredFieldNames = ['baseUrl'];
     return this.viewSchema.filter(field =>
@@ -543,11 +545,12 @@ export class DfServiceDetailsComponent implements OnInit {
     if (!this.isNetworkService || !this.viewSchema) {
       return [];
     }
-    
+
     // All other fields are considered advanced
     const requiredFieldNames = ['baseUrl'];
     return this.viewSchema.filter(
-      field => !requiredFieldNames.includes(field.name) && field.name !== 'content'
+      field =>
+        !requiredFieldNames.includes(field.name) && field.name !== 'content'
     );
   }
 
@@ -596,10 +599,10 @@ export class DfServiceDetailsComponent implements OnInit {
       snackbarError: 'server',
       snackbarSuccess: 'services.createSuccessMsg',
     };
-    
+
     // Initialize service_doc_by_service_id based on service type
     let serviceDoc = null;
-    
+
     if (this.isNetworkService) {
       params = {
         ...params,
@@ -610,7 +613,9 @@ export class DfServiceDetailsComponent implements OnInit {
       if (data.config?.content) {
         serviceDoc = {
           content: data.config.content,
-          format: this.serviceDefinitionType ? Number(this.serviceDefinitionType) : 0
+          format: this.serviceDefinitionType
+            ? Number(this.serviceDefinitionType)
+            : 0,
         };
         // Remove content from config as it's moved to service_doc_by_service_id
         delete data.config.content;
@@ -625,13 +630,15 @@ export class DfServiceDetailsComponent implements OnInit {
       if (data.config?.serviceDefinition) {
         serviceDoc = {
           content: data.config.serviceDefinition,
-          format: this.serviceDefinitionType ? Number(this.serviceDefinitionType) : 0
+          format: this.serviceDefinitionType
+            ? Number(this.serviceDefinitionType)
+            : 0,
         };
         // Remove serviceDefinition from config as it's moved to service_doc_by_service_id
         delete data.config.serviceDefinition;
       }
     }
-    
+
     // Apply service_doc_by_service_id to data
     data.service_doc_by_service_id = serviceDoc;
     let payload;

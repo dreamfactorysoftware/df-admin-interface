@@ -1,0 +1,51 @@
+{
+  "description": "Create and edit email templates for User Registration, User Invite, Password Reset, and your custom email services.",
+  "templateName": {
+    "label": "Template Name",
+    "placeholder": "Enter template name",
+    "error": "Template name required"
+  },
+  "templateDescription": {
+    "label": "Template Description",
+    "placeholder": "Enter template description"
+  },
+  "recipient": {
+    "label": "Recipient",
+    "tooltip": "Enter recipient address. Enter multiple addresses separated by comma."
+  },
+  "cc": {
+    "label": "CC",
+    "tooltip": "Enter cc address. Enter multiple addresses separated by comma"
+  },
+  "bcc": {
+    "label": "BCC",
+    "tooltip": "Enter bcc address. Enter multiple addresses separated by comma."
+  },
+  "subject": { "label": "Subject", "placeholder": "Enter email subject" },
+  "attachment": {
+    "label": "Attachment",
+    "tooltip": "You can enter URL for attachment. Enter multiple URLs separated by comma. You can use lookup keys here too. Example: {key1},{key2}.",
+    "placeholder": "Enter email attachment"
+  },
+  "body": "Body",
+  "senderName": {
+    "label": "Sender Name",
+    "placeholder": "Enter sender name"
+  },
+  "senderEmail": {
+    "label": "Sender Email",
+    "placeholder": "Enter sender email"
+  },
+  "replyToName": {
+    "label": "Reply To Name",
+    "placeholder": "Enter reply to name"
+  },
+  "replyToEmail": {
+    "label": "Reply To Email",
+    "placeholder": "Enter reply to email"
+  },
+  "alerts": {
+    "createSuccess": "Email template successfully created",
+    "updateSuccess": "Email template successfully updated"
+  }
+}
