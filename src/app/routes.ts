@@ -52,6 +52,7 @@ import { eventsResolver } from './adf-event-scripts/resolvers/events.resolver';
 import { systemEventsResolver } from './adf-services/resolvers/system-events.resolver';
 import { checkStatusResolver } from './adf-config/resolvers/df-check-status.resolver';
 import { licenseGuard } from './shared/guards/license.guard';
+import { globalLicenseGuard } from './shared/guards/global-license.guard';
 import { errorGaurd } from './shared/guards/error.guard';
 import { paywallGuard } from './shared/guards/paywall.guard';
 import { rootAdminGuard } from './shared/guards/admin.guard';
@@ -80,7 +81,7 @@ export const routes: Routes = [
   {
     path: ROUTES.HOME,
     children: HomeRoutes,
-    canActivate: [loggedInGuard, licenseGuard],
+    canActivate: [loggedInGuard, licenseGuard, globalLicenseGuard],
     providers: [provideTranslocoScope('home')],
   },
   {
@@ -288,7 +289,7 @@ export const routes: Routes = [
         providers: [provideTranslocoScope('apiDocs')],
       },
     ],
-    canActivate: [loggedInGuard, licenseGuard],
+    canActivate: [loggedInGuard, licenseGuard, globalLicenseGuard],
   },
   {
     path: ROUTES.API_SECURITY,
@@ -347,7 +348,7 @@ export const routes: Routes = [
         providers: [provideTranslocoScope('services')],
       },
     ],
-    canActivate: [loggedInGuard, licenseGuard],
+    canActivate: [loggedInGuard, licenseGuard, globalLicenseGuard],
   },
   {
     path: ROUTES.SYSTEM_SETTINGS,
@@ -525,7 +526,7 @@ export const routes: Routes = [
         providers: [provideTranslocoScope('services')],
       },
     ],
-    canActivate: [loggedInGuard, licenseGuard],
+    canActivate: [loggedInGuard, licenseGuard, globalLicenseGuard],
   },
   {
     path: ROUTES.ADMIN_SETTINGS,
@@ -797,12 +798,12 @@ export const routes: Routes = [
         providers: [provideTranslocoScope('files')],
       },
     ],
-    canActivate: [loggedInGuard, licenseGuard],
+    canActivate: [loggedInGuard, licenseGuard, globalLicenseGuard],
   },
   {
     path: ROUTES.AI,
     loadComponent: () => import('./ai/ai.component').then(m => m.AiComponent),
-    canActivate: [loggedInGuard, licenseGuard],
+    canActivate: [loggedInGuard, licenseGuard, globalLicenseGuard],
     data: { showPaywall: true },
   },
   {
@@ -812,7 +813,7 @@ export const routes: Routes = [
         m => m.DfProfileComponent
       ),
     resolve: { data: profileResolver },
-    canActivate: [loggedInGuard, licenseGuard],
+    canActivate: [loggedInGuard, licenseGuard, globalLicenseGuard],
     providers: [
       DfProfileService,
       DfPasswordService,

@@ -1,0 +1,16 @@
+{
+  "table": {
+    "header": {
+      "name": "Service Name",
+      "label": "Label",
+      "description": "Description",
+      "group": "Group",
+      "type": "Type"
+    }
+  },
+  "downloadApiDoc": "Download Api Documentation",
+  "apiKeys": {
+    "label": "Available API Keys",
+    "copied": "API Key copied to clipboard"
+  }
+}

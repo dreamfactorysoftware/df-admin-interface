@@ -1,0 +1,137 @@
+[
+    {
+      "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbc69_alloy-p-500.png",
+      "alt": "AlloyDB",
+      "label": "alloydb"
+    },
+    {
+      "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/663d4b60d4c482cefa684e84_dynamodb%20logo.png",
+      "alt": "aws_dynamodb",
+      "label": "aws_dynamodb"
+    },
+    {
+      "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/663d4aeec92f326a1b4d7aba_redshift.png",
+      "alt": "aws_redshift_db",
+      "label": "aws_redshift_db"
+    },
+    {
+      "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbc6c_azure-p-500.png",
+      "alt": "azure_documentdb",
+      "label": "azure_documentdb"
+    },
+    {
+      "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbc6e_API%2520Logo%2520Container-p-500.png",
+      "alt": "azure_table",
+      "label": "azure_table"
+    },
+    {
+      "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbbf3_API%2520Logo%2520Container-p-500.webp",
+      "alt": "cassandra",
+      "label": "cassandra"
+    },
+    {
+      "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbbf2_API%2520Logo%2520Container-8-p-500.webp",
+      "alt": "couchdb",
+      "label": "couchdb"
+    },
+    {
+      "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbbf7_API%2520Logo%2520Container-14-p-500.webp",
+      "alt": "firebird",
+      "label": "firebird"
+    },
+    {
+      "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbc63_API%2520Logo%2520Container-p-500.webp",
+      "alt": "ibmdb2",
+      "label": "ibmdb2"
+    },
+    {
+      "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbc6d_ibm-p-500.png",
+      "alt": "informix",
+      "label": "informix"
+    },
+    {
+      "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbc6a_mariaDB-p-500.png",
+      "alt": "mariadb",
+      "label": "mariadb"
+    },
+    {
+      "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/663d4c15c6896a7cbc6606d4_singlestore.png",
+      "alt": "memsql",
+      "label": "memsql"
+    },
+    {
+      "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbbf1_API%2520Logo%2520Container-21-p-500.webp",
+      "alt": "mongodb",
+      "label": "mongodb"
+    },
+    {
+      "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbb7e_API%2520Logo%2520Container-3-p-500.webp",
+      "alt": "mysql",
+      "label": "mysql"
+    },
+    {
+      "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbb01_API%2520Logo%2520Container-5-p-500.webp",
+      "alt": "oracle",
+      "label": "oracle"
+    },
+    {
+      "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbb1a_API%2520Logo%2520Container-7-p-500.webp",
+      "alt": "pgsql",
+      "label": "pgsql"
+    },
+    {
+      "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbc68_Salesforce-p-500.png",
+      "alt": "salesforce_db",
+      "label": "salesforce_db"
+    },
+    {
+      "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbc66_Sap%2520SQL-p-500.png",
+      "alt": "sqlanywhere",
+      "label": "sqlanywhere"
+    },
+    {
+      "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbbab_API%2520Logo%2520Container-11-p-500.webp",
+      "alt": "sqlite",
+      "label": "sqlite"
+    },
+    {
+      "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbbd8_API%2520Logo%2520Container-27-p-500.webp",
+      "alt": "sqlsrv",
+      "label": "sqlsrv"
+    },
+    {
+      "src": "https://assets-global.website-files.com/64ed8da8a866be7a702fbafb/64ed8da8a866be7a702fbc67_API%2520Logo%2520Container-p-500.png",
+      "alt": "apache_hive",
+      "label": "apache_hive"
+    },
+    {
+      "src": "https://cdn.prod.website-files.com/64ed8da8a866be7a702fbafb/663179140e764316a084735b_connector%20logo%20updated.png",
+      "alt": "snowflake",
+      "label": "snowflake"
+    },
+    {
+      "src": "assets/img/bigquery.png",
+      "alt": "bigquery",
+      "label": "bigquery"
+    },
+    {
+      "src": "assets/img/databricks.png",
+      "alt": "databricks",
+      "label": "databricks"
+    },
+    {
+      "src": "assets/img/dremio.svg",
+      "alt": "dremio",
+      "label": "dremio"
+    },
+    {
+      "src": "assets/img/sap.svg",
+      "alt": "hana",
+      "label": "hana"
+    },
+    {
+      "src": "assets/img/trino.svg",
+      "alt": "Trino",
+      "label": "trino"
+    }
+  ]

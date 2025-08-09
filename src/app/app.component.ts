@@ -1,13 +1,15 @@
 import { Component, OnInit } from '@angular/core';
 import { DfLoadingSpinnerService } from './shared/services/df-loading-spinner.service';
 import { NgIf, AsyncPipe } from '@angular/common';
-import { RouterOutlet, Router, ActivatedRoute } from '@angular/router';
+import { RouterOutlet, Router, ActivatedRoute, NavigationEnd } from '@angular/router';
 import { DfSideNavComponent } from './shared/components/df-side-nav/df-side-nav.component';
 import { DfLicenseCheckService } from './shared/services/df-license-check.service';
-import { UntilDestroy } from '@ngneat/until-destroy';
+import { UntilDestroy, untilDestroyed } from '@ngneat/until-destroy';
 import { AuthService } from './shared/services/auth.service';
 import { LoggingService } from './shared/services/logging.service';
 import { LoginResponse } from './shared/types/auth.types';
+import { ROUTES } from './shared/types/routes';
+import { filter } from 'rxjs/operators';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -34,6 +36,18 @@ export class AppComponent implements OnInit {
   ngOnInit() {
     this.loggingService.log('AppComponent initialized');
     this.handleAuthentication();
+    
+    // Monitor license check changes and redirect when disable_ui is true
+    this.licenseCheck$
+      .pipe(untilDestroyed(this))
+      .subscribe(licenseCheck => {
+        if (licenseCheck?.disableUi === 'true') {
+          // Force navigation to license-expired page
+          if (!this.router.url.includes(ROUTES.LICENSE_EXPIRED)) {
+            this.router.navigate([ROUTES.LICENSE_EXPIRED]);
+          }
+        }
+      });
   }
 
   private handleAuthentication() {

@@ -585,7 +585,7 @@
                   </mat-button-toggle-group>
                 </ng-container>
                 <mat-label class="full-width">Service Definition</mat-label>
-                
+
                 <ng-container *ngIf="serviceForm.getRawValue().type === 'rws'">
                   <df-file-github
                     [type]="getControl('type')"
@@ -594,7 +594,7 @@
                     class="full-width">
                   </df-file-github>
                 </ng-container>
-                
+
                 <ng-container *ngIf="serviceForm.getRawValue().type === 'soap'">
                   <df-file-github
                     [type]="getControl('type')"
@@ -603,8 +603,12 @@
                     class="full-width">
                   </df-file-github>
                 </ng-container>
-                
-                <ng-container *ngIf="serviceForm.getRawValue().type === 'rest' || serviceForm.getRawValue().type === 'http'">
+
+                <ng-container
+                  *ngIf="
+                    serviceForm.getRawValue().type === 'rest' ||
+                    serviceForm.getRawValue().type === 'http'
+                  ">
                   <df-ace-editor
                     class="full-width"
                     [formControl]="getConfigControl('content')"
@@ -674,84 +678,87 @@
                 >{{ 'services.options' | transloco }}
               </mat-expansion-panel-header>
               <div class="details-section">
-              <ng-container
-                *ngIf="
-                  this.isFile && serviceForm.getRawValue().type === 'local_file'
-                ">
-                <div class="actions full-width">
-                  <input
-                    type="file"
-                    [accept]=""
-                    #fileInput
-                    (change)="excelUpload($event)"
-                    style="display: none" />
-                  <button
-                    type="button"
-                    mat-flat-button
-                    class="save-btn"
-                    (click)="fileInput.click()">
-                    Upload Excel
-                  </button>
-                </div>
-                <df-ace-editor
-                  class="full-width"
-                  [formControl]="getConfigControl('excelContent')"
-                  [mode]="excelMode"></df-ace-editor>
-              </ng-container>
-              <ng-container *ngFor="let item of viewSchema">
                 <ng-container
                   *ngIf="
-                    item.type === 'text' && item.name === 'content';
-                    else dynamic
+                    this.isFile &&
+                    serviceForm.getRawValue().type === 'local_file'
                   ">
-                  <ng-container *ngIf="getConfigControl('storageServiceId')">
-                    <df-script-editor
-                      [type]="getControl('type')"
-                      [storageServiceId]="getConfigControl('storageServiceId')"
-                      [storagePath]="getConfigControl('storagePath')"
-                      [content]="getServiceDocByServiceIdControl('content')"
-                      [cache]="serviceData ? serviceData.name : ''"
-                      class="full-width"></df-script-editor>
-                  </ng-container>
+                  <div class="actions full-width">
+                    <input
+                      type="file"
+                      [accept]=""
+                      #fileInput
+                      (change)="excelUpload($event)"
+                      style="display: none" />
+                    <button
+                      type="button"
+                      mat-flat-button
+                      class="save-btn"
+                      (click)="fileInput.click()">
+                      Upload Excel
+                    </button>
+                  </div>
+                  <df-ace-editor
+                    class="full-width"
+                    [formControl]="getConfigControl('excelContent')"
+                    [mode]="excelMode"></df-ace-editor>
                 </ng-container>
-                <ng-template #dynamic>
-                  <df-dynamic-field
+                <ng-container *ngFor="let item of viewSchema">
+                  <ng-container
                     *ngIf="
-                      [
-                        'integer',
-                        'password',
-                        'string',
-                        'text',
-                        'picklist',
-                        'multi_picklist',
-                        'boolean',
-                        'file_certificate',
-                        'file_certificate_api'
-                      ].includes(item.type)
-                    "
-                    color="primary"
-                    [schema]="item"
-                    [formControl]="getConfigControl(item.name)"
-                    [class.dynamic-width]="
-                      ['file_certificate', 'file_certificate_api'].indexOf(
-                        item.type
-                      ) === -1
-                    "
-                    [class.full-width]="
-                      ['file_certificate', 'file_certificate_api'].indexOf(
-                        item.type
-                      ) !== -1
-                    "></df-dynamic-field>
-                  <df-array-field
-                    *ngIf="item.type === 'array' || item.type === 'object'"
-                    [schema]="item"
-                    [formControl]="getConfigControl(item.name)"
-                    class="full-width"></df-array-field>
-                </ng-template>
-              </ng-container>
-            </div>
-          </mat-expansion-panel>
-        </mat-accordion>
+                      item.type === 'text' && item.name === 'content';
+                      else dynamic
+                    ">
+                    <ng-container *ngIf="getConfigControl('storageServiceId')">
+                      <df-script-editor
+                        [type]="getControl('type')"
+                        [storageServiceId]="
+                          getConfigControl('storageServiceId')
+                        "
+                        [storagePath]="getConfigControl('storagePath')"
+                        [content]="getServiceDocByServiceIdControl('content')"
+                        [cache]="serviceData ? serviceData.name : ''"
+                        class="full-width"></df-script-editor>
+                    </ng-container>
+                  </ng-container>
+                  <ng-template #dynamic>
+                    <df-dynamic-field
+                      *ngIf="
+                        [
+                          'integer',
+                          'password',
+                          'string',
+                          'text',
+                          'picklist',
+                          'multi_picklist',
+                          'boolean',
+                          'file_certificate',
+                          'file_certificate_api'
+                        ].includes(item.type)
+                      "
+                      color="primary"
+                      [schema]="item"
+                      [formControl]="getConfigControl(item.name)"
+                      [class.dynamic-width]="
+                        ['file_certificate', 'file_certificate_api'].indexOf(
+                          item.type
+                        ) === -1
+                      "
+                      [class.full-width]="
+                        ['file_certificate', 'file_certificate_api'].indexOf(
+                          item.type
+                        ) !== -1
+                      "></df-dynamic-field>
+                    <df-array-field
+                      *ngIf="item.type === 'array' || item.type === 'object'"
+                      [schema]="item"
+                      [formControl]="getConfigControl(item.name)"
+                      class="full-width"></df-array-field>
+                  </ng-template>
+                </ng-container>
+              </div>
+            </mat-expansion-panel>
+          </mat-accordion>
         </ng-container>
       </ng-container>
     </ng-container>
