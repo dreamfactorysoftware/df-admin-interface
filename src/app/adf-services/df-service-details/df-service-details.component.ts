@@ -379,8 +379,13 @@ export class DfServiceDetailsComponent implements OnInit {
   }
 
   get subscriptionRequired() {
+    const serviceType = this.serviceForm.controls['type'].value;
+    // Local email service is open source and should not require subscription
+    if (serviceType === 'local_email') {
+      return false;
+    }
     return (
-      this.serviceForm.controls['type'].value && this.configSchema?.length === 0
+      serviceType && this.configSchema?.length === 0
     );
   }
 

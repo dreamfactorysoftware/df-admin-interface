@@ -1,5 +1,5 @@
 import { LiveAnnouncer } from '@angular/cdk/a11y';
-import { Component, Inject } from '@angular/core';
+import { Component, Inject, OnInit } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoService } from '@ngneat/transloco';
@@ -27,7 +27,7 @@ import { catchError, throwError } from 'rxjs';
   standalone: true,
   imports: DfManageTableModules,
 })
-export class DfManageServicesTableComponent extends DfManageTableComponent<ServiceRow> {
+export class DfManageServicesTableComponent extends DfManageTableComponent<ServiceRow> implements OnInit {
   serviceTypes: Array<ServiceType> = [];
   system = false;
   constructor(
@@ -40,11 +40,19 @@ export class DfManageServicesTableComponent extends DfManageTableComponent<Servi
     dialog: MatDialog
   ) {
     super(router, activatedRoute, liveAnnouncer, translateService, dialog);
-    this._activatedRoute.data.subscribe(({ system, data }) => {
-      this.serviceTypes = data.serviceTypes;
-      this.system = system;
-      this.allowCreate = !system;
-      if (system) {
+  }
+  
+  override ngOnInit(): void {
+    // Call parent's ngOnInit first to set up the data source
+    super.ngOnInit();
+    
+    // Then subscribe to route data for additional setup
+    this._activatedRoute.data.subscribe((routeData) => {
+      const { data } = routeData;
+      this.system = routeData['system'] || this._activatedRoute.snapshot.parent?.data?.['system'] || false;
+      this.serviceTypes = data?.serviceTypes;
+      this.allowCreate = !this.system;
+      if (this.system) {
         this.actions = {
           default: this.actions.default,
           additional:
