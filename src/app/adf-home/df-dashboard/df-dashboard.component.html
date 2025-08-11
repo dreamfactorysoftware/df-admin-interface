@@ -21,6 +21,7 @@
         [value]="stats.services.total"
         [subtitle]="'home.dashboard.services.total' | transloco"
         [showPrompt]="stats.services.total === 0"
+        [isZero]="stats.services.total === 0"
         color="primary">
         <div prompt class="service-prompt" *ngIf="stats.services.total === 0">
           <span>{{ 'home.dashboard.services.createPrompt' | transloco }}</span>
@@ -33,7 +34,12 @@
         [title]="'home.dashboard.apiKeys.title' | transloco"
         [value]="stats.apiKeys.total"
         [subtitle]="'home.dashboard.apiKeys.total' | transloco"
+        [showPrompt]="stats.apiKeys.total === 0"
+        [isZero]="stats.apiKeys.total === 0"
         color="success">
+        <div prompt class="key-prompt" *ngIf="stats.apiKeys.total === 0">
+          <span>{{ 'home.dashboard.apiKeys.createPrompt' | transloco }}</span>
+        </div>
       </df-dashboard-card>
 
       <!-- Roles Card -->
@@ -42,7 +48,12 @@
         [title]="'home.dashboard.roles.title' | transloco"
         [value]="stats.roles.total"
         [subtitle]="'home.dashboard.roles.total' | transloco"
+        [showPrompt]="stats.roles.total === 0"
+        [isZero]="stats.roles.total === 0"
         color="info">
+        <div prompt class="role-prompt" *ngIf="stats.roles.total === 0">
+          <span>{{ 'home.dashboard.roles.createPrompt' | transloco }}</span>
+        </div>
       </df-dashboard-card>
     </div>
   </div>

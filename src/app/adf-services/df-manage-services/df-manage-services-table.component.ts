@@ -27,7 +27,10 @@ import { catchError, throwError } from 'rxjs';
   standalone: true,
   imports: DfManageTableModules,
 })
-export class DfManageServicesTableComponent extends DfManageTableComponent<ServiceRow> implements OnInit {
+export class DfManageServicesTableComponent
+  extends DfManageTableComponent<ServiceRow>
+  implements OnInit
+{
   serviceTypes: Array<ServiceType> = [];
   system = false;
   constructor(
@@ -41,15 +44,18 @@ export class DfManageServicesTableComponent extends DfManageTableComponent<Servi
   ) {
     super(router, activatedRoute, liveAnnouncer, translateService, dialog);
   }
-  
+
   override ngOnInit(): void {
     // Call parent's ngOnInit first to set up the data source
     super.ngOnInit();
-    
+
     // Then subscribe to route data for additional setup
-    this._activatedRoute.data.subscribe((routeData) => {
+    this._activatedRoute.data.subscribe(routeData => {
       const { data } = routeData;
-      this.system = routeData['system'] || this._activatedRoute.snapshot.parent?.data?.['system'] || false;
+      this.system =
+        routeData['system'] ||
+        this._activatedRoute.snapshot.parent?.data?.['system'] ||
+        false;
       this.serviceTypes = data?.serviceTypes;
       this.allowCreate = !this.system;
       if (this.system) {
