@@ -12,7 +12,7 @@ import { mapSnakeToCamel } from '../utilities/case';
 export class DfLicenseCheckService {
   private licenseCheckSubject = new BehaviorSubject<CheckResponse | null>(null);
   licenseCheck$ = this.licenseCheckSubject.asObservable();
-  
+
   get currentLicenseCheck(): CheckResponse | null {
     return this.licenseCheckSubject.value;
   }

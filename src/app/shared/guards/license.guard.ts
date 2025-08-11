@@ -9,7 +9,7 @@ export const licenseGuard = (route: ActivatedRouteSnapshot) => {
   const licenseCheckService = inject(DfLicenseCheckService);
   const router = inject(Router);
   const systemConfigDataService = inject(DfSystemConfigDataService);
-  
+
   // First check if we already have a license check result
   const currentLicenseCheck = licenseCheckService.currentLicenseCheck;
   if (currentLicenseCheck) {
@@ -32,7 +32,7 @@ export const licenseGuard = (route: ActivatedRouteSnapshot) => {
       return of(router.createUrlTree([ROUTES.HOME]));
     }
   }
-  
+
   return systemConfigDataService.environment$.pipe(
     take(1),
     switchMap(environment => {
@@ -72,7 +72,8 @@ export const licenseGuard = (route: ActivatedRouteSnapshot) => {
               catchError(error => {
                 // The error response is already handled in the service
                 // Check the current value after error
-                const errorLicenseCheck = licenseCheckService.currentLicenseCheck;
+                const errorLicenseCheck =
+                  licenseCheckService.currentLicenseCheck;
                 if (errorLicenseCheck?.disableUi === 'true') {
                   if (route?.routeConfig?.path !== ROUTES.LICENSE_EXPIRED) {
                     return of(router.createUrlTree([ROUTES.LICENSE_EXPIRED]));
