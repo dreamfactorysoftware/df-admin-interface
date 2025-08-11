@@ -99,7 +99,7 @@
     "services": {
       "title": "API Services",
       "total": "Your Services",
-      "createPrompt": "Get started! Create your first API using the cards above"
+      "createPrompt": "🚀 Get started! Create your first API service above!"
     },
     "admins": {
       "title": "Admins",
@@ -107,11 +107,13 @@
     },
     "apiKeys": {
       "title": "API Keys",
-      "total": "Your API Keys"
+      "total": "Your API Keys",
+      "createPrompt": "🔑 Secure your APIs! Generate an API key now!"
     },
     "roles": {
       "title": "Roles",
-      "total": "Your Roles"
+      "total": "Your Roles",
+      "createPrompt": "🔒 Control access! Set up your first role!"
     }
   }
 }

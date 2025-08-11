@@ -384,9 +384,7 @@ export class DfServiceDetailsComponent implements OnInit {
     if (serviceType === 'local_email') {
       return false;
     }
-    return (
-      serviceType && this.configSchema?.length === 0
-    );
+    return serviceType && this.configSchema?.length === 0;
   }
 
   get scriptMode() {

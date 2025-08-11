@@ -21,6 +21,7 @@ export class DfDashboardCardComponent {
   @Input() trendClass?: string;
   @Input() footerText?: string;
   @Input() showPrompt?: boolean = false;
+  @Input() isZero?: boolean = false;
   @Input() color: 'primary' | 'accent' | 'success' | 'info' | 'warn' =
     'primary';
 }

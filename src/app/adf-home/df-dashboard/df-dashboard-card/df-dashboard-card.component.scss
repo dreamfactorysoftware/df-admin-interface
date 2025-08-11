@@ -113,17 +113,53 @@
 
 // Prompt styling
 ::ng-deep [prompt] {
-  font-size: 13px;
-  color: #7f11e0;
-  font-weight: 500;
+  font-size: 14px;
+  color: #d32f2f;
+  font-weight: 600;
   display: flex;
   align-items: center;
-  gap: 4px;
-  animation: pulse 2s infinite;
+  gap: 6px;
+  animation: urgent-pulse 1.5s infinite;
+  text-shadow: 0 0 8px rgba(211, 47, 47, 0.3);
+  letter-spacing: 0.5px;
 
-  &:before {
-    content: '👆';
-    font-size: 16px;
+  span {
+    position: relative;
+    
+    &::after {
+      content: '';
+      position: absolute;
+      bottom: -2px;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, 
+        transparent, 
+        #d32f2f, 
+        transparent
+      );
+      animation: underline-slide 2s infinite;
+    }
+  }
+}
+
+@keyframes urgent-pulse {
+  0%, 100% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+}
+
+@keyframes underline-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
   }
 }
 
@@ -136,6 +172,97 @@
   }
   100% {
     opacity: 0.8;
+  }
+}
+
+// Zero value styling
+.dashboard-card.zero-value {
+  background: linear-gradient(135deg, #fff5f5 0%, #ffe0e0 100%);
+  border: 2px solid #ff6b6b;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 0 20px rgba(255, 107, 107, 0.2);
+  animation: glow-pulse 2.5s infinite;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(90deg, 
+      transparent,
+      rgba(255, 107, 107, 0.3),
+      transparent
+    );
+    animation: shimmer 3s infinite;
+  }
+
+  .card-value {
+    color: #d32f2f !important;
+    font-weight: 700 !important;
+    text-shadow: 0 0 3px rgba(211, 47, 47, 0.2);
+  }
+
+  .icon-container {
+    animation: attention-pulse 2s infinite;
+    box-shadow: 0 0 15px rgba(255, 107, 107, 0.3);
+  }
+
+  &:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 4px 30px rgba(255, 107, 107, 0.3);
+  }
+}
+
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(255, 107, 107, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(255, 107, 107, 0.4);
+  }
+}
+
+// Shake animation for zero value cards
+.dashboard-card.shake-animation {
+  animation: subtle-shake 4s infinite;
+}
+
+@keyframes subtle-shake {
+  0%, 90%, 100% {
+    transform: translateX(0);
+  }
+  92% {
+    transform: translateX(-2px) rotate(-0.5deg);
+  }
+  94% {
+    transform: translateX(2px) rotate(0.5deg);
+  }
+  96% {
+    transform: translateX(-1px) rotate(-0.3deg);
+  }
+  98% {
+    transform: translateX(1px) rotate(0.3deg);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}
+
+@keyframes attention-pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
   }
 }
 
@@ -165,9 +292,35 @@
         color: #bbb;
       }
     }
+
+    &.zero-value {
+      background: linear-gradient(135deg, #4a1a1a 0%, #3d1515 100%);
+      border: 2px solid #ff6b6b;
+
+      &::before {
+        background: linear-gradient(90deg, 
+          transparent,
+          rgba(255, 107, 107, 0.2),
+          transparent
+        );
+      }
+
+      .card-value {
+        color: #ff8a80 !important;
+      }
+    }
   }
 
   ::ng-deep [prompt] {
-    color: #bb86fc;
+    color: #ff8a80;
+    text-shadow: 0 0 10px rgba(255, 138, 128, 0.5);
+    
+    span::after {
+      background: linear-gradient(90deg, 
+        transparent, 
+        #ff8a80, 
+        transparent
+      );
+    }
   }
 }

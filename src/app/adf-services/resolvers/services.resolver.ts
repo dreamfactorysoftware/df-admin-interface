@@ -21,8 +21,10 @@ export const servicesResolver =
     const serviceTypeService = inject(SERVICE_TYPE_SERVICE_TOKEN);
     const servicesService = inject(SERVICES_SERVICE_TOKEN);
 
-    const system: boolean = route.data['system'] || route.parent?.data?.['system'] || false;
-    const groups: Array<string> = route.data['groups'] || route.parent?.data?.['groups'];
+    const system: boolean =
+      route.data['system'] || route.parent?.data?.['system'] || false;
+    const groups: Array<string> =
+      route.data['groups'] || route.parent?.data?.['groups'];
 
     if (groups) {
       const filteredGroups = groups.map(grp =>
@@ -44,7 +46,9 @@ export const servicesResolver =
               limit,
               sort: 'name',
               filter: `${
-                system ? '(created_by_id is null) and (name != "api_docs") and ' : ''
+                system
+                  ? '(created_by_id is null) and (name != "api_docs") and '
+                  : ''
               }(type in ("${serviceTypes.map(src => src.name).join('","')}"))${
                 filter ? ` and ${filter}` : ''
               }`,
