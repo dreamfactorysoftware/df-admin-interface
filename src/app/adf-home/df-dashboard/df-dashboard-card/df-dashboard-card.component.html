@@ -1,7 +1,10 @@
-<mat-card class="dashboard-card" 
+<mat-card
+  class="dashboard-card"
   [class]="'card-' + color"
   [class.zero-value]="isZero"
-  [class.shake-animation]="isZero">
+  [class.shake-animation]="isZero"
+  [class.clickable]="clickable"
+  (click)="onClick()">
   <mat-card-content>
     <div class="card-header">
       <div class="icon-container" [class]="'icon-' + color">

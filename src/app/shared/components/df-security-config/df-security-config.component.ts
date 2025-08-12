@@ -8,6 +8,8 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatIconModule } from '@angular/material/icon';
 import { Router } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatDialog } from '@angular/material/dialog';
+import { DfCelebrationDialogComponent } from '../df-celebration-dialog/df-celebration-dialog.component';
 import { DfSystemService } from 'src/app/shared/services/df-system.service';
 import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
 import { switchMap, catchError, map } from 'rxjs';
@@ -49,6 +51,7 @@ export class DfSecurityConfigComponent implements OnInit {
   @Input() serviceName: string = '';
   @Input() serviceId: number | null = null;
   @Input() isDatabase: boolean = false;
+  @Input() isFirstTimeUser: boolean = false;
 
   @Output() goBack = new EventEmitter<void>();
 
@@ -67,7 +70,8 @@ export class DfSecurityConfigComponent implements OnInit {
     private router: Router,
     private snackBar: MatSnackBar,
     private systemService: DfSystemService,
-    private snackbarService: DfSnackbarService
+    private snackbarService: DfSnackbarService,
+    private dialog: MatDialog
   ) {}
 
   ngOnInit(): void {
@@ -434,24 +438,42 @@ export class DfSecurityConfigComponent implements OnInit {
             );
           }
 
-          // Navigate to API docs
-          this.router
-            .navigateByUrl(
-              `/api-connections/api-docs/${result.formattedName}`,
-              {
-                replaceUrl: true,
-              }
-            )
-            .then(success => {
-              if (!success) {
-                this.router.navigate(
-                  ['api-connections', 'api-docs', result.formattedName],
-                  {
-                    replaceUrl: true,
-                  }
-                );
-              }
+          // Check if this is first-time user and show celebration
+          if (this.isFirstTimeUser && this.isDatabase) {
+            // Show celebration dialog for first-time users
+            const dialogRef = this.dialog.open(DfCelebrationDialogComponent, {
+              width: '550px',
+              maxWidth: '90vw',
+              disableClose: true,
+              panelClass: 'celebration-dialog-container',
+              data: {
+                serviceName: result.formattedName,
+                apiKey: result.apiKey,
+                isFirstTime: true,
+              },
             });
+            
+            // Dialog will handle navigation to API docs when closed
+          } else {
+            // Navigate to API docs directly for experienced users
+            this.router
+              .navigateByUrl(
+                `/api-connections/api-docs/${result.formattedName}`,
+                {
+                  replaceUrl: true,
+                }
+              )
+              .then(success => {
+                if (!success) {
+                  this.router.navigate(
+                    ['api-connections', 'api-docs', result.formattedName],
+                    {
+                      replaceUrl: true,
+                    }
+                  );
+                }
+              });
+          }
         },
         error: error => {
           // Show error message using DfSnackbarService

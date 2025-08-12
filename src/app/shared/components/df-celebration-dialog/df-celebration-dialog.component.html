@@ -1,0 +1,94 @@
+<div class="celebration-dialog">
+  <!-- Confetti/Fireworks Background -->
+  <div class="celebration-effects" *ngIf="showConfetti">
+    <div class="confetti" *ngFor="let i of [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]" [style.--confetti-index]="i"></div>
+    <div class="firework" *ngFor="let j of [1,2,3,4,5]" [style.--firework-index]="j"></div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="dialog-content">
+    <!-- Success Header -->
+    <div class="success-header" [@fadeIn]>
+      <div class="success-icon-wrapper">
+        <fa-icon [icon]="faRocket" class="rocket-icon"></fa-icon>
+        <div class="success-circle"></div>
+      </div>
+      <h1 class="celebration-title">
+        {{ 'services.celebration.title' | transloco }}
+      </h1>
+      <p class="celebration-subtitle">
+        {{ 'services.celebration.subtitle' | transloco: { name: data.serviceName } }}
+      </p>
+    </div>
+
+    <!-- Achievement Steps -->
+    <div class="steps-container">
+      <h3 class="steps-title">{{ 'services.celebration.whatHappened' | transloco }}</h3>
+      
+      <div class="steps-timeline">
+        <div 
+          class="step-item" 
+          *ngFor="let step of steps; let i = index"
+          [class.revealed]="currentStep >= i"
+          [class.pulse-animation]="currentStep === i">
+          
+          <div class="step-connector" *ngIf="i < steps.length - 1"></div>
+          
+          <div class="step-icon">
+            <fa-icon [icon]="step.icon"></fa-icon>
+          </div>
+          
+          <div class="step-content">
+            <h4 class="step-title">{{ step.title | transloco }}</h4>
+            <p class="step-description">{{ step.description | transloco }}</p>
+            <span class="step-timing">
+              <fa-icon [icon]="faBolt" class="timing-icon"></fa-icon>
+              {{ step.timing }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Total Time Summary -->
+    <div class="performance-summary" *ngIf="allStepsRevealed" [@slideUp]>
+      <div class="performance-badge">
+        <fa-icon [icon]="faBolt" class="performance-icon"></fa-icon>
+        <span class="performance-text">
+          {{ 'services.celebration.totalTime' | transloco }}
+        </span>
+      </div>
+    </div>
+
+    <!-- API Key Display (if available) -->
+    <div class="api-key-section" *ngIf="data.apiKey && allStepsRevealed" [@slideUp]>
+      <div class="api-key-label">{{ 'services.celebration.yourApiKey' | transloco }}</div>
+      <div class="api-key-display">
+        <code>{{ data.apiKey }}</code>
+        <button 
+          mat-icon-button 
+          (click)="copyApiKey()"
+          matTooltip="{{ 'services.celebration.copyKey' | transloco }}">
+          <fa-icon [icon]="faCopy"></fa-icon>
+        </button>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="dialog-actions" *ngIf="allStepsRevealed" [@fadeIn]>
+      <button 
+        mat-flat-button 
+        color="primary" 
+        class="explore-button"
+        (click)="goToApiDocs()">
+        <fa-icon [icon]="faRocket" class="button-icon"></fa-icon>
+        {{ 'services.celebration.exploreApi' | transloco }}
+        <span class="countdown" *ngIf="countdown > 0">({{ countdown }})</span>
+      </button>
+      
+      <p class="auto-redirect-note">
+        {{ 'services.celebration.autoRedirect' | transloco }}
+      </p>
+    </div>
+  </div>
+</div>

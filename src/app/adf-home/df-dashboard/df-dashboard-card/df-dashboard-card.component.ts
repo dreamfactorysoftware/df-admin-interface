@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
@@ -24,4 +24,12 @@ export class DfDashboardCardComponent {
   @Input() isZero?: boolean = false;
   @Input() color: 'primary' | 'accent' | 'success' | 'info' | 'warn' =
     'primary';
+  @Input() clickable?: boolean = false;
+  @Output() cardClick = new EventEmitter<void>();
+
+  onClick(): void {
+    if (this.clickable) {
+      this.cardClick.emit();
+    }
+  }
 }

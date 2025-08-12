@@ -10,6 +10,15 @@
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   }
 
+  &.clickable {
+    cursor: pointer;
+    
+    &:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 6px 25px rgba(0, 0, 0, 0.15);
+    }
+  }
+
   .mat-card-content {
     padding: 20px;
   }
@@ -125,7 +134,7 @@
 
   span {
     position: relative;
-    
+
     &::after {
       content: '';
       position: absolute;
@@ -133,18 +142,15 @@
       left: 0;
       right: 0;
       height: 2px;
-      background: linear-gradient(90deg, 
-        transparent, 
-        #d32f2f, 
-        transparent
-      );
+      background: linear-gradient(90deg, transparent, #d32f2f, transparent);
       animation: underline-slide 2s infinite;
     }
   }
 }
 
 @keyframes urgent-pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.9;
     transform: scale(1);
   }
@@ -191,7 +197,8 @@
     left: -2px;
     right: -2px;
     bottom: -2px;
-    background: linear-gradient(90deg, 
+    background: linear-gradient(
+      90deg,
       transparent,
       rgba(255, 107, 107, 0.3),
       transparent
@@ -217,7 +224,8 @@
 }
 
 @keyframes glow-pulse {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 20px rgba(255, 107, 107, 0.2);
   }
   50% {
@@ -231,7 +239,9 @@
 }
 
 @keyframes subtle-shake {
-  0%, 90%, 100% {
+  0%,
+  90%,
+  100% {
     transform: translateX(0);
   }
   92% {
@@ -258,7 +268,8 @@
 }
 
 @keyframes attention-pulse {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
   }
   50% {
@@ -298,7 +309,8 @@
       border: 2px solid #ff6b6b;
 
       &::before {
-        background: linear-gradient(90deg, 
+        background: linear-gradient(
+          90deg,
           transparent,
           rgba(255, 107, 107, 0.2),
           transparent
@@ -314,13 +326,9 @@
   ::ng-deep [prompt] {
     color: #ff8a80;
     text-shadow: 0 0 10px rgba(255, 138, 128, 0.5);
-    
+
     span::after {
-      background: linear-gradient(90deg, 
-        transparent, 
-        #ff8a80, 
-        transparent
-      );
+      background: linear-gradient(90deg, transparent, #ff8a80, transparent);
     }
   }
 }

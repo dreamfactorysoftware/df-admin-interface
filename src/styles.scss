@@ -236,3 +236,18 @@ a {
   backdrop-filter: blur(6px) !important;
   -webkit-backdrop-filter: blur(6px) !important;
 }
+
+// Celebration Dialog Panel
+.celebration-dialog-container {
+  .mat-mdc-dialog-container {
+    padding: 0 !important;
+    overflow: visible !important;
+    border-radius: 12px !important;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3) !important;
+  }
+  
+  .mat-mdc-dialog-surface {
+    border-radius: 12px !important;
+    overflow: hidden !important;
+  }
+}

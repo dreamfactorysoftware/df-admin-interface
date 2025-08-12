@@ -1,4 +1,5 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
@@ -53,7 +54,8 @@ export class DfDashboardComponent implements OnInit, OnDestroy {
   constructor(
     private analyticsService: DfAnalyticsService,
     public themeService: DfThemeService,
-    public breakpointService: DfBreakpointService
+    public breakpointService: DfBreakpointService,
+    private router: Router
   ) {}
 
   ngOnInit(): void {
@@ -94,5 +96,23 @@ export class DfDashboardComponent implements OnInit, OnDestroy {
           };
         },
       });
+  }
+
+  onServicesCardClick(): void {
+    if (this.stats.services.total === 0) {
+      this.router.navigate(['/api-connections/api-types/database/create']);
+    }
+  }
+
+  onApiKeysCardClick(): void {
+    if (this.stats.apiKeys.total === 0) {
+      this.router.navigate(['/api-connections/api-keys/create']);
+    }
+  }
+
+  onRolesCardClick(): void {
+    if (this.stats.roles.total === 0) {
+      this.router.navigate(['/api-connections/role-based-access/create']);
+    }
   }
 }
