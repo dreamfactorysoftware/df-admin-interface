@@ -366,6 +366,14 @@
             </ng-container>
           </ng-container>
         </ng-container>
+        <!-- First-time user guidance message for database services -->
+        <div class="first-time-guidance" *ngIf="isFirstTimeUser && isDatabase && !subscriptionRequired">
+          <fa-icon [icon]="faCircleInfo" class="guidance-icon"></fa-icon>
+          <p class="guidance-text">
+            {{ 'services.firstTimeGuidance' | transloco }}
+          </p>
+        </div>
+        
         <div class="full-width action-bar" *ngIf="!subscriptionRequired">
           <button
             class="cancel-btn"
@@ -375,7 +383,21 @@
             {{ 'cancel' | transloco }}
           </button>
           <div class="button-group">
+            <!-- For first-time users creating database APIs, only show Security Config button as primary -->
             <button
+              *ngIf="isFirstTimeUser && isDatabase"
+              mat-flat-button
+              class="save-btn"
+              color="primary"
+              type="button"
+              [disabled]="!serviceForm.valid"
+              (click)="goToSecurityConfig()">
+              {{ 'services.controls.nextSecurityConfig' | transloco }}
+            </button>
+            
+            <!-- For experienced users or non-database services, show both buttons -->
+            <button
+              *ngIf="!(isFirstTimeUser && isDatabase)"
               mat-flat-button
               class="save-btn secondary-btn"
               type="button"
@@ -383,7 +405,11 @@
               (click)="goToSecurityConfig()">
               {{ 'services.controls.securityConfig' | transloco }}
             </button>
-            <button class="save-btn" mat-flat-button color="primary">
+            <button 
+              *ngIf="!(isFirstTimeUser && isDatabase)"
+              class="save-btn" 
+              mat-flat-button 
+              color="primary">
               {{ 'services.controls.createAndTest' | transloco }}
             </button>
           </div>
@@ -396,6 +422,7 @@
             [serviceName]="serviceForm.get('name')?.value"
             [serviceId]="currentServiceId"
             [isDatabase]="isDatabase"
+            [isFirstTimeUser]="isFirstTimeUser"
             (goBack)="goBack()">
           </df-security-config>
         </div>

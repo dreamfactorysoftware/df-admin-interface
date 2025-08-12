@@ -21,9 +21,39 @@
       "tooltip": "Write a brief description of the API (optional)."
     },
     "createAndTest": "Create & Test",
-    "securityConfig": "Security Config"
+    "securityConfig": "Security Config",
+    "nextSecurityConfig": "Next: Security Configuration"
   },
+  "firstTimeGuidance": "Welcome! Since this is your first API, we'll guide you through setting up security configuration to ensure your API is properly protected.",
   "deleteSuccessMsg": "Service successfully deleted",
   "createSuccessMsg": "Service successfully created",
-  "updateSuccessMsg": "Service successfully updated"
+  "updateSuccessMsg": "Service successfully updated",
+  "celebration": {
+    "title": "🎉 Your First API is Live!",
+    "subtitle": "{{name}} is ready to use",
+    "whatHappened": "Here's what just happened in under 1 second:",
+    "steps": {
+      "database": {
+        "title": "Connected to Database",
+        "description": "Established secure connection and analyzed your database schema"
+      },
+      "endpoints": {
+        "title": "Generated REST API Endpoints",
+        "description": "Created full CRUD operations for all tables with pagination & filtering"
+      },
+      "security": {
+        "title": "Applied Security Configuration",
+        "description": "Set up role-based access control with your specified permissions"
+      },
+      "apiKey": {
+        "title": "Generated API Key",
+        "description": "Created a secure API key for authentication"
+      }
+    },
+    "totalTime": "Total time: < 1 second",
+    "yourApiKey": "Your API Key:",
+    "copyKey": "Copy API Key",
+    "exploreApi": "Explore Your API",
+    "autoRedirect": "You'll be automatically redirected to API documentation..."
+  }
 }

@@ -85,6 +85,7 @@ import { TitleCasePipe } from '@angular/common';
 import { MatDividerModule } from '@angular/material/divider';
 import { DfSystemService } from 'src/app/shared/services/df-system.service';
 import { DfPaywallModal } from 'src/app/shared/components/df-paywall-modal/df-paywall-modal.component';
+import { DfAnalyticsService } from 'src/app/shared/services/df-analytics.service';
 
 // Add these interfaces at the bottom of the file with the other interfaces
 interface RoleResponse {
@@ -175,6 +176,7 @@ export class DfServiceDetailsComponent implements OnInit {
   @ViewChild('stepper') stepper!: MatStepper;
   showSecurityConfig = false;
   currentServiceId: number | null = null;
+  isFirstTimeUser = false;
   constructor(
     private activatedRoute: ActivatedRoute,
     private fb: FormBuilder,
@@ -188,7 +190,8 @@ export class DfServiceDetailsComponent implements OnInit {
     private snackbarService: DfSnackbarService,
     private currentServiceService: DfCurrentServiceService,
     private snackBar: MatSnackBar,
-    private systemService: DfSystemService
+    private systemService: DfSystemService,
+    private analyticsService: DfAnalyticsService
   ) {
     this.serviceForm = this.fb.group({
       type: ['', Validators.required],
@@ -208,6 +211,13 @@ export class DfServiceDetailsComponent implements OnInit {
   }
   isDarkMode = this.themeService.darkMode$;
   ngOnInit(): void {
+    // Check if this is the user's first API (only for new service creation, not editing)
+    if (!this.edit) {
+      this.analyticsService.getDashboardStats().subscribe(stats => {
+        this.isFirstTimeUser = stats.services.total === 0;
+      });
+    }
+    
     this.http
       .get<Array<ImageObject>>('assets/img/databaseImages.json')
       .subscribe(images => {

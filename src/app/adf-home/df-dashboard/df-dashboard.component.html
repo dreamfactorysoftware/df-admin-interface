@@ -22,6 +22,8 @@
         [subtitle]="'home.dashboard.services.total' | transloco"
         [showPrompt]="stats.services.total === 0"
         [isZero]="stats.services.total === 0"
+        [clickable]="stats.services.total === 0"
+        (cardClick)="onServicesCardClick()"
         color="primary">
         <div prompt class="service-prompt" *ngIf="stats.services.total === 0">
           <span>{{ 'home.dashboard.services.createPrompt' | transloco }}</span>
@@ -36,6 +38,8 @@
         [subtitle]="'home.dashboard.apiKeys.total' | transloco"
         [showPrompt]="stats.apiKeys.total === 0"
         [isZero]="stats.apiKeys.total === 0"
+        [clickable]="stats.apiKeys.total === 0"
+        (cardClick)="onApiKeysCardClick()"
         color="success">
         <div prompt class="key-prompt" *ngIf="stats.apiKeys.total === 0">
           <span>{{ 'home.dashboard.apiKeys.createPrompt' | transloco }}</span>
@@ -50,6 +54,8 @@
         [subtitle]="'home.dashboard.roles.total' | transloco"
         [showPrompt]="stats.roles.total === 0"
         [isZero]="stats.roles.total === 0"
+        [clickable]="stats.roles.total === 0"
+        (cardClick)="onRolesCardClick()"
         color="info">
         <div prompt class="role-prompt" *ngIf="stats.roles.total === 0">
           <span>{{ 'home.dashboard.roles.createPrompt' | transloco }}</span>
