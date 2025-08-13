@@ -20,7 +20,9 @@
     <div class="card-body">
       <h3 class="card-title">{{ title }}</h3>
       <div class="card-value" *ngIf="!isZero">{{ value }}</div>
-      <div class="card-value zero-state-cta" *ngIf="isZero">{{ zeroStateText }}</div>
+      <div class="card-value zero-state-cta" *ngIf="isZero">
+        {{ zeroStateText }}
+      </div>
       <p class="card-subtitle" *ngIf="subtitle && !isZero">{{ subtitle }}</p>
       <ng-content></ng-content>
     </div>

@@ -60,13 +60,11 @@
       </div>
     </div>
 
-
     <!-- API Connection Details -->
     <div
       class="api-connection-section"
       *ngIf="data.apiKey && allStepsRevealed"
       [@slideUp]>
-      
       <!-- Example Endpoint -->
       <div class="endpoint-preview">
         <div class="endpoint-label">
@@ -75,7 +73,9 @@
         </div>
         <div class="endpoint-display">
           <code>{{ baseUrl }}/api/v2/{{ data.serviceName }}/_table</code>
-          <span class="endpoint-hint">{{ 'services.celebration.endpointHint' | transloco }}</span>
+          <span class="endpoint-hint">{{
+            'services.celebration.endpointHint' | transloco
+          }}</span>
         </div>
       </div>
 
@@ -90,7 +90,11 @@
           <button
             mat-icon-button
             (click)="copyApiKey()"
-            [matTooltip]="apiKeyCopied ? ('services.celebration.keyCopied' | transloco) : ('services.celebration.copyKey' | transloco)">
+            [matTooltip]="
+              apiKeyCopied
+                ? ('services.celebration.keyCopied' | transloco)
+                : ('services.celebration.copyKey' | transloco)
+            ">
             <fa-icon [icon]="apiKeyCopied ? faCheck : faCopy"></fa-icon>
           </button>
         </div>

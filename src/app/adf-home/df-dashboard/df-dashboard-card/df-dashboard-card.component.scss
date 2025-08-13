@@ -178,16 +178,16 @@
 
   .icon-container {
     box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
-    
+
     // Keep original colors for each icon type
     &.icon-primary {
       background: linear-gradient(135deg, #7f11e0 0%, #5c239a 100%);
     }
-    
+
     &.icon-success {
       background: linear-gradient(135deg, #4caf50 0%, #388e3c 100%);
     }
-    
+
     &.icon-info {
       background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
     }
@@ -195,7 +195,7 @@
 
   .card-value.zero-state-cta {
     position: relative;
-    
+
     &::after {
       content: '→';
       position: absolute;
@@ -227,7 +227,7 @@
 
     .card-value.zero-state-cta {
       transform: translateX(-5px);
-      
+
       &::after {
         opacity: 1;
         right: -30px;
