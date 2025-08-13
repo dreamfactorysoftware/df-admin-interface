@@ -6,7 +6,9 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   position: relative;
   padding: 0;
   overflow: hidden;
-  min-height: 480px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
   background: linear-gradient(135deg, #f5f3ff 0%, #fff 100%);
   animation: subtle-entrance 0.4s ease-out;
 }
@@ -39,9 +41,10 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   width: 10px;
   height: 10px;
   top: -10px;
-  animation: confetti-fall calc(3s + var(--confetti-index) * 0.1s) linear infinite;
+  animation: confetti-fall calc(3s + var(--confetti-index) * 0.1s) linear
+    infinite;
   animation-delay: calc(var(--confetti-index) * -0.2s);
-  
+
   &::before {
     content: '';
     position: absolute;
@@ -60,11 +63,11 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
     border-radius: 2px;
     transform: rotate(calc(var(--confetti-index) * 30deg));
   }
-  
+
   &:nth-child(odd) {
     left: calc(var(--confetti-index) * 6.5%);
   }
-  
+
   &:nth-child(even) {
     right: calc(var(--confetti-index) * 6.5%);
   }
@@ -95,15 +98,31 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  animation: firework-launch calc(2s + var(--firework-index) * 0.3s) ease-out infinite;
+  animation: firework-launch calc(2s + var(--firework-index) * 0.3s) ease-out
+    infinite;
   animation-delay: calc(var(--firework-index) * 0.5s);
-  
-  &:nth-child(1) { left: 20%; background: #7f11e0; }
-  &:nth-child(2) { left: 40%; background: #ff4081; }
-  &:nth-child(3) { left: 50%; background: #4caf50; }
-  &:nth-child(4) { left: 60%; background: #ffc107; }
-  &:nth-child(5) { left: 80%; background: #2196f3; }
-  
+
+  &:nth-child(1) {
+    left: 20%;
+    background: #7f11e0;
+  }
+  &:nth-child(2) {
+    left: 40%;
+    background: #ff4081;
+  }
+  &:nth-child(3) {
+    left: 50%;
+    background: #4caf50;
+  }
+  &:nth-child(4) {
+    left: 60%;
+    background: #ffc107;
+  }
+  &:nth-child(5) {
+    left: 80%;
+    background: #2196f3;
+  }
+
   &::after {
     content: '';
     position: absolute;
@@ -114,7 +133,8 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
     left: -48px;
     background: radial-gradient(circle, currentColor 0%, transparent 70%);
     opacity: 0;
-    animation: firework-explode calc(2s + var(--firework-index) * 0.3s) ease-out infinite;
+    animation: firework-explode calc(2s + var(--firework-index) * 0.3s) ease-out
+      infinite;
     animation-delay: calc(var(--firework-index) * 0.5s + 0.8s);
   }
 }
@@ -153,16 +173,38 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
 .dialog-content {
   position: relative;
   z-index: 2;
-  padding: 24px;
+  padding: 20px;
   max-width: 100%;
   margin: 0 auto;
   text-align: center;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1;
+  max-height: calc(85vh - 40px);
+  
+  /* Custom scrollbar */
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: rgba(127, 17, 224, 0.05);
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: rgba(127, 17, 224, 0.2);
+    border-radius: 3px;
+    
+    &:hover {
+      background: rgba(127, 17, 224, 0.3);
+    }
+  }
 }
 
 // Success Header
 .success-header {
   text-align: center;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
   animation: fadeInDown 0.6s ease-out;
 }
 
@@ -171,7 +213,7 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   width: 64px;
   height: 64px;
   margin: 0 auto 16px;
-  
+
   .rocket-icon {
     position: absolute;
     top: 50%;
@@ -182,7 +224,7 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
     z-index: 2;
     animation: rocket-launch 2s ease-in-out infinite;
   }
-  
+
   .success-circle {
     position: absolute;
     width: 100%;
@@ -195,7 +237,8 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
 }
 
 @keyframes rocket-launch {
-  0%, 100% {
+  0%,
+  100% {
     transform: translate(-50%, -50%) translateY(0);
   }
   50% {
@@ -204,7 +247,8 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
 }
 
 @keyframes pulse-circle {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
     opacity: 0.1;
   }
@@ -215,16 +259,16 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
 }
 
 .celebration-title {
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 600;
   color: #333;
-  margin: 0 0 8px;
+  margin: 0 0 6px;
   animation: bounce-in 0.8s ease-out;
   text-align: center;
 }
 
 .celebration-subtitle {
-  font-size: 15px;
+  font-size: 14px;
   color: #666;
   margin: 0;
   text-align: center;
@@ -232,16 +276,16 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
 
 // Steps Timeline
 .steps-container {
-  margin: 24px 0;
+  margin: 12px 0;
   text-align: left;
-  padding: 0 10px;
+  padding: 0 8px;
 }
 
 .steps-title {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 500;
   color: #333;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
   text-align: center;
 }
 
@@ -256,22 +300,22 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   position: relative;
   display: flex;
   align-items: flex-start;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
   opacity: 0;
   transform: translateX(-20px);
   transition: all 0.5s ease-out;
-  
+
   &.revealed {
     opacity: 1;
     transform: translateX(0);
   }
-  
+
   &.pulse-animation {
     .step-icon {
       animation: icon-pulse 0.6s ease-out;
     }
   }
-  
+
   .step-connector {
     position: absolute;
     left: -35px;
@@ -335,104 +379,170 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   font-size: 12px;
   color: #4caf50;
   font-weight: 500;
-  
+
   .timing-icon {
     font-size: 12px;
   }
 }
 
-// Performance Summary
-.performance-summary {
-  text-align: center;
-  margin: 20px 0;
+// API Connection Section
+.api-connection-section {
+  margin: 12px auto;
+  padding: 14px;
+  background: linear-gradient(135deg, #f8f5ff 0%, #f5f5f5 100%);
+  border: 1px solid rgba(127, 17, 224, 0.1);
+  border-radius: 12px;
   animation: slideUp 0.5s ease-out;
+  max-width: 480px;
 }
 
-.performance-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 20px;
-  background: linear-gradient(135deg, #4caf50 0%, #388e3c 100%);
-  border-radius: 20px;
-  color: white;
+.endpoint-preview {
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(127, 17, 224, 0.1);
+}
+
+.endpoint-label {
+  font-size: 14px;
   font-weight: 500;
-  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
-  
-  .performance-icon {
+  color: #333;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .endpoint-icon {
+    color: #7f11e0;
     font-size: 16px;
   }
-  
-  .performance-text {
-    font-size: 14px;
+}
+
+.endpoint-display {
+  position: relative;
+
+  code {
+    display: block;
+    padding: 12px 16px;
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    color: #2196f3;
+    overflow-x: auto;
+    margin-bottom: 4px;
+  }
+
+  .endpoint-hint {
+    font-size: 11px;
+    color: #999;
+    font-style: italic;
   }
 }
 
-// API Key Section
-.api-key-section {
-  margin: 20px auto;
-  padding: 14px;
-  background: #f5f5f5;
-  border-radius: 8px;
-  animation: slideUp 0.5s ease-out;
-  max-width: 450px;
+.api-key-subsection {
+  margin-bottom: 10px;
 }
 
 .api-key-label {
-  font-size: 13px;
-  color: #666;
-  margin-bottom: 8px;
-  text-align: left;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .key-icon {
+    color: #ff9800;
+    font-size: 16px;
+  }
 }
 
 .api-key-display {
   display: flex;
   align-items: center;
   gap: 8px;
-  
+
   code {
     flex: 1;
-    padding: 8px 12px;
+    padding: 10px 14px;
     background: white;
     border: 1px solid #e0e0e0;
-    border-radius: 4px;
+    border-radius: 6px;
     font-family: monospace;
     font-size: 14px;
+    color: #333;
     overflow-x: auto;
   }
-  
+
   button {
+    transition: all 0.2s ease;
+    
     fa-icon {
       font-size: 16px;
       color: #666;
+      transition: color 0.2s ease;
     }
-    
+
     &:hover fa-icon {
       color: #7f11e0;
     }
   }
 }
 
+.usage-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px;
+  background: rgba(33, 150, 243, 0.05);
+  border-radius: 6px;
+  font-size: 12px;
+  color: #555;
+  line-height: 1.4;
+
+  .info-icon {
+    color: #2196f3;
+    font-size: 14px;
+    margin-top: 1px;
+  }
+}
+
 // Dialog Actions
 .dialog-actions {
   text-align: center;
-  margin-top: 24px;
+  margin-top: 12px;
+  padding-bottom: 8px;
   animation: fadeIn 0.5s ease-out;
 }
 
-.explore-button {
+.test-api-button {
   padding: 10px 28px;
   font-size: 15px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  margin-bottom: 10px;
+  min-width: 200px;
+
   .button-icon {
     margin-right: 8px;
+    font-size: 18px;
   }
-  
+
   .countdown {
     margin-left: 8px;
-    opacity: 0.8;
+    opacity: 0.7;
+    font-size: 14px;
+  }
+}
+
+.explore-later-button {
+  font-size: 14px;
+  color: #666;
+  
+  &:hover {
+    background: rgba(0, 0, 0, 0.04);
   }
 }
 
@@ -494,25 +604,35 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   .celebration-dialog {
     background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1e 100%);
   }
-  
+
   .celebration-title,
   .steps-title,
   .step-title {
     color: rgba(255, 255, 255, 0.87);
   }
-  
+
   .celebration-subtitle,
   .step-description {
     color: rgba(255, 255, 255, 0.6);
   }
-  
-  .api-key-section {
-    background: rgba(255, 255, 255, 0.05);
-    
+
+  .api-connection-section {
+    background: linear-gradient(135deg, rgba(127, 17, 224, 0.05) 0%, rgba(255, 255, 255, 0.03) 100%);
+    border-color: rgba(127, 17, 224, 0.2);
+
     code {
       background: rgba(255, 255, 255, 0.1);
       border-color: rgba(255, 255, 255, 0.2);
       color: rgba(255, 255, 255, 0.87);
+    }
+
+    .endpoint-display code {
+      color: #5eb8ff;
+    }
+
+    .usage-hint {
+      background: rgba(33, 150, 243, 0.08);
+      color: rgba(255, 255, 255, 0.7);
     }
   }
 }

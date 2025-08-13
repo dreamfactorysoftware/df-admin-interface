@@ -18,6 +18,9 @@ import {
   faBolt,
   faDatabase,
   faCopy,
+  faCheck,
+  faFlask,
+  faInfoCircle,
 } from '@fortawesome/free-solid-svg-icons';
 import { Router } from '@angular/router';
 import { interval, Subject, takeUntil } from 'rxjs';
@@ -45,7 +48,7 @@ export interface CelebrationDialogData {
 })
 export class DfCelebrationDialogComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
-  
+
   // Icons
   faCheckCircle = faCheckCircle;
   faRocket = faRocket;
@@ -54,12 +57,17 @@ export class DfCelebrationDialogComponent implements OnInit, OnDestroy {
   faBolt = faBolt;
   faDatabase = faDatabase;
   faCopy = faCopy;
+  faCheck = faCheck;
+  faFlask = faFlask;
+  faInfoCircle = faInfoCircle;
 
   // Animation states
   showConfetti = true;
   currentStep = -1;
   allStepsRevealed = false;
   countdown = 15;
+  apiKeyCopied = false;
+  baseUrl = window.location.origin;
 
   // API creation steps
   steps = [
@@ -101,7 +109,7 @@ export class DfCelebrationDialogComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     // Start revealing steps one by one
     this.revealSteps();
-    
+
     // Start countdown after all steps are revealed
     setTimeout(() => {
       this.startCountdown();
@@ -117,12 +125,15 @@ export class DfCelebrationDialogComponent implements OnInit, OnDestroy {
     // Reveal each step with a delay
     const stepDelay = 500;
     this.steps.forEach((_, index) => {
-      setTimeout(() => {
-        this.currentStep = index;
-        if (index === this.steps.length - 1) {
-          this.allStepsRevealed = true;
-        }
-      }, stepDelay * (index + 1));
+      setTimeout(
+        () => {
+          this.currentStep = index;
+          if (index === this.steps.length - 1) {
+            this.allStepsRevealed = true;
+          }
+        },
+        stepDelay * (index + 1)
+      );
     });
   }
 
@@ -145,6 +156,15 @@ export class DfCelebrationDialogComponent implements OnInit, OnDestroy {
   copyApiKey(): void {
     if (this.data.apiKey) {
       navigator.clipboard.writeText(this.data.apiKey);
+      this.apiKeyCopied = true;
+      setTimeout(() => {
+        this.apiKeyCopied = false;
+      }, 2000);
     }
+  }
+
+  skipToHome(): void {
+    this.dialogRef.close();
+    this.router.navigate(['/home']);
   }
 }

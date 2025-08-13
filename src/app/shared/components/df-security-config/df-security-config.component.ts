@@ -444,6 +444,7 @@ export class DfSecurityConfigComponent implements OnInit {
             const dialogRef = this.dialog.open(DfCelebrationDialogComponent, {
               width: '550px',
               maxWidth: '90vw',
+              maxHeight: '85vh',
               disableClose: true,
               panelClass: 'celebration-dialog-container',
               data: {
@@ -452,7 +453,7 @@ export class DfSecurityConfigComponent implements OnInit {
                 isFirstTime: true,
               },
             });
-            
+
             // Dialog will handle navigation to API docs when closed
           } else {
             // Navigate to API docs directly for experienced users

@@ -50,10 +50,14 @@
         "description": "Created a secure API key for authentication"
       }
     },
-    "totalTime": "Total time: < 1 second",
-    "yourApiKey": "Your API Key:",
+    "endpointLabel": "Your API Endpoint:",
+    "endpointHint": "(lists all tables)",
+    "yourApiKey": "Authentication Key:",
     "copyKey": "Copy API Key",
-    "exploreApi": "Explore Your API",
-    "autoRedirect": "You'll be automatically redirected to API documentation..."
+    "keyCopied": "Copied!",
+    "usageHint": "Add the API key to the 'X-DreamFactory-Api-Key' header in your requests",
+    "testYourApi": "Test Your API Now",
+    "exploreLater": "I'll explore later",
+    "autoRedirectTest": "Redirecting to API testing playground..."
   }
 }

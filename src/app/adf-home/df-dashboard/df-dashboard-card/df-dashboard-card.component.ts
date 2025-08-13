@@ -22,6 +22,7 @@ export class DfDashboardCardComponent {
   @Input() footerText?: string;
   @Input() showPrompt?: boolean = false;
   @Input() isZero?: boolean = false;
+  @Input() zeroStateText?: string = 'Click to get started!';
   @Input() color: 'primary' | 'accent' | 'success' | 'info' | 'warn' =
     'primary';
   @Input() clickable?: boolean = false;
