@@ -181,20 +181,20 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   overflow-x: hidden;
   flex: 1;
   max-height: calc(85vh - 40px);
-  
+
   /* Custom scrollbar */
   &::-webkit-scrollbar {
     width: 6px;
   }
-  
+
   &::-webkit-scrollbar-track {
     background: rgba(127, 17, 224, 0.05);
   }
-  
+
   &::-webkit-scrollbar-thumb {
     background: rgba(127, 17, 224, 0.2);
     border-radius: 3px;
-    
+
     &:hover {
       background: rgba(127, 17, 224, 0.3);
     }
@@ -478,7 +478,7 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
 
   button {
     transition: all 0.2s ease;
-    
+
     fa-icon {
       font-size: 16px;
       color: #666;
@@ -540,7 +540,7 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
 .explore-later-button {
   font-size: 14px;
   color: #666;
-  
+
   &:hover {
     background: rgba(0, 0, 0, 0.04);
   }
@@ -617,7 +617,11 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   }
 
   .api-connection-section {
-    background: linear-gradient(135deg, rgba(127, 17, 224, 0.05) 0%, rgba(255, 255, 255, 0.03) 100%);
+    background: linear-gradient(
+      135deg,
+      rgba(127, 17, 224, 0.05) 0%,
+      rgba(255, 255, 255, 0.03) 100%
+    );
     border-color: rgba(127, 17, 224, 0.2);
 
     code {
