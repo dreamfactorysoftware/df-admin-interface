@@ -217,7 +217,7 @@ export class DfServiceDetailsComponent implements OnInit {
         this.isFirstTimeUser = stats.services.total === 0;
       });
     }
-    
+
     this.http
       .get<Array<ImageObject>>('assets/img/databaseImages.json')
       .subscribe(images => {

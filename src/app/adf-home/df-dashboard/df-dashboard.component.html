@@ -22,6 +22,7 @@
         [subtitle]="'home.dashboard.services.total' | transloco"
         [showPrompt]="stats.services.total === 0"
         [isZero]="stats.services.total === 0"
+        [zeroStateText]="'Create your first API'"
         [clickable]="stats.services.total === 0"
         (cardClick)="onServicesCardClick()"
         color="primary">
@@ -38,6 +39,7 @@
         [subtitle]="'home.dashboard.apiKeys.total' | transloco"
         [showPrompt]="stats.apiKeys.total === 0"
         [isZero]="stats.apiKeys.total === 0"
+        [zeroStateText]="'Generate your API key'"
         [clickable]="stats.apiKeys.total === 0"
         (cardClick)="onApiKeysCardClick()"
         color="success">
@@ -54,6 +56,7 @@
         [subtitle]="'home.dashboard.roles.total' | transloco"
         [showPrompt]="stats.roles.total === 0"
         [isZero]="stats.roles.total === 0"
+        [zeroStateText]="'Set up your first role'"
         [clickable]="stats.roles.total === 0"
         (cardClick)="onRolesCardClick()"
         color="info">
