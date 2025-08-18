@@ -218,26 +218,50 @@ export class DfScriptDetailsComponent implements OnInit {
         this.tableProcedureFlag = 'function';
         this.tableOptions = [
           ...this.ungroupedEventOptions[this.selectedEventItem].parameter
-            .procedureName,
+            .functionName,
         ];
       }
     }
   }
 
   selectedTable() {
-    this.completeScriptName = this.selectedRouteItem.replace(
-      '{table_name}',
-      this.selectTable
-    );
+    if (this.tableProcedureFlag === 'table') {
+      this.completeScriptName = this.selectedRouteItem.replace(
+        '{table_name}',
+        this.selectTable
+      );
+    } else if (this.tableProcedureFlag === 'procedure') {
+      this.completeScriptName = this.selectedRouteItem.replace(
+        '{procedure_name}',
+        this.selectTable
+      );
+    } else if (this.tableProcedureFlag === 'function') {
+      this.completeScriptName = this.selectedRouteItem.replace(
+        '{function_name}',
+        this.selectTable
+      );
+    }
   }
 
   selectedRoute() {
     this.completeScriptName = this.selectedRouteItem;
     if (this.selectTable) {
-      this.completeScriptName = this.completeScriptName.replace(
-        '{table_name}',
-        this.selectTable
-      );
+      if (this.tableProcedureFlag === 'table') {
+        this.completeScriptName = this.completeScriptName.replace(
+          '{table_name}',
+          this.selectTable
+        );
+      } else if (this.tableProcedureFlag === 'procedure') {
+        this.completeScriptName = this.completeScriptName.replace(
+          '{procedure_name}',
+          this.selectTable
+        );
+      } else if (this.tableProcedureFlag === 'function') {
+        this.completeScriptName = this.completeScriptName.replace(
+          '{function_name}',
+          this.selectTable
+        );
+      }
     }
   }
 }
