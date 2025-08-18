@@ -17,6 +17,9 @@ import { generateApiKey } from 'src/app/shared/utilities/hash';
 import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
 import { AdditonalAction } from 'src/app/shared/types/table';
 import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
+import { DfDuplicateDialogComponent } from 'src/app/shared/components/df-duplicate-dialog/df-duplicate-dialog.component';
+import { faCopy } from '@fortawesome/free-solid-svg-icons';
+import { catchError, throwError } from 'rxjs';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -72,7 +75,7 @@ export class DfManageAppsTableComponent extends DfManageTableComponent<AppRow> {
             row.name
           );
           this.appsService
-            .update(row.id, { apiKey: newKey })
+            .update(row.id, { api_key: newKey })
             .subscribe(() => this.refreshTable());
         },
         ariaLabel: {
@@ -81,10 +84,34 @@ export class DfManageAppsTableComponent extends DfManageTableComponent<AppRow> {
         disabled: row => row.createdById === null,
       },
     ];
+
+    // Add duplicate action before delete action
+    const duplicateAction = {
+      label: 'duplicate',
+      function: (row: AppRow) => this.duplicateApp(row),
+      ariaLabel: {
+        key: 'duplicateApp',
+        param: 'name',
+      },
+      icon: faCopy,
+    };
+
     if (this.actions.additional) {
+      // Find the delete action index
+      const deleteIndex = this.actions.additional.findIndex(
+        action => action.label === 'delete'
+      );
+      if (deleteIndex !== -1) {
+        // Insert duplicate before delete
+        this.actions.additional.splice(deleteIndex, 0, duplicateAction);
+      } else {
+        // Add at the beginning if no delete found
+        this.actions.additional.unshift(duplicateAction);
+      }
+      // Add the extra actions at the end
       this.actions.additional.push(...extraActions);
     } else {
-      this.actions.additional = extraActions;
+      this.actions.additional = [duplicateAction, ...extraActions];
     }
   }
   override columns = [
@@ -147,6 +174,83 @@ export class DfManageAppsTableComponent extends DfManageTableComponent<AppRow> {
       .subscribe(data => {
         this.dataSource.data = this.mapDataToTable(data.resource);
         this.tableLength = data.meta.count;
+      });
+  }
+
+  duplicateApp(row: AppRow): void {
+    // First, get the full app details
+    this.appsService
+      .get<AppType>(row.id)
+      .pipe(
+        catchError(error => {
+          console.error('Failed to fetch app details:', error);
+          return throwError(() => error);
+        })
+      )
+      .subscribe(app => {
+        // Get all existing app names for validation
+        this.appsService
+          .getAll<GenericListResponse<AppType>>({ limit: 1000 })
+          .subscribe(allApps => {
+            const existingNames = allApps.resource.map(a => a.name);
+
+            const dialogRef = this.dialog.open(DfDuplicateDialogComponent, {
+              width: '400px',
+              data: {
+                title: 'apps.duplicate.title',
+                message: 'apps.duplicate.message',
+                label: 'apps.duplicate.nameLabel',
+                originalName: app.name,
+                existingNames: existingNames,
+              },
+            });
+
+            dialogRef.afterClosed().subscribe(newName => {
+              if (newName) {
+                // Create a copy of the app with the new name
+                // Using snake_case as expected by the API
+                // Note: API key is generated server-side, not sent in payload
+                const duplicatedApp = {
+                  name: newName,
+                  description: `${app.description || ''} (copy)`,
+                  is_active: app.isActive,
+                  type: app.type,
+                  role_id: app.roleId || null,
+                  // Copy app location specific fields
+                  url: app.url || null,
+                  storage_service_id: app.storageServiceId || null,
+                  storage_container: app.storageContainer || null,
+                  path: app.path || null,
+                  // Copy additional settings
+                  requires_fullscreen: app.requiresFullscreen,
+                  allow_fullscreen_toggle: app.allowFullscreenToggle,
+                  toggle_location: app.toggleLocation,
+                };
+
+                // Wrap in resource array as expected by the API
+                const payload = {
+                  resource: [duplicatedApp],
+                };
+
+                // Create the new app
+                this.appsService
+                  .create(payload, {
+                    snackbarSuccess: 'apps.alerts.duplicateSuccess',
+                    fields: '*',
+                    related: 'role_by_role_id',
+                  })
+                  .pipe(
+                    catchError(error => {
+                      console.error('Failed to duplicate app:', error);
+                      return throwError(() => error);
+                    })
+                  )
+                  .subscribe(() => {
+                    this.refreshTable();
+                  });
+              }
+            });
+          });
       });
   }
 }

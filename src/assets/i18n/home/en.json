@@ -91,5 +91,29 @@
     "angularJs": "Angular JS",
     "angular2": "Angular 2",
     "react": "React"
+  },
+  "dashboard": {
+    "title": "Quick Stats",
+    "loading": "Loading stats...",
+    "error": "Unable to load stats. Please try again later.",
+    "services": {
+      "title": "API Services",
+      "total": "Your Services",
+      "createPrompt": "🚀 Get started! Create your first API service above!"
+    },
+    "admins": {
+      "title": "Admins",
+      "total": "Total Admins"
+    },
+    "apiKeys": {
+      "title": "API Keys",
+      "total": "Your API Keys",
+      "createPrompt": "🔑 Secure your APIs! Generate an API key now!"
+    },
+    "roles": {
+      "title": "Roles",
+      "total": "Your Roles",
+      "createPrompt": "🔒 Control access! Set up your first role!"
+    }
   }
 }

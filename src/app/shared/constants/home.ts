@@ -30,7 +30,7 @@ const videoTutorials = {
 const fullDocumentation = {
   name: 'home.resourceLinks.fullDocumentation',
   icon: faBook,
-  link: 'https://wiki.dreamfactory.com/',
+  link: 'https://docs.dreamfactory.com/',
 };
 
 const communityForum = {

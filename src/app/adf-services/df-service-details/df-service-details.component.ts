@@ -85,6 +85,7 @@ import { TitleCasePipe } from '@angular/common';
 import { MatDividerModule } from '@angular/material/divider';
 import { DfSystemService } from 'src/app/shared/services/df-system.service';
 import { DfPaywallModal } from 'src/app/shared/components/df-paywall-modal/df-paywall-modal.component';
+import { DfAnalyticsService } from 'src/app/shared/services/df-analytics.service';
 
 // Add these interfaces at the bottom of the file with the other interfaces
 interface RoleResponse {
@@ -175,6 +176,7 @@ export class DfServiceDetailsComponent implements OnInit {
   @ViewChild('stepper') stepper!: MatStepper;
   showSecurityConfig = false;
   currentServiceId: number | null = null;
+  isFirstTimeUser = false;
   constructor(
     private activatedRoute: ActivatedRoute,
     private fb: FormBuilder,
@@ -188,7 +190,8 @@ export class DfServiceDetailsComponent implements OnInit {
     private snackbarService: DfSnackbarService,
     private currentServiceService: DfCurrentServiceService,
     private snackBar: MatSnackBar,
-    private systemService: DfSystemService
+    private systemService: DfSystemService,
+    private analyticsService: DfAnalyticsService
   ) {
     this.serviceForm = this.fb.group({
       type: ['', Validators.required],
@@ -197,7 +200,7 @@ export class DfServiceDetailsComponent implements OnInit {
       description: [''],
       isActive: [true],
       service_doc_by_service_id: this.fb.group({
-        format: [],
+        format: [0],
         content: [''],
       }),
     });
@@ -208,6 +211,13 @@ export class DfServiceDetailsComponent implements OnInit {
   }
   isDarkMode = this.themeService.darkMode$;
   ngOnInit(): void {
+    // Check if this is the user's first API (only for new service creation, not editing)
+    if (!this.edit) {
+      this.analyticsService.getDashboardStats().subscribe(stats => {
+        this.isFirstTimeUser = stats.services.total === 0;
+      });
+    }
+
     this.http
       .get<Array<ImageObject>>('assets/img/databaseImages.json')
       .subscribe(images => {
@@ -305,14 +315,21 @@ export class DfServiceDetailsComponent implements OnInit {
           if (data?.serviceDocByServiceId) {
             this.serviceDefinitionType =
               '' + data?.serviceDocByServiceId.format;
-            this.getConfigControl('serviceDefinition').setValue(
-              data.config.content
-            );
-          }
-          if (!this.isAuth) {
-            this.getConfigControl('serviceDefinition').setValue(
-              data.config.content
-            );
+
+            // For network services, set the content field
+            if (this.isNetworkService) {
+              this.getConfigControl('content')?.setValue(
+                data.serviceDocByServiceId.content
+              );
+              this.content = data.serviceDocByServiceId.content || '';
+            }
+            // For script services, set the serviceDefinition field
+            else if (this.isScriptService) {
+              this.getConfigControl('serviceDefinition')?.setValue(
+                data.serviceDocByServiceId.content
+              );
+              this.content = data.serviceDocByServiceId.content || '';
+            }
           }
           this.serviceForm.controls['type'].disable();
         } else {
@@ -364,15 +381,20 @@ export class DfServiceDetailsComponent implements OnInit {
       if (this.isNetworkService) {
         this.serviceForm.addControl('type', new FormControl(''));
         config.addControl('content', new FormControl(''));
+        // Initialize serviceDefinitionType for JSON/YAML toggle
+        this.serviceDefinitionType = '0'; // Default to JSON
       }
       this.serviceForm.addControl('config', config);
     }
   }
 
   get subscriptionRequired() {
-    return (
-      this.serviceForm.controls['type'].value && this.configSchema?.length === 0
-    );
+    const serviceType = this.serviceForm.controls['type'].value;
+    // Local email service is open source and should not require subscription
+    if (serviceType === 'local_email') {
+      return false;
+    }
+    return serviceType && this.configSchema?.length === 0;
   }
 
   get scriptMode() {
@@ -390,6 +412,16 @@ export class DfServiceDetailsComponent implements OnInit {
       return AceEditorMode.PHP;
     }
     return AceEditorMode.TEXT;
+  }
+
+  get serviceDefinitionMode(): AceEditorMode {
+    return this.serviceDefinitionType === '0'
+      ? AceEditorMode.JSON
+      : AceEditorMode.YAML;
+  }
+
+  get excelMode(): AceEditorMode {
+    return AceEditorMode.JSON;
   }
 
   excelUpload(event: Event) {
@@ -509,6 +541,36 @@ export class DfServiceDetailsComponent implements OnInit {
     );
   }
 
+  // Network service field categorization
+  get networkRequiredFields() {
+    if (!this.isNetworkService || !this.viewSchema) {
+      return [];
+    }
+
+    // Base URL is the primary required field for network services
+    const requiredFieldNames = ['baseUrl'];
+    return this.viewSchema.filter(field =>
+      requiredFieldNames.includes(field.name)
+    );
+  }
+
+  get networkAdvancedFields() {
+    if (!this.isNetworkService || !this.viewSchema) {
+      return [];
+    }
+
+    // All other fields are considered advanced
+    const requiredFieldNames = ['baseUrl'];
+    return this.viewSchema.filter(
+      field =>
+        !requiredFieldNames.includes(field.name) && field.name !== 'content'
+    );
+  }
+
+  get showNetworkAdvancedOptions(): boolean {
+    return this.isNetworkService;
+  }
+
   getConfigControl(name: string) {
     return this.serviceForm.get(`config.${name}`) as FormControl;
   }
@@ -550,44 +612,48 @@ export class DfServiceDetailsComponent implements OnInit {
       snackbarError: 'server',
       snackbarSuccess: 'services.createSuccessMsg',
     };
+
+    // Initialize service_doc_by_service_id based on service type
+    let serviceDoc = null;
+
     if (this.isNetworkService) {
       params = {
         ...params,
         fields: '*',
         related: 'service_doc_by_service_id',
       };
-      // if (!data.config.serviceDefinition) {
-      //   data.service_doc_by_service_id = null;
-      // } else {
-      data.service_doc_by_service_id.content = data.config.content;
-      data.service_doc_by_service_id.format = Number(
-        this.serviceDefinitionType
-      );
-      // }
+      // For network services (including RWS), use the content field
+      if (data.config?.content) {
+        serviceDoc = {
+          content: data.config.content,
+          format: this.serviceDefinitionType
+            ? Number(this.serviceDefinitionType)
+            : 0,
+        };
+        // Remove content from config as it's moved to service_doc_by_service_id
+        delete data.config.content;
+      }
     } else if (this.isScriptService) {
       params = {
         ...params,
         fields: '*',
         related: 'service_doc_by_service_id',
       };
-      // data.service_doc_by_service_id = null;
-      // data.config.content = this.serviceDefinition;
-      if (!data.config) {
-        data.service_doc_by_service_id = null;
-      } else {
-        data.config.content = data.config.serviceDefinition;
-        if (data.service_doc_by_service_id.content === '') {
-          data.service_doc_by_service_id = null;
-        } else {
-          data.service_doc_by_service_id.format = this.serviceDefinitionType
+      // For script services, use the serviceDefinition field
+      if (data.config?.serviceDefinition) {
+        serviceDoc = {
+          content: data.config.serviceDefinition,
+          format: this.serviceDefinitionType
             ? Number(this.serviceDefinitionType)
-            : 0;
-        }
+            : 0,
+        };
+        // Remove serviceDefinition from config as it's moved to service_doc_by_service_id
         delete data.config.serviceDefinition;
       }
-    } else {
-      delete data.service_doc_by_service_id;
     }
+
+    // Apply service_doc_by_service_id to data
+    data.service_doc_by_service_id = serviceDoc;
     let payload;
     if (data.type.toLowerCase().includes('saml')) {
       params = {
@@ -627,12 +693,11 @@ export class DfServiceDetailsComponent implements OnInit {
       }
       delete payload.isActive;
     } else {
-      // data.service_doc_by_service_id = null;
+      // For other service types, use the base data
       payload = {
         ...data,
         id: this.edit ? this.serviceData.id : null,
       };
-      payload = { ...data };
     }
     if (this.edit) {
       const payload = {
@@ -834,6 +899,8 @@ export class DfServiceDetailsComponent implements OnInit {
             ? Number(this.serviceDefinitionType)
             : 0,
         };
+        // Remove content from config as it's moved to service_doc_by_service_id
+        delete payload.config.content;
       } else if (this.isScriptService && data.config?.serviceDefinition) {
         payload.service_doc_by_service_id = {
           content: data.config.serviceDefinition,
@@ -841,6 +908,8 @@ export class DfServiceDetailsComponent implements OnInit {
             ? Number(this.serviceDefinitionType)
             : 0,
         };
+        // Remove serviceDefinition from config as it's moved to service_doc_by_service_id
+        delete payload.config.serviceDefinition;
       } else {
         payload.service_doc_by_service_id = null;
       }

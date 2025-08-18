@@ -26,18 +26,10 @@ export class DfSystemInfoComponent implements OnInit {
   ) {}
 
   ngOnInit() {
-    this.systemConfigDataService.environment$.subscribe(environment => {
-      if (
-        environment.platform?.license &&
-        environment.platform?.license !== 'OPEN SOURCE' &&
-        environment.platform?.licenseKey
-      ) {
-        const data = this.licenseCheckService.check(
-          environment.platform?.licenseKey as string
-        );
-        data.subscribe(data => {
-          this.status = data;
-        });
+    // Use the existing license check result instead of triggering a new one
+    this.licenseCheckService.licenseCheck$.subscribe(licenseCheck => {
+      if (licenseCheck) {
+        this.status = licenseCheck;
       } else {
         this.status = undefined;
       }

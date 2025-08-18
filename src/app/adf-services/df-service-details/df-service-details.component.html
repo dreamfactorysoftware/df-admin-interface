@@ -366,6 +366,16 @@
             </ng-container>
           </ng-container>
         </ng-container>
+        <!-- First-time user guidance message for database services -->
+        <div
+          class="first-time-guidance"
+          *ngIf="isFirstTimeUser && isDatabase && !subscriptionRequired">
+          <fa-icon [icon]="faCircleInfo" class="guidance-icon"></fa-icon>
+          <p class="guidance-text">
+            {{ 'services.firstTimeGuidance' | transloco }}
+          </p>
+        </div>
+
         <div class="full-width action-bar" *ngIf="!subscriptionRequired">
           <button
             class="cancel-btn"
@@ -375,7 +385,21 @@
             {{ 'cancel' | transloco }}
           </button>
           <div class="button-group">
+            <!-- For first-time users creating database APIs, only show Security Config button as primary -->
             <button
+              *ngIf="isFirstTimeUser && isDatabase"
+              mat-flat-button
+              class="save-btn"
+              color="primary"
+              type="button"
+              [disabled]="!serviceForm.valid"
+              (click)="goToSecurityConfig()">
+              {{ 'services.controls.nextSecurityConfig' | transloco }}
+            </button>
+
+            <!-- For experienced users or non-database services, show both buttons -->
+            <button
+              *ngIf="!(isFirstTimeUser && isDatabase)"
               mat-flat-button
               class="save-btn secondary-btn"
               type="button"
@@ -383,7 +407,11 @@
               (click)="goToSecurityConfig()">
               {{ 'services.controls.securityConfig' | transloco }}
             </button>
-            <button class="save-btn" mat-flat-button color="primary">
+            <button
+              *ngIf="!(isFirstTimeUser && isDatabase)"
+              class="save-btn"
+              mat-flat-button
+              color="primary">
               {{ 'services.controls.createAndTest' | transloco }}
             </button>
           </div>
@@ -396,6 +424,7 @@
             [serviceName]="serviceForm.get('name')?.value"
             [serviceId]="currentServiceId"
             [isDatabase]="isDatabase"
+            [isFirstTimeUser]="isFirstTimeUser"
             (goBack)="goBack()">
           </df-security-config>
         </div>
@@ -531,26 +560,47 @@
     </div>
     <ng-container *ngIf="viewSchema && !subscriptionRequired">
       <ng-container formGroupName="config">
-        <ng-container *ngIf="this.isNetworkService || this.isScriptService">
-          <ng-container *ngIf="getConfigControl('storageServiceId')">
-            <df-script-editor
-              [isScript]="this.isScriptService"
-              [type]="getControl('type')"
-              [storageServiceId]="getConfigControl('storageServiceId')"
-              [storagePath]="getConfigControl('storagePath')"
-              [content]="getConfigControl('serviceDefinition')"
-              [cache]="serviceData ? serviceData.name : ''"
-              class="full-width"></df-script-editor>
+        <!-- Network Service Configuration -->
+        <ng-container *ngIf="this.isNetworkService">
+          <!-- Required Fields (Base URL) - Always visible at the top -->
+          <ng-container *ngFor="let item of networkRequiredFields">
+            <df-dynamic-field
+              *ngIf="
+                [
+                  'integer',
+                  'password',
+                  'string',
+                  'text',
+                  'picklist',
+                  'multi_picklist',
+                  'boolean',
+                  'file_certificate',
+                  'file_certificate_api'
+                ].includes(item.type)
+              "
+              color="primary"
+              [schema]="item"
+              [formControl]="getConfigControl(item.name)"
+              [class.dynamic-width]="
+                ['file_certificate', 'file_certificate_api'].indexOf(
+                  item.type
+                ) === -1
+              "
+              [class.full-width]="
+                ['file_certificate', 'file_certificate_api'].indexOf(
+                  item.type
+                ) !== -1
+              "></df-dynamic-field>
           </ng-container>
-        </ng-container>
-        <mat-accordion class="full-width">
-          <mat-expansion-panel [expanded]="serviceForm.getRawValue().type">
-            <mat-expansion-panel-header
-              >{{ 'services.options' | transloco }}
-            </mat-expansion-panel-header>
-            <div class="details-section">
-              <ng-container
-                *ngIf="this.isNetworkService || this.isScriptService">
+
+          <!-- Advanced Options Section for Network Services -->
+          <mat-accordion class="full-width">
+            <mat-expansion-panel [expanded]="false">
+              <mat-expansion-panel-header>
+                Advanced Options
+              </mat-expansion-panel-header>
+              <div class="details-section">
+                <!-- Service Definition Section -->
                 <ng-container *ngIf="serviceForm.getRawValue().type !== 'soap'">
                   <mat-button-toggle-group
                     aria-label="Service Definition Type"
@@ -573,48 +623,30 @@
                     class="full-width">
                   </df-file-github>
                 </ng-container>
-              </ng-container>
-              <ng-container
-                *ngIf="
-                  this.isFile && serviceForm.getRawValue().type === 'local_file'
-                ">
-                <div class="actions full-width">
-                  <input
-                    type="file"
-                    [accept]=""
-                    #fileInput
-                    (change)="excelUpload($event)"
-                    style="display: none" />
-                  <button
-                    type="button"
-                    mat-flat-button
-                    class="save-btn"
-                    (click)="fileInput.click()">
-                    Upload Excel
-                  </button>
-                </div>
-                <df-ace-editor
-                  class="full-width"
-                  [formControl]="getConfigControl('excelContent')"
-                  [mode]="serviceForm.getRawValue().type"></df-ace-editor>
-              </ng-container>
-              <ng-container *ngFor="let item of viewSchema">
+
+                <ng-container *ngIf="serviceForm.getRawValue().type === 'soap'">
+                  <df-file-github
+                    [type]="getControl('type')"
+                    [content]="getConfigControl('content')"
+                    [contentText]="content"
+                    class="full-width">
+                  </df-file-github>
+                </ng-container>
+
                 <ng-container
                   *ngIf="
-                    item.type === 'text' && item.name === 'content';
-                    else dynamic
+                    serviceForm.getRawValue().type === 'rest' ||
+                    serviceForm.getRawValue().type === 'http'
                   ">
-                  <ng-container *ngIf="getConfigControl('storageServiceId')">
-                    <df-script-editor
-                      [type]="getControl('type')"
-                      [storageServiceId]="getConfigControl('storageServiceId')"
-                      [storagePath]="getConfigControl('storagePath')"
-                      [content]="getServiceDocByServiceIdControl('content')"
-                      [cache]="serviceData ? serviceData.name : ''"
-                      class="full-width"></df-script-editor>
-                  </ng-container>
+                  <df-ace-editor
+                    class="full-width"
+                    [formControl]="getConfigControl('content')"
+                    [mode]="serviceDefinitionMode">
+                  </df-ace-editor>
                 </ng-container>
-                <ng-template #dynamic>
+
+                <!-- Other Advanced Fields -->
+                <ng-container *ngFor="let item of networkAdvancedFields">
                   <df-dynamic-field
                     *ngIf="
                       [
@@ -647,11 +679,116 @@
                     [schema]="item"
                     [formControl]="getConfigControl(item.name)"
                     class="full-width"></df-array-field>
-                </ng-template>
-              </ng-container>
-            </div>
-          </mat-expansion-panel>
-        </mat-accordion>
+                </ng-container>
+              </div>
+            </mat-expansion-panel>
+          </mat-accordion>
+        </ng-container>
+
+        <!-- Script Service Configuration (unchanged) -->
+        <ng-container *ngIf="this.isScriptService">
+          <ng-container *ngIf="getConfigControl('storageServiceId')">
+            <df-script-editor
+              [isScript]="this.isScriptService"
+              [type]="getControl('type')"
+              [storageServiceId]="getConfigControl('storageServiceId')"
+              [storagePath]="getConfigControl('storagePath')"
+              [content]="getConfigControl('serviceDefinition')"
+              [cache]="serviceData ? serviceData.name : ''"
+              class="full-width"></df-script-editor>
+          </ng-container>
+        </ng-container>
+
+        <!-- Other Service Types (unchanged) -->
+        <ng-container *ngIf="!this.isNetworkService && !this.isScriptService">
+          <mat-accordion class="full-width">
+            <mat-expansion-panel [expanded]="serviceForm.getRawValue().type">
+              <mat-expansion-panel-header
+                >{{ 'services.options' | transloco }}
+              </mat-expansion-panel-header>
+              <div class="details-section">
+                <ng-container
+                  *ngIf="
+                    this.isFile &&
+                    serviceForm.getRawValue().type === 'local_file'
+                  ">
+                  <div class="actions full-width">
+                    <input
+                      type="file"
+                      [accept]=""
+                      #fileInput
+                      (change)="excelUpload($event)"
+                      style="display: none" />
+                    <button
+                      type="button"
+                      mat-flat-button
+                      class="save-btn"
+                      (click)="fileInput.click()">
+                      Upload Excel
+                    </button>
+                  </div>
+                  <df-ace-editor
+                    class="full-width"
+                    [formControl]="getConfigControl('excelContent')"
+                    [mode]="excelMode"></df-ace-editor>
+                </ng-container>
+                <ng-container *ngFor="let item of viewSchema">
+                  <ng-container
+                    *ngIf="
+                      item.type === 'text' && item.name === 'content';
+                      else dynamic
+                    ">
+                    <ng-container *ngIf="getConfigControl('storageServiceId')">
+                      <df-script-editor
+                        [type]="getControl('type')"
+                        [storageServiceId]="
+                          getConfigControl('storageServiceId')
+                        "
+                        [storagePath]="getConfigControl('storagePath')"
+                        [content]="getServiceDocByServiceIdControl('content')"
+                        [cache]="serviceData ? serviceData.name : ''"
+                        class="full-width"></df-script-editor>
+                    </ng-container>
+                  </ng-container>
+                  <ng-template #dynamic>
+                    <df-dynamic-field
+                      *ngIf="
+                        [
+                          'integer',
+                          'password',
+                          'string',
+                          'text',
+                          'picklist',
+                          'multi_picklist',
+                          'boolean',
+                          'file_certificate',
+                          'file_certificate_api'
+                        ].includes(item.type)
+                      "
+                      color="primary"
+                      [schema]="item"
+                      [formControl]="getConfigControl(item.name)"
+                      [class.dynamic-width]="
+                        ['file_certificate', 'file_certificate_api'].indexOf(
+                          item.type
+                        ) === -1
+                      "
+                      [class.full-width]="
+                        ['file_certificate', 'file_certificate_api'].indexOf(
+                          item.type
+                        ) !== -1
+                      "></df-dynamic-field>
+                    <df-array-field
+                      *ngIf="item.type === 'array' || item.type === 'object'"
+                      [schema]="item"
+                      [formControl]="getConfigControl(item.name)"
+                      class="full-width"></df-array-field>
+                  </ng-template>
+                </ng-container>
+              </div>
+            </mat-expansion-panel>
+          </mat-accordion>
+        </ng-container>
       </ng-container>
     </ng-container>
     <div class="full-width action-bar" *ngIf="!subscriptionRequired">

@@ -13,6 +13,10 @@ export class DfLicenseCheckService {
   private licenseCheckSubject = new BehaviorSubject<CheckResponse | null>(null);
   licenseCheck$ = this.licenseCheckSubject.asObservable();
 
+  get currentLicenseCheck(): CheckResponse | null {
+    return this.licenseCheckSubject.value;
+  }
+
   constructor(private httpClient: HttpClient) {}
 
   check(licenseKey: string) {
@@ -26,7 +30,8 @@ export class DfLicenseCheckService {
         map(response => mapSnakeToCamel(response)),
         tap(response => this.licenseCheckSubject.next(response)),
         catchError(e => {
-          this.licenseCheckSubject.next(e.error);
+          const errorResponse = mapSnakeToCamel(e.error);
+          this.licenseCheckSubject.next(errorResponse);
           return throwError(() => new Error(e));
         })
       );

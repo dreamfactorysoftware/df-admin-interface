@@ -602,3 +602,48 @@ mat-icon {
     }
   }
 }
+
+// First-time user guidance styles
+.first-time-guidance {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  margin: 20px 0;
+  background: linear-gradient(135deg, #f3e7ff 0%, #e8d5ff 100%);
+  border-radius: 8px;
+  border-left: 4px solid mat.get-color-from-palette($df-purple-palette, 500);
+
+  .guidance-icon {
+    color: mat.get-color-from-palette($df-purple-palette, 600);
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+
+  .guidance-text {
+    margin: 0;
+    color: #4a4a4a;
+    font-size: 14px;
+    line-height: 1.5;
+    flex: 1;
+  }
+}
+
+.dark-theme {
+  .first-time-guidance {
+    background: linear-gradient(
+      135deg,
+      rgba(124, 77, 255, 0.15) 0%,
+      rgba(124, 77, 255, 0.1) 100%
+    );
+    border-left-color: mat.get-color-from-palette($df-purple-palette, 300);
+
+    .guidance-icon {
+      color: mat.get-color-from-palette($df-purple-palette, 300);
+    }
+
+    .guidance-text {
+      color: rgba(255, 255, 255, 0.87);
+    }
+  }
+}

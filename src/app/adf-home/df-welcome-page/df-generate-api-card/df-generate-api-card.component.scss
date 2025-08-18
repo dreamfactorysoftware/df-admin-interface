@@ -1,36 +1,45 @@
 .df-generate-api-card {
   cursor: pointer;
   width: 100%;
-  min-height: 115px;
+  min-height: 160px;
   display: flex;
   flex-direction: column;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
 }
 
 .df-generate-api-card-content {
   display: flex;
   flex-direction: column;
   align-items: left;
-  padding: 12px;
+  padding: 20px;
   flex-grow: 1;
   overflow: hidden;
 
   fa-icon {
-    margin-bottom: 8px;
+    margin-bottom: 12px;
     flex-shrink: 0;
+    font-size: 2rem;
   }
 
   .df-card-header {
-    font-size: 14px;
-    font-weight: 500;
-    margin-bottom: 0px;
-    line-height: 1.2;
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    line-height: 1.3;
   }
   .df-card-description {
-    font-size: 12px;
-    line-height: 1.4;
+    font-size: 14px;
+    line-height: 1.5;
     display: -webkit-box;
-    line-clamp: 2;
-    -webkit-line-clamp: 2;
+    line-clamp: 3;
+    -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
     text-overflow: ellipsis;
