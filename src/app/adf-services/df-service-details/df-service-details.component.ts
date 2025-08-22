@@ -308,25 +308,25 @@ export class DfServiceDetailsComponent implements OnInit {
             if (!data.config) {
               data.config = {};
             }
-            
+
             // Helper function to detect if content is likely an OpenAPI/Swagger spec
             const isLikelyOpenApiSpec = (content: string): boolean => {
               if (!content) return false;
               const trimmed = content.trim();
-              
+
               // Check for common OpenAPI/Swagger patterns
               const openApiPatterns = [
-                /^\s*\{?\s*["']?openapi["']?\s*:/i,  // JSON or YAML openapi field
-                /^\s*\{?\s*["']?swagger["']?\s*:/i,   // JSON or YAML swagger field
-                /^\s*openapi\s*:/im,                   // YAML format
-                /^\s*swagger\s*:/im,                   // YAML format
-                /["']paths["']\s*:\s*\{/i,             // JSON paths object
-                /^\s*paths\s*:/im                      // YAML paths
+                /^\s*\{?\s*["']?openapi["']?\s*:/i, // JSON or YAML openapi field
+                /^\s*\{?\s*["']?swagger["']?\s*:/i, // JSON or YAML swagger field
+                /^\s*openapi\s*:/im, // YAML format
+                /^\s*swagger\s*:/im, // YAML format
+                /["']paths["']\s*:\s*\{/i, // JSON paths object
+                /^\s*paths\s*:/im, // YAML paths
               ];
-              
+
               return openApiPatterns.some(pattern => pattern.test(trimmed));
             };
-            
+
             // Check if this is an old script service with content in the wrong place
             // Old structure: script content was in serviceDocByServiceId.content
             // New structure: script content should be in config.content, OpenAPI spec (if any) in serviceDocByServiceId.content
@@ -421,7 +421,7 @@ export class DfServiceDetailsComponent implements OnInit {
     this.isNetworkService = false;
     this.isScriptService = false;
     this.isFile = false;
-    
+
     // Find the service type to get its group
     const serviceType = this.serviceTypes.find(st => st.name === type);
     if (serviceType && serviceType.group) {
@@ -735,7 +735,8 @@ export class DfServiceDetailsComponent implements OnInit {
         related: 'service_doc_by_service_id',
       };
       // For script services, check if there's an OpenAPI spec
-      const openApiContent = this.getServiceDocByServiceIdControl('content')?.value;
+      const openApiContent =
+        this.getServiceDocByServiceIdControl('content')?.value;
       if (openApiContent && openApiContent.trim()) {
         serviceDoc = {
           content: openApiContent,
@@ -1003,7 +1004,8 @@ export class DfServiceDetailsComponent implements OnInit {
         // Remove content from config as it's moved to service_doc_by_service_id
         delete payload.config.content;
       } else if (this.isScriptService) {
-        const openApiContent = this.getServiceDocByServiceIdControl('content')?.value;
+        const openApiContent =
+          this.getServiceDocByServiceIdControl('content')?.value;
         if (openApiContent && openApiContent.trim()) {
           payload.service_doc_by_service_id = {
             content: openApiContent,
