@@ -18,9 +18,9 @@ export class DfLoadingSpinnerService {
     } else {
       this.activeCounter = Math.max(this.activeCounter - 1, 0);
     }
-    
+
     const shouldBeActive = this.activeCounter > 0;
-    
+
     // Only defer if the value is actually changing to avoid unnecessary timeouts
     // This prevents ExpressionChangedAfterItHasBeenCheckedError by ensuring
     // the value change happens after the current change detection cycle completes
