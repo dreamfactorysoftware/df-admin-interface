@@ -473,7 +473,7 @@ export class DfServiceDetailsComponent implements OnInit {
       let sessionToken = '';
       let apiKeyFromCookie = '';
 
-      for (let cookie of cookies) {
+      for (const cookie of cookies) {
         const [name, value] = cookie.trim().split('=');
         if (name === 'df_session_token' || name === 'session_token') {
           sessionToken = value;
