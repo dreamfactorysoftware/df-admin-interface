@@ -83,15 +83,15 @@ export const SILVER_SERVICES: Array<ServiceType> = [
   {
     name: 'soap',
     label: 'SOAP Service',
-    description:
-      'SOAP service supporting SOAP 1.1 and 1.2 protocols.',
+    description: 'SOAP service supporting SOAP 1.1 and 1.2 protocols.',
     group: 'Remote Service',
     configSchema: [],
   },
   {
     name: 'excel',
     label: 'Excel Service',
-    description: 'Service to manage XLS, XLSX, CSV files with storage service integration.',
+    description:
+      'Service to manage XLS, XLSX, CSV files with storage service integration.',
     group: 'Excel',
     configSchema: [],
   },

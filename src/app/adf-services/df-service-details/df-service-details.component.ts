@@ -178,7 +178,7 @@ export class DfServiceDetailsComponent implements OnInit {
   currentServiceId: number | null = null;
   isFirstTimeUser = false;
   availableFileServices: any[] = [];
-  
+
   constructor(
     private activatedRoute: ActivatedRoute,
     private fb: FormBuilder,
@@ -311,16 +311,19 @@ export class DfServiceDetailsComponent implements OnInit {
         if (this.edit) {
           this.configSchema = this.getConfigSchema(data.type);
           this.initializeConfig('');
-          
+
           // For Excel services, extract storage_service_id and load file services
           if (data.type === 'excel') {
             console.log('Editing Excel service, data:', data);
             console.log('Config:', data.config);
-            console.log('Storage service ID from config:', data.config?.storageServiceId);
-            
+            console.log(
+              'Storage service ID from config:',
+              data.config?.storageServiceId
+            );
+
             // Extract storageServiceId from config
             const storageServiceId = data.config?.storageServiceId;
-            
+
             // Load file services first, then set the form value when services are loaded
             this.loadAvailableFileServices(() => {
               console.log('File services loaded, now setting form value');
@@ -329,7 +332,7 @@ export class DfServiceDetailsComponent implements OnInit {
                 this.serviceForm.patchValue({
                   ...data,
                   config: data.config,
-                  storageServiceId: storageServiceId
+                  storageServiceId: storageServiceId,
                 });
               } else {
                 console.log('No storageServiceId found in config');
@@ -370,14 +373,14 @@ export class DfServiceDetailsComponent implements OnInit {
             this.serviceForm.removeControl('config');
             this.configSchema = this.getConfigSchema(value);
             this.initializeConfig(value);
-            
+
             // Load file services when Excel service type is selected
             if (value === 'excel') {
               this.loadAvailableFileServices();
             }
           });
         }
-        
+
         // If editing an Excel service, load file services immediately
         if (this.edit && data?.type === 'excel') {
           this.loadAvailableFileServices();
@@ -397,29 +400,41 @@ export class DfServiceDetailsComponent implements OnInit {
     console.log('this.edit:', this.edit);
     console.log('this.serviceData:', this.serviceData);
     console.log('this.availableFileServices:', this.availableFileServices);
-    
+
     // First try to get from the form
     let storageServiceId = this.serviceForm.get('storageServiceId')?.value;
     console.log('storageServiceId from form:', storageServiceId);
-    
+
     // If not in form, try to get from service data (for editing)
-    if (!storageServiceId && this.edit && this.serviceData?.config?.storageServiceId) {
+    if (
+      !storageServiceId &&
+      this.edit &&
+      this.serviceData?.config?.storageServiceId
+    ) {
       storageServiceId = this.serviceData.config.storageServiceId;
-      console.log('storageServiceId from serviceData.config.storageServiceId:', storageServiceId);
+      console.log(
+        'storageServiceId from serviceData.config.storageServiceId:',
+        storageServiceId
+      );
     }
-    
+
     // Debug: Let's see what's in the service data
     console.log('this.serviceData.config:', this.serviceData?.config);
-    console.log('this.serviceData.config?.storageServiceId:', this.serviceData?.config?.storageServiceId);
-    
+    console.log(
+      'this.serviceData.config?.storageServiceId:',
+      this.serviceData?.config?.storageServiceId
+    );
+
     if (!storageServiceId) {
       console.log('No storageServiceId found, returning default message');
       return 'No storage service selected';
     }
-    
-    const selectedService = this.availableFileServices.find(service => service.id === storageServiceId);
+
+    const selectedService = this.availableFileServices.find(
+      service => service.id === storageServiceId
+    );
     console.log('selectedService found:', selectedService);
-    
+
     if (selectedService) {
       const displayName = selectedService.label || selectedService.name;
       console.log('Returning display name:', displayName);
@@ -432,17 +447,24 @@ export class DfServiceDetailsComponent implements OnInit {
 
   loadAvailableFileServices(callback?: () => void) {
     console.log('=== loadAvailableFileServices called ===');
-    console.log('Current service form type:', this.serviceForm.getRawValue().type);
-    console.log('Available file services before loading:', this.availableFileServices);
-    
+    console.log(
+      'Current service form type:',
+      this.serviceForm.getRawValue().type
+    );
+    console.log(
+      'Available file services before loading:',
+      this.availableFileServices
+    );
+
     // Try multiple authentication methods
     let authHeader = '';
-    
+
     // Method 1: Check localStorage for API key
-    const apiKey = localStorage.getItem('df_token') || 
-                   localStorage.getItem('X-DreamFactory-API-Key') ||
-                   sessionStorage.getItem('df_token');
-    
+    const apiKey =
+      localStorage.getItem('df_token') ||
+      localStorage.getItem('X-DreamFactory-API-Key') ||
+      sessionStorage.getItem('df_token');
+
     if (apiKey) {
       authHeader = `X-DreamFactory-API-Key: ${apiKey}`;
     } else {
@@ -450,7 +472,7 @@ export class DfServiceDetailsComponent implements OnInit {
       const cookies = document.cookie.split(';');
       let sessionToken = '';
       let apiKeyFromCookie = '';
-      
+
       for (let cookie of cookies) {
         const [name, value] = cookie.trim().split('=');
         if (name === 'df_session_token' || name === 'session_token') {
@@ -460,7 +482,7 @@ export class DfServiceDetailsComponent implements OnInit {
           apiKeyFromCookie = value;
         }
       }
-      
+
       if (sessionToken) {
         authHeader = `X-DreamFactory-Session-Token: ${sessionToken}`;
       } else if (apiKeyFromCookie) {
@@ -470,81 +492,98 @@ export class DfServiceDetailsComponent implements OnInit {
         if ((window as any).dfAuthToken) {
           authHeader = `X-DreamFactory-API-Key: ${(window as any).dfAuthToken}`;
         } else if ((window as any).dreamFactoryToken) {
-          authHeader = `X-DreamFactory-API-Key: ${(window as any).dreamFactoryToken}`;
+          authHeader = `X-DreamFactory-API-Key: ${
+            (window as any).dreamFactoryToken
+          }`;
         }
       }
     }
-    
+
     if (!authHeader) {
       console.warn('No authentication method found, cannot load file services');
       this.availableFileServices = [];
       if (callback) callback();
       return;
     }
-    
+
     // Get file services from the system
     const apiUrl = `${window.location.origin}/api/v2/system/service`;
-    
+
     // Parse the auth header to get key and value
     const [headerName, headerValue] = authHeader.split(': ');
     const headers: any = {};
     if (headerName && headerValue) {
       headers[headerName] = headerValue;
     }
-    
-    this.http.get<any>(apiUrl, {
-      params: {
-        filter: 'type=local_file',
-        fields: 'id,name,label,type'
-      },
-      headers: headers
-    }).subscribe({
-      next: (response: any) => {
-        if (response.resource && Array.isArray(response.resource)) {
-          this.availableFileServices = response.resource;
-          console.log('File services loaded successfully:', this.availableFileServices);
-        } else {
-          console.warn('No file services found in response or invalid format');
-          this.availableFileServices = [];
-        }
-        if (callback) callback();
-      },
-      error: (error) => {
-        console.error('Failed to load file services:', error);
-        
-        // Fallback: try to get services without filter
-        this.http.get<any>(apiUrl, {
-          params: {
-            fields: 'id,name,label,type'
-          },
-          headers: headers
-        }).subscribe({
-          next: (fallbackResponse: any) => {
-            if (fallbackResponse.resource && Array.isArray(fallbackResponse.resource)) {
-              // Filter for file-related services
-              const allServices = fallbackResponse.resource;
-              
-              this.availableFileServices = allServices.filter((service: any) => 
-                service.type && (
-                  service.type === 'local_file' || 
-                  service.type === 'file' ||
-                  service.type.includes('file')
-                )
-              );
-              console.log('File services loaded via fallback:', this.availableFileServices);
-            } else {
-              this.availableFileServices = [];
-            }
-            if (callback) callback();
-          },
-          error: (fallbackError) => {
-            console.error('Fallback also failed:', fallbackError);
+
+    this.http
+      .get<any>(apiUrl, {
+        params: {
+          filter: 'type=local_file',
+          fields: 'id,name,label,type',
+        },
+        headers: headers,
+      })
+      .subscribe({
+        next: (response: any) => {
+          if (response.resource && Array.isArray(response.resource)) {
+            this.availableFileServices = response.resource;
+            console.log(
+              'File services loaded successfully:',
+              this.availableFileServices
+            );
+          } else {
+            console.warn(
+              'No file services found in response or invalid format'
+            );
             this.availableFileServices = [];
-            if (callback) callback();
           }
-        });
-      }
-    });
+          if (callback) callback();
+        },
+        error: error => {
+          console.error('Failed to load file services:', error);
+
+          // Fallback: try to get services without filter
+          this.http
+            .get<any>(apiUrl, {
+              params: {
+                fields: 'id,name,label,type',
+              },
+              headers: headers,
+            })
+            .subscribe({
+              next: (fallbackResponse: any) => {
+                if (
+                  fallbackResponse.resource &&
+                  Array.isArray(fallbackResponse.resource)
+                ) {
+                  // Filter for file-related services
+                  const allServices = fallbackResponse.resource;
+
+                  this.availableFileServices = allServices.filter(
+                    (service: any) =>
+                      service.type &&
+                      (service.type === 'local_file' ||
+                        service.type === 'file' ||
+                        service.type.includes('file'))
+                  );
+                  console.log(
+                    'File services loaded via fallback:',
+                    this.availableFileServices
+                  );
+                } else {
+                  this.availableFileServices = [];
+                }
+                if (callback) callback();
+              },
+              error: fallbackError => {
+                console.error('Fallback also failed:', fallbackError);
+                this.availableFileServices = [];
+                if (callback) callback();
+              },
+            });
+        },
+      });
   }
 
   // Helper method for debugging (can be removed in production)
@@ -902,8 +941,8 @@ export class DfServiceDetailsComponent implements OnInit {
         id: this.edit ? this.serviceData.id : null,
         config: {
           ...(data.config || {}),
-          storage_service_id: data.storageServiceId
-        }
+          storage_service_id: data.storageServiceId,
+        },
       };
       // Remove storageServiceId from root level as it's now in config
       delete payload.storageServiceId;
@@ -914,10 +953,10 @@ export class DfServiceDetailsComponent implements OnInit {
         id: this.edit ? this.serviceData.id : null,
       };
     }
-          if (this.edit) {
-        let editPayload: any;
-        
-        if (data.type === 'excel') {
+    if (this.edit) {
+      let editPayload: any;
+
+      if (data.type === 'excel') {
         // For Excel services, ensure storage_service_id is properly handled
         editPayload = {
           ...this.serviceData,
@@ -925,7 +964,7 @@ export class DfServiceDetailsComponent implements OnInit {
           config: {
             ...(this.serviceData.config || {}),
             ...data.config,
-            storage_service_id: data.storageServiceId // Ensure this is included
+            storage_service_id: data.storageServiceId, // Ensure this is included
           },
           service_doc_by_service_id: data.service_doc_by_service_id
             ? {
@@ -953,7 +992,7 @@ export class DfServiceDetailsComponent implements OnInit {
             : null,
         };
       }
-      
+
       delete editPayload.config.serviceDefinition;
       this.servicesService
         .update(this.serviceData.id, editPayload, {

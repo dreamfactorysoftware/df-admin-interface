@@ -199,11 +199,7 @@
       <mat-step>
         <ng-template matStepLabel>Service Options</ng-template>
         <br />
-        
-        
-        
-        
-        
+
         <ng-container *ngIf="viewSchema && !subscriptionRequired">
           <ng-container formGroupName="config">
             <ng-container *ngIf="!isDatabase || !hasStandardFields">
@@ -492,7 +488,6 @@
         [icon]="faCircleInfo"
         [matTooltip]="'services.controls.serviceType.tooltip' | transloco" />
     </mat-form-field>
-    
 
     <mat-form-field
       subscriptSizing="dynamic"
@@ -509,13 +504,15 @@
         [icon]="faCircleInfo"
         [matTooltip]="'services.controls.namespace.tooltip' | transloco" />
     </mat-form-field>
-    
+
     <!-- Excel Service Configuration -->
     <ng-container *ngIf="serviceForm.getRawValue().type === 'excel'">
       <mat-form-field appearance="outline" class="full-width">
         <mat-label>Storage Service *</mat-label>
         <mat-select formControlName="storageServiceId" required>
-          <mat-option *ngFor="let service of availableFileServices" [value]="service.id">
+          <mat-option
+            *ngFor="let service of availableFileServices"
+            [value]="service.id">
             {{ service.label || service.name }}
           </mat-option>
         </mat-select>
