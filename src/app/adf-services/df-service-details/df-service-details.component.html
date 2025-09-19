@@ -701,18 +701,88 @@
           </mat-accordion>
         </ng-container>
 
-        <!-- Script Service Configuration (unchanged) -->
+        <!-- Script Service Configuration -->
         <ng-container *ngIf="this.isScriptService">
+          <!-- Script Content - Always visible -->
           <ng-container *ngIf="getConfigControl('storageServiceId')">
             <df-script-editor
               [isScript]="this.isScriptService"
               [type]="getControl('type')"
               [storageServiceId]="getConfigControl('storageServiceId')"
               [storagePath]="getConfigControl('storagePath')"
-              [content]="getConfigControl('serviceDefinition')"
+              [content]="getConfigControl('content')"
               [cache]="serviceData ? serviceData.name : ''"
               class="full-width"></df-script-editor>
           </ng-container>
+
+          <!-- Advanced Options Section for Script Services -->
+          <mat-accordion class="full-width">
+            <mat-expansion-panel [expanded]="false">
+              <mat-expansion-panel-header>
+                Advanced Options
+              </mat-expansion-panel-header>
+              <div class="details-section">
+                <!-- OpenAPI Service Definition Section -->
+                <mat-button-toggle-group
+                  aria-label="Service Definition Type"
+                  [(ngModel)]="serviceDefinitionType"
+                  [ngModelOptions]="{ standalone: true }"
+                  (change)="
+                    onServiceDefinitionTypeChange(serviceDefinitionType)
+                  ">
+                  <mat-button-toggle value="0">JSON</mat-button-toggle>
+                  <mat-button-toggle value="1">YAML</mat-button-toggle>
+                </mat-button-toggle-group>
+                <mat-label class="full-width"
+                  >OpenAPI Service Definition (Optional)</mat-label
+                >
+
+                <df-ace-editor
+                  class="full-width"
+                  [formControl]="getServiceDocByServiceIdControl('content')"
+                  [mode]="serviceDefinitionMode">
+                </df-ace-editor>
+
+                <!-- Other configuration fields if any -->
+                <ng-container *ngFor="let item of viewSchema">
+                  <ng-container *ngIf="item.name !== 'content'">
+                    <df-dynamic-field
+                      *ngIf="
+                        [
+                          'integer',
+                          'password',
+                          'string',
+                          'text',
+                          'picklist',
+                          'multi_picklist',
+                          'boolean',
+                          'file_certificate',
+                          'file_certificate_api'
+                        ].includes(item.type)
+                      "
+                      color="primary"
+                      [schema]="item"
+                      [formControl]="getConfigControl(item.name)"
+                      [class.dynamic-width]="
+                        ['file_certificate', 'file_certificate_api'].indexOf(
+                          item.type
+                        ) === -1
+                      "
+                      [class.full-width]="
+                        ['file_certificate', 'file_certificate_api'].indexOf(
+                          item.type
+                        ) !== -1
+                      "></df-dynamic-field>
+                    <df-array-field
+                      *ngIf="item.type === 'array' || item.type === 'object'"
+                      [schema]="item"
+                      [formControl]="getConfigControl(item.name)"
+                      class="full-width"></df-array-field>
+                  </ng-container>
+                </ng-container>
+              </div>
+            </mat-expansion-panel>
+          </mat-accordion>
         </ng-container>
 
         <!-- Other Service Types (unchanged) -->

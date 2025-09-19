@@ -297,14 +297,80 @@ export class DfServiceDetailsComponent implements OnInit {
           }
         }
         if (data?.serviceDocByServiceId) {
-          data.config.serviceDefinition = data?.serviceDocByServiceId.content;
-          this.getServiceDocByServiceIdControl('content').setValue(
-            data?.serviceDocByServiceId.content
-          );
+          // For network services, keep the old behavior
+          if (this.isNetworkService) {
+            data.config.serviceDefinition = data?.serviceDocByServiceId.content;
+            // Set the service doc content in the dedicated field
+            this.getServiceDocByServiceIdControl('content').setValue(
+              data?.serviceDocByServiceId.content
+            );
+          }
+          // For script services, handle migration of old data structure
+          else if (this.isScriptService) {
+            // Ensure config object exists
+            if (!data.config) {
+              data.config = {};
+            }
+
+            // Helper function to detect if content is likely an OpenAPI/Swagger spec
+            const isLikelyOpenApiSpec = (content: string): boolean => {
+              if (!content) return false;
+              const trimmed = content.trim();
+
+              // Check for common OpenAPI/Swagger patterns
+              const openApiPatterns = [
+                /^\s*\{?\s*["']?openapi["']?\s*:/i, // JSON or YAML openapi field
+                /^\s*\{?\s*["']?swagger["']?\s*:/i, // JSON or YAML swagger field
+                /^\s*openapi\s*:/im, // YAML format
+                /^\s*swagger\s*:/im, // YAML format
+                /["']paths["']\s*:\s*\{/i, // JSON paths object
+                /^\s*paths\s*:/im, // YAML paths
+              ];
+
+              return openApiPatterns.some(pattern => pattern.test(trimmed));
+            };
+
+            // Check if this is an old script service with content in the wrong place
+            // Old structure: script content was in serviceDocByServiceId.content
+            // New structure: script content should be in config.content, OpenAPI spec (if any) in serviceDocByServiceId.content
+            if (!data.config.content || data.config.content.trim() === '') {
+              // No script content in config, check if it's in serviceDocByServiceId
+              if (data.serviceDocByServiceId?.content) {
+                // Determine if this is script content or an OpenAPI spec
+                if (isLikelyOpenApiSpec(data.serviceDocByServiceId.content)) {
+                  // This is an OpenAPI spec - leave it in the OpenAPI field
+                  this.getServiceDocByServiceIdControl('content').setValue(
+                    data.serviceDocByServiceId.content
+                  );
+                } else {
+                  // This is likely script content - migrate it
+                  data.config.content = data.serviceDocByServiceId.content;
+                  // Clear the OpenAPI field since this was script content
+                  this.getServiceDocByServiceIdControl('content').setValue('');
+                }
+              }
+            } else {
+              // Script content exists in config.content (correct location)
+              // serviceDocByServiceId.content (if present) is an actual OpenAPI spec
+              this.getServiceDocByServiceIdControl('content').setValue(
+                data?.serviceDocByServiceId.content || ''
+              );
+            }
+          } else {
+            // For other service types, just set the service doc content
+            this.getServiceDocByServiceIdControl('content').setValue(
+              data?.serviceDocByServiceId.content
+            );
+          }
         }
         this.serviceData = data;
         if (data) {
-          this.content = data.config.serviceDefinition;
+          // For script services, use script content, not service definition
+          if (this.isScriptService) {
+            this.content = data.config.content || '';
+          } else {
+            this.content = data.config.serviceDefinition || '';
+          }
         } else {
           this.content = '';
         }
@@ -359,12 +425,11 @@ export class DfServiceDetailsComponent implements OnInit {
               );
               this.content = data.serviceDocByServiceId.content || '';
             }
-            // For script services, set the serviceDefinition field
+            // For script services, keep script content separate from OpenAPI spec
             else if (this.isScriptService) {
-              this.getConfigControl('serviceDefinition')?.setValue(
-                data.serviceDocByServiceId.content
-              );
-              this.content = data.serviceDocByServiceId.content || '';
+              // Don't overwrite script content - OpenAPI spec is handled separately
+              // The script content should remain in data.config.content
+              // The OpenAPI spec is already set in getServiceDocByServiceIdControl above
             }
           }
           this.serviceForm.controls['type'].disable();
@@ -372,6 +437,8 @@ export class DfServiceDetailsComponent implements OnInit {
           this.serviceForm.controls['type'].valueChanges.subscribe(value => {
             this.serviceForm.removeControl('config');
             this.configSchema = this.getConfigSchema(value);
+            // Update service type flags based on selected type
+            this.updateServiceTypeFlags(value);
             this.initializeConfig(value);
 
             // Load file services when Excel service type is selected
@@ -591,6 +658,26 @@ export class DfServiceDetailsComponent implements OnInit {
     console.log('Form values:', this.serviceForm.value);
   }
 
+  updateServiceTypeFlags(type: string) {
+    // Reset all flags
+    this.isNetworkService = false;
+    this.isScriptService = false;
+    this.isFile = false;
+
+    // Find the service type to get its group
+    const serviceType = this.serviceTypes.find(st => st.name === type);
+    if (serviceType && serviceType.group) {
+      const group = serviceType.group;
+      if (group === 'Remote Service') {
+        this.isNetworkService = true;
+      } else if (group === 'Script') {
+        this.isScriptService = true;
+      } else if (group === 'File') {
+        this.isFile = true;
+      }
+    }
+  }
+
   initializeConfig(value: string) {
     if (this.configSchema && this.configSchema.length > 0) {
       const config = this.fb.group({});
@@ -623,6 +710,14 @@ export class DfServiceDetailsComponent implements OnInit {
       if (this.isNetworkService) {
         this.serviceForm.addControl('type', new FormControl(''));
         config.addControl('content', new FormControl(''));
+        // Initialize serviceDefinitionType for JSON/YAML toggle
+        this.serviceDefinitionType = '0'; // Default to JSON
+      }
+      if (this.isScriptService) {
+        // Ensure script services have content field for script content
+        if (!config.get('content')) {
+          config.addControl('content', new FormControl(''));
+        }
         // Initialize serviceDefinitionType for JSON/YAML toggle
         this.serviceDefinitionType = '0'; // Default to JSON
       }
@@ -881,17 +976,19 @@ export class DfServiceDetailsComponent implements OnInit {
         fields: '*',
         related: 'service_doc_by_service_id',
       };
-      // For script services, use the serviceDefinition field
-      if (data.config?.serviceDefinition) {
+      // For script services, check if there's an OpenAPI spec
+      const openApiContent =
+        this.getServiceDocByServiceIdControl('content')?.value;
+      if (openApiContent && openApiContent.trim()) {
         serviceDoc = {
-          content: data.config.serviceDefinition,
+          content: openApiContent,
           format: this.serviceDefinitionType
             ? Number(this.serviceDefinitionType)
             : 0,
         };
-        // Remove serviceDefinition from config as it's moved to service_doc_by_service_id
-        delete data.config.serviceDefinition;
       }
+      // Keep script content in config.content - don't remove it
+      // Script content and OpenAPI spec are separate concerns
     }
 
     // Apply service_doc_by_service_id to data
@@ -968,6 +1065,8 @@ export class DfServiceDetailsComponent implements OnInit {
           },
           service_doc_by_service_id: data.service_doc_by_service_id
             ? {
+                // Preserve the existing record's id for UPDATE operations
+                id: this.serviceData.serviceDocByServiceId?.id,
                 ...(this.serviceData.serviceDocByServiceId || {}),
                 ...data.service_doc_by_service_id,
               }
@@ -986,6 +1085,8 @@ export class DfServiceDetailsComponent implements OnInit {
           },
           service_doc_by_service_id: data.service_doc_by_service_id
             ? {
+                // Preserve the existing record's id for UPDATE operations
+                id: this.serviceData.serviceDocByServiceId?.id,
                 ...(this.serviceData.serviceDocByServiceId || {}),
                 ...data.service_doc_by_service_id,
               }
@@ -993,7 +1094,10 @@ export class DfServiceDetailsComponent implements OnInit {
         };
       }
 
-      delete editPayload.config.serviceDefinition;
+      // Only delete serviceDefinition for network services, not script services
+      if (this.isNetworkService) {
+        delete editPayload.config.serviceDefinition;
+      }
       this.servicesService
         .update(this.serviceData.id, editPayload, {
           snackbarError: 'server',
@@ -1180,15 +1284,17 @@ export class DfServiceDetailsComponent implements OnInit {
         };
         // Remove content from config as it's moved to service_doc_by_service_id
         delete payload.config.content;
-      } else if (this.isScriptService && data.config?.serviceDefinition) {
-        payload.service_doc_by_service_id = {
-          content: data.config.serviceDefinition,
-          format: this.serviceDefinitionType
-            ? Number(this.serviceDefinitionType)
-            : 0,
-        };
-        // Remove serviceDefinition from config as it's moved to service_doc_by_service_id
-        delete payload.config.serviceDefinition;
+      } else if (this.isScriptService) {
+        const openApiContent =
+          this.getServiceDocByServiceIdControl('content')?.value;
+        if (openApiContent && openApiContent.trim()) {
+          payload.service_doc_by_service_id = {
+            content: openApiContent,
+            format: this.serviceDefinitionType
+              ? Number(this.serviceDefinitionType)
+              : 0,
+          };
+        }
       } else {
         payload.service_doc_by_service_id = null;
       }
