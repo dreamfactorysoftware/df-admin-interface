@@ -177,6 +177,8 @@ export class DfServiceDetailsComponent implements OnInit {
   showSecurityConfig = false;
   currentServiceId: number | null = null;
   isFirstTimeUser = false;
+  availableFileServices: any[] = [];
+
   constructor(
     private activatedRoute: ActivatedRoute,
     private fb: FormBuilder,
@@ -199,6 +201,7 @@ export class DfServiceDetailsComponent implements OnInit {
       label: [''],
       description: [''],
       isActive: [true],
+      storageServiceId: [null], // Add storage service ID field for Excel services
       service_doc_by_service_id: this.fb.group({
         format: [0],
         content: [''],
@@ -294,24 +297,123 @@ export class DfServiceDetailsComponent implements OnInit {
           }
         }
         if (data?.serviceDocByServiceId) {
-          data.config.serviceDefinition = data?.serviceDocByServiceId.content;
-          this.getServiceDocByServiceIdControl('content').setValue(
-            data?.serviceDocByServiceId.content
-          );
+          // For network services, keep the old behavior
+          if (this.isNetworkService) {
+            data.config.serviceDefinition = data?.serviceDocByServiceId.content;
+            // Set the service doc content in the dedicated field
+            this.getServiceDocByServiceIdControl('content').setValue(
+              data?.serviceDocByServiceId.content
+            );
+          }
+          // For script services, handle migration of old data structure
+          else if (this.isScriptService) {
+            // Ensure config object exists
+            if (!data.config) {
+              data.config = {};
+            }
+
+            // Helper function to detect if content is likely an OpenAPI/Swagger spec
+            const isLikelyOpenApiSpec = (content: string): boolean => {
+              if (!content) return false;
+              const trimmed = content.trim();
+
+              // Check for common OpenAPI/Swagger patterns
+              const openApiPatterns = [
+                /^\s*\{?\s*["']?openapi["']?\s*:/i, // JSON or YAML openapi field
+                /^\s*\{?\s*["']?swagger["']?\s*:/i, // JSON or YAML swagger field
+                /^\s*openapi\s*:/im, // YAML format
+                /^\s*swagger\s*:/im, // YAML format
+                /["']paths["']\s*:\s*\{/i, // JSON paths object
+                /^\s*paths\s*:/im, // YAML paths
+              ];
+
+              return openApiPatterns.some(pattern => pattern.test(trimmed));
+            };
+
+            // Check if this is an old script service with content in the wrong place
+            // Old structure: script content was in serviceDocByServiceId.content
+            // New structure: script content should be in config.content, OpenAPI spec (if any) in serviceDocByServiceId.content
+            if (!data.config.content || data.config.content.trim() === '') {
+              // No script content in config, check if it's in serviceDocByServiceId
+              if (data.serviceDocByServiceId?.content) {
+                // Determine if this is script content or an OpenAPI spec
+                if (isLikelyOpenApiSpec(data.serviceDocByServiceId.content)) {
+                  // This is an OpenAPI spec - leave it in the OpenAPI field
+                  this.getServiceDocByServiceIdControl('content').setValue(
+                    data.serviceDocByServiceId.content
+                  );
+                } else {
+                  // This is likely script content - migrate it
+                  data.config.content = data.serviceDocByServiceId.content;
+                  // Clear the OpenAPI field since this was script content
+                  this.getServiceDocByServiceIdControl('content').setValue('');
+                }
+              }
+            } else {
+              // Script content exists in config.content (correct location)
+              // serviceDocByServiceId.content (if present) is an actual OpenAPI spec
+              this.getServiceDocByServiceIdControl('content').setValue(
+                data?.serviceDocByServiceId.content || ''
+              );
+            }
+          } else {
+            // For other service types, just set the service doc content
+            this.getServiceDocByServiceIdControl('content').setValue(
+              data?.serviceDocByServiceId.content
+            );
+          }
         }
         this.serviceData = data;
         if (data) {
-          this.content = data.config.serviceDefinition;
+          // For script services, use script content, not service definition
+          if (this.isScriptService) {
+            this.content = data.config.content || '';
+          } else {
+            this.content = data.config.serviceDefinition || '';
+          }
         } else {
           this.content = '';
         }
         if (this.edit) {
           this.configSchema = this.getConfigSchema(data.type);
           this.initializeConfig('');
-          this.serviceForm.patchValue({
-            ...data,
-            config: data.config,
-          });
+
+          // For Excel services, extract storage_service_id and load file services
+          if (data.type === 'excel') {
+            console.log('Editing Excel service, data:', data);
+            console.log('Config:', data.config);
+            console.log(
+              'Storage service ID from config:',
+              data.config?.storageServiceId
+            );
+
+            // Extract storageServiceId from config
+            const storageServiceId = data.config?.storageServiceId;
+
+            // Load file services first, then set the form value when services are loaded
+            this.loadAvailableFileServices(() => {
+              console.log('File services loaded, now setting form value');
+              if (storageServiceId) {
+                console.log('Setting storageServiceId to:', storageServiceId);
+                this.serviceForm.patchValue({
+                  ...data,
+                  config: data.config,
+                  storageServiceId: storageServiceId,
+                });
+              } else {
+                console.log('No storageServiceId found in config');
+                this.serviceForm.patchValue({
+                  ...data,
+                  config: data.config,
+                });
+              }
+            });
+          } else {
+            this.serviceForm.patchValue({
+              ...data,
+              config: data.config,
+            });
+          }
           if (data?.serviceDocByServiceId) {
             this.serviceDefinitionType =
               '' + data?.serviceDocByServiceId.format;
@@ -323,12 +425,11 @@ export class DfServiceDetailsComponent implements OnInit {
               );
               this.content = data.serviceDocByServiceId.content || '';
             }
-            // For script services, set the serviceDefinition field
+            // For script services, keep script content separate from OpenAPI spec
             else if (this.isScriptService) {
-              this.getConfigControl('serviceDefinition')?.setValue(
-                data.serviceDocByServiceId.content
-              );
-              this.content = data.serviceDocByServiceId.content || '';
+              // Don't overwrite script content - OpenAPI spec is handled separately
+              // The script content should remain in data.config.content
+              // The OpenAPI spec is already set in getServiceDocByServiceIdControl above
             }
           }
           this.serviceForm.controls['type'].disable();
@@ -336,8 +437,20 @@ export class DfServiceDetailsComponent implements OnInit {
           this.serviceForm.controls['type'].valueChanges.subscribe(value => {
             this.serviceForm.removeControl('config');
             this.configSchema = this.getConfigSchema(value);
+            // Update service type flags based on selected type
+            this.updateServiceTypeFlags(value);
             this.initializeConfig(value);
+
+            // Load file services when Excel service type is selected
+            if (value === 'excel') {
+              this.loadAvailableFileServices();
+            }
           });
+        }
+
+        // If editing an Excel service, load file services immediately
+        if (this.edit && data?.type === 'excel') {
+          this.loadAvailableFileServices();
         }
       });
     if (this.isDatabase) {
@@ -346,6 +459,222 @@ export class DfServiceDetailsComponent implements OnInit {
           label: value,
         });
       });
+    }
+  }
+
+  getStorageServiceDisplayName(): string {
+    console.log('=== getStorageServiceDisplayName called ===');
+    console.log('this.edit:', this.edit);
+    console.log('this.serviceData:', this.serviceData);
+    console.log('this.availableFileServices:', this.availableFileServices);
+
+    // First try to get from the form
+    let storageServiceId = this.serviceForm.get('storageServiceId')?.value;
+    console.log('storageServiceId from form:', storageServiceId);
+
+    // If not in form, try to get from service data (for editing)
+    if (
+      !storageServiceId &&
+      this.edit &&
+      this.serviceData?.config?.storageServiceId
+    ) {
+      storageServiceId = this.serviceData.config.storageServiceId;
+      console.log(
+        'storageServiceId from serviceData.config.storageServiceId:',
+        storageServiceId
+      );
+    }
+
+    // Debug: Let's see what's in the service data
+    console.log('this.serviceData.config:', this.serviceData?.config);
+    console.log(
+      'this.serviceData.config?.storageServiceId:',
+      this.serviceData?.config?.storageServiceId
+    );
+
+    if (!storageServiceId) {
+      console.log('No storageServiceId found, returning default message');
+      return 'No storage service selected';
+    }
+
+    const selectedService = this.availableFileServices.find(
+      service => service.id === storageServiceId
+    );
+    console.log('selectedService found:', selectedService);
+
+    if (selectedService) {
+      const displayName = selectedService.label || selectedService.name;
+      console.log('Returning display name:', displayName);
+      return displayName;
+    } else {
+      console.log('Service not found in availableFileServices, returning ID');
+      return `Service ID: ${storageServiceId}`;
+    }
+  }
+
+  loadAvailableFileServices(callback?: () => void) {
+    console.log('=== loadAvailableFileServices called ===');
+    console.log(
+      'Current service form type:',
+      this.serviceForm.getRawValue().type
+    );
+    console.log(
+      'Available file services before loading:',
+      this.availableFileServices
+    );
+
+    // Try multiple authentication methods
+    let authHeader = '';
+
+    // Method 1: Check localStorage for API key
+    const apiKey =
+      localStorage.getItem('df_token') ||
+      localStorage.getItem('X-DreamFactory-API-Key') ||
+      sessionStorage.getItem('df_token');
+
+    if (apiKey) {
+      authHeader = `X-DreamFactory-API-Key: ${apiKey}`;
+    } else {
+      // Method 2: Try to get from cookies
+      const cookies = document.cookie.split(';');
+      let sessionToken = '';
+      let apiKeyFromCookie = '';
+
+      for (const cookie of cookies) {
+        const [name, value] = cookie.trim().split('=');
+        if (name === 'df_session_token' || name === 'session_token') {
+          sessionToken = value;
+        }
+        if (name === 'df_api_key' || name === 'api_key') {
+          apiKeyFromCookie = value;
+        }
+      }
+
+      if (sessionToken) {
+        authHeader = `X-DreamFactory-Session-Token: ${sessionToken}`;
+      } else if (apiKeyFromCookie) {
+        authHeader = `X-DreamFactory-API-Key: ${apiKeyFromCookie}`;
+      } else {
+        // Method 3: Check if there's a global variable or service
+        if ((window as any).dfAuthToken) {
+          authHeader = `X-DreamFactory-API-Key: ${(window as any).dfAuthToken}`;
+        } else if ((window as any).dreamFactoryToken) {
+          authHeader = `X-DreamFactory-API-Key: ${
+            (window as any).dreamFactoryToken
+          }`;
+        }
+      }
+    }
+
+    if (!authHeader) {
+      console.warn('No authentication method found, cannot load file services');
+      this.availableFileServices = [];
+      if (callback) callback();
+      return;
+    }
+
+    // Get file services from the system
+    const apiUrl = `${window.location.origin}/api/v2/system/service`;
+
+    // Parse the auth header to get key and value
+    const [headerName, headerValue] = authHeader.split(': ');
+    const headers: any = {};
+    if (headerName && headerValue) {
+      headers[headerName] = headerValue;
+    }
+
+    this.http
+      .get<any>(apiUrl, {
+        params: {
+          filter: 'type=local_file',
+          fields: 'id,name,label,type',
+        },
+        headers: headers,
+      })
+      .subscribe({
+        next: (response: any) => {
+          if (response.resource && Array.isArray(response.resource)) {
+            this.availableFileServices = response.resource;
+            console.log(
+              'File services loaded successfully:',
+              this.availableFileServices
+            );
+          } else {
+            console.warn(
+              'No file services found in response or invalid format'
+            );
+            this.availableFileServices = [];
+          }
+          if (callback) callback();
+        },
+        error: error => {
+          console.error('Failed to load file services:', error);
+
+          // Fallback: try to get services without filter
+          this.http
+            .get<any>(apiUrl, {
+              params: {
+                fields: 'id,name,label,type',
+              },
+              headers: headers,
+            })
+            .subscribe({
+              next: (fallbackResponse: any) => {
+                if (
+                  fallbackResponse.resource &&
+                  Array.isArray(fallbackResponse.resource)
+                ) {
+                  // Filter for file-related services
+                  const allServices = fallbackResponse.resource;
+
+                  this.availableFileServices = allServices.filter(
+                    (service: any) =>
+                      service.type &&
+                      (service.type === 'local_file' ||
+                        service.type === 'file' ||
+                        service.type.includes('file'))
+                  );
+                  console.log(
+                    'File services loaded via fallback:',
+                    this.availableFileServices
+                  );
+                } else {
+                  this.availableFileServices = [];
+                }
+                if (callback) callback();
+              },
+              error: fallbackError => {
+                console.error('Fallback also failed:', fallbackError);
+                this.availableFileServices = [];
+                if (callback) callback();
+              },
+            });
+        },
+      });
+  }
+
+  // Helper method for debugging (can be removed in production)
+  logFormValues() {
+    console.log('Form values:', this.serviceForm.value);
+  }
+
+  updateServiceTypeFlags(type: string) {
+    // Reset all flags
+    this.isNetworkService = false;
+    this.isScriptService = false;
+    this.isFile = false;
+
+    // Find the service type to get its group
+    const serviceType = this.serviceTypes.find(st => st.name === type);
+    if (serviceType && serviceType.group) {
+      const group = serviceType.group;
+      if (group === 'Remote Service') {
+        this.isNetworkService = true;
+      } else if (group === 'Script') {
+        this.isScriptService = true;
+      } else if (group === 'File') {
+        this.isFile = true;
+      }
     }
   }
 
@@ -381,6 +710,14 @@ export class DfServiceDetailsComponent implements OnInit {
       if (this.isNetworkService) {
         this.serviceForm.addControl('type', new FormControl(''));
         config.addControl('content', new FormControl(''));
+        // Initialize serviceDefinitionType for JSON/YAML toggle
+        this.serviceDefinitionType = '0'; // Default to JSON
+      }
+      if (this.isScriptService) {
+        // Ensure script services have content field for script content
+        if (!config.get('content')) {
+          config.addControl('content', new FormControl(''));
+        }
         // Initialize serviceDefinitionType for JSON/YAML toggle
         this.serviceDefinitionType = '0'; // Default to JSON
       }
@@ -639,22 +976,24 @@ export class DfServiceDetailsComponent implements OnInit {
         fields: '*',
         related: 'service_doc_by_service_id',
       };
-      // For script services, use the serviceDefinition field
-      if (data.config?.serviceDefinition) {
+      // For script services, check if there's an OpenAPI spec
+      const openApiContent =
+        this.getServiceDocByServiceIdControl('content')?.value;
+      if (openApiContent && openApiContent.trim()) {
         serviceDoc = {
-          content: data.config.serviceDefinition,
+          content: openApiContent,
           format: this.serviceDefinitionType
             ? Number(this.serviceDefinitionType)
             : 0,
         };
-        // Remove serviceDefinition from config as it's moved to service_doc_by_service_id
-        delete data.config.serviceDefinition;
       }
+      // Keep script content in config.content - don't remove it
+      // Script content and OpenAPI spec are separate concerns
     }
 
     // Apply service_doc_by_service_id to data
     data.service_doc_by_service_id = serviceDoc;
-    let payload;
+    let payload: any;
     if (data.type.toLowerCase().includes('saml')) {
       params = {
         ...params,
@@ -692,6 +1031,18 @@ export class DfServiceDetailsComponent implements OnInit {
         payload.config.icon_class = data.config.iconClass;
       }
       delete payload.isActive;
+    } else if (data.type === 'excel') {
+      // For Excel services, handle storage_service_id
+      payload = {
+        ...data,
+        id: this.edit ? this.serviceData.id : null,
+        config: {
+          ...(data.config || {}),
+          storage_service_id: data.storageServiceId,
+        },
+      };
+      // Remove storageServiceId from root level as it's now in config
+      delete payload.storageServiceId;
     } else {
       // For other service types, use the base data
       payload = {
@@ -700,23 +1051,55 @@ export class DfServiceDetailsComponent implements OnInit {
       };
     }
     if (this.edit) {
-      const payload = {
-        ...this.serviceData,
-        ...data,
-        config: {
-          ...(this.serviceData.config || {}),
-          ...data.config,
-        },
-        service_doc_by_service_id: data.service_doc_by_service_id
-          ? {
-              ...(this.serviceData.serviceDocByServiceId || {}),
-              ...data.service_doc_by_service_id,
-            }
-          : null,
-      };
-      delete payload.config.serviceDefinition;
+      let editPayload: any;
+
+      if (data.type === 'excel') {
+        // For Excel services, ensure storage_service_id is properly handled
+        editPayload = {
+          ...this.serviceData,
+          ...data,
+          config: {
+            ...(this.serviceData.config || {}),
+            ...data.config,
+            storage_service_id: data.storageServiceId, // Ensure this is included
+          },
+          service_doc_by_service_id: data.service_doc_by_service_id
+            ? {
+                // Preserve the existing record's id for UPDATE operations
+                id: this.serviceData.serviceDocByServiceId?.id,
+                ...(this.serviceData.serviceDocByServiceId || {}),
+                ...data.service_doc_by_service_id,
+              }
+            : null,
+        };
+        // Remove storageServiceId from root level as it's now in config
+        delete editPayload.storageServiceId;
+      } else {
+        // For other service types, use the standard approach
+        editPayload = {
+          ...this.serviceData,
+          ...data,
+          config: {
+            ...(this.serviceData.config || {}),
+            ...data.config,
+          },
+          service_doc_by_service_id: data.service_doc_by_service_id
+            ? {
+                // Preserve the existing record's id for UPDATE operations
+                id: this.serviceData.serviceDocByServiceId?.id,
+                ...(this.serviceData.serviceDocByServiceId || {}),
+                ...data.service_doc_by_service_id,
+              }
+            : null,
+        };
+      }
+
+      // Only delete serviceDefinition for network services, not script services
+      if (this.isNetworkService) {
+        delete editPayload.config.serviceDefinition;
+      }
       this.servicesService
-        .update(this.serviceData.id, payload, {
+        .update(this.serviceData.id, editPayload, {
           snackbarError: 'server',
           snackbarSuccess: 'services.updateSuccessMsg',
         })
@@ -726,7 +1109,7 @@ export class DfServiceDetailsComponent implements OnInit {
           } else {
             if (Cache) {
               this.cacheService
-                .delete(payload.name, {
+                .delete(editPayload.name, {
                   snackbarSuccess: 'cache.serviceCacheFlushed',
                 })
                 .subscribe({
@@ -901,15 +1284,17 @@ export class DfServiceDetailsComponent implements OnInit {
         };
         // Remove content from config as it's moved to service_doc_by_service_id
         delete payload.config.content;
-      } else if (this.isScriptService && data.config?.serviceDefinition) {
-        payload.service_doc_by_service_id = {
-          content: data.config.serviceDefinition,
-          format: this.serviceDefinitionType
-            ? Number(this.serviceDefinitionType)
-            : 0,
-        };
-        // Remove serviceDefinition from config as it's moved to service_doc_by_service_id
-        delete payload.config.serviceDefinition;
+      } else if (this.isScriptService) {
+        const openApiContent =
+          this.getServiceDocByServiceIdControl('content')?.value;
+        if (openApiContent && openApiContent.trim()) {
+          payload.service_doc_by_service_id = {
+            content: openApiContent,
+            format: this.serviceDefinitionType
+              ? Number(this.serviceDefinitionType)
+              : 0,
+          };
+        }
       } else {
         payload.service_doc_by_service_id = null;
       }

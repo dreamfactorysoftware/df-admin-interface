@@ -16,11 +16,18 @@ export class DfLoadingSpinnerService {
     if (value) {
       this.activeCounter++;
     } else {
-      setTimeout(
-        () => (this.activeCounter = Math.max(this.activeCounter - 1, 0)),
-        100
-      );
+      this.activeCounter = Math.max(this.activeCounter - 1, 0);
     }
-    this.active$.next(value);
+
+    const shouldBeActive = this.activeCounter > 0;
+
+    // Only defer if the value is actually changing to avoid unnecessary timeouts
+    // This prevents ExpressionChangedAfterItHasBeenCheckedError by ensuring
+    // the value change happens after the current change detection cycle completes
+    if (this.active$.value !== shouldBeActive) {
+      setTimeout(() => {
+        this.active$.next(shouldBeActive);
+      }, 0);
+    }
   }
 }
