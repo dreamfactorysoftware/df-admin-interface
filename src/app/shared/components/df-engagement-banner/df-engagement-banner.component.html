@@ -1,0 +1,19 @@
+<ng-container *ngIf="showBanner">
+  <div class="engagement-banner">
+    <div class="banner-content">
+      <span class="banner-text">
+        {{ 'engagementBanner.message' | transloco }}
+      </span>
+      <button class="cta-button" (click)="openCalendly()">
+        {{ 'engagementBanner.ctaButton' | transloco }}
+      </button>
+      <button
+        class="dismiss-button"
+        (click)="dismissBanner()"
+        [attr.aria-label]="'engagementBanner.dismiss' | transloco">
+        ×
+      </button>
+    </div>
+  </div>
+  <div class="banner-spacer"></div>
+</ng-container>

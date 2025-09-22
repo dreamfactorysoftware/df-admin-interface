@@ -442,5 +442,10 @@
   "language": "Change language",
   "languages": {
     "en": "English"
+  },
+  "engagementBanner": {
+    "message": "Testing DreamFactory? Let's show you what's possible. Book your free walkthrough",
+    "ctaButton": "Schedule Now",
+    "dismiss": "Dismiss banner"
   }
 }
