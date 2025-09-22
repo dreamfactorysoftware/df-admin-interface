@@ -177,6 +177,8 @@ export class DfServiceDetailsComponent implements OnInit {
   showSecurityConfig = false;
   currentServiceId: number | null = null;
   isFirstTimeUser = false;
+  availableFileServices: any[] = [];
+
   constructor(
     private activatedRoute: ActivatedRoute,
     private fb: FormBuilder,
@@ -199,6 +201,7 @@ export class DfServiceDetailsComponent implements OnInit {
       label: [''],
       description: [''],
       isActive: [true],
+      storageServiceId: [null], // Add storage service ID field for Excel services
       service_doc_by_service_id: this.fb.group({
         format: [0],
         content: [''],
@@ -374,10 +377,43 @@ export class DfServiceDetailsComponent implements OnInit {
         if (this.edit) {
           this.configSchema = this.getConfigSchema(data.type);
           this.initializeConfig('');
-          this.serviceForm.patchValue({
-            ...data,
-            config: data.config,
-          });
+
+          // For Excel services, extract storage_service_id and load file services
+          if (data.type === 'excel') {
+            console.log('Editing Excel service, data:', data);
+            console.log('Config:', data.config);
+            console.log(
+              'Storage service ID from config:',
+              data.config?.storageServiceId
+            );
+
+            // Extract storageServiceId from config
+            const storageServiceId = data.config?.storageServiceId;
+
+            // Load file services first, then set the form value when services are loaded
+            this.loadAvailableFileServices(() => {
+              console.log('File services loaded, now setting form value');
+              if (storageServiceId) {
+                console.log('Setting storageServiceId to:', storageServiceId);
+                this.serviceForm.patchValue({
+                  ...data,
+                  config: data.config,
+                  storageServiceId: storageServiceId,
+                });
+              } else {
+                console.log('No storageServiceId found in config');
+                this.serviceForm.patchValue({
+                  ...data,
+                  config: data.config,
+                });
+              }
+            });
+          } else {
+            this.serviceForm.patchValue({
+              ...data,
+              config: data.config,
+            });
+          }
           if (data?.serviceDocByServiceId) {
             this.serviceDefinitionType =
               '' + data?.serviceDocByServiceId.format;
@@ -404,7 +440,17 @@ export class DfServiceDetailsComponent implements OnInit {
             // Update service type flags based on selected type
             this.updateServiceTypeFlags(value);
             this.initializeConfig(value);
+
+            // Load file services when Excel service type is selected
+            if (value === 'excel') {
+              this.loadAvailableFileServices();
+            }
           });
+        }
+
+        // If editing an Excel service, load file services immediately
+        if (this.edit && data?.type === 'excel') {
+          this.loadAvailableFileServices();
         }
       });
     if (this.isDatabase) {
@@ -414,6 +460,202 @@ export class DfServiceDetailsComponent implements OnInit {
         });
       });
     }
+  }
+
+  getStorageServiceDisplayName(): string {
+    console.log('=== getStorageServiceDisplayName called ===');
+    console.log('this.edit:', this.edit);
+    console.log('this.serviceData:', this.serviceData);
+    console.log('this.availableFileServices:', this.availableFileServices);
+
+    // First try to get from the form
+    let storageServiceId = this.serviceForm.get('storageServiceId')?.value;
+    console.log('storageServiceId from form:', storageServiceId);
+
+    // If not in form, try to get from service data (for editing)
+    if (
+      !storageServiceId &&
+      this.edit &&
+      this.serviceData?.config?.storageServiceId
+    ) {
+      storageServiceId = this.serviceData.config.storageServiceId;
+      console.log(
+        'storageServiceId from serviceData.config.storageServiceId:',
+        storageServiceId
+      );
+    }
+
+    // Debug: Let's see what's in the service data
+    console.log('this.serviceData.config:', this.serviceData?.config);
+    console.log(
+      'this.serviceData.config?.storageServiceId:',
+      this.serviceData?.config?.storageServiceId
+    );
+
+    if (!storageServiceId) {
+      console.log('No storageServiceId found, returning default message');
+      return 'No storage service selected';
+    }
+
+    const selectedService = this.availableFileServices.find(
+      service => service.id === storageServiceId
+    );
+    console.log('selectedService found:', selectedService);
+
+    if (selectedService) {
+      const displayName = selectedService.label || selectedService.name;
+      console.log('Returning display name:', displayName);
+      return displayName;
+    } else {
+      console.log('Service not found in availableFileServices, returning ID');
+      return `Service ID: ${storageServiceId}`;
+    }
+  }
+
+  loadAvailableFileServices(callback?: () => void) {
+    console.log('=== loadAvailableFileServices called ===');
+    console.log(
+      'Current service form type:',
+      this.serviceForm.getRawValue().type
+    );
+    console.log(
+      'Available file services before loading:',
+      this.availableFileServices
+    );
+
+    // Try multiple authentication methods
+    let authHeader = '';
+
+    // Method 1: Check localStorage for API key
+    const apiKey =
+      localStorage.getItem('df_token') ||
+      localStorage.getItem('X-DreamFactory-API-Key') ||
+      sessionStorage.getItem('df_token');
+
+    if (apiKey) {
+      authHeader = `X-DreamFactory-API-Key: ${apiKey}`;
+    } else {
+      // Method 2: Try to get from cookies
+      const cookies = document.cookie.split(';');
+      let sessionToken = '';
+      let apiKeyFromCookie = '';
+
+      for (const cookie of cookies) {
+        const [name, value] = cookie.trim().split('=');
+        if (name === 'df_session_token' || name === 'session_token') {
+          sessionToken = value;
+        }
+        if (name === 'df_api_key' || name === 'api_key') {
+          apiKeyFromCookie = value;
+        }
+      }
+
+      if (sessionToken) {
+        authHeader = `X-DreamFactory-Session-Token: ${sessionToken}`;
+      } else if (apiKeyFromCookie) {
+        authHeader = `X-DreamFactory-API-Key: ${apiKeyFromCookie}`;
+      } else {
+        // Method 3: Check if there's a global variable or service
+        if ((window as any).dfAuthToken) {
+          authHeader = `X-DreamFactory-API-Key: ${(window as any).dfAuthToken}`;
+        } else if ((window as any).dreamFactoryToken) {
+          authHeader = `X-DreamFactory-API-Key: ${
+            (window as any).dreamFactoryToken
+          }`;
+        }
+      }
+    }
+
+    if (!authHeader) {
+      console.warn('No authentication method found, cannot load file services');
+      this.availableFileServices = [];
+      if (callback) callback();
+      return;
+    }
+
+    // Get file services from the system
+    const apiUrl = `${window.location.origin}/api/v2/system/service`;
+
+    // Parse the auth header to get key and value
+    const [headerName, headerValue] = authHeader.split(': ');
+    const headers: any = {};
+    if (headerName && headerValue) {
+      headers[headerName] = headerValue;
+    }
+
+    this.http
+      .get<any>(apiUrl, {
+        params: {
+          filter: 'type=local_file',
+          fields: 'id,name,label,type',
+        },
+        headers: headers,
+      })
+      .subscribe({
+        next: (response: any) => {
+          if (response.resource && Array.isArray(response.resource)) {
+            this.availableFileServices = response.resource;
+            console.log(
+              'File services loaded successfully:',
+              this.availableFileServices
+            );
+          } else {
+            console.warn(
+              'No file services found in response or invalid format'
+            );
+            this.availableFileServices = [];
+          }
+          if (callback) callback();
+        },
+        error: error => {
+          console.error('Failed to load file services:', error);
+
+          // Fallback: try to get services without filter
+          this.http
+            .get<any>(apiUrl, {
+              params: {
+                fields: 'id,name,label,type',
+              },
+              headers: headers,
+            })
+            .subscribe({
+              next: (fallbackResponse: any) => {
+                if (
+                  fallbackResponse.resource &&
+                  Array.isArray(fallbackResponse.resource)
+                ) {
+                  // Filter for file-related services
+                  const allServices = fallbackResponse.resource;
+
+                  this.availableFileServices = allServices.filter(
+                    (service: any) =>
+                      service.type &&
+                      (service.type === 'local_file' ||
+                        service.type === 'file' ||
+                        service.type.includes('file'))
+                  );
+                  console.log(
+                    'File services loaded via fallback:',
+                    this.availableFileServices
+                  );
+                } else {
+                  this.availableFileServices = [];
+                }
+                if (callback) callback();
+              },
+              error: fallbackError => {
+                console.error('Fallback also failed:', fallbackError);
+                this.availableFileServices = [];
+                if (callback) callback();
+              },
+            });
+        },
+      });
+  }
+
+  // Helper method for debugging (can be removed in production)
+  logFormValues() {
+    console.log('Form values:', this.serviceForm.value);
   }
 
   updateServiceTypeFlags(type: string) {
@@ -751,7 +993,7 @@ export class DfServiceDetailsComponent implements OnInit {
 
     // Apply service_doc_by_service_id to data
     data.service_doc_by_service_id = serviceDoc;
-    let payload;
+    let payload: any;
     if (data.type.toLowerCase().includes('saml')) {
       params = {
         ...params,
@@ -789,6 +1031,18 @@ export class DfServiceDetailsComponent implements OnInit {
         payload.config.icon_class = data.config.iconClass;
       }
       delete payload.isActive;
+    } else if (data.type === 'excel') {
+      // For Excel services, handle storage_service_id
+      payload = {
+        ...data,
+        id: this.edit ? this.serviceData.id : null,
+        config: {
+          ...(data.config || {}),
+          storage_service_id: data.storageServiceId,
+        },
+      };
+      // Remove storageServiceId from root level as it's now in config
+      delete payload.storageServiceId;
     } else {
       // For other service types, use the base data
       payload = {
@@ -797,28 +1051,55 @@ export class DfServiceDetailsComponent implements OnInit {
       };
     }
     if (this.edit) {
-      const payload = {
-        ...this.serviceData,
-        ...data,
-        config: {
-          ...(this.serviceData.config || {}),
-          ...data.config,
-        },
-        service_doc_by_service_id: data.service_doc_by_service_id
-          ? {
-              // Preserve the existing record's id for UPDATE operations
-              id: this.serviceData.serviceDocByServiceId?.id,
-              ...(this.serviceData.serviceDocByServiceId || {}),
-              ...data.service_doc_by_service_id,
-            }
-          : null,
-      };
+      let editPayload: any;
+
+      if (data.type === 'excel') {
+        // For Excel services, ensure storage_service_id is properly handled
+        editPayload = {
+          ...this.serviceData,
+          ...data,
+          config: {
+            ...(this.serviceData.config || {}),
+            ...data.config,
+            storage_service_id: data.storageServiceId, // Ensure this is included
+          },
+          service_doc_by_service_id: data.service_doc_by_service_id
+            ? {
+                // Preserve the existing record's id for UPDATE operations
+                id: this.serviceData.serviceDocByServiceId?.id,
+                ...(this.serviceData.serviceDocByServiceId || {}),
+                ...data.service_doc_by_service_id,
+              }
+            : null,
+        };
+        // Remove storageServiceId from root level as it's now in config
+        delete editPayload.storageServiceId;
+      } else {
+        // For other service types, use the standard approach
+        editPayload = {
+          ...this.serviceData,
+          ...data,
+          config: {
+            ...(this.serviceData.config || {}),
+            ...data.config,
+          },
+          service_doc_by_service_id: data.service_doc_by_service_id
+            ? {
+                // Preserve the existing record's id for UPDATE operations
+                id: this.serviceData.serviceDocByServiceId?.id,
+                ...(this.serviceData.serviceDocByServiceId || {}),
+                ...data.service_doc_by_service_id,
+              }
+            : null,
+        };
+      }
+
       // Only delete serviceDefinition for network services, not script services
       if (this.isNetworkService) {
-        delete payload.config.serviceDefinition;
+        delete editPayload.config.serviceDefinition;
       }
       this.servicesService
-        .update(this.serviceData.id, payload, {
+        .update(this.serviceData.id, editPayload, {
           snackbarError: 'server',
           snackbarSuccess: 'services.updateSuccessMsg',
         })
@@ -828,7 +1109,7 @@ export class DfServiceDetailsComponent implements OnInit {
           } else {
             if (Cache) {
               this.cacheService
-                .delete(payload.name, {
+                .delete(editPayload.name, {
                   snackbarSuccess: 'cache.serviceCacheFlushed',
                 })
                 .subscribe({
