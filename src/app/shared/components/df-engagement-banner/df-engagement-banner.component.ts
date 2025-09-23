@@ -20,27 +20,17 @@ export class DfEngagementBannerComponent implements OnInit {
   constructor(private systemConfigService: DfSystemConfigDataService) {}
 
   ngOnInit() {
-    const isDismissed =
-      localStorage.getItem('df-engagement-banner-dismissed') === 'true';
+    this.systemConfigService.environment$
+      .pipe(untilDestroyed(this))
+      .subscribe(environment => {
+        const license = environment.platform?.license?.toUpperCase();
+        const isTrial = environment.platform?.isTrial ?? false;
 
-    if (!isDismissed) {
-      this.systemConfigService.environment$
-        .pipe(untilDestroyed(this))
-        .subscribe(environment => {
-          const license = environment.platform?.license?.toUpperCase();
-          const isTrial = environment.platform?.isTrial ?? false;
-
-          this.showBanner = license === 'OPEN SOURCE' || isTrial;
-        });
-    }
+        this.showBanner = license === 'OPEN SOURCE' || isTrial;
+      });
   }
 
   openCalendly() {
     window.open(this.calendlyUrl, '_blank');
-  }
-
-  dismissBanner() {
-    this.showBanner = false;
-    localStorage.setItem('df-engagement-banner-dismissed', 'true');
   }
 }

@@ -47,37 +47,6 @@
       outline-offset: 2px;
     }
   }
-
-  .dismiss-button {
-    background: transparent;
-    border: none;
-    color: #2d2d2d;
-    font-size: 24px;
-    cursor: pointer;
-    padding: 0;
-    margin-left: 10px;
-    opacity: 0.6;
-    transition: opacity 0.2s ease;
-    position: absolute;
-    right: 20px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 30px;
-    height: 30px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    &:hover {
-      opacity: 1;
-    }
-
-    &:focus {
-      outline: 2px solid #7c3aed;
-      outline-offset: 2px;
-      border-radius: 2px;
-    }
-  }
 }
 
 .banner-spacer {
@@ -105,10 +74,6 @@
     .cta-button {
       padding: 8px 16px;
       font-size: 13px;
-    }
-
-    .dismiss-button {
-      right: 10px;
     }
   }
 }
