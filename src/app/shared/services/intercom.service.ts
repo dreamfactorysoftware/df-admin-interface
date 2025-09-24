@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { environment } from '../../../../environments/environment';
 import { DfUserDataService } from './df-user-data.service';
+import { DfSystemConfigDataService } from './df-system-config-data.service';
 
 // Declare Intercom on window for shutdown/update operations
 
@@ -10,7 +11,10 @@ import { DfUserDataService } from './df-user-data.service';
 export class IntercomService {
   private intercomLoaded = false;
 
-  constructor(private dfUserDataService: DfUserDataService) {}
+  constructor(
+    private dfUserDataService: DfUserDataService,
+    private dfSystemConfigDataService: DfSystemConfigDataService
+  ) {}
 
   async initializeIntercom(): Promise<void> {
     // Check if Intercom should be enabled based on environment config
@@ -31,6 +35,7 @@ export class IntercomService {
 
       // Get current user data
       const userData = this.dfUserDataService.userData;
+      const systemEnvironment = this.dfSystemConfigDataService.environment;
 
       if (userData) {
         // Initialize Intercom with user data
@@ -44,12 +49,11 @@ export class IntercomService {
           created_at: userData.lastLoginDate
             ? Math.floor(new Date(userData.lastLoginDate).getTime() / 1000)
             : undefined,
-          custom_attributes: {
-            is_sys_admin: userData.isSysAdmin,
-            is_root_admin: userData.isRootAdmin,
-            role_id: userData.roleId,
-            instance_url: window.location.origin,
-          },
+          is_sys_admin: userData.isSysAdmin,
+          is_root_admin: userData.isRootAdmin,
+          role_id: userData.roleId,
+          instance_url: window.location.origin,
+          license_key: systemEnvironment.platform?.licenseKey || 'N/A',
         });
 
         this.intercomLoaded = true;
@@ -96,6 +100,8 @@ export class IntercomService {
       return;
     }
 
+    const systemEnvironment = this.dfSystemConfigDataService.environment;
+
     if (userData) {
       (window as any).Intercom('update', {
         user_id: userData.id?.toString() || userData.sessionId,
@@ -106,12 +112,11 @@ export class IntercomService {
         created_at: userData.lastLoginDate
           ? Math.floor(new Date(userData.lastLoginDate).getTime() / 1000)
           : undefined,
-        custom_attributes: {
-          is_sys_admin: userData.isSysAdmin,
-          is_root_admin: userData.isRootAdmin,
-          role_id: userData.roleId,
-          instance_url: window.location.origin,
-        },
+        is_sys_admin: userData.isSysAdmin,
+        is_root_admin: userData.isRootAdmin,
+        role_id: userData.roleId,
+        instance_url: window.location.origin,
+        license_key: systemEnvironment.platform?.licenseKey || 'N/A',
       });
     }
   }

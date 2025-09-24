@@ -114,10 +114,11 @@ export class AppComponent implements OnInit {
 
   private async initializeIntercom(): Promise<void> {
     try {
-      // Wait a bit for authentication to complete
+      // Wait a bit for authentication and environment data to complete
       setTimeout(async () => {
+        // Ensure environment data is loaded
         await this.intercomService.initializeIntercom();
-      }, 1000);
+      }, 2000); // Increased delay to ensure environment data is loaded
     } catch (error) {
       this.loggingService.log(`Failed to initialize Intercom: ${error}`);
     }
