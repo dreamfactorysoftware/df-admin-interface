@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
-import { catchError, map, of } from 'rxjs';
+import { catchError, map, of, switchMap } from 'rxjs';
 import { URLS } from '../../shared/constants/urls';
 import {
   HTTP_OPTION_LOGIN_FALSE,
@@ -9,6 +9,7 @@ import {
 } from '../../shared/constants/http-headers';
 import { ROUTES } from '../../shared/types/routes';
 import { DfUserDataService } from '../../shared/services/df-user-data.service';
+import { DfRoleRedirectService } from '../../shared/services/df-role-redirect.service';
 import { GenericSuccessResponse } from 'src/app/shared/types/generic-http';
 import {
   LoginCredentials,
@@ -22,7 +23,8 @@ export class DfAuthService {
   constructor(
     private http: HttpClient,
     private router: Router,
-    private userDataService: DfUserDataService
+    private userDataService: DfUserDataService,
+    private roleRedirectService: DfRoleRedirectService
   ) {}
 
   register(data: RegisterDetails) {
@@ -54,6 +56,22 @@ export class DfAuthService {
             );
         })
       );
+  }
+
+  /**
+   * Login with role-based redirect
+   * @param credentials Login credentials
+   * @param returnUrl Optional return URL
+   * @returns Observable<{ userData: UserSession, redirectUrl: string }>
+   */
+  loginWithRedirect(credentials: LoginCredentials, returnUrl?: string) {
+    return this.login(credentials).pipe(
+      switchMap(userData => {
+        return this.roleRedirectService.getLoginRedirectUrl(userData, returnUrl).pipe(
+          map(redirectUrl => ({ userData, redirectUrl }))
+        );
+      })
+    );
   }
 
   checkSession() {

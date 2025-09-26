@@ -29,6 +29,20 @@
     <mat-label>{{ 'description' | transloco }}</mat-label>
     <textarea rows="1" matInput formControlName="description"></textarea>
   </mat-form-field>
+  <mat-form-field
+    appearance="outline"
+    subscriptSizing="dynamic"
+    class="dynamic-width">
+    <mat-label>Login Redirect URI</mat-label>
+    <input matInput formControlName="redirectUri" placeholder="e.g., /api-connections/api-docs" />
+    <mat-hint>Optional: Internal URI only (must start with /). Examples: /home, /api-connections/api-docs</mat-hint>
+    <mat-error *ngIf="roleForm.controls['redirectUri'].hasError('invalidInternalUri')">
+      Must be an internal URI starting with / and containing only letters, numbers, /, _, and -
+    </mat-error>
+    <mat-error *ngIf="roleForm.controls['redirectUri'].hasError('externalUrlBlocked')">
+      External URLs are not allowed for security reasons. Use internal routes only.
+    </mat-error>
+  </mat-form-field>
 
   <div formArrayName="serviceAccess" class="full-width">
     <df-roles-access

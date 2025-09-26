@@ -75,6 +75,7 @@ export class DfRoleDetailsComponent implements OnInit {
       id: [0],
       name: ['', Validators.required],
       description: [''],
+      redirectUri: ['', [this.internalUriValidator]],
       active: [false],
       serviceAccess: this.fb.array([]),
       lookupKeys: this.fb.array([]),
@@ -94,6 +95,7 @@ export class DfRoleDetailsComponent implements OnInit {
           id: data.id,
           name: data.name,
           description: data.description,
+          redirectUri: data.redirectUri,
           active: data.isActive,
         });
 
@@ -266,6 +268,7 @@ export class DfRoleDetailsComponent implements OnInit {
       id: formValue.id,
       name: formValue.name,
       description: formValue.description,
+      redirectUri: formValue.redirectUri,
       isActive: formValue.active,
       roleServiceAccessByRoleId: formValue.serviceAccess.map(
         (val: AccessForm, index: number) => {
@@ -326,6 +329,31 @@ export class DfRoleDetailsComponent implements OnInit {
           this.goBack();
         });
     }
+  }
+
+  /**
+   * Custom validator to ensure redirect URI is internal only
+   */
+  internalUriValidator(control: FormControl): { [key: string]: any } | null {
+    if (!control.value) {
+      return null; // Allow empty values
+    }
+
+    const value = control.value.trim();
+
+    // Must start with / and contain only valid internal route characters
+    const internalUriPattern = /^\/[a-zA-Z0-9\/_-]*$/;
+
+    if (!internalUriPattern.test(value)) {
+      return { 'invalidInternalUri': { value: control.value } };
+    }
+
+    // Explicitly block external URLs
+    if (value.includes('://') || value.includes('www.') || value.includes('.com') || value.includes('.org')) {
+      return { 'externalUrlBlocked': { value: control.value } };
+    }
+
+    return null;
   }
 
   goBack() {

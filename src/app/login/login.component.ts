@@ -28,10 +28,10 @@ export class LoginComponent implements OnInit {
   }
 
   handleSamlLogin(jwt: string) {
-    this.authService.loginWithJwt(jwt).subscribe(
-      result => {
-        if (result && result.session_token) {
-          this.router.navigate(['/home']);
+    this.authService.loginWithJwtAndRedirect(jwt).subscribe(
+      ({ user, redirectUrl }: { user: any; redirectUrl: string }) => {
+        if (user && (user.session_token || user.sessionToken)) {
+          this.router.navigateByUrl(redirectUrl);
         } else {
           this.notificationService.error(
             'Login Error',

@@ -27,11 +27,12 @@ export class SamlCallbackComponent implements OnInit {
   }
 
   private handleSamlLogin(jwt: string) {
-    this.authService.loginWithJwt(jwt).subscribe(
-      result => {
-        if (result && result.session_token) {
+    this.authService.loginWithJwtAndRedirect(jwt).subscribe(
+      ({ user, redirectUrl }: { user: any; redirectUrl: string }) => {
+        if (user && (user.session_token || user.sessionToken)) {
           this.loggingService.log('SAML login successful');
-          this.router.navigate(['/home']);
+          this.loggingService.log(`Redirecting to: ${redirectUrl}`);
+          this.router.navigateByUrl(redirectUrl);
         } else {
           this.loggingService.log('Invalid session token received');
           this.router.navigate(['/login']);

@@ -5,9 +5,10 @@ import {
   Validators,
   ReactiveFormsModule,
 } from '@angular/forms';
-import { catchError, throwError } from 'rxjs';
+import { catchError, throwError, switchMap } from 'rxjs';
 import { DfAuthService } from '../services/df-auth.service';
 import { DfSystemConfigDataService } from '../../shared/services/df-system-config-data.service';
+import { DfRoleRedirectService } from '../../shared/services/df-role-redirect.service';
 import {
   AlertType,
   DfAlertComponent,
@@ -82,7 +83,8 @@ export class DfLoginComponent implements OnInit {
     private router: Router,
     private themeService: DfThemeService,
     private snackbarService: DfSnackbarService,
-    private popupOverlay: PopupOverlayService
+    private popupOverlay: PopupOverlayService,
+    private roleRedirectService: DfRoleRedirectService
   ) {
     this.loginForm = this.fb.group({
       services: [''],
@@ -154,6 +156,11 @@ export class DfLoginComponent implements OnInit {
     this.authService
       .login(credentials)
       .pipe(
+        switchMap(userData => {
+          console.log('DfLoginComponent: Login successful, user data:', userData);
+          // Use role-based redirect service to determine where to go
+          return this.roleRedirectService.getLoginRedirectUrl(userData);
+        }),
         catchError(err => {
           if (err.status === 401 && isPasswordTooShort) {
             this.popupOverlay.open({
@@ -167,7 +174,8 @@ export class DfLoginComponent implements OnInit {
           return throwError(() => new Error(err));
         })
       )
-      .subscribe(() => {
+      .subscribe(redirectUrl => {
+        console.log('DfLoginComponent: Redirecting to:', redirectUrl);
         this.showAlert = false;
         if (isPasswordTooShort) {
           this.popupOverlay.open({
@@ -175,7 +183,7 @@ export class DfLoginComponent implements OnInit {
             showRemindMeLater: true,
           });
         }
-        this.router.navigate([ROUTES.HOME]);
+        this.router.navigateByUrl(redirectUrl);
       });
   }
 }

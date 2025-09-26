@@ -37,16 +37,16 @@ export class SamlAuthGuard implements CanActivate {
 
     if (jwt) {
       this.loggingService.log('JWT found, attempting to login');
-      return this.authService.loginWithJwt(jwt).pipe(
-        map(result => {
+      return this.authService.loginWithJwtAndRedirect(jwt).pipe(
+        map(({ user, redirectUrl }: { user: any; redirectUrl: string }) => {
           this.loggingService.log(
-            `loginWithJwt result: ${JSON.stringify(result)}`
+            `loginWithJwtAndRedirect result: ${JSON.stringify(user)}`
           );
-          if (result && result.session_token) {
+          if (user && (user.session_token || user.sessionToken)) {
             this.loggingService.log(
-              'Authentication successful, navigating to /home'
+              `Authentication successful, navigating to ${redirectUrl}`
             );
-            this.router.navigate(['/home']);
+            this.router.navigateByUrl(redirectUrl);
             return false;
           } else {
             this.loggingService.log(

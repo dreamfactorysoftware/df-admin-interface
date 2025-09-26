@@ -9,6 +9,7 @@ export interface RoleType {
   description: string;
   id: number;
   isActive: boolean;
+  redirectUri?: string;
   createdById: number;
   createdDate: string;
   lastModifiedById: number;

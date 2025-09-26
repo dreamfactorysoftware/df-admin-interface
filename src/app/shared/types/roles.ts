@@ -2,6 +2,7 @@ export interface RolePayload {
   id?: number;
   name: string;
   description: string;
+  redirectUri?: string;
   isActive: boolean;
   roleServiceAccessByRoleId: RoleServiceAccess[];
   lookupByRoleId: Lookup[];

@@ -64,19 +64,23 @@ export class AppComponent implements OnInit {
 
     if (jwt) {
       this.loggingService.log(`JWT found in URL: ${jwt.substring(0, 20)}...`);
-      this.authService.loginWithJwt(jwt).subscribe(
-        (user: LoginResponse) => {
+      this.authService.loginWithJwtAndRedirect(jwt).subscribe(
+        ({ user, redirectUrl }: { user: LoginResponse; redirectUrl: string }) => {
           const isAuthenticated = !!(user.session_token || user.sessionToken);
           this.loggingService.log(
             `Login successful for user: ${
               isAuthenticated ? 'Authenticated' : 'Unknown'
             }`
           );
-          window.location.href = '/#/home'; // Use window.location.href for hash-based routing
+          this.loggingService.log(`User object: ${JSON.stringify(user)}`);
+          this.loggingService.log(`Redirecting to: ${redirectUrl}`);
+          console.log('AppComponent: JWT login complete, user:', user);
+          console.log('AppComponent: Redirecting to:', redirectUrl);
+          this.router.navigateByUrl(redirectUrl); // Use Angular router for secure navigation
         },
         error => {
           this.loggingService.log(`Login failed: ${JSON.stringify(error)}`);
-          window.location.href = '/#/auth/login';
+          this.router.navigate(['/auth/login']);
         }
       );
     } else {
@@ -87,7 +91,7 @@ export class AppComponent implements OnInit {
         );
       } else {
         this.loggingService.log('User is already logged in');
-        window.location.href = '/#/home';
+        this.router.navigate(['/home']);
       }
     }
   }
