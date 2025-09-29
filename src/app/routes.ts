@@ -457,6 +457,13 @@ export const routes: Routes = [
               data: DfGlobalLookupKeysResolver,
             },
           },
+          {
+            path: ROUTES.INTERCOM,
+            loadComponent: () =>
+              import(
+                './adf-config/df-intercom/df-intercom-config.component'
+              ).then(m => m.DfIntercomConfigComponent),
+          },
         ],
       },
       {

@@ -31,6 +31,7 @@
     "@fortawesome/free-brands-svg-icons": "^6.4.2",
     "@fortawesome/free-regular-svg-icons": "^6.4.0",
     "@fortawesome/free-solid-svg-icons": "^6.4.0",
+    "@intercom/messenger-js-sdk": "^0.0.17",
     "@ngneat/transloco": "^5.0.7",
     "@ngneat/until-destroy": "^10.0.0",
     "ace-builds": "^1.24.2",

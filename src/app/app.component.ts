@@ -16,6 +16,8 @@ import { LoggingService } from './shared/services/logging.service';
 import { LoginResponse } from './shared/types/auth.types';
 import { ROUTES } from './shared/types/routes';
 import { filter } from 'rxjs/operators';
+import { IntercomService } from './shared/services/intercom.service';
+import { DfUserDataService } from './shared/services/df-user-data.service';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -42,12 +44,30 @@ export class AppComponent implements OnInit {
     private authService: AuthService,
     private router: Router,
     private route: ActivatedRoute,
-    private loggingService: LoggingService
+    private loggingService: LoggingService,
+    private intercomService: IntercomService,
+    private dfUserDataService: DfUserDataService
   ) {}
 
   ngOnInit() {
     this.loggingService.log('AppComponent initialized');
     this.handleAuthentication();
+
+    // Initialize Intercom after authentication
+    this.initializeIntercom();
+
+    // Watch for user data changes to update Intercom
+    this.dfUserDataService.userData$
+      .pipe(untilDestroyed(this))
+      .subscribe(userData => {
+        if (userData) {
+          // Update Intercom with new user data
+          this.intercomService.updateUser(userData);
+        } else {
+          // User logged out, shutdown Intercom
+          this.intercomService.shutdownIntercom();
+        }
+      });
 
     // Monitor license check changes and redirect when disable_ui is true
     this.licenseCheck$.pipe(untilDestroyed(this)).subscribe(licenseCheck => {
@@ -96,6 +116,18 @@ export class AppComponent implements OnInit {
         this.loggingService.log('User is already logged in');
         window.location.href = '/#/home';
       }
+    }
+  }
+
+  private async initializeIntercom(): Promise<void> {
+    try {
+      // Wait a bit for authentication and environment data to complete
+      setTimeout(async () => {
+        // Ensure environment data is loaded
+        await this.intercomService.initializeIntercom();
+      }, 2000); // Increased delay to ensure environment data is loaded
+    } catch (error) {
+      this.loggingService.log(`Failed to initialize Intercom: ${error}`);
     }
   }
 

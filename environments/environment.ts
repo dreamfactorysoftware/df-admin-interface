@@ -5,4 +5,6 @@ export const environment = {
     '36fda24fe5588fa4285ac6c6c2fdfbdb6b6bc9834699774c9bf777f706d05a88',
   dfFileManagerApiKey:
     'b5cb82af7b5d4130f36149f90aa2746782e59a872ac70454ac188743cb55b0ba',
+  intercomWidget: true, // Enable/disable Intercom chat widget
+  intercomAppId: 'ymvqkyiw', // Intercom app ID
 };

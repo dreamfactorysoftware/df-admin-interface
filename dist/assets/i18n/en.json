@@ -299,6 +299,10 @@
         "global-lookup-keys": {
           "nav": "Global Lookup Keys",
           "header": "{{nav.system-settings.config.global-lookup-keys.nav}}"
+        },
+        "intercom": {
+          "nav": "Intercom",
+          "header": "{{nav.system-settings.config.intercom.nav}}"
         }
       },
       "scheduler": {
