@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
-import { environment } from '../../../../environments/environment';
 import { DfUserDataService } from './df-user-data.service';
 import { DfSystemConfigDataService } from './df-system-config-data.service';
+import { DfIntercomConfigService } from '../../adf-config/df-intercom/df-intercom-config.service';
 
 // Declare Intercom on window for shutdown/update operations
 
@@ -13,13 +13,17 @@ export class IntercomService {
 
   constructor(
     private dfUserDataService: DfUserDataService,
-    private dfSystemConfigDataService: DfSystemConfigDataService
+    private dfSystemConfigDataService: DfSystemConfigDataService,
+    private dfIntercomConfigService: DfIntercomConfigService
   ) {}
 
   async initializeIntercom(): Promise<void> {
-    // Check if Intercom should be enabled based on environment config
-    if (!environment.intercomWidget) {
-      console.log('Intercom widget is disabled via environment configuration');
+    // Check if Intercom should be enabled based on API config
+    const apiConfig = this.dfIntercomConfigService.currentConfig;
+    const intercomEnabled = apiConfig.intercomWidget ?? true; // Default to true if no config exists
+
+    if (!intercomEnabled) {
+      console.log('Intercom widget is disabled via configuration');
       return;
     }
 
@@ -40,7 +44,7 @@ export class IntercomService {
       if (userData) {
         // Initialize Intercom with user data
         Intercom({
-          app_id: environment.intercomAppId || 'ymvqkyiw',
+          app_id: apiConfig.intercomAppId || 'ymvqkyiw',
           user_id: userData.id?.toString() || userData.sessionId,
           name:
             userData.name ||
@@ -54,6 +58,11 @@ export class IntercomService {
           role_id: userData.roleId,
           instance_url: window.location.origin,
           license_key: systemEnvironment.platform?.licenseKey || 'N/A',
+          DreamFactoryTier: systemEnvironment.platform?.license || 'N/A',
+          "DreamFactory version": systemEnvironment.platform?.version || 'N/A',
+          plan: systemEnvironment.platform?.license || 'N/A',
+          is_hosted: systemEnvironment.platform?.isHosted || false,
+          is_trial: systemEnvironment.platform?.isTrial || false,
         });
 
         this.intercomLoaded = true;
@@ -61,7 +70,7 @@ export class IntercomService {
       } else {
         // Initialize Intercom for non-logged-in users (visitor mode)
         Intercom({
-          app_id: environment.intercomAppId || 'ymvqkyiw',
+          app_id: apiConfig.intercomAppId || 'ymvqkyiw',
         });
 
         this.intercomLoaded = true;
@@ -92,8 +101,11 @@ export class IntercomService {
   }
 
   updateUser(userData: any): void {
+    const apiConfig = this.dfIntercomConfigService.currentConfig;
+    const intercomEnabled = apiConfig.intercomWidget ?? true; // Default to true if no config exists
+
     if (
-      !environment.intercomWidget ||
+      !intercomEnabled ||
       !(window as any).Intercom ||
       !this.intercomLoaded
     ) {
@@ -117,6 +129,11 @@ export class IntercomService {
         role_id: userData.roleId,
         instance_url: window.location.origin,
         license_key: systemEnvironment.platform?.licenseKey || 'N/A',
+        DreamFactoryTier: systemEnvironment.platform?.license || 'N/A',
+        "DreamFactory version": systemEnvironment.platform?.version || 'N/A',
+        plan: systemEnvironment.platform?.license || 'N/A',
+        is_hosted: systemEnvironment.platform?.isHosted || false,
+        is_trial: systemEnvironment.platform?.isTrial || false,
       });
     }
   }
