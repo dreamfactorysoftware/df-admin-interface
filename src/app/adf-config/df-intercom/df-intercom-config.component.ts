@@ -17,8 +17,8 @@ import { IntercomService } from '../../shared/services/intercom.service';
     CommonModule,
     MatSlideToggleModule,
     MatProgressSpinnerModule,
-    FormsModule
-  ]
+    FormsModule,
+  ],
 })
 export class DfIntercomConfigComponent implements OnInit {
   intercomEnabled = true;
@@ -38,38 +38,49 @@ export class DfIntercomConfigComponent implements OnInit {
   loadConfig(): void {
     this.loading = true;
     this.intercomConfigService.getConfig().subscribe({
-      next: (config) => {
+      next: config => {
         this.intercomEnabled = config.intercomWidget ?? true;
         this.loading = false;
       },
-      error: (error) => {
+      error: error => {
         console.error('Failed to load Intercom configuration:', error);
-        this.snackbarService.openSnackBar('Failed to load configuration', 'error');
+        this.snackbarService.openSnackBar(
+          'Failed to load configuration',
+          'error'
+        );
         this.loading = false;
-      }
+      },
     });
   }
 
   saveConfig(): void {
     this.saving = true;
-    this.intercomConfigService.updateConfig({ intercomWidget: this.intercomEnabled }).subscribe({
-      next: () => {
-        this.snackbarService.openSnackBar('Intercom configuration saved successfully', 'success');
-        this.saving = false;
+    this.intercomConfigService
+      .updateConfig({ intercomWidget: this.intercomEnabled })
+      .subscribe({
+        next: () => {
+          this.snackbarService.openSnackBar(
+            'Intercom configuration saved successfully',
+            'success'
+          );
+          this.saving = false;
 
-        // Update the Intercom widget state immediately
-        if (this.intercomEnabled) {
-          this.intercomService.showIntercom();
-        } else {
-          this.intercomService.hideIntercom();
-        }
-      },
-      error: (error) => {
-        console.error('Failed to save Intercom configuration:', error);
-        this.snackbarService.openSnackBar('Failed to save configuration', 'error');
-        this.saving = false;
-      }
-    });
+          // Update the Intercom widget state immediately
+          if (this.intercomEnabled) {
+            this.intercomService.showIntercom();
+          } else {
+            this.intercomService.hideIntercom();
+          }
+        },
+        error: error => {
+          console.error('Failed to save Intercom configuration:', error);
+          this.snackbarService.openSnackBar(
+            'Failed to save configuration',
+            'error'
+          );
+          this.saving = false;
+        },
+      });
   }
 
   onToggleChange(): void {

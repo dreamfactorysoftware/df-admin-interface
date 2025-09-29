@@ -59,7 +59,7 @@ export class IntercomService {
           instance_url: window.location.origin,
           license_key: systemEnvironment.platform?.licenseKey || 'N/A',
           DreamFactoryTier: systemEnvironment.platform?.license || 'N/A',
-          "DreamFactory version": systemEnvironment.platform?.version || 'N/A',
+          'DreamFactory version': systemEnvironment.platform?.version || 'N/A',
           plan: systemEnvironment.platform?.license || 'N/A',
           is_hosted: systemEnvironment.platform?.isHosted || false,
           is_trial: systemEnvironment.platform?.isTrial || false,
@@ -104,11 +104,7 @@ export class IntercomService {
     const apiConfig = this.dfIntercomConfigService.currentConfig;
     const intercomEnabled = apiConfig.intercomWidget ?? true; // Default to true if no config exists
 
-    if (
-      !intercomEnabled ||
-      !(window as any).Intercom ||
-      !this.intercomLoaded
-    ) {
+    if (!intercomEnabled || !(window as any).Intercom || !this.intercomLoaded) {
       return;
     }
 
@@ -130,7 +126,7 @@ export class IntercomService {
         instance_url: window.location.origin,
         license_key: systemEnvironment.platform?.licenseKey || 'N/A',
         DreamFactoryTier: systemEnvironment.platform?.license || 'N/A',
-        "DreamFactory version": systemEnvironment.platform?.version || 'N/A',
+        'DreamFactory version': systemEnvironment.platform?.version || 'N/A',
         plan: systemEnvironment.platform?.license || 'N/A',
         is_hosted: systemEnvironment.platform?.isHosted || false,
         is_trial: systemEnvironment.platform?.isTrial || false,

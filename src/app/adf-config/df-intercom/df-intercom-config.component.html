@@ -1,7 +1,8 @@
 <div class="intercom-config-container">
   <p>
-    Control whether the Intercom chat widget is displayed to users.
-    When disabled, no Intercom resources will be loaded and the widget will not appear.
+    Control whether the Intercom chat widget is displayed to users. When
+    disabled, no Intercom resources will be loaded and the widget will not
+    appear.
   </p>
 
   <div class="config-section">
@@ -17,7 +18,9 @@
       [disabled]="saving"
       color="primary"
       class="toggle-control">
-      {{ intercomEnabled ? 'Intercom Widget Enabled' : 'Intercom Widget Disabled' }}
+      {{
+        intercomEnabled ? 'Intercom Widget Enabled' : 'Intercom Widget Disabled'
+      }}
     </mat-slide-toggle>
 
     <div class="saving-indicator" *ngIf="saving">
