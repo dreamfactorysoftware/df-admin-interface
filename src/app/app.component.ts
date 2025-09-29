@@ -8,6 +8,7 @@ import {
   NavigationEnd,
 } from '@angular/router';
 import { DfSideNavComponent } from './shared/components/df-side-nav/df-side-nav.component';
+import { DfEngagementBannerComponent } from './shared/components/df-engagement-banner/df-engagement-banner.component';
 import { DfLicenseCheckService } from './shared/services/df-license-check.service';
 import { UntilDestroy, untilDestroyed } from '@ngneat/until-destroy';
 import { AuthService } from './shared/services/auth.service';
@@ -24,7 +25,13 @@ import { DfUserDataService } from './shared/services/df-user-data.service';
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss'],
   standalone: true,
-  imports: [DfSideNavComponent, RouterOutlet, NgIf, AsyncPipe],
+  imports: [
+    DfSideNavComponent,
+    DfEngagementBannerComponent,
+    RouterOutlet,
+    NgIf,
+    AsyncPipe,
+  ],
 })
 export class AppComponent implements OnInit {
   title = 'df-admin-interface';

@@ -1,0 +1,79 @@
+.engagement-banner {
+  background-color: #ffd9b3;
+  color: #2d2d2d;
+  padding: 12px 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  font-family: inherit;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1100;
+
+  .banner-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    max-width: 1200px;
+    margin: 0 auto;
+    position: relative;
+  }
+
+  .banner-text {
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.4;
+  }
+
+  .cta-button {
+    background-color: #7c3aed;
+    color: white;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    white-space: nowrap;
+
+    &:hover {
+      background-color: #6a28d9;
+    }
+
+    &:focus {
+      outline: 2px solid #7c3aed;
+      outline-offset: 2px;
+    }
+  }
+}
+
+.banner-spacer {
+  height: 56px;
+}
+
+@media (max-width: 768px) {
+  .banner-spacer {
+    height: 72px;
+  }
+  .engagement-banner {
+    padding: 10px 15px;
+
+    .banner-content {
+      flex-direction: column;
+      gap: 10px;
+      padding-right: 40px;
+    }
+
+    .banner-text {
+      font-size: 13px;
+      text-align: center;
+    }
+
+    .cta-button {
+      padding: 8px 16px;
+      font-size: 13px;
+    }
+  }
+}
