@@ -86,6 +86,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { DfSystemService } from 'src/app/shared/services/df-system.service';
 import { DfPaywallModal } from 'src/app/shared/components/df-paywall-modal/df-paywall-modal.component';
 import { DfAnalyticsService } from 'src/app/shared/services/df-analytics.service';
+import { ROLE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 
 // Add these interfaces at the bottom of the file with the other interfaces
 interface RoleResponse {
@@ -160,6 +161,7 @@ export class DfServiceDetailsComponent implements OnInit {
   isScriptService = false;
   isFile = false;
   isAuth = false;
+  isOAuth = false;
   serviceTypes: Array<ServiceType>;
   notIncludedServices: Array<ServiceType>;
   serviceForm: FormGroup;
@@ -169,6 +171,7 @@ export class DfServiceDetailsComponent implements OnInit {
   configSchema: Array<ConfigSchema>;
   images: Array<ImageObject>;
   search = '';
+  roles: Array<any> = [];
   serviceDefinition: string;
   serviceDefinitionType: string;
   systemEvents: Array<{ label: string; value: string }>;
@@ -191,7 +194,8 @@ export class DfServiceDetailsComponent implements OnInit {
     private currentServiceService: DfCurrentServiceService,
     private snackBar: MatSnackBar,
     private systemService: DfSystemService,
-    private analyticsService: DfAnalyticsService
+    private analyticsService: DfAnalyticsService,
+    @Inject(ROLE_SERVICE_TOKEN) private roleService: DfBaseCrudService
   ) {
     this.serviceForm = this.fb.group({
       type: ['', Validators.required],
@@ -211,6 +215,17 @@ export class DfServiceDetailsComponent implements OnInit {
   }
   isDarkMode = this.themeService.darkMode$;
   ngOnInit(): void {
+    // Load roles for OAuth configuration
+    this.roleService.getAll({ limit: 1000, sort: 'name' }).subscribe({
+      next: (response: any) => {
+        this.roles = response.resource || [];
+      },
+      error: (error) => {
+        console.error('Failed to load roles:', error);
+        this.roles = [];
+      }
+    });
+
     // Check if this is the user's first API (only for new service creation, not editing)
     if (!this.edit) {
       this.analyticsService.getDashboardStats().subscribe(stats => {
@@ -244,6 +259,9 @@ export class DfServiceDetailsComponent implements OnInit {
         }
         if (route['groups'] && route['groups'][0] === 'LDAP') {
           this.isAuth = true;
+        }
+        if (route['groups'] && route['groups'][0] === 'OAuth') {
+          this.isOAuth = true;
         }
         const { data, serviceTypes, groups } = route;
         const licenseType = env.platform?.license;
@@ -293,6 +311,25 @@ export class DfServiceDetailsComponent implements OnInit {
             );
           }
         }
+
+        // Ensure oauth_azure_ad service has the complete configSchema including default_role
+        if (this.isOAuth) {
+          const azureAdIndex = this.serviceTypes.findIndex(s => s.name === 'oauth_azure_ad');
+          if (azureAdIndex !== -1) {
+            // Replace with our local definition that includes full configSchema
+            const localAzureAdService = SILVER_SERVICES.find(s => s.name === 'oauth_azure_ad');
+            if (localAzureAdService) {
+              this.serviceTypes[azureAdIndex] = localAzureAdService;
+            }
+          } else {
+            // If not found, add it from our local definitions
+            const localAzureAdService = SILVER_SERVICES.find(s => s.name === 'oauth_azure_ad');
+            if (localAzureAdService && groups.includes('OAuth')) {
+              this.serviceTypes.push(localAzureAdService);
+            }
+          }
+        }
+
         if (data?.serviceDocByServiceId) {
           // For network services, keep the old behavior
           if (this.isNetworkService) {
@@ -421,6 +458,7 @@ export class DfServiceDetailsComponent implements OnInit {
     this.isNetworkService = false;
     this.isScriptService = false;
     this.isFile = false;
+    this.isOAuth = false;
 
     // Find the service type to get its group
     const serviceType = this.serviceTypes.find(st => st.name === type);
@@ -432,13 +470,19 @@ export class DfServiceDetailsComponent implements OnInit {
         this.isScriptService = true;
       } else if (group === 'File') {
         this.isFile = true;
+      } else if (group === 'OAuth') {
+        this.isOAuth = true;
       }
     }
   }
 
   initializeConfig(value: string) {
+    // Always create a config FormGroup to prevent template errors
+    const config = this.fb.group({});
+
+
+    // If we have a config schema, populate the form controls
     if (this.configSchema && this.configSchema.length > 0) {
-      const config = this.fb.group({});
       this.configSchema.forEach(control => {
         const validator = [];
         if (control.required) {
@@ -449,9 +493,7 @@ export class DfServiceDetailsComponent implements OnInit {
           new FormControl(control.default, validator)
         );
       });
-      if (this.isFile && value === 'local_file') {
-        config?.addControl('excelContent', new FormControl(''));
-      }
+
       const contentConfigControl = this.configSchema.filter(
         control => control.name === 'content'
       )?.[0];
@@ -465,21 +507,74 @@ export class DfServiceDetailsComponent implements OnInit {
           new FormControl(contentConfigControl.default, validator)
         );
       }
-      if (this.isNetworkService) {
-        this.serviceForm.addControl('type', new FormControl(''));
+    }
+
+    // Service-specific configuration
+    if (this.isFile && value === 'local_file') {
+      config?.addControl('excelContent', new FormControl(''));
+    }
+
+    if (this.isNetworkService) {
+      this.serviceForm.addControl('type', new FormControl(''));
+      config.addControl('content', new FormControl(''));
+      // Initialize serviceDefinitionType for JSON/YAML toggle
+      this.serviceDefinitionType = '0'; // Default to JSON
+    }
+
+    if (this.isScriptService) {
+      // Ensure script services have content field for script content
+      if (!config.get('content')) {
         config.addControl('content', new FormControl(''));
-        // Initialize serviceDefinitionType for JSON/YAML toggle
-        this.serviceDefinitionType = '0'; // Default to JSON
       }
-      if (this.isScriptService) {
-        // Ensure script services have content field for script content
-        if (!config.get('content')) {
-          config.addControl('content', new FormControl(''));
+      // Initialize serviceDefinitionType for JSON/YAML toggle
+      this.serviceDefinitionType = '0'; // Default to JSON
+    }
+
+    if (this.isOAuth) {
+      // Set up OAuth-specific form validation
+      this.setupOAuthValidation(config);
+    }
+
+    // Always add the config FormGroup to prevent template errors
+    this.serviceForm.addControl('config', config);
+  }
+
+  setupOAuthValidation(config: FormGroup): void {
+    // Set up form listeners for OAuth validation
+    const grantTypeControl = config.get('grantType');
+    const isClientCredentialsControl = config.get('isClientCredentials');
+    const redirectUrlControl = config.get('redirectUrl');
+
+    // Initial validation setup based on default grant type or client credentials flag
+    if (redirectUrlControl) {
+      const isClientCredentials = isClientCredentialsControl?.value === true;
+      const grantType = grantTypeControl?.value;
+
+      if (grantType === 'client_credentials' || isClientCredentials) {
+        redirectUrlControl.clearValidators();
+        redirectUrlControl.setValue(null);
+      } else {
+        redirectUrlControl.setValidators([Validators.required]);
+        // Set empty string as default value for authorization code flow
+        if (!redirectUrlControl.value) {
+          redirectUrlControl.setValue('');
         }
-        // Initialize serviceDefinitionType for JSON/YAML toggle
-        this.serviceDefinitionType = '0'; // Default to JSON
       }
-      this.serviceForm.addControl('config', config);
+      redirectUrlControl.updateValueAndValidity();
+    }
+
+    // Set up listeners for grant type changes
+    if (grantTypeControl) {
+      grantTypeControl.valueChanges.subscribe(() => {
+        this.onGrantTypeChange();
+      });
+    }
+
+    // Set up listeners for client credentials checkbox changes
+    if (isClientCredentialsControl) {
+      isClientCredentialsControl.valueChanges.subscribe(() => {
+        this.onClientCredentialsChange();
+      });
     }
   }
 
@@ -666,8 +761,13 @@ export class DfServiceDetailsComponent implements OnInit {
     return this.isNetworkService;
   }
 
-  getConfigControl(name: string) {
-    return this.serviceForm.get(`config.${name}`) as FormControl;
+  getConfigControl(name: string): FormControl | null {
+    const configGroup = this.serviceForm.get('config') as FormGroup;
+    if (!configGroup) {
+      return null;
+    }
+    const control = configGroup.get(name);
+    return control as FormControl;
   }
 
   getServiceDocByServiceIdControl(name: string) {
@@ -1067,6 +1167,84 @@ export class DfServiceDetailsComponent implements OnInit {
   onServiceTypeSelect(selectedServiceTypeLable: string) {
     this.selectedServiceTypeLable =
       selectedServiceTypeLable || 'Unknown. Unable to identify Service Type';
+  }
+
+  // OAuth specific methods
+  get isClientCredentialsFlow(): boolean {
+    const grantType = this.getConfigControl('grantType')?.value;
+    const isClientCredentials = this.getConfigControl('isClientCredentials')?.value;
+    return grantType === 'client_credentials' || isClientCredentials === true;
+  }
+
+  onGrantTypeChange(): void {
+    if (this.isOAuth) {
+      const grantType = this.getConfigControl('grantType')?.value;
+      const redirectUrlControl = this.getConfigControl('redirectUrl');
+
+      if (grantType === 'client_credentials') {
+        // For client credentials flow, redirect URL is not required and should be null
+        if (redirectUrlControl) {
+          redirectUrlControl.clearValidators();
+          redirectUrlControl.setValue(null);
+          redirectUrlControl.updateValueAndValidity();
+        }
+        // Set isClientCredentials to true (without emitting event to prevent infinite loop)
+        const isClientCredentialsControl = this.getConfigControl('isClientCredentials');
+        if (isClientCredentialsControl) {
+          isClientCredentialsControl.setValue(true, { emitEvent: false });
+        }
+      } else {
+        // For authorization code flow, redirect URL is required
+        if (redirectUrlControl) {
+          redirectUrlControl.setValidators([Validators.required]);
+          // Set empty string as default value when switching back to authorization code
+          if (!redirectUrlControl.value) {
+            redirectUrlControl.setValue('');
+          }
+          redirectUrlControl.updateValueAndValidity();
+        }
+        // Set isClientCredentials to false (without emitting event to prevent infinite loop)
+        const isClientCredentialsControl = this.getConfigControl('isClientCredentials');
+        if (isClientCredentialsControl) {
+          isClientCredentialsControl.setValue(false, { emitEvent: false });
+        }
+      }
+    }
+  }
+
+  onClientCredentialsChange(): void {
+    if (this.isOAuth) {
+      const isClientCredentials = this.getConfigControl('isClientCredentials')?.value;
+      const grantTypeControl = this.getConfigControl('grantType');
+      const redirectUrlControl = this.getConfigControl('redirectUrl');
+
+      if (isClientCredentials) {
+        // Update grant type to client_credentials (without emitting event to prevent infinite loop)
+        if (grantTypeControl) {
+          grantTypeControl.setValue('client_credentials', { emitEvent: false });
+        }
+        // Make redirect URL optional and clear its value
+        if (redirectUrlControl) {
+          redirectUrlControl.clearValidators();
+          redirectUrlControl.setValue(null);
+          redirectUrlControl.updateValueAndValidity();
+        }
+      } else {
+        // Update grant type to authorization_code (without emitting event to prevent infinite loop)
+        if (grantTypeControl) {
+          grantTypeControl.setValue('authorization_code', { emitEvent: false });
+        }
+        // Make redirect URL required and set a default value
+        if (redirectUrlControl) {
+          redirectUrlControl.setValidators([Validators.required]);
+          // Set empty string as default value when switching back to authorization code
+          if (!redirectUrlControl.value) {
+            redirectUrlControl.setValue('');
+          }
+          redirectUrlControl.updateValueAndValidity();
+        }
+      }
+    }
   }
 }
 interface ImageObject {

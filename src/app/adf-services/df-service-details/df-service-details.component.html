@@ -215,9 +215,9 @@
                         <df-script-editor
                           [type]="getControl('type')"
                           [storageServiceId]="
-                            getConfigControl('storageServiceId')
+                            getConfigControl('storageServiceId')!
                           "
-                          [storagePath]="getConfigControl('storagePath')"
+                          [storagePath]="getConfigControl('storagePath')!"
                           [content]="getServiceDocByServiceIdControl('content')"
                           [cache]="serviceData ? serviceData.name : ''"
                           class="full-width">
@@ -240,7 +240,7 @@
                           ].includes(item.type)
                         "
                         [schema]="item"
-                        [formControl]="getConfigControl(item.name)"
+                        [formControl]="getConfigControl(item.name)!"
                         [class.dynamic-width]="
                           ['file_certificate', 'file_certificate_api'].indexOf(
                             item.type
@@ -254,7 +254,7 @@
                       <df-array-field
                         *ngIf="item.type === 'array' || item.type === 'object'"
                         [schema]="item"
-                        [formControl]="getConfigControl(item.name)"
+                        [formControl]="getConfigControl(item.name)!"
                         class="full-width">
                       </df-array-field>
                     </ng-template>
@@ -281,14 +281,14 @@
                       ].includes(item.type)
                     "
                     [schema]="item"
-                    [formControl]="getConfigControl(item.name)"
+                    [formControl]="getConfigControl(item.name)!"
                     [class.dynamic-width]="item.type !== 'file_certificate'"
                     [class.full-width]="item.type === 'file_certificate'">
                   </df-dynamic-field>
                   <df-array-field
                     *ngIf="item.type === 'array' || item.type === 'object'"
                     [schema]="item"
-                    [formControl]="getConfigControl(item.name)"
+                    [formControl]="getConfigControl(item.name)!"
                     class="full-width">
                   </df-array-field>
                 </ng-container>
@@ -312,9 +312,9 @@
                             <df-script-editor
                               [type]="getControl('type')"
                               [storageServiceId]="
-                                getConfigControl('storageServiceId')
+                                getConfigControl('storageServiceId')!
                               "
-                              [storagePath]="getConfigControl('storagePath')"
+                              [storagePath]="getConfigControl('storagePath')!"
                               [content]="
                                 getServiceDocByServiceIdControl('content')
                               "
@@ -339,7 +339,7 @@
                               ].includes(item.type)
                             "
                             [schema]="item"
-                            [formControl]="getConfigControl(item.name)"
+                            [formControl]="getConfigControl(item.name)!"
                             [class.dynamic-width]="
                               item.type !== 'file_certificate' &&
                               item.type !== 'file_certificate_api'
@@ -354,7 +354,7 @@
                               item.type === 'array' || item.type === 'object'
                             "
                             [schema]="item"
-                            [formControl]="getConfigControl(item.name)"
+                            [formControl]="getConfigControl(item.name)!"
                             class="full-width">
                           </df-array-field>
                         </ng-template>
@@ -580,7 +580,7 @@
               "
               color="primary"
               [schema]="item"
-              [formControl]="getConfigControl(item.name)"
+              [formControl]="getConfigControl(item.name)!"
               [class.dynamic-width]="
                 ['file_certificate', 'file_certificate_api'].indexOf(
                   item.type
@@ -618,7 +618,7 @@
                 <ng-container *ngIf="serviceForm.getRawValue().type === 'rws'">
                   <df-file-github
                     [type]="getControl('type')"
-                    [content]="getConfigControl('content')"
+                    [content]="getConfigControl('content')!"
                     [contentText]="content"
                     class="full-width">
                   </df-file-github>
@@ -627,7 +627,7 @@
                 <ng-container *ngIf="serviceForm.getRawValue().type === 'soap'">
                   <df-file-github
                     [type]="getControl('type')"
-                    [content]="getConfigControl('content')"
+                    [content]="getConfigControl('content')!"
                     [contentText]="content"
                     class="full-width">
                   </df-file-github>
@@ -640,7 +640,7 @@
                   ">
                   <df-ace-editor
                     class="full-width"
-                    [formControl]="getConfigControl('content')"
+                    [formControl]="getConfigControl('content')!"
                     [mode]="serviceDefinitionMode">
                   </df-ace-editor>
                 </ng-container>
@@ -663,7 +663,7 @@
                     "
                     color="primary"
                     [schema]="item"
-                    [formControl]="getConfigControl(item.name)"
+                    [formControl]="getConfigControl(item.name)!"
                     [class.dynamic-width]="
                       ['file_certificate', 'file_certificate_api'].indexOf(
                         item.type
@@ -677,7 +677,7 @@
                   <df-array-field
                     *ngIf="item.type === 'array' || item.type === 'object'"
                     [schema]="item"
-                    [formControl]="getConfigControl(item.name)"
+                    [formControl]="getConfigControl(item.name)!"
                     class="full-width"></df-array-field>
                 </ng-container>
               </div>
@@ -692,9 +692,9 @@
             <df-script-editor
               [isScript]="this.isScriptService"
               [type]="getControl('type')"
-              [storageServiceId]="getConfigControl('storageServiceId')"
-              [storagePath]="getConfigControl('storagePath')"
-              [content]="getConfigControl('content')"
+              [storageServiceId]="getConfigControl('storageServiceId')!"
+              [storagePath]="getConfigControl('storagePath')!"
+              [content]="getConfigControl('content')!"
               [cache]="serviceData ? serviceData.name : ''"
               class="full-width"></df-script-editor>
           </ng-container>
@@ -746,7 +746,7 @@
                       "
                       color="primary"
                       [schema]="item"
-                      [formControl]="getConfigControl(item.name)"
+                      [formControl]="getConfigControl(item.name)!"
                       [class.dynamic-width]="
                         ['file_certificate', 'file_certificate_api'].indexOf(
                           item.type
@@ -760,7 +760,7 @@
                     <df-array-field
                       *ngIf="item.type === 'array' || item.type === 'object'"
                       [schema]="item"
-                      [formControl]="getConfigControl(item.name)"
+                      [formControl]="getConfigControl(item.name)!"
                       class="full-width"></df-array-field>
                   </ng-container>
                 </ng-container>
@@ -769,8 +769,124 @@
           </mat-accordion>
         </ng-container>
 
+        <!-- OAuth Service Configuration -->
+        <ng-container *ngIf="this.isOAuth">
+          <!-- Required OAuth Fields - Always visible -->
+          <div class="details-section">
+            <ng-container *ngFor="let item of viewSchema">
+              <ng-container *ngIf="['clientId', 'clientSecret', 'tenantId'].includes(item.name)">
+                <df-dynamic-field
+                  *ngIf="
+                    [
+                      'integer',
+                      'password',
+                      'string',
+                      'text',
+                      'picklist',
+                      'multi_picklist',
+                      'boolean'
+                    ].includes(item.type) && getConfigControl(item.name)
+                  "
+                  color="primary"
+                  [schema]="item"
+                  [formControl]="getConfigControl(item.name)!"
+                  class="dynamic-width">
+                </df-dynamic-field>
+              </ng-container>
+            </ng-container>
+          </div>
+
+          <!-- Grant Type Configuration -->
+          <div class="details-section">
+            <ng-container *ngFor="let item of viewSchema">
+              <ng-container *ngIf="item.name === 'grantType'">
+                <df-dynamic-field
+                  *ngIf="item.type === 'picklist' && getConfigControl(item.name)"
+                  color="primary"
+                  [schema]="item"
+                  [formControl]="getConfigControl(item.name)!"
+                  class="dynamic-width"
+                  (selectionChange)="onGrantTypeChange()">
+                </df-dynamic-field>
+              </ng-container>
+              <ng-container *ngIf="item.name === 'isClientCredentials'">
+                <df-dynamic-field
+                  *ngIf="item.type === 'boolean' && getConfigControl(item.name)"
+                  color="primary"
+                  [schema]="item"
+                  [formControl]="getConfigControl(item.name)!"
+                  class="dynamic-width"
+                  (change)="onClientCredentialsChange()">
+                </df-dynamic-field>
+              </ng-container>
+            </ng-container>
+          </div>
+
+          <!-- Conditional Redirect URL -->
+          <div class="details-section" *ngIf="!isClientCredentialsFlow">
+            <ng-container *ngFor="let item of viewSchema">
+              <ng-container *ngIf="item.name === 'redirectUrl'">
+                <df-dynamic-field
+                  *ngIf="item.type === 'string' && getConfigControl(item.name)"
+                  color="primary"
+                  [schema]="item"
+                  [formControl]="getConfigControl(item.name)!"
+                  class="full-width">
+                </df-dynamic-field>
+              </ng-container>
+            </ng-container>
+          </div>
+
+          <!-- Default Role Selection -->
+          <div class="details-section">
+            <mat-form-field class="dynamic-width" *ngIf="getConfigControl('defaultRole')">
+              <mat-label>Default Role</mat-label>
+              <mat-select [formControl]="getConfigControl('defaultRole')!">
+                <mat-option [value]="null">-- Select Role --</mat-option>
+                <mat-option *ngFor="let role of roles" [value]="role.id">
+                  {{ role.name }}
+                </mat-option>
+              </mat-select>
+              <mat-hint>Select a default role for users logging in with this OAuth service. For Client Credentials flow, this role defines the permissions for service-to-service authentication.</mat-hint>
+            </mat-form-field>
+          </div>
+
+          <!-- Advanced OAuth Options -->
+          <mat-accordion class="full-width">
+            <mat-expansion-panel [expanded]="false">
+              <mat-expansion-panel-header>
+                Advanced OAuth Options
+              </mat-expansion-panel-header>
+              <div class="details-section">
+                <ng-container *ngFor="let item of viewSchema">
+                  <ng-container *ngIf="['authorityUrl', 'scopes'].includes(item.name)">
+                    <df-dynamic-field
+                      *ngIf="
+                        [
+                          'integer',
+                          'password',
+                          'string',
+                          'text',
+                          'picklist',
+                          'multi_picklist',
+                          'boolean'
+                        ].includes(item.type) && getConfigControl(item.name)
+                      "
+                      color="primary"
+                      [schema]="item"
+                      [formControl]="getConfigControl(item.name)!"
+                      [class.dynamic-width]="item.type !== 'text'"
+                      [class.full-width]="item.type === 'text'">
+                    </df-dynamic-field>
+                  </ng-container>
+                </ng-container>
+              </div>
+            </mat-expansion-panel>
+          </mat-accordion>
+        </ng-container>
+
         <!-- Other Service Types (unchanged) -->
-        <ng-container *ngIf="!this.isNetworkService && !this.isScriptService">
+        <ng-container *ngIf="!this.isNetworkService && !this.isScriptService && !this.isOAuth">
           <mat-accordion class="full-width">
             <mat-expansion-panel [expanded]="serviceForm.getRawValue().type">
               <mat-expansion-panel-header
@@ -799,7 +915,7 @@
                   </div>
                   <df-ace-editor
                     class="full-width"
-                    [formControl]="getConfigControl('excelContent')"
+                    [formControl]="getConfigControl('excelContent')!"
                     [mode]="excelMode"></df-ace-editor>
                 </ng-container>
                 <ng-container *ngFor="let item of viewSchema">
@@ -812,9 +928,9 @@
                       <df-script-editor
                         [type]="getControl('type')"
                         [storageServiceId]="
-                          getConfigControl('storageServiceId')
+                          getConfigControl('storageServiceId')!
                         "
-                        [storagePath]="getConfigControl('storagePath')"
+                        [storagePath]="getConfigControl('storagePath')!"
                         [content]="getServiceDocByServiceIdControl('content')"
                         [cache]="serviceData ? serviceData.name : ''"
                         class="full-width"></df-script-editor>
@@ -837,7 +953,7 @@
                       "
                       color="primary"
                       [schema]="item"
-                      [formControl]="getConfigControl(item.name)"
+                      [formControl]="getConfigControl(item.name)!"
                       [class.dynamic-width]="
                         ['file_certificate', 'file_certificate_api'].indexOf(
                           item.type
@@ -851,7 +967,7 @@
                     <df-array-field
                       *ngIf="item.type === 'array' || item.type === 'object'"
                       [schema]="item"
-                      [formControl]="getConfigControl(item.name)"
+                      [formControl]="getConfigControl(item.name)!"
                       class="full-width"></df-array-field>
                   </ng-template>
                 </ng-container>
