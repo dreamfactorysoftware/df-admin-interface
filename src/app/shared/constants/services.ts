@@ -33,7 +33,8 @@ export const SILVER_SERVICES: Array<ServiceType> = [
         name: 'client_id',
         label: 'Client ID',
         type: 'string',
-        description: 'The Application (client) ID from Azure AD app registration',
+        description:
+          'The Application (client) ID from Azure AD app registration',
         alias: 'client_id',
         precision: 0,
         scale: null,
@@ -54,7 +55,7 @@ export const SILVER_SERVICES: Array<ServiceType> = [
         dbFunction: null,
         isVirtual: false,
         isAggregate: false,
-        items: 'string'
+        items: 'string',
       },
       {
         name: 'client_secret',
@@ -81,7 +82,7 @@ export const SILVER_SERVICES: Array<ServiceType> = [
         dbFunction: null,
         isVirtual: false,
         isAggregate: false,
-        items: 'string'
+        items: 'string',
       },
       {
         name: 'tenant_id',
@@ -108,13 +109,14 @@ export const SILVER_SERVICES: Array<ServiceType> = [
         dbFunction: null,
         isVirtual: false,
         isAggregate: false,
-        items: 'string'
+        items: 'string',
       },
       {
         name: 'authority_url',
         label: 'Authority URL',
         type: 'string',
-        description: 'Custom authority URL (optional, defaults to https://login.microsoftonline.com/{tenant_id})',
+        description:
+          'Custom authority URL (optional, defaults to https://login.microsoftonline.com/{tenant_id})',
         alias: 'authority_url',
         precision: 0,
         scale: null,
@@ -135,7 +137,7 @@ export const SILVER_SERVICES: Array<ServiceType> = [
         dbFunction: null,
         isVirtual: false,
         isAggregate: false,
-        items: 'string'
+        items: 'string',
       },
       {
         name: 'grant_type',
@@ -159,19 +161,20 @@ export const SILVER_SERVICES: Array<ServiceType> = [
         refOnDelete: null,
         picklist: [
           { label: 'Authorization Code', value: 'authorization_code' },
-          { label: 'Client Credentials', value: 'client_credentials' }
+          { label: 'Client Credentials', value: 'client_credentials' },
         ],
         validation: null,
         dbFunction: null,
         isVirtual: false,
         isAggregate: false,
-        items: 'string'
+        items: 'string',
       },
       {
         name: 'is_client_credentials',
         label: 'Use Client Credentials Flow',
         type: 'boolean',
-        description: 'Enable Client Credentials flow (no user interaction required)',
+        description:
+          'Enable Client Credentials flow (no user interaction required)',
         alias: 'is_client_credentials',
         precision: 0,
         scale: null,
@@ -192,13 +195,14 @@ export const SILVER_SERVICES: Array<ServiceType> = [
         dbFunction: null,
         isVirtual: false,
         isAggregate: false,
-        items: 'string'
+        items: 'string',
       },
       {
         name: 'redirect_url',
         label: 'Redirect URL',
         type: 'string',
-        description: 'The redirect URL configured in Azure AD app registration (required for authorization_code flow)',
+        description:
+          'The redirect URL configured in Azure AD app registration (required for authorization_code flow)',
         alias: 'redirect_url',
         precision: 0,
         scale: null,
@@ -219,13 +223,14 @@ export const SILVER_SERVICES: Array<ServiceType> = [
         dbFunction: null,
         isVirtual: false,
         isAggregate: false,
-        items: 'string'
+        items: 'string',
       },
       {
         name: 'scopes',
         label: 'Scopes',
         type: 'text',
-        description: 'Space-separated list of OAuth scopes to request (e.g., "https://graph.microsoft.com/.default" for Client Credentials)',
+        description:
+          'Space-separated list of OAuth scopes to request (e.g., "https://graph.microsoft.com/.default" for Client Credentials)',
         alias: 'scopes',
         precision: 0,
         scale: null,
@@ -246,13 +251,14 @@ export const SILVER_SERVICES: Array<ServiceType> = [
         dbFunction: null,
         isVirtual: false,
         isAggregate: false,
-        items: 'string'
+        items: 'string',
       },
       {
         name: 'default_role',
         label: 'Default Role',
         type: 'integer',
-        description: 'Select a default role for users logging in with this OAuth service. For Client Credentials flow, this role defines the permissions for service-to-service authentication.',
+        description:
+          'Select a default role for users logging in with this OAuth service. For Client Credentials flow, this role defines the permissions for service-to-service authentication.',
         alias: 'default_role',
         precision: 0,
         scale: null,
@@ -273,8 +279,8 @@ export const SILVER_SERVICES: Array<ServiceType> = [
         dbFunction: null,
         isVirtual: false,
         isAggregate: false,
-        items: 'string'
-      }
+        items: 'string',
+      },
     ],
   },
   {

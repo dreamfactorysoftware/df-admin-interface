@@ -220,10 +220,10 @@ export class DfServiceDetailsComponent implements OnInit {
       next: (response: any) => {
         this.roles = response.resource || [];
       },
-      error: (error) => {
+      error: error => {
         console.error('Failed to load roles:', error);
         this.roles = [];
-      }
+      },
     });
 
     // Check if this is the user's first API (only for new service creation, not editing)
@@ -314,16 +314,22 @@ export class DfServiceDetailsComponent implements OnInit {
 
         // Ensure oauth_azure_ad service has the complete configSchema including default_role
         if (this.isOAuth) {
-          const azureAdIndex = this.serviceTypes.findIndex(s => s.name === 'oauth_azure_ad');
+          const azureAdIndex = this.serviceTypes.findIndex(
+            s => s.name === 'oauth_azure_ad'
+          );
           if (azureAdIndex !== -1) {
             // Replace with our local definition that includes full configSchema
-            const localAzureAdService = SILVER_SERVICES.find(s => s.name === 'oauth_azure_ad');
+            const localAzureAdService = SILVER_SERVICES.find(
+              s => s.name === 'oauth_azure_ad'
+            );
             if (localAzureAdService) {
               this.serviceTypes[azureAdIndex] = localAzureAdService;
             }
           } else {
             // If not found, add it from our local definitions
-            const localAzureAdService = SILVER_SERVICES.find(s => s.name === 'oauth_azure_ad');
+            const localAzureAdService = SILVER_SERVICES.find(
+              s => s.name === 'oauth_azure_ad'
+            );
             if (localAzureAdService && groups.includes('OAuth')) {
               this.serviceTypes.push(localAzureAdService);
             }
@@ -479,7 +485,6 @@ export class DfServiceDetailsComponent implements OnInit {
   initializeConfig(value: string) {
     // Always create a config FormGroup to prevent template errors
     const config = this.fb.group({});
-
 
     // If we have a config schema, populate the form controls
     if (this.configSchema && this.configSchema.length > 0) {
@@ -1172,7 +1177,8 @@ export class DfServiceDetailsComponent implements OnInit {
   // OAuth specific methods
   get isClientCredentialsFlow(): boolean {
     const grantType = this.getConfigControl('grantType')?.value;
-    const isClientCredentials = this.getConfigControl('isClientCredentials')?.value;
+    const isClientCredentials = this.getConfigControl('isClientCredentials')
+      ?.value;
     return grantType === 'client_credentials' || isClientCredentials === true;
   }
 
@@ -1189,7 +1195,9 @@ export class DfServiceDetailsComponent implements OnInit {
           redirectUrlControl.updateValueAndValidity();
         }
         // Set isClientCredentials to true (without emitting event to prevent infinite loop)
-        const isClientCredentialsControl = this.getConfigControl('isClientCredentials');
+        const isClientCredentialsControl = this.getConfigControl(
+          'isClientCredentials'
+        );
         if (isClientCredentialsControl) {
           isClientCredentialsControl.setValue(true, { emitEvent: false });
         }
@@ -1204,7 +1212,9 @@ export class DfServiceDetailsComponent implements OnInit {
           redirectUrlControl.updateValueAndValidity();
         }
         // Set isClientCredentials to false (without emitting event to prevent infinite loop)
-        const isClientCredentialsControl = this.getConfigControl('isClientCredentials');
+        const isClientCredentialsControl = this.getConfigControl(
+          'isClientCredentials'
+        );
         if (isClientCredentialsControl) {
           isClientCredentialsControl.setValue(false, { emitEvent: false });
         }
@@ -1214,7 +1224,8 @@ export class DfServiceDetailsComponent implements OnInit {
 
   onClientCredentialsChange(): void {
     if (this.isOAuth) {
-      const isClientCredentials = this.getConfigControl('isClientCredentials')?.value;
+      const isClientCredentials = this.getConfigControl('isClientCredentials')
+        ?.value;
       const grantTypeControl = this.getConfigControl('grantType');
       const redirectUrlControl = this.getConfigControl('redirectUrl');
 
