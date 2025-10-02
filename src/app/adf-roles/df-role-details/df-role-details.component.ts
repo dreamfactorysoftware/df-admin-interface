@@ -259,9 +259,62 @@ export class DfRoleDetailsComponent implements OnInit {
   }
 
   onSubmit() {
-    if (this.roleForm.invalid) return;
+    // Clear validators for all hidden items before validation
+    const serviceAccess = this.roleForm.get('serviceAccess') as FormArray;
+    serviceAccess.controls.forEach((control, index) => {
+      if (!this.visibilityArray[index]) {
+        console.log(`Clearing validators for hidden item at index ${index}`);
+        control.get('service')?.clearValidators();
+        control.get('component')?.clearValidators();
+        control.get('access')?.clearValidators();
+        control.get('requester')?.clearValidators();
+        control.get('service')?.updateValueAndValidity();
+        control.get('component')?.updateValueAndValidity();
+        control.get('access')?.updateValueAndValidity();
+        control.get('requester')?.updateValueAndValidity();
+      }
+    });
+
+    if (this.roleForm.invalid) {
+      // Mark all controls as touched to show validation errors
+      this.roleForm.markAllAsTouched();
+
+      console.log('Form is invalid:', this.roleForm.errors);
+      console.log('Form controls validity:', {
+        name: this.roleForm.get('name')?.errors,
+        description: this.roleForm.get('description')?.errors,
+        active: this.roleForm.get('active')?.errors,
+        serviceAccess: this.roleForm.get('serviceAccess')?.errors,
+        lookupKeys: this.roleForm.get('lookupKeys')?.errors,
+      });
+
+      serviceAccess.controls.forEach((control, index) => {
+        console.log(`ServiceAccess[${index}] valid:`, control.valid, 'visibility:', this.visibilityArray[index]);
+        if (control.invalid) {
+          console.log(`ServiceAccess[${index}] errors:`, control.errors);
+          console.log(`ServiceAccess[${index}] controls errors:`, {
+            service: control.get('service')?.errors,
+            component: control.get('component')?.errors,
+            access: control.get('access')?.errors,
+            requester: control.get('requester')?.errors,
+          });
+          console.log(`ServiceAccess[${index}] controls valid:`, {
+            service: control.get('service')?.valid,
+            component: control.get('component')?.valid,
+            access: control.get('access')?.valid,
+            requester: control.get('requester')?.valid,
+          });
+          console.log(`ServiceAccess[${index}] values:`, control.value);
+        }
+      });
+
+      return;
+    }
     const formValue = this.roleForm.getRawValue();
-    if (formValue.name === '' || formValue.name === null) return;
+    if (formValue.name === '' || formValue.name === null) {
+      console.log('Form name is empty');
+      return;
+    }
     const payload: RolePayload = {
       id: formValue.id,
       name: formValue.name,
