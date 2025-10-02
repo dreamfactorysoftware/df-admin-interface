@@ -204,6 +204,19 @@ export class DfRolesAccessComponent implements OnInit {
     return components || [];
   }
 
+  getFormArrayIndex(visibleIndex: number): number {
+    let visibleCount = 0;
+    for (let i = 0; i < this.visible.length; i++) {
+      if (this.visible[i]) {
+        if (visibleCount === visibleIndex) {
+          return i;
+        }
+        visibleCount++;
+      }
+    }
+    return -1;
+  }
+
   filterOptions(event: Event, index: number) {
     const input = (event.target as HTMLInputElement).value.toLowerCase();
     const serviceId = this.formArray.at(index).get('service')?.value;
@@ -294,6 +307,7 @@ export class DfRolesAccessComponent implements OnInit {
       })
     );
     this.visible.push(true);
+    console.log('FormArray after add:', this.formArray.value, 'Visible:', this.visible);
     this.updateDataSource();
   }
 
@@ -323,9 +337,40 @@ export class DfRolesAccessComponent implements OnInit {
   }
 
   remove(index: number) {
+    console.log('Remove called with index:', index, 'Visible array before:', [...this.visible]);
     if (index >= 0 && index < this.formArray.length) {
+      // Find the actual form array index for the nth visible item BEFORE updating visible array
+      let visibleCount = 0;
+      let actualIndex = -1;
+      for (let i = 0; i < this.visible.length; i++) {
+        if (this.visible[i]) {
+          if (visibleCount === index) {
+            actualIndex = i;
+            break;
+          }
+          visibleCount++;
+        }
+      }
+      console.log('Actual form array index to hide:', actualIndex);
+
       this.visible = this.updateNthTrueToFalse(this.visible, index);
+
+      // Clear validators for the hidden item
+      if (actualIndex !== -1 && actualIndex < this.formArray.length) {
+        const formGroup = this.formArray.at(actualIndex);
+        console.log('Clearing validators for form group at index:', actualIndex);
+        formGroup.get('service')?.clearValidators();
+        formGroup.get('component')?.clearValidators();
+        formGroup.get('access')?.clearValidators();
+        formGroup.get('requester')?.clearValidators();
+        formGroup.get('service')?.updateValueAndValidity();
+        formGroup.get('component')?.updateValueAndValidity();
+        formGroup.get('access')?.updateValueAndValidity();
+        formGroup.get('requester')?.updateValueAndValidity();
+        console.log('Form group validity after clearing:', formGroup.valid);
+      }
     }
+    console.log('FormArray after remove:', this.formArray.value, 'Visible:', this.visible);
     this.updateDataSource();
   }
 
