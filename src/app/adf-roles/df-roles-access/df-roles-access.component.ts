@@ -307,7 +307,6 @@ export class DfRolesAccessComponent implements OnInit {
       })
     );
     this.visible.push(true);
-    console.log('FormArray after add:', this.formArray.value, 'Visible:', this.visible);
     this.updateDataSource();
   }
 
@@ -337,7 +336,9 @@ export class DfRolesAccessComponent implements OnInit {
   }
 
   remove(index: number) {
-    console.log('Remove called with index:', index, 'Visible array before:', [...this.visible]);
+    console.log('Remove called with index:', index, 'Visible array before:', [
+      ...this.visible,
+    ]);
     if (index >= 0 && index < this.formArray.length) {
       // Find the actual form array index for the nth visible item BEFORE updating visible array
       let visibleCount = 0;
@@ -358,7 +359,10 @@ export class DfRolesAccessComponent implements OnInit {
       // Clear validators for the hidden item
       if (actualIndex !== -1 && actualIndex < this.formArray.length) {
         const formGroup = this.formArray.at(actualIndex);
-        console.log('Clearing validators for form group at index:', actualIndex);
+        console.log(
+          'Clearing validators for form group at index:',
+          actualIndex
+        );
         formGroup.get('service')?.clearValidators();
         formGroup.get('component')?.clearValidators();
         formGroup.get('access')?.clearValidators();
@@ -370,7 +374,12 @@ export class DfRolesAccessComponent implements OnInit {
         console.log('Form group validity after clearing:', formGroup.valid);
       }
     }
-    console.log('FormArray after remove:', this.formArray.value, 'Visible:', this.visible);
+    console.log(
+      'FormArray after remove:',
+      this.formArray.value,
+      'Visible:',
+      this.visible
+    );
     this.updateDataSource();
   }
 

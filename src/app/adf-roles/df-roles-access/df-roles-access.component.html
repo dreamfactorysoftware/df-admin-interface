@@ -38,7 +38,12 @@
                     >{{ option.name }}</mat-option
                   >
                 </mat-select>
-                <mat-error *ngIf="formArray.controls[getFormArrayIndex(i)]?.get('service')?.hasError('required')">
+                <mat-error
+                  *ngIf="
+                    formArray.controls[getFormArrayIndex(i)]
+                      ?.get('service')
+                      ?.hasError('required')
+                  ">
                   Service is required
                 </mat-error>
               </mat-form-field>
@@ -57,14 +62,24 @@
                 <mat-label>{{
                   'roles.accessOverview.tableHeadings.component' | transloco
                 }}</mat-label>
-                <mat-select formControlName="component" panelWdith="null" required>
+                <mat-select
+                  formControlName="component"
+                  panelWdith="null"
+                  required>
                   <mat-option
-                    *ngFor="let option of getComponentArray(getFormArrayIndex(i))"
+                    *ngFor="
+                      let option of getComponentArray(getFormArrayIndex(i))
+                    "
                     [value]="option"
                     >{{ option }}</mat-option
                   >
                 </mat-select>
-                <mat-error *ngIf="formArray.controls[getFormArrayIndex(i)]?.get('component')?.hasError('required')">
+                <mat-error
+                  *ngIf="
+                    formArray.controls[getFormArrayIndex(i)]
+                      ?.get('component')
+                      ?.hasError('required')
+                  ">
                   Component is required
                 </mat-error>
               </mat-form-field>
@@ -87,7 +102,9 @@
                   formControlName="access"
                   multiple
                   panelWidth="null"
-                  (selectionChange)="accessChange(getFormArrayIndex(i), $event.value)"
+                  (selectionChange)="
+                    accessChange(getFormArrayIndex(i), $event.value)
+                  "
                   required>
                   <mat-option
                     *ngFor="let option of accessOptions"
@@ -96,20 +113,28 @@
                     <span
                       class="example-additional-selection"
                       *ngIf="
-                        (formArray.controls[getFormArrayIndex(i)]?.value.access.length || 0) > 1
+                        (formArray.controls[getFormArrayIndex(i)]?.value.access
+                          .length || 0) > 1
                       ">
                       (+{{
-                        (formArray.controls[getFormArrayIndex(i)]?.value.access.length || 0) - 1
+                        (formArray.controls[getFormArrayIndex(i)]?.value.access
+                          .length || 0) - 1
                       }}
                       {{
-                        formArray.controls[getFormArrayIndex(i)]?.value.access.length === 2
+                        formArray.controls[getFormArrayIndex(i)]?.value.access
+                          .length === 2
                           ? 'other'
                           : 'others'
                       }})
                     </span>
                   </mat-option>
                 </mat-select>
-                <mat-error *ngIf="formArray.controls[getFormArrayIndex(i)]?.get('access')?.hasError('required')">
+                <mat-error
+                  *ngIf="
+                    formArray.controls[getFormArrayIndex(i)]
+                      ?.get('access')
+                      ?.hasError('required')
+                  ">
                   Access is required
                 </mat-error>
               </mat-form-field>
@@ -197,7 +222,9 @@
                 ">
                 <ng-container
                   *ngFor="
-                    let advancedFilter of getAdvancedFilters(getFormArrayIndex(i)).controls;
+                    let advancedFilter of getAdvancedFilters(
+                      getFormArrayIndex(i)
+                    ).controls;
                     let j = index
                   ">
                   <div [formArrayName]="j" class="expandedItems">
