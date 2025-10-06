@@ -289,7 +289,6 @@ export class DfRoleDetailsComponent implements OnInit {
       });
 
       serviceAccess.controls.forEach((control, index) => {
-        console.log(`ServiceAccess[${index}] valid:`, control.valid, 'visibility:', this.visibilityArray[index]);
         if (control.invalid) {
           console.log(`ServiceAccess[${index}] errors:`, control.errors);
           console.log(`ServiceAccess[${index}] controls errors:`, {
