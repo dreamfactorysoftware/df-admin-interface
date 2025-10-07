@@ -204,6 +204,19 @@ export class DfRolesAccessComponent implements OnInit {
     return components || [];
   }
 
+  getFormArrayIndex(visibleIndex: number): number {
+    let visibleCount = 0;
+    for (let i = 0; i < this.visible.length; i++) {
+      if (this.visible[i]) {
+        if (visibleCount === visibleIndex) {
+          return i;
+        }
+        visibleCount++;
+      }
+    }
+    return -1;
+  }
+
   filterOptions(event: Event, index: number) {
     const input = (event.target as HTMLInputElement).value.toLowerCase();
     const serviceId = this.formArray.at(index).get('service')?.value;
@@ -324,7 +337,33 @@ export class DfRolesAccessComponent implements OnInit {
 
   remove(index: number) {
     if (index >= 0 && index < this.formArray.length) {
+      // Find the actual form array index for the nth visible item BEFORE updating visible array
+      let visibleCount = 0;
+      let actualIndex = -1;
+      for (let i = 0; i < this.visible.length; i++) {
+        if (this.visible[i]) {
+          if (visibleCount === index) {
+            actualIndex = i;
+            break;
+          }
+          visibleCount++;
+        }
+      }
+
       this.visible = this.updateNthTrueToFalse(this.visible, index);
+
+      // Clear validators for the hidden item
+      if (actualIndex !== -1 && actualIndex < this.formArray.length) {
+        const formGroup = this.formArray.at(actualIndex);
+        formGroup.get('service')?.clearValidators();
+        formGroup.get('component')?.clearValidators();
+        formGroup.get('access')?.clearValidators();
+        formGroup.get('requester')?.clearValidators();
+        formGroup.get('service')?.updateValueAndValidity();
+        formGroup.get('component')?.updateValueAndValidity();
+        formGroup.get('access')?.updateValueAndValidity();
+        formGroup.get('requester')?.updateValueAndValidity();
+      }
     }
     this.updateDataSource();
   }

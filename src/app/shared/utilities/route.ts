@@ -100,7 +100,8 @@ export function accessibleRoutes(
           ROUTES.CORS,
           ROUTES.CACHE,
           ROUTES.EMAIL_TEMPLATES,
-          ROUTES.GLOBAL_LOOKUP_KEYS
+          ROUTES.GLOBAL_LOOKUP_KEYS,
+          ROUTES.INTERCOM
         );
         break;
       case 'limits':

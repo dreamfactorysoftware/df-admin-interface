@@ -66,7 +66,7 @@ export abstract class DfUserDetailsBaseComponent<T> implements OnInit {
   ) {
     this.userForm = this.fb.group({
       profileDetailsGroup: this.fb.group({
-        username: ['', Validators.minLength(16)],
+        username: ['', Validators.minLength(6)],
         email: ['', Validators.email],
         firstName: [''],
         lastName: [''],
