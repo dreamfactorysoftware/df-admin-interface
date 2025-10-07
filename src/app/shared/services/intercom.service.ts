@@ -3,8 +3,6 @@ import { DfUserDataService } from './df-user-data.service';
 import { DfSystemConfigDataService } from './df-system-config-data.service';
 import { DfIntercomConfigService } from '../../adf-config/df-intercom/df-intercom-config.service';
 
-// Declare Intercom on window for shutdown/update operations
-
 @Injectable({
   providedIn: 'root',
 })
@@ -18,31 +16,25 @@ export class IntercomService {
   ) {}
 
   async initializeIntercom(): Promise<void> {
-    // Check if Intercom should be enabled based on API config
     const apiConfig = this.dfIntercomConfigService.currentConfig;
-    const intercomEnabled = apiConfig.intercomWidget ?? true; // Default to true if no config exists
+    const intercomEnabled = apiConfig.intercomWidget ?? true;
 
     if (!intercomEnabled) {
-      console.log('Intercom widget is disabled via configuration');
       return;
     }
 
-    // Check if Intercom is already loaded
     if (this.intercomLoaded) {
       return;
     }
 
-    // Dynamically import the Intercom SDK
     try {
       const IntercomModule = await import('@intercom/messenger-js-sdk');
       const Intercom = IntercomModule.default;
 
-      // Get current user data
       const userData = this.dfUserDataService.userData;
       const systemEnvironment = this.dfSystemConfigDataService.environment;
 
       if (userData) {
-        // Initialize Intercom with user data
         Intercom({
           app_id: apiConfig.intercomAppId || 'ymvqkyiw',
           user_id: userData.id?.toString() || userData.sessionId,
@@ -66,15 +58,12 @@ export class IntercomService {
         });
 
         this.intercomLoaded = true;
-        console.log('Intercom widget initialized successfully');
       } else {
-        // Initialize Intercom for non-logged-in users (visitor mode)
         Intercom({
           app_id: apiConfig.intercomAppId || 'ymvqkyiw',
         });
 
         this.intercomLoaded = true;
-        console.log('Intercom widget initialized in visitor mode');
       }
     } catch (error) {
       console.error('Failed to initialize Intercom:', error);
@@ -102,7 +91,7 @@ export class IntercomService {
 
   updateUser(userData: any): void {
     const apiConfig = this.dfIntercomConfigService.currentConfig;
-    const intercomEnabled = apiConfig.intercomWidget ?? true; // Default to true if no config exists
+    const intercomEnabled = apiConfig.intercomWidget ?? true;
 
     if (!intercomEnabled || !(window as any).Intercom || !this.intercomLoaded) {
       return;

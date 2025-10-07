@@ -65,7 +65,6 @@ export class DfIntercomConfigComponent implements OnInit {
           );
           this.saving = false;
 
-          // Update the Intercom widget state immediately
           if (this.intercomEnabled) {
             this.intercomService.showIntercom();
           } else {
@@ -84,7 +83,6 @@ export class DfIntercomConfigComponent implements OnInit {
   }
 
   onToggleChange(): void {
-    // Auto-save when toggle changes
     this.saveConfig();
   }
 }

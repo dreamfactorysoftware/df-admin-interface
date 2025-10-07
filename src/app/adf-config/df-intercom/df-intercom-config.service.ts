@@ -22,7 +22,6 @@ export class DfIntercomConfigService {
   constructor(
     @Inject(LOOKUP_KEYS_SERVICE_TOKEN) private lookupService: DfBaseCrudService
   ) {
-    // Load config on service initialization
     this.loadConfig();
   }
 
@@ -33,7 +32,6 @@ export class DfIntercomConfigService {
   }
 
   getConfig(): Observable<IntercomConfig> {
-    // Get the lookup key for Intercom configuration
     return this.lookupService
       .getAll<any>({ filter: `name="${this.INTERCOM_KEY}"` })
       .pipe(
@@ -47,7 +45,6 @@ export class DfIntercomConfigService {
           return config;
         }),
         catchError(() => {
-          // If config doesn't exist or error occurs, return default
           const defaultConfig: IntercomConfig = {
             intercomWidget: true,
             intercomAppId: 'ymvqkyiw',
@@ -61,30 +58,19 @@ export class DfIntercomConfigService {
   updateConfig(config: IntercomConfig): Observable<any> {
     const value = config.intercomWidget ? 'true' : 'false';
 
-    // First check if the key exists
     return this.lookupService
       .getAll<any>({ filter: `name="${this.INTERCOM_KEY}"` })
       .pipe(
         map(response => response?.resource?.[0]),
         catchError(() => of(null)),
         switchMap(existingKey => {
-          console.log('Existing lookup key:', existingKey);
           if (existingKey) {
-            // Update existing key
-            console.log(
-              'Updating existing key with id:',
-              existingKey.id,
-              'value:',
-              value
-            );
             return this.lookupService.patch(existingKey.id, { value }).pipe(
               tap(() => {
-                console.log('Successfully updated lookup key');
                 this.configSubject.next(config);
               })
             );
           } else {
-            // Create new key - DreamFactory expects data wrapped in resource array
             const payload = {
               resource: [
                 {
@@ -94,10 +80,8 @@ export class DfIntercomConfigService {
                 },
               ],
             };
-            console.log('Creating new lookup key with payload:', payload);
             return this.lookupService.create(payload).pipe(
               tap(() => {
-                console.log('Successfully created lookup key');
                 this.configSubject.next(config);
               })
             );
@@ -105,7 +89,6 @@ export class DfIntercomConfigService {
         }),
         catchError(error => {
           console.error('Failed to update Intercom config:', error);
-          console.error('Error details:', error.error || error);
           throw error;
         })
       );

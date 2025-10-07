@@ -183,77 +183,6 @@ export class DfRoleDetailsComponent implements OnInit {
     this.showAlert = true;
   }
 
-  // onSubmit() {
-  // OLD function
-  //   if (this.roleForm.invalid) return;
-
-  //   const formValue = this.roleForm.getRawValue();
-
-  //   const payload: RolePayload = {
-  //     id: formValue.id,
-  //     name: formValue.name,
-  //     description: formValue.description,
-  //     isActive: formValue.active,
-  //     roleServiceAccessByRoleId: formValue.serviceAccess.map(
-  //       (val: AccessForm) => {
-  //         const advancedFilters = {
-  //           field: val.expandField,
-  //           operator: val.expandOperator,
-  //           value: val.expandValue,
-  //         };
-
-  //         const filtersArray = [];
-  //         filtersArray.push(advancedFilters);
-
-  //         return {
-  //           id: val.id,
-  //           serviceId: val.service,
-  //           component: val.component,
-  //           verbMask: val.access.reduce((acc, cur) => acc + cur, 0), // add up all the values in the array
-  //           requestorMask: val.requester.reduce((acc, cur) => acc + cur, 0), // 1 = API, 2 = SCRIPT, 3 = API & SCRIPT
-  //           filters: filtersArray,
-  //           filterOp: this.filterOp,
-  //         };
-  //       }
-  //     ),
-  //     lookupByRoleId: formValue.lookupKeys,
-  //   };
-
-  // const createPayload = {
-  //   resource: [payload],
-  // };
-
-  //   if (this.type === 'edit' && payload.id) {
-  //     this.roleService
-  //       .update(payload.id, payload)
-  //       .pipe(
-  //         catchError(err => {
-  //           this.triggerAlert('error', err.error.error.message);
-  //           return throwError(() => new Error(err));
-  //         })
-  //       )
-  //       .subscribe(() => {
-  //         this.goBack();
-  //       });
-  //   } else {
-  //     this.roleService
-  //       .create(createPayload, {
-  //         fields: '*',
-  //         related: 'role_service_access_by_role_id,lookup_by_role_id',
-  //       })
-  //       .pipe(
-  //         catchError(err => {
-  //           this.triggerAlert(
-  //             'error',
-  //             err.error.error.context.resource[0].message
-  //           );
-  //           return throwError(() => new Error(err));
-  //         })
-  //       )
-  //       .subscribe(() => {
-  //         this.goBack();
-  //       });
-  //   }
   get serviceAccess(): FormArray {
     return this.roleForm.get('serviceAccess') as FormArray;
   }
@@ -263,7 +192,6 @@ export class DfRoleDetailsComponent implements OnInit {
     const serviceAccess = this.roleForm.get('serviceAccess') as FormArray;
     serviceAccess.controls.forEach((control, index) => {
       if (!this.visibilityArray[index]) {
-        console.log(`Clearing validators for hidden item at index ${index}`);
         control.get('service')?.clearValidators();
         control.get('component')?.clearValidators();
         control.get('access')?.clearValidators();
@@ -278,40 +206,10 @@ export class DfRoleDetailsComponent implements OnInit {
     if (this.roleForm.invalid) {
       // Mark all controls as touched to show validation errors
       this.roleForm.markAllAsTouched();
-
-      console.log('Form is invalid:', this.roleForm.errors);
-      console.log('Form controls validity:', {
-        name: this.roleForm.get('name')?.errors,
-        description: this.roleForm.get('description')?.errors,
-        active: this.roleForm.get('active')?.errors,
-        serviceAccess: this.roleForm.get('serviceAccess')?.errors,
-        lookupKeys: this.roleForm.get('lookupKeys')?.errors,
-      });
-
-      serviceAccess.controls.forEach((control, index) => {
-        if (control.invalid) {
-          console.log(`ServiceAccess[${index}] errors:`, control.errors);
-          console.log(`ServiceAccess[${index}] controls errors:`, {
-            service: control.get('service')?.errors,
-            component: control.get('component')?.errors,
-            access: control.get('access')?.errors,
-            requester: control.get('requester')?.errors,
-          });
-          console.log(`ServiceAccess[${index}] controls valid:`, {
-            service: control.get('service')?.valid,
-            component: control.get('component')?.valid,
-            access: control.get('access')?.valid,
-            requester: control.get('requester')?.valid,
-          });
-          console.log(`ServiceAccess[${index}] values:`, control.value);
-        }
-      });
-
       return;
     }
     const formValue = this.roleForm.getRawValue();
     if (formValue.name === '' || formValue.name === null) {
-      console.log('Form name is empty');
       return;
     }
     const payload: RolePayload = {
