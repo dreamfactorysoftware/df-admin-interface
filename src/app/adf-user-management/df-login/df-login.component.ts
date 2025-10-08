@@ -33,6 +33,7 @@ import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 import { CommonModule } from '@angular/common';
 import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
 import { PopupOverlayService } from 'src/app/shared/components/df-popup/popup-overlay.service';
+import { ErrorSharingService } from 'src/app/shared/services/error-sharing.service';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -82,7 +83,8 @@ export class DfLoginComponent implements OnInit {
     private router: Router,
     private themeService: DfThemeService,
     private snackbarService: DfSnackbarService,
-    private popupOverlay: PopupOverlayService
+    private popupOverlay: PopupOverlayService,
+    private errorSharingService: ErrorSharingService
   ) {
     this.loginForm = this.fb.group({
       services: [''],
@@ -96,6 +98,22 @@ export class DfLoginComponent implements OnInit {
   getIcon = getIcon;
 
   ngOnInit() {
+    // Check for shared error first
+    this.errorSharingService.error$.subscribe(sharedError => {
+      if (sharedError) {
+        // Decode the error message properly (remove URL encoding)
+        const decodedError = decodeURIComponent(sharedError.replace(/\+/g, ' '));
+
+        // Set the alert message for the built-in alert display
+        this.alertMsg = decodedError;
+        this.showAlert = true;
+        this.alertType = 'error';
+
+        // Clear the error after displaying it
+        this.errorSharingService.clearError();
+      }
+    });
+
     this.systemConfigDataService.environment$.subscribe(env => {
       this.envloginAttribute = env.authentication.loginAttribute;
       this.setLoginAttribute(env.authentication.loginAttribute);
