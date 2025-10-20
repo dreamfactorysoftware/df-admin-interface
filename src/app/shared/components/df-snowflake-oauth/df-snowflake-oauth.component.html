@@ -1,0 +1,95 @@
+<mat-card class="oauth-card" *ngIf="showOAuthPanel">
+  <mat-card-header>
+    <mat-card-title>
+      <mat-icon>cloud</mat-icon>
+      Snowflake OAuth Authorization
+    </mat-card-title>
+  </mat-card-header>
+
+  <mat-card-content>
+    <div class="oauth-status" *ngIf="!loading && oauthStatus">
+      <!-- Configuration Status -->
+      <div class="status-row">
+        <mat-icon [class.success]="oauthStatus.configured" [class.error]="!oauthStatus.configured">
+          {{ oauthStatus.configured ? 'check_circle' : 'cancel' }}
+        </mat-icon>
+        <span>OAuth Configured: {{ oauthStatus.configured ? 'Yes' : 'No' }}</span>
+      </div>
+
+      <!-- Authorization Status -->
+      <div class="status-row">
+        <mat-icon [class.success]="oauthStatus.authorized" [class.error]="!oauthStatus.authorized">
+          {{ oauthStatus.authorized ? 'check_circle' : 'cancel' }}
+        </mat-icon>
+        <span>Authorized: {{ oauthStatus.authorized ? 'Yes' : 'No' }}</span>
+      </div>
+
+      <!-- Expiration Info -->
+      <div class="status-row" *ngIf="oauthStatus.authorized && oauthStatus.expires_at">
+        <mat-icon [class.warning]="oauthStatus.is_expired || oauthStatus.needs_refresh">
+          {{ oauthStatus.is_expired || oauthStatus.needs_refresh ? 'warning' : 'schedule' }}
+        </mat-icon>
+        <span>Expires: {{ oauthStatus.expires_at }}</span>
+      </div>
+
+      <!-- Warning Messages -->
+      <div class="alert alert-warning" *ngIf="!oauthStatus.configured">
+        <mat-icon>info</mat-icon>
+        <span>Please configure OAuth Client ID and Client Secret in the service settings above.</span>
+      </div>
+
+      <div class="alert alert-warning" *ngIf="oauthStatus.configured && !oauthStatus.authorized">
+        <mat-icon>info</mat-icon>
+        <span>Click "Authorize with Snowflake" to complete OAuth setup.</span>
+      </div>
+
+      <div class="alert alert-error" *ngIf="oauthStatus.is_expired">
+        <mat-icon>error</mat-icon>
+        <span>OAuth token has expired. Please re-authorize or refresh the token.</span>
+      </div>
+
+      <div class="alert alert-warning" *ngIf="oauthStatus.needs_refresh && !oauthStatus.is_expired">
+        <mat-icon>warning</mat-icon>
+        <span>OAuth token will expire soon. Consider refreshing it.</span>
+      </div>
+    </div>
+
+    <div class="loading-state" *ngIf="loading">
+      <mat-spinner diameter="40"></mat-spinner>
+      <span>Checking OAuth status...</span>
+    </div>
+  </mat-card-content>
+
+  <mat-card-actions>
+    <!-- Authorize Button -->
+    <button
+      mat-raised-button
+      color="primary"
+      (click)="authorize()"
+      [disabled]="!oauthStatus?.configured || authorizing || loading"
+      *ngIf="!oauthStatus?.authorized || oauthStatus?.is_expired">
+      <mat-icon>login</mat-icon>
+      {{ authorizing ? 'Authorizing...' : 'Authorize with Snowflake' }}
+    </button>
+
+    <!-- Refresh Button -->
+    <button
+      mat-stroked-button
+      color="accent"
+      (click)="refresh()"
+      [disabled]="!oauthStatus?.authorized || loading"
+      *ngIf="oauthStatus?.authorized && !oauthStatus?.is_expired">
+      <mat-icon>refresh</mat-icon>
+      Refresh Token
+    </button>
+
+    <!-- Check Status Button -->
+    <button
+      mat-stroked-button
+      (click)="checkStatus()"
+      [disabled]="loading">
+      <mat-icon>sync</mat-icon>
+      Check Status
+    </button>
+  </mat-card-actions>
+</mat-card>
