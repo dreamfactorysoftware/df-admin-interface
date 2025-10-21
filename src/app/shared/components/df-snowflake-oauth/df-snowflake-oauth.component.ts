@@ -68,7 +68,8 @@ export class DfSnowflakeOAuthComponent implements OnInit, OnDestroy {
 
   get isSnowflakeOAuth(): boolean {
     return (
-      (this.serviceType === 'snowflake_db' || this.serviceType === 'snowflake') &&
+      (this.serviceType === 'snowflake_db' ||
+        this.serviceType === 'snowflake') &&
       this.config?.authenticator === 'oauth'
     );
   }
@@ -126,7 +127,10 @@ export class DfSnowflakeOAuthComponent implements OnInit, OnDestroy {
         next: response => {
           console.log('OAuth authorize response:', response);
           if (response.authorizationUrl) {
-            console.log('Opening popup window with URL:', response.authorizationUrl);
+            console.log(
+              'Opening popup window with URL:',
+              response.authorizationUrl
+            );
 
             // Open authorization URL in popup
             this.authWindow = window.open(
@@ -138,7 +142,11 @@ export class DfSnowflakeOAuthComponent implements OnInit, OnDestroy {
             console.log('window.open() returned:', this.authWindow);
 
             // Check if popup was blocked
-            if (!this.authWindow || this.authWindow.closed || typeof this.authWindow.closed === 'undefined') {
+            if (
+              !this.authWindow ||
+              this.authWindow.closed ||
+              typeof this.authWindow.closed === 'undefined'
+            ) {
               console.error('Popup was blocked');
               this.snackbarService.openSnackBar(
                 'Popup blocked. Please allow popups for this site and try again.',
@@ -157,7 +165,9 @@ export class DfSnowflakeOAuthComponent implements OnInit, OnDestroy {
           console.error('Failed to get authorization URL:', error);
           this.authorizing = false;
           const errorMsg =
-            error.error?.error?.message || error.error?.error || 'Failed to start OAuth authorization';
+            error.error?.error?.message ||
+            error.error?.error ||
+            'Failed to start OAuth authorization';
           this.snackbarService.openSnackBar(errorMsg, 'error');
         },
       });
