@@ -1,0 +1,141 @@
+.oauth-card {
+  margin: 16px 0;
+  width: 100%;
+
+  mat-card-header {
+    margin-bottom: 16px;
+
+    mat-card-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 18px;
+      font-weight: 500;
+    }
+  }
+
+  mat-card-content {
+    .oauth-status {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+
+      .status-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 14px;
+
+        mat-icon {
+          font-size: 20px;
+          width: 20px;
+          height: 20px;
+
+          &.success {
+            color: #4caf50;
+          }
+
+          &.error {
+            color: #f44336;
+          }
+
+          &.warning {
+            color: #ff9800;
+          }
+        }
+      }
+
+      .alert {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 12px;
+        border-radius: 4px;
+        font-size: 13px;
+        margin-top: 8px;
+
+        mat-icon {
+          font-size: 20px;
+          width: 20px;
+          height: 20px;
+          flex-shrink: 0;
+        }
+
+        &.alert-warning {
+          background-color: #fff3cd;
+          border: 1px solid #ffc107;
+          color: #856404;
+
+          mat-icon {
+            color: #ff9800;
+          }
+        }
+
+        &.alert-error {
+          background-color: #f8d7da;
+          border: 1px solid #f44336;
+          color: #721c24;
+
+          mat-icon {
+            color: #f44336;
+          }
+        }
+      }
+    }
+
+    .loading-state {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 20px;
+      justify-content: center;
+
+      span {
+        font-size: 14px;
+        color: #666;
+      }
+    }
+  }
+
+  mat-card-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 16px;
+
+    button {
+      mat-icon {
+        margin-right: 4px;
+      }
+    }
+  }
+}
+
+// Dark theme support
+.dark-theme {
+  .oauth-card {
+    mat-card-content {
+      .oauth-status {
+        .alert {
+          &.alert-warning {
+            background-color: rgba(255, 152, 0, 0.15);
+            border-color: #ff9800;
+            color: #ffb74d;
+          }
+
+          &.alert-error {
+            background-color: rgba(244, 67, 54, 0.15);
+            border-color: #f44336;
+            color: #ef5350;
+          }
+        }
+      }
+
+      .loading-state {
+        span {
+          color: #aaa;
+        }
+      }
+    }
+  }
+}

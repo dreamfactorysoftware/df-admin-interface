@@ -86,6 +86,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { DfSystemService } from 'src/app/shared/services/df-system.service';
 import { DfPaywallModal } from 'src/app/shared/components/df-paywall-modal/df-paywall-modal.component';
 import { DfAnalyticsService } from 'src/app/shared/services/df-analytics.service';
+import { DfSnowflakeOAuthComponent } from 'src/app/shared/components/df-snowflake-oauth/df-snowflake-oauth.component';
 
 // Add these interfaces at the bottom of the file with the other interfaces
 interface RoleResponse {
@@ -151,6 +152,7 @@ interface ServiceResponse {
     TitleCasePipe,
     MatDividerModule,
     DfSecurityConfigComponent,
+    DfSnowflakeOAuthComponent,
   ],
 })
 export class DfServiceDetailsComponent implements OnInit {

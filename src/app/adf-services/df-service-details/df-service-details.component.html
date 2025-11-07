@@ -367,6 +367,15 @@
             </ng-container>
           </ng-container>
         </ng-container>
+
+        <!-- Snowflake OAuth Panel -->
+        <df-snowflake-oauth
+          *ngIf="serviceForm.getRawValue().type === 'snowflake_db' && this.edit"
+          [serviceId]="serviceData?.id"
+          [serviceType]="serviceForm.getRawValue().type"
+          [config]="serviceForm.getRawValue().config">
+        </df-snowflake-oauth>
+
         <!-- First-time user guidance message for database services -->
         <div
           class="first-time-guidance"
@@ -877,6 +886,19 @@
         </ng-container>
       </ng-container>
     </ng-container>
+
+    <!-- Snowflake OAuth Panel (for edit mode) -->
+    <df-snowflake-oauth
+      *ngIf="
+        (serviceForm.getRawValue().type === 'snowflake_db' ||
+          serviceForm.getRawValue().type === 'snowflake') &&
+        this.edit
+      "
+      [serviceId]="serviceData?.id"
+      [serviceType]="serviceForm.getRawValue().type"
+      [config]="serviceForm.getRawValue().config">
+    </df-snowflake-oauth>
+
     <div class="full-width action-bar" *ngIf="!subscriptionRequired">
       <button
         mat-flat-button
