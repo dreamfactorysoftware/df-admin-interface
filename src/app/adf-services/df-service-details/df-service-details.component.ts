@@ -839,6 +839,29 @@ export class DfServiceDetailsComponent implements OnInit {
       return this.viewSchema;
     }
 
+    // Snowflake-specific field organization
+    const serviceType = this.serviceForm?.get('type')?.value?.toLowerCase() || '';
+    if (serviceType.includes('snowflake')) {
+      const basicFieldNames = [
+        'useodbc',               // camelCase: useOdbc
+        'authenticator',
+        'username',
+        'password',
+        'key',
+        'passcode',
+        'oauthclientid',         // camelCase: oauthClientId
+        'oauthclientsecretraw',  // camelCase: oauthClientSecretRaw
+        'database',
+        'schema',
+        'role',
+        'warehouse',
+      ];
+      return this.viewSchema.filter(field =>
+        basicFieldNames.includes(field.name.toLowerCase())
+      );
+    }
+
+    // Default database fields
     const basicFieldNames = [
       'host',
       'port',
@@ -860,6 +883,29 @@ export class DfServiceDetailsComponent implements OnInit {
       return [];
     }
 
+    // Snowflake-specific field organization
+    const serviceType = this.serviceForm?.get('type')?.value?.toLowerCase() || '';
+    if (serviceType.includes('snowflake')) {
+      const basicFieldNames = [
+        'useodbc',               // camelCase: useOdbc
+        'authenticator',
+        'username',
+        'password',
+        'key',
+        'passcode',
+        'oauthclientid',         // camelCase: oauthClientId
+        'oauthclientsecretraw',  // camelCase: oauthClientSecretRaw
+        'database',
+        'schema',
+        'role',
+        'warehouse',
+      ];
+      return this.viewSchema.filter(
+        field => !basicFieldNames.includes(field.name.toLowerCase())
+      );
+    }
+
+    // Default database fields
     const basicFieldNames = [
       'host',
       'port',
@@ -1350,6 +1396,17 @@ export class DfServiceDetailsComponent implements OnInit {
   onServiceTypeSelect(selectedServiceTypeLable: string) {
     this.selectedServiceTypeLable =
       selectedServiceTypeLable || 'Unknown. Unable to identify Service Type';
+  }
+
+  /**
+   * Handle OAuth component requesting save
+   * Simply shows a message - user needs to click save button
+   */
+  saveAndAuthorize(oauthComponent: any) {
+    this.snackbarService.openSnackBar(
+      'Please save the service first using the Save button below, then you can authorize',
+      'info'
+    );
   }
 }
 interface ImageObject {

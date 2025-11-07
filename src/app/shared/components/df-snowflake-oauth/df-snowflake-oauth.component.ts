@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, OnDestroy } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
@@ -39,6 +39,7 @@ export class DfSnowflakeOAuthComponent implements OnInit, OnDestroy {
   @Input() serviceId?: number;
   @Input() serviceType!: string;
   @Input() config: any = {};
+  @Output() needsSave = new EventEmitter<void>();
 
   oauthStatus: OAuthStatus | null = null;
   loading = false;
@@ -110,10 +111,8 @@ export class DfSnowflakeOAuthComponent implements OnInit, OnDestroy {
 
   authorize(): void {
     if (!this.serviceId) {
-      this.snackbarService.openSnackBar(
-        'Please save the service first before authorizing',
-        'error'
-      );
+      // Emit event to parent component to save and authorize
+      this.needsSave.emit();
       return;
     }
 
