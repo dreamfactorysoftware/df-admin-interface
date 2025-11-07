@@ -840,17 +840,18 @@ export class DfServiceDetailsComponent implements OnInit {
     }
 
     // Snowflake-specific field organization
-    const serviceType = this.serviceForm?.get('type')?.value?.toLowerCase() || '';
+    const serviceType =
+      this.serviceForm?.get('type')?.value?.toLowerCase() || '';
     if (serviceType.includes('snowflake')) {
       const basicFieldNames = [
-        'useodbc',               // camelCase: useOdbc
+        'useodbc', // camelCase: useOdbc
         'authenticator',
         'username',
         'password',
         'key',
         'passcode',
-        'oauthclientid',         // camelCase: oauthClientId
-        'oauthclientsecretraw',  // camelCase: oauthClientSecretRaw
+        'oauthclientid', // camelCase: oauthClientId
+        'oauthclientsecretraw', // camelCase: oauthClientSecretRaw
         'database',
         'schema',
         'role',
@@ -884,17 +885,18 @@ export class DfServiceDetailsComponent implements OnInit {
     }
 
     // Snowflake-specific field organization
-    const serviceType = this.serviceForm?.get('type')?.value?.toLowerCase() || '';
+    const serviceType =
+      this.serviceForm?.get('type')?.value?.toLowerCase() || '';
     if (serviceType.includes('snowflake')) {
       const basicFieldNames = [
-        'useodbc',               // camelCase: useOdbc
+        'useodbc', // camelCase: useOdbc
         'authenticator',
         'username',
         'password',
         'key',
         'passcode',
-        'oauthclientid',         // camelCase: oauthClientId
-        'oauthclientsecretraw',  // camelCase: oauthClientSecretRaw
+        'oauthclientid', // camelCase: oauthClientId
+        'oauthclientsecretraw', // camelCase: oauthClientSecretRaw
         'database',
         'schema',
         'role',

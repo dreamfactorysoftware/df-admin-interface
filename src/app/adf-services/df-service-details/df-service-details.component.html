@@ -369,7 +369,12 @@
         </ng-container>
 
         <!-- Snowflake OAuth Panel -->
-        <div *ngIf="(serviceForm.getRawValue().type === 'snowflake_db' || serviceForm.getRawValue().type === 'snowflake') && serviceForm.getRawValue().config?.authenticator === 'oauth'">
+        <div
+          *ngIf="
+            (serviceForm.getRawValue().type === 'snowflake_db' ||
+              serviceForm.getRawValue().type === 'snowflake') &&
+            serviceForm.getRawValue().config?.authenticator === 'oauth'
+          ">
           <df-snowflake-oauth
             #snowflakeOAuth
             [serviceId]="serviceData?.id"
@@ -891,7 +896,12 @@
     </ng-container>
 
     <!-- Snowflake OAuth Panel -->
-    <div *ngIf="(serviceForm.getRawValue().type === 'snowflake_db' || serviceForm.getRawValue().type === 'snowflake') && serviceForm.getRawValue().config?.authenticator === 'oauth'">
+    <div
+      *ngIf="
+        (serviceForm.getRawValue().type === 'snowflake_db' ||
+          serviceForm.getRawValue().type === 'snowflake') &&
+        serviceForm.getRawValue().config?.authenticator === 'oauth'
+      ">
       <df-snowflake-oauth
         #snowflakeOAuthEdit
         [serviceId]="serviceData?.id"
