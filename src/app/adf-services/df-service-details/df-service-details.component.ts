@@ -86,6 +86,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { DfSystemService } from 'src/app/shared/services/df-system.service';
 import { DfPaywallModal } from 'src/app/shared/components/df-paywall-modal/df-paywall-modal.component';
 import { DfAnalyticsService } from 'src/app/shared/services/df-analytics.service';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 // Add these interfaces at the bottom of the file with the other interfaces
 interface RoleResponse {
@@ -151,6 +152,7 @@ interface ServiceResponse {
     TitleCasePipe,
     MatDividerModule,
     DfSecurityConfigComponent,
+    MatProgressSpinnerModule,
   ],
 })
 export class DfServiceDetailsComponent implements OnInit {
@@ -160,6 +162,7 @@ export class DfServiceDetailsComponent implements OnInit {
   isScriptService = false;
   isFile = false;
   isAuth = false;
+  isSnowflake = false;
   serviceTypes: Array<ServiceType>;
   notIncludedServices: Array<ServiceType>;
   serviceForm: FormGroup;
@@ -178,6 +181,9 @@ export class DfServiceDetailsComponent implements OnInit {
   currentServiceId: number | null = null;
   isFirstTimeUser = false;
   availableFileServices: any[] = [];
+  oauthCheckInProgress = false;
+  oauthCheckMessage = '';
+  oauthCheckSuccess = false;
 
   constructor(
     private activatedRoute: ActivatedRoute,
@@ -247,6 +253,11 @@ export class DfServiceDetailsComponent implements OnInit {
         }
         if (route['groups'] && route['groups'][0] === 'LDAP') {
           this.isAuth = true;
+        }
+        // Check if this is a Snowflake service
+        const serviceType = this.serviceForm.getRawValue().type || route['data']?.type;
+        if (serviceType === 'snowflake') {
+          this.isSnowflake = true;
         }
         const { data, serviceTypes, groups } = route;
         const licenseType = env.platform?.license;
@@ -659,10 +670,18 @@ export class DfServiceDetailsComponent implements OnInit {
   }
 
   updateServiceTypeFlags(type: string) {
+    console.log('[Snowflake Debug] updateServiceTypeFlags called with type:', type);
     // Reset all flags
     this.isNetworkService = false;
     this.isScriptService = false;
     this.isFile = false;
+    this.isSnowflake = false;
+
+    // Check for Snowflake specifically
+    if (type === 'snowflake') {
+      this.isSnowflake = true;
+      console.log('[Snowflake Debug] Snowflake service detected, isSnowflake set to true');
+    }
 
     // Find the service type to get its group
     const serviceType = this.serviceTypes.find(st => st.name === type);
@@ -906,6 +925,41 @@ export class DfServiceDetailsComponent implements OnInit {
 
   get showNetworkAdvancedOptions(): boolean {
     return this.isNetworkService;
+  }
+
+  // Snowflake field categorization
+  get snowflakeBasicFields() {
+    console.log('[Snowflake Debug] isSnowflake:', this.isSnowflake);
+    console.log('[Snowflake Debug] viewSchema:', this.viewSchema);
+    if (!this.isSnowflake || !this.viewSchema) {
+      console.log('[Snowflake Debug] Returning empty - isSnowflake or viewSchema is falsy');
+      return [];
+    }
+    // Log the first field to see its structure
+    if (this.viewSchema.length > 0) {
+      console.log('[Snowflake Debug] First field:', this.viewSchema[0]);
+    }
+    // Filter fields marked as 'basic' category
+    const basicFields = this.viewSchema.filter(field =>
+      (field as any).category === 'basic'
+    );
+    console.log('[Snowflake Debug] basicFields count:', basicFields.length);
+    console.log('[Snowflake Debug] basicFields:', basicFields);
+    return basicFields;
+  }
+
+  get snowflakeAdvancedFields() {
+    if (!this.isSnowflake || !this.viewSchema) {
+      return [];
+    }
+    // Filter fields marked as 'advanced' category
+    return this.viewSchema.filter(field =>
+      (field as any).category === 'advanced'
+    );
+  }
+
+  get showSnowflakeAdvancedOptions(): boolean {
+    return this.isSnowflake && this.snowflakeAdvancedFields.length > 0;
   }
 
   getConfigControl(name: string) {
@@ -1348,6 +1402,111 @@ export class DfServiceDetailsComponent implements OnInit {
   onServiceTypeSelect(selectedServiceTypeLable: string) {
     this.selectedServiceTypeLable =
       selectedServiceTypeLable || 'Unknown. Unable to identify Service Type';
+  }
+
+  /**
+   * Test OAuth connection for Snowflake
+   * For Native App: Uses SPCS session token automatically
+   * For Standard: Initiates OAuth flow with configured client ID/secret
+   */
+  async testSnowflakeOAuth() {
+    this.oauthCheckInProgress = true;
+    this.oauthCheckMessage = 'Checking OAuth connection...';
+    this.oauthCheckSuccess = false;
+
+    try {
+      // Save the service first if it doesn't exist
+      let serviceId = this.currentServiceId;
+
+      if (!serviceId && !this.edit) {
+        // Need to create the service first
+        const data = this.serviceForm.getRawValue();
+        const formattedName = this.formatServiceName(data.name);
+        this.serviceForm.patchValue({ name: formattedName });
+
+        const payload = {
+          ...data,
+          id: null,
+        };
+
+        const serviceResponse = await this.servicesService
+          .create<ServiceResponse>(
+            {
+              resource: [payload],
+            },
+            {
+              snackbarError: 'server',
+              snackbarSuccess: 'Service created successfully',
+            }
+          )
+          .toPromise();
+
+        if (serviceResponse && serviceResponse.resource && serviceResponse.resource[0]) {
+          serviceId = serviceResponse.resource[0].id;
+          this.currentServiceId = serviceId;
+        } else {
+          throw new Error('Failed to create service');
+        }
+      } else if (this.edit && this.serviceData) {
+        serviceId = this.serviceData.id;
+      }
+
+      if (!serviceId) {
+        throw new Error('Service ID is required for OAuth check');
+      }
+
+      // Call the OAuth authorize endpoint
+      const response = await this.http
+        .get<any>(`${BASE_URL}/_oauth/snowflake/authorize?service_id=${serviceId}`)
+        .toPromise();
+
+      if (response.direct_auth) {
+        // SPCS mode - token was automatically applied
+        this.oauthCheckMessage = 'OAuth connection successful! (Native App mode)';
+        this.oauthCheckSuccess = true;
+
+        // Refresh the service data to show updated token
+        if (this.edit) {
+          setTimeout(() => {
+            window.location.reload();
+          }, 1500);
+        }
+      } else if (response.authorization_url) {
+        // Standard OAuth flow - redirect user
+        this.oauthCheckMessage = 'Redirecting to Snowflake for authorization...';
+        window.location.href = response.authorization_url;
+      } else {
+        throw new Error('Unexpected response from OAuth endpoint');
+      }
+    } catch (error: any) {
+      // Extract meaningful error message from various error structures
+      let errorMessage = 'Unknown error';
+
+      if (error?.status === 404) {
+        errorMessage = 'OAuth endpoint not found. This feature requires Snowflake Native App environment or proper OAuth configuration.';
+      } else if (error?.error) {
+        // Handle nested error structures from HTTP responses
+        if (typeof error.error === 'string') {
+          errorMessage = error.error;
+        } else if (error.error.error) {
+          if (typeof error.error.error === 'string') {
+            errorMessage = error.error.error;
+          } else if (error.error.error.message) {
+            errorMessage = error.error.error.message;
+          }
+        } else if (error.error.message) {
+          errorMessage = error.error.message;
+        }
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+
+      this.oauthCheckMessage = `OAuth check failed: ${errorMessage}`;
+      this.oauthCheckSuccess = false;
+      console.error('OAuth check error:', error);
+    } finally {
+      this.oauthCheckInProgress = false;
+    }
   }
 }
 interface ImageObject {

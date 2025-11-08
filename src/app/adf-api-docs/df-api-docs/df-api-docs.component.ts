@@ -20,10 +20,6 @@ import {
   SESSION_TOKEN_HEADER,
   API_KEY_HEADER,
 } from 'src/app/shared/constants/http-headers';
-import {
-  mapCamelToSnake,
-  mapSnakeToCamel,
-} from 'src/app/shared/utilities/case';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 import { AsyncPipe, NgIf, NgFor, SlicePipe, NgClass } from '@angular/common';
 import { environment } from '../../../../environments/environment';
@@ -166,11 +162,9 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
     this.subscriptions.push(
       this.activatedRoute.data.subscribe(({ data }) => {
         if (data) {
-          if (data.paths['/']?.get?.operationId === 'getSoapResources') {
-            this.apiDocJson = { ...data, paths: mapSnakeToCamel(data.paths) };
-          } else {
-            this.apiDocJson = { ...data, paths: mapCamelToSnake(data.paths) };
-          }
+          // Pass the OpenAPI spec as-is to Swagger UI without transformation
+          // The OpenAPI spec has specific property names that must not be transformed
+          this.apiDocJson = data;
         }
       })
     );
