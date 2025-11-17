@@ -267,23 +267,31 @@
               <div
                 class="full-width oauth-check-section"
                 *ngIf="getControl('type')?.value === 'snowflake'"
-                style="margin-top: 20px;">
+                style="margin-top: 20px">
                 <button
                   mat-raised-button
                   color="primary"
                   type="button"
                   [disabled]="oauthCheckInProgress"
                   (click)="testSnowflakeOAuth()">
-                  <mat-icon *ngIf="!oauthCheckInProgress">check_circle</mat-icon>
-                  <mat-spinner *ngIf="oauthCheckInProgress" diameter="20"></mat-spinner>
-                  {{ oauthCheckInProgress ? 'Checking...' : 'Test OAuth Connection' }}
+                  <mat-icon *ngIf="!oauthCheckInProgress"
+                    >check_circle</mat-icon
+                  >
+                  <mat-spinner
+                    *ngIf="oauthCheckInProgress"
+                    diameter="20"></mat-spinner>
+                  {{
+                    oauthCheckInProgress
+                      ? 'Checking...'
+                      : 'Test OAuth Connection'
+                  }}
                 </button>
                 <p
                   class="oauth-message"
                   *ngIf="oauthCheckMessage"
                   [ngClass]="{
                     success: oauthCheckSuccess,
-                    error: !oauthCheckSuccess && oauthCheckMessage
+                    error: !oauthCheckSuccess && oauthCheckMessage,
                   }">
                   {{ oauthCheckMessage }}
                 </p>
@@ -328,8 +336,7 @@
                 </ng-container>
 
                 <!-- OAuth Token Check Button (for Native App users) -->
-                <div
-                  class="full-width oauth-check-section">
+                <div class="full-width oauth-check-section">
                   <button
                     mat-raised-button
                     color="primary"
@@ -448,23 +455,31 @@
               <div
                 class="full-width oauth-check-section"
                 *ngIf="getControl('type')?.value === 'snowflake'"
-                style="margin-top: 20px;">
+                style="margin-top: 20px">
                 <button
                   mat-raised-button
                   color="primary"
                   type="button"
                   [disabled]="oauthCheckInProgress"
                   (click)="testSnowflakeOAuth()">
-                  <mat-icon *ngIf="!oauthCheckInProgress">check_circle</mat-icon>
-                  <mat-spinner *ngIf="oauthCheckInProgress" diameter="20"></mat-spinner>
-                  {{ oauthCheckInProgress ? 'Checking...' : 'Test OAuth Connection' }}
+                  <mat-icon *ngIf="!oauthCheckInProgress"
+                    >check_circle</mat-icon
+                  >
+                  <mat-spinner
+                    *ngIf="oauthCheckInProgress"
+                    diameter="20"></mat-spinner>
+                  {{
+                    oauthCheckInProgress
+                      ? 'Checking...'
+                      : 'Test OAuth Connection'
+                  }}
                 </button>
                 <p
                   class="oauth-message"
                   *ngIf="oauthCheckMessage"
                   [ngClass]="{
                     success: oauthCheckSuccess,
-                    error: !oauthCheckSuccess && oauthCheckMessage
+                    error: !oauthCheckSuccess && oauthCheckMessage,
                   }">
                   {{ oauthCheckMessage }}
                 </p>
@@ -1051,23 +1066,31 @@
                 <div
                   class="full-width oauth-check-section"
                   *ngIf="getControl('type')?.value === 'snowflake'"
-                  style="margin-top: 20px;">
+                  style="margin-top: 20px">
                   <button
                     mat-raised-button
                     color="primary"
                     type="button"
                     [disabled]="oauthCheckInProgress"
                     (click)="testSnowflakeOAuth()">
-                    <mat-icon *ngIf="!oauthCheckInProgress">check_circle</mat-icon>
-                    <mat-spinner *ngIf="oauthCheckInProgress" diameter="20"></mat-spinner>
-                    {{ oauthCheckInProgress ? 'Checking...' : 'Test OAuth Connection' }}
+                    <mat-icon *ngIf="!oauthCheckInProgress"
+                      >check_circle</mat-icon
+                    >
+                    <mat-spinner
+                      *ngIf="oauthCheckInProgress"
+                      diameter="20"></mat-spinner>
+                    {{
+                      oauthCheckInProgress
+                        ? 'Checking...'
+                        : 'Test OAuth Connection'
+                    }}
                   </button>
                   <p
                     class="oauth-message"
                     *ngIf="oauthCheckMessage"
                     [ngClass]="{
                       success: oauthCheckSuccess,
-                      error: !oauthCheckSuccess && oauthCheckMessage
+                      error: !oauthCheckSuccess && oauthCheckMessage,
                     }">
                     {{ oauthCheckMessage }}
                   </p>

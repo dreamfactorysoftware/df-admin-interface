@@ -259,10 +259,15 @@ export class DfServiceDetailsComponent implements OnInit {
         // Check if this is a Snowflake service
         const serviceType =
           this.serviceForm.getRawValue().type || route['data']?.type;
-        console.log('[Snowflake Init Debug] Checking service type in route subscription:', serviceType);
+        console.log(
+          '[Snowflake Init Debug] Checking service type in route subscription:',
+          serviceType
+        );
         if (serviceType === 'snowflake') {
           this.isSnowflake = true;
-          console.log('[Snowflake Init Debug] isSnowflake set to true from route data');
+          console.log(
+            '[Snowflake Init Debug] isSnowflake set to true from route data'
+          );
           // Mark component for check to ensure template re-renders with new flag
           this.cdr.markForCheck();
           console.log('[Snowflake Init Debug] Called cdr.markForCheck()');
@@ -445,8 +450,14 @@ export class DfServiceDetailsComponent implements OnInit {
           console.log('  - viewSchema length:', this.viewSchema?.length);
           console.log('  - subscriptionRequired:', this.subscriptionRequired);
           console.log('  - hasStandardFields:', this.hasStandardFields);
-          console.log('  - Parent condition (viewSchema && !subscriptionRequired):', !!this.viewSchema && !this.subscriptionRequired);
-          console.log('  - authenticator value:', this.getConfigControl('authenticator')?.value);
+          console.log(
+            '  - Parent condition (viewSchema && !subscriptionRequired):',
+            !!this.viewSchema && !this.subscriptionRequired
+          );
+          console.log(
+            '  - authenticator value:',
+            this.getConfigControl('authenticator')?.value
+          );
           console.log('  - Calling snowflakeBasicFields getter...');
           const basicFields = this.snowflakeBasicFields;
           console.log('  - snowflakeBasicFields returned:', basicFields);
@@ -455,7 +466,10 @@ export class DfServiceDetailsComponent implements OnInit {
           this.cdr.markForCheck();
           this.cdr.detectChanges();
           console.log('  - Change detection complete');
-          console.log('  - Full config:', this.serviceForm.get('config')?.value);
+          console.log(
+            '  - Full config:',
+            this.serviceForm.get('config')?.value
+          );
 
           if (data?.serviceDocByServiceId) {
             this.serviceDefinitionType =
@@ -1010,7 +1024,9 @@ export class DfServiceDetailsComponent implements OnInit {
     const control = this.serviceForm.get(`config.${name}`) as FormControl;
     // Debug logging for authenticator field
     if (name === 'authenticator' && control) {
-      console.log('[OAuth Button Debug] getConfigControl(authenticator) called:');
+      console.log(
+        '[OAuth Button Debug] getConfigControl(authenticator) called:'
+      );
       console.log('  - control exists:', !!control);
       console.log('  - control.value:', control.value);
       console.log('  - value === "oauth":', control.value === 'oauth');
@@ -1478,7 +1494,11 @@ export class DfServiceDetailsComponent implements OnInit {
 
         // Clean payload to avoid relationship errors
         // Remove service_doc_by_service_id and any other problematic fields
-        const { service_doc_by_service_id, serviceDocByServiceId, ...cleanData } = data as any;
+        const {
+          service_doc_by_service_id,
+          serviceDocByServiceId,
+          ...cleanData
+        } = data as any;
 
         const payload = {
           ...cleanData,
@@ -1524,10 +1544,11 @@ export class DfServiceDetailsComponent implements OnInit {
         )
         .toPromise();
 
-      if (response.direct_auth) {
-        // SPCS mode - token was automatically applied
-        this.oauthCheckMessage =
-          'OAuth connection successful! (Native App mode)';
+      // Check for success field first
+      if (response.success === true) {
+        // OAuth succeeded (either SPCS or standard flow completed)
+        const mode = response.spcs_mode || response.direct_auth ? 'Native App' : 'OAuth';
+        this.oauthCheckMessage = response.message || `OAuth connection successful! (${mode} mode)`;
         this.oauthCheckSuccess = true;
 
         // Refresh the service data to show updated token
@@ -1542,7 +1563,7 @@ export class DfServiceDetailsComponent implements OnInit {
           'Redirecting to Snowflake for authorization...';
         window.location.href = response.authorization_url;
       } else {
-        throw new Error('Unexpected response from OAuth endpoint');
+        throw new Error(response.message || 'Unexpected response from OAuth endpoint');
       }
     } catch (error: any) {
       // Extract meaningful error message from various error structures

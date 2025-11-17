@@ -18,7 +18,11 @@ export const caseInterceptor: HttpInterceptorFn = (
   // OpenAPI specs must preserve their exact property names
   const isApiDocs = req.url.includes('/api_docs');
 
-  if (req.url.startsWith('/api') && !(req.body instanceof FormData) && !isApiDocs) {
+  if (
+    req.url.startsWith('/api') &&
+    !(req.body instanceof FormData) &&
+    !isApiDocs
+  ) {
     const transformedRequest = req.clone({
       body: mapCamelToSnake(req.body),
     });

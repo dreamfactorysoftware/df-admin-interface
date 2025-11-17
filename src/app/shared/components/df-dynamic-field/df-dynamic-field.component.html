@@ -10,7 +10,7 @@
         'string',
         'picklist',
         'multi_picklist',
-        'text'
+        'text',
       ].includes(schema.type)
     ">
     <mat-label *ngIf="showLabel">{{ schema.label }}</mat-label>
@@ -22,8 +22,8 @@
         schema.type === 'integer'
           ? 'number'
           : schema.type === 'password'
-          ? 'password'
-          : 'text'
+            ? 'password'
+            : 'text'
       "
       [attr.autocomplete]="
         schema.type === 'password' ? 'current-password' : 'off'
