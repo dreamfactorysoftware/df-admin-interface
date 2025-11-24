@@ -21,10 +21,6 @@ import {
   SESSION_TOKEN_HEADER,
   API_KEY_HEADER,
 } from 'src/app/shared/constants/http-headers';
-import {
-  mapCamelToSnake,
-  mapSnakeToCamel,
-} from 'src/app/shared/utilities/case';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 import { AsyncPipe, NgIf, NgFor, SlicePipe, NgClass } from '@angular/common';
 import { environment } from '../../../../environments/environment';

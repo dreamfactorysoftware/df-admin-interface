@@ -237,7 +237,7 @@
                             'multi_picklist',
                             'boolean',
                             'file_certificate',
-                            'file_certificate_api'
+                            'file_certificate_api',
                           ].includes(item.type)
                         "
                         [schema]="item"
@@ -262,9 +262,165 @@
                   </ng-container>
                 </div>
               </mat-accordion>
+
+              <!-- OAuth Test Button for Snowflake (in generic layout) -->
+              <div
+                class="full-width oauth-check-section"
+                *ngIf="getControl('type')?.value === 'snowflake'"
+                style="margin-top: 20px">
+                <button
+                  mat-raised-button
+                  color="primary"
+                  type="button"
+                  [disabled]="oauthCheckInProgress"
+                  (click)="testSnowflakeOAuth()">
+                  <mat-icon *ngIf="!oauthCheckInProgress"
+                    >check_circle</mat-icon
+                  >
+                  <mat-spinner
+                    *ngIf="oauthCheckInProgress"
+                    diameter="20"></mat-spinner>
+                  {{
+                    oauthCheckInProgress
+                      ? 'Checking...'
+                      : 'Test OAuth Connection'
+                  }}
+                </button>
+                <p
+                  class="oauth-message"
+                  *ngIf="oauthCheckMessage"
+                  [ngClass]="{
+                    success: oauthCheckSuccess,
+                    error: !oauthCheckSuccess && oauthCheckMessage,
+                  }">
+                  {{ oauthCheckMessage }}
+                </p>
+              </div>
             </ng-container>
 
-            <ng-container *ngIf="isDatabase && hasStandardFields">
+            <!-- Snowflake-specific UI layout -->
+            <ng-container *ngIf="isSnowflake">
+              <div class="details-section basic-fields-section">
+                <ng-container *ngFor="let item of snowflakeBasicFields">
+                  <df-dynamic-field
+                    *ngIf="
+                      [
+                        'integer',
+                        'password',
+                        'string',
+                        'text',
+                        'picklist',
+                        'multi_picklist',
+                        'boolean',
+                        'file_certificate',
+                        'file_certificate_api',
+                      ].includes(item.type)
+                    "
+                    [schema]="item"
+                    [formControl]="getConfigControl(item.name)"
+                    [class.dynamic-width]="
+                      item.type !== 'file_certificate' &&
+                      item.type !== 'file_certificate_api'
+                    "
+                    [class.full-width]="
+                      item.type === 'file_certificate' ||
+                      item.type === 'file_certificate_api'
+                    ">
+                  </df-dynamic-field>
+                  <df-array-field
+                    *ngIf="item.type === 'array' || item.type === 'object'"
+                    [schema]="item"
+                    [formControl]="getConfigControl(item.name)"
+                    class="full-width">
+                  </df-array-field>
+                </ng-container>
+
+                <!-- OAuth Token Check Button (for Native App users) -->
+                <div class="full-width oauth-check-section">
+                  <button
+                    mat-raised-button
+                    color="primary"
+                    type="button"
+                    [disabled]="oauthCheckInProgress"
+                    (click)="testSnowflakeOAuth()">
+                    <mat-icon *ngIf="!oauthCheckInProgress"
+                      >check_circle</mat-icon
+                    >
+                    <mat-spinner
+                      *ngIf="oauthCheckInProgress"
+                      diameter="20"></mat-spinner>
+                    {{
+                      oauthCheckInProgress
+                        ? 'Checking...'
+                        : 'Test OAuth Connection'
+                    }}
+                  </button>
+                  <p
+                    class="oauth-message"
+                    *ngIf="oauthCheckMessage"
+                    [ngClass]="{
+                      success: oauthCheckSuccess,
+                      error: !oauthCheckSuccess && oauthCheckMessage,
+                    }">
+                    {{ oauthCheckMessage }}
+                  </p>
+                </div>
+              </div>
+
+              <div
+                class="advanced-section"
+                *ngIf="showSnowflakeAdvancedOptions">
+                <mat-accordion class="full-width">
+                  <mat-expansion-panel [expanded]="false">
+                    <mat-expansion-panel-header>
+                      Advanced Options
+                    </mat-expansion-panel-header>
+                    <div class="details-section">
+                      <ng-container
+                        *ngFor="let item of snowflakeAdvancedFields">
+                        <df-dynamic-field
+                          *ngIf="
+                            [
+                              'integer',
+                              'password',
+                              'string',
+                              'text',
+                              'picklist',
+                              'multi_picklist',
+                              'boolean',
+                              'file_certificate',
+                              'file_certificate_api',
+                            ].includes(item.type)
+                          "
+                          [schema]="item"
+                          [formControl]="getConfigControl(item.name)"
+                          [class.dynamic-width]="
+                            item.type !== 'file_certificate' &&
+                            item.type !== 'file_certificate_api'
+                          "
+                          [class.full-width]="
+                            item.type === 'file_certificate' ||
+                            item.type === 'file_certificate_api'
+                          ">
+                        </df-dynamic-field>
+                        <df-array-field
+                          *ngIf="
+                            item.type === 'array' || item.type === 'object'
+                          "
+                          [schema]="item"
+                          [formControl]="getConfigControl(item.name)"
+                          class="full-width">
+                        </df-array-field>
+                      </ng-container>
+                    </div>
+                  </mat-expansion-panel>
+                </mat-accordion>
+              </div>
+            </ng-container>
+
+            <!-- Standard database UI layout -->
+            <ng-container
+              *ngIf="isDatabase && hasStandardFields && !isSnowflake">
               <div class="details-section basic-fields-section">
                 <ng-container *ngFor="let item of basicFields">
                   <df-dynamic-field
@@ -278,7 +434,7 @@
                         'multi_picklist',
                         'boolean',
                         'file_certificate',
-                        'file_certificate_api'
+                        'file_certificate_api',
                       ].includes(item.type)
                     "
                     [schema]="item"
@@ -293,6 +449,40 @@
                     class="full-width">
                   </df-array-field>
                 </ng-container>
+              </div>
+
+              <!-- OAuth Test Button for Snowflake (in standard database layout) -->
+              <div
+                class="full-width oauth-check-section"
+                *ngIf="getControl('type')?.value === 'snowflake'"
+                style="margin-top: 20px">
+                <button
+                  mat-raised-button
+                  color="primary"
+                  type="button"
+                  [disabled]="oauthCheckInProgress"
+                  (click)="testSnowflakeOAuth()">
+                  <mat-icon *ngIf="!oauthCheckInProgress"
+                    >check_circle</mat-icon
+                  >
+                  <mat-spinner
+                    *ngIf="oauthCheckInProgress"
+                    diameter="20"></mat-spinner>
+                  {{
+                    oauthCheckInProgress
+                      ? 'Checking...'
+                      : 'Test OAuth Connection'
+                  }}
+                </button>
+                <p
+                  class="oauth-message"
+                  *ngIf="oauthCheckMessage"
+                  [ngClass]="{
+                    success: oauthCheckSuccess,
+                    error: !oauthCheckSuccess && oauthCheckMessage,
+                  }">
+                  {{ oauthCheckMessage }}
+                </p>
               </div>
 
               <div class="advanced-section" *ngIf="showAdvancedOptions">
@@ -336,7 +526,7 @@
                                 'multi_picklist',
                                 'boolean',
                                 'file_certificate',
-                                'file_certificate_api'
+                                'file_certificate_api',
                               ].includes(item.type)
                             "
                             [schema]="item"
@@ -591,7 +781,7 @@
                   'multi_picklist',
                   'boolean',
                   'file_certificate',
-                  'file_certificate_api'
+                  'file_certificate_api',
                 ].includes(item.type)
               "
               color="primary"
@@ -674,7 +864,7 @@
                         'multi_picklist',
                         'boolean',
                         'file_certificate',
-                        'file_certificate_api'
+                        'file_certificate_api',
                       ].includes(item.type)
                     "
                     color="primary"
@@ -757,7 +947,7 @@
                           'multi_picklist',
                           'boolean',
                           'file_certificate',
-                          'file_certificate_api'
+                          'file_certificate_api',
                         ].includes(item.type)
                       "
                       color="primary"
@@ -848,7 +1038,7 @@
                           'multi_picklist',
                           'boolean',
                           'file_certificate',
-                          'file_certificate_api'
+                          'file_certificate_api',
                         ].includes(item.type)
                       "
                       color="primary"
@@ -871,6 +1061,40 @@
                       class="full-width"></df-array-field>
                   </ng-template>
                 </ng-container>
+
+                <!-- OAuth Test Button for Snowflake (in edit mode) -->
+                <div
+                  class="full-width oauth-check-section"
+                  *ngIf="getControl('type')?.value === 'snowflake'"
+                  style="margin-top: 20px">
+                  <button
+                    mat-raised-button
+                    color="primary"
+                    type="button"
+                    [disabled]="oauthCheckInProgress"
+                    (click)="testSnowflakeOAuth()">
+                    <mat-icon *ngIf="!oauthCheckInProgress"
+                      >check_circle</mat-icon
+                    >
+                    <mat-spinner
+                      *ngIf="oauthCheckInProgress"
+                      diameter="20"></mat-spinner>
+                    {{
+                      oauthCheckInProgress
+                        ? 'Checking...'
+                        : 'Test OAuth Connection'
+                    }}
+                  </button>
+                  <p
+                    class="oauth-message"
+                    *ngIf="oauthCheckMessage"
+                    [ngClass]="{
+                      success: oauthCheckSuccess,
+                      error: !oauthCheckSuccess && oauthCheckMessage,
+                    }">
+                    {{ oauthCheckMessage }}
+                  </p>
+                </div>
               </div>
             </mat-expansion-panel>
           </mat-accordion>
