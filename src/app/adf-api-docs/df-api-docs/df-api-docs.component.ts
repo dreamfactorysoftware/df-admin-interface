@@ -5,6 +5,7 @@ import {
   OnInit,
   ViewChild,
   OnDestroy,
+  NgZone,
 } from '@angular/core';
 import SwaggerUI from 'swagger-ui';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -134,7 +135,8 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
     private snackBar: MatSnackBar,
     private currentServiceService: DfCurrentServiceService,
     private http: HttpClient,
-    private httpBackend: HttpBackend
+    private httpBackend: HttpBackend,
+    private ngZone: NgZone
   ) {
     this.rawHttp = new HttpClient(httpBackend);
   }
@@ -142,6 +144,22 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
   ngOnInit(): void {
     // Get the service name from the route
     this.serviceName = this.activatedRoute.snapshot.params['name'];
+
+    // Get the API documentation SYNCHRONOUSLY from snapshot
+    const data = this.activatedRoute.snapshot.data['data'];
+    console.log('[API Docs Debug] Route data:', data);
+    console.log('[API Docs Debug] Service name:', this.serviceName);
+
+    if (data) {
+      if (data.paths['/']?.get?.operationId === 'getSoapResources') {
+        this.apiDocJson = { ...data, paths: mapSnakeToCamel(data.paths) };
+      } else {
+        this.apiDocJson = { ...data, paths: mapCamelToSnake(data.paths) };
+      }
+      console.log('[API Docs Debug] apiDocJson set:', this.apiDocJson ? 'YES' : 'NO');
+    } else {
+      console.error('[API Docs Debug] NO DATA from resolver!');
+    }
 
     // First fetch the service ID by name (use normal http)
     if (this.serviceName) {
@@ -162,19 +180,6 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
       );
     }
 
-    // Handle the API documentation
-    this.subscriptions.push(
-      this.activatedRoute.data.subscribe(({ data }) => {
-        if (data) {
-          if (data.paths['/']?.get?.operationId === 'getSoapResources') {
-            this.apiDocJson = { ...data, paths: mapSnakeToCamel(data.paths) };
-          } else {
-            this.apiDocJson = { ...data, paths: mapCamelToSnake(data.paths) };
-          }
-        }
-      })
-    );
-
     // Subscribe to the current service ID once
     this.subscriptions.push(
       this.currentServiceService
@@ -192,6 +197,11 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
   }
 
   ngAfterContentInit(): void {
+    console.log('[API Docs Debug] ngAfterContentInit called');
+    console.log('[API Docs Debug] apiDocJson exists:', !!this.apiDocJson);
+    console.log('[API Docs Debug] apiDocElement exists:', !!this.apiDocElement);
+    console.log('[API Docs Debug] apiDocElement.nativeElement:', this.apiDocElement?.nativeElement);
+
     this.checkApiHealth();
     this.generateSwaggerWithApiKey(this.apiDocJson);
   }
@@ -271,47 +281,69 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
   }
 
   private generateSwaggerWithApiKey(apiDocumentation: ApiDocJson): void {
-    SwaggerUI({
-      spec: apiDocumentation,
-      domNode: this.apiDocElement?.nativeElement,
-      requestInterceptor: (req: SwaggerUI.Request) => {
-        req['headers'][SESSION_TOKEN_HEADER] = this.userDataService.token;
-        req['headers'][API_KEY_HEADER] = environment.dfApiDocsApiKey;
-        // Parse the request URL
-        const url = new URL(req['url']);
-        const params = new URLSearchParams(url.search);
-        // Decode all parameters
-        params.forEach((value, key) => {
-          params.set(key, decodeURIComponent(value));
+    console.log('[API Docs Debug] generateSwaggerWithApiKey called');
+    console.log('[API Docs Debug] apiDocumentation:', apiDocumentation);
+    console.log('[API Docs Debug] domNode:', this.apiDocElement?.nativeElement);
+
+    if (!apiDocumentation) {
+      console.error('[API Docs Debug] NO apiDocumentation provided!');
+      return;
+    }
+
+    if (!this.apiDocElement?.nativeElement) {
+      console.error('[API Docs Debug] NO DOM element found!');
+      return;
+    }
+
+    // Run SwaggerUI outside Angular's zone to prevent Zone.js interference with React
+    console.log('[API Docs Debug] Running SwaggerUI outside Angular zone...');
+    this.ngZone.runOutsideAngular(() => {
+      // Also defer to next tick to ensure DOM is stable
+      setTimeout(() => {
+        console.log('[API Docs Debug] Calling SwaggerUI...');
+        SwaggerUI({
+          spec: apiDocumentation,
+          domNode: this.apiDocElement?.nativeElement,
+          requestInterceptor: (req: SwaggerUI.Request) => {
+            req['headers'][SESSION_TOKEN_HEADER] = this.userDataService.token;
+            req['headers'][API_KEY_HEADER] = environment.dfApiDocsApiKey;
+            // Parse the request URL
+            const url = new URL(req['url']);
+            const params = new URLSearchParams(url.search);
+            // Decode all parameters
+            params.forEach((value, key) => {
+              params.set(key, decodeURIComponent(value));
+            });
+            // Update the URL with decoded parameters
+            url.search = params.toString();
+            req['url'] = url.toString();
+            return req;
+          },
+          showMutatedRequest: true,
+          onComplete: () => {
+            if (
+              this.apiDocElement &&
+              this.apiDocElement.nativeElement &&
+              this.swaggerInjectedContentContainerRef &&
+              this.swaggerInjectedContentContainerRef.nativeElement
+            ) {
+              const swaggerContainer = this.apiDocElement.nativeElement;
+              const customContentNode =
+                this.swaggerInjectedContentContainerRef.nativeElement;
+
+              const infoContainer = swaggerContainer.querySelector(
+                '.information-container .main'
+              );
+
+              this.injectCustomContent(
+                swaggerContainer,
+                infoContainer,
+                customContentNode
+              );
+            }
+          },
         });
-        // Update the URL with decoded parameters
-        url.search = params.toString();
-        req['url'] = url.toString();
-        return req;
-      },
-      showMutatedRequest: true,
-      onComplete: () => {
-        if (
-          this.apiDocElement &&
-          this.apiDocElement.nativeElement &&
-          this.swaggerInjectedContentContainerRef &&
-          this.swaggerInjectedContentContainerRef.nativeElement
-        ) {
-          const swaggerContainer = this.apiDocElement.nativeElement;
-          const customContentNode =
-            this.swaggerInjectedContentContainerRef.nativeElement;
-
-          const infoContainer = swaggerContainer.querySelector(
-            '.information-container .main'
-          );
-
-          this.injectCustomContent(
-            swaggerContainer,
-            infoContainer,
-            customContentNode
-          );
-        }
-      },
+      }, 0);
     });
   }
 

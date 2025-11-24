@@ -1,0 +1,102 @@
+.marketplace-banner {
+  position: sticky;
+  top: 0;
+  z-index: 9999;
+  background: linear-gradient(135deg, rgb(255, 141, 92) 0%, #764ba2 100%);
+  color: white;
+  padding: 14px 24px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-bottom: 3px solid #5a67d8;
+
+  .banner-content {
+    max-width: 1400px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+
+    @media (max-width: 768px) {
+      justify-content: center;
+      text-align: center;
+    }
+  }
+
+  .banner-icon {
+    font-size: 24px;
+    flex-shrink: 0;
+  }
+
+  .banner-text {
+    flex: 1;
+    min-width: 300px;
+
+    strong {
+      display: block;
+      font-size: 16px;
+      margin-bottom: 4px;
+    }
+
+    .banner-detail {
+      font-size: 14px;
+      opacity: 0.95;
+    }
+  }
+
+  .banner-stats {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+
+    .stat-item {
+      padding: 6px 12px;
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 6px;
+      font-size: 14px;
+      white-space: nowrap;
+
+      strong {
+        margin-right: 4px;
+      }
+
+      .low-remaining {
+        color: #ffc107;
+        font-weight: bold;
+        animation: pulse 2s infinite;
+      }
+    }
+  }
+
+  .upgrade-button {
+    padding: 10px 20px;
+    background: white;
+    color: #667eea;
+    text-decoration: none;
+    font-weight: bold;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      background: #f7fafc;
+    }
+
+    &:active {
+      transform: translateY(0);
+    }
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}

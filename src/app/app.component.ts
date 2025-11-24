@@ -9,6 +9,7 @@ import {
 } from '@angular/router';
 import { DfSideNavComponent } from './shared/components/df-side-nav/df-side-nav.component';
 import { DfEngagementBannerComponent } from './shared/components/df-engagement-banner/df-engagement-banner.component';
+import { DfSnowflakeMarketplaceBannerComponent } from './shared/components/df-snowflake-marketplace-banner/df-snowflake-marketplace-banner.component';
 import { DfLicenseCheckService } from './shared/services/df-license-check.service';
 import { UntilDestroy, untilDestroyed } from '@ngneat/until-destroy';
 import { AuthService } from './shared/services/auth.service';
@@ -28,6 +29,7 @@ import { DfUserDataService } from './shared/services/df-user-data.service';
   imports: [
     DfSideNavComponent,
     DfEngagementBannerComponent,
+    DfSnowflakeMarketplaceBannerComponent,
     RouterOutlet,
     NgIf,
     AsyncPipe,

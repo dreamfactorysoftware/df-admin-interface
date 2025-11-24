@@ -1,0 +1,27 @@
+<ng-container *ngIf="showMarketplaceBanner">
+  <div class="marketplace-banner">
+    <div class="banner-content">
+      <div class="banner-icon">⚠️</div>
+      <div class="banner-text">
+        <strong>Snowflake Marketplace Free Edition</strong>
+        <span class="banner-detail">
+          Limited to {{ marketplaceInfo.limit }} Snowflake API requests per day.
+        </span>
+      </div>
+      <div class="banner-stats">
+        <span class="stat-item">
+          <strong>Used:</strong> {{ marketplaceInfo.used }}
+        </span>
+        <span class="stat-item">
+          <strong>Remaining:</strong>
+          <span [class.low-remaining]="isLowRemaining">
+            {{ marketplaceInfo.remaining }}
+          </span>
+        </span>
+      </div>
+      <a [href]="'mailto:' + upgradeEmail" class="upgrade-button">
+        Upgrade to Unlimited
+      </a>
+    </div>
+  </div>
+</ng-container>
