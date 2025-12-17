@@ -3,8 +3,9 @@ import { DfAuthService } from '../../adf-user-management/services/df-auth.servic
 import { map, switchMap } from 'rxjs/operators';
 import { Router } from '@angular/router';
 import { ROUTES } from '../types/routes';
-import { of } from 'rxjs';
+import { EMPTY, of } from 'rxjs';
 import { DfUserDataService } from '../services/df-user-data.service';
+import { handleRedirectIfPresent } from '../utilities/url';
 
 export const loggedInGuard = () => {
   const authService = inject(DfAuthService);
@@ -18,9 +19,17 @@ export const loggedInGuard = () => {
             if (!validSession) {
               return router.createUrlTree([ROUTES.AUTH]);
             }
+            // Session is valid, check for redirect
+            if (handleRedirectIfPresent(userDataService.token)) {
+              return false; // Prevent Angular navigation, external redirect in progress
+            }
             return true;
           })
         );
+      }
+      // Already logged in, check for redirect
+      if (handleRedirectIfPresent(userDataService.token)) {
+        return EMPTY; // Don't emit, external redirect in progress
       }
       return of(true);
     })

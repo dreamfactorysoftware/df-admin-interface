@@ -1,12 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { DfLoadingSpinnerService } from './shared/services/df-loading-spinner.service';
 import { NgIf, AsyncPipe } from '@angular/common';
-import {
-  RouterOutlet,
-  Router,
-  ActivatedRoute,
-  NavigationEnd,
-} from '@angular/router';
+import { RouterOutlet, Router, ActivatedRoute } from '@angular/router';
 import { DfSideNavComponent } from './shared/components/df-side-nav/df-side-nav.component';
 import { DfEngagementBannerComponent } from './shared/components/df-engagement-banner/df-engagement-banner.component';
 import { DfLicenseCheckService } from './shared/services/df-license-check.service';
@@ -15,7 +10,6 @@ import { AuthService } from './shared/services/auth.service';
 import { LoggingService } from './shared/services/logging.service';
 import { LoginResponse } from './shared/types/auth.types';
 import { ROUTES } from './shared/types/routes';
-import { filter } from 'rxjs/operators';
 import { IntercomService } from './shared/services/intercom.service';
 import { DfUserDataService } from './shared/services/df-user-data.service';
 
