@@ -102,7 +102,9 @@ export class DfLoginComponent implements OnInit {
     this.errorSharingService.error$.subscribe(sharedError => {
       if (sharedError) {
         // Decode the error message properly (remove URL encoding)
-        const decodedError = decodeURIComponent(sharedError.replace(/\+/g, ' '));
+        const decodedError = decodeURIComponent(
+          sharedError.replace(/\+/g, ' ')
+        );
 
         // Set the alert message for the built-in alert display
         this.alertMsg = decodedError;

@@ -61,6 +61,7 @@ export class DfRoleDetailsComponent implements OnInit {
   showAlert = false;
   alertType: AlertType = 'error';
   visibilityArray: boolean[] = [];
+  deletedLookupKeys: any[] = []; // Track deleted lookup keys for backend deletion
 
   constructor(
     @Inject(ROLE_SERVICE_TOKEN)
@@ -85,6 +86,8 @@ export class DfRoleDetailsComponent implements OnInit {
   ngOnInit(): void {
     this.activatedRoute.data.subscribe(({ data, type }) => {
       this.type = type;
+      // Reset deleted lookup keys array when loading a role
+      this.deletedLookupKeys = [];
       if (data) {
         this.snackbarService.setSnackbarLastEle(
           data.label ? data.label : data.name,
@@ -143,6 +146,8 @@ export class DfRoleDetailsComponent implements OnInit {
           data.lookupByRoleId.forEach((item: any) => {
             (this.roleForm.controls['lookupKeys'] as FormArray).push(
               new FormGroup({
+                id: new FormControl(item.id),
+                roleId: new FormControl(item.roleId),
                 name: new FormControl(item.name, [Validators.required]),
                 value: new FormControl(item.value),
                 private: new FormControl(item.private),
@@ -175,6 +180,14 @@ export class DfRoleDetailsComponent implements OnInit {
     }
 
     return result;
+  }
+
+  onLookupDeleted(deletedLookup: any) {
+    // Add deleted lookup to tracking array with role_id set to null for backend deletion
+    this.deletedLookupKeys.push({
+      ...deletedLookup,
+      roleId: null // Setting roleId to null signals the backend to delete this record
+    });
   }
 
   triggerAlert(type: AlertType, msg: string) {
@@ -290,7 +303,10 @@ export class DfRoleDetailsComponent implements OnInit {
           };
         }
       ),
-      lookupByRoleId: formValue.lookupKeys,
+      lookupByRoleId: [
+        ...formValue.lookupKeys,
+        ...this.deletedLookupKeys // Include deleted items with roleId: null
+      ],
     };
     const createPayload = {
       resource: [payload],

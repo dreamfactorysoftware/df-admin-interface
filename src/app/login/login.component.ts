@@ -26,7 +26,10 @@ export class LoginComponent implements OnInit {
 
     // Check for shared error first
     this.errorSharingService.error$.subscribe(sharedError => {
-      console.log('LOGIN COMPONENT - Error subscription triggered with:', sharedError);
+      console.log(
+        'LOGIN COMPONENT - Error subscription triggered with:',
+        sharedError
+      );
 
       if (sharedError) {
         console.log('Login component received shared error:', sharedError);
