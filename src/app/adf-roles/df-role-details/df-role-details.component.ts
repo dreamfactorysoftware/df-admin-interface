@@ -62,6 +62,7 @@ export class DfRoleDetailsComponent implements OnInit {
   alertType: AlertType = 'error';
   visibilityArray: boolean[] = [];
   originalLookupKeyIds: number[] = [];
+  deletedLookupKeys: any[] = [];
 
   constructor(
     @Inject(ROLE_SERVICE_TOKEN)
@@ -86,6 +87,8 @@ export class DfRoleDetailsComponent implements OnInit {
   ngOnInit(): void {
     this.activatedRoute.data.subscribe(({ data, type }) => {
       this.type = type;
+      // Reset deleted lookup keys array when loading a role
+      this.deletedLookupKeys = [];
       if (data) {
         this.snackbarService.setSnackbarLastEle(
           data.label ? data.label : data.name,
@@ -181,6 +184,14 @@ export class DfRoleDetailsComponent implements OnInit {
     }
 
     return result;
+  }
+
+  onLookupDeleted(deletedLookup: any) {
+    // Add deleted lookup to tracking array with role_id set to null for backend deletion
+    this.deletedLookupKeys.push({
+      ...deletedLookup,
+      roleId: null // Setting roleId to null signals the backend to delete this record
+    });
   }
 
   triggerAlert(type: AlertType, msg: string) {

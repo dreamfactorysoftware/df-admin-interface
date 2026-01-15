@@ -102,14 +102,13 @@ export class DfLinkServiceComponent implements OnInit, OnChanges {
   }
 
   findServiceById() {
-    const select = this.storageServices.find(
-      service => service.name === this.storageServiceId
+    // Show GitHub UI if there are any GitHub services available for script storage
+    // This allows scripts to be loaded from GitHub regardless of which service
+    // the event script is being attached to
+    const hasGithubService = this.storageServices.some(
+      service => service.type === 'github'
     );
-    if (select?.type === 'github') {
-      this.selectType = true;
-    } else {
-      this.selectType = false;
-    }
+    this.selectType = hasGithubService;
   }
 
   updateDataSource() {

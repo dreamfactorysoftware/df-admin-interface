@@ -13,6 +13,7 @@ import { DfLicenseCheckService } from './shared/services/df-license-check.servic
 import { UntilDestroy, untilDestroyed } from '@ngneat/until-destroy';
 import { AuthService } from './shared/services/auth.service';
 import { LoggingService } from './shared/services/logging.service';
+import { ErrorSharingService } from './shared/services/error-sharing.service';
 import { LoginResponse } from './shared/types/auth.types';
 import { ROUTES } from './shared/types/routes';
 import { filter } from 'rxjs/operators';
@@ -45,6 +46,7 @@ export class AppComponent implements OnInit {
     private router: Router,
     private route: ActivatedRoute,
     private loggingService: LoggingService,
+    private errorSharingService: ErrorSharingService,
     private intercomService: IntercomService,
     private dfUserDataService: DfUserDataService
   ) {}
@@ -89,7 +91,17 @@ export class AppComponent implements OnInit {
     const jwtMatch = fullUrl.match(/[?&]jwt=([^&#]*)/);
     const jwt = jwtMatch ? jwtMatch[1] : null;
 
-    if (jwt) {
+    const errorMatch = fullUrl.match(/[?&]error=([^&#]*)/);
+    const error = errorMatch ? decodeURIComponent(errorMatch[1]) : null;
+
+    if (error) {
+      this.loggingService.log(`OAuth error found: ${error}`);
+
+      // Set error in sharing service and navigate to auth/login
+      this.errorSharingService.setError(error);
+      this.router.navigate(['/auth/login']);
+      return;
+    } else if (jwt) {
       this.loggingService.log(`JWT found in URL: ${jwt.substring(0, 20)}...`);
       this.authService.loginWithJwt(jwt).subscribe(
         (user: LoginResponse) => {
@@ -99,11 +111,11 @@ export class AppComponent implements OnInit {
               isAuthenticated ? 'Authenticated' : 'Unknown'
             }`
           );
-          window.location.href = '/#/home'; // Use window.location.href for hash-based routing
+          window.location.href = '/dreamfactory/dist/#/home'; // Use window.location.href for hash-based routing
         },
         error => {
           this.loggingService.log(`Login failed: ${JSON.stringify(error)}`);
-          window.location.href = '/#/auth/login';
+          window.location.href = '/dreamfactory/dist/#/auth/login';
         }
       );
     } else {
@@ -114,7 +126,7 @@ export class AppComponent implements OnInit {
         );
       } else {
         this.loggingService.log('User is already logged in');
-        window.location.href = '/#/home';
+        window.location.href = '/dreamfactory/dist/#/home';
       }
     }
   }
