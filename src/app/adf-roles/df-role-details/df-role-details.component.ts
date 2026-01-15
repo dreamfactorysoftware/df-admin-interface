@@ -196,85 +196,35 @@ export class DfRoleDetailsComponent implements OnInit {
     this.showAlert = true;
   }
 
-  // onSubmit() {
-  // OLD function
-  //   if (this.roleForm.invalid) return;
-
-  //   const formValue = this.roleForm.getRawValue();
-
-  //   const payload: RolePayload = {
-  //     id: formValue.id,
-  //     name: formValue.name,
-  //     description: formValue.description,
-  //     isActive: formValue.active,
-  //     roleServiceAccessByRoleId: formValue.serviceAccess.map(
-  //       (val: AccessForm) => {
-  //         const advancedFilters = {
-  //           field: val.expandField,
-  //           operator: val.expandOperator,
-  //           value: val.expandValue,
-  //         };
-
-  //         const filtersArray = [];
-  //         filtersArray.push(advancedFilters);
-
-  //         return {
-  //           id: val.id,
-  //           serviceId: val.service,
-  //           component: val.component,
-  //           verbMask: val.access.reduce((acc, cur) => acc + cur, 0), // add up all the values in the array
-  //           requestorMask: val.requester.reduce((acc, cur) => acc + cur, 0), // 1 = API, 2 = SCRIPT, 3 = API & SCRIPT
-  //           filters: filtersArray,
-  //           filterOp: this.filterOp,
-  //         };
-  //       }
-  //     ),
-  //     lookupByRoleId: formValue.lookupKeys,
-  //   };
-
-  // const createPayload = {
-  //   resource: [payload],
-  // };
-
-  //   if (this.type === 'edit' && payload.id) {
-  //     this.roleService
-  //       .update(payload.id, payload)
-  //       .pipe(
-  //         catchError(err => {
-  //           this.triggerAlert('error', err.error.error.message);
-  //           return throwError(() => new Error(err));
-  //         })
-  //       )
-  //       .subscribe(() => {
-  //         this.goBack();
-  //       });
-  //   } else {
-  //     this.roleService
-  //       .create(createPayload, {
-  //         fields: '*',
-  //         related: 'role_service_access_by_role_id,lookup_by_role_id',
-  //       })
-  //       .pipe(
-  //         catchError(err => {
-  //           this.triggerAlert(
-  //             'error',
-  //             err.error.error.context.resource[0].message
-  //           );
-  //           return throwError(() => new Error(err));
-  //         })
-  //       )
-  //       .subscribe(() => {
-  //         this.goBack();
-  //       });
-  //   }
   get serviceAccess(): FormArray {
     return this.roleForm.get('serviceAccess') as FormArray;
   }
 
   onSubmit() {
-    if (this.roleForm.invalid) return;
+    // Clear validators for all hidden items before validation
+    const serviceAccess = this.roleForm.get('serviceAccess') as FormArray;
+    serviceAccess.controls.forEach((control, index) => {
+      if (!this.visibilityArray[index]) {
+        control.get('service')?.clearValidators();
+        control.get('component')?.clearValidators();
+        control.get('access')?.clearValidators();
+        control.get('requester')?.clearValidators();
+        control.get('service')?.updateValueAndValidity();
+        control.get('component')?.updateValueAndValidity();
+        control.get('access')?.updateValueAndValidity();
+        control.get('requester')?.updateValueAndValidity();
+      }
+    });
+
+    if (this.roleForm.invalid) {
+      // Mark all controls as touched to show validation errors
+      this.roleForm.markAllAsTouched();
+      return;
+    }
     const formValue = this.roleForm.getRawValue();
-    if (formValue.name === '' || formValue.name === null) return;
+    if (formValue.name === '' || formValue.name === null) {
+      return;
+    }
     const payload: RolePayload = {
       id: formValue.id,
       name: formValue.name,

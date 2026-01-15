@@ -299,6 +299,10 @@
         "global-lookup-keys": {
           "nav": "Global Lookup Keys",
           "header": "{{nav.system-settings.config.global-lookup-keys.nav}}"
+        },
+        "intercom": {
+          "nav": "Intercom",
+          "header": "{{nav.system-settings.config.intercom.nav}}"
         }
       },
       "scheduler": {
@@ -442,5 +446,9 @@
   "language": "Change language",
   "languages": {
     "en": "English"
+  },
+  "engagementBanner": {
+    "message": "Testing DreamFactory? Let's show you what's possible. Book your free walkthrough",
+    "ctaButton": "Schedule Now"
   }
 }
