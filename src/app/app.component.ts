@@ -46,7 +46,7 @@ export class AppComponent implements OnInit {
     private router: Router,
     private route: ActivatedRoute,
     private loggingService: LoggingService,
-    private errorSharingService: ErrorSharingService
+    private errorSharingService: ErrorSharingService,
     private intercomService: IntercomService,
     private dfUserDataService: DfUserDataService
   ) {}
