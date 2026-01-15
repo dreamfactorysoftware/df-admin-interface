@@ -61,6 +61,7 @@ export class DfRoleDetailsComponent implements OnInit {
   showAlert = false;
   alertType: AlertType = 'error';
   visibilityArray: boolean[] = [];
+  originalLookupKeyIds: number[] = [];
 
   constructor(
     @Inject(ROLE_SERVICE_TOKEN)
@@ -141,8 +142,13 @@ export class DfRoleDetailsComponent implements OnInit {
 
         if (data.lookupByRoleId.length > 0) {
           data.lookupByRoleId.forEach((item: any) => {
+            // Track original lookup key IDs for deletion detection
+            if (item.id) {
+              this.originalLookupKeyIds.push(item.id);
+            }
             (this.roleForm.controls['lookupKeys'] as FormArray).push(
               new FormGroup({
+                id: new FormControl(item.id),
                 name: new FormControl(item.name, [Validators.required]),
                 value: new FormControl(item.value),
                 private: new FormControl(item.private),
@@ -240,7 +246,7 @@ export class DfRoleDetailsComponent implements OnInit {
           };
         }
       ),
-      lookupByRoleId: formValue.lookupKeys,
+      lookupByRoleId: this.getLookupKeysWithDeletions(formValue),
     };
     const createPayload = {
       resource: [payload],
@@ -276,6 +282,30 @@ export class DfRoleDetailsComponent implements OnInit {
           this.goBack();
         });
     }
+  }
+
+  getLookupKeysWithDeletions(formValue: any) {
+    const currentLookupKeys = formValue.lookupKeys;
+    const result = [...currentLookupKeys];
+
+    // Find IDs that were deleted (present in original but not in current)
+    const currentIds = currentLookupKeys
+      .map((lk: any) => lk.id)
+      .filter((id: any) => id);
+
+    const deletedIds = this.originalLookupKeyIds.filter(
+      (id: number) => !currentIds.includes(id)
+    );
+
+    // Add deleted lookup keys with role_id set to null to trigger deletion
+    deletedIds.forEach((id: number) => {
+      result.push({
+        id: id,
+        role_id: null,
+      });
+    });
+
+    return result;
   }
 
   goBack() {
