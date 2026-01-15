@@ -62,6 +62,7 @@ export class DfRoleDetailsComponent implements OnInit {
   alertType: AlertType = 'error';
   visibilityArray: boolean[] = [];
   originalLookupKeyIds: number[] = [];
+  deletedLookupKeys: any[] = [];
 
   constructor(
     @Inject(ROLE_SERVICE_TOKEN)
