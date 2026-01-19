@@ -13,9 +13,9 @@ export const urlQueryLoginGuard = () => {
   const sessionToken = urlParams.get('session_token');
 
   if (sessionToken) {
-    return authService.loginWithToken().pipe(
+    return authService.loginWithToken(sessionToken).pipe(
       map(() => {
-        router.navigate([]);
+        router.navigate([ROUTES.HOME]);
         return false;
       }),
       catchError(() => {

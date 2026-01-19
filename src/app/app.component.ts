@@ -83,6 +83,9 @@ export class AppComponent implements OnInit {
     const jwtMatch = fullUrl.match(/[?&]jwt=([^&#]*)/);
     const jwt = jwtMatch ? jwtMatch[1] : null;
 
+    const sessionTokenMatch = fullUrl.match(/[?&]session_token=([^&#]*)/);
+    const sessionToken = sessionTokenMatch ? sessionTokenMatch[1] : null;
+
     if (jwt) {
       this.loggingService.log(`JWT found in URL: ${jwt.substring(0, 20)}...`);
       this.authService.loginWithJwt(jwt).subscribe(
@@ -93,15 +96,32 @@ export class AppComponent implements OnInit {
               isAuthenticated ? 'Authenticated' : 'Unknown'
             }`
           );
-          window.location.href = '/#/home'; // Use window.location.href for hash-based routing
+          window.location.href = '/#/home';
         },
         error => {
           this.loggingService.log(`Login failed: ${JSON.stringify(error)}`);
           window.location.href = '/#/auth/login';
         }
       );
+    } else if (sessionToken) {
+      this.loggingService.log(`Session token found in URL`);
+      this.authService.loginWithJwt(sessionToken).subscribe(
+        (user: LoginResponse) => {
+          const isAuthenticated = !!(user.session_token || user.sessionToken);
+          this.loggingService.log(
+            `OAuth login successful: ${
+              isAuthenticated ? 'Authenticated' : 'Unknown'
+            }`
+          );
+          window.location.href = '/#/home';
+        },
+        (error: unknown) => {
+          this.loggingService.log(`OAuth login failed: ${JSON.stringify(error)}`);
+          window.location.href = '/#/auth/login';
+        }
+      );
     } else {
-      this.loggingService.log('No JWT found in URL');
+      this.loggingService.log('No JWT or session token found in URL');
       if (!this.authService.isAuthenticated()) {
         this.loggingService.log(
           'User not logged in, redirecting to login page'

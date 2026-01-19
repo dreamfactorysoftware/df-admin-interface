@@ -809,9 +809,12 @@ export const routes: Routes = [
   },
   {
     path: ROUTES.AI,
-    loadComponent: () => import('./ai/ai.component').then(m => m.AiComponent),
+    children: ServiceRoutes,
+    data: {
+      groups: SERVICE_GROUPS[ROUTES.AI],
+    },
     canActivate: [loggedInGuard, licenseGuard, globalLicenseGuard],
-    data: { showPaywall: true },
+    providers: [provideTranslocoScope('services')],
   },
   {
     path: ROUTES.PROFILE,

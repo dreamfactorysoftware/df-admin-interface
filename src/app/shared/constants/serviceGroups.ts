@@ -12,8 +12,8 @@ export const SERVICE_GROUPS = {
     'Log',
     'Source Control',
     'IoT',
-    'MCP',
   ],
   [ROUTES.AUTHENTICATION]: ['LDAP', 'SSO', 'OAuth'],
   [ROUTES.LOGS]: ['Log'],
+  [ROUTES.AI]: ['MCP'],
 };
