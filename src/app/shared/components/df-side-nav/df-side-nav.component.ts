@@ -130,6 +130,7 @@ export class DfSideNavComponent implements OnInit {
             return of([
               'apps',
               'users',
+              'roles',
               'services',
               'apidocs',
               'schema/data',
