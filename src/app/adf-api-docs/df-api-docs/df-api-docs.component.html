@@ -54,7 +54,7 @@
       'status-loading': healthStatus === 'loading',
       'status-healthy': healthStatus === 'healthy',
       'status-unhealthy': healthStatus === 'unhealthy',
-      'status-warning': healthStatus === 'warning'
+      'status-warning': healthStatus === 'warning',
     }">
     <div *ngIf="healthStatus === 'loading'">
       <p>{{ 'apiHealthBanner.loading' | transloco }}</p>

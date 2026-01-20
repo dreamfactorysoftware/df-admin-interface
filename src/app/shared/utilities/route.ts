@@ -72,6 +72,9 @@ export function accessibleRoutes(
       case 'users':
         allowed.push(ROUTES.USERS);
         break;
+      case 'roles':
+        allowed.push(ROUTES.ROLE_BASED_ACCESS);
+        break;
       case 'services':
         allowed.push(
           ROUTES.DATABASE,
