@@ -190,7 +190,7 @@ export class DfRoleDetailsComponent implements OnInit {
     // Add deleted lookup to tracking array with role_id set to null for backend deletion
     this.deletedLookupKeys.push({
       ...deletedLookup,
-      roleId: null // Setting roleId to null signals the backend to delete this record
+      roleId: null, // Setting roleId to null signals the backend to delete this record
     });
   }
 

@@ -127,7 +127,9 @@ export class AppComponent implements OnInit {
           window.location.href = '/#/home';
         },
         (error: unknown) => {
-          this.loggingService.log(`OAuth login failed: ${JSON.stringify(error)}`);
+          this.loggingService.log(
+            `OAuth login failed: ${JSON.stringify(error)}`
+          );
           window.location.href = '/#/auth/login';
         }
       );
