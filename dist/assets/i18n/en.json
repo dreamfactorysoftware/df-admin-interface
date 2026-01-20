@@ -145,7 +145,15 @@
     },
     "ai": {
       "nav": "AI",
-      "header": "{{nav.ai.nav}}"
+      "header": "{{nav.ai.nav}}",
+      "create": {
+        "nav": "Create AI Tool",
+        "header": "{{nav.ai.create.nav}}"
+      },
+      "edit": {
+        "nav": "{{edit}}",
+        "header": "{{nav.ai.edit.nav}}"
+      }
     },
     "api-connections": {
       "nav": "API Generation & Connections",

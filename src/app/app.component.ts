@@ -1,12 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { DfLoadingSpinnerService } from './shared/services/df-loading-spinner.service';
 import { NgIf, AsyncPipe } from '@angular/common';
-import {
-  RouterOutlet,
-  Router,
-  ActivatedRoute,
-  NavigationEnd,
-} from '@angular/router';
+import { RouterOutlet, Router, ActivatedRoute } from '@angular/router';
 import { DfSideNavComponent } from './shared/components/df-side-nav/df-side-nav.component';
 import { DfEngagementBannerComponent } from './shared/components/df-engagement-banner/df-engagement-banner.component';
 import { DfLicenseCheckService } from './shared/services/df-license-check.service';
@@ -16,7 +11,6 @@ import { LoggingService } from './shared/services/logging.service';
 import { ErrorSharingService } from './shared/services/error-sharing.service';
 import { LoginResponse } from './shared/types/auth.types';
 import { ROUTES } from './shared/types/routes';
-import { filter } from 'rxjs/operators';
 import { IntercomService } from './shared/services/intercom.service';
 import { DfUserDataService } from './shared/services/df-user-data.service';
 
@@ -93,6 +87,8 @@ export class AppComponent implements OnInit {
 
     const errorMatch = fullUrl.match(/[?&]error=([^&#]*)/);
     const error = errorMatch ? decodeURIComponent(errorMatch[1]) : null;
+    const sessionTokenMatch = fullUrl.match(/[?&]session_token=([^&#]*)/);
+    const sessionToken = sessionTokenMatch ? sessionTokenMatch[1] : null;
 
     if (error) {
       this.loggingService.log(`OAuth error found: ${error}`);
@@ -118,8 +114,27 @@ export class AppComponent implements OnInit {
           window.location.href = '/dreamfactory/dist/#/auth/login';
         }
       );
+    } else if (sessionToken) {
+      this.loggingService.log(`Session token found in URL`);
+      this.authService.loginWithJwt(sessionToken).subscribe(
+        (user: LoginResponse) => {
+          const isAuthenticated = !!(user.session_token || user.sessionToken);
+          this.loggingService.log(
+            `OAuth login successful: ${
+              isAuthenticated ? 'Authenticated' : 'Unknown'
+            }`
+          );
+          window.location.href = '/#/home';
+        },
+        (error: unknown) => {
+          this.loggingService.log(
+            `OAuth login failed: ${JSON.stringify(error)}`
+          );
+          window.location.href = '/#/auth/login';
+        }
+      );
     } else {
-      this.loggingService.log('No JWT found in URL');
+      this.loggingService.log('No JWT or session token found in URL');
       if (!this.authService.isAuthenticated()) {
         this.loggingService.log(
           'User not logged in, redirecting to login page'
