@@ -300,9 +300,39 @@
 
             <!-- Snowflake-specific UI layout -->
             <ng-container *ngIf="isSnowflake">
+              <!-- Native App Mode: Simplified form with only user-configurable fields -->
+              <div *ngIf="isNativeApp" class="native-app-notice" style="background: #e3f2fd; padding: 12px; border-radius: 4px; margin-bottom: 16px;">
+                <strong>Snowflake Native App Mode</strong>
+                <p style="margin: 4px 0 0 0; font-size: 13px;">OAuth authentication is automatically configured. Just specify your database connection details below.</p>
+              </div>
+
               <div class="details-section basic-fields-section">
-                <ng-container *ngFor="let item of snowflakeBasicFields">
-                  <df-dynamic-field
+                <!-- Native App: Show only user-configurable fields -->
+                <ng-container *ngIf="isNativeApp">
+                  <ng-container *ngFor="let item of snowflakeNativeAppFields">
+                    <df-dynamic-field
+                      *ngIf="
+                        [
+                          'integer',
+                          'password',
+                          'string',
+                          'text',
+                          'picklist',
+                          'multi_picklist',
+                          'boolean',
+                        ].includes(item.type)
+                      "
+                      [schema]="item"
+                      [formControl]="getConfigControl(item.name)"
+                      class="dynamic-width">
+                    </df-dynamic-field>
+                  </ng-container>
+                </ng-container>
+
+                <!-- Standard Mode: Show all basic fields -->
+                <ng-container *ngIf="!isNativeApp">
+                  <ng-container *ngFor="let item of snowflakeBasicFields">
+                    <df-dynamic-field
                     *ngIf="
                       [
                         'integer',
@@ -332,7 +362,8 @@
                     [schema]="item"
                     [formControl]="getConfigControl(item.name)"
                     class="full-width">
-                  </df-array-field>
+                    </df-array-field>
+                  </ng-container>
                 </ng-container>
 
                 <!-- OAuth Token Check Button (for Native App users) -->

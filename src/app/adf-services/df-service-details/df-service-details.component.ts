@@ -164,6 +164,8 @@ export class DfServiceDetailsComponent implements OnInit {
   isFile = false;
   isAuth = false;
   isSnowflake = false;
+  // Native App branch - always show simplified Snowflake UI
+  isNativeApp = true;
   serviceTypes: Array<ServiceType>;
   notIncludedServices: Array<ServiceType>;
   serviceForm: FormGroup;
@@ -1017,7 +1019,23 @@ export class DfServiceDetailsComponent implements OnInit {
   }
 
   get showSnowflakeAdvancedOptions(): boolean {
+    // In native app mode, don't show advanced options (they're auto-configured)
+    if (this.isNativeApp) {
+      return false;
+    }
     return this.isSnowflake && this.snowflakeAdvancedFields.length > 0;
+  }
+
+  // Native app shows only the user-configurable fields
+  get snowflakeNativeAppFields() {
+    if (!this.isSnowflake || !this.viewSchema) {
+      return [];
+    }
+    // In native app mode, show only these fields (user needs to configure these)
+    const nativeAppFieldNames = ['database', 'warehouse', 'schema', 'role'];
+    return this.viewSchema.filter(field =>
+      nativeAppFieldNames.includes((field as any).name)
+    );
   }
 
   getConfigControl(name: string) {
@@ -1547,8 +1565,10 @@ export class DfServiceDetailsComponent implements OnInit {
       // Check for success field first
       if (response.success === true) {
         // OAuth succeeded (either SPCS or standard flow completed)
-        const mode = response.spcs_mode || response.direct_auth ? 'Native App' : 'OAuth';
-        this.oauthCheckMessage = response.message || `OAuth connection successful! (${mode} mode)`;
+        const mode =
+          response.spcs_mode || response.direct_auth ? 'Native App' : 'OAuth';
+        this.oauthCheckMessage =
+          response.message || `OAuth connection successful! (${mode} mode)`;
         this.oauthCheckSuccess = true;
 
         // Refresh the service data to show updated token
@@ -1563,7 +1583,9 @@ export class DfServiceDetailsComponent implements OnInit {
           'Redirecting to Snowflake for authorization...';
         window.location.href = response.authorization_url;
       } else {
-        throw new Error(response.message || 'Unexpected response from OAuth endpoint');
+        throw new Error(
+          response.message || 'Unexpected response from OAuth endpoint'
+        );
       }
     } catch (error: any) {
       // Extract meaningful error message from various error structures
