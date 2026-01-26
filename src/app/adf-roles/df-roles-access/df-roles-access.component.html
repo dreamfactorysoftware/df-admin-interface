@@ -113,15 +113,15 @@
                     <span
                       class="example-additional-selection"
                       *ngIf="
-                        (formArray.controls[getFormArrayIndex(i)]?.value.access
+                        (formArray.controls[getFormArrayIndex(i)].value.access
                           .length || 0) > 1
                       ">
                       (+{{
-                        (formArray.controls[getFormArrayIndex(i)]?.value.access
+                        (formArray.controls[getFormArrayIndex(i)].value.access
                           .length || 0) - 1
                       }}
                       {{
-                        formArray.controls[getFormArrayIndex(i)]?.value.access
+                        formArray.controls[getFormArrayIndex(i)].value.access
                           .length === 2
                           ? 'other'
                           : 'others'

@@ -1,5 +1,5 @@
 import { NgIf, NgTemplateOutlet } from '@angular/common';
-import { Component, Input, OnInit } from '@angular/core';
+import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import {
   FormArray,
   FormControl,
@@ -52,6 +52,7 @@ export class DfLookupKeysComponent implements OnInit {
   faTrashCan = faTrashCan;
   faPlus = faPlus;
   @Input() showAccordion = true;
+  @Output() lookupDeleted = new EventEmitter<any>(); // Emit deleted lookup keys
 
   constructor(
     private rootFormGroup: FormGroupDirective,
@@ -88,6 +89,11 @@ export class DfLookupKeysComponent implements OnInit {
   }
 
   remove(index: number) {
+    const deletedItem = this.lookupKeys.at(index).value;
+    // Emit the deleted item if it has an id (existing record)
+    if (deletedItem.id) {
+      this.lookupDeleted.emit(deletedItem);
+    }
     this.lookupKeys.removeAt(index);
     this.updateDataSource();
   }
