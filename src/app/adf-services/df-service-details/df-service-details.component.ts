@@ -188,6 +188,16 @@ export class DfServiceDetailsComponent implements OnInit {
   oauthCheckMessage = '';
   oauthCheckSuccess = false;
 
+  // OAuth token status for display
+  oauthTokenStatus: {
+    authorized: boolean;
+    expires_at: string | null;
+    is_expired: boolean;
+    is_native_app: boolean;
+    spcs_token_available: boolean;
+  } | null = null;
+  oauthStatusLoading = false;
+
   constructor(
     private activatedRoute: ActivatedRoute,
     private fb: FormBuilder,
@@ -406,6 +416,10 @@ export class DfServiceDetailsComponent implements OnInit {
           if (data.type === 'snowflake') {
             this.isSnowflake = true;
             console.log('[Snowflake Edit] isSnowflake set to true for edit mode');
+            // Fetch OAuth token status for display
+            if (data.id) {
+              this.fetchOAuthStatus(data.id);
+            }
           }
           this.initializeConfig('');
 
@@ -1469,7 +1483,18 @@ export class DfServiceDetailsComponent implements OnInit {
         'success'
       );
 
-      // Show security config section
+      // For Native App mode: Skip security config and go directly to API docs
+      if (this.isNativeApp && this.isSnowflake) {
+        // Navigate to API docs for the newly created service
+        setTimeout(() => {
+          this.router.navigate(['/api-connections/api-docs'], {
+            queryParams: { serviceName: createdService.name }
+          });
+        }, 1000);
+        return;
+      }
+
+      // Show security config section (for non-native app mode)
       this.showSecurityConfig = true;
 
       // Move to security config step
@@ -1490,6 +1515,34 @@ export class DfServiceDetailsComponent implements OnInit {
   onServiceTypeSelect(selectedServiceTypeLable: string) {
     this.selectedServiceTypeLable =
       selectedServiceTypeLable || 'Unknown. Unable to identify Service Type';
+  }
+
+  /**
+   * Fetch OAuth token status for Snowflake service
+   * Shows token validity, expiry time, and native app status
+   */
+  async fetchOAuthStatus(serviceId: number) {
+    if (!serviceId) return;
+
+    this.oauthStatusLoading = true;
+    try {
+      const response = await this.http
+        .get<any>(`${BASE_URL}/_oauth/snowflake/status?service_id=${serviceId}`)
+        .toPromise();
+
+      this.oauthTokenStatus = {
+        authorized: response.authorized,
+        expires_at: response.expires_at,
+        is_expired: response.is_expired,
+        is_native_app: response.is_native_app,
+        spcs_token_available: response.spcs_token_available,
+      };
+    } catch (error) {
+      console.error('Failed to fetch OAuth status:', error);
+      this.oauthTokenStatus = null;
+    } finally {
+      this.oauthStatusLoading = false;
+    }
   }
 
   /**

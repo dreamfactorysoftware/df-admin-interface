@@ -618,9 +618,21 @@
             {{ 'cancel' | transloco }}
           </button>
           <div class="button-group">
-            <!-- For first-time users creating database APIs, only show Security Config button as primary -->
+            <!-- Native App Mode: Simplified button that skips security config -->
             <button
-              *ngIf="isFirstTimeUser && isDatabase"
+              *ngIf="isNativeApp && isSnowflake"
+              mat-flat-button
+              class="save-btn"
+              color="primary"
+              type="button"
+              [disabled]="!serviceForm.valid"
+              (click)="goToSecurityConfig()">
+              Create & View API Docs
+            </button>
+
+            <!-- For first-time users creating database APIs (non-native app), only show Security Config button as primary -->
+            <button
+              *ngIf="isFirstTimeUser && isDatabase && !(isNativeApp && isSnowflake)"
               mat-flat-button
               class="save-btn"
               color="primary"
@@ -630,9 +642,9 @@
               {{ 'services.controls.nextSecurityConfig' | transloco }}
             </button>
 
-            <!-- For experienced users or non-database services, show both buttons -->
+            <!-- For experienced users or non-database services (non-native app), show both buttons -->
             <button
-              *ngIf="!(isFirstTimeUser && isDatabase)"
+              *ngIf="!(isFirstTimeUser && isDatabase) && !(isNativeApp && isSnowflake)"
               mat-flat-button
               class="save-btn secondary-btn"
               type="button"
@@ -641,7 +653,7 @@
               {{ 'services.controls.securityConfig' | transloco }}
             </button>
             <button
-              *ngIf="!(isFirstTimeUser && isDatabase)"
+              *ngIf="!(isFirstTimeUser && isDatabase) && !(isNativeApp && isSnowflake)"
               class="save-btn"
               mat-flat-button
               color="primary">
@@ -1034,6 +1046,49 @@
               OAuth authentication is automatically configured. Just specify
               your database connection details below.
             </p>
+          </div>
+
+          <!-- OAuth Token Status Display -->
+          <div
+            *ngIf="oauthTokenStatus && isNativeApp"
+            class="oauth-status-card"
+            style="
+              background: #f5f5f5;
+              border: 1px solid #e0e0e0;
+              border-radius: 8px;
+              padding: 16px;
+              margin-bottom: 16px;
+            ">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+              <mat-icon
+                [style.color]="oauthTokenStatus.authorized && !oauthTokenStatus.is_expired ? '#4caf50' : '#f44336'">
+                {{ oauthTokenStatus.authorized && !oauthTokenStatus.is_expired ? 'check_circle' : 'error' }}
+              </mat-icon>
+              <strong style="font-size: 14px;">
+                OAuth Token Status:
+                {{ oauthTokenStatus.authorized && !oauthTokenStatus.is_expired ? 'Active' : 'Needs Refresh' }}
+              </strong>
+            </div>
+            <div style="font-size: 13px; color: #666;">
+              <div *ngIf="oauthTokenStatus.spcs_token_available" style="margin-bottom: 4px;">
+                <mat-icon style="font-size: 16px; width: 16px; height: 16px; vertical-align: middle; color: #2196f3;">cloud</mat-icon>
+                SPCS Session Token: Available
+              </div>
+              <div *ngIf="oauthTokenStatus.expires_at">
+                Token Expires: {{ oauthTokenStatus.expires_at | date:'medium' }}
+              </div>
+              <div *ngIf="!oauthTokenStatus.expires_at && oauthTokenStatus.spcs_token_available">
+                Token managed by Snowflake Container Services
+              </div>
+            </div>
+          </div>
+
+          <!-- Loading state for OAuth status -->
+          <div
+            *ngIf="oauthStatusLoading && isNativeApp"
+            style="margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+            <mat-spinner diameter="20"></mat-spinner>
+            <span style="font-size: 13px; color: #666;">Loading token status...</span>
           </div>
 
           <div class="details-section basic-fields-section">

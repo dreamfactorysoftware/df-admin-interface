@@ -1,4 +1,4 @@
-import { Component, Inject } from '@angular/core';
+import { Component, Inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common'; // Add this import
 import { RouterModule } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
@@ -10,6 +10,8 @@ import {
   faFile,
   faTools,
   faBook,
+  faSnowflake,
+  faRocket,
 } from '@fortawesome/free-solid-svg-icons';
 
 import {
@@ -68,7 +70,7 @@ import { DfDashboardComponent } from '../df-dashboard/df-dashboard.component';
   ],
   providers: [DfBaseCrudService],
 })
-export class DfWelcomePageComponent {
+export class DfWelcomePageComponent implements OnInit {
   faCirclePlay = faCirclePlay;
   faHeart = faHeart;
   faComment = faComment;
@@ -78,8 +80,14 @@ export class DfWelcomePageComponent {
   faFile = faFile;
   faTools = faTools;
   faBook = faBook;
+  faSnowflake = faSnowflake;
+  faRocket = faRocket;
+
+  // Native App mode - hardcoded for Snowflake Native App branch
+  isNativeApp = true;
 
   fpDBRoute = `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_TYPES}/${ROUTES.DATABASE}/${ROUTES.CREATE}`;
+  fpSnowflakeRoute = `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_TYPES}/${ROUTES.DATABASE}/${ROUTES.CREATE}?type=snowflake`;
   fpScriptingRoute = `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_TYPES}/${ROUTES.SCRIPTING}/${ROUTES.CREATE}`;
   fpNetworkRoute = `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_TYPES}/${ROUTES.NETWORK}/${ROUTES.CREATE}`;
   fpFileRoute = `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_TYPES}/${ROUTES.FILE}/${ROUTES.CREATE}`;
@@ -87,6 +95,7 @@ export class DfWelcomePageComponent {
   fpApiDocsRoute = `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_DOCS}`;
 
   public generateApiCardsData: any[];
+  public nativeAppCardsData: any[];
 
   welcomePageResources = welcomePageResources;
   nativeExampleLinks = nativeExampleLinks;
@@ -143,6 +152,26 @@ export class DfWelcomePageComponent {
         icon: this.faBook,
         headerTextKey: 'home.welcomePage.apiDocsCard.header',
         textKey: 'home.welcomePage.apiDocsCard.description',
+        route: this.fpApiDocsRoute,
+        bgColor: 'rgba(217, 54, 138, 0.1)',
+        headerColor: 'rgb(217, 54, 138)',
+      },
+    ];
+
+    // Native App specific cards - focused on Snowflake workflow
+    this.nativeAppCardsData = [
+      {
+        icon: this.faSnowflake,
+        headerText: 'Connect to Snowflake',
+        text: 'Create a REST API for your Snowflake data. OAuth is auto-configured.',
+        route: this.fpDBRoute,
+        bgColor: 'rgba(41, 182, 246, 0.15)',
+        headerColor: 'rgb(41, 182, 246)',
+      },
+      {
+        icon: this.faBook,
+        headerText: 'API Documentation',
+        text: 'Explore and test your APIs with interactive documentation.',
         route: this.fpApiDocsRoute,
         bgColor: 'rgba(217, 54, 138, 0.1)',
         headerColor: 'rgb(217, 54, 138)',
