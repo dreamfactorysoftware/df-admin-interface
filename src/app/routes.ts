@@ -87,9 +87,9 @@ export const routes: Routes = [
   {
     path: ROUTES.LICENSE_EXPIRED,
     loadComponent: () =>
-      import(
-        './shared/components/df-license-expired/df-license-expired.component'
-      ).then(m => m.DfLicenseExpiredComponent),
+      import('./shared/components/df-license-expired/df-license-expired.component').then(
+        m => m.DfLicenseExpiredComponent
+      ),
     canActivate: [licenseGuard],
   },
   {
@@ -158,26 +158,26 @@ export const routes: Routes = [
           {
             path: '',
             loadComponent: () =>
-              import(
-                './adf-roles/df-manage-roles/df-manage-roles.component'
-              ).then(m => m.DfManageRolesComponent),
+              import('./adf-roles/df-manage-roles/df-manage-roles.component').then(
+                m => m.DfManageRolesComponent
+              ),
             resolve: { data: rolesResolver() },
           },
           {
             path: 'create',
             loadComponent: () =>
-              import(
-                './adf-roles/df-role-details/df-role-details.component'
-              ).then(m => m.DfRoleDetailsComponent),
+              import('./adf-roles/df-role-details/df-role-details.component').then(
+                m => m.DfRoleDetailsComponent
+              ),
             resolve: { services: servicesResolver(0) },
             data: { type: 'create' },
           },
           {
             path: ':id',
             loadComponent: () =>
-              import(
-                './adf-roles/df-role-details/df-role-details.component'
-              ).then(m => m.DfRoleDetailsComponent),
+              import('./adf-roles/df-role-details/df-role-details.component').then(
+                m => m.DfRoleDetailsComponent
+              ),
             resolve: { data: roleResolver, services: servicesResolver(0) },
             data: { type: 'edit' },
           },
@@ -190,9 +190,9 @@ export const routes: Routes = [
           {
             path: '',
             loadComponent: () =>
-              import(
-                './adf-apps/df-manage-apps/df-manage-apps-table.component'
-              ).then(m => m.DfManageAppsTableComponent),
+              import('./adf-apps/df-manage-apps/df-manage-apps-table.component').then(
+                m => m.DfManageAppsTableComponent
+              ),
             resolve: {
               data: appsResolver(0),
             },
@@ -227,9 +227,9 @@ export const routes: Routes = [
           {
             path: '',
             loadComponent: () =>
-              import(
-                './adf-event-scripts/df-manage-scripts/df-manage-scripts.component'
-              ).then(m => m.DfManageScriptsComponent),
+              import('./adf-event-scripts/df-manage-scripts/df-manage-scripts.component').then(
+                m => m.DfManageScriptsComponent
+              ),
             resolve: {
               data: eventScriptsResolver,
             },
@@ -237,9 +237,9 @@ export const routes: Routes = [
           {
             path: ROUTES.CREATE,
             loadComponent: () =>
-              import(
-                './adf-event-scripts/df-script-details/df-script-details.component'
-              ).then(m => m.DfScriptDetailsComponent),
+              import('./adf-event-scripts/df-script-details/df-script-details.component').then(
+                m => m.DfScriptDetailsComponent
+              ),
             resolve: {
               data: eventsResolver,
             },
@@ -249,9 +249,9 @@ export const routes: Routes = [
           {
             path: ':name',
             loadComponent: () =>
-              import(
-                './adf-event-scripts/df-script-details/df-script-details.component'
-              ).then(m => m.DfScriptDetailsComponent),
+              import('./adf-event-scripts/df-script-details/df-script-details.component').then(
+                m => m.DfScriptDetailsComponent
+              ),
             resolve: {
               data: eventScriptResolver,
             },
@@ -267,9 +267,9 @@ export const routes: Routes = [
           {
             path: '',
             loadComponent: () =>
-              import(
-                './adf-api-docs/df-api-docs/df-api-docs-table.component'
-              ).then(m => m.DfApiDocsTableComponent),
+              import('./adf-api-docs/df-api-docs/df-api-docs-table.component').then(
+                m => m.DfApiDocsTableComponent
+              ),
             resolve: {
               data: servicesResolver(100, '(type not like "%swagger%")'),
               serviceTypes: serviceTypesResolver,
@@ -301,17 +301,17 @@ export const routes: Routes = [
           {
             path: '',
             loadComponent: () =>
-              import(
-                './adf-limits/df-manage-limits/df-manage-limits.component'
-              ).then(m => m.DfManageLimitsComponent),
+              import('./adf-limits/df-manage-limits/df-manage-limits.component').then(
+                m => m.DfManageLimitsComponent
+              ),
             resolve: { data: limitsResolver() },
           },
           {
             path: ROUTES.CREATE,
             loadComponent: () =>
-              import(
-                './adf-limits/df-limit-details/df-limit-details.component'
-              ).then(m => m.DfLimitDetailsComponent),
+              import('./adf-limits/df-limit-details/df-limit-details.component').then(
+                m => m.DfLimitDetailsComponent
+              ),
             resolve: {
               data: limitsResolver(),
               users: usersResolver(0),
@@ -324,9 +324,9 @@ export const routes: Routes = [
           {
             path: ':id',
             loadComponent: () =>
-              import(
-                './adf-limits/df-limit-details/df-limit-details.component'
-              ).then(m => m.DfLimitDetailsComponent),
+              import('./adf-limits/df-limit-details/df-limit-details.component').then(
+                m => m.DfLimitDetailsComponent
+              ),
             resolve: {
               data: limitsResolver(),
               users: usersResolver(0),
@@ -360,9 +360,9 @@ export const routes: Routes = [
           {
             path: ROUTES.SYSTEM_INFO,
             loadComponent: () =>
-              import(
-                './adf-config/df-system-info/df-system-info.component'
-              ).then(m => m.DfSystemInfoComponent),
+              import('./adf-config/df-system-info/df-system-info.component').then(
+                m => m.DfSystemInfoComponent
+              ),
             providers: [provideTranslocoScope('systemInfo')],
             resolve: {
               data: checkStatusResolver,
@@ -374,9 +374,9 @@ export const routes: Routes = [
               {
                 path: '',
                 loadComponent: () =>
-                  import(
-                    './adf-config/df-cors/df-manage-cors-table.component'
-                  ).then(m => m.DfManageCorsTableComponent),
+                  import('./adf-config/df-cors/df-manage-cors-table.component').then(
+                    m => m.DfManageCorsTableComponent
+                  ),
                 resolve: {
                   data: corsConfigResolver,
                 },
@@ -384,17 +384,17 @@ export const routes: Routes = [
               {
                 path: ROUTES.CREATE,
                 loadComponent: () =>
-                  import(
-                    './adf-config/df-cors/df-cors-config-details.component'
-                  ).then(m => m.DfCorsConfigDetailsComponent),
+                  import('./adf-config/df-cors/df-cors-config-details.component').then(
+                    m => m.DfCorsConfigDetailsComponent
+                  ),
                 data: { type: 'create' },
               },
               {
                 path: ':id',
                 loadComponent: () =>
-                  import(
-                    './adf-config/df-cors/df-cors-config-details.component'
-                  ).then(m => m.DfCorsConfigDetailsComponent),
+                  import('./adf-config/df-cors/df-cors-config-details.component').then(
+                    m => m.DfCorsConfigDetailsComponent
+                  ),
                 resolve: {
                   data: corsConfigResolver,
                 },
@@ -420,9 +420,9 @@ export const routes: Routes = [
               {
                 path: '',
                 loadComponent: () =>
-                  import(
-                    './adf-config/df-email-templates/df-email-templates.component'
-                  ).then(m => m.DfEmailTemplatesComponent),
+                  import('./adf-config/df-email-templates/df-email-templates.component').then(
+                    m => m.DfEmailTemplatesComponent
+                  ),
                 resolve: {
                   data: DfEmailTemplatesResolver,
                 },
@@ -430,17 +430,17 @@ export const routes: Routes = [
               {
                 path: ROUTES.CREATE,
                 loadComponent: () =>
-                  import(
-                    './adf-config/df-email-template-details/df-email-template-details.component'
-                  ).then(m => m.DfEmailTemplateDetailsComponent),
+                  import('./adf-config/df-email-template-details/df-email-template-details.component').then(
+                    m => m.DfEmailTemplateDetailsComponent
+                  ),
                 data: { type: 'create' },
               },
               {
                 path: ':id',
                 loadComponent: () =>
-                  import(
-                    './adf-config/df-email-template-details/df-email-template-details.component'
-                  ).then(m => m.DfEmailTemplateDetailsComponent),
+                  import('./adf-config/df-email-template-details/df-email-template-details.component').then(
+                    m => m.DfEmailTemplateDetailsComponent
+                  ),
                 resolve: { data: DfEmailTemplateDetailsResolver },
                 data: { type: 'edit' },
               },
@@ -450,9 +450,9 @@ export const routes: Routes = [
           {
             path: ROUTES.GLOBAL_LOOKUP_KEYS,
             loadComponent: () =>
-              import(
-                './adf-config/df-global-lookup-keys/df-global-lookup-keys.component'
-              ).then(m => m.DfGlobalLookupKeysComponent),
+              import('./adf-config/df-global-lookup-keys/df-global-lookup-keys.component').then(
+                m => m.DfGlobalLookupKeysComponent
+              ),
             resolve: {
               data: DfGlobalLookupKeysResolver,
             },
@@ -460,9 +460,9 @@ export const routes: Routes = [
           {
             path: ROUTES.INTERCOM,
             loadComponent: () =>
-              import(
-                './adf-config/df-intercom/df-intercom-config.component'
-              ).then(m => m.DfIntercomConfigComponent),
+              import('./adf-config/df-intercom/df-intercom-config.component').then(
+                m => m.DfIntercomConfigComponent
+              ),
           },
         ],
       },
@@ -472,9 +472,9 @@ export const routes: Routes = [
           {
             path: '',
             loadComponent: () =>
-              import(
-                './adf-scheduler/df-manage-scheduler/df-manage-scheduler.component'
-              ).then(m => m.DfManageSchedulerComponent),
+              import('./adf-scheduler/df-manage-scheduler/df-manage-scheduler.component').then(
+                m => m.DfManageSchedulerComponent
+              ),
             resolve: {
               data: schedulerResolver,
             },
@@ -482,9 +482,9 @@ export const routes: Routes = [
           {
             path: ROUTES.CREATE,
             loadComponent: () =>
-              import(
-                './adf-scheduler/df-scheduler-details/df-scheduler-details.component'
-              ).then(m => m.DfSchedulerDetailsComponent),
+              import('./adf-scheduler/df-scheduler-details/df-scheduler-details.component').then(
+                m => m.DfSchedulerDetailsComponent
+              ),
             resolve: {
               data: servicesResolver(0),
             },
@@ -493,9 +493,9 @@ export const routes: Routes = [
           {
             path: ':id',
             loadComponent: () =>
-              import(
-                './adf-scheduler/df-scheduler-details/df-scheduler-details.component'
-              ).then(m => m.DfSchedulerDetailsComponent),
+              import('./adf-scheduler/df-scheduler-details/df-scheduler-details.component').then(
+                m => m.DfSchedulerDetailsComponent
+              ),
             resolve: {
               data: servicesResolver(0),
               schedulerObject: schedulerResolver,
@@ -519,9 +519,9 @@ export const routes: Routes = [
       {
         path: ROUTES.REPORTING,
         loadComponent: () =>
-          import(
-            './adf-reports/df-manage-service-report/df-manage-service-report.component'
-          ).then(m => m.DfManageServiceReportComponent),
+          import('./adf-reports/df-manage-service-report/df-manage-service-report.component').then(
+            m => m.DfManageServiceReportComponent
+          ),
         resolve: { data: serviceReportsResolver },
       },
       {
@@ -545,25 +545,25 @@ export const routes: Routes = [
           {
             path: '',
             loadComponent: () =>
-              import(
-                './adf-admins/df-manage-admins/df-manage-admins.component'
-              ).then(m => m.DfManageAdminsComponent),
+              import('./adf-admins/df-manage-admins/df-manage-admins.component').then(
+                m => m.DfManageAdminsComponent
+              ),
             resolve: { data: adminsResolver() },
           },
           {
             path: ROUTES.CREATE,
             loadComponent: () =>
-              import(
-                './adf-admins/df-admin-details/df-admin-details.component'
-              ).then(m => m.DfAdminDetailsComponent),
+              import('./adf-admins/df-admin-details/df-admin-details.component').then(
+                m => m.DfAdminDetailsComponent
+              ),
             data: { type: 'create' },
           },
           {
             path: ':id',
             loadComponent: () =>
-              import(
-                './adf-admins/df-admin-details/df-admin-details.component'
-              ).then(m => m.DfAdminDetailsComponent),
+              import('./adf-admins/df-admin-details/df-admin-details.component').then(
+                m => m.DfAdminDetailsComponent
+              ),
             resolve: { data: adminsResolver() },
             data: { type: 'edit' },
           },
@@ -580,9 +580,9 @@ export const routes: Routes = [
           {
             path: '',
             loadComponent: () =>
-              import(
-                './adf-schema/df-manage-databases-table/df-manage-databases-table.component'
-              ).then(m => m.DfManageDatabasesTableComponent),
+              import('./adf-schema/df-manage-databases-table/df-manage-databases-table.component').then(
+                m => m.DfManageDatabasesTableComponent
+              ),
             resolve: {
               data: servicesResolver(),
             },
@@ -593,9 +593,9 @@ export const routes: Routes = [
               {
                 path: '',
                 loadComponent: () =>
-                  import(
-                    './adf-schema/df-manage-tables-table/df-manage-tables-table.component'
-                  ).then(m => m.DfManageTablesTableComponent),
+                  import('./adf-schema/df-manage-tables-table/df-manage-tables-table.component').then(
+                    m => m.DfManageTablesTableComponent
+                  ),
                 resolve: {
                   data: schemaResolver,
                 },
@@ -606,17 +606,17 @@ export const routes: Routes = [
                   {
                     path: '',
                     loadComponent: () =>
-                      import(
-                        './adf-schema/df-table-details/df-table-details.component'
-                      ).then(m => m.DfTableDetailsComponent),
+                      import('./adf-schema/df-table-details/df-table-details.component').then(
+                        m => m.DfTableDetailsComponent
+                      ),
                     data: { type: 'create' },
                   },
                   {
                     path: ':fieldName',
                     loadComponent: () =>
-                      import(
-                        './adf-schema/df-field-details/df-field-details.component'
-                      ).then(m => m.DfFieldDetailsComponent),
+                      import('./adf-schema/df-field-details/df-field-details.component').then(
+                        m => m.DfFieldDetailsComponent
+                      ),
                     data: { type: 'edit' },
                   },
                 ],
@@ -627,9 +627,9 @@ export const routes: Routes = [
                   {
                     path: '',
                     loadComponent: () =>
-                      import(
-                        './adf-schema/df-table-details/df-table-details.component'
-                      ).then(m => m.DfTableDetailsComponent),
+                      import('./adf-schema/df-table-details/df-table-details.component').then(
+                        m => m.DfTableDetailsComponent
+                      ),
                     resolve: { data: DfTableDetailsResolver },
                     data: { type: 'edit' },
                   },
@@ -644,17 +644,17 @@ export const routes: Routes = [
                       {
                         path: ROUTES.CREATE,
                         loadComponent: () =>
-                          import(
-                            './adf-schema/df-field-details/df-field-details.component'
-                          ).then(m => m.DfFieldDetailsComponent),
+                          import('./adf-schema/df-field-details/df-field-details.component').then(
+                            m => m.DfFieldDetailsComponent
+                          ),
                         data: { type: 'create' },
                       },
                       {
                         path: ':fieldName',
                         loadComponent: () =>
-                          import(
-                            './adf-schema/df-field-details/df-field-details.component'
-                          ).then(m => m.DfFieldDetailsComponent),
+                          import('./adf-schema/df-field-details/df-field-details.component').then(
+                            m => m.DfFieldDetailsComponent
+                          ),
                         data: { type: 'edit' },
                       },
                     ],
@@ -670,9 +670,9 @@ export const routes: Routes = [
                       {
                         path: ROUTES.CREATE,
                         loadComponent: () =>
-                          import(
-                            './adf-schema/df-relationship-details/df-relationship-details.component'
-                          ).then(m => m.DfRelationshipDetailsComponent),
+                          import('./adf-schema/df-relationship-details/df-relationship-details.component').then(
+                            m => m.DfRelationshipDetailsComponent
+                          ),
                         resolve: {
                           fields: DfTableFieldResolver,
                           services: servicesResolver(0),
@@ -682,9 +682,9 @@ export const routes: Routes = [
                       {
                         path: ':relName',
                         loadComponent: () =>
-                          import(
-                            './adf-schema/df-relationship-details/df-relationship-details.component'
-                          ).then(m => m.DfRelationshipDetailsComponent),
+                          import('./adf-schema/df-relationship-details/df-relationship-details.component').then(
+                            m => m.DfRelationshipDetailsComponent
+                          ),
                         resolve: {
                           data: DfTableRelationshipsEditResolver,
                           fields: DfTableFieldResolver,
@@ -711,17 +711,17 @@ export const routes: Routes = [
           {
             path: '',
             loadComponent: () =>
-              import(
-                './adf-users/df-manage-users/df-manage-users.component'
-              ).then(m => m.DfManageUsersComponent),
+              import('./adf-users/df-manage-users/df-manage-users.component').then(
+                m => m.DfManageUsersComponent
+              ),
             resolve: { data: usersResolver() },
           },
           {
             path: ROUTES.CREATE,
             loadComponent: () =>
-              import(
-                './adf-users/df-user-details/df-user-details.component'
-              ).then(m => m.DfUserDetailsComponent),
+              import('./adf-users/df-user-details/df-user-details.component').then(
+                m => m.DfUserDetailsComponent
+              ),
             data: { type: 'create' },
             resolve: {
               apps: appsResolver(0),
@@ -731,9 +731,9 @@ export const routes: Routes = [
           {
             path: ':id',
             loadComponent: () =>
-              import(
-                './adf-users/df-user-details/df-user-details.component'
-              ).then(m => m.DfUserDetailsComponent),
+              import('./adf-users/df-user-details/df-user-details.component').then(
+                m => m.DfUserDetailsComponent
+              ),
             resolve: {
               data: userResolver,
               apps: appsResolver(0),

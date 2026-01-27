@@ -402,9 +402,11 @@ export class DfServiceDetailsComponent implements OnInit {
         }
         if (this.edit) {
           this.configSchema = this.getConfigSchema(data.type);
-          // Don't call updateServiceTypeFlags here - it resets flags unnecessarily
-          // Flags are already set correctly at lines 244-264 from route data
-          // Calling updateServiceTypeFlags would reset them and potentially confuse Angular's change detection
+          // Explicitly set isSnowflake flag in edit mode
+          if (data.type === 'snowflake') {
+            this.isSnowflake = true;
+            console.log('[Snowflake Edit] isSnowflake set to true for edit mode');
+          }
           this.initializeConfig('');
 
           // For Excel services, extract storage_service_id and load file services
