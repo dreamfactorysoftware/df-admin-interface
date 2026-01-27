@@ -60,6 +60,7 @@
             <a
               *ngFor="let card of nativeAppCardsData"
               [routerLink]="card.route"
+              [queryParams]="card.queryParams"
               class="native-app-card"
               style="
                 background: white;
@@ -150,9 +151,9 @@
             <fa-icon [icon]="faComment" style="margin-right: 8px"></fa-icon>
             Need Help or Ready to Upgrade?
           </h3>
-          <p style="margin-bottom: 16px; color: rgba(255,255,255,0.9)">
-            Get technical support, discuss your use case, or learn about full-featured
-            deployment options beyond the Marketplace trial.
+          <p style="margin-bottom: 16px; color: rgba(255, 255, 255, 0.9)">
+            Get technical support, discuss your use case, or learn about
+            full-featured deployment options beyond the Marketplace trial.
           </p>
           <a
             href="https://calendly.com/nicdavidson-df/snowflake-native-app-support"
@@ -166,7 +167,9 @@
               border-radius: 8px;
               text-decoration: none;
               font-weight: 600;
-              transition: transform 0.2s, box-shadow 0.2s;
+              transition:
+                transform 0.2s,
+                box-shadow 0.2s;
             ">
             Schedule a Call
           </a>

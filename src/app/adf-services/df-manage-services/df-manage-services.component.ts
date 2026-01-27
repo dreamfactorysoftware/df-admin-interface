@@ -11,7 +11,13 @@ import { MatIconModule } from '@angular/material/icon';
   selector: 'df-manage-services',
   templateUrl: './df-manage-services.component.html',
   standalone: true,
-  imports: [DfPaywallComponent, DfManageServicesTableComponent, NgIf, MatCardModule, MatIconModule],
+  imports: [
+    DfPaywallComponent,
+    DfManageServicesTableComponent,
+    NgIf,
+    MatCardModule,
+    MatIconModule,
+  ],
 })
 export class DfManageServicesComponent implements OnInit {
   paywall = false;
