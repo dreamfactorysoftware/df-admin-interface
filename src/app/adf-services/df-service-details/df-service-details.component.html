@@ -632,7 +632,9 @@
 
             <!-- For first-time users creating database APIs (non-native app), only show Security Config button as primary -->
             <button
-              *ngIf="isFirstTimeUser && isDatabase && !(isNativeApp && isSnowflake)"
+              *ngIf="
+                isFirstTimeUser && isDatabase && !(isNativeApp && isSnowflake)
+              "
               mat-flat-button
               class="save-btn"
               color="primary"
@@ -644,7 +646,10 @@
 
             <!-- For experienced users or non-database services (non-native app), show both buttons -->
             <button
-              *ngIf="!(isFirstTimeUser && isDatabase) && !(isNativeApp && isSnowflake)"
+              *ngIf="
+                !(isFirstTimeUser && isDatabase) &&
+                !(isNativeApp && isSnowflake)
+              "
               mat-flat-button
               class="save-btn secondary-btn"
               type="button"
@@ -653,7 +658,10 @@
               {{ 'services.controls.securityConfig' | transloco }}
             </button>
             <button
-              *ngIf="!(isFirstTimeUser && isDatabase) && !(isNativeApp && isSnowflake)"
+              *ngIf="
+                !(isFirstTimeUser && isDatabase) &&
+                !(isNativeApp && isSnowflake)
+              "
               class="save-btn"
               mat-flat-button
               color="primary">
@@ -1059,25 +1067,59 @@
               padding: 16px;
               margin-bottom: 16px;
             ">
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                margin-bottom: 8px;
+              ">
               <mat-icon
-                [style.color]="oauthTokenStatus.authorized && !oauthTokenStatus.is_expired ? '#4caf50' : '#f44336'">
-                {{ oauthTokenStatus.authorized && !oauthTokenStatus.is_expired ? 'check_circle' : 'error' }}
+                [style.color]="
+                  oauthTokenStatus.authorized && !oauthTokenStatus.is_expired
+                    ? '#4caf50'
+                    : '#f44336'
+                ">
+                {{
+                  oauthTokenStatus.authorized && !oauthTokenStatus.is_expired
+                    ? 'check_circle'
+                    : 'error'
+                }}
               </mat-icon>
-              <strong style="font-size: 14px;">
+              <strong style="font-size: 14px">
                 OAuth Token Status:
-                {{ oauthTokenStatus.authorized && !oauthTokenStatus.is_expired ? 'Active' : 'Needs Refresh' }}
+                {{
+                  oauthTokenStatus.authorized && !oauthTokenStatus.is_expired
+                    ? 'Active'
+                    : 'Needs Refresh'
+                }}
               </strong>
             </div>
-            <div style="font-size: 13px; color: #666;">
-              <div *ngIf="oauthTokenStatus.spcs_token_available" style="margin-bottom: 4px;">
-                <mat-icon style="font-size: 16px; width: 16px; height: 16px; vertical-align: middle; color: #2196f3;">cloud</mat-icon>
+            <div style="font-size: 13px; color: #666">
+              <div
+                *ngIf="oauthTokenStatus.spcs_token_available"
+                style="margin-bottom: 4px">
+                <mat-icon
+                  style="
+                    font-size: 16px;
+                    width: 16px;
+                    height: 16px;
+                    vertical-align: middle;
+                    color: #2196f3;
+                  "
+                  >cloud</mat-icon
+                >
                 SPCS Session Token: Available
               </div>
               <div *ngIf="oauthTokenStatus.expires_at">
-                Token Expires: {{ oauthTokenStatus.expires_at | date:'medium' }}
+                Token Expires:
+                {{ oauthTokenStatus.expires_at | date: 'medium' }}
               </div>
-              <div *ngIf="!oauthTokenStatus.expires_at && oauthTokenStatus.spcs_token_available">
+              <div
+                *ngIf="
+                  !oauthTokenStatus.expires_at &&
+                  oauthTokenStatus.spcs_token_available
+                ">
                 Token managed by Snowflake Container Services
               </div>
             </div>
@@ -1086,9 +1128,16 @@
           <!-- Loading state for OAuth status -->
           <div
             *ngIf="oauthStatusLoading && isNativeApp"
-            style="margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+            style="
+              margin-bottom: 16px;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+            ">
             <mat-spinner diameter="20"></mat-spinner>
-            <span style="font-size: 13px; color: #666;">Loading token status...</span>
+            <span style="font-size: 13px; color: #666"
+              >Loading token status...</span
+            >
           </div>
 
           <div class="details-section basic-fields-section">
@@ -1164,9 +1213,7 @@
                   *ngIf="oauthCheckInProgress"
                   diameter="20"></mat-spinner>
                 {{
-                  oauthCheckInProgress
-                    ? 'Checking...'
-                    : 'Test OAuth Connection'
+                  oauthCheckInProgress ? 'Checking...' : 'Test OAuth Connection'
                 }}
               </button>
               <p
@@ -1181,9 +1228,7 @@
             </div>
           </div>
 
-          <div
-            class="advanced-section"
-            *ngIf="showSnowflakeAdvancedOptions">
+          <div class="advanced-section" *ngIf="showSnowflakeAdvancedOptions">
             <mat-accordion class="full-width">
               <mat-expansion-panel [expanded]="false">
                 <mat-expansion-panel-header>
@@ -1230,7 +1275,10 @@
         </ng-container>
 
         <!-- Other Service Types (unchanged) -->
-        <ng-container *ngIf="!this.isNetworkService && !this.isScriptService && !this.isSnowflake">
+        <ng-container
+          *ngIf="
+            !this.isNetworkService && !this.isScriptService && !this.isSnowflake
+          ">
           <mat-accordion class="full-width">
             <mat-expansion-panel [expanded]="serviceForm.getRawValue().type">
               <mat-expansion-panel-header

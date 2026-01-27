@@ -15,7 +15,7 @@ import { TranslocoModule } from '@ngneat/transloco';
 export class DfEngagementBannerComponent implements OnInit {
   showBanner = false;
   calendlyUrl =
-    'https://calendly.com/dreamfactory-platform/expert-consultation-lab-setup';
+    'https://calendly.com/nicdavidson-df/snowflake-native-app-support';
 
   constructor(private systemConfigService: DfSystemConfigDataService) {}
 

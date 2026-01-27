@@ -415,7 +415,9 @@ export class DfServiceDetailsComponent implements OnInit {
           // Explicitly set isSnowflake flag in edit mode
           if (data.type === 'snowflake') {
             this.isSnowflake = true;
-            console.log('[Snowflake Edit] isSnowflake set to true for edit mode');
+            console.log(
+              '[Snowflake Edit] isSnowflake set to true for edit mode'
+            );
             // Fetch OAuth token status for display
             if (data.id) {
               this.fetchOAuthStatus(data.id);
@@ -1488,7 +1490,7 @@ export class DfServiceDetailsComponent implements OnInit {
         // Navigate to API docs for the newly created service
         setTimeout(() => {
           this.router.navigate(['/api-connections/api-docs'], {
-            queryParams: { serviceName: createdService.name }
+            queryParams: { serviceName: createdService.name },
           });
         }, 1000);
         return;

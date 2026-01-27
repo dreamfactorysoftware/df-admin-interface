@@ -164,7 +164,7 @@ export class DfWelcomePageComponent implements OnInit {
         icon: this.faSnowflake,
         headerText: 'Connect to Snowflake',
         text: 'Create a REST API for your Snowflake data. OAuth is auto-configured.',
-        route: this.fpDBRoute,
+        route: this.fpSnowflakeRoute,
         bgColor: 'rgba(41, 182, 246, 0.15)',
         headerColor: 'rgb(41, 182, 246)',
       },

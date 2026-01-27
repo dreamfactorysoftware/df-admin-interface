@@ -3,35 +3,60 @@
     isFirstTimeUser: isFirstTimeUser$ | async,
   } as data">
   <div [class]="(isDarkMode | async) ? 'dark-theme' : ''">
-
     <!-- Native App Mode: Snowflake-focused welcome page -->
     <ng-container *ngIf="isNativeApp">
-      <section class="native-app-welcome" style="padding: 20px;">
+      <section class="native-app-welcome" style="padding: 20px">
         <!-- Getting Started Guide -->
-        <article style="margin-bottom: 32px;">
-          <h2 style="margin-bottom: 16px; color: #1976d2;">
-            <fa-icon [icon]="faRocket" style="margin-right: 8px;"></fa-icon>
+        <article style="margin-bottom: 32px">
+          <h2 style="margin-bottom: 16px; color: #1976d2">
+            <fa-icon [icon]="faRocket" style="margin-right: 8px"></fa-icon>
             Welcome to DreamFactory for Snowflake
           </h2>
-          <p style="font-size: 16px; color: #666; margin-bottom: 24px;">
-            Turn your Snowflake data into secure REST APIs in minutes. Follow these steps to get started:
+          <p style="font-size: 16px; color: #666; margin-bottom: 24px">
+            Turn your Snowflake data into secure REST APIs in minutes. Follow
+            these steps to get started:
           </p>
 
           <!-- Step-by-step guide -->
-          <div style="background: #f5f5f5; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
-            <h3 style="margin-bottom: 16px; font-size: 18px;">Quick Start Guide</h3>
-            <ol style="margin: 0; padding-left: 20px; line-height: 2;">
-              <li><strong>Create a Snowflake API</strong> - Click the card below to connect to your Snowflake data</li>
-              <li><strong>Configure Connection</strong> - Enter your database, schema, warehouse, and role</li>
-              <li><strong>Test OAuth</strong> - Click "Test OAuth Connection" to verify authentication</li>
-              <li><strong>Explore API Docs</strong> - View auto-generated API documentation and test endpoints</li>
-              <li><strong>Make API Calls</strong> - Use your API key to authenticate requests from your applications</li>
+          <div
+            style="
+              background: #f5f5f5;
+              border-radius: 12px;
+              padding: 24px;
+              margin-bottom: 24px;
+            ">
+            <h3 style="margin-bottom: 16px; font-size: 18px">
+              Quick Start Guide
+            </h3>
+            <ol style="margin: 0; padding-left: 20px; line-height: 2">
+              <li>
+                <strong>Create a Snowflake API</strong> - Click the card below
+                to connect to your Snowflake data
+              </li>
+              <li>
+                <strong>Configure Connection</strong> - Enter your database,
+                schema, warehouse, and role
+              </li>
+              <li>
+                <strong>Test OAuth</strong> - Click "Test OAuth Connection" to
+                verify authentication
+              </li>
+              <li>
+                <strong>Explore API Docs</strong> - View auto-generated API
+                documentation and test endpoints
+              </li>
+              <li>
+                <strong>Make API Calls</strong> - Use your API key to
+                authenticate requests from your applications
+              </li>
             </ol>
           </div>
 
           <!-- Quick action cards -->
-          <h3 style="margin-bottom: 16px;">Get Started</h3>
-          <div class="button-group" style="display: flex; gap: 16px; flex-wrap: wrap;">
+          <h3 style="margin-bottom: 16px">Get Started</h3>
+          <div
+            class="button-group"
+            style="display: flex; gap: 16px; flex-wrap: wrap">
             <a
               *ngFor="let card of nativeAppCardsData"
               [routerLink]="card.route"
@@ -45,39 +70,106 @@
                 flex: 1;
                 min-width: 250px;
                 max-width: 350px;
-                transition: box-shadow 0.2s, transform 0.2s;
+                transition:
+                  box-shadow 0.2s,
+                  transform 0.2s;
                 text-decoration: none;
               ">
-              <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+              <div
+                style="
+                  display: flex;
+                  align-items: center;
+                  gap: 12px;
+                  margin-bottom: 12px;
+                ">
                 <fa-icon
                   [icon]="card.icon"
                   [style.color]="card.headerColor"
-                  style="font-size: 28px;">
+                  style="font-size: 28px">
                 </fa-icon>
-                <h4 style="margin: 0; color: #333;">{{ card.headerText }}</h4>
+                <h4 style="margin: 0; color: #333">{{ card.headerText }}</h4>
               </div>
-              <p style="margin: 0; color: #666; font-size: 14px;">{{ card.text }}</p>
+              <p style="margin: 0; color: #666; font-size: 14px">
+                {{ card.text }}
+              </p>
             </a>
           </div>
         </article>
 
         <!-- API Authentication Info -->
-        <article style="background: #e3f2fd; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
-          <h3 style="margin-bottom: 12px; color: #1565c0;">
-            <fa-icon [icon]="faBook" style="margin-right: 8px;"></fa-icon>
+        <article
+          style="
+            background: #e3f2fd;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+          ">
+          <h3 style="margin-bottom: 12px; color: #1565c0">
+            <fa-icon [icon]="faBook" style="margin-right: 8px"></fa-icon>
             Authenticating API Requests
           </h3>
-          <p style="margin-bottom: 12px; color: #333;">
-            Once you've created your Snowflake API, authenticate requests using your API key:
+          <p style="margin-bottom: 12px; color: #333">
+            Once you've created your Snowflake API, authenticate requests using
+            your API key:
           </p>
-          <div style="background: #263238; color: #aed581; padding: 16px; border-radius: 8px; font-family: monospace; font-size: 13px; overflow-x: auto;">
-            <div style="color: #80cbc4;">// Example: Get all tables from your schema</div>
-            <div>curl -X GET "https://your-app-url/api/v2/your-service/_table" \</div>
-            <div style="padding-left: 20px;">-H "X-DreamFactory-API-Key: YOUR_API_KEY"</div>
+          <div
+            style="
+              background: #263238;
+              color: #aed581;
+              padding: 16px;
+              border-radius: 8px;
+              font-family: monospace;
+              font-size: 13px;
+              overflow-x: auto;
+            ">
+            <div style="color: #80cbc4">
+              // Example: Get all tables from your schema
+            </div>
+            <div>
+              curl -X GET "https://your-app-url/api/v2/your-service/_table" \
+            </div>
+            <div style="padding-left: 20px">
+              -H "X-DreamFactory-API-Key: YOUR_API_KEY"
+            </div>
           </div>
-          <p style="margin-top: 12px; font-size: 13px; color: #666;">
+          <p style="margin-top: 12px; font-size: 13px; color: #666">
             Find your API key in <strong>API Connections → API Keys</strong>
           </p>
+        </article>
+
+        <!-- Support & Upgrade CTA -->
+        <article
+          style="
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            color: white;
+          ">
+          <h3 style="margin-bottom: 12px; color: white">
+            <fa-icon [icon]="faComment" style="margin-right: 8px"></fa-icon>
+            Need Help or Ready to Upgrade?
+          </h3>
+          <p style="margin-bottom: 16px; color: rgba(255,255,255,0.9)">
+            Get technical support, discuss your use case, or learn about full-featured
+            deployment options beyond the Marketplace trial.
+          </p>
+          <a
+            href="https://calendly.com/nicdavidson-df/snowflake-native-app-support"
+            target="_blank"
+            rel="noopener"
+            style="
+              display: inline-block;
+              background: white;
+              color: #667eea;
+              padding: 12px 24px;
+              border-radius: 8px;
+              text-decoration: none;
+              font-weight: 600;
+              transition: transform 0.2s, box-shadow 0.2s;
+            ">
+            Schedule a Call
+          </a>
         </article>
 
         <!-- Dashboard Section -->
