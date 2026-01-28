@@ -17,9 +17,19 @@ export class DfEngagementBannerComponent implements OnInit {
   calendlyUrl =
     'https://calendly.com/nicdavidson-df/snowflake-native-app-support';
 
+  // Native App branch - always show the banner
+  isNativeApp = true;
+
   constructor(private systemConfigService: DfSystemConfigDataService) {}
 
   ngOnInit() {
+    // In Native App mode, always show the banner
+    if (this.isNativeApp) {
+      this.showBanner = true;
+      return;
+    }
+
+    // Standard mode: check license
     this.systemConfigService.environment$
       .pipe(untilDestroyed(this))
       .subscribe(environment => {

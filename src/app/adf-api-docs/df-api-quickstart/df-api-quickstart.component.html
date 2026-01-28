@@ -1,4 +1,77 @@
 <mat-accordion>
+  <!-- Getting Started Section for Native App -->
+  <mat-expansion-panel *ngIf="isNativeApp" [expanded]="true">
+    <mat-expansion-panel-header>
+      <mat-panel-title style="font-size: 18px">
+        <mat-icon style="margin-right: 8px">rocket_launch</mat-icon>
+        Getting Started: Call Your API from Outside Snowflake
+      </mat-panel-title>
+    </mat-expansion-panel-header>
+    <ng-template matExpansionPanelContent>
+      <div class="getting-started-content" style="padding: 8px 0;">
+        <p class="themed-text" style="margin-bottom: 16px;">
+          Your Snowflake API is ready! Follow these steps to access it from external applications:
+        </p>
+
+        <div class="step-cards" style="display: flex; flex-direction: column; gap: 16px;">
+          <!-- Step 1: API Keys -->
+          <div class="step-card" style="background: #f5f5f5; border-radius: 8px; padding: 16px; border-left: 4px solid #1976d2;">
+            <div style="display: flex; align-items: flex-start; gap: 12px;">
+              <div style="background: #1976d2; color: white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0;">1</div>
+              <div style="flex: 1;">
+                <h4 style="margin: 0 0 8px 0; font-size: 16px;">Get an API Key</h4>
+                <p style="margin: 0 0 12px 0; color: #666; font-size: 14px;">
+                  API keys authenticate external requests. Create one in the API Keys section.
+                </p>
+                <a mat-stroked-button color="primary" routerLink="/api-security/api-keys" style="text-decoration: none;">
+                  <mat-icon>key</mat-icon>
+                  Go to API Keys
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 2: Role-Based Access -->
+          <div class="step-card" style="background: #f5f5f5; border-radius: 8px; padding: 16px; border-left: 4px solid #388e3c;">
+            <div style="display: flex; align-items: flex-start; gap: 12px;">
+              <div style="background: #388e3c; color: white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0;">2</div>
+              <div style="flex: 1;">
+                <h4 style="margin: 0 0 8px 0; font-size: 16px;">Configure Access Permissions</h4>
+                <p style="margin: 0 0 12px 0; color: #666; font-size: 14px;">
+                  Control which tables and operations each API key can access using Role-Based Access.
+                </p>
+                <a mat-stroked-button color="primary" routerLink="/role-based-access" style="text-decoration: none;">
+                  <mat-icon>admin_panel_settings</mat-icon>
+                  Go to Role-Based Access
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 3: Make API Call -->
+          <div class="step-card" style="background: #f5f5f5; border-radius: 8px; padding: 16px; border-left: 4px solid #7b1fa2;">
+            <div style="display: flex; align-items: flex-start; gap: 12px;">
+              <div style="background: #7b1fa2; color: white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0;">3</div>
+              <div style="flex: 1;">
+                <h4 style="margin: 0 0 8px 0; font-size: 16px;">Call Your API</h4>
+                <p style="margin: 0 0 12px 0; color: #666; font-size: 14px;">
+                  Use the cURL commands below or any HTTP client. Include your API key in the header:
+                </p>
+                <pre style="background: #263238; color: #aed581; padding: 12px; border-radius: 4px; font-size: 13px; overflow-x: auto; margin: 0;">curl -X GET "{{ baseUrl }}/{{ serviceName }}/_table" \
+  -H "X-DreamFactory-API-Key: YOUR_API_KEY"</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: 16px; padding: 12px; background: #e3f2fd; border-radius: 4px;">
+          <strong style="color: #1565c0;">Pro Tip:</strong>
+          <span style="color: #666;"> The API documentation below is interactive - expand any endpoint and click "Try it out" to test requests directly.</span>
+        </div>
+      </div>
+    </ng-template>
+  </mat-expansion-panel>
+
   <mat-expansion-panel #curlCommandsPanel>
     <mat-expansion-panel-header>
       <mat-panel-title style="font-size: 18px">

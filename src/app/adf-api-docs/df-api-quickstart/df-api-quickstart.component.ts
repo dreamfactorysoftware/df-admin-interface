@@ -17,6 +17,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { DfApiTesterComponent } from 'src/app/shared/components/df-api-tester/df-api-tester.component';
 import { healthCheckEndpointsInfo } from '../constants/health-check-endpoints';
+import { RouterModule } from '@angular/router';
 
 interface CurlCommand {
   title: string;
@@ -42,6 +43,7 @@ interface CurlCommand {
     MatDividerModule,
     MatButtonModule,
     DfApiTesterComponent,
+    RouterModule,
   ],
 })
 export class DfApiQuickstartComponent implements OnChanges {
@@ -50,6 +52,14 @@ export class DfApiQuickstartComponent implements OnChanges {
 
   curlCommands: CurlCommand[] = [];
   faCopy = faCopy;
+
+  // Native App flag - shows getting started guide
+  isNativeApp = true;
+
+  // Base URL for API calls (without service name)
+  get baseUrl(): string {
+    return `${window.location.origin}${BASE_URL}`;
+  }
 
   constructor(
     private clipboard: Clipboard,

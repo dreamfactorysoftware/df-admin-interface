@@ -537,6 +537,25 @@ export class DfServiceDetailsComponent implements OnInit {
         });
       });
     }
+
+    // Check for type query param to pre-select service type and skip to step 2
+    this.activatedRoute.queryParams.subscribe(params => {
+      const preselectedType = params['type'];
+      if (preselectedType && !this.edit) {
+        // Wait for serviceTypes to be loaded, then set the type and advance stepper
+        setTimeout(() => {
+          if (this.serviceTypes?.find(st => st.name === preselectedType)) {
+            this.serviceForm.patchValue({ type: preselectedType });
+            console.log('[QueryParam] Pre-selected service type:', preselectedType);
+            // Advance to step 2 (service details)
+            if (this.stepper) {
+              this.stepper.next();
+              console.log('[QueryParam] Advanced stepper to step 2');
+            }
+          }
+        }, 200);
+      }
+    });
   }
 
   getStorageServiceDisplayName(): string {

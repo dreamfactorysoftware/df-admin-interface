@@ -1,37 +1,103 @@
 <!-- Native App AI Route: Show custom message instead of paywall -->
 <ng-container *ngIf="isNativeApp && isAiRoute && paywall; else checkPaywall">
-  <mat-card class="native-app-ai-notice">
-    <mat-card-header>
-      <mat-icon mat-card-avatar>smart_toy</mat-icon>
-      <mat-card-title>AI Services (MCP Server)</mat-card-title>
-      <mat-card-subtitle
-        >Not available on Snowflake Marketplace</mat-card-subtitle
-      >
-    </mat-card-header>
-    <mat-card-content>
-      <p>
-        The DreamFactory MCP Server enables AI assistants like Claude to
-        interact with your databases through natural language. Due to Snowflake
-        Marketplace container limitations, this feature is not available in the
-        Native App deployment.
+  <div class="ai-services-page" style="max-width: 900px; margin: 0 auto; padding: 24px;">
+    <!-- Hero Section -->
+    <div style="text-align: center; margin-bottom: 40px;">
+      <div style="display: inline-flex; align-items: center; justify-content: center; width: 80px; height: 80px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 20px; margin-bottom: 20px;">
+        <span style="font-size: 40px;">🧠</span>
+      </div>
+      <h1 style="font-size: 32px; font-weight: 600; margin: 0 0 12px 0;">DreamFactory MCP Server</h1>
+      <p style="font-size: 18px; color: #666; margin: 0 0 16px 0;">
+        Connect AI assistants directly to your databases with natural language
       </p>
-      <p style="margin-top: 16px">
-        <strong>Want AI-powered database access?</strong><br />
-        The MCP Server can be deployed alongside your Snowflake database using
-        our on-premises or cloud-hosted DreamFactory instance. This allows AI
-        tools to securely query your Snowflake data through DreamFactory's REST
-        APIs.
+      <div style="display: inline-block; background: #fff3e0; color: #e65100; padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 500;">
+        <span style="margin-right: 4px;">ℹ️</span>
+        Not available on the Snowflake Marketplace at this time
+      </div>
+    </div>
+
+    <!-- Feature Cards -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 40px;">
+      <div style="background: #f8f9fa; border-radius: 12px; padding: 24px; border: 1px solid #e0e0e0;">
+        <div style="font-size: 32px; margin-bottom: 12px;">💬</div>
+        <h3 style="margin: 0 0 8px 0; font-size: 18px;">Natural Language Queries</h3>
+        <p style="margin: 0; color: #666; font-size: 14px; line-height: 1.6;">
+          Ask questions in plain English. "Show me all orders from last month" becomes a SQL query automatically.
+        </p>
+      </div>
+
+      <div style="background: #f8f9fa; border-radius: 12px; padding: 24px; border: 1px solid #e0e0e0;">
+        <div style="font-size: 32px; margin-bottom: 12px;">🔒</div>
+        <h3 style="margin: 0 0 8px 0; font-size: 18px;">Role-Based Security</h3>
+        <p style="margin: 0; color: #666; font-size: 14px; line-height: 1.6;">
+          AI access inherits DreamFactory's security model. Control exactly which tables and operations are allowed.
+        </p>
+      </div>
+
+      <div style="background: #f8f9fa; border-radius: 12px; padding: 24px; border: 1px solid #e0e0e0;">
+        <div style="font-size: 32px; margin-bottom: 12px;">🔗</div>
+        <h3 style="margin: 0 0 8px 0; font-size: 18px;">Multi-Database Support</h3>
+        <p style="margin: 0; color: #666; font-size: 14px; line-height: 1.6;">
+          Connect to Snowflake, PostgreSQL, MySQL, SQL Server, and 20+ other databases through a single interface.
+        </p>
+      </div>
+
+      <div style="background: #f8f9fa; border-radius: 12px; padding: 24px; border: 1px solid #e0e0e0;">
+        <div style="font-size: 32px; margin-bottom: 12px;">🤖</div>
+        <h3 style="margin: 0 0 8px 0; font-size: 18px;">Works with Claude & More</h3>
+        <p style="margin: 0; color: #666; font-size: 14px; line-height: 1.6;">
+          Compatible with Claude Desktop, Cursor, and any AI tool that supports the Model Context Protocol (MCP).
+        </p>
+      </div>
+    </div>
+
+    <!-- How it Works -->
+    <div style="background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%); border-radius: 16px; padding: 32px; margin-bottom: 40px;">
+      <h2 style="margin: 0 0 24px 0; font-size: 24px; text-align: center;">How It Works</h2>
+      <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 32px;">
+        <div style="text-align: center; flex: 1; min-width: 150px;">
+          <div style="background: white; width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            <span style="font-size: 20px; font-weight: bold; color: #667eea;">1</span>
+          </div>
+          <p style="margin: 0; font-size: 14px; color: #333;">Deploy DreamFactory with MCP Server</p>
+        </div>
+        <div style="text-align: center; flex: 1; min-width: 150px;">
+          <div style="background: white; width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            <span style="font-size: 20px; font-weight: bold; color: #667eea;">2</span>
+          </div>
+          <p style="margin: 0; font-size: 14px; color: #333;">Connect your Snowflake database</p>
+        </div>
+        <div style="text-align: center; flex: 1; min-width: 150px;">
+          <div style="background: white; width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            <span style="font-size: 20px; font-weight: bold; color: #667eea;">3</span>
+          </div>
+          <p style="margin: 0; font-size: 14px; color: #333;">Configure with your LLM provider</p>
+        </div>
+        <div style="text-align: center; flex: 1; min-width: 150px;">
+          <div style="background: white; width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            <span style="font-size: 20px; font-weight: bold; color: #667eea;">4</span>
+          </div>
+          <p style="margin: 0; font-size: 14px; color: #333;">Query your data with AI</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- CTA Section -->
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 16px; padding: 40px; text-align: center; color: white;">
+      <h2 style="margin: 0 0 12px 0; font-size: 28px; color: white;">Ready to Enable AI for Your Database?</h2>
+      <p style="margin: 0 0 24px 0; font-size: 16px; opacity: 0.9;">
+        The MCP Server is available with DreamFactory's on-premises and cloud-hosted deployments.
+        Schedule a call to learn how to connect AI assistants to your Snowflake data.
       </p>
-      <p style="margin-top: 16px">
-        <a
-          href="https://www.dreamfactory.com/contact"
-          target="_blank"
-          rel="noopener">
-          Contact us to learn more about AI integration options
-        </a>
-      </p>
-    </mat-card-content>
-  </mat-card>
+      <a
+        href="https://calendly.com/nicdavidson-df/snowflake-native-app-support"
+        target="_blank"
+        rel="noopener"
+        style="display: inline-block; background: white; color: #667eea; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px; transition: transform 0.2s;">
+        Schedule a Demo
+      </a>
+    </div>
+  </div>
 </ng-container>
 
 <ng-template #checkPaywall>

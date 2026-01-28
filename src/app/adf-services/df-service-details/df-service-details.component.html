@@ -113,38 +113,43 @@
         <ng-template matStepLabel>Service Details</ng-template>
         <br />
         <div class="details-section">
-          <mat-form-field
-            subscriptSizing="dynamic"
-            class="dynamic-width"
-            *ngIf="!subscriptionRequired"
-            appearance="outline">
-            <mat-label>{{
-              'services.controls.namespace.label' | transloco
-            }}</mat-label>
-            <input matInput formControlName="name" />
-            <fa-icon
-              class="tool-tip-trigger"
-              matSuffix
-              [icon]="faCircleInfo"
-              [matTooltip]="
-                'services.controls.namespace.tooltip' | transloco
-              " />
-          </mat-form-field>
-          <mat-form-field
-            appearance="outline"
-            subscriptSizing="dynamic"
-            class="dynamic-width"
-            *ngIf="!subscriptionRequired">
-            <mat-label>{{
-              'services.controls.label.label' | transloco
-            }}</mat-label>
-            <input matInput formControlName="label" />
-            <fa-icon
-              class="tool-tip-trigger"
-              matSuffix
-              [icon]="faCircleInfo"
-              [matTooltip]="'services.controls.label.tooltip' | transloco" />
-          </mat-form-field>
+          <!-- Equal-width row for Namespace and Label -->
+          <div *ngIf="!subscriptionRequired" style="display: flex; gap: 16px; width: 100%; margin-bottom: 8px;">
+            <mat-form-field
+              subscriptSizing="fixed"
+              style="flex: 1;"
+              appearance="outline">
+              <mat-label>{{
+                'services.controls.namespace.label' | transloco
+              }}</mat-label>
+              <input matInput formControlName="name" />
+              <fa-icon
+                class="tool-tip-trigger"
+                matSuffix
+                [icon]="faCircleInfo"
+                [matTooltip]="
+                  'services.controls.namespace.tooltip' | transloco
+                " />
+              <mat-hint>
+                API URL: /api/v2/<strong>{{ serviceForm.get('name')?.value || 'your-name' }}</strong>/_table/... (lowercase, no spaces)
+              </mat-hint>
+            </mat-form-field>
+            <mat-form-field
+              appearance="outline"
+              subscriptSizing="fixed"
+              style="flex: 1;">
+              <mat-label>{{
+                'services.controls.label.label' | transloco
+              }}</mat-label>
+              <input matInput formControlName="label" />
+              <fa-icon
+                class="tool-tip-trigger"
+                matSuffix
+                [icon]="faCircleInfo"
+                [matTooltip]="'services.controls.label.tooltip' | transloco" />
+              <mat-hint>Display name shown in the UI</mat-hint>
+            </mat-form-field>
+          </div>
           <mat-form-field
             appearance="outline"
             subscriptSizing="dynamic"

@@ -4,8 +4,6 @@ import { DfManageServicesTableComponent } from './df-manage-services-table.compo
 import { ActivatedRoute, Router } from '@angular/router';
 import { NgIf } from '@angular/common';
 import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
-import { MatCardModule } from '@angular/material/card';
-import { MatIconModule } from '@angular/material/icon';
 
 @Component({
   selector: 'df-manage-services',
@@ -15,8 +13,6 @@ import { MatIconModule } from '@angular/material/icon';
     DfPaywallComponent,
     DfManageServicesTableComponent,
     NgIf,
-    MatCardModule,
-    MatIconModule,
   ],
 })
 export class DfManageServicesComponent implements OnInit {
@@ -35,7 +31,13 @@ export class DfManageServicesComponent implements OnInit {
     this.isAiRoute = this.router.url.startsWith('/ai');
 
     this.activatedRoute.data.subscribe(({ data }) => {
-      this.paywall = data.serviceTypes && data.serviceTypes.length === 0;
+      // In Native App mode on AI route, always show the "not available" message
+      // regardless of whether MCP package is installed locally
+      if (this.isNativeApp && this.isAiRoute) {
+        this.paywall = true;
+      } else {
+        this.paywall = data.serviceTypes && data.serviceTypes.length === 0;
+      }
     });
     this.snackbarService.setSnackbarLastEle('', false);
   }
