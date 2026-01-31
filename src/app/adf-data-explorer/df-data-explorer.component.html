@@ -1,0 +1,52 @@
+<div class="data-explorer-container" [class.dark-theme]="isDarkMode$ | async" *transloco="let t; scope: 'dataExplorer'">
+  <mat-sidenav-container class="explorer-sidenav-container">
+    <!-- Left Panel -->
+    <mat-sidenav mode="side" opened class="explorer-sidenav" [fixedInViewport]="false">
+      <div class="sidenav-content">
+        <!-- Database list or Schema tree -->
+        <ng-container *ngIf="!selectedDb">
+          <df-db-selector
+            [databases]="databases"
+            [loading]="loadingDbs"
+            [error]="errorDbs"
+            (databaseSelected)="onDatabaseSelected($event)"
+            (retry)="loadDatabases()">
+          </df-db-selector>
+        </ng-container>
+
+        <ng-container *ngIf="selectedDb">
+          <df-schema-tree
+            [serviceName]="selectedDb.name"
+            [serviceLabel]="selectedDb.label || selectedDb.name"
+            [tables]="tables"
+            [loading]="loadingSchema"
+            [error]="errorSchema"
+            [selectedTable]="selectedTable"
+            (tableSelected)="onTableSelected($event)"
+            (backClicked)="onBackToDatabases()"
+            (retry)="loadSchema(selectedDb.name)">
+          </df-schema-tree>
+        </ng-container>
+      </div>
+    </mat-sidenav>
+
+    <!-- Main Content -->
+    <mat-sidenav-content class="explorer-content">
+      <ng-container *ngIf="!selectedTable">
+        <div class="empty-state">
+          <mat-icon class="empty-icon">storage</mat-icon>
+          <h2>{{ t('dataExplorer.title') }}</h2>
+          <p *ngIf="!selectedDb">{{ t('dataExplorer.selectDatabase') }}</p>
+          <p *ngIf="selectedDb">{{ t('dataExplorer.selectTable') }}</p>
+        </div>
+      </ng-container>
+
+      <ng-container *ngIf="selectedTable && selectedDb">
+        <df-data-grid
+          [serviceName]="selectedDb.name"
+          [tableName]="selectedTable.name">
+        </df-data-grid>
+      </ng-container>
+    </mat-sidenav-content>
+  </mat-sidenav-container>
+</div>

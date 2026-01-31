@@ -288,6 +288,14 @@ export const routes: Routes = [
         ],
         providers: [provideTranslocoScope('apiDocs')],
       },
+      {
+        path: ROUTES.DATA_EXPLORER,
+        loadComponent: () =>
+          import('./adf-data-explorer/df-data-explorer.component').then(
+            m => m.DfDataExplorerComponent
+          ),
+        providers: [provideTranslocoScope('dataExplorer')],
+      },
     ],
     canActivate: [loggedInGuard, licenseGuard, globalLicenseGuard],
   },
