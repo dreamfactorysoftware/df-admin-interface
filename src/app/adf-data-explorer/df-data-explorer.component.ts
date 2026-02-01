@@ -1,4 +1,12 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  OnDestroy,
+  AfterViewInit,
+  ElementRef,
+  HostBinding,
+  NgZone,
+} from '@angular/core';
 import { NgIf, AsyncPipe } from '@angular/common';
 import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatToolbarModule } from '@angular/material/toolbar';
@@ -37,11 +45,13 @@ import { DfThemeService } from '../shared/services/df-theme.service';
     DfDataGridComponent,
   ],
 })
-export class DfDataExplorerComponent implements OnInit, OnDestroy {
+export class DfDataExplorerComponent implements OnInit, OnDestroy, AfterViewInit {
+  @HostBinding('style.height.px') hostHeight: number | null = null;
   databases: DatabaseService[] = [];
   tables: TableInfo[] = [];
   selectedDb: DatabaseService | null = null;
   selectedTable: TableInfo | null = null;
+  pendingFilter: string | undefined;
 
   loadingDbs = false;
   loadingSchema = false;
@@ -52,18 +62,49 @@ export class DfDataExplorerComponent implements OnInit, OnDestroy {
 
   private destroy$ = new Subject<void>();
 
+  private resizeObserver: ResizeObserver | null = null;
+  private resizeListener = () => this.calculateHeight();
+
   constructor(
     private dataExplorerService: DataExplorerService,
-    private themeService: DfThemeService
+    private themeService: DfThemeService,
+    private elementRef: ElementRef,
+    private ngZone: NgZone
   ) {}
 
   ngOnInit(): void {
     this.loadDatabases();
   }
 
+  ngAfterViewInit(): void {
+    // Measure actual available height from element position in viewport
+    this.calculateHeight();
+    window.addEventListener('resize', this.resizeListener);
+
+    // Watch for parent layout changes (e.g. sidebar collapse)
+    this.ngZone.runOutsideAngular(() => {
+      this.resizeObserver = new ResizeObserver(() => {
+        this.ngZone.run(() => this.calculateHeight());
+      });
+      const parent = this.elementRef.nativeElement.parentElement;
+      if (parent) {
+        this.resizeObserver.observe(parent);
+      }
+    });
+  }
+
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+    window.removeEventListener('resize', this.resizeListener);
+    this.resizeObserver?.disconnect();
+  }
+
+  private calculateHeight(): void {
+    const el = this.elementRef.nativeElement as HTMLElement;
+    const rect = el.getBoundingClientRect();
+    // Available height = viewport bottom - element top - small margin for safety
+    this.hostHeight = Math.floor(window.innerHeight - rect.top);
   }
 
   loadDatabases(): void {
@@ -110,12 +151,29 @@ export class DfDataExplorerComponent implements OnInit, OnDestroy {
   }
 
   onTableSelected(table: TableInfo): void {
+    this.pendingFilter = undefined;
     this.selectedTable = table;
+  }
+
+  onTableNavigated(event: { tableName: string; filter?: string }): void {
+    // Find the table in the current schema list
+    const table = this.tables.find(t => t.name === event.tableName);
+    if (table) {
+      this.pendingFilter = event.filter;
+      // If navigating to the same table, briefly null to force ngOnChanges
+      if (this.selectedTable?.name === table.name) {
+        this.selectedTable = null;
+        setTimeout(() => (this.selectedTable = table));
+      } else {
+        this.selectedTable = table;
+      }
+    }
   }
 
   onBackToDatabases(): void {
     this.selectedDb = null;
     this.selectedTable = null;
+    this.pendingFilter = undefined;
     this.tables = [];
   }
 }
