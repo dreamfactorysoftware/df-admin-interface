@@ -34,6 +34,46 @@ export interface TableDataResponse {
   };
 }
 
+export interface FieldInfo {
+  name: string;
+  label: string;
+  type: string;
+  dbType: string;
+  length?: number;
+  precision?: number;
+  scale?: number;
+  default?: any;
+  isPrimaryKey: boolean;
+  isForeignKey: boolean;
+  refTable?: string;
+  refField?: string;
+  isUnique: boolean;
+  isIndex: boolean;
+  allowNull: boolean;
+  isVirtual: boolean;
+  isAggregate: boolean;
+  autoIncrement: boolean;
+}
+
+export interface RelatedInfo {
+  name: string;
+  type: string;
+  refTable: string;
+  refField: string;
+  field: string;
+  junctionTable?: string;
+  junctionField?: string;
+  junctionRefField?: string;
+}
+
+export interface TableSchemaResponse {
+  name: string;
+  label?: string;
+  plural?: string;
+  field: FieldInfo[];
+  related?: RelatedInfo[];
+}
+
 const DB_GROUPS = ['Database', 'Big Data'];
 
 @Injectable({ providedIn: 'root' })
@@ -100,12 +140,26 @@ export class DataExplorerService {
       );
   }
 
+  getTableSchema(
+    serviceName: string,
+    tableName: string
+  ): Observable<TableSchemaResponse> {
+    return this.http.get<TableSchemaResponse>(
+      `${BASE_URL}/${serviceName}/_schema/${tableName}`,
+      {
+        params: { refresh: 'true' },
+        headers: { 'show-loading': '' },
+      }
+    );
+  }
+
   getTableData(
     serviceName: string,
     tableName: string,
     limit = 50,
     offset = 0,
-    order?: string
+    order?: string,
+    filter?: string
   ): Observable<TableDataResponse> {
     const params: any = {
       limit: limit.toString(),
@@ -114,6 +168,9 @@ export class DataExplorerService {
     };
     if (order) {
       params.order = order;
+    }
+    if (filter) {
+      params.filter = filter;
     }
     return this.http.get<TableDataResponse>(
       `${BASE_URL}/${serviceName}/_table/${tableName}`,

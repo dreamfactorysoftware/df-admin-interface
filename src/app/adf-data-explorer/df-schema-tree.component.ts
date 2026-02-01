@@ -105,12 +105,13 @@ import { TableInfo } from './services/data-explorer.service';
         display: flex;
         align-items: center;
         gap: 8px;
-        padding: 8px 12px 8px 8px;
+        padding: 0 12px 0 8px;
+        height: 49px;
+        box-sizing: border-box;
         border-bottom: 1px solid #e0e0e0;
         font-weight: 500;
         font-size: 14px;
         color: #424242;
-        min-height: 52px;
 
         .back-btn {
           flex-shrink: 0;

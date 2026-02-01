@@ -1,17 +1,30 @@
 :host {
   display: block;
-  height: calc(100vh - 130px);
+  overflow: hidden;
+  // height is set dynamically via HostBinding based on actual viewport position
 }
 
 .data-explorer-container {
   height: 100%;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
+// Use explicit height: 100% chain instead of flex, so mat-sidenav-container
+// propagates its height properly to children using height: 100%
 .explorer-sidenav-container {
-  flex: 1;
-  height: 100%;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+}
+
+// Also target via ::ng-deep to override Angular Material's own host styles
+::ng-deep mat-sidenav-container.explorer-sidenav-container {
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
 }
 
 .explorer-sidenav {
@@ -32,11 +45,18 @@
 
 .explorer-content {
   background: #fff;
-  height: 100%;
 
   .dark-theme & {
     background: #424242;
   }
+}
+
+// Force mat-sidenav-content to have bounded height and act as positioned parent
+::ng-deep .mat-sidenav-content,
+::ng-deep .mat-drawer-content {
+  height: 100% !important;
+  overflow: hidden !important;
+  position: relative !important;
 }
 
 .empty-state {

@@ -21,5 +21,14 @@
   "database": "Database",
   "table": "Table",
   "readOnly": "Read-only",
-  "rowsPerPage": "Rows per page"
+  "rowsPerPage": "Rows per page",
+  "schemaInfo": "Schema Info",
+  "columns": "Columns",
+  "relationships": "Relationships",
+  "filterPlaceholder": "Filter...",
+  "clearFilters": "Clear all filters",
+  "recordDetail": "Record Detail",
+  "nullValue": "NULL",
+  "showApiCall": "Show API Call",
+  "quickSearch": "Search rows..."
 }

@@ -44,7 +44,9 @@
       <ng-container *ngIf="selectedTable && selectedDb">
         <df-data-grid
           [serviceName]="selectedDb.name"
-          [tableName]="selectedTable.name">
+          [tableName]="selectedTable.name"
+          [initialFilter]="pendingFilter"
+          (tableNavigated)="onTableNavigated($event)">
         </df-data-grid>
       </ng-container>
     </mat-sidenav-content>
