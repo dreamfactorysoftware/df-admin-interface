@@ -87,7 +87,7 @@ export function accessibleRoutes(
         );
         break;
       case 'apidocs':
-        allowed.push(ROUTES.API_DOCS);
+        allowed.push(ROUTES.API_DOCS, ROUTES.DATA_EXPLORER);
         break;
       case 'schema/data':
         allowed.push(ROUTES.SCHEMA);

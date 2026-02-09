@@ -29,6 +29,7 @@ export enum ROUTES {
   SCRIPTS = 'scripts',
   EVENT_SCRIPTS = 'event-scripts',
   API_DOCS = 'api-docs',
+  DATA_EXPLORER = 'data-explorer',
   API_SECURITY = 'api-security',
   RATE_LIMITING = 'rate-limiting',
   AUTHENTICATION = 'authentication',
