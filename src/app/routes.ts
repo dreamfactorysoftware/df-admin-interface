@@ -57,6 +57,13 @@ import { errorGaurd } from './shared/guards/error.guard';
 import { paywallGuard } from './shared/guards/paywall.guard';
 import { rootAdminGuard } from './shared/guards/admin.guard';
 import { SERVICE_GROUPS } from './shared/constants/serviceGroups';
+import {
+  guardianDashboardResolver,
+  guardianLogsResolver,
+  guardianAlertsResolver,
+  guardianApprovalsResolver,
+  guardianConfigResolver,
+} from './adf-guardian/resolvers/guardian.resolver';
 
 export const routes: Routes = [
   {
@@ -346,6 +353,56 @@ export const routes: Routes = [
           groups: SERVICE_GROUPS[ROUTES.AUTHENTICATION],
         },
         providers: [provideTranslocoScope('services')],
+      },
+      {
+        path: ROUTES.AI_GUARDIAN,
+        children: [
+          {
+            path: '',
+            redirectTo: 'dashboard',
+            pathMatch: 'full' as const,
+          },
+          {
+            path: 'dashboard',
+            loadComponent: () =>
+              import(
+                './adf-guardian/df-guardian-dashboard/df-guardian-dashboard.component'
+              ).then(m => m.DfGuardianDashboardComponent),
+            resolve: { data: guardianDashboardResolver },
+          },
+          {
+            path: 'logs',
+            loadComponent: () =>
+              import(
+                './adf-guardian/df-guardian-logs/df-guardian-logs.component'
+              ).then(m => m.DfGuardianLogsComponent),
+            resolve: { data: guardianLogsResolver() },
+          },
+          {
+            path: 'alerts',
+            loadComponent: () =>
+              import(
+                './adf-guardian/df-guardian-alerts/df-guardian-alerts.component'
+              ).then(m => m.DfGuardianAlertsComponent),
+            resolve: { data: guardianAlertsResolver() },
+          },
+          {
+            path: 'approvals',
+            loadComponent: () =>
+              import(
+                './adf-guardian/df-guardian-approvals/df-guardian-approvals.component'
+              ).then(m => m.DfGuardianApprovalsComponent),
+            resolve: { data: guardianApprovalsResolver() },
+          },
+          {
+            path: 'config',
+            loadComponent: () =>
+              import(
+                './adf-guardian/df-guardian-config/df-guardian-config.component'
+              ).then(m => m.DfGuardianConfigComponent),
+            resolve: { data: guardianConfigResolver },
+          },
+        ],
       },
     ],
     canActivate: [loggedInGuard, licenseGuard, globalLicenseGuard],
@@ -809,10 +866,35 @@ export const routes: Routes = [
   },
   {
     path: ROUTES.AI,
-    children: ServiceRoutes,
-    data: {
-      groups: SERVICE_GROUPS[ROUTES.AI],
-    },
+    children: [
+      { path: '', redirectTo: ROUTES.AI_MCP, pathMatch: 'full' as const },
+      {
+        path: ROUTES.AI_MCP,
+        children: ServiceRoutes,
+        data: {
+          groups: SERVICE_GROUPS[ROUTES.AI_MCP],
+        },
+      },
+      {
+        path: ROUTES.AI_PROVIDERS,
+        children: ServiceRoutes,
+        data: {
+          groups: SERVICE_GROUPS[ROUTES.AI_PROVIDERS],
+        },
+      },
+      {
+        path: ROUTES.AI_CHAT,
+        children: [
+          {
+            path: '',
+            loadComponent: () =>
+              import(
+                './adf-ai/df-ai-chat-placeholder/df-ai-chat-placeholder.component'
+              ).then(m => m.DfAiChatPlaceholderComponent),
+          },
+        ],
+      },
+    ],
     canActivate: [loggedInGuard, licenseGuard, globalLicenseGuard],
     providers: [provideTranslocoScope('services')],
   },

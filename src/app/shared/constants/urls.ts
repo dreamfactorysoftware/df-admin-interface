@@ -33,4 +33,9 @@ export enum URLS {
   LOOKUP_KEYS = `${BASE_URL}/system/lookup`,
   FILES = `${BASE_URL}/files`,
   LOGS = `${BASE_URL}/logs`,
+  GUARDIAN_DASHBOARD = `${BASE_URL}/system/guardian/dashboard`,
+  GUARDIAN_LOG = `${BASE_URL}/system/guardian/log`,
+  GUARDIAN_ALERT = `${BASE_URL}/system/guardian/alert`,
+  GUARDIAN_APPROVAL = `${BASE_URL}/system/guardian/approval`,
+  GUARDIAN_CONFIG = `${BASE_URL}/system/guardian/config`,
 }

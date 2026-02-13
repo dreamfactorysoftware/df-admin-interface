@@ -115,3 +115,32 @@ export const FILE_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
   'FILE_SERVICE_TOKEN',
   dfBaseCrudServiceProvider(URLS.FILES)
 );
+
+export const GUARDIAN_DASHBOARD_SERVICE_TOKEN =
+  new InjectionToken<DfBaseCrudService>(
+    'GUARDIAN_DASHBOARD_SERVICE_TOKEN',
+    dfBaseCrudServiceProvider(URLS.GUARDIAN_DASHBOARD)
+  );
+
+export const GUARDIAN_LOG_SERVICE_TOKEN = new InjectionToken<DfBaseCrudService>(
+  'GUARDIAN_LOG_SERVICE_TOKEN',
+  dfBaseCrudServiceProvider(URLS.GUARDIAN_LOG)
+);
+
+export const GUARDIAN_ALERT_SERVICE_TOKEN =
+  new InjectionToken<DfBaseCrudService>(
+    'GUARDIAN_ALERT_SERVICE_TOKEN',
+    dfBaseCrudServiceProvider(URLS.GUARDIAN_ALERT)
+  );
+
+export const GUARDIAN_APPROVAL_SERVICE_TOKEN =
+  new InjectionToken<DfBaseCrudService>(
+    'GUARDIAN_APPROVAL_SERVICE_TOKEN',
+    dfBaseCrudServiceProvider(URLS.GUARDIAN_APPROVAL)
+  );
+
+export const GUARDIAN_CONFIG_SERVICE_TOKEN =
+  new InjectionToken<DfBaseCrudService>(
+    'GUARDIAN_CONFIG_SERVICE_TOKEN',
+    dfBaseCrudServiceProvider(URLS.GUARDIAN_CONFIG)
+  );

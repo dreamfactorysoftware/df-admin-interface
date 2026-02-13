@@ -146,13 +146,33 @@
     "ai": {
       "nav": "AI",
       "header": "{{nav.ai.nav}}",
-      "create": {
-        "nav": "Create AI Tool",
-        "header": "{{nav.ai.create.nav}}"
+      "mcp-server": {
+        "nav": "MCP Server",
+        "header": "{{nav.ai.mcp-server.nav}}",
+        "create": {
+          "nav": "Create MCP Service",
+          "header": "{{nav.ai.mcp-server.create.nav}}"
+        },
+        "edit": {
+          "nav": "{{edit}}",
+          "header": "{{nav.ai.mcp-server.edit.nav}}"
+        }
       },
-      "edit": {
-        "nav": "{{edit}}",
-        "header": "{{nav.ai.edit.nav}}"
+      "providers": {
+        "nav": "AI Providers",
+        "header": "{{nav.ai.providers.nav}}",
+        "create": {
+          "nav": "Create AI Provider",
+          "header": "{{nav.ai.providers.create.nav}}"
+        },
+        "edit": {
+          "nav": "{{edit}}",
+          "header": "{{nav.ai.providers.edit.nav}}"
+        }
+      },
+      "chat": {
+        "nav": "Chat",
+        "header": "{{nav.ai.chat.nav}}"
       }
     },
     "api-connections": {
@@ -266,6 +286,30 @@
         "create": {
           "nav": "Create Authentication API",
           "header": "{{nav.api-security.authentication.create.nav}}"
+        }
+      },
+      "ai-guardian": {
+        "nav": "AI Guardian",
+        "header": "{{nav.api-security.ai-guardian.nav}}",
+        "dashboard": {
+          "nav": "Dashboard",
+          "header": "{{nav.api-security.ai-guardian.dashboard.nav}}"
+        },
+        "logs": {
+          "nav": "Logs",
+          "header": "{{nav.api-security.ai-guardian.logs.nav}}"
+        },
+        "alerts": {
+          "nav": "Alerts",
+          "header": "{{nav.api-security.ai-guardian.alerts.nav}}"
+        },
+        "approvals": {
+          "nav": "Approvals",
+          "header": "{{nav.api-security.ai-guardian.approvals.nav}}"
+        },
+        "config": {
+          "nav": "Configuration",
+          "header": "{{nav.api-security.ai-guardian.config.nav}}"
         }
       }
     },

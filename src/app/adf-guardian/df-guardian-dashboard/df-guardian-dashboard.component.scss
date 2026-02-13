@@ -1,0 +1,95 @@
+.guardian-dashboard {
+  padding: 16px;
+}
+
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+
+  h2 {
+    margin: 0;
+  }
+}
+
+.stat-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  text-align: center;
+
+  .stat-value {
+    font-size: 2rem;
+    font-weight: 600;
+    margin: 8px 0 4px;
+  }
+
+  .stat-label {
+    font-size: 0.85rem;
+    opacity: 0.7;
+  }
+
+  &.stat-block .stat-value { color: #f44336; }
+  &.stat-flag .stat-value { color: #ff9800; }
+  &.stat-allow .stat-value { color: #4caf50; }
+  &.stat-review .stat-value { color: #2196f3; }
+}
+
+.alert-summary {
+  margin-bottom: 24px;
+}
+
+.alert-chips {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 8px 0;
+}
+
+.alert-chip {
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 0.85rem;
+  font-weight: 500;
+
+  &.critical { background: #f44336; color: white; }
+  &.high { background: #ff9800; color: white; }
+  &.medium { background: #ffc107; color: #333; }
+  &.low { background: #8bc34a; color: white; }
+}
+
+.recent-activity {
+  margin-bottom: 16px;
+}
+
+.activity-table {
+  width: 100%;
+}
+
+.method-badge {
+  font-family: monospace;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.decision-badge {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.decision-block { background: #ffebee; color: #c62828; }
+.decision-flag { background: #fff3e0; color: #e65100; }
+.decision-allow { background: #e8f5e9; color: #2e7d32; }
+.decision-review { background: #e3f2fd; color: #1565c0; }
+
+.risk-high { color: #f44336; font-weight: 600; }
+.risk-medium { color: #ff9800; font-weight: 500; }
+.risk-low { color: #4caf50; }

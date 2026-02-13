@@ -1,0 +1,194 @@
+<div class="guardian-config" *ngIf="form">
+  <div class="config-header">
+    <h2>AI Guardian Configuration</h2>
+    <button mat-raised-button color="primary" (click)="save()" [disabled]="saving">
+      {{ saving ? 'Saving...' : 'Save Changes' }}
+    </button>
+  </div>
+
+  <form [formGroup]="form">
+    <mat-card class="config-section">
+      <mat-card-header><mat-card-title>Feature Toggles</mat-card-title></mat-card-header>
+      <mat-card-content>
+        <div class="toggle-row">
+          <mat-slide-toggle formControlName="gatekeeper_enabled">
+            Gatekeeper (AI request evaluation)
+          </mat-slide-toggle>
+        </div>
+        <div class="toggle-row">
+          <mat-slide-toggle formControlName="logwatch_enabled">
+            LogWatch (pattern analysis)
+          </mat-slide-toggle>
+        </div>
+        <div class="toggle-row">
+          <mat-slide-toggle formControlName="approval_enabled">
+            Human-in-the-Loop Approval
+          </mat-slide-toggle>
+        </div>
+        <div class="toggle-row">
+          <mat-slide-toggle formControlName="cache_enabled">
+            Response Caching
+          </mat-slide-toggle>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="config-section">
+      <mat-card-header><mat-card-title>AI Service</mat-card-title></mat-card-header>
+      <mat-card-content>
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>AI Service Name</mat-label>
+          <input matInput formControlName="ai_service_name" placeholder="Name of an AI Connection service (e.g. my-claude)">
+          <mat-hint>The df-ai service to use for request evaluation</mat-hint>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Fallback AI Service Name (optional)</mat-label>
+          <input matInput formControlName="fallback_ai_service_name" placeholder="Fallback AI service if primary fails">
+        </mat-form-field>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="config-section">
+      <mat-card-header><mat-card-title>Risk Thresholds</mat-card-title></mat-card-header>
+      <mat-card-content>
+        <mat-form-field appearance="outline">
+          <mat-label>Block Threshold (0-100)</mat-label>
+          <input matInput type="number" formControlName="threshold" min="0" max="100">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Review Threshold (0-100)</mat-label>
+          <input matInput type="number" formControlName="review_threshold" min="0" max="100">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Fallback Action</mat-label>
+          <mat-select formControlName="fallback_action">
+            <mat-option value="allow">Allow</mat-option>
+            <mat-option value="block">Block</mat-option>
+            <mat-option value="flag">Flag</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="config-section">
+      <mat-card-header><mat-card-title>Performance</mat-card-title></mat-card-header>
+      <mat-card-content>
+        <mat-form-field appearance="outline">
+          <mat-label>Evaluation Timeout (seconds)</mat-label>
+          <input matInput type="number" formControlName="evaluation_timeout" min="1" max="60">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Max Request Body Size (bytes)</mat-label>
+          <input matInput type="number" formControlName="max_body_size" min="256">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Cache TTL (seconds)</mat-label>
+          <input matInput type="number" formControlName="cache_ttl" min="0">
+        </mat-form-field>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="config-section">
+      <mat-card-header><mat-card-title>Approval Settings</mat-card-title></mat-card-header>
+      <mat-card-content>
+        <mat-form-field appearance="outline">
+          <mat-label>Approval Timeout (seconds)</mat-label>
+          <input matInput type="number" formControlName="approval_timeout" min="10">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Timeout Action</mat-label>
+          <mat-select formControlName="approval_timeout_action">
+            <mat-option value="allow">Allow</mat-option>
+            <mat-option value="block">Block</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="config-section">
+      <mat-card-header><mat-card-title>Scope</mat-card-title></mat-card-header>
+      <mat-card-content>
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>HTTP Methods to Evaluate</mat-label>
+          <input matInput formControlName="methods" placeholder="POST,PUT,PATCH,DELETE">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Bypass Services (comma-separated)</mat-label>
+          <input matInput formControlName="bypass_services" placeholder="system,user">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Bypass Users (comma-separated emails)</mat-label>
+          <input matInput formControlName="bypass_users" placeholder="admin@example.com">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Bypass IPs (comma-separated)</mat-label>
+          <input matInput formControlName="bypass_ips" placeholder="127.0.0.1">
+        </mat-form-field>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="config-section">
+      <mat-card-header><mat-card-title>LogWatch</mat-card-title></mat-card-header>
+      <mat-card-content>
+        <mat-form-field appearance="outline">
+          <mat-label>Analysis Frequency (minutes)</mat-label>
+          <input matInput type="number" formControlName="logwatch_frequency" min="1" max="60">
+        </mat-form-field>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="config-section">
+      <mat-card-header><mat-card-title>Notifications</mat-card-title></mat-card-header>
+      <mat-card-content>
+        <p class="section-hint">Configure one or more channels for approval requests and security alerts. All enabled channels fire independently.</p>
+
+        <h4>DreamFactory Service</h4>
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Notification Service Name</mat-label>
+          <input matInput formControlName="notification_service_name" placeholder="Name of a DF email/notification service">
+          <mat-hint>e.g. an Email or SNS service configured in DreamFactory</mat-hint>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Email Recipients</mat-label>
+          <input matInput formControlName="notification_email_recipients" placeholder="admin@example.com, ops@example.com">
+          <mat-hint>Comma-separated email addresses (used when notification service is an email service)</mat-hint>
+        </mat-form-field>
+
+        <h4>Webhook (Slack / Generic)</h4>
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Webhook URL</mat-label>
+          <input matInput formControlName="webhook_url" placeholder="https://hooks.slack.com/services/...">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Webhook Format</mat-label>
+          <mat-select formControlName="webhook_format">
+            <mat-option value="generic">Generic JSON</mat-option>
+            <mat-option value="slack">Slack</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <h4>Telegram</h4>
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Telegram Bot Token</mat-label>
+          <input matInput formControlName="telegram_bot_token">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Telegram Chat ID</mat-label>
+          <input matInput formControlName="telegram_chat_id">
+        </mat-form-field>
+      </mat-card-content>
+    </mat-card>
+  </form>
+</div>
