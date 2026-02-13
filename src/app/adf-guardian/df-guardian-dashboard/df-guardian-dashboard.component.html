@@ -1,12 +1,16 @@
 <div class="guardian-dashboard" *ngIf="data">
   <div class="dashboard-header">
     <h2>AI Guardian Dashboard</h2>
-    <button mat-raised-button color="primary" (click)="refresh()">Refresh</button>
+    <button mat-raised-button color="primary" (click)="refresh()">
+      Refresh
+    </button>
   </div>
 
   <div class="stat-cards">
     <mat-card class="stat-card">
-      <mat-card-header><mat-card-title>Evaluations</mat-card-title></mat-card-header>
+      <mat-card-header
+        ><mat-card-title>Evaluations</mat-card-title></mat-card-header
+      >
       <mat-card-content>
         <div class="stat-value">{{ data.stats.total_evaluations }}</div>
         <div class="stat-label">Last 24 hours</div>
@@ -14,7 +18,9 @@
     </mat-card>
 
     <mat-card class="stat-card stat-block">
-      <mat-card-header><mat-card-title>Blocked</mat-card-title></mat-card-header>
+      <mat-card-header
+        ><mat-card-title>Blocked</mat-card-title></mat-card-header
+      >
       <mat-card-content>
         <div class="stat-value">{{ data.stats.blocks }}</div>
         <div class="stat-label">Threats stopped</div>
@@ -22,7 +28,9 @@
     </mat-card>
 
     <mat-card class="stat-card stat-flag">
-      <mat-card-header><mat-card-title>Flagged</mat-card-title></mat-card-header>
+      <mat-card-header
+        ><mat-card-title>Flagged</mat-card-title></mat-card-header
+      >
       <mat-card-content>
         <div class="stat-value">{{ data.stats.flags }}</div>
         <div class="stat-label">For review</div>
@@ -30,7 +38,9 @@
     </mat-card>
 
     <mat-card class="stat-card stat-allow">
-      <mat-card-header><mat-card-title>Allowed</mat-card-title></mat-card-header>
+      <mat-card-header
+        ><mat-card-title>Allowed</mat-card-title></mat-card-header
+      >
       <mat-card-content>
         <div class="stat-value">{{ data.stats.allows }}</div>
         <div class="stat-label">Safe requests</div>
@@ -38,15 +48,25 @@
     </mat-card>
 
     <mat-card class="stat-card">
-      <mat-card-header><mat-card-title>Cache Hits</mat-card-title></mat-card-header>
+      <mat-card-header
+        ><mat-card-title>Cache Hits</mat-card-title></mat-card-header
+      >
       <mat-card-content>
         <div class="stat-value">{{ data.stats.cache_hits }}</div>
-        <div class="stat-label">{{ data.stats.avg_latency_ms ? (data.stats.avg_latency_ms + 'ms avg') : 'No latency data' }}</div>
+        <div class="stat-label">
+          {{
+            data.stats.avg_latency_ms
+              ? data.stats.avg_latency_ms + 'ms avg'
+              : 'No latency data'
+          }}
+        </div>
       </mat-card-content>
     </mat-card>
 
     <mat-card class="stat-card stat-review">
-      <mat-card-header><mat-card-title>Pending</mat-card-title></mat-card-header>
+      <mat-card-header
+        ><mat-card-title>Pending</mat-card-title></mat-card-header
+      >
       <mat-card-content>
         <div class="stat-value">{{ data.stats.pending_approvals }}</div>
         <div class="stat-label">Awaiting approval</div>
@@ -54,12 +74,24 @@
     </mat-card>
   </div>
 
-  <div class="alert-summary" *ngIf="data.alert_counts.critical + data.alert_counts.high + data.alert_counts.medium + data.alert_counts.low > 0">
+  <div
+    class="alert-summary"
+    *ngIf="
+      data.alert_counts.critical +
+        data.alert_counts.high +
+        data.alert_counts.medium +
+        data.alert_counts.low >
+      0
+    ">
     <mat-card>
-      <mat-card-header><mat-card-title>Open Alerts</mat-card-title></mat-card-header>
+      <mat-card-header
+        ><mat-card-title>Open Alerts</mat-card-title></mat-card-header
+      >
       <mat-card-content>
         <div class="alert-chips">
-          <span class="alert-chip critical" *ngIf="data.alert_counts.critical > 0">
+          <span
+            class="alert-chip critical"
+            *ngIf="data.alert_counts.critical > 0">
             Critical: {{ data.alert_counts.critical }}
           </span>
           <span class="alert-chip high" *ngIf="data.alert_counts.high > 0">
@@ -77,9 +109,14 @@
   </div>
 
   <mat-card class="recent-activity">
-    <mat-card-header><mat-card-title>Recent Activity</mat-card-title></mat-card-header>
+    <mat-card-header
+      ><mat-card-title>Recent Activity</mat-card-title></mat-card-header
+    >
     <mat-card-content>
-      <table mat-table [dataSource]="data.recent_activity" class="activity-table">
+      <table
+        mat-table
+        [dataSource]="data.recent_activity"
+        class="activity-table">
         <ng-container matColumnDef="method">
           <th mat-header-cell *matHeaderCellDef>Method</th>
           <td mat-cell *matCellDef="let row">
@@ -105,14 +142,19 @@
         <ng-container matColumnDef="risk_score">
           <th mat-header-cell *matHeaderCellDef>Risk</th>
           <td mat-cell *matCellDef="let row">
-            <span [class]="getRiskClass(row.risk_score)">{{ row.risk_score }}</span>
+            <span [class]="getRiskClass(row.risk_score)">{{
+              row.risk_score
+            }}</span>
           </td>
         </ng-container>
 
         <ng-container matColumnDef="decision">
           <th mat-header-cell *matHeaderCellDef>Decision</th>
           <td mat-cell *matCellDef="let row">
-            <span [class]="'decision-badge ' + getDecisionClass(row.decision)">{{ row.decision }}</span>
+            <span
+              [class]="'decision-badge ' + getDecisionClass(row.decision)"
+              >{{ row.decision }}</span
+            >
           </td>
         </ng-container>
 
@@ -123,7 +165,9 @@
 
         <ng-container matColumnDef="created_at">
           <th mat-header-cell *matHeaderCellDef>Time</th>
-          <td mat-cell *matCellDef="let row">{{ formatTime(row.created_at) }}</td>
+          <td mat-cell *matCellDef="let row">
+            {{ formatTime(row.created_at) }}
+          </td>
         </ng-container>
 
         <tr mat-header-row *matHeaderRowDef="recentColumns"></tr>

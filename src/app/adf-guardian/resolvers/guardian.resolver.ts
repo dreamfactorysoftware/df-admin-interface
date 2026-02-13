@@ -20,11 +20,12 @@ interface GenericListResponse<T> {
   meta: { count: number };
 }
 
-export const guardianDashboardResolver: ResolveFn<GuardianDashboardData> =
-  () => {
-    const service = inject(GUARDIAN_DASHBOARD_SERVICE_TOKEN);
-    return service.getAll<GuardianDashboardData>({});
-  };
+export const guardianDashboardResolver: ResolveFn<
+  GuardianDashboardData
+> = () => {
+  const service = inject(GUARDIAN_DASHBOARD_SERVICE_TOKEN);
+  return service.getAll<GuardianDashboardData>({});
+};
 
 export const guardianLogsResolver =
   (limit?: number): ResolveFn<GenericListResponse<GuardianLogEntry>> =>

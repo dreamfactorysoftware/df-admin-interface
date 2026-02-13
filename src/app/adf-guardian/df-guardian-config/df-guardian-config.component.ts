@@ -1,10 +1,6 @@
 import { Component, Inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import {
-  FormBuilder,
-  FormGroup,
-  ReactiveFormsModule,
-} from '@angular/forms';
+import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -95,9 +91,14 @@ export class DfGuardianConfigComponent implements OnInit {
       },
       error: err => {
         this.saving = false;
-        this.snackBar.open('Error saving configuration: ' + (err.error?.error?.message || err.message), 'OK', {
-          duration: 5000,
-        });
+        this.snackBar.open(
+          'Error saving configuration: ' +
+            (err.error?.error?.message || err.message),
+          'OK',
+          {
+            duration: 5000,
+          }
+        );
       },
     });
   }

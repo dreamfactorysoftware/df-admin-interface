@@ -365,41 +365,41 @@ export const routes: Routes = [
           {
             path: 'dashboard',
             loadComponent: () =>
-              import(
-                './adf-guardian/df-guardian-dashboard/df-guardian-dashboard.component'
-              ).then(m => m.DfGuardianDashboardComponent),
+              import('./adf-guardian/df-guardian-dashboard/df-guardian-dashboard.component').then(
+                m => m.DfGuardianDashboardComponent
+              ),
             resolve: { data: guardianDashboardResolver },
           },
           {
             path: 'logs',
             loadComponent: () =>
-              import(
-                './adf-guardian/df-guardian-logs/df-guardian-logs.component'
-              ).then(m => m.DfGuardianLogsComponent),
+              import('./adf-guardian/df-guardian-logs/df-guardian-logs.component').then(
+                m => m.DfGuardianLogsComponent
+              ),
             resolve: { data: guardianLogsResolver() },
           },
           {
             path: 'alerts',
             loadComponent: () =>
-              import(
-                './adf-guardian/df-guardian-alerts/df-guardian-alerts.component'
-              ).then(m => m.DfGuardianAlertsComponent),
+              import('./adf-guardian/df-guardian-alerts/df-guardian-alerts.component').then(
+                m => m.DfGuardianAlertsComponent
+              ),
             resolve: { data: guardianAlertsResolver() },
           },
           {
             path: 'approvals',
             loadComponent: () =>
-              import(
-                './adf-guardian/df-guardian-approvals/df-guardian-approvals.component'
-              ).then(m => m.DfGuardianApprovalsComponent),
+              import('./adf-guardian/df-guardian-approvals/df-guardian-approvals.component').then(
+                m => m.DfGuardianApprovalsComponent
+              ),
             resolve: { data: guardianApprovalsResolver() },
           },
           {
             path: 'config',
             loadComponent: () =>
-              import(
-                './adf-guardian/df-guardian-config/df-guardian-config.component'
-              ).then(m => m.DfGuardianConfigComponent),
+              import('./adf-guardian/df-guardian-config/df-guardian-config.component').then(
+                m => m.DfGuardianConfigComponent
+              ),
             resolve: { data: guardianConfigResolver },
           },
         ],
@@ -888,9 +888,9 @@ export const routes: Routes = [
           {
             path: '',
             loadComponent: () =>
-              import(
-                './adf-ai/df-ai-chat-placeholder/df-ai-chat-placeholder.component'
-              ).then(m => m.DfAiChatPlaceholderComponent),
+              import('./adf-ai/df-ai-chat-placeholder/df-ai-chat-placeholder.component').then(
+                m => m.DfAiChatPlaceholderComponent
+              ),
           },
         ],
       },
