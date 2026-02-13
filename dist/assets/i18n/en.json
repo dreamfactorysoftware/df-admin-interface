@@ -287,6 +287,30 @@
           "nav": "Create Authentication API",
           "header": "{{nav.api-security.authentication.create.nav}}"
         }
+      },
+      "ai-guardian": {
+        "nav": "AI Guardian",
+        "header": "{{nav.api-security.ai-guardian.nav}}",
+        "dashboard": {
+          "nav": "Dashboard",
+          "header": "{{nav.api-security.ai-guardian.dashboard.nav}}"
+        },
+        "logs": {
+          "nav": "Logs",
+          "header": "{{nav.api-security.ai-guardian.logs.nav}}"
+        },
+        "alerts": {
+          "nav": "Alerts",
+          "header": "{{nav.api-security.ai-guardian.alerts.nav}}"
+        },
+        "approvals": {
+          "nav": "Approvals",
+          "header": "{{nav.api-security.ai-guardian.approvals.nav}}"
+        },
+        "config": {
+          "nav": "Configuration",
+          "header": "{{nav.api-security.ai-guardian.config.nav}}"
+        }
       }
     },
     "system-settings": {
