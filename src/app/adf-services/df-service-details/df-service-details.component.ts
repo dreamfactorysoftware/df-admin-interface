@@ -16,6 +16,7 @@ import {
   Validators,
 } from '@angular/forms';
 import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -151,6 +152,7 @@ interface ServiceResponse {
     TitleCasePipe,
     MatDividerModule,
     DfSecurityConfigComponent,
+    MatProgressSpinnerModule,
   ],
 })
 export class DfServiceDetailsComponent implements OnInit {
@@ -160,6 +162,7 @@ export class DfServiceDetailsComponent implements OnInit {
   isScriptService = false;
   isFile = false;
   isAuth = false;
+  isAiService = false;
   serviceTypes: Array<ServiceType>;
   notIncludedServices: Array<ServiceType>;
   serviceForm: FormGroup;
@@ -178,6 +181,13 @@ export class DfServiceDetailsComponent implements OnInit {
   currentServiceId: number | null = null;
   isFirstTimeUser = false;
   availableFileServices: any[] = [];
+
+  // AI service specific
+  availableModels: Array<{ id: string; name: string; context_window?: number }> = [];
+  fetchingModels = false;
+  modelsFetched = false;
+  availableApiKeys: Array<{ id: number; name: string; roleName: string; role_id: number }> = [];
+  loadingApiKeys = false;
 
   constructor(
     private activatedRoute: ActivatedRoute,
@@ -247,6 +257,9 @@ export class DfServiceDetailsComponent implements OnInit {
         }
         if (route['groups'] && route['groups'][0] === 'LDAP') {
           this.isAuth = true;
+        }
+        if (route['groups'] && route['groups'][0] === 'AI') {
+          this.isAiService = true;
         }
         const { data, serviceTypes, groups } = route;
         const licenseType = env.platform?.license;
@@ -446,6 +459,11 @@ export class DfServiceDetailsComponent implements OnInit {
               this.loadAvailableFileServices();
             }
           });
+
+          // Auto-select when there's only one service type (e.g. AI Connection)
+          if (this.serviceTypes.length === 1) {
+            this.serviceForm.controls['type'].setValue(this.serviceTypes[0].name);
+          }
         }
 
         // If editing an Excel service, load file services immediately
@@ -663,6 +681,7 @@ export class DfServiceDetailsComponent implements OnInit {
     this.isNetworkService = false;
     this.isScriptService = false;
     this.isFile = false;
+    this.isAiService = false;
 
     // Find the service type to get its group
     const serviceType = this.serviceTypes.find(st => st.name === type);
@@ -674,6 +693,8 @@ export class DfServiceDetailsComponent implements OnInit {
         this.isScriptService = true;
       } else if (group === 'File') {
         this.isFile = true;
+      } else if (group === 'AI') {
+        this.isAiService = true;
       }
     }
   }
@@ -722,6 +743,11 @@ export class DfServiceDetailsComponent implements OnInit {
         this.serviceDefinitionType = '0'; // Default to JSON
       }
       this.serviceForm.addControl('config', config);
+
+      // AI service: watch provider changes to auto-fill base_url
+      if (this.isAiService) {
+        this.setupAiProviderWatcher();
+      }
     }
   }
 
@@ -1348,6 +1374,233 @@ export class DfServiceDetailsComponent implements OnInit {
   onServiceTypeSelect(selectedServiceTypeLable: string) {
     this.selectedServiceTypeLable =
       selectedServiceTypeLable || 'Unknown. Unable to identify Service Type';
+  }
+
+  // ── AI Service Methods ──
+
+  /**
+   * Watch the 'provider' config field. When it changes, auto-fill the
+   * 'baseUrl' field with the default_base_url from the picklist value.
+   */
+  private setupAiProviderWatcher(): void {
+    const providerControl = this.getConfigControl('provider');
+    if (!providerControl) return;
+
+    providerControl.valueChanges.subscribe((provider: string) => {
+      if (!provider) return;
+
+      // Look up default_base_url from the schema picklist values
+      const providerSchema = this.configSchema?.find(s => s.name === 'provider');
+      const selectedOption = providerSchema?.values?.find(
+        (v: any) => v.name === provider
+      );
+
+      if (selectedOption?.default_base_url !== undefined) {
+        const baseUrlControl = this.getConfigControl('baseUrl');
+        if (baseUrlControl) {
+          baseUrlControl.setValue(selectedOption.default_base_url);
+        }
+      }
+
+      // Reset model state when provider changes
+      this.availableModels = [];
+      this.modelsFetched = false;
+    });
+
+    // Fetch available DreamFactory API keys for the data access selector
+    this.loadAvailableApiKeys();
+  }
+
+  private loadAvailableApiKeys(): void {
+    this.loadingApiKeys = true;
+
+    // Load apps (API keys) — no filter param, it can cause silent API failures
+    this.http
+      .get<any>(`${BASE_URL}/system/app`, {
+        params: { fields: 'id,name,role_id,is_active' },
+      })
+      .subscribe({
+        next: (appResponse: any) => {
+          const allApps = appResponse?.resource || [];
+          // Filter client-side: active apps with a role assigned
+          // API may return snake_case (role_id) or camelCase (roleId)
+          const apps = allApps.filter(
+            (a: any) => a.is_active !== false && (a.role_id || a.roleId)
+          );
+
+          // Also load roles to get display names
+          this.http
+            .get<any>(`${BASE_URL}/system/role`, {
+              params: { fields: 'id,name' },
+            })
+            .subscribe({
+              next: (roleResponse: any) => {
+                this.loadingApiKeys = false;
+                const roles = roleResponse?.resource || [];
+                const roleMap = new Map<number, string>();
+                roles.forEach((r: any) => roleMap.set(r.id, r.name));
+
+                this.availableApiKeys = apps.map((a: any) => {
+                  const roleId = a.role_id ?? a.roleId;
+                  return {
+                    id: a.id,
+                    name: a.name,
+                    role_id: roleId,
+                    roleName: roleMap.get(roleId) || `Role #${roleId}`,
+                  };
+                });
+              },
+              error: () => {
+                this.loadingApiKeys = false;
+                this.availableApiKeys = apps.map((a: any) => {
+                  const roleId = a.role_id ?? a.roleId;
+                  return {
+                    id: a.id,
+                    name: a.name,
+                    role_id: roleId,
+                    roleName: `Role #${roleId}`,
+                  };
+                });
+              },
+            });
+        },
+        error: (err: any) => {
+          this.loadingApiKeys = false;
+          console.error('Failed to load API keys:', err);
+          this.availableApiKeys = [];
+        },
+      });
+  }
+
+  /** The config fields to show in the main AI connection section. */
+  get aiConnectionFields(): Array<ConfigSchema> {
+    if (!this.configSchema) return [];
+    const connectionFieldNames = ['provider', 'apiKey', 'baseUrl'];
+    return this.configSchema.filter(s => connectionFieldNames.includes(s.name));
+  }
+
+  /** The config fields for the advanced section. */
+  get aiAdvancedFields(): Array<ConfigSchema> {
+    if (!this.configSchema) return [];
+    const skipFields = [
+      'provider', 'apiKey', 'baseUrl',
+      'defaultModel', 'allowedModels', 'allowedRoles', 'appId',
+    ];
+    return this.configSchema.filter(s => !skipFields.includes(s.name));
+  }
+
+  /**
+   * Call the backend to test the connection and fetch available models
+   * from the configured provider.
+   */
+  fetchModels(): void {
+    const provider = this.getConfigControl('provider')?.value;
+    const apiKey = this.getConfigControl('apiKey')?.value;
+    const baseUrl = this.getConfigControl('baseUrl')?.value;
+
+    if (!provider) {
+      this.snackbarService.openSnackBar('Please select a provider first.', 'error');
+      return;
+    }
+
+    this.fetchingModels = true;
+    this.availableModels = [];
+
+    this.http
+      .post<any>('/_internal/ai/test-connection', {
+        provider,
+        api_key: apiKey || '',
+        base_url: baseUrl || '',
+        organization_id: this.getConfigControl('organizationId')?.value || '',
+      })
+      .subscribe({
+        next: (response: any) => {
+          this.fetchingModels = false;
+          if (response.success && response.resource) {
+            this.availableModels = response.resource;
+            this.modelsFetched = true;
+            this.snackbarService.openSnackBar(
+              `Connected! Found ${this.availableModels.length} models.`,
+              'success'
+            );
+          } else {
+            this.snackbarService.openSnackBar(
+              response?.error?.message || 'Failed to fetch models.',
+              'error'
+            );
+          }
+        },
+        error: (err: any) => {
+          this.fetchingModels = false;
+          const message =
+            err?.error?.error?.message || err?.message || 'Connection failed.';
+          this.snackbarService.openSnackBar(message, 'error');
+        },
+      });
+  }
+
+  /** Toggle a model in the allowed_models list. */
+  toggleAllowedModel(modelId: string): void {
+    const control = this.getConfigControl('allowedModels');
+    if (!control) return;
+
+    let current: string[] = [];
+    try {
+      const val = control.value;
+      if (Array.isArray(val)) {
+        current = val;
+      } else if (typeof val === 'string' && val.trim()) {
+        current = JSON.parse(val);
+      }
+    } catch {
+      current = [];
+    }
+
+    const idx = current.indexOf(modelId);
+    if (idx >= 0) {
+      current.splice(idx, 1);
+    } else {
+      current.push(modelId);
+    }
+    control.setValue(JSON.stringify(current));
+  }
+
+  /** Check if a model is in the allowed list. */
+  isModelAllowed(modelId: string): boolean {
+    const control = this.getConfigControl('allowedModels');
+    if (!control) return false;
+
+    let current: string[] = [];
+    try {
+      const val = control.value;
+      if (Array.isArray(val)) {
+        current = val;
+      } else if (typeof val === 'string' && val.trim()) {
+        current = JSON.parse(val);
+      }
+    } catch {
+      current = [];
+    }
+    return current.includes(modelId);
+  }
+
+  /** Whether no models are explicitly allowed (meaning all are allowed). */
+  get allModelsAllowed(): boolean {
+    const control = this.getConfigControl('allowedModels');
+    if (!control) return true;
+
+    let current: string[] = [];
+    try {
+      const val = control.value;
+      if (Array.isArray(val)) {
+        current = val;
+      } else if (typeof val === 'string' && val.trim()) {
+        current = JSON.parse(val);
+      }
+    } catch {
+      current = [];
+    }
+    return current.length === 0;
   }
 }
 interface ImageObject {

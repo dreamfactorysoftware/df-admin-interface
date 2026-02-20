@@ -17,4 +17,5 @@ export const SERVICE_GROUPS = {
   [ROUTES.LOGS]: ['Log'],
   [ROUTES.AI_MCP]: ['MCP'],
   [ROUTES.AI_PROVIDERS]: ['AI'],
+  [ROUTES.AI_CHAT]: ['AI Chat'],
 };

@@ -888,8 +888,8 @@ export const routes: Routes = [
           {
             path: '',
             loadComponent: () =>
-              import('./adf-ai/df-ai-chat-placeholder/df-ai-chat-placeholder.component').then(
-                m => m.DfAiChatPlaceholderComponent
+              import('./adf-ai/df-ai-chat/df-ai-chat.component').then(
+                m => m.DfAiChatComponent
               ),
           },
         ],

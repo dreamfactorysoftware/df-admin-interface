@@ -1,0 +1,138 @@
+<div class="data-chat">
+  <!-- Config bar -->
+  <div class="config-bar">
+    <mat-form-field appearance="outline" class="config-field">
+      <mat-label>AI Service</mat-label>
+      <mat-select [(value)]="selectedAiService" (selectionChange)="onAiServiceChange()">
+        <mat-option *ngFor="let svc of aiServices" [value]="svc.name">
+          {{ svc.label || svc.name }}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <button mat-stroked-button (click)="newChat()" [disabled]="loading || !selectedAiService" class="new-chat-btn">
+      New Chat
+    </button>
+  </div>
+
+  <!-- Role & database info -->
+  <div class="db-info" *ngIf="configured && roleName && !configLoading">
+    <mat-icon class="db-info-icon">security</mat-icon>
+    <span>Role: <strong>{{ roleName }}</strong></span>
+  </div>
+
+  <div class="db-info" *ngIf="dbServices.length > 0 && !configLoading">
+    <mat-icon class="db-info-icon">storage</mat-icon>
+    <span>Available databases:</span>
+    <mat-chip-set>
+      <mat-chip *ngFor="let db of dbServices">{{ db }}</mat-chip>
+    </mat-chip-set>
+  </div>
+
+  <!-- Status messages -->
+  <div class="status-bar" *ngIf="configLoading">
+    <mat-spinner diameter="20"></mat-spinner>
+    <span>Loading configuration...</span>
+  </div>
+
+  <!-- Error banner -->
+  <div class="error-banner" *ngIf="error">
+    <span>{{ error }}</span>
+    <button mat-icon-button (click)="error = ''"><mat-icon>close</mat-icon></button>
+  </div>
+
+  <!-- Chat area -->
+  <div class="chat-area" #chatContainer>
+    <div class="empty-state" *ngIf="chatHistory.length === 0 && !loading">
+      <h3>Chat with Your Data</h3>
+      <p>Select an AI service above, then ask a question about your data.</p>
+      <div class="examples">
+        <p><strong>Example questions:</strong></p>
+        <ul>
+          <li>How many records are in the users table?</li>
+          <li>Show me the top 10 orders by amount</li>
+          <li>What tables are available?</li>
+          <li>Find all customers from California</li>
+        </ul>
+      </div>
+    </div>
+
+    <div *ngFor="let entry of chatHistory" class="chat-entry" [ngClass]="'chat-' + entry.role">
+      <!-- User message -->
+      <div *ngIf="entry.role === 'user'" class="message user-message">
+        <div class="message-content">{{ entry.content }}</div>
+      </div>
+
+      <!-- Assistant message -->
+      <div *ngIf="entry.role === 'assistant'" class="message assistant-message">
+        <div class="message-content" [innerHTML]="entry.content"></div>
+
+        <!-- Tool calls accordion -->
+        <mat-accordion *ngIf="entry.toolCalls && entry.toolCalls.length > 0" class="tool-calls">
+          <mat-expansion-panel *ngFor="let tc of entry.toolCalls" class="tool-panel">
+            <mat-expansion-panel-header>
+              <mat-panel-title>
+                <mat-icon class="tool-icon" [ngClass]="tc.isError ? 'tool-error' : 'tool-ok'">
+                  {{ tc.isError ? 'error' : 'build' }}
+                </mat-icon>
+                <span class="tool-name">{{ tc.tool }}</span>
+              </mat-panel-title>
+              <mat-panel-description>
+                {{ tc.durationMs }}ms
+              </mat-panel-description>
+            </mat-expansion-panel-header>
+            <div class="tool-detail">
+              <div class="tool-section">
+                <strong>Input:</strong>
+                <pre>{{ formatToolInput(tc.input) }}</pre>
+              </div>
+              <div class="tool-section">
+                <strong>Output:</strong>
+                <pre class="tool-output">{{ tc.outputPreview }}</pre>
+              </div>
+            </div>
+          </mat-expansion-panel>
+        </mat-accordion>
+
+        <!-- Token usage footer -->
+        <div class="message-meta" *ngIf="entry.inputTokens">
+          <span>{{ entry.inputTokens }} in / {{ entry.outputTokens }} out tokens</span>
+          <span>&middot;</span>
+          <span>{{ entry.latencyMs }}ms</span>
+          <span *ngIf="entry.iterations && entry.iterations > 1">&middot; {{ entry.iterations }} iterations</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loading indicator -->
+    <div *ngIf="loading" class="chat-entry chat-assistant">
+      <div class="message assistant-message loading-message">
+        <mat-spinner diameter="24"></mat-spinner>
+        <span>Querying your data...</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Input area -->
+  <div class="input-area">
+    <mat-form-field appearance="outline" class="input-field">
+      <textarea
+        matInput
+        [(ngModel)]="userInput"
+        (keydown)="onKeydown($event)"
+        placeholder="Ask a question about your data..."
+        rows="1"
+        [disabled]="loading"
+      ></textarea>
+    </mat-form-field>
+    <button
+      mat-fab
+      color="primary"
+      (click)="send()"
+      [disabled]="!canSend"
+      class="send-btn"
+    >
+      <mat-icon>send</mat-icon>
+    </button>
+  </div>
+</div>

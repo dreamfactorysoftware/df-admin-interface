@@ -469,7 +469,8 @@
     <mat-form-field
       subscriptSizing="dynamic"
       class="dynamic-width"
-      appearance="outline">
+      appearance="outline"
+      *ngIf="serviceTypes.length > 1">
       <mat-label>{{
         'services.controls.serviceType.label' | transloco
       }}</mat-label>
@@ -785,8 +786,161 @@
           </mat-accordion>
         </ng-container>
 
+        <!-- AI Service Configuration -->
+        <ng-container *ngIf="this.isAiService">
+          <!-- Connection Fields: Provider, API Key, Base URL -->
+          <div class="details-section">
+            <ng-container *ngFor="let item of aiConnectionFields">
+              <df-dynamic-field
+                *ngIf="['picklist', 'password', 'string', 'text'].includes(item.type)"
+                [schema]="item"
+                [formControl]="getConfigControl(item.name)"
+                class="dynamic-width">
+              </df-dynamic-field>
+            </ng-container>
+          </div>
+
+          <!-- Fetch Models Button -->
+          <div class="full-width" style="margin: 8px 0 16px;">
+            <button
+              mat-flat-button
+              color="primary"
+              type="button"
+              (click)="fetchModels()"
+              [disabled]="fetchingModels || !getConfigControl('provider')?.value">
+              <mat-spinner
+                *ngIf="fetchingModels"
+                diameter="18"
+                style="display: inline-block; margin-right: 8px;">
+              </mat-spinner>
+              {{ fetchingModels ? 'Connecting...' : 'Test Connection & Fetch Models' }}
+            </button>
+          </div>
+
+          <!-- Model Selection (shown after fetching) -->
+          <ng-container *ngIf="modelsFetched && availableModels.length > 0">
+            <!-- Default Model dropdown -->
+            <mat-form-field appearance="outline" class="dynamic-width">
+              <mat-label>Default Model</mat-label>
+              <mat-select [formControl]="getConfigControl('defaultModel')">
+                <mat-option value="">-- None --</mat-option>
+                <mat-option *ngFor="let model of availableModels" [value]="model.id">
+                  {{ model.name || model.id }}
+                  <span *ngIf="model.context_window"> ({{ model.context_window | number }} ctx)</span>
+                </mat-option>
+              </mat-select>
+              <fa-icon
+                class="tool-tip-trigger"
+                matSuffix
+                [icon]="faCircleInfo"
+                matTooltip="The model to use by default for requests. Can be overridden per request." />
+            </mat-form-field>
+
+            <!-- Allowed Models checkboxes -->
+            <div class="full-width" style="margin: 8px 0;">
+              <label style="font-weight: 500; display: block; margin-bottom: 8px;">
+                Allowed Models
+                <fa-icon
+                  class="tool-tip-trigger"
+                  [icon]="faCircleInfo"
+                  matTooltip="Select which models users can access. Leave all unchecked to allow all models." />
+              </label>
+              <span *ngIf="allModelsAllowed" style="font-size: 12px; color: #666; display: block; margin-bottom: 8px;">
+                No models selected &mdash; all {{ availableModels.length }} models are allowed.
+              </span>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                <mat-checkbox
+                  *ngFor="let model of availableModels"
+                  [checked]="isModelAllowed(model.id)"
+                  (change)="toggleAllowedModel(model.id)"
+                  color="primary">
+                  {{ model.name || model.id }}
+                </mat-checkbox>
+              </div>
+            </div>
+          </ng-container>
+
+          <!-- Manual model fields (shown when models haven't been fetched) -->
+          <ng-container *ngIf="!modelsFetched">
+            <ng-container *ngFor="let item of viewSchema">
+              <df-dynamic-field
+                *ngIf="(item.name === 'defaultModel' || item.name === 'allowedModels') && ['string', 'text'].includes(item.type)"
+                [schema]="item"
+                [formControl]="getConfigControl(item.name)"
+                class="dynamic-width">
+              </df-dynamic-field>
+            </ng-container>
+          </ng-container>
+
+          <!-- DreamFactory Data Access API Key -->
+          <mat-divider style="margin: 24px 0 16px;"></mat-divider>
+          <div class="full-width" style="margin-bottom: 16px;">
+            <h4 style="margin: 0 0 4px; font-weight: 500;">DreamFactory Data Access API Key</h4>
+            <p style="margin: 0 0 12px; font-size: 13px; color: #666;">
+              Select the DreamFactory API Key the AI will use to authenticate when querying your data.
+              The key's assigned role controls what databases and tables the AI can access.
+              This is NOT the AI provider key above &mdash; this is a DreamFactory API key.
+            </p>
+
+            <ng-container *ngIf="loadingApiKeys">
+              <span style="font-size: 12px; color: #666;">Loading DreamFactory API keys...</span>
+            </ng-container>
+            <ng-container *ngIf="!loadingApiKeys && availableApiKeys.length === 0">
+              <span style="font-size: 12px; color: #999;">
+                No DreamFactory API Keys with roles found.
+                <a href="/apps" style="color: #1976d2;">Create an API Key</a> with a role assigned first.
+              </span>
+            </ng-container>
+            <ng-container *ngIf="!loadingApiKeys && availableApiKeys.length > 0">
+              <mat-form-field appearance="outline" class="dynamic-width">
+                <mat-label>DreamFactory API Key (data access)</mat-label>
+                <mat-select [formControl]="getConfigControl('appId')">
+                  <mat-option [value]="null">-- None (no data access) --</mat-option>
+                  <mat-option *ngFor="let key of availableApiKeys" [value]="key.id">
+                    {{ key.name }} (role: {{ key.roleName }})
+                  </mat-option>
+                </mat-select>
+                <fa-icon
+                  class="tool-tip-trigger"
+                  matSuffix
+                  [icon]="faCircleInfo"
+                  matTooltip="The DreamFactory API Key the AI uses to authenticate when accessing your data. The key's assigned role determines which databases, tables, and operations the AI is allowed to use." />
+              </mat-form-field>
+              <span *ngIf="!getConfigControl('appId')?.value" style="font-size: 12px; color: #f44336; display: block; margin-top: -8px; margin-bottom: 8px;">
+                No API key selected &mdash; the AI cannot access any data. Select a DreamFactory API Key above.
+              </span>
+            </ng-container>
+          </div>
+
+          <!-- Advanced Options -->
+          <mat-accordion class="full-width">
+            <mat-expansion-panel [expanded]="false">
+              <mat-expansion-panel-header>
+                Advanced Options
+              </mat-expansion-panel-header>
+              <div class="details-section">
+                <ng-container *ngFor="let item of aiAdvancedFields">
+                  <df-dynamic-field
+                    *ngIf="['integer', 'password', 'string', 'text', 'picklist', 'multi_picklist', 'boolean'].includes(item.type)"
+                    [schema]="item"
+                    [formControl]="getConfigControl(item.name)"
+                    [class.dynamic-width]="item.type !== 'text'"
+                    [class.full-width]="item.type === 'text'">
+                  </df-dynamic-field>
+                  <df-array-field
+                    *ngIf="item.type === 'array' || item.type === 'object'"
+                    [schema]="item"
+                    [formControl]="getConfigControl(item.name)"
+                    class="full-width">
+                  </df-array-field>
+                </ng-container>
+              </div>
+            </mat-expansion-panel>
+          </mat-accordion>
+        </ng-container>
+
         <!-- Other Service Types (unchanged) -->
-        <ng-container *ngIf="!this.isNetworkService && !this.isScriptService">
+        <ng-container *ngIf="!this.isNetworkService && !this.isScriptService && !this.isAiService">
           <mat-accordion class="full-width">
             <mat-expansion-panel [expanded]="serviceForm.getRawValue().type">
               <mat-expansion-panel-header
