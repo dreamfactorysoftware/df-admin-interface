@@ -189,6 +189,17 @@ export class DfServiceDetailsComponent implements OnInit {
   }[] = [];
   mcpServicesLoaded = false;
   disabledTools = new Set<string>();
+  mcpGlobalTools: { name: string; title: string; description: string }[] = [
+    { name: 'list_apis', title: 'List Available APIs', description: 'List all available database APIs and their tool prefixes' },
+    { name: 'all_get_tables', title: 'Get Tables from All Databases', description: 'Retrieve tables from all connected database services in one call' },
+    { name: 'all_find_table', title: 'Find Table Across Databases', description: 'Search for a table by name across all connected databases' },
+    { name: 'all_get_stored_procedures', title: 'Get Stored Procedures from All', description: 'Retrieve stored procedures from all connected databases' },
+    { name: 'all_get_stored_functions', title: 'Get Stored Functions from All', description: 'Retrieve stored functions from all connected databases' },
+    { name: 'all_get_resources', title: 'Get Resources from All', description: 'Retrieve all available resources from all connected databases' },
+    { name: 'all_list_files', title: 'List Files from All Storage', description: 'List files from all connected file storage services' },
+    { name: 'search', title: 'Search (stub)', description: 'Stub search implementation for connectors that require it' },
+    { name: 'fetch', title: 'Fetch (stub)', description: 'Stub fetch implementation for connectors that require it' },
+  ];
 
   constructor(
     private activatedRoute: ActivatedRoute,
@@ -775,6 +786,20 @@ export class DfServiceDetailsComponent implements OnInit {
       this.disabledTools.delete(toolName);
     } else {
       this.disabledTools.add(toolName);
+    }
+  }
+
+  isAllGlobalToolsEnabled(): boolean {
+    return this.mcpGlobalTools.some(t => !this.disabledTools.has(t.name));
+  }
+
+  toggleAllGlobalTools(enabled: boolean) {
+    for (const tool of this.mcpGlobalTools) {
+      if (enabled) {
+        this.disabledTools.delete(tool.name);
+      } else {
+        this.disabledTools.add(tool.name);
+      }
     }
   }
 
