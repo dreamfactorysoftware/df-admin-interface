@@ -44,15 +44,22 @@ export class DfAnalyticsService {
   }
 
   private fetchStats(): Observable<DashboardStats> {
-    // Fetch minimal data to filter out system services
+    // Fetch minimal data to filter out system services.
+    // Use skip-error so roles without system permissions degrade gracefully
+    // to the catchError fallback instead of triggering the error interceptor.
+    const headers = { 'skip-error': 'true' };
     const requests = {
       services: this.http.get<any>(
-        '/api/v2/system/service?fields=id,name,type&include_count=true'
+        '/api/v2/system/service?fields=id,name,type&include_count=true',
+        { headers }
       ),
       roles: this.http.get<any>(
-        '/api/v2/system/role?fields=id,name&include_count=true'
+        '/api/v2/system/role?fields=id,name&include_count=true',
+        { headers }
       ),
-      appKeys: this.http.get<any>('/api/v2/system/app?include_count=true'),
+      appKeys: this.http.get<any>('/api/v2/system/app?include_count=true', {
+        headers,
+      }),
     };
 
     return forkJoin(requests).pipe(

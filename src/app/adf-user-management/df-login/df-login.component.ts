@@ -16,6 +16,7 @@ import { Router, RouterLink } from '@angular/router';
 import { ROUTES } from '../../shared/types/routes';
 import { getIcon, iconExist } from '../../shared/utilities/icons';
 import { LoginCredentials } from '../../shared/types/user-management';
+import { REDIRECT_URL_KEY } from '../../shared/utilities/url';
 
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { MatButtonModule } from '@angular/material/button';
@@ -150,6 +151,23 @@ export class DfLoginComponent implements OnInit {
     }
     this.loginForm.controls['username'].updateValueAndValidity();
     this.loginForm.controls['email'].updateValueAndValidity();
+  }
+
+  /**
+   * Build the OAuth/SAML SSO URL, preserving any pending external redirect.
+   * When an external redirect URL is stored (e.g. from an MCP OAuth flow),
+   * it is appended as a query parameter so the DreamFactory OAuth callback
+   * can redirect directly to the external caller after authentication.
+   * For normal UI logins (no stored redirect), the URL is returned unchanged.
+   */
+  getOAuthUrl(servicePath: string): string {
+    const base = '/api/v2/' + servicePath;
+    const redirectUrl = localStorage.getItem(REDIRECT_URL_KEY);
+    if (!redirectUrl) {
+      return base;
+    }
+    const separator = base.includes('?') ? '&' : '?';
+    return base + separator + 'redirect=' + encodeURIComponent(redirectUrl);
   }
 
   login() {
