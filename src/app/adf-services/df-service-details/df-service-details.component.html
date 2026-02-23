@@ -882,13 +882,17 @@
     <ng-container *ngIf="isMcp && edit">
       <mat-accordion class="full-width">
         <mat-expansion-panel [expanded]="true">
-          <mat-expansion-panel-header>
-            MCP Tools
-          </mat-expansion-panel-header>
+          <mat-expansion-panel-header> MCP Tools </mat-expansion-panel-header>
           <div class="details-section" *ngIf="!mcpServicesLoaded">
             <p>Loading services...</p>
           </div>
-          <div class="details-section" *ngIf="mcpServicesLoaded && mcpServices.length === 0 && mcpGlobalTools.length === 0">
+          <div
+            class="details-section"
+            *ngIf="
+              mcpServicesLoaded &&
+              mcpServices.length === 0 &&
+              mcpGlobalTools.length === 0
+            ">
             <p>No database or file services found.</p>
           </div>
           <div *ngIf="mcpServicesLoaded" class="mcp-tools-container">
@@ -918,7 +922,9 @@
                     </tr>
                   </thead>
                   <tbody>
-                    <tr *ngFor="let tool of mcpGlobalTools" [class.disabled-row]="!isToolEnabled(tool.name)">
+                    <tr
+                      *ngFor="let tool of mcpGlobalTools"
+                      [class.disabled-row]="!isToolEnabled(tool.name)">
                       <td class="toggle-col">
                         <mat-slide-toggle
                           color="primary"
@@ -926,7 +932,9 @@
                           (change)="toggleTool(tool.name, $event.checked)">
                         </mat-slide-toggle>
                       </td>
-                      <td><code>{{ tool.name }}</code></td>
+                      <td>
+                        <code>{{ tool.name }}</code>
+                      </td>
                       <td>{{ tool.description }}</td>
                     </tr>
                   </tbody>
@@ -934,7 +942,9 @@
               </mat-expansion-panel>
 
               <!-- Per-service tools -->
-              <mat-expansion-panel *ngFor="let svc of mcpServices" [expanded]="svc.expanded">
+              <mat-expansion-panel
+                *ngFor="let svc of mcpServices"
+                [expanded]="svc.expanded">
                 <mat-expansion-panel-header>
                   <mat-panel-title class="mcp-service-header">
                     <mat-slide-toggle
@@ -958,7 +968,9 @@
                     </tr>
                   </thead>
                   <tbody>
-                    <tr *ngFor="let tool of svc.tools" [class.disabled-row]="!isToolEnabled(tool.name)">
+                    <tr
+                      *ngFor="let tool of svc.tools"
+                      [class.disabled-row]="!isToolEnabled(tool.name)">
                       <td class="toggle-col">
                         <mat-slide-toggle
                           color="primary"
@@ -966,7 +978,9 @@
                           (change)="toggleTool(tool.name, $event.checked)">
                         </mat-slide-toggle>
                       </td>
-                      <td><code>{{ tool.name }}</code></td>
+                      <td>
+                        <code>{{ tool.name }}</code>
+                      </td>
                       <td>{{ tool.description }}</td>
                     </tr>
                   </tbody>
