@@ -160,6 +160,7 @@ export class DfServiceDetailsComponent implements OnInit {
   isScriptService = false;
   isFile = false;
   isAuth = false;
+  isMcp = false;
   serviceTypes: Array<ServiceType>;
   notIncludedServices: Array<ServiceType>;
   serviceForm: FormGroup;
@@ -178,6 +179,65 @@ export class DfServiceDetailsComponent implements OnInit {
   currentServiceId: number | null = null;
   isFirstTimeUser = false;
   availableFileServices: any[] = [];
+  mcpServices: {
+    name: string;
+    label: string;
+    type: string;
+    category: string;
+    tools: { name: string; title: string; description: string }[];
+    expanded: boolean;
+  }[] = [];
+  mcpServicesLoaded = false;
+  disabledTools = new Set<string>();
+  mcpGlobalTools: { name: string; title: string; description: string }[] = [
+    {
+      name: 'list_apis',
+      title: 'List Available APIs',
+      description: 'List all available database APIs and their tool prefixes',
+    },
+    {
+      name: 'all_get_tables',
+      title: 'Get Tables from All Databases',
+      description:
+        'Retrieve tables from all connected database services in one call',
+    },
+    {
+      name: 'all_find_table',
+      title: 'Find Table Across Databases',
+      description: 'Search for a table by name across all connected databases',
+    },
+    {
+      name: 'all_get_stored_procedures',
+      title: 'Get Stored Procedures from All',
+      description: 'Retrieve stored procedures from all connected databases',
+    },
+    {
+      name: 'all_get_stored_functions',
+      title: 'Get Stored Functions from All',
+      description: 'Retrieve stored functions from all connected databases',
+    },
+    {
+      name: 'all_get_resources',
+      title: 'Get Resources from All',
+      description:
+        'Retrieve all available resources from all connected databases',
+    },
+    {
+      name: 'all_list_files',
+      title: 'List Files from All Storage',
+      description: 'List files from all connected file storage services',
+    },
+    {
+      name: 'search',
+      title: 'Search (stub)',
+      description: 'Stub search implementation for connectors that require it',
+    },
+    {
+      name: 'fetch',
+      title: 'Fetch (stub)',
+      description: 'Stub fetch implementation for connectors that require it',
+    },
+  ];
 
   constructor(
     private activatedRoute: ActivatedRoute,
@@ -247,6 +307,9 @@ export class DfServiceDetailsComponent implements OnInit {
         }
         if (route['groups'] && route['groups'][0] === 'LDAP') {
           this.isAuth = true;
+        }
+        if (route['groups'] && route['groups'][0] === 'MCP') {
+          this.isMcp = true;
         }
         const { data, serviceTypes, groups } = route;
         const licenseType = env.platform?.license;
@@ -452,6 +515,13 @@ export class DfServiceDetailsComponent implements OnInit {
         if (this.edit && data?.type === 'excel') {
           this.loadAvailableFileServices();
         }
+
+        // If editing an MCP service, load available services
+        if (this.edit && this.isMcp) {
+          const disabled: string[] = data?.config?.disabledTools ?? [];
+          this.disabledTools = new Set(disabled);
+          this.loadMcpServices();
+        }
       });
     if (this.isDatabase) {
       this.serviceForm.controls['type'].valueChanges.subscribe(value => {
@@ -651,6 +721,240 @@ export class DfServiceDetailsComponent implements OnInit {
             });
         },
       });
+  }
+
+  loadMcpServices() {
+    if (this.mcpServicesLoaded) return;
+
+    this.http
+      .get<any>('/api/v2/system/service_type', {
+        params: { fields: 'name,group' },
+      })
+      .pipe(
+        switchMap((typeData: any) => {
+          const types: any[] = typeData?.resource ?? [];
+          const dbTypes = new Set(
+            types
+              .filter((t: any) => t.group === 'Database')
+              .map((t: any) => t.name)
+          );
+          const fileTypes = new Set(
+            types.filter((t: any) => t.group === 'File').map((t: any) => t.name)
+          );
+
+          return this.http
+            .get<any>('/api/v2/system/service', {
+              params: { fields: 'name,label,type,is_active' },
+            })
+            .pipe(
+              map((svcData: any) => {
+                const services: any[] = svcData?.resource ?? [];
+                return services
+                  .filter(
+                    (s: any) =>
+                      s.isActive !== false &&
+                      (dbTypes.has(s.type) || fileTypes.has(s.type))
+                  )
+                  .map((s: any) => {
+                    const category = dbTypes.has(s.type) ? 'Database' : 'File';
+                    const prefix = this.sanitizeApiName(s.name);
+                    return {
+                      name: s.name,
+                      label: s.label || s.name,
+                      type: s.type,
+                      category,
+                      tools: this.buildToolList(prefix, category),
+                      expanded: false,
+                    };
+                  });
+              })
+            );
+        })
+      )
+      .subscribe({
+        next: services => {
+          this.mcpServices = services;
+          this.mcpServicesLoaded = true;
+        },
+        error: err => {
+          console.error('Failed to load MCP services:', err);
+          this.mcpServicesLoaded = true;
+        },
+      });
+  }
+
+  private buildToolList(
+    prefix: string,
+    category: string
+  ): { name: string; title: string; description: string }[] {
+    if (category === 'Database') {
+      return [
+        {
+          name: `${prefix}_get_tables`,
+          title: 'List Tables',
+          description: 'Get tables available in the database',
+        },
+        {
+          name: `${prefix}_get_table_schema`,
+          title: 'Get Table Schema',
+          description: 'Retrieve the schema of a specific table',
+        },
+        {
+          name: `${prefix}_get_table_data`,
+          title: 'Get Table Data',
+          description:
+            'Retrieve table data with filtering, pagination, and sorting',
+        },
+        {
+          name: `${prefix}_create_records`,
+          title: 'Create Records',
+          description: 'Create one or more records in a table',
+        },
+        {
+          name: `${prefix}_update_records`,
+          title: 'Update Records',
+          description: 'Update (patch) records in a table',
+        },
+        {
+          name: `${prefix}_delete_records`,
+          title: 'Delete Records',
+          description: 'Delete records from a table',
+        },
+        {
+          name: `${prefix}_get_table_fields`,
+          title: 'Get Table Fields',
+          description: 'Retrieve field definitions for a table',
+        },
+        {
+          name: `${prefix}_get_table_relationships`,
+          title: 'Get Table Relationships',
+          description: 'Retrieve relationships definition for a table',
+        },
+        {
+          name: `${prefix}_get_stored_procedures`,
+          title: 'List Stored Procedures',
+          description: 'Get stored procedures available in the database',
+        },
+        {
+          name: `${prefix}_call_stored_procedure`,
+          title: 'Call Stored Procedure',
+          description: 'Call a stored procedure',
+        },
+        {
+          name: `${prefix}_get_stored_functions`,
+          title: 'List Stored Functions',
+          description: 'Get stored functions available in the database',
+        },
+        {
+          name: `${prefix}_call_stored_function`,
+          title: 'Call Stored Function',
+          description: 'Call a stored function',
+        },
+        {
+          name: `${prefix}_get_database_resources`,
+          title: 'List Database Resources',
+          description: 'Get all resources available in the database service',
+        },
+        {
+          name: `${prefix}_get_api_spec`,
+          title: 'Get API Spec',
+          description:
+            'Get the OpenAPI specification for this database service',
+        },
+        {
+          name: `${prefix}_get_data_model`,
+          title: 'Get Data Model',
+          description:
+            'Get a condensed data model showing all tables and columns',
+        },
+        {
+          name: `${prefix}_aggregate_data`,
+          title: 'Aggregate Data',
+          description:
+            'Compute server-side aggregations (SUM, COUNT, AVG, MIN, MAX)',
+        },
+      ];
+    }
+    return [
+      {
+        name: `${prefix}_list_files`,
+        title: 'List Files',
+        description: 'List files and folders in a path',
+      },
+      {
+        name: `${prefix}_get_file`,
+        title: 'Get File Content',
+        description: 'Get the content of a file',
+      },
+      {
+        name: `${prefix}_create_file`,
+        title: 'Create File',
+        description: 'Create a new file with the given content',
+      },
+      {
+        name: `${prefix}_get_file_properties`,
+        title: 'Get File Properties',
+        description: 'Get properties/metadata of a file or folder',
+      },
+      {
+        name: `${prefix}_create_folder`,
+        title: 'Create Folder',
+        description: 'Create a new folder',
+      },
+      {
+        name: `${prefix}_delete_file`,
+        title: 'Delete File or Folder',
+        description: 'Delete a file or folder',
+      },
+    ];
+  }
+
+  isToolEnabled(toolName: string): boolean {
+    return !this.disabledTools.has(toolName);
+  }
+
+  toggleTool(toolName: string, enabled: boolean) {
+    if (enabled) {
+      this.disabledTools.delete(toolName);
+    } else {
+      this.disabledTools.add(toolName);
+    }
+  }
+
+  isAllGlobalToolsEnabled(): boolean {
+    return this.mcpGlobalTools.some(t => !this.disabledTools.has(t.name));
+  }
+
+  toggleAllGlobalTools(enabled: boolean) {
+    for (const tool of this.mcpGlobalTools) {
+      if (enabled) {
+        this.disabledTools.delete(tool.name);
+      } else {
+        this.disabledTools.add(tool.name);
+      }
+    }
+  }
+
+  isServiceEnabled(svc: { tools: { name: string }[] }): boolean {
+    return svc.tools.some(t => !this.disabledTools.has(t.name));
+  }
+
+  toggleService(svc: { tools: { name: string }[] }, enabled: boolean) {
+    for (const tool of svc.tools) {
+      if (enabled) {
+        this.disabledTools.delete(tool.name);
+      } else {
+        this.disabledTools.add(tool.name);
+      }
+    }
+  }
+
+  private sanitizeApiName(name: string): string {
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_|_$/g, '');
   }
 
   // Helper method for debugging (can be removed in production)
@@ -1097,6 +1401,10 @@ export class DfServiceDetailsComponent implements OnInit {
       // Only delete serviceDefinition for network services, not script services
       if (this.isNetworkService) {
         delete editPayload.config.serviceDefinition;
+      }
+      // Include disabled tools for MCP services
+      if (this.isMcp) {
+        editPayload.config.disabledTools = Array.from(this.disabledTools);
       }
       this.servicesService
         .update(this.serviceData.id, editPayload, {
