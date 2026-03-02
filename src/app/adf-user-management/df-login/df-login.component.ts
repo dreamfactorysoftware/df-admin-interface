@@ -162,7 +162,7 @@ export class DfLoginComponent implements OnInit {
    */
   getOAuthUrl(servicePath: string): string {
     const base = '/api/v2/' + servicePath;
-    const redirectUrl = localStorage.getItem(REDIRECT_URL_KEY);
+    const redirectUrl = sessionStorage.getItem(REDIRECT_URL_KEY);
     if (!redirectUrl) {
       return base;
     }
