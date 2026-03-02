@@ -33,6 +33,10 @@ export function captureRedirectUrl(): void {
   const redirectUrl = urlParams.get('redirect');
   if (redirectUrl) {
     localStorage.setItem(REDIRECT_URL_KEY, redirectUrl);
+  } else {
+    // No redirect param means normal login — clear any stale redirect URL
+    // left over from a previous MCP OAuth flow
+    localStorage.removeItem(REDIRECT_URL_KEY);
   }
 }
 
