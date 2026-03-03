@@ -992,6 +992,191 @@
       </mat-accordion>
     </ng-container>
 
+    <!-- MCP Custom Tools -->
+    <ng-container *ngIf="isMcp && edit">
+      <mat-accordion class="full-width">
+        <mat-expansion-panel [expanded]="customTools.length > 0">
+          <mat-expansion-panel-header>
+            Custom Tools
+          </mat-expansion-panel-header>
+
+          <div class="custom-tools-container">
+            <p class="custom-tools-description">
+              Define custom tools that make HTTP requests to external APIs.
+              These tools will be available to MCP clients alongside the built-in DreamFactory tools.
+            </p>
+
+            <div class="custom-tools-actions" *ngIf="editingToolIndex === null">
+              <button mat-flat-button color="primary" (click)="addCustomTool()">
+                <fa-icon [icon]="faPlus" class="btn-icon"></fa-icon>
+                Add Custom Tool
+              </button>
+            </div>
+
+            <!-- Add/Edit Form -->
+            <div class="custom-tool-form" *ngIf="editingToolIndex !== null" [formGroup]="customToolForm">
+              <h4>{{ editingToolIndex === -1 ? 'Add Custom Tool' : 'Edit Custom Tool' }}</h4>
+
+              <div class="form-row">
+                <mat-form-field appearance="outline" class="form-field-half">
+                  <mat-label>Tool Name</mat-label>
+                  <input matInput formControlName="name" placeholder="my_tool_name">
+                  <mat-hint>Letters, numbers, and underscores only</mat-hint>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline" class="form-field-quarter">
+                  <mat-label>HTTP Method</mat-label>
+                  <mat-select formControlName="httpMethod">
+                    <mat-option value="GET">GET</mat-option>
+                    <mat-option value="POST">POST</mat-option>
+                    <mat-option value="PUT">PUT</mat-option>
+                    <mat-option value="PATCH">PATCH</mat-option>
+                    <mat-option value="DELETE">DELETE</mat-option>
+                  </mat-select>
+                </mat-form-field>
+              </div>
+
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>URL</mat-label>
+                <input matInput formControlName="url" placeholder="https://api.example.com/endpoint/{id}">
+                <mat-hint>Use &#123;param&#125; for path parameters</mat-hint>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Description</mat-label>
+                <textarea matInput formControlName="description" rows="2"
+                  placeholder="Describe what this tool does..."></textarea>
+                <mat-hint>This description is shown to the LLM</mat-hint>
+              </mat-form-field>
+
+              <!-- Parameters -->
+              <div class="parameters-section">
+                <div class="section-header">
+                  <h5>Parameters</h5>
+                  <button mat-button color="primary" type="button" (click)="addToolParameter()">
+                    <fa-icon [icon]="faPlus" class="btn-icon"></fa-icon>
+                    Add Parameter
+                  </button>
+                </div>
+
+                <table class="mcp-services-table full-width" *ngIf="customToolParameters.length > 0"
+                  formArrayName="parameters">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Type</th>
+                      <th>Location</th>
+                      <th>Required</th>
+                      <th>Description</th>
+                      <th class="action-col"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let param of customToolParameters.controls; let i = index" [formGroupName]="i">
+                      <td>
+                        <input matInput formControlName="name" placeholder="param_name" class="inline-input">
+                      </td>
+                      <td>
+                        <select formControlName="type" class="inline-select">
+                          <option value="string">string</option>
+                          <option value="number">number</option>
+                          <option value="integer">integer</option>
+                          <option value="boolean">boolean</option>
+                        </select>
+                      </td>
+                      <td>
+                        <select formControlName="in" class="inline-select">
+                          <option value="query">query</option>
+                          <option value="path">path</option>
+                          <option value="body">body</option>
+                          <option value="header">header</option>
+                        </select>
+                      </td>
+                      <td>
+                        <mat-checkbox formControlName="required"></mat-checkbox>
+                      </td>
+                      <td>
+                        <input matInput formControlName="description" placeholder="Description" class="inline-input">
+                      </td>
+                      <td class="action-col">
+                        <button mat-icon-button color="warn" type="button" (click)="removeToolParameter(i)"
+                          matTooltip="Remove parameter">
+                          <fa-icon [icon]="faTrashCan"></fa-icon>
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Headers -->
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Static Headers (JSON)</mat-label>
+                <textarea matInput formControlName="headers" rows="2"
+                  placeholder='{"Authorization": "Bearer token"}'></textarea>
+              </mat-form-field>
+
+              <div class="form-actions">
+                <button mat-button type="button" (click)="cancelCustomToolEdit()">Cancel</button>
+                <button mat-flat-button color="primary" type="button" (click)="saveCustomTool()"
+                  [disabled]="customToolForm.invalid">
+                  {{ editingToolIndex === -1 ? 'Add' : 'Update' }}
+                </button>
+              </div>
+            </div>
+
+            <!-- Custom Tools Table -->
+            <table class="mcp-services-table full-width" *ngIf="customTools.length > 0">
+              <thead>
+                <tr>
+                  <th class="toggle-col"></th>
+                  <th>Name</th>
+                  <th>Method</th>
+                  <th>URL</th>
+                  <th>Description</th>
+                  <th class="action-col"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let tool of customTools; let i = index"
+                  [class.disabled-row]="!tool.enabled">
+                  <td class="toggle-col">
+                    <mat-slide-toggle
+                      color="primary"
+                      [checked]="tool.enabled"
+                      (change)="toggleCustomTool(i, $event.checked)">
+                    </mat-slide-toggle>
+                  </td>
+                  <td><code>{{ tool.name }}</code></td>
+                  <td><code>{{ tool.httpMethod }}</code></td>
+                  <td class="url-cell">{{ tool.url }}</td>
+                  <td>{{ tool.description }}</td>
+                  <td class="action-col">
+                    <div class="action-buttons">
+                      <button mat-icon-button (click)="editCustomTool(i)"
+                        [disabled]="editingToolIndex !== null"
+                        matTooltip="Edit tool">
+                        <fa-icon [icon]="faPenToSquare"></fa-icon>
+                      </button>
+                      <button mat-icon-button color="warn" (click)="deleteCustomTool(i)"
+                        [disabled]="editingToolIndex !== null"
+                        matTooltip="Delete tool">
+                        <fa-icon [icon]="faTrashCan"></fa-icon>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <p *ngIf="customTools.length === 0 && editingToolIndex === null" class="no-tools-message">
+              No custom tools defined. Click "Add Custom Tool" to create one.
+            </p>
+          </div>
+        </mat-expansion-panel>
+      </mat-accordion>
+    </ng-container>
+
     <div class="full-width action-bar" *ngIf="!subscriptionRequired">
       <button
         mat-flat-button

@@ -628,6 +628,152 @@ mat-icon {
   }
 }
 
+.custom-tools-container {
+  padding: 8px 0;
+
+  .custom-tools-description {
+    color: rgba(0, 0, 0, 0.6);
+    font-size: 14px;
+    margin-bottom: 16px;
+  }
+
+  .custom-tools-actions {
+    margin-bottom: 16px;
+  }
+
+  .no-tools-message {
+    color: rgba(0, 0, 0, 0.45);
+    font-style: italic;
+    padding: 16px 0;
+  }
+
+  code {
+    font-size: 12px;
+    padding: 2px 6px;
+    background: rgba(0, 0, 0, 0.06);
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+
+  .url-cell {
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.custom-tool-form {
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 16px;
+
+  h4 {
+    margin: 0 0 16px;
+    font-weight: 500;
+  }
+
+  .form-row {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  .form-field-half {
+    flex: 1;
+  }
+
+  .form-field-quarter {
+    width: 160px;
+    flex-shrink: 0;
+  }
+
+  .parameters-section {
+    margin: 16px 0;
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+
+      h5 {
+        margin: 0;
+        font-weight: 500;
+      }
+    }
+  }
+
+  .inline-input {
+    width: 100%;
+    padding: 4px 8px;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    font-size: 13px;
+    background: transparent;
+  }
+
+  .inline-select {
+    padding: 4px 8px;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    font-size: 13px;
+    background: transparent;
+  }
+
+  .form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+  }
+}
+
+.btn-icon {
+  margin-right: 6px;
+}
+
+.action-col {
+  width: 100px;
+  white-space: nowrap;
+  text-align: right;
+  padding-right: 4px !important;
+
+  .action-buttons {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0;
+  }
+}
+
+.dark-theme {
+  .custom-tools-container {
+    .custom-tools-description {
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    .no-tools-message {
+      color: rgba(255, 255, 255, 0.45);
+    }
+
+    code {
+      background: rgba(255, 255, 255, 0.1);
+    }
+  }
+
+  .custom-tool-form {
+    background: rgba(255, 255, 255, 0.05);
+
+    .inline-input,
+    .inline-select {
+      border-color: rgba(255, 255, 255, 0.3);
+      color: rgba(255, 255, 255, 0.87);
+    }
+  }
+}
+
 .basic-fields-section {
   margin-bottom: 2rem;
 
