@@ -5,7 +5,10 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslocoModule } from '@ngneat/transloco';
-import { FieldInfo, TableSchemaResponse } from './services/data-explorer.service';
+import {
+  FieldInfo,
+  TableSchemaResponse,
+} from './services/data-explorer.service';
 
 @Component({
   selector: 'df-row-detail',
@@ -33,26 +36,49 @@ import { FieldInfo, TableSchemaResponse } from './services/data-explorer.service
         <div class="field-entry" *ngFor="let key of objectKeys(row)">
           <div class="field-label">
             <span class="field-key">{{ key }}</span>
-            <span class="field-type-badge" *ngIf="getFieldInfo(key) as fi">{{ fi.dbType }}</span>
+            <span class="field-type-badge" *ngIf="getFieldInfo(key) as fi">{{
+              fi.dbType
+            }}</span>
             <mat-chip-set class="field-badges" *ngIf="getFieldInfo(key) as fi">
-              <mat-chip *ngIf="fi.isPrimaryKey" class="badge-pk" disabled>PK</mat-chip>
-              <mat-chip *ngIf="fi.isForeignKey" class="badge-fk" disabled
-                [matTooltip]="fi.refTable + '.' + fi.refField">FK</mat-chip>
+              <mat-chip *ngIf="fi.isPrimaryKey" class="badge-pk" disabled
+                >PK</mat-chip
+              >
+              <mat-chip
+                *ngIf="fi.isForeignKey"
+                class="badge-fk"
+                disabled
+                [matTooltip]="fi.refTable + '.' + fi.refField"
+                >FK</mat-chip
+              >
             </mat-chip-set>
           </div>
-          <div class="field-value" [class.null-value]="row[key] === null || row[key] === undefined">
+          <div
+            class="field-value"
+            [class.null-value]="row[key] === null || row[key] === undefined">
             <ng-container *ngIf="row[key] === null || row[key] === undefined">
               <span class="null-badge">{{ t('dataExplorer.nullValue') }}</span>
             </ng-container>
             <ng-container *ngIf="row[key] !== null && row[key] !== undefined">
-              <pre *ngIf="isObject(row[key])" class="json-value">{{ row[key] | json }}</pre>
-              <span *ngIf="!isObject(row[key])" class="text-value">{{ row[key] }}</span>
+              <pre *ngIf="isObject(row[key])" class="json-value">{{
+                row[key] | json
+              }}</pre>
+              <span *ngIf="!isObject(row[key])" class="text-value">{{
+                row[key]
+              }}</span>
             </ng-container>
           </div>
-          <div class="field-ref" *ngIf="getFieldInfo(key)?.isForeignKey && getFieldInfo(key)?.refTable">
+          <div
+            class="field-ref"
+            *ngIf="
+              getFieldInfo(key)?.isForeignKey && getFieldInfo(key)?.refTable
+            ">
             <mat-icon class="ref-icon">link</mat-icon>
-            <a class="ref-link" (click)="navigateToTable.emit(getFieldInfo(key)!.refTable!)">
-              {{ getFieldInfo(key)!.refTable }}.{{ getFieldInfo(key)!.refField }}
+            <a
+              class="ref-link"
+              (click)="navigateToTable.emit(getFieldInfo(key)!.refTable!)">
+              {{ getFieldInfo(key)!.refTable }}.{{
+                getFieldInfo(key)!.refField
+              }}
             </a>
           </div>
         </div>
@@ -215,11 +241,15 @@ import { FieldInfo, TableSchemaResponse } from './services/data-explorer.service
         .detail-header {
           background: #2c2c2c;
           border-bottom-color: #424242;
-          .detail-title { color: #bdbdbd; }
+          .detail-title {
+            color: #bdbdbd;
+          }
         }
         .field-entry {
           border-bottom-color: #2c2c2c;
-          .field-label .field-key { color: #e0e0e0; }
+          .field-label .field-key {
+            color: #e0e0e0;
+          }
           .field-value {
             color: #e0e0e0;
             .null-badge {
@@ -233,7 +263,9 @@ import { FieldInfo, TableSchemaResponse } from './services/data-explorer.service
             }
           }
         }
-        .ref-link { color: #64b5f6; }
+        .ref-link {
+          color: #64b5f6;
+        }
       }
     `,
   ],

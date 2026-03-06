@@ -13,7 +13,11 @@ import {
 import { NgIf, NgFor, NgClass, JsonPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatTableModule, MatTableDataSource } from '@angular/material/table';
-import { MatPaginatorModule, MatPaginator, PageEvent } from '@angular/material/paginator';
+import {
+  MatPaginatorModule,
+  MatPaginator,
+  PageEvent,
+} from '@angular/material/paginator';
 import { MatSortModule, MatSort, Sort } from '@angular/material/sort';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
@@ -29,7 +33,12 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSelectModule } from '@angular/material/select';
 import { TranslocoModule } from '@ngneat/transloco';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faTable, faLock, faFilter, faCode } from '@fortawesome/free-solid-svg-icons';
+import {
+  faTable,
+  faLock,
+  faFilter,
+  faCode,
+} from '@fortawesome/free-solid-svg-icons';
 import { Subject } from 'rxjs';
 import { takeUntil, debounceTime } from 'rxjs/operators';
 import {
@@ -88,7 +97,9 @@ interface ColumnFilter {
             <fa-icon [icon]="faTable" class="toolbar-icon"></fa-icon>
             <span class="table-title">{{ tableName }}</span>
             <mat-chip-set class="readonly-chip">
-              <mat-chip disabled matTooltip="Data Explorer is currently read-only. Use the API call to build write operations.">
+              <mat-chip
+                disabled
+                matTooltip="Data Explorer is currently read-only. Use the API call to build write operations.">
                 <fa-icon [icon]="faLock" class="lock-icon"></fa-icon>
                 {{ t('dataExplorer.readOnly') }}
               </mat-chip>
@@ -96,29 +107,42 @@ interface ColumnFilter {
           </div>
           <div class="toolbar-right">
             <!-- Quick search -->
-            <div class="quick-search" *ngIf="!initialLoading && columns.length > 0"
+            <div
+              class="quick-search"
+              *ngIf="!initialLoading && columns.length > 0"
               matTooltip="Search within the current page of results. Filters rows client-side across all visible columns.">
               <mat-icon class="search-icon">search</mat-icon>
-              <input class="search-input"
+              <input
+                class="search-input"
                 [placeholder]="t('dataExplorer.quickSearch')"
                 [value]="quickSearchTerm"
-                (input)="onQuickSearch($event)">
-              <button *ngIf="quickSearchTerm" class="search-clear" (click)="clearQuickSearch()">
+                (input)="onQuickSearch($event)" />
+              <button
+                *ngIf="quickSearchTerm"
+                class="search-clear"
+                (click)="clearQuickSearch()">
                 <mat-icon>close</mat-icon>
               </button>
             </div>
 
             <!-- Filter count badge -->
-            <button mat-icon-button
+            <button
+              mat-icon-button
               *ngIf="activeFilterCount > 0"
               (click)="clearAllFilters()"
               [matTooltip]="t('dataExplorer.clearFilters')"
               class="clear-filters-btn">
-              <mat-icon [matBadge]="activeFilterCount" matBadgeColor="accent" matBadgeSize="small">filter_list_off</mat-icon>
+              <mat-icon
+                [matBadge]="activeFilterCount"
+                matBadgeColor="accent"
+                matBadgeSize="small"
+                >filter_list_off</mat-icon
+              >
             </button>
 
             <!-- Show API call -->
-            <button mat-icon-button
+            <button
+              mat-icon-button
               (click)="showApiCall = !showApiCall"
               matTooltip="Show the DreamFactory REST API call that matches your current view. Copy it to use in your own apps."
               [class.active]="showApiCall">
@@ -126,11 +150,17 @@ interface ColumnFilter {
             </button>
 
             <!-- Column visibility -->
-            <button mat-icon-button [matMenuTriggerFor]="columnMenu" matTooltip="Show or hide columns in the grid">
+            <button
+              mat-icon-button
+              [matMenuTriggerFor]="columnMenu"
+              matTooltip="Show or hide columns in the grid">
               <mat-icon>view_column</mat-icon>
             </button>
             <mat-menu #columnMenu="matMenu" class="column-menu">
-              <div *ngFor="let col of allColumns" class="column-menu-item" (click)="$event.stopPropagation()">
+              <div
+                *ngFor="let col of allColumns"
+                class="column-menu-item"
+                (click)="$event.stopPropagation()">
                 <mat-checkbox
                   [checked]="!hiddenColumns.has(col)"
                   (change)="toggleColumn(col)">
@@ -140,7 +170,8 @@ interface ColumnFilter {
             </mat-menu>
 
             <!-- Schema info toggle -->
-            <button mat-icon-button
+            <button
+              mat-icon-button
               (click)="toggleSchemaPanel()"
               matTooltip="View column types, primary keys, foreign keys, and table relationships"
               [class.active]="showSchemaPanel">
@@ -152,39 +183,79 @@ interface ColumnFilter {
         <!-- Navigation filter indicator -->
         <div class="nav-filter-bar" *ngIf="navigationFilter">
           <mat-icon class="nav-filter-icon">link</mat-icon>
-          <span class="nav-filter-text">Filtered via foreign key: <code>{{ navigationFilter }}</code></span>
-          <button mat-icon-button class="nav-filter-clear" (click)="clearNavigationFilter()" matTooltip="Remove navigation filter and show all records">
+          <span class="nav-filter-text"
+            >Filtered via foreign key: <code>{{ navigationFilter }}</code></span
+          >
+          <button
+            mat-icon-button
+            class="nav-filter-clear"
+            (click)="clearNavigationFilter()"
+            matTooltip="Remove navigation filter and show all records">
             <mat-icon>close</mat-icon>
           </button>
         </div>
 
         <!-- Top pagination bar -->
-        <div class="top-pagination" *ngIf="!initialLoading && !error && columns.length > 0">
+        <div
+          class="top-pagination"
+          *ngIf="!initialLoading && !error && columns.length > 0">
           <div class="top-pagination-left">
-            <span class="page-info" *ngIf="totalRecords > 0"
-              matTooltip="Records {{ currentOffset + 1 }} through {{ currentOffset + dataSource.data.length }} out of {{ totalRecords }} total. Use the per-column filters below the headers for server-side filtering.">
-              {{ currentOffset + 1 }}–{{ currentOffset + dataSource.data.length }}
+            <span
+              class="page-info"
+              *ngIf="totalRecords > 0"
+              matTooltip="Records {{ currentOffset + 1 }} through {{
+                currentOffset + dataSource.data.length
+              }} out of {{
+                totalRecords
+              }} total. Use the per-column filters below the headers for server-side filtering.">
+              {{ currentOffset + 1 }}–{{
+                currentOffset + dataSource.data.length
+              }}
               of {{ totalRecords }} records
             </span>
           </div>
           <div class="top-pagination-right">
-            <label class="page-size-label">Rows:
-              <select class="page-size-select" [value]="pageSize" (change)="onPageSizeChange($event)">
-                <option *ngFor="let size of pageSizeOptions" [value]="size">{{ size }}</option>
+            <label class="page-size-label"
+              >Rows:
+              <select
+                class="page-size-select"
+                [value]="pageSize"
+                (change)="onPageSizeChange($event)">
+                <option *ngFor="let size of pageSizeOptions" [value]="size">
+                  {{ size }}
+                </option>
               </select>
             </label>
             <div class="page-nav">
-              <button mat-icon-button (click)="goToFirstPage()" [disabled]="pageIndex === 0" matTooltip="First page">
+              <button
+                mat-icon-button
+                (click)="goToFirstPage()"
+                [disabled]="pageIndex === 0"
+                matTooltip="First page">
                 <mat-icon>first_page</mat-icon>
               </button>
-              <button mat-icon-button (click)="goToPrevPage()" [disabled]="pageIndex === 0" matTooltip="Previous page">
+              <button
+                mat-icon-button
+                (click)="goToPrevPage()"
+                [disabled]="pageIndex === 0"
+                matTooltip="Previous page">
                 <mat-icon>chevron_left</mat-icon>
               </button>
-              <span class="page-label">{{ pageIndex + 1 }} / {{ totalPages }}</span>
-              <button mat-icon-button (click)="goToNextPage()" [disabled]="isLastPage()" matTooltip="Next page">
+              <span class="page-label"
+                >{{ pageIndex + 1 }} / {{ totalPages }}</span
+              >
+              <button
+                mat-icon-button
+                (click)="goToNextPage()"
+                [disabled]="isLastPage()"
+                matTooltip="Next page">
                 <mat-icon>chevron_right</mat-icon>
               </button>
-              <button mat-icon-button (click)="goToLastPage()" [disabled]="isLastPage()" matTooltip="Last page">
+              <button
+                mat-icon-button
+                (click)="goToLastPage()"
+                [disabled]="isLastPage()"
+                matTooltip="Last page">
                 <mat-icon>last_page</mat-icon>
               </button>
             </div>
@@ -192,40 +263,89 @@ interface ColumnFilter {
         </div>
 
         <!-- API Call bar -->
-        <div class="api-call-bar" *ngIf="showApiCall && !initialLoading && columns.length > 0">
+        <div
+          class="api-call-bar"
+          *ngIf="showApiCall && !initialLoading && columns.length > 0">
           <div class="api-call-desc">
-            This is the DreamFactory REST API call equivalent to your current view.
-            Any sorting or column filters you apply will update the URL in real time.
-            Click the URL or the copy button to copy it to your clipboard.
+            This is the DreamFactory REST API call equivalent to your current
+            view. Any sorting or column filters you apply will update the URL in
+            real time. Click the URL or the copy button to copy it to your
+            clipboard.
           </div>
           <div class="api-call-top">
-            <span class="api-method" matTooltip="HTTP method — GET retrieves records without modifying data">GET</span>
-            <code class="api-url" (click)="copyApiUrl()" matTooltip="Click to copy this URL">{{ buildApiUrl() }}</code>
-            <button mat-icon-button class="copy-btn" (click)="copyApiUrl()" matTooltip="Copy URL to clipboard">
+            <span
+              class="api-method"
+              matTooltip="HTTP method — GET retrieves records without modifying data"
+              >GET</span
+            >
+            <code
+              class="api-url"
+              (click)="copyApiUrl()"
+              matTooltip="Click to copy this URL"
+              >{{ buildApiUrl() }}</code
+            >
+            <button
+              mat-icon-button
+              class="copy-btn"
+              (click)="copyApiUrl()"
+              matTooltip="Copy URL to clipboard">
               <mat-icon>{{ apiCopied ? 'check' : 'content_copy' }}</mat-icon>
             </button>
           </div>
           <div class="api-call-options">
             <span class="options-label">Include:</span>
-            <label class="api-option" matTooltip="limit — Maximum number of records to return per request (currently {{ pageSize }})">
-              <input type="checkbox" [checked]="apiIncludeLimit" (change)="apiIncludeLimit = !apiIncludeLimit">
+            <label
+              class="api-option"
+              matTooltip="limit — Maximum number of records to return per request (currently {{
+                pageSize
+              }})">
+              <input
+                type="checkbox"
+                [checked]="apiIncludeLimit"
+                (change)="apiIncludeLimit = !apiIncludeLimit" />
               limit
             </label>
-            <label class="api-option" matTooltip="offset — Number of records to skip, used for pagination (currently {{ currentOffset }})">
-              <input type="checkbox" [checked]="apiIncludeOffset" (change)="apiIncludeOffset = !apiIncludeOffset">
+            <label
+              class="api-option"
+              matTooltip="offset — Number of records to skip, used for pagination (currently {{
+                currentOffset
+              }})">
+              <input
+                type="checkbox"
+                [checked]="apiIncludeOffset"
+                (change)="apiIncludeOffset = !apiIncludeOffset" />
               offset
             </label>
-            <label class="api-option" matTooltip="include_count — Returns total record count in the response metadata">
-              <input type="checkbox" [checked]="apiIncludeCount" (change)="apiIncludeCount = !apiIncludeCount">
+            <label
+              class="api-option"
+              matTooltip="include_count — Returns total record count in the response metadata">
+              <input
+                type="checkbox"
+                [checked]="apiIncludeCount"
+                (change)="apiIncludeCount = !apiIncludeCount" />
               include_count
             </label>
           </div>
           <div class="api-call-related" *ngIf="cachedSchema?.related?.length">
             <span class="options-label">Related:</span>
-            <label class="api-option" *ngFor="let rel of cachedSchema!.related"
-              [matTooltip]="rel.type + ' — Include ' + rel.refTable + ' records linked via ' + rel.field + ' → ' + rel.refField">
-              <input type="checkbox" [checked]="apiSelectedRelated[rel.name]"
-                (change)="apiSelectedRelated[rel.name] = !apiSelectedRelated[rel.name]">
+            <label
+              class="api-option"
+              *ngFor="let rel of cachedSchema!.related"
+              [matTooltip]="
+                rel.type +
+                ' — Include ' +
+                rel.refTable +
+                ' records linked via ' +
+                rel.field +
+                ' → ' +
+                rel.refField
+              ">
+              <input
+                type="checkbox"
+                [checked]="apiSelectedRelated[rel.name]"
+                (change)="
+                  apiSelectedRelated[rel.name] = !apiSelectedRelated[rel.name]
+                " />
               {{ rel.name }}
             </label>
           </div>
@@ -247,67 +367,117 @@ interface ColumnFilter {
         </div>
 
         <!-- Empty -->
-        <div class="empty-state" *ngIf="!initialLoading && !error && dataSource.data.length === 0 && allColumns.length === 0">
+        <div
+          class="empty-state"
+          *ngIf="
+            !initialLoading &&
+            !error &&
+            dataSource.data.length === 0 &&
+            allColumns.length === 0
+          ">
           <mat-icon>inbox</mat-icon>
           <span>{{ t('dataExplorer.noData') }}</span>
           <small>{{ t('dataExplorer.noDataHint') }}</small>
         </div>
 
         <!-- Data Table -->
-        <div class="table-wrapper" *ngIf="!initialLoading && !error && columns.length > 0" [class.is-loading]="loading">
+        <div
+          class="table-wrapper"
+          *ngIf="!initialLoading && !error && columns.length > 0"
+          [class.is-loading]="loading">
           <div class="table-scroll">
-            <table mat-table [dataSource]="dataSource" matSort (matSortChange)="onSortChange($event)" class="data-table">
+            <table
+              mat-table
+              [dataSource]="dataSource"
+              matSort
+              (matSortChange)="onSortChange($event)"
+              class="data-table">
               <ng-container *ngFor="let col of columns" [matColumnDef]="col">
-                <th mat-header-cell *matHeaderCellDef mat-sort-header class="header-cell"
+                <th
+                  mat-header-cell
+                  *matHeaderCellDef
+                  mat-sort-header
+                  class="header-cell"
                   [style.width.px]="columnWidths[col]"
                   [style.min-width.px]="columnWidths[col]"
                   [style.max-width.px]="columnWidths[col]">
-                  <mat-icon *ngIf="isPrimaryKey(col)" class="pk-icon" matTooltip="Primary Key">vpn_key</mat-icon>
+                  <mat-icon
+                    *ngIf="isPrimaryKey(col)"
+                    class="pk-icon"
+                    matTooltip="Primary Key"
+                    >vpn_key</mat-icon
+                  >
                   {{ col }}
-                  <span class="resize-handle" (mousedown)="onResizeStart($event, col)"></span>
+                  <span
+                    class="resize-handle"
+                    (mousedown)="onResizeStart($event, col)"></span>
                 </th>
-                <td mat-cell *matCellDef="let row" class="data-cell"
+                <td
+                  mat-cell
+                  *matCellDef="let row"
+                  class="data-cell"
                   [style.width.px]="columnWidths[col]"
                   [style.min-width.px]="columnWidths[col]"
                   [style.max-width.px]="columnWidths[col]"
-                  [class.null-cell]="row[col] === null || row[col] === undefined"
+                  [class.null-cell]="
+                    row[col] === null || row[col] === undefined
+                  "
                   [class.fk-cell]="isForeignKey(col) && row[col] != null">
-                  <span *ngIf="isForeignKey(col) && row[col] != null"
+                  <span
+                    *ngIf="isForeignKey(col) && row[col] != null"
                     class="fk-link"
                     (click)="onFkClick($event, col, row[col])"
                     [matTooltip]="'Go to ' + getFkRefTable(col)">
                     {{ formatCellValue(row[col]) }}
                     <mat-icon class="fk-nav-icon">open_in_new</mat-icon>
                   </span>
-                  <ng-container *ngIf="!(isForeignKey(col) && row[col] != null)">
+                  <ng-container
+                    *ngIf="!(isForeignKey(col) && row[col] != null)">
                     {{ formatCellValue(row[col]) }}
                   </ng-container>
                 </td>
               </ng-container>
 
               <!-- Filter row columns -->
-              <ng-container *ngFor="let col of columns" [matColumnDef]="'filter_' + col">
-                <th mat-header-cell *matHeaderCellDef class="filter-cell"
+              <ng-container
+                *ngFor="let col of columns"
+                [matColumnDef]="'filter_' + col">
+                <th
+                  mat-header-cell
+                  *matHeaderCellDef
+                  class="filter-cell"
                   [style.width.px]="columnWidths[col]"
                   [style.min-width.px]="columnWidths[col]"
                   [style.max-width.px]="columnWidths[col]">
                   <div class="filter-group">
-                    <select class="filter-op"
+                    <select
+                      class="filter-op"
                       [value]="getFilterOp(col)"
                       (change)="onFilterOpChange(col, $event)">
-                      <option *ngFor="let op of getOperatorsForColumn(col)" [value]="op.value">{{ op.label }}</option>
+                      <option
+                        *ngFor="let op of getOperatorsForColumn(col)"
+                        [value]="op.value">
+                        {{ op.label }}
+                      </option>
                     </select>
-                    <input *ngIf="!isNullOp(getFilterOp(col))" class="filter-input"
+                    <input
+                      *ngIf="!isNullOp(getFilterOp(col))"
+                      class="filter-input"
                       [placeholder]="t('dataExplorer.filterPlaceholder')"
                       [value]="getFilterValue(col)"
-                      (input)="onFilterInput(col, $event)">
+                      (input)="onFilterInput(col, $event)" />
                   </div>
                 </th>
               </ng-container>
 
               <tr mat-header-row *matHeaderRowDef="columns; sticky: true"></tr>
-              <tr mat-header-row *matHeaderRowDef="filterColumns; sticky: true" class="filter-row"></tr>
-              <tr mat-row *matRowDef="let row; columns: columns;"
+              <tr
+                mat-header-row
+                *matHeaderRowDef="filterColumns; sticky: true"
+                class="filter-row"></tr>
+              <tr
+                mat-row
+                *matRowDef="let row; columns: columns"
                 (click)="onRowClick(row)"
                 [class.selected-row]="row === selectedRow"
                 class="clickable-row"
@@ -318,27 +488,53 @@ interface ColumnFilter {
         </div>
 
         <!-- Footer status bar -->
-        <div class="grid-footer" *ngIf="!initialLoading && !error && columns.length > 0">
-          <span class="footer-info" matTooltip="Total records matching current server-side filters">
+        <div
+          class="grid-footer"
+          *ngIf="!initialLoading && !error && columns.length > 0">
+          <span
+            class="footer-info"
+            matTooltip="Total records matching current server-side filters">
             {{ totalRecords }} records
-            <ng-container *ngIf="activeFilterCount > 0"> (filtered)</ng-container>
+            <ng-container *ngIf="activeFilterCount > 0">
+              (filtered)</ng-container
+            >
           </span>
-          <span class="footer-info" matTooltip="Use the column visibility button to show/hide columns">{{ columns.length }} of {{ allColumns.length }} columns</span>
+          <span
+            class="footer-info"
+            matTooltip="Use the column visibility button to show/hide columns"
+            >{{ columns.length }} of {{ allColumns.length }} columns</span
+          >
           <div class="footer-right">
             <span class="page-info-footer" *ngIf="totalRecords > 0">
               Page {{ pageIndex + 1 }} of {{ totalPages }}
             </span>
             <div class="page-nav-footer">
-              <button mat-icon-button (click)="goToFirstPage()" [disabled]="pageIndex === 0" class="footer-btn">
+              <button
+                mat-icon-button
+                (click)="goToFirstPage()"
+                [disabled]="pageIndex === 0"
+                class="footer-btn">
                 <mat-icon>first_page</mat-icon>
               </button>
-              <button mat-icon-button (click)="goToPrevPage()" [disabled]="pageIndex === 0" class="footer-btn">
+              <button
+                mat-icon-button
+                (click)="goToPrevPage()"
+                [disabled]="pageIndex === 0"
+                class="footer-btn">
                 <mat-icon>chevron_left</mat-icon>
               </button>
-              <button mat-icon-button (click)="goToNextPage()" [disabled]="isLastPage()" class="footer-btn">
+              <button
+                mat-icon-button
+                (click)="goToNextPage()"
+                [disabled]="isLastPage()"
+                class="footer-btn">
                 <mat-icon>chevron_right</mat-icon>
               </button>
-              <button mat-icon-button (click)="goToLastPage()" [disabled]="isLastPage()" class="footer-btn">
+              <button
+                mat-icon-button
+                (click)="goToLastPage()"
+                [disabled]="isLastPage()"
+                class="footer-btn">
                 <mat-icon>last_page</mat-icon>
               </button>
             </div>
@@ -447,11 +643,17 @@ interface ColumnFilter {
         border-bottom-color: #424242;
         background: #303030;
         .toolbar-left {
-          .toolbar-icon { color: #ce93d8; }
-          .table-title { color: #e0e0e0; }
+          .toolbar-icon {
+            color: #ce93d8;
+          }
+          .table-title {
+            color: #e0e0e0;
+          }
         }
         .toolbar-right {
-          button.active { color: #ce93d8; }
+          button.active {
+            color: #ce93d8;
+          }
         }
       }
 
@@ -474,7 +676,9 @@ interface ColumnFilter {
         color: #757575;
 
         .top-pagination-left {
-          .page-info { white-space: nowrap; }
+          .page-info {
+            white-space: nowrap;
+          }
         }
 
         .top-pagination-right {
@@ -515,7 +719,9 @@ interface ColumnFilter {
               width: 28px;
               height: 28px;
               line-height: 28px;
-              mat-icon { font-size: 18px; }
+              mat-icon {
+                font-size: 18px;
+              }
             }
           }
         }
@@ -566,8 +772,12 @@ interface ColumnFilter {
       }
 
       @keyframes loading-bar {
-        0% { transform: translateX(-100%); }
-        100% { transform: translateX(100%); }
+        0% {
+          transform: translateX(-100%);
+        }
+        100% {
+          transform: translateX(100%);
+        }
       }
 
       .table-scroll {
@@ -602,14 +812,22 @@ interface ColumnFilter {
       }
 
       :host-context(.dark-theme) .table-scroll {
-        &::-webkit-scrollbar-track { background: #252525; }
+        &::-webkit-scrollbar-track {
+          background: #252525;
+        }
         &::-webkit-scrollbar-thumb {
           background: #555;
           border-color: #252525;
-          &:hover { background: #6a6a6a; }
-          &:active { background: #7a7a7a; }
+          &:hover {
+            background: #6a6a6a;
+          }
+          &:active {
+            background: #7a7a7a;
+          }
         }
-        &::-webkit-scrollbar-corner { background: #252525; }
+        &::-webkit-scrollbar-corner {
+          background: #252525;
+        }
         scrollbar-color: #555 #252525;
       }
 
@@ -777,21 +995,29 @@ interface ColumnFilter {
             background: #2c2c2c;
             border-color: #424242;
             color: #e0e0e0;
-            &:focus { border-color: #ce93d8; }
+            &:focus {
+              border-color: #ce93d8;
+            }
           }
 
           .filter-input {
             background: #2c2c2c;
             border-color: #424242;
             color: #e0e0e0;
-            &:focus { border-color: #ce93d8; }
-            &::placeholder { color: #616161; }
+            &:focus {
+              border-color: #ce93d8;
+            }
+            &::placeholder {
+              color: #616161;
+            }
           }
         }
         .data-cell {
           border-right-color: #383838;
           color: #e0e0e0;
-          &.null-cell { color: #616161; }
+          &.null-cell {
+            color: #616161;
+          }
         }
         tr.mat-mdc-row:hover {
           background: rgba(206, 147, 216, 0.06);
@@ -836,7 +1062,9 @@ interface ColumnFilter {
               width: 26px;
               height: 26px;
               line-height: 26px;
-              mat-icon { font-size: 18px; }
+              mat-icon {
+                font-size: 18px;
+              }
             }
           }
         }
@@ -873,7 +1101,9 @@ interface ColumnFilter {
           font-size: 12px;
           width: 140px;
           color: #424242;
-          &::placeholder { color: #bdbdbd; }
+          &::placeholder {
+            color: #bdbdbd;
+          }
         }
 
         .search-clear {
@@ -885,8 +1115,14 @@ interface ColumnFilter {
           cursor: pointer;
           padding: 0;
           color: #9e9e9e;
-          mat-icon { font-size: 14px; width: 14px; height: 14px; }
-          &:hover { color: #616161; }
+          mat-icon {
+            font-size: 14px;
+            width: 14px;
+            height: 14px;
+          }
+          &:hover {
+            color: #616161;
+          }
         }
       }
 
@@ -895,12 +1131,18 @@ interface ColumnFilter {
         border-color: #424242;
         .search-input {
           color: #e0e0e0;
-          &::placeholder { color: #616161; }
+          &::placeholder {
+            color: #616161;
+          }
         }
-        .search-icon { color: #757575; }
+        .search-icon {
+          color: #757575;
+        }
         .search-clear {
           color: #757575;
-          &:hover { color: #bdbdbd; }
+          &:hover {
+            color: #bdbdbd;
+          }
         }
       }
 
@@ -950,7 +1192,9 @@ interface ColumnFilter {
           font-size: 12px;
           color: #37474f;
           cursor: pointer;
-          &:hover { color: #1565c0; }
+          &:hover {
+            color: #1565c0;
+          }
         }
 
         .copy-btn {
@@ -958,7 +1202,9 @@ interface ColumnFilter {
           width: 24px;
           height: 24px;
           line-height: 24px;
-          mat-icon { font-size: 16px; }
+          mat-icon {
+            font-size: 16px;
+          }
         }
 
         .api-call-options,
@@ -984,7 +1230,7 @@ interface ColumnFilter {
             cursor: pointer;
             white-space: nowrap;
 
-            input[type="checkbox"] {
+            input[type='checkbox'] {
               width: 12px;
               height: 12px;
               margin: 0;
@@ -998,17 +1244,25 @@ interface ColumnFilter {
       :host-context(.dark-theme) .api-call-bar {
         background: #1a2332;
         border-bottom-color: #424242;
-        .api-call-desc { color: #78909c; }
+        .api-call-desc {
+          color: #78909c;
+        }
         .api-url {
           color: #b0bec5;
-          &:hover { color: #64b5f6; }
+          &:hover {
+            color: #64b5f6;
+          }
         }
         .api-call-options,
         .api-call-related {
-          .options-label { color: #616161; }
+          .options-label {
+            color: #616161;
+          }
           .api-option {
             color: #9e9e9e;
-            input[type="checkbox"] { accent-color: #ce93d8; }
+            input[type='checkbox'] {
+              accent-color: #ce93d8;
+            }
           }
         }
       }
@@ -1107,7 +1361,9 @@ interface ColumnFilter {
           height: 24px;
           line-height: 24px;
           color: #7b1fa2;
-          mat-icon { font-size: 16px; }
+          mat-icon {
+            font-size: 16px;
+          }
         }
       }
 
@@ -1116,11 +1372,15 @@ interface ColumnFilter {
         border-bottom-color: #424242;
         color: #e1bee7;
 
-        .nav-filter-icon { color: #ce93d8; }
+        .nav-filter-icon {
+          color: #ce93d8;
+        }
         .nav-filter-text code {
           background: rgba(206, 147, 216, 0.15);
         }
-        .nav-filter-clear { color: #ce93d8; }
+        .nav-filter-clear {
+          color: #ce93d8;
+        }
       }
 
       /* Quick search highlight */
@@ -1130,11 +1390,16 @@ interface ColumnFilter {
     `,
   ],
 })
-export class DfDataGridComponent implements OnChanges, OnDestroy, AfterViewInit {
+export class DfDataGridComponent
+  implements OnChanges, OnDestroy, AfterViewInit
+{
   @Input() serviceName = '';
   @Input() tableName = '';
   @Input() initialFilter: string | undefined;
-  @Output() tableNavigated = new EventEmitter<{ tableName: string; filter?: string }>();
+  @Output() tableNavigated = new EventEmitter<{
+    tableName: string;
+    filter?: string;
+  }>();
 
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
@@ -1401,7 +1666,10 @@ export class DfDataGridComponent implements OnChanges, OnDestroy, AfterViewInit 
   }
 
   goToLastPage(): void {
-    this.pageIndex = Math.max(0, Math.ceil(this.totalRecords / this.pageSize) - 1);
+    this.pageIndex = Math.max(
+      0,
+      Math.ceil(this.totalRecords / this.pageSize) - 1
+    );
     this.currentOffset = this.pageIndex * this.pageSize;
     this.loadData();
   }
@@ -1432,9 +1700,11 @@ export class DfDataGridComponent implements OnChanges, OnDestroy, AfterViewInit 
     if (exact) return exact;
     // Try case-insensitive match (camelCase vs snake_case)
     const lower = jsonKey.toLowerCase();
-    return this.cachedSchema.field.find(
-      f => f.name.toLowerCase().replace(/_/g, '') === lower
-    ) || null;
+    return (
+      this.cachedSchema.field.find(
+        f => f.name.toLowerCase().replace(/_/g, '') === lower
+      ) || null
+    );
   }
 
   /** Map a JSON response key back to the actual DB column name via schema */
@@ -1584,7 +1854,12 @@ export class DfDataGridComponent implements OnChanges, OnDestroy, AfterViewInit 
         parts.push(`(${dbCol} like '%${escaped}')`);
       } else {
         const opMap: Record<string, string> = {
-          eq: '=', neq: '!=', gt: '>', lt: '<', gte: '>=', lte: '<=',
+          eq: '=',
+          neq: '!=',
+          gt: '>',
+          lt: '<',
+          gte: '>=',
+          lte: '<=',
         };
         const sqlOp = opMap[op] || '=';
         const fieldInfo = this.getFieldInfo(col);
@@ -1602,18 +1877,36 @@ export class DfDataGridComponent implements OnChanges, OnDestroy, AfterViewInit 
 
   private isNumericType(type: string): boolean {
     const numericTypes = [
-      'integer', 'int', 'smallint', 'bigint', 'tinyint',
-      'float', 'double', 'decimal', 'numeric', 'real',
-      'serial', 'bigserial', 'int2', 'int4', 'int8',
-      'float4', 'float8', 'money',
+      'integer',
+      'int',
+      'smallint',
+      'bigint',
+      'tinyint',
+      'float',
+      'double',
+      'decimal',
+      'numeric',
+      'real',
+      'serial',
+      'bigserial',
+      'int2',
+      'int4',
+      'int8',
+      'float4',
+      'float8',
+      'money',
     ];
     return numericTypes.some(t => type.toLowerCase().includes(t));
   }
 
   private isDateType(type: string): boolean {
     const dateTypes = [
-      'date', 'datetime', 'timestamp', 'time',
-      'timestamptz', 'timetz',
+      'date',
+      'datetime',
+      'timestamp',
+      'time',
+      'timestamptz',
+      'timetz',
     ];
     return dateTypes.some(t => type.toLowerCase().includes(t));
   }
@@ -1658,7 +1951,9 @@ export class DfDataGridComponent implements OnChanges, OnDestroy, AfterViewInit 
     if (!fi?.refTable || !fi?.refField) return;
 
     const isNumeric = this.isNumericType((fi.type || fi.dbType).toLowerCase());
-    const filterValue = isNumeric ? `(${fi.refField} = ${value})` : `(${fi.refField} = '${String(value).replace(/'/g, "''")}')`;
+    const filterValue = isNumeric
+      ? `(${fi.refField} = ${value})`
+      : `(${fi.refField} = '${String(value).replace(/'/g, "''")}')`;
 
     this.tableNavigated.emit({
       tableName: fi.refTable,
@@ -1732,7 +2027,10 @@ export class DfDataGridComponent implements OnChanges, OnDestroy, AfterViewInit 
     } else {
       this.dataSource.filter = this.quickSearchTerm.trim().toLowerCase();
     }
-    this.dataSource.filterPredicate = (row: Record<string, any>, filter: string) => {
+    this.dataSource.filterPredicate = (
+      row: Record<string, any>,
+      filter: string
+    ) => {
       return this.columns.some(col => {
         const val = row[col];
         if (val === null || val === undefined) return false;

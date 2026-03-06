@@ -882,7 +882,7 @@
     <ng-container *ngIf="isMcp && edit">
       <mat-accordion class="full-width">
         <mat-expansion-panel [expanded]="true">
-          <mat-expansion-panel-header> MCP Tools </mat-expansion-panel-header>
+          <mat-expansion-panel-header> Built-in Tools </mat-expansion-panel-header>
           <div class="details-section" *ngIf="!mcpServicesLoaded">
             <p>Loading services...</p>
           </div>
@@ -1002,8 +1002,9 @@
 
           <div class="custom-tools-container">
             <p class="custom-tools-description">
-              Define custom tools that make HTTP requests to external APIs.
-              These tools will be available to MCP clients alongside the built-in DreamFactory tools.
+              Define custom tools that make HTTP requests to external APIs or
+              execute server-side formulas. These tools will be available to
+              MCP clients alongside the built-in DreamFactory tools.
             </p>
 
             <div class="custom-tools-actions" *ngIf="editingToolIndex === null">
@@ -1014,17 +1015,39 @@
             </div>
 
             <!-- Add/Edit Form -->
-            <div class="custom-tool-form" *ngIf="editingToolIndex !== null" [formGroup]="customToolForm">
-              <h4>{{ editingToolIndex === -1 ? 'Add Custom Tool' : 'Edit Custom Tool' }}</h4>
+            <div
+              class="custom-tool-form"
+              *ngIf="editingToolIndex !== null"
+              [formGroup]="customToolForm">
+              <h4>
+                {{
+                  editingToolIndex === -1
+                    ? 'Add Custom Tool'
+                    : 'Edit Custom Tool'
+                }}
+              </h4>
+
+              <mat-button-toggle-group
+                formControlName="toolType"
+                class="tool-type-toggle">
+                <mat-button-toggle value="api">API</mat-button-toggle>
+                <mat-button-toggle value="formula">Formula</mat-button-toggle>
+              </mat-button-toggle-group>
 
               <div class="form-row">
                 <mat-form-field appearance="outline" class="form-field-half">
                   <mat-label>Tool Name</mat-label>
-                  <input matInput formControlName="name" placeholder="my_tool_name">
+                  <input
+                    matInput
+                    formControlName="name"
+                    placeholder="my_tool_name" />
                   <mat-hint>Letters, numbers, and underscores only</mat-hint>
                 </mat-form-field>
 
-                <mat-form-field appearance="outline" class="form-field-quarter">
+                <mat-form-field
+                  appearance="outline"
+                  class="form-field-quarter"
+                  *ngIf="customToolForm.get('toolType')?.value === 'api'">
                   <mat-label>HTTP Method</mat-label>
                   <mat-select formControlName="httpMethod">
                     <mat-option value="GET">GET</mat-option>
@@ -1036,15 +1059,24 @@
                 </mat-form-field>
               </div>
 
-              <mat-form-field appearance="outline" class="full-width">
+              <mat-form-field
+                appearance="outline"
+                class="full-width"
+                *ngIf="customToolForm.get('toolType')?.value === 'api'">
                 <mat-label>URL</mat-label>
-                <input matInput formControlName="url" placeholder="https://api.example.com/endpoint/{id}">
+                <input
+                  matInput
+                  formControlName="url"
+                  placeholder="https://api.example.com/endpoint/{id}" />
                 <mat-hint>Use &#123;param&#125; for path parameters</mat-hint>
               </mat-form-field>
 
               <mat-form-field appearance="outline" class="full-width">
                 <mat-label>Description</mat-label>
-                <textarea matInput formControlName="description" rows="2"
+                <textarea
+                  matInput
+                  formControlName="description"
+                  rows="2"
                   placeholder="Describe what this tool does..."></textarea>
                 <mat-hint>This description is shown to the LLM</mat-hint>
               </mat-form-field>
@@ -1053,28 +1085,43 @@
               <div class="parameters-section">
                 <div class="section-header">
                   <h5>Parameters</h5>
-                  <button mat-button color="primary" type="button" (click)="addToolParameter()">
+                  <button
+                    mat-button
+                    color="primary"
+                    type="button"
+                    (click)="addToolParameter()">
                     <fa-icon [icon]="faPlus" class="btn-icon"></fa-icon>
                     Add Parameter
                   </button>
                 </div>
 
-                <table class="mcp-services-table full-width" *ngIf="customToolParameters.length > 0"
+                <table
+                  class="mcp-services-table full-width"
+                  *ngIf="customToolParameters.length > 0"
                   formArrayName="parameters">
                   <thead>
                     <tr>
                       <th>Name</th>
                       <th>Type</th>
-                      <th>Location</th>
+                      <th *ngIf="customToolForm.get('toolType')?.value === 'api'">Location</th>
                       <th>Required</th>
                       <th>Description</th>
                       <th class="action-col"></th>
                     </tr>
                   </thead>
                   <tbody>
-                    <tr *ngFor="let param of customToolParameters.controls; let i = index" [formGroupName]="i">
+                    <tr
+                      *ngFor="
+                        let param of customToolParameters.controls;
+                        let i = index
+                      "
+                      [formGroupName]="i">
                       <td>
-                        <input matInput formControlName="name" placeholder="param_name" class="inline-input">
+                        <input
+                          matInput
+                          formControlName="name"
+                          placeholder="param_name"
+                          class="inline-input" />
                       </td>
                       <td>
                         <select formControlName="type" class="inline-select">
@@ -1084,7 +1131,7 @@
                           <option value="boolean">boolean</option>
                         </select>
                       </td>
-                      <td>
+                      <td *ngIf="customToolForm.get('toolType')?.value === 'api'">
                         <select formControlName="in" class="inline-select">
                           <option value="query">query</option>
                           <option value="path">path</option>
@@ -1096,10 +1143,18 @@
                         <mat-checkbox formControlName="required"></mat-checkbox>
                       </td>
                       <td>
-                        <input matInput formControlName="description" placeholder="Description" class="inline-input">
+                        <input
+                          matInput
+                          formControlName="description"
+                          placeholder="Description"
+                          class="inline-input" />
                       </td>
                       <td class="action-col">
-                        <button mat-icon-button color="warn" type="button" (click)="removeToolParameter(i)"
+                        <button
+                          mat-icon-button
+                          color="warn"
+                          type="button"
+                          (click)="removeToolParameter(i)"
                           matTooltip="Remove parameter">
                           <fa-icon [icon]="faTrashCan"></fa-icon>
                         </button>
@@ -1109,16 +1164,44 @@
                 </table>
               </div>
 
-              <!-- Headers -->
-              <mat-form-field appearance="outline" class="full-width">
+              <mat-form-field
+                appearance="outline"
+                class="full-width"
+                *ngIf="customToolForm.get('toolType')?.value === 'formula'">
+                <mat-label>Formula (JavaScript function body)</mat-label>
+                <textarea
+                  matInput
+                  formControlName="formula"
+                  rows="6"
+                  placeholder="// Parameters are available as variables&#10;// Return the result&#10;return param1 + param2;"></textarea>
+                <mat-hint>Write a JavaScript function body. Parameters are available as variables by name.</mat-hint>
+              </mat-form-field>
+
+              <!-- Headers (API tools only) -->
+              <mat-form-field
+                appearance="outline"
+                class="full-width"
+                *ngIf="customToolForm.get('toolType')?.value === 'api'">
                 <mat-label>Static Headers (JSON)</mat-label>
-                <textarea matInput formControlName="headers" rows="2"
+                <textarea
+                  matInput
+                  formControlName="headers"
+                  rows="2"
                   placeholder='{"Authorization": "Bearer token"}'></textarea>
               </mat-form-field>
 
               <div class="form-actions">
-                <button mat-button type="button" (click)="cancelCustomToolEdit()">Cancel</button>
-                <button mat-flat-button color="primary" type="button" (click)="saveCustomTool()"
+                <button
+                  mat-button
+                  type="button"
+                  (click)="cancelCustomToolEdit()">
+                  Cancel
+                </button>
+                <button
+                  mat-flat-button
+                  color="primary"
+                  type="button"
+                  (click)="saveCustomTool()"
                   [disabled]="customToolForm.invalid">
                   {{ editingToolIndex === -1 ? 'Add' : 'Update' }}
                 </button>
@@ -1126,19 +1209,22 @@
             </div>
 
             <!-- Custom Tools Table -->
-            <table class="mcp-services-table full-width" *ngIf="customTools.length > 0">
+            <table
+              class="mcp-services-table full-width"
+              *ngIf="customTools.length > 0">
               <thead>
                 <tr>
                   <th class="toggle-col"></th>
                   <th>Name</th>
-                  <th>Method</th>
-                  <th>URL</th>
+                  <th>Type</th>
+                  <th>Method / URL</th>
                   <th>Description</th>
                   <th class="action-col"></th>
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let tool of customTools; let i = index"
+                <tr
+                  *ngFor="let tool of customTools; let i = index"
                   [class.disabled-row]="!tool.enabled">
                   <td class="toggle-col">
                     <mat-slide-toggle
@@ -1147,18 +1233,34 @@
                       (change)="toggleCustomTool(i, $event.checked)">
                     </mat-slide-toggle>
                   </td>
-                  <td><code>{{ tool.name }}</code></td>
-                  <td><code>{{ tool.httpMethod }}</code></td>
-                  <td class="url-cell">{{ tool.url }}</td>
+                  <td>
+                    <code>{{ tool.name }}</code>
+                  </td>
+                  <td>
+                    <code>{{ (tool.toolType || 'api').toUpperCase() }}</code>
+                  </td>
+                  <td class="url-cell">
+                    <ng-container *ngIf="(tool.toolType || 'api') === 'api'">
+                      <code>{{ tool.httpMethod }}</code> {{ tool.url }}
+                    </ng-container>
+                    <ng-container *ngIf="tool.toolType === 'formula'">
+                      <em>Formula</em>
+                    </ng-container>
+                  </td>
                   <td>{{ tool.description }}</td>
                   <td class="action-col">
                     <div class="action-buttons">
-                      <button mat-icon-button (click)="editCustomTool(i)"
+                      <button
+                        mat-icon-button
+                        (click)="editCustomTool(i)"
                         [disabled]="editingToolIndex !== null"
                         matTooltip="Edit tool">
                         <fa-icon [icon]="faPenToSquare"></fa-icon>
                       </button>
-                      <button mat-icon-button color="warn" (click)="deleteCustomTool(i)"
+                      <button
+                        mat-icon-button
+                        color="warn"
+                        (click)="deleteCustomTool(i)"
                         [disabled]="editingToolIndex !== null"
                         matTooltip="Delete tool">
                         <fa-icon [icon]="faTrashCan"></fa-icon>
@@ -1169,7 +1271,9 @@
               </tbody>
             </table>
 
-            <p *ngIf="customTools.length === 0 && editingToolIndex === null" class="no-tools-message">
+            <p
+              *ngIf="customTools.length === 0 && editingToolIndex === null"
+              class="no-tools-message">
               No custom tools defined. Click "Add Custom Tool" to create one.
             </p>
           </div>

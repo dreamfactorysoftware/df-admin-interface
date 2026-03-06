@@ -280,13 +280,28 @@ export class DfServiceDetailsComponent implements OnInit {
       }),
     });
     this.customToolForm = this.fb.group({
+      toolType: ['api'],
       name: ['', [Validators.required, Validators.pattern(/^[a-zA-Z0-9_]+$/)]],
       description: ['', Validators.required],
-      httpMethod: ['GET', Validators.required],
+      httpMethod: ['GET'],
       url: ['', Validators.required],
       parameters: this.fb.array([]),
       headers: ['{}'],
+      formula: [''],
       enabled: [true],
+    });
+    this.customToolForm.get('toolType')!.valueChanges.subscribe((type: string) => {
+      const urlCtrl = this.customToolForm.get('url')!;
+      const formulaCtrl = this.customToolForm.get('formula')!;
+      if (type === 'formula') {
+        urlCtrl.clearValidators();
+        formulaCtrl.setValidators(Validators.required);
+      } else {
+        urlCtrl.setValidators(Validators.required);
+        formulaCtrl.clearValidators();
+      }
+      urlCtrl.updateValueAndValidity();
+      formulaCtrl.updateValueAndValidity();
     });
     const id = this.activatedRoute.snapshot.paramMap.get('id');
     if (id) {
@@ -541,16 +556,20 @@ export class DfServiceDetailsComponent implements OnInit {
         if (this.edit && this.isMcp) {
           const disabled: string[] = data?.config?.disabledTools ?? [];
           this.disabledTools = new Set(disabled);
-          this.customTools = (data?.config?.customTools ?? []).map((t: any) => ({
-            id: t.id,
-            name: t.name,
-            description: t.description,
-            httpMethod: t.httpMethod,
-            url: t.url,
-            parameters: t.parameters || [],
-            headers: t.headers || {},
-            enabled: t.enabled !== false && t.enabled !== 0,
-          }));
+          this.customTools = (data?.config?.customTools ?? []).map(
+            (t: any) => ({
+              id: t.id,
+              toolType: t.toolType || 'api',
+              name: t.name,
+              description: t.description,
+              httpMethod: t.httpMethod,
+              url: t.url,
+              parameters: t.parameters || [],
+              headers: t.headers || {},
+              formula: t.formula || '',
+              enabled: t.enabled !== false && t.enabled !== 0,
+            })
+          );
           this.loadMcpServices();
         }
       });
@@ -1006,11 +1025,13 @@ export class DfServiceDetailsComponent implements OnInit {
   addCustomTool() {
     this.editingToolIndex = -1;
     this.customToolForm.reset({
+      toolType: 'api',
       name: '',
       description: '',
       httpMethod: 'GET',
       url: '',
       headers: '{}',
+      formula: '',
       enabled: true,
     });
     this.customToolParameters.clear();
@@ -1020,11 +1041,13 @@ export class DfServiceDetailsComponent implements OnInit {
     const tool = this.customTools[index];
     this.editingToolIndex = index;
     this.customToolForm.patchValue({
+      toolType: tool.toolType || 'api',
       name: tool.name,
       description: tool.description,
-      httpMethod: tool.httpMethod,
-      url: tool.url,
+      httpMethod: tool.httpMethod || 'GET',
+      url: tool.url || '',
       headers: JSON.stringify(tool.headers || {}, null, 2),
+      formula: tool.formula || '',
       enabled: tool.enabled,
     });
     this.customToolParameters.clear();
@@ -1049,12 +1072,14 @@ export class DfServiceDetailsComponent implements OnInit {
     }
 
     const tool: any = {
+      toolType: formValue.toolType || 'api',
       name: formValue.name,
       description: formValue.description,
       httpMethod: formValue.httpMethod,
       url: formValue.url,
       parameters: formValue.parameters || [],
       headers,
+      formula: formValue.formula || '',
       enabled: formValue.enabled ?? true,
     };
 
@@ -1534,12 +1559,14 @@ export class DfServiceDetailsComponent implements OnInit {
         editPayload.config.disabledTools = Array.from(this.disabledTools);
         editPayload.config.customTools = this.customTools.map((tool: any) => ({
           id: tool.id,
+          toolType: tool.toolType || 'api',
           name: tool.name,
           description: tool.description,
           httpMethod: tool.httpMethod,
           url: tool.url,
           parameters: tool.parameters,
           headers: tool.headers,
+          formula: tool.formula || '',
           enabled: tool.enabled,
         }));
       }

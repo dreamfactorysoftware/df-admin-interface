@@ -663,6 +663,14 @@ mat-icon {
   }
 }
 
+.tool-type-toggle {
+  margin-bottom: 16px;
+
+  .mat-button-toggle {
+    min-width: 100px;
+  }
+}
+
 .custom-tool-form {
   background: rgba(0, 0, 0, 0.03);
   border-radius: 8px;
