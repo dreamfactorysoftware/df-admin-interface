@@ -290,19 +290,21 @@ export class DfServiceDetailsComponent implements OnInit {
       formula: [''],
       enabled: [true],
     });
-    this.customToolForm.get('toolType')!.valueChanges.subscribe((type: string) => {
-      const urlCtrl = this.customToolForm.get('url')!;
-      const formulaCtrl = this.customToolForm.get('formula')!;
-      if (type === 'formula') {
-        urlCtrl.clearValidators();
-        formulaCtrl.setValidators(Validators.required);
-      } else {
-        urlCtrl.setValidators(Validators.required);
-        formulaCtrl.clearValidators();
-      }
-      urlCtrl.updateValueAndValidity();
-      formulaCtrl.updateValueAndValidity();
-    });
+    this.customToolForm
+      .get('toolType')!
+      .valueChanges.subscribe((type: string) => {
+        const urlCtrl = this.customToolForm.get('url')!;
+        const formulaCtrl = this.customToolForm.get('formula')!;
+        if (type === 'formula') {
+          urlCtrl.clearValidators();
+          formulaCtrl.setValidators(Validators.required);
+        } else {
+          urlCtrl.setValidators(Validators.required);
+          formulaCtrl.clearValidators();
+        }
+        urlCtrl.updateValueAndValidity();
+        formulaCtrl.updateValueAndValidity();
+      });
     const id = this.activatedRoute.snapshot.paramMap.get('id');
     if (id) {
       this.edit = true;

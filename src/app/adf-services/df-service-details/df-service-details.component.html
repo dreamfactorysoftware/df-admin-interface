@@ -882,7 +882,9 @@
     <ng-container *ngIf="isMcp && edit">
       <mat-accordion class="full-width">
         <mat-expansion-panel [expanded]="true">
-          <mat-expansion-panel-header> Built-in Tools </mat-expansion-panel-header>
+          <mat-expansion-panel-header>
+            Built-in Tools
+          </mat-expansion-panel-header>
           <div class="details-section" *ngIf="!mcpServicesLoaded">
             <p>Loading services...</p>
           </div>
@@ -1003,8 +1005,8 @@
           <div class="custom-tools-container">
             <p class="custom-tools-description">
               Define custom tools that make HTTP requests to external APIs or
-              execute server-side formulas. These tools will be available to
-              MCP clients alongside the built-in DreamFactory tools.
+              execute server-side formulas. These tools will be available to MCP
+              clients alongside the built-in DreamFactory tools.
             </p>
 
             <div class="custom-tools-actions" *ngIf="editingToolIndex === null">
@@ -1103,7 +1105,10 @@
                     <tr>
                       <th>Name</th>
                       <th>Type</th>
-                      <th *ngIf="customToolForm.get('toolType')?.value === 'api'">Location</th>
+                      <th
+                        *ngIf="customToolForm.get('toolType')?.value === 'api'">
+                        Location
+                      </th>
                       <th>Required</th>
                       <th>Description</th>
                       <th class="action-col"></th>
@@ -1131,7 +1136,8 @@
                           <option value="boolean">boolean</option>
                         </select>
                       </td>
-                      <td *ngIf="customToolForm.get('toolType')?.value === 'api'">
+                      <td
+                        *ngIf="customToolForm.get('toolType')?.value === 'api'">
                         <select formControlName="in" class="inline-select">
                           <option value="query">query</option>
                           <option value="path">path</option>
@@ -1174,7 +1180,10 @@
                   formControlName="formula"
                   rows="6"
                   placeholder="// Parameters are available as variables&#10;// Return the result&#10;return param1 + param2;"></textarea>
-                <mat-hint>Write a JavaScript function body. Parameters are available as variables by name.</mat-hint>
+                <mat-hint
+                  >Write a JavaScript function body. Parameters are available as
+                  variables by name.</mat-hint
+                >
               </mat-form-field>
 
               <!-- Headers (API tools only) -->
