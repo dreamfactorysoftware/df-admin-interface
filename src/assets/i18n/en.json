@@ -245,6 +245,10 @@
       "api-docs": {
         "nav": "API Docs",
         "header": "{{nav.api-connections.api-docs.nav}}"
+      },
+      "data-explorer": {
+        "nav": "Data Explorer",
+        "header": "{{nav.api-connections.data-explorer.nav}}"
       }
     },
     "api-security": {
