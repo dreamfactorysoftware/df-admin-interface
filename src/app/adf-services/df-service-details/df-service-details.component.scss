@@ -580,14 +580,16 @@ mat-icon {
 }
 
 .mcp-tools-container {
-  padding: 8px 0;
+  padding: 12px 0;
 
   code {
     font-size: 12px;
-    padding: 2px 6px;
-    background: rgba(0, 0, 0, 0.06);
+    padding: 3px 8px;
+    background: rgba(mat.get-color-from-palette($df-purple-palette, 500), 0.08);
+    color: mat.get-color-from-palette($df-purple-palette, 700);
     border-radius: 4px;
     white-space: nowrap;
+    font-weight: 500;
   }
 }
 
@@ -602,7 +604,12 @@ mat-icon {
 }
 
 .disabled-row {
-  opacity: 0.5;
+  opacity: 0.45;
+  transition: opacity 0.2s ease;
+
+  &:hover {
+    opacity: 0.65;
+  }
 }
 
 .mcp-services-table {
@@ -612,47 +619,63 @@ mat-icon {
   th,
   td {
     text-align: left;
-    padding: 8px 12px;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
   }
 
   th {
-    font-weight: 500;
-    color: rgba(0, 0, 0, 0.6);
-    font-size: 12px;
+    font-weight: 600;
+    color: rgba(0, 0, 0, 0.5);
+    font-size: 11px;
     text-transform: uppercase;
+    letter-spacing: 0.5px;
   }
 
   td {
     font-size: 14px;
   }
+
+  tbody tr {
+    transition: background-color 0.15s ease;
+
+    &:hover {
+      background-color: rgba(mat.get-color-from-palette($df-purple-palette, 50), 0.3);
+    }
+  }
 }
 
 .custom-tools-container {
-  padding: 8px 0;
+  padding: 12px 0;
 
   .custom-tools-description {
     color: rgba(0, 0, 0, 0.6);
     font-size: 14px;
-    margin-bottom: 16px;
+    line-height: 1.6;
+    margin-bottom: 20px;
   }
 
   .custom-tools-actions {
-    margin-bottom: 16px;
+    margin-bottom: 20px;
   }
 
   .no-tools-message {
-    color: rgba(0, 0, 0, 0.45);
+    color: rgba(0, 0, 0, 0.4);
     font-style: italic;
-    padding: 16px 0;
+    padding: 24px 16px;
+    text-align: center;
+    border: 1px dashed rgba(0, 0, 0, 0.15);
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.015);
   }
 
   code {
     font-size: 12px;
-    padding: 2px 6px;
-    background: rgba(0, 0, 0, 0.06);
+    padding: 3px 8px;
+    background: rgba(mat.get-color-from-palette($df-purple-palette, 500), 0.08);
+    color: mat.get-color-from-palette($df-purple-palette, 700);
     border-radius: 4px;
     white-space: nowrap;
+    font-weight: 500;
   }
 
   .url-cell {
@@ -660,26 +683,35 @@ mat-icon {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    color: rgba(0, 0, 0, 0.6);
+    font-size: 13px;
   }
 }
 
 .tool-type-toggle {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 
   .mat-button-toggle {
-    min-width: 100px;
+    min-width: 110px;
   }
 }
 
 .custom-tool-form {
-  background: rgba(0, 0, 0, 0.03);
-  border-radius: 8px;
-  padding: 20px;
-  margin-bottom: 16px;
+  background: linear-gradient(
+    135deg,
+    rgba(mat.get-color-from-palette($df-purple-palette, 50), 0.35) 0%,
+    rgba(mat.get-color-from-palette($df-purple-palette, 100), 0.15) 100%
+  );
+  border: 1px solid rgba(mat.get-color-from-palette($df-purple-palette, 200), 0.4);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 20px;
 
   h4 {
-    margin: 0 0 16px;
-    font-weight: 500;
+    margin: 0 0 20px;
+    font-weight: 600;
+    font-size: 16px;
+    color: mat.get-color-from-palette($df-purple-palette, 900);
   }
 
   .form-row {
@@ -698,43 +730,212 @@ mat-icon {
   }
 
   .parameters-section {
-    margin: 16px 0;
+    margin: 20px 0;
 
     .section-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 8px;
+      margin-bottom: 16px;
 
       h5 {
         margin: 0;
-        font-weight: 500;
+        font-weight: 600;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: rgba(0, 0, 0, 0.55);
       }
+    }
+
+    .parameter-cards {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .parameter-card {
+      background: rgba(255, 255, 255, 0.7);
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      border-radius: 10px;
+      padding: 16px 20px 8px;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+
+      &:hover {
+        border-color: rgba(mat.get-color-from-palette($df-purple-palette, 300), 0.5);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+      }
+
+      &:focus-within {
+        border-color: mat.get-color-from-palette($df-purple-palette, 400);
+        box-shadow: 0 0 0 2px rgba(mat.get-color-from-palette($df-purple-palette, 400), 0.1);
+      }
+    }
+
+    .parameter-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+
+      .parameter-index {
+        font-size: 12px;
+        font-weight: 600;
+        color: mat.get-color-from-palette($df-purple-palette, 500);
+        background: rgba(mat.get-color-from-palette($df-purple-palette, 500), 0.1);
+        padding: 2px 10px;
+        border-radius: 12px;
+        letter-spacing: 0.3px;
+      }
+
+      .parameter-remove-btn {
+        opacity: 0.4;
+        transition: opacity 0.15s ease;
+        transform: scale(0.85);
+
+        &:hover {
+          opacity: 1;
+        }
+      }
+    }
+
+    .parameter-card-fields {
+      display: grid;
+      grid-template-columns: 1fr 120px 120px auto;
+      gap: 12px;
+      align-items: start;
+
+      .param-field {
+        min-width: 0;
+      }
+
+      .param-field--name {
+        grid-column: 1;
+      }
+
+      .param-field--type {
+        grid-column: 2;
+      }
+
+      .param-field--location {
+        grid-column: 3;
+      }
+
+      .param-field--required {
+        grid-column: 4;
+        padding-top: 12px;
+        white-space: nowrap;
+      }
+
+      .param-field--desc {
+        grid-column: 1 / -1;
+      }
+    }
+
+    .no-parameters-hint {
+      color: rgba(0, 0, 0, 0.35);
+      font-size: 13px;
+      text-align: center;
+      padding: 20px 16px;
+      margin: 0;
+      border: 1px dashed rgba(0, 0, 0, 0.12);
+      border-radius: 10px;
     }
   }
 
   .inline-input {
     width: 100%;
-    padding: 4px 8px;
-    border: 1px solid rgba(0, 0, 0, 0.2);
-    border-radius: 4px;
+    padding: 6px 10px;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    border-radius: 6px;
     font-size: 13px;
-    background: transparent;
+    background: rgba(255, 255, 255, 0.8);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+
+    &:focus {
+      outline: none;
+      border-color: mat.get-color-from-palette($df-purple-palette, 400);
+      box-shadow: 0 0 0 2px rgba(mat.get-color-from-palette($df-purple-palette, 400), 0.15);
+    }
+
+    &::placeholder {
+      color: rgba(0, 0, 0, 0.3);
+    }
   }
 
   .inline-select {
-    padding: 4px 8px;
-    border: 1px solid rgba(0, 0, 0, 0.2);
-    border-radius: 4px;
+    padding: 6px 10px;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    border-radius: 6px;
     font-size: 13px;
-    background: transparent;
+    background: rgba(255, 255, 255, 0.8);
+    cursor: pointer;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+
+    &:focus {
+      outline: none;
+      border-color: mat.get-color-from-palette($df-purple-palette, 400);
+      box-shadow: 0 0 0 2px rgba(mat.get-color-from-palette($df-purple-palette, 400), 0.15);
+    }
+  }
+
+  .editor-section {
+    margin-bottom: 16px;
+
+    .editor-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: rgba(0, 0, 0, 0.6);
+      margin-bottom: 8px;
+    }
+
+    .editor-wrapper {
+      border: 1px solid rgba(0, 0, 0, 0.15);
+      border-radius: 8px;
+      overflow: hidden;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+
+      &:focus-within {
+        border-color: mat.get-color-from-palette($df-purple-palette, 400);
+        box-shadow: 0 0 0 2px rgba(mat.get-color-from-palette($df-purple-palette, 400), 0.12);
+      }
+
+      df-ace-editor {
+        display: block;
+        min-height: 200px;
+
+        ::ng-deep .editor {
+          min-height: 200px;
+          border-radius: 8px;
+        }
+      }
+
+      &--compact df-ace-editor {
+        min-height: 100px;
+
+        ::ng-deep .editor {
+          min-height: 100px;
+        }
+      }
+    }
+
+    .editor-hint {
+      display: block;
+      font-size: 12px;
+      color: rgba(0, 0, 0, 0.45);
+      margin-top: 6px;
+      padding-left: 2px;
+    }
   }
 
   .form-actions {
     display: flex;
     justify-content: flex-end;
-    gap: 8px;
-    margin-top: 16px;
+    gap: 12px;
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
   }
 }
 
@@ -752,32 +953,125 @@ mat-icon {
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 0;
+    gap: 2px;
+
+    button {
+      opacity: 0.6;
+      transition: opacity 0.15s ease;
+
+      &:hover {
+        opacity: 1;
+      }
+    }
   }
 }
 
 .dark-theme {
+  .mcp-tools-container {
+    code {
+      background: rgba(mat.get-color-from-palette($df-purple-palette, 400), 0.15);
+      color: mat.get-color-from-palette($df-purple-palette, 200);
+    }
+  }
+
   .custom-tools-container {
     .custom-tools-description {
       color: rgba(255, 255, 255, 0.6);
     }
 
     .no-tools-message {
-      color: rgba(255, 255, 255, 0.45);
+      color: rgba(255, 255, 255, 0.4);
+      border-color: rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.03);
     }
 
     code {
-      background: rgba(255, 255, 255, 0.1);
+      background: rgba(mat.get-color-from-palette($df-purple-palette, 400), 0.15);
+      color: mat.get-color-from-palette($df-purple-palette, 200);
+    }
+  }
+
+  .mcp-services-table {
+    th,
+    td {
+      border-bottom-color: rgba(255, 255, 255, 0.08);
+    }
+
+    th {
+      color: rgba(255, 255, 255, 0.45);
+    }
+
+    tbody tr:hover {
+      background-color: rgba(
+        mat.get-color-from-palette($df-purple-palette, 400),
+        0.08
+      );
     }
   }
 
   .custom-tool-form {
-    background: rgba(255, 255, 255, 0.05);
+    background: linear-gradient(
+      135deg,
+      rgba(mat.get-color-from-palette($df-purple-palette, 400), 0.1) 0%,
+      rgba(mat.get-color-from-palette($df-purple-palette, 400), 0.05) 100%
+    );
+    border-color: rgba(mat.get-color-from-palette($df-purple-palette, 400), 0.2);
 
-    .inline-input,
-    .inline-select {
-      border-color: rgba(255, 255, 255, 0.3);
-      color: rgba(255, 255, 255, 0.87);
+    h4 {
+      color: rgba(255, 255, 255, 0.95);
+    }
+
+    .parameters-section {
+      .section-header h5 {
+        color: rgba(255, 255, 255, 0.45);
+      }
+
+      .parameter-card {
+        background: rgba(255, 255, 255, 0.05);
+        border-color: rgba(255, 255, 255, 0.1);
+
+        &:hover {
+          border-color: rgba(mat.get-color-from-palette($df-purple-palette, 300), 0.3);
+        }
+
+        &:focus-within {
+          border-color: mat.get-color-from-palette($df-purple-palette, 300);
+          box-shadow: 0 0 0 2px rgba(mat.get-color-from-palette($df-purple-palette, 300), 0.1);
+        }
+      }
+
+      .parameter-index {
+        color: mat.get-color-from-palette($df-purple-palette, 300);
+        background: rgba(mat.get-color-from-palette($df-purple-palette, 300), 0.12);
+      }
+
+      .no-parameters-hint {
+        color: rgba(255, 255, 255, 0.3);
+        border-color: rgba(255, 255, 255, 0.1);
+      }
+    }
+
+    .editor-section {
+      .editor-label {
+        color: rgba(255, 255, 255, 0.6);
+      }
+
+      .editor-wrapper {
+        border-color: rgba(255, 255, 255, 0.15);
+
+        &:focus-within {
+          border-color: mat.get-color-from-palette($df-purple-palette, 300);
+          box-shadow: 0 0 0 2px rgba(mat.get-color-from-palette($df-purple-palette, 300), 0.12);
+        }
+      }
+
+      .editor-hint {
+        color: rgba(255, 255, 255, 0.35);
+      }
+    }
+
+    .form-actions {
+      border-top-color: rgba(255, 255, 255, 0.08);
     }
   }
 }

@@ -287,23 +287,23 @@ export class DfServiceDetailsComponent implements OnInit {
       url: ['', Validators.required],
       parameters: this.fb.array([]),
       headers: ['{}'],
-      formula: [''],
+      function: [''],
       enabled: [true],
     });
     this.customToolForm
       .get('toolType')!
       .valueChanges.subscribe((type: string) => {
         const urlCtrl = this.customToolForm.get('url')!;
-        const formulaCtrl = this.customToolForm.get('formula')!;
-        if (type === 'formula') {
+        const functionCtrl = this.customToolForm.get('function')!;
+        if (type === 'function') {
           urlCtrl.clearValidators();
-          formulaCtrl.setValidators(Validators.required);
+          functionCtrl.setValidators(Validators.required);
         } else {
           urlCtrl.setValidators(Validators.required);
-          formulaCtrl.clearValidators();
+          functionCtrl.clearValidators();
         }
         urlCtrl.updateValueAndValidity();
-        formulaCtrl.updateValueAndValidity();
+        functionCtrl.updateValueAndValidity();
       });
     const id = this.activatedRoute.snapshot.paramMap.get('id');
     if (id) {
@@ -568,7 +568,7 @@ export class DfServiceDetailsComponent implements OnInit {
               url: t.url,
               parameters: t.parameters || [],
               headers: t.headers || {},
-              formula: t.formula || '',
+              function: t.function || '',
               enabled: t.enabled !== false && t.enabled !== 0,
             })
           );
@@ -1033,7 +1033,7 @@ export class DfServiceDetailsComponent implements OnInit {
       httpMethod: 'GET',
       url: '',
       headers: '{}',
-      formula: '',
+      function: '',
       enabled: true,
     });
     this.customToolParameters.clear();
@@ -1049,7 +1049,7 @@ export class DfServiceDetailsComponent implements OnInit {
       httpMethod: tool.httpMethod || 'GET',
       url: tool.url || '',
       headers: JSON.stringify(tool.headers || {}, null, 2),
-      formula: tool.formula || '',
+      function: tool.function || '',
       enabled: tool.enabled,
     });
     this.customToolParameters.clear();
@@ -1081,7 +1081,7 @@ export class DfServiceDetailsComponent implements OnInit {
       url: formValue.url,
       parameters: formValue.parameters || [],
       headers,
-      formula: formValue.formula || '',
+      function: formValue.function || '',
       enabled: formValue.enabled ?? true,
     };
 
@@ -1216,6 +1216,14 @@ export class DfServiceDetailsComponent implements OnInit {
   }
 
   get excelMode(): AceEditorMode {
+    return AceEditorMode.JSON;
+  }
+
+  get functionEditorMode(): AceEditorMode {
+    return AceEditorMode.JAVASCRIPT;
+  }
+
+  get headersEditorMode(): AceEditorMode {
     return AceEditorMode.JSON;
   }
 
@@ -1568,7 +1576,7 @@ export class DfServiceDetailsComponent implements OnInit {
           url: tool.url,
           parameters: tool.parameters,
           headers: tool.headers,
-          formula: tool.formula || '',
+          function: tool.function || '',
           enabled: tool.enabled,
         }));
       }
