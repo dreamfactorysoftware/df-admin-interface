@@ -32,7 +32,9 @@ export function captureRedirectUrl(): void {
   const urlParams = getHashAwareQueryParams();
   const redirectUrl = urlParams.get('redirect');
   if (redirectUrl) {
-    localStorage.setItem(REDIRECT_URL_KEY, redirectUrl);
+    sessionStorage.setItem(REDIRECT_URL_KEY, redirectUrl);
+  } else {
+    sessionStorage.removeItem(REDIRECT_URL_KEY);
   }
 }
 
@@ -42,10 +44,10 @@ export function captureRedirectUrl(): void {
  * @returns true if redirect is happening, false otherwise
  */
 export function handleRedirectIfPresent(sessionToken?: string | null): boolean {
-  const redirectUrl = localStorage.getItem(REDIRECT_URL_KEY);
+  const redirectUrl = sessionStorage.getItem(REDIRECT_URL_KEY);
 
   if (redirectUrl) {
-    localStorage.removeItem(REDIRECT_URL_KEY);
+    sessionStorage.removeItem(REDIRECT_URL_KEY);
     if (sessionToken) {
       const separator = redirectUrl.includes('?') ? '&' : '?';
       const finalUrl = `${redirectUrl}${separator}session_token=${sessionToken}`;
