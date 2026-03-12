@@ -1005,8 +1005,8 @@
           <div class="custom-tools-container">
             <p class="custom-tools-description">
               Define custom tools that make HTTP requests to external APIs or
-              execute server-side functions. These tools will be available to MCP
-              clients alongside the built-in DreamFactory tools.
+              execute server-side functions. These tools will be available to
+              MCP clients alongside the built-in DreamFactory tools.
             </p>
 
             <div class="custom-tools-actions" *ngIf="editingToolIndex === null">
@@ -1121,7 +1121,9 @@
                       </button>
                     </div>
                     <div class="parameter-card-fields">
-                      <mat-form-field appearance="outline" class="param-field param-field--name">
+                      <mat-form-field
+                        appearance="outline"
+                        class="param-field param-field--name">
                         <mat-label>Name</mat-label>
                         <input
                           matInput
@@ -1129,7 +1131,9 @@
                           placeholder="param_name" />
                       </mat-form-field>
 
-                      <mat-form-field appearance="outline" class="param-field param-field--type">
+                      <mat-form-field
+                        appearance="outline"
+                        class="param-field param-field--type">
                         <mat-label>Type</mat-label>
                         <mat-select formControlName="type">
                           <mat-option value="string">string</mat-option>
@@ -1153,10 +1157,14 @@
                       </mat-form-field>
 
                       <div class="param-field param-field--required">
-                        <mat-checkbox formControlName="required">Required</mat-checkbox>
+                        <mat-checkbox formControlName="required"
+                          >Required</mat-checkbox
+                        >
                       </div>
 
-                      <mat-form-field appearance="outline" class="param-field param-field--desc">
+                      <mat-form-field
+                        appearance="outline"
+                        class="param-field param-field--desc">
                         <mat-label>Description</mat-label>
                         <input
                           matInput
@@ -1167,7 +1175,9 @@
                   </div>
                 </div>
 
-                <p class="no-parameters-hint" *ngIf="customToolParameters.length === 0">
+                <p
+                  class="no-parameters-hint"
+                  *ngIf="customToolParameters.length === 0">
                   No parameters yet. Add one to define inputs for this tool.
                 </p>
               </div>
@@ -1176,7 +1186,9 @@
               <div
                 class="editor-section"
                 *ngIf="customToolForm.get('toolType')?.value === 'function'">
-                <label class="editor-label">Function (JavaScript function body)</label>
+                <label class="editor-label"
+                  >Function (JavaScript function body)</label
+                >
                 <div class="editor-wrapper">
                   <df-ace-editor
                     formControlName="function"

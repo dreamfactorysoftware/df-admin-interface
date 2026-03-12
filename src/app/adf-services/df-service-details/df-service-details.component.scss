@@ -639,7 +639,10 @@ mat-icon {
     transition: background-color 0.15s ease;
 
     &:hover {
-      background-color: rgba(mat.get-color-from-palette($df-purple-palette, 50), 0.3);
+      background-color: rgba(
+        mat.get-color-from-palette($df-purple-palette, 50),
+        0.3
+      );
     }
   }
 }
@@ -702,7 +705,8 @@ mat-icon {
     rgba(mat.get-color-from-palette($df-purple-palette, 50), 0.35) 0%,
     rgba(mat.get-color-from-palette($df-purple-palette, 100), 0.15) 100%
   );
-  border: 1px solid rgba(mat.get-color-from-palette($df-purple-palette, 200), 0.4);
+  border: 1px solid
+    rgba(mat.get-color-from-palette($df-purple-palette, 200), 0.4);
   border-radius: 12px;
   padding: 24px;
   margin-bottom: 20px;
@@ -759,16 +763,22 @@ mat-icon {
       border: 1px solid rgba(0, 0, 0, 0.1);
       border-radius: 10px;
       padding: 16px 20px 8px;
-      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease;
 
       &:hover {
-        border-color: rgba(mat.get-color-from-palette($df-purple-palette, 300), 0.5);
+        border-color: rgba(
+          mat.get-color-from-palette($df-purple-palette, 300),
+          0.5
+        );
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
       }
 
       &:focus-within {
         border-color: mat.get-color-from-palette($df-purple-palette, 400);
-        box-shadow: 0 0 0 2px rgba(mat.get-color-from-palette($df-purple-palette, 400), 0.1);
+        box-shadow: 0 0 0 2px
+          rgba(mat.get-color-from-palette($df-purple-palette, 400), 0.1);
       }
     }
 
@@ -782,7 +792,10 @@ mat-icon {
         font-size: 12px;
         font-weight: 600;
         color: mat.get-color-from-palette($df-purple-palette, 500);
-        background: rgba(mat.get-color-from-palette($df-purple-palette, 500), 0.1);
+        background: rgba(
+          mat.get-color-from-palette($df-purple-palette, 500),
+          0.1
+        );
         padding: 2px 10px;
         border-radius: 12px;
         letter-spacing: 0.3px;
@@ -850,12 +863,15 @@ mat-icon {
     border-radius: 6px;
     font-size: 13px;
     background: rgba(255, 255, 255, 0.8);
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    transition:
+      border-color 0.2s ease,
+      box-shadow 0.2s ease;
 
     &:focus {
       outline: none;
       border-color: mat.get-color-from-palette($df-purple-palette, 400);
-      box-shadow: 0 0 0 2px rgba(mat.get-color-from-palette($df-purple-palette, 400), 0.15);
+      box-shadow: 0 0 0 2px
+        rgba(mat.get-color-from-palette($df-purple-palette, 400), 0.15);
     }
 
     &::placeholder {
@@ -870,12 +886,15 @@ mat-icon {
     font-size: 13px;
     background: rgba(255, 255, 255, 0.8);
     cursor: pointer;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    transition:
+      border-color 0.2s ease,
+      box-shadow 0.2s ease;
 
     &:focus {
       outline: none;
       border-color: mat.get-color-from-palette($df-purple-palette, 400);
-      box-shadow: 0 0 0 2px rgba(mat.get-color-from-palette($df-purple-palette, 400), 0.15);
+      box-shadow: 0 0 0 2px
+        rgba(mat.get-color-from-palette($df-purple-palette, 400), 0.15);
     }
   }
 
@@ -894,11 +913,14 @@ mat-icon {
       border: 1px solid rgba(0, 0, 0, 0.15);
       border-radius: 8px;
       overflow: hidden;
-      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease;
 
       &:focus-within {
         border-color: mat.get-color-from-palette($df-purple-palette, 400);
-        box-shadow: 0 0 0 2px rgba(mat.get-color-from-palette($df-purple-palette, 400), 0.12);
+        box-shadow: 0 0 0 2px
+          rgba(mat.get-color-from-palette($df-purple-palette, 400), 0.12);
       }
 
       df-ace-editor {
@@ -969,7 +991,10 @@ mat-icon {
 .dark-theme {
   .mcp-tools-container {
     code {
-      background: rgba(mat.get-color-from-palette($df-purple-palette, 400), 0.15);
+      background: rgba(
+        mat.get-color-from-palette($df-purple-palette, 400),
+        0.15
+      );
       color: mat.get-color-from-palette($df-purple-palette, 200);
     }
   }
@@ -986,7 +1011,10 @@ mat-icon {
     }
 
     code {
-      background: rgba(mat.get-color-from-palette($df-purple-palette, 400), 0.15);
+      background: rgba(
+        mat.get-color-from-palette($df-purple-palette, 400),
+        0.15
+      );
       color: mat.get-color-from-palette($df-purple-palette, 200);
     }
   }
@@ -1015,7 +1043,10 @@ mat-icon {
       rgba(mat.get-color-from-palette($df-purple-palette, 400), 0.1) 0%,
       rgba(mat.get-color-from-palette($df-purple-palette, 400), 0.05) 100%
     );
-    border-color: rgba(mat.get-color-from-palette($df-purple-palette, 400), 0.2);
+    border-color: rgba(
+      mat.get-color-from-palette($df-purple-palette, 400),
+      0.2
+    );
 
     h4 {
       color: rgba(255, 255, 255, 0.95);
@@ -1031,18 +1062,25 @@ mat-icon {
         border-color: rgba(255, 255, 255, 0.1);
 
         &:hover {
-          border-color: rgba(mat.get-color-from-palette($df-purple-palette, 300), 0.3);
+          border-color: rgba(
+            mat.get-color-from-palette($df-purple-palette, 300),
+            0.3
+          );
         }
 
         &:focus-within {
           border-color: mat.get-color-from-palette($df-purple-palette, 300);
-          box-shadow: 0 0 0 2px rgba(mat.get-color-from-palette($df-purple-palette, 300), 0.1);
+          box-shadow: 0 0 0 2px
+            rgba(mat.get-color-from-palette($df-purple-palette, 300), 0.1);
         }
       }
 
       .parameter-index {
         color: mat.get-color-from-palette($df-purple-palette, 300);
-        background: rgba(mat.get-color-from-palette($df-purple-palette, 300), 0.12);
+        background: rgba(
+          mat.get-color-from-palette($df-purple-palette, 300),
+          0.12
+        );
       }
 
       .no-parameters-hint {
@@ -1061,7 +1099,8 @@ mat-icon {
 
         &:focus-within {
           border-color: mat.get-color-from-palette($df-purple-palette, 300);
-          box-shadow: 0 0 0 2px rgba(mat.get-color-from-palette($df-purple-palette, 300), 0.12);
+          box-shadow: 0 0 0 2px
+            rgba(mat.get-color-from-palette($df-purple-palette, 300), 0.12);
         }
       }
 
