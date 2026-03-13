@@ -45,7 +45,9 @@ import { DfThemeService } from '../shared/services/df-theme.service';
     DfDataGridComponent,
   ],
 })
-export class DfDataExplorerComponent implements OnInit, OnDestroy, AfterViewInit {
+export class DfDataExplorerComponent
+  implements OnInit, OnDestroy, AfterViewInit
+{
   @HostBinding('style.height.px') hostHeight: number | null = null;
   databases: DatabaseService[] = [];
   tables: TableInfo[] = [];
@@ -119,7 +121,8 @@ export class DfDataExplorerComponent implements OnInit, OnDestroy, AfterViewInit
           this.loadingDbs = false;
         },
         error: err => {
-          this.errorDbs = err?.error?.error?.message || 'Failed to load databases';
+          this.errorDbs =
+            err?.error?.error?.message || 'Failed to load databases';
           this.loadingDbs = false;
         },
       });
@@ -144,7 +147,8 @@ export class DfDataExplorerComponent implements OnInit, OnDestroy, AfterViewInit
           this.loadingSchema = false;
         },
         error: err => {
-          this.errorSchema = err?.error?.error?.message || 'Failed to load schema';
+          this.errorSchema =
+            err?.error?.error?.message || 'Failed to load schema';
           this.loadingSchema = false;
         },
       });

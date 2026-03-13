@@ -105,24 +105,20 @@ export class DataExplorerService {
         }
         const typeFilter = `(type in ("${typeNames.join('","')}"))`;
         return this.http
-          .get<{ resource: DatabaseService[] }>(
-            `${BASE_URL}/system/service`,
-            {
-              params: {
-                filter: typeFilter,
-                fields: 'id,name,label,description,type',
-                limit: '100',
-                sort: 'name',
-              },
-              headers: { 'show-loading': '', 'Cache-Control': 'no-cache, private' },
-            }
-          )
+          .get<{ resource: DatabaseService[] }>(`${BASE_URL}/system/service`, {
+            params: {
+              filter: typeFilter,
+              fields: 'id,name,label,description,type',
+              limit: '100',
+              sort: 'name',
+            },
+            headers: {
+              'show-loading': '',
+              'Cache-Control': 'no-cache, private',
+            },
+          })
           .pipe(
-            map(res =>
-              (res.resource || []).filter(
-                s => s.isActive !== false
-              )
-            )
+            map(res => (res.resource || []).filter(s => s.isActive !== false))
           );
       })
     );

@@ -121,11 +121,10 @@ export class DfVerbPickerComponent implements ControlValueAccessor, DoCheck {
         this.type === 'number'
           ? (selected || []).reduce((acc: number, val: number) => acc | val, 0)
           : this.type === 'verb_multiple'
-            ? ((selected || []).map(
-                (v: any) =>
-                  this.verbs.find(vr => vr.value === v)?.altValue ?? ''
-              ) as Array<Verb>)
-            : (this.verbs.find(vr => vr.value === selected)?.altValue ?? '');
+          ? ((selected || []).map(
+              (v: any) => this.verbs.find(vr => vr.value === v)?.altValue ?? ''
+            ) as Array<Verb>)
+          : this.verbs.find(vr => vr.value === selected)?.altValue ?? '';
       this.onChange(total);
     });
   }

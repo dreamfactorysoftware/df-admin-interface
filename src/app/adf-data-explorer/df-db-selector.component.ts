@@ -47,20 +47,25 @@ import { DatabaseService } from './services/data-explorer.service';
       </div>
 
       <!-- Empty -->
-      <div class="empty-state" *ngIf="!loading && !error && databases.length === 0">
+      <div
+        class="empty-state"
+        *ngIf="!loading && !error && databases.length === 0">
         <mat-icon>info_outline</mat-icon>
         <span>{{ t('dataExplorer.noDatabases') }}</span>
         <small>{{ t('dataExplorer.noDatabasesHint') }}</small>
       </div>
 
       <!-- Database list -->
-      <mat-nav-list *ngIf="!loading && !error && databases.length > 0" class="db-list">
-        <a mat-list-item
-           *ngFor="let db of databases"
-           (click)="databaseSelected.emit(db)"
-           [matTooltip]="db.description || db.name"
-           matTooltipPosition="right"
-           class="db-item">
+      <mat-nav-list
+        *ngIf="!loading && !error && databases.length > 0"
+        class="db-list">
+        <a
+          mat-list-item
+          *ngFor="let db of databases"
+          (click)="databaseSelected.emit(db)"
+          [matTooltip]="db.description || db.name"
+          matTooltipPosition="right"
+          class="db-item">
           <fa-icon [icon]="faDatabase" class="db-icon"></fa-icon>
           <div class="db-info">
             <span class="db-name">{{ db.label || db.name }}</span>

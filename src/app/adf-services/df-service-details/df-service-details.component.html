@@ -237,7 +237,7 @@
                             'multi_picklist',
                             'boolean',
                             'file_certificate',
-                            'file_certificate_api',
+                            'file_certificate_api'
                           ].includes(item.type)
                         "
                         [schema]="item"
@@ -278,7 +278,7 @@
                         'multi_picklist',
                         'boolean',
                         'file_certificate',
-                        'file_certificate_api',
+                        'file_certificate_api'
                       ].includes(item.type)
                     "
                     [schema]="item"
@@ -336,7 +336,7 @@
                                 'multi_picklist',
                                 'boolean',
                                 'file_certificate',
-                                'file_certificate_api',
+                                'file_certificate_api'
                               ].includes(item.type)
                             "
                             [schema]="item"
@@ -591,7 +591,7 @@
                   'multi_picklist',
                   'boolean',
                   'file_certificate',
-                  'file_certificate_api',
+                  'file_certificate_api'
                 ].includes(item.type)
               "
               color="primary"
@@ -674,7 +674,7 @@
                         'multi_picklist',
                         'boolean',
                         'file_certificate',
-                        'file_certificate_api',
+                        'file_certificate_api'
                       ].includes(item.type)
                     "
                     color="primary"
@@ -757,7 +757,7 @@
                           'multi_picklist',
                           'boolean',
                           'file_certificate',
-                          'file_certificate_api',
+                          'file_certificate_api'
                         ].includes(item.type)
                       "
                       color="primary"
@@ -848,7 +848,7 @@
                           'multi_picklist',
                           'boolean',
                           'file_certificate',
-                          'file_certificate_api',
+                          'file_certificate_api'
                         ].includes(item.type)
                       "
                       color="primary"
@@ -882,7 +882,9 @@
     <ng-container *ngIf="isMcp && edit">
       <mat-accordion class="full-width">
         <mat-expansion-panel [expanded]="true">
-          <mat-expansion-panel-header> MCP Tools </mat-expansion-panel-header>
+          <mat-expansion-panel-header>
+            Built-in Tools
+          </mat-expansion-panel-header>
           <div class="details-section" *ngIf="!mcpServicesLoaded">
             <p>Loading services...</p>
           </div>
@@ -987,6 +989,317 @@
                 </table>
               </mat-expansion-panel>
             </mat-accordion>
+          </div>
+        </mat-expansion-panel>
+      </mat-accordion>
+    </ng-container>
+
+    <!-- MCP Custom Tools -->
+    <ng-container *ngIf="isMcp && edit">
+      <mat-accordion class="full-width">
+        <mat-expansion-panel [expanded]="customTools.length > 0">
+          <mat-expansion-panel-header>
+            Custom Tools
+          </mat-expansion-panel-header>
+
+          <div class="custom-tools-container">
+            <p class="custom-tools-description">
+              Define custom tools that make HTTP requests to external APIs or
+              execute server-side functions. These tools will be available to
+              MCP clients alongside the built-in DreamFactory tools.
+            </p>
+
+            <div class="custom-tools-actions" *ngIf="editingToolIndex === null">
+              <button mat-flat-button color="primary" (click)="addCustomTool()">
+                <fa-icon [icon]="faPlus" class="btn-icon"></fa-icon>
+                Add Custom Tool
+              </button>
+            </div>
+
+            <!-- Add/Edit Form -->
+            <div
+              class="custom-tool-form"
+              *ngIf="editingToolIndex !== null"
+              [formGroup]="customToolForm">
+              <h4>
+                {{
+                  editingToolIndex === -1
+                    ? 'Add Custom Tool'
+                    : 'Edit Custom Tool'
+                }}
+              </h4>
+
+              <mat-button-toggle-group
+                formControlName="toolType"
+                class="tool-type-toggle">
+                <mat-button-toggle value="api">API</mat-button-toggle>
+                <mat-button-toggle value="function">Function</mat-button-toggle>
+              </mat-button-toggle-group>
+
+              <div class="form-row">
+                <mat-form-field appearance="outline" class="form-field-half">
+                  <mat-label>Tool Name</mat-label>
+                  <input
+                    matInput
+                    formControlName="name"
+                    placeholder="my_tool_name" />
+                  <mat-hint>Letters, numbers, and underscores only</mat-hint>
+                </mat-form-field>
+
+                <mat-form-field
+                  appearance="outline"
+                  class="form-field-quarter"
+                  *ngIf="customToolForm.get('toolType')?.value === 'api'">
+                  <mat-label>HTTP Method</mat-label>
+                  <mat-select formControlName="httpMethod">
+                    <mat-option value="GET">GET</mat-option>
+                    <mat-option value="POST">POST</mat-option>
+                    <mat-option value="PUT">PUT</mat-option>
+                    <mat-option value="PATCH">PATCH</mat-option>
+                    <mat-option value="DELETE">DELETE</mat-option>
+                  </mat-select>
+                </mat-form-field>
+              </div>
+
+              <mat-form-field
+                appearance="outline"
+                class="full-width"
+                *ngIf="customToolForm.get('toolType')?.value === 'api'">
+                <mat-label>URL</mat-label>
+                <input
+                  matInput
+                  formControlName="url"
+                  placeholder="https://api.example.com/endpoint/{id}" />
+                <mat-hint>Use &#123;param&#125; for path parameters</mat-hint>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Description</mat-label>
+                <textarea
+                  matInput
+                  formControlName="description"
+                  rows="2"
+                  placeholder="Describe what this tool does..."></textarea>
+                <mat-hint>This description is shown to the LLM</mat-hint>
+              </mat-form-field>
+
+              <!-- Parameters -->
+              <div class="parameters-section">
+                <div class="section-header">
+                  <h5>Parameters</h5>
+                  <button
+                    mat-stroked-button
+                    color="primary"
+                    type="button"
+                    (click)="addToolParameter()">
+                    <fa-icon [icon]="faPlus" class="btn-icon"></fa-icon>
+                    Add Parameter
+                  </button>
+                </div>
+
+                <div
+                  class="parameter-cards"
+                  *ngIf="customToolParameters.length > 0"
+                  formArrayName="parameters">
+                  <div
+                    class="parameter-card"
+                    *ngFor="
+                      let param of customToolParameters.controls;
+                      let i = index
+                    "
+                    [formGroupName]="i">
+                    <div class="parameter-card-header">
+                      <span class="parameter-index">#{{ i + 1 }}</span>
+                      <button
+                        mat-icon-button
+                        color="warn"
+                        type="button"
+                        (click)="removeToolParameter(i)"
+                        matTooltip="Remove parameter"
+                        class="parameter-remove-btn">
+                        <fa-icon [icon]="faTrashCan"></fa-icon>
+                      </button>
+                    </div>
+                    <div class="parameter-card-fields">
+                      <mat-form-field
+                        appearance="outline"
+                        class="param-field param-field--name">
+                        <mat-label>Name</mat-label>
+                        <input
+                          matInput
+                          formControlName="name"
+                          placeholder="param_name" />
+                      </mat-form-field>
+
+                      <mat-form-field
+                        appearance="outline"
+                        class="param-field param-field--type">
+                        <mat-label>Type</mat-label>
+                        <mat-select formControlName="type">
+                          <mat-option value="string">string</mat-option>
+                          <mat-option value="number">number</mat-option>
+                          <mat-option value="integer">integer</mat-option>
+                          <mat-option value="boolean">boolean</mat-option>
+                        </mat-select>
+                      </mat-form-field>
+
+                      <mat-form-field
+                        appearance="outline"
+                        class="param-field param-field--location"
+                        *ngIf="customToolForm.get('toolType')?.value === 'api'">
+                        <mat-label>Location</mat-label>
+                        <mat-select formControlName="in">
+                          <mat-option value="query">query</mat-option>
+                          <mat-option value="path">path</mat-option>
+                          <mat-option value="body">body</mat-option>
+                          <mat-option value="header">header</mat-option>
+                        </mat-select>
+                      </mat-form-field>
+
+                      <div class="param-field param-field--required">
+                        <mat-checkbox formControlName="required"
+                          >Required</mat-checkbox
+                        >
+                      </div>
+
+                      <mat-form-field
+                        appearance="outline"
+                        class="param-field param-field--desc">
+                        <mat-label>Description</mat-label>
+                        <input
+                          matInput
+                          formControlName="description"
+                          placeholder="What this parameter does" />
+                      </mat-form-field>
+                    </div>
+                  </div>
+                </div>
+
+                <p
+                  class="no-parameters-hint"
+                  *ngIf="customToolParameters.length === 0">
+                  No parameters yet. Add one to define inputs for this tool.
+                </p>
+              </div>
+
+              <!-- Function editor -->
+              <div
+                class="editor-section"
+                *ngIf="customToolForm.get('toolType')?.value === 'function'">
+                <label class="editor-label"
+                  >Function (JavaScript function body)</label
+                >
+                <div class="editor-wrapper">
+                  <df-ace-editor
+                    formControlName="function"
+                    [mode]="functionEditorMode">
+                  </df-ace-editor>
+                </div>
+                <span class="editor-hint">
+                  Write a JavaScript function body. Parameters are available as
+                  variables by name.
+                </span>
+              </div>
+
+              <!-- Headers (API tools only) -->
+              <div
+                class="editor-section"
+                *ngIf="customToolForm.get('toolType')?.value === 'api'">
+                <label class="editor-label">Static Headers (JSON)</label>
+                <div class="editor-wrapper editor-wrapper--compact">
+                  <df-ace-editor
+                    formControlName="headers"
+                    [mode]="headersEditorMode">
+                  </df-ace-editor>
+                </div>
+              </div>
+
+              <div class="form-actions">
+                <button
+                  mat-button
+                  type="button"
+                  (click)="cancelCustomToolEdit()">
+                  Cancel
+                </button>
+                <button
+                  mat-flat-button
+                  color="primary"
+                  type="button"
+                  (click)="saveCustomTool()"
+                  [disabled]="customToolForm.invalid">
+                  {{ editingToolIndex === -1 ? 'Add' : 'Update' }}
+                </button>
+              </div>
+            </div>
+
+            <!-- Custom Tools Table -->
+            <table
+              class="mcp-services-table full-width"
+              *ngIf="customTools.length > 0">
+              <thead>
+                <tr>
+                  <th class="toggle-col"></th>
+                  <th>Name</th>
+                  <th>Type</th>
+                  <th>Method / URL</th>
+                  <th>Description</th>
+                  <th class="action-col"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  *ngFor="let tool of customTools; let i = index"
+                  [class.disabled-row]="!tool.enabled">
+                  <td class="toggle-col">
+                    <mat-slide-toggle
+                      color="primary"
+                      [checked]="tool.enabled"
+                      (change)="toggleCustomTool(i, $event.checked)">
+                    </mat-slide-toggle>
+                  </td>
+                  <td>
+                    <code>{{ tool.name }}</code>
+                  </td>
+                  <td>
+                    <code>{{ (tool.toolType || 'api').toUpperCase() }}</code>
+                  </td>
+                  <td class="url-cell">
+                    <ng-container *ngIf="(tool.toolType || 'api') === 'api'">
+                      <code>{{ tool.httpMethod }}</code> {{ tool.url }}
+                    </ng-container>
+                    <ng-container *ngIf="tool.toolType === 'function'">
+                      <em>Function</em>
+                    </ng-container>
+                  </td>
+                  <td>{{ tool.description }}</td>
+                  <td class="action-col">
+                    <div class="action-buttons">
+                      <button
+                        mat-icon-button
+                        (click)="editCustomTool(i)"
+                        [disabled]="editingToolIndex !== null"
+                        matTooltip="Edit tool">
+                        <fa-icon [icon]="faPenToSquare"></fa-icon>
+                      </button>
+                      <button
+                        mat-icon-button
+                        color="warn"
+                        (click)="deleteCustomTool(i)"
+                        [disabled]="editingToolIndex !== null"
+                        matTooltip="Delete tool">
+                        <fa-icon [icon]="faTrashCan"></fa-icon>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <p
+              *ngIf="customTools.length === 0 && editingToolIndex === null"
+              class="no-tools-message">
+              No custom tools defined. Click "Add Custom Tool" to create one.
+            </p>
           </div>
         </mat-expansion-panel>
       </mat-accordion>
