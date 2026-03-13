@@ -8,6 +8,7 @@ import {
   ViewChild,
 } from '@angular/core';
 import {
+  FormArray,
   FormBuilder,
   FormControl,
   FormGroup,
@@ -34,7 +35,12 @@ import {
   camelToSnakeString,
   snakeToCamelString,
 } from 'src/app/shared/utilities/case';
-import { faCircleInfo } from '@fortawesome/free-solid-svg-icons';
+import {
+  faCircleInfo,
+  faPenToSquare,
+  faTrashCan,
+  faPlus,
+} from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatButtonModule } from '@angular/material/button';
@@ -165,6 +171,9 @@ export class DfServiceDetailsComponent implements OnInit {
   notIncludedServices: Array<ServiceType>;
   serviceForm: FormGroup;
   faCircleInfo = faCircleInfo;
+  faPenToSquare = faPenToSquare;
+  faTrashCan = faTrashCan;
+  faPlus = faPlus;
   serviceData: Service;
   selectedServiceTypeLable: string;
   configSchema: Array<ConfigSchema>;
@@ -238,6 +247,9 @@ export class DfServiceDetailsComponent implements OnInit {
       description: 'Stub fetch implementation for connectors that require it',
     },
   ];
+  customTools: any[] = [];
+  editingToolIndex: number | null = null;
+  customToolForm!: FormGroup;
 
   constructor(
     private activatedRoute: ActivatedRoute,
@@ -267,6 +279,32 @@ export class DfServiceDetailsComponent implements OnInit {
         content: [''],
       }),
     });
+    this.customToolForm = this.fb.group({
+      toolType: ['api'],
+      name: ['', [Validators.required, Validators.pattern(/^[a-zA-Z0-9_]+$/)]],
+      description: ['', Validators.required],
+      httpMethod: ['GET'],
+      url: ['', Validators.required],
+      parameters: this.fb.array([]),
+      headers: ['{}'],
+      function: [''],
+      enabled: [true],
+    });
+    this.customToolForm
+      .get('toolType')!
+      .valueChanges.subscribe((type: string) => {
+        const urlCtrl = this.customToolForm.get('url')!;
+        const functionCtrl = this.customToolForm.get('function')!;
+        if (type === 'function') {
+          urlCtrl.clearValidators();
+          functionCtrl.setValidators(Validators.required);
+        } else {
+          urlCtrl.setValidators(Validators.required);
+          functionCtrl.clearValidators();
+        }
+        urlCtrl.updateValueAndValidity();
+        functionCtrl.updateValueAndValidity();
+      });
     const id = this.activatedRoute.snapshot.paramMap.get('id');
     if (id) {
       this.edit = true;
@@ -516,10 +554,24 @@ export class DfServiceDetailsComponent implements OnInit {
           this.loadAvailableFileServices();
         }
 
-        // If editing an MCP service, load available services
+        // If editing an MCP service, load available services and custom tools
         if (this.edit && this.isMcp) {
           const disabled: string[] = data?.config?.disabledTools ?? [];
           this.disabledTools = new Set(disabled);
+          this.customTools = (data?.config?.customTools ?? []).map(
+            (t: any) => ({
+              id: t.id,
+              toolType: t.toolType || 'api',
+              name: t.name,
+              description: t.description,
+              httpMethod: t.httpMethod,
+              url: t.url,
+              parameters: t.parameters || [],
+              headers: t.headers || {},
+              function: t.function || '',
+              enabled: t.enabled !== false && t.enabled !== 0,
+            })
+          );
           this.loadMcpServices();
         }
       });
@@ -957,6 +1009,108 @@ export class DfServiceDetailsComponent implements OnInit {
       .replace(/^_|_$/g, '');
   }
 
+  // Custom tools management
+  get customToolParameters(): FormArray {
+    return this.customToolForm.get('parameters') as FormArray;
+  }
+
+  createParameterGroup(param?: any): FormGroup {
+    return this.fb.group({
+      name: [param?.name ?? '', Validators.required],
+      type: [param?.type ?? 'string'],
+      in: [param?.in ?? 'query'],
+      required: [param?.required ?? false],
+      description: [param?.description ?? ''],
+    });
+  }
+
+  addCustomTool() {
+    this.editingToolIndex = -1;
+    this.customToolForm.reset({
+      toolType: 'api',
+      name: '',
+      description: '',
+      httpMethod: 'GET',
+      url: '',
+      headers: '{}',
+      function: '',
+      enabled: true,
+    });
+    this.customToolParameters.clear();
+  }
+
+  editCustomTool(index: number) {
+    const tool = this.customTools[index];
+    this.editingToolIndex = index;
+    this.customToolForm.patchValue({
+      toolType: tool.toolType || 'api',
+      name: tool.name,
+      description: tool.description,
+      httpMethod: tool.httpMethod || 'GET',
+      url: tool.url || '',
+      headers: JSON.stringify(tool.headers || {}, null, 2),
+      function: tool.function || '',
+      enabled: tool.enabled,
+    });
+    this.customToolParameters.clear();
+    (tool.parameters || []).forEach((p: any) => {
+      this.customToolParameters.push(this.createParameterGroup(p));
+    });
+  }
+
+  deleteCustomTool(index: number) {
+    this.customTools.splice(index, 1);
+  }
+
+  saveCustomTool() {
+    if (this.customToolForm.invalid) return;
+
+    const formValue = this.customToolForm.getRawValue();
+    let headers: Record<string, string> = {};
+    try {
+      headers = JSON.parse(formValue.headers || '{}');
+    } catch {
+      headers = {};
+    }
+
+    const tool: any = {
+      toolType: formValue.toolType || 'api',
+      name: formValue.name,
+      description: formValue.description,
+      httpMethod: formValue.httpMethod,
+      url: formValue.url,
+      parameters: formValue.parameters || [],
+      headers,
+      function: formValue.function || '',
+      enabled: formValue.enabled ?? true,
+    };
+
+    if (this.editingToolIndex === -1) {
+      this.customTools.push(tool);
+    } else if (this.editingToolIndex !== null) {
+      tool.id = this.customTools[this.editingToolIndex].id;
+      this.customTools[this.editingToolIndex] = tool;
+    }
+
+    this.editingToolIndex = null;
+  }
+
+  cancelCustomToolEdit() {
+    this.editingToolIndex = null;
+  }
+
+  toggleCustomTool(index: number, enabled: boolean) {
+    this.customTools[index].enabled = enabled;
+  }
+
+  addToolParameter() {
+    this.customToolParameters.push(this.createParameterGroup());
+  }
+
+  removeToolParameter(index: number) {
+    this.customToolParameters.removeAt(index);
+  }
+
   // Helper method for debugging (can be removed in production)
   logFormValues() {
     console.log('Form values:', this.serviceForm.value);
@@ -1062,6 +1216,14 @@ export class DfServiceDetailsComponent implements OnInit {
   }
 
   get excelMode(): AceEditorMode {
+    return AceEditorMode.JSON;
+  }
+
+  get functionEditorMode(): AceEditorMode {
+    return AceEditorMode.JAVASCRIPT;
+  }
+
+  get headersEditorMode(): AceEditorMode {
     return AceEditorMode.JSON;
   }
 
@@ -1402,9 +1564,21 @@ export class DfServiceDetailsComponent implements OnInit {
       if (this.isNetworkService) {
         delete editPayload.config.serviceDefinition;
       }
-      // Include disabled tools for MCP services
+      // Include disabled tools and custom tools for MCP services
       if (this.isMcp) {
         editPayload.config.disabledTools = Array.from(this.disabledTools);
+        editPayload.config.customTools = this.customTools.map((tool: any) => ({
+          id: tool.id,
+          toolType: tool.toolType || 'api',
+          name: tool.name,
+          description: tool.description,
+          httpMethod: tool.httpMethod,
+          url: tool.url,
+          parameters: tool.parameters,
+          headers: tool.headers,
+          function: tool.function || '',
+          enabled: tool.enabled,
+        }));
       }
       this.servicesService
         .update(this.serviceData.id, editPayload, {

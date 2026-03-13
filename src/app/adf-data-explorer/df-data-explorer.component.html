@@ -1,7 +1,14 @@
-<div class="data-explorer-container" [class.dark-theme]="isDarkMode$ | async" *transloco="let t; scope: 'dataExplorer'">
+<div
+  class="data-explorer-container"
+  [class.dark-theme]="isDarkMode$ | async"
+  *transloco="let t; scope: 'dataExplorer'">
   <mat-sidenav-container class="explorer-sidenav-container">
     <!-- Left Panel -->
-    <mat-sidenav mode="side" opened class="explorer-sidenav" [fixedInViewport]="false">
+    <mat-sidenav
+      mode="side"
+      opened
+      class="explorer-sidenav"
+      [fixedInViewport]="false">
       <div class="sidenav-content">
         <!-- Database list or Schema tree -->
         <ng-container *ngIf="!selectedDb">
