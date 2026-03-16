@@ -26,9 +26,13 @@ export function getHashAwareQueryParams(): URLSearchParams {
 }
 
 /**
- * Captures and stores redirect URL from query parameters if present
+ * Captures and stores redirect URL from query parameters if present.
+ * Uses sessionStorage (per-tab) to prevent cross-tab interference.
  */
 export function captureRedirectUrl(): void {
+  // Clean up any stale entry from the previous localStorage-based implementation
+  localStorage.removeItem(REDIRECT_URL_KEY);
+
   const urlParams = getHashAwareQueryParams();
   const redirectUrl = urlParams.get('redirect');
   if (redirectUrl) {

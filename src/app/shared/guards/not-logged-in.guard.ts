@@ -4,7 +4,7 @@ import { map, switchMap } from 'rxjs/operators';
 import { Router } from '@angular/router';
 import { ROUTES } from '../types/routes';
 import { DfUserDataService } from '../services/df-user-data.service';
-import { EMPTY, of } from 'rxjs';
+import { of } from 'rxjs';
 import { captureRedirectUrl, handleRedirectIfPresent } from '../utilities/url';
 
 export const notLoggedInGuard = () => {
@@ -32,7 +32,7 @@ export const notLoggedInGuard = () => {
       }
       // Already logged in, check for redirect
       if (handleRedirectIfPresent(userDataService.token)) {
-        return EMPTY; // External redirect in progress
+        return of(false); // Resolve guard so router doesn't stall; window.location.href handles the redirect
       }
       return of(router.createUrlTree([ROUTES.HOME]));
     })
