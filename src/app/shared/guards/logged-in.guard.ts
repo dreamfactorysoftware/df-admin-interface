@@ -3,7 +3,7 @@ import { DfAuthService } from '../../adf-user-management/services/df-auth.servic
 import { map, switchMap } from 'rxjs/operators';
 import { Router } from '@angular/router';
 import { ROUTES } from '../types/routes';
-import { EMPTY, of } from 'rxjs';
+import { of } from 'rxjs';
 import { DfUserDataService } from '../services/df-user-data.service';
 import { handleRedirectIfPresent } from '../utilities/url';
 
@@ -29,7 +29,7 @@ export const loggedInGuard = () => {
       }
       // Already logged in, check for redirect
       if (handleRedirectIfPresent(userDataService.token)) {
-        return EMPTY; // Don't emit, external redirect in progress
+        return of(false); // Resolve guard so router doesn't stall; window.location.href handles the redirect
       }
       return of(true);
     })
