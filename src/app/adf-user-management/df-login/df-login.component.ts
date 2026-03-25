@@ -16,7 +16,7 @@ import { Router, RouterLink } from '@angular/router';
 import { ROUTES } from '../../shared/types/routes';
 import { getIcon, iconExist } from '../../shared/utilities/icons';
 import { LoginCredentials } from '../../shared/types/user-management';
-import { REDIRECT_URL_KEY } from '../../shared/utilities/url';
+import { REDIRECT_URL_KEY, handleRedirectIfPresent } from '../../shared/utilities/url';
 
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { MatButtonModule } from '@angular/material/button';
@@ -205,7 +205,7 @@ export class DfLoginComponent implements OnInit {
           return throwError(() => new Error(err));
         })
       )
-      .subscribe(() => {
+      .subscribe(userData => {
         this.showAlert = false;
         if (isPasswordTooShort) {
           this.popupOverlay.open({
@@ -213,7 +213,14 @@ export class DfLoginComponent implements OnInit {
             showRemindMeLater: true,
           });
         }
-        this.router.navigate([ROUTES.HOME]);
+        // Check for pending external redirect (e.g. MCP OAuth flow) before
+        // navigating to the home page.  handleRedirectIfPresent() will perform
+        // a full-page navigation via window.location.href when a redirect URL
+        // is stored in sessionStorage, so we must skip the Angular router in
+        // that case to avoid a race between the two navigations.
+        if (!handleRedirectIfPresent(userData.sessionToken)) {
+          this.router.navigate([ROUTES.HOME]);
+        }
       });
   }
 }

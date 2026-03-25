@@ -13,6 +13,7 @@ import { LoginResponse } from './shared/types/auth.types';
 import { ROUTES } from './shared/types/routes';
 import { IntercomService } from './shared/services/intercom.service';
 import { DfUserDataService } from './shared/services/df-user-data.service';
+import { handleRedirectIfPresent } from './shared/utilities/url';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -101,13 +102,18 @@ export class AppComponent implements OnInit {
       this.loggingService.log(`JWT found in URL: ${jwt.substring(0, 20)}...`);
       this.authService.loginWithJwt(jwt).subscribe(
         (user: LoginResponse) => {
-          const isAuthenticated = !!(user.session_token || user.sessionToken);
+          const token = user.session_token || user.sessionToken;
           this.loggingService.log(
             `Login successful for user: ${
-              isAuthenticated ? 'Authenticated' : 'Unknown'
+              token ? 'Authenticated' : 'Unknown'
             }`
           );
-          window.location.href = '/dreamfactory/dist/#/home'; // Use window.location.href for hash-based routing
+          // Check for pending external redirect (e.g. MCP OAuth flow) before
+          // navigating to home. handleRedirectIfPresent() performs a full-page
+          // navigation when a redirect URL is stored in sessionStorage.
+          if (!handleRedirectIfPresent(token)) {
+            window.location.href = '/dreamfactory/dist/#/home';
+          }
         },
         error => {
           this.loggingService.log(`Login failed: ${JSON.stringify(error)}`);
@@ -118,13 +124,15 @@ export class AppComponent implements OnInit {
       this.loggingService.log(`Session token found in URL`);
       this.authService.loginWithJwt(sessionToken).subscribe(
         (user: LoginResponse) => {
-          const isAuthenticated = !!(user.session_token || user.sessionToken);
+          const token = user.session_token || user.sessionToken;
           this.loggingService.log(
             `OAuth login successful: ${
-              isAuthenticated ? 'Authenticated' : 'Unknown'
+              token ? 'Authenticated' : 'Unknown'
             }`
           );
-          window.location.href = '/#/home';
+          if (!handleRedirectIfPresent(token)) {
+            window.location.href = '/#/home';
+          }
         },
         (error: unknown) => {
           this.loggingService.log(
