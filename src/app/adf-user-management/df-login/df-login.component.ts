@@ -16,7 +16,10 @@ import { Router, RouterLink } from '@angular/router';
 import { ROUTES } from '../../shared/types/routes';
 import { getIcon, iconExist } from '../../shared/utilities/icons';
 import { LoginCredentials } from '../../shared/types/user-management';
-import { REDIRECT_URL_KEY, handleRedirectIfPresent } from '../../shared/utilities/url';
+import {
+  REDIRECT_URL_KEY,
+  handleRedirectIfPresent,
+} from '../../shared/utilities/url';
 
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { MatButtonModule } from '@angular/material/button';

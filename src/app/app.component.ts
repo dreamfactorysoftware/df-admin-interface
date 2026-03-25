@@ -13,7 +13,7 @@ import { LoginResponse } from './shared/types/auth.types';
 import { ROUTES } from './shared/types/routes';
 import { IntercomService } from './shared/services/intercom.service';
 import { DfUserDataService } from './shared/services/df-user-data.service';
-import { handleRedirectIfPresent } from './shared/utilities/url';
+import { captureRedirectUrl, handleRedirectIfPresent } from './shared/utilities/url';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -80,6 +80,10 @@ export class AppComponent implements OnInit {
   private handleAuthentication() {
     this.loggingService.log('Handling authentication');
 
+    // Capture redirect URL early so it's available for all auth paths.
+    // This runs before route guards, which also call captureRedirectUrl().
+    captureRedirectUrl();
+
     const fullUrl = window.location.href;
     this.loggingService.log(`Full URL: ${fullUrl}`);
 
@@ -104,9 +108,7 @@ export class AppComponent implements OnInit {
         (user: LoginResponse) => {
           const token = user.session_token || user.sessionToken;
           this.loggingService.log(
-            `Login successful for user: ${
-              token ? 'Authenticated' : 'Unknown'
-            }`
+            `Login successful for user: ${token ? 'Authenticated' : 'Unknown'}`
           );
           // Check for pending external redirect (e.g. MCP OAuth flow) before
           // navigating to home. handleRedirectIfPresent() performs a full-page
@@ -126,9 +128,7 @@ export class AppComponent implements OnInit {
         (user: LoginResponse) => {
           const token = user.session_token || user.sessionToken;
           this.loggingService.log(
-            `OAuth login successful: ${
-              token ? 'Authenticated' : 'Unknown'
-            }`
+            `OAuth login successful: ${token ? 'Authenticated' : 'Unknown'}`
           );
           if (!handleRedirectIfPresent(token)) {
             window.location.href = '/#/home';
@@ -149,7 +149,12 @@ export class AppComponent implements OnInit {
         );
       } else {
         this.loggingService.log('User is already logged in');
-        window.location.href = '/dreamfactory/dist/#/home';
+        // Check for pending external redirect (e.g. MCP OAuth flow) before
+        // navigating to home. This handles the case where an already-logged-in
+        // user is redirected to the login page by an external OAuth flow.
+        if (!handleRedirectIfPresent(this.dfUserDataService.token)) {
+          window.location.href = '/dreamfactory/dist/#/home';
+        }
       }
     }
   }
