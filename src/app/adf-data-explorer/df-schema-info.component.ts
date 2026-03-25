@@ -56,16 +56,30 @@ import {
 
       <div class="schema-body" *ngIf="schema && !loading && !error">
         <!-- Fields -->
-        <div class="section-header">{{ t('dataExplorer.columns') }} ({{ schema.field.length }})</div>
+        <div class="section-header">
+          {{ t('dataExplorer.columns') }} ({{ schema.field.length }})
+        </div>
         <div class="field-list">
           <div class="field-row" *ngFor="let field of schema.field">
             <div class="field-name">
               <span>{{ field.name }}</span>
               <mat-chip-set class="field-badges">
-                <mat-chip *ngIf="field.isPrimaryKey" class="badge-pk" disabled>PK</mat-chip>
-                <mat-chip *ngIf="field.isForeignKey" class="badge-fk" disabled
-                  [matTooltip]="field.refTable + '.' + field.refField">FK</mat-chip>
-                <mat-chip *ngIf="field.isUnique && !field.isPrimaryKey" class="badge-uq" disabled>UQ</mat-chip>
+                <mat-chip *ngIf="field.isPrimaryKey" class="badge-pk" disabled
+                  >PK</mat-chip
+                >
+                <mat-chip
+                  *ngIf="field.isForeignKey"
+                  class="badge-fk"
+                  disabled
+                  [matTooltip]="field.refTable + '.' + field.refField"
+                  >FK</mat-chip
+                >
+                <mat-chip
+                  *ngIf="field.isUnique && !field.isPrimaryKey"
+                  class="badge-uq"
+                  disabled
+                  >UQ</mat-chip
+                >
               </mat-chip-set>
             </div>
             <div class="field-type">{{ field.dbType }}</div>
@@ -75,7 +89,9 @@ import {
             </div>
             <div class="field-ref" *ngIf="field.isForeignKey && field.refTable">
               <mat-icon class="ref-icon">subdirectory_arrow_right</mat-icon>
-              <a class="ref-link" (click)="navigateToTable.emit(field.refTable!)">
+              <a
+                class="ref-link"
+                (click)="navigateToTable.emit(field.refTable!)">
                 {{ field.refTable }}.{{ field.refField }}
               </a>
             </div>
@@ -84,14 +100,24 @@ import {
 
         <!-- Relationships -->
         <div *ngIf="schema.related && schema.related.length > 0">
-          <div class="section-header">{{ t('dataExplorer.relationships') }} ({{ schema.related!.length }})</div>
+          <div class="section-header">
+            {{ t('dataExplorer.relationships') }} ({{ schema.related!.length }})
+          </div>
           <div class="rel-list">
             <div class="rel-row" *ngFor="let rel of schema.related">
-              <mat-icon class="rel-icon">{{ rel.type === 'belongs_to' ? 'arrow_back' : 'arrow_forward' }}</mat-icon>
+              <mat-icon class="rel-icon">{{
+                rel.type === 'belongs_to' ? 'arrow_back' : 'arrow_forward'
+              }}</mat-icon>
               <div class="rel-info">
                 <span class="rel-type">{{ rel.type }}</span>
-                <a class="ref-link" (click)="navigateToTable.emit(rel.refTable)">{{ rel.refTable }}</a>
-                <span class="rel-field">{{ rel.field }} → {{ rel.refField }}</span>
+                <a
+                  class="ref-link"
+                  (click)="navigateToTable.emit(rel.refTable)"
+                  >{{ rel.refTable }}</a
+                >
+                <span class="rel-field"
+                  >{{ rel.field }} → {{ rel.refField }}</span
+                >
               </div>
             </div>
           </div>
@@ -218,7 +244,8 @@ import {
             gap: 8px;
             margin-top: 2px;
 
-            .not-null, .auto-inc {
+            .not-null,
+            .auto-inc {
               font-size: 10px;
               color: #9e9e9e;
               text-transform: uppercase;
@@ -296,7 +323,9 @@ import {
         .schema-header {
           background: #2c2c2c;
           border-bottom-color: #424242;
-          .schema-title { color: #bdbdbd; }
+          .schema-title {
+            color: #bdbdbd;
+          }
         }
         .section-header {
           color: #757575;
@@ -304,13 +333,21 @@ import {
         }
         .field-list .field-row {
           border-bottom-color: #2c2c2c;
-          .field-name { color: #e0e0e0; }
-          .field-type { color: #9e9e9e; }
+          .field-name {
+            color: #e0e0e0;
+          }
+          .field-type {
+            color: #9e9e9e;
+          }
         }
-        .ref-link { color: #64b5f6; }
+        .ref-link {
+          color: #64b5f6;
+        }
         .rel-list .rel-row {
           border-bottom-color: #2c2c2c;
-          .rel-icon { color: #ce93d8; }
+          .rel-icon {
+            color: #ce93d8;
+          }
         }
       }
     `,
@@ -374,7 +411,10 @@ export class DfSchemaInfoComponent implements OnChanges, OnDestroy {
     return this.schema;
   }
 
-  getCachedSchema(serviceName: string, tableName: string): TableSchemaResponse | null {
+  getCachedSchema(
+    serviceName: string,
+    tableName: string
+  ): TableSchemaResponse | null {
     return this.cache.get(`${serviceName}:${tableName}`) || null;
   }
 }

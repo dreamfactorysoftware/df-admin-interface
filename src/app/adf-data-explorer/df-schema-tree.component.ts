@@ -1,4 +1,11 @@
-import { Component, EventEmitter, Input, Output, OnChanges, SimpleChanges } from '@angular/core';
+import {
+  Component,
+  EventEmitter,
+  Input,
+  Output,
+  OnChanges,
+  SimpleChanges,
+} from '@angular/core';
 import { NgIf, NgFor } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatListModule } from '@angular/material/list';
@@ -38,22 +45,27 @@ import { TableInfo } from './services/data-explorer.service';
           <mat-icon>arrow_back</mat-icon>
         </button>
         <fa-icon [icon]="faDatabase" class="header-icon"></fa-icon>
-        <span class="header-title" [matTooltip]="serviceLabel">{{ serviceLabel }}</span>
+        <span class="header-title" [matTooltip]="serviceLabel">{{
+          serviceLabel
+        }}</span>
       </div>
 
       <!-- Search -->
       <div class="search-box" *ngIf="!loading && !error && tables.length > 0">
         <mat-form-field appearance="outline" class="search-field">
           <mat-icon matPrefix>search</mat-icon>
-          <input matInput
-                 [placeholder]="t('dataExplorer.searchTables')"
-                 [(ngModel)]="searchQuery"
-                 (ngModelChange)="filterTables()">
+          <input
+            matInput
+            [placeholder]="t('dataExplorer.searchTables')"
+            [(ngModel)]="searchQuery"
+            (ngModelChange)="filterTables()" />
         </mat-form-field>
       </div>
 
       <!-- Tables header -->
-      <div class="tables-header" *ngIf="!loading && !error && tables.length > 0">
+      <div
+        class="tables-header"
+        *ngIf="!loading && !error && tables.length > 0">
         <span class="tables-label">{{ t('dataExplorer.tables') }}</span>
         <span class="tables-count">{{ filteredTables.length }}</span>
       </div>
@@ -74,19 +86,24 @@ import { TableInfo } from './services/data-explorer.service';
       </div>
 
       <!-- Empty -->
-      <div class="empty-state" *ngIf="!loading && !error && tables.length === 0">
+      <div
+        class="empty-state"
+        *ngIf="!loading && !error && tables.length === 0">
         <mat-icon>info_outline</mat-icon>
         <span>{{ t('dataExplorer.noTables') }}</span>
         <small>{{ t('dataExplorer.noTablesHint') }}</small>
       </div>
 
       <!-- Table list -->
-      <mat-nav-list *ngIf="!loading && !error && filteredTables.length > 0" class="table-list">
-        <a mat-list-item
-           *ngFor="let table of filteredTables"
-           (click)="tableSelected.emit(table)"
-           [class.selected]="selectedTable?.name === table.name"
-           class="table-item">
+      <mat-nav-list
+        *ngIf="!loading && !error && filteredTables.length > 0"
+        class="table-list">
+        <a
+          mat-list-item
+          *ngFor="let table of filteredTables"
+          (click)="tableSelected.emit(table)"
+          [class.selected]="selectedTable?.name === table.name"
+          class="table-item">
           <fa-icon [icon]="faTable" class="table-icon"></fa-icon>
           <span class="table-name">{{ table.name }}</span>
         </a>
@@ -151,7 +168,9 @@ import { TableInfo } from './services/data-explorer.service';
       :host-context(.dark-theme) .panel-header {
         border-bottom-color: #424242;
         color: #e0e0e0;
-        .header-icon { color: #ce93d8; }
+        .header-icon {
+          color: #ce93d8;
+        }
       }
 
       .search-box {
@@ -267,7 +286,9 @@ import { TableInfo } from './services/data-explorer.service';
       }
 
       :host-context(.dark-theme) .table-item {
-        .table-icon { color: #ce93d8; }
+        .table-icon {
+          color: #ce93d8;
+        }
         &.selected {
           background: rgba(206, 147, 216, 0.12);
         }
