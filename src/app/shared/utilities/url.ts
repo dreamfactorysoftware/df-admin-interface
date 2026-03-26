@@ -57,9 +57,9 @@ export function handleRedirectIfPresent(sessionToken?: string | null): boolean {
     if (sessionToken) {
       const separator = redirectUrl.includes('?') ? '&' : '?';
       const finalUrl = `${redirectUrl}${separator}session_token=${sessionToken}`;
-      window.location.href = finalUrl;
+      window.location.replace(finalUrl);
     } else {
-      window.location.href = redirectUrl;
+      window.location.replace(redirectUrl);
     }
     return true;
   }
