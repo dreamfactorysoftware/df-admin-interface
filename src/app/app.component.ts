@@ -13,7 +13,10 @@ import { LoginResponse } from './shared/types/auth.types';
 import { ROUTES } from './shared/types/routes';
 import { IntercomService } from './shared/services/intercom.service';
 import { DfUserDataService } from './shared/services/df-user-data.service';
-import { captureRedirectUrl, handleRedirectIfPresent } from './shared/utilities/url';
+import {
+  captureRedirectUrl,
+  handleRedirectIfPresent,
+} from './shared/utilities/url';
 
 @UntilDestroy({ checkProperties: true })
 @Component({

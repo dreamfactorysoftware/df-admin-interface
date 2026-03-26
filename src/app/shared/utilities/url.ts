@@ -37,9 +37,11 @@ export function captureRedirectUrl(): void {
   const redirectUrl = urlParams.get('redirect');
   if (redirectUrl) {
     sessionStorage.setItem(REDIRECT_URL_KEY, redirectUrl);
-  } else {
-    sessionStorage.removeItem(REDIRECT_URL_KEY);
   }
+  // Do NOT remove an existing entry when the URL has no redirect param.
+  // Angular's router may strip query params from the hash before guards run,
+  // which would cause a second captureRedirectUrl() call to delete the entry
+  // that was correctly stored by an earlier call.
 }
 
 /**
