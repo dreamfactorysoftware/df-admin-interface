@@ -1122,6 +1122,14 @@ export class DfServiceDetailsComponent implements OnInit {
       related?: string;
     };
 
+    // If the service was already created during OAuth "Test Connection",
+    // we must take the update path even though this.edit is still false.
+    // Otherwise save() POSTs again and hits UNIQUE constraint on service.name.
+    const isUpdate = this.edit || !!this.currentServiceId;
+    const updateServiceId = this.edit
+      ? this.serviceData?.id
+      : this.currentServiceId;
+
     let params: Params = {
       snackbarError: 'server',
       snackbarSuccess: 'services.createSuccessMsg',
@@ -1181,7 +1189,7 @@ export class DfServiceDetailsComponent implements OnInit {
       payload = {
         ...data,
         is_active: data.isActive,
-        id: this.edit ? this.serviceData.id : null,
+        id: isUpdate ? updateServiceId : null,
         config: {
           sp_nameIDFormat: data.config.spNameIDFormat,
           default_role: data.config.defaultRole,
@@ -1212,7 +1220,7 @@ export class DfServiceDetailsComponent implements OnInit {
       // For Excel services, handle storage_service_id
       payload = {
         ...data,
-        id: this.edit ? this.serviceData.id : null,
+        id: isUpdate ? updateServiceId : null,
         config: {
           ...(data.config || {}),
           storage_service_id: data.storageServiceId,
@@ -1224,27 +1232,31 @@ export class DfServiceDetailsComponent implements OnInit {
       // For other service types, use the base data
       payload = {
         ...data,
-        id: this.edit ? this.serviceData.id : null,
+        id: isUpdate ? updateServiceId : null,
       };
     }
-    if (this.edit) {
+    if (isUpdate) {
       let editPayload: any;
+
+      // When the service was created during OAuth "Test Connection",
+      // this.serviceData is not populated — fall back to empty object.
+      const baseServiceData = this.serviceData || {};
 
       if (data.type === 'excel') {
         // For Excel services, ensure storage_service_id is properly handled
         editPayload = {
-          ...this.serviceData,
+          ...baseServiceData,
           ...data,
           config: {
-            ...(this.serviceData.config || {}),
+            ...(baseServiceData.config || {}),
             ...data.config,
             storage_service_id: data.storageServiceId, // Ensure this is included
           },
           service_doc_by_service_id: data.service_doc_by_service_id
             ? {
                 // Preserve the existing record's id for UPDATE operations
-                id: this.serviceData.serviceDocByServiceId?.id,
-                ...(this.serviceData.serviceDocByServiceId || {}),
+                id: baseServiceData.serviceDocByServiceId?.id,
+                ...(baseServiceData.serviceDocByServiceId || {}),
                 ...data.service_doc_by_service_id,
               }
             : null,
@@ -1254,17 +1266,17 @@ export class DfServiceDetailsComponent implements OnInit {
       } else {
         // For other service types, use the standard approach
         editPayload = {
-          ...this.serviceData,
+          ...baseServiceData,
           ...data,
           config: {
-            ...(this.serviceData.config || {}),
+            ...(baseServiceData.config || {}),
             ...data.config,
           },
           service_doc_by_service_id: data.service_doc_by_service_id
             ? {
                 // Preserve the existing record's id for UPDATE operations
-                id: this.serviceData.serviceDocByServiceId?.id,
-                ...(this.serviceData.serviceDocByServiceId || {}),
+                id: baseServiceData.serviceDocByServiceId?.id,
+                ...(baseServiceData.serviceDocByServiceId || {}),
                 ...data.service_doc_by_service_id,
               }
             : null,
@@ -1276,7 +1288,8 @@ export class DfServiceDetailsComponent implements OnInit {
         delete editPayload.config.serviceDefinition;
       }
       this.servicesService
-        .update(this.serviceData.id, editPayload, {
+        // Non-null: isUpdate guarantees either this.serviceData.id or this.currentServiceId is set
+        .update(updateServiceId as string | number, editPayload, {
           snackbarError: 'server',
           snackbarSuccess: 'services.updateSuccessMsg',
         })
