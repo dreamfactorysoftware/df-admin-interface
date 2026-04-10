@@ -909,6 +909,17 @@ mat-icon {
       margin-bottom: 8px;
     }
 
+    .editor-label-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 4px;
+
+      .editor-label {
+        margin-bottom: 0;
+      }
+    }
+
     .editor-wrapper {
       border: 1px solid rgba(0, 0, 0, 0.15);
       border-radius: 8px;
