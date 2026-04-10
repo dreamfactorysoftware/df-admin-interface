@@ -1489,27 +1489,41 @@ export class DfServiceDetailsComponent implements OnInit {
         payload.service_doc_by_service_id = null;
       }
 
-      const serviceResponse = await this.servicesService
-        .create<ServiceResponse>(
-          {
-            resource: [payload],
-          },
-          {
+      let createdService: any;
+
+      if (this.currentServiceId) {
+        // Service already created by testSnowflakeOAuth — update instead
+        const updatePayload = { ...payload, id: this.currentServiceId };
+        await this.servicesService
+          .update(this.currentServiceId, updatePayload, {
             snackbarError: 'server',
-            snackbarSuccess: 'services.createSuccessMsg',
-          }
-        )
-        .toPromise();
+            snackbarSuccess: 'services.updateSuccessMsg',
+          })
+          .toPromise();
+        createdService = { id: this.currentServiceId, name: formattedName };
+      } else {
+        const serviceResponse = await this.servicesService
+          .create<ServiceResponse>(
+            {
+              resource: [payload],
+            },
+            {
+              snackbarError: 'server',
+              snackbarSuccess: 'services.createSuccessMsg',
+            }
+          )
+          .toPromise();
 
-      if (!serviceResponse) {
-        throw new Error('No response received from service creation');
+        if (!serviceResponse) {
+          throw new Error('No response received from service creation');
+        }
+
+        // The response comes back with resource array containing the created service
+        createdService = (serviceResponse as ServiceResponse).resource[0];
+
+        // Store the newly created service ID for role creation
+        this.currentServiceId = createdService.id;
       }
-
-      // The response comes back with resource array containing the created service
-      const createdService = (serviceResponse as ServiceResponse).resource[0];
-
-      // Store the newly created service ID for role creation
-      this.currentServiceId = createdService.id;
 
       // Show success message using DfSnackbarService
       this.snackbarService.openSnackBar(
