@@ -1088,8 +1088,8 @@
                   </button>
                 </mat-menu>
                 <mat-hint
-                  >Use &#123;LOOKUP_NAME&#125; for secrets or
-                  &#123;param&#125; for path parameters</mat-hint
+                  >Use &#123;LOOKUP_NAME&#125; for secrets or &#123;param&#125;
+                  for path parameters</mat-hint
                 >
               </mat-form-field>
 
@@ -1415,3 +1415,34 @@
   *ngIf="subscriptionRequired"
   [serviceName]="selectedServiceTypeLable || 'Unable to fetch service name'">
 </df-paywall>
+
+<ng-template #unsavedToolDialog>
+  <h1 mat-dialog-title>Unsaved custom tool</h1>
+  <div mat-dialog-content>
+    You have unsaved changes in the custom tool editor. Saving the service now
+    will discard those changes unless you add/update the tool first.
+  </div>
+  <div mat-dialog-actions align="end">
+    <button
+      mat-flat-button
+      type="button"
+      (click)="closeUnsavedToolDialog('cancel')">
+      Keep editing
+    </button>
+    <button
+      mat-flat-button
+      color="warn"
+      type="button"
+      (click)="closeUnsavedToolDialog('discard')">
+      Discard tool changes
+    </button>
+    <button
+      mat-flat-button
+      color="primary"
+      cdkFocusInitial
+      type="button"
+      (click)="closeUnsavedToolDialog('save')">
+      Add/Update tool, then save
+    </button>
+  </div>
+</ng-template>

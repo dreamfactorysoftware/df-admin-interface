@@ -5,6 +5,7 @@ import {
   Inject,
   Input,
   OnInit,
+  TemplateRef,
   ViewChild,
 } from '@angular/core';
 import {
@@ -72,7 +73,11 @@ import { DfPaywallComponent } from 'src/app/shared/components/df-paywall/df-payw
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { HttpClient } from '@angular/common/http';
-import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import {
+  MatDialog,
+  MatDialogModule,
+  MatDialogRef,
+} from '@angular/material/dialog';
 import { MatMenuModule } from '@angular/material/menu';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -93,6 +98,8 @@ import { MatDividerModule } from '@angular/material/divider';
 import { DfSystemService } from 'src/app/shared/services/df-system.service';
 import { DfPaywallModal } from 'src/app/shared/components/df-paywall-modal/df-paywall-modal.component';
 import { DfAnalyticsService } from 'src/app/shared/services/df-analytics.service';
+
+type UnsavedToolChoice = 'save' | 'discard' | 'cancel';
 
 // Add these interfaces at the bottom of the file with the other interfaces
 interface RoleResponse {
@@ -159,6 +166,7 @@ interface ServiceResponse {
     MatDividerModule,
     DfSecurityConfigComponent,
     MatMenuModule,
+    MatDialogModule,
   ],
 })
 export class DfServiceDetailsComponent implements OnInit {
@@ -255,6 +263,10 @@ export class DfServiceDetailsComponent implements OnInit {
   availableLookups: Array<{ name: string }> = [];
   @ViewChild('functionEditor') functionEditor: DfAceEditorComponent;
   @ViewChild('headersEditor') headersEditor: DfAceEditorComponent;
+  @ViewChild('unsavedToolDialog')
+  unsavedToolDialogTpl!: TemplateRef<unknown>;
+  private unsavedToolDialogRef: MatDialogRef<unknown, UnsavedToolChoice> | null =
+    null;
   private liveHeadersValue: string | null = null;
   private liveFunctionValue: string | null = null;
 
@@ -1155,6 +1167,14 @@ export class DfServiceDetailsComponent implements OnInit {
     this.editingToolIndex = null;
   }
 
+  hasUnsavedCustomTool(): boolean {
+    return this.editingToolIndex !== null && this.customToolForm.dirty;
+  }
+
+  closeUnsavedToolDialog(choice: UnsavedToolChoice) {
+    this.unsavedToolDialogRef?.close(choice);
+  }
+
   toggleCustomTool(index: number, enabled: boolean) {
     this.customTools[index].enabled = enabled;
   }
@@ -1450,6 +1470,37 @@ export class DfServiceDetailsComponent implements OnInit {
   warnings: string[] = [];
 
   save(Cache: boolean, Continue: boolean) {
+    if (this.hasUnsavedCustomTool()) {
+      if (this.unsavedToolDialogRef) return;
+      this.unsavedToolDialogRef = this.dialog.open<
+        unknown,
+        unknown,
+        UnsavedToolChoice
+      >(this.unsavedToolDialogTpl, {
+        width: '440px',
+        disableClose: true,
+      });
+      this.unsavedToolDialogRef.afterClosed().subscribe(choice => {
+        this.unsavedToolDialogRef = null;
+        if (!choice || choice === 'cancel') return;
+        if (choice === 'save') {
+          if (this.customToolForm.invalid) {
+            this.snackbarService.openSnackBar(
+              'Custom tool has invalid fields. Fix them or discard the edit before saving the service.',
+              'error'
+            );
+            return;
+          }
+          this.saveCustomTool();
+        } else {
+          this.cancelCustomToolEdit();
+        }
+        this.customToolForm.markAsPristine();
+        this.save(Cache, Continue);
+      });
+      return;
+    }
+
     const data = this.serviceForm.getRawValue();
     if (data.type === '' || data.name === '') {
       return;
