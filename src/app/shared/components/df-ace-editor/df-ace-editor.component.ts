@@ -42,6 +42,7 @@ export class DfAceEditorComponent
   @ViewChild('editor') elementRef: ElementRef<HTMLElement>;
 
   private editor: ace.Ace.Editor;
+  private suppressChange = false;
 
   onChange: (value: string) => void;
   onTouched: () => void;
@@ -55,7 +56,12 @@ export class DfAceEditorComponent
   writeValue(value: string): void {
     this.value = value;
     if (this.editor) {
-      this.editor.setValue(value);
+      // Suppress onChange during programmatic setValue to prevent feedback
+      // loops with reactive forms. Use -1 to move cursor to start without
+      // selecting all text.
+      this.suppressChange = true;
+      this.editor.setValue(value, -1);
+      this.suppressChange = false;
     }
   }
 
@@ -63,7 +69,11 @@ export class DfAceEditorComponent
     elementRef: ElementRef<HTMLElement>,
     mode: AceEditorMode = AceEditorMode.TEXT
   ): void {
-    ace.config.set('basePath', '/assets/ace-builds');
+    // Resolve relative to the document base href so it works regardless of
+    // where the app is mounted (e.g. /dreamfactory/dist/ in production).
+    const base = document.querySelector('base')?.getAttribute('href') || '/';
+    ace.config.set('basePath', `${base}assets/ace-builds`);
+    this.suppressChange = true;
     this.editor = ace.edit(elementRef.nativeElement, {
       mode: `ace/mode/${this.getMode(mode)}`,
       value: this.value,
@@ -75,8 +85,10 @@ export class DfAceEditorComponent
       readOnly: false,
       maxLines: 50,
     });
+    this.suppressChange = false;
     this.editor.renderer.attachToShadowRoot();
     this.editor.addEventListener('change', () => {
+      if (this.suppressChange) return;
       this.valueChange.emit(this.editor.getValue());
       if (this.onChange) {
         this.onChange(this.editor.getValue());
@@ -118,6 +130,14 @@ export class DfAceEditorComponent
 
   setValue(value: string): void {
     this.editor.setValue(value);
+  }
+
+  /** Insert text at the current cursor position */
+  insertAtCursor(text: string): void {
+    if (this.editor) {
+      this.editor.insert(text);
+      this.editor.focus();
+    }
   }
 
   ngOnDestroy(): void {

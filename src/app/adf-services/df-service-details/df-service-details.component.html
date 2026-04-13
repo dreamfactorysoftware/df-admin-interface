@@ -1070,7 +1070,27 @@
                   matInput
                   formControlName="url"
                   placeholder="https://api.example.com/endpoint/{id}" />
-                <mat-hint>Use &#123;param&#125; for path parameters</mat-hint>
+                <button
+                  mat-icon-button
+                  matSuffix
+                  type="button"
+                  [matMenuTriggerFor]="urlLookupMenu"
+                  [disabled]="availableLookups.length === 0"
+                  matTooltip="Insert Lookup">
+                  <fa-icon [icon]="faPlus"></fa-icon>
+                </button>
+                <mat-menu #urlLookupMenu="matMenu">
+                  <button
+                    mat-menu-item
+                    *ngFor="let lookup of availableLookups"
+                    (click)="insertLookup(lookup.name, 'url')">
+                    {{ lookup.name }}
+                  </button>
+                </mat-menu>
+                <mat-hint
+                  >Use &#123;LOOKUP_NAME&#125; for secrets or
+                  &#123;param&#125; for path parameters</mat-hint
+                >
               </mat-form-field>
 
               <mat-form-field appearance="outline" class="full-width">
@@ -1186,18 +1206,39 @@
               <div
                 class="editor-section"
                 *ngIf="customToolForm.get('toolType')?.value === 'function'">
-                <label class="editor-label"
-                  >Function (JavaScript function body)</label
-                >
+                <div class="editor-label-row">
+                  <label class="editor-label"
+                    >Function (JavaScript function body)</label
+                  >
+                  <button
+                    mat-stroked-button
+                    type="button"
+                    [matMenuTriggerFor]="fnLookupMenu"
+                    [disabled]="availableLookups.length === 0">
+                    <fa-icon [icon]="faPlus" class="btn-icon"></fa-icon>
+                    Insert Lookup
+                  </button>
+                  <mat-menu #fnLookupMenu="matMenu">
+                    <button
+                      mat-menu-item
+                      *ngFor="let lookup of availableLookups"
+                      (click)="insertLookup(lookup.name, 'function')">
+                      {{ lookup.name }}
+                    </button>
+                  </mat-menu>
+                </div>
                 <div class="editor-wrapper">
                   <df-ace-editor
+                    #functionEditor
                     formControlName="function"
-                    [mode]="functionEditorMode">
+                    [mode]="functionEditorMode"
+                    (valueChange)="onFunctionChange($event)">
                   </df-ace-editor>
                 </div>
                 <span class="editor-hint">
                   Write a JavaScript function body. Parameters are available as
-                  variables by name.
+                  variables by name. Use <code>secrets.LOOKUP_NAME</code> to
+                  reference lookup values.
                 </span>
               </div>
 
@@ -1205,11 +1246,31 @@
               <div
                 class="editor-section"
                 *ngIf="customToolForm.get('toolType')?.value === 'api'">
-                <label class="editor-label">Static Headers (JSON)</label>
+                <div class="editor-label-row">
+                  <label class="editor-label">Static Headers (JSON)</label>
+                  <button
+                    mat-stroked-button
+                    type="button"
+                    [matMenuTriggerFor]="hdrLookupMenu"
+                    [disabled]="availableLookups.length === 0">
+                    <fa-icon [icon]="faPlus" class="btn-icon"></fa-icon>
+                    Insert Lookup
+                  </button>
+                  <mat-menu #hdrLookupMenu="matMenu">
+                    <button
+                      mat-menu-item
+                      *ngFor="let lookup of availableLookups"
+                      (click)="insertLookup(lookup.name, 'headers')">
+                      {{ lookup.name }}
+                    </button>
+                  </mat-menu>
+                </div>
                 <div class="editor-wrapper editor-wrapper--compact">
                   <df-ace-editor
+                    #headersEditor
                     formControlName="headers"
-                    [mode]="headersEditorMode">
+                    [mode]="headersEditorMode"
+                    (valueChange)="onHeadersChange($event)">
                   </df-ace-editor>
                 </div>
               </div>

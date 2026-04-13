@@ -73,6 +73,7 @@ import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { HttpClient } from '@angular/common/http';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatMenuModule } from '@angular/material/menu';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { readAsText } from '../../shared/utilities/file';
@@ -157,6 +158,7 @@ interface ServiceResponse {
     TitleCasePipe,
     MatDividerModule,
     DfSecurityConfigComponent,
+    MatMenuModule,
   ],
 })
 export class DfServiceDetailsComponent implements OnInit {
@@ -250,6 +252,11 @@ export class DfServiceDetailsComponent implements OnInit {
   customTools: any[] = [];
   editingToolIndex: number | null = null;
   customToolForm!: FormGroup;
+  availableLookups: Array<{ name: string }> = [];
+  @ViewChild('functionEditor') functionEditor: DfAceEditorComponent;
+  @ViewChild('headersEditor') headersEditor: DfAceEditorComponent;
+  private liveHeadersValue: string | null = null;
+  private liveFunctionValue: string | null = null;
 
   constructor(
     private activatedRoute: ActivatedRoute,
@@ -323,6 +330,13 @@ export class DfServiceDetailsComponent implements OnInit {
       .get<Array<ImageObject>>('assets/img/databaseImages.json')
       .subscribe(images => {
         this.images = images;
+      });
+    this.http
+      .get<any>(`${BASE_URL}/system/lookup`, {
+        params: { fields: 'name', limit: '100' },
+      })
+      .subscribe(res => {
+        this.availableLookups = res?.resource ?? [];
       });
     this.systemConfigDataService.environment$
       .pipe(
@@ -1037,21 +1051,26 @@ export class DfServiceDetailsComponent implements OnInit {
       enabled: true,
     });
     this.customToolParameters.clear();
+    this.liveHeadersValue = null;
+    this.liveFunctionValue = null;
   }
 
   editCustomTool(index: number) {
     const tool = this.customTools[index];
     this.editingToolIndex = index;
+    const headersJson = JSON.stringify(tool.headers || {}, null, 2);
     this.customToolForm.patchValue({
       toolType: tool.toolType || 'api',
       name: tool.name,
       description: tool.description,
       httpMethod: tool.httpMethod || 'GET',
       url: tool.url || '',
-      headers: JSON.stringify(tool.headers || {}, null, 2),
+      headers: headersJson,
       function: tool.function || '',
       enabled: tool.enabled,
     });
+    this.liveHeadersValue = headersJson;
+    this.liveFunctionValue = tool.function || '';
     this.customToolParameters.clear();
     (tool.parameters || []).forEach((p: any) => {
       this.customToolParameters.push(this.createParameterGroup(p));
@@ -1062,15 +1081,52 @@ export class DfServiceDetailsComponent implements OnInit {
     this.customTools.splice(index, 1);
   }
 
+  onHeadersChange(value: string): void {
+    this.liveHeadersValue = value;
+  }
+
+  onFunctionChange(value: string): void {
+    this.liveFunctionValue = value;
+  }
+
+  insertLookup(
+    lookupName: string,
+    target: 'function' | 'headers' | 'url'
+  ): void {
+    if (target === 'function') {
+      this.functionEditor?.insertAtCursor(`secrets.${lookupName}`);
+    } else if (target === 'headers') {
+      this.headersEditor?.insertAtCursor(`{${lookupName}}`);
+    } else if (target === 'url') {
+      const urlCtrl = this.customToolForm.get('url');
+      if (urlCtrl) {
+        const current = urlCtrl.value || '';
+        urlCtrl.setValue(current + `{${lookupName}}`);
+      }
+    }
+  }
+
   saveCustomTool() {
     if (this.customToolForm.invalid) return;
 
     const formValue = this.customToolForm.getRawValue();
+
+    // Use live editor values captured via (valueChange) — the reactive form
+    // binding loses sync when *ngIf destroys/recreates the editor components.
+    const headersStr = this.liveHeadersValue ?? formValue.headers ?? '{}';
+    const functionStr = this.liveFunctionValue ?? formValue.function ?? '';
+
     let headers: Record<string, string> = {};
-    try {
-      headers = JSON.parse(formValue.headers || '{}');
-    } catch {
-      headers = {};
+    if (formValue.toolType === 'api' && headersStr.trim() !== '') {
+      try {
+        headers = JSON.parse(headersStr);
+      } catch (e: any) {
+        this.snackbarService.openSnackBar(
+          `Invalid JSON in Static Headers: ${e.message}`,
+          'error'
+        );
+        return;
+      }
     }
 
     const tool: any = {
@@ -1081,7 +1137,7 @@ export class DfServiceDetailsComponent implements OnInit {
       url: formValue.url,
       parameters: formValue.parameters || [],
       headers,
-      function: formValue.function || '',
+      function: functionStr,
       enabled: formValue.enabled ?? true,
     };
 
