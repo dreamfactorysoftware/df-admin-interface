@@ -21,6 +21,7 @@ import { TranslocoPipe } from '@ngneat/transloco';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 import { AsyncPipe } from '@angular/common';
+import { noWhitespaceValidator } from 'src/app/shared/validators/no-whitespace.validator';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -80,7 +81,7 @@ export class DfLookupKeysComponent implements OnInit {
   add() {
     this.lookupKeys.push(
       new FormGroup({
-        name: new FormControl('', Validators.required),
+        name: new FormControl('', [Validators.required, noWhitespaceValidator]),
         value: new FormControl(''),
         private: new FormControl(false),
       })

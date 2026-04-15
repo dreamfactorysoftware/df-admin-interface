@@ -265,8 +265,10 @@ export class DfServiceDetailsComponent implements OnInit {
   @ViewChild('headersEditor') headersEditor: DfAceEditorComponent;
   @ViewChild('unsavedToolDialog')
   unsavedToolDialogTpl!: TemplateRef<unknown>;
-  private unsavedToolDialogRef: MatDialogRef<unknown, UnsavedToolChoice> | null =
-    null;
+  private unsavedToolDialogRef: MatDialogRef<
+    unknown,
+    UnsavedToolChoice
+  > | null = null;
   private liveHeadersValue: string | null = null;
   private liveFunctionValue: string | null = null;
 
