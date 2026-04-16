@@ -15,6 +15,7 @@ import { MatCheckboxChange } from '@angular/material/checkbox';
 import { UserProfileType } from '../../types/user';
 import { ROUTES } from 'src/app/shared/types/routes';
 import { uniqueNameValidator } from '../../validators/unique-name.validator';
+import { noWhitespaceValidator } from '../../validators/no-whitespace.validator';
 import { AppType } from 'src/app/shared/types/apps';
 import { RoleType } from '../../types/role';
 import { faEnvelope } from '@fortawesome/free-solid-svg-icons';
@@ -181,7 +182,10 @@ export abstract class DfUserDetailsBaseComponent<T> implements OnInit {
           data.lookupByUserId.forEach((item: any) => {
             (this.userForm.controls['lookupKeys'] as FormArray).push(
               new FormGroup({
-                name: new FormControl(item.name, [Validators.required]),
+                name: new FormControl(item.name, [
+                  Validators.required,
+                  noWhitespaceValidator,
+                ]),
                 value: new FormControl(item.value),
                 private: new FormControl(item.private),
                 id: new FormControl(item.id),

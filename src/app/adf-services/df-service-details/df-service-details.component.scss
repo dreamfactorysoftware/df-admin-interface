@@ -733,6 +733,20 @@ mat-icon {
     flex-shrink: 0;
   }
 
+  .form-field-third {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .scm-link-section {
+    margin-bottom: 16px;
+  }
+
+  .scm-actions {
+    margin-top: 8px;
+    margin-bottom: 8px;
+  }
+
   .parameters-section {
     margin: 20px 0;
 
