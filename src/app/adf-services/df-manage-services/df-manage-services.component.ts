@@ -9,11 +9,7 @@ import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
   selector: 'df-manage-services',
   templateUrl: './df-manage-services.component.html',
   standalone: true,
-  imports: [
-    DfPaywallComponent,
-    DfManageServicesTableComponent,
-    NgIf,
-  ],
+  imports: [DfPaywallComponent, DfManageServicesTableComponent, NgIf],
 })
 export class DfManageServicesComponent implements OnInit {
   paywall = false;
