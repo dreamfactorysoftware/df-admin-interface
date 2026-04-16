@@ -198,6 +198,24 @@ export class DfServiceDetailsComponent implements OnInit {
   } | null = null;
   oauthStatusLoading = false;
 
+  // Snowflake Native App discovery — populates the service-creation picker from
+  // what the app's SPCS identity has been granted (no typed credentials required).
+  snowflakeDiscovery = {
+    databases: [] as Array<{ name: string; comment?: string }>,
+    schemas: [] as Array<{ name: string; comment?: string }>,
+    warehouses: [] as Array<{ name: string; state?: string; size?: string }>,
+    roles: [] as Array<{ name: string; comment?: string }>,
+    loading: {
+      databases: false,
+      schemas: false,
+      warehouses: false,
+      roles: false,
+    },
+    error: null as string | null,
+    initialized: false,
+    schemasSubscribed: false,
+  };
+
   constructor(
     private activatedRoute: ActivatedRoute,
     private fb: FormBuilder,
@@ -283,6 +301,7 @@ export class DfServiceDetailsComponent implements OnInit {
           // Mark component for check to ensure template re-renders with new flag
           this.cdr.markForCheck();
           console.log('[Snowflake Init Debug] Called cdr.markForCheck()');
+          this.initSnowflakeNativeDiscovery();
         }
         const { data, serviceTypes, groups } = route;
         const licenseType = env.platform?.license;
@@ -422,6 +441,7 @@ export class DfServiceDetailsComponent implements OnInit {
             if (data.id) {
               this.fetchOAuthStatus(data.id);
             }
+            this.initSnowflakeNativeDiscovery();
           }
           this.initializeConfig('');
 
@@ -546,7 +566,10 @@ export class DfServiceDetailsComponent implements OnInit {
         setTimeout(() => {
           if (this.serviceTypes?.find(st => st.name === preselectedType)) {
             this.serviceForm.patchValue({ type: preselectedType });
-            console.log('[QueryParam] Pre-selected service type:', preselectedType);
+            console.log(
+              '[QueryParam] Pre-selected service type:',
+              preselectedType
+            );
             // Advance to step 2 (service details)
             if (this.stepper) {
               this.stepper.next();
@@ -772,6 +795,7 @@ export class DfServiceDetailsComponent implements OnInit {
       console.log(
         '[Snowflake Debug] Snowflake service detected, isSnowflake set to true'
       );
+      this.initSnowflakeNativeDiscovery();
     }
 
     // Find the service type to get its group
@@ -1569,6 +1593,121 @@ export class DfServiceDetailsComponent implements OnInit {
    * Fetch OAuth token status for Snowflake service
    * Shows token validity, expiry time, and native app status
    */
+  /**
+   * Load the 3 non-dependent lists (databases, warehouses, roles) and set up the
+   * cascading subscription for schemas. Idempotent — safe to call multiple times.
+   */
+  initSnowflakeNativeDiscovery(): void {
+    if (!this.isNativeApp || !this.isSnowflake) {
+      return;
+    }
+    if (this.snowflakeDiscovery.initialized) {
+      return;
+    }
+    this.snowflakeDiscovery.initialized = true;
+    this.snowflakeDiscovery.error = null;
+
+    this.loadSnowflakeDatabases();
+    this.loadSnowflakeWarehouses();
+    this.loadSnowflakeRoles();
+    this.subscribeSnowflakeDatabaseChanges();
+  }
+
+  private subscribeSnowflakeDatabaseChanges(): void {
+    if (this.snowflakeDiscovery.schemasSubscribed) {
+      return;
+    }
+    const dbControl = this.getConfigControl('database');
+    if (!dbControl) {
+      // Form not ready yet — retry shortly. Guarded by schemasSubscribed flag.
+      setTimeout(() => this.subscribeSnowflakeDatabaseChanges(), 300);
+      return;
+    }
+    this.snowflakeDiscovery.schemasSubscribed = true;
+
+    if (dbControl.value) {
+      this.loadSnowflakeSchemas(dbControl.value);
+    }
+
+    dbControl.valueChanges.subscribe((value: string | null) => {
+      this.snowflakeDiscovery.schemas = [];
+      const schemaControl = this.getConfigControl('schema');
+      if (schemaControl && schemaControl.value) {
+        schemaControl.setValue('', { emitEvent: false });
+      }
+      if (value) {
+        this.loadSnowflakeSchemas(value);
+      }
+    });
+  }
+
+  private async loadSnowflakeDatabases(): Promise<void> {
+    this.snowflakeDiscovery.loading.databases = true;
+    try {
+      const response: any = await this.http
+        .get(`${BASE_URL}/_snowflake/discover/databases`)
+        .toPromise();
+      this.snowflakeDiscovery.databases = response?.resource ?? [];
+    } catch (err) {
+      console.error('Failed to load Snowflake databases', err);
+      this.snowflakeDiscovery.error =
+        'Unable to load databases from the Snowflake Native App.';
+    } finally {
+      this.snowflakeDiscovery.loading.databases = false;
+    }
+  }
+
+  private async loadSnowflakeSchemas(database: string): Promise<void> {
+    if (!database) {
+      this.snowflakeDiscovery.schemas = [];
+      return;
+    }
+    this.snowflakeDiscovery.loading.schemas = true;
+    try {
+      const response: any = await this.http
+        .get(
+          `${BASE_URL}/_snowflake/discover/schemas?database=${encodeURIComponent(
+            database
+          )}`
+        )
+        .toPromise();
+      this.snowflakeDiscovery.schemas = response?.resource ?? [];
+    } catch (err) {
+      console.error('Failed to load Snowflake schemas', err);
+      this.snowflakeDiscovery.schemas = [];
+    } finally {
+      this.snowflakeDiscovery.loading.schemas = false;
+    }
+  }
+
+  private async loadSnowflakeWarehouses(): Promise<void> {
+    this.snowflakeDiscovery.loading.warehouses = true;
+    try {
+      const response: any = await this.http
+        .get(`${BASE_URL}/_snowflake/discover/warehouses`)
+        .toPromise();
+      this.snowflakeDiscovery.warehouses = response?.resource ?? [];
+    } catch (err) {
+      console.error('Failed to load Snowflake warehouses', err);
+    } finally {
+      this.snowflakeDiscovery.loading.warehouses = false;
+    }
+  }
+
+  private async loadSnowflakeRoles(): Promise<void> {
+    this.snowflakeDiscovery.loading.roles = true;
+    try {
+      const response: any = await this.http
+        .get(`${BASE_URL}/_snowflake/discover/roles`)
+        .toPromise();
+      this.snowflakeDiscovery.roles = response?.resource ?? [];
+    } catch (err) {
+      console.error('Failed to load Snowflake roles', err);
+    } finally {
+      this.snowflakeDiscovery.loading.roles = false;
+    }
+  }
+
   async fetchOAuthStatus(serviceId: number) {
     if (!serviceId) return;
 
