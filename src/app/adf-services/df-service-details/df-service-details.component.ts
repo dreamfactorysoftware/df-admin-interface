@@ -261,6 +261,7 @@ export class DfServiceDetailsComponent implements OnInit {
   editingToolIndex: number | null = null;
   customToolForm!: FormGroup;
   availableLookups: Array<{ name: string }> = [];
+  availableScmServices: Array<{ id: number; name: string; label: string; type: string }> = [];
   @ViewChild('functionEditor') functionEditor: DfAceEditorComponent;
   @ViewChild('headersEditor') headersEditor: DfAceEditorComponent;
   @ViewChild('unsavedToolDialog')
@@ -310,6 +311,10 @@ export class DfServiceDetailsComponent implements OnInit {
       headers: ['{}'],
       function: [''],
       enabled: [true],
+      storageServiceId: [null],
+      scmRepository: [''],
+      scmReference: [''],
+      storagePath: [''],
     });
     this.customToolForm
       .get('toolType')!
@@ -318,13 +323,26 @@ export class DfServiceDetailsComponent implements OnInit {
         const functionCtrl = this.customToolForm.get('function')!;
         if (type === 'function') {
           urlCtrl.clearValidators();
-          functionCtrl.setValidators(Validators.required);
+          // Function body is not required when linked to an SCM service
+          const hasScm = !!this.customToolForm.get('storageServiceId')?.value;
+          functionCtrl.setValidators(hasScm ? [] : [Validators.required]);
         } else {
           urlCtrl.setValidators(Validators.required);
           functionCtrl.clearValidators();
         }
         urlCtrl.updateValueAndValidity();
         functionCtrl.updateValueAndValidity();
+      });
+    // When storageServiceId changes, update function validation
+    this.customToolForm
+      .get('storageServiceId')!
+      .valueChanges.subscribe((serviceId: any) => {
+        const functionCtrl = this.customToolForm.get('function')!;
+        const toolType = this.customToolForm.get('toolType')?.value;
+        if (toolType === 'function') {
+          functionCtrl.setValidators(serviceId ? [] : [Validators.required]);
+          functionCtrl.updateValueAndValidity();
+        }
       });
     const id = this.activatedRoute.snapshot.paramMap.get('id');
     if (id) {
@@ -598,9 +616,14 @@ export class DfServiceDetailsComponent implements OnInit {
               headers: t.headers || {},
               function: t.function || '',
               enabled: t.enabled !== false && t.enabled !== 0,
+              storageServiceId: t.storageServiceId || null,
+              scmRepository: t.scmRepository || '',
+              scmReference: t.scmReference || '',
+              storagePath: t.storagePath || '',
             })
           );
           this.loadMcpServices();
+          this.loadAvailableScmServices();
         }
       });
     if (this.isDatabase) {
@@ -1063,6 +1086,10 @@ export class DfServiceDetailsComponent implements OnInit {
       headers: '{}',
       function: '',
       enabled: true,
+      storageServiceId: null,
+      scmRepository: '',
+      scmReference: '',
+      storagePath: '',
     });
     this.customToolParameters.clear();
     this.liveHeadersValue = null;
@@ -1082,6 +1109,10 @@ export class DfServiceDetailsComponent implements OnInit {
       headers: headersJson,
       function: tool.function || '',
       enabled: tool.enabled,
+      storageServiceId: tool.storageServiceId || null,
+      scmRepository: tool.scmRepository || '',
+      scmReference: tool.scmReference || '',
+      storagePath: tool.storagePath || '',
     });
     this.liveHeadersValue = headersJson;
     this.liveFunctionValue = tool.function || '';
@@ -1153,6 +1184,10 @@ export class DfServiceDetailsComponent implements OnInit {
       headers,
       function: functionStr,
       enabled: formValue.enabled ?? true,
+      storageServiceId: formValue.storageServiceId || null,
+      scmRepository: formValue.scmRepository || '',
+      scmReference: formValue.scmReference || '',
+      storagePath: formValue.storagePath || '',
     };
 
     if (this.editingToolIndex === -1) {
@@ -1179,6 +1214,66 @@ export class DfServiceDetailsComponent implements OnInit {
 
   toggleCustomTool(index: number, enabled: boolean) {
     this.customTools[index].enabled = enabled;
+  }
+
+  loadAvailableScmServices() {
+    this.http
+      .get<any>('/api/v2', {
+        params: {
+          group: 'source control',
+          fields: 'id,name,label,type',
+        },
+      })
+      .subscribe({
+        next: (res: any) => {
+          this.availableScmServices = (res?.resource ?? res?.services ?? [])
+            .filter((s: any) => s.id && s.name);
+        },
+        error: () => {
+          this.availableScmServices = [];
+        },
+      });
+  }
+
+  viewLatestScmContent() {
+    const serviceId = this.customToolForm.get('storageServiceId')?.value;
+    const repo = this.customToolForm.get('scmRepository')?.value;
+    const branch = this.customToolForm.get('scmReference')?.value || 'master';
+    const path = this.customToolForm.get('storagePath')?.value;
+
+    if (!serviceId || !repo || !path) {
+      this.snackbarService.openSnackBar(
+        'Service, repository, and path are required to fetch from SCM.',
+        'error'
+      );
+      return;
+    }
+
+    const service = this.availableScmServices.find(s => s.id === serviceId);
+    if (!service) {
+      this.snackbarService.openSnackBar('Selected SCM service not found.', 'error');
+      return;
+    }
+
+    const url = `/api/v2/${service.name}/_repo/${repo}`;
+    this.http
+      .get(url, {
+        params: { branch, content: '1', path },
+        responseType: 'text',
+      })
+      .subscribe({
+        next: (content: string) => {
+          this.customToolForm.get('function')?.setValue(content);
+          this.liveFunctionValue = content;
+          this.snackbarService.openSnackBar('Function loaded from repository.', 'success');
+        },
+        error: (err: any) => {
+          this.snackbarService.openSnackBar(
+            `Failed to fetch from SCM: ${err?.error?.error?.message || err.message}`,
+            'error'
+          );
+        },
+      });
   }
 
   addToolParameter() {
@@ -1687,6 +1782,10 @@ export class DfServiceDetailsComponent implements OnInit {
           headers: tool.headers,
           function: tool.function || '',
           enabled: tool.enabled,
+          storageServiceId: tool.storageServiceId || null,
+          scmRepository: tool.scmRepository || '',
+          scmReference: tool.scmReference || '',
+          storagePath: tool.storagePath || '',
         }));
       }
       this.servicesService

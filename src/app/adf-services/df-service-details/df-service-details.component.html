@@ -1202,6 +1202,71 @@
                 </p>
               </div>
 
+              <!-- Link to SCM Service (function tools only) -->
+              <div
+                class="scm-link-section"
+                *ngIf="customToolForm.get('toolType')?.value === 'function' && availableScmServices.length > 0"
+                [formGroup]="customToolForm">
+                <mat-expansion-panel [expanded]="!!customToolForm.get('storageServiceId')?.value">
+                  <mat-expansion-panel-header>
+                    <mat-panel-title>Link to Repository</mat-panel-title>
+                  </mat-expansion-panel-header>
+
+                  <div class="form-row">
+                    <mat-form-field appearance="outline" class="form-field-half">
+                      <mat-label>SCM Service</mat-label>
+                      <mat-select formControlName="storageServiceId">
+                        <mat-option [value]="null">None</mat-option>
+                        <mat-option
+                          *ngFor="let svc of availableScmServices"
+                          [value]="svc.id">
+                          {{ svc.label || svc.name }}
+                        </mat-option>
+                      </mat-select>
+                      <mat-hint>Select a GitHub, GitLab, or Bitbucket service</mat-hint>
+                    </mat-form-field>
+                  </div>
+
+                  <div class="form-row" *ngIf="customToolForm.get('storageServiceId')?.value">
+                    <mat-form-field appearance="outline" class="form-field-third">
+                      <mat-label>Repository</mat-label>
+                      <input
+                        matInput
+                        formControlName="scmRepository"
+                        placeholder="my-repo" />
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline" class="form-field-third">
+                      <mat-label>Branch / Tag</mat-label>
+                      <input
+                        matInput
+                        formControlName="scmReference"
+                        placeholder="master" />
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline" class="form-field-third">
+                      <mat-label>File Path</mat-label>
+                      <input
+                        matInput
+                        formControlName="storagePath"
+                        placeholder="scripts/my-tool.js" />
+                    </mat-form-field>
+                  </div>
+
+                  <div
+                    class="scm-actions"
+                    *ngIf="customToolForm.get('storageServiceId')?.value">
+                    <button
+                      mat-flat-button
+                      color="primary"
+                      type="button"
+                      (click)="viewLatestScmContent()">
+                      View Latest
+                    </button>
+                  </div>
+                </mat-expansion-panel>
+              </div>
+
               <!-- Function editor -->
               <div
                 class="editor-section"
@@ -1329,7 +1394,8 @@
                       <code>{{ tool.httpMethod }}</code> {{ tool.url }}
                     </ng-container>
                     <ng-container *ngIf="tool.toolType === 'function'">
-                      <em>Function</em>
+                      <em *ngIf="!tool.storageServiceId">Function</em>
+                      <em *ngIf="tool.storageServiceId">SCM: {{ tool.scmRepository }}/{{ tool.storagePath }}</em>
                     </ng-container>
                   </td>
                   <td>{{ tool.description }}</td>
