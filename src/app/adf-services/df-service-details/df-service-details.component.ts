@@ -1840,13 +1840,13 @@ export class DfServiceDetailsComponent implements OnInit {
         // Handle nested error structures from HTTP responses
         if (typeof error.error === 'string') {
           errorMessage = error.error;
-        } else if (error.error.error) {
+        } else if (error.error?.error) {
           if (typeof error.error.error === 'string') {
             errorMessage = error.error.error;
-          } else if (error.error.error.message) {
+          } else if (error.error.error?.message) {
             errorMessage = error.error.error.message;
           }
-        } else if (error.error.message) {
+        } else if (error.error?.message) {
           errorMessage = error.error.message;
         }
       } else if (error?.message) {
