@@ -23,14 +23,16 @@ import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatInputModule } from '@angular/material/input';
 import { Observable, map, startWith } from 'rxjs';
 import { groupEvents } from 'src/app/shared/utilities/eventScripts';
-import { EVENT_SCRIPT_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
+import {
+  EVENTS_SERVICE_TOKEN,
+  EVENT_SCRIPT_SERVICE_TOKEN,
+} from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
-import { Service } from 'src/app/shared/types/service';
+import { ScriptEventResponse } from 'src/app/shared/types/scripts';
 import { CommonModule } from '@angular/common';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 import { DfLinkServiceComponent } from 'src/app/shared/components/df-link-service/df-link-service.component';
 import { camelToSnakeString } from 'src/app/shared/utilities/case';
-import { ConstantPool } from '@angular/compiler';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -62,7 +64,7 @@ export class DfScriptDetailsComponent implements OnInit {
   type: 'create' | 'edit' = 'create';
   scriptEvents: Array<ScriptEvent>;
   scriptEventsOptions: Observable<Array<ScriptEvent>>;
-  unGroupedEvents: ScriptEvent;
+  unGroupedEvents: ScriptEventResponse;
   ungroupedEventItems: string[];
   ungroupedEventOptions: ScriptEvent;
   ungroupedRouteOptions: string[];
@@ -82,6 +84,8 @@ export class DfScriptDetailsComponent implements OnInit {
     private router: Router,
     @Inject(EVENT_SCRIPT_SERVICE_TOKEN)
     private eventScriptService: DfBaseCrudService,
+    @Inject(EVENTS_SERVICE_TOKEN)
+    private eventsService: DfBaseCrudService,
     private themeService: DfThemeService
   ) {
     this.storeServiceArray = [];
@@ -98,7 +102,6 @@ export class DfScriptDetailsComponent implements OnInit {
   }
   isDarkMode = this.themeService.darkMode$;
 
-  storageServices: Service;
   ngOnInit(): void {
     this.activatedRoute.data.subscribe(({ data, type }) => {
       this.type = type;
@@ -114,10 +117,9 @@ export class DfScriptDetailsComponent implements OnInit {
         this.scriptForm.controls['name'].disable();
         this.completeScriptName = data.name;
       } else {
-        this.scriptEvents = groupEvents(data);
-        this.unGroupedEvents = data;
-        this.storageServices = data;
-        this.storeServiceArray = Object.keys(this.storageServices) as string[];
+        this.scriptEvents = [];
+        this.unGroupedEvents = {};
+        this.storeServiceArray = (data?.resource ?? []) as string[];
       }
     });
     this.scriptEventsOptions = this.scriptForm.controls[
@@ -185,15 +187,36 @@ export class DfScriptDetailsComponent implements OnInit {
     this.ungroupedEventItems = [];
     this.ungroupedRouteOptions = [];
     this.selectedRouteItem = '';
-    let serviceType: string = this.selectedServiceItem;
-    if (serviceType === 'api_docs') {
-      serviceType = 'apiDocs';
-    }
-    this.ungroupedEventOptions = this.unGroupedEvents[serviceType];
-    this.ungroupedEventItems = this.ungroupedEventItems || [];
-    Object.keys(this.ungroupedEventOptions).forEach(key => {
-      this.ungroupedEventItems.push(key);
-    });
+    this.selectedEventItem = '';
+    this.tableOptions = undefined as unknown as string[];
+    this.completeScriptName = '';
+
+    const serviceName = this.selectedServiceItem;
+    if (!serviceName) return;
+
+    this.eventsService
+      .getAll<ScriptEventResponse>({
+        additionalParams: [
+          { key: 'service', value: serviceName },
+          { key: 'scriptable', value: true },
+        ],
+        limit: 0,
+        includeCount: false,
+      })
+      .subscribe(response => {
+        this.unGroupedEvents = response;
+        this.scriptEvents = groupEvents(response);
+        let serviceKey: string = serviceName;
+        if (serviceKey === 'api_docs') {
+          serviceKey = 'apiDocs';
+        }
+        this.ungroupedEventOptions = response[serviceKey] as ScriptEvent;
+        if (this.ungroupedEventOptions) {
+          Object.keys(this.ungroupedEventOptions).forEach(key => {
+            this.ungroupedEventItems.push(key);
+          });
+        }
+      });
   }
 
   selectedEventItemEvent() {
