@@ -13,21 +13,27 @@ export class DfLoadingSpinnerService {
   }
 
   set active(value: boolean) {
+    // Decide on the transition from the counter itself, not from active$.value.
+    // Rapid toggles schedule emits via queueMicrotask; during that window
+    // active$.value is stale, so comparing against it loses decrements when
+    // several requests start and finish inside one tick (spinner stuck on).
+    const wasActive = this.activeCounter > 0;
     if (value) {
       this.activeCounter++;
     } else {
       this.activeCounter = Math.max(this.activeCounter - 1, 0);
     }
+    const isActive = this.activeCounter > 0;
 
-    const shouldBeActive = this.activeCounter > 0;
-
-    // Only defer if the value is actually changing to avoid unnecessary timeouts
-    // This prevents ExpressionChangedAfterItHasBeenCheckedError by ensuring
-    // the value change happens after the current change detection cycle completes
-    if (this.active$.value !== shouldBeActive) {
-      setTimeout(() => {
-        this.active$.next(shouldBeActive);
-      }, 0);
+    if (wasActive !== isActive) {
+      // queueMicrotask runs after the current change-detection pass (so no
+      // ExpressionChangedAfterItHasBeenCheckedError) but before the next
+      // macrotask, which keeps emit ordering consistent with request ordering.
+      queueMicrotask(() => {
+        if (this.active$.value !== isActive) {
+          this.active$.next(isActive);
+        }
+      });
     }
   }
 }
