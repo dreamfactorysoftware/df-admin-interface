@@ -1,0 +1,78 @@
+name: E2E (Playwright)
+
+on:
+  push:
+    branches: ['develop']
+  pull_request:
+    branches: ['develop']
+  schedule:
+    # Nightly canary against crucible so drift is caught before a customer does.
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: 'Base URL to run E2E against'
+        required: false
+        default: ''
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Install Playwright Browsers
+        run: npx playwright install chromium --with-deps
+
+      # For PRs and pushes we spin up a minimal DreamFactory stack so the
+      # smoke specs run against a real API. The stack is provided by the
+      # df-docker-dev sibling repo checked out into the runner.
+      - name: Check out df-docker-dev
+        if: github.event_name == 'push' || github.event_name == 'pull_request'
+        uses: actions/checkout@v4
+        with:
+          repository: dreamfactorysoftware/df-docker-dev
+          path: df-docker-dev
+          fetch-depth: 1
+
+      - name: Start DreamFactory stack
+        if: github.event_name == 'push' || github.event_name == 'pull_request'
+        working-directory: df-docker-dev
+        run: |
+          docker compose up -d web mysql redis
+          # wait for /system/environment to come back 200
+          timeout 120 bash -c 'until curl -fsS http://localhost:8080/api/v2/system/environment > /dev/null; do sleep 2; done'
+
+      - name: Resolve target URL
+        id: target
+        run: |
+          if [ -n "${{ github.event.inputs.target_url }}" ]; then
+            echo "url=${{ github.event.inputs.target_url }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "url=${{ secrets.E2E_NIGHTLY_URL }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "url=http://localhost:8080" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run Playwright tests
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ steps.target.outputs.url }}
+          DF_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL || 'admin@dreamfactory.com' }}
+          DF_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD || 'passwordpassword' }}
+        run: npm run e2e
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
