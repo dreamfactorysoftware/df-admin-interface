@@ -149,9 +149,19 @@
 <ng-template #navList let-items>
   <ng-container *ngFor="let item of items">
     <div mat-list-item *ngIf="!item.subRoutes; else subRoutes">
-      <button
+      <!--
+        Leaf nav items are <a routerLink> instead of <button (click)>.
+        This gives us proper browser affordances (middle-click / ctrl-click
+        to open in a new tab, URL preview on hover, copy link address,
+        screen reader "link" semantics) and a stable data-testid hook for
+        automation. handleNavClick() still fires on click to clear any
+        route-error banner; router navigation goes through [routerLink].
+      -->
+      <a
         mat-flat-button
         class="nav-item"
+        [routerLink]="item.path"
+        [attr.data-testid]="navTestId(item.path)"
         [class.active]="isActive(item)"
         [class.commercial-feature]="isFeatureLocked(item.path, licenseType)"
         [class.ai-nav-item]="item.path === '/ai'"
@@ -162,14 +172,16 @@
           </ng-container>
           {{ navLabel(item.path) | transloco }}
         </span>
-      </button>
+      </a>
     </div>
     <ng-template #subRoutes>
       <mat-expansion-panel
         class="expansion-panel"
         [class.mat-elevation-z0]="true"
         [expanded]="isActive(item)">
-        <mat-expansion-panel-header class="parent-route">
+        <mat-expansion-panel-header
+          class="parent-route"
+          [attr.data-testid]="navGroupTestId(item.path)">
           <span class="nav-item">
             <ng-container *ngIf="item?.icon">
               <img [src]="item.icon" [alt]="item.path" /> </ng-container
