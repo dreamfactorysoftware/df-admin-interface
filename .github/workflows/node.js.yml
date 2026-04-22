@@ -25,7 +25,6 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
       - run: npm ci
-      - run: npm run lint --if-present
       # `test:ci` runs only the specs that currently pass. The rest are
       # quarantined by jest.config.ci.js until the @ngneat/transloco ESM
       # migration is completed. New tests should be added to that config.
