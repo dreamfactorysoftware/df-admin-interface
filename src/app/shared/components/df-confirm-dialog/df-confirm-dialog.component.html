@@ -1,13 +1,18 @@
 <h1 mat-dialog-title>{{ data.title | transloco }}</h1>
 <div mat-dialog-content>{{ data.message | transloco }}</div>
 <div mat-dialog-actions>
-  <button mat-flat-button mat-dialog-close type="button">
+  <button
+    mat-flat-button
+    mat-dialog-close
+    data-testid="confirm-dialog-cancel"
+    type="button">
     {{ 'no' | transloco }}
   </button>
   <button
     mat-flat-button
     (click)="onClose()"
     cdkFocusInitial
+    data-testid="confirm-dialog-confirm"
     type="button"
     color="primary">
     {{ 'yes' | transloco }}

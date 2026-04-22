@@ -201,8 +201,31 @@ export class DfSideNavComponent implements OnInit {
   }
 
   handleNavClick(nav: Nav) {
+    // Leaf nav items now route via [routerLink] on <a>; this handler only
+    // clears any route-level error banner so the new page starts clean.
+    // Kept as a (click) handler rather than a router-event subscription
+    // because we want to wipe the error *before* the navigation renders.
     this.errorService.error = null;
-    this.router.navigate([nav.path]);
+    // Still useful for programmatic callers (keyboard shortcuts / search)
+    // that don't trigger the anchor. No-op when the anchor has already
+    // navigated to the same URL.
+    if (this.router.url !== nav.path) {
+      this.router.navigate([nav.path]);
+    }
+  }
+
+  /** Stable data-testid for a leaf nav item. */
+  navTestId(path: string): string {
+    return `nav-${this.normalizePath(path)}`;
+  }
+
+  /** Stable data-testid for a nav category (expansion panel header). */
+  navGroupTestId(path: string): string {
+    return `nav-group-${this.normalizePath(path)}`;
+  }
+
+  private normalizePath(path: string): string {
+    return path.replace(/^\/+/, '').replace(/\//g, '-') || 'root';
   }
 
   handleSearchClick() {

@@ -13,6 +13,9 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
   testDir: './e2e',
+  // Files prefixed with `_` are exploratory / discovery runs — not gated
+  // on CI. Run them explicitly with `npx playwright test e2e/_findings.spec.ts`.
+  testIgnore: ['**/_*.spec.ts'],
   fullyParallel: false, // DF sessions are stateful; run serial to avoid flakes
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [['html'], ['github']] : 'list',

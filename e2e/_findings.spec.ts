@@ -1,109 +1,58 @@
 /**
- * Discovery run. Not a regression gate — this spec is designed to FAIL
- * loudly on anything that isn't working so we get a concrete bug list.
- * Do not add to jest.config.ci or the nightly Playwright workflow.
+ * Discovery run. Not a regression gate — this spec is designed to walk
+ * the most common journeys and report what breaks along the way. Each
+ * journey reports to the shared `findings` list; the summary prints at
+ * the end of the run.
  *
- * Strategy: simulate a new admin working through the most common journeys
- * on a vanilla dev-docker instance. Each step records what it saw; the
- * final console report lists every deviation from expected.
+ * Now uses the NavPage page-object which depends on data-testid
+ * attributes added to df-side-nav.component.html in this branch.
  */
 import { test, expect, Page } from '@playwright/test';
 import { loginAsAdmin, waitForAppReady } from './fixtures/admin-login';
+import { NavPage } from './fixtures/nav';
 
-type Finding = {
-  journey: string;
-  step: string;
-  detail: string;
-};
+type Finding = { journey: string; step: string; detail: string };
 const findings: Finding[] = [];
 function report(journey: string, step: string, detail: string) {
   findings.push({ journey, step, detail });
   console.log(`  [${journey}] ${step}: ${detail}`);
 }
 
-async function clickNavByText(
-  page: Page,
-  label: string,
-  journey: string
-): Promise<boolean> {
-  // Sidebar entries are <div mat-list-item> wrappers with a <button
-  // .nav-item> and a <span .nav-item> inside. The router navigation is
-  // bound to the mat-list-item, not the inner button — clicking only the
-  // button appears to trigger but doesn't actually route. Click the
-  // mat-list-item containing the target text.
-  const el = page
-    .locator(`[mat-list-item]:has(button.nav-item:has-text("${label}"))`)
-    .first();
-  const count = await el.count();
-  if (count === 0) {
-    report(journey, 'nav-select', `no mat-list-item matched "${label}"`);
-    return false;
-  }
-  try {
-    await el.scrollIntoViewIfNeeded({ timeout: 2_000 });
-  } catch (e: any) {
-    report(journey, 'nav-scroll', e.message.split('\n')[0]);
-  }
-  try {
-    await el.click({ timeout: 5_000, force: true });
-    return true;
-  } catch (e: any) {
-    report(journey, 'nav-click', e.message.split('\n')[0]);
-    return false;
-  }
-}
-
 async function setupPage(page: Page) {
   await page.setViewportSize({ width: 1600, height: 900 });
   await loginAsAdmin(page);
   await waitForAppReady(page);
-  // Wait for the sidebar nav to populate. Home button is always present;
-  // if it never appears, the login flow didn't resolve.
-  await page
-    .locator('button.nav-item:has-text("Home")')
-    .first()
-    .waitFor({ timeout: 10_000 })
-    .catch(() => {});
 }
 
 test.describe.configure({ timeout: 240_000 });
 
 test('journey: event-scripts create', async ({ page }) => {
   const J = 'event-scripts';
-  const nav4xx: number[] = [];
-  page.on('response', r => {
-    if (r.url().includes('/api/') && r.status() >= 400) nav4xx.push(r.status());
-  });
   page.on('pageerror', e => report(J, 'jsError', e.message));
+
   await setupPage(page);
-
-  // 1. Navigate
-  const clicked = await clickNavByText(page, 'Event Scripts', J);
-  if (!clicked) {
-    report(J, 'nav', 'Event Scripts nav entry not clickable from fresh login');
+  const nav = new NavPage(page);
+  try {
+    await nav.goto('/api-connections/event-scripts');
+  } catch (e: any) {
+    report(J, 'nav', `nav.goto failed: ${e.message.split('\n')[0]}`);
     return;
   }
-  await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => {});
-  const url = page.url();
-  if (!/event-scripts/.test(url)) {
-    report(J, 'nav', `expected /event-scripts, landed at ${url}`);
-    return;
-  }
+  report(J, 'nav', `ok → ${page.url()}`);
 
-  // 2. Click +
-  const addBtn = page.locator('button.save-btn').first();
+  // + button
+  const addBtn = page.getByTestId('manage-table-create');
   if (!(await addBtn.isVisible().catch(() => false))) {
-    report(J, '+ button', '.save-btn not visible on /event-scripts list');
+    report(J, '+ button', 'not visible on list');
     return;
   }
-  await addBtn.click().catch(e => report(J, '+ click', e.message));
-
+  await addBtn.click();
   await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => {});
 
-  // 3. Create form — Service dropdown
+  // Service dropdown
   const svcSel = page.locator('mat-select').first();
   if (!(await svcSel.isVisible().catch(() => false))) {
-    report(J, 'form', 'no mat-select visible on create form');
+    report(J, 'form', 'no mat-select on create form');
     return;
   }
   await svcSel.click();
@@ -112,79 +61,96 @@ test('journey: event-scripts create', async ({ page }) => {
     report(J, 'service dropdown', 'zero options');
     return;
   }
-  report(J, 'service dropdown', `${svcOptions.length} options: ${svcOptions.slice(0, 5).join(', ')}…`);
-  await page.locator('mat-option').filter({ hasText: /^db$/ }).first().click().catch(() => {});
+  report(J, 'service dropdown', `${svcOptions.length} options`);
+  await page
+    .locator('mat-option')
+    .filter({ hasText: /^db$/ })
+    .first()
+    .click()
+    .catch(() => {});
   await page.waitForTimeout(500);
 
-  // 4. Script Type
+  // Script Type
   const typeSel = page.locator('mat-select').nth(1);
   await typeSel.click().catch(() => {});
   const typeOptions = await page.locator('mat-option').allTextContents();
   if (typeOptions.length === 0) {
-    report(J, 'script type dropdown', 'zero options after picking service=db');
+    report(J, 'script type', 'zero options after picking db');
     return;
   }
-  report(J, 'script type dropdown', `${typeOptions.length} options, first: ${typeOptions[0]}`);
+  report(J, 'script type', `${typeOptions.length} options, first: ${typeOptions[0]}`);
   await page.locator('mat-option').first().click();
   await page.waitForTimeout(300);
 
-  // 5. Script Method
+  // Script Method
   const methodSel = page.locator('mat-select').nth(2);
   await methodSel.click().catch(() => {});
   const methodOptions = await page.locator('mat-option').allTextContents();
   if (methodOptions.length === 0) {
-    report(J, 'script method dropdown', 'zero options after picking type');
+    report(J, 'script method', 'zero options after picking type');
     return;
   }
-  report(J, 'script method dropdown', `${methodOptions.length} options, first: ${methodOptions[0]}`);
+  report(
+    J,
+    'script method',
+    `${methodOptions.length} options, first: ${methodOptions[0]}`
+  );
   await page.locator('mat-option').first().click();
   await page.waitForTimeout(300);
 
-  // 6. Save
+  // Save
   const saveBtn = page.locator('button[type="submit"]').first();
   if (!(await saveBtn.isVisible().catch(() => false))) {
-    report(J, 'save button', 'not visible');
+    report(J, 'save', 'no submit button');
     return;
   }
   const [saveResp] = await Promise.all([
-    page.waitForResponse(r => r.url().includes('/api/v2/system/event_script') && r.request().method() === 'POST', { timeout: 10_000 }).catch(() => null),
+    page
+      .waitForResponse(
+        r =>
+          r.url().includes('/api/v2/system/event_script') &&
+          r.request().method() === 'POST',
+        { timeout: 10_000 }
+      )
+      .catch(() => null),
     saveBtn.click().catch(() => {}),
   ]);
   if (!saveResp) {
-    report(J, 'save', 'no POST /system/event_script fired — form submit did nothing');
+    report(J, 'save', 'no POST /system/event_script fired');
   } else if (!saveResp.ok()) {
-    report(J, 'save', `HTTP ${saveResp.status()} ${saveResp.statusText()}: ${(await saveResp.text()).slice(0, 200)}`);
+    const body = await saveResp.text();
+    report(J, 'save', `HTTP ${saveResp.status()}: ${body.slice(0, 180)}`);
   } else {
     report(J, 'save', `OK ${saveResp.status()}`);
   }
-
-  if (nav4xx.length) report(J, '4xx/5xx', `statuses: ${nav4xx.join(',')}`);
 });
 
-test('journey: api-connections > database', async ({ page }) => {
+test('journey: api-connections > database list + create form', async ({ page }) => {
   const J = 'api-db';
   page.on('pageerror', e => report(J, 'jsError', e.message));
+
   await setupPage(page);
-
-  if (!(await clickNavByText(page, 'Database', J))) {
+  const nav = new NavPage(page);
+  try {
+    await nav.goto('/api-connections/api-types/database');
+  } catch (e: any) {
+    report(J, 'nav', `nav.goto failed: ${e.message.split('\n')[0]}`);
     return;
   }
-  await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => {});
-  report(J, 'nav', `landed at ${page.url()}`);
+  report(J, 'nav', `ok → ${page.url()}`);
 
-  // Look for + button
-  if (!(await page.locator('button.save-btn').first().isVisible().catch(() => false))) {
-    report(J, '+ button', 'no .save-btn on Database list view');
+  const addBtn = page.getByTestId('manage-table-create');
+  if (!(await addBtn.isVisible().catch(() => false))) {
+    report(J, '+ button', 'not visible on list');
     return;
   }
-  await page.locator('button.save-btn').first().click();
+  await addBtn.click();
   await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => {});
-  report(J, 'create form', `URL after +: ${page.url()}`);
+  report(J, 'create form', `URL: ${page.url()}`);
 
-  // Is there a service type picker?
   const typeSel = page.locator('mat-select').first();
   if (!(await typeSel.isVisible().catch(() => false))) {
-    report(J, 'type picker', 'no mat-select on create form');
+    report(J, 'type picker', 'no mat-select');
     return;
   }
   await typeSel.click();
@@ -192,78 +158,85 @@ test('journey: api-connections > database', async ({ page }) => {
   report(J, 'type picker', `${types} service-type options`);
 });
 
-test('journey: roles list', async ({ page }) => {
+test('journey: roles list + create form', async ({ page }) => {
   const J = 'roles';
   page.on('pageerror', e => report(J, 'jsError', e.message));
+
   await setupPage(page);
-
-  const ok = await clickNavByText(page, 'Role Based Access', J);
-  if (!ok) {
-    report(J, 'nav', 'Role Based Access nav entry not clickable');
+  const nav = new NavPage(page);
+  try {
+    await nav.goto('/api-connections/role-based-access');
+  } catch (e: any) {
+    report(J, 'nav', `nav.goto failed: ${e.message.split('\n')[0]}`);
     return;
   }
-  await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => {});
-  report(J, 'nav', `landed at ${page.url()}`);
+  report(J, 'nav', `ok → ${page.url()}`);
 
-  // List view
   const rows = await page.locator('mat-row, tr.mat-mdc-row').count();
-  report(J, 'list', `${rows} role rows rendered`);
+  report(J, 'list', `${rows} role rows`);
 
-  if (!(await page.locator('button.save-btn').first().isVisible().catch(() => false))) {
-    report(J, '+ button', 'no .save-btn on roles list');
+  const addBtn = page.getByTestId('manage-table-create');
+  if (!(await addBtn.isVisible().catch(() => false))) {
+    report(J, '+ button', 'not visible on list');
     return;
   }
-  await page.locator('button.save-btn').first().click();
+  await addBtn.click();
   await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => {});
   report(J, 'create form', `URL: ${page.url()}`);
 
   const inputs = await page.locator('input[type="text"], mat-select').count();
-  report(J, 'create form', `${inputs} inputs/selects on form`);
+  report(J, 'create form inputs', `${inputs} inputs/selects`);
 });
 
-test('journey: admin users list', async ({ page }) => {
+test('journey: admin users list + create form', async ({ page }) => {
   const J = 'admins';
   page.on('pageerror', e => report(J, 'jsError', e.message));
-  await setupPage(page);
 
-  if (!(await clickNavByText(page, 'Admins', J))) {
+  await setupPage(page);
+  const nav = new NavPage(page);
+  try {
+    await nav.goto('/admin-settings/admins');
+  } catch (e: any) {
+    report(J, 'nav', `nav.goto failed: ${e.message.split('\n')[0]}`);
     return;
   }
-  await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => {});
-  report(J, 'nav', `landed at ${page.url()}`);
+  report(J, 'nav', `ok → ${page.url()}`);
 
   const rows = await page.locator('mat-row, tr.mat-mdc-row').count();
-  report(J, 'list', `${rows} admin rows rendered`);
+  report(J, 'list', `${rows} admin rows`);
 
-  if (!(await page.locator('button.save-btn').first().isVisible().catch(() => false))) {
-    report(J, '+ button', 'no .save-btn on admins list');
+  const addBtn = page.getByTestId('manage-table-create');
+  if (!(await addBtn.isVisible().catch(() => false))) {
+    report(J, '+ button', 'not visible on list');
     return;
   }
-  await page.locator('button.save-btn').first().click();
+  await addBtn.click();
   await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => {});
   report(J, 'create form', `URL: ${page.url()}`);
 });
 
-test('journey: mcp create service', async ({ page }) => {
-  const J = 'mcp';
+test('journey: api-keys list + create form', async ({ page }) => {
+  const J = 'api-keys';
   page.on('pageerror', e => report(J, 'jsError', e.message));
+
   await setupPage(page);
-
-  if (!(await clickNavByText(page, 'Utility', J))) {
+  const nav = new NavPage(page);
+  try {
+    await nav.goto('/api-connections/api-keys');
+  } catch (e: any) {
+    report(J, 'nav', `nav.goto failed: ${e.message.split('\n')[0]}`);
     return;
   }
-  await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => {});
-  report(J, 'nav', `landed at ${page.url()}`);
+  report(J, 'nav', `ok → ${page.url()}`);
 
-  // Look for sub-nav MCP link
-  const mcpLink = page.locator('a:has-text("MCP"), button:has-text("MCP")').first();
-  if (!(await mcpLink.isVisible().catch(() => false))) {
-    report(J, 'mcp link', 'no MCP sub-nav under Utility');
+  const addBtn = page.getByTestId('manage-table-create');
+  if (!(await addBtn.isVisible().catch(() => false))) {
+    report(J, '+ button', 'not visible on list');
     return;
   }
-  await mcpLink.click().catch(() => {});
+  await addBtn.click();
   await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => {});
-  report(J, 'mcp page', `URL: ${page.url()}`);
+  report(J, 'create form', `URL: ${page.url()}`);
 });
 
 test.afterAll(() => {
@@ -278,7 +251,9 @@ test.afterAll(() => {
     }
     for (const [j, list] of byJ) {
       console.log(`\n== ${j} ==`);
-      for (const f of list) console.log(`  • ${f.step.padEnd(22)} ${f.detail}`);
+      for (const f of list) {
+        console.log(`  • ${f.step.padEnd(24)} ${f.detail}`);
+      }
     }
   }
   console.log('\n=== END FINDINGS ===\n');
