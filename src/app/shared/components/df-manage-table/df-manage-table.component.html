@@ -3,6 +3,7 @@
     *ngIf="allowCreate"
     mat-mini-fab
     class="save-btn"
+    data-testid="manage-table-create"
     [attr.aria-label]="'newEntry' | transloco"
     (click)="createRow()"
     type="button">
@@ -12,6 +13,7 @@
     *ngIf="schema"
     mat-mini-fab
     color="alternate"
+    data-testid="manage-table-refresh-schema"
     [attr.aria-label]="'importList' | transloco"
     (click)="refreshSchema()"
     type="button">
@@ -30,7 +32,7 @@
 </div>
 <ng-container
   *ngIf="{
-    currentPageSize: currentPageSize$ | async
+    currentPageSize: currentPageSize$ | async,
   } as data">
   <div
     class="table-container"

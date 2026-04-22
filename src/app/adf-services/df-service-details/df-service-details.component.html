@@ -237,7 +237,7 @@
                             'multi_picklist',
                             'boolean',
                             'file_certificate',
-                            'file_certificate_api'
+                            'file_certificate_api',
                           ].includes(item.type)
                         "
                         [schema]="item"
@@ -278,7 +278,7 @@
                         'multi_picklist',
                         'boolean',
                         'file_certificate',
-                        'file_certificate_api'
+                        'file_certificate_api',
                       ].includes(item.type)
                     "
                     [schema]="item"
@@ -336,7 +336,7 @@
                                 'multi_picklist',
                                 'boolean',
                                 'file_certificate',
-                                'file_certificate_api'
+                                'file_certificate_api',
                               ].includes(item.type)
                             "
                             [schema]="item"
@@ -591,7 +591,7 @@
                   'multi_picklist',
                   'boolean',
                   'file_certificate',
-                  'file_certificate_api'
+                  'file_certificate_api',
                 ].includes(item.type)
               "
               color="primary"
@@ -674,7 +674,7 @@
                         'multi_picklist',
                         'boolean',
                         'file_certificate',
-                        'file_certificate_api'
+                        'file_certificate_api',
                       ].includes(item.type)
                     "
                     color="primary"
@@ -757,7 +757,7 @@
                           'multi_picklist',
                           'boolean',
                           'file_certificate',
-                          'file_certificate_api'
+                          'file_certificate_api',
                         ].includes(item.type)
                       "
                       color="primary"
@@ -848,7 +848,7 @@
                           'multi_picklist',
                           'boolean',
                           'file_certificate',
-                          'file_certificate_api'
+                          'file_certificate_api',
                         ].includes(item.type)
                       "
                       color="primary"
@@ -1070,7 +1070,27 @@
                   matInput
                   formControlName="url"
                   placeholder="https://api.example.com/endpoint/{id}" />
-                <mat-hint>Use &#123;param&#125; for path parameters</mat-hint>
+                <button
+                  mat-icon-button
+                  matSuffix
+                  type="button"
+                  [matMenuTriggerFor]="urlLookupMenu"
+                  [disabled]="availableLookups.length === 0"
+                  matTooltip="Insert Lookup">
+                  <fa-icon [icon]="faPlus"></fa-icon>
+                </button>
+                <mat-menu #urlLookupMenu="matMenu">
+                  <button
+                    mat-menu-item
+                    *ngFor="let lookup of availableLookups"
+                    (click)="insertLookup(lookup.name, 'url')">
+                    {{ lookup.name }}
+                  </button>
+                </mat-menu>
+                <mat-hint
+                  >Use &#123;LOOKUP_NAME&#125; for secrets or &#123;param&#125;
+                  for path parameters</mat-hint
+                >
               </mat-form-field>
 
               <mat-form-field appearance="outline" class="full-width">
@@ -1182,22 +1202,108 @@
                 </p>
               </div>
 
+              <!-- Link to SCM Service (function tools only) -->
+              <div
+                class="scm-link-section"
+                *ngIf="customToolForm.get('toolType')?.value === 'function' && availableScmServices.length > 0"
+                [formGroup]="customToolForm">
+                <mat-expansion-panel [expanded]="!!customToolForm.get('storageServiceId')?.value">
+                  <mat-expansion-panel-header>
+                    <mat-panel-title>Link to Repository</mat-panel-title>
+                  </mat-expansion-panel-header>
+
+                  <div class="form-row">
+                    <mat-form-field appearance="outline" class="form-field-half">
+                      <mat-label>SCM Service</mat-label>
+                      <mat-select formControlName="storageServiceId">
+                        <mat-option [value]="null">None</mat-option>
+                        <mat-option
+                          *ngFor="let svc of availableScmServices"
+                          [value]="svc.id">
+                          {{ svc.label || svc.name }}
+                        </mat-option>
+                      </mat-select>
+                      <mat-hint>Select a GitHub, GitLab, or Bitbucket service</mat-hint>
+                    </mat-form-field>
+                  </div>
+
+                  <div class="form-row" *ngIf="customToolForm.get('storageServiceId')?.value">
+                    <mat-form-field appearance="outline" class="form-field-third">
+                      <mat-label>Repository</mat-label>
+                      <input
+                        matInput
+                        formControlName="scmRepository"
+                        placeholder="my-repo" />
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline" class="form-field-third">
+                      <mat-label>Branch / Tag</mat-label>
+                      <input
+                        matInput
+                        formControlName="scmReference"
+                        placeholder="master" />
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline" class="form-field-third">
+                      <mat-label>File Path</mat-label>
+                      <input
+                        matInput
+                        formControlName="storagePath"
+                        placeholder="scripts/my-tool.js" />
+                    </mat-form-field>
+                  </div>
+
+                  <div
+                    class="scm-actions"
+                    *ngIf="customToolForm.get('storageServiceId')?.value">
+                    <button
+                      mat-flat-button
+                      color="primary"
+                      type="button"
+                      (click)="viewLatestScmContent()">
+                      View Latest
+                    </button>
+                  </div>
+                </mat-expansion-panel>
+              </div>
+
               <!-- Function editor -->
               <div
                 class="editor-section"
                 *ngIf="customToolForm.get('toolType')?.value === 'function'">
-                <label class="editor-label"
-                  >Function (JavaScript function body)</label
-                >
+                <div class="editor-label-row">
+                  <label class="editor-label"
+                    >Function (JavaScript function body)</label
+                  >
+                  <button
+                    mat-stroked-button
+                    type="button"
+                    [matMenuTriggerFor]="fnLookupMenu"
+                    [disabled]="availableLookups.length === 0">
+                    <fa-icon [icon]="faPlus" class="btn-icon"></fa-icon>
+                    Insert Lookup
+                  </button>
+                  <mat-menu #fnLookupMenu="matMenu">
+                    <button
+                      mat-menu-item
+                      *ngFor="let lookup of availableLookups"
+                      (click)="insertLookup(lookup.name, 'function')">
+                      {{ lookup.name }}
+                    </button>
+                  </mat-menu>
+                </div>
                 <div class="editor-wrapper">
                   <df-ace-editor
+                    #functionEditor
                     formControlName="function"
-                    [mode]="functionEditorMode">
+                    [mode]="functionEditorMode"
+                    (valueChange)="onFunctionChange($event)">
                   </df-ace-editor>
                 </div>
                 <span class="editor-hint">
                   Write a JavaScript function body. Parameters are available as
-                  variables by name.
+                  variables by name. Use <code>secrets.LOOKUP_NAME</code> to
+                  reference lookup values.
                 </span>
               </div>
 
@@ -1205,11 +1311,31 @@
               <div
                 class="editor-section"
                 *ngIf="customToolForm.get('toolType')?.value === 'api'">
-                <label class="editor-label">Static Headers (JSON)</label>
+                <div class="editor-label-row">
+                  <label class="editor-label">Static Headers (JSON)</label>
+                  <button
+                    mat-stroked-button
+                    type="button"
+                    [matMenuTriggerFor]="hdrLookupMenu"
+                    [disabled]="availableLookups.length === 0">
+                    <fa-icon [icon]="faPlus" class="btn-icon"></fa-icon>
+                    Insert Lookup
+                  </button>
+                  <mat-menu #hdrLookupMenu="matMenu">
+                    <button
+                      mat-menu-item
+                      *ngFor="let lookup of availableLookups"
+                      (click)="insertLookup(lookup.name, 'headers')">
+                      {{ lookup.name }}
+                    </button>
+                  </mat-menu>
+                </div>
                 <div class="editor-wrapper editor-wrapper--compact">
                   <df-ace-editor
+                    #headersEditor
                     formControlName="headers"
-                    [mode]="headersEditorMode">
+                    [mode]="headersEditorMode"
+                    (valueChange)="onHeadersChange($event)">
                   </df-ace-editor>
                 </div>
               </div>
@@ -1268,7 +1394,8 @@
                       <code>{{ tool.httpMethod }}</code> {{ tool.url }}
                     </ng-container>
                     <ng-container *ngIf="tool.toolType === 'function'">
-                      <em>Function</em>
+                      <em *ngIf="!tool.storageServiceId">Function</em>
+                      <em *ngIf="tool.storageServiceId">SCM: {{ tool.scmRepository }}/{{ tool.storagePath }}</em>
                     </ng-container>
                   </td>
                   <td>{{ tool.description }}</td>
@@ -1354,3 +1481,34 @@
   *ngIf="subscriptionRequired"
   [serviceName]="selectedServiceTypeLable || 'Unable to fetch service name'">
 </df-paywall>
+
+<ng-template #unsavedToolDialog>
+  <h1 mat-dialog-title>Unsaved custom tool</h1>
+  <div mat-dialog-content>
+    You have unsaved changes in the custom tool editor. Saving the service now
+    will discard those changes unless you add/update the tool first.
+  </div>
+  <div mat-dialog-actions align="end">
+    <button
+      mat-flat-button
+      type="button"
+      (click)="closeUnsavedToolDialog('cancel')">
+      Keep editing
+    </button>
+    <button
+      mat-flat-button
+      color="warn"
+      type="button"
+      (click)="closeUnsavedToolDialog('discard')">
+      Discard tool changes
+    </button>
+    <button
+      mat-flat-button
+      color="primary"
+      cdkFocusInitial
+      type="button"
+      (click)="closeUnsavedToolDialog('save')">
+      Add/Update tool, then save
+    </button>
+  </div>
+</ng-template>

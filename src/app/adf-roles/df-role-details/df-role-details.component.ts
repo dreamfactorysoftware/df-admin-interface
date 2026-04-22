@@ -20,6 +20,7 @@ import { ROLE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { DfLookupKeysComponent } from 'src/app/shared/components/df-lookup-keys/df-lookup-keys.component';
+import { noWhitespaceValidator } from 'src/app/shared/validators/no-whitespace.validator';
 import { MatInputModule } from '@angular/material/input';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatButtonModule } from '@angular/material/button';
@@ -152,7 +153,10 @@ export class DfRoleDetailsComponent implements OnInit {
             (this.roleForm.controls['lookupKeys'] as FormArray).push(
               new FormGroup({
                 id: new FormControl(item.id),
-                name: new FormControl(item.name, [Validators.required]),
+                name: new FormControl(item.name, [
+                  Validators.required,
+                  noWhitespaceValidator,
+                ]),
                 value: new FormControl(item.value),
                 private: new FormControl(item.private),
               })

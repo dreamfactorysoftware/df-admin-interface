@@ -5,6 +5,7 @@ import {
   Inject,
   Input,
   OnInit,
+  TemplateRef,
   ViewChild,
 } from '@angular/core';
 import {
@@ -72,7 +73,12 @@ import { DfPaywallComponent } from 'src/app/shared/components/df-paywall/df-payw
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { HttpClient } from '@angular/common/http';
-import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import {
+  MatDialog,
+  MatDialogModule,
+  MatDialogRef,
+} from '@angular/material/dialog';
+import { MatMenuModule } from '@angular/material/menu';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { readAsText } from '../../shared/utilities/file';
@@ -92,6 +98,8 @@ import { MatDividerModule } from '@angular/material/divider';
 import { DfSystemService } from 'src/app/shared/services/df-system.service';
 import { DfPaywallModal } from 'src/app/shared/components/df-paywall-modal/df-paywall-modal.component';
 import { DfAnalyticsService } from 'src/app/shared/services/df-analytics.service';
+
+type UnsavedToolChoice = 'save' | 'discard' | 'cancel';
 
 // Add these interfaces at the bottom of the file with the other interfaces
 interface RoleResponse {
@@ -157,6 +165,8 @@ interface ServiceResponse {
     TitleCasePipe,
     MatDividerModule,
     DfSecurityConfigComponent,
+    MatMenuModule,
+    MatDialogModule,
   ],
 })
 export class DfServiceDetailsComponent implements OnInit {
@@ -250,6 +260,18 @@ export class DfServiceDetailsComponent implements OnInit {
   customTools: any[] = [];
   editingToolIndex: number | null = null;
   customToolForm!: FormGroup;
+  availableLookups: Array<{ name: string }> = [];
+  availableScmServices: Array<{ id: number; name: string; label: string; type: string }> = [];
+  @ViewChild('functionEditor') functionEditor: DfAceEditorComponent;
+  @ViewChild('headersEditor') headersEditor: DfAceEditorComponent;
+  @ViewChild('unsavedToolDialog')
+  unsavedToolDialogTpl!: TemplateRef<unknown>;
+  private unsavedToolDialogRef: MatDialogRef<
+    unknown,
+    UnsavedToolChoice
+  > | null = null;
+  private liveHeadersValue: string | null = null;
+  private liveFunctionValue: string | null = null;
 
   constructor(
     private activatedRoute: ActivatedRoute,
@@ -289,6 +311,10 @@ export class DfServiceDetailsComponent implements OnInit {
       headers: ['{}'],
       function: [''],
       enabled: [true],
+      storageServiceId: [null],
+      scmRepository: [''],
+      scmReference: [''],
+      storagePath: [''],
     });
     this.customToolForm
       .get('toolType')!
@@ -297,13 +323,26 @@ export class DfServiceDetailsComponent implements OnInit {
         const functionCtrl = this.customToolForm.get('function')!;
         if (type === 'function') {
           urlCtrl.clearValidators();
-          functionCtrl.setValidators(Validators.required);
+          // Function body is not required when linked to an SCM service
+          const hasScm = !!this.customToolForm.get('storageServiceId')?.value;
+          functionCtrl.setValidators(hasScm ? [] : [Validators.required]);
         } else {
           urlCtrl.setValidators(Validators.required);
           functionCtrl.clearValidators();
         }
         urlCtrl.updateValueAndValidity();
         functionCtrl.updateValueAndValidity();
+      });
+    // When storageServiceId changes, update function validation
+    this.customToolForm
+      .get('storageServiceId')!
+      .valueChanges.subscribe((serviceId: any) => {
+        const functionCtrl = this.customToolForm.get('function')!;
+        const toolType = this.customToolForm.get('toolType')?.value;
+        if (toolType === 'function') {
+          functionCtrl.setValidators(serviceId ? [] : [Validators.required]);
+          functionCtrl.updateValueAndValidity();
+        }
       });
     const id = this.activatedRoute.snapshot.paramMap.get('id');
     if (id) {
@@ -323,6 +362,13 @@ export class DfServiceDetailsComponent implements OnInit {
       .get<Array<ImageObject>>('assets/img/databaseImages.json')
       .subscribe(images => {
         this.images = images;
+      });
+    this.http
+      .get<any>(`${BASE_URL}/system/lookup`, {
+        params: { fields: 'name', limit: '100' },
+      })
+      .subscribe(res => {
+        this.availableLookups = res?.resource ?? [];
       });
     this.systemConfigDataService.environment$
       .pipe(
@@ -570,9 +616,14 @@ export class DfServiceDetailsComponent implements OnInit {
               headers: t.headers || {},
               function: t.function || '',
               enabled: t.enabled !== false && t.enabled !== 0,
+              storageServiceId: t.storageServiceId || null,
+              scmRepository: t.scmRepository || '',
+              scmReference: t.scmReference || '',
+              storagePath: t.storagePath || '',
             })
           );
           this.loadMcpServices();
+          this.loadAvailableScmServices();
         }
       });
     if (this.isDatabase) {
@@ -1035,23 +1086,36 @@ export class DfServiceDetailsComponent implements OnInit {
       headers: '{}',
       function: '',
       enabled: true,
+      storageServiceId: null,
+      scmRepository: '',
+      scmReference: '',
+      storagePath: '',
     });
     this.customToolParameters.clear();
+    this.liveHeadersValue = null;
+    this.liveFunctionValue = null;
   }
 
   editCustomTool(index: number) {
     const tool = this.customTools[index];
     this.editingToolIndex = index;
+    const headersJson = JSON.stringify(tool.headers || {}, null, 2);
     this.customToolForm.patchValue({
       toolType: tool.toolType || 'api',
       name: tool.name,
       description: tool.description,
       httpMethod: tool.httpMethod || 'GET',
       url: tool.url || '',
-      headers: JSON.stringify(tool.headers || {}, null, 2),
+      headers: headersJson,
       function: tool.function || '',
       enabled: tool.enabled,
+      storageServiceId: tool.storageServiceId || null,
+      scmRepository: tool.scmRepository || '',
+      scmReference: tool.scmReference || '',
+      storagePath: tool.storagePath || '',
     });
+    this.liveHeadersValue = headersJson;
+    this.liveFunctionValue = tool.function || '';
     this.customToolParameters.clear();
     (tool.parameters || []).forEach((p: any) => {
       this.customToolParameters.push(this.createParameterGroup(p));
@@ -1062,15 +1126,52 @@ export class DfServiceDetailsComponent implements OnInit {
     this.customTools.splice(index, 1);
   }
 
+  onHeadersChange(value: string): void {
+    this.liveHeadersValue = value;
+  }
+
+  onFunctionChange(value: string): void {
+    this.liveFunctionValue = value;
+  }
+
+  insertLookup(
+    lookupName: string,
+    target: 'function' | 'headers' | 'url'
+  ): void {
+    if (target === 'function') {
+      this.functionEditor?.insertAtCursor(`secrets.${lookupName}`);
+    } else if (target === 'headers') {
+      this.headersEditor?.insertAtCursor(`{${lookupName}}`);
+    } else if (target === 'url') {
+      const urlCtrl = this.customToolForm.get('url');
+      if (urlCtrl) {
+        const current = urlCtrl.value || '';
+        urlCtrl.setValue(current + `{${lookupName}}`);
+      }
+    }
+  }
+
   saveCustomTool() {
     if (this.customToolForm.invalid) return;
 
     const formValue = this.customToolForm.getRawValue();
+
+    // Use live editor values captured via (valueChange) — the reactive form
+    // binding loses sync when *ngIf destroys/recreates the editor components.
+    const headersStr = this.liveHeadersValue ?? formValue.headers ?? '{}';
+    const functionStr = this.liveFunctionValue ?? formValue.function ?? '';
+
     let headers: Record<string, string> = {};
-    try {
-      headers = JSON.parse(formValue.headers || '{}');
-    } catch {
-      headers = {};
+    if (formValue.toolType === 'api' && headersStr.trim() !== '') {
+      try {
+        headers = JSON.parse(headersStr);
+      } catch (e: any) {
+        this.snackbarService.openSnackBar(
+          `Invalid JSON in Static Headers: ${e.message}`,
+          'error'
+        );
+        return;
+      }
     }
 
     const tool: any = {
@@ -1081,8 +1182,12 @@ export class DfServiceDetailsComponent implements OnInit {
       url: formValue.url,
       parameters: formValue.parameters || [],
       headers,
-      function: formValue.function || '',
+      function: functionStr,
       enabled: formValue.enabled ?? true,
+      storageServiceId: formValue.storageServiceId || null,
+      scmRepository: formValue.scmRepository || '',
+      scmReference: formValue.scmReference || '',
+      storagePath: formValue.storagePath || '',
     };
 
     if (this.editingToolIndex === -1) {
@@ -1099,8 +1204,76 @@ export class DfServiceDetailsComponent implements OnInit {
     this.editingToolIndex = null;
   }
 
+  hasUnsavedCustomTool(): boolean {
+    return this.editingToolIndex !== null && this.customToolForm.dirty;
+  }
+
+  closeUnsavedToolDialog(choice: UnsavedToolChoice) {
+    this.unsavedToolDialogRef?.close(choice);
+  }
+
   toggleCustomTool(index: number, enabled: boolean) {
     this.customTools[index].enabled = enabled;
+  }
+
+  loadAvailableScmServices() {
+    this.http
+      .get<any>('/api/v2', {
+        params: {
+          group: 'source control',
+          fields: 'id,name,label,type',
+        },
+      })
+      .subscribe({
+        next: (res: any) => {
+          this.availableScmServices = (res?.resource ?? res?.services ?? [])
+            .filter((s: any) => s.id && s.name);
+        },
+        error: () => {
+          this.availableScmServices = [];
+        },
+      });
+  }
+
+  viewLatestScmContent() {
+    const serviceId = this.customToolForm.get('storageServiceId')?.value;
+    const repo = this.customToolForm.get('scmRepository')?.value;
+    const branch = this.customToolForm.get('scmReference')?.value || 'master';
+    const path = this.customToolForm.get('storagePath')?.value;
+
+    if (!serviceId || !repo || !path) {
+      this.snackbarService.openSnackBar(
+        'Service, repository, and path are required to fetch from SCM.',
+        'error'
+      );
+      return;
+    }
+
+    const service = this.availableScmServices.find(s => s.id === serviceId);
+    if (!service) {
+      this.snackbarService.openSnackBar('Selected SCM service not found.', 'error');
+      return;
+    }
+
+    const url = `/api/v2/${service.name}/_repo/${repo}`;
+    this.http
+      .get(url, {
+        params: { branch, content: '1', path },
+        responseType: 'text',
+      })
+      .subscribe({
+        next: (content: string) => {
+          this.customToolForm.get('function')?.setValue(content);
+          this.liveFunctionValue = content;
+          this.snackbarService.openSnackBar('Function loaded from repository.', 'success');
+        },
+        error: (err: any) => {
+          this.snackbarService.openSnackBar(
+            `Failed to fetch from SCM: ${err?.error?.error?.message || err.message}`,
+            'error'
+          );
+        },
+      });
   }
 
   addToolParameter() {
@@ -1394,6 +1567,37 @@ export class DfServiceDetailsComponent implements OnInit {
   warnings: string[] = [];
 
   save(Cache: boolean, Continue: boolean) {
+    if (this.hasUnsavedCustomTool()) {
+      if (this.unsavedToolDialogRef) return;
+      this.unsavedToolDialogRef = this.dialog.open<
+        unknown,
+        unknown,
+        UnsavedToolChoice
+      >(this.unsavedToolDialogTpl, {
+        width: '440px',
+        disableClose: true,
+      });
+      this.unsavedToolDialogRef.afterClosed().subscribe(choice => {
+        this.unsavedToolDialogRef = null;
+        if (!choice || choice === 'cancel') return;
+        if (choice === 'save') {
+          if (this.customToolForm.invalid) {
+            this.snackbarService.openSnackBar(
+              'Custom tool has invalid fields. Fix them or discard the edit before saving the service.',
+              'error'
+            );
+            return;
+          }
+          this.saveCustomTool();
+        } else {
+          this.cancelCustomToolEdit();
+        }
+        this.customToolForm.markAsPristine();
+        this.save(Cache, Continue);
+      });
+      return;
+    }
+
     const data = this.serviceForm.getRawValue();
     if (data.type === '' || data.name === '') {
       return;
@@ -1578,6 +1782,10 @@ export class DfServiceDetailsComponent implements OnInit {
           headers: tool.headers,
           function: tool.function || '',
           enabled: tool.enabled,
+          storageServiceId: tool.storageServiceId || null,
+          scmRepository: tool.scmRepository || '',
+          scmReference: tool.scmReference || '',
+          storagePath: tool.storagePath || '',
         }));
       }
       this.servicesService

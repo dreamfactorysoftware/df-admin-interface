@@ -2,7 +2,8 @@
 <form [formGroup]="lookupKeysForm" (ngSubmit)="save()">
   <df-lookup-keys
     [showAccordion]="false"
-    formArrayName="lookupKeys"></df-lookup-keys>
+    formArrayName="lookupKeys"
+    (lookupDeleted)="onLookupDeleted($event)"></df-lookup-keys>
 
   <button mat-flat-button class="save-btn" type="submit">
     {{ 'save' | transloco }}

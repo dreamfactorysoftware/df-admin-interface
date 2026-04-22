@@ -4,6 +4,8 @@ module.exports = {
   moduleNameMapper: {
     '^src/(.*)$': '<rootDir>/src/$1',
   },
+  // Playwright specs live under e2e/ and must never be picked up by Jest.
+  testPathIgnorePatterns: ['/node_modules/', '<rootDir>/e2e/'],
   transformIgnorePatterns: [
     'node_modules/(?!@angular|swagger-ui|react-syntax-highlighter|swagger-client|@ngneat|@fortawesome)',
   ],
