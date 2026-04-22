@@ -7,6 +7,7 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "jest --verbose",
+    "test:ci": "jest --ci --watchAll=false --passWithNoTests --config jest.config.ci.js",
     "test:coverage": "jest --coverage",
     "test:watch": "jest --watch",
     "lint": "ng lint",
