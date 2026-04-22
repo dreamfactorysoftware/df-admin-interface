@@ -43,15 +43,42 @@ export function captureRedirectUrl(): void {
 }
 
 /**
+ * Validates that a redirect URL is safe to follow:
+ * - Must be a valid http/https URL (delegates to isValidHttpUrl)
+ * - Must share the same origin as the current page (prevents open redirect)
+ */
+export function isSameOriginUrl(url: string): boolean {
+  if (!isValidHttpUrl(url)) {
+    return false;
+  }
+  try {
+    const parsed = new URL(url);
+    return parsed.origin === window.location.origin;
+  } catch (_) {
+    return false;
+  }
+}
+
+/**
  * Checks for stored redirect URL and performs redirect if present.
  * Appends session token to the redirect URL if available.
- * @returns true if redirect is happening, false otherwise
+ * Only redirects to same-origin URLs to prevent open-redirect attacks.
+ * Falls back to the root path when the stored URL fails validation.
+ * @returns true if a redirect is happening, false otherwise
  */
 export function handleRedirectIfPresent(sessionToken?: string | null): boolean {
   const redirectUrl = sessionStorage.getItem(REDIRECT_URL_KEY);
 
   if (redirectUrl) {
     sessionStorage.removeItem(REDIRECT_URL_KEY);
+
+    if (!isSameOriginUrl(redirectUrl)) {
+      // Stored URL failed origin validation — fall back to the default dashboard
+      // rather than silently dropping the redirect, so the user still lands somewhere.
+      window.location.href = '/';
+      return true;
+    }
+
     if (sessionToken) {
       const separator = redirectUrl.includes('?') ? '&' : '?';
       const finalUrl = `${redirectUrl}${separator}session_token=${sessionToken}`;
