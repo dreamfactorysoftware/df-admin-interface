@@ -32,10 +32,7 @@ import { ScriptEventResponse } from 'src/app/shared/types/scripts';
 import { CommonModule } from '@angular/common';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 import { DfLinkServiceComponent } from 'src/app/shared/components/df-link-service/df-link-service.component';
-import {
-  camelToSnakeString,
-  snakeToCamelString,
-} from 'src/app/shared/utilities/case';
+import { camelToSnakeString } from 'src/app/shared/utilities/case';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -209,12 +206,9 @@ export class DfScriptDetailsComponent implements OnInit {
       .subscribe(response => {
         this.unGroupedEvents = response;
         this.scriptEvents = groupEvents(response);
-        // The response interceptor converts snake_case keys to camelCase, so
-        // any service whose name has an underscore (api_docs, triskele_db,
-        // local_file, etc.) needs the same transform applied to the lookup
-        // key — not just the previously hard-coded api_docs case.
-        const serviceKey = snakeToCamelString(serviceName);
-        this.ungroupedEventOptions = response[serviceKey] as ScriptEvent;
+        // /system/event responses are now exempt from the case interceptor
+        // (see case.interceptor.ts) so keys match the service name verbatim.
+        this.ungroupedEventOptions = response[serviceName] as ScriptEvent;
         if (this.ungroupedEventOptions) {
           Object.keys(this.ungroupedEventOptions).forEach(key => {
             this.ungroupedEventItems.push(key);

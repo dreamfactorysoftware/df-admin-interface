@@ -18,6 +18,14 @@ export const caseInterceptor: HttpInterceptorFn = (
   // property names that must not be transformed or Swagger UI won't parse them correctly
   const isApiDocsRequest = req.url.includes('/api_docs');
 
+  // Skip case transformation for /system/event responses. The response keys are
+  // event names (e.g. "test_underscore._schema") that the backend uses verbatim
+  // when matching scripts — transforming them to camelCase makes the UI show
+  // bogus names and the script lookup drift from what the backend expects.
+  const isSystemEventRequest = /\/system\/event(\?|$|\/)/.test(req.url);
+
+  const skipResponseTransform = isApiDocsRequest || isSystemEventRequest;
+
   if (req.url.startsWith('/api') && !(req.body instanceof FormData)) {
     const transformedRequest = req.clone({
       body: isApiDocsRequest ? req.body : mapCamelToSnake(req.body),
@@ -28,8 +36,7 @@ export const caseInterceptor: HttpInterceptorFn = (
           event instanceof HttpResponse &&
           event.headers.get('Content-Type')?.includes('application/json')
         ) {
-          // Don't transform API docs responses - they need their original OpenAPI format
-          if (isApiDocsRequest) {
+          if (skipResponseTransform) {
             return event;
           }
           return event.clone({ body: mapSnakeToCamel(event.body) });
