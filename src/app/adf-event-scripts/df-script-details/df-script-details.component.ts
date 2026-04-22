@@ -154,7 +154,10 @@ export class DfScriptDetailsComponent implements OnInit {
         script.storageServiceId?.type === 'local_file'
           ? script.storagePath
           : null,
-      name: this.completeScriptName ?? this.selectedRouteItem,
+      // Fall back on empty string too, not just null/undefined —
+      // selectedServiceItemEvent() resets completeScriptName to '' so `??`
+      // would skip the fallback and produce an empty script name.
+      name: this.completeScriptName || this.selectedRouteItem,
     };
     if (this.type === 'edit') {
       this.scriptDetails = { ...this.scriptDetails, ...scriptItem };
