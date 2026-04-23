@@ -1535,12 +1535,37 @@ export class DfServiceDetailsComponent implements OnInit {
       return [];
     }
 
-    // All other fields are considered advanced
     const requiredFieldNames = ['baseUrl'];
     return this.viewSchema.filter(
       field =>
-        !requiredFieldNames.includes(field.name) && field.name !== 'content'
+        !requiredFieldNames.includes(field.name) &&
+        !this.oauthFieldNames.includes(field.name) &&
+        field.name !== 'content'
     );
+  }
+
+  private readonly oauthFieldNames = [
+    'oauthTokenUrl',
+    'oauthClientId',
+    'oauthClientSecret',
+    'oauthGrantType',
+    'oauthScope',
+    'oauthAuthMethod',
+  ];
+
+  get networkOAuthFields() {
+    if (!this.isNetworkService || !this.viewSchema) {
+      return [];
+    }
+    const bySchema = new Map<string, ConfigSchema>();
+    this.viewSchema.forEach(f => bySchema.set(f.name, f));
+    return this.oauthFieldNames
+      .map(name => bySchema.get(name))
+      .filter((f): f is ConfigSchema => !!f);
+  }
+
+  get hasNetworkOAuthFields(): boolean {
+    return this.networkOAuthFields.length > 0;
   }
 
   get showNetworkAdvancedOptions(): boolean {
