@@ -322,8 +322,19 @@
                 ">
                 <strong>Snowflake Native App Mode</strong>
                 <p style="margin: 4px 0 0 0; font-size: 13px">
-                  OAuth authentication is automatically configured. Just specify
-                  your database connection details below.
+                  OAuth is automatically configured using the app's SPCS
+                  identity. Fields below accept any value you type —
+                  suggestions show objects your app has been granted access
+                  to.
+                </p>
+                <p style="margin: 8px 0 0 0; font-size: 13px">
+                  <strong>Heads up:</strong> if an endpoint returns "not
+                  granted to this user," the app principal needs the relevant
+                  grants. Run
+                  <code>GRANT USAGE ON DATABASE &lt;db&gt; TO APPLICATION
+                  &lt;your_app_name&gt;;</code>
+                  (and similar for schema / tables / warehouse) as a role
+                  that owns those objects.
                 </p>
               </div>
 
@@ -412,7 +423,7 @@
                   </mat-form-field>
 
                   <mat-form-field class="dynamic-width">
-                    <mat-label>Role</mat-label>
+                    <mat-label>Role (optional)</mat-label>
                     <input
                       matInput
                       type="text"
@@ -427,6 +438,12 @@
                     </mat-autocomplete>
                     <mat-hint *ngIf="snowflakeDiscovery.loading.roles"
                       >Loading roles…</mat-hint
+                    >
+                    <mat-hint *ngIf="!snowflakeDiscovery.loading.roles"
+                      >Usually leave blank. Native Apps can't assume account
+                      roles — grant privileges directly to the application
+                      with
+                      <code>GRANT … TO APPLICATION &lt;app&gt;</code>.</mat-hint
                     >
                   </mat-form-field>
 
