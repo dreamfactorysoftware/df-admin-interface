@@ -23,38 +23,139 @@
           </mat-select>
         </mat-form-field>
         <mat-form-field
+          *ngIf="isGithubSelected; else repoTextInput"
           appearance="outline"
           subscriptSizing="dynamic"
           class="full-width form-field-gap">
-          <mat-label>Repository: </mat-label>
+          <mat-label>Repository</mat-label>
           <input
             matInput
             type="text"
-            placeholder="path"
-            formControlName="repoInput" />
+            placeholder="Type to filter…"
+            formControlName="repoInput"
+            [matAutocomplete]="repoAuto" />
+          <mat-autocomplete #repoAuto="matAutocomplete" autoActiveFirstOption>
+            <mat-option
+              *ngFor="let repo of filteredRepositories | slice: 0 : 200"
+              [value]="repo">
+              {{ repo }}
+            </mat-option>
+          </mat-autocomplete>
+          <mat-hint *ngIf="loadingRepos">Loading repositories…</mat-hint>
+          <mat-hint
+            *ngIf="
+              !loadingRepos && repositories.length > 0 && !repoFetchTruncated
+            ">
+            {{ repositories.length }} repositories
+          </mat-hint>
+          <mat-hint *ngIf="!loadingRepos && repoFetchTruncated">
+            Showing first {{ repositories.length }} repositories (list was
+            truncated)
+          </mat-hint>
+          <mat-hint
+            *ngIf="!loadingRepos && repositories.length === 0"
+            class="warn">
+            No repositories returned.
+          </mat-hint>
         </mat-form-field>
+        <ng-template #repoTextInput>
+          <mat-form-field
+            appearance="outline"
+            subscriptSizing="dynamic"
+            class="full-width form-field-gap">
+            <mat-label>Repository: </mat-label>
+            <input
+              matInput
+              type="text"
+              placeholder="path"
+              formControlName="repoInput" />
+          </mat-form-field>
+        </ng-template>
         <mat-form-field
           appearance="outline"
           subscriptSizing="dynamic"
           class="full-width form-field-gap">
-          <mat-label>Branch/Tag: </mat-label>
+          <mat-label>Branch/Tag </mat-label>
           <input
             matInput
             type="text"
-            placeholder="path"
+            placeholder="main"
             formControlName="branchInput" />
         </mat-form-field>
-        <mat-form-field
-          appearance="outline"
-          subscriptSizing="dynamic"
-          class="full-width form-field-gap">
-          <mat-label>Path</mat-label>
-          <input
-            matInput
-            type="text"
-            placeholder="path"
-            formControlName="pathInput" />
-        </mat-form-field>
+        <ng-container
+          *ngIf="
+            isGithubSelected && roleForm.get('repoInput')?.value;
+            else pathTextInput
+          ">
+          <div class="link-service-explorer">
+            <div class="link-service-breadcrumb">
+              <button
+                mat-button
+                type="button"
+                (click)="navigateToCrumb(-1)"
+                class="link-service-crumb">
+                <mat-icon>home</mat-icon>
+              </button>
+              <ng-container *ngFor="let seg of pathSegments; let i = index">
+                <mat-icon class="link-service-crumb-sep"
+                  >chevron_right</mat-icon
+                >
+                <button
+                  mat-button
+                  type="button"
+                  (click)="navigateToCrumb(i)"
+                  class="link-service-crumb">
+                  {{ seg }}
+                </button>
+              </ng-container>
+            </div>
+            <div
+              class="link-service-selected"
+              *ngIf="roleForm.get('pathInput')?.value as selected">
+              <mat-icon>description</mat-icon>
+              <span>{{ selected }}</span>
+            </div>
+            <div class="link-service-list" *ngIf="!loadingItems">
+              <div class="link-service-error" *ngIf="explorerError as err">
+                {{ err }}
+              </div>
+              <div
+                class="link-service-empty"
+                *ngIf="
+                  !explorerError && pathItems.length === 0 && !loadingItems
+                ">
+                Empty folder.
+              </div>
+              <button
+                *ngFor="let item of pathItems"
+                mat-button
+                type="button"
+                class="link-service-item"
+                (click)="onItemClick(item)">
+                <mat-icon>{{
+                  item.type === 'dir' ? 'folder' : 'description'
+                }}</mat-icon>
+                <span>{{ item.name }}</span>
+              </button>
+            </div>
+            <div class="link-service-loading" *ngIf="loadingItems">
+              <mat-spinner diameter="24"></mat-spinner>
+            </div>
+          </div>
+        </ng-container>
+        <ng-template #pathTextInput>
+          <mat-form-field
+            appearance="outline"
+            subscriptSizing="dynamic"
+            class="full-width form-field-gap">
+            <mat-label>Path</mat-label>
+            <input
+              matInput
+              type="text"
+              placeholder="path"
+              formControlName="pathInput" />
+          </mat-form-field>
+        </ng-template>
         <div class="full-width action-bar">
           <button
             class="save-btn"
@@ -74,6 +175,68 @@
             <i class="fa fa-refresh"></i>
             Delete Cache
           </button>
+        </div>
+        <div class="link-service-webhook" *ngIf="showWebhookSection">
+          <div class="webhook-header">
+            <mat-icon>sync</mat-icon>
+            <span>Auto-refresh on GitHub push</span>
+          </div>
+          <p class="webhook-help">
+            Paste this URL into your GitHub repo's Settings → Webhooks. The
+            script's cache will clear on every push, so the next call fetches
+            the latest version automatically.
+          </p>
+          <div class="webhook-key-row">
+            <mat-form-field
+              appearance="outline"
+              subscriptSizing="dynamic"
+              class="webhook-key-field">
+              <mat-label>DreamFactory API Key</mat-label>
+              <input
+                matInput
+                type="text"
+                placeholder="Paste a DreamFactory API key, or click Generate"
+                [formControl]="apiKeyControl" />
+              <mat-hint *ngIf="!generateKeyError">
+                Use an existing key, or click Auto-generate to fetch a shared
+                scoped key (reused across all webhook-enabled scripts).
+              </mat-hint>
+              <mat-hint *ngIf="generateKeyError" class="webhook-key-error">
+                {{ generateKeyError }}
+              </mat-hint>
+            </mat-form-field>
+            <button
+              mat-stroked-button
+              type="button"
+              color="primary"
+              class="webhook-generate-btn"
+              [disabled]="!canGenerateKey"
+              (click)="generateWebhookKey()">
+              <mat-icon *ngIf="!generatingKey">vpn_key</mat-icon>
+              <mat-spinner *ngIf="generatingKey" diameter="16"></mat-spinner>
+              Auto-generate
+            </button>
+          </div>
+          <div class="webhook-url-row">
+            <mat-form-field
+              appearance="outline"
+              subscriptSizing="dynamic"
+              class="webhook-url-field">
+              <mat-label>Payload URL</mat-label>
+              <input matInput type="text" [value]="webhookUrl" readonly />
+            </mat-form-field>
+            <button
+              mat-icon-button
+              type="button"
+              (click)="copyWebhookUrl()"
+              matTooltip="Copy URL">
+              <mat-icon>content_copy</mat-icon>
+            </button>
+          </div>
+          <small class="webhook-details">
+            Content type: <code>application/json</code> · Events: just the
+            <code>push</code> event
+          </small>
         </div>
       </mat-expansion-panel>
     </mat-accordion>

@@ -54,6 +54,7 @@ import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service'
 import { Service } from 'src/app/shared/types/files';
 import { AceEditorMode } from 'src/app/shared/types/scripts';
 import { DfScriptEditorComponent } from 'src/app/shared/components/df-script-editor/df-script-editor.component';
+import { DfLinkServiceComponent } from 'src/app/shared/components/df-link-service/df-link-service.component';
 import { DfFileGithubComponent } from 'src/app/shared/components/df-file-github/df-file-github.component';
 import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
 import {
@@ -154,6 +155,7 @@ interface ServiceResponse {
     MatTooltipModule,
     MatButtonModule,
     DfScriptEditorComponent,
+    DfLinkServiceComponent,
     DfFileGithubComponent,
     DfPaywallComponent,
     MatStepperModule,
@@ -261,7 +263,12 @@ export class DfServiceDetailsComponent implements OnInit {
   editingToolIndex: number | null = null;
   customToolForm!: FormGroup;
   availableLookups: Array<{ name: string }> = [];
-  availableScmServices: Array<{ id: number; name: string; label: string; type: string }> = [];
+  availableScmServices: Array<{
+    id: number;
+    name: string;
+    label: string;
+    type: string;
+  }> = [];
   @ViewChild('functionEditor') functionEditor: DfAceEditorComponent;
   @ViewChild('headersEditor') headersEditor: DfAceEditorComponent;
   @ViewChild('unsavedToolDialog')
@@ -1226,8 +1233,11 @@ export class DfServiceDetailsComponent implements OnInit {
       })
       .subscribe({
         next: (res: any) => {
-          this.availableScmServices = (res?.resource ?? res?.services ?? [])
-            .filter((s: any) => s.id && s.name);
+          this.availableScmServices = (
+            res?.resource ??
+            res?.services ??
+            []
+          ).filter((s: any) => s.id && s.name);
         },
         error: () => {
           this.availableScmServices = [];
@@ -1251,7 +1261,10 @@ export class DfServiceDetailsComponent implements OnInit {
 
     const service = this.availableScmServices.find(s => s.id === serviceId);
     if (!service) {
-      this.snackbarService.openSnackBar('Selected SCM service not found.', 'error');
+      this.snackbarService.openSnackBar(
+        'Selected SCM service not found.',
+        'error'
+      );
       return;
     }
 
@@ -1265,7 +1278,10 @@ export class DfServiceDetailsComponent implements OnInit {
         next: (content: string) => {
           this.customToolForm.get('function')?.setValue(content);
           this.liveFunctionValue = content;
-          this.snackbarService.openSnackBar('Function loaded from repository.', 'success');
+          this.snackbarService.openSnackBar(
+            'Function loaded from repository.',
+            'success'
+          );
         },
         error: (err: any) => {
           this.snackbarService.openSnackBar(

@@ -114,17 +114,27 @@
     >{{ 'eventModification' | transloco }}</mat-slide-toggle
   >
   <df-link-service
-    [cache]="scriptForm.getRawValue().name"
+    [cache]="
+      completeScriptName || selectedRouteItem || scriptForm.getRawValue().name
+    "
+    [cacheScope]="'event'"
     [storageServiceId]="selectedServiceItem"
     [storagePath]="getControl('storagePath')"
-    [content]="getControl('content')"></df-link-service>
+    [content]="getControl('content')"
+    [storageServiceIdControl]="getControl('storageServiceId')"
+    [scmRepositoryControl]="getControl('scmRepository')"
+    [scmReferenceControl]="getControl('scmReference')"></df-link-service>
   <df-script-editor
     class="full-width"
     [cache]="scriptForm.getRawValue().name"
     [type]="getControl('type')"
     [storageServiceId]="getControl('storageServiceId')"
     [storagePath]="getControl('storagePath')"
-    [content]="getControl('content')"></df-script-editor>
+    [content]="getControl('content')"
+    [scmRepository]="getControl('scmRepository')"
+    [scmReference]="getControl('scmReference')"
+    [hideScmActions]="true"
+    [snapshotTimestamp]="scriptDetails?.lastModifiedDate"></df-script-editor>
   <div class="full-width action-bar">
     <button class="cancel-btn" mat-flat-button type="button" (click)="goBack()">
       {{ 'cancel' | transloco }}

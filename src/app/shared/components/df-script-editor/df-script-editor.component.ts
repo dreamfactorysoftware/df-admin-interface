@@ -1,4 +1,5 @@
-import { NgFor, NgIf } from '@angular/common';
+import { DatePipe, NgFor, NgIf } from '@angular/common';
+import { MatIconModule } from '@angular/material/icon';
 import { Component, Inject, Input, OnInit } from '@angular/core';
 import {
   FormControl,
@@ -46,12 +47,18 @@ import { DfThemeService } from '../../services/df-theme.service';
     MatInputModule,
     DfAceEditorComponent,
     AsyncPipe,
+    DatePipe,
+    MatIconModule,
     ReactiveFormsModule,
   ],
 })
 export class DfScriptEditorComponent implements OnInit {
   @Input() isScript: boolean;
   @Input() cache: string;
+  @Input() hideScmActions = false;
+  @Input() snapshotTimestamp?: string | Date | null;
+  @Input() scmRepository?: FormControl;
+  @Input() scmReference?: FormControl;
   @Input({ required: true }) type: FormControl;
   @Input({ required: true }) storageServiceId: FormControl;
   @Input({ required: true }) storagePath: FormControl;
@@ -59,6 +66,8 @@ export class DfScriptEditorComponent implements OnInit {
 
   storageServices: Array<Service> = [];
   checked = false;
+  lastRefreshedAt: Date | null = null;
+  refreshError: string | null = null;
 
   constructor(
     private dialog: MatDialog,
@@ -88,17 +97,20 @@ export class DfScriptEditorComponent implements OnInit {
     if (this.storageServiceId.getRawValue()) {
       this.storagePath.addValidators([Validators.required]);
     }
+    // Track previous value so we only reset storagePath on a real user-driven
+    // service change, not when the parent patches the form on load/prefill.
+    let prevServiceId: any = this.storageServiceId.getRawValue();
     this.storageServiceId.valueChanges.subscribe(value => {
-      this.storagePath.reset();
+      const isUserSwap =
+        !!prevServiceId && value !== prevServiceId && value !== null;
+      prevServiceId = value;
+      if (isUserSwap) {
+        this.storagePath.reset();
+      }
       if (value) {
         this.storagePath.addValidators([Validators.required]);
-        // this.content.reset();
-        // this.content.disable();
-      } else {
-        if (this.storagePath.hasValidator(Validators.required)) {
-          // this.content.enable();
-          this.storagePath.removeValidators([Validators.required]);
-        }
+      } else if (this.storagePath.hasValidator(Validators.required)) {
+        this.storagePath.removeValidators([Validators.required]);
       }
       this.storagePath.updateValueAndValidity();
     });
@@ -122,22 +134,62 @@ export class DfScriptEditorComponent implements OnInit {
   }
 
   viewLatest() {
-    const filePath = `${
-      this.storageServices.find(
-        service => service.id === this.storageServiceId.getRawValue()
-      )?.name
-    }/${this.storagePath.getRawValue()}`;
-    if (filePath.endsWith('.json')) {
-      this.fileService
-        .downloadJson(filePath)
-        .subscribe(text => this.content.setValue(text));
+    this.refreshError = null;
+    const serviceId = this.storageServiceId.getRawValue();
+    const service = this.storageServices.find(s => s.id === serviceId);
+    if (!service) {
+      this.refreshError = !serviceId
+        ? 'No storage service linked to this script.'
+        : `Storage service (id ${serviceId}) is not available.`;
       return;
-    } else {
-      this.fileService
-        .downloadFile(filePath)
-        .pipe(switchMap(res => readAsText(res as Blob)))
-        .subscribe(text => this.content.setValue(text));
     }
+    const storagePath = this.storagePath.getRawValue();
+    if (!storagePath) {
+      this.refreshError = 'No file path saved — pick a file first.';
+      return;
+    }
+
+    const scmRepo = this.scmRepository?.getRawValue();
+    const scmRef = this.scmReference?.getRawValue() || 'main';
+    const isScmLinked = service.type === 'github' && !!scmRepo;
+
+    const filePath = isScmLinked
+      ? `${service.name}/_repo/${scmRepo}?branch=${encodeURIComponent(
+          scmRef
+        )}&content=1&path=${encodeURIComponent(storagePath)}`
+      : `${service.name}/${storagePath}`;
+
+    const markRefreshed = () => {
+      this.lastRefreshedAt = new Date();
+      this.refreshError = null;
+    };
+    const handleError = (err: any) => {
+      this.refreshError =
+        err?.error?.error?.message ??
+        err?.error?.message ??
+        err?.message ??
+        'Refresh failed.';
+    };
+    if (!isScmLinked && filePath.endsWith('.json')) {
+      this.fileService.downloadJson(filePath).subscribe({
+        next: text => {
+          this.content.setValue(text);
+          markRefreshed();
+        },
+        error: handleError,
+      });
+      return;
+    }
+    this.fileService
+      .downloadFile(filePath)
+      .pipe(switchMap(res => readAsText(res as Blob)))
+      .subscribe({
+        next: text => {
+          this.content.setValue(text);
+          markRefreshed();
+        },
+        error: handleError,
+      });
   }
 
   deleteCache() {
@@ -147,5 +199,23 @@ export class DfScriptEditorComponent implements OnInit {
         snackbarSuccess: 'scripts.deleteCacheSuccessMsg',
       })
       .subscribe();
+  }
+
+  get showSnapshotBanner(): boolean {
+    return (
+      !!this.storageServiceId?.getRawValue() &&
+      (!!this.snapshotTimestamp || !!this.lastRefreshedAt)
+    );
+  }
+
+  get snapshotDisplayDate(): Date | null {
+    if (this.lastRefreshedAt) return this.lastRefreshedAt;
+    if (!this.snapshotTimestamp) return null;
+    const d = new Date(this.snapshotTimestamp);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  get snapshotLocked(): boolean {
+    return !this.storageServiceId?.getRawValue();
   }
 }
