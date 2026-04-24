@@ -34,7 +34,9 @@
     </mat-form-field>
   </ng-container>
 
-  <div class="actions" *ngIf="storageServiceId.getRawValue()">
+  <div
+    class="actions"
+    *ngIf="storageServiceId.getRawValue() && !hideScmActions">
     <button
       mat-flat-button
       color="primary"
@@ -54,6 +56,31 @@
   </div>
   <div class="content">
     <span *ngIf="isScript">Script Contents</span>
+    <div class="script-editor-snapshot-banner" *ngIf="showSnapshotBanner">
+      <mat-icon class="snapshot-icon">history</mat-icon>
+      <div class="snapshot-message">
+        <span class="snapshot-text" *ngIf="snapshotDisplayDate as snap">
+          Snapshot from {{ snap | date: 'medium' }} — the running script uses
+          whatever is currently in the linked storage.
+        </span>
+        <span class="snapshot-text" *ngIf="!snapshotDisplayDate">
+          Snapshot — the running script uses whatever is currently in the linked
+          storage.
+        </span>
+        <span class="snapshot-error" *ngIf="refreshError">
+          {{ refreshError }}
+        </span>
+      </div>
+      <button
+        mat-stroked-button
+        color="primary"
+        type="button"
+        class="snapshot-refresh-btn"
+        (click)="viewLatest()">
+        <mat-icon>refresh</mat-icon>
+        Refresh
+      </button>
+    </div>
     <df-ace-editor
       class="full-width"
       [formControl]="content"

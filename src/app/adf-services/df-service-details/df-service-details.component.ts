@@ -59,6 +59,7 @@ import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service'
 import { Service } from 'src/app/shared/types/files';
 import { AceEditorMode } from 'src/app/shared/types/scripts';
 import { DfScriptEditorComponent } from 'src/app/shared/components/df-script-editor/df-script-editor.component';
+import { DfLinkServiceComponent } from 'src/app/shared/components/df-link-service/df-link-service.component';
 import { DfFileGithubComponent } from 'src/app/shared/components/df-file-github/df-file-github.component';
 import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
 import {
@@ -164,6 +165,7 @@ interface ServiceResponse {
     MatTooltipModule,
     MatButtonModule,
     DfScriptEditorComponent,
+    DfLinkServiceComponent,
     DfFileGithubComponent,
     DfPaywallComponent,
     MatStepperModule,

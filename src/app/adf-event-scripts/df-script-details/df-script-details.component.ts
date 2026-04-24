@@ -96,6 +96,8 @@ export class DfScriptDetailsComponent implements OnInit {
       content: [''],
       storageServiceId: [],
       storagePath: [''],
+      scmRepository: [''],
+      scmReference: [''],
       isActive: [false],
       allow_event_modification: [false],
     });
@@ -114,6 +116,15 @@ export class DfScriptDetailsComponent implements OnInit {
         );
         editData = { ...editData, isActive: data.isActive };
         this.scriptForm.patchValue(editData);
+        // The camelToSnakeString reduce above rewrites storage/scm keys
+        // into snake_case, which doesn't match our camelCase controls.
+        // Re-patch them explicitly so they actually populate on edit.
+        this.scriptForm.patchValue({
+          storageServiceId: data.storageServiceId,
+          storagePath: data.storagePath,
+          scmRepository: data.scmRepository,
+          scmReference: data.scmReference,
+        });
         this.scriptForm.controls['name'].disable();
         this.completeScriptName = data.name;
       } else {
@@ -144,16 +155,15 @@ export class DfScriptDetailsComponent implements OnInit {
       return;
     }
     const script = this.scriptForm.getRawValue();
+    // storageServiceId may be a raw id (explorer flow) or a service object
+    // with {id, type} from the legacy dropdown flow — normalize to the id.
+    const storageServiceId =
+      script.storageServiceId && typeof script.storageServiceId === 'object'
+        ? (script.storageServiceId.id ?? null)
+        : (script.storageServiceId ?? null);
     const scriptItem = {
       ...script,
-      storageServiceId:
-        script.storageServiceId?.type === 'local_file'
-          ? script.storageServiceId?.id
-          : null,
-      storage_path:
-        script.storageServiceId?.type === 'local_file'
-          ? script.storagePath
-          : null,
+      storageServiceId,
       // Fall back on empty string too, not just null/undefined —
       // selectedServiceItemEvent() resets completeScriptName to '' so `??`
       // would skip the fallback and produce an empty script name.
@@ -162,10 +172,10 @@ export class DfScriptDetailsComponent implements OnInit {
     if (this.type === 'edit') {
       this.scriptDetails = { ...this.scriptDetails, ...scriptItem };
       this.eventScriptService
-        .update(script.name, script)
+        .update(script.name, scriptItem)
         .subscribe(() => this.goBack());
     } else {
-      this.scriptDetails = script;
+      this.scriptDetails = scriptItem;
       this.eventScriptService
         .create(scriptItem, undefined, scriptItem.name)
         .subscribe(() => this.goBack());
