@@ -1567,6 +1567,12 @@ export class DfServiceDetailsComponent implements OnInit {
     return this.serviceForm.get(`config.${name}`) as FormControl;
   }
 
+  get aiRoleId(): number | null {
+    const c = this.serviceForm.get('config.ai_role_id');
+    const v = c?.value;
+    return typeof v === 'number' ? v : null;
+  }
+
   getServiceDocByServiceIdControl(name: string) {
     return this.serviceForm.get(
       `service_doc_by_service_id.${name}`

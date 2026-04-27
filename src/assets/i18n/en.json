@@ -179,7 +179,7 @@
         }
       },
       "chat": {
-        "nav": "Chat",
+        "nav": "Conversations",
         "header": "AI Chat"
       },
       "mcp": {
