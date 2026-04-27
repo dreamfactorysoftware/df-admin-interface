@@ -44,7 +44,10 @@ describe('DfAiChatComponent (polling lifecycle)', () => {
     component = Object.create(DfAiChatComponent.prototype);
     Object.assign(component, {
       api,
-      route: { snapshot: { queryParamMap: { get: () => null } }, paramMap: of({ get: () => null }) },
+      route: {
+        snapshot: { queryParamMap: { get: () => null } },
+        paramMap: of({ get: () => null }),
+      },
       router: {},
       cdr: { markForCheck: () => undefined },
       chatServices: [],
@@ -67,8 +70,16 @@ describe('DfAiChatComponent (polling lifecycle)', () => {
   afterEach(() => jest.useRealTimers());
 
   it('two concurrent sends share a single poll timer that survives until both finish', () => {
-    const send1 = new Subject<{ id: number; role: 'assistant'; content: string }>();
-    const send2 = new Subject<{ id: number; role: 'assistant'; content: string }>();
+    const send1 = new Subject<{
+      id: number;
+      role: 'assistant';
+      content: string;
+    }>();
+    const send2 = new Subject<{
+      id: number;
+      role: 'assistant';
+      content: string;
+    }>();
     api.sendMessage
       .mockReturnValueOnce(send1.asObservable())
       .mockReturnValueOnce(send2.asObservable());
