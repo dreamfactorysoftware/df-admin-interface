@@ -816,6 +816,14 @@
                   class="full-width"
                   [form]="serviceForm"></df-ai-model-picker>
 
+                <!-- AI Connection: allowed-roles multi-select. Replaces
+                     the auto-rendered allowed_roles JSON text field.
+                     Required by df-ai-chat session validation. -->
+                <df-ai-allowed-roles
+                  *ngIf="serviceForm.getRawValue().type === 'ai_connection'"
+                  class="full-width"
+                  [form]="serviceForm"></df-ai-allowed-roles>
+
                 <ng-container
                   *ngIf="
                     this.isFile &&
@@ -844,6 +852,7 @@
                 <ng-container *ngFor="let item of viewSchema">
                   <!-- ai_chat: aiServiceId and aiRoleId picked via prereqs panel above
                        ai_connection: defaultModel picked via model-picker above
+                       ai_connection: allowedRoles picked via allowed-roles chips above
                        (df-service-details camelCases the schema names) -->
                   <ng-container
                     *ngIf="
@@ -854,7 +863,8 @@
                       ) &&
                       !(
                         serviceForm.getRawValue().type === 'ai_connection' &&
-                        item.name === 'defaultModel'
+                        (item.name === 'defaultModel' ||
+                          item.name === 'allowedRoles')
                       )
                     ">
                     <ng-container
