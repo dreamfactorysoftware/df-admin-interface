@@ -154,7 +154,16 @@ export class DfAiTestConnectionComponent {
 
   run(): void {
     const config = this.form.get('config')?.value ?? {};
+    // DF's case interceptor camel-cases /api/* response bodies, so an
+    // edited connection's form has baseUrl/apiKey not base_url/api_key.
+    // Read both — picks whichever the form actually carries.
     const provider = config.provider;
+    const apiKey = config.api_key ?? config.apiKey ?? null;
+    const baseUrl = config.base_url ?? config.baseUrl ?? null;
+    const orgId = config.organization_id ?? config.organizationId ?? null;
+    const extraHeaders = config.extra_headers ?? config.extraHeaders ?? null;
+    const timeout = config.timeout ?? null;
+
     if (!provider) {
       this.result = {
         success: false,
@@ -168,7 +177,7 @@ export class DfAiTestConnectionComponent {
     const needsKey = provider !== 'ollama' && provider !== 'openai_compatible';
     const needsUrl = provider === 'openai_compatible' || provider === 'ollama';
 
-    if (needsKey && !config.api_key) {
+    if (needsKey && !apiKey) {
       this.result = {
         success: false,
         error: {
@@ -178,7 +187,7 @@ export class DfAiTestConnectionComponent {
       };
       return;
     }
-    if (needsUrl && !config.base_url) {
+    if (needsUrl && !baseUrl) {
       this.result = {
         success: false,
         error: {
@@ -195,11 +204,11 @@ export class DfAiTestConnectionComponent {
 
     const body = {
       provider,
-      api_key: config.api_key ?? null,
-      base_url: config.base_url ?? null,
-      organization_id: config.organization_id ?? null,
-      extra_headers: config.extra_headers ?? null,
-      timeout: config.timeout ?? null,
+      api_key: apiKey,
+      base_url: baseUrl,
+      organization_id: orgId,
+      extra_headers: extraHeaders,
+      timeout,
     };
 
     this.http

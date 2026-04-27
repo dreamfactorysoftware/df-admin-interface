@@ -230,7 +230,7 @@ interface NormalizedModel {
   ],
 })
 export class DfAiModelPickerComponent implements OnInit {
-  /** Service form. Reads config.{provider, api_key, base_url, ...}, writes config.default_model. */
+  /** Service form. Reads config.{provider, api_key, base_url, ...}, writes config.defaultModel. */
   @Input({ required: true }) form!: FormGroup;
 
   private http = inject(HttpClient);
@@ -255,7 +255,7 @@ export class DfAiModelPickerComponent implements OnInit {
   }
 
   get currentValue(): string {
-    return this.form.get('config.default_model')?.value ?? '';
+    return this.form.get('config.defaultModel')?.value ?? '';
   }
 
   get fetchHint(): string {
@@ -270,12 +270,12 @@ export class DfAiModelPickerComponent implements OnInit {
   }
 
   select(id: string): void {
-    this.form.get('config.default_model')?.setValue(id);
+    this.form.get('config.defaultModel')?.setValue(id);
   }
 
   onCustomInput(event: Event): void {
     const value = (event.target as HTMLInputElement).value;
-    this.form.get('config.default_model')?.setValue(value);
+    this.form.get('config.defaultModel')?.setValue(value);
   }
 
   toggleCustom(): void {
@@ -293,12 +293,15 @@ export class DfAiModelPickerComponent implements OnInit {
     this.loading = true;
     this.error = null;
 
+    // DF camel-cases /api/* response bodies, so saved connections may
+    // have baseUrl/apiKey on the form rather than base_url/api_key.
     const body = {
       provider,
-      api_key: config.api_key ?? null,
-      base_url: config.base_url ?? null,
-      organization_id: config.organization_id ?? null,
-      extra_headers: config.extra_headers ?? null,
+      api_key: config.api_key ?? config.apiKey ?? null,
+      base_url: config.base_url ?? config.baseUrl ?? null,
+      organization_id:
+        config.organization_id ?? config.organizationId ?? null,
+      extra_headers: config.extra_headers ?? config.extraHeaders ?? null,
       timeout: config.timeout ?? null,
     };
 

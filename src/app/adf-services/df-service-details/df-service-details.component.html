@@ -842,18 +842,19 @@
                     [mode]="excelMode"></df-ace-editor>
                 </ng-container>
                 <ng-container *ngFor="let item of viewSchema">
-                  <!-- ai_chat: ai_service_id and ai_role_id picked via prereqs panel above
-                       ai_connection: default_model picked via model-picker above -->
+                  <!-- ai_chat: aiServiceId and aiRoleId picked via prereqs panel above
+                       ai_connection: defaultModel picked via model-picker above
+                       (df-service-details camelCases the schema names) -->
                   <ng-container
                     *ngIf="
                       !(
                         serviceForm.getRawValue().type === 'ai_chat' &&
-                        (item.name === 'ai_service_id' ||
-                          item.name === 'ai_role_id')
+                        (item.name === 'aiServiceId' ||
+                          item.name === 'aiRoleId')
                       ) &&
                       !(
                         serviceForm.getRawValue().type === 'ai_connection' &&
-                        item.name === 'default_model'
+                        item.name === 'defaultModel'
                       )
                     ">
                     <ng-container

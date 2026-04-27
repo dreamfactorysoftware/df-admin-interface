@@ -1573,24 +1573,27 @@ export class DfServiceDetailsComponent implements OnInit {
     return this.serviceForm.get(`config.${name}`) as FormControl;
   }
 
+  // df-service-details camelCases all schema field names when building the
+  // form (see getConfigSchema -> snakeToCamelString). So ai_role_id is
+  // exposed on the form as aiRoleId, ai_service_id as aiServiceId, etc.
   get aiRoleId(): number | null {
-    const c = this.serviceForm.get('config.ai_role_id');
+    const c = this.serviceForm.get('config.aiRoleId');
     const v = c?.value;
     return typeof v === 'number' ? v : null;
   }
 
   get aiServiceId(): number | null {
-    const c = this.serviceForm.get('config.ai_service_id');
+    const c = this.serviceForm.get('config.aiServiceId');
     const v = c?.value;
     return typeof v === 'number' ? v : null;
   }
 
   setAiServiceId(id: number): void {
-    this.serviceForm.get('config.ai_service_id')?.setValue(id);
+    this.serviceForm.get('config.aiServiceId')?.setValue(id);
   }
 
   setAiRoleId(id: number): void {
-    this.serviceForm.get('config.ai_role_id')?.setValue(id);
+    this.serviceForm.get('config.aiRoleId')?.setValue(id);
   }
 
   getServiceDocByServiceIdControl(name: string) {
