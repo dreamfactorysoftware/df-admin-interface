@@ -299,8 +299,7 @@ export class DfAiModelPickerComponent implements OnInit {
       provider,
       api_key: config.api_key ?? config.apiKey ?? null,
       base_url: config.base_url ?? config.baseUrl ?? null,
-      organization_id:
-        config.organization_id ?? config.organizationId ?? null,
+      organization_id: config.organization_id ?? config.organizationId ?? null,
       extra_headers: config.extra_headers ?? config.extraHeaders ?? null,
       timeout: config.timeout ?? null,
     };
