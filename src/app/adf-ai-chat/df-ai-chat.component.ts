@@ -66,6 +66,7 @@ export class DfAiChatComponent implements OnInit, OnDestroy {
   faDatabase = faDatabase;
 
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
+  private inFlightSends = 0;
   private subs: Subscription[] = [];
   private optimisticIdCounter = -1;
   private autoScrollPinned = true;
@@ -113,6 +114,9 @@ export class DfAiChatComponent implements OnInit, OnDestroy {
     }
     this.selectedServiceName = name;
     this.activeSession = null;
+    this.stopPolling();
+    this.inFlightSends = 0;
+    this.awaitingAssistant = false;
     this.loadSessions();
   }
 
@@ -184,6 +188,8 @@ export class DfAiChatComponent implements OnInit, OnDestroy {
         this.sessions = this.sessions.filter(x => x.id !== s.id);
         if (this.activeSession?.id === s.id) {
           this.activeSession = null;
+          this.stopPolling();
+          this.awaitingAssistant = false;
         }
       },
       error: err => (this.errorMessage = this.extractError(err)),
@@ -208,6 +214,7 @@ export class DfAiChatComponent implements OnInit, OnDestroy {
     };
     this.scrollToBottom(true);
 
+    this.inFlightSends++;
     this.awaitingAssistant = true;
     this.startPolling(sessionId);
 
@@ -215,9 +222,12 @@ export class DfAiChatComponent implements OnInit, OnDestroy {
       .sendMessage(this.selectedServiceName, sessionId, text)
       .pipe(
         finalize(() => {
-          this.awaitingAssistant = false;
-          this.stopPolling();
-          // One final refresh to reconcile optimistic message + final state.
+          this.inFlightSends = Math.max(0, this.inFlightSends - 1);
+          if (this.inFlightSends === 0) {
+            this.awaitingAssistant = false;
+            this.stopPolling();
+          }
+          // Final reconciliation regardless — pulls the canonical state.
           this.refreshActiveSession(sessionId);
         })
       )
@@ -231,8 +241,14 @@ export class DfAiChatComponent implements OnInit, OnDestroy {
       });
   }
 
+  /**
+   * Idempotent: starts the poll timer once. Concurrent sends share a single
+   * timer that runs while inFlightSends > 0.
+   */
   private startPolling(sessionId: number): void {
-    this.stopPolling();
+    if (this.pollTimer) {
+      return;
+    }
     const tick = () => {
       this.refreshActiveSession(sessionId);
       this.pollTimer = setTimeout(tick, 1000);
