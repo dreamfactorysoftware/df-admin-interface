@@ -97,6 +97,10 @@ export class DfRoleScopeComponent implements OnChanges {
   faChevronDown = faChevronDown;
   faChevronRight = faChevronRight;
 
+  get hasRoleId(): boolean {
+    return this.roleId !== null && this.roleId !== undefined;
+  }
+
   constructor(
     @Inject(ROLE_SERVICE_TOKEN) private roleService: DfBaseCrudService,
     @Inject(SERVICES_SERVICE_TOKEN) private servicesService: DfBaseCrudService
@@ -127,7 +131,8 @@ export class DfRoleScopeComponent implements OnChanges {
     this.roleName = '';
     this.roleDescription = '';
 
-    if (this.roleId == null) {
+    const id = this.roleId;
+    if (id === null || id === undefined) {
       return;
     }
 
@@ -135,7 +140,7 @@ export class DfRoleScopeComponent implements OnChanges {
 
     forkJoin({
       role: this.roleService
-        .get<RoleScopeRoleResponse>(this.roleId, {
+        .get<RoleScopeRoleResponse>(id, {
           related: 'role_service_access_by_role_id',
         })
         .pipe(catchError(() => of(null))),

@@ -8,7 +8,7 @@
     {{ error }}
   </div>
 
-  <ng-container *ngIf="!loading && !error && roleId != null">
+  <ng-container *ngIf="!loading && !error && hasRoleId">
     <header class="df-role-scope__header">
       <h3>
         {{ 'roleScope.heading' | transloco: { name: roleName } }}
