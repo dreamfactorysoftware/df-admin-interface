@@ -1,0 +1,109 @@
+<div class="df-role-scope" [class.compact]="compact">
+  <div *ngIf="loading" class="df-role-scope__loading">
+    <mat-spinner diameter="24"></mat-spinner>
+    <span>{{ 'roleScope.loading' | transloco }}</span>
+  </div>
+
+  <div *ngIf="error" class="df-role-scope__error">
+    {{ error }}
+  </div>
+
+  <ng-container *ngIf="!loading && !error && roleId != null">
+    <header class="df-role-scope__header">
+      <h3>
+        {{ 'roleScope.heading' | transloco: { name: roleName } }}
+      </h3>
+      <p *ngIf="roleDescription" class="df-role-scope__description">
+        {{ roleDescription }}
+      </p>
+    </header>
+
+    <section class="df-role-scope__allowed">
+      <h4 class="df-role-scope__section-title">
+        {{ 'roleScope.allowedHeading' | transloco }}
+      </h4>
+
+      <div
+        *ngIf="allowedServices.length === 0"
+        class="df-role-scope__empty">
+        {{ 'roleScope.noAccess' | transloco }}
+      </div>
+
+      <ul class="df-role-scope__service-list">
+        <li
+          *ngFor="let entry of allowedServices; trackBy: trackByServiceId"
+          class="df-role-scope__service df-role-scope__service--allowed">
+          <div class="df-role-scope__service-header">
+            <fa-icon
+              [icon]="faCheck"
+              class="df-role-scope__icon df-role-scope__icon--allow"></fa-icon>
+            <span class="df-role-scope__service-name">{{
+              entry.service.name
+            }}</span>
+            <span class="df-role-scope__service-type">{{
+              entry.service.type
+            }}</span>
+          </div>
+          <ul class="df-role-scope__rule-list">
+            <li
+              *ngFor="let rule of entry.rules"
+              class="df-role-scope__rule">
+              <code class="df-role-scope__component">{{ rule.component }}</code>
+              <span class="df-role-scope__verbs">
+                <span
+                  *ngFor="let v of rule.verbs"
+                  class="df-role-scope__verb-chip"
+                  >{{ v }}</span
+                >
+                <span
+                  *ngIf="rule.verbs.length === 0"
+                  class="df-role-scope__verb-empty"
+                  >{{ 'roleScope.noVerbs' | transloco }}</span
+                >
+              </span>
+              <span
+                *ngIf="rule.requesters.length > 0"
+                class="df-role-scope__requesters">
+                ({{ rule.requesters.join(', ') }})
+              </span>
+            </li>
+          </ul>
+        </li>
+      </ul>
+    </section>
+
+    <section
+      *ngIf="showDeniedServices && deniedServices.length > 0"
+      class="df-role-scope__denied">
+      <button
+        type="button"
+        class="df-role-scope__denied-toggle"
+        (click)="toggleDenied()">
+        <fa-icon
+          [icon]="expandedDenied ? faChevronDown : faChevronRight"></fa-icon>
+        <span>{{
+          'roleScope.deniedHeading'
+            | transloco: { count: deniedServices.length }
+        }}</span>
+      </button>
+      <ul *ngIf="expandedDenied" class="df-role-scope__service-list">
+        <li
+          *ngFor="let svc of deniedServices; trackBy: trackByDeniedId"
+          class="df-role-scope__service df-role-scope__service--denied">
+          <fa-icon
+            [icon]="faXmark"
+            class="df-role-scope__icon df-role-scope__icon--deny"></fa-icon>
+          <span class="df-role-scope__service-name">{{ svc.name }}</span>
+          <span class="df-role-scope__service-type">{{ svc.type }}</span>
+          <span class="df-role-scope__deny-label">{{
+            'roleScope.noAccessLabel' | transloco
+          }}</span>
+        </li>
+      </ul>
+    </section>
+
+    <footer class="df-role-scope__footer">
+      {{ 'roleScope.footer' | transloco }}
+    </footer>
+  </ng-container>
+</div>
