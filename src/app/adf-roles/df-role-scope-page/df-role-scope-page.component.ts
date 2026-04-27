@@ -22,14 +22,14 @@ import { DfRoleScopeComponent } from 'src/app/shared/components/df-role-scope/df
     <div class="df-role-scope-page">
       <a class="df-role-scope-page__back" mat-button [routerLink]="['..']">
         <fa-icon [icon]="faArrowLeft"></fa-icon>
-        <span>{{ 'roleScope.back' | transloco }}</span>
+        <span>{{ 'roles.roleScope.back' | transloco }}</span>
       </a>
       <df-role-scope *ngIf="roleId !== null" [roleId]="roleId">
         <a
           df-role-scope-error-action
           mat-stroked-button
           [routerLink]="['..', '..']">
-          {{ 'roleScope.errorRecovery' | transloco }}
+          {{ 'roles.roleScope.errorRecovery' | transloco }}
         </a>
       </df-role-scope>
     </div>
@@ -39,10 +39,11 @@ import { DfRoleScopeComponent } from 'src/app/shared/components/df-role-scope/df
       .df-role-scope-page {
         display: flex;
         flex-direction: column;
-        gap: 1rem;
-        padding: 1.5rem;
-        max-width: 960px;
+        gap: 1.25rem;
+        padding: 1.5rem 2rem 3rem;
+        max-width: 1200px;
         margin: 0 auto;
+        width: 100%;
       }
 
       .df-role-scope-page__back {

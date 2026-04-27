@@ -69,13 +69,13 @@ export class DfManageRolesTableComponent extends DfManageTableComponent<RoleRow>
     };
 
     const viewScopeAction = {
-      label: 'roleScope.action',
+      label: 'roles.roleScope.action',
       function: (row: RoleRow) =>
         this.router.navigate([row.id, 'scope'], {
           relativeTo: this._activatedRoute,
         }),
       ariaLabel: {
-        key: 'roleScope.action',
+        key: 'roles.roleScope.action',
         param: 'name',
       },
       icon: faEye,

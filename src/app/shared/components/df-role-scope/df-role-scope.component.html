@@ -1,7 +1,7 @@
 <div class="df-role-scope" [class.compact]="compact">
   <div *ngIf="loading" class="df-role-scope__loading">
     <mat-spinner diameter="24"></mat-spinner>
-    <span>{{ 'roleScope.loading' | transloco }}</span>
+    <span>{{ 'roles.roleScope.loading' | transloco }}</span>
   </div>
 
   <div *ngIf="error" class="df-role-scope__error">
@@ -12,7 +12,7 @@
   <ng-container *ngIf="!loading && !error && hasRoleId">
     <header class="df-role-scope__header">
       <h3>
-        {{ 'roleScope.heading' | transloco: { name: roleName } }}
+        {{ 'roles.roleScope.heading' | transloco: { name: roleName } }}
       </h3>
       <p *ngIf="roleDescription" class="df-role-scope__description">
         {{ roleDescription }}
@@ -21,11 +21,11 @@
 
     <section class="df-role-scope__allowed">
       <h4 class="df-role-scope__section-title">
-        {{ 'roleScope.allowedHeading' | transloco }}
+        {{ 'roles.roleScope.allowedHeading' | transloco }}
       </h4>
 
       <div *ngIf="allowedServices.length === 0" class="df-role-scope__empty">
-        {{ 'roleScope.noAccess' | transloco }}
+        {{ 'roles.roleScope.noAccess' | transloco }}
       </div>
 
       <ul class="df-role-scope__service-list">
@@ -55,7 +55,7 @@
                 <span
                   *ngIf="rule.verbs.length === 0"
                   class="df-role-scope__verb-empty"
-                  >{{ 'roleScope.noVerbs' | transloco }}</span
+                  >{{ 'roles.roleScope.noVerbs' | transloco }}</span
                 >
               </span>
               <span
@@ -79,7 +79,7 @@
         <fa-icon
           [icon]="expandedDenied ? faChevronDown : faChevronRight"></fa-icon>
         <span>{{
-          'roleScope.deniedHeading'
+          'roles.roleScope.deniedHeading'
             | transloco: { count: deniedServices.length }
         }}</span>
       </button>
@@ -93,14 +93,14 @@
           <span class="df-role-scope__service-name">{{ svc.name }}</span>
           <span class="df-role-scope__service-type">{{ svc.type }}</span>
           <span class="df-role-scope__deny-label">{{
-            'roleScope.noAccessLabel' | transloco
+            'roles.roleScope.noAccessLabel' | transloco
           }}</span>
         </li>
       </ul>
     </section>
 
     <footer class="df-role-scope__footer">
-      {{ 'roleScope.footer' | transloco }}
+      {{ 'roles.roleScope.footer' | transloco }}
     </footer>
   </ng-container>
 </div>
