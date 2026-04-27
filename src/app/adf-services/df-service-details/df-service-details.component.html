@@ -871,6 +871,17 @@
                       class="full-width"></df-array-field>
                   </ng-template>
                 </ng-container>
+
+                <!-- AI Chat: show what the AI can see, derived from ai_role_id -->
+                <df-role-scope
+                  *ngIf="
+                    serviceForm.getRawValue().type === 'ai_chat' &&
+                    getConfigControl('ai_role_id').value
+                  "
+                  class="full-width"
+                  [roleId]="
+                    getConfigControl('ai_role_id').value
+                  "></df-role-scope>
               </div>
             </mat-expansion-panel>
           </mat-accordion>

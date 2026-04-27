@@ -28,6 +28,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { DfArrayFieldComponent } from 'src/app/shared/components/df-field-array/df-array-field.component';
 import { DfDynamicFieldComponent } from 'src/app/shared/components/df-dynamic-field/df-dynamic-field.component';
+import { DfRoleScopeComponent } from 'src/app/shared/components/df-role-scope/df-role-scope.component';
 import { DfAceEditorComponent } from 'src/app/shared/components/df-ace-editor/df-ace-editor.component';
 import { DfSecurityConfigComponent } from 'src/app/shared/components/df-security-config/df-security-config.component';
 
@@ -148,6 +149,7 @@ interface ServiceResponse {
     MatCheckboxModule,
     NgTemplateOutlet,
     DfDynamicFieldComponent,
+    DfRoleScopeComponent,
     DfArrayFieldComponent,
     DfAceEditorComponent,
     FontAwesomeModule,
