@@ -146,7 +146,7 @@ interface RoleRow {
               [routerLink]="[
                 '/api-connections/role-based-access',
                 r.id,
-                'scope'
+                'scope',
               ]"
               class="prereqs__link"
               >scope</a
@@ -267,7 +267,9 @@ interface RoleRow {
           font-size: 0.8125rem;
           color: inherit;
           cursor: pointer;
-          transition: border-color 120ms ease, background 120ms ease;
+          transition:
+            border-color 120ms ease,
+            background 120ms ease;
 
           &:hover {
             border-color: rgba(96, 165, 250, 0.6);

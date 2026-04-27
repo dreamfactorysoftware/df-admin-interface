@@ -49,18 +49,16 @@ interface TestConnectionResponse {
           [icon]="result.success ? faCheckCircle : faCircleXmark"></fa-icon>
         <div class="test-conn__detail">
           <strong>{{
-            result.success
-              ? 'Connection succeeded'
-              : 'Connection failed'
+            result.success ? 'Connection succeeded' : 'Connection failed'
           }}</strong>
           <p *ngIf="!result.success && result.error?.message">
             {{ result.error?.message }}
           </p>
-          <p
-            *ngIf="result.success && modelCount > 0"
-            class="test-conn__models">
+          <p *ngIf="result.success && modelCount > 0" class="test-conn__models">
             {{ modelCount }} models available
-            <span *ngIf="firstModelLabel">— including {{ firstModelLabel }}</span>
+            <span *ngIf="firstModelLabel"
+              >— including {{ firstModelLabel }}</span
+            >
           </p>
         </div>
       </div>
