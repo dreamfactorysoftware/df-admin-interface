@@ -326,4 +326,8 @@ export class DfRoleDetailsComponent implements OnInit {
   goBack() {
     this.router.navigate(['../'], { relativeTo: this.activatedRoute });
   }
+
+  viewScope() {
+    this.router.navigate(['scope'], { relativeTo: this.activatedRoute });
+  }
 }

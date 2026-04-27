@@ -24,7 +24,14 @@ import { DfRoleScopeComponent } from 'src/app/shared/components/df-role-scope/df
         <fa-icon [icon]="faArrowLeft"></fa-icon>
         <span>{{ 'roleScope.back' | transloco }}</span>
       </a>
-      <df-role-scope *ngIf="roleId !== null" [roleId]="roleId"></df-role-scope>
+      <df-role-scope *ngIf="roleId !== null" [roleId]="roleId">
+        <a
+          df-role-scope-error-action
+          mat-stroked-button
+          [routerLink]="['..', '..']">
+          {{ 'roleScope.errorRecovery' | transloco }}
+        </a>
+      </df-role-scope>
     </div>
   `,
   styles: [
