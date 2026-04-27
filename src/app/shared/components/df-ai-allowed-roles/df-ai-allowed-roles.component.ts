@@ -42,10 +42,9 @@ interface RoleRow {
       </div>
 
       <p class="allowed-roles__hint">
-        Pick the DreamFactory roles that may use this AI Connection. Each
-        role's data scope determines what the AI can read while operating
-        under that role. At least one role is required before chat sessions
-        can run.
+        Pick the DreamFactory roles that may use this AI Connection. Each role's
+        data scope determines what the AI can read while operating under that
+        role. At least one role is required before chat sessions can run.
       </p>
 
       <div
@@ -74,20 +73,14 @@ interface RoleRow {
             <span class="allowed-roles__name">{{ r.name }}</span>
           </button>
           <a
-            [routerLink]="[
-              '/api-connections/role-based-access',
-              r.id,
-              'scope'
-            ]"
+            [routerLink]="['/api-connections/role-based-access', r.id, 'scope']"
             class="allowed-roles__link"
             >what can this role see?</a
           >
         </li>
       </ul>
 
-      <p
-        *ngIf="!loading && roles.length === 0"
-        class="allowed-roles__empty">
+      <p *ngIf="!loading && roles.length === 0" class="allowed-roles__empty">
         No DreamFactory roles exist yet. Create one and come back.
       </p>
     </div>
@@ -189,7 +182,9 @@ interface RoleRow {
           font-size: 0.95rem;
           color: inherit;
           cursor: pointer;
-          transition: border-color 120ms ease, background 120ms ease;
+          transition:
+            border-color 120ms ease,
+            background 120ms ease;
 
           &:hover {
             border-color: rgba(167, 139, 250, 0.6);
@@ -268,9 +263,7 @@ export class DfAiAllowedRolesComponent implements OnInit {
 
   toggle(id: number): void {
     const cur = this.selected;
-    const next = cur.includes(id)
-      ? cur.filter(x => x !== id)
-      : [...cur, id];
+    const next = cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id];
     this.form.get('config.allowedRoles')?.setValue(next);
   }
 
