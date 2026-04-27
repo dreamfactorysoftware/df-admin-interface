@@ -154,7 +154,7 @@ interface RoleRow {
               [routerLink]="[
                 '/api-connections/role-based-access',
                 r.id,
-                'scope'
+                'scope',
               ]"
               class="prereqs__link"
               >what can this role see?</a
