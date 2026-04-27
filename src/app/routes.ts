@@ -184,9 +184,9 @@ export const routes: Routes = [
           {
             path: ':id/scope',
             loadComponent: () =>
-              import(
-                './adf-roles/df-role-scope-page/df-role-scope-page.component'
-              ).then(m => m.DfRoleScopePageComponent),
+              import('./adf-roles/df-role-scope-page/df-role-scope-page.component').then(
+                m => m.DfRoleScopePageComponent
+              ),
           },
         ],
         providers: [provideTranslocoScope('roles')],

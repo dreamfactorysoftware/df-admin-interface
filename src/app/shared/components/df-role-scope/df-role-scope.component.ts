@@ -164,10 +164,7 @@ export class DfRoleScopeComponent implements OnChanges {
     });
   }
 
-  private buildScope(
-    role: RoleScopeRoleResponse,
-    services: Service[]
-  ): void {
+  private buildScope(role: RoleScopeRoleResponse, services: Service[]): void {
     const accessRows = role.roleServiceAccessByRoleId ?? [];
     const serviceById = new Map<number, Service>();
     services.forEach(s => serviceById.set(s.id, s));

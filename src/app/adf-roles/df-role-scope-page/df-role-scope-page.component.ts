@@ -20,10 +20,7 @@ import { DfRoleScopeComponent } from 'src/app/shared/components/df-role-scope/df
   ],
   template: `
     <div class="df-role-scope-page">
-      <a
-        class="df-role-scope-page__back"
-        mat-button
-        [routerLink]="['..']">
+      <a class="df-role-scope-page__back" mat-button [routerLink]="['..']">
         <fa-icon [icon]="faArrowLeft"></fa-icon>
         <span>{{ 'roleScope.back' | transloco }}</span>
       </a>

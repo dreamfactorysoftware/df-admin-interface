@@ -23,9 +23,7 @@
         {{ 'roleScope.allowedHeading' | transloco }}
       </h4>
 
-      <div
-        *ngIf="allowedServices.length === 0"
-        class="df-role-scope__empty">
+      <div *ngIf="allowedServices.length === 0" class="df-role-scope__empty">
         {{ 'roleScope.noAccess' | transloco }}
       </div>
 
@@ -45,9 +43,7 @@
             }}</span>
           </div>
           <ul class="df-role-scope__rule-list">
-            <li
-              *ngFor="let rule of entry.rules"
-              class="df-role-scope__rule">
+            <li *ngFor="let rule of entry.rules" class="df-role-scope__rule">
               <code class="df-role-scope__component">{{ rule.component }}</code>
               <span class="df-role-scope__verbs">
                 <span
