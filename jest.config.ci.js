@@ -31,5 +31,15 @@ module.exports = {
     '<rootDir>/src/app/shared/utilities/file.spec.ts',
     '<rootDir>/src/app/shared/services/df-breakpoint.service.spec.ts',
     '<rootDir>/src/app/shared/services/df-theme.service.spec.ts',
+    // 2026-04-27 AI admin UI: role-scope visualization, AI chat module,
+    // test-connection. Pure-class + HttpClientTestingModule patterns —
+    // no transloco TestBed setup required.
+    '<rootDir>/src/app/shared/components/df-role-scope/df-role-scope.component.spec.ts',
+    '<rootDir>/src/app/adf-ai-chat/services/ai-chat.service.spec.ts',
+    '<rootDir>/src/app/adf-ai-chat/components/df-chat-input/df-chat-input.component.spec.ts',
+    '<rootDir>/src/app/adf-ai-chat/components/df-chat-message/df-chat-message.component.spec.ts',
+    '<rootDir>/src/app/adf-ai-chat/components/df-chat-tool-result/df-chat-tool-result.component.spec.ts',
+    '<rootDir>/src/app/adf-ai-chat/components/df-ai-chat-prereqs/df-ai-chat-prereqs.component.spec.ts',
+    '<rootDir>/src/app/shared/components/df-ai-test-connection/df-ai-test-connection.component.spec.ts',
   ],
 };
