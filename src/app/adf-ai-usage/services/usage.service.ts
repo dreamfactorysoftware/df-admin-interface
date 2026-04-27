@@ -1,137 +1,185 @@
-import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { Injectable, inject } from '@angular/core';
 import { Observable, forkJoin, of } from 'rxjs';
 import { catchError, map, switchMap } from 'rxjs/operators';
 import { BASE_URL } from 'src/app/shared/constants/urls';
-import { UsageSessionRow } from '../types/usage';
-import { ChatService } from 'src/app/adf-ai-chat/types/chat';
 
-interface ServiceListResponse {
-  resource: ChatService[];
+export type TimeRange = '24h' | '7d' | '30d' | 'all';
+
+export interface UsageResponse {
+  period: string;
+  since: string;
+  total_requests: number;
+  total_input_tokens: number;
+  total_output_tokens: number;
+  errors: number;
+  avg_latency_ms: number;
+  by_service: GroupRowRaw[];
+  by_user: GroupRowRaw[];
+  by_role: GroupRowRaw[];
+  by_provider: GroupRowRaw[];
+  by_model: ModelRowRaw[];
+  by_resource: ResourceRowRaw[];
+  series: SeriesRowRaw[];
 }
 
-interface SessionListResponse {
-  resource: Array<UsageSessionRow>;
+interface GroupRowRaw {
+  service_id?: number;
+  user_id?: number | null;
+  role_id?: number | null;
+  provider?: string;
+  requests: number | string;
+  input_tokens: number | string;
+  output_tokens: number | string;
+  avg_latency?: number | string;
+  errors?: number | string;
 }
 
-interface RoleRow {
+interface ModelRowRaw {
+  model: string;
+  provider: string;
+  requests: number | string;
+  input_tokens: number | string;
+  output_tokens: number | string;
+}
+
+interface ResourceRowRaw {
+  resource: string;
+  requests: number | string;
+}
+
+interface SeriesRowRaw {
+  date: string;
+  requests: number | string;
+  input_tokens: number | string;
+  output_tokens: number | string;
+  errors: number | string;
+}
+
+interface ServiceLookupRow {
+  id: number;
+  name: string;
+  label?: string;
+  type: string;
+}
+
+interface RoleLookupRow {
   id: number;
   name: string;
 }
 
-interface UserRow {
+interface UserLookupRow {
   id: number;
-  name: string;
-  username: string;
-  email: string;
-}
-
-interface AiConnectionRow {
-  id: number;
-  name: string;
-  config?: { provider?: string };
+  name?: string;
+  username?: string;
+  email?: string;
 }
 
 export interface UsageBundle {
-  sessions: UsageSessionRow[];
-  services: ChatService[];
+  raw: UsageResponse;
+  services: Map<number, ServiceLookupRow>;
   users: Map<number, string>;
   roles: Map<number, string>;
-  /** ai_service_id -> provider name (for cost estimation lookups). */
-  connectionProviders: Map<number, string>;
 }
 
 @Injectable({ providedIn: 'root' })
 export class UsageService {
   private http = inject(HttpClient);
 
-  /**
-   * Fetch every chat service's sessions and the user/role lookup tables in
-   * parallel. Returns a single shaped bundle the dashboard can render.
-   *
-   * Client-side aggregation — fine for PoC scale. Phase 1 swaps to a backend
-   * rollup endpoint.
-   */
-  loadAll(): Observable<UsageBundle> {
+  loadAll(range: TimeRange): Observable<UsageBundle> {
+    const period = range === 'all' ? '3650d' : range;
+
     return forkJoin({
-      services: this.listChatServices(),
+      raw: this.http
+        .get<UsageResponse>('/_internal/ai/usage', { params: { period } })
+        .pipe(
+          catchError(() =>
+            of({
+              period,
+              since: new Date(Date.now() - 7 * 86400000).toISOString(),
+              total_requests: 0,
+              total_input_tokens: 0,
+              total_output_tokens: 0,
+              errors: 0,
+              avg_latency_ms: 0,
+              by_service: [],
+              by_user: [],
+              by_role: [],
+              by_provider: [],
+              by_model: [],
+              by_resource: [],
+              series: [],
+            } as UsageResponse)
+          )
+        ),
+      services: this.listServices(),
       users: this.listUsers(),
       roles: this.listRoles(),
-      connections: this.listAiConnections(),
-    }).pipe(
-      switchMap(({ services, users, roles, connections }) => {
-        if (services.length === 0) {
-          return of({
-            sessions: [] as UsageSessionRow[],
-            services,
-            users,
-            roles,
-            connectionProviders: connections,
-          });
-        }
-        const perService = services.map(svc =>
-          this.http
-            .get<SessionListResponse>(`${BASE_URL}/${svc.name}/session`, {
-              params: { status: 'all' },
-            })
-            .pipe(
-              map(res =>
-                (res.resource ?? []).map(s => ({
-                  ...s,
-                  service_name: svc.name,
-                  service_label: svc.label,
-                }))
-              ),
-              catchError(() => of([] as UsageSessionRow[]))
-            )
-        );
-        return forkJoin(perService).pipe(
-          map(arrays => ({
-            sessions: arrays.flat(),
-            services,
-            users,
-            roles,
-            connectionProviders: connections,
-          }))
-        );
-      })
-    );
+    }).pipe(map(b => b));
   }
 
-  private listChatServices(): Observable<ChatService[]> {
+  private listServices(): Observable<Map<number, ServiceLookupRow>> {
     return this.http
-      .get<ServiceListResponse>(`${BASE_URL}/system/service`, {
+      .get<{ resource: ServiceLookupRow[] }>(`${BASE_URL}/system/service`, {
         params: {
-          filter: 'type = "ai_chat"',
-          fields: 'id,name,label,type,description,is_active',
+          fields: 'id,name,label,type',
+          filter: '(type = "ai_connection") or (type = "ai_chat")',
         },
       })
       .pipe(
-        map(res => res.resource ?? []),
-        catchError(() => of([] as ChatService[]))
+        map(res => {
+          const m = new Map<number, ServiceLookupRow>();
+          (res.resource ?? []).forEach(s => m.set(s.id, s));
+          return m;
+        }),
+        catchError(() => of(new Map<number, ServiceLookupRow>()))
       );
   }
 
   private listUsers(): Observable<Map<number, string>> {
     return this.http
-      .get<{ resource: UserRow[] }>(`${BASE_URL}/system/user`, {
+      .get<{ resource: UserLookupRow[] }>(`${BASE_URL}/system/user`, {
         params: { fields: 'id,name,username,email' },
       })
       .pipe(
-        map(res => {
-          const m = new Map<number, string>();
-          (res.resource ?? []).forEach(u =>
-            m.set(u.id, u.name || u.username || u.email || `user #${u.id}`)
-          );
-          return m;
-        }),
+        switchMap(userRes =>
+          this.http
+            .get<{ resource: UserLookupRow[] }>(`${BASE_URL}/system/admin`, {
+              params: { fields: 'id,name,username,email' },
+            })
+            .pipe(
+              map(adminRes => {
+                const m = new Map<number, string>();
+                const fold = (rows: UserLookupRow[]) => {
+                  rows.forEach(u =>
+                    m.set(
+                      u.id,
+                      u.name || u.username || u.email || `user #${u.id}`
+                    )
+                  );
+                };
+                fold(userRes.resource ?? []);
+                fold(adminRes.resource ?? []);
+                return m;
+              }),
+              catchError(() => of(this.foldUsers(userRes.resource ?? [])))
+            )
+        ),
         catchError(() => of(new Map<number, string>()))
       );
   }
 
+  private foldUsers(rows: UserLookupRow[]): Map<number, string> {
+    const m = new Map<number, string>();
+    rows.forEach(u =>
+      m.set(u.id, u.name || u.username || u.email || `user #${u.id}`)
+    );
+    return m;
+  }
+
   private listRoles(): Observable<Map<number, string>> {
     return this.http
-      .get<{ resource: RoleRow[] }>(`${BASE_URL}/system/role`, {
+      .get<{ resource: RoleLookupRow[] }>(`${BASE_URL}/system/role`, {
         params: { fields: 'id,name' },
       })
       .pipe(
@@ -143,27 +191,17 @@ export class UsageService {
         catchError(() => of(new Map<number, string>()))
       );
   }
+}
 
-  private listAiConnections(): Observable<Map<number, string>> {
-    return this.http
-      .get<{ resource: AiConnectionRow[] }>(`${BASE_URL}/system/service`, {
-        params: {
-          filter: 'type = "ai_connection"',
-          fields: 'id,name,config',
-          related: 'service_doc_by_service_id',
-        },
-      })
-      .pipe(
-        map(res => {
-          const m = new Map<number, string>();
-          (res.resource ?? []).forEach(c => {
-            if (c.config?.provider) {
-              m.set(c.id, c.config.provider);
-            }
-          });
-          return m;
-        }),
-        catchError(() => of(new Map<number, string>()))
-      );
+/** Helpers used by the dashboard to render group rows. The backend may
+ *  return numeric fields as strings (DB driver dependent) — coerce here. */
+export function n(v: unknown): number {
+  if (typeof v === 'number') {
+    return v;
   }
+  if (typeof v === 'string') {
+    const x = Number(v);
+    return Number.isFinite(x) ? x : 0;
+  }
+  return 0;
 }

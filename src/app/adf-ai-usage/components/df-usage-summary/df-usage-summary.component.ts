@@ -9,7 +9,7 @@ import { UsageSummary } from '../../types/usage';
   template: `
     <div class="summary">
       <article class="summary__card">
-        <span class="summary__label">Sessions</span>
+        <span class="summary__label">Requests</span>
         <span class="summary__value">{{ summary.sessionCount | number }}</span>
       </article>
       <article class="summary__card">
@@ -24,16 +24,18 @@ import { UsageSummary } from '../../types/usage';
         <span class="summary__label">Total tokens</span>
         <span class="summary__value">{{ summary.totalTokens | number }}</span>
       </article>
-      <article class="summary__card">
-        <span class="summary__label">Tool calls</span>
-        <span class="summary__value">{{ summary.toolCalls | number }}</span>
+      <article
+        class="summary__card"
+        [class.summary__card--error]="(summary.errors ?? 0) > 0">
+        <span class="summary__label">Errors</span>
+        <span class="summary__value">{{ summary.errors ?? 0 | number }}</span>
       </article>
       <article class="summary__card">
-        <span class="summary__label">Avg / session</span>
-        <span class="summary__value"
-          >{{ summary.avgTokensPerSession | number }}
-          <small>tokens</small></span
-        >
+        <span class="summary__label">Avg latency</span>
+        <span class="summary__value">
+          {{ summary.avgLatencyMs ?? 0 | number }}
+          <small>ms</small>
+        </span>
       </article>
     </div>
   `,
@@ -52,6 +54,15 @@ import { UsageSummary } from '../../types/usage';
           display: flex;
           flex-direction: column;
           gap: 0.35rem;
+
+          &--error {
+            background: rgba(220, 53, 69, 0.08);
+            border-color: rgba(220, 53, 69, 0.3);
+
+            .summary__value {
+              color: #ff8585;
+            }
+          }
         }
         &__label {
           font-size: 0.75rem;

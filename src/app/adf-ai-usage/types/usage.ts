@@ -28,13 +28,15 @@ export interface GroupRow {
 
 /** Top-line summary cards. */
 export interface UsageSummary {
-  sessionCount: number;
+  sessionCount: number; // requests for the gateway, sessions in chat-only views
   inputTokens: number;
   outputTokens: number;
   totalTokens: number;
   toolCalls: number;
   avgTokensPerSession: number;
   avgToolCallsPerSession: number;
+  errors?: number;
+  avgLatencyMs?: number;
 }
 
 export type GroupBy = 'user' | 'role' | 'service';
