@@ -29,6 +29,7 @@ import { TranslocoPipe } from '@ngneat/transloco';
 import { DfArrayFieldComponent } from 'src/app/shared/components/df-field-array/df-array-field.component';
 import { DfDynamicFieldComponent } from 'src/app/shared/components/df-dynamic-field/df-dynamic-field.component';
 import { DfRoleScopeComponent } from 'src/app/shared/components/df-role-scope/df-role-scope.component';
+import { DfAiChatPrereqsComponent } from 'src/app/adf-ai-chat/components/df-ai-chat-prereqs/df-ai-chat-prereqs.component';
 import { DfAceEditorComponent } from 'src/app/shared/components/df-ace-editor/df-ace-editor.component';
 import { DfSecurityConfigComponent } from 'src/app/shared/components/df-security-config/df-security-config.component';
 
@@ -150,6 +151,7 @@ interface ServiceResponse {
     NgTemplateOutlet,
     DfDynamicFieldComponent,
     DfRoleScopeComponent,
+    DfAiChatPrereqsComponent,
     DfArrayFieldComponent,
     DfAceEditorComponent,
     FontAwesomeModule,

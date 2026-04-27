@@ -793,6 +793,11 @@
                 >{{ 'services.options' | transloco }}
               </mat-expansion-panel-header>
               <div class="details-section">
+                <!-- AI Chat: prereqs panel (lists existing AI Connections + Roles, links to create) -->
+                <df-ai-chat-prereqs
+                  *ngIf="serviceForm.getRawValue().type === 'ai_chat'"
+                  class="full-width"></df-ai-chat-prereqs>
+
                 <ng-container
                   *ngIf="
                     this.isFile &&
