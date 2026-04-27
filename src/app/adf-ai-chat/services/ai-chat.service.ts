@@ -81,10 +81,7 @@ export class AiChatService {
     );
   }
 
-  deleteSession(
-    serviceName: string,
-    sessionId: number
-  ): Observable<unknown> {
+  deleteSession(serviceName: string, sessionId: number): Observable<unknown> {
     return this.http.delete(`${BASE_URL}/${serviceName}/session/${sessionId}`);
   }
 }

@@ -71,7 +71,9 @@ export class DfAiChatComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.api.listChatServices().subscribe({
       next: res => {
-        this.chatServices = (res.resource ?? []).filter(s => s.isActive !== false);
+        this.chatServices = (res.resource ?? []).filter(
+          s => s.isActive !== false
+        );
         this.loadingServices = false;
         const initial =
           this.route.snapshot.queryParamMap.get('service') ??
@@ -272,12 +274,11 @@ export class DfAiChatComponent implements OnInit, OnDestroy {
   private extractError(err: unknown): string {
     if (typeof err === 'object' && err !== null) {
       // Angular HttpErrorResponse: err.error.error.message
-      const e = err as { error?: { error?: { message?: string } }; message?: string };
-      return (
-        e.error?.error?.message ??
-        e.message ??
-        'Something went wrong.'
-      );
+      const e = err as {
+        error?: { error?: { message?: string } };
+        message?: string;
+      };
+      return e.error?.error?.message ?? e.message ?? 'Something went wrong.';
     }
     return 'Something went wrong.';
   }

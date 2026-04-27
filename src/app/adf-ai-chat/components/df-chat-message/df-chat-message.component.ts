@@ -30,13 +30,9 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
         </div>
         <div class="msg__bubble">
           <p *ngIf="message.content">{{ message.content }}</p>
-          <p *ngIf="!message.content" class="msg__empty">
-            (no text response)
-          </p>
+          <p *ngIf="!message.content" class="msg__empty">(no text response)</p>
           <div *ngIf="hasToolCalls" class="msg__tool-calls">
-            <div
-              *ngFor="let tc of message.tool_calls"
-              class="msg__tool-call">
+            <div *ngFor="let tc of message.tool_calls" class="msg__tool-call">
               <span class="msg__tool-call-name">{{ tc.name }}</span>
               <span *ngIf="tc.service" class="msg__tool-call-service">{{
                 tc.service

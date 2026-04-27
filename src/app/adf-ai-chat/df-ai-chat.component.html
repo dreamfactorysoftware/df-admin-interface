@@ -17,9 +17,7 @@
           </mat-option>
         </mat-select>
       </mat-form-field>
-      <span
-        *ngIf="chatServices.length === 1"
-        class="ai-chat__service-name">
+      <span *ngIf="chatServices.length === 1" class="ai-chat__service-name">
         {{ chatServices[0].label || chatServices[0].name }}
       </span>
     </div>
@@ -27,9 +25,7 @@
     <div class="ai-chat__header-right" *ngIf="dataScope.length > 0">
       <fa-icon [icon]="faDatabase"></fa-icon>
       <span class="ai-chat__scope-label">Data scope:</span>
-      <span
-        *ngFor="let svc of dataScope"
-        class="ai-chat__scope-chip">
+      <span *ngFor="let svc of dataScope" class="ai-chat__scope-chip">
         {{ svc }}
       </span>
     </div>
