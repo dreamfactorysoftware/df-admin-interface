@@ -824,10 +824,34 @@ export const routes: Routes = [
   },
   {
     path: ROUTES.AI,
-    children: ServiceRoutes,
-    data: {
-      groups: SERVICE_GROUPS[ROUTES.AI],
-    },
+    children: [
+      {
+        path: '',
+        redirectTo: ROUTES.AI_CONNECTIONS,
+        pathMatch: 'full',
+      },
+      {
+        path: ROUTES.AI_CONNECTIONS,
+        children: ServiceRoutes,
+        data: {
+          groups: SERVICE_GROUPS[ROUTES.AI_CONNECTIONS],
+        },
+      },
+      {
+        path: ROUTES.AI_CHAT_SERVICES,
+        children: ServiceRoutes,
+        data: {
+          groups: SERVICE_GROUPS[ROUTES.AI_CHAT_SERVICES],
+        },
+      },
+      {
+        path: ROUTES.AI_MCP,
+        children: ServiceRoutes,
+        data: {
+          groups: SERVICE_GROUPS[ROUTES.AI_MCP],
+        },
+      },
+    ],
     canActivate: [loggedInGuard, licenseGuard, globalLicenseGuard],
     providers: [provideTranslocoScope('services')],
   },

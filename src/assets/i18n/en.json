@@ -153,6 +153,42 @@
       "edit": {
         "nav": "{{edit}}",
         "header": "{{nav.ai.edit.nav}}"
+      },
+      "connections": {
+        "nav": "Connections",
+        "header": "AI Connections",
+        "create": {
+          "nav": "Create",
+          "header": "New AI Connection"
+        },
+        "edit": {
+          "nav": "{{edit}}",
+          "header": "Edit AI Connection"
+        }
+      },
+      "chat-services": {
+        "nav": "Chat Services",
+        "header": "AI Chat Services",
+        "create": {
+          "nav": "Create",
+          "header": "New AI Chat Service"
+        },
+        "edit": {
+          "nav": "{{edit}}",
+          "header": "Edit AI Chat Service"
+        }
+      },
+      "mcp": {
+        "nav": "MCP",
+        "header": "MCP Servers",
+        "create": {
+          "nav": "Create",
+          "header": "New MCP Server"
+        },
+        "edit": {
+          "nav": "{{edit}}",
+          "header": "Edit MCP Server"
+        }
       }
     },
     "api-connections": {
