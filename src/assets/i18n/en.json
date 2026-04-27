@@ -178,6 +178,10 @@
           "header": "Edit AI Chat Service"
         }
       },
+      "chat": {
+        "nav": "Chat",
+        "header": "AI Chat"
+      },
       "mcp": {
         "nav": "MCP",
         "header": "MCP Servers",

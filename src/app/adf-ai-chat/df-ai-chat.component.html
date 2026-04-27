@@ -1,0 +1,104 @@
+<div class="ai-chat">
+  <!-- Service picker (top bar): only relevant if multiple services exist -->
+  <header class="ai-chat__header">
+    <div class="ai-chat__header-left">
+      <h2>AI Chat</h2>
+      <mat-form-field
+        *ngIf="chatServices.length > 1"
+        appearance="outline"
+        subscriptSizing="dynamic"
+        class="ai-chat__service-picker">
+        <mat-label>Chat Service</mat-label>
+        <mat-select
+          [value]="selectedServiceName"
+          (selectionChange)="selectService($event.value)">
+          <mat-option *ngFor="let s of chatServices" [value]="s.name">
+            {{ s.label || s.name }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <span
+        *ngIf="chatServices.length === 1"
+        class="ai-chat__service-name">
+        {{ chatServices[0].label || chatServices[0].name }}
+      </span>
+    </div>
+
+    <div class="ai-chat__header-right" *ngIf="dataScope.length > 0">
+      <fa-icon [icon]="faDatabase"></fa-icon>
+      <span class="ai-chat__scope-label">Data scope:</span>
+      <span
+        *ngFor="let svc of dataScope"
+        class="ai-chat__scope-chip">
+        {{ svc }}
+      </span>
+    </div>
+  </header>
+
+  <!-- Empty state: no chat services configured -->
+  <div
+    *ngIf="!loadingServices && chatServices.length === 0"
+    class="ai-chat__empty">
+    <h3>No AI Chat services yet</h3>
+    <p>
+      Create one under
+      <a [routerLink]="['/ai/chat-services/create']">AI / Chat Services</a>
+      to start chatting.
+    </p>
+  </div>
+
+  <!-- Loading services -->
+  <div *ngIf="loadingServices" class="ai-chat__loading">
+    <mat-spinner diameter="32"></mat-spinner>
+  </div>
+
+  <!-- Main layout: session list + message feed -->
+  <div
+    *ngIf="!loadingServices && chatServices.length > 0"
+    class="ai-chat__body">
+    <df-chat-session-list
+      class="ai-chat__sidebar"
+      [sessions]="sessions"
+      [activeId]="activeSession?.id ?? null"
+      [loading]="loadingSessions"
+      (newSession)="newChat()"
+      (select)="openSession($event.id)"
+      (delete)="deleteSession($event)"></df-chat-session-list>
+
+    <main class="ai-chat__main">
+      <div *ngIf="errorMessage" class="ai-chat__error">
+        {{ errorMessage }}
+      </div>
+
+      <div
+        *ngIf="!activeSession && !loadingSession"
+        class="ai-chat__placeholder">
+        <p>Select a session, or start a new chat.</p>
+      </div>
+
+      <div *ngIf="loadingSession" class="ai-chat__loading">
+        <mat-spinner diameter="32"></mat-spinner>
+      </div>
+
+      <ng-container *ngIf="activeSession">
+        <div class="ai-chat__messages" #messageScroll>
+          <div *ngIf="messages.length === 0" class="ai-chat__placeholder">
+            <p>Ask anything about your data.</p>
+          </div>
+          <df-chat-message
+            *ngFor="let m of messages; trackBy: trackMsg"
+            [message]="m"
+            class="ai-chat__message"></df-chat-message>
+          <div *ngIf="awaitingAssistant" class="ai-chat__thinking">
+            <mat-spinner diameter="16"></mat-spinner>
+            <span>Thinking…</span>
+          </div>
+        </div>
+
+        <df-chat-input
+          [busy]="awaitingAssistant"
+          (send)="send($event)"></df-chat-input>
+      </ng-container>
+    </main>
+  </div>
+</div>

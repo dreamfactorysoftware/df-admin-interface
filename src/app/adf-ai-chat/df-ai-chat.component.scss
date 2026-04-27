@@ -1,0 +1,147 @@
+.ai-chat {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 8rem);
+  min-height: 500px;
+  margin: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  overflow: hidden;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    flex-wrap: wrap;
+  }
+
+  &__header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+
+    h2 {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+  }
+
+  &__service-picker {
+    min-width: 220px;
+  }
+
+  &__service-name {
+    padding: 0.25rem 0.625rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    font-size: 0.875rem;
+  }
+
+  &__header-right {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.875rem;
+  }
+
+  &__scope-label {
+    font-weight: 600;
+  }
+
+  &__scope-chip {
+    font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+    font-size: 0.8125rem;
+    padding: 0.2rem 0.625rem;
+    border-radius: 999px;
+    background: rgba(46, 160, 67, 0.15);
+    border: 1px solid rgba(46, 160, 67, 0.4);
+    color: #4ade80;
+  }
+
+  &__empty,
+  &__placeholder {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 255, 255, 0.6);
+    text-align: center;
+    padding: 2rem;
+
+    h3 {
+      margin: 0 0 0.5rem;
+      color: rgba(255, 255, 255, 0.85);
+    }
+
+    a {
+      color: #60a5fa;
+    }
+  }
+
+  &__loading {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  &__body {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    min-height: 0;
+  }
+
+  &__sidebar {
+    min-height: 0;
+  }
+
+  &__main {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  &__error {
+    margin: 0.75rem 1rem;
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    background: rgba(220, 53, 69, 0.12);
+    border: 1px solid rgba(220, 53, 69, 0.4);
+    color: #ff8585;
+  }
+
+  &__messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.25rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    scroll-behavior: smooth;
+  }
+
+  &__message {
+    display: block;
+  }
+
+  &__thinking {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.5rem 0.875rem;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 999px;
+    color: rgba(255, 255, 255, 0.65);
+    font-size: 0.875rem;
+    align-self: flex-start;
+  }
+}

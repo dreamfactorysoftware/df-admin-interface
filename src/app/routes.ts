@@ -845,6 +845,25 @@ export const routes: Routes = [
         },
       },
       {
+        path: ROUTES.AI_CHAT_UI,
+        children: [
+          {
+            path: '',
+            loadComponent: () =>
+              import('./adf-ai-chat/df-ai-chat.component').then(
+                m => m.DfAiChatComponent
+              ),
+          },
+          {
+            path: ':sessionId',
+            loadComponent: () =>
+              import('./adf-ai-chat/df-ai-chat.component').then(
+                m => m.DfAiChatComponent
+              ),
+          },
+        ],
+      },
+      {
         path: ROUTES.AI_MCP,
         children: ServiceRoutes,
         data: {
