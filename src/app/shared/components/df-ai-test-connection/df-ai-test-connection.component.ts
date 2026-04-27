@@ -166,8 +166,7 @@ export class DfAiTestConnectionComponent {
     // Provider-level field validation, so the user gets a useful message
     // instead of "No host part in the URL" or "invalid x-api-key".
     const needsKey = provider !== 'ollama' && provider !== 'openai_compatible';
-    const needsUrl =
-      provider === 'openai_compatible' || provider === 'ollama';
+    const needsUrl = provider === 'openai_compatible' || provider === 'ollama';
 
     if (needsKey && !config.api_key) {
       this.result = {

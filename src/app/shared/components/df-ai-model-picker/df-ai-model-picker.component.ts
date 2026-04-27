@@ -93,9 +93,7 @@ interface NormalizedModel {
             <mat-option *ngFor="let m of models" [value]="m.id">
               <span class="model-picker__option">
                 <span class="model-picker__option-label">{{ m.label }}</span>
-                <span
-                  *ngIf="m.context"
-                  class="model-picker__option-meta"
+                <span *ngIf="m.context" class="model-picker__option-meta"
                   >{{ m.context | number }} ctx</span
                 >
               </span>
@@ -117,7 +115,9 @@ interface NormalizedModel {
         </p>
 
         <p *ngIf="currentValue" class="model-picker__current">
-          <fa-icon [icon]="faCircleCheck" class="model-picker__current-ok"></fa-icon>
+          <fa-icon
+            [icon]="faCircleCheck"
+            class="model-picker__current-ok"></fa-icon>
           Selected:
           <code>{{ currentValue }}</code>
         </p>
