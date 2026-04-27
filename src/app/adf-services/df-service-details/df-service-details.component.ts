@@ -31,6 +31,7 @@ import { DfDynamicFieldComponent } from 'src/app/shared/components/df-dynamic-fi
 import { DfRoleScopeComponent } from 'src/app/shared/components/df-role-scope/df-role-scope.component';
 import { DfAiChatPrereqsComponent } from 'src/app/adf-ai-chat/components/df-ai-chat-prereqs/df-ai-chat-prereqs.component';
 import { DfAiTestConnectionComponent } from 'src/app/shared/components/df-ai-test-connection/df-ai-test-connection.component';
+import { DfAiModelPickerComponent } from 'src/app/shared/components/df-ai-model-picker/df-ai-model-picker.component';
 import { DfAceEditorComponent } from 'src/app/shared/components/df-ace-editor/df-ace-editor.component';
 import { DfSecurityConfigComponent } from 'src/app/shared/components/df-security-config/df-security-config.component';
 
@@ -154,6 +155,7 @@ interface ServiceResponse {
     DfRoleScopeComponent,
     DfAiChatPrereqsComponent,
     DfAiTestConnectionComponent,
+    DfAiModelPickerComponent,
     DfArrayFieldComponent,
     DfAceEditorComponent,
     FontAwesomeModule,

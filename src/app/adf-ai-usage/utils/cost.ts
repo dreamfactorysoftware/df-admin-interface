@@ -21,6 +21,9 @@ export const DEFAULT_RATES: Record<string, ProviderRates> = {
     inputPer1k: 0.002,
     outputPer1k: 0.01,
   },
+  // Local / self-hosted: zero by default. Inference is on customer hardware.
+  // Admins can override per-row in the UI if they want to model GPU
+  // amortization or electricity costs.
   ollama: {
     provider: 'ollama',
     inputPer1k: 0,
@@ -28,8 +31,8 @@ export const DEFAULT_RATES: Record<string, ProviderRates> = {
   },
   openai_compatible: {
     provider: 'openai_compatible',
-    inputPer1k: 0.0025,
-    outputPer1k: 0.01,
+    inputPer1k: 0,
+    outputPer1k: 0,
   },
 };
 

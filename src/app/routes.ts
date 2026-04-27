@@ -830,6 +830,10 @@ export const routes: Routes = [
         redirectTo: ROUTES.AI_CONNECTIONS,
         pathMatch: 'full',
       },
+      // Order matters: nav is auto-generated from this list. Connections
+      // come first because they're the gateway primary; conversations,
+      // usage, and MCP are sibling consumers; chat-services is admin
+      // configuration (rare touch) so it goes last.
       {
         path: ROUTES.AI_CONNECTIONS,
         children: ServiceRoutes,
@@ -838,11 +842,11 @@ export const routes: Routes = [
         },
       },
       {
-        path: ROUTES.AI_CHAT_SERVICES,
-        children: ServiceRoutes,
-        data: {
-          groups: SERVICE_GROUPS[ROUTES.AI_CHAT_SERVICES],
-        },
+        path: ROUTES.AI_USAGE,
+        loadComponent: () =>
+          import('./adf-ai-usage/df-ai-usage.component').then(
+            m => m.DfAiUsageComponent
+          ),
       },
       {
         path: ROUTES.AI_CHAT_UI,
@@ -864,17 +868,19 @@ export const routes: Routes = [
         ],
       },
       {
-        path: ROUTES.AI_USAGE,
-        loadComponent: () =>
-          import('./adf-ai-usage/df-ai-usage.component').then(
-            m => m.DfAiUsageComponent
-          ),
-      },
-      {
         path: ROUTES.AI_MCP,
         children: ServiceRoutes,
         data: {
           groups: SERVICE_GROUPS[ROUTES.AI_MCP],
+        },
+      },
+      // Admin-only setup for the in-DF chat UI. Goes last because most
+      // admins won't touch this often.
+      {
+        path: ROUTES.AI_CHAT_SERVICES,
+        children: ServiceRoutes,
+        data: {
+          groups: SERVICE_GROUPS[ROUTES.AI_CHAT_SERVICES],
         },
       },
     ],

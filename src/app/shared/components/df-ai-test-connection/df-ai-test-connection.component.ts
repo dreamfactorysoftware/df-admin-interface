@@ -163,6 +163,34 @@ export class DfAiTestConnectionComponent {
       return;
     }
 
+    // Provider-level field validation, so the user gets a useful message
+    // instead of "No host part in the URL" or "invalid x-api-key".
+    const needsKey = provider !== 'ollama' && provider !== 'openai_compatible';
+    const needsUrl =
+      provider === 'openai_compatible' || provider === 'ollama';
+
+    if (needsKey && !config.api_key) {
+      this.result = {
+        success: false,
+        error: {
+          message:
+            provider + ' requires an API key. Fill in API Key, then test.',
+        },
+      };
+      return;
+    }
+    if (needsUrl && !config.base_url) {
+      this.result = {
+        success: false,
+        error: {
+          message:
+            provider +
+            ' requires a Base URL (e.g. http://host:8090/v1). Fill in Base URL, then test.',
+        },
+      };
+      return;
+    }
+
     this.loading = true;
     this.result = null;
 

@@ -15,7 +15,7 @@ export const sessionTokenInterceptor: HttpInterceptorFn = (
   req: HttpRequest<unknown>,
   next: HttpHandlerFn
 ) => {
-  if (req.url.startsWith('/api')) {
+  if (req.url.startsWith('/api') || req.url.startsWith('/_internal')) {
     req = req.clone({
       setHeaders: {
         [API_KEY_HEADER]: environment.dfAdminApiKey,

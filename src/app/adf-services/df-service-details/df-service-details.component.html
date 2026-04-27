@@ -808,6 +808,14 @@
                   class="full-width"
                   [form]="serviceForm"></df-ai-test-connection>
 
+                <!-- AI Connection: model picker — fetches available models
+                     from the provider and writes selection to default_model.
+                     Replaces the auto-rendered default_model text field. -->
+                <df-ai-model-picker
+                  *ngIf="serviceForm.getRawValue().type === 'ai_connection'"
+                  class="full-width"
+                  [form]="serviceForm"></df-ai-model-picker>
+
                 <ng-container
                   *ngIf="
                     this.isFile &&
@@ -834,13 +842,18 @@
                     [mode]="excelMode"></df-ace-editor>
                 </ng-container>
                 <ng-container *ngFor="let item of viewSchema">
-                  <!-- ai_chat: ai_service_id and ai_role_id are picked via prereqs panel above -->
+                  <!-- ai_chat: ai_service_id and ai_role_id picked via prereqs panel above
+                       ai_connection: default_model picked via model-picker above -->
                   <ng-container
                     *ngIf="
                       !(
                         serviceForm.getRawValue().type === 'ai_chat' &&
                         (item.name === 'ai_service_id' ||
                           item.name === 'ai_role_id')
+                      ) &&
+                      !(
+                        serviceForm.getRawValue().type === 'ai_connection' &&
+                        item.name === 'default_model'
                       )
                     ">
                     <ng-container
