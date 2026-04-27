@@ -35,15 +35,17 @@ interface RoleRow {
       <header class="prereqs__header">
         <h4>Before you save</h4>
         <p>
-          An AI Chat service connects an AI Connection (the LLM provider) to
-          a DreamFactory Role (the data scope). Both must exist first — copy
-          their IDs into the form below.
+          An AI Chat service connects an AI Connection (the LLM provider) to a
+          DreamFactory Role (the data scope). Both must exist first — copy their
+          IDs into the form below.
         </p>
       </header>
 
       <section
         class="prereqs__section"
-        [class.prereqs__section--missing]="!loading && connections.length === 0">
+        [class.prereqs__section--missing]="
+          !loading && connections.length === 0
+        ">
         <div class="prereqs__row">
           <fa-icon
             [icon]="connections.length ? faCheck : faCircleExclamation"
@@ -73,9 +75,7 @@ interface RoleRow {
           <li *ngFor="let c of connections" class="prereqs__item">
             <code class="prereqs__id">id = {{ c.id }}</code>
             <span class="prereqs__name">{{ c.label || c.name }}</span>
-            <a
-              [routerLink]="['/ai/connections', c.id]"
-              class="prereqs__link"
+            <a [routerLink]="['/ai/connections', c.id]" class="prereqs__link"
               >view</a
             >
           </li>
@@ -97,9 +97,7 @@ interface RoleRow {
             class="prereqs__icon"
             [class.prereqs__icon--ok]="roles.length"
             [class.prereqs__icon--miss]="!roles.length"></fa-icon>
-          <fa-icon
-            [icon]="faShieldHalved"
-            class="prereqs__kind-icon"></fa-icon>
+          <fa-icon [icon]="faShieldHalved" class="prereqs__kind-icon"></fa-icon>
           <span class="prereqs__title">Roles</span>
           <span class="prereqs__count">
             <ng-container *ngIf="loading">loading…</ng-container>
@@ -124,7 +122,7 @@ interface RoleRow {
               [routerLink]="[
                 '/api-connections/role-based-access',
                 r.id,
-                'scope'
+                'scope',
               ]"
               class="prereqs__link"
               >view scope</a
