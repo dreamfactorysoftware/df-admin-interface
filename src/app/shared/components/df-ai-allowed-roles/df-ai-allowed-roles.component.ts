@@ -90,33 +90,34 @@ interface RoleRow {
       .allowed-roles {
         display: flex;
         flex-direction: column;
-        gap: 0.75rem;
-        padding: 1.25rem 1.5rem;
-        margin: 0.5rem 0;
+        gap: 1rem;
+        padding: 1.5rem 1.75rem;
+        margin: 1rem 0;
         background: rgba(255, 255, 255, 0.02);
         border: 1px solid rgba(255, 255, 255, 0.08);
         border-radius: 8px;
+        font-size: 1rem;
 
         &__header {
           display: flex;
           align-items: center;
-          gap: 0.625rem;
+          gap: 0.75rem;
           flex-wrap: wrap;
         }
 
         &__icon {
           color: #a78bfa;
-          font-size: 1.05rem;
+          font-size: 1.25rem;
         }
 
         &__title {
           font-weight: 600;
-          font-size: 1rem;
+          font-size: 1.15rem;
         }
 
         &__count {
-          font-size: 0.85rem;
-          color: rgba(255, 255, 255, 0.55);
+          font-size: 0.95rem;
+          color: rgba(255, 255, 255, 0.6);
         }
 
         &__action {
@@ -124,35 +125,35 @@ interface RoleRow {
           display: inline-flex !important;
           align-items: center;
           gap: 0.4rem;
-          font-size: 0.8125rem !important;
-          padding: 0 0.75rem !important;
-          min-height: 32px !important;
+          font-size: 0.95rem !important;
+          padding: 0 0.875rem !important;
+          min-height: 38px !important;
         }
 
         &__hint {
           margin: 0;
-          font-size: 0.875rem;
-          color: rgba(255, 255, 255, 0.7);
-          line-height: 1.5;
+          font-size: 0.95rem;
+          color: rgba(255, 255, 255, 0.75);
+          line-height: 1.55;
         }
 
         &__warn {
           display: flex;
           align-items: flex-start;
-          gap: 0.5rem;
-          padding: 0.625rem 0.875rem;
+          gap: 0.625rem;
+          padding: 0.875rem 1.125rem;
           background: rgba(245, 158, 11, 0.1);
           border: 1px solid rgba(245, 158, 11, 0.4);
           border-radius: 4px;
           color: #fbbf24;
-          font-size: 0.875rem;
+          font-size: 0.95rem;
         }
 
         &__loading,
         &__empty {
-          color: rgba(255, 255, 255, 0.55);
+          color: rgba(255, 255, 255, 0.6);
           font-style: italic;
-          font-size: 0.875rem;
+          font-size: 0.95rem;
         }
 
         &__list {
@@ -161,12 +162,12 @@ interface RoleRow {
           padding: 0;
           display: flex;
           flex-wrap: wrap;
-          gap: 0.5rem 0.625rem;
+          gap: 0.625rem 0.75rem;
 
           li {
             display: inline-flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 0.625rem;
           }
         }
 
@@ -174,12 +175,12 @@ interface RoleRow {
           display: inline-flex;
           align-items: center;
           gap: 0.5rem;
-          padding: 0.5rem 0.95rem;
+          padding: 0.55rem 1.05rem;
           background: rgba(255, 255, 255, 0.04);
           border: 1px solid rgba(255, 255, 255, 0.1);
           border-radius: 999px;
           font: inherit;
-          font-size: 0.95rem;
+          font-size: 1rem;
           color: inherit;
           cursor: pointer;
           transition:
@@ -207,8 +208,8 @@ interface RoleRow {
         }
 
         &__link {
-          font-size: 0.75rem;
-          color: rgba(255, 255, 255, 0.45);
+          font-size: 0.85rem;
+          color: rgba(255, 255, 255, 0.5);
           text-decoration: none;
 
           &:hover {

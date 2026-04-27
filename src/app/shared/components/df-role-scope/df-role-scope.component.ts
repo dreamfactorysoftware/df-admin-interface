@@ -91,6 +91,7 @@ export class DfRoleScopeComponent implements OnChanges {
   allowedServices: ScopeServiceEntry[] = [];
   deniedServices: Service[] = [];
   expandedDenied = false;
+  hasWildcardGrant = false;
 
   faCheck = faCheck;
   faXmark = faXmark;
@@ -174,9 +175,41 @@ export class DfRoleScopeComponent implements OnChanges {
     const serviceById = new Map<number, Service>();
     services.forEach(s => serviceById.set(s.id, s));
 
+    // service_id = 0 in DF is the "all services" wildcard — one access row
+    // grants the listed verbs/components against every service in the catalog.
+    // Pull those out first; they fan out across the whole denied list.
+    const wildcardRules: Array<{
+      component: string;
+      verbs: string[];
+      requesters: string[];
+    }> = [];
+    for (const row of accessRows) {
+      if (row.serviceId === 0 || row.serviceId == null) {
+        wildcardRules.push({
+          component: row.component || '*',
+          verbs: this.decodeMask(row.verbMask, VERB_LABELS),
+          requesters: this.decodeMask(row.requestorMask, REQUESTER_LABELS),
+        });
+      }
+    }
+
     const grouped = new Map<number, ScopeServiceEntry>();
 
+    // Seed with wildcard rules applied to every known service.
+    if (wildcardRules.length > 0) {
+      for (const svc of services) {
+        grouped.set(svc.id, {
+          service: svc,
+          rules: wildcardRules.map(r => ({ ...r })),
+        });
+      }
+    }
+
+    // Layer in service-specific rows on top.
     for (const row of accessRows) {
+      if (row.serviceId === 0 || row.serviceId == null) {
+        continue;
+      }
       const svc = serviceById.get(row.serviceId);
       if (!svc) {
         continue;
@@ -196,11 +229,15 @@ export class DfRoleScopeComponent implements OnChanges {
     this.allowedServices = Array.from(grouped.values()).sort((a, b) =>
       a.service.name.localeCompare(b.service.name)
     );
+    this.hasWildcardGrant = wildcardRules.length > 0;
 
     if (this.showDeniedServices) {
-      this.deniedServices = services
-        .filter(s => !grouped.has(s.id))
-        .sort((a, b) => a.name.localeCompare(b.name));
+      // With a wildcard grant, nothing is denied.
+      this.deniedServices = wildcardRules.length
+        ? []
+        : services
+            .filter(s => !grouped.has(s.id))
+            .sort((a, b) => a.name.localeCompare(b.name));
     }
   }
 

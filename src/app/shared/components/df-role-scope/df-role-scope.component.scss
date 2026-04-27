@@ -36,6 +36,39 @@
     }
   }
 
+  &__wildcard {
+    padding: 0.875rem 1.125rem;
+    border-radius: 6px;
+    background: rgba(46, 160, 67, 0.1);
+    border: 1px solid rgba(46, 160, 67, 0.4);
+    color: rgba(255, 255, 255, 0.92);
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    font-size: 1rem;
+    line-height: 1.5;
+
+    fa-icon {
+      color: #4ade80;
+      font-size: 1.15rem;
+      flex-shrink: 0;
+      margin-top: 0.1rem;
+    }
+
+    code {
+      font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 0.1rem 0.4rem;
+      border-radius: 3px;
+      font-size: 0.9rem;
+    }
+
+    strong {
+      color: #4ade80;
+      font-weight: 600;
+    }
+  }
+
   &__header {
     h3 {
       margin: 0;

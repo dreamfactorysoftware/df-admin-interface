@@ -174,4 +174,85 @@ describe('DfRoleScopeComponent (logic)', () => {
     loadFor(12);
     expect(component.allowedServices).toEqual([]);
   });
+
+  describe('wildcard (service_id=0)', () => {
+    it('fans an all-services grant out to every service in the catalog', () => {
+      roleService.get.mockReturnValue(
+        of({
+          ...role,
+          roleServiceAccessByRoleId: [
+            {
+              id: 1,
+              roleId: 12,
+              serviceId: 0,
+              component: '*',
+              verbMask: 31,
+              requestorMask: 3,
+            },
+          ],
+        })
+      );
+      loadFor(12);
+      expect(component.hasWildcardGrant).toBe(true);
+      // All three services in the test catalog get the rule.
+      expect(component.allowedServices.map(e => e.service.name)).toEqual([
+        'billing_db',
+        'db',
+        'fdny_mock',
+      ]);
+      expect(component.allowedServices[0].rules[0].verbs).toEqual([
+        'GET',
+        'POST',
+        'PUT',
+        'PATCH',
+        'DELETE',
+      ]);
+      // No services are denied when the role has full access.
+      expect(component.deniedServices).toEqual([]);
+    });
+
+    it('layers service-specific rules on top of a wildcard grant', () => {
+      roleService.get.mockReturnValue(
+        of({
+          ...role,
+          roleServiceAccessByRoleId: [
+            // Wildcard read across everything
+            {
+              id: 1,
+              roleId: 12,
+              serviceId: 0,
+              component: '*',
+              verbMask: 1,
+              requestorMask: 1,
+            },
+            // Plus full CRUD on db specifically
+            {
+              id: 2,
+              roleId: 12,
+              serviceId: 3,
+              component: '_table/customers',
+              verbMask: 31,
+              requestorMask: 1,
+            },
+          ],
+        })
+      );
+      loadFor(12);
+      const dbEntry = component.allowedServices.find(
+        e => e.service.name === 'db'
+      );
+      expect(dbEntry?.rules.length).toBe(2);
+      expect(dbEntry?.rules.map(r => r.component).sort()).toEqual([
+        '*',
+        '_table/customers',
+      ]);
+    });
+
+    it('does not flag wildcard when serviceId is positive', () => {
+      // Sanity: regular per-service entries should not trigger the
+      // wildcard banner.
+      loadFor(12);
+      expect(component.hasWildcardGrant).toBe(false);
+    });
+  });
 });

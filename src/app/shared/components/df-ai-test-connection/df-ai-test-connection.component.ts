@@ -69,22 +69,26 @@ interface TestConnectionResponse {
       .test-conn {
         display: flex;
         flex-direction: column;
-        gap: 0.625rem;
-        margin: 0.75rem 0;
+        gap: 0.75rem;
+        margin: 1rem 0;
+        font-size: 1rem;
 
         &__button {
           align-self: flex-start;
           display: inline-flex !important;
           align-items: center;
           gap: 0.5rem;
+          font-size: 0.95rem !important;
+          min-height: 38px !important;
         }
 
         &__result {
           display: flex;
-          gap: 0.625rem;
-          padding: 0.75rem 1rem;
+          gap: 0.75rem;
+          padding: 0.875rem 1.125rem;
           border-radius: 6px;
           align-items: flex-start;
+          font-size: 1rem;
 
           &--ok {
             background: rgba(46, 160, 67, 0.1);
@@ -101,24 +105,25 @@ interface TestConnectionResponse {
 
         &__detail {
           flex: 1;
-          color: rgba(255, 255, 255, 0.85);
-          font-size: 0.875rem;
+          color: rgba(255, 255, 255, 0.9);
           display: flex;
           flex-direction: column;
-          gap: 0.25rem;
+          gap: 0.35rem;
 
           strong {
             font-weight: 600;
+            font-size: 1rem;
           }
 
           p {
             margin: 0;
-            color: rgba(255, 255, 255, 0.7);
+            color: rgba(255, 255, 255, 0.75);
+            font-size: 0.95rem;
           }
         }
 
         &__models {
-          font-size: 0.8125rem;
+          font-size: 0.95rem;
         }
       }
     `,
@@ -174,8 +179,9 @@ export class DfAiTestConnectionComponent {
 
     // Provider-level field validation, so the user gets a useful message
     // instead of "No host part in the URL" or "invalid x-api-key".
+    // ollama has a default base_url; only openai_compatible truly requires one.
     const needsKey = provider !== 'ollama' && provider !== 'openai_compatible';
-    const needsUrl = provider === 'openai_compatible' || provider === 'ollama';
+    const needsUrl = provider === 'openai_compatible';
 
     if (needsKey && !apiKey) {
       this.result = {

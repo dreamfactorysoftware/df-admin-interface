@@ -142,22 +142,23 @@ interface NormalizedModel {
       .model-picker {
         display: flex;
         flex-direction: column;
-        gap: 0.625rem;
-        padding: 1rem 1.25rem;
-        margin: 0.5rem 0;
+        gap: 0.875rem;
+        padding: 1.25rem 1.5rem;
+        margin: 1rem 0;
         background: rgba(255, 255, 255, 0.02);
         border: 1px solid rgba(255, 255, 255, 0.08);
         border-radius: 8px;
+        font-size: 1rem;
 
         &__header {
           display: flex;
           align-items: center;
-          gap: 0.75rem;
+          gap: 0.875rem;
           flex-wrap: wrap;
         }
         &__title {
           font-weight: 600;
-          font-size: 1rem;
+          font-size: 1.1rem;
           margin-right: auto;
         }
         &__refresh,
@@ -165,9 +166,9 @@ interface NormalizedModel {
           display: inline-flex !important;
           align-items: center;
           gap: 0.4rem;
-          font-size: 0.85rem !important;
-          padding: 0 0.75rem !important;
-          min-height: 32px !important;
+          font-size: 0.95rem !important;
+          padding: 0 0.875rem !important;
+          min-height: 38px !important;
         }
         &__select,
         &__custom {
@@ -184,41 +185,42 @@ interface NormalizedModel {
           flex: 1;
         }
         &__option-meta {
-          font-size: 0.75rem;
+          font-size: 0.85rem;
           color: rgba(255, 255, 255, 0.55);
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
         }
 
         &__hint {
           margin: 0;
-          font-size: 0.85rem;
-          color: rgba(255, 255, 255, 0.6);
+          font-size: 0.95rem;
+          color: rgba(255, 255, 255, 0.7);
           font-style: italic;
+          line-height: 1.5;
         }
         &__error {
           display: flex;
           align-items: flex-start;
           gap: 0.5rem;
-          padding: 0.5rem 0.75rem;
+          padding: 0.625rem 0.875rem;
           border-radius: 4px;
           background: rgba(220, 53, 69, 0.1);
           border: 1px solid rgba(220, 53, 69, 0.3);
           color: #ff8585;
-          font-size: 0.85rem;
+          font-size: 0.95rem;
         }
         &__current {
           margin: 0;
-          font-size: 0.875rem;
-          color: rgba(255, 255, 255, 0.7);
+          font-size: 0.95rem;
+          color: rgba(255, 255, 255, 0.85);
           display: flex;
           align-items: center;
           gap: 0.5rem;
 
           code {
             font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
-            font-size: 0.8125rem;
+            font-size: 0.9rem;
             background: rgba(255, 255, 255, 0.08);
-            padding: 0.15rem 0.4rem;
+            padding: 0.2rem 0.5rem;
             border-radius: 3px;
           }
         }

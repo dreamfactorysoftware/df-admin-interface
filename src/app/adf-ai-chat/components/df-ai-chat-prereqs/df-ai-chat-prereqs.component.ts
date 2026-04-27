@@ -269,12 +269,12 @@ interface RoleRow {
           display: inline-flex;
           align-items: center;
           gap: 0.5rem;
-          padding: 0.5rem 0.95rem;
+          padding: 0.55rem 1.05rem;
           background: rgba(255, 255, 255, 0.04);
           border: 1px solid rgba(255, 255, 255, 0.1);
           border-radius: 999px;
           font: inherit;
-          font-size: 0.95rem;
+          font-size: 1rem;
           color: inherit;
           cursor: pointer;
           transition:
