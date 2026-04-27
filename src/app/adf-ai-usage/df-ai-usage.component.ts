@@ -124,7 +124,9 @@ export class DfAiUsageComponent implements OnInit {
   get byUser(): GroupRow[] {
     return (this.bundle?.raw.by_user ?? []).map(r => {
       const id = r.user_id ?? 0;
-      const label = id ? this.bundle?.users.get(id) ?? `user #${id}` : 'anonymous';
+      const label = id
+        ? (this.bundle?.users.get(id) ?? `user #${id}`)
+        : 'anonymous';
       return this.toRow(String(id), label, r);
     });
   }
@@ -133,7 +135,7 @@ export class DfAiUsageComponent implements OnInit {
     return (this.bundle?.raw.by_role ?? []).map(r => {
       const id = r.role_id ?? 0;
       const label = id
-        ? this.bundle?.roles.get(id) ?? `role #${id}`
+        ? (this.bundle?.roles.get(id) ?? `role #${id}`)
         : '— no role —';
       return this.toRow(String(id), label, r);
     });
@@ -195,7 +197,11 @@ export class DfAiUsageComponent implements OnInit {
   private toRow(
     key: string,
     label: string,
-    r: { requests: number | string; input_tokens?: number | string; output_tokens?: number | string }
+    r: {
+      requests: number | string;
+      input_tokens?: number | string;
+      output_tokens?: number | string;
+    }
   ): GroupRow {
     const inputTokens = n(r.input_tokens);
     const outputTokens = n(r.output_tokens);
