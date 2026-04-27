@@ -793,10 +793,20 @@
                 >{{ 'services.options' | transloco }}
               </mat-expansion-panel-header>
               <div class="details-section">
-                <!-- AI Chat: prereqs panel (lists existing AI Connections + Roles, links to create) -->
+                <!-- AI Chat: pick a connection + role; hides the integer fields below -->
                 <df-ai-chat-prereqs
                   *ngIf="serviceForm.getRawValue().type === 'ai_chat'"
-                  class="full-width"></df-ai-chat-prereqs>
+                  class="full-width"
+                  [selectedConnectionId]="aiServiceId"
+                  [selectedRoleId]="aiRoleId"
+                  (selectConnection)="setAiServiceId($event)"
+                  (selectRole)="setAiRoleId($event)"></df-ai-chat-prereqs>
+
+                <!-- AI Connection: validate provider + key without saving first -->
+                <df-ai-test-connection
+                  *ngIf="serviceForm.getRawValue().type === 'ai_connection'"
+                  class="full-width"
+                  [form]="serviceForm"></df-ai-test-connection>
 
                 <ng-container
                   *ngIf="
@@ -823,7 +833,16 @@
                     [formControl]="getConfigControl('excelContent')"
                     [mode]="excelMode"></df-ace-editor>
                 </ng-container>
-                <ng-container *ngFor="let item of viewSchema">
+                <ng-container
+                  *ngFor="let item of viewSchema"
+                  [ngSwitch]="
+                    serviceForm.getRawValue().type === 'ai_chat' &&
+                    (item.name === 'ai_service_id' ||
+                      item.name === 'ai_role_id')
+                  ">
+                  <!-- Hidden: handled by df-ai-chat-prereqs above -->
+                  <ng-container *ngSwitchCase="true"></ng-container>
+                  <ng-container *ngSwitchDefault>
                   <ng-container
                     *ngIf="
                       item.type === 'text' && item.name === 'content';
@@ -875,6 +894,7 @@
                       [formControl]="getConfigControl(item.name)"
                       class="full-width"></df-array-field>
                   </ng-template>
+                  </ng-container>
                 </ng-container>
 
                 <!-- AI Chat: show what the AI can see, derived from ai_role_id -->

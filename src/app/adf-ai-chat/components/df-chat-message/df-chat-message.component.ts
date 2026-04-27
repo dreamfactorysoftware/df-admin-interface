@@ -29,7 +29,14 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
           <fa-icon [icon]="faRobot"></fa-icon>
         </div>
         <div class="msg__bubble">
-          <p *ngIf="message.content">{{ message.content }}</p>
+          <ng-container *ngIf="message.content">
+            <ng-container *ngFor="let seg of segments">
+              <pre
+                *ngIf="seg.type === 'code'"
+                class="msg__code"><code>{{ seg.text }}</code></pre>
+              <p *ngIf="seg.type === 'text'">{{ seg.text }}</p>
+            </ng-container>
+          </ng-container>
           <p *ngIf="!message.content" class="msg__empty">(no text response)</p>
           <div *ngIf="hasToolCalls" class="msg__tool-calls">
             <div *ngFor="let tc of message.tool_calls" class="msg__tool-call">
@@ -136,6 +143,26 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
           font-size: 0.875rem;
         }
 
+        &__code {
+          margin: 0.5rem 0;
+          padding: 0.75rem 0.875rem;
+          background: rgba(0, 0, 0, 0.35);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 6px;
+          font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+          font-size: 0.8125rem;
+          line-height: 1.5;
+          overflow: auto;
+          white-space: pre;
+          color: rgba(255, 255, 255, 0.92);
+
+          code {
+            font-family: inherit;
+            background: transparent;
+            padding: 0;
+          }
+        }
+
         &__tool-calls {
           display: flex;
           flex-direction: column;
@@ -195,5 +222,40 @@ export class DfChatMessageComponent {
       this.message.output_tokens != null ||
       this.message.latency_ms != null
     );
+  }
+
+  /**
+   * Split assistant content into text + fenced-code segments. Pure-text
+   * binding only — no innerHTML, so there is no XSS surface.
+   */
+  get segments(): Array<{ type: 'text' | 'code'; text: string }> {
+    const c = this.message.content ?? '';
+    if (!c) {
+      return [];
+    }
+    const out: Array<{ type: 'text' | 'code'; text: string }> = [];
+    const re = /```[a-zA-Z0-9_-]*\n([\s\S]*?)```/g;
+    let last = 0;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(c))) {
+      if (m.index > last) {
+        const text = c.slice(last, m.index);
+        if (text.trim()) {
+          out.push({ type: 'text', text });
+        }
+      }
+      out.push({ type: 'code', text: m[1] });
+      last = m.index + m[0].length;
+    }
+    if (last < c.length) {
+      const text = c.slice(last);
+      if (text.trim()) {
+        out.push({ type: 'text', text });
+      }
+    }
+    if (out.length === 0) {
+      out.push({ type: 'text', text: c });
+    }
+    return out;
   }
 }

@@ -1,11 +1,19 @@
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { Component, OnInit, inject } from '@angular/core';
+import {
+  Component,
+  EventEmitter,
+  Input,
+  OnInit,
+  Output,
+  inject,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import {
   faCheck,
+  faCircleCheck,
   faCircleExclamation,
   faPlus,
   faRobot,
@@ -33,11 +41,11 @@ interface RoleRow {
   template: `
     <div class="prereqs">
       <header class="prereqs__header">
-        <h4>Before you save</h4>
+        <h4>AI Chat setup</h4>
         <p>
-          An AI Chat service connects an AI Connection (the LLM provider) to a
-          DreamFactory Role (the data scope). Both must exist first — copy their
-          IDs into the form below.
+          An AI Chat service ties an AI Connection (the LLM) to a DreamFactory
+          Role (the data scope). Pick one of each below — your selection writes
+          straight into the form.
         </p>
       </header>
 
@@ -53,11 +61,11 @@ interface RoleRow {
             [class.prereqs__icon--ok]="connections.length"
             [class.prereqs__icon--miss]="!connections.length"></fa-icon>
           <fa-icon [icon]="faRobot" class="prereqs__kind-icon"></fa-icon>
-          <span class="prereqs__title">AI Connections</span>
+          <span class="prereqs__title">AI Connection</span>
           <span class="prereqs__count">
             <ng-container *ngIf="loading">loading…</ng-container>
             <ng-container *ngIf="!loading">
-              {{ connections.length }} configured
+              {{ connections.length }} available
             </ng-container>
           </span>
           <a
@@ -72,19 +80,25 @@ interface RoleRow {
         </div>
 
         <ul *ngIf="connections.length" class="prereqs__list">
-          <li *ngFor="let c of connections" class="prereqs__item">
-            <code class="prereqs__id">id = {{ c.id }}</code>
-            <span class="prereqs__name">{{ c.label || c.name }}</span>
-            <a [routerLink]="['/ai/connections', c.id]" class="prereqs__link"
-              >view</a
-            >
+          <li *ngFor="let c of connections">
+            <button
+              type="button"
+              class="prereqs__chip"
+              [class.prereqs__chip--selected]="c.id === selectedConnectionId"
+              (click)="selectConnection.emit(c.id)">
+              <fa-icon
+                *ngIf="c.id === selectedConnectionId"
+                [icon]="faCircleCheck"
+                class="prereqs__chip-check"></fa-icon>
+              <span class="prereqs__name">{{ c.label || c.name }}</span>
+              <code class="prereqs__id">#{{ c.id }}</code>
+            </button>
           </li>
         </ul>
 
         <p *ngIf="!loading && connections.length === 0" class="prereqs__hint">
-          No AI Connections yet. The AI Chat service can't run without one —
-          create one above and copy its <code>id</code> into the
-          <strong>AI Service</strong> field below.
+          No AI Connections yet. The chat service can't run without one — use
+          the button above to create one, then come back.
         </p>
       </section>
 
@@ -98,7 +112,7 @@ interface RoleRow {
             [class.prereqs__icon--ok]="roles.length"
             [class.prereqs__icon--miss]="!roles.length"></fa-icon>
           <fa-icon [icon]="faShieldHalved" class="prereqs__kind-icon"></fa-icon>
-          <span class="prereqs__title">Roles</span>
+          <span class="prereqs__title">AI Role</span>
           <span class="prereqs__count">
             <ng-container *ngIf="loading">loading…</ng-container>
             <ng-container *ngIf="!loading">
@@ -115,25 +129,34 @@ interface RoleRow {
         </div>
 
         <ul *ngIf="roles.length" class="prereqs__list">
-          <li *ngFor="let r of roles" class="prereqs__item">
-            <code class="prereqs__id">id = {{ r.id }}</code>
-            <span class="prereqs__name">{{ r.name }}</span>
+          <li *ngFor="let r of roles">
+            <button
+              type="button"
+              class="prereqs__chip"
+              [class.prereqs__chip--selected]="r.id === selectedRoleId"
+              (click)="selectRole.emit(r.id)">
+              <fa-icon
+                *ngIf="r.id === selectedRoleId"
+                [icon]="faCircleCheck"
+                class="prereqs__chip-check"></fa-icon>
+              <span class="prereqs__name">{{ r.name }}</span>
+              <code class="prereqs__id">#{{ r.id }}</code>
+            </button>
             <a
               [routerLink]="[
                 '/api-connections/role-based-access',
                 r.id,
-                'scope',
+                'scope'
               ]"
               class="prereqs__link"
-              >view scope</a
+              >scope</a
             >
           </li>
         </ul>
 
         <p *ngIf="!loading && roles.length === 0" class="prereqs__hint">
-          No Roles configured. The AI operates under a Role that defines what
-          data it can access — create a restricted role and copy its
-          <code>id</code> into the <strong>AI Role</strong> field below.
+          No Roles configured. The AI operates under a Role that limits what
+          data it can access. Create a restricted role and come back.
         </p>
       </section>
     </div>
@@ -219,28 +242,61 @@ interface RoleRow {
 
         &__list {
           list-style: none;
-          margin: 0.5rem 0 0;
+          margin: 0.625rem 0 0;
           padding: 0;
           display: flex;
           flex-wrap: wrap;
-          gap: 0.5rem;
+          gap: 0.5rem 0.625rem;
+
+          li {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+          }
         }
 
-        &__item {
+        &__chip {
           display: inline-flex;
           align-items: center;
           gap: 0.5rem;
-          padding: 0.25rem 0.625rem;
-          background: rgba(255, 255, 255, 0.05);
-          border: 1px solid rgba(255, 255, 255, 0.08);
+          padding: 0.4rem 0.75rem;
+          background: rgba(255, 255, 255, 0.04);
+          border: 1px solid rgba(255, 255, 255, 0.1);
           border-radius: 999px;
+          font: inherit;
           font-size: 0.8125rem;
+          color: inherit;
+          cursor: pointer;
+          transition: border-color 120ms ease, background 120ms ease;
+
+          &:hover {
+            border-color: rgba(96, 165, 250, 0.6);
+            background: rgba(96, 165, 250, 0.08);
+          }
+
+          &--selected {
+            border-color: #60a5fa;
+            background: rgba(96, 165, 250, 0.18);
+            color: #fff;
+          }
+        }
+
+        &__chip-check {
+          color: #60a5fa;
         }
 
         &__id {
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
-          font-size: 0.75rem;
-          color: #60a5fa;
+          font-size: 0.7rem;
+          color: rgba(255, 255, 255, 0.5);
+          padding: 0.05rem 0.4rem;
+          border-radius: 3px;
+          background: rgba(255, 255, 255, 0.06);
+        }
+
+        &__chip--selected &__id {
+          color: rgba(255, 255, 255, 0.9);
+          background: rgba(255, 255, 255, 0.18);
         }
 
         &__name {
@@ -249,14 +305,12 @@ interface RoleRow {
 
         &__link {
           font-size: 0.75rem;
-          color: rgba(255, 255, 255, 0.5);
+          color: rgba(255, 255, 255, 0.45);
           text-decoration: none;
-          padding-left: 0.25rem;
-          border-left: 1px solid rgba(255, 255, 255, 0.1);
-          margin-left: 0.25rem;
 
           &:hover {
             color: #60a5fa;
+            text-decoration: underline;
           }
         }
 
@@ -285,11 +339,18 @@ interface RoleRow {
 export class DfAiChatPrereqsComponent implements OnInit {
   private http = inject(HttpClient);
 
+  @Input() selectedConnectionId: number | null = null;
+  @Input() selectedRoleId: number | null = null;
+
+  @Output() selectConnection = new EventEmitter<number>();
+  @Output() selectRole = new EventEmitter<number>();
+
   loading = true;
   connections: AiConnectionRow[] = [];
   roles: RoleRow[] = [];
 
   faCheck = faCheck;
+  faCircleCheck = faCircleCheck;
   faCircleExclamation = faCircleExclamation;
   faPlus = faPlus;
   faRobot = faRobot;

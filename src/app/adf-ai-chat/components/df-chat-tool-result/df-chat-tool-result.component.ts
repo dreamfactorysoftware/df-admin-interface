@@ -141,7 +141,7 @@ export class DfChatToolResultComponent {
   faTriangleExclamation = faTriangleExclamation;
 
   ngOnInit(): void {
-    this.expanded = this.startExpanded;
+    this.expanded = this.startExpanded || !!this.message.is_error;
   }
 
   get pretty(): string {

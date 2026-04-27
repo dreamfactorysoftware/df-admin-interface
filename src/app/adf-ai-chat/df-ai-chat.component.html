@@ -77,7 +77,10 @@
       </div>
 
       <ng-container *ngIf="activeSession">
-        <div class="ai-chat__messages" #messageScroll>
+        <div
+          class="ai-chat__messages"
+          #messageScroll
+          (scroll)="onMessagesScroll($event)">
           <div *ngIf="messages.length === 0" class="ai-chat__placeholder">
             <p>Ask anything about your data.</p>
           </div>

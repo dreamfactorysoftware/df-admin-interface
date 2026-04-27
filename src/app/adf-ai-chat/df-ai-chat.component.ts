@@ -67,6 +67,8 @@ export class DfAiChatComponent implements OnInit, OnDestroy {
 
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
   private subs: Subscription[] = [];
+  private optimisticIdCounter = -1;
+  private autoScrollPinned = true;
 
   ngOnInit(): void {
     this.api.listChatServices().subscribe({
@@ -162,7 +164,9 @@ export class DfAiChatComponent implements OnInit, OnDestroy {
       .subscribe({
         next: session => {
           this.activeSession = session;
-          this.scrollToBottom();
+          // Opening a session: always pin to bottom regardless of prior state.
+          this.autoScrollPinned = true;
+          this.scrollToBottom(true);
         },
         error: err => (this.errorMessage = this.extractError(err)),
       });
@@ -192,7 +196,7 @@ export class DfAiChatComponent implements OnInit, OnDestroy {
     }
     const sessionId = this.activeSession.id;
     const optimistic: ChatMessage = {
-      id: -Date.now(),
+      id: this.optimisticIdCounter--,
       session_id: sessionId,
       role: 'user',
       content: text,
@@ -202,7 +206,7 @@ export class DfAiChatComponent implements OnInit, OnDestroy {
       ...this.activeSession,
       messages: [...(this.activeSession.messages ?? []), optimistic],
     };
-    this.scrollToBottom();
+    this.scrollToBottom(true);
 
     this.awaitingAssistant = true;
     this.startPolling(sessionId);
@@ -262,11 +266,26 @@ export class DfAiChatComponent implements OnInit, OnDestroy {
     });
   }
 
-  private scrollToBottom(): void {
+  /**
+   * Track whether the user is currently scrolled near the bottom. We only
+   * auto-scroll on new messages when they are — otherwise scroll position
+   * gets ripped away while they're reading history.
+   */
+  onMessagesScroll(event: Event): void {
+    const el = event.target as HTMLElement;
+    const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+    this.autoScrollPinned = distance < 60;
+  }
+
+  private scrollToBottom(force = false): void {
+    if (!force && !this.autoScrollPinned) {
+      return;
+    }
     setTimeout(() => {
       const el = this.messageScroll?.nativeElement;
       if (el) {
         el.scrollTop = el.scrollHeight;
+        this.autoScrollPinned = true;
       }
     });
   }
