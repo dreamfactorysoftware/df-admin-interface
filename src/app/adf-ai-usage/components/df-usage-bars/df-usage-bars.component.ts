@@ -15,9 +15,7 @@ import { GroupRow } from '../../types/usage';
         </span>
       </div>
 
-      <div *ngIf="visibleRows.length === 0" class="bars__empty">
-        No data.
-      </div>
+      <div *ngIf="visibleRows.length === 0" class="bars__empty">No data.</div>
 
       <ul class="bars__list">
         <li

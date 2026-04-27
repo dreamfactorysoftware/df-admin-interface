@@ -35,13 +35,11 @@
   <div *ngIf="errorMessage" class="usage__error">{{ errorMessage }}</div>
 
   <ng-container *ngIf="!loading && bundle">
-    <div
-      *ngIf="bundle.sessions.length === 0"
-      class="usage__empty">
+    <div *ngIf="bundle.sessions.length === 0" class="usage__empty">
       <h3>No chat sessions yet</h3>
       <p>
-        Token usage data appears here once chat services have run sessions.
-        Try the
+        Token usage data appears here once chat services have run sessions. Try
+        the
         <a [routerLink]="['/ai/chat']">
           <fa-icon [icon]="faMessage"></fa-icon>
           chat UI

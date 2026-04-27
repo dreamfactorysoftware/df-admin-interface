@@ -70,7 +70,9 @@ export class DfAiUsageComponent implements OnInit {
         next: bundle => (this.bundle = bundle),
         error: err => {
           this.errorMessage =
-            err?.error?.error?.message ?? err?.message ?? 'Failed to load usage.';
+            err?.error?.error?.message ??
+            err?.message ??
+            'Failed to load usage.';
         },
       });
   }

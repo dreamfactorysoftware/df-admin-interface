@@ -73,7 +73,9 @@ export function summarize(sessions: UsageSessionRow[]): UsageSummary {
     outputTokens,
     totalTokens,
     toolCalls,
-    avgTokensPerSession: sessionCount ? Math.round(totalTokens / sessionCount) : 0,
+    avgTokensPerSession: sessionCount
+      ? Math.round(totalTokens / sessionCount)
+      : 0,
     avgToolCallsPerSession: sessionCount
       ? Math.round((toolCalls / sessionCount) * 10) / 10
       : 0,

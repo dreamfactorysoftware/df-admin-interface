@@ -1,7 +1,11 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input, OnChanges } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { UsageSessionRow, UsageSummary, ProviderRates } from '../../types/usage';
+import {
+  UsageSessionRow,
+  UsageSummary,
+  ProviderRates,
+} from '../../types/usage';
 import { DEFAULT_RATES, estimateCost, formatUSD } from '../../utils/cost';
 
 interface ProviderBreakdown {
@@ -50,7 +54,9 @@ interface ProviderBreakdown {
                 step="0.0001"
                 min="0"
                 [ngModel]="row.rates.inputPer1k"
-                (ngModelChange)="updateRate(row.provider, 'inputPer1k', $event)" />
+                (ngModelChange)="
+                  updateRate(row.provider, 'inputPer1k', $event)
+                " />
             </td>
             <td class="cost__col-num">{{ row.outputTokens | number }}</td>
             <td class="cost__col-rate">
@@ -176,8 +182,7 @@ export class DfCostEstimatorComponent implements OnChanges {
     field: 'inputPer1k' | 'outputPer1k',
     value: number
   ): void {
-    const cur =
-      this.customRates.get(provider) ??
+    const cur = this.customRates.get(provider) ??
       DEFAULT_RATES[provider] ?? {
         provider,
         inputPer1k: 0,
@@ -200,8 +205,7 @@ export class DfCostEstimatorComponent implements OnChanges {
     }
 
     this.rows = Array.from(byProvider.entries()).map(([provider, t]) => {
-      const rates =
-        this.customRates.get(provider) ??
+      const rates = this.customRates.get(provider) ??
         DEFAULT_RATES[provider] ?? {
           provider,
           inputPer1k: 0,

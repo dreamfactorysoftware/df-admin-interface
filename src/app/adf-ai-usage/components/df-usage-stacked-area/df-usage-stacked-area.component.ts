@@ -24,12 +24,13 @@ interface YTick {
   standalone: true,
   imports: [CommonModule],
   template: `
-    <figure class="chart" [style.--chart-w.px]="width" [style.--chart-h.px]="height">
+    <figure
+      class="chart"
+      [style.--chart-w.px]="width"
+      [style.--chart-h.px]="height">
       <div class="chart__legend">
         <span class="chart__title">Tokens over time</span>
-        <span
-          *ngFor="let l of layers"
-          class="chart__legend-item">
+        <span *ngFor="let l of layers" class="chart__legend-item">
           <span class="chart__legend-swatch" [style.background]="l.fill"></span>
           {{ l.label }}
           <span class="chart__legend-total">{{ formatK(l.total) }}</span>
@@ -77,10 +78,7 @@ interface YTick {
         </g>
 
         <g *ngIf="!hasData" class="chart__empty">
-          <text
-            [attr.x]="width / 2"
-            [attr.y]="height / 2"
-            text-anchor="middle">
+          <text [attr.x]="width / 2" [attr.y]="height / 2" text-anchor="middle">
             No data in this range yet.
           </text>
         </g>
@@ -190,7 +188,9 @@ export class DfUsageStackedAreaComponent implements OnChanges {
     }
 
     const xAt = (i: number): number =>
-      n === 1 ? this.paddingX + innerW / 2 : this.paddingX + (i / (n - 1)) * innerW;
+      n === 1
+        ? this.paddingX + innerW / 2
+        : this.paddingX + (i / (n - 1)) * innerW;
 
     const yAt = (v: number): number =>
       this.paddingY + innerH * (1 - v / maxStack);
@@ -203,10 +203,7 @@ export class DfUsageStackedAreaComponent implements OnChanges {
       baseline
     );
     const outputPath = pathArea(
-      this.data.map((b, i) => [
-        xAt(i),
-        yAt(b.inputTokens + b.outputTokens),
-      ]),
+      this.data.map((b, i) => [xAt(i), yAt(b.inputTokens + b.outputTokens)]),
       baseline,
       this.data.map((b, i) => [xAt(i), yAt(b.inputTokens)])
     );

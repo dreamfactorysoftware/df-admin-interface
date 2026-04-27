@@ -12,9 +12,9 @@ describe('cost', () => {
     });
 
     it('returns zero for zero rates (e.g. ollama)', () => {
-      expect(
-        estimateCost(1_000_000, 1_000_000, DEFAULT_RATES['ollama'])
-      ).toBe(0);
+      expect(estimateCost(1_000_000, 1_000_000, DEFAULT_RATES['ollama'])).toBe(
+        0
+      );
     });
 
     it('handles fractional thousands', () => {

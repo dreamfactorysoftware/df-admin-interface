@@ -63,9 +63,7 @@ describe('aggregate', () => {
     });
 
     it('"7d" drops the 8-day-old session', () => {
-      expect(filterByRange(sessions, '7d', NOW).map(s => s.id)).toEqual([
-        1, 2,
-      ]);
+      expect(filterByRange(sessions, '7d', NOW).map(s => s.id)).toEqual([1, 2]);
     });
 
     it('drops sessions with no timestamp', () => {
@@ -89,8 +87,16 @@ describe('aggregate', () => {
 
     it('aggregates token + tool counts and rounds averages', () => {
       const summary = summarize([
-        s({ total_input_tokens: 100, total_output_tokens: 200, tool_call_count: 1 }),
-        s({ total_input_tokens: 200, total_output_tokens: 400, tool_call_count: 4 }),
+        s({
+          total_input_tokens: 100,
+          total_output_tokens: 200,
+          tool_call_count: 1,
+        }),
+        s({
+          total_input_tokens: 200,
+          total_output_tokens: 400,
+          tool_call_count: 4,
+        }),
       ]);
       expect(summary.sessionCount).toBe(2);
       expect(summary.inputTokens).toBe(300);
