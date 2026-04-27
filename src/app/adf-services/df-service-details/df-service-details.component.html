@@ -833,16 +833,16 @@
                     [formControl]="getConfigControl('excelContent')"
                     [mode]="excelMode"></df-ace-editor>
                 </ng-container>
-                <ng-container
-                  *ngFor="let item of viewSchema"
-                  [ngSwitch]="
-                    serviceForm.getRawValue().type === 'ai_chat' &&
-                    (item.name === 'ai_service_id' ||
-                      item.name === 'ai_role_id')
-                  ">
-                  <!-- Hidden: handled by df-ai-chat-prereqs above -->
-                  <ng-container *ngSwitchCase="true"></ng-container>
-                  <ng-container *ngSwitchDefault>
+                <ng-container *ngFor="let item of viewSchema">
+                  <!-- ai_chat: ai_service_id and ai_role_id are picked via prereqs panel above -->
+                  <ng-container
+                    *ngIf="
+                      !(
+                        serviceForm.getRawValue().type === 'ai_chat' &&
+                        (item.name === 'ai_service_id' ||
+                          item.name === 'ai_role_id')
+                      )
+                    ">
                     <ng-container
                       *ngIf="
                         item.type === 'text' && item.name === 'content';

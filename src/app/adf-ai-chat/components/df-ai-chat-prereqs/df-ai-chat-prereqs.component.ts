@@ -175,28 +175,29 @@ interface RoleRow {
         border: 1px solid rgba(96, 165, 250, 0.3);
         background: rgba(96, 165, 250, 0.05);
         border-radius: 8px;
-        padding: 1.25rem 1.5rem;
+        padding: 1.5rem 1.75rem;
         margin: 1rem 0;
         display: flex;
         flex-direction: column;
-        gap: 1rem;
+        gap: 1.25rem;
+        font-size: 1rem;
 
         &__header {
           h4 {
-            margin: 0 0 0.25rem;
-            font-size: 1rem;
+            margin: 0 0 0.4rem;
+            font-size: 1.2rem;
             font-weight: 600;
           }
           p {
             margin: 0;
-            color: rgba(255, 255, 255, 0.7);
-            font-size: 0.875rem;
-            line-height: 1.5;
+            color: rgba(255, 255, 255, 0.75);
+            font-size: 0.95rem;
+            line-height: 1.55;
           }
         }
 
         &__section {
-          padding: 0.75rem 1rem;
+          padding: 1rem 1.25rem;
           border-radius: 6px;
           background: rgba(255, 255, 255, 0.02);
 
@@ -214,7 +215,7 @@ interface RoleRow {
         }
 
         &__icon {
-          font-size: 1.05rem;
+          font-size: 1.2rem;
 
           &--ok {
             color: #4ade80;
@@ -226,16 +227,17 @@ interface RoleRow {
 
         &__kind-icon {
           color: rgba(255, 255, 255, 0.5);
+          font-size: 1.05rem;
         }
 
         &__title {
           font-weight: 600;
-          font-size: 0.95rem;
+          font-size: 1.1rem;
         }
 
         &__count {
-          font-size: 0.8125rem;
-          color: rgba(255, 255, 255, 0.55);
+          font-size: 0.9rem;
+          color: rgba(255, 255, 255, 0.6);
         }
 
         &__action {
@@ -267,12 +269,12 @@ interface RoleRow {
           display: inline-flex;
           align-items: center;
           gap: 0.5rem;
-          padding: 0.4rem 0.75rem;
+          padding: 0.5rem 0.95rem;
           background: rgba(255, 255, 255, 0.04);
           border: 1px solid rgba(255, 255, 255, 0.1);
           border-radius: 999px;
           font: inherit;
-          font-size: 0.8125rem;
+          font-size: 0.95rem;
           color: inherit;
           cursor: pointer;
           transition:
@@ -300,9 +302,9 @@ interface RoleRow {
         }
 
         &__pick-hint {
-          margin: 0.5rem 0 0;
-          font-size: 0.8125rem;
-          color: rgba(255, 255, 255, 0.55);
+          margin: 0.625rem 0 0;
+          font-size: 0.9rem;
+          color: rgba(255, 255, 255, 0.6);
           font-style: italic;
         }
 
