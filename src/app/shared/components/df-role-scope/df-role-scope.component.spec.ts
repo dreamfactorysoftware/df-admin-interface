@@ -58,7 +58,12 @@ describe('DfRoleScopeComponent (logic)', () => {
   function loadFor(id: number | null | undefined): void {
     component.roleId = id;
     component.ngOnChanges({
-      roleId: { previousValue: null, currentValue: id, firstChange: true, isFirstChange: () => true },
+      roleId: {
+        previousValue: null,
+        currentValue: id,
+        firstChange: true,
+        isFirstChange: () => true,
+      },
     } as never);
   }
 

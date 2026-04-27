@@ -57,7 +57,9 @@ describe('DfChatToolResultComponent', () => {
       content: '{"a":1,"b":[2,3]}',
     });
     fixture.detectChanges();
-    expect(component.pretty).toBe('{\n  "a": 1,\n  "b": [\n    2,\n    3\n  ]\n}');
+    expect(component.pretty).toBe(
+      '{\n  "a": 1,\n  "b": [\n    2,\n    3\n  ]\n}'
+    );
   });
 
   it('returns invalid JSON content as-is', () => {

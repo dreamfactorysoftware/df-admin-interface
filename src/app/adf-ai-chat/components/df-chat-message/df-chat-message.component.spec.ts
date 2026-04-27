@@ -33,7 +33,9 @@ describe('DfChatMessageComponent', () => {
 
     it('returns single text segment when no code block', () => {
       component.message = msg({ content: 'hello world' });
-      expect(component.segments).toEqual([{ type: 'text', text: 'hello world' }]);
+      expect(component.segments).toEqual([
+        { type: 'text', text: 'hello world' },
+      ]);
     });
 
     it('extracts a fenced code block in the middle of text', () => {
@@ -56,9 +58,9 @@ describe('DfChatMessageComponent', () => {
         'a\n',
         'b\n',
       ]);
-      expect(segs.filter(s => s.type === 'text').map(s => s.text.trim())).toEqual(
-        ['middle']
-      );
+      expect(
+        segs.filter(s => s.type === 'text').map(s => s.text.trim())
+      ).toEqual(['middle']);
     });
 
     it('handles a code block that takes up the whole message', () => {

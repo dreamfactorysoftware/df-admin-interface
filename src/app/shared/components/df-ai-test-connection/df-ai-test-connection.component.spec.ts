@@ -4,11 +4,7 @@ import {
   HttpTestingController,
 } from '@angular/common/http/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import {
-  FormControl,
-  FormGroup,
-  ReactiveFormsModule,
-} from '@angular/forms';
+import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { DfAiTestConnectionComponent } from './df-ai-test-connection.component';
 
 function buildForm(config: Record<string, unknown> = {}): FormGroup {
@@ -89,10 +85,12 @@ describe('DfAiTestConnectionComponent', () => {
     component.form = buildForm({ provider: 'anthropic', api_key: 'bad' });
     fixture.detectChanges();
     component.run();
-    http.expectOne('/_internal/ai/test-connection').flush(
-      { success: false, error: { message: 'Invalid API key' } },
-      { status: 400, statusText: 'Bad Request' }
-    );
+    http
+      .expectOne('/_internal/ai/test-connection')
+      .flush(
+        { success: false, error: { message: 'Invalid API key' } },
+        { status: 400, statusText: 'Bad Request' }
+      );
     expect(component.result?.success).toBe(false);
     expect(component.result?.error?.message).toBe('Invalid API key');
   });
