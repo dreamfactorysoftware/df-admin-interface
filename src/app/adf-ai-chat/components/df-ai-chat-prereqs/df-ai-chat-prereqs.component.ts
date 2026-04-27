@@ -79,6 +79,11 @@ interface RoleRow {
           </a>
         </div>
 
+        <p
+          *ngIf="connections.length && selectedConnectionId == null"
+          class="prereqs__pick-hint">
+          Click one to use it for this chat service:
+        </p>
         <ul *ngIf="connections.length" class="prereqs__list">
           <li *ngFor="let c of connections">
             <button
@@ -91,7 +96,6 @@ interface RoleRow {
                 [icon]="faCircleCheck"
                 class="prereqs__chip-check"></fa-icon>
               <span class="prereqs__name">{{ c.label || c.name }}</span>
-              <code class="prereqs__id">#{{ c.id }}</code>
             </button>
           </li>
         </ul>
@@ -128,6 +132,11 @@ interface RoleRow {
           </a>
         </div>
 
+        <p
+          *ngIf="roles.length && selectedRoleId == null"
+          class="prereqs__pick-hint">
+          Click one to scope the AI's data access:
+        </p>
         <ul *ngIf="roles.length" class="prereqs__list">
           <li *ngFor="let r of roles">
             <button
@@ -140,16 +149,15 @@ interface RoleRow {
                 [icon]="faCircleCheck"
                 class="prereqs__chip-check"></fa-icon>
               <span class="prereqs__name">{{ r.name }}</span>
-              <code class="prereqs__id">#{{ r.id }}</code>
             </button>
             <a
               [routerLink]="[
                 '/api-connections/role-based-access',
                 r.id,
-                'scope',
+                'scope'
               ]"
               class="prereqs__link"
-              >scope</a
+              >what can this role see?</a
             >
           </li>
         </ul>
@@ -287,22 +295,15 @@ interface RoleRow {
           color: #60a5fa;
         }
 
-        &__id {
-          font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
-          font-size: 0.7rem;
-          color: rgba(255, 255, 255, 0.5);
-          padding: 0.05rem 0.4rem;
-          border-radius: 3px;
-          background: rgba(255, 255, 255, 0.06);
-        }
-
-        &__chip--selected &__id {
-          color: rgba(255, 255, 255, 0.9);
-          background: rgba(255, 255, 255, 0.18);
-        }
-
         &__name {
           font-weight: 500;
+        }
+
+        &__pick-hint {
+          margin: 0.5rem 0 0;
+          font-size: 0.8125rem;
+          color: rgba(255, 255, 255, 0.55);
+          font-style: italic;
         }
 
         &__link {
