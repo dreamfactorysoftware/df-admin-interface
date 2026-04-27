@@ -42,5 +42,7 @@ module.exports = {
     '<rootDir>/src/app/adf-ai-chat/components/df-ai-chat-prereqs/df-ai-chat-prereqs.component.spec.ts',
     '<rootDir>/src/app/shared/components/df-ai-test-connection/df-ai-test-connection.component.spec.ts',
     '<rootDir>/src/app/adf-ai-chat/df-ai-chat.poll.spec.ts',
+    '<rootDir>/src/app/adf-ai-usage/utils/aggregate.spec.ts',
+    '<rootDir>/src/app/adf-ai-usage/utils/cost.spec.ts',
   ],
 };

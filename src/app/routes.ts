@@ -864,6 +864,13 @@ export const routes: Routes = [
         ],
       },
       {
+        path: ROUTES.AI_USAGE,
+        loadComponent: () =>
+          import('./adf-ai-usage/df-ai-usage.component').then(
+            m => m.DfAiUsageComponent
+          ),
+      },
+      {
         path: ROUTES.AI_MCP,
         children: ServiceRoutes,
         data: {

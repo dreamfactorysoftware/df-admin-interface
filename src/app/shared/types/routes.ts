@@ -20,6 +20,7 @@ export enum ROUTES {
   AI_CONNECTIONS = 'connections',
   AI_CHAT_SERVICES = 'chat-services',
   AI_CHAT_UI = 'chat',
+  AI_USAGE = 'usage',
   AI_MCP = 'mcp',
   API_CONNECTIONS = 'api-connections',
   API_TYPES = 'api-types',

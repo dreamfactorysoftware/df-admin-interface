@@ -1,0 +1,81 @@
+<div class="usage">
+  <header class="usage__header">
+    <div class="usage__title">
+      <fa-icon [icon]="faChartLine"></fa-icon>
+      <h2>AI Usage Analytics</h2>
+    </div>
+
+    <div class="usage__controls">
+      <mat-button-toggle-group
+        [value]="range"
+        (change)="setRange($event.value)"
+        aria-label="Time range">
+        <mat-button-toggle value="24h">24h</mat-button-toggle>
+        <mat-button-toggle value="7d">7d</mat-button-toggle>
+        <mat-button-toggle value="30d">30d</mat-button-toggle>
+        <mat-button-toggle value="all">All</mat-button-toggle>
+      </mat-button-toggle-group>
+
+      <button
+        type="button"
+        mat-stroked-button
+        class="usage__refresh"
+        [disabled]="loading"
+        (click)="refresh()">
+        <fa-icon [icon]="faArrowsRotate"></fa-icon>
+        <span>Refresh</span>
+      </button>
+    </div>
+  </header>
+
+  <div *ngIf="loading" class="usage__loading">
+    <mat-spinner diameter="32"></mat-spinner>
+  </div>
+
+  <div *ngIf="errorMessage" class="usage__error">{{ errorMessage }}</div>
+
+  <ng-container *ngIf="!loading && bundle">
+    <div
+      *ngIf="bundle.sessions.length === 0"
+      class="usage__empty">
+      <h3>No chat sessions yet</h3>
+      <p>
+        Token usage data appears here once chat services have run sessions.
+        Try the
+        <a [routerLink]="['/ai/chat']">
+          <fa-icon [icon]="faMessage"></fa-icon>
+          chat UI
+        </a>
+        to start one.
+      </p>
+    </div>
+
+    <ng-container *ngIf="bundle.sessions.length > 0">
+      <df-usage-summary [summary]="summary"></df-usage-summary>
+
+      <df-usage-stacked-area [data]="series"></df-usage-stacked-area>
+
+      <div class="usage__grid">
+        <df-usage-bars
+          title="Top users"
+          [rows]="byUser"
+          [limit]="8"></df-usage-bars>
+        <df-usage-bars
+          title="Top roles"
+          [rows]="byRole"
+          [limit]="8"></df-usage-bars>
+        <df-usage-bars
+          title="By chat service"
+          [rows]="byService"
+          [limit]="8"
+          [clickable]="true"
+          (rowClick)="jumpToService($event)"></df-usage-bars>
+      </div>
+
+      <df-cost-estimator
+        [sessions]="filteredSessions"
+        [connectionProviders]="bundle.connectionProviders"
+        [summary]="summary"></df-cost-estimator>
+    </ng-container>
+  </ng-container>
+</div>

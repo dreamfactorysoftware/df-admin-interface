@@ -1,0 +1,92 @@
+.usage {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.25rem 1.75rem 3rem;
+  max-width: 1280px;
+  margin: 0 auto;
+  width: 100%;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  &__title {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+
+    h2 {
+      margin: 0;
+      font-size: 1.4rem;
+      font-weight: 600;
+    }
+
+    fa-icon {
+      color: #60a5fa;
+      font-size: 1.1rem;
+    }
+  }
+
+  &__controls {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  &__refresh {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  &__loading {
+    padding: 4rem;
+    display: flex;
+    justify-content: center;
+  }
+
+  &__error {
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    background: rgba(220, 53, 69, 0.12);
+    border: 1px solid rgba(220, 53, 69, 0.4);
+    color: #ff8585;
+  }
+
+  &__empty {
+    padding: 3rem 2rem;
+    text-align: center;
+    border: 1px dashed rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.02);
+
+    h3 {
+      margin: 0 0 0.5rem;
+    }
+    p {
+      margin: 0;
+      color: rgba(255, 255, 255, 0.6);
+    }
+    a {
+      color: #60a5fa;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+  }
+
+  &__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 1rem;
+  }
+}

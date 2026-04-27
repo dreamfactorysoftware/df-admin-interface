@@ -69,6 +69,7 @@ export function accessibleRoutes(
     ROUTES.AI_CONNECTIONS,
     ROUTES.AI_CHAT_SERVICES,
     ROUTES.AI_CHAT_UI,
+    ROUTES.AI_USAGE,
     ROUTES.AI_MCP,
   ];
   allowedTabs?.forEach(tab => {

@@ -182,6 +182,10 @@
         "nav": "Conversations",
         "header": "AI Chat"
       },
+      "usage": {
+        "nav": "Usage",
+        "header": "AI Usage Analytics"
+      },
       "mcp": {
         "nav": "MCP",
         "header": "MCP Servers",
