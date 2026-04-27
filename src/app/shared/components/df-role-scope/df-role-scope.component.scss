@@ -3,7 +3,8 @@
   flex-direction: column;
   gap: 1.5rem;
   padding: 1.75rem 2rem;
-  border: 1px solid var(--mdc-outlined-card-outline-color, rgba(255, 255, 255, 0.12));
+  border: 1px solid
+    var(--mdc-outlined-card-outline-color, rgba(255, 255, 255, 0.12));
   border-radius: 8px;
   background: var(--mat-app-surface, transparent);
   font-size: 1rem;
