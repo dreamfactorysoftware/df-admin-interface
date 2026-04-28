@@ -18,11 +18,11 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { finalize } from 'rxjs/operators';
 import {
-  EMPTY_FILTERS,
   TimeRange,
   UsageBundle,
   UsageFilters,
   UsageService,
+  createEmptyFilters,
   n,
 } from './services/usage.service';
 import { GroupRow, TimeBucket, UsageSummary } from './types/usage';
@@ -69,9 +69,9 @@ export class DfAiUsageComponent implements OnInit {
   bundle: UsageBundle | null = null;
   range: TimeRange = '7d';
 
-  // Filter state. Mutated in place via addFilter/removeFilter; refresh() is
-  // called once after mutation. Sent as-is to the backend.
-  filters: UsageFilters = { ...EMPTY_FILTERS };
+  // Filter state. Mutated in place via toggleFilter / removeChip; refresh()
+  // is called once after each mutation. Sent as-is to the backend.
+  filters: UsageFilters = createEmptyFilters();
 
   // Derived views are cached here on each refresh. The template binds to these
   // as stable references, NOT recomputed on every change-detection tick —
@@ -175,40 +175,24 @@ export class DfAiUsageComponent implements OnInit {
     if (Number.isFinite(id) && id > 0) this.toggleFilter('service_id', id);
   }
 
-  toggleFilter<K extends keyof UsageFilters>(
-    key: K,
-    value: UsageFilters[K][number]
-  ): void {
-    const list = this.filters[key] as (string | number)[];
-    const idx = list.indexOf(value as string | number);
+  /** Toggle a single (dimension, value) pair on the active filter set. */
+  toggleFilter(dimension: keyof UsageFilters, value: string | number): void {
+    const list = this.filters[dimension] as Array<string | number>;
+    const idx = list.indexOf(value);
     if (idx >= 0) {
       list.splice(idx, 1);
     } else {
-      list.push(value as string | number);
+      list.push(value);
     }
     this.refresh();
   }
 
   removeChip(chip: ActiveFilterChip): void {
-    this.toggleFilter(chip.dimension, chip.value as never);
+    this.toggleFilter(chip.dimension, chip.value);
   }
 
   clearFilters(): void {
-    this.filters = { ...EMPTY_FILTERS };
-    Object.keys(this.filters).forEach(k => {
-      (this.filters[k as keyof UsageFilters] as unknown[]).length = 0;
-    });
-    // Re-init properly so each array is its own (the spread above shares refs).
-    this.filters = {
-      provider: [],
-      service_id: [],
-      model: [],
-      user_id: [],
-      role_id: [],
-      app_id: [],
-      resource: [],
-      status: [],
-    };
+    this.filters = createEmptyFilters();
     this.refresh();
   }
 

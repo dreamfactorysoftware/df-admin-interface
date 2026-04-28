@@ -25,14 +25,15 @@ interface ProviderBreakdown {
     <mat-card class="cost">
       <mat-card-content>
         <header class="cost__head">
-          <h4 class="cost__title">Estimated cost</h4>
+          <h4 class="cost__title">What-if cost calculator</h4>
           <span class="cost__total">{{ formatUSD(totalCost) }}</span>
         </header>
         <p class="cost__hint">
-          Estimated using DF's stored input/output token counts and the rates
-          below (USD per 1k tokens). Edit any rate to recompute. Defaults are
-          conservative mid-tier estimates and don't account for caching, batch
-          discounts, or model-tier differences.
+          The "Estimated cost" tile above is the source of truth — it uses the
+          rates you configured on each AI Connection at log-time. This panel
+          lets you experiment with different rates against the same token
+          counts, so you can model what a price change would do without editing
+          your services. Edits here don't persist.
         </p>
 
         <table class="cost__table" *ngIf="rows.length > 0; else noConn">

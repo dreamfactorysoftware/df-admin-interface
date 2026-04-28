@@ -22,16 +22,20 @@ export interface UsageFilters {
   status: string[];
 }
 
-export const EMPTY_FILTERS: UsageFilters = {
-  provider: [],
-  service_id: [],
-  model: [],
-  user_id: [],
-  role_id: [],
-  app_id: [],
-  resource: [],
-  status: [],
-};
+/** Factory — NOT a const — because returning a singleton would let callers
+ *  mutate the shared empty arrays. */
+export function createEmptyFilters(): UsageFilters {
+  return {
+    provider: [],
+    service_id: [],
+    model: [],
+    user_id: [],
+    role_id: [],
+    app_id: [],
+    resource: [],
+    status: [],
+  };
+}
 
 export interface UsageResponse {
   period: string;
@@ -188,7 +192,7 @@ export class UsageService {
 
   loadAll(
     range: TimeRange,
-    filters: UsageFilters = EMPTY_FILTERS
+    filters: UsageFilters = createEmptyFilters()
   ): Observable<UsageBundle> {
     const period = range === 'all' ? '3650d' : range;
 
