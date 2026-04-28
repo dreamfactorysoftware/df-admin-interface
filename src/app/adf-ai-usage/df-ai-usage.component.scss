@@ -1,7 +1,7 @@
 .usage {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 24px;
   padding: 20px 24px 40px;
   max-width: 1400px;
   margin: 0 auto;
@@ -24,11 +24,22 @@
       margin: 0;
       font-size: 24px;
       font-weight: 600;
+      color: #333;
     }
 
     fa-icon {
       color: #7f11e0;
       font-size: 20px;
+    }
+  }
+
+  &__title-hint {
+    font-size: 14px !important;
+    color: #999 !important;
+    cursor: help;
+
+    &:hover {
+      color: #7f11e0 !important;
     }
   }
 
@@ -88,16 +99,39 @@
   &__grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
-    gap: 20px;
+    gap: 16px;
   }
+
+  // Filter card -------------------------------------------------------------
 
   &__filters {
     mat-card-content {
-      padding: 16px 20px;
+      padding: 16px 20px 12px;
       display: flex;
       flex-direction: column;
       gap: 12px;
     }
+  }
+
+  &__filters-head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  &__filters-label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #666;
+    font-weight: 700;
+  }
+
+  &__filters-hint {
+    font-size: 12px;
+    color: #999;
+    font-style: italic;
   }
 
   &__filter-row {
@@ -120,29 +154,58 @@
     align-items: center;
     flex-wrap: wrap;
     gap: 8px;
+    padding-top: 4px;
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+    margin-top: 4px;
+    padding-top: 12px;
   }
 
-  &__section-header {
-    margin-top: 16px;
-    padding-top: 20px;
-    border-top: 1px dashed rgba(0, 0, 0, 0.12);
+  // Section headers ---------------------------------------------------------
+  // Used between major sections (DF AI usage / External MCP traffic) to give
+  // the dashboard visual rhythm without heavy dividers.
 
-    h3 {
-      margin: 0 0 6px;
-      font-size: 18px;
-      font-weight: 600;
-      color: #333;
+  &__section-header {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  &__section-title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #333;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &__section-hint {
+    font-size: 13px;
+    color: #999;
+    cursor: help;
+
+    &:hover {
+      color: #7f11e0;
     }
   }
 
-  &__section-disclaimer {
+  &__section-subtitle {
     margin: 0;
     font-size: 13px;
     color: #666;
     line-height: 1.5;
+  }
+
+  &__section-disclaimer {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: #444;
+    line-height: 1.5;
     background: rgba(255, 152, 0, 0.06);
     border-left: 3px solid #ff9800;
-    padding: 10px 12px;
+    padding: 8px 12px;
     border-radius: 0 4px 4px 0;
 
     strong {
@@ -150,14 +213,17 @@
     }
   }
 
+  // MCP summary tiles -------------------------------------------------------
+  // Tighter than the AI summary because the MCP section is secondary content.
+
   &__mcp-summary {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
     gap: 16px;
   }
 
   &__mcp-card mat-card-content {
-    padding: 20px;
+    padding: 16px 20px;
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -172,10 +238,11 @@
   }
 
   &__mcp-value {
-    font-size: 24px;
+    font-size: 22px;
     font-weight: 600;
     color: #333;
     font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+    line-height: 1.2;
 
     small {
       font-size: 12px;
@@ -186,18 +253,65 @@
   }
 }
 
+// Dark theme --------------------------------------------------------------
+
 :host-context(.dark-theme) {
   .usage {
-    &__section-header {
-      border-top-color: rgba(255, 255, 255, 0.12);
-
-      h3 {
+    &__title {
+      h2 {
         color: #fff;
+      }
+      fa-icon {
+        color: #bb86fc;
       }
     }
 
+    &__title-hint {
+      color: #888 !important;
+
+      &:hover {
+        color: #bb86fc !important;
+      }
+    }
+
+    &__error {
+      background: rgba(244, 67, 54, 0.12);
+      color: #ff8585;
+    }
+
+    &__empty p {
+      color: #bbb;
+    }
+    &__empty a {
+      color: #bb86fc;
+    }
+
+    &__filters-label {
+      color: #bbb;
+    }
+    &__filters-hint {
+      color: #888;
+    }
+
+    &__filter-chips {
+      border-top-color: rgba(255, 255, 255, 0.08);
+    }
+
+    &__section-title {
+      color: #fff;
+    }
+    &__section-hint {
+      color: #888;
+
+      &:hover {
+        color: #bb86fc;
+      }
+    }
+    &__section-subtitle {
+      color: #bbb;
+    }
     &__section-disclaimer {
-      color: #ccc;
+      color: #ddd;
       background: rgba(255, 152, 0, 0.1);
 
       strong {
@@ -208,27 +322,8 @@
     &__mcp-label {
       color: #bbb;
     }
-
     &__mcp-value {
       color: #fff;
-    }
-  }
-}
-
-:host-context(.dark-theme) {
-  .usage {
-    &__title fa-icon {
-      color: #bb86fc;
-    }
-    &__error {
-      background: rgba(244, 67, 54, 0.12);
-      color: #ff8585;
-    }
-    &__empty p {
-      color: #bbb;
-    }
-    &__empty a {
-      color: #bb86fc;
     }
   }
 }

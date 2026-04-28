@@ -9,10 +9,12 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import {
   faArrowsRotate,
   faChartLine,
+  faCircleInfo,
   faMessage,
   faXmark,
 } from '@fortawesome/free-solid-svg-icons';
@@ -51,6 +53,7 @@ interface ActiveFilterChip {
     MatFormFieldModule,
     MatProgressSpinnerModule,
     MatSelectModule,
+    MatTooltipModule,
     FontAwesomeModule,
     DfUsageStackedAreaComponent,
     DfUsageBarsComponent,
@@ -118,6 +121,7 @@ export class DfAiUsageComponent implements OnInit {
 
   faArrowsRotate = faArrowsRotate;
   faChartLine = faChartLine;
+  faCircleInfo = faCircleInfo;
   faMessage = faMessage;
   faXmark = faXmark;
 

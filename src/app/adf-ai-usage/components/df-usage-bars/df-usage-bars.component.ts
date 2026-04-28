@@ -1,17 +1,28 @@
 import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { MatCardModule } from '@angular/material/card';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { faCircleInfo } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { GroupRow } from '../../types/usage';
 
 @Component({
   selector: 'df-usage-bars',
   standalone: true,
-  imports: [CommonModule, MatCardModule],
+  imports: [CommonModule, MatCardModule, MatTooltipModule, FontAwesomeModule],
   template: `
     <mat-card class="bars">
       <mat-card-content>
         <div class="bars__head">
-          <h4 class="bars__title">{{ title }}</h4>
+          <h4 class="bars__title">
+            {{ title }}
+            <fa-icon
+              *ngIf="hint"
+              class="bars__hint"
+              [icon]="faCircleInfo"
+              [matTooltip]="hint"
+              matTooltipPosition="above"></fa-icon>
+          </h4>
           <span class="bars__subtitle" *ngIf="rows.length > limit">
             top {{ limit }} of {{ rows.length }}
           </span>
@@ -66,6 +77,18 @@ import { GroupRow } from '../../types/usage';
           font-size: 16px;
           font-weight: 600;
           color: #333;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+        }
+        &__hint {
+          font-size: 13px;
+          color: #999;
+          cursor: help;
+
+          &:hover {
+            color: #7f11e0;
+          }
         }
         &__subtitle {
           font-size: 12px;
@@ -159,6 +182,13 @@ import { GroupRow } from '../../types/usage';
           &__empty {
             color: #bbb;
           }
+          &__hint {
+            color: #888;
+
+            &:hover {
+              color: #bb86fc;
+            }
+          }
           &__track {
             background: rgba(255, 255, 255, 0.08);
           }
@@ -175,10 +205,14 @@ import { GroupRow } from '../../types/usage';
 })
 export class DfUsageBarsComponent {
   @Input({ required: true }) title!: string;
+  /** Optional one-line description rendered as a tooltip on an info icon
+   *  next to the title — for explaining what this panel actually shows. */
+  @Input() hint = '';
   @Input() rows: GroupRow[] = [];
   @Input() limit = 8;
   @Input() clickable = false;
   @Output() rowClick = new EventEmitter<GroupRow>();
+  faCircleInfo = faCircleInfo;
 
   get visibleRows(): GroupRow[] {
     return (this.rows ?? []).slice(0, this.limit);

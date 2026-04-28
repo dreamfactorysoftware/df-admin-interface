@@ -3,13 +3,20 @@
     <div class="usage__title">
       <fa-icon [icon]="faChartLine"></fa-icon>
       <h2>AI Usage Analytics</h2>
+      <fa-icon
+        class="usage__title-hint"
+        [icon]="faCircleInfo"
+        matTooltip="Every AI request that flows through DreamFactory — direct REST calls to AI Connections, chats from the DF chat UI, and inbound MCP tool calls from external AI agents. Use the filters to drill into a specific user, app, or model."
+        matTooltipPosition="below"></fa-icon>
     </div>
 
     <div class="usage__controls">
       <mat-button-toggle-group
         [value]="range"
         (change)="setRange($event.value)"
-        aria-label="Time range">
+        aria-label="Time range"
+        matTooltip="Time window for all metrics on this page"
+        matTooltipPosition="above">
         <mat-button-toggle value="24h">24h</mat-button-toggle>
         <mat-button-toggle value="7d">7d</mat-button-toggle>
         <mat-button-toggle value="30d">30d</mat-button-toggle>
@@ -21,7 +28,9 @@
         mat-stroked-button
         class="usage__refresh"
         [disabled]="loading"
-        (click)="refresh()">
+        (click)="refresh()"
+        matTooltip="Re-run the queries against the live database"
+        matTooltipPosition="above">
         <fa-icon [icon]="faArrowsRotate"></fa-icon>
         <span>Refresh</span>
       </button>
@@ -30,8 +39,18 @@
 
   <mat-card class="usage__filters">
     <mat-card-content>
+      <div class="usage__filters-head">
+        <span class="usage__filters-label">Filters</span>
+        <span class="usage__filters-hint">
+          Click any bar in the panels below to add/remove a filter quickly.
+        </span>
+      </div>
       <div class="usage__filter-row">
-        <mat-form-field appearance="outline" class="usage__filter-field">
+        <mat-form-field
+          appearance="outline"
+          class="usage__filter-field"
+          matTooltip="LLM provider (anthropic, openai, xai, ollama, openai_compatible)"
+          matTooltipPosition="above">
           <mat-label>Provider</mat-label>
           <mat-select
             multiple
@@ -43,7 +62,11 @@
           </mat-select>
         </mat-form-field>
 
-        <mat-form-field appearance="outline" class="usage__filter-field">
+        <mat-form-field
+          appearance="outline"
+          class="usage__filter-field"
+          matTooltip="Specific AI Connection or AI Chat service in DreamFactory"
+          matTooltipPosition="above">
           <mat-label>Connection</mat-label>
           <mat-select
             multiple
@@ -55,7 +78,11 @@
           </mat-select>
         </mat-form-field>
 
-        <mat-form-field appearance="outline" class="usage__filter-field">
+        <mat-form-field
+          appearance="outline"
+          class="usage__filter-field"
+          matTooltip="Specific model name (e.g. claude-sonnet-4-5, gpt-4o)"
+          matTooltipPosition="above">
           <mat-label>Model</mat-label>
           <mat-select
             multiple
@@ -67,7 +94,11 @@
           </mat-select>
         </mat-form-field>
 
-        <mat-form-field appearance="outline" class="usage__filter-field">
+        <mat-form-field
+          appearance="outline"
+          class="usage__filter-field"
+          matTooltip="Which DreamFactory app / API key the request was made under. Useful for billing per integration or customer."
+          matTooltipPosition="above">
           <mat-label>App / API key</mat-label>
           <mat-select
             multiple
@@ -79,7 +110,11 @@
           </mat-select>
         </mat-form-field>
 
-        <mat-form-field appearance="outline" class="usage__filter-field">
+        <mat-form-field
+          appearance="outline"
+          class="usage__filter-field"
+          matTooltip="The DF user who made the request. Anonymous calls (no session) are bucketed separately."
+          matTooltipPosition="above">
           <mat-label>User</mat-label>
           <mat-select
             multiple
@@ -91,7 +126,11 @@
           </mat-select>
         </mat-form-field>
 
-        <mat-form-field appearance="outline" class="usage__filter-field">
+        <mat-form-field
+          appearance="outline"
+          class="usage__filter-field"
+          matTooltip="The DF role active on the request — this is what gates which data tables an AI tool call could read."
+          matTooltipPosition="above">
           <mat-label>Role</mat-label>
           <mat-select
             multiple
@@ -103,7 +142,11 @@
           </mat-select>
         </mat-form-field>
 
-        <mat-form-field appearance="outline" class="usage__filter-field">
+        <mat-form-field
+          appearance="outline"
+          class="usage__filter-field"
+          matTooltip="Which API endpoint was hit (chat, completion, embeddings, data-chat, etc.)"
+          matTooltipPosition="above">
           <mat-label>Endpoint</mat-label>
           <mat-select
             multiple
@@ -115,7 +158,11 @@
           </mat-select>
         </mat-form-field>
 
-        <mat-form-field appearance="outline" class="usage__filter-field">
+        <mat-form-field
+          appearance="outline"
+          class="usage__filter-field"
+          matTooltip="Filter to only successful or only errored requests"
+          matTooltipPosition="above">
           <mat-label>Status</mat-label>
           <mat-select
             multiple
@@ -169,6 +216,20 @@
     </mat-card>
 
     <ng-container *ngIf="bundle.raw.total_requests > 0">
+      <header class="usage__section-header">
+        <h3 class="usage__section-title">
+          DreamFactory AI usage
+          <fa-icon
+            class="usage__section-hint"
+            [icon]="faCircleInfo"
+            matTooltip="Outbound calls from DreamFactory to AI providers (Anthropic, OpenAI, etc.). DF pays for the tokens here — these are the numbers that hit your provider invoice."
+            matTooltipPosition="above"></fa-icon>
+        </h3>
+        <p class="usage__section-subtitle">
+          Provider calls billed to your DreamFactory account
+        </p>
+      </header>
+
       <df-usage-summary [summary]="summary"></df-usage-summary>
 
       <df-usage-stacked-area [data]="series"></df-usage-stacked-area>
@@ -176,40 +237,47 @@
       <div class="usage__grid">
         <df-usage-bars
           title="Top users"
+          hint="Which DF users are firing the most AI requests. Click a row to filter."
           [rows]="byUser"
           [limit]="8"
           [clickable]="true"
           (rowClick)="drillByUser($event)"></df-usage-bars>
         <df-usage-bars
           title="Top roles"
+          hint="Spend grouped by the role active on each request. Useful for finding role boundaries that need tightening."
           [rows]="byRole"
           [limit]="8"
           [clickable]="true"
           (rowClick)="drillByRole($event)"></df-usage-bars>
         <df-usage-bars
           title="By app / API key"
+          hint="Spend per DF API key. Each integration or customer should ideally have its own key — gives you per-tenant cost visibility."
           [rows]="byApp"
           [limit]="8"
           [clickable]="true"
           (rowClick)="drillByApp($event)"></df-usage-bars>
         <df-usage-bars
           title="By AI Connection"
+          hint="Spend per configured AI Connection service. Click a row to jump into the connection's edit page."
           [rows]="byService"
           [limit]="8"
           [clickable]="true"
           (rowClick)="drillByService($event)"></df-usage-bars>
         <df-usage-bars
           title="By provider"
+          hint="Anthropic vs OpenAI vs xAI vs local. Compare provider mix and cost share."
           [rows]="byProvider"
           [limit]="8"
           [clickable]="true"
           (rowClick)="drillByProvider($event)"></df-usage-bars>
         <df-usage-bars
           title="By model"
+          hint="Token usage per specific model. The fastest way to spot expensive models that should be swapped or capped."
           [rows]="byModel"
           [limit]="8"></df-usage-bars>
         <df-usage-bars
           title="By endpoint"
+          hint="Which API endpoints (chat, completion, embeddings, etc.) account for the volume."
           [rows]="byResource"
           [limit]="8"></df-usage-bars>
       </div>
@@ -222,17 +290,26 @@
 
     <ng-container *ngIf="mcpTotalRequests > 0">
       <header class="usage__section-header">
-        <h3>External MCP traffic</h3>
+        <h3 class="usage__section-title">
+          External MCP traffic
+          <fa-icon
+            class="usage__section-hint"
+            [icon]="faCircleInfo"
+            matTooltip="Inbound tool calls from external AI agents (Claude Desktop, Cursor, etc.) hitting MCP services on this DF instance. Useful for auditing who is using your data and how often."
+            matTooltipPosition="above"></fa-icon>
+        </h3>
         <p class="usage__section-disclaimer">
-          Inbound tool calls from external AI agents (Claude Desktop, Cursor,
-          custom MCP clients). Token cost is borne by the calling client —
-          <strong>not</strong> billed to DreamFactory. The bytes columns track
-          what flowed through the gateway, not provider tokens.
+          Token cost is borne by the calling AI agent —
+          <strong>not</strong> billed to DreamFactory. Bytes track what flowed
+          through the gateway, not provider tokens.
         </p>
       </header>
 
       <div class="usage__mcp-summary">
-        <mat-card class="usage__mcp-card">
+        <mat-card
+          class="usage__mcp-card"
+          matTooltip="Total tool / resource calls across all MCP services in the period"
+          matTooltipPosition="above">
           <mat-card-content>
             <span class="usage__mcp-label">MCP requests</span>
             <span class="usage__mcp-value">{{
@@ -240,19 +317,28 @@
             }}</span>
           </mat-card-content>
         </mat-card>
-        <mat-card class="usage__mcp-card">
+        <mat-card
+          class="usage__mcp-card"
+          matTooltip="Bytes received from MCP clients (their JSON-RPC payloads)"
+          matTooltipPosition="above">
           <mat-card-content>
             <span class="usage__mcp-label">Bytes in</span>
             <span class="usage__mcp-value">{{ mcpBytesIn | number }}</span>
           </mat-card-content>
         </mat-card>
-        <mat-card class="usage__mcp-card">
+        <mat-card
+          class="usage__mcp-card"
+          matTooltip="Bytes returned to MCP clients (tool results). Streaming SSE responses don't count exactly — they're recorded as 0."
+          matTooltipPosition="above">
           <mat-card-content>
             <span class="usage__mcp-label">Bytes out</span>
             <span class="usage__mcp-value">{{ mcpBytesOut | number }}</span>
           </mat-card-content>
         </mat-card>
-        <mat-card class="usage__mcp-card">
+        <mat-card
+          class="usage__mcp-card"
+          matTooltip="Mean time to dispatch a tool call through the daemon and return a result"
+          matTooltipPosition="above">
           <mat-card-content>
             <span class="usage__mcp-label">Avg latency</span>
             <span class="usage__mcp-value">
@@ -265,26 +351,32 @@
       <div class="usage__grid">
         <df-usage-bars
           title="MCP clients"
+          hint="Which AI agents are connecting (Claude Desktop, Cursor, custom). Pulled from the OAuth client_name registered when the agent first connected."
           [rows]="mcpByClient"
           [limit]="8"></df-usage-bars>
         <df-usage-bars
           title="MCP tools"
+          hint="Most-invoked MCP tools. High-volume tools are good candidates for caching or rate limiting."
           [rows]="mcpByTool"
           [limit]="8"></df-usage-bars>
         <df-usage-bars
           title="MCP users"
+          hint="Which DF users granted MCP access via OAuth. Each row's permissions still apply when the AI agent runs tools."
           [rows]="mcpByUser"
           [limit]="8"></df-usage-bars>
         <df-usage-bars
           title="MCP services"
+          hint="Per MCP service definition. Multiple MCP services can run on one DF instance with different tool/permission scopes."
           [rows]="mcpByService"
           [limit]="8"></df-usage-bars>
         <df-usage-bars
           title="MCP apps"
+          hint="DF API key the MCP session was bound to. Each MCP service points at one app."
           [rows]="mcpByApp"
           [limit]="8"></df-usage-bars>
         <df-usage-bars
           title="MCP methods"
+          hint="JSON-RPC method dispatch counts (tools/call, resources/read, prompts/get, etc.)"
           [rows]="mcpByMethod"
           [limit]="8"></df-usage-bars>
       </div>
