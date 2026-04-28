@@ -7,7 +7,7 @@ import {
   UsageSummary,
   ProviderRates,
 } from '../../types/usage';
-import { DEFAULT_RATES, estimateCost, formatUSD } from '../../utils/cost';
+import { estimateCost, formatUSD } from '../../utils/cost';
 
 interface ProviderBreakdown {
   provider: string;
@@ -210,6 +210,10 @@ export class DfCostEstimatorComponent implements OnChanges {
   @Input({ required: true }) sessions: UsageSessionRow[] = [];
   /** ai_service_id -> provider name */
   @Input({ required: true }) connectionProviders!: Map<number, string>;
+  /** Provider → default rates, sourced from the backend's UsageRates table
+   *  via bundle.raw.default_rates. Single source of truth for fallback
+   *  pricing — no hardcoded duplicate in the frontend. */
+  @Input() defaultRates: Record<string, ProviderRates> = {};
   @Input() summary?: UsageSummary;
 
   rows: ProviderBreakdown[] = [];
@@ -225,7 +229,7 @@ export class DfCostEstimatorComponent implements OnChanges {
     value: number
   ): void {
     const cur = this.customRates.get(provider) ??
-      DEFAULT_RATES[provider] ?? {
+      this.defaultRates[provider] ?? {
         provider,
         inputPer1k: 0,
         outputPer1k: 0,
@@ -248,7 +252,7 @@ export class DfCostEstimatorComponent implements OnChanges {
 
     this.rows = Array.from(byProvider.entries()).map(([provider, t]) => {
       const rates = this.customRates.get(provider) ??
-        DEFAULT_RATES[provider] ?? {
+        this.defaultRates[provider] ?? {
           provider,
           inputPer1k: 0,
           outputPer1k: 0,

@@ -216,6 +216,185 @@
   // MCP summary tiles -------------------------------------------------------
   // Tighter than the AI summary because the MCP section is secondary content.
 
+  // Budget banner + panel ----------------------------------------------------
+
+  &__budget-banner {
+    border-left: 4px solid #ff9800;
+
+    mat-card-content {
+      padding: 14px 18px;
+    }
+  }
+
+  &__budget-banner-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #b26500;
+    font-size: 14px;
+
+    fa-icon {
+      color: #ff9800;
+      font-size: 16px;
+    }
+  }
+
+  &__budget-banner-list {
+    list-style: none;
+    margin: 8px 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
+
+    li {
+      display: flex;
+      gap: 8px;
+      align-items: baseline;
+      flex-wrap: wrap;
+    }
+  }
+
+  &__budget-banner-name {
+    font-weight: 600;
+    color: #333;
+  }
+
+  &__budget-banner-projection {
+    color: #666;
+
+    strong {
+      color: #b26500;
+      font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+    }
+  }
+
+  &__budgets {
+    mat-card-content {
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+  }
+
+  &__budgets-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+  }
+
+  &__budgets-title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &__budgets-period {
+    font-size: 12px;
+    color: #999;
+    font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+  }
+
+  &__budgets-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  &__budgets-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  &__budgets-row-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    font-size: 14px;
+  }
+
+  &__budgets-row-name {
+    font-weight: 500;
+    color: #333;
+  }
+
+  &__budgets-row-amount {
+    font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+    font-size: 13px;
+    color: #444;
+
+    &--over {
+      color: #d32f2f;
+      font-weight: 600;
+    }
+  }
+
+  &__budgets-row-bar {
+    position: relative;
+    height: 8px;
+    background: rgba(0, 0, 0, 0.06);
+    border-radius: 999px;
+    overflow: hidden;
+
+    &--over {
+      background: rgba(244, 67, 54, 0.12);
+    }
+  }
+
+  &__budgets-row-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    background: #2e7d32;
+    transition: width 0.2s ease-out;
+  }
+
+  &__budgets-row-bar--over &__budgets-row-fill {
+    background: #d32f2f;
+  }
+
+  &__budgets-row-projection {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    background: repeating-linear-gradient(
+      45deg,
+      rgba(46, 125, 50, 0.4),
+      rgba(46, 125, 50, 0.4) 4px,
+      rgba(46, 125, 50, 0.15) 4px,
+      rgba(46, 125, 50, 0.15) 8px
+    );
+  }
+
+  &__budgets-row-bar--over &__budgets-row-projection {
+    background: repeating-linear-gradient(
+      45deg,
+      rgba(211, 47, 47, 0.55),
+      rgba(211, 47, 47, 0.55) 4px,
+      rgba(211, 47, 47, 0.2) 4px,
+      rgba(211, 47, 47, 0.2) 8px
+    );
+  }
+
+  &__budgets-row-projection-label {
+    font-size: 11px;
+    color: #999;
+    font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+  }
+
   &__mcp-summary {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -324,6 +503,43 @@
     }
     &__mcp-value {
       color: #fff;
+    }
+
+    &__budget-banner-head {
+      color: #ffb74d;
+    }
+    &__budget-banner-name {
+      color: #fff;
+    }
+    &__budget-banner-projection {
+      color: #bbb;
+
+      strong {
+        color: #ffb74d;
+      }
+    }
+
+    &__budgets-title,
+    &__budgets-row-name {
+      color: #fff;
+    }
+    &__budgets-period,
+    &__budgets-row-projection-label {
+      color: #888;
+    }
+    &__budgets-row-amount {
+      color: #ddd;
+
+      &--over {
+        color: #ff8585;
+      }
+    }
+    &__budgets-row-bar {
+      background: rgba(255, 255, 255, 0.08);
+
+      &--over {
+        background: rgba(244, 67, 54, 0.18);
+      }
     }
   }
 }

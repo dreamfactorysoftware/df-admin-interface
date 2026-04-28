@@ -46,6 +46,9 @@ export interface UsageResponse {
   total_cost_usd: number;
   errors: number;
   avg_latency_ms: number;
+  latency_p50_ms: number;
+  latency_p95_ms: number;
+  latency_p99_ms: number;
   by_service: GroupRowRaw[];
   by_user: GroupRowRaw[];
   by_role: GroupRowRaw[];
@@ -53,8 +56,51 @@ export interface UsageResponse {
   by_provider: GroupRowRaw[];
   by_model: ModelRowRaw[];
   by_resource: ResourceRowRaw[];
+  by_error_class: ErrorClassRowRaw[];
   series: SeriesRowRaw[];
   filters: Partial<Record<keyof UsageFilters, (string | number)[]>>;
+  /** Per-service month-to-date spend vs configured budget. Calendar-month
+   *  bound, NOT bound to the dashboard's period filter. */
+  budgets: BudgetRowRaw[];
+  /** Per-provider fallback rates from the backend's UsageRates::DEFAULT_RATES.
+   *  Frontend reads from here so we don't have to maintain a duplicate
+   *  hardcoded pricing table. */
+  default_rates: Record<
+    string,
+    { input_per_1k: number; output_per_1k: number }
+  >;
+  /** Top-line totals for the immediately-preceding window of equal length.
+   *  Only present when the request was made with compare=1. */
+  previous?: PreviousSummaryRaw;
+}
+
+export interface BudgetRowRaw {
+  service_id: number;
+  monthly_budget_usd: number | string;
+  spent_month_usd: number | string;
+  projected_month_end_usd: number | string;
+  days_into_month: number;
+  days_in_month: number;
+  on_track: boolean;
+}
+
+interface PreviousSummaryRaw {
+  since: string;
+  until: string | null;
+  total_requests: number;
+  total_input_tokens: number;
+  total_output_tokens: number;
+  total_cost_usd: number;
+  errors: number;
+  avg_latency_ms: number;
+  latency_p50_ms: number;
+  latency_p95_ms: number;
+  latency_p99_ms: number;
+}
+
+interface ErrorClassRowRaw {
+  class: string;
+  count: number | string;
 }
 
 interface GroupRowRaw {
@@ -196,7 +242,7 @@ export class UsageService {
   ): Observable<UsageBundle> {
     const period = range === 'all' ? '3650d' : range;
 
-    let params = new HttpParams().set('period', period);
+    let params = new HttpParams().set('period', period).set('compare', '1');
     (Object.keys(filters) as (keyof UsageFilters)[]).forEach(key => {
       const values = filters[key] as (string | number)[];
       values.forEach(v => {
@@ -216,6 +262,9 @@ export class UsageService {
             total_cost_usd: 0,
             errors: 0,
             avg_latency_ms: 0,
+            latency_p50_ms: 0,
+            latency_p95_ms: 0,
+            latency_p99_ms: 0,
             by_service: [],
             by_user: [],
             by_role: [],
@@ -223,8 +272,11 @@ export class UsageService {
             by_provider: [],
             by_model: [],
             by_resource: [],
+            by_error_class: [],
             series: [],
             filters: {},
+            budgets: [],
+            default_rates: {},
           } as UsageResponse)
         )
       ),

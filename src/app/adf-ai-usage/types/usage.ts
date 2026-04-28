@@ -39,7 +39,36 @@ export interface UsageSummary {
   avgToolCallsPerSession: number;
   errors?: number;
   avgLatencyMs?: number;
+  latencyP50Ms?: number;
+  latencyP95Ms?: number;
+  latencyP99Ms?: number;
   totalCostUsd?: number;
+  /** Optional period-over-period deltas. Keys mirror the value field name on
+   *  this summary; values are signed percent deltas (1.0 = 100% increase).
+   *  Absent if no comparison was requested or previous period had no data. */
+  deltas?: SummaryDeltas;
+  /** Optional per-day sparkline series for each tile. Same key contract as
+   *  deltas. Absent rows mean "no sparkline for this tile". */
+  sparklines?: SummarySparklines;
+}
+
+export interface SummaryDeltas {
+  requests?: number | null;
+  inputTokens?: number | null;
+  outputTokens?: number | null;
+  totalTokens?: number | null;
+  errors?: number | null;
+  latency?: number | null; // p50 delta — most representative
+  cost?: number | null;
+}
+
+export interface SummarySparklines {
+  requests?: number[];
+  inputTokens?: number[];
+  outputTokens?: number[];
+  totalTokens?: number[];
+  errors?: number[];
+  cost?: number[];
 }
 
 export type GroupBy = 'user' | 'role' | 'service';

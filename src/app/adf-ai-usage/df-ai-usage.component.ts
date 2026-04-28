@@ -16,6 +16,7 @@ import {
   faChartLine,
   faCircleInfo,
   faMessage,
+  faTriangleExclamation,
   faXmark,
 } from '@fortawesome/free-solid-svg-icons';
 import { finalize } from 'rxjs/operators';
@@ -27,7 +28,13 @@ import {
   createEmptyFilters,
   n,
 } from './services/usage.service';
-import { GroupRow, TimeBucket, UsageSummary } from './types/usage';
+import {
+  GroupRow,
+  ProviderRates,
+  TimeBucket,
+  UsageSummary,
+} from './types/usage';
+import { ratesFromBundle } from './utils/cost';
 import { DfUsageStackedAreaComponent } from './components/df-usage-stacked-area/df-usage-stacked-area.component';
 import { DfUsageBarsComponent } from './components/df-usage-bars/df-usage-bars.component';
 import { DfUsageSummaryComponent } from './components/df-usage-summary/df-usage-summary.component';
@@ -37,6 +44,21 @@ interface ActiveFilterChip {
   dimension: keyof UsageFilters;
   value: string | number;
   label: string;
+}
+
+/** Budget row enriched with the resolved service label + computed ratios for
+ *  cleaner template binding. */
+export interface BudgetRow {
+  serviceId: number;
+  serviceLabel: string;
+  budgetUsd: number;
+  spentMonthUsd: number;
+  projectedMonthEndUsd: number;
+  spentRatio: number; // 0..1+ (>1 means already over)
+  projectedRatio: number; // 0..1+ (>1 means projected to exceed)
+  onTrack: boolean;
+  daysIntoMonth: number;
+  daysInMonth: number;
 }
 
 @Component({
@@ -89,6 +111,9 @@ export class DfAiUsageComponent implements OnInit {
   byProvider: GroupRow[] = [];
   byResource: GroupRow[] = [];
   byModel: GroupRow[] = [];
+  byErrorClass: GroupRow[] = [];
+  budgets: BudgetRow[] = [];
+  budgetWarnings: BudgetRow[] = []; // those projected to exceed budget
   activeChips: ActiveFilterChip[] = [];
 
   // MCP-side views — distinct from the AI panels because MCP is INBOUND
@@ -118,11 +143,13 @@ export class DfAiUsageComponent implements OnInit {
   connectionProviders: Map<number, string> = new Map();
   costInputSessions: ReturnType<DfAiUsageComponent['buildCostInputSessions']> =
     [];
+  defaultRates: Record<string, ProviderRates> = {};
 
   faArrowsRotate = faArrowsRotate;
   faChartLine = faChartLine;
   faCircleInfo = faCircleInfo;
   faMessage = faMessage;
+  faTriangleExclamation = faTriangleExclamation;
   faXmark = faXmark;
 
   ngOnInit(): void {
@@ -225,6 +252,9 @@ export class DfAiUsageComponent implements OnInit {
       this.byProvider = [];
       this.byResource = [];
       this.byModel = [];
+      this.byErrorClass = [];
+      this.budgets = [];
+      this.budgetWarnings = [];
       this.connectionProviders = new Map();
       this.costInputSessions = [];
       this.activeChips = [];
@@ -232,6 +262,8 @@ export class DfAiUsageComponent implements OnInit {
     }
 
     const totalTokens = r.total_input_tokens + r.total_output_tokens;
+    const sparklines = this.buildSparklines(r);
+    const deltas = this.buildDeltas(r);
     this.summary = {
       sessionCount: r.total_requests,
       inputTokens: r.total_input_tokens,
@@ -244,7 +276,12 @@ export class DfAiUsageComponent implements OnInit {
       avgToolCallsPerSession: 0,
       errors: r.errors,
       avgLatencyMs: r.avg_latency_ms,
+      latencyP50Ms: r.latency_p50_ms,
+      latencyP95Ms: r.latency_p95_ms,
+      latencyP99Ms: r.latency_p99_ms,
       totalCostUsd: r.total_cost_usd,
+      deltas,
+      sparklines,
     };
 
     this.series = (r.series ?? []).map(b => ({
@@ -306,6 +343,37 @@ export class DfAiUsageComponent implements OnInit {
       costUsd: 0,
     }));
 
+    this.byErrorClass = (r.by_error_class ?? []).map(row => ({
+      key: row.class,
+      label: this.errorClassLabel(row.class),
+      inputTokens: 0,
+      outputTokens: 0,
+      totalTokens: n(row.count),
+      toolCalls: 0,
+      sessions: n(row.count),
+      costUsd: 0,
+    }));
+
+    this.budgets = (r.budgets ?? []).map(row => {
+      const budget = n(row.monthly_budget_usd);
+      const spent = n(row.spent_month_usd);
+      const projected = n(row.projected_month_end_usd);
+      const svc = this.bundle?.services.get(row.service_id);
+      return {
+        serviceId: row.service_id,
+        serviceLabel: svc?.label || svc?.name || `service #${row.service_id}`,
+        budgetUsd: budget,
+        spentMonthUsd: spent,
+        projectedMonthEndUsd: projected,
+        spentRatio: budget > 0 ? spent / budget : 0,
+        projectedRatio: budget > 0 ? projected / budget : 0,
+        onTrack: row.on_track,
+        daysIntoMonth: row.days_into_month,
+        daysInMonth: row.days_in_month,
+      };
+    });
+    this.budgetWarnings = this.budgets.filter(b => !b.onTrack);
+
     const services = this.bundle?.services;
     const providerFallback = r.by_provider[0]?.provider ?? 'unknown';
     const cp = new Map<number, string>();
@@ -321,6 +389,8 @@ export class DfAiUsageComponent implements OnInit {
     this.connectionProviders = cp;
 
     this.costInputSessions = this.buildCostInputSessions(r);
+
+    this.defaultRates = ratesFromBundle(r.default_rates);
 
     this.providerOptions = (r.by_provider ?? [])
       .map(row => row.provider ?? '')
@@ -502,8 +572,82 @@ export class DfAiUsageComponent implements OnInit {
       avgToolCallsPerSession: 0,
       errors: 0,
       avgLatencyMs: 0,
+      latencyP50Ms: 0,
+      latencyP95Ms: 0,
+      latencyP99Ms: 0,
       totalCostUsd: 0,
     };
+  }
+
+  /** Compute period-over-period deltas as fractions (1.0 = +100%). Returns
+   *  null for any metric where the previous period had zero baseline — we
+   *  can't divide by zero, and "infinitely more" isn't a useful number. */
+  private buildDeltas(
+    r: NonNullable<UsageBundle['raw']>
+  ): UsageSummary['deltas'] {
+    const prev = r.previous;
+    if (!prev) {
+      return undefined;
+    }
+    const pct = (current: number, previous: number): number | null =>
+      previous > 0 ? (current - previous) / previous : null;
+    return {
+      requests: pct(r.total_requests, prev.total_requests),
+      inputTokens: pct(r.total_input_tokens, prev.total_input_tokens),
+      outputTokens: pct(r.total_output_tokens, prev.total_output_tokens),
+      totalTokens: pct(
+        r.total_input_tokens + r.total_output_tokens,
+        prev.total_input_tokens + prev.total_output_tokens
+      ),
+      errors: pct(r.errors, prev.errors),
+      latency: pct(r.latency_p50_ms, prev.latency_p50_ms),
+      cost: pct(r.total_cost_usd, prev.total_cost_usd),
+    };
+  }
+
+  /** Per-day sparkline arrays straight from the time-series. */
+  private buildSparklines(
+    r: NonNullable<UsageBundle['raw']>
+  ): UsageSummary['sparklines'] {
+    const series = r.series ?? [];
+    if (series.length === 0) {
+      return undefined;
+    }
+    return {
+      requests: series.map(b => n(b.requests)),
+      inputTokens: series.map(b => n(b.input_tokens)),
+      outputTokens: series.map(b => n(b.output_tokens)),
+      totalTokens: series.map(b => n(b.input_tokens) + n(b.output_tokens)),
+      errors: series.map(b => n(b.errors)),
+      cost: series.map(b => n(b.cost_usd)),
+    };
+  }
+
+  formatUsd(v: number): string {
+    if (!Number.isFinite(v)) return '$0.00';
+    if (v > 0 && v < 0.01) return '<$0.01';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: v < 1 ? 4 : 2,
+    }).format(v);
+  }
+
+  /** Map raw error_class identifier into a human label for the bars panel. */
+  private errorClassLabel(cls: string): string {
+    const map: Record<string, string> = {
+      timeout: 'Timeout',
+      rate_limit: 'Rate-limited',
+      auth: 'Auth failure',
+      model_not_found: 'Model not found',
+      context_overflow: 'Context too long',
+      connectivity: 'Connectivity',
+      provider_5xx: 'Provider 5xx',
+      provider_4xx: 'Provider 4xx',
+      other: 'Other',
+      unknown: 'Unknown',
+    };
+    return map[cls] ?? cls;
   }
 
   private toRow(

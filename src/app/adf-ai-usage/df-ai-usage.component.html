@@ -37,6 +37,33 @@
     </div>
   </header>
 
+  <mat-card *ngIf="budgetWarnings.length > 0" class="usage__budget-banner">
+    <mat-card-content>
+      <div class="usage__budget-banner-head">
+        <fa-icon [icon]="faTriangleExclamation"></fa-icon>
+        <strong>
+          {{ budgetWarnings.length }}
+          {{
+            budgetWarnings.length === 1 ? 'connection is' : 'connections are'
+          }}
+          projected to exceed budget this month
+        </strong>
+      </div>
+      <ul class="usage__budget-banner-list">
+        <li *ngFor="let b of budgetWarnings">
+          <span class="usage__budget-banner-name">{{ b.serviceLabel }}</span>
+          <span class="usage__budget-banner-projection">
+            projected
+            <strong>{{ formatUsd(b.projectedMonthEndUsd) }}</strong>
+            of {{ formatUsd(b.budgetUsd) }} budget ({{
+              b.projectedRatio * 100 | number: '1.0-0'
+            }}%)
+          </span>
+        </li>
+      </ul>
+    </mat-card-content>
+  </mat-card>
+
   <mat-card class="usage__filters">
     <mat-card-content>
       <div class="usage__filters-head">
@@ -280,11 +307,74 @@
           hint="Which API endpoints (chat, completion, embeddings, etc.) account for the volume."
           [rows]="byResource"
           [limit]="8"></df-usage-bars>
+        <df-usage-bars
+          *ngIf="byErrorClass.length > 0"
+          title="Error breakdown"
+          hint="Failures grouped by inferred cause. Auth = stale key. Rate-limited = quota hit. Timeout = provider slow. Provider 5xx = their problem; provider 4xx = usually a bad request shape."
+          [rows]="byErrorClass"
+          [limit]="8"></df-usage-bars>
       </div>
+
+      <mat-card *ngIf="budgets.length > 0" class="usage__budgets">
+        <mat-card-content>
+          <header class="usage__budgets-head">
+            <h4 class="usage__budgets-title">
+              Budget status
+              <fa-icon
+                class="usage__section-hint"
+                [icon]="faCircleInfo"
+                matTooltip="Spend this calendar month vs. your configured budget per AI Connection. Projection extrapolates today's burn rate to month-end. Set or adjust budgets on each connection's edit page."
+                matTooltipPosition="above"></fa-icon>
+            </h4>
+            <span class="usage__budgets-period">
+              day {{ budgets[0].daysIntoMonth }} of
+              {{ budgets[0].daysInMonth }}
+            </span>
+          </header>
+          <ul class="usage__budgets-list">
+            <li *ngFor="let b of budgets" class="usage__budgets-row">
+              <div class="usage__budgets-row-head">
+                <span class="usage__budgets-row-name">{{
+                  b.serviceLabel
+                }}</span>
+                <span
+                  class="usage__budgets-row-amount"
+                  [class.usage__budgets-row-amount--over]="!b.onTrack">
+                  {{ formatUsd(b.spentMonthUsd) }} /
+                  {{ formatUsd(b.budgetUsd) }}
+                </span>
+              </div>
+              <div
+                class="usage__budgets-row-bar"
+                [class.usage__budgets-row-bar--over]="!b.onTrack">
+                <div
+                  class="usage__budgets-row-fill"
+                  [style.width.%]="
+                    b.spentRatio > 1 ? 100 : b.spentRatio * 100
+                  "></div>
+                <div
+                  *ngIf="b.projectedRatio > b.spentRatio"
+                  class="usage__budgets-row-projection"
+                  [style.left.%]="b.spentRatio > 1 ? 100 : b.spentRatio * 100"
+                  [style.width.%]="
+                    b.projectedRatio > 1
+                      ? 100 - (b.spentRatio > 1 ? 100 : b.spentRatio * 100)
+                      : (b.projectedRatio - b.spentRatio) * 100
+                  "></div>
+              </div>
+              <span class="usage__budgets-row-projection-label">
+                projected {{ formatUsd(b.projectedMonthEndUsd) }} by month-end
+                ({{ b.projectedRatio * 100 | number: '1.0-0' }}%)
+              </span>
+            </li>
+          </ul>
+        </mat-card-content>
+      </mat-card>
 
       <df-cost-estimator
         [sessions]="costInputSessions"
         [connectionProviders]="connectionProviders"
+        [defaultRates]="defaultRates"
         [summary]="summary"></df-cost-estimator>
     </ng-container>
 
