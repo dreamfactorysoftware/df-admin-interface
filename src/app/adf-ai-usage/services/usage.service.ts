@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, forkJoin, of } from 'rxjs';
-import { catchError, map, switchMap } from 'rxjs/operators';
+import { catchError, map } from 'rxjs/operators';
 import { BASE_URL } from 'src/app/shared/constants/urls';
 
 export type TimeRange = '24h' | '7d' | '30d' | 'all';
@@ -137,44 +137,24 @@ export class UsageService {
   }
 
   private listUsers(): Observable<Map<number, string>> {
+    // /api/v2/system/admin requires root-admin and is gated by df-compliance
+    // (returns 500/403 for restricted admins). We only fetch /system/user
+    // here — admin names not appearing in the dashboard is acceptable; the
+    // by_user breakdown falls back to "user #N".
     return this.http
       .get<{ resource: UserLookupRow[] }>(`${BASE_URL}/system/user`, {
         params: { fields: 'id,name,username,email' },
       })
       .pipe(
-        switchMap(userRes =>
-          this.http
-            .get<{ resource: UserLookupRow[] }>(`${BASE_URL}/system/admin`, {
-              params: { fields: 'id,name,username,email' },
-            })
-            .pipe(
-              map(adminRes => {
-                const m = new Map<number, string>();
-                const fold = (rows: UserLookupRow[]) => {
-                  rows.forEach(u =>
-                    m.set(
-                      u.id,
-                      u.name || u.username || u.email || `user #${u.id}`
-                    )
-                  );
-                };
-                fold(userRes.resource ?? []);
-                fold(adminRes.resource ?? []);
-                return m;
-              }),
-              catchError(() => of(this.foldUsers(userRes.resource ?? [])))
-            )
-        ),
+        map(res => {
+          const m = new Map<number, string>();
+          (res.resource ?? []).forEach(u =>
+            m.set(u.id, u.name || u.username || u.email || `user #${u.id}`)
+          );
+          return m;
+        }),
         catchError(() => of(new Map<number, string>()))
       );
-  }
-
-  private foldUsers(rows: UserLookupRow[]): Map<number, string> {
-    const m = new Map<number, string>();
-    rows.forEach(u =>
-      m.set(u.id, u.name || u.username || u.email || `user #${u.id}`)
-    );
-    return m;
   }
 
   private listRoles(): Observable<Map<number, string>> {
