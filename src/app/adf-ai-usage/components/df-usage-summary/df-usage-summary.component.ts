@@ -1,86 +1,131 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input } from '@angular/core';
+import { MatCardModule } from '@angular/material/card';
 import { UsageSummary } from '../../types/usage';
 
 @Component({
   selector: 'df-usage-summary',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MatCardModule],
   template: `
     <div class="summary">
-      <article class="summary__card">
-        <span class="summary__label">Requests</span>
-        <span class="summary__value">{{ summary.sessionCount | number }}</span>
-      </article>
-      <article class="summary__card">
-        <span class="summary__label">Input tokens</span>
-        <span class="summary__value">{{ summary.inputTokens | number }}</span>
-      </article>
-      <article class="summary__card">
-        <span class="summary__label">Output tokens</span>
-        <span class="summary__value">{{ summary.outputTokens | number }}</span>
-      </article>
-      <article class="summary__card">
-        <span class="summary__label">Total tokens</span>
-        <span class="summary__value">{{ summary.totalTokens | number }}</span>
-      </article>
-      <article
+      <mat-card class="summary__card">
+        <mat-card-content>
+          <span class="summary__label">Requests</span>
+          <span class="summary__value">{{
+            summary.sessionCount | number
+          }}</span>
+        </mat-card-content>
+      </mat-card>
+      <mat-card class="summary__card">
+        <mat-card-content>
+          <span class="summary__label">Input tokens</span>
+          <span class="summary__value">{{ summary.inputTokens | number }}</span>
+        </mat-card-content>
+      </mat-card>
+      <mat-card class="summary__card">
+        <mat-card-content>
+          <span class="summary__label">Output tokens</span>
+          <span class="summary__value">{{
+            summary.outputTokens | number
+          }}</span>
+        </mat-card-content>
+      </mat-card>
+      <mat-card class="summary__card">
+        <mat-card-content>
+          <span class="summary__label">Total tokens</span>
+          <span class="summary__value">{{ summary.totalTokens | number }}</span>
+        </mat-card-content>
+      </mat-card>
+      <mat-card
         class="summary__card"
         [class.summary__card--error]="(summary.errors ?? 0) > 0">
-        <span class="summary__label">Errors</span>
-        <span class="summary__value">{{ summary.errors ?? 0 | number }}</span>
-      </article>
-      <article class="summary__card">
-        <span class="summary__label">Avg latency</span>
-        <span class="summary__value">
-          {{ summary.avgLatencyMs ?? 0 | number }}
-          <small>ms</small>
-        </span>
-      </article>
+        <mat-card-content>
+          <span class="summary__label">Errors</span>
+          <span class="summary__value">{{ summary.errors ?? 0 | number }}</span>
+        </mat-card-content>
+      </mat-card>
+      <mat-card class="summary__card">
+        <mat-card-content>
+          <span class="summary__label">Avg latency</span>
+          <span class="summary__value">
+            {{ summary.avgLatencyMs ?? 0 | number }}
+            <small>ms</small>
+          </span>
+        </mat-card-content>
+      </mat-card>
+      <mat-card class="summary__card summary__card--cost">
+        <mat-card-content>
+          <span class="summary__label">Estimated cost</span>
+          <span class="summary__value">
+            {{ formatUsd(summary.totalCostUsd ?? 0) }}
+          </span>
+        </mat-card-content>
+      </mat-card>
     </div>
   `,
   styles: [
     `
       .summary {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-        gap: 0.75rem;
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        gap: 16px;
 
         &__card {
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          border-radius: 8px;
-          padding: 0.875rem 1rem;
-          display: flex;
-          flex-direction: column;
-          gap: 0.35rem;
+          mat-card-content {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 20px;
+          }
 
           &--error {
-            background: rgba(220, 53, 69, 0.08);
-            border-color: rgba(220, 53, 69, 0.3);
-
-            .summary__value {
-              color: #ff8585;
+            mat-card-content {
+              background: rgba(244, 67, 54, 0.06);
             }
+            .summary__value {
+              color: #d32f2f;
+            }
+          }
+          &--cost .summary__value {
+            color: #2e7d32;
           }
         }
         &__label {
-          font-size: 0.75rem;
+          font-size: 12px;
           text-transform: uppercase;
           letter-spacing: 0.06em;
-          color: rgba(255, 255, 255, 0.5);
+          color: #666;
+          font-weight: 600;
         }
         &__value {
-          font-size: 1.4rem;
+          font-size: 28px;
           font-weight: 600;
-          font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
-          line-height: 1;
+          color: #333;
+          line-height: 1.2;
 
           small {
-            font-size: 0.7rem;
-            color: rgba(255, 255, 255, 0.5);
-            font-weight: 400;
-            margin-left: 0.25rem;
+            font-size: 12px;
+            font-weight: 500;
+            color: #999;
+            margin-left: 4px;
+          }
+        }
+      }
+
+      :host-context(.dark-theme) {
+        .summary {
+          &__label {
+            color: #bbb;
+          }
+          &__value {
+            color: #fff;
+            small {
+              color: #999;
+            }
+          }
+          &__card--error .summary__value {
+            color: #ff8585;
           }
         }
       }
@@ -89,4 +134,14 @@ import { UsageSummary } from '../../types/usage';
 })
 export class DfUsageSummaryComponent {
   @Input({ required: true }) summary!: UsageSummary;
+
+  formatUsd(v: number): string {
+    if (!Number.isFinite(v)) return '$0.00';
+    if (v > 0 && v < 0.01) return '<$0.01';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: v < 1 ? 4 : 2,
+    }).format(v);
+  }
 }

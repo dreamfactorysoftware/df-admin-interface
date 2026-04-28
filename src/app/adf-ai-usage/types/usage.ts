@@ -13,6 +13,7 @@ export interface TimeBucket {
   outputTokens: number;
   toolCalls: number;
   sessions: number;
+  costUsd: number;
 }
 
 /** Aggregated totals for a single grouping key (user, role, service, etc.). */
@@ -24,6 +25,7 @@ export interface GroupRow {
   totalTokens: number;
   toolCalls: number;
   sessions: number;
+  costUsd: number;
 }
 
 /** Top-line summary cards. */
@@ -37,6 +39,7 @@ export interface UsageSummary {
   avgToolCallsPerSession: number;
   errors?: number;
   avgLatencyMs?: number;
+  totalCostUsd?: number;
 }
 
 export type GroupBy = 'user' | 'role' | 'service';

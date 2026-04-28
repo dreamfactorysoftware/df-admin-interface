@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, forkJoin, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
@@ -6,31 +6,63 @@ import { BASE_URL } from 'src/app/shared/constants/urls';
 
 export type TimeRange = '24h' | '7d' | '30d' | 'all';
 
+/**
+ * Filter state for the Gateway dashboard. Each key is multi-valued; an
+ * empty array means "no filter on this dimension." The same shape is sent
+ * to the backend (one query param per key, repeated for multi-values).
+ */
+export interface UsageFilters {
+  provider: string[];
+  service_id: number[];
+  model: string[];
+  user_id: number[];
+  role_id: number[];
+  app_id: number[];
+  resource: string[];
+  status: string[];
+}
+
+export const EMPTY_FILTERS: UsageFilters = {
+  provider: [],
+  service_id: [],
+  model: [],
+  user_id: [],
+  role_id: [],
+  app_id: [],
+  resource: [],
+  status: [],
+};
+
 export interface UsageResponse {
   period: string;
   since: string;
   total_requests: number;
   total_input_tokens: number;
   total_output_tokens: number;
+  total_cost_usd: number;
   errors: number;
   avg_latency_ms: number;
   by_service: GroupRowRaw[];
   by_user: GroupRowRaw[];
   by_role: GroupRowRaw[];
+  by_app: GroupRowRaw[];
   by_provider: GroupRowRaw[];
   by_model: ModelRowRaw[];
   by_resource: ResourceRowRaw[];
   series: SeriesRowRaw[];
+  filters: Partial<Record<keyof UsageFilters, (string | number)[]>>;
 }
 
 interface GroupRowRaw {
   service_id?: number;
   user_id?: number | null;
   role_id?: number | null;
+  app_id?: number | null;
   provider?: string;
   requests: number | string;
   input_tokens: number | string;
   output_tokens: number | string;
+  cost_usd?: number | string;
   avg_latency?: number | string;
   errors?: number | string;
 }
@@ -41,6 +73,7 @@ interface ModelRowRaw {
   requests: number | string;
   input_tokens: number | string;
   output_tokens: number | string;
+  cost_usd?: number | string;
 }
 
 interface ResourceRowRaw {
@@ -53,6 +86,7 @@ interface SeriesRowRaw {
   requests: number | string;
   input_tokens: number | string;
   output_tokens: number | string;
+  cost_usd?: number | string;
   errors: number | string;
 }
 
@@ -75,46 +109,148 @@ interface UserLookupRow {
   email?: string;
 }
 
+interface AppLookupRow {
+  id: number;
+  name: string;
+}
+
+/** MCP audit-log aggregation. Distinct from ai_usage — MCP token cost is
+ *  borne by the calling AI agent (Claude Desktop, Cursor, etc.), NOT by DF.
+ *  The dashboard surfaces request volume / bytes / tool mix only. */
+export interface McpUsageResponse {
+  period: string;
+  since: string;
+  total_requests: number;
+  total_bytes_in: number;
+  total_bytes_out: number;
+  errors: number;
+  avg_duration_ms: number;
+  by_service: McpGroupRowRaw[];
+  by_user: McpGroupRowRaw[];
+  by_role: McpGroupRowRaw[];
+  by_app: McpGroupRowRaw[];
+  by_client: McpClientRowRaw[];
+  by_tool: McpToolRowRaw[];
+  by_method: McpMethodRowRaw[];
+  series: McpSeriesRowRaw[];
+}
+
+interface McpGroupRowRaw {
+  service_id?: number;
+  user_id?: number | null;
+  role_id?: number | null;
+  app_id?: number | null;
+  requests: number | string;
+  bytes_in: number | string;
+  bytes_out: number | string;
+}
+
+interface McpClientRowRaw {
+  client_id: string | null;
+  client_name: string | null;
+  requests: number | string;
+  bytes_in: number | string;
+  bytes_out: number | string;
+}
+
+interface McpToolRowRaw {
+  tool_name: string;
+  requests: number | string;
+  bytes_in: number | string;
+  bytes_out: number | string;
+}
+
+interface McpMethodRowRaw {
+  method: string;
+  requests: number | string;
+}
+
+interface McpSeriesRowRaw {
+  date: string;
+  requests: number | string;
+  bytes_in: number | string;
+  bytes_out: number | string;
+  errors: number | string;
+}
+
 export interface UsageBundle {
   raw: UsageResponse;
+  mcp: McpUsageResponse;
   services: Map<number, ServiceLookupRow>;
   users: Map<number, string>;
   roles: Map<number, string>;
+  apps: Map<number, string>;
 }
 
 @Injectable({ providedIn: 'root' })
 export class UsageService {
   private http = inject(HttpClient);
 
-  loadAll(range: TimeRange): Observable<UsageBundle> {
+  loadAll(
+    range: TimeRange,
+    filters: UsageFilters = EMPTY_FILTERS
+  ): Observable<UsageBundle> {
     const period = range === 'all' ? '3650d' : range;
 
+    let params = new HttpParams().set('period', period);
+    (Object.keys(filters) as (keyof UsageFilters)[]).forEach(key => {
+      const values = filters[key] as (string | number)[];
+      values.forEach(v => {
+        params = params.append(key, String(v));
+      });
+    });
+
     return forkJoin({
-      raw: this.http
-        .get<UsageResponse>('/_internal/ai/usage', { params: { period } })
+      raw: this.http.get<UsageResponse>('/_internal/ai/usage', { params }).pipe(
+        catchError(() =>
+          of({
+            period,
+            since: new Date(Date.now() - 7 * 86400000).toISOString(),
+            total_requests: 0,
+            total_input_tokens: 0,
+            total_output_tokens: 0,
+            total_cost_usd: 0,
+            errors: 0,
+            avg_latency_ms: 0,
+            by_service: [],
+            by_user: [],
+            by_role: [],
+            by_app: [],
+            by_provider: [],
+            by_model: [],
+            by_resource: [],
+            series: [],
+            filters: {},
+          } as UsageResponse)
+        )
+      ),
+      mcp: this.http
+        .get<McpUsageResponse>('/_internal/ai/mcp-usage', { params })
         .pipe(
           catchError(() =>
             of({
               period,
               since: new Date(Date.now() - 7 * 86400000).toISOString(),
               total_requests: 0,
-              total_input_tokens: 0,
-              total_output_tokens: 0,
+              total_bytes_in: 0,
+              total_bytes_out: 0,
               errors: 0,
-              avg_latency_ms: 0,
+              avg_duration_ms: 0,
               by_service: [],
               by_user: [],
               by_role: [],
-              by_provider: [],
-              by_model: [],
-              by_resource: [],
+              by_app: [],
+              by_client: [],
+              by_tool: [],
+              by_method: [],
               series: [],
-            } as UsageResponse)
+            } as McpUsageResponse)
           )
         ),
       services: this.listServices(),
       users: this.listUsers(),
       roles: this.listRoles(),
+      apps: this.listApps(),
     }).pipe(map(b => b));
   }
 
@@ -123,7 +259,8 @@ export class UsageService {
       .get<{ resource: ServiceLookupRow[] }>(`${BASE_URL}/system/service`, {
         params: {
           fields: 'id,name,label,type',
-          filter: '(type = "ai_connection") or (type = "ai_chat")',
+          filter:
+            '(type = "ai_connection") or (type = "ai_chat") or (type = "mcp")',
         },
       })
       .pipe(
@@ -166,6 +303,21 @@ export class UsageService {
         map(res => {
           const m = new Map<number, string>();
           (res.resource ?? []).forEach(r => m.set(r.id, r.name));
+          return m;
+        }),
+        catchError(() => of(new Map<number, string>()))
+      );
+  }
+
+  private listApps(): Observable<Map<number, string>> {
+    return this.http
+      .get<{ resource: AppLookupRow[] }>(`${BASE_URL}/system/app`, {
+        params: { fields: 'id,name' },
+      })
+      .pipe(
+        map(res => {
+          const m = new Map<number, string>();
+          (res.resource ?? []).forEach(a => m.set(a.id, a.name));
           return m;
         }),
         catchError(() => of(new Map<number, string>()))

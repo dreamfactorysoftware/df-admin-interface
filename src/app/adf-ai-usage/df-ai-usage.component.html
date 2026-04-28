@@ -28,6 +28,124 @@
     </div>
   </header>
 
+  <mat-card class="usage__filters">
+    <mat-card-content>
+      <div class="usage__filter-row">
+        <mat-form-field appearance="outline" class="usage__filter-field">
+          <mat-label>Provider</mat-label>
+          <mat-select
+            multiple
+            [ngModel]="filters.provider"
+            (ngModelChange)="onSelectChange('provider', $event)">
+            <mat-option *ngFor="let p of providerOptions" [value]="p">
+              {{ p }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="usage__filter-field">
+          <mat-label>Connection</mat-label>
+          <mat-select
+            multiple
+            [ngModel]="filters.service_id"
+            (ngModelChange)="onSelectChange('service_id', $event)">
+            <mat-option *ngFor="let s of serviceOptions" [value]="s.id">
+              {{ s.label }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="usage__filter-field">
+          <mat-label>Model</mat-label>
+          <mat-select
+            multiple
+            [ngModel]="filters.model"
+            (ngModelChange)="onSelectChange('model', $event)">
+            <mat-option *ngFor="let m of modelOptions" [value]="m">
+              {{ m }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="usage__filter-field">
+          <mat-label>App / API key</mat-label>
+          <mat-select
+            multiple
+            [ngModel]="filters.app_id"
+            (ngModelChange)="onSelectChange('app_id', $event)">
+            <mat-option *ngFor="let a of appOptions" [value]="a.id">
+              {{ a.label }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="usage__filter-field">
+          <mat-label>User</mat-label>
+          <mat-select
+            multiple
+            [ngModel]="filters.user_id"
+            (ngModelChange)="onSelectChange('user_id', $event)">
+            <mat-option *ngFor="let u of userOptions" [value]="u.id">
+              {{ u.label }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="usage__filter-field">
+          <mat-label>Role</mat-label>
+          <mat-select
+            multiple
+            [ngModel]="filters.role_id"
+            (ngModelChange)="onSelectChange('role_id', $event)">
+            <mat-option *ngFor="let r of roleOptions" [value]="r.id">
+              {{ r.label }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="usage__filter-field">
+          <mat-label>Endpoint</mat-label>
+          <mat-select
+            multiple
+            [ngModel]="filters.resource"
+            (ngModelChange)="onSelectChange('resource', $event)">
+            <mat-option *ngFor="let res of resourceOptions" [value]="res">
+              {{ res }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="usage__filter-field">
+          <mat-label>Status</mat-label>
+          <mat-select
+            multiple
+            [ngModel]="filters.status"
+            (ngModelChange)="onSelectChange('status', $event)">
+            <mat-option *ngFor="let s of statusOptions" [value]="s">
+              {{ s }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <div class="usage__filter-chips" *ngIf="hasActiveFilters()">
+        <mat-chip-set>
+          <mat-chip
+            *ngFor="let chip of activeChips"
+            (removed)="removeChip(chip)">
+            {{ chip.label }}
+            <button matChipRemove [attr.aria-label]="'remove ' + chip.label">
+              <fa-icon [icon]="faXmark"></fa-icon>
+            </button>
+          </mat-chip>
+        </mat-chip-set>
+        <button mat-button color="primary" (click)="clearFilters()">
+          Clear all
+        </button>
+      </div>
+    </mat-card-content>
+  </mat-card>
+
   <div *ngIf="loading" class="usage__loading">
     <mat-spinner diameter="32"></mat-spinner>
   </div>
@@ -35,18 +153,20 @@
   <div *ngIf="errorMessage" class="usage__error">{{ errorMessage }}</div>
 
   <ng-container *ngIf="!loading && bundle">
-    <div *ngIf="bundle.raw.total_requests === 0" class="usage__empty">
-      <h3>No AI requests in this period</h3>
-      <p>
-        This view tracks every AI request through DreamFactory — direct REST
-        calls to your AI Connections from any client app, plus chats started
-        from the
-        <a [routerLink]="['/ai/chat']">
-          <fa-icon [icon]="faMessage"></fa-icon>
-          DF chat UI</a
-        >. Fire a request and refresh.
-      </p>
-    </div>
+    <mat-card *ngIf="bundle.raw.total_requests === 0" class="usage__empty">
+      <mat-card-content>
+        <h3>No AI requests in this period</h3>
+        <p>
+          This view tracks every AI request through DreamFactory — direct REST
+          calls to your AI Connections from any client app, plus chats started
+          from the
+          <a [routerLink]="['/ai/chat']">
+            <fa-icon [icon]="faMessage"></fa-icon>
+            DF chat UI</a
+          >. Fire a request and refresh.
+        </p>
+      </mat-card-content>
+    </mat-card>
 
     <ng-container *ngIf="bundle.raw.total_requests > 0">
       <df-usage-summary [summary]="summary"></df-usage-summary>
@@ -57,20 +177,36 @@
         <df-usage-bars
           title="Top users"
           [rows]="byUser"
-          [limit]="8"></df-usage-bars>
+          [limit]="8"
+          [clickable]="true"
+          (rowClick)="drillByUser($event)"></df-usage-bars>
         <df-usage-bars
           title="Top roles"
           [rows]="byRole"
-          [limit]="8"></df-usage-bars>
+          [limit]="8"
+          [clickable]="true"
+          (rowClick)="drillByRole($event)"></df-usage-bars>
+        <df-usage-bars
+          title="By app / API key"
+          [rows]="byApp"
+          [limit]="8"
+          [clickable]="true"
+          (rowClick)="drillByApp($event)"></df-usage-bars>
         <df-usage-bars
           title="By AI Connection"
           [rows]="byService"
           [limit]="8"
           [clickable]="true"
-          (rowClick)="jumpToService($event)"></df-usage-bars>
+          (rowClick)="drillByService($event)"></df-usage-bars>
         <df-usage-bars
           title="By provider"
           [rows]="byProvider"
+          [limit]="8"
+          [clickable]="true"
+          (rowClick)="drillByProvider($event)"></df-usage-bars>
+        <df-usage-bars
+          title="By model"
+          [rows]="byModel"
           [limit]="8"></df-usage-bars>
         <df-usage-bars
           title="By endpoint"
@@ -82,6 +218,76 @@
         [sessions]="costInputSessions"
         [connectionProviders]="connectionProviders"
         [summary]="summary"></df-cost-estimator>
+    </ng-container>
+
+    <ng-container *ngIf="mcpTotalRequests > 0">
+      <header class="usage__section-header">
+        <h3>External MCP traffic</h3>
+        <p class="usage__section-disclaimer">
+          Inbound tool calls from external AI agents (Claude Desktop, Cursor,
+          custom MCP clients). Token cost is borne by the calling client —
+          <strong>not</strong> billed to DreamFactory. The bytes columns track
+          what flowed through the gateway, not provider tokens.
+        </p>
+      </header>
+
+      <div class="usage__mcp-summary">
+        <mat-card class="usage__mcp-card">
+          <mat-card-content>
+            <span class="usage__mcp-label">MCP requests</span>
+            <span class="usage__mcp-value">{{
+              mcpTotalRequests | number
+            }}</span>
+          </mat-card-content>
+        </mat-card>
+        <mat-card class="usage__mcp-card">
+          <mat-card-content>
+            <span class="usage__mcp-label">Bytes in</span>
+            <span class="usage__mcp-value">{{ mcpBytesIn | number }}</span>
+          </mat-card-content>
+        </mat-card>
+        <mat-card class="usage__mcp-card">
+          <mat-card-content>
+            <span class="usage__mcp-label">Bytes out</span>
+            <span class="usage__mcp-value">{{ mcpBytesOut | number }}</span>
+          </mat-card-content>
+        </mat-card>
+        <mat-card class="usage__mcp-card">
+          <mat-card-content>
+            <span class="usage__mcp-label">Avg latency</span>
+            <span class="usage__mcp-value">
+              {{ mcpAvgDurationMs | number }}<small>ms</small>
+            </span>
+          </mat-card-content>
+        </mat-card>
+      </div>
+
+      <div class="usage__grid">
+        <df-usage-bars
+          title="MCP clients"
+          [rows]="mcpByClient"
+          [limit]="8"></df-usage-bars>
+        <df-usage-bars
+          title="MCP tools"
+          [rows]="mcpByTool"
+          [limit]="8"></df-usage-bars>
+        <df-usage-bars
+          title="MCP users"
+          [rows]="mcpByUser"
+          [limit]="8"></df-usage-bars>
+        <df-usage-bars
+          title="MCP services"
+          [rows]="mcpByService"
+          [limit]="8"></df-usage-bars>
+        <df-usage-bars
+          title="MCP apps"
+          [rows]="mcpByApp"
+          [limit]="8"></df-usage-bars>
+        <df-usage-bars
+          title="MCP methods"
+          [rows]="mcpByMethod"
+          [limit]="8"></df-usage-bars>
+      </div>
     </ng-container>
   </ng-container>
 </div>

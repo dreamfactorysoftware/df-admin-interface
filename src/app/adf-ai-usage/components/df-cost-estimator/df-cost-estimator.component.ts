@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input, OnChanges } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { MatCardModule } from '@angular/material/card';
 import {
   UsageSessionRow,
   UsageSummary,
@@ -19,138 +20,143 @@ interface ProviderBreakdown {
 @Component({
   selector: 'df-cost-estimator',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, MatCardModule],
   template: `
-    <section class="cost">
-      <header class="cost__head">
-        <h4 class="cost__title">Estimated cost</h4>
-        <span class="cost__total">{{ formatUSD(totalCost) }}</span>
-      </header>
-      <p class="cost__hint">
-        Estimated using DF's stored input/output token counts and the rates
-        below (USD per 1k tokens). Edit any rate to recompute. Defaults are
-        conservative mid-tier estimates and don't account for caching, batch
-        discounts, or model-tier differences.
-      </p>
-
-      <table class="cost__table" *ngIf="rows.length > 0; else noConn">
-        <thead>
-          <tr>
-            <th>Provider</th>
-            <th class="cost__col-num">Input tokens</th>
-            <th class="cost__col-rate">$ / 1k in</th>
-            <th class="cost__col-num">Output tokens</th>
-            <th class="cost__col-rate">$ / 1k out</th>
-            <th class="cost__col-num">Subtotal</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let row of rows">
-            <td>{{ row.provider }}</td>
-            <td class="cost__col-num">{{ row.inputTokens | number }}</td>
-            <td class="cost__col-rate">
-              <input
-                type="number"
-                step="0.0001"
-                min="0"
-                [ngModel]="row.rates.inputPer1k"
-                (ngModelChange)="
-                  updateRate(row.provider, 'inputPer1k', $event)
-                " />
-            </td>
-            <td class="cost__col-num">{{ row.outputTokens | number }}</td>
-            <td class="cost__col-rate">
-              <input
-                type="number"
-                step="0.0001"
-                min="0"
-                [ngModel]="row.rates.outputPer1k"
-                (ngModelChange)="
-                  updateRate(row.provider, 'outputPer1k', $event)
-                " />
-            </td>
-            <td class="cost__col-num">{{ formatUSD(row.cost) }}</td>
-          </tr>
-        </tbody>
-      </table>
-      <ng-template #noConn>
-        <p class="cost__empty">
-          No AI Connections configured — can't attribute tokens to providers
-          yet.
+    <mat-card class="cost">
+      <mat-card-content>
+        <header class="cost__head">
+          <h4 class="cost__title">Estimated cost</h4>
+          <span class="cost__total">{{ formatUSD(totalCost) }}</span>
+        </header>
+        <p class="cost__hint">
+          Estimated using DF's stored input/output token counts and the rates
+          below (USD per 1k tokens). Edit any rate to recompute. Defaults are
+          conservative mid-tier estimates and don't account for caching, batch
+          discounts, or model-tier differences.
         </p>
-      </ng-template>
-    </section>
+
+        <table class="cost__table" *ngIf="rows.length > 0; else noConn">
+          <thead>
+            <tr>
+              <th>Provider</th>
+              <th class="cost__col-num">Input tokens</th>
+              <th class="cost__col-rate">$ / 1k in</th>
+              <th class="cost__col-num">Output tokens</th>
+              <th class="cost__col-rate">$ / 1k out</th>
+              <th class="cost__col-num">Subtotal</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let row of rows">
+              <td>{{ row.provider }}</td>
+              <td class="cost__col-num">{{ row.inputTokens | number }}</td>
+              <td class="cost__col-rate">
+                <input
+                  type="number"
+                  step="0.0001"
+                  min="0"
+                  [ngModel]="row.rates.inputPer1k"
+                  (ngModelChange)="
+                    updateRate(row.provider, 'inputPer1k', $event)
+                  " />
+              </td>
+              <td class="cost__col-num">{{ row.outputTokens | number }}</td>
+              <td class="cost__col-rate">
+                <input
+                  type="number"
+                  step="0.0001"
+                  min="0"
+                  [ngModel]="row.rates.outputPer1k"
+                  (ngModelChange)="
+                    updateRate(row.provider, 'outputPer1k', $event)
+                  " />
+              </td>
+              <td class="cost__col-num">{{ formatUSD(row.cost) }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <ng-template #noConn>
+          <p class="cost__empty">
+            No AI Connections configured — can't attribute tokens to providers
+            yet.
+          </p>
+        </ng-template>
+      </mat-card-content>
+    </mat-card>
   `,
   styles: [
     `
       .cost {
-        background: rgba(255, 255, 255, 0.02);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 8px;
-        padding: 1rem 1.25rem;
-        display: flex;
-        flex-direction: column;
-        gap: 0.75rem;
+        mat-card-content {
+          padding: 20px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
 
         &__head {
           display: flex;
           align-items: baseline;
           justify-content: space-between;
+          gap: 12px;
         }
         &__title {
           margin: 0;
-          font-size: 0.95rem;
+          font-size: 16px;
           font-weight: 600;
+          color: #333;
         }
         &__total {
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
-          font-size: 1.5rem;
-          font-weight: 600;
-          color: #4ade80;
+          font-size: 24px;
+          font-weight: 700;
+          color: #2e7d32;
         }
         &__hint {
           margin: 0;
-          font-size: 0.8125rem;
-          color: rgba(255, 255, 255, 0.6);
+          font-size: 13px;
+          color: #666;
           line-height: 1.5;
         }
         &__empty {
-          font-size: 0.875rem;
-          color: rgba(255, 255, 255, 0.5);
+          font-size: 14px;
+          color: #999;
           font-style: italic;
         }
         &__table {
           width: 100%;
           border-collapse: collapse;
-          font-size: 0.85rem;
+          font-size: 14px;
+          color: #333;
 
           th {
             text-align: left;
-            padding: 0.5rem 0.625rem;
-            font-size: 0.7rem;
+            padding: 10px 12px;
+            font-size: 11px;
             text-transform: uppercase;
-            letter-spacing: 0.04em;
-            color: rgba(255, 255, 255, 0.55);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            letter-spacing: 0.05em;
+            color: #666;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+            font-weight: 600;
           }
           td {
-            padding: 0.5rem 0.625rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            padding: 10px 12px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.04);
           }
           input {
-            width: 5rem;
-            padding: 0.25rem 0.4rem;
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            width: 90px;
+            padding: 6px 8px;
+            background: #fff;
+            border: 1px solid rgba(0, 0, 0, 0.2);
             border-radius: 4px;
             color: inherit;
-            font: inherit;
             font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+            font-size: 13px;
             text-align: right;
 
             &:focus {
               outline: none;
-              border-color: #60a5fa;
+              border-color: #7f11e0;
             }
           }
         }
@@ -159,6 +165,41 @@ interface ProviderBreakdown {
           text-align: right;
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
           white-space: nowrap;
+        }
+      }
+
+      :host-context(.dark-theme) {
+        .cost {
+          &__title {
+            color: #fff;
+          }
+          &__total {
+            color: #81c784;
+          }
+          &__hint,
+          &__empty {
+            color: #bbb;
+          }
+          &__table {
+            color: #fff;
+
+            th {
+              color: #bbb;
+              border-bottom-color: rgba(255, 255, 255, 0.12);
+            }
+            td {
+              border-bottom-color: rgba(255, 255, 255, 0.06);
+            }
+            input {
+              background: rgba(255, 255, 255, 0.06);
+              border-color: rgba(255, 255, 255, 0.2);
+              color: #fff;
+
+              &:focus {
+                border-color: #bb86fc;
+              }
+            }
+          }
         }
       }
     `,

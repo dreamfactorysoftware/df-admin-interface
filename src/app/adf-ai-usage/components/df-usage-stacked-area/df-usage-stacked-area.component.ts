@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input, OnChanges } from '@angular/core';
+import { MatCardModule } from '@angular/material/card';
 import { TimeBucket } from '../../types/usage';
 
 interface Layer {
@@ -22,128 +23,159 @@ interface YTick {
 @Component({
   selector: 'df-usage-stacked-area',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MatCardModule],
   template: `
-    <figure
+    <mat-card
       class="chart"
       [style.--chart-w.px]="width"
       [style.--chart-h.px]="height">
-      <div class="chart__legend">
-        <span class="chart__title">Tokens over time</span>
-        <span *ngFor="let l of layers" class="chart__legend-item">
-          <span class="chart__legend-swatch" [style.background]="l.fill"></span>
-          {{ l.label }}
-          <span class="chart__legend-total">{{ formatK(l.total) }}</span>
-        </span>
-      </div>
-      <svg
-        class="chart__svg"
-        [attr.viewBox]="'0 0 ' + width + ' ' + height"
-        preserveAspectRatio="none"
-        role="img"
-        aria-label="Tokens over time">
-        <g class="chart__grid">
-          <line
-            *ngFor="let t of yTicks"
-            [attr.x1]="paddingX"
-            [attr.x2]="width - paddingX"
-            [attr.y1]="t.y"
-            [attr.y2]="t.y" />
-        </g>
+      <mat-card-content>
+        <div class="chart__legend">
+          <span class="chart__title">Tokens over time</span>
+          <span *ngFor="let l of layers" class="chart__legend-item">
+            <span
+              class="chart__legend-swatch"
+              [style.background]="l.fill"></span>
+            {{ l.label }}
+            <span class="chart__legend-total">{{ formatK(l.total) }}</span>
+          </span>
+        </div>
+        <svg
+          class="chart__svg"
+          [attr.viewBox]="'0 0 ' + width + ' ' + height"
+          preserveAspectRatio="none"
+          role="img"
+          aria-label="Tokens over time">
+          <g class="chart__grid">
+            <line
+              *ngFor="let t of yTicks"
+              [attr.x1]="paddingX"
+              [attr.x2]="width - paddingX"
+              [attr.y1]="t.y"
+              [attr.y2]="t.y" />
+          </g>
 
-        <path
-          *ngFor="let layer of layers"
-          [attr.d]="layer.d"
-          [attr.fill]="layer.fill"
-          fill-opacity="0.85"
-          stroke="none" />
+          <path
+            *ngFor="let layer of layers"
+            [attr.d]="layer.d"
+            [attr.fill]="layer.fill"
+            fill-opacity="0.85"
+            stroke="none" />
 
-        <g class="chart__axis chart__axis--x">
-          <text
-            *ngFor="let t of xTicks"
-            [attr.x]="t.x"
-            [attr.y]="height - 4"
-            text-anchor="middle">
-            {{ t.label }}
-          </text>
-        </g>
-        <g class="chart__axis chart__axis--y">
-          <text
-            *ngFor="let t of yTicks"
-            [attr.x]="paddingX - 6"
-            [attr.y]="t.y + 4"
-            text-anchor="end">
-            {{ t.label }}
-          </text>
-        </g>
+          <g class="chart__axis chart__axis--x">
+            <text
+              *ngFor="let t of xTicks"
+              [attr.x]="t.x"
+              [attr.y]="height - 4"
+              text-anchor="middle">
+              {{ t.label }}
+            </text>
+          </g>
+          <g class="chart__axis chart__axis--y">
+            <text
+              *ngFor="let t of yTicks"
+              [attr.x]="paddingX - 6"
+              [attr.y]="t.y + 4"
+              text-anchor="end">
+              {{ t.label }}
+            </text>
+          </g>
 
-        <g *ngIf="!hasData" class="chart__empty">
-          <text [attr.x]="width / 2" [attr.y]="height / 2" text-anchor="middle">
-            No data in this range yet.
-          </text>
-        </g>
-      </svg>
-    </figure>
+          <g *ngIf="!hasData" class="chart__empty">
+            <text
+              [attr.x]="width / 2"
+              [attr.y]="height / 2"
+              text-anchor="middle">
+              No data in this range yet.
+            </text>
+          </g>
+        </svg>
+      </mat-card-content>
+    </mat-card>
   `,
   styles: [
     `
       .chart {
-        margin: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 0.5rem;
+        mat-card-content {
+          padding: 20px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
 
         &__legend {
           display: flex;
           flex-wrap: wrap;
           align-items: center;
-          gap: 0.75rem 1.25rem;
-          font-size: 0.8125rem;
-          color: rgba(255, 255, 255, 0.7);
+          gap: 12px 24px;
+          font-size: 13px;
+          color: #666;
         }
         &__title {
           font-weight: 600;
-          color: rgba(255, 255, 255, 0.9);
-          font-size: 0.95rem;
-          margin-right: 0.5rem;
+          color: #333;
+          font-size: 16px;
+          margin-right: 8px;
         }
         &__legend-item {
           display: inline-flex;
           align-items: center;
-          gap: 0.4rem;
+          gap: 8px;
         }
         &__legend-swatch {
-          width: 0.7rem;
-          height: 0.7rem;
+          width: 12px;
+          height: 12px;
           border-radius: 2px;
         }
         &__legend-total {
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
-          font-size: 0.75rem;
-          color: rgba(255, 255, 255, 0.55);
+          font-size: 12px;
+          color: #999;
         }
 
         &__svg {
           width: 100%;
-          height: var(--chart-h, 240px);
-          background: rgba(255, 255, 255, 0.02);
-          border: 1px solid rgba(255, 255, 255, 0.06);
-          border-radius: 6px;
+          height: var(--chart-h, 280px);
+          background: rgba(0, 0, 0, 0.02);
+          border-radius: 4px;
         }
 
         &__grid line {
-          stroke: rgba(255, 255, 255, 0.06);
+          stroke: rgba(0, 0, 0, 0.08);
           stroke-dasharray: 2 4;
         }
         &__axis text {
-          fill: rgba(255, 255, 255, 0.5);
-          font-size: 0.7rem;
+          fill: #999;
+          font-size: 12px;
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
         }
         &__empty text {
-          fill: rgba(255, 255, 255, 0.4);
+          fill: #999;
           font-style: italic;
-          font-size: 0.85rem;
+          font-size: 14px;
+        }
+      }
+
+      :host-context(.dark-theme) {
+        .chart {
+          &__legend {
+            color: #bbb;
+          }
+          &__title {
+            color: #fff;
+          }
+          &__legend-total,
+          &__axis text,
+          &__empty text {
+            color: #bbb;
+            fill: #bbb;
+          }
+          &__svg {
+            background: rgba(255, 255, 255, 0.04);
+          }
+          &__grid line {
+            stroke: rgba(255, 255, 255, 0.08);
+          }
         }
       }
     `,
@@ -152,7 +184,7 @@ interface YTick {
 export class DfUsageStackedAreaComponent implements OnChanges {
   @Input() data: TimeBucket[] = [];
   @Input() width = 720;
-  @Input() height = 240;
+  @Input() height = 280;
   @Input() paddingX = 48;
   @Input() paddingY = 16;
 
@@ -211,13 +243,13 @@ export class DfUsageStackedAreaComponent implements OnChanges {
     this.layers = [
       {
         d: inputPath,
-        fill: '#3b82f6',
+        fill: '#2196f3',
         label: 'Input',
         total: sumKey(this.data, 'inputTokens'),
       },
       {
         d: outputPath,
-        fill: '#a78bfa',
+        fill: '#7f11e0',
         label: 'Output',
         total: sumKey(this.data, 'outputTokens'),
       },
