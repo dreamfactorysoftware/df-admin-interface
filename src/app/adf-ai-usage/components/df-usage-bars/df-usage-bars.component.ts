@@ -49,6 +49,12 @@ import { GroupRow } from '../../types/usage';
             </div>
             <div class="bars__totals">
               <span class="bars__total">{{ formatK(row.totalTokens) }}</span>
+              <span
+                *ngIf="row.costPer1kTokens && row.costPer1kTokens > 0"
+                class="bars__rate"
+                matTooltip="Effective rate paid per 1k tokens in this window">
+                {{ formatRate(row.costPer1kTokens) }}/1k
+              </span>
               <span class="bars__count">{{ row.sessions }} sess</span>
             </div>
           </li>
@@ -168,6 +174,14 @@ import { GroupRow } from '../../types/usage';
           font-size: 12px;
           color: #999;
         }
+        &__rate {
+          font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+          font-size: 11px;
+          color: #7f11e0;
+          background: rgba(127, 17, 224, 0.08);
+          padding: 1px 6px;
+          border-radius: 3px;
+        }
       }
 
       :host-context(.dark-theme) {
@@ -181,6 +195,10 @@ import { GroupRow } from '../../types/usage';
           &__count,
           &__empty {
             color: #bbb;
+          }
+          &__rate {
+            color: #b388ff;
+            background: rgba(127, 17, 224, 0.18);
           }
           &__hint {
             color: #888;
@@ -236,5 +254,16 @@ export class DfUsageBarsComponent {
       return `${(n / 1000).toFixed(n < 10_000 ? 1 : 0)}k`;
     }
     return `${(n / 1_000_000).toFixed(1)}M`;
+  }
+
+  /** Render an effective per-1k-token rate compactly. Sub-cent rates need
+   *  more precision than $0.00 — show $0.0008 not $0.00 because the whole
+   *  point of this column is "is this model expensive?" */
+  formatRate(rate: number): string {
+    if (!Number.isFinite(rate) || rate <= 0) return '$0';
+    if (rate < 0.001) return '<$0.001';
+    if (rate < 0.01) return `$${rate.toFixed(4)}`;
+    if (rate < 1) return `$${rate.toFixed(3)}`;
+    return `$${rate.toFixed(2)}`;
   }
 }

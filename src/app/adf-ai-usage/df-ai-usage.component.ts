@@ -21,6 +21,8 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { finalize } from 'rxjs/operators';
 import {
+  DimensionSeriesRowRaw,
+  ExpensiveCallRowRaw,
   TimeRange,
   UsageBundle,
   UsageFilters,
@@ -39,6 +41,14 @@ import { DfUsageStackedAreaComponent } from './components/df-usage-stacked-area/
 import { DfUsageBarsComponent } from './components/df-usage-bars/df-usage-bars.component';
 import { DfUsageSummaryComponent } from './components/df-usage-summary/df-usage-summary.component';
 import { DfCostEstimatorComponent } from './components/df-cost-estimator/df-cost-estimator.component';
+import {
+  DfCostByDimensionComponent,
+  DimensionSeriesPoint,
+} from './components/df-cost-by-dimension/df-cost-by-dimension.component';
+import {
+  DfExpensiveCallsComponent,
+  ExpensiveCallRow,
+} from './components/df-expensive-calls/df-expensive-calls.component';
 
 interface ActiveFilterChip {
   dimension: keyof UsageFilters;
@@ -81,6 +91,8 @@ export interface BudgetRow {
     DfUsageBarsComponent,
     DfUsageSummaryComponent,
     DfCostEstimatorComponent,
+    DfCostByDimensionComponent,
+    DfExpensiveCallsComponent,
   ],
   templateUrl: './df-ai-usage.component.html',
   styleUrls: ['./df-ai-usage.component.scss'],
@@ -115,6 +127,17 @@ export class DfAiUsageComponent implements OnInit {
   budgets: BudgetRow[] = [];
   budgetWarnings: BudgetRow[] = []; // those projected to exceed budget
   activeChips: ActiveFilterChip[] = [];
+
+  // ─── New analytics views (the "where is my money going" surfaces) ─────
+  // Multi-dim cost-over-time series, one DimensionSeriesPoint array per
+  // dimension. Top N by cost + Other bucket, mapped to display labels here
+  // so the chart component stays generic.
+  costByModelSeries: DimensionSeriesPoint[] = [];
+  costByUserSeries: DimensionSeriesPoint[] = [];
+  costByAppSeries: DimensionSeriesPoint[] = [];
+  costByProviderSeries: DimensionSeriesPoint[] = [];
+  /** Top N most expensive single calls in the window. */
+  expensiveCalls: ExpensiveCallRow[] = [];
 
   // MCP-side views — distinct from the AI panels because MCP is INBOUND
   // traffic from external AI agents (Claude Desktop, Cursor). Token cost is
@@ -258,6 +281,11 @@ export class DfAiUsageComponent implements OnInit {
       this.connectionProviders = new Map();
       this.costInputSessions = [];
       this.activeChips = [];
+      this.costByModelSeries = [];
+      this.costByUserSeries = [];
+      this.costByAppSeries = [];
+      this.costByProviderSeries = [];
+      this.expensiveCalls = [];
       return;
     }
 
@@ -275,6 +303,7 @@ export class DfAiUsageComponent implements OnInit {
         : 0,
       avgToolCallsPerSession: 0,
       errors: r.errors,
+      partials: r.partials ?? 0,
       avgLatencyMs: r.avg_latency_ms,
       latencyP50Ms: r.latency_p50_ms,
       latencyP95Ms: r.latency_p95_ms,
@@ -328,9 +357,40 @@ export class DfAiUsageComponent implements OnInit {
       this.toRow(row.provider ?? 'unknown', row.provider ?? 'unknown', row)
     );
 
-    this.byModel = (r.by_model ?? []).map(row =>
-      this.toRow(row.model, `${row.model} (${row.provider})`, row)
+    this.byModel = (r.by_model ?? []).map(row => {
+      const base = this.toRow(row.model, `${row.model} (${row.provider})`, row);
+      base.costPer1kTokens = n(row.cost_per_1k_tokens);
+      return base;
+    });
+
+    // Multi-dim cost-over-time series. Each one is mapped to display
+    // labels HERE so the chart component stays generic / reusable.
+    this.costByModelSeries = this.toDimensionSeries(
+      r.series_by_model,
+      bucket => String(bucket)
     );
+    this.costByProviderSeries = this.toDimensionSeries(
+      r.series_by_provider,
+      bucket => String(bucket)
+    );
+    this.costByUserSeries = this.toDimensionSeries(
+      r.series_by_user,
+      bucket => {
+        const id = Number(bucket);
+        if (!Number.isFinite(id) || id <= 0) return String(bucket);
+        return this.bundle?.users.get(id) ?? `user #${id}`;
+      }
+    );
+    this.costByAppSeries = this.toDimensionSeries(
+      r.series_by_app,
+      bucket => {
+        const id = Number(bucket);
+        if (!Number.isFinite(id) || id <= 0) return String(bucket);
+        return this.bundle?.apps.get(id) ?? `app #${id}`;
+      }
+    );
+
+    this.expensiveCalls = this.toExpensiveCalls(r.most_expensive_calls);
 
     this.byResource = (r.by_resource ?? []).map(row => ({
       key: row.resource,
@@ -571,6 +631,7 @@ export class DfAiUsageComponent implements OnInit {
       avgTokensPerSession: 0,
       avgToolCallsPerSession: 0,
       errors: 0,
+      partials: 0,
       avgLatencyMs: 0,
       latencyP50Ms: 0,
       latencyP95Ms: 0,
@@ -672,5 +733,61 @@ export class DfAiUsageComponent implements OnInit {
       sessions: n(r.requests),
       costUsd: n(r.cost_usd),
     };
+  }
+
+  /** Flatten the backend's series_by_<dim> rows into the chart-friendly
+   *  shape, preserving the __other__ sentinel for the chart's gray layer. */
+  private toDimensionSeries(
+    rows: DimensionSeriesRowRaw[] | undefined,
+    labelFor: (bucket: string | number) => string
+  ): DimensionSeriesPoint[] {
+    if (!rows || rows.length === 0) return [];
+    return rows.map(r => {
+      const rawBucket = r.bucket;
+      const isOther = rawBucket === '__other__';
+      const key = isOther ? '__other__' : labelFor(rawBucket);
+      return {
+        date: r.date,
+        bucket: key,
+        cost: n(r.cost_usd),
+        requests: n(r.requests),
+      };
+    });
+  }
+
+  /** Map most_expensive_calls rows to the table component's display shape,
+   *  resolving user/app/service ids to labels via the bundle lookups. */
+  private toExpensiveCalls(
+    rows: ExpensiveCallRowRaw[] | undefined
+  ): ExpensiveCallRow[] {
+    if (!rows || rows.length === 0) return [];
+    return rows.map(r => {
+      const userId = r.user_id ?? 0;
+      const appId = r.app_id ?? 0;
+      const userLabel = userId
+        ? (this.bundle?.users.get(userId) ?? `user #${userId}`)
+        : '—';
+      const appLabel = appId
+        ? (this.bundle?.apps.get(appId) ?? `app #${appId}`)
+        : '—';
+      const svc = this.bundle?.services.get(r.service_id);
+      const serviceLabel =
+        svc?.label || svc?.name || `service #${r.service_id}`;
+      return {
+        id: r.id,
+        provider: r.provider,
+        model: r.model,
+        resource: r.resource,
+        userLabel,
+        appLabel,
+        serviceLabel,
+        inputTokens: n(r.input_tokens),
+        outputTokens: n(r.output_tokens),
+        costUsd: n(r.cost_usd),
+        latencyMs: n(r.latency_ms),
+        status: r.status,
+        createdAt: r.created_at,
+      };
+    });
   }
 }

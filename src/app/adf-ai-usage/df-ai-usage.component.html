@@ -261,6 +261,44 @@
 
       <df-usage-stacked-area [data]="series"></df-usage-stacked-area>
 
+      <header class="usage__section-header usage__section-header--inset">
+        <h3 class="usage__section-title">
+          Where is my money going?
+          <fa-icon
+            class="usage__section-hint"
+            [icon]="faCircleInfo"
+            matTooltip="Cost broken out by the four dimensions that matter for chargeback and optimization. Top 10 spenders per dimension are stacked; the long tail is folded into a muted Other layer."
+            matTooltipPosition="above"></fa-icon>
+        </h3>
+        <p class="usage__section-subtitle">
+          Stacked spend over time per dimension — find the model, user, app,
+          or provider eating budget at a glance
+        </p>
+      </header>
+
+      <div class="usage__cost-grid">
+        <df-cost-by-dimension
+          title="Cost by model"
+          subtitle="Top 10 models by spend, plus Other"
+          [data]="costByModelSeries"></df-cost-by-dimension>
+        <df-cost-by-dimension
+          title="Cost by provider"
+          subtitle="Anthropic vs OpenAI vs xAI vs local"
+          [data]="costByProviderSeries"></df-cost-by-dimension>
+        <df-cost-by-dimension
+          title="Cost by user"
+          subtitle="Top 10 spenders, plus Other"
+          [data]="costByUserSeries"></df-cost-by-dimension>
+        <df-cost-by-dimension
+          title="Cost by app / API key"
+          subtitle="Per-tenant cost visibility"
+          [data]="costByAppSeries"></df-cost-by-dimension>
+      </div>
+
+      <df-expensive-calls
+        title="Top 10 most expensive calls"
+        [data]="expensiveCalls"></df-expensive-calls>
+
       <div class="usage__grid">
         <df-usage-bars
           title="Top users"

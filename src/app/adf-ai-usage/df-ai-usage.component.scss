@@ -102,6 +102,21 @@
     gap: 16px;
   }
 
+  // Two-column grid for the cost-by-dimension charts. Wider min-width than
+  // the bars grid because a stacked area needs more horizontal room to
+  // read cleanly.
+  &__cost-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(480px, 1fr));
+    gap: 16px;
+  }
+
+  &__section-header--inset {
+    margin-top: 16px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+  }
+
   // Filter card -------------------------------------------------------------
 
   &__filters {

@@ -125,6 +125,20 @@ import { DfSparklineComponent } from '../df-sparkline/df-sparkline.component';
       </mat-card>
 
       <mat-card
+        *ngIf="(summary.partials ?? 0) > 0"
+        class="summary__card summary__card--partial"
+        matTooltip="Streaming requests where the client disconnected before the model finished. Tokens delivered are still billed; an uptick here usually points at a network or load-balancer timeout, not a model issue."
+        matTooltipPosition="above">
+        <mat-card-content>
+          <span class="summary__label">Partials</span>
+          <span class="summary__value">{{
+            summary.partials ?? 0 | number
+          }}</span>
+          <span class="summary__hint">streaming, client disconnected</span>
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card
         class="summary__card summary__card--latency"
         matTooltip="p50 = median (typical user). p95 = the slowest 5% of calls — what unhappy users feel. p99 = the worst tail. Avg gets pulled around by outliers; trust p50 for the typical case and p95 to answer is-this-fast-enough."
         matTooltipPosition="above">
@@ -235,9 +249,22 @@ import { DfSparklineComponent } from '../df-sparkline/df-sparkline.component';
               color: #d32f2f;
             }
           }
+          &--partial {
+            mat-card-content {
+              background: rgba(255, 152, 0, 0.05);
+            }
+            .summary__value {
+              color: #e65100;
+            }
+          }
           &--cost .summary__value {
             color: #2e7d32;
           }
+        }
+        &__hint {
+          font-size: 11px;
+          color: #999;
+          font-style: italic;
         }
         &__label {
           font-size: 12px;

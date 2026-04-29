@@ -45,6 +45,11 @@ export interface UsageResponse {
   total_output_tokens: number;
   total_cost_usd: number;
   errors: number;
+  /** Streaming requests where the client disconnected before the model
+   *  finished. Billed for tokens delivered, but tracked separately so an
+   *  uptick (usually a network/timeout problem) doesn't hide inside the
+   *  success rate. */
+  partials?: number;
   avg_latency_ms: number;
   latency_p50_ms: number;
   latency_p95_ms: number;
@@ -58,6 +63,16 @@ export interface UsageResponse {
   by_resource: ResourceRowRaw[];
   by_error_class: ErrorClassRowRaw[];
   series: SeriesRowRaw[];
+  /** Stacked cost-over-time series broken out by model, user, app, provider.
+   *  Each is top-N by cost plus a `__other__` bucket for the long tail.
+   *  All four populate when there's data in the window. */
+  series_by_model?: DimensionSeriesRowRaw[];
+  series_by_user?: DimensionSeriesRowRaw[];
+  series_by_app?: DimensionSeriesRowRaw[];
+  series_by_provider?: DimensionSeriesRowRaw[];
+  /** Top N most expensive single calls in the window — outliers an average
+   *  hides. Each row carries full attribution for drill-down. */
+  most_expensive_calls?: ExpensiveCallRowRaw[];
   filters: Partial<Record<keyof UsageFilters, (string | number)[]>>;
   /** Per-service month-to-date spend vs configured budget. Calendar-month
    *  bound, NOT bound to the dashboard's period filter. */
@@ -73,6 +88,40 @@ export interface UsageResponse {
    *  Only present when the request was made with compare=1. */
   previous?: PreviousSummaryRaw;
 }
+
+/** One point in a stacked cost-over-time series. `bucket` is the dimension
+ *  value (model name, user_id, etc.) or the `__other__` sentinel for the
+ *  long-tail aggregate. */
+export interface DimensionSeriesRowRaw {
+  date: string;
+  bucket: string | number;
+  requests: number | string;
+  input_tokens: number | string;
+  output_tokens: number | string;
+  cost_usd: number | string;
+}
+
+/** A single high-cost row from `most_expensive_calls`. */
+export interface ExpensiveCallRowRaw {
+  id: number;
+  service_id: number;
+  user_id: number | null;
+  role_id: number | null;
+  app_id: number | null;
+  provider: string;
+  model: string;
+  resource: string;
+  input_tokens: number | string;
+  output_tokens: number | string;
+  cost_usd: number | string;
+  latency_ms: number | string;
+  status: string;
+  created_at: string;
+}
+
+/** Sentinel used by the backend to identify the long-tail "Other" bucket
+ *  in the multi-dim time series. UI renders it with a distinct gray. */
+export const OTHER_BUCKET = '__other__';
 
 export interface BudgetRowRaw {
   service_id: number;
@@ -124,6 +173,10 @@ interface ModelRowRaw {
   input_tokens: number | string;
   output_tokens: number | string;
   cost_usd?: number | string;
+  /** Effective per-1000-token rate the customer paid in this window — backend
+   *  computes this from cost_usd / total_tokens. Lets the dashboard answer
+   *  "is this premium model worth the rate" without doing the math client-side. */
+  cost_per_1k_tokens?: number | string;
 }
 
 interface ResourceRowRaw {
@@ -265,6 +318,7 @@ export class UsageService {
             latency_p50_ms: 0,
             latency_p95_ms: 0,
             latency_p99_ms: 0,
+            partials: 0,
             by_service: [],
             by_user: [],
             by_role: [],
@@ -274,6 +328,11 @@ export class UsageService {
             by_resource: [],
             by_error_class: [],
             series: [],
+            series_by_model: [],
+            series_by_user: [],
+            series_by_app: [],
+            series_by_provider: [],
+            most_expensive_calls: [],
             filters: {},
             budgets: [],
             default_rates: {},

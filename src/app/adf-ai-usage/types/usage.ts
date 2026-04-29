@@ -26,6 +26,10 @@ export interface GroupRow {
   toolCalls: number;
   sessions: number;
   costUsd: number;
+  /** Optional effective per-1000-token rate for this group. Currently
+   *  populated only on by_model rows (backend computes cost / total_tokens
+   *  × 1000). Lets the UI render "this model costs $X/1k" inline. */
+  costPer1kTokens?: number;
 }
 
 /** Top-line summary cards. */
@@ -38,6 +42,10 @@ export interface UsageSummary {
   avgTokensPerSession: number;
   avgToolCallsPerSession: number;
   errors?: number;
+  /** Streaming requests where the client disconnected before completion.
+   *  Billed for tokens delivered, but tracked separately to keep the
+   *  success-rate signal honest. */
+  partials?: number;
   avgLatencyMs?: number;
   latencyP50Ms?: number;
   latencyP95Ms?: number;
