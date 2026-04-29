@@ -103,7 +103,7 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
             background: rgba(255, 255, 255, 0.04);
             color: rgba(255, 255, 255, 0.6);
             font-style: italic;
-            font-size: 0.875rem;
+            font-size: 14px;
           }
         }
 
@@ -117,7 +117,7 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 0.95rem;
+          font-size: 15px;
         }
 
         &__bubble {
@@ -140,7 +140,7 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
         &__empty {
           color: rgba(255, 255, 255, 0.4);
           font-style: italic;
-          font-size: 0.875rem;
+          font-size: 14px;
         }
 
         &__code {
@@ -150,7 +150,7 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
           border: 1px solid rgba(255, 255, 255, 0.08);
           border-radius: 6px;
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
-          font-size: 0.8125rem;
+          font-size: 13px;
           line-height: 1.5;
           overflow: auto;
           white-space: pre;
@@ -170,7 +170,7 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
           margin-top: 0.5rem;
           padding-top: 0.5rem;
           border-top: 1px dashed rgba(255, 255, 255, 0.1);
-          font-size: 0.8125rem;
+          font-size: 13px;
           color: rgba(255, 255, 255, 0.7);
         }
 
@@ -182,14 +182,14 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
 
         &__tool-call-name {
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
-          font-size: 0.8125rem;
+          font-size: 13px;
         }
 
         &__tool-call-service {
           padding: 0.1rem 0.4rem;
           border-radius: 999px;
           background: rgba(255, 255, 255, 0.08);
-          font-size: 0.7rem;
+          font-size: 11px;
         }
 
         &__usage {
@@ -198,7 +198,7 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
           margin-top: 0.5rem;
           padding-top: 0.5rem;
           border-top: 1px dashed rgba(255, 255, 255, 0.08);
-          font-size: 0.7rem;
+          font-size: 11px;
           color: rgba(255, 255, 255, 0.45);
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
         }

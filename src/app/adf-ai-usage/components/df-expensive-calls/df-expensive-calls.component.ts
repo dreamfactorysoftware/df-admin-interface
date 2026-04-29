@@ -79,9 +79,15 @@ export interface ExpensiveCallRow {
                 <td class="exp__td">{{ r.userLabel }}</td>
                 <td class="exp__td">{{ r.appLabel }}</td>
                 <td class="exp__td">{{ r.serviceLabel }}</td>
-                <td class="exp__td exp__td--num">{{ formatTokens(r.inputTokens) }}</td>
-                <td class="exp__td exp__td--num">{{ formatTokens(r.outputTokens) }}</td>
-                <td class="exp__td exp__td--num">{{ formatLatency(r.latencyMs) }}</td>
+                <td class="exp__td exp__td--num">
+                  {{ formatTokens(r.inputTokens) }}
+                </td>
+                <td class="exp__td exp__td--num">
+                  {{ formatTokens(r.outputTokens) }}
+                </td>
+                <td class="exp__td exp__td--num">
+                  {{ formatLatency(r.latencyMs) }}
+                </td>
                 <td class="exp__td">
                   <span
                     class="exp__pill"
@@ -91,9 +97,7 @@ export interface ExpensiveCallRow {
                     {{ r.status }}
                   </span>
                 </td>
-                <td
-                  class="exp__td exp__td--when"
-                  [matTooltip]="r.createdAt">
+                <td class="exp__td exp__td--when" [matTooltip]="r.createdAt">
                   {{ r.createdAt | date: 'MMM d, HH:mm' }}
                 </td>
               </tr>

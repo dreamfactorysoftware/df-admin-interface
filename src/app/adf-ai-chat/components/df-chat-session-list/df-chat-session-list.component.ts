@@ -79,7 +79,7 @@ import { ChatSession } from '../../types/chat';
           padding: 1rem 1rem 0;
           color: rgba(255, 255, 255, 0.5);
           font-style: italic;
-          font-size: 0.875rem;
+          font-size: 14px;
         }
 
         &__items {
@@ -129,7 +129,7 @@ import { ChatSession } from '../../types/chat';
         }
 
         &__meta {
-          font-size: 0.75rem;
+          font-size: 12px;
           color: rgba(255, 255, 255, 0.5);
         }
 
@@ -139,7 +139,7 @@ import { ChatSession } from '../../types/chat';
           color: rgba(255, 255, 255, 0.3);
           cursor: pointer;
           padding: 0.5rem 0.875rem;
-          font-size: 0.875rem;
+          font-size: 14px;
 
           &:hover {
             color: #ff6b6b;

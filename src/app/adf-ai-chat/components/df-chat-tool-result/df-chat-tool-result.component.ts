@@ -49,7 +49,7 @@ import { ChatMessage } from '../../types/chat';
         border-radius: 8px;
         background: rgba(255, 255, 255, 0.02);
         overflow: hidden;
-        font-size: 0.875rem;
+        font-size: 14px;
 
         &--error {
           border-color: rgba(220, 53, 69, 0.4);
@@ -93,7 +93,7 @@ import { ChatMessage } from '../../types/chat';
         }
 
         &__badge {
-          font-size: 0.7rem;
+          font-size: 11px;
           font-weight: 700;
           padding: 0.125rem 0.4rem;
           border-radius: 3px;
@@ -105,7 +105,7 @@ import { ChatMessage } from '../../types/chat';
 
         &__latency {
           margin-left: auto;
-          font-size: 0.75rem;
+          font-size: 12px;
           color: rgba(255, 255, 255, 0.5);
         }
 
@@ -118,7 +118,7 @@ import { ChatMessage } from '../../types/chat';
         &__content {
           margin: 0;
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
-          font-size: 0.8125rem;
+          font-size: 13px;
           line-height: 1.5;
           white-space: pre-wrap;
           word-break: break-word;

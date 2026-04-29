@@ -802,11 +802,15 @@
                   (selectConnection)="setAiServiceId($event)"
                   (selectRole)="setAiRoleId($event)"></df-ai-chat-prereqs>
 
-                <!-- AI Connection: validate provider + key without saving first -->
+                <!-- AI Connection: validate provider + key without saving first.
+                     `serviceId` lets the backend fall back to the saved api_key
+                     when the form's field is blank — so admins can click Test
+                     without re-typing previously-saved secrets. -->
                 <df-ai-test-connection
                   *ngIf="serviceForm.getRawValue().type === 'ai_connection'"
                   class="full-width"
-                  [form]="serviceForm"></df-ai-test-connection>
+                  [form]="serviceForm"
+                  [serviceId]="edit && serviceData ? serviceData.id : null"></df-ai-test-connection>
 
                 <!-- AI Connection: model picker — fetches available models
                      from the provider and writes selection to default_model.

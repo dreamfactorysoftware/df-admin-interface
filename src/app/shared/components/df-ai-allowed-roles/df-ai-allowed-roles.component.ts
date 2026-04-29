@@ -96,7 +96,7 @@ interface RoleRow {
         background: rgba(255, 255, 255, 0.02);
         border: 1px solid rgba(255, 255, 255, 0.08);
         border-radius: 8px;
-        font-size: 1rem;
+        font-size: 16px;
 
         &__header {
           display: flex;
@@ -107,16 +107,16 @@ interface RoleRow {
 
         &__icon {
           color: #a78bfa;
-          font-size: 1.25rem;
+          font-size: 20px;
         }
 
         &__title {
           font-weight: 600;
-          font-size: 1.15rem;
+          font-size: 18px;
         }
 
         &__count {
-          font-size: 0.95rem;
+          font-size: 15px;
           color: rgba(255, 255, 255, 0.6);
         }
 
@@ -132,7 +132,7 @@ interface RoleRow {
 
         &__hint {
           margin: 0;
-          font-size: 0.95rem;
+          font-size: 15px;
           color: rgba(255, 255, 255, 0.75);
           line-height: 1.55;
         }
@@ -146,14 +146,14 @@ interface RoleRow {
           border: 1px solid rgba(245, 158, 11, 0.4);
           border-radius: 4px;
           color: #fbbf24;
-          font-size: 0.95rem;
+          font-size: 15px;
         }
 
         &__loading,
         &__empty {
           color: rgba(255, 255, 255, 0.6);
           font-style: italic;
-          font-size: 0.95rem;
+          font-size: 15px;
         }
 
         &__list {
@@ -180,7 +180,7 @@ interface RoleRow {
           border: 1px solid rgba(255, 255, 255, 0.1);
           border-radius: 999px;
           font: inherit;
-          font-size: 1rem;
+          font-size: 16px;
           color: inherit;
           cursor: pointer;
           transition:
@@ -208,7 +208,7 @@ interface RoleRow {
         }
 
         &__link {
-          font-size: 0.85rem;
+          font-size: 14px;
           color: rgba(255, 255, 255, 0.5);
           text-decoration: none;
 

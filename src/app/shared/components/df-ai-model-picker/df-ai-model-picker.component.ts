@@ -148,7 +148,7 @@ interface NormalizedModel {
         background: rgba(255, 255, 255, 0.02);
         border: 1px solid rgba(255, 255, 255, 0.08);
         border-radius: 8px;
-        font-size: 1rem;
+        font-size: 16px;
 
         &__header {
           display: flex;
@@ -158,7 +158,7 @@ interface NormalizedModel {
         }
         &__title {
           font-weight: 600;
-          font-size: 1.1rem;
+          font-size: 18px;
           margin-right: auto;
         }
         &__refresh,
@@ -185,14 +185,14 @@ interface NormalizedModel {
           flex: 1;
         }
         &__option-meta {
-          font-size: 0.85rem;
+          font-size: 14px;
           color: rgba(255, 255, 255, 0.55);
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
         }
 
         &__hint {
           margin: 0;
-          font-size: 0.95rem;
+          font-size: 15px;
           color: rgba(255, 255, 255, 0.7);
           font-style: italic;
           line-height: 1.5;
@@ -206,11 +206,11 @@ interface NormalizedModel {
           background: rgba(220, 53, 69, 0.1);
           border: 1px solid rgba(220, 53, 69, 0.3);
           color: #ff8585;
-          font-size: 0.95rem;
+          font-size: 15px;
         }
         &__current {
           margin: 0;
-          font-size: 0.95rem;
+          font-size: 15px;
           color: rgba(255, 255, 255, 0.85);
           display: flex;
           align-items: center;
@@ -218,7 +218,7 @@ interface NormalizedModel {
 
           code {
             font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
-            font-size: 0.9rem;
+            font-size: 14px;
             background: rgba(255, 255, 255, 0.08);
             padding: 0.2rem 0.5rem;
             border-radius: 3px;

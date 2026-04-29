@@ -365,30 +365,23 @@ export class DfAiUsageComponent implements OnInit {
 
     // Multi-dim cost-over-time series. Each one is mapped to display
     // labels HERE so the chart component stays generic / reusable.
-    this.costByModelSeries = this.toDimensionSeries(
-      r.series_by_model,
-      bucket => String(bucket)
+    this.costByModelSeries = this.toDimensionSeries(r.series_by_model, bucket =>
+      String(bucket)
     );
     this.costByProviderSeries = this.toDimensionSeries(
       r.series_by_provider,
       bucket => String(bucket)
     );
-    this.costByUserSeries = this.toDimensionSeries(
-      r.series_by_user,
-      bucket => {
-        const id = Number(bucket);
-        if (!Number.isFinite(id) || id <= 0) return String(bucket);
-        return this.bundle?.users.get(id) ?? `user #${id}`;
-      }
-    );
-    this.costByAppSeries = this.toDimensionSeries(
-      r.series_by_app,
-      bucket => {
-        const id = Number(bucket);
-        if (!Number.isFinite(id) || id <= 0) return String(bucket);
-        return this.bundle?.apps.get(id) ?? `app #${id}`;
-      }
-    );
+    this.costByUserSeries = this.toDimensionSeries(r.series_by_user, bucket => {
+      const id = Number(bucket);
+      if (!Number.isFinite(id) || id <= 0) return String(bucket);
+      return this.bundle?.users.get(id) ?? `user #${id}`;
+    });
+    this.costByAppSeries = this.toDimensionSeries(r.series_by_app, bucket => {
+      const id = Number(bucket);
+      if (!Number.isFinite(id) || id <= 0) return String(bucket);
+      return this.bundle?.apps.get(id) ?? `app #${id}`;
+    });
 
     this.expensiveCalls = this.toExpensiveCalls(r.most_expensive_calls);
 

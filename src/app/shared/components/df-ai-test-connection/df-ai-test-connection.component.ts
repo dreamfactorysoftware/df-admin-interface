@@ -71,7 +71,7 @@ interface TestConnectionResponse {
         flex-direction: column;
         gap: 0.75rem;
         margin: 1rem 0;
-        font-size: 1rem;
+        font-size: 16px;
 
         &__button {
           align-self: flex-start;
@@ -88,7 +88,7 @@ interface TestConnectionResponse {
           padding: 0.875rem 1.125rem;
           border-radius: 6px;
           align-items: flex-start;
-          font-size: 1rem;
+          font-size: 16px;
 
           &--ok {
             background: rgba(46, 160, 67, 0.1);
@@ -112,18 +112,18 @@ interface TestConnectionResponse {
 
           strong {
             font-weight: 600;
-            font-size: 1rem;
+            font-size: 16px;
           }
 
           p {
             margin: 0;
             color: rgba(255, 255, 255, 0.75);
-            font-size: 0.95rem;
+            font-size: 15px;
           }
         }
 
         &__models {
-          font-size: 0.95rem;
+          font-size: 15px;
         }
       }
     `,
@@ -132,6 +132,11 @@ interface TestConnectionResponse {
 export class DfAiTestConnectionComponent {
   /** Service form. Reads config.provider, config.api_key, config.base_url etc. */
   @Input({ required: true }) form!: FormGroup;
+
+  /** Service id when editing an existing AI Connection. The backend uses
+   *  this to fall back to the saved config for any field the form left
+   *  blank — so admins can click Test without re-entering saved secrets. */
+  @Input() serviceId: number | null = null;
 
   private http = inject(HttpClient);
 
@@ -183,17 +188,24 @@ export class DfAiTestConnectionComponent {
     const needsKey = provider !== 'ollama' && provider !== 'openai_compatible';
     const needsUrl = provider === 'openai_compatible';
 
-    if (needsKey && !apiKey) {
+    // When editing an existing connection, the backend will fall back to
+    // the saved config for any field this form left blank — so we don't
+    // require the user to re-type a previously-saved api_key just to test.
+    const hasSavedConfig = this.serviceId != null;
+
+    if (needsKey && !apiKey && !hasSavedConfig) {
       this.result = {
         success: false,
         error: {
           message:
-            provider + ' requires an API key. Fill in API Key, then test.',
+            provider +
+            ' requires an API key. Fill in API Key, then test. ' +
+            '(Existing connections fall back to the saved key automatically.)',
         },
       };
       return;
     }
-    if (needsUrl && !baseUrl) {
+    if (needsUrl && !baseUrl && !hasSavedConfig) {
       this.result = {
         success: false,
         error: {
@@ -208,7 +220,7 @@ export class DfAiTestConnectionComponent {
     this.loading = true;
     this.result = null;
 
-    const body = {
+    const body: Record<string, unknown> = {
       provider,
       api_key: apiKey,
       base_url: baseUrl,
@@ -216,6 +228,12 @@ export class DfAiTestConnectionComponent {
       extra_headers: extraHeaders,
       timeout,
     };
+    if (this.serviceId) {
+      // Backend uses this to fall back to the saved api_key / base_url /
+      // org_id / extra_headers for any field this form sent blank. Lets
+      // the user click Test without re-typing the (already-saved) secret.
+      body['service_id'] = this.serviceId;
+    }
 
     this.http
       .post<TestConnectionResponse>('/_internal/ai/test-connection', body)

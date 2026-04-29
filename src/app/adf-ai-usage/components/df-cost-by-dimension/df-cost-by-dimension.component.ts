@@ -58,9 +58,7 @@ interface Tick {
 
         <div *ngIf="layers.length > 0" class="cbd__legend">
           <span *ngFor="let l of layers" class="cbd__legend-item">
-            <span
-              class="cbd__legend-swatch"
-              [style.background]="l.fill"></span>
+            <span class="cbd__legend-swatch" [style.background]="l.fill"></span>
             <span [class.cbd__legend-other]="l.isOther">{{ l.label }}</span>
             <span class="cbd__legend-cost">{{ formatUsd(l.totalCost) }}</span>
           </span>
@@ -382,7 +380,9 @@ export class DfCostByDimensionComponent implements OnChanges {
     const tickCount = Math.min(5, dates.length);
     const ticks: Tick[] = [];
     for (let i = 0; i < tickCount; i++) {
-      const idx = Math.round((i * (dates.length - 1)) / Math.max(1, tickCount - 1));
+      const idx = Math.round(
+        (i * (dates.length - 1)) / Math.max(1, tickCount - 1)
+      );
       const x =
         dates.length === 1
           ? this.paddingX + innerW / 2

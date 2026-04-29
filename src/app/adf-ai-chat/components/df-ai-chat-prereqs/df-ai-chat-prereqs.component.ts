@@ -180,18 +180,18 @@ interface RoleRow {
         display: flex;
         flex-direction: column;
         gap: 1.25rem;
-        font-size: 1rem;
+        font-size: 16px;
 
         &__header {
           h4 {
             margin: 0 0 0.4rem;
-            font-size: 1.2rem;
+            font-size: 19px;
             font-weight: 600;
           }
           p {
             margin: 0;
             color: rgba(255, 255, 255, 0.75);
-            font-size: 0.95rem;
+            font-size: 15px;
             line-height: 1.55;
           }
         }
@@ -215,7 +215,7 @@ interface RoleRow {
         }
 
         &__icon {
-          font-size: 1.2rem;
+          font-size: 19px;
 
           &--ok {
             color: #4ade80;
@@ -227,16 +227,16 @@ interface RoleRow {
 
         &__kind-icon {
           color: rgba(255, 255, 255, 0.5);
-          font-size: 1.05rem;
+          font-size: 17px;
         }
 
         &__title {
           font-weight: 600;
-          font-size: 1.1rem;
+          font-size: 18px;
         }
 
         &__count {
-          font-size: 0.9rem;
+          font-size: 14px;
           color: rgba(255, 255, 255, 0.6);
         }
 
@@ -274,7 +274,7 @@ interface RoleRow {
           border: 1px solid rgba(255, 255, 255, 0.1);
           border-radius: 999px;
           font: inherit;
-          font-size: 1rem;
+          font-size: 16px;
           color: inherit;
           cursor: pointer;
           transition:
@@ -303,13 +303,13 @@ interface RoleRow {
 
         &__pick-hint {
           margin: 0.625rem 0 0;
-          font-size: 0.9rem;
+          font-size: 14px;
           color: rgba(255, 255, 255, 0.6);
           font-style: italic;
         }
 
         &__link {
-          font-size: 0.75rem;
+          font-size: 12px;
           color: rgba(255, 255, 255, 0.45);
           text-decoration: none;
 
@@ -321,13 +321,13 @@ interface RoleRow {
 
         &__hint {
           margin: 0.5rem 0 0;
-          font-size: 0.8125rem;
+          font-size: 13px;
           color: rgba(255, 255, 255, 0.7);
           line-height: 1.5;
 
           code {
             font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
-            font-size: 0.75rem;
+            font-size: 12px;
             padding: 0.1rem 0.375rem;
             border-radius: 3px;
             background: rgba(255, 255, 255, 0.08);
