@@ -32,7 +32,6 @@ import { ScriptEventResponse } from 'src/app/shared/types/scripts';
 import { CommonModule } from '@angular/common';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 import { DfLinkServiceComponent } from 'src/app/shared/components/df-link-service/df-link-service.component';
-import { camelToSnakeString } from 'src/app/shared/utilities/case';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -94,10 +93,10 @@ export class DfScriptDetailsComponent implements OnInit {
       name: [''],
       type: ['nodejs', [Validators.required]],
       content: [''],
-      storageServiceId: [],
+      storageServiceId: [null],
       storagePath: [''],
       isActive: [false],
-      allow_event_modification: [false],
+      allowEventModification: [false],
     });
   }
   isDarkMode = this.themeService.darkMode$;
@@ -107,13 +106,7 @@ export class DfScriptDetailsComponent implements OnInit {
       this.type = type;
       if (type === 'edit') {
         this.scriptDetails = data;
-        let editData = Object.keys(data).reduce(
-          (acc, cur) =>
-            (acc = { ...acc, [camelToSnakeString(cur)]: data[cur] }),
-          {}
-        );
-        editData = { ...editData, isActive: data.isActive };
-        this.scriptForm.patchValue(editData);
+        this.scriptForm.patchValue(data);
         this.scriptForm.controls['name'].disable();
         this.completeScriptName = data.name;
       } else {
@@ -146,14 +139,8 @@ export class DfScriptDetailsComponent implements OnInit {
     const script = this.scriptForm.getRawValue();
     const scriptItem = {
       ...script,
-      storageServiceId:
-        script.storageServiceId?.type === 'local_file'
-          ? script.storageServiceId?.id
-          : null,
-      storage_path:
-        script.storageServiceId?.type === 'local_file'
-          ? script.storagePath
-          : null,
+      storageServiceId: script.storageServiceId ?? null,
+      storagePath: script.storagePath || null,
       // Fall back on empty string too, not just null/undefined —
       // selectedServiceItemEvent() resets completeScriptName to '' so `??`
       // would skip the fallback and produce an empty script name.
@@ -162,10 +149,10 @@ export class DfScriptDetailsComponent implements OnInit {
     if (this.type === 'edit') {
       this.scriptDetails = { ...this.scriptDetails, ...scriptItem };
       this.eventScriptService
-        .update(script.name, script)
+        .update(scriptItem.name, scriptItem)
         .subscribe(() => this.goBack());
     } else {
-      this.scriptDetails = script;
+      this.scriptDetails = scriptItem;
       this.eventScriptService
         .create(scriptItem, undefined, scriptItem.name)
         .subscribe(() => this.goBack());

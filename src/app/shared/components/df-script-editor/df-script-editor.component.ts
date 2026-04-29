@@ -85,7 +85,8 @@ export class DfScriptEditorComponent implements OnInit {
   }
   isDarkMode = this.themeService.darkMode$;
   ngOnInit(): void {
-    if (this.storageServiceId.getRawValue()) {
+    if (this.storageServiceId.getRawValue() || this.storagePath.getRawValue()) {
+      this.checked = true;
       this.storagePath.addValidators([Validators.required]);
     }
     this.storageServiceId.valueChanges.subscribe(value => {
