@@ -261,7 +261,12 @@ export class DfServiceDetailsComponent implements OnInit {
   editingToolIndex: number | null = null;
   customToolForm!: FormGroup;
   availableLookups: Array<{ name: string }> = [];
-  availableScmServices: Array<{ id: number; name: string; label: string; type: string }> = [];
+  availableScmServices: Array<{
+    id: number;
+    name: string;
+    label: string;
+    type: string;
+  }> = [];
   @ViewChild('functionEditor') functionEditor: DfAceEditorComponent;
   @ViewChild('headersEditor') headersEditor: DfAceEditorComponent;
   @ViewChild('unsavedToolDialog')
@@ -1226,8 +1231,11 @@ export class DfServiceDetailsComponent implements OnInit {
       })
       .subscribe({
         next: (res: any) => {
-          this.availableScmServices = (res?.resource ?? res?.services ?? [])
-            .filter((s: any) => s.id && s.name);
+          this.availableScmServices = (
+            res?.resource ??
+            res?.services ??
+            []
+          ).filter((s: any) => s.id && s.name);
         },
         error: () => {
           this.availableScmServices = [];
@@ -1251,7 +1259,10 @@ export class DfServiceDetailsComponent implements OnInit {
 
     const service = this.availableScmServices.find(s => s.id === serviceId);
     if (!service) {
-      this.snackbarService.openSnackBar('Selected SCM service not found.', 'error');
+      this.snackbarService.openSnackBar(
+        'Selected SCM service not found.',
+        'error'
+      );
       return;
     }
 
@@ -1265,7 +1276,10 @@ export class DfServiceDetailsComponent implements OnInit {
         next: (content: string) => {
           this.customToolForm.get('function')?.setValue(content);
           this.liveFunctionValue = content;
-          this.snackbarService.openSnackBar('Function loaded from repository.', 'success');
+          this.snackbarService.openSnackBar(
+            'Function loaded from repository.',
+            'success'
+          );
         },
         error: (err: any) => {
           this.snackbarService.openSnackBar(
