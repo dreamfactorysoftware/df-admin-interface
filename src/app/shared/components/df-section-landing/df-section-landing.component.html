@@ -1,0 +1,87 @@
+<section class="section-landing">
+  <div class="section-landing__header">
+    <div>
+      <span class="section-landing__eyebrow">{{ eyebrow }}</span>
+      <h2>{{ title }}</h2>
+      <p>{{ description }}</p>
+    </div>
+    <div class="section-landing__actions" *ngIf="actions.length">
+      <a
+        *ngFor="let action of actions"
+        mat-flat-button
+        [color]="action.primary ? 'primary' : undefined"
+        [routerLink]="action.route">
+        <mat-icon *ngIf="action.icon">{{ action.icon }}</mat-icon>
+        {{ action.label }}
+      </a>
+    </div>
+  </div>
+
+  <div class="section-landing__stats" *ngIf="stats.length">
+    <div class="section-stat" *ngFor="let stat of stats">
+      <mat-icon *ngIf="stat.icon">{{ stat.icon }}</mat-icon>
+      <span>{{ stat.label }}</span>
+      <strong>{{ stat.value }}</strong>
+    </div>
+  </div>
+
+  <div class="section-landing__groups">
+    <section
+      class="section-landing__group"
+      *ngFor="let group of groups"
+      [attr.aria-label]="group.title">
+      <h3>{{ group.title }}</h3>
+      <div class="section-landing__cards">
+        <ng-container
+          *ngFor="let card of group.cards; trackBy: trackByCardRoute">
+          <a
+            *ngIf="!card.disabled; else disabledCard"
+            class="section-card"
+            [routerLink]="card.route"
+            [attr.aria-label]="card.title">
+            <div class="section-card__icon">
+              <mat-icon>{{ card.icon }}</mat-icon>
+            </div>
+            <div class="section-card__body">
+              <h4>{{ card.title }}</h4>
+              <p>{{ card.text }}</p>
+              <span class="section-card__meta" *ngIf="card.meta">
+                {{ card.meta }}
+              </span>
+              <span class="section-card__action">
+                {{ card.action }}
+                <mat-icon>arrow_forward</mat-icon>
+              </span>
+            </div>
+          </a>
+          <ng-template #disabledCard>
+            <article class="section-card section-card--disabled">
+              <div class="section-card__icon">
+                <mat-icon>{{ card.icon }}</mat-icon>
+              </div>
+              <div class="section-card__body">
+                <h4>{{ card.title }}</h4>
+                <p>{{ card.text }}</p>
+                <span class="section-card__meta" *ngIf="card.meta">
+                  {{ card.meta }}
+                </span>
+                <span class="section-card__unavailable">Not installed</span>
+              </div>
+            </article>
+          </ng-template>
+        </ng-container>
+      </div>
+    </section>
+  </div>
+
+  <section
+    class="section-landing__notes"
+    *ngIf="notes.length"
+    aria-label="Operational notes">
+    <div *ngFor="let note of notes">
+      <mat-icon>{{ note.icon }}</mat-icon>
+      <h3>{{ note.title }}</h3>
+      <p>{{ note.text }}</p>
+    </div>
+  </section>
+</section>

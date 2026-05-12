@@ -1,0 +1,513 @@
+<div class="usage">
+  <header class="usage__header">
+    <div class="usage__title">
+      <fa-icon [icon]="faChartLine"></fa-icon>
+      <h2>AI Usage Analytics</h2>
+      <fa-icon
+        class="usage__title-hint"
+        [icon]="faCircleInfo"
+        matTooltip="Every AI request that flows through DreamFactory — direct REST calls to AI Connections, chats from the DF chat UI, and inbound MCP tool calls from external AI agents. Use the filters to drill into a specific user, app, or model."
+        matTooltipPosition="below"></fa-icon>
+    </div>
+
+    <div class="usage__controls">
+      <mat-button-toggle-group
+        [value]="range"
+        (change)="setRange($event.value)"
+        aria-label="Time range"
+        matTooltip="Time window for all metrics on this page"
+        matTooltipPosition="above">
+        <mat-button-toggle value="24h">24h</mat-button-toggle>
+        <mat-button-toggle value="7d">7d</mat-button-toggle>
+        <mat-button-toggle value="30d">30d</mat-button-toggle>
+        <mat-button-toggle value="all">All</mat-button-toggle>
+      </mat-button-toggle-group>
+
+      <button
+        type="button"
+        mat-stroked-button
+        class="usage__refresh"
+        [disabled]="loading"
+        (click)="refresh()"
+        matTooltip="Re-run the queries against the live database"
+        matTooltipPosition="above">
+        <fa-icon [icon]="faArrowsRotate"></fa-icon>
+        <span>Refresh</span>
+      </button>
+    </div>
+  </header>
+
+  <mat-card *ngIf="budgetWarnings.length > 0" class="usage__budget-banner">
+    <mat-card-content>
+      <div class="usage__budget-banner-head">
+        <fa-icon [icon]="faTriangleExclamation"></fa-icon>
+        <strong>
+          {{ budgetWarnings.length }}
+          {{
+            budgetWarnings.length === 1 ? 'connection is' : 'connections are'
+          }}
+          projected to exceed budget this month
+        </strong>
+      </div>
+      <ul class="usage__budget-banner-list">
+        <li *ngFor="let b of budgetWarnings">
+          <span class="usage__budget-banner-name">{{ b.serviceLabel }}</span>
+          <span class="usage__budget-banner-projection">
+            projected
+            <strong>{{ formatUsd(b.projectedMonthEndUsd) }}</strong>
+            of {{ formatUsd(b.budgetUsd) }} budget ({{
+              b.projectedRatio * 100 | number: '1.0-0'
+            }}%)
+          </span>
+        </li>
+      </ul>
+    </mat-card-content>
+  </mat-card>
+
+  <mat-card class="usage__filters">
+    <mat-card-content>
+      <div class="usage__filters-head">
+        <span class="usage__filters-label">Filters</span>
+        <span class="usage__filters-hint">
+          Click any bar in the panels below to add/remove a filter quickly.
+        </span>
+      </div>
+      <div class="usage__filter-row">
+        <mat-form-field
+          appearance="outline"
+          class="usage__filter-field"
+          matTooltip="LLM provider (anthropic, openai, xai, ollama, openai_compatible)"
+          matTooltipPosition="above">
+          <mat-label>Provider</mat-label>
+          <mat-select
+            multiple
+            [ngModel]="filters.provider"
+            (ngModelChange)="onSelectChange('provider', $event)">
+            <mat-option *ngFor="let p of providerOptions" [value]="p">
+              {{ p }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field
+          appearance="outline"
+          class="usage__filter-field"
+          matTooltip="Specific AI Connection or AI Chat service in DreamFactory"
+          matTooltipPosition="above">
+          <mat-label>Connection</mat-label>
+          <mat-select
+            multiple
+            [ngModel]="filters.service_id"
+            (ngModelChange)="onSelectChange('service_id', $event)">
+            <mat-option *ngFor="let s of serviceOptions" [value]="s.id">
+              {{ s.label }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field
+          appearance="outline"
+          class="usage__filter-field"
+          matTooltip="Specific model name (e.g. claude-sonnet-4-5, gpt-4o)"
+          matTooltipPosition="above">
+          <mat-label>Model</mat-label>
+          <mat-select
+            multiple
+            [ngModel]="filters.model"
+            (ngModelChange)="onSelectChange('model', $event)">
+            <mat-option *ngFor="let m of modelOptions" [value]="m">
+              {{ m }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field
+          appearance="outline"
+          class="usage__filter-field"
+          matTooltip="Which DreamFactory app / API key the request was made under. Useful for billing per integration or customer."
+          matTooltipPosition="above">
+          <mat-label>App / API key</mat-label>
+          <mat-select
+            multiple
+            [ngModel]="filters.app_id"
+            (ngModelChange)="onSelectChange('app_id', $event)">
+            <mat-option *ngFor="let a of appOptions" [value]="a.id">
+              {{ a.label }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field
+          appearance="outline"
+          class="usage__filter-field"
+          matTooltip="The DF user who made the request. Anonymous calls (no session) are bucketed separately."
+          matTooltipPosition="above">
+          <mat-label>User</mat-label>
+          <mat-select
+            multiple
+            [ngModel]="filters.user_id"
+            (ngModelChange)="onSelectChange('user_id', $event)">
+            <mat-option *ngFor="let u of userOptions" [value]="u.id">
+              {{ u.label }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field
+          appearance="outline"
+          class="usage__filter-field"
+          matTooltip="The DF role active on the request — this is what gates which data tables an AI tool call could read."
+          matTooltipPosition="above">
+          <mat-label>Role</mat-label>
+          <mat-select
+            multiple
+            [ngModel]="filters.role_id"
+            (ngModelChange)="onSelectChange('role_id', $event)">
+            <mat-option *ngFor="let r of roleOptions" [value]="r.id">
+              {{ r.label }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field
+          appearance="outline"
+          class="usage__filter-field"
+          matTooltip="Which API endpoint was hit (chat, completion, embeddings, data-chat, etc.)"
+          matTooltipPosition="above">
+          <mat-label>Endpoint</mat-label>
+          <mat-select
+            multiple
+            [ngModel]="filters.resource"
+            (ngModelChange)="onSelectChange('resource', $event)">
+            <mat-option *ngFor="let res of resourceOptions" [value]="res">
+              {{ res }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field
+          appearance="outline"
+          class="usage__filter-field"
+          matTooltip="Filter to only successful or only errored requests"
+          matTooltipPosition="above">
+          <mat-label>Status</mat-label>
+          <mat-select
+            multiple
+            [ngModel]="filters.status"
+            (ngModelChange)="onSelectChange('status', $event)">
+            <mat-option *ngFor="let s of statusOptions" [value]="s">
+              {{ s }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <div class="usage__filter-chips" *ngIf="hasActiveFilters()">
+        <mat-chip-set>
+          <mat-chip
+            *ngFor="let chip of activeChips"
+            (removed)="removeChip(chip)">
+            {{ chip.label }}
+            <button matChipRemove [attr.aria-label]="'remove ' + chip.label">
+              <fa-icon [icon]="faXmark"></fa-icon>
+            </button>
+          </mat-chip>
+        </mat-chip-set>
+        <button mat-button color="primary" (click)="clearFilters()">
+          Clear all
+        </button>
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+  <div *ngIf="loading" class="usage__loading">
+    <mat-spinner diameter="32"></mat-spinner>
+  </div>
+
+  <div *ngIf="errorMessage" class="usage__error">{{ errorMessage }}</div>
+
+  <ng-container *ngIf="!loading && bundle">
+    <mat-card *ngIf="bundle.raw.total_requests === 0" class="usage__empty">
+      <mat-card-content>
+        <h3>No AI requests in this period</h3>
+        <p>
+          This view tracks every AI request through DreamFactory — direct REST
+          calls to your AI Connections from any client app, plus chats started
+          from the
+          <a [routerLink]="['/ai/chat']">
+            <fa-icon [icon]="faMessage"></fa-icon>
+            DF chat UI</a
+          >. Fire a request and refresh.
+        </p>
+      </mat-card-content>
+    </mat-card>
+
+    <ng-container *ngIf="bundle.raw.total_requests > 0">
+      <header class="usage__section-header">
+        <h3 class="usage__section-title">
+          DreamFactory AI usage
+          <fa-icon
+            class="usage__section-hint"
+            [icon]="faCircleInfo"
+            matTooltip="Outbound calls from DreamFactory to AI providers (Anthropic, OpenAI, etc.). DF pays for the tokens here — these are the numbers that hit your provider invoice."
+            matTooltipPosition="above"></fa-icon>
+        </h3>
+        <p class="usage__section-subtitle">
+          Provider calls billed to your DreamFactory account
+        </p>
+      </header>
+
+      <df-usage-summary [summary]="summary"></df-usage-summary>
+
+      <df-usage-stacked-area [data]="series"></df-usage-stacked-area>
+
+      <header class="usage__section-header usage__section-header--inset">
+        <h3 class="usage__section-title">
+          Where is my money going?
+          <fa-icon
+            class="usage__section-hint"
+            [icon]="faCircleInfo"
+            matTooltip="Cost broken out by the four dimensions that matter for chargeback and optimization. Top 10 spenders per dimension are stacked; the long tail is folded into a muted Other layer."
+            matTooltipPosition="above"></fa-icon>
+        </h3>
+        <p class="usage__section-subtitle">
+          Stacked spend over time per dimension — find the model, user, app, or
+          provider eating budget at a glance
+        </p>
+      </header>
+
+      <div class="usage__cost-grid">
+        <df-cost-by-dimension
+          title="Cost by model"
+          subtitle="Top 10 models by spend, plus Other"
+          [data]="costByModelSeries"></df-cost-by-dimension>
+        <df-cost-by-dimension
+          title="Cost by provider"
+          subtitle="Anthropic vs OpenAI vs xAI vs local"
+          [data]="costByProviderSeries"></df-cost-by-dimension>
+        <df-cost-by-dimension
+          title="Cost by user"
+          subtitle="Top 10 spenders, plus Other"
+          [data]="costByUserSeries"></df-cost-by-dimension>
+        <df-cost-by-dimension
+          title="Cost by app / API key"
+          subtitle="Per-tenant cost visibility"
+          [data]="costByAppSeries"></df-cost-by-dimension>
+      </div>
+
+      <df-expensive-calls
+        title="Top 10 most expensive calls"
+        [data]="expensiveCalls"></df-expensive-calls>
+
+      <div class="usage__grid">
+        <df-usage-bars
+          title="Top users"
+          hint="Which DF users are firing the most AI requests. Click a row to filter."
+          [rows]="byUser"
+          [limit]="8"
+          [clickable]="true"
+          (rowClick)="drillByUser($event)"></df-usage-bars>
+        <df-usage-bars
+          title="Top roles"
+          hint="Spend grouped by the role active on each request. Useful for finding role boundaries that need tightening."
+          [rows]="byRole"
+          [limit]="8"
+          [clickable]="true"
+          (rowClick)="drillByRole($event)"></df-usage-bars>
+        <df-usage-bars
+          title="By app / API key"
+          hint="Spend per DF API key. Each integration or customer should ideally have its own key — gives you per-tenant cost visibility."
+          [rows]="byApp"
+          [limit]="8"
+          [clickable]="true"
+          (rowClick)="drillByApp($event)"></df-usage-bars>
+        <df-usage-bars
+          title="By AI Connection"
+          hint="Spend per configured AI Connection service. Click a row to jump into the connection's edit page."
+          [rows]="byService"
+          [limit]="8"
+          [clickable]="true"
+          (rowClick)="drillByService($event)"></df-usage-bars>
+        <df-usage-bars
+          title="By provider"
+          hint="Anthropic vs OpenAI vs xAI vs local. Compare provider mix and cost share."
+          [rows]="byProvider"
+          [limit]="8"
+          [clickable]="true"
+          (rowClick)="drillByProvider($event)"></df-usage-bars>
+        <df-usage-bars
+          title="By model"
+          hint="Token usage per specific model. The fastest way to spot expensive models that should be swapped or capped."
+          [rows]="byModel"
+          [limit]="8"></df-usage-bars>
+        <df-usage-bars
+          title="By endpoint"
+          hint="Which API endpoints (chat, completion, embeddings, etc.) account for the volume."
+          [rows]="byResource"
+          [limit]="8"></df-usage-bars>
+        <df-usage-bars
+          *ngIf="byErrorClass.length > 0"
+          title="Error breakdown"
+          hint="Failures grouped by inferred cause. Auth = stale key. Rate-limited = quota hit. Timeout = provider slow. Provider 5xx = their problem; provider 4xx = usually a bad request shape."
+          [rows]="byErrorClass"
+          [limit]="8"></df-usage-bars>
+      </div>
+
+      <mat-card *ngIf="budgets.length > 0" class="usage__budgets">
+        <mat-card-content>
+          <header class="usage__budgets-head">
+            <h4 class="usage__budgets-title">
+              Budget status
+              <fa-icon
+                class="usage__section-hint"
+                [icon]="faCircleInfo"
+                matTooltip="Spend this calendar month vs. your configured budget per AI Connection. Projection extrapolates today's burn rate to month-end. Set or adjust budgets on each connection's edit page."
+                matTooltipPosition="above"></fa-icon>
+            </h4>
+            <span class="usage__budgets-period">
+              day {{ budgets[0].daysIntoMonth }} of
+              {{ budgets[0].daysInMonth }}
+            </span>
+          </header>
+          <ul class="usage__budgets-list">
+            <li *ngFor="let b of budgets" class="usage__budgets-row">
+              <div class="usage__budgets-row-head">
+                <span class="usage__budgets-row-name">{{
+                  b.serviceLabel
+                }}</span>
+                <span
+                  class="usage__budgets-row-amount"
+                  [class.usage__budgets-row-amount--over]="!b.onTrack">
+                  {{ formatUsd(b.spentMonthUsd) }} /
+                  {{ formatUsd(b.budgetUsd) }}
+                </span>
+              </div>
+              <div
+                class="usage__budgets-row-bar"
+                [class.usage__budgets-row-bar--over]="!b.onTrack">
+                <div
+                  class="usage__budgets-row-fill"
+                  [style.width.%]="
+                    b.spentRatio > 1 ? 100 : b.spentRatio * 100
+                  "></div>
+                <div
+                  *ngIf="b.projectedRatio > b.spentRatio"
+                  class="usage__budgets-row-projection"
+                  [style.left.%]="b.spentRatio > 1 ? 100 : b.spentRatio * 100"
+                  [style.width.%]="
+                    b.projectedRatio > 1
+                      ? 100 - (b.spentRatio > 1 ? 100 : b.spentRatio * 100)
+                      : (b.projectedRatio - b.spentRatio) * 100
+                  "></div>
+              </div>
+              <span class="usage__budgets-row-projection-label">
+                projected {{ formatUsd(b.projectedMonthEndUsd) }} by month-end
+                ({{ b.projectedRatio * 100 | number: '1.0-0' }}%)
+              </span>
+            </li>
+          </ul>
+        </mat-card-content>
+      </mat-card>
+
+      <df-cost-estimator
+        [sessions]="costInputSessions"
+        [connectionProviders]="connectionProviders"
+        [defaultRates]="defaultRates"
+        [summary]="summary"></df-cost-estimator>
+    </ng-container>
+
+    <ng-container *ngIf="mcpTotalRequests > 0">
+      <header class="usage__section-header">
+        <h3 class="usage__section-title">
+          External MCP traffic
+          <fa-icon
+            class="usage__section-hint"
+            [icon]="faCircleInfo"
+            matTooltip="Inbound tool calls from external AI agents (Claude Desktop, Cursor, etc.) hitting MCP services on this DF instance. Useful for auditing who is using your data and how often."
+            matTooltipPosition="above"></fa-icon>
+        </h3>
+        <p class="usage__section-disclaimer">
+          Token cost is borne by the calling AI agent —
+          <strong>not</strong> billed to DreamFactory. Bytes track what flowed
+          through the gateway, not provider tokens.
+        </p>
+      </header>
+
+      <div class="usage__mcp-summary">
+        <mat-card
+          class="usage__mcp-card"
+          matTooltip="Total tool / resource calls across all MCP services in the period"
+          matTooltipPosition="above">
+          <mat-card-content>
+            <span class="usage__mcp-label">MCP requests</span>
+            <span class="usage__mcp-value">{{
+              mcpTotalRequests | number
+            }}</span>
+          </mat-card-content>
+        </mat-card>
+        <mat-card
+          class="usage__mcp-card"
+          matTooltip="Bytes received from MCP clients (their JSON-RPC payloads)"
+          matTooltipPosition="above">
+          <mat-card-content>
+            <span class="usage__mcp-label">Bytes in</span>
+            <span class="usage__mcp-value">{{ mcpBytesIn | number }}</span>
+          </mat-card-content>
+        </mat-card>
+        <mat-card
+          class="usage__mcp-card"
+          matTooltip="Bytes returned to MCP clients (tool results). Streaming SSE responses don't count exactly — they're recorded as 0."
+          matTooltipPosition="above">
+          <mat-card-content>
+            <span class="usage__mcp-label">Bytes out</span>
+            <span class="usage__mcp-value">{{ mcpBytesOut | number }}</span>
+          </mat-card-content>
+        </mat-card>
+        <mat-card
+          class="usage__mcp-card"
+          matTooltip="Mean time to dispatch a tool call through the daemon and return a result"
+          matTooltipPosition="above">
+          <mat-card-content>
+            <span class="usage__mcp-label">Avg latency</span>
+            <span class="usage__mcp-value">
+              {{ mcpAvgDurationMs | number }}<small>ms</small>
+            </span>
+          </mat-card-content>
+        </mat-card>
+      </div>
+
+      <div class="usage__grid">
+        <df-usage-bars
+          title="MCP clients"
+          hint="Which AI agents are connecting (Claude Desktop, Cursor, custom). Pulled from the OAuth client_name registered when the agent first connected."
+          [rows]="mcpByClient"
+          [limit]="8"></df-usage-bars>
+        <df-usage-bars
+          title="MCP tools"
+          hint="Most-invoked MCP tools. High-volume tools are good candidates for caching or rate limiting."
+          [rows]="mcpByTool"
+          [limit]="8"></df-usage-bars>
+        <df-usage-bars
+          title="MCP users"
+          hint="Which DF users granted MCP access via OAuth. Each row's permissions still apply when the AI agent runs tools."
+          [rows]="mcpByUser"
+          [limit]="8"></df-usage-bars>
+        <df-usage-bars
+          title="MCP services"
+          hint="Per MCP service definition. Multiple MCP services can run on one DF instance with different tool/permission scopes."
+          [rows]="mcpByService"
+          [limit]="8"></df-usage-bars>
+        <df-usage-bars
+          title="MCP apps"
+          hint="DF API key the MCP session was bound to. Each MCP service points at one app."
+          [rows]="mcpByApp"
+          [limit]="8"></df-usage-bars>
+        <df-usage-bars
+          title="MCP methods"
+          hint="JSON-RPC method dispatch counts (tools/call, resources/read, prompts/get, etc.)"
+          [rows]="mcpByMethod"
+          [limit]="8"></df-usage-bars>
+      </div>
+    </ng-container>
+  </ng-container>
+</div>

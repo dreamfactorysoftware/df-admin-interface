@@ -69,4 +69,15 @@ describe('DfSideNavComponent', () => {
     const label = component.navLabel('/test/123');
     expect(label).toBe('nav.test.123.nav');
   });
+
+  it('should navigate to a parent nav route when handleNavClick() is called', () => {
+    const nav = { path: '/ai', route: ROUTES.AI };
+    const router = TestBed.inject(Router);
+    const navigateSpy = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+    jest.spyOn(router, 'url', 'get').mockReturnValue('/home');
+
+    component.handleNavClick(nav);
+
+    expect(navigateSpy).toHaveBeenCalledWith(['/ai']);
+  });
 });

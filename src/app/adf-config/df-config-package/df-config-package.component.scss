@@ -1,0 +1,131 @@
+.config-package {
+  padding: 4px 0 32px;
+}
+
+.config-package__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 18px;
+
+  h2 {
+    margin: 0 0 8px;
+    color: #102a43;
+    font-size: 1.6rem;
+    font-weight: 700;
+  }
+
+  p {
+    max-width: 760px;
+    margin: 0;
+    color: #506989;
+    line-height: 1.5;
+  }
+
+  button {
+    flex-shrink: 0;
+  }
+}
+
+.config-package__eyebrow {
+  margin-bottom: 6px !important;
+  color: #d9368a !important;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.config-package__notice {
+  margin-bottom: 16px;
+  border: 1px solid #f2b8cf;
+  border-left: 4px solid #d9368a;
+  border-radius: 8px;
+  box-shadow: none;
+
+  mat-card-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #394b61;
+  }
+}
+
+.config-package__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.config-package__panel {
+  border: 1px solid #d9e2ec;
+  border-radius: 8px;
+  box-shadow: 0 8px 20px rgba(16, 42, 67, 0.08);
+
+  mat-card-title {
+    color: #102a43;
+    font-weight: 700;
+  }
+
+  mat-card-subtitle {
+    color: #627d98;
+  }
+}
+
+.config-package__field {
+  width: 100%;
+
+  textarea {
+    font-family:
+      ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+      'Courier New', monospace;
+    font-size: 0.82rem;
+    line-height: 1.45;
+  }
+}
+
+.config-package__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.config-package__status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.config-package__message,
+.config-package__error {
+  margin-top: 16px;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.config-package__message {
+  overflow: auto;
+  background: #f4f7fb;
+}
+
+.config-package__error {
+  background: #fff1f1;
+  color: #a51c30;
+}
+
+fa-icon {
+  margin-right: 6px;
+}
+
+@media (max-width: 900px) {
+  .config-package__header {
+    flex-direction: column;
+  }
+
+  .config-package__grid {
+    grid-template-columns: 1fr;
+  }
+}

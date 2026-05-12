@@ -1,6 +1,14 @@
+.df-generate-api-card-link {
+  color: inherit;
+  display: block;
+  height: 100%;
+  text-decoration: none;
+}
+
 .df-generate-api-card {
   cursor: pointer;
   width: 100%;
+  height: 100%;
   min-height: 160px;
   display: flex;
   flex-direction: column;
