@@ -64,7 +64,7 @@ export class DfSectionLandingComponent {
     return `#${card.route}`;
   }
 
-  markOpening(event: MouseEvent, card: SectionLandingCard): void {
+  markOpening(event: MouseEvent | PointerEvent, card: SectionLandingCard): void {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey) {
       return;
     }

@@ -1,4 +1,13 @@
 <section class="section-landing">
+  <div
+    class="section-landing__opening"
+    *ngIf="openingRoute"
+    aria-live="polite"
+    aria-busy="true">
+    <mat-icon>hourglass_top</mat-icon>
+    <span>Opening section...</span>
+  </div>
+
   <div class="section-landing__header">
     <div>
       <span class="section-landing__eyebrow">{{ eyebrow }}</span>

@@ -1,9 +1,6 @@
 import { Routes } from '@angular/router';
 import { ROUTES } from '../shared/types/routes';
-import {
-  serviceResolver,
-  servicesResolver,
-} from './resolvers/services.resolver';
+import { serviceResolver } from './resolvers/services.resolver';
 import { serviceTypesResolver } from './resolvers/service-types.resolver';
 
 export const ServiceRoutes: Routes = [
@@ -13,9 +10,6 @@ export const ServiceRoutes: Routes = [
       import('./df-manage-services/df-manage-services.component').then(
         m => m.DfManageServicesComponent
       ),
-    resolve: {
-      data: servicesResolver(),
-    },
   },
   {
     path: ROUTES.CREATE,
