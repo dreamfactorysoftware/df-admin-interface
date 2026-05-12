@@ -181,6 +181,13 @@ export const routes: Routes = [
             resolve: { data: roleResolver, services: servicesResolver(0) },
             data: { type: 'edit' },
           },
+          {
+            path: ':id/scope',
+            loadComponent: () =>
+              import('./adf-roles/df-role-scope-page/df-role-scope-page.component').then(
+                m => m.DfRoleScopePageComponent
+              ),
+          },
         ],
         providers: [provideTranslocoScope('roles')],
       },
@@ -817,10 +824,66 @@ export const routes: Routes = [
   },
   {
     path: ROUTES.AI,
-    children: ServiceRoutes,
-    data: {
-      groups: SERVICE_GROUPS[ROUTES.AI],
-    },
+    children: [
+      {
+        path: '',
+        redirectTo: ROUTES.AI_CONNECTIONS,
+        pathMatch: 'full',
+      },
+      // Order matters: nav is auto-generated from this list. Connections
+      // come first because they're the gateway primary; conversations,
+      // usage, and MCP are sibling consumers; chat-services is admin
+      // configuration (rare touch) so it goes last.
+      {
+        path: ROUTES.AI_CONNECTIONS,
+        children: ServiceRoutes,
+        data: {
+          groups: SERVICE_GROUPS[ROUTES.AI_CONNECTIONS],
+        },
+      },
+      {
+        path: ROUTES.AI_USAGE,
+        loadComponent: () =>
+          import('./adf-ai-usage/df-ai-usage.component').then(
+            m => m.DfAiUsageComponent
+          ),
+      },
+      {
+        path: ROUTES.AI_CHAT_UI,
+        children: [
+          {
+            path: '',
+            loadComponent: () =>
+              import('./adf-ai-chat/df-ai-chat.component').then(
+                m => m.DfAiChatComponent
+              ),
+          },
+          {
+            path: ':sessionId',
+            loadComponent: () =>
+              import('./adf-ai-chat/df-ai-chat.component').then(
+                m => m.DfAiChatComponent
+              ),
+          },
+        ],
+      },
+      {
+        path: ROUTES.AI_MCP,
+        children: ServiceRoutes,
+        data: {
+          groups: SERVICE_GROUPS[ROUTES.AI_MCP],
+        },
+      },
+      // Admin-only setup for the in-DF chat UI. Goes last because most
+      // admins won't touch this often.
+      {
+        path: ROUTES.AI_CHAT_SERVICES,
+        children: ServiceRoutes,
+        data: {
+          groups: SERVICE_GROUPS[ROUTES.AI_CHAT_SERVICES],
+        },
+      },
+    ],
     canActivate: [loggedInGuard, licenseGuard, globalLicenseGuard],
     providers: [provideTranslocoScope('services')],
   },

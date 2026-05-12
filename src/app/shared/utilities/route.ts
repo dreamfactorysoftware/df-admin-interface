@@ -63,7 +63,15 @@ export function accessibleRoutes(
   navs: Array<Nav>,
   allowedTabs: Array<string>
 ): Array<Nav> {
-  const allowed: Array<ROUTES> = [ROUTES.SYSTEM_INFO, ROUTES.AI];
+  const allowed: Array<ROUTES> = [
+    ROUTES.SYSTEM_INFO,
+    ROUTES.AI,
+    ROUTES.AI_CONNECTIONS,
+    ROUTES.AI_CHAT_SERVICES,
+    ROUTES.AI_CHAT_UI,
+    ROUTES.AI_USAGE,
+    ROUTES.AI_MCP,
+  ];
   allowedTabs?.forEach(tab => {
     switch (tab) {
       case 'apps':

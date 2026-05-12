@@ -51,6 +51,13 @@
     <button class="cancel-btn" mat-flat-button type="button" (click)="goBack()">
       {{ 'cancel' | transloco }}
     </button>
+    <button
+      *ngIf="type === 'edit'"
+      mat-flat-button
+      type="button"
+      (click)="viewScope()">
+      {{ 'roles.roleScope.action' | transloco }}
+    </button>
     <button class="save-btn" mat-flat-button color="primary">
       <span *ngIf="type === 'create'">
         {{ 'save' | transloco }}

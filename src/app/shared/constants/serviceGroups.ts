@@ -15,5 +15,8 @@ export const SERVICE_GROUPS = {
   ],
   [ROUTES.AUTHENTICATION]: ['LDAP', 'SSO', 'OAuth'],
   [ROUTES.LOGS]: ['Log'],
-  [ROUTES.AI]: ['MCP'],
+  [ROUTES.AI]: ['MCP', 'AI', 'AI Chat'],
+  [ROUTES.AI_CONNECTIONS]: ['AI'],
+  [ROUTES.AI_CHAT_SERVICES]: ['AI Chat'],
+  [ROUTES.AI_MCP]: ['MCP'],
 };
