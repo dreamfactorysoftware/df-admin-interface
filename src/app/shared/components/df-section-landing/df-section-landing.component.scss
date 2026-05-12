@@ -156,6 +156,11 @@
   transform: translateY(-1px);
 }
 
+.section-card--opening {
+  border-color: rgba(15, 118, 110, 0.5);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.09);
+}
+
 .section-card--disabled {
   background: #f8fafc;
   box-shadow: none;

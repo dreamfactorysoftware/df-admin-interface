@@ -54,7 +54,20 @@ export class DfSectionLandingComponent {
   @Input() groups: SectionLandingGroup[] = [];
   @Input() notes: SectionLandingNote[] = [];
 
+  openingRoute = '';
+
   trackByCardRoute(_: number, card: SectionLandingCard): string {
     return card.route;
+  }
+
+  cardHref(card: SectionLandingCard): string {
+    return `#${card.route}`;
+  }
+
+  markOpening(event: MouseEvent, card: SectionLandingCard): void {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey) {
+      return;
+    }
+    this.openingRoute = card.route;
   }
 }

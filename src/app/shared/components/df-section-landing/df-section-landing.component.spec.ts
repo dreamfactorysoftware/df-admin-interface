@@ -38,6 +38,6 @@ describe('DfSectionLandingComponent', () => {
     const card = fixture.debugElement.query(By.css('a.section-card'));
 
     expect(card).toBeTruthy();
-    expect(card.attributes['href']).toBe('/api-connections');
+    expect(card.attributes['href']).toBe('#/api-connections');
   });
 });

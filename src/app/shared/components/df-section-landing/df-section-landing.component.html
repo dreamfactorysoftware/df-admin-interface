@@ -37,8 +37,10 @@
           <a
             *ngIf="!card.disabled; else disabledCard"
             class="section-card"
-            [routerLink]="card.route"
-            [attr.aria-label]="card.title">
+            [href]="cardHref(card)"
+            [class.section-card--opening]="openingRoute === card.route"
+            [attr.aria-label]="card.title"
+            (click)="markOpening($event, card)">
             <div class="section-card__icon">
               <mat-icon>{{ card.icon }}</mat-icon>
             </div>
@@ -49,7 +51,7 @@
                 {{ card.meta }}
               </span>
               <span class="section-card__action">
-                {{ card.action }}
+                {{ openingRoute === card.route ? 'Opening...' : card.action }}
                 <mat-icon>arrow_forward</mat-icon>
               </span>
             </div>

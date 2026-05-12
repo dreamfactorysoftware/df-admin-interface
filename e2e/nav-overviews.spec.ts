@@ -81,6 +81,19 @@ test.describe('Parent nav overview pages', () => {
     await expect(page).toHaveURL(/#\/api-connections\/api-types\/database$/);
   });
 
+  test('api generation file tile opens the file service category on the first click', async ({
+    page,
+  }) => {
+    await page.goto('/dreamfactory/dist/#/api-connections');
+
+    const fileTile = page
+      .getByRole('link', { name: /^File$/ })
+      .locator('.section-card__icon');
+    await expect(fileTile).toBeVisible();
+    await fileTile.click();
+    await expect(page).toHaveURL(/#\/api-connections\/api-types\/file$/);
+  });
+
   test('parent nav entries route to overview pages without redirecting to first child', async ({
     page,
   }) => {
