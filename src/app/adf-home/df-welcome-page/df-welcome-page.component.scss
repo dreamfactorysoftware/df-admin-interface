@@ -131,6 +131,52 @@ mat-card.notice-card {
   }
 }
 
+.ai-home-cta {
+  align-items: center;
+  background: #f0fdfa;
+  border: 1px solid rgba(13, 148, 136, 0.25);
+  border-radius: 8px;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+}
+
+.ai-home-cta__icon {
+  align-items: center;
+  background: #ccfbf1;
+  border-radius: 8px;
+  color: #0f766e;
+  display: flex;
+  height: 42px;
+  justify-content: center;
+  width: 42px;
+}
+
+.ai-home-cta__copy {
+  min-width: 0;
+
+  h3 {
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.25;
+    margin: 0 0 4px;
+  }
+
+  p {
+    color: #475569;
+    font-size: 13px;
+    line-height: 1.45;
+    margin: 0;
+  }
+}
+
+.ai-home-cta a {
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
 #learn-more-heading {
   text-align: center;
   margin: 0;
@@ -146,4 +192,15 @@ mat-card.notice-card {
 .dashboard-section {
   margin-top: 48px;
   margin-bottom: 32px;
+}
+
+@media (max-width: 760px) {
+  .ai-home-cta {
+    grid-template-columns: 42px minmax(0, 1fr);
+
+    a {
+      grid-column: 1 / -1;
+      justify-self: flex-start;
+    }
+  }
 }

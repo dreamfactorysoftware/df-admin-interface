@@ -11,6 +11,21 @@
           <h2>
             {{ 'home.welcomePage.generateYourApis' | transloco }}
           </h2>
+          <aside class="ai-home-cta">
+            <div class="ai-home-cta__icon">
+              <mat-icon>auto_awesome</mat-icon>
+            </div>
+            <div class="ai-home-cta__copy">
+              <h3>Set up AI access</h3>
+              <p>
+                Connect an LLM, scope what it can read, add chat or MCP access,
+                and watch usage from one checklist.
+              </p>
+            </div>
+            <a mat-flat-button color="primary" [routerLink]="aiSetupRoute">
+              Open AI setup
+            </a>
+          </aside>
           <div class="button-group" aria-labelledby="welcome-heading">
             <df-generate-api-card
               *ngFor="let card of generateApiCardsData"

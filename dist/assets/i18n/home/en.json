@@ -12,7 +12,31 @@
   },
   "welcomePage": {
     "watchVideoCta": "Watch our video!",
-    "generateYourApis": "Generate Your APIs!",
+    "generateYourApis": "DreamFactory API Management",
+    "apiManagementCard": {
+      "header": "API Management",
+      "description": "Build, secure, document, and test governed APIs"
+    },
+    "apiTypesCard": {
+      "header": "API Types",
+      "description": "Choose databases, files, network services, scripts, or utilities"
+    },
+    "securityCard": {
+      "header": "Security",
+      "description": "Manage authentication, rate limits, roles, and API keys"
+    },
+    "systemCard": {
+      "header": "System",
+      "description": "Check runtime health, logs, cache, scheduler, and platform settings"
+    },
+    "adminSettingsCard": {
+      "header": "Admin Settings",
+      "description": "Manage admins, users, schema, files, and diagnostics"
+    },
+    "aiGatewayCard": {
+      "header": "AI Data Gateway",
+      "description": "Connect AI to governed DreamFactory data, chat, MCP, and usage"
+    },
     "connectToDatabaseCard": {
       "header": "Connect to Database",
       "description": "SQL Server, Postgres, MySQL, Snowflake and more"

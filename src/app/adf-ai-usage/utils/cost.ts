@@ -8,7 +8,7 @@ import { ProviderRates } from '../types/usage';
  * in sync ONLY for empty-bundle scenarios; never edit one without the
  * other.
  */
-const FALLBACK_RATES: Record<string, ProviderRates> = {
+export const DEFAULT_RATES: Record<string, ProviderRates> = {
   anthropic: { provider: 'anthropic', inputPer1k: 0.003, outputPer1k: 0.015 },
   openai: { provider: 'openai', inputPer1k: 0.0025, outputPer1k: 0.01 },
   xai: { provider: 'xai', inputPer1k: 0.002, outputPer1k: 0.01 },
@@ -31,7 +31,7 @@ export function ratesFromBundle(
     | undefined
 ): Record<string, ProviderRates> {
   if (!defaultRates) {
-    return FALLBACK_RATES;
+    return DEFAULT_RATES;
   }
   const out: Record<string, ProviderRates> = {};
   for (const [provider, r] of Object.entries(defaultRates)) {
@@ -44,7 +44,7 @@ export function ratesFromBundle(
   // Merge in fallback for any provider the backend didn't list — keeps the
   // estimator from breaking if a new provider gets added before the
   // backend's default_rates table catches up.
-  return { ...FALLBACK_RATES, ...out };
+  return { ...DEFAULT_RATES, ...out };
 }
 
 export function estimateCost(

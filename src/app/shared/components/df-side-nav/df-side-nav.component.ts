@@ -179,6 +179,10 @@ export class DfSideNavComponent implements OnInit {
     const segments = route.replace('/', '').split('/').join('.');
     return `nav.${segments}.nav`;
   }
+
+  navLink(nav: Nav) {
+    return nav.linkPath ?? nav.path;
+  }
   private hasAddedLastEle = false;
   get breadCrumbs() {
     const urlParts = this.router.url.split('/');
@@ -209,8 +213,9 @@ export class DfSideNavComponent implements OnInit {
     // Still useful for programmatic callers (keyboard shortcuts / search)
     // that don't trigger the anchor. No-op when the anchor has already
     // navigated to the same URL.
-    if (this.router.url !== nav.path) {
-      this.router.navigate([nav.path]);
+    const linkPath = this.navLink(nav);
+    if (this.router.url !== linkPath) {
+      this.router.navigate([linkPath]);
     }
   }
 

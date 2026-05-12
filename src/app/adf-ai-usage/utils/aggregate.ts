@@ -101,6 +101,7 @@ export function timeSeries(
       outputTokens: 0,
       toolCalls: 0,
       sessions: 0,
+      costUsd: 0,
     };
     b.inputTokens += s.total_input_tokens ?? 0;
     b.outputTokens += s.total_output_tokens ?? 0;
@@ -131,6 +132,7 @@ export function timeSeries(
         outputTokens: 0,
         toolCalls: 0,
         sessions: 0,
+        costUsd: 0,
       }
     );
     cursor.setDate(cursor.getDate() + 1);
@@ -169,6 +171,7 @@ export function groupBy(
       totalTokens: 0,
       toolCalls: 0,
       sessions: 0,
+      costUsd: 0,
     };
     row.inputTokens += s.total_input_tokens ?? 0;
     row.outputTokens += s.total_output_tokens ?? 0;

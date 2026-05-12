@@ -10,6 +10,11 @@ import {
   faFile,
   faTools,
   faBook,
+  faShieldAlt,
+  faCogs,
+  faUsersCog,
+  faMagic,
+  faProjectDiagram,
 } from '@fortawesome/free-solid-svg-icons';
 
 import {
@@ -78,13 +83,18 @@ export class DfWelcomePageComponent {
   faFile = faFile;
   faTools = faTools;
   faBook = faBook;
+  faShieldAlt = faShieldAlt;
+  faCogs = faCogs;
+  faUsersCog = faUsersCog;
+  faMagic = faMagic;
+  faProjectDiagram = faProjectDiagram;
 
-  fpDBRoute = `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_TYPES}/${ROUTES.DATABASE}/${ROUTES.CREATE}`;
-  fpScriptingRoute = `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_TYPES}/${ROUTES.SCRIPTING}/${ROUTES.CREATE}`;
-  fpNetworkRoute = `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_TYPES}/${ROUTES.NETWORK}/${ROUTES.CREATE}`;
-  fpFileRoute = `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_TYPES}/${ROUTES.FILE}/${ROUTES.CREATE}`;
-  fpUtilityRoute = `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_TYPES}/${ROUTES.UTILITY}/${ROUTES.CREATE}`;
-  fpApiDocsRoute = `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_DOCS}`;
+  apiConnectionsRoute = `/${ROUTES.API_CONNECTIONS}`;
+  apiTypesRoute = `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_TYPES}`;
+  securityRoute = `/${ROUTES.API_SECURITY}`;
+  systemRoute = `/${ROUTES.SYSTEM_SETTINGS}`;
+  adminSettingsRoute = `/${ROUTES.ADMIN_SETTINGS}`;
+  aiSetupRoute = `/${ROUTES.AI}`;
 
   public generateApiCardsData: any[];
 
@@ -100,50 +110,50 @@ export class DfWelcomePageComponent {
   ) {
     this.generateApiCardsData = [
       {
-        icon: this.faDatabase,
-        headerTextKey: 'home.welcomePage.connectToDatabaseCard.header',
-        textKey: 'home.welcomePage.connectToDatabaseCard.description',
-        route: this.fpDBRoute,
+        icon: this.faProjectDiagram,
+        headerTextKey: 'home.welcomePage.apiManagementCard.header',
+        textKey: 'home.welcomePage.apiManagementCard.description',
+        route: this.apiConnectionsRoute,
         bgColor: 'rgba(127, 17, 224, 0.1)',
         headerColor: 'rgb(127, 17, 224)',
       },
       {
-        icon: this.faCode,
-        headerTextKey: 'home.welcomePage.useScriptingServicesCard.header',
-        textKey: 'home.welcomePage.useScriptingServicesCard.description',
-        route: this.fpScriptingRoute,
+        icon: this.faDatabase,
+        headerTextKey: 'home.welcomePage.apiTypesCard.header',
+        textKey: 'home.welcomePage.apiTypesCard.description',
+        route: this.apiTypesRoute,
         bgColor: 'rgba(92,35,154, 0.1)',
         headerColor: 'rgb(92,35,154)',
       },
       {
-        icon: this.faNetworkWired,
-        headerTextKey: 'home.welcomePage.proxyWebServicesCard.header',
-        textKey: 'home.welcomePage.proxyWebServicesCard.description',
-        route: this.fpNetworkRoute,
+        icon: this.faShieldAlt,
+        headerTextKey: 'home.welcomePage.securityCard.header',
+        textKey: 'home.welcomePage.securityCard.description',
+        route: this.securityRoute,
         bgColor: 'rgb(235,253,245)',
         headerColor: 'rgb(25,97,80)',
       },
       {
-        icon: this.faFile,
-        headerTextKey: 'home.welcomePage.exposeFileStorageCard.header',
-        textKey: 'home.welcomePage.exposeFileStorageCard.description',
-        route: this.fpFileRoute,
+        icon: this.faCogs,
+        headerTextKey: 'home.welcomePage.systemCard.header',
+        textKey: 'home.welcomePage.systemCard.description',
+        route: this.systemRoute,
         bgColor: 'rgb(255,251,236)',
         headerColor: 'rgb(136,72,43)',
       },
       {
-        icon: this.faTools,
-        headerTextKey: 'home.welcomePage.utilityServicesCard.header',
-        textKey: 'home.welcomePage.utilityServicesCard.description',
-        route: this.fpUtilityRoute,
+        icon: this.faUsersCog,
+        headerTextKey: 'home.welcomePage.adminSettingsCard.header',
+        textKey: 'home.welcomePage.adminSettingsCard.description',
+        route: this.adminSettingsRoute,
         bgColor: 'rgba(80,105,137, 0.1)',
         headerColor: 'rgb(80,105,137)',
       },
       {
-        icon: this.faBook,
-        headerTextKey: 'home.welcomePage.apiDocsCard.header',
-        textKey: 'home.welcomePage.apiDocsCard.description',
-        route: this.fpApiDocsRoute,
+        icon: this.faMagic,
+        headerTextKey: 'home.welcomePage.aiGatewayCard.header',
+        textKey: 'home.welcomePage.aiGatewayCard.description',
+        route: this.aiSetupRoute,
         bgColor: 'rgba(217, 54, 138, 0.1)',
         headerColor: 'rgb(217, 54, 138)',
       },

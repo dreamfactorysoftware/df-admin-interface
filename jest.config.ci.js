@@ -44,5 +44,7 @@ module.exports = {
     '<rootDir>/src/app/adf-ai-chat/df-ai-chat.poll.spec.ts',
     '<rootDir>/src/app/adf-ai-usage/utils/aggregate.spec.ts',
     '<rootDir>/src/app/adf-ai-usage/utils/cost.spec.ts',
+    '<rootDir>/src/app/shared/components/df-section-landing/df-section-landing.component.spec.ts',
+    '<rootDir>/src/app/adf-home/df-welcome-page/df-generate-api-card/df-generate-api-card.component.spec.ts',
   ],
 };

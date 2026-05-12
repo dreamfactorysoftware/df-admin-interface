@@ -31,6 +31,14 @@ export function transformRoutes(routes: Routes, root = ''): Array<Nav> {
         !filteredFromNav.includes(route.path as ROUTES)
     )
     .map(route => {
+      const navMetadata = {
+        ...(route.data?.['navLinkPath']
+          ? { linkPath: route.data['navLinkPath'] }
+          : {}),
+        ...(route.data?.['navLabelPath']
+          ? { labelPath: route.data['navLabelPath'] }
+          : {}),
+      };
       if (route.children) {
         const subRoutes = transformRoutes(
           route.children,
@@ -38,6 +46,7 @@ export function transformRoutes(routes: Routes, root = ''): Array<Nav> {
         );
         return {
           path: `${root}/${route.path}`,
+          ...navMetadata,
           subRoutes: subRoutes.length ? subRoutes : undefined,
           route: route.path as ROUTES,
           icon: findIconForRoute(route as string),
@@ -45,6 +54,7 @@ export function transformRoutes(routes: Routes, root = ''): Array<Nav> {
       }
       return {
         path: `${root}/${route.path}`,
+        ...navMetadata,
         route: route.path as ROUTES,
         icon: findIconForRoute(route as string),
       };
@@ -66,6 +76,7 @@ export function accessibleRoutes(
   const allowed: Array<ROUTES> = [
     ROUTES.SYSTEM_INFO,
     ROUTES.AI,
+    ROUTES.AI_SETUP,
     ROUTES.AI_CONNECTIONS,
     ROUTES.AI_CHAT_SERVICES,
     ROUTES.AI_CHAT_UI,
@@ -101,7 +112,7 @@ export function accessibleRoutes(
         allowed.push(ROUTES.SCHEMA);
         break;
       case 'files':
-        allowed.push(ROUTES.FILES);
+        allowed.push(ROUTES.FILES, ROUTES.FILE_LOGS);
         break;
       case 'scripts':
         allowed.push(ROUTES.EVENT_SCRIPTS);
@@ -110,6 +121,7 @@ export function accessibleRoutes(
         allowed.push(
           ROUTES.CORS,
           ROUTES.CACHE,
+          ROUTES.CONFIG_PACKAGE,
           ROUTES.EMAIL_TEMPLATES,
           ROUTES.GLOBAL_LOOKUP_KEYS,
           ROUTES.INTERCOM

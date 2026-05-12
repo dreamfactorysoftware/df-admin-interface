@@ -154,6 +154,10 @@
         "nav": "{{edit}}",
         "header": "{{nav.ai.edit.nav}}"
       },
+      "setup": {
+        "nav": "Setup",
+        "header": "AI Setup"
+      },
       "connections": {
         "nav": "Connections",
         "header": "AI Connections",
@@ -167,7 +171,7 @@
         }
       },
       "chat-services": {
-        "nav": "Chat Services",
+        "nav": "Chat Configuration",
         "header": "AI Chat Services",
         "create": {
           "nav": "Create",
@@ -201,6 +205,7 @@
     },
     "api-connections": {
       "nav": "API Generation & Connections",
+      "header": "{{nav.api-connections.nav}}",
       "api-types": {
         "nav": "API Types",
         "database": {
@@ -297,6 +302,7 @@
     },
     "api-security": {
       "nav": "Security",
+      "header": "{{nav.api-security.nav}}",
       "rate-limiting": {
         "nav": "Rate Limiting",
         "header": "{{nav.api-security.rate-limiting.nav}}",
@@ -315,10 +321,19 @@
           "nav": "Create Authentication API",
           "header": "{{nav.api-security.authentication.create.nav}}"
         }
+      },
+      "role-based-access": {
+        "nav": "Role Based Access",
+        "header": "{{nav.api-security.role-based-access.nav}}"
+      },
+      "api-keys": {
+        "nav": "API Keys",
+        "header": "{{nav.api-security.api-keys.nav}}"
       }
     },
     "system-settings": {
-      "nav": "System Settings",
+      "nav": "System",
+      "header": "{{nav.system-settings.nav}}",
       "config": {
         "nav": "Config",
         "header": "Config",
@@ -339,6 +354,10 @@
         "cache": {
           "nav": "Cache",
           "header": "{{nav.system-settings.config.cache.nav}}"
+        },
+        "config-package": {
+          "nav": "Config Import / Export",
+          "header": "{{nav.system-settings.config.config-package.nav}}"
         },
         "email-templates": {
           "nav": "Email Templates",
@@ -378,6 +397,10 @@
           "header": "Create Log"
           }
         },
+      "file-logs": {
+        "nav": "Logs",
+        "header": "{{nav.system-settings.file-logs.nav}}"
+      },
       "reporting": {
         "nav": "Reporting",
         "header": "{{nav.system-settings.reporting.nav}}"
@@ -389,6 +412,7 @@
     },
     "admin-settings": {
       "nav": "Admin Settings",
+      "header": "{{nav.admin-settings.nav}}",
       "admins": {
         "nav": "Admins",
         "header": "Manage Admins",

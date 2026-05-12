@@ -97,16 +97,20 @@ export const routes: Routes = [
     children: [
       {
         path: '',
-        redirectTo: ROUTES.API_TYPES,
-        pathMatch: 'full',
+        loadComponent: () =>
+          import('./adf-section-overviews/df-api-connections-overview.component').then(
+            m => m.DfApiConnectionsOverviewComponent
+          ),
       },
       {
         path: ROUTES.API_TYPES,
         children: [
           {
             path: '',
-            redirectTo: ROUTES.DATABASE,
-            pathMatch: 'full',
+            loadComponent: () =>
+              import('./adf-section-overviews/df-api-types-overview.component').then(
+                m => m.DfApiTypesOverviewComponent
+              ),
           },
           {
             path: ROUTES.DATABASE,
@@ -309,7 +313,21 @@ export const routes: Routes = [
   {
     path: ROUTES.API_SECURITY,
     children: [
-      { path: '', redirectTo: ROUTES.RATE_LIMITING, pathMatch: 'full' },
+      {
+        path: '',
+        loadComponent: () =>
+          import('./adf-section-overviews/df-security-overview.component').then(
+            m => m.DfSecurityOverviewComponent
+          ),
+      },
+      {
+        path: ROUTES.AUTHENTICATION,
+        children: ServiceRoutes,
+        data: {
+          groups: SERVICE_GROUPS[ROUTES.AUTHENTICATION],
+        },
+        providers: [provideTranslocoScope('services')],
+      },
       {
         path: ROUTES.RATE_LIMITING,
         children: [
@@ -355,12 +373,22 @@ export const routes: Routes = [
         providers: [provideTranslocoScope('limits')],
       },
       {
-        path: ROUTES.AUTHENTICATION,
-        children: ServiceRoutes,
+        path: ROUTES.ROLE_BASED_ACCESS,
+        redirectTo: `/${ROUTES.API_CONNECTIONS}/${ROUTES.ROLE_BASED_ACCESS}`,
+        pathMatch: 'full',
         data: {
-          groups: SERVICE_GROUPS[ROUTES.AUTHENTICATION],
+          navLinkPath: `/${ROUTES.API_CONNECTIONS}/${ROUTES.ROLE_BASED_ACCESS}`,
+          navLabelPath: `/${ROUTES.API_SECURITY}/${ROUTES.ROLE_BASED_ACCESS}`,
         },
-        providers: [provideTranslocoScope('services')],
+      },
+      {
+        path: ROUTES.API_KEYS,
+        redirectTo: `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_KEYS}`,
+        pathMatch: 'full',
+        data: {
+          navLinkPath: `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_KEYS}`,
+          navLabelPath: `/${ROUTES.API_SECURITY}/${ROUTES.API_KEYS}`,
+        },
       },
     ],
     canActivate: [loggedInGuard, licenseGuard, globalLicenseGuard],
@@ -368,7 +396,13 @@ export const routes: Routes = [
   {
     path: ROUTES.SYSTEM_SETTINGS,
     children: [
-      { path: '', redirectTo: ROUTES.CONFIG, pathMatch: 'full' },
+      {
+        path: '',
+        loadComponent: () =>
+          import('./adf-section-overviews/df-system-overview.component').then(
+            m => m.DfSystemOverviewComponent
+          ),
+      },
       {
         path: ROUTES.CONFIG,
         children: [
@@ -428,6 +462,13 @@ export const routes: Routes = [
               data: DfCacheResolver,
             },
             providers: [provideTranslocoScope('cache')],
+          },
+          {
+            path: ROUTES.CONFIG_PACKAGE,
+            loadComponent: () =>
+              import('./adf-config/df-config-package/df-config-package.component').then(
+                m => m.DfConfigPackageComponent
+              ),
           },
           {
             path: ROUTES.EMAIL_TEMPLATES,
@@ -521,6 +562,15 @@ export const routes: Routes = [
         providers: [provideTranslocoScope('scheduler')],
       },
       {
+        path: ROUTES.FILE_LOGS,
+        redirectTo: `/${ROUTES.ADMIN_SETTINGS}/${ROUTES.LOGS}`,
+        pathMatch: 'full',
+        data: {
+          navLinkPath: `/${ROUTES.ADMIN_SETTINGS}/${ROUTES.LOGS}`,
+          navLabelPath: `/${ROUTES.SYSTEM_SETTINGS}/${ROUTES.FILE_LOGS}`,
+        },
+      },
+      {
         path: ROUTES.LOGS,
         children: ServiceRoutes,
         data: {
@@ -553,7 +603,13 @@ export const routes: Routes = [
   {
     path: ROUTES.ADMIN_SETTINGS,
     children: [
-      { path: '', redirectTo: ROUTES.ADMINS, pathMatch: 'full' },
+      {
+        path: '',
+        loadComponent: () =>
+          import('./adf-section-overviews/df-admin-settings-overview.component').then(
+            m => m.DfAdminSettingsOverviewComponent
+          ),
+      },
       {
         path: ROUTES.ADMINS,
         children: [
@@ -827,10 +883,19 @@ export const routes: Routes = [
     children: [
       {
         path: '',
-        redirectTo: ROUTES.AI_CONNECTIONS,
-        pathMatch: 'full',
+        loadComponent: () =>
+          import('./adf-ai-setup/df-ai-setup.component').then(
+            m => m.DfAiSetupComponent
+          ),
       },
-      // Order matters: nav is auto-generated from this list. Connections
+      {
+        path: ROUTES.AI_SETUP,
+        loadComponent: () =>
+          import('./adf-ai-setup/df-ai-setup.component').then(
+            m => m.DfAiSetupComponent
+          ),
+      },
+      // Order matters: nav is auto-generated from this list. Setup and connections
       // come first because they're the gateway primary; conversations,
       // usage, and MCP are sibling consumers; chat-services is admin
       // configuration (rare touch) so it goes last.
