@@ -60,6 +60,27 @@ test.describe('Parent nav overview pages', () => {
     ).toBeVisible();
   });
 
+  test('tile bodies navigate on the first click, not only text clicks', async ({
+    page,
+  }) => {
+    await page.goto('/dreamfactory/dist/#/home');
+
+    const homeTile = page
+      .getByRole('link', { name: /API Management/ })
+      .locator('mat-card');
+    await expect(homeTile).toBeVisible();
+    await homeTile.click({ position: { x: 18, y: 18 } });
+    await expect(page).toHaveURL(/#\/api-connections$/);
+
+    await page.goto('/dreamfactory/dist/#/api-connections/api-types');
+    const overviewTile = page
+      .getByRole('link', { name: /Database APIs/ })
+      .locator('.section-card__icon');
+    await expect(overviewTile).toBeVisible();
+    await overviewTile.click();
+    await expect(page).toHaveURL(/#\/api-connections\/api-types\/database$/);
+  });
+
   test('parent nav entries route to overview pages without redirecting to first child', async ({
     page,
   }) => {
