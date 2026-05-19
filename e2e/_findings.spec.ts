@@ -47,7 +47,9 @@ test('journey: event-scripts create', async ({ page }) => {
     return;
   }
   await addBtn.click();
-  await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => {});
+  await page
+    .waitForLoadState('networkidle', { timeout: 8_000 })
+    .catch(() => {});
 
   // Service dropdown
   const svcSel = page.locator('mat-select').first();
@@ -78,7 +80,11 @@ test('journey: event-scripts create', async ({ page }) => {
     report(J, 'script type', 'zero options after picking db');
     return;
   }
-  report(J, 'script type', `${typeOptions.length} options, first: ${typeOptions[0]}`);
+  report(
+    J,
+    'script type',
+    `${typeOptions.length} options, first: ${typeOptions[0]}`
+  );
   await page.locator('mat-option').first().click();
   await page.waitForTimeout(300);
 
@@ -125,7 +131,9 @@ test('journey: event-scripts create', async ({ page }) => {
   }
 });
 
-test('journey: api-connections > database list + create form', async ({ page }) => {
+test('journey: api-connections > database list + create form', async ({
+  page,
+}) => {
   const J = 'api-db';
   page.on('pageerror', e => report(J, 'jsError', e.message));
 
@@ -145,7 +153,9 @@ test('journey: api-connections > database list + create form', async ({ page }) 
     return;
   }
   await addBtn.click();
-  await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => {});
+  await page
+    .waitForLoadState('networkidle', { timeout: 8_000 })
+    .catch(() => {});
   report(J, 'create form', `URL: ${page.url()}`);
 
   const typeSel = page.locator('mat-select').first();
@@ -181,7 +191,9 @@ test('journey: roles list + create form', async ({ page }) => {
     return;
   }
   await addBtn.click();
-  await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => {});
+  await page
+    .waitForLoadState('networkidle', { timeout: 8_000 })
+    .catch(() => {});
   report(J, 'create form', `URL: ${page.url()}`);
 
   const inputs = await page.locator('input[type="text"], mat-select').count();
@@ -211,7 +223,9 @@ test('journey: admin users list + create form', async ({ page }) => {
     return;
   }
   await addBtn.click();
-  await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => {});
+  await page
+    .waitForLoadState('networkidle', { timeout: 8_000 })
+    .catch(() => {});
   report(J, 'create form', `URL: ${page.url()}`);
 });
 
@@ -235,7 +249,9 @@ test('journey: api-keys list + create form', async ({ page }) => {
     return;
   }
   await addBtn.click();
-  await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => {});
+  await page
+    .waitForLoadState('networkidle', { timeout: 8_000 })
+    .catch(() => {});
   report(J, 'create form', `URL: ${page.url()}`);
 });
 

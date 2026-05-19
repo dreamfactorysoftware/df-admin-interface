@@ -94,7 +94,8 @@ export class DfScriptEditorComponent implements OnInit {
   }
   isDarkMode = this.themeService.darkMode$;
   ngOnInit(): void {
-    if (this.storageServiceId.getRawValue()) {
+    if (this.storageServiceId.getRawValue() || this.storagePath.getRawValue()) {
+      this.checked = true;
       this.storagePath.addValidators([Validators.required]);
     }
     // Track previous value so we only reset storagePath on a real user-driven
@@ -115,6 +116,17 @@ export class DfScriptEditorComponent implements OnInit {
       this.storagePath.updateValueAndValidity();
     });
   }
+  onCheckedChange(checked: boolean) {
+    if (!checked) {
+      // Clear the underlying form values when the user opts out of file-based
+      // storage. Without this the inputs are merely hidden by the *ngIf and
+      // the stale storageServiceId/storagePath get re-saved, leaving the
+      // record looking "still attached" on next open.
+      this.storageServiceId.setValue(null);
+      this.storagePath.setValue('');
+    }
+  }
+
   fileUpload(event: Event) {
     const input = event.target as HTMLInputElement;
     if (input.files) {
