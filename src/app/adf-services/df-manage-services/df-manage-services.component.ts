@@ -20,7 +20,7 @@ export class DfManageServicesComponent implements OnInit {
 
   ngOnInit(): void {
     this.activatedRoute.data.subscribe(({ data }) => {
-      this.paywall = data.serviceTypes && data.serviceTypes.length === 0;
+      this.paywall = !!data?.serviceTypes && data.serviceTypes.length === 0;
     });
     this.snackbarService.setSnackbarLastEle('', false);
   }

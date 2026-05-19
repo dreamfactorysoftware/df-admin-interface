@@ -11,14 +11,15 @@ export const ADMIN_PASSWORD =
  * because no code path hydrates userData from storage at bootstrap.
  */
 export async function loginAsAdmin(page: Page) {
+  await page.context().clearCookies();
   await page.goto('/dreamfactory/dist/#/auth/login');
   // Labels come from the userManagement i18n bundle — "Enter Email" /
   // "Enter Password" in English. Use type-based selectors to stay
   // language-agnostic.
-  const email = page.locator('input[type="email"]').first();
+  const email = page.locator('input').first();
   await expect(email).toBeVisible({ timeout: 15_000 });
   await email.fill(ADMIN_EMAIL);
-  await page.locator('input[type="password"]').first().fill(ADMIN_PASSWORD);
+  await page.locator('input').nth(1).fill(ADMIN_PASSWORD);
 
   const loginReq = page.waitForResponse(
     r =>
@@ -40,7 +41,7 @@ export async function loginAsAdmin(page: Page) {
 
 /** Wait for the admin UI shell to be fully painted. */
 export async function waitForAppReady(page: Page) {
-  await page.waitForSelector('mat-toolbar, mat-sidenav, nav', {
+  await page.waitForSelector('mat-toolbar, mat-sidenav', {
     timeout: 15_000,
   });
 }

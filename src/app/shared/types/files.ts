@@ -18,6 +18,8 @@ export interface Service {
   type: string;
   config?: any;
   serviceDocByServiceId?: any;
+  createdDate?: string;
+  lastModifiedDate?: string;
 }
 
 export interface FileTableRow {

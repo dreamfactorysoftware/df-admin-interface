@@ -1,0 +1,560 @@
+.usage {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 20px 24px 40px;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  &__title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    h2 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    fa-icon {
+      color: #7f11e0;
+      font-size: 20px;
+    }
+  }
+
+  &__title-hint {
+    font-size: 14px !important;
+    color: #999 !important;
+    cursor: help;
+
+    &:hover {
+      color: #7f11e0 !important;
+    }
+  }
+
+  &__controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  &__refresh {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &__loading {
+    padding: 48px;
+    display: flex;
+    justify-content: center;
+  }
+
+  &__error {
+    padding: 12px 16px;
+    border-radius: 4px;
+    background: rgba(244, 67, 54, 0.08);
+    border: 1px solid rgba(244, 67, 54, 0.3);
+    color: #d32f2f;
+    font-size: 14px;
+  }
+
+  &__empty {
+    text-align: center;
+
+    h3 {
+      margin: 0 0 8px;
+      font-size: 18px;
+      font-weight: 600;
+    }
+    p {
+      margin: 0;
+      color: #666;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    a {
+      color: #7f11e0;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+  }
+
+  &__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: 16px;
+  }
+
+  // Two-column grid for the cost-by-dimension charts. Wider min-width than
+  // the bars grid because a stacked area needs more horizontal room to
+  // read cleanly.
+  &__cost-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(480px, 1fr));
+    gap: 16px;
+  }
+
+  &__section-header--inset {
+    margin-top: 16px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+  }
+
+  // Filter card -------------------------------------------------------------
+
+  &__filters {
+    mat-card-content {
+      padding: 16px 20px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+  }
+
+  &__filters-head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  &__filters-label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #666;
+    font-weight: 700;
+  }
+
+  &__filters-hint {
+    font-size: 12px;
+    color: #999;
+    font-style: italic;
+  }
+
+  &__filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  &__filter-field {
+    min-width: 180px;
+    flex: 1 1 180px;
+
+    ::ng-deep .mat-mdc-form-field-subscript-wrapper {
+      display: none;
+    }
+  }
+
+  &__filter-chips {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-top: 4px;
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+    margin-top: 4px;
+    padding-top: 12px;
+  }
+
+  // Section headers ---------------------------------------------------------
+  // Used between major sections (DF AI usage / External MCP traffic) to give
+  // the dashboard visual rhythm without heavy dividers.
+
+  &__section-header {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  &__section-title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #333;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &__section-hint {
+    font-size: 13px;
+    color: #999;
+    cursor: help;
+
+    &:hover {
+      color: #7f11e0;
+    }
+  }
+
+  &__section-subtitle {
+    margin: 0;
+    font-size: 13px;
+    color: #666;
+    line-height: 1.5;
+  }
+
+  &__section-disclaimer {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: #444;
+    line-height: 1.5;
+    background: rgba(255, 152, 0, 0.06);
+    border-left: 3px solid #ff9800;
+    padding: 8px 12px;
+    border-radius: 0 4px 4px 0;
+
+    strong {
+      color: #e65100;
+    }
+  }
+
+  // MCP summary tiles -------------------------------------------------------
+  // Tighter than the AI summary because the MCP section is secondary content.
+
+  // Budget banner + panel ----------------------------------------------------
+
+  &__budget-banner {
+    border-left: 4px solid #ff9800;
+
+    mat-card-content {
+      padding: 14px 18px;
+    }
+  }
+
+  &__budget-banner-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #b26500;
+    font-size: 14px;
+
+    fa-icon {
+      color: #ff9800;
+      font-size: 16px;
+    }
+  }
+
+  &__budget-banner-list {
+    list-style: none;
+    margin: 8px 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
+
+    li {
+      display: flex;
+      gap: 8px;
+      align-items: baseline;
+      flex-wrap: wrap;
+    }
+  }
+
+  &__budget-banner-name {
+    font-weight: 600;
+    color: #333;
+  }
+
+  &__budget-banner-projection {
+    color: #666;
+
+    strong {
+      color: #b26500;
+      font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+    }
+  }
+
+  &__budgets {
+    mat-card-content {
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+  }
+
+  &__budgets-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+  }
+
+  &__budgets-title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &__budgets-period {
+    font-size: 12px;
+    color: #999;
+    font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+  }
+
+  &__budgets-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  &__budgets-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  &__budgets-row-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    font-size: 14px;
+  }
+
+  &__budgets-row-name {
+    font-weight: 500;
+    color: #333;
+  }
+
+  &__budgets-row-amount {
+    font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+    font-size: 13px;
+    color: #444;
+
+    &--over {
+      color: #d32f2f;
+      font-weight: 600;
+    }
+  }
+
+  &__budgets-row-bar {
+    position: relative;
+    height: 8px;
+    background: rgba(0, 0, 0, 0.06);
+    border-radius: 999px;
+    overflow: hidden;
+
+    &--over {
+      background: rgba(244, 67, 54, 0.12);
+    }
+  }
+
+  &__budgets-row-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    background: #2e7d32;
+    transition: width 0.2s ease-out;
+  }
+
+  &__budgets-row-bar--over &__budgets-row-fill {
+    background: #d32f2f;
+  }
+
+  &__budgets-row-projection {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    background: repeating-linear-gradient(
+      45deg,
+      rgba(46, 125, 50, 0.4),
+      rgba(46, 125, 50, 0.4) 4px,
+      rgba(46, 125, 50, 0.15) 4px,
+      rgba(46, 125, 50, 0.15) 8px
+    );
+  }
+
+  &__budgets-row-bar--over &__budgets-row-projection {
+    background: repeating-linear-gradient(
+      45deg,
+      rgba(211, 47, 47, 0.55),
+      rgba(211, 47, 47, 0.55) 4px,
+      rgba(211, 47, 47, 0.2) 4px,
+      rgba(211, 47, 47, 0.2) 8px
+    );
+  }
+
+  &__budgets-row-projection-label {
+    font-size: 11px;
+    color: #999;
+    font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+  }
+
+  &__mcp-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 16px;
+  }
+
+  &__mcp-card mat-card-content {
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  &__mcp-label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #666;
+    font-weight: 600;
+  }
+
+  &__mcp-value {
+    font-size: 22px;
+    font-weight: 600;
+    color: #333;
+    font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+    line-height: 1.2;
+
+    small {
+      font-size: 12px;
+      font-weight: 500;
+      color: #999;
+      margin-left: 4px;
+    }
+  }
+}
+
+// Dark theme --------------------------------------------------------------
+
+:host-context(.dark-theme) {
+  .usage {
+    &__title {
+      h2 {
+        color: #fff;
+      }
+      fa-icon {
+        color: #bb86fc;
+      }
+    }
+
+    &__title-hint {
+      color: #888 !important;
+
+      &:hover {
+        color: #bb86fc !important;
+      }
+    }
+
+    &__error {
+      background: rgba(244, 67, 54, 0.12);
+      color: #ff8585;
+    }
+
+    &__empty p {
+      color: #bbb;
+    }
+    &__empty a {
+      color: #bb86fc;
+    }
+
+    &__filters-label {
+      color: #bbb;
+    }
+    &__filters-hint {
+      color: #888;
+    }
+
+    &__filter-chips {
+      border-top-color: rgba(255, 255, 255, 0.08);
+    }
+
+    &__section-title {
+      color: #fff;
+    }
+    &__section-hint {
+      color: #888;
+
+      &:hover {
+        color: #bb86fc;
+      }
+    }
+    &__section-subtitle {
+      color: #bbb;
+    }
+    &__section-disclaimer {
+      color: #ddd;
+      background: rgba(255, 152, 0, 0.1);
+
+      strong {
+        color: #ffb74d;
+      }
+    }
+
+    &__mcp-label {
+      color: #bbb;
+    }
+    &__mcp-value {
+      color: #fff;
+    }
+
+    &__budget-banner-head {
+      color: #ffb74d;
+    }
+    &__budget-banner-name {
+      color: #fff;
+    }
+    &__budget-banner-projection {
+      color: #bbb;
+
+      strong {
+        color: #ffb74d;
+      }
+    }
+
+    &__budgets-title,
+    &__budgets-row-name {
+      color: #fff;
+    }
+    &__budgets-period,
+    &__budgets-row-projection-label {
+      color: #888;
+    }
+    &__budgets-row-amount {
+      color: #ddd;
+
+      &--over {
+        color: #ff8585;
+      }
+    }
+    &__budgets-row-bar {
+      background: rgba(255, 255, 255, 0.08);
+
+      &--over {
+        background: rgba(244, 67, 54, 0.18);
+      }
+    }
+  }
+}

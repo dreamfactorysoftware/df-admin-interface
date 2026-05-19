@@ -95,6 +95,8 @@ export class DfScriptDetailsComponent implements OnInit {
       content: [''],
       storageServiceId: [null],
       storagePath: [''],
+      scmRepository: [''],
+      scmReference: [''],
       isActive: [false],
       allowEventModification: [false],
     });
@@ -137,15 +139,19 @@ export class DfScriptDetailsComponent implements OnInit {
       return;
     }
     const script = this.scriptForm.getRawValue();
+    // storageServiceId may be a raw id (explorer flow) or a service object
+    // with {id, type} from the legacy dropdown flow — normalize to the id.
+    const storageServiceId =
+      script.storageServiceId && typeof script.storageServiceId === 'object'
+        ? (script.storageServiceId.id ?? null)
+        : (script.storageServiceId ?? null);
     const scriptItem = {
       ...script,
-      storageServiceId: script.storageServiceId ?? null,
-      storagePath: script.storagePath || null,
-      // Fall back on empty string too, not just null/undefined —
-      // selectedServiceItemEvent() resets completeScriptName to '' so `??`
-      // would skip the fallback and produce an empty script name.
+      storageServiceId,                     
+      storagePath: script.storagePath || null,  
       name: this.completeScriptName || this.selectedRouteItem,
     };
+
     if (this.type === 'edit') {
       this.scriptDetails = { ...this.scriptDetails, ...scriptItem };
       this.eventScriptService

@@ -21,7 +21,7 @@ import {
   transition,
 } from '@angular/animations';
 import { DfDuplicateDialogComponent } from 'src/app/shared/components/df-duplicate-dialog/df-duplicate-dialog.component';
-import { faCopy } from '@fortawesome/free-solid-svg-icons';
+import { faCopy, faEye } from '@fortawesome/free-solid-svg-icons';
 import { catchError, throwError } from 'rxjs';
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -68,16 +68,31 @@ export class DfManageRolesTableComponent extends DfManageTableComponent<RoleRow>
       icon: faCopy,
     };
 
+    const viewScopeAction = {
+      label: 'roles.roleScope.action',
+      function: (row: RoleRow) =>
+        this.router.navigate([row.id, 'scope'], {
+          relativeTo: this._activatedRoute,
+        }),
+      ariaLabel: {
+        key: 'roles.roleScope.action',
+        param: 'name',
+      },
+      icon: faEye,
+    };
+
     if (this.actions.additional) {
-      // Insert duplicate action before delete action
       const deleteIndex = this.actions.additional.findIndex(
         action => action.label === 'delete'
       );
-      if (deleteIndex !== -1) {
-        this.actions.additional.splice(deleteIndex, 0, duplicateAction);
-      } else {
-        this.actions.additional.push(duplicateAction);
-      }
+      const insertAt =
+        deleteIndex !== -1 ? deleteIndex : this.actions.additional.length;
+      this.actions.additional.splice(
+        insertAt,
+        0,
+        viewScopeAction,
+        duplicateAction
+      );
     }
   }
 

@@ -60,6 +60,43 @@ $red-palette: mat.define-palette(mat.$red-palette);
   }
 }
 
+.app-container.small {
+  .mat-toolbar {
+    gap: 8px;
+    min-height: 56px;
+    overflow: hidden;
+    padding: 8px;
+
+    .button-wrapper {
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .search-bar {
+      display: none;
+    }
+
+    .spacer {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    .profile-icon {
+      flex: 0 0 40px;
+      min-width: 40px;
+      overflow: hidden;
+      padding: 0 8px;
+
+      ::ng-deep .mdc-button__label {
+        align-items: center;
+        display: flex;
+        overflow: hidden;
+        width: 20px;
+      }
+    }
+  }
+}
+
 .search-btn {
   font-size: 1.6rem;
   font-weight: 400;
