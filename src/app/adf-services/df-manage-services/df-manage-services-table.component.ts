@@ -36,6 +36,7 @@ export class DfManageServicesTableComponent
 {
   serviceTypes: Array<ServiceType> = [];
   system = false;
+  private scopedByGroups = false;
   constructor(
     router: Router,
     activatedRoute: ActivatedRoute,
@@ -106,6 +107,7 @@ export class DfManageServicesTableComponent
       routeData['groups'] ||
       this._activatedRoute.snapshot.parent?.data?.['groups'] ||
       [];
+    this.scopedByGroups = groups.length > 0;
 
     const serviceTypes$ = groups.length
       ? forkJoin(
@@ -129,9 +131,11 @@ export class DfManageServicesTableComponent
                     ? '(created_by_id is null) and (name != "api_docs") and '
                     : ''
                 }(type in ("${serviceTypes.map(src => src.name).join('","')}"))`
-              : this.system
-                ? '(created_by_id is null) and (name != "api_docs")'
-                : undefined;
+              : this.scopedByGroups
+                ? '(id = -1)'
+                : this.system
+                  ? '(created_by_id is null) and (name != "api_docs")'
+                  : undefined;
 
           return this.serviceService
             .getAll<GenericListResponse<Service>>({
@@ -222,6 +226,8 @@ export class DfManageServicesTableComponent
       filter = `${
         filter ? `(${filter}) and ` : ''
       }(type in ("${this.serviceTypes.map(src => src.name).join('","')}"))`;
+    } else if (this.scopedByGroups) {
+      filter = `${filter ? `(${filter}) and ` : ''}(id = -1)`;
     }
 
     this.serviceService
