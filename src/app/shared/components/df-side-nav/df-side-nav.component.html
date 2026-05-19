@@ -147,7 +147,7 @@
 </div>
 
 <ng-template #navList let-items>
-  <ng-container *ngFor="let item of items">
+  <ng-container *ngFor="let item of items; trackBy: trackByNavPath">
     <div mat-list-item *ngIf="!item.subRoutes; else subRoutes">
       <!--
         Leaf nav items are <a routerLink> instead of <button (click)>.

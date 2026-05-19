@@ -1,7 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, forkJoin, of } from 'rxjs';
-import { catchError, map } from 'rxjs/operators';
+import { catchError, map, shareReplay } from 'rxjs/operators';
 import { BASE_URL } from 'src/app/shared/constants/urls';
 
 export type TimeRange = '24h' | '7d' | '30d' | 'all';
@@ -288,6 +288,10 @@ export interface UsageBundle {
 @Injectable({ providedIn: 'root' })
 export class UsageService {
   private http = inject(HttpClient);
+  private servicesLookup$?: Observable<Map<number, ServiceLookupRow>>;
+  private usersLookup$?: Observable<Map<number, string>>;
+  private rolesLookup$?: Observable<Map<number, string>>;
+  private appsLookup$?: Observable<Map<number, string>>;
 
   loadAll(
     range: TimeRange,
@@ -362,11 +366,31 @@ export class UsageService {
             } as McpUsageResponse)
           )
         ),
-      services: this.listServices(),
-      users: this.listUsers(),
-      roles: this.listRoles(),
-      apps: this.listApps(),
+      services: this.getServicesLookup(),
+      users: this.getUsersLookup(),
+      roles: this.getRolesLookup(),
+      apps: this.getAppsLookup(),
     }).pipe(map(b => b));
+  }
+
+  private getServicesLookup(): Observable<Map<number, ServiceLookupRow>> {
+    this.servicesLookup$ ??= this.listServices().pipe(shareReplay(1));
+    return this.servicesLookup$;
+  }
+
+  private getUsersLookup(): Observable<Map<number, string>> {
+    this.usersLookup$ ??= this.listUsers().pipe(shareReplay(1));
+    return this.usersLookup$;
+  }
+
+  private getRolesLookup(): Observable<Map<number, string>> {
+    this.rolesLookup$ ??= this.listRoles().pipe(shareReplay(1));
+    return this.rolesLookup$;
+  }
+
+  private getAppsLookup(): Observable<Map<number, string>> {
+    this.appsLookup$ ??= this.listApps().pipe(shareReplay(1));
+    return this.appsLookup$;
   }
 
   private listServices(): Observable<Map<number, ServiceLookupRow>> {
