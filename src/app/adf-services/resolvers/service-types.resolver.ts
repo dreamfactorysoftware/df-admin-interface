@@ -9,7 +9,8 @@ export const serviceTypesResolver: ResolveFn<Array<ServiceType>> = (
   route: ActivatedRouteSnapshot
 ) => {
   const serviceTypeService = inject(SERVICE_TYPE_SERVICE_TOKEN);
-  const groups: Array<string> = route.data['groups'];
+  const groups: Array<string> =
+    route.data['groups'] || route.parent?.data?.['groups'];
   if (groups) {
     const filteredGroups = groups.map(grp =>
       serviceTypeService.getAll<GenericListResponse<ServiceType>>({
