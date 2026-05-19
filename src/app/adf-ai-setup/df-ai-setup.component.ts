@@ -45,7 +45,7 @@ export class DfAiSetupComponent {
         },
         {
           icon: 'admin_panel_settings',
-          title: 'Role Based Access',
+          title: 'Role-Based Access',
           text: 'Create least-privilege DreamFactory roles so AI tool calls can reach only the data and services they should.',
           route: `/${ROUTES.API_CONNECTIONS}/${ROUTES.ROLE_BASED_ACCESS}`,
           action: 'Manage roles',

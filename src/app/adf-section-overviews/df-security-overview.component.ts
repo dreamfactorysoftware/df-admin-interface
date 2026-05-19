@@ -100,7 +100,7 @@ export class DfSecurityOverviewComponent implements OnInit {
           },
           {
             icon: 'admin_panel_settings',
-            title: 'Role Based Access',
+            title: 'Role-Based Access',
             text: 'Audit what users, apps, and AI services are allowed to reach.',
             route: `/${ROUTES.API_CONNECTIONS}/${ROUTES.ROLE_BASED_ACCESS}`,
             action: 'Manage roles',
