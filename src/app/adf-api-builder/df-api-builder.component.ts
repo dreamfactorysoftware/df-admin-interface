@@ -1289,14 +1289,11 @@ export class DfApiBuilderComponent implements OnInit {
               service.type
             )
           );
-          const sample =
-            this.sourceServices.find(
-              service => service.name === 'sample_pgsql'
-            ) ?? this.sourceServices[0];
-          if (sample) {
-            this.sourceForm.patchValue({ service: sample.name });
-            this.loadTables(sample.name);
-          }
+          // Do not auto-load a sample service on page load.
+          // In some local environments demo services (e.g. sample_pgsql)
+          // exist in metadata but are not configured/running, which can
+          // trigger hard API errors and route-level error redirects.
+          this.sourceForm.patchValue({ service: '', table: '' });
         },
         error: () => this.toast('Could not load source APIs.'),
       });

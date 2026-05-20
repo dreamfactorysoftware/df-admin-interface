@@ -94,6 +94,11 @@ export const routes: Routes = [
     canActivate: [licenseGuard],
   },
   {
+    path: ROUTES.API_BUILDER,
+    redirectTo: `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_TYPES}/${ROUTES.API_BUILDER}`,
+    pathMatch: 'full',
+  },
+  {
     path: ROUTES.API_CONNECTIONS,
     children: [
       {
