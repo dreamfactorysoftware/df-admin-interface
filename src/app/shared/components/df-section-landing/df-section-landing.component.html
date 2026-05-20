@@ -1,13 +1,4 @@
 <section class="section-landing">
-  <div
-    class="section-landing__opening"
-    *ngIf="openingRoute"
-    aria-live="polite"
-    aria-busy="true">
-    <mat-icon>hourglass_top</mat-icon>
-    <span>Opening section...</span>
-  </div>
-
   <div class="section-landing__header">
     <div>
       <span class="section-landing__eyebrow">{{ eyebrow }}</span>
@@ -37,7 +28,7 @@
   <div class="section-landing__groups">
     <section
       class="section-landing__group"
-      *ngFor="let group of groups"
+      *ngFor="let group of groups; trackBy: trackByGroupTitle"
       [attr.aria-label]="group.title">
       <h3>{{ group.title }}</h3>
       <div class="section-landing__cards">
@@ -46,10 +37,8 @@
           <a
             *ngIf="!card.disabled; else disabledCard"
             class="section-card"
-            [href]="cardHref(card)"
-            [class.section-card--opening]="openingRoute === card.route"
-            [attr.aria-label]="card.title"
-            (click)="markOpening($event, card)">
+            [routerLink]="card.route"
+            [attr.aria-label]="card.title">
             <div class="section-card__icon">
               <mat-icon>{{ card.icon }}</mat-icon>
             </div>
@@ -60,7 +49,7 @@
                 {{ card.meta }}
               </span>
               <span class="section-card__action">
-                {{ openingRoute === card.route ? 'Opening...' : card.action }}
+                {{ card.action }}
                 <mat-icon>arrow_forward</mat-icon>
               </span>
             </div>

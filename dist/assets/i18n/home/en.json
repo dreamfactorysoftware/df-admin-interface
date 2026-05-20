@@ -43,14 +43,14 @@
     },
     "useScriptingServicesCard": {
       "header": "Use Scripting Services",
-      "description": "Automate business logic with PHP, NodeJs or Python"
+      "description": "Automate business logic with PHP, Node.js, or Python"
     },
     "proxyWebServicesCard": {
-      "header": "Proxy a Web Services",
+      "header": "Proxy a Web Service",
       "description": "REST, SOAP, or remote Swagger API"
     },
     "exposeFileStorageCard": {
-      "header": "Expose a File Storage",
+      "header": "Expose File Storage",
       "description": "AWS S3, Azure Blob, or local FS"
     },
     "utilityServicesCard": {

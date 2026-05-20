@@ -262,7 +262,7 @@
         }
       },
       "role-based-access": {
-        "nav": "Role Based Access",
+        "nav": "Role-Based Access",
         "header": "{{nav.api-connections.role-based-access.nav}}",
         "create": {
           "nav": "Create a new role",
@@ -323,7 +323,7 @@
         }
       },
       "role-based-access": {
-        "nav": "Role Based Access",
+        "nav": "Role-Based Access",
         "header": "{{nav.api-security.role-based-access.nav}}"
       },
       "api-keys": {

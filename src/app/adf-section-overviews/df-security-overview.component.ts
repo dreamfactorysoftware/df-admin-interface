@@ -32,6 +32,8 @@ export class DfSecurityOverviewComponent implements OnInit {
   private serviceTypeService = inject(SERVICE_TYPE_SERVICE_TOKEN);
   private serviceTypes: ServiceType[] | null = null;
 
+  groups: SectionLandingGroup[] = [];
+
   readonly actions: SectionLandingAction[] = [
     {
       label: 'Create role',
@@ -65,20 +67,26 @@ export class DfSecurityOverviewComponent implements OnInit {
   ];
 
   ngOnInit(): void {
+    this.buildGroups();
+
     this.serviceTypeService
       .getAll<GenericListResponse<ServiceType>>({ limit: 500 })
       .pipe(
         map(response => response.resource ?? []),
         catchError(() => of([]))
       )
-      .subscribe(serviceTypes => (this.serviceTypes = serviceTypes));
+      .subscribe(serviceTypes => {
+        this.serviceTypes = serviceTypes;
+        this.buildGroups();
+      });
   }
 
-  get groups(): SectionLandingGroup[] {
+  private buildGroups(): void {
     const authCount = this.countServiceTypes(
       SERVICE_GROUPS[ROUTES.AUTHENTICATION]
     );
-    return [
+
+    this.groups = [
       {
         title: 'Security controls',
         cards: [
