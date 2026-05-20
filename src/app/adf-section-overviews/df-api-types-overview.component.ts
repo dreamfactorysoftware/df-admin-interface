@@ -34,9 +34,9 @@ export class DfApiTypesOverviewComponent implements OnInit {
 
   readonly actions: SectionLandingAction[] = [
     {
-      label: 'Create Database API',
-      route: `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_TYPES}/${ROUTES.DATABASE}/${ROUTES.CREATE}`,
-      icon: 'storage',
+      label: 'Create Custom API',
+      route: `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_TYPES}/${ROUTES.API_BUILDER}`,
+      icon: 'api',
       primary: true,
     },
     {
@@ -79,6 +79,13 @@ export class DfApiTypesOverviewComponent implements OnInit {
       {
         title: 'Available API source categories',
         cards: [
+          this.serviceCard(
+            'api',
+            'API Builder',
+            'Create custom business APIs that compose database, RWS, script, and relationship-backed calls.',
+            ROUTES.API_BUILDER,
+            SERVICE_GROUPS[ROUTES.API_BUILDER]
+          ),
           this.serviceCard(
             'storage',
             'Database APIs',

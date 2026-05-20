@@ -705,31 +705,13 @@
         <ng-container *ngIf="this.isScriptService">
           <!-- Script Content - Always visible -->
           <ng-container *ngIf="getConfigControl('storageServiceId')">
-            <df-link-service
-              [cache]="
-                serviceForm.get('name')?.value ||
-                (serviceData ? serviceData.name : '')
-              "
-              [cacheScope]="'service'"
-              [storageServiceId]="serviceData ? serviceData.name : 'new'"
-              [storagePath]="getConfigControl('storagePath')"
-              [content]="getConfigControl('content')"
-              [storageServiceIdControl]="getConfigControl('storageServiceId')"
-              [scmRepositoryControl]="getConfigControl('scmRepository')"
-              [scmReferenceControl]="
-                getConfigControl('scmReference')
-              "></df-link-service>
             <df-script-editor
               [isScript]="this.isScriptService"
               [type]="getControl('type')"
               [storageServiceId]="getConfigControl('storageServiceId')"
               [storagePath]="getConfigControl('storagePath')"
               [content]="getConfigControl('content')"
-              [scmRepository]="getConfigControl('scmRepository')"
-              [scmReference]="getConfigControl('scmReference')"
               [cache]="serviceData ? serviceData.name : ''"
-              [hideScmActions]="true"
-              [snapshotTimestamp]="serviceData?.lastModifiedDate"
               class="full-width"></df-script-editor>
           </ng-container>
 
@@ -828,7 +810,9 @@
                   *ngIf="serviceForm.getRawValue().type === 'ai_connection'"
                   class="full-width"
                   [form]="serviceForm"
-                  [serviceId]="edit && serviceData ? serviceData.id : null"></df-ai-test-connection>
+                  [serviceId]="
+                    edit && serviceData ? serviceData.id : null
+                  "></df-ai-test-connection>
 
                 <!-- AI Connection: model picker — fetches available models
                      from the provider and writes selection to default_model.

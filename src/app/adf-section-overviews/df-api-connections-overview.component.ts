@@ -36,9 +36,9 @@ export class DfApiConnectionsOverviewComponent implements OnInit {
 
   readonly actions: SectionLandingAction[] = [
     {
-      label: 'Create Database API',
-      route: `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_TYPES}/${ROUTES.DATABASE}/${ROUTES.CREATE}`,
-      icon: 'storage',
+      label: 'Create Custom API',
+      route: `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_TYPES}/${ROUTES.API_BUILDER}`,
+      icon: 'api',
       primary: true,
     },
     {
@@ -82,6 +82,13 @@ export class DfApiConnectionsOverviewComponent implements OnInit {
         title: 'Create APIs',
         cards: [
           this.serviceCard(
+            'api',
+            'API Builder',
+            'Compose existing services into custom business APIs with multiple endpoints.',
+            ROUTES.API_BUILDER,
+            SERVICE_GROUPS[ROUTES.API_BUILDER]
+          ),
+          this.serviceCard(
             'storage',
             'Database',
             'Expose SQL and big data sources through REST APIs.',
@@ -123,7 +130,7 @@ export class DfApiConnectionsOverviewComponent implements OnInit {
         cards: [
           {
             icon: 'admin_panel_settings',
-            title: 'Role-Based Access',
+            title: 'Role Based Access',
             text: 'Define service, table, verb, and record-level access.',
             route: `/${ROUTES.API_CONNECTIONS}/${ROUTES.ROLE_BASED_ACCESS}`,
             action: 'Manage roles',

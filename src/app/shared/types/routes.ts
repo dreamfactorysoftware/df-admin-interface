@@ -25,6 +25,7 @@ export enum ROUTES {
   AI_MCP = 'mcp',
   API_CONNECTIONS = 'api-connections',
   API_TYPES = 'api-types',
+  API_BUILDER = 'api-builder',
   DATABASE = 'database',
   SCRIPTING = 'scripting',
   NETWORK = 'network',

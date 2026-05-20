@@ -59,7 +59,6 @@ import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service'
 import { Service } from 'src/app/shared/types/files';
 import { AceEditorMode } from 'src/app/shared/types/scripts';
 import { DfScriptEditorComponent } from 'src/app/shared/components/df-script-editor/df-script-editor.component';
-import { DfLinkServiceComponent } from 'src/app/shared/components/df-link-service/df-link-service.component';
 import { DfFileGithubComponent } from 'src/app/shared/components/df-file-github/df-file-github.component';
 import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
 import {
@@ -165,7 +164,6 @@ interface ServiceResponse {
     MatTooltipModule,
     MatButtonModule,
     DfScriptEditorComponent,
-    DfLinkServiceComponent,
     DfFileGithubComponent,
     DfPaywallComponent,
     MatStepperModule,
@@ -313,6 +311,7 @@ export class DfServiceDetailsComponent implements OnInit {
       description: [''],
       isActive: [true],
       storageServiceId: [null], // Add storage service ID field for Excel services
+      config: this.fb.group({}),
       service_doc_by_service_id: this.fb.group({
         format: [0],
         content: [''],
@@ -1336,8 +1335,9 @@ export class DfServiceDetailsComponent implements OnInit {
   }
 
   initializeConfig(value: string) {
+    const config = this.fb.group({});
+
     if (this.configSchema && this.configSchema.length > 0) {
-      const config = this.fb.group({});
       this.configSchema.forEach(control => {
         const validator = [];
         if (control.required) {
@@ -1378,16 +1378,23 @@ export class DfServiceDetailsComponent implements OnInit {
         // Initialize serviceDefinitionType for JSON/YAML toggle
         this.serviceDefinitionType = '0'; // Default to JSON
       }
-      this.serviceForm.addControl('config', config);
     }
+
+    this.serviceForm.setControl('config', config);
   }
 
   get subscriptionRequired() {
     const serviceType = this.serviceForm.controls['type'].value;
     // Local email service is open source and should not require subscription
-    if (serviceType === 'local_email') {
+    if (serviceType === 'local_email' || serviceType === 'api_builder') {
       return false;
     }
+
+    const selectedType = this.serviceTypes.find(st => st.name === serviceType);
+    if (selectedType?.group === 'API Builder') {
+      return false;
+    }
+
     return serviceType && this.configSchema?.length === 0;
   }
 

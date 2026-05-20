@@ -34,6 +34,7 @@ import {
 } from './adf-schema/resolvers/df-schema.resolver';
 import { DfGlobalLookupKeysResolver } from './adf-config/resolvers/df-global-lookup-keys.resolver';
 import { ServiceRoutes } from './adf-services/routes';
+import { ApiBuilderRoutes } from './adf-api-builder/routes';
 import { servicesResolver } from './adf-services/resolvers/services.resolver';
 import { HomeRoutes } from './adf-home/routes';
 import { provideTranslocoScope } from '@ngneat/transloco';
@@ -111,6 +112,13 @@ export const routes: Routes = [
               import('./adf-section-overviews/df-api-types-overview.component').then(
                 m => m.DfApiTypesOverviewComponent
               ),
+          },
+          {
+            path: ROUTES.API_BUILDER,
+            children: ApiBuilderRoutes,
+            data: {
+              groups: SERVICE_GROUPS[ROUTES.API_BUILDER],
+            },
           },
           {
             path: ROUTES.DATABASE,
