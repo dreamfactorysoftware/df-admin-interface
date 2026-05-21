@@ -143,6 +143,21 @@ type OpenApiDocument = {
   paths?: Record<string, unknown>;
 };
 
+type WorkflowStepKey =
+  | 'source'
+  | 'shape'
+  | 'rules'
+  | 'route'
+  | 'output'
+  | 'publish';
+
+type WorkflowStep = {
+  key: WorkflowStepKey;
+  label: string;
+  detail: string;
+  complete: boolean;
+};
+
 @Component({
   selector: 'df-api-builder',
   standalone: true,
@@ -275,7 +290,7 @@ type OpenApiDocument = {
               [formGroup]="endpointForm"
               class="endpoint-shell"
               (ngSubmit)="saveEndpoint(false)">
-              <div class="route-preview hero-preview">
+              <div class="route-preview hero-preview" id="workflow-route">
                 <mat-icon>route</mat-icon>
                 <span>
                   <strong>{{ generatedRouteLabel }}</strong>
@@ -283,7 +298,20 @@ type OpenApiDocument = {
                 </span>
               </div>
 
-              <div class="source-builder" [formGroup]="sourceForm">
+              <section class="workflow-strip" aria-label="Workflow status">
+                <button
+                  mat-button
+                  type="button"
+                  class="workflow-step"
+                  *ngFor="let step of workflowSteps"
+                  [class.complete]="step.complete"
+                  (click)="focusWorkflowStep(step.key)">
+                  <span class="step-label">{{ step.label }}</span>
+                  <small>{{ step.detail }}</small>
+                </button>
+              </section>
+
+              <div class="source-builder" [formGroup]="sourceForm" id="workflow-source">
                 <mat-form-field appearance="outline">
                   <mat-label>Find Source API</mat-label>
                   <input
@@ -328,7 +356,7 @@ type OpenApiDocument = {
                 </mat-checkbox>
               </div>
 
-              <section class="builder-section" *ngIf="sourceFields.length">
+              <section class="builder-section" *ngIf="sourceFields.length" id="workflow-shape">
                 <div class="section-heading">
                   <span>
                     <strong>Fields</strong>
@@ -418,7 +446,7 @@ type OpenApiDocument = {
                 </div>
               </section>
 
-              <section class="builder-section">
+              <section class="builder-section" id="workflow-rules">
                 <div class="section-heading">
                   <span>
                     <strong>Filters</strong>
@@ -497,7 +525,7 @@ type OpenApiDocument = {
                 </div>
               </section>
 
-              <section class="builder-section">
+              <section class="builder-section" id="workflow-output">
                 <div class="section-heading">
                   <span>
                     <strong>Result Options</strong>
@@ -552,7 +580,7 @@ type OpenApiDocument = {
                 </div>
               </section>
 
-              <div class="save-row">
+              <div class="save-row" id="workflow-publish">
                 <button
                   mat-flat-button
                   color="primary"
@@ -749,6 +777,39 @@ type OpenApiDocument = {
         align-items: center;
         display: flex;
         gap: 8px;
+      }
+
+      .workflow-strip {
+        display: grid;
+        gap: 8px;
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+        margin-bottom: 8px;
+      }
+
+      .workflow-step {
+        align-items: flex-start;
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        line-height: 1.2;
+        padding: 8px 10px;
+        text-align: left;
+      }
+
+      .workflow-step.complete {
+        border-color: rgba(34, 197, 94, 0.65);
+      }
+
+      .workflow-step .step-label {
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .workflow-step small {
+        font-size: 11px;
+        opacity: 0.85;
       }
 
       .api-list {
@@ -1283,6 +1344,55 @@ export class DfApiBuilderComponent implements OnInit {
       });
 
     return groups;
+  }
+
+  get workflowSteps(): WorkflowStep[] {
+    const serviceSelected = !!this.sourceForm.value.service;
+    const tableSelected = !!this.sourceForm.value.table;
+    const routeReady = !!this.endpointForm.value.path;
+    const hasFields = this.selectedFieldNames.length > 0;
+    const hasRuleData = this.filterRules.length > 0;
+    const hasOutput = !!this.sourceForm.value.outputShape;
+    const hasSavedEndpoint = !!this.selectedEndpointId;
+
+    return [
+      {
+        key: 'source',
+        label: 'Source',
+        detail: serviceSelected && tableSelected ? 'Service + table selected' : 'Pick service and table',
+        complete: serviceSelected && tableSelected,
+      },
+      {
+        key: 'shape',
+        label: 'Shape',
+        detail: hasFields ? `${this.selectedFieldNames.length} fields selected` : 'Select fields',
+        complete: hasFields,
+      },
+      {
+        key: 'rules',
+        label: 'Rules',
+        detail: hasRuleData ? `${this.filterRules.length} filters` : 'Optional filters',
+        complete: true,
+      },
+      {
+        key: 'route',
+        label: 'Route',
+        detail: routeReady ? this.generatedRouteLabel : 'Generate route',
+        complete: routeReady,
+      },
+      {
+        key: 'output',
+        label: 'Output',
+        detail: hasOutput ? `Shape: ${this.sourceForm.value.outputShape}` : 'Set output options',
+        complete: hasOutput,
+      },
+      {
+        key: 'publish',
+        label: 'Publish',
+        detail: hasSavedEndpoint ? 'Saved endpoint selected' : 'Save endpoint',
+        complete: hasSavedEndpoint,
+      },
+    ];
   }
 
   get editorTitle(): string {
@@ -2319,6 +2429,16 @@ export class DfApiBuilderComponent implements OnInit {
     });
     this.testForm.patchValue({ endpointId: null });
     this.toast('Endpoint duplicated into a new draft. Save to create it.');
+  }
+
+  focusWorkflowStep(step: WorkflowStepKey): void {
+    const targetId = `workflow-${step}`;
+    const element = document.getElementById(targetId);
+    if (!element) {
+      return;
+    }
+
+    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
   loadSample(): void {
