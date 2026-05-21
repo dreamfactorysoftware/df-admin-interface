@@ -16,6 +16,7 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { finalize } from 'rxjs';
 import { BASE_URL } from '../shared/constants/urls';
 import { GenericListResponse } from '../shared/types/generic-http';
+import { ApiBuilderMapperService } from './api-builder-mapper.service';
 
 type ApiDefinition = {
   id: number;
@@ -55,6 +56,11 @@ type SourceService = {
   name: string;
   label?: string;
   type: string;
+};
+
+type SourceServiceGroup = {
+  label: string;
+  services: SourceService[];
 };
 
 type SourceTable = {
@@ -279,15 +285,27 @@ type OpenApiDocument = {
 
               <div class="source-builder" [formGroup]="sourceForm">
                 <mat-form-field appearance="outline">
+                  <mat-label>Find Source API</mat-label>
+                  <input
+                    matInput
+                    [value]="sourceServiceSearch"
+                    (input)="sourceServiceSearch = $any($event.target).value" />
+                </mat-form-field>
+                <mat-form-field appearance="outline">
                   <mat-label>Source API</mat-label>
                   <mat-select
                     formControlName="service"
                     (selectionChange)="loadTables($event.value)">
-                    <mat-option
-                      *ngFor="let service of sourceServices"
-                      [value]="service.name">
-                      {{ service.label || service.name }} ({{ service.type }})
-                    </mat-option>
+                    <mat-optgroup
+                      *ngFor="let group of groupedSourceServices"
+                      [label]="group.label">
+                      <mat-option
+                        *ngFor="let service of group.services"
+                        [value]="service.name">
+                        {{ service.label || service.name }}
+                        ({{ service.type }} · {{ introspectionBadge(service) }})
+                      </mat-option>
+                    </mat-optgroup>
                   </mat-select>
                 </mat-form-field>
                 <mat-form-field appearance="outline">
@@ -1121,6 +1139,7 @@ export class DfApiBuilderComponent implements OnInit {
   private fb = inject(FormBuilder);
   private http = inject(HttpClient);
   private snackBar = inject(MatSnackBar);
+  private mapper = inject(ApiBuilderMapperService);
 
   apis: ApiDefinition[] = [];
   endpoints: EndpointDefinition[] = [];
@@ -1129,6 +1148,9 @@ export class DfApiBuilderComponent implements OnInit {
   sourceFields: SourceField[] = [];
   sourceRelationships: SourceRelationship[] = [];
   sourceOpenApiPaths: string[] = [];
+  sourceServiceSearch = '';
+  private readonly recentSourceKey = 'df_api_builder_recent_sources';
+  recentSourceNames: string[] = [];
   selectedFields = new Set<string>();
   selectedRelationships = new Set<string>();
   private pendingSelectedFieldNames: string[] | null = null;
@@ -1196,12 +1218,61 @@ export class DfApiBuilderComponent implements OnInit {
 
   get selectedEndpoints(): EndpointDefinition[] {
     if (!this.selectedApiId) {
-      return this.endpoints;
+      return [];
     }
 
     return this.endpoints.filter(
       endpoint => (endpoint.apiId ?? endpoint.api_id) === this.selectedApiId
     );
+  }
+
+  get filteredSourceServices(): SourceService[] {
+    const query = this.sourceServiceSearch.trim().toLowerCase();
+    if (!query) {
+      return [...this.sourceServices];
+    }
+
+    return this.sourceServices.filter(service => {
+      const haystack =
+        `${service.name} ${service.label ?? ''} ${service.type}`.toLowerCase();
+      return haystack.includes(query);
+    });
+  }
+
+  get groupedSourceServices(): SourceServiceGroup[] {
+    const services = this.filteredSourceServices;
+    const recent = this.recentSourceNames
+      .map(name => services.find(service => service.name === name))
+      .filter((service): service is SourceService => !!service);
+
+    const remaining = services.filter(
+      service => !this.recentSourceNames.includes(service.name)
+    );
+
+    const byType = new Map<string, SourceService[]>();
+    remaining.forEach(service => {
+      const group = byType.get(service.type) ?? [];
+      group.push(service);
+      byType.set(service.type, group);
+    });
+
+    const groups: SourceServiceGroup[] = [];
+    if (recent.length) {
+      groups.push({ label: 'Recent', services: recent });
+    }
+
+    Array.from(byType.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .forEach(([type, grouped]) => {
+        groups.push({
+          label: this.titleFromName(type),
+          services: grouped.sort((a, b) =>
+            (a.label || a.name).localeCompare(b.label || b.name)
+          ),
+        });
+      });
+
+    return groups;
   }
 
   get editorTitle(): string {
@@ -1295,8 +1366,46 @@ export class DfApiBuilderComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.recentSourceNames = this.readRecentSources();
     this.loadSourceServices();
     this.loadAll();
+  }
+
+  introspectionBadge(service: SourceService): string {
+    const t = (service.type || '').toLowerCase();
+    if (
+      ['pgsql', 'mysql', 'sqlite', 'sqlsrv', 'oracle', 'ibmdb2'].includes(t)
+    ) {
+      return 'schema';
+    }
+    if (['rest', 'soap', 'http'].includes(t)) {
+      return 'openapi';
+    }
+    return 'limited';
+  }
+
+  private rememberRecentSource(serviceName: string): void {
+    const next = [
+      serviceName,
+      ...this.recentSourceNames.filter(name => name !== serviceName),
+    ].slice(0, 6);
+    this.recentSourceNames = next;
+    localStorage.setItem(this.recentSourceKey, JSON.stringify(next));
+  }
+
+  private readRecentSources(): string[] {
+    try {
+      const raw = localStorage.getItem(this.recentSourceKey);
+      if (!raw) {
+        return [];
+      }
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed)
+        ? parsed.filter(item => typeof item === 'string')
+        : [];
+    } catch {
+      return [];
+    }
   }
 
   loadAll(): void {
@@ -1365,6 +1474,8 @@ export class DfApiBuilderComponent implements OnInit {
     if (!serviceName) {
       return;
     }
+
+    this.rememberRecentSource(serviceName);
 
     this.sourceTables = [];
     this.sourceFields = [];
@@ -1786,19 +1897,21 @@ export class DfApiBuilderComponent implements OnInit {
       return;
     }
 
-    const payload = this.withoutEmptyOptionalFields({
-      name:
-        this.apiForm.value.name ||
-        this.safeStepId(
-          this.apiForm.value.basePath ||
-            this.apiForm.value.label ||
-            'custom_api'
-        ),
-      base_path: this.apiForm.value.basePath ?? '',
-      label: this.apiForm.value.label ?? '',
-      description: this.apiForm.value.description ?? '',
-      status: this.apiForm.value.status ?? 'draft',
-    });
+    const payload = this.withoutEmptyOptionalFields(
+      this.mapper.toApiPayload({
+        name:
+          this.apiForm.value.name ||
+          this.safeStepId(
+            this.apiForm.value.basePath ||
+              this.apiForm.value.label ||
+              'custom_api'
+          ),
+        basePath: this.apiForm.value.basePath ?? '',
+        label: this.apiForm.value.label ?? '',
+        description: this.apiForm.value.description ?? '',
+        status: this.apiForm.value.status ?? 'draft',
+      })
+    );
     const request: any = this.selectedApiId
       ? this.http.put<ApiDefinition>(
           `${BASE_URL}/api_builder/apis/${this.selectedApiId}`,
@@ -1856,26 +1969,32 @@ export class DfApiBuilderComponent implements OnInit {
       return;
     }
 
-    const payload = this.withoutEmptyOptionalFields({
-      api_id: this.endpointForm.value.apiId,
-      method: this.endpointForm.value.method ?? 'GET',
-      path: this.endpointForm.value.path ?? '',
-      label: this.endpointForm.value.label ?? '',
-      description: this.endpointForm.value.description ?? '',
-      is_active: true,
-      request_schema: this.buildRequestSchema(!!this.sourceForm.value.includeId),
-      response_schema: this.buildResponseSchema(
-        this.sourceForm.value.outputShape === 'table'
-          ? this.safeStepId(this.sourceForm.value.table ?? 'data')
-          : 'data',
-        !!this.sourceForm.value.includeId
-      ),
-      execution_plan: executionPlan,
-      response_mapping: responseMapping,
-    });
+    const payload = this.withoutEmptyOptionalFields(
+      this.mapper.toEndpointPayload({
+        apiId: this.endpointForm.value.apiId,
+        method: this.endpointForm.value.method ?? 'GET',
+        path: this.endpointForm.value.path ?? '',
+        label: this.endpointForm.value.label ?? '',
+        description: this.endpointForm.value.description ?? '',
+        isActive: true,
+        requestSchema: this.buildRequestSchema(
+          !!this.sourceForm.value.includeId
+        ),
+        responseSchema: this.buildResponseSchema(
+          this.sourceForm.value.outputShape === 'table'
+            ? this.safeStepId(this.sourceForm.value.table ?? 'data')
+            : 'data',
+          !!this.sourceForm.value.includeId
+        ),
+        executionPlan,
+        responseMapping,
+      })
+    );
 
-    const normalizedPath = String(payload.path ?? '').trim();
-    const normalizedMethod = String(payload.method ?? 'GET').toUpperCase();
+    const normalizedPath = String((payload as any).path ?? '').trim();
+    const normalizedMethod = String(
+      (payload as any).method ?? 'GET'
+    ).toUpperCase();
     const duplicate = this.endpoints.find(endpoint => {
       const endpointId = endpoint.id;
       if (this.selectedEndpointId && endpointId === this.selectedEndpointId) {
@@ -1886,7 +2005,7 @@ export class DfApiBuilderComponent implements OnInit {
       const endpointPath = String(endpoint.path ?? '').trim();
       const endpointMethod = String(endpoint.method ?? '').toUpperCase();
       return (
-        endpointApiId === payload.api_id &&
+        endpointApiId === (payload as any).api_id &&
         endpointPath === normalizedPath &&
         endpointMethod === normalizedMethod
       );
