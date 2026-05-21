@@ -372,15 +372,19 @@ type OpenApiDocument = {
                   <span>
                     <strong>Relationships</strong>
                     <small
-                      >Detected from DreamFactory schema. Phase 3 will use these
-                      for cross-resource payloads.</small
+                      >Choose related resources to include in the same
+                      call.</small
                     >
                   </span>
                 </div>
                 <div class="relationship-grid">
-                  <span
+                  <mat-checkbox
                     class="relationship-pill"
-                    *ngFor="let relationship of sourceRelationships">
+                    *ngFor="let relationship of sourceRelationships"
+                    [checked]="isRelationshipSelected(relationship.name)"
+                    (change)="
+                      toggleRelationship(relationship.name, $event.checked)
+                    ">
                     <strong>{{
                       relationship.label || titleFromName(relationship.name)
                     }}</strong>
@@ -392,7 +396,7 @@ type OpenApiDocument = {
                           'related table'
                       }}
                     </small>
-                  </span>
+                  </mat-checkbox>
                 </div>
               </section>
 
@@ -421,7 +425,11 @@ type OpenApiDocument = {
 
                 <div
                   class="filter-row"
-                  *ngFor="let filter of filterRules; let i = index">
+                  *ngFor="
+                    let filter of filterRules;
+                    let i = index;
+                    trackBy: trackByFilterIndex
+                  ">
                   <mat-form-field appearance="outline">
                     <mat-label>Field</mat-label>
                     <mat-select
@@ -535,7 +543,9 @@ type OpenApiDocument = {
                     endpointForm.invalid || saving || !canGenerateFromSource
                   ">
                   <mat-icon>add_link</mat-icon>
-                  {{ selectedEndpointId ? 'Update Endpoint' : 'Save Endpoint' }}
+                  {{
+                    selectedEndpointId ? 'Update Endpoint' : 'Create Endpoint'
+                  }}
                 </button>
                 <button
                   mat-stroked-button
@@ -548,10 +558,6 @@ type OpenApiDocument = {
                 <button mat-button type="button" (click)="openApiDocs()">
                   <mat-icon>description</mat-icon>
                   API Docs
-                </button>
-                <button mat-button type="button" (click)="newEndpoint()">
-                  <mat-icon>add</mat-icon>
-                  New Endpoint
                 </button>
               </div>
 
@@ -608,8 +614,31 @@ type OpenApiDocument = {
 
         <mat-card class="side-panel">
           <mat-card-header>
-            <mat-card-title>Endpoints</mat-card-title>
-            <mat-card-subtitle>Saved routes in this API.</mat-card-subtitle>
+            <div class="endpoints-header-row">
+              <div>
+                <mat-card-title>Endpoints</mat-card-title>
+                <mat-card-subtitle>Saved routes in this API.</mat-card-subtitle>
+              </div>
+              <div class="endpoint-actions">
+                <button
+                  mat-button
+                  type="button"
+                  [disabled]="!selectedEndpointId"
+                  (click)="duplicateSelectedEndpoint()">
+                  <mat-icon>content_copy</mat-icon>
+                  Duplicate
+                </button>
+                <button
+                  mat-flat-button
+                  color="primary"
+                  type="button"
+                  [disabled]="!selectedApiId"
+                  (click)="newEndpoint()">
+                  <mat-icon>add</mat-icon>
+                  New Endpoint
+                </button>
+              </div>
+            </div>
           </mat-card-header>
           <mat-card-content>
             <div class="list">
@@ -678,6 +707,20 @@ type OpenApiDocument = {
         display: grid;
         gap: 16px;
         grid-template-columns: minmax(520px, 1fr) minmax(280px, 0.34fr);
+      }
+
+      .endpoints-header-row {
+        align-items: center;
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        width: 100%;
+      }
+
+      .endpoint-actions {
+        align-items: center;
+        display: flex;
+        gap: 8px;
       }
 
       .api-list {
@@ -1087,8 +1130,23 @@ export class DfApiBuilderComponent implements OnInit {
   sourceRelationships: SourceRelationship[] = [];
   sourceOpenApiPaths: string[] = [];
   selectedFields = new Set<string>();
+  selectedRelationships = new Set<string>();
+  private pendingSelectedFieldNames: string[] | null = null;
   filterRules: FilterRule[] = [];
   fieldSearch = '';
+  private readonly textOperators: FilterOperatorOption[] = [
+    { value: '=', label: 'equals' },
+    { value: '!=', label: 'does not equal' },
+    { value: 'like', label: 'contains' },
+  ];
+  private readonly comparableOperators: FilterOperatorOption[] = [
+    { value: '=', label: 'equals' },
+    { value: '!=', label: 'does not equal' },
+    { value: '>', label: 'greater than' },
+    { value: '>=', label: 'greater than or equal' },
+    { value: '<', label: 'less than' },
+    { value: '<=', label: 'less than or equal' },
+  ];
   loading = false;
   saving = false;
   editorOpen = false;
@@ -1278,16 +1336,20 @@ export class DfApiBuilderComponent implements OnInit {
 
   loadSourceServices(): void {
     this.http
-      .get<GenericListResponse<SourceService>>(`${BASE_URL}/system/service`, {
-        params: { fields: 'name,label,type', limit: 500 },
-      })
+      .get<GenericListResponse<SourceService & { is_active?: boolean }>>(
+        `${BASE_URL}/system/service`,
+        {
+          params: { fields: 'name,label,type,is_active', limit: 500 },
+        }
+      )
       .subscribe({
         next: response => {
           const services = response.resource ?? [];
-          this.sourceServices = services.filter(service =>
-            ['pgsql', 'mysql', 'sqlite', 'sqlsrv', 'oracle', 'ibmdb2'].includes(
-              service.type
-            )
+          this.sourceServices = services.filter(
+            service =>
+              service.name !== 'api_builder' &&
+              service.name !== 'system' &&
+              service.is_active !== false
           );
           // Do not auto-load a sample service on page load.
           // In some local environments demo services (e.g. sample_pgsql)
@@ -1309,20 +1371,22 @@ export class DfApiBuilderComponent implements OnInit {
     this.sourceRelationships = [];
     this.sourceOpenApiPaths = [];
     this.selectedFields.clear();
+    this.selectedRelationships.clear();
     this.sourceForm.patchValue({ table: '' });
 
     this.http
-      .get<SourceSchemaResponse>(
-        `${BASE_URL}/api_builder/schema/${serviceName}`
+      .get<GenericListResponse<SourceTable>>(
+        `${BASE_URL}/${serviceName}/_schema`,
+        {
+          params: { fields: 'name,label' },
+        }
       )
       .subscribe({
         next: response => {
-          const tables = ((response.resource ?? []) as SourceTable[]).map(
-            table => ({
-              ...table,
-              source: table.source ?? 'schema',
-            })
-          );
+          const tables = (response.resource ?? []).map(table => ({
+            ...table,
+            source: 'schema' as const,
+          }));
           if (tables.length) {
             this.setSourceTables(tables);
             return;
@@ -1357,6 +1421,25 @@ export class DfApiBuilderComponent implements OnInit {
   }
 
   loadTablesFromSchema(serviceName: string): void {
+    const serviceType = this.sourceServices.find(
+      service => service.name === serviceName
+    )?.type;
+    const isDatabaseService = [
+      'pgsql',
+      'mysql',
+      'sqlite',
+      'sqlsrv',
+      'oracle',
+      'ibmdb2',
+    ].includes(String(serviceType));
+
+    if (!isDatabaseService) {
+      this.toast(
+        'This source API does not expose table schema metadata for field selection.'
+      );
+      return;
+    }
+
     this.http
       .get<GenericListResponse<SourceTable>>(
         `${BASE_URL}/${serviceName}/_table`,
@@ -1379,12 +1462,17 @@ export class DfApiBuilderComponent implements OnInit {
 
   setSourceTables(tables: SourceTable[]): void {
     this.sourceTables = tables;
-    const customers =
+    const preferredTable = this.sourceForm.value.table;
+    const preferred = preferredTable
+      ? this.sourceTables.find(table => table.name === preferredTable)
+      : undefined;
+    const defaultTable =
+      preferred ??
       this.sourceTables.find(table => table.name === 'customers') ??
       this.sourceTables[0];
-    if (customers) {
-      this.sourceForm.patchValue({ table: customers.name });
-      this.loadFields(customers.name);
+    if (defaultTable) {
+      this.sourceForm.patchValue({ table: defaultTable.name });
+      this.loadFields(defaultTable.name);
     }
   }
 
@@ -1400,29 +1488,53 @@ export class DfApiBuilderComponent implements OnInit {
     this.fieldSearch = '';
 
     this.http
-      .get<SourceSchemaResponse>(
-        `${BASE_URL}/api_builder/schema/${serviceName}/${tableName}`
-      )
+      .get<{
+        field?: SourceField[];
+        related?: any[];
+      }>(`${BASE_URL}/${serviceName}/_schema/${tableName}`)
       .subscribe({
         next: response => {
-          this.sourceFields = ((response.resource ?? []) as SourceField[]).map(
-            field => ({
-              ...field,
-              label: field.label || this.titleFromName(field.name),
-            })
+          this.sourceFields = (response.field ?? []).map(field => ({
+            ...field,
+            label: field.label || this.titleFromName(field.name),
+          }));
+          this.sourceRelationships = this.mapRelatedToRelationships(
+            response.related
           );
-          this.sourceRelationships = response.relationships ?? [];
-          this.sourceFields.forEach(field =>
-            this.selectedFields.add(field.name)
-          );
+          if (this.pendingSelectedFieldNames?.length) {
+            const allowed = new Set(this.pendingSelectedFieldNames);
+            this.sourceFields.forEach(field => {
+              if (allowed.has(field.name)) {
+                this.selectedFields.add(field.name);
+              }
+            });
+            this.pendingSelectedFieldNames = null;
+          } else {
+            this.sourceFields.forEach(field =>
+              this.selectedFields.add(field.name)
+            );
+          }
           this.generateEndpointFromSource();
         },
-        error: () => this.toast('Could not load table fields.'),
+        error: () => this.loadFieldsFromOpenApi(tableName),
       });
   }
 
   isFieldSelected(fieldName: string): boolean {
     return this.selectedFields.has(fieldName);
+  }
+
+  isRelationshipSelected(relationshipName: string): boolean {
+    return this.selectedRelationships.has(relationshipName);
+  }
+
+  toggleRelationship(relationshipName: string, checked: boolean): void {
+    if (checked) {
+      this.selectedRelationships.add(relationshipName);
+    } else {
+      this.selectedRelationships.delete(relationshipName);
+    }
+    this.generateEndpointFromSource();
   }
 
   toggleField(fieldName: string, checked: boolean): void {
@@ -1461,7 +1573,7 @@ export class DfApiBuilderComponent implements OnInit {
       ...this.filterRules,
       { field: field.name, operator: '=', value: '' },
     ];
-    this.generateEndpointFromSource();
+    this.markPreviewStale();
   }
 
   removeFilter(index: number): void {
@@ -1476,10 +1588,17 @@ export class DfApiBuilderComponent implements OnInit {
     key: keyof FilterRule,
     value: string | FilterOperator
   ): void {
-    this.filterRules = this.filterRules.map((filter, itemIndex) =>
-      itemIndex === index ? { ...filter, [key]: value } : filter
-    );
+    const filter = this.filterRules[index];
+    if (!filter) {
+      return;
+    }
+
+    (filter as FilterRule)[key] = value as never;
     this.generateEndpointFromSource();
+  }
+
+  trackByFilterIndex(index: number): number {
+    return index;
   }
 
   filterOperatorOptions(fieldName: string): FilterOperatorOption[] {
@@ -1489,21 +1608,10 @@ export class DfApiBuilderComponent implements OnInit {
       this.isNumericField(field) ||
       ['date', 'datetime', 'timestamp'].some(item => type.includes(item))
     ) {
-      return [
-        { value: '=', label: 'equals' },
-        { value: '!=', label: 'does not equal' },
-        { value: '>', label: 'greater than' },
-        { value: '>=', label: 'greater than or equal' },
-        { value: '<', label: 'less than' },
-        { value: '<=', label: 'less than or equal' },
-      ];
+      return this.comparableOperators;
     }
 
-    return [
-      { value: '=', label: 'equals' },
-      { value: '!=', label: 'does not equal' },
-      { value: 'like', label: 'contains' },
-    ];
+    return this.textOperators;
   }
 
   generateEndpointFromSource(): void {
@@ -1525,6 +1633,9 @@ export class DfApiBuilderComponent implements OnInit {
       : `_table/${table}`;
     const filter = this.buildFilterString();
     const params: Record<string, string> = { fields: fields.join(',') };
+    if (this.selectedRelationships.size) {
+      params['related'] = Array.from(this.selectedRelationships).join(',');
+    }
     if (filter) {
       params['filter'] = filter;
     }
@@ -1639,14 +1750,35 @@ export class DfApiBuilderComponent implements OnInit {
   }
 
   openApiDocs(): void {
-    const basePath = this.apiForm.value.basePath;
-    const serviceName = basePath
-      ? basePath.replace(/^\/+|\/+$/g, '')
-      : 'api_builder';
-    window.open(
-      `${window.location.origin}/dreamfactory/dist/#/api-connections/api-docs/${serviceName}`,
-      '_blank'
-    );
+    if (!this.selectedApiId) {
+      this.toast('Save the API first so docs can be generated for it.');
+      return;
+    }
+
+    const selectedApi = this.apis.find(api => api.id === this.selectedApiId);
+    const basePath =
+      selectedApi?.basePath ??
+      selectedApi?.base_path ??
+      this.apiForm.value.basePath ??
+      '';
+    const serviceName = basePath.replace(/^\/+|\/+$/g, '');
+    if (!serviceName) {
+      this.toast('API URL is empty. Set API URL and save before opening docs.');
+      return;
+    }
+
+    this.http.get(`${BASE_URL}/api_docs/${serviceName}`).subscribe({
+      next: () => {
+        window.location.assign(
+          `${window.location.origin}/dreamfactory/dist/#/api-connections/api-docs/${serviceName}`
+        );
+      },
+      error: (error: any) => {
+        this.toast(
+          `Could not load generated OpenAPI spec for ${serviceName}. ${this.describeHttpError(error)}`
+        );
+      },
+    });
   }
 
   saveApi(): void {
@@ -1662,7 +1794,7 @@ export class DfApiBuilderComponent implements OnInit {
             this.apiForm.value.label ||
             'custom_api'
         ),
-      basePath: this.apiForm.value.basePath ?? '',
+      base_path: this.apiForm.value.basePath ?? '',
       label: this.apiForm.value.label ?? '',
       description: this.apiForm.value.description ?? '',
       status: this.apiForm.value.status ?? 'draft',
@@ -1697,11 +1829,17 @@ export class DfApiBuilderComponent implements OnInit {
         ];
         this.selectApi(api.id);
       },
-      error: () => this.toast('Could not save API.'),
+      error: (error: any) =>
+        this.toast(`Could not save API. ${this.describeHttpError(error)}`),
     });
   }
 
   saveEndpoint(): void {
+    if (!this.selectedApiId) {
+      this.toast('Save the API first, then create endpoints inside it.');
+      return;
+    }
+
     if (this.endpointForm.invalid) {
       return;
     }
@@ -1719,26 +1857,53 @@ export class DfApiBuilderComponent implements OnInit {
     }
 
     const payload = this.withoutEmptyOptionalFields({
-      apiId: this.endpointForm.value.apiId,
+      api_id: this.endpointForm.value.apiId,
       method: this.endpointForm.value.method ?? 'GET',
       path: this.endpointForm.value.path ?? '',
       label: this.endpointForm.value.label ?? '',
       description: this.endpointForm.value.description ?? '',
-      isActive: true,
-      requestSchema: this.buildRequestSchema(!!this.sourceForm.value.includeId),
-      responseSchema: this.buildResponseSchema(
+      is_active: true,
+      request_schema: this.buildRequestSchema(!!this.sourceForm.value.includeId),
+      response_schema: this.buildResponseSchema(
         this.sourceForm.value.outputShape === 'table'
           ? this.safeStepId(this.sourceForm.value.table ?? 'data')
           : 'data',
         !!this.sourceForm.value.includeId
       ),
-      executionPlan,
-      responseMapping,
+      execution_plan: executionPlan,
+      response_mapping: responseMapping,
     });
 
-    const request: any = this.selectedEndpointId
+    const normalizedPath = String(payload.path ?? '').trim();
+    const normalizedMethod = String(payload.method ?? 'GET').toUpperCase();
+    const duplicate = this.endpoints.find(endpoint => {
+      const endpointId = endpoint.id;
+      if (this.selectedEndpointId && endpointId === this.selectedEndpointId) {
+        return false;
+      }
+
+      const endpointApiId = endpoint.apiId ?? endpoint.api_id;
+      const endpointPath = String(endpoint.path ?? '').trim();
+      const endpointMethod = String(endpoint.method ?? '').toUpperCase();
+      return (
+        endpointApiId === payload.api_id &&
+        endpointPath === normalizedPath &&
+        endpointMethod === normalizedMethod
+      );
+    });
+
+    let targetEndpointId = this.selectedEndpointId;
+    if (duplicate) {
+      this.toast(
+        `Endpoint ${normalizedMethod} ${normalizedPath} already exists in this API (id ${duplicate.id}). Saving as update.`
+      );
+      this.selectEndpoint(duplicate.id);
+      targetEndpointId = duplicate.id;
+    }
+
+    const request: any = targetEndpointId
       ? this.http.put<EndpointDefinition>(
-          `${BASE_URL}/api_builder/endpoints/${this.selectedEndpointId}`,
+          `${BASE_URL}/api_builder/endpoints/${targetEndpointId}`,
           payload
         )
       : this.http.post<GenericListResponse<EndpointDefinition>>(
@@ -1766,7 +1931,8 @@ export class DfApiBuilderComponent implements OnInit {
         ];
         this.selectEndpoint(endpoint.id);
       },
-      error: () => this.toast('Could not save endpoint.'),
+      error: (error: any) =>
+        this.toast(`Could not save endpoint. ${this.describeHttpError(error)}`),
     });
   }
 
@@ -1841,6 +2007,47 @@ export class DfApiBuilderComponent implements OnInit {
           2
         ),
       });
+
+      const execution = (endpoint.executionPlan ?? endpoint.execution_plan) as
+        | { steps?: any[] }
+        | undefined;
+      const step = Array.isArray(execution?.steps)
+        ? execution?.steps?.[0]
+        : null;
+      const resource = String(step?.resource ?? '');
+      const service = String(step?.service ?? '');
+      const tableMatch = resource.match(
+        /^_table\/([^/{]+)(?:\/\{path\.id\})?$/
+      );
+      const table = tableMatch?.[1] ?? '';
+      const includeId = resource.endsWith('/{path.id}');
+      const params = (step?.params ?? {}) as Record<string, unknown>;
+      const fields = String(params['fields'] ?? '')
+        .split(',')
+        .map(item => item.trim())
+        .filter(Boolean);
+      const related = String(params['related'] ?? '')
+        .split(',')
+        .map(item => item.trim())
+        .filter(Boolean);
+      const order = String(params['order'] ?? '');
+      const [sortField = '', sortDirection = 'ASC'] = order.split(/\s+/, 2);
+      const limit = Number(params['limit'] ?? 25);
+
+      if (service && table) {
+        this.pendingSelectedFieldNames = fields.length ? fields : null;
+        this.selectedRelationships = new Set(related);
+        this.sourceForm.patchValue({
+          service,
+          table,
+          includeId,
+          sortField,
+          sortDirection: sortDirection || 'ASC',
+          limit: Number.isFinite(limit) && limit > 0 ? limit : 25,
+        });
+        this.filterRules = this.parseFilters(String(params['filter'] ?? ''));
+        this.loadTables(service);
+      }
     }
     this.testForm.patchValue({ endpointId: id });
   }
@@ -1872,28 +2079,78 @@ export class DfApiBuilderComponent implements OnInit {
   }
 
   newEndpoint(): void {
+    if (!this.selectedApiId) {
+      this.toast('Save the API first, then add endpoints to it.');
+      return;
+    }
+
     this.selectedEndpointId = null;
+    this.pendingSelectedFieldNames = null;
     this.endpointForm.reset({
       apiId: this.selectedApiId,
       method: 'GET',
-      path: '/customers/{id}/summary',
+      path: '',
       label: '',
       description: '',
-      executionPlan: this.sampleExecutionPlan(),
-      responseMapping: this.sampleResponseMapping(),
+      executionPlan: '{}',
+      responseMapping: '{}',
     });
     this.testForm.patchValue({ endpointId: null });
+    this.testResult = '';
+    this.previewResult = '';
+    this.previewStale = false;
+
+    this.selectedFields.clear();
+    this.selectedRelationships.clear();
     this.filterRules = [];
+    this.sourceTables = [];
+    this.sourceFields = [];
+    this.sourceRelationships = [];
     this.sourceForm.patchValue({
+      service: '',
+      table: '',
       includeId: false,
       sortField: '',
       sortDirection: 'ASC',
       limit: 25,
       outputShape: 'data',
     });
-    if (this.canGenerateFromSource) {
-      this.generateEndpointFromSource();
+  }
+
+  duplicateSelectedEndpoint(): void {
+    const selected = this.endpoints.find(
+      endpoint => endpoint.id === this.selectedEndpointId
+    );
+
+    if (!selected || !this.selectedApiId) {
+      this.toast('Select an endpoint to duplicate.');
+      return;
     }
+
+    this.selectEndpoint(selected.id);
+
+    const sourcePath = String(selected.path ?? '').trim();
+    const duplicatePath = sourcePath
+      ? sourcePath.endsWith('-copy')
+        ? sourcePath
+        : `${sourcePath}-copy`
+      : '/new-endpoint';
+
+    const sourceLabel = String(selected.label ?? '').trim();
+    const duplicateLabel = sourceLabel
+      ? sourceLabel.endsWith(' (copy)')
+        ? sourceLabel
+        : `${sourceLabel} (copy)`
+      : 'Copied endpoint';
+
+    this.selectedEndpointId = null;
+    this.endpointForm.patchValue({
+      apiId: this.selectedApiId,
+      path: duplicatePath,
+      label: duplicateLabel,
+    });
+    this.testForm.patchValue({ endpointId: null });
+    this.toast('Endpoint duplicated into a new draft. Save to create it.');
   }
 
   loadSample(): void {
@@ -1991,15 +2248,144 @@ export class DfApiBuilderComponent implements OnInit {
   private tablesFromOpenApi(paths: string[]): SourceTable[] {
     const tableNames = new Set<string>();
     paths.forEach(path => {
-      const match = path.match(/^\/_table\/([^/{]+)$/);
-      if (match?.[1]) {
-        tableNames.add(match[1]);
+      const tableMatch = path.match(/^\/_table\/([^/{]+)$/);
+      if (tableMatch?.[1]) {
+        tableNames.add(tableMatch[1]);
+        return;
+      }
+
+      const resourceMatch = path.match(/^\/([^/{]+)(?:\/\{[^}]+\})?$/);
+      if (resourceMatch?.[1] && !resourceMatch[1].startsWith('_')) {
+        tableNames.add(resourceMatch[1]);
       }
     });
 
     return Array.from(tableNames)
       .sort((a, b) => a.localeCompare(b))
       .map(name => ({ name, source: 'openapi' }));
+  }
+
+  private loadFieldsFromOpenApi(tableName: string): void {
+    const serviceName = this.sourceForm.value.service;
+    if (!serviceName) {
+      this.toast('Could not load table fields.');
+      return;
+    }
+
+    this.http
+      .get<OpenApiDocument>(`${BASE_URL}/api_docs/${serviceName}`, {
+        params: { expand_schema: true },
+      })
+      .subscribe({
+        next: document => {
+          const fields = this.fieldsFromOpenApi(document, tableName);
+          if (!fields.length) {
+            this.toast('No field schema found in API spec for this resource.');
+            return;
+          }
+
+          this.sourceFields = fields;
+          this.sourceRelationships = [];
+          if (this.pendingSelectedFieldNames?.length) {
+            const allowed = new Set(this.pendingSelectedFieldNames);
+            this.sourceFields.forEach(field => {
+              if (allowed.has(field.name)) {
+                this.selectedFields.add(field.name);
+              }
+            });
+            this.pendingSelectedFieldNames = null;
+          } else {
+            this.sourceFields.forEach(field =>
+              this.selectedFields.add(field.name)
+            );
+          }
+          this.generateEndpointFromSource();
+        },
+        error: () => this.toast('Could not load table fields.'),
+      });
+  }
+
+  private fieldsFromOpenApi(
+    document: OpenApiDocument,
+    resourceName: string
+  ): SourceField[] {
+    const paths = document.paths ?? {};
+    const candidatePaths = [
+      `/_table/${resourceName}`,
+      `/${resourceName}`,
+      `/${resourceName}/{id}`,
+    ];
+
+    for (const path of candidatePaths) {
+      const pathItem = paths[path] as Record<string, any> | undefined;
+      const getOperation = pathItem?.['get'];
+      const schema =
+        getOperation?.responses?.['200']?.content?.['application/json']?.schema;
+      const rowSchema = this.resolveRowSchema(schema);
+      const properties = rowSchema?.properties as
+        | Record<string, any>
+        | undefined;
+      if (!properties) {
+        continue;
+      }
+
+      return Object.entries(properties).map(([name, propertySchema]) => ({
+        name,
+        label: this.titleFromName(name),
+        type: this.sourceFieldTypeFromOpenApi(
+          propertySchema as Record<string, unknown>
+        ),
+        openapi: propertySchema as Record<string, unknown>,
+      }));
+    }
+
+    return [];
+  }
+
+  private resolveRowSchema(schema: any): any {
+    if (!schema || typeof schema !== 'object') {
+      return null;
+    }
+
+    if (schema.type === 'object' && schema.properties) {
+      const values = Object.values(schema.properties as Record<string, any>);
+      const arrayProperty = values.find(
+        value => value?.type === 'array' && value?.items
+      );
+      return arrayProperty?.items ?? schema;
+    }
+
+    if (schema.type === 'array' && schema.items) {
+      return schema.items;
+    }
+
+    return null;
+  }
+
+  private sourceFieldTypeFromOpenApi(schema: Record<string, unknown>): string {
+    const type = String(schema?.['type'] ?? 'string');
+    const format = String(schema?.['format'] ?? '');
+    return format ? `${type}:${format}` : type;
+  }
+
+  private mapRelatedToRelationships(related?: any[]): SourceRelationship[] {
+    if (!Array.isArray(related)) {
+      return [];
+    }
+
+    return related
+      .map((item: any) => ({
+        name: String(item?.name ?? item?.field ?? ''),
+        label: String(
+          item?.label ??
+            this.titleFromName(String(item?.name ?? item?.field ?? ''))
+        ),
+        type: String(item?.type ?? 'relationship'),
+        field: String(item?.field ?? ''),
+        refTable: String(item?.ref_table ?? item?.table ?? ''),
+        refField: String(item?.ref_field ?? item?.id_field ?? ''),
+      }))
+      .filter(item => !!item.name);
   }
 
   private buildFilterString(): string {
@@ -2012,6 +2398,43 @@ export class DfApiBuilderComponent implements OnInit {
           : `${filter.field}${filter.operator}${value}`;
       })
       .join(' AND ');
+  }
+
+  private parseFilters(filterString: string): FilterRule[] {
+    if (!filterString.trim()) {
+      return [];
+    }
+
+    return filterString
+      .split(/\s+AND\s+/i)
+      .map(part => part.trim())
+      .filter(Boolean)
+      .map(part => {
+        const likeMatch = part.match(/^([A-Za-z0-9_]+)\s+like\s+'?(.*?)'?$/i);
+        if (likeMatch) {
+          const [, field, value] = likeMatch;
+          return {
+            field,
+            operator: 'like' as FilterOperator,
+            value: value.replace(/^%|%$/g, ''),
+          };
+        }
+
+        const opMatch = part.match(
+          /^([A-Za-z0-9_]+)\s*(=|!=|>=|<=|>|<)\s*'?(.+?)'?$/
+        );
+        if (opMatch) {
+          const [, field, operator, value] = opMatch;
+          return {
+            field,
+            operator: operator as FilterOperator,
+            value,
+          };
+        }
+
+        return null;
+      })
+      .filter((rule): rule is FilterRule => !!rule);
   }
 
   private formatFilterValue(filter: FilterRule): string {
@@ -2167,6 +2590,27 @@ export class DfApiBuilderComponent implements OnInit {
 
   private safeStepId(value: string): string {
     return value.replace(/[^A-Za-z0-9_]+/g, '_');
+  }
+
+  private describeHttpError(error: any): string {
+    const message =
+      error?.error?.context?.resource?.[0]?.message ??
+      error?.error?.message ??
+      error?.message ??
+      'Unknown error.';
+    const normalized = String(message)
+      .replace(/\s+/g, ' ')
+      .replace(/&quot;/g, '"')
+      .trim();
+
+    if (
+      normalized.includes('Duplicate entry') &&
+      normalized.includes('api_id_method_path_unique')
+    ) {
+      return 'An endpoint with the same HTTP method and path already exists in this API.';
+    }
+
+    return normalized;
   }
 
   titleFromName(value: string): string {
