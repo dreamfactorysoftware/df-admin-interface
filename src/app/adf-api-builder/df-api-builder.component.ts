@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, HostListener, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -274,7 +274,7 @@ type OpenApiDocument = {
             <form
               [formGroup]="endpointForm"
               class="endpoint-shell"
-              (ngSubmit)="saveEndpoint()">
+              (ngSubmit)="saveEndpoint(false)">
               <div class="route-preview hero-preview">
                 <mat-icon>route</mat-icon>
                 <span>
@@ -564,6 +564,16 @@ type OpenApiDocument = {
                   {{
                     selectedEndpointId ? 'Update Endpoint' : 'Create Endpoint'
                   }}
+                </button>
+                <button
+                  mat-stroked-button
+                  type="button"
+                  [disabled]="
+                    endpointForm.invalid || saving || !canGenerateFromSource
+                  "
+                  (click)="saveEndpoint(true)">
+                  <mat-icon>playlist_add</mat-icon>
+                  Save + New
                 </button>
                 <button
                   mat-stroked-button
@@ -1371,6 +1381,39 @@ export class DfApiBuilderComponent implements OnInit {
     this.loadAll();
   }
 
+  @HostListener('document:keydown', ['$event'])
+  onGlobalShortcut(event: KeyboardEvent): void {
+    if (!this.editorOpen || this.saving) {
+      return;
+    }
+
+    const target = event.target as HTMLElement | null;
+    const tag = target?.tagName?.toLowerCase() ?? '';
+    const isTypingContext =
+      !!target?.closest('input, textarea, [contenteditable="true"], mat-select');
+    if (isTypingContext || ['input', 'textarea', 'select'].includes(tag)) {
+      return;
+    }
+
+    const key = event.key.toLowerCase();
+    if (key === 'n') {
+      event.preventDefault();
+      this.newEndpoint();
+      return;
+    }
+
+    if (key === 'd') {
+      event.preventDefault();
+      this.duplicateSelectedEndpoint();
+      return;
+    }
+
+    if (key === 's') {
+      event.preventDefault();
+      this.saveEndpoint(false);
+    }
+  }
+
   introspectionBadge(service: SourceService): string {
     const t = (service.type || '').toLowerCase();
     if (
@@ -1947,7 +1990,7 @@ export class DfApiBuilderComponent implements OnInit {
     });
   }
 
-  saveEndpoint(): void {
+  saveEndpoint(createAnother = false): void {
     if (!this.selectedApiId) {
       this.toast('Save the API first, then create endpoints inside it.');
       return;
@@ -2043,11 +2086,17 @@ export class DfApiBuilderComponent implements OnInit {
         }
 
         const endpoint = { ...payload, ...saved } as EndpointDefinition;
-        this.toast('Endpoint saved.');
+        this.toast(createAnother ? 'Endpoint saved. Ready for next endpoint.' : 'Endpoint saved.');
         this.endpoints = [
           endpoint,
           ...this.endpoints.filter(existing => existing.id !== endpoint.id),
         ];
+
+        if (createAnother) {
+          this.newEndpoint();
+          return;
+        }
+
         this.selectEndpoint(endpoint.id);
       },
       error: (error: any) =>
