@@ -613,7 +613,10 @@ type WorkflowStep = {
                   color="primary"
                   type="submit"
                   [disabled]="
-                    endpointForm.invalid || saving || !canGenerateFromSource
+                    endpointForm.invalid ||
+                    saving ||
+                    !canGenerateFromSource ||
+                    hasJsonErrors
                   ">
                   <mat-icon>add_link</mat-icon>
                   {{
@@ -624,7 +627,10 @@ type WorkflowStep = {
                   mat-stroked-button
                   type="button"
                   [disabled]="
-                    endpointForm.invalid || saving || !canGenerateFromSource
+                    endpointForm.invalid ||
+                    saving ||
+                    !canGenerateFromSource ||
+                    hasJsonErrors
                   "
                   (click)="saveEndpoint(true)">
                   <mat-icon>playlist_add</mat-icon>
@@ -670,24 +676,6 @@ type WorkflowStep = {
                   <mat-form-field appearance="outline">
                     <mat-label>Path</mat-label>
                     <input matInput formControlName="path" />
-                  </mat-form-field>
-                  <mat-form-field
-                    appearance="outline"
-                    class="span-2 json-field">
-                    <mat-label>Execution Plan JSON</mat-label>
-                    <textarea
-                      matInput
-                      rows="9"
-                      formControlName="executionPlan"></textarea>
-                  </mat-form-field>
-                  <mat-form-field
-                    appearance="outline"
-                    class="span-2 json-field">
-                    <mat-label>Response Mapping JSON</mat-label>
-                    <textarea
-                      matInput
-                      rows="5"
-                      formControlName="responseMapping"></textarea>
                   </mat-form-field>
                 </div>
               </details>
@@ -742,6 +730,78 @@ type WorkflowStep = {
                 <span>No endpoints saved yet.</span>
               </div>
             </div>
+
+            <mat-tab-group class="endpoint-panel-tabs">
+              <mat-tab label="Inspector">
+                <div class="inspector-panel">
+                  <div class="inspector-block">
+                    <strong>Execution Steps</strong>
+                    <div
+                      class="preview-list"
+                      *ngIf="executionStepsPreview.length; else noSteps">
+                      <div
+                        class="preview-row"
+                        *ngFor="let step of executionStepsPreview">
+                        <span>{{ step.title }}</span>
+                        <small>{{ step.detail }}</small>
+                      </div>
+                    </div>
+                    <ng-template #noSteps>
+                      <p class="inspector-empty">
+                        No execution steps in JSON yet.
+                      </p>
+                    </ng-template>
+                  </div>
+
+                  <div class="inspector-block">
+                    <strong>Response Fields</strong>
+                    <div
+                      class="response-tags"
+                      *ngIf="
+                        responseFieldsPreview.length;
+                        else noResponseFields
+                      ">
+                      <span
+                        class="response-tag"
+                        *ngFor="let field of responseFieldsPreview"
+                        >{{ field }}</span
+                      >
+                    </div>
+                    <ng-template #noResponseFields>
+                      <p class="inspector-empty">
+                        No response mapping fields yet.
+                      </p>
+                    </ng-template>
+                  </div>
+                </div>
+              </mat-tab>
+
+              <mat-tab label="Advanced JSON">
+                <div class="advanced-json-panel" [formGroup]="endpointForm">
+                  <mat-form-field appearance="outline" class="json-field">
+                    <mat-label>Execution Plan JSON</mat-label>
+                    <textarea
+                      matInput
+                      rows="10"
+                      formControlName="executionPlan"></textarea>
+                    <mat-error *ngIf="executionPlanError">{{
+                      executionPlanError
+                    }}</mat-error>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="json-field">
+                    <mat-label>Response Mapping JSON</mat-label>
+                    <textarea
+                      matInput
+                      rows="8"
+                      formControlName="responseMapping"></textarea>
+                    <mat-error *ngIf="responseMappingError">{{
+                      responseMappingError
+                    }}</mat-error>
+                  </mat-form-field>
+                </div>
+              </mat-tab>
+            </mat-tab-group>
           </mat-card-content>
         </mat-card>
       </div>
@@ -804,6 +864,48 @@ type WorkflowStep = {
         align-items: center;
         display: flex;
         gap: 8px;
+      }
+
+      .endpoint-panel-tabs {
+        margin-top: 12px;
+      }
+
+      .inspector-panel {
+        display: grid;
+        gap: 12px;
+        padding-top: 12px;
+      }
+
+      .inspector-block {
+        border: 1px solid rgba(127, 127, 127, 0.25);
+        border-radius: 8px;
+        display: grid;
+        gap: 8px;
+        padding: 10px;
+      }
+
+      .inspector-empty {
+        margin: 0;
+        opacity: 0.72;
+      }
+
+      .response-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .response-tag {
+        border: 1px solid rgba(127, 127, 127, 0.3);
+        border-radius: 999px;
+        font-size: 12px;
+        padding: 2px 8px;
+      }
+
+      .advanced-json-panel {
+        display: grid;
+        gap: 10px;
+        padding-top: 12px;
       }
 
       .workflow-strip {
@@ -1503,6 +1605,22 @@ export class DfApiBuilderComponent implements OnInit {
     return Object.keys(mapping);
   }
 
+  get executionPlanError(): string {
+    return this.jsonValidationError(
+      this.endpointForm.controls.executionPlan.errors
+    );
+  }
+
+  get responseMappingError(): string {
+    return this.jsonValidationError(
+      this.endpointForm.controls.responseMapping.errors
+    );
+  }
+
+  get hasJsonErrors(): boolean {
+    return !!this.executionPlanError || !!this.responseMappingError;
+  }
+
   get selectedFieldNames(): string[] {
     return Array.from(this.selectedFields);
   }
@@ -1555,6 +1673,15 @@ export class DfApiBuilderComponent implements OnInit {
 
   ngOnInit(): void {
     this.recentSourceNames = this.readRecentSources();
+    this.validateJsonEditors();
+    this.endpointForm.controls.executionPlan.valueChanges.subscribe(() => {
+      this.validateJsonEditors();
+      this.markPreviewStale();
+    });
+    this.endpointForm.controls.responseMapping.valueChanges.subscribe(() => {
+      this.validateJsonEditors();
+      this.markPreviewStale();
+    });
     this.loadSourceServices();
     this.loadAll();
   }
@@ -2549,6 +2676,64 @@ export class DfApiBuilderComponent implements OnInit {
       pathParams: '{\n  "id": 1\n}',
       query: '{}',
     });
+  }
+
+  private validateJsonEditors(): void {
+    this.applyJsonControlValidation(
+      this.endpointForm.controls.executionPlan,
+      'Execution plan'
+    );
+    this.applyJsonControlValidation(
+      this.endpointForm.controls.responseMapping,
+      'Response mapping'
+    );
+  }
+
+  private applyJsonControlValidation(
+    control: {
+      value: string | null;
+      errors: Record<string, any> | null;
+      setErrors: (errors: Record<string, any> | null) => void;
+    },
+    label: string
+  ): void {
+    const value = control.value ?? '';
+    const nextErrors: Record<string, any> = {
+      ...(control.errors ?? {}),
+    };
+    delete nextErrors['jsonInvalid'];
+
+    if (!value.trim()) {
+      nextErrors['required'] = true;
+    } else {
+      delete nextErrors['required'];
+      try {
+        const parsed = JSON.parse(value);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          nextErrors['jsonInvalid'] = `${label} must be a JSON object.`;
+        }
+      } catch (error: any) {
+        nextErrors['jsonInvalid'] =
+          `${label} JSON is invalid: ${error?.message ?? 'Parse error.'}`;
+      }
+    }
+
+    control.setErrors(Object.keys(nextErrors).length ? nextErrors : null);
+  }
+
+  private jsonValidationError(
+    errors: Record<string, any> | null | undefined
+  ): string {
+    if (!errors) {
+      return '';
+    }
+    if (typeof errors['jsonInvalid'] === 'string') {
+      return errors['jsonInvalid'];
+    }
+    if (errors['required']) {
+      return 'JSON is required.';
+    }
+    return '';
   }
 
   private sampleExecutionPlan(): string {
