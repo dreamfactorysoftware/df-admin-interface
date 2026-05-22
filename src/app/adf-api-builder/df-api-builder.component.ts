@@ -311,7 +311,10 @@ type WorkflowStep = {
                 </button>
               </section>
 
-              <div class="source-builder" [formGroup]="sourceForm" id="workflow-source">
+              <div
+                class="source-builder"
+                [formGroup]="sourceForm"
+                id="workflow-source">
                 <mat-form-field appearance="outline">
                   <mat-label>Find Source API</mat-label>
                   <input
@@ -336,18 +339,39 @@ type WorkflowStep = {
                     </mat-optgroup>
                   </mat-select>
                 </mat-form-field>
+                <div
+                  class="recent-source-chips"
+                  *ngIf="recentSourceServices.length">
+                  <button
+                    mat-stroked-button
+                    type="button"
+                    *ngFor="let recent of recentSourceServices"
+                    (click)="selectRecentSource(recent.name)">
+                    {{ recent.label || recent.name }}
+                  </button>
+                </div>
+                <mat-form-field appearance="outline">
+                  <mat-label>Find Resource</mat-label>
+                  <input
+                    matInput
+                    [value]="sourceTableSearch"
+                    (input)="sourceTableSearch = $any($event.target).value" />
+                </mat-form-field>
                 <mat-form-field appearance="outline">
                   <mat-label>Table</mat-label>
                   <mat-select
                     formControlName="table"
                     (selectionChange)="loadFields($event.value)">
                     <mat-option
-                      *ngFor="let table of sourceTables"
+                      *ngFor="let table of filteredSourceTables"
                       [value]="table.name">
                       {{ table.label || titleFromName(table.name) }}
                     </mat-option>
                   </mat-select>
                 </mat-form-field>
+                <p class="source-hint" *ngIf="sourceIntrospectionHint">
+                  {{ sourceIntrospectionHint }}
+                </p>
                 <mat-checkbox
                   class="id-toggle"
                   formControlName="includeId"
@@ -356,7 +380,10 @@ type WorkflowStep = {
                 </mat-checkbox>
               </div>
 
-              <section class="builder-section" *ngIf="sourceFields.length" id="workflow-shape">
+              <section
+                class="builder-section"
+                *ngIf="sourceFields.length"
+                id="workflow-shape">
                 <div class="section-heading">
                   <span>
                     <strong>Fields</strong>
@@ -921,6 +948,18 @@ type WorkflowStep = {
         padding: 12px;
       }
 
+      .recent-source-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .source-hint {
+        font-size: 12px;
+        margin: 0;
+        opacity: 0.82;
+      }
+
       .source-builder mat-form-field {
         margin-bottom: -20px;
       }
@@ -1220,6 +1259,8 @@ export class DfApiBuilderComponent implements OnInit {
   sourceRelationships: SourceRelationship[] = [];
   sourceOpenApiPaths: string[] = [];
   sourceServiceSearch = '';
+  sourceTableSearch = '';
+  sourceIntrospectionHint = '';
   private readonly recentSourceKey = 'df_api_builder_recent_sources';
   recentSourceNames: string[] = [];
   selectedFields = new Set<string>();
@@ -1310,6 +1351,24 @@ export class DfApiBuilderComponent implements OnInit {
     });
   }
 
+  get filteredSourceTables(): SourceTable[] {
+    const query = this.sourceTableSearch.trim().toLowerCase();
+    if (!query) {
+      return [...this.sourceTables];
+    }
+
+    return this.sourceTables.filter(table => {
+      const haystack = `${table.name} ${table.label ?? ''}`.toLowerCase();
+      return haystack.includes(query);
+    });
+  }
+
+  get recentSourceServices(): SourceService[] {
+    return this.recentSourceNames
+      .map(name => this.sourceServices.find(service => service.name === name))
+      .filter((service): service is SourceService => !!service);
+  }
+
   get groupedSourceServices(): SourceServiceGroup[] {
     const services = this.filteredSourceServices;
     const recent = this.recentSourceNames
@@ -1359,19 +1418,26 @@ export class DfApiBuilderComponent implements OnInit {
       {
         key: 'source',
         label: 'Source',
-        detail: serviceSelected && tableSelected ? 'Service + table selected' : 'Pick service and table',
+        detail:
+          serviceSelected && tableSelected
+            ? 'Service + table selected'
+            : 'Pick service and table',
         complete: serviceSelected && tableSelected,
       },
       {
         key: 'shape',
         label: 'Shape',
-        detail: hasFields ? `${this.selectedFieldNames.length} fields selected` : 'Select fields',
+        detail: hasFields
+          ? `${this.selectedFieldNames.length} fields selected`
+          : 'Select fields',
         complete: hasFields,
       },
       {
         key: 'rules',
         label: 'Rules',
-        detail: hasRuleData ? `${this.filterRules.length} filters` : 'Optional filters',
+        detail: hasRuleData
+          ? `${this.filterRules.length} filters`
+          : 'Optional filters',
         complete: true,
       },
       {
@@ -1383,7 +1449,9 @@ export class DfApiBuilderComponent implements OnInit {
       {
         key: 'output',
         label: 'Output',
-        detail: hasOutput ? `Shape: ${this.sourceForm.value.outputShape}` : 'Set output options',
+        detail: hasOutput
+          ? `Shape: ${this.sourceForm.value.outputShape}`
+          : 'Set output options',
         complete: hasOutput,
       },
       {
@@ -1499,8 +1567,9 @@ export class DfApiBuilderComponent implements OnInit {
 
     const target = event.target as HTMLElement | null;
     const tag = target?.tagName?.toLowerCase() ?? '';
-    const isTypingContext =
-      !!target?.closest('input, textarea, [contenteditable="true"], mat-select');
+    const isTypingContext = !!target?.closest(
+      'input, textarea, [contenteditable="true"], mat-select'
+    );
     if (isTypingContext || ['input', 'textarea', 'select'].includes(tag)) {
       return;
     }
@@ -1532,9 +1601,14 @@ export class DfApiBuilderComponent implements OnInit {
       return 'schema';
     }
     if (['rest', 'soap', 'http'].includes(t)) {
-      return 'openapi';
+      return 'api_docs';
     }
-    return 'limited';
+    return 'no metadata';
+  }
+
+  selectRecentSource(serviceName: string): void {
+    this.sourceForm.patchValue({ service: serviceName });
+    this.loadTables(serviceName);
   }
 
   private rememberRecentSource(serviceName: string): void {
@@ -1634,6 +1708,8 @@ export class DfApiBuilderComponent implements OnInit {
     this.sourceFields = [];
     this.sourceRelationships = [];
     this.sourceOpenApiPaths = [];
+    this.sourceIntrospectionHint = '';
+    this.sourceTableSearch = '';
     this.selectedFields.clear();
     this.selectedRelationships.clear();
     this.sourceForm.patchValue({ table: '' });
@@ -1652,6 +1728,8 @@ export class DfApiBuilderComponent implements OnInit {
             source: 'schema' as const,
           }));
           if (tables.length) {
+            this.sourceIntrospectionHint =
+              'Schema metadata loaded from native service schema.';
             this.setSourceTables(tables);
             return;
           }
@@ -1674,6 +1752,8 @@ export class DfApiBuilderComponent implements OnInit {
             this.sourceOpenApiPaths
           );
           if (tablesFromOpenApi.length) {
+            this.sourceIntrospectionHint =
+              'Using api_docs fallback for resource discovery (native schema unavailable).';
             this.setSourceTables(tablesFromOpenApi);
             return;
           }
@@ -1698,6 +1778,8 @@ export class DfApiBuilderComponent implements OnInit {
     ].includes(String(serviceType));
 
     if (!isDatabaseService) {
+      this.sourceIntrospectionHint =
+        'No metadata available for this source type. Choose a source with schema or api_docs support.';
       this.toast(
         'This source API does not expose table schema metadata for field selection.'
       );
@@ -2196,7 +2278,11 @@ export class DfApiBuilderComponent implements OnInit {
         }
 
         const endpoint = { ...payload, ...saved } as EndpointDefinition;
-        this.toast(createAnother ? 'Endpoint saved. Ready for next endpoint.' : 'Endpoint saved.');
+        this.toast(
+          createAnother
+            ? 'Endpoint saved. Ready for next endpoint.'
+            : 'Endpoint saved.'
+        );
         this.endpoints = [
           endpoint,
           ...this.endpoints.filter(existing => existing.id !== endpoint.id),
