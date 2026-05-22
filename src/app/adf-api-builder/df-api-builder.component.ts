@@ -1850,18 +1850,30 @@ export class DfApiBuilderComponent implements OnInit {
       )
       .subscribe({
         next: response => {
-          const tables = (response.resource ?? []).map(table => ({
-            ...table,
-            source: 'schema' as const,
-          }));
-          if (tables.length) {
-            this.sourceIntrospectionHint =
-              'Schema metadata loaded from native service schema.';
-            this.setSourceTables(tables);
-            return;
-          }
+          try {
+            const rawTables = Array.isArray(response?.resource)
+              ? response.resource
+              : [];
+            const tables = rawTables.map(table => ({
+              ...table,
+              source: 'schema' as const,
+            }));
+            if (tables.length) {
+              this.sourceIntrospectionHint =
+                'Schema metadata loaded from native service schema.';
+              this.setSourceTables(tables);
+              return;
+            }
 
-          this.loadTablesFromOpenApi(serviceName);
+            this.loadTablesFromOpenApi(serviceName);
+          } catch (error) {
+            console.error('Failed to process source schema table list', {
+              serviceName,
+              response,
+              error,
+            });
+            this.loadTablesFromOpenApi(serviceName);
+          }
         },
         error: () => this.loadTablesFromOpenApi(serviceName),
       });
@@ -1967,27 +1979,40 @@ export class DfApiBuilderComponent implements OnInit {
       }>(`${BASE_URL}/${serviceName}/_schema/${tableName}`)
       .subscribe({
         next: response => {
-          this.sourceFields = (response.field ?? []).map(field => ({
-            ...field,
-            label: field.label || this.titleFromName(field.name),
-          }));
-          this.sourceRelationships = this.mapRelatedToRelationships(
-            response.related
-          );
-          if (this.pendingSelectedFieldNames?.length) {
-            const allowed = new Set(this.pendingSelectedFieldNames);
-            this.sourceFields.forEach(field => {
-              if (allowed.has(field.name)) {
-                this.selectedFields.add(field.name);
-              }
-            });
-            this.pendingSelectedFieldNames = null;
-          } else {
-            this.sourceFields.forEach(field =>
-              this.selectedFields.add(field.name)
+          try {
+            const rawFields = Array.isArray(response?.field)
+              ? response.field
+              : [];
+            this.sourceFields = rawFields.map(field => ({
+              ...field,
+              label: field.label || this.titleFromName(field.name),
+            }));
+            this.sourceRelationships = this.mapRelatedToRelationships(
+              Array.isArray(response?.related) ? response.related : []
             );
+            if (this.pendingSelectedFieldNames?.length) {
+              const allowed = new Set(this.pendingSelectedFieldNames);
+              this.sourceFields.forEach(field => {
+                if (allowed.has(field.name)) {
+                  this.selectedFields.add(field.name);
+                }
+              });
+              this.pendingSelectedFieldNames = null;
+            } else {
+              this.sourceFields.forEach(field =>
+                this.selectedFields.add(field.name)
+              );
+            }
+            this.generateEndpointFromSource();
+          } catch (error) {
+            console.error('Failed to process source fields response', {
+              serviceName,
+              tableName,
+              response,
+              error,
+            });
+            this.loadFieldsFromOpenApi(tableName);
           }
-          this.generateEndpointFromSource();
         },
         error: () => this.loadFieldsFromOpenApi(tableName),
       });
