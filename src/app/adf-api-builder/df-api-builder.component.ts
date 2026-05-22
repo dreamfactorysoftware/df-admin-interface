@@ -2562,7 +2562,8 @@ export class DfApiBuilderComponent implements OnInit {
             limit: Number.isFinite(limit) && limit > 0 ? limit : 25,
           });
           this.filterRules = this.parseFilters(String(params['filter'] ?? ''));
-          this.loadTables(service);
+          this.sourceIntrospectionHint =
+            'Source metadata loading is paused while stabilizing endpoint editor. Use Refresh Source Metadata to reload fields.';
         }
       } catch (error: any) {
         console.error('Failed to load endpoint into builder', {
