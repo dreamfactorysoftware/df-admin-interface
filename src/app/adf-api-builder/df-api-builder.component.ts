@@ -2481,63 +2481,75 @@ export class DfApiBuilderComponent implements OnInit {
     this.selectedEndpointId = id;
     const endpoint = this.endpoints.find(item => item.id === id);
     if (endpoint) {
-      this.endpointForm.patchValue({
-        apiId: endpoint.apiId ?? endpoint.api_id ?? this.selectedApiId,
-        method: endpoint.method,
-        path: endpoint.path,
-        label: endpoint.label ?? '',
-        description: endpoint.description ?? '',
-        executionPlan: JSON.stringify(
-          endpoint.executionPlan ?? endpoint.execution_plan ?? {},
-          null,
-          2
-        ),
-        responseMapping: JSON.stringify(
-          endpoint.responseMapping ?? endpoint.response_mapping ?? {},
-          null,
-          2
-        ),
-      });
-
-      const execution = (endpoint.executionPlan ?? endpoint.execution_plan) as
-        | { steps?: any[] }
-        | undefined;
-      const step = Array.isArray(execution?.steps)
-        ? execution?.steps?.[0]
-        : null;
-      const resource = String(step?.resource ?? '');
-      const service = String(step?.service ?? '');
-      const tableMatch = resource.match(
-        /^_table\/([^/{]+)(?:\/\{path\.id\})?$/
-      );
-      const table = tableMatch?.[1] ?? '';
-      const includeId = resource.endsWith('/{path.id}');
-      const params = (step?.params ?? {}) as Record<string, unknown>;
-      const fields = String(params['fields'] ?? '')
-        .split(',')
-        .map(item => item.trim())
-        .filter(Boolean);
-      const related = String(params['related'] ?? '')
-        .split(',')
-        .map(item => item.trim())
-        .filter(Boolean);
-      const order = String(params['order'] ?? '');
-      const [sortField = '', sortDirection = 'ASC'] = order.split(/\s+/, 2);
-      const limit = Number(params['limit'] ?? 25);
-
-      if (service && table) {
-        this.pendingSelectedFieldNames = fields.length ? fields : null;
-        this.selectedRelationships = new Set(related);
-        this.sourceForm.patchValue({
-          service,
-          table,
-          includeId,
-          sortField,
-          sortDirection: sortDirection || 'ASC',
-          limit: Number.isFinite(limit) && limit > 0 ? limit : 25,
+      try {
+        this.endpointForm.patchValue({
+          apiId: endpoint.apiId ?? endpoint.api_id ?? this.selectedApiId,
+          method: endpoint.method,
+          path: endpoint.path,
+          label: endpoint.label ?? '',
+          description: endpoint.description ?? '',
+          executionPlan: JSON.stringify(
+            endpoint.executionPlan ?? endpoint.execution_plan ?? {},
+            null,
+            2
+          ),
+          responseMapping: JSON.stringify(
+            endpoint.responseMapping ?? endpoint.response_mapping ?? {},
+            null,
+            2
+          ),
         });
-        this.filterRules = this.parseFilters(String(params['filter'] ?? ''));
-        this.loadTables(service);
+
+        const execution = (endpoint.executionPlan ??
+          endpoint.execution_plan) as { steps?: any[] } | undefined;
+        const step = Array.isArray(execution?.steps)
+          ? execution?.steps?.[0]
+          : null;
+        const resource = String(step?.resource ?? '');
+        const service = String(step?.service ?? '');
+        const tableMatch = resource.match(
+          /^_table\/([^/{]+)(?:\/\{path\.id\})?$/
+        );
+        const table = tableMatch?.[1] ?? '';
+        const includeId = resource.endsWith('/{path.id}');
+        const params = (step?.params ?? {}) as Record<string, unknown>;
+        const fields = String(params['fields'] ?? '')
+          .split(',')
+          .map(item => item.trim())
+          .filter(Boolean);
+        const related = String(params['related'] ?? '')
+          .split(',')
+          .map(item => item.trim())
+          .filter(Boolean);
+        const order = String(params['order'] ?? '');
+        const [sortField = '', sortDirection = 'ASC'] = order.split(/\s+/, 2);
+        const limit = Number(params['limit'] ?? 25);
+
+        if (service && table) {
+          this.pendingSelectedFieldNames = fields.length ? fields : null;
+          this.selectedRelationships = new Set(related);
+          this.sourceForm.patchValue({
+            service,
+            table,
+            includeId,
+            sortField,
+            sortDirection: sortDirection || 'ASC',
+            limit: Number.isFinite(limit) && limit > 0 ? limit : 25,
+          });
+          this.filterRules = this.parseFilters(String(params['filter'] ?? ''));
+          this.loadTables(service);
+        }
+      } catch (error: any) {
+        console.error('Failed to load endpoint into builder', {
+          endpointId: id,
+          error,
+          endpoint,
+        });
+        this.toast(
+          `Could not load endpoint ${id} into the builder. ${error?.message ?? ''}`
+        );
+        this.newEndpoint();
+        return;
       }
     }
     this.testForm.patchValue({ endpointId: id });
