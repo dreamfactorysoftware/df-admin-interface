@@ -836,7 +836,8 @@
                 <df-ai-model-picker
                   *ngIf="serviceForm.getRawValue().type === 'ai_connection'"
                   class="full-width"
-                  [form]="serviceForm"></df-ai-model-picker>
+                  [form]="serviceForm"
+                  [serviceId]="edit && serviceData ? serviceData.id : null"></df-ai-model-picker>
 
                 <!-- AI Connection: allowed-roles multi-select. Replaces
                      the auto-rendered allowed_roles JSON text field.
