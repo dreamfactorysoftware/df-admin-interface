@@ -28,6 +28,11 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { DfArrayFieldComponent } from 'src/app/shared/components/df-field-array/df-array-field.component';
 import { DfDynamicFieldComponent } from 'src/app/shared/components/df-dynamic-field/df-dynamic-field.component';
+import { DfRoleScopeComponent } from 'src/app/shared/components/df-role-scope/df-role-scope.component';
+import { DfAiChatPrereqsComponent } from 'src/app/adf-ai-chat/components/df-ai-chat-prereqs/df-ai-chat-prereqs.component';
+import { DfAiTestConnectionComponent } from 'src/app/shared/components/df-ai-test-connection/df-ai-test-connection.component';
+import { DfAiModelPickerComponent } from 'src/app/shared/components/df-ai-model-picker/df-ai-model-picker.component';
+import { DfAiAllowedRolesComponent } from 'src/app/shared/components/df-ai-allowed-roles/df-ai-allowed-roles.component';
 import { DfAceEditorComponent } from 'src/app/shared/components/df-ace-editor/df-ace-editor.component';
 import { DfSecurityConfigComponent } from 'src/app/shared/components/df-security-config/df-security-config.component';
 
@@ -54,6 +59,7 @@ import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service'
 import { Service } from 'src/app/shared/types/files';
 import { AceEditorMode } from 'src/app/shared/types/scripts';
 import { DfScriptEditorComponent } from 'src/app/shared/components/df-script-editor/df-script-editor.component';
+import { DfLinkServiceComponent } from 'src/app/shared/components/df-link-service/df-link-service.component';
 import { DfFileGithubComponent } from 'src/app/shared/components/df-file-github/df-file-github.component';
 import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
 import {
@@ -148,12 +154,18 @@ interface ServiceResponse {
     MatCheckboxModule,
     NgTemplateOutlet,
     DfDynamicFieldComponent,
+    DfRoleScopeComponent,
+    DfAiChatPrereqsComponent,
+    DfAiTestConnectionComponent,
+    DfAiModelPickerComponent,
+    DfAiAllowedRolesComponent,
     DfArrayFieldComponent,
     DfAceEditorComponent,
     FontAwesomeModule,
     MatTooltipModule,
     MatButtonModule,
     DfScriptEditorComponent,
+    DfLinkServiceComponent,
     DfFileGithubComponent,
     DfPaywallComponent,
     MatStepperModule,
@@ -261,7 +273,12 @@ export class DfServiceDetailsComponent implements OnInit {
   editingToolIndex: number | null = null;
   customToolForm!: FormGroup;
   availableLookups: Array<{ name: string }> = [];
-  availableScmServices: Array<{ id: number; name: string; label: string; type: string }> = [];
+  availableScmServices: Array<{
+    id: number;
+    name: string;
+    label: string;
+    type: string;
+  }> = [];
   @ViewChild('functionEditor') functionEditor: DfAceEditorComponent;
   @ViewChild('headersEditor') headersEditor: DfAceEditorComponent;
   @ViewChild('unsavedToolDialog')
@@ -1226,8 +1243,11 @@ export class DfServiceDetailsComponent implements OnInit {
       })
       .subscribe({
         next: (res: any) => {
-          this.availableScmServices = (res?.resource ?? res?.services ?? [])
-            .filter((s: any) => s.id && s.name);
+          this.availableScmServices = (
+            res?.resource ??
+            res?.services ??
+            []
+          ).filter((s: any) => s.id && s.name);
         },
         error: () => {
           this.availableScmServices = [];
@@ -1251,7 +1271,10 @@ export class DfServiceDetailsComponent implements OnInit {
 
     const service = this.availableScmServices.find(s => s.id === serviceId);
     if (!service) {
-      this.snackbarService.openSnackBar('Selected SCM service not found.', 'error');
+      this.snackbarService.openSnackBar(
+        'Selected SCM service not found.',
+        'error'
+      );
       return;
     }
 
@@ -1265,7 +1288,10 @@ export class DfServiceDetailsComponent implements OnInit {
         next: (content: string) => {
           this.customToolForm.get('function')?.setValue(content);
           this.liveFunctionValue = content;
-          this.snackbarService.openSnackBar('Function loaded from repository.', 'success');
+          this.snackbarService.openSnackBar(
+            'Function loaded from repository.',
+            'success'
+          );
         },
         error: (err: any) => {
           this.snackbarService.openSnackBar(
@@ -1549,6 +1575,29 @@ export class DfServiceDetailsComponent implements OnInit {
 
   getConfigControl(name: string) {
     return this.serviceForm.get(`config.${name}`) as FormControl;
+  }
+
+  // df-service-details camelCases all schema field names when building the
+  // form (see getConfigSchema -> snakeToCamelString). So ai_role_id is
+  // exposed on the form as aiRoleId, ai_service_id as aiServiceId, etc.
+  get aiRoleId(): number | null {
+    const c = this.serviceForm.get('config.aiRoleId');
+    const v = c?.value;
+    return typeof v === 'number' ? v : null;
+  }
+
+  get aiServiceId(): number | null {
+    const c = this.serviceForm.get('config.aiServiceId');
+    const v = c?.value;
+    return typeof v === 'number' ? v : null;
+  }
+
+  setAiServiceId(id: number): void {
+    this.serviceForm.get('config.aiServiceId')?.setValue(id);
+  }
+
+  setAiRoleId(id: number): void {
+    this.serviceForm.get('config.aiRoleId')?.setValue(id);
   }
 
   getServiceDocByServiceIdControl(name: string) {

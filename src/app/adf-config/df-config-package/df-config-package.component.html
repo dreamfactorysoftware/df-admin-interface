@@ -1,0 +1,106 @@
+<section class="config-package">
+  <header class="config-package__header">
+    <div>
+      <p class="config-package__eyebrow">Portable configuration</p>
+      <h2>Config Import / Export</h2>
+      <p>
+        Move DreamFactory services, roles, and app bindings between instances.
+        The package uses stable names instead of database IDs, so binary
+        quickstart work can move into shared test and production environments.
+      </p>
+    </div>
+    <button mat-flat-button color="primary" (click)="exportConfig()">
+      <fa-icon [icon]="faDownload"></fa-icon>
+      Export config
+    </button>
+  </header>
+
+  <mat-card class="config-package__notice">
+    <mat-card-content>
+      <fa-icon [icon]="faTriangleExclamation"></fa-icon>
+      <span>
+        Packages include services, roles, role service access, and apps. Service
+        connection settings may include credentials; review exports before
+        sharing them outside your team.
+      </span>
+    </mat-card-content>
+  </mat-card>
+
+  <div class="config-package__grid">
+    <mat-card class="config-package__panel">
+      <mat-card-header>
+        <mat-card-title>Export</mat-card-title>
+        <mat-card-subtitle
+          >Generate a portable JSON manifest.</mat-card-subtitle
+        >
+      </mat-card-header>
+      <mat-card-content>
+        <div class="config-package__actions">
+          <button
+            mat-stroked-button
+            [disabled]="!exportedJson"
+            (click)="downloadExport()">
+            <fa-icon [icon]="faDownload"></fa-icon>
+            Download JSON
+          </button>
+          <button
+            mat-stroked-button
+            [disabled]="!exportedJson"
+            (click)="useExportForImport()">
+            <fa-icon [icon]="faFileImport"></fa-icon>
+            Use for import
+          </button>
+        </div>
+        <mat-form-field appearance="outline" class="config-package__field">
+          <mat-label>Portable JSON manifest</mat-label>
+          <textarea
+            matInput
+            readonly
+            rows="20"
+            [ngModel]="exportedJson"
+            placeholder="Click Export config to generate a manifest."></textarea>
+        </mat-form-field>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="config-package__panel">
+      <mat-card-header>
+        <mat-card-title>Import</mat-card-title>
+        <mat-card-subtitle
+          >Apply a manifest to this instance.</mat-card-subtitle
+        >
+      </mat-card-header>
+      <mat-card-content>
+        <mat-form-field appearance="outline" class="config-package__field">
+          <mat-label>Paste manifest JSON</mat-label>
+          <textarea
+            matInput
+            rows="20"
+            [(ngModel)]="importJson"
+            placeholder='{ "format": "dreamfactory.config/v1", ... }'></textarea>
+        </mat-form-field>
+
+        <mat-checkbox [(ngModel)]="overwrite">
+          Overwrite existing services, roles, and apps with matching names
+        </mat-checkbox>
+      </mat-card-content>
+      <mat-card-actions align="end">
+        <button
+          mat-flat-button
+          color="primary"
+          [disabled]="loading || !importJson.trim()"
+          (click)="importConfig()">
+          <fa-icon [icon]="faFileImport"></fa-icon>
+          Import config
+        </button>
+      </mat-card-actions>
+    </mat-card>
+  </div>
+
+  <div class="config-package__status" *ngIf="loading">
+    <mat-spinner diameter="26"></mat-spinner>
+    <span>Working...</span>
+  </div>
+  <pre class="config-package__message" *ngIf="message">{{ message }}</pre>
+  <div class="config-package__error" *ngIf="error">{{ error }}</div>
+</section>

@@ -16,7 +16,7 @@ export class DfGenerateApiCardComponent {
   @Input() icon: IconDefinition;
   @Input() headerText: string;
   @Input() text: string;
-  @Input() routerLink: string;
+  @Input() route: string;
   @Input() cardFinalBackgroundColor: string;
   @Input() cardFinalHeaderColor: string;
 }

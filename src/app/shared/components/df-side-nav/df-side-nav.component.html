@@ -147,7 +147,7 @@
 </div>
 
 <ng-template #navList let-items>
-  <ng-container *ngFor="let item of items">
+  <ng-container *ngFor="let item of items; trackBy: trackByNavPath">
     <div mat-list-item *ngIf="!item.subRoutes; else subRoutes">
       <!--
         Leaf nav items are <a routerLink> instead of <button (click)>.
@@ -160,7 +160,7 @@
       <a
         mat-flat-button
         class="nav-item"
-        [routerLink]="item.path"
+        [routerLink]="navLink(item)"
         [attr.data-testid]="navTestId(item.path)"
         [class.active]="isActive(item)"
         [class.commercial-feature]="isFeatureLocked(item.path, licenseType)"
@@ -170,7 +170,7 @@
           <ng-container *ngIf="item?.icon">
             <img [src]="item.icon" [alt]="item.path" />
           </ng-container>
-          {{ navLabel(item.path) | transloco }}
+          {{ navLabel(item.labelPath || item.path) | transloco }}
         </span>
       </a>
     </div>
@@ -181,11 +181,12 @@
         [expanded]="isActive(item)">
         <mat-expansion-panel-header
           class="parent-route"
-          [attr.data-testid]="navGroupTestId(item.path)">
+          [attr.data-testid]="navGroupTestId(item.path)"
+          (click)="handleNavClick(item)">
           <span class="nav-item">
             <ng-container *ngIf="item?.icon">
               <img [src]="item.icon" [alt]="item.path" /> </ng-container
-            >{{ navLabel(item.path) | transloco }}
+            >{{ navLabel(item.labelPath || item.path) | transloco }}
           </span>
         </mat-expansion-panel-header>
         <mat-nav-list>

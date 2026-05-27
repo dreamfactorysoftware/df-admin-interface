@@ -705,13 +705,31 @@
         <ng-container *ngIf="this.isScriptService">
           <!-- Script Content - Always visible -->
           <ng-container *ngIf="getConfigControl('storageServiceId')">
+            <df-link-service
+              [cache]="
+                serviceForm.get('name')?.value ||
+                (serviceData ? serviceData.name : '')
+              "
+              [cacheScope]="'service'"
+              [storageServiceId]="serviceData ? serviceData.name : 'new'"
+              [storagePath]="getConfigControl('storagePath')"
+              [content]="getConfigControl('content')"
+              [storageServiceIdControl]="getConfigControl('storageServiceId')"
+              [scmRepositoryControl]="getConfigControl('scmRepository')"
+              [scmReferenceControl]="
+                getConfigControl('scmReference')
+              "></df-link-service>
             <df-script-editor
               [isScript]="this.isScriptService"
               [type]="getControl('type')"
               [storageServiceId]="getConfigControl('storageServiceId')"
               [storagePath]="getConfigControl('storagePath')"
               [content]="getConfigControl('content')"
+              [scmRepository]="getConfigControl('scmRepository')"
+              [scmReference]="getConfigControl('scmReference')"
               [cache]="serviceData ? serviceData.name : ''"
+              [hideScmActions]="true"
+              [snapshotTimestamp]="serviceData?.lastModifiedDate"
               class="full-width"></df-script-editor>
           </ng-container>
 
@@ -793,6 +811,41 @@
                 >{{ 'services.options' | transloco }}
               </mat-expansion-panel-header>
               <div class="details-section">
+                <!-- AI Chat: pick a connection + role; hides the integer fields below -->
+                <df-ai-chat-prereqs
+                  *ngIf="serviceForm.getRawValue().type === 'ai_chat'"
+                  class="full-width"
+                  [selectedConnectionId]="aiServiceId"
+                  [selectedRoleId]="aiRoleId"
+                  (selectConnection)="setAiServiceId($event)"
+                  (selectRole)="setAiRoleId($event)"></df-ai-chat-prereqs>
+
+                <!-- AI Connection: validate provider + key without saving first.
+                     `serviceId` lets the backend fall back to the saved api_key
+                     when the form's field is blank — so admins can click Test
+                     without re-typing previously-saved secrets. -->
+                <df-ai-test-connection
+                  *ngIf="serviceForm.getRawValue().type === 'ai_connection'"
+                  class="full-width"
+                  [form]="serviceForm"
+                  [serviceId]="edit && serviceData ? serviceData.id : null"></df-ai-test-connection>
+
+                <!-- AI Connection: model picker — fetches available models
+                     from the provider and writes selection to default_model.
+                     Replaces the auto-rendered default_model text field. -->
+                <df-ai-model-picker
+                  *ngIf="serviceForm.getRawValue().type === 'ai_connection'"
+                  class="full-width"
+                  [form]="serviceForm"></df-ai-model-picker>
+
+                <!-- AI Connection: allowed-roles multi-select. Replaces
+                     the auto-rendered allowed_roles JSON text field.
+                     Required by df-ai-chat session validation. -->
+                <df-ai-allowed-roles
+                  *ngIf="serviceForm.getRawValue().type === 'ai_connection'"
+                  class="full-width"
+                  [form]="serviceForm"></df-ai-allowed-roles>
+
                 <ng-container
                   *ngIf="
                     this.isFile &&
@@ -819,58 +872,85 @@
                     [mode]="excelMode"></df-ace-editor>
                 </ng-container>
                 <ng-container *ngFor="let item of viewSchema">
+                  <!-- ai_chat: aiServiceId and aiRoleId picked via prereqs panel above
+                       ai_connection: defaultModel picked via model-picker above
+                       ai_connection: allowedRoles picked via allowed-roles chips above
+                       (df-service-details camelCases the schema names) -->
                   <ng-container
                     *ngIf="
-                      item.type === 'text' && item.name === 'content';
-                      else dynamic
+                      !(
+                        serviceForm.getRawValue().type === 'ai_chat' &&
+                        (item.name === 'aiServiceId' ||
+                          item.name === 'aiRoleId')
+                      ) &&
+                      !(
+                        serviceForm.getRawValue().type === 'ai_connection' &&
+                        (item.name === 'defaultModel' ||
+                          item.name === 'allowedRoles')
+                      )
                     ">
-                    <ng-container *ngIf="getConfigControl('storageServiceId')">
-                      <df-script-editor
-                        [type]="getControl('type')"
-                        [storageServiceId]="
-                          getConfigControl('storageServiceId')
-                        "
-                        [storagePath]="getConfigControl('storagePath')"
-                        [content]="getServiceDocByServiceIdControl('content')"
-                        [cache]="serviceData ? serviceData.name : ''"
-                        class="full-width"></df-script-editor>
-                    </ng-container>
-                  </ng-container>
-                  <ng-template #dynamic>
-                    <df-dynamic-field
+                    <ng-container
                       *ngIf="
-                        [
-                          'integer',
-                          'password',
-                          'string',
-                          'text',
-                          'picklist',
-                          'multi_picklist',
-                          'boolean',
-                          'file_certificate',
-                          'file_certificate_api',
-                        ].includes(item.type)
-                      "
-                      color="primary"
-                      [schema]="item"
-                      [formControl]="getConfigControl(item.name)"
-                      [class.dynamic-width]="
-                        ['file_certificate', 'file_certificate_api'].indexOf(
-                          item.type
-                        ) === -1
-                      "
-                      [class.full-width]="
-                        ['file_certificate', 'file_certificate_api'].indexOf(
-                          item.type
-                        ) !== -1
-                      "></df-dynamic-field>
-                    <df-array-field
-                      *ngIf="item.type === 'array' || item.type === 'object'"
-                      [schema]="item"
-                      [formControl]="getConfigControl(item.name)"
-                      class="full-width"></df-array-field>
-                  </ng-template>
+                        item.type === 'text' && item.name === 'content';
+                        else dynamic
+                      ">
+                      <ng-container
+                        *ngIf="getConfigControl('storageServiceId')">
+                        <df-script-editor
+                          [type]="getControl('type')"
+                          [storageServiceId]="
+                            getConfigControl('storageServiceId')
+                          "
+                          [storagePath]="getConfigControl('storagePath')"
+                          [content]="getServiceDocByServiceIdControl('content')"
+                          [cache]="serviceData ? serviceData.name : ''"
+                          class="full-width"></df-script-editor>
+                      </ng-container>
+                    </ng-container>
+                    <ng-template #dynamic>
+                      <df-dynamic-field
+                        *ngIf="
+                          [
+                            'integer',
+                            'password',
+                            'string',
+                            'text',
+                            'picklist',
+                            'multi_picklist',
+                            'boolean',
+                            'file_certificate',
+                            'file_certificate_api',
+                          ].includes(item.type)
+                        "
+                        color="primary"
+                        [schema]="item"
+                        [formControl]="getConfigControl(item.name)"
+                        [class.dynamic-width]="
+                          ['file_certificate', 'file_certificate_api'].indexOf(
+                            item.type
+                          ) === -1
+                        "
+                        [class.full-width]="
+                          ['file_certificate', 'file_certificate_api'].indexOf(
+                            item.type
+                          ) !== -1
+                        "></df-dynamic-field>
+                      <df-array-field
+                        *ngIf="item.type === 'array' || item.type === 'object'"
+                        [schema]="item"
+                        [formControl]="getConfigControl(item.name)"
+                        class="full-width"></df-array-field>
+                    </ng-template>
+                  </ng-container>
                 </ng-container>
+
+                <!-- AI Chat: show what the AI can see, derived from ai_role_id -->
+                <df-role-scope
+                  *ngIf="
+                    serviceForm.getRawValue().type === 'ai_chat' && aiRoleId
+                  "
+                  class="full-width"
+                  [roleId]="aiRoleId"></df-role-scope>
               </div>
             </mat-expansion-panel>
           </mat-accordion>
@@ -1205,15 +1285,21 @@
               <!-- Link to SCM Service (function tools only) -->
               <div
                 class="scm-link-section"
-                *ngIf="customToolForm.get('toolType')?.value === 'function' && availableScmServices.length > 0"
+                *ngIf="
+                  customToolForm.get('toolType')?.value === 'function' &&
+                  availableScmServices.length > 0
+                "
                 [formGroup]="customToolForm">
-                <mat-expansion-panel [expanded]="!!customToolForm.get('storageServiceId')?.value">
+                <mat-expansion-panel
+                  [expanded]="!!customToolForm.get('storageServiceId')?.value">
                   <mat-expansion-panel-header>
                     <mat-panel-title>Link to Repository</mat-panel-title>
                   </mat-expansion-panel-header>
 
                   <div class="form-row">
-                    <mat-form-field appearance="outline" class="form-field-half">
+                    <mat-form-field
+                      appearance="outline"
+                      class="form-field-half">
                       <mat-label>SCM Service</mat-label>
                       <mat-select formControlName="storageServiceId">
                         <mat-option [value]="null">None</mat-option>
@@ -1223,12 +1309,18 @@
                           {{ svc.label || svc.name }}
                         </mat-option>
                       </mat-select>
-                      <mat-hint>Select a GitHub, GitLab, or Bitbucket service</mat-hint>
+                      <mat-hint
+                        >Select a GitHub, GitLab, or Bitbucket service</mat-hint
+                      >
                     </mat-form-field>
                   </div>
 
-                  <div class="form-row" *ngIf="customToolForm.get('storageServiceId')?.value">
-                    <mat-form-field appearance="outline" class="form-field-third">
+                  <div
+                    class="form-row"
+                    *ngIf="customToolForm.get('storageServiceId')?.value">
+                    <mat-form-field
+                      appearance="outline"
+                      class="form-field-third">
                       <mat-label>Repository</mat-label>
                       <input
                         matInput
@@ -1236,7 +1328,9 @@
                         placeholder="my-repo" />
                     </mat-form-field>
 
-                    <mat-form-field appearance="outline" class="form-field-third">
+                    <mat-form-field
+                      appearance="outline"
+                      class="form-field-third">
                       <mat-label>Branch / Tag</mat-label>
                       <input
                         matInput
@@ -1244,7 +1338,9 @@
                         placeholder="master" />
                     </mat-form-field>
 
-                    <mat-form-field appearance="outline" class="form-field-third">
+                    <mat-form-field
+                      appearance="outline"
+                      class="form-field-third">
                       <mat-label>File Path</mat-label>
                       <input
                         matInput
@@ -1395,7 +1491,11 @@
                     </ng-container>
                     <ng-container *ngIf="tool.toolType === 'function'">
                       <em *ngIf="!tool.storageServiceId">Function</em>
-                      <em *ngIf="tool.storageServiceId">SCM: {{ tool.scmRepository }}/{{ tool.storagePath }}</em>
+                      <em *ngIf="tool.storageServiceId"
+                        >SCM: {{ tool.scmRepository }}/{{
+                          tool.storagePath
+                        }}</em
+                      >
                     </ng-container>
                   </td>
                   <td>{{ tool.description }}</td>

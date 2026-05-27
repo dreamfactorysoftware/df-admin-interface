@@ -3,7 +3,10 @@ import { Component, Inject, OnInit } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoService } from '@ngneat/transloco';
-import { SERVICES_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
+import {
+  SERVICES_SERVICE_TOKEN,
+  SERVICE_TYPE_SERVICE_TOKEN,
+} from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import {
   DfManageTableComponent,
@@ -15,7 +18,7 @@ import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { DfDuplicateDialogComponent } from 'src/app/shared/components/df-duplicate-dialog/df-duplicate-dialog.component';
 import { faCopy } from '@fortawesome/free-solid-svg-icons';
-import { catchError, throwError } from 'rxjs';
+import { catchError, forkJoin, map, of, switchMap, throwError } from 'rxjs';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-manage-services-table',
@@ -33,6 +36,7 @@ export class DfManageServicesTableComponent
 {
   serviceTypes: Array<ServiceType> = [];
   system = false;
+  private scopedByGroups = false;
   constructor(
     router: Router,
     activatedRoute: ActivatedRoute,
@@ -40,6 +44,8 @@ export class DfManageServicesTableComponent
     translateService: TranslocoService,
     @Inject(SERVICES_SERVICE_TOKEN)
     private serviceService: DfBaseCrudService,
+    @Inject(SERVICE_TYPE_SERVICE_TOKEN)
+    private serviceTypeService: DfBaseCrudService,
     dialog: MatDialog
   ) {
     super(router, activatedRoute, liveAnnouncer, translateService, dialog);
@@ -56,8 +62,11 @@ export class DfManageServicesTableComponent
         routeData['system'] ||
         this._activatedRoute.snapshot.parent?.data?.['system'] ||
         false;
-      this.serviceTypes = data?.serviceTypes;
+      this.serviceTypes = data?.serviceTypes ?? [];
       this.allowCreate = !this.system;
+      if (!data?.resource) {
+        this.loadTableData(routeData);
+      }
       if (this.system) {
         this.actions = {
           default: this.actions.default,
@@ -91,6 +100,56 @@ export class DfManageServicesTableComponent
         }
       }
     });
+  }
+
+  private loadTableData(routeData: any): void {
+    const groups: string[] =
+      routeData['groups'] ||
+      this._activatedRoute.snapshot.parent?.data?.['groups'] ||
+      [];
+    this.scopedByGroups = groups.length > 0;
+
+    const serviceTypes$ = groups.length
+      ? forkJoin(
+          groups.map(group =>
+            this.serviceTypeService.getAll<GenericListResponse<ServiceType>>({
+              fields: 'name',
+              additionalParams: [{ key: 'group', value: group }],
+            })
+          )
+        ).pipe(map(groups => groups.map(group => group.resource).flat()))
+      : of([] as ServiceType[]);
+
+    serviceTypes$
+      .pipe(
+        switchMap(serviceTypes => {
+          this.serviceTypes = serviceTypes;
+          const filter =
+            serviceTypes.length > 0
+              ? `${
+                  this.system
+                    ? '(created_by_id is null) and (name != "api_docs") and '
+                    : ''
+                }(type in ("${serviceTypes.map(src => src.name).join('","')}"))`
+              : this.scopedByGroups
+                ? '(id = -1)'
+                : this.system
+                  ? '(created_by_id is null) and (name != "api_docs")'
+                  : undefined;
+
+          return this.serviceService
+            .getAll<GenericListResponse<Service>>({
+              sort: 'name',
+              filter,
+            })
+            .pipe(map(services => ({ ...services, serviceTypes })));
+        })
+      )
+      .subscribe(data => {
+        this.dataSource.data = this.mapDataToTable(data.resource ?? []);
+        this.dataSource.paginator = this.paginator;
+        this.tableLength = data.meta?.count ?? this.dataSource.data.length;
+      });
   }
   override columns = [
     {
@@ -167,6 +226,8 @@ export class DfManageServicesTableComponent
       filter = `${
         filter ? `(${filter}) and ` : ''
       }(type in ("${this.serviceTypes.map(src => src.name).join('","')}"))`;
+    } else if (this.scopedByGroups) {
+      filter = `${filter ? `(${filter}) and ` : ''}(id = -1)`;
     }
 
     this.serviceService

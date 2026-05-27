@@ -91,6 +91,7 @@ export class DfSideNavComponent implements OnInit {
   faPlus = faPlus;
   faRefresh = faRefresh;
   licenseType: string = 'OPEN SOURCE';
+
   constructor(
     private breakpointService: DfBreakpointService,
     private userDataService: DfUserDataService,
@@ -179,25 +180,12 @@ export class DfSideNavComponent implements OnInit {
     const segments = route.replace('/', '').split('/').join('.');
     return `nav.${segments}.nav`;
   }
-  private hasAddedLastEle = false;
+
+  navLink(nav: Nav) {
+    return nav.linkPath ?? nav.path;
+  }
   get breadCrumbs() {
-    const urlParts = this.router.url.split('/');
-    // this.snackbarService.isEditPage$.
-    // if () {
-    let url = '';
-    // }
-    this.snackbarService.isEditPage$.subscribe(isEdit => {
-      if (isEdit) {
-        urlParts.pop();
-        this.snackbarService.snackbarLastEle$.subscribe(lastEle => {
-          urlParts.push(lastEle);
-        });
-        url = urlParts.join('/');
-      } else {
-        url = this.router.url;
-      }
-    });
-    return generateBreadcrumb(routes, url);
+    return generateBreadcrumb(routes, this.router.url);
   }
 
   handleNavClick(nav: Nav) {
@@ -209,8 +197,9 @@ export class DfSideNavComponent implements OnInit {
     // Still useful for programmatic callers (keyboard shortcuts / search)
     // that don't trigger the anchor. No-op when the anchor has already
     // navigated to the same URL.
-    if (this.router.url !== nav.path) {
-      this.router.navigate([nav.path]);
+    const linkPath = this.navLink(nav);
+    if (this.router.url !== linkPath) {
+      this.router.navigate([linkPath]);
     }
   }
 
@@ -223,6 +212,8 @@ export class DfSideNavComponent implements OnInit {
   navGroupTestId(path: string): string {
     return `nav-group-${this.normalizePath(path)}`;
   }
+
+  trackByNavPath = (_: number, item: Nav) => item.path;
 
   private normalizePath(path: string): string {
     return path.replace(/^\/+/, '').replace(/\//g, '-') || 'root';

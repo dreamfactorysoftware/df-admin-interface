@@ -29,6 +29,7 @@ export enum URLS {
   SCRIPT_TYPE = `${BASE_URL}/system/script_type`,
   SCHEDULER = `${BASE_URL}/system/scheduler`,
   SYSTEM_CACHE = `${BASE_URL}/system/cache`,
+  CONFIG_PACKAGE = `${BASE_URL}/system/config_package`,
   EMAIL_TEMPLATES = `${BASE_URL}/system/email_template`,
   LOOKUP_KEYS = `${BASE_URL}/system/lookup`,
   FILES = `${BASE_URL}/files`,
