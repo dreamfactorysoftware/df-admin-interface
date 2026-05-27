@@ -139,14 +139,25 @@ interface NormalizedModel {
   `,
   styles: [
     `
+      /* Theme-flip tokens: dark text/surfaces by default (light mode);
+         the dark-theme class restores the original light-on-dark look. */
+      :host-context(.dark-theme) {
+        --df-ai-fg: rgba(255, 255, 255, 0.85);
+        --df-ai-fg-muted: rgba(255, 255, 255, 0.7);
+        --df-ai-fg-faint: rgba(255, 255, 255, 0.55);
+        --df-ai-surface: rgba(255, 255, 255, 0.02);
+        --df-ai-surface-strong: rgba(255, 255, 255, 0.08);
+        --df-ai-border: rgba(255, 255, 255, 0.08);
+      }
+
       .model-picker {
         display: flex;
         flex-direction: column;
         gap: 0.875rem;
         padding: 1.25rem 1.5rem;
         margin: 1rem 0;
-        background: rgba(255, 255, 255, 0.02);
-        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: var(--df-ai-surface, rgba(0, 0, 0, 0.03));
+        border: 1px solid var(--df-ai-border, rgba(0, 0, 0, 0.12));
         border-radius: 8px;
         font-size: 16px;
 
@@ -186,14 +197,14 @@ interface NormalizedModel {
         }
         &__option-meta {
           font-size: 14px;
-          color: rgba(255, 255, 255, 0.55);
+          color: var(--df-ai-fg-faint, rgba(0, 0, 0, 0.55));
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
         }
 
         &__hint {
           margin: 0;
           font-size: 15px;
-          color: rgba(255, 255, 255, 0.7);
+          color: var(--df-ai-fg-muted, rgba(0, 0, 0, 0.6));
           font-style: italic;
           line-height: 1.5;
         }
@@ -211,7 +222,7 @@ interface NormalizedModel {
         &__current {
           margin: 0;
           font-size: 15px;
-          color: rgba(255, 255, 255, 0.85);
+          color: var(--df-ai-fg, rgba(0, 0, 0, 0.85));
           display: flex;
           align-items: center;
           gap: 0.5rem;
@@ -219,7 +230,7 @@ interface NormalizedModel {
           code {
             font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
             font-size: 14px;
-            background: rgba(255, 255, 255, 0.08);
+            background: var(--df-ai-surface-strong, rgba(0, 0, 0, 0.06));
             padding: 0.2rem 0.5rem;
             border-radius: 3px;
           }
@@ -234,6 +245,11 @@ interface NormalizedModel {
 export class DfAiModelPickerComponent implements OnInit {
   /** Service form. Reads config.{provider, api_key, base_url, ...}, writes config.defaultModel. */
   @Input({ required: true }) form!: FormGroup;
+
+  /** Service id when editing a saved AI Connection. Lets the backend fall
+   *  back to the stored api_key when the form only holds the masked value,
+   *  so "Fetch models" works after the connection has been saved. */
+  @Input() serviceId: number | null = null;
 
   private http = inject(HttpClient);
 
@@ -297,14 +313,20 @@ export class DfAiModelPickerComponent implements OnInit {
 
     // DF camel-cases /api/* response bodies, so saved connections may
     // have baseUrl/apiKey on the form rather than base_url/api_key.
-    const body = {
+    // Never forward the redisplayed protection mask as a real key — null
+    // it and pass service_id so the backend uses the stored secret.
+    const rawApiKey = config.api_key ?? config.apiKey ?? null;
+    const body: Record<string, unknown> = {
       provider,
-      api_key: config.api_key ?? config.apiKey ?? null,
+      api_key: rawApiKey === '**********' ? null : rawApiKey,
       base_url: config.base_url ?? config.baseUrl ?? null,
       organization_id: config.organization_id ?? config.organizationId ?? null,
       extra_headers: config.extra_headers ?? config.extraHeaders ?? null,
       timeout: config.timeout ?? null,
     };
+    if (this.serviceId) {
+      body['service_id'] = this.serviceId;
+    }
 
     this.http
       .post<TestConnectionResponse>('/_internal/ai/test-connection', body)
