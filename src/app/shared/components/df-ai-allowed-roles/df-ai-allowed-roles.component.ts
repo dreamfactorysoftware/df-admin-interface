@@ -87,14 +87,25 @@ interface RoleRow {
   `,
   styles: [
     `
+      /* Theme-flip tokens: dark text/surfaces by default (light mode);
+         the dark-theme class restores the original light-on-dark look. */
+      :host-context(.dark-theme) {
+        --df-ai-fg: rgba(255, 255, 255, 0.9);
+        --df-ai-fg-muted: rgba(255, 255, 255, 0.7);
+        --df-ai-fg-faint: rgba(255, 255, 255, 0.5);
+        --df-ai-surface: rgba(255, 255, 255, 0.02);
+        --df-ai-surface-strong: rgba(255, 255, 255, 0.04);
+        --df-ai-border: rgba(255, 255, 255, 0.08);
+      }
+
       .allowed-roles {
         display: flex;
         flex-direction: column;
         gap: 1rem;
         padding: 1.5rem 1.75rem;
         margin: 1rem 0;
-        background: rgba(255, 255, 255, 0.02);
-        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: var(--df-ai-surface, rgba(0, 0, 0, 0.03));
+        border: 1px solid var(--df-ai-border, rgba(0, 0, 0, 0.12));
         border-radius: 8px;
         font-size: 16px;
 
@@ -117,7 +128,7 @@ interface RoleRow {
 
         &__count {
           font-size: 15px;
-          color: rgba(255, 255, 255, 0.6);
+          color: var(--df-ai-fg-muted, rgba(0, 0, 0, 0.6));
         }
 
         &__action {
@@ -133,7 +144,7 @@ interface RoleRow {
         &__hint {
           margin: 0;
           font-size: 15px;
-          color: rgba(255, 255, 255, 0.75);
+          color: var(--df-ai-fg-muted, rgba(0, 0, 0, 0.7));
           line-height: 1.55;
         }
 
@@ -151,7 +162,7 @@ interface RoleRow {
 
         &__loading,
         &__empty {
-          color: rgba(255, 255, 255, 0.6);
+          color: var(--df-ai-fg-muted, rgba(0, 0, 0, 0.6));
           font-style: italic;
           font-size: 15px;
         }
@@ -176,8 +187,8 @@ interface RoleRow {
           align-items: center;
           gap: 0.5rem;
           padding: 0.55rem 1.05rem;
-          background: rgba(255, 255, 255, 0.04);
-          border: 1px solid rgba(255, 255, 255, 0.1);
+          background: var(--df-ai-surface-strong, rgba(0, 0, 0, 0.05));
+          border: 1px solid var(--df-ai-border, rgba(0, 0, 0, 0.12));
           border-radius: 999px;
           font: inherit;
           font-size: 16px;
@@ -195,7 +206,7 @@ interface RoleRow {
           &--selected {
             border-color: #a78bfa;
             background: rgba(167, 139, 250, 0.18);
-            color: #fff;
+            color: var(--df-ai-fg, rgba(0, 0, 0, 0.87));
           }
         }
 
@@ -209,7 +220,7 @@ interface RoleRow {
 
         &__link {
           font-size: 14px;
-          color: rgba(255, 255, 255, 0.5);
+          color: var(--df-ai-fg-faint, rgba(0, 0, 0, 0.5));
           text-decoration: none;
 
           &:hover {

@@ -171,6 +171,17 @@ interface RoleRow {
   `,
   styles: [
     `
+      /* Theme-flip tokens: dark text/surfaces by default (light mode);
+         the dark-theme class restores the original light-on-dark look. */
+      :host-context(.dark-theme) {
+        --df-ai-fg: rgba(255, 255, 255, 0.9);
+        --df-ai-fg-muted: rgba(255, 255, 255, 0.7);
+        --df-ai-fg-faint: rgba(255, 255, 255, 0.5);
+        --df-ai-surface: rgba(255, 255, 255, 0.02);
+        --df-ai-surface-strong: rgba(255, 255, 255, 0.08);
+        --df-ai-border: rgba(255, 255, 255, 0.1);
+      }
+
       .prereqs {
         border: 1px solid rgba(96, 165, 250, 0.3);
         background: rgba(96, 165, 250, 0.05);
@@ -190,7 +201,7 @@ interface RoleRow {
           }
           p {
             margin: 0;
-            color: rgba(255, 255, 255, 0.75);
+            color: var(--df-ai-fg-muted, rgba(0, 0, 0, 0.7));
             font-size: 15px;
             line-height: 1.55;
           }
@@ -199,7 +210,7 @@ interface RoleRow {
         &__section {
           padding: 1rem 1.25rem;
           border-radius: 6px;
-          background: rgba(255, 255, 255, 0.02);
+          background: var(--df-ai-surface, rgba(0, 0, 0, 0.03));
 
           &--missing {
             background: rgba(220, 53, 69, 0.06);
@@ -226,7 +237,7 @@ interface RoleRow {
         }
 
         &__kind-icon {
-          color: rgba(255, 255, 255, 0.5);
+          color: var(--df-ai-fg-faint, rgba(0, 0, 0, 0.5));
           font-size: 17px;
         }
 
@@ -237,7 +248,7 @@ interface RoleRow {
 
         &__count {
           font-size: 14px;
-          color: rgba(255, 255, 255, 0.6);
+          color: var(--df-ai-fg-muted, rgba(0, 0, 0, 0.6));
         }
 
         &__action {
@@ -270,8 +281,8 @@ interface RoleRow {
           align-items: center;
           gap: 0.5rem;
           padding: 0.55rem 1.05rem;
-          background: rgba(255, 255, 255, 0.04);
-          border: 1px solid rgba(255, 255, 255, 0.1);
+          background: var(--df-ai-surface-strong, rgba(0, 0, 0, 0.05));
+          border: 1px solid var(--df-ai-border, rgba(0, 0, 0, 0.12));
           border-radius: 999px;
           font: inherit;
           font-size: 16px;
@@ -289,7 +300,7 @@ interface RoleRow {
           &--selected {
             border-color: #60a5fa;
             background: rgba(96, 165, 250, 0.18);
-            color: #fff;
+            color: var(--df-ai-fg, rgba(0, 0, 0, 0.87));
           }
         }
 
@@ -304,13 +315,13 @@ interface RoleRow {
         &__pick-hint {
           margin: 0.625rem 0 0;
           font-size: 14px;
-          color: rgba(255, 255, 255, 0.6);
+          color: var(--df-ai-fg-muted, rgba(0, 0, 0, 0.6));
           font-style: italic;
         }
 
         &__link {
           font-size: 12px;
-          color: rgba(255, 255, 255, 0.45);
+          color: var(--df-ai-fg-faint, rgba(0, 0, 0, 0.45));
           text-decoration: none;
 
           &:hover {
@@ -322,7 +333,7 @@ interface RoleRow {
         &__hint {
           margin: 0.5rem 0 0;
           font-size: 13px;
-          color: rgba(255, 255, 255, 0.7);
+          color: var(--df-ai-fg-muted, rgba(0, 0, 0, 0.7));
           line-height: 1.5;
 
           code {
@@ -330,11 +341,11 @@ interface RoleRow {
             font-size: 12px;
             padding: 0.1rem 0.375rem;
             border-radius: 3px;
-            background: rgba(255, 255, 255, 0.08);
+            background: var(--df-ai-surface-strong, rgba(0, 0, 0, 0.06));
           }
 
           strong {
-            color: rgba(255, 255, 255, 0.9);
+            color: var(--df-ai-fg, rgba(0, 0, 0, 0.9));
           }
         }
       }
