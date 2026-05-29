@@ -208,6 +208,7 @@
       "header": "{{nav.api-connections.nav}}",
       "api-types": {
         "nav": "API Types",
+        "header": "{{nav.api-connections.api-types.nav}}",
         "database": {
           "nav": "Database",
           "header": "{{nav.api-connections.api-types.database.nav}}",
