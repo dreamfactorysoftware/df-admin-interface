@@ -49,6 +49,7 @@ export enum ROUTES {
   ADMIN_SETTINGS = 'admin-settings',
   ADMINS = 'admins',
   SCHEMA = 'schema',
+  SCHEMA_CONTRACTS = 'schema-contracts',
   USERS = 'users',
   FILES = 'files',
   LAUNCHPAD = 'launchpad',

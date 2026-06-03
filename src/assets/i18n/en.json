@@ -443,6 +443,10 @@
           }
         }
       },
+      "schema-contracts": {
+        "nav": "Schema Contracts",
+        "header": "{{nav.admin-settings.schema-contracts.nav}}"
+      },
       "users": {
         "nav": "Users",
         "header": "Manage Users",

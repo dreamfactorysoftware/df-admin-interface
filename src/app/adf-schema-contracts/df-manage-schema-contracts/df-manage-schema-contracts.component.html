@@ -1,0 +1,261 @@
+<div class="schema-contracts-page">
+  <header class="page-header">
+    <h1>Schema Contracts</h1>
+    <p class="subhead">
+      Lock the public-API shape of a SQL service. Drift is computed against
+      the live database whenever this page is opened.
+    </p>
+  </header>
+
+  <mat-card class="picker-card">
+    <mat-card-content>
+      <mat-form-field appearance="outline" class="service-picker">
+        <mat-label>SQL service</mat-label>
+        <mat-select
+          [formControl]="serviceControl"
+          (selectionChange)="onServiceChange()"
+        >
+          <mat-option *ngFor="let svc of sqlServices" [value]="svc.name">
+            {{ svc.label || svc.name }} <small>({{ svc.type }})</small>
+          </mat-option>
+        </mat-select>
+        <mat-progress-spinner
+          *ngIf="loadingServices"
+          matSuffix
+          diameter="18"
+          mode="indeterminate"
+        ></mat-progress-spinner>
+      </mat-form-field>
+
+      <button
+        mat-button
+        (click)="refreshTables()"
+        [disabled]="!serviceControl.value || loadingTables"
+      >
+        <mat-icon>refresh</mat-icon>
+        Refresh
+      </button>
+    </mat-card-content>
+  </mat-card>
+
+  <mat-card class="config-card" *ngIf="serviceControl.value && serviceSummary">
+    <mat-card-content>
+      <div class="config-row">
+        <mat-form-field appearance="outline" class="mode-picker">
+          <mat-label>Mode</mat-label>
+          <mat-select [(ngModel)]="pendingMode" (selectionChange)="onConfigEdit()">
+            <mat-option value="none">
+              none <small>— no contract</small>
+            </mat-option>
+            <mat-option value="auto">
+              auto <small>— promote additive drift automatically</small>
+            </mat-option>
+            <mat-option value="strict">
+              strict <small>— every change needs manual promotion</small>
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="retention-input"
+                        *ngIf="pendingMode !== 'none'">
+          <mat-label>Retention (snapshots per table)</mat-label>
+          <input matInput type="number" min="0"
+                 [(ngModel)]="pendingRetention"
+                 (input)="onConfigEdit()"
+                 placeholder="keep all" />
+          <mat-hint>blank = keep all forever</mat-hint>
+        </mat-form-field>
+
+        <button mat-stroked-button color="primary"
+                (click)="saveConfig()"
+                [disabled]="!configDirty || busyAction">
+          Save config
+        </button>
+      </div>
+
+      <mat-divider></mat-divider>
+
+      <div class="action-row">
+        <button mat-stroked-button color="primary"
+                (click)="promote()"
+                [disabled]="busyAction || serviceSummary.mode === 'none'"
+                matTooltip="Compute drift across the service and auto-promote or queue for review per mode">
+          <mat-icon>auto_awesome</mat-icon>
+          Auto-promote
+        </button>
+
+        <button mat-button color="warn"
+                (click)="unlockService()"
+                [disabled]="busyAction || (serviceSummary.snapshotCounts.active === 0 && serviceSummary.mode === 'none')"
+                matTooltip="Archive every active snapshot and clear the service config">
+          <mat-icon>lock_open</mat-icon>
+          Unlock service
+        </button>
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+  <ng-container *ngIf="tablesResponse">
+    <mat-card class="summary-card">
+      <mat-card-content>
+        <div class="summary-grid">
+          <div class="summary-cell">
+            <span class="value">{{ tablesResponse.summary.tablesTotal }}</span>
+            <span class="label">Total tables</span>
+          </div>
+          <div class="summary-cell">
+            <span class="value">{{ tablesResponse.summary.tablesLocked }}</span>
+            <span class="label">Locked</span>
+          </div>
+          <div class="summary-cell">
+            <span class="value">{{ tablesResponse.summary.tablesWithDrift }}</span>
+            <span class="label">With drift</span>
+          </div>
+          <div class="summary-cell breaking" *ngIf="tablesResponse.summary.tablesWithBreaking > 0">
+            <span class="value">{{ tablesResponse.summary.tablesWithBreaking }}</span>
+            <span class="label">Breaking</span>
+          </div>
+          <div class="summary-cell">
+            <span class="value">{{ tablesResponse.mode }}</span>
+            <span class="label">Mode</span>
+          </div>
+
+          <ng-container *ngIf="serviceSummary">
+            <div class="summary-cell" *ngIf="serviceSummary.snapshotCounts.archived > 0">
+              <span class="value">{{ serviceSummary.snapshotCounts.archived }}</span>
+              <span class="label">Archived</span>
+            </div>
+            <div class="summary-cell"
+                 *ngIf="serviceSummary.archiveRetentionCount !== null">
+              <span class="value">{{ serviceSummary.archiveRetentionCount }}</span>
+              <span class="label">Retention</span>
+            </div>
+            <div class="summary-cell"
+                 *ngIf="serviceSummary.latestPromotion">
+              <span class="value date">{{ serviceSummary.latestPromotion | date:'mediumDate' }}</span>
+              <span class="label">Latest lock</span>
+            </div>
+          </ng-container>
+        </div>
+
+        <div *ngIf="tablesResponse.describeError" class="describe-error">
+          <mat-icon>error_outline</mat-icon>
+          Live describe failed: {{ tablesResponse.describeError }}
+          (snapshot data still shown)
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="table-card">
+      <mat-card-content>
+        <table mat-table [dataSource]="tablesResponse.tables" class="contract-table">
+          <ng-container matColumnDef="name">
+            <th mat-header-cell *matHeaderCellDef>Table</th>
+            <td mat-cell *matCellDef="let row">
+              <div class="table-name">
+                <strong>{{ row.name }}</strong>
+                <small *ngIf="row.schema">{{ row.schema }}</small>
+              </div>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="locked">
+            <th mat-header-cell *matHeaderCellDef>Lock</th>
+            <td mat-cell *matCellDef="let row">
+              <ng-container *ngIf="row.locked; else unlocked">
+                <mat-icon class="lock-icon">lock</mat-icon>
+                v{{ row.snapshot?.version }}
+              </ng-container>
+              <ng-template #unlocked>
+                <mat-icon class="lock-icon muted">lock_open</mat-icon>
+                <span class="muted">—</span>
+              </ng-template>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="drift">
+            <th mat-header-cell *matHeaderCellDef>Drift</th>
+            <td mat-cell *matCellDef="let row">
+              <span
+                class="badge"
+                [ngClass]="'badge-' + driftBadge(row).color"
+                [matTooltip]="
+                  row.drift
+                    ? ('breaking: ' + row.drift.summary.breakingCount +
+                       ' • potentially: ' + row.drift.summary.potentiallyBreakingCount +
+                       ' • additive: ' + row.drift.summary.additiveCount +
+                       ' • cosmetic: ' + row.drift.summary.cosmeticCount)
+                    : ''
+                "
+              >
+                {{ driftBadge(row).label }}
+              </span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef class="actions-col">Actions</th>
+            <td mat-cell *matCellDef="let row" class="actions-col">
+              <button
+                mat-stroked-button
+                color="primary"
+                (click)="lock(row)"
+                [disabled]="busyAction"
+              >
+                {{ row.locked ? 'Re-lock' : 'Lock' }}
+              </button>
+
+              <button
+                mat-button
+                (click)="viewDiff(row)"
+                [disabled]="!row.locked || busyAction"
+              >
+                View drift
+              </button>
+
+              <button
+                mat-icon-button
+                [matMenuTriggerFor]="rowMenu"
+                [disabled]="busyAction"
+                matTooltip="More actions"
+                aria-label="More actions"
+              >
+                <mat-icon>more_vert</mat-icon>
+              </button>
+
+              <mat-menu #rowMenu="matMenu">
+                <button mat-menu-item (click)="test(row)">
+                  <mat-icon>science</mat-icon>
+                  <span>Test (preview lock)</span>
+                </button>
+                <button mat-menu-item (click)="viewOpenApi(row)">
+                  <mat-icon>data_object</mat-icon>
+                  <span>OpenAPI schema</span>
+                </button>
+                <button mat-menu-item (click)="viewHistory(row)" [disabled]="!row.locked">
+                  <mat-icon>history</mat-icon>
+                  <span>History</span>
+                </button>
+                <button mat-menu-item (click)="unlock(row)" [disabled]="!row.locked">
+                  <mat-icon color="warn">lock_open</mat-icon>
+                  <span>Unlock</span>
+                </button>
+              </mat-menu>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+        </table>
+
+        <div *ngIf="loadingTables" class="loading-overlay">
+          <mat-progress-spinner diameter="32" mode="indeterminate"></mat-progress-spinner>
+        </div>
+      </mat-card-content>
+    </mat-card>
+  </ng-container>
+
+  <div *ngIf="!serviceControl.value && !loadingServices" class="empty-state">
+    Pick a SQL service above to see its tables and contract status.
+  </div>
+</div>

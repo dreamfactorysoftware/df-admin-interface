@@ -1,0 +1,167 @@
+.schema-contracts-page {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+
+  .page-header {
+    margin-bottom: 16px;
+
+    h1 {
+      margin: 0 0 4px;
+      font-size: 24px;
+      font-weight: 500;
+    }
+
+    .subhead {
+      margin: 0;
+      color: rgba(0, 0, 0, 0.6);
+      font-size: 14px;
+    }
+  }
+
+  .picker-card,
+  .summary-card,
+  .table-card,
+  .config-card {
+    margin-bottom: 16px;
+  }
+
+  .config-card {
+    .config-row {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+
+      .mode-picker     { min-width: 280px; flex: 1; }
+      .retention-input { min-width: 220px; flex: 1; }
+
+      button { margin-top: 8px; }
+    }
+
+    mat-divider { margin: 8px 0 16px; }
+
+    .action-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+  }
+
+  .picker-card mat-card-content {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    flex-wrap: wrap;
+
+    .service-picker {
+      min-width: 320px;
+      flex: 1;
+    }
+  }
+
+  .summary-grid {
+    display: flex;
+    gap: 24px 32px;
+    flex-wrap: wrap;
+    row-gap: 16px;
+
+    .summary-cell {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      min-width: 80px;
+
+      .value {
+        font-size: 28px;
+        font-weight: 500;
+        line-height: 1.1;
+
+        // Dates are wider than numbers — shrink so they fit on one line.
+        &.date {
+          font-size: 18px;
+          font-weight: 400;
+          white-space: nowrap;
+        }
+      }
+      .label {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: rgba(0, 0, 0, 0.55);
+      }
+      &.breaking .value {
+        color: #d32f2f;
+      }
+    }
+  }
+
+  .describe-error {
+    margin-top: 12px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    color: #b00020;
+    font-size: 13px;
+  }
+
+  .contract-table {
+    width: 100%;
+
+    .table-name {
+      display: flex;
+      flex-direction: column;
+      strong { font-weight: 500; }
+      small { color: rgba(0, 0, 0, 0.55); }
+    }
+
+    .lock-icon {
+      vertical-align: middle;
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+      margin-right: 4px;
+      &.muted { color: rgba(0, 0, 0, 0.35); }
+    }
+    .muted { color: rgba(0, 0, 0, 0.4); }
+
+    .actions-col {
+      width: 240px;
+      text-align: right;
+      white-space: nowrap;
+
+      button + button {
+        margin-left: 4px;
+      }
+    }
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: capitalize;
+
+    &-red    { background: #ffebee; color: #b71c1c; }
+    &-orange { background: #fff3e0; color: #e65100; }
+    &-yellow { background: #fffde7; color: #795548; }
+    &-green  { background: #e8f5e9; color: #1b5e20; }
+    &-grey   { background: #f5f5f5; color: rgba(0, 0, 0, 0.55); }
+  }
+
+  .loading-overlay {
+    display: flex;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .empty-state {
+    text-align: center;
+    color: rgba(0, 0, 0, 0.5);
+    padding: 48px 16px;
+    font-size: 14px;
+  }
+}
