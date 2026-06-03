@@ -107,7 +107,10 @@ export class DfSchemaContractsService {
    * List every snapshot version (active + archived) for one table. Metadata
    * only — fetch a specific version's full schema via getSnapshotVersion.
    */
-  listSnapshots(serviceName: string, tableName: string): Observable<SnapshotHistoryResponse> {
+  listSnapshots(
+    serviceName: string,
+    tableName: string
+  ): Observable<SnapshotHistoryResponse> {
     return this.http.get<SnapshotHistoryResponse>(
       `${URLS.SCHEMA_CONTRACT}/${encodeURIComponent(serviceName)}/tables/${encodeURIComponent(tableName)}/snapshots`
     );

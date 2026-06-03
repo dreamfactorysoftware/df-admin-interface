@@ -34,13 +34,27 @@
       flex-wrap: wrap;
       margin-bottom: 8px;
 
-      .mode-picker     { min-width: 280px; flex: 1; }
-      .retention-input { min-width: 220px; flex: 1; }
+      .mode-picker {
+        min-width: 280px;
+        flex: 1;
+      }
+      .enforcement-picker {
+        min-width: 300px;
+        flex: 1;
+      }
+      .retention-input {
+        min-width: 220px;
+        flex: 1;
+      }
 
-      button { margin-top: 8px; }
+      button {
+        margin-top: 8px;
+      }
     }
 
-    mat-divider { margin: 8px 0 16px; }
+    mat-divider {
+      margin: 8px 0 16px;
+    }
 
     .action-row {
       display: flex;
@@ -84,6 +98,14 @@
           font-weight: 400;
           white-space: nowrap;
         }
+
+        // Enforcement is a word, not a number — shrink + emphasize.
+        &.enforcement {
+          font-size: 16px;
+          font-weight: 500;
+          white-space: nowrap;
+          color: #6a1b9a;
+        }
       }
       .label {
         font-size: 12px;
@@ -112,8 +134,12 @@
     .table-name {
       display: flex;
       flex-direction: column;
-      strong { font-weight: 500; }
-      small { color: rgba(0, 0, 0, 0.55); }
+      strong {
+        font-weight: 500;
+      }
+      small {
+        color: rgba(0, 0, 0, 0.55);
+      }
     }
 
     .lock-icon {
@@ -122,9 +148,13 @@
       width: 18px;
       height: 18px;
       margin-right: 4px;
-      &.muted { color: rgba(0, 0, 0, 0.35); }
+      &.muted {
+        color: rgba(0, 0, 0, 0.35);
+      }
     }
-    .muted { color: rgba(0, 0, 0, 0.4); }
+    .muted {
+      color: rgba(0, 0, 0, 0.4);
+    }
 
     .actions-col {
       width: 240px;
@@ -145,11 +175,26 @@
     font-weight: 500;
     text-transform: capitalize;
 
-    &-red    { background: #ffebee; color: #b71c1c; }
-    &-orange { background: #fff3e0; color: #e65100; }
-    &-yellow { background: #fffde7; color: #795548; }
-    &-green  { background: #e8f5e9; color: #1b5e20; }
-    &-grey   { background: #f5f5f5; color: rgba(0, 0, 0, 0.55); }
+    &-red {
+      background: #ffebee;
+      color: #b71c1c;
+    }
+    &-orange {
+      background: #fff3e0;
+      color: #e65100;
+    }
+    &-yellow {
+      background: #fffde7;
+      color: #795548;
+    }
+    &-green {
+      background: #e8f5e9;
+      color: #1b5e20;
+    }
+    &-grey {
+      background: #f5f5f5;
+      color: rgba(0, 0, 0, 0.55);
+    }
   }
 
   .loading-overlay {

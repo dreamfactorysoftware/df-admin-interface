@@ -25,6 +25,7 @@ import { DfSchemaContractsService } from '../services/df-schema-contracts.servic
 import {
   ContractMode,
   PromoteResponse,
+  RuntimeEnforcement,
   ServiceDescriptor,
   ServiceSummary,
   TableEntry,
@@ -80,9 +81,9 @@ const SQL_SERVICE_TYPES: ReadonlySet<string> = new Set([
 })
 export class DfManageSchemaContractsComponent implements OnInit {
   private readonly servicesApi = inject(SERVICES_SERVICE_TOKEN);
-  private readonly contracts   = inject(DfSchemaContractsService);
-  private readonly dialog      = inject(MatDialog);
-  private readonly snackbar    = inject(DfSnackbarService);
+  private readonly contracts = inject(DfSchemaContractsService);
+  private readonly dialog = inject(MatDialog);
+  private readonly snackbar = inject(DfSnackbarService);
 
   readonly serviceControl = new FormControl<string | null>(null);
 
@@ -91,8 +92,8 @@ export class DfManageSchemaContractsComponent implements OnInit {
   serviceSummary: ServiceSummary | null = null;
 
   loadingServices = false;
-  loadingTables   = false;
-  busyAction      = false;
+  loadingTables = false;
+  busyAction = false;
 
   readonly displayedColumns = ['name', 'locked', 'drift', 'actions'];
 
@@ -100,6 +101,7 @@ export class DfManageSchemaContractsComponent implements OnInit {
   // model tracks user intent; we only push to the server when "Save" is hit
   // so the user can experiment before committing.
   pendingMode: ContractMode = 'none';
+  pendingEnforcement: RuntimeEnforcement = 'off';
   pendingRetention: number | null = null;
   configDirty = false;
 
@@ -109,7 +111,8 @@ export class DfManageSchemaContractsComponent implements OnInit {
 
   loadServices(): void {
     this.loadingServices = true;
-    this.servicesApi.getAll<{ resource: ServiceDescriptor[] }>({ limit: 1000, sort: 'name' })
+    this.servicesApi
+      .getAll<{ resource: ServiceDescriptor[] }>({ limit: 1000, sort: 'name' })
       .pipe(catchError(() => of({ resource: [] })))
       .subscribe(({ resource }) => {
         this.sqlServices = (resource ?? []).filter(s =>
@@ -146,11 +149,18 @@ export class DfManageSchemaContractsComponent implements OnInit {
     }
     this.loadingTables = true;
     forkJoin({
-      tables: this.contracts.listTables(name).pipe(catchError(err => {
-        this.notify(`Failed to load tables: ${err?.error?.error?.message ?? err?.message ?? 'unknown error'}`, 'error');
-        return of(null);
-      })),
-      summary: this.contracts.getServiceSummary(name).pipe(catchError(() => of(null))),
+      tables: this.contracts.listTables(name).pipe(
+        catchError(err => {
+          this.notify(
+            `Failed to load tables: ${err?.error?.error?.message ?? err?.message ?? 'unknown error'}`,
+            'error'
+          );
+          return of(null);
+        })
+      ),
+      summary: this.contracts
+        .getServiceSummary(name)
+        .pipe(catchError(() => of(null))),
     }).subscribe(({ tables, summary }) => {
       this.tablesResponse = tables;
       this.serviceSummary = summary;
@@ -158,9 +168,10 @@ export class DfManageSchemaContractsComponent implements OnInit {
 
       // Sync the user-facing form state with what the server actually has.
       // Until the user edits, pending state equals server state.
-      this.pendingMode      = summary?.mode ?? 'none';
+      this.pendingMode = summary?.mode ?? 'none';
+      this.pendingEnforcement = summary?.runtimeEnforcement ?? 'off';
       this.pendingRetention = summary?.archiveRetentionCount ?? null;
-      this.configDirty      = false;
+      this.configDirty = false;
     });
   }
 
@@ -170,45 +181,74 @@ export class DfManageSchemaContractsComponent implements OnInit {
 
   saveConfig(): void {
     const name = this.serviceControl.value;
-    if (!name) { return; }
+    if (!name) {
+      return;
+    }
     this.busyAction = true;
-    this.contracts.updateServiceConfig(name, {
-      mode: this.pendingMode,
-      archiveRetentionCount: this.pendingRetention,
-    })
-      .pipe(catchError(err => {
-        this.notify(`Save failed: ${err?.error?.error?.message ?? 'unknown error'}`, 'error');
-        return of(null);
-      }))
+    this.contracts
+      .updateServiceConfig(name, {
+        mode: this.pendingMode,
+        runtimeEnforcement: this.pendingEnforcement,
+        archiveRetentionCount: this.pendingRetention,
+      })
+      .pipe(
+        catchError(err => {
+          this.notify(
+            `Save failed: ${err?.error?.error?.message ?? 'unknown error'}`,
+            'error'
+          );
+          return of(null);
+        })
+      )
       .subscribe(updated => {
         this.busyAction = false;
         if (updated) {
           this.serviceSummary = updated;
-          this.pendingMode      = updated.mode;
+          this.pendingMode = updated.mode;
+          this.pendingEnforcement = updated.runtimeEnforcement;
           this.pendingRetention = updated.archiveRetentionCount;
-          this.configDirty      = false;
-          this.notify(`${name}: mode=${updated.mode}`, 'success');
+          this.configDirty = false;
+          this.notify(
+            `${name}: mode=${updated.mode}, enforcement=${updated.runtimeEnforcement}`,
+            'success'
+          );
         }
       });
   }
 
   promote(): void {
     const name = this.serviceControl.value;
-    if (!name) { return; }
+    if (!name) {
+      return;
+    }
     this.busyAction = true;
-    this.contracts.promoteService(name)
-      .pipe(catchError(err => {
-        this.notify(`Promote failed: ${err?.error?.error?.message ?? 'unknown error'}`, 'error');
-        return of(null);
-      }))
+    this.contracts
+      .promoteService(name)
+      .pipe(
+        catchError(err => {
+          this.notify(
+            `Promote failed: ${err?.error?.error?.message ?? 'unknown error'}`,
+            'error'
+          );
+          return of(null);
+        })
+      )
       .subscribe((response: PromoteResponse | null) => {
         this.busyAction = false;
-        if (!response) { return; }
+        if (!response) {
+          return;
+        }
         const s = response.summary;
         const parts: string[] = [];
-        if (s.tablesPromoted > 0)    { parts.push(`${s.tablesPromoted} promoted`); }
-        if (s.tablesNeedsReview > 0) { parts.push(`${s.tablesNeedsReview} need review`); }
-        if (s.tablesNoDrift > 0)     { parts.push(`${s.tablesNoDrift} unchanged`); }
+        if (s.tablesPromoted > 0) {
+          parts.push(`${s.tablesPromoted} promoted`);
+        }
+        if (s.tablesNeedsReview > 0) {
+          parts.push(`${s.tablesNeedsReview} need review`);
+        }
+        if (s.tablesNoDrift > 0) {
+          parts.push(`${s.tablesNoDrift} unchanged`);
+        }
         const tone: AlertType = s.tablesNeedsReview > 0 ? 'warning' : 'success';
         this.notify(
           `${name} (${response.mode}): ${parts.join(', ') || 'nothing to do'}`,
@@ -220,16 +260,28 @@ export class DfManageSchemaContractsComponent implements OnInit {
 
   unlockService(): void {
     const name = this.serviceControl.value;
-    if (!name) { return; }
-    if (!confirm(`Archive every active snapshot for "${name}" and clear its mode? Snapshots are kept as history.`)) {
+    if (!name) {
+      return;
+    }
+    if (
+      !confirm(
+        `Archive every active snapshot for "${name}" and clear its mode? Snapshots are kept as history.`
+      )
+    ) {
       return;
     }
     this.busyAction = true;
-    this.contracts.unlockService(name)
-      .pipe(catchError(err => {
-        this.notify(`Unlock service failed: ${err?.error?.error?.message ?? 'unknown error'}`, 'error');
-        return of(null);
-      }))
+    this.contracts
+      .unlockService(name)
+      .pipe(
+        catchError(err => {
+          this.notify(
+            `Unlock service failed: ${err?.error?.error?.message ?? 'unknown error'}`,
+            'error'
+          );
+          return of(null);
+        })
+      )
       .subscribe(result => {
         this.busyAction = false;
         if (result) {
@@ -244,20 +296,31 @@ export class DfManageSchemaContractsComponent implements OnInit {
 
   lock(row: TableEntry): void {
     const service = this.serviceControl.value;
-    if (!service) { return; }
+    if (!service) {
+      return;
+    }
     this.busyAction = true;
-    this.contracts.lockTable(service, row.name)
-      .pipe(catchError(err => {
-        this.notify(`Lock failed: ${err?.error?.error?.message ?? 'unknown error'}`, 'error');
-        return of(null);
-      }))
+    this.contracts
+      .lockTable(service, row.name)
+      .pipe(
+        catchError(err => {
+          this.notify(
+            `Lock failed: ${err?.error?.error?.message ?? 'unknown error'}`,
+            'error'
+          );
+          return of(null);
+        })
+      )
       .subscribe(result => {
         this.busyAction = false;
         if (result) {
           const action = result.lockResult ?? 'updated';
           // "no_change" is an info; "locked" and "promoted" are successes.
           const tone: AlertType = action === 'no_change' ? 'info' : 'success';
-          this.notify(`${row.name}: ${action} (v${result.contractVersion})`, tone);
+          this.notify(
+            `${row.name}: ${action} (v${result.contractVersion})`,
+            tone
+          );
           this.refreshTables();
         }
       });
@@ -265,13 +328,21 @@ export class DfManageSchemaContractsComponent implements OnInit {
 
   unlock(row: TableEntry): void {
     const service = this.serviceControl.value;
-    if (!service) { return; }
+    if (!service) {
+      return;
+    }
     this.busyAction = true;
-    this.contracts.unlockTable(service, row.name)
-      .pipe(catchError(err => {
-        this.notify(`Unlock failed: ${err?.error?.error?.message ?? 'unknown error'}`, 'error');
-        return of(null);
-      }))
+    this.contracts
+      .unlockTable(service, row.name)
+      .pipe(
+        catchError(err => {
+          this.notify(
+            `Unlock failed: ${err?.error?.error?.message ?? 'unknown error'}`,
+            'error'
+          );
+          return of(null);
+        })
+      )
       .subscribe(() => {
         this.busyAction = false;
         this.notify(`${row.name}: unlocked`, 'success');
@@ -281,7 +352,9 @@ export class DfManageSchemaContractsComponent implements OnInit {
 
   viewDiff(row: TableEntry): void {
     const service = this.serviceControl.value;
-    if (!service) { return; }
+    if (!service) {
+      return;
+    }
     this.dialog.open(DfTableDiffDialogComponent, {
       width: '900px',
       maxWidth: '95vw',
@@ -296,7 +369,9 @@ export class DfManageSchemaContractsComponent implements OnInit {
    */
   test(row: TableEntry): void {
     const service = this.serviceControl.value;
-    if (!service) { return; }
+    if (!service) {
+      return;
+    }
     this.dialog.open(DfTableDiffDialogComponent, {
       width: '900px',
       maxWidth: '95vw',
@@ -307,7 +382,9 @@ export class DfManageSchemaContractsComponent implements OnInit {
 
   viewHistory(row: TableEntry): void {
     const service = this.serviceControl.value;
-    if (!service) { return; }
+    if (!service) {
+      return;
+    }
     this.dialog.open(DfSnapshotHistoryDialogComponent, {
       width: '1000px',
       maxWidth: '95vw',
@@ -318,7 +395,9 @@ export class DfManageSchemaContractsComponent implements OnInit {
 
   viewOpenApi(row: TableEntry): void {
     const service = this.serviceControl.value;
-    if (!service) { return; }
+    if (!service) {
+      return;
+    }
     this.dialog.open(DfOpenApiDialogComponent, {
       width: '800px',
       maxWidth: '95vw',
@@ -331,7 +410,10 @@ export class DfManageSchemaContractsComponent implements OnInit {
    * Pick the worst severity present on the table so the row badge reflects
    * the strongest signal, not just the most common one.
    */
-  driftBadge(entry: TableEntry): { label: string; color: 'red' | 'orange' | 'yellow' | 'green' | 'grey' } {
+  driftBadge(entry: TableEntry): {
+    label: string;
+    color: 'red' | 'orange' | 'yellow' | 'green' | 'grey';
+  } {
     if (!entry.locked) {
       return { label: 'unlocked', color: 'grey' };
     }

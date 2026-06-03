@@ -70,9 +70,12 @@ export interface TablesResponse {
  * TablesResponse: focuses on service-wide metadata (mode, retention,
  * snapshot counts, latest promotion) rather than per-table drift.
  */
+export type RuntimeEnforcement = 'off' | 'shape_response' | 'strict';
+
 export interface ServiceSummary {
   service: string;
   mode: ContractMode;
+  runtimeEnforcement: RuntimeEnforcement;
   archiveRetentionCount: number | null;
   snapshotCounts: {
     active: number;
@@ -172,6 +175,7 @@ export interface ServiceDescriptor {
 
 export interface UpdateServiceConfigBody {
   mode?: ContractMode;
+  runtimeEnforcement?: RuntimeEnforcement;
   archiveRetentionCount?: number | null;
 }
 

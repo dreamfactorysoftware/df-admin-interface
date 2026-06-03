@@ -1,13 +1,22 @@
 import { CommonModule } from '@angular/common';
 import { Component, Inject, OnInit, inject } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
+import {
+  MAT_DIALOG_DATA,
+  MatDialogModule,
+  MatDialogRef,
+} from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTabsModule } from '@angular/material/tabs';
 import { Observable, catchError, of } from 'rxjs';
 import { DfSchemaContractsService } from '../services/df-schema-contracts.service';
-import { DriftChange, DriftSummary, TableDiffResponse, TestResponse } from '../types';
+import {
+  DriftChange,
+  DriftSummary,
+  TableDiffResponse,
+  TestResponse,
+} from '../types';
 
 export type DiffDialogMode = 'diff' | 'test';
 
@@ -59,7 +68,9 @@ interface ReportViewModel {
 
     <div mat-dialog-content class="diff-dialog">
       <div *ngIf="loading" class="loading">
-        <mat-progress-spinner diameter="32" mode="indeterminate"></mat-progress-spinner>
+        <mat-progress-spinner
+          diameter="32"
+          mode="indeterminate"></mat-progress-spinner>
       </div>
 
       <div *ngIf="errorMessage" class="error">
@@ -77,38 +88,65 @@ interface ReportViewModel {
                 <em>({{ report.wouldBeAction }})</em>
               </div>
               <div *ngIf="report.activeSnapshotVersion !== null">
-                <strong>Currently active:</strong> v{{ report.activeSnapshotVersion }}
+                <strong>Currently active:</strong> v{{
+                  report.activeSnapshotVersion
+                }}
               </div>
               <div *ngIf="report.activeSnapshotVersion === null">
-                <strong>Currently active:</strong> <em>none (would be initial lock)</em>
+                <strong>Currently active:</strong>
+                <em>none (would be initial lock)</em>
               </div>
             </ng-container>
             <ng-container *ngIf="data.mode === 'diff'">
-              <div><strong>Active version:</strong> v{{ report.activeSnapshotVersion }}</div>
+              <div>
+                <strong>Active version:</strong> v{{
+                  report.activeSnapshotVersion
+                }}
+              </div>
               <div *ngIf="report.activeSnapshotHash">
-                <strong>Hash:</strong> <code>{{ (report.activeSnapshotHash | slice:0:12) }}…</code>
+                <strong>Hash:</strong>
+                <code>{{ report.activeSnapshotHash | slice: 0 : 12 }}…</code>
               </div>
             </ng-container>
             <div><strong>Checked at:</strong> {{ report.checkedAt }}</div>
           </div>
           <div class="status">
-            <span class="status-badge" [class.bad]="report.hasBreaking" [class.good]="!report.hasDrift">
-              {{ report.hasBreaking ? 'BREAKING' : (report.hasDrift ? 'DRIFT' : 'NO DRIFT') }}
+            <span
+              class="status-badge"
+              [class.bad]="report.hasBreaking"
+              [class.good]="!report.hasDrift">
+              {{
+                report.hasBreaking
+                  ? 'BREAKING'
+                  : report.hasDrift
+                    ? 'DRIFT'
+                    : 'NO DRIFT'
+              }}
             </span>
           </div>
         </section>
 
         <section class="counts">
-          <span class="count breaking">{{ report.summary.breakingCount }} breaking</span>
-          <span class="count maybe">{{ report.summary.potentiallyBreakingCount }} maybe-breaking</span>
-          <span class="count additive">{{ report.summary.additiveCount }} additive</span>
-          <span class="count cosmetic">{{ report.summary.cosmeticCount }} cosmetic</span>
+          <span class="count breaking"
+            >{{ report.summary.breakingCount }} breaking</span
+          >
+          <span class="count maybe"
+            >{{ report.summary.potentiallyBreakingCount }} maybe-breaking</span
+          >
+          <span class="count additive"
+            >{{ report.summary.additiveCount }} additive</span
+          >
+          <span class="count cosmetic"
+            >{{ report.summary.cosmeticCount }} cosmetic</span
+          >
         </section>
 
         <mat-tab-group *ngIf="report.hasDrift">
           <mat-tab label="Changes ({{ report.summary.totalChanges }})">
             <ul class="change-list">
-              <li *ngFor="let c of sortedChanges" [class]="'severity-' + c.severity">
+              <li
+                *ngFor="let c of sortedChanges"
+                [class]="'severity-' + c.severity">
                 <span class="kind">{{ c.kind }}</span>
                 <span class="path">{{ c.path }}</span>
                 <details *ngIf="hasInterestingDetail(c)">
@@ -133,111 +171,165 @@ interface ReportViewModel {
       <button mat-button (click)="close()">Close</button>
     </div>
   `,
-  styles: [`
-    .diff-dialog { min-width: 600px; max-height: 70vh; overflow: auto; }
-    .loading, .error { display: flex; justify-content: center; padding: 24px; }
-    .error { color: #b00020; gap: 8px; align-items: center; }
+  styles: [
+    `
+      .diff-dialog {
+        min-width: 600px;
+        max-height: 70vh;
+        overflow: auto;
+      }
+      .loading,
+      .error {
+        display: flex;
+        justify-content: center;
+        padding: 24px;
+      }
+      .error {
+        color: #b00020;
+        gap: 8px;
+        align-items: center;
+      }
 
-    .header-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      padding-bottom: 12px;
-      border-bottom: 1px solid rgba(0,0,0,0.08);
-    }
-    .meta div { font-size: 13px; margin-bottom: 2px; }
-    .meta code { background: #f5f5f5; padding: 1px 4px; border-radius: 3px; }
-    .meta em { color: rgba(0,0,0,0.6); font-style: italic; }
-
-    .status-badge {
-      display: inline-block;
-      padding: 4px 12px;
-      border-radius: 999px;
-      font-weight: 600;
-      font-size: 12px;
-      letter-spacing: 0.5px;
-      background: #fff3e0;
-      color: #e65100;
-
-      &.good { background: #e8f5e9; color: #1b5e20; }
-      &.bad  { background: #ffebee; color: #b71c1c; }
-    }
-
-    .counts {
-      display: flex;
-      gap: 12px;
-      margin: 12px 0;
-      flex-wrap: wrap;
-
-      .count {
-        font-size: 12px;
-        padding: 2px 8px;
-        border-radius: 4px;
+      .header-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        padding-bottom: 12px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+      }
+      .meta div {
+        font-size: 13px;
+        margin-bottom: 2px;
+      }
+      .meta code {
         background: #f5f5f5;
-
-        &.breaking { background: #ffebee; color: #b71c1c; }
-        &.maybe    { background: #fff3e0; color: #e65100; }
-        &.additive { background: #fffde7; color: #795548; }
-        &.cosmetic { color: rgba(0,0,0,0.55); }
+        padding: 1px 4px;
+        border-radius: 3px;
       }
-    }
+      .meta em {
+        color: rgba(0, 0, 0, 0.6);
+        font-style: italic;
+      }
 
-    .change-list {
-      list-style: none;
-      padding: 0;
-      margin: 8px 0 0;
+      .status-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 999px;
+        font-weight: 600;
+        font-size: 12px;
+        letter-spacing: 0.5px;
+        background: #fff3e0;
+        color: #e65100;
 
-      li {
-        display: grid;
-        grid-template-columns: 220px 1fr;
+        &.good {
+          background: #e8f5e9;
+          color: #1b5e20;
+        }
+        &.bad {
+          background: #ffebee;
+          color: #b71c1c;
+        }
+      }
+
+      .counts {
+        display: flex;
         gap: 12px;
-        padding: 8px 0;
-        border-bottom: 1px solid rgba(0,0,0,0.05);
-        align-items: baseline;
+        margin: 12px 0;
+        flex-wrap: wrap;
 
-        .kind {
-          font-family: monospace;
+        .count {
           font-size: 12px;
-          color: rgba(0,0,0,0.7);
-        }
-        .path {
-          font-weight: 500;
-        }
-        details {
-          grid-column: 1 / -1;
-          margin-top: 4px;
-        }
-        pre {
-          background: #fafafa;
-          padding: 8px;
+          padding: 2px 8px;
           border-radius: 4px;
-          font-size: 11px;
-          overflow-x: auto;
-          margin: 4px 0 0;
+          background: #f5f5f5;
+
+          &.breaking {
+            background: #ffebee;
+            color: #b71c1c;
+          }
+          &.maybe {
+            background: #fff3e0;
+            color: #e65100;
+          }
+          &.additive {
+            background: #fffde7;
+            color: #795548;
+          }
+          &.cosmetic {
+            color: rgba(0, 0, 0, 0.55);
+          }
         }
-
-        &.severity-breaking            { border-left: 3px solid #b71c1c; padding-left: 8px; }
-        &.severity-potentially_breaking { border-left: 3px solid #e65100; padding-left: 8px; }
-        &.severity-additive            { border-left: 3px solid #fbc02d; padding-left: 8px; }
-        &.severity-cosmetic            { border-left: 3px solid rgba(0,0,0,0.2); padding-left: 8px; }
       }
-    }
 
-    .candidate-json {
-      background: #fafafa;
-      padding: 12px;
-      border-radius: 4px;
-      font-size: 11px;
-      max-height: 50vh;
-      overflow: auto;
-    }
+      .change-list {
+        list-style: none;
+        padding: 0;
+        margin: 8px 0 0;
 
-    .no-drift {
-      padding: 24px 0;
-      text-align: center;
-      color: rgba(0,0,0,0.55);
-    }
-  `],
+        li {
+          display: grid;
+          grid-template-columns: 220px 1fr;
+          gap: 12px;
+          padding: 8px 0;
+          border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+          align-items: baseline;
+
+          .kind {
+            font-family: monospace;
+            font-size: 12px;
+            color: rgba(0, 0, 0, 0.7);
+          }
+          .path {
+            font-weight: 500;
+          }
+          details {
+            grid-column: 1 / -1;
+            margin-top: 4px;
+          }
+          pre {
+            background: #fafafa;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            overflow-x: auto;
+            margin: 4px 0 0;
+          }
+
+          &.severity-breaking {
+            border-left: 3px solid #b71c1c;
+            padding-left: 8px;
+          }
+          &.severity-potentially_breaking {
+            border-left: 3px solid #e65100;
+            padding-left: 8px;
+          }
+          &.severity-additive {
+            border-left: 3px solid #fbc02d;
+            padding-left: 8px;
+          }
+          &.severity-cosmetic {
+            border-left: 3px solid rgba(0, 0, 0, 0.2);
+            padding-left: 8px;
+          }
+        }
+      }
+
+      .candidate-json {
+        background: #fafafa;
+        padding: 12px;
+        border-radius: 4px;
+        font-size: 11px;
+        max-height: 50vh;
+        overflow: auto;
+      }
+
+      .no-drift {
+        padding: 24px 0;
+        text-align: center;
+        color: rgba(0, 0, 0, 0.55);
+      }
+    `,
+  ],
 })
 export class DfTableDiffDialogComponent implements OnInit {
   private readonly contracts = inject(DfSchemaContractsService);
@@ -268,18 +360,24 @@ export class DfTableDiffDialogComponent implements OnInit {
         : this.contracts.getTableDiff(this.data.service, this.data.table);
 
     source$
-      .pipe(catchError(err => {
-        this.errorMessage = err?.error?.error?.message
-          ?? err?.message
-          ?? 'Failed to load report.';
-        return of(null);
-      }))
+      .pipe(
+        catchError(err => {
+          this.errorMessage =
+            err?.error?.error?.message ??
+            err?.message ??
+            'Failed to load report.';
+          return of(null);
+        })
+      )
       .subscribe(response => {
         this.loading = false;
-        if (!response) { return; }
+        if (!response) {
+          return;
+        }
         this.report = this.toViewModel(response);
         this.sortedChanges = [...response.changes].sort(
-          (a, b) => this.severityRank(a.severity) - this.severityRank(b.severity)
+          (a, b) =>
+            this.severityRank(a.severity) - this.severityRank(b.severity)
         );
         if (response.candidate) {
           this.candidateJson = JSON.stringify(response.candidate, null, 2);
@@ -317,11 +415,16 @@ export class DfTableDiffDialogComponent implements OnInit {
 
   private severityRank(s: string): number {
     switch (s) {
-      case 'breaking':              return 0;
-      case 'potentially_breaking':  return 1;
-      case 'additive':              return 2;
-      case 'cosmetic':              return 3;
-      default:                      return 4;
+      case 'breaking':
+        return 0;
+      case 'potentially_breaking':
+        return 1;
+      case 'additive':
+        return 2;
+      case 'cosmetic':
+        return 3;
+      default:
+        return 4;
     }
   }
 }
