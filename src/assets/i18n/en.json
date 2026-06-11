@@ -136,6 +136,10 @@
     "nextStepFooter": {"header": "Next Step:", "body": "Scroll below to explore generated endpoints that allow you to read, write, and filter your data via REST"}
   },
   "nav": {
+    "api-builder": {
+      "nav": "API Builder",
+      "header": "{{nav.api-builder.nav}}"
+    },
     "error": {
       "header": "Error"
     },
@@ -208,6 +212,7 @@
       "header": "{{nav.api-connections.nav}}",
       "api-types": {
         "nav": "API Types",
+        "header": "{{nav.api-connections.api-types.nav}}",
         "database": {
           "nav": "Database",
           "header": "{{nav.api-connections.api-types.database.nav}}",
@@ -259,6 +264,10 @@
             "nav": "Create Utility API",
             "header": "{{nav.api-connections.api-types.utility.create.nav}}"
           }
+        },
+        "api-builder": {
+          "nav": "API Builder",
+          "header": "{{nav.api-connections.api-types.api-builder.nav}}"
         }
       },
       "role-based-access": {
