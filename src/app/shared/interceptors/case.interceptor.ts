@@ -24,7 +24,14 @@ export const caseInterceptor: HttpInterceptorFn = (
   // bogus names and the script lookup drift from what the backend expects.
   const isSystemEventRequest = /\/system\/event(\?|$|\/)/.test(req.url);
 
-  const skipResponseTransform = isApiDocsRequest || isSystemEventRequest;
+  // Skip response transform for the API Builder preview/test runner. Its response
+  // is live data from the user's endpoint, whose keys are real source columns or
+  // user-defined output aliases (which may be snake_case on purpose) — camelCasing
+  // them would misrepresent what the actual /api/v2/{api}/{endpoint} returns.
+  const isApiBuilderTest = /\/api_builder\/test(\?|$|\/)/.test(req.url);
+
+  const skipResponseTransform =
+    isApiDocsRequest || isSystemEventRequest || isApiBuilderTest;
 
   if (req.url.startsWith('/api') && !(req.body instanceof FormData)) {
     const transformedRequest = req.clone({

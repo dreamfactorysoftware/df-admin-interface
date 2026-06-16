@@ -1,7 +1,15 @@
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { Component, HostListener, OnInit, inject } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  HostListener,
+  OnInit,
+  inject,
+} from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -13,6 +21,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTabsModule } from '@angular/material/tabs';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { finalize } from 'rxjs';
 import { BASE_URL } from '../shared/constants/urls';
 import { GenericListResponse } from '../shared/types/generic-http';
@@ -164,6 +173,7 @@ type WorkflowStep = {
   imports: [
     CommonModule,
     ReactiveFormsModule,
+    MatAutocompleteModule,
     MatButtonModule,
     MatCardModule,
     MatCheckboxModule,
@@ -175,30 +185,30 @@ type WorkflowStep = {
     MatSelectModule,
     MatSnackBarModule,
     MatTabsModule,
+    MatTooltipModule,
   ],
   template: `
     <section class="builder-shell">
       <header class="builder-header">
-        <div>
+        <div *ngIf="!editorOpen">
           <p class="eyebrow">API Builder</p>
-          <h1>{{ editorOpen ? editorTitle : 'Custom APIs' }}</h1>
+          <h1>Custom APIs</h1>
           <p>
-            {{
-              editorOpen
-                ? 'Choose data sources and fields; API Builder generates the route and DreamFactory calls.'
-                : 'Manage built APIs, open one to edit endpoints, or create a new API.'
-            }}
+            Manage built APIs, open one to edit its endpoints, or create a new
+            API.
           </p>
         </div>
+        <a
+          *ngIf="editorOpen"
+          class="back-link"
+          role="button"
+          tabindex="0"
+          (click)="closeEditor()"
+          (keydown.enter)="closeEditor()">
+          <mat-icon>arrow_back</mat-icon>
+          All APIs
+        </a>
         <div class="header-actions">
-          <button
-            mat-button
-            *ngIf="editorOpen"
-            type="button"
-            (click)="closeEditor()">
-            <mat-icon>arrow_back</mat-icon>
-            All APIs
-          </button>
           <button
             mat-flat-button
             color="primary"
@@ -211,7 +221,9 @@ type WorkflowStep = {
         </div>
       </header>
 
-      <mat-progress-bar *ngIf="loading" mode="indeterminate"></mat-progress-bar>
+      <mat-progress-bar
+        *ngIf="loading || saving || previewing"
+        mode="indeterminate"></mat-progress-bar>
 
       <div class="api-list" *ngIf="!editorOpen">
         <mat-card class="create-card" (click)="newApi()">
@@ -232,12 +244,30 @@ type WorkflowStep = {
             <mat-card-subtitle
               >/{{ api.basePath || api.base_path }}</mat-card-subtitle
             >
+            <button
+              mat-icon-button
+              class="api-card-delete"
+              type="button"
+              aria-label="Delete API"
+              matTooltip="Delete API"
+              (click)="deleteApi(api.id, $event)">
+              <mat-icon>delete</mat-icon>
+            </button>
           </mat-card-header>
           <mat-card-content>
             <p>{{ api.description || 'No description yet.' }}</p>
             <div class="card-meta">
-              <span>{{ api.status || 'draft' }}</span>
-              <span>{{ endpointCount(api.id) }} endpoints</span>
+              <span class="status-chip status-{{ api.status || 'draft' }}">{{
+                api.status || 'draft'
+              }}</span>
+              <span class="count-chip">
+                {{ endpointCounts.get(api.id) ?? 0 }}
+                {{
+                  (endpointCounts.get(api.id) ?? 0) === 1
+                    ? 'endpoint'
+                    : 'endpoints'
+                }}
+              </span>
             </div>
           </mat-card-content>
         </mat-card>
@@ -254,557 +284,779 @@ type WorkflowStep = {
         >
       </div>
 
-      <div class="builder-workbench" *ngIf="editorOpen">
-        <mat-card class="endpoint-builder-card">
-          <mat-card-header>
-            <mat-card-title>Build Endpoint</mat-card-title>
-            <mat-card-subtitle>
-              Pick a table, remove fields, add filters, and decide whether the
-              URL accepts an ID.
-            </mat-card-subtitle>
-          </mat-card-header>
-          <mat-card-content>
-            <form
-              [formGroup]="apiForm"
-              class="api-strip"
-              (ngSubmit)="saveApi()">
+      <div class="api-detail" *ngIf="editorOpen">
+        <mat-card class="api-settings-card">
+          <form
+            [formGroup]="apiForm"
+            class="api-settings-form"
+            (ngSubmit)="saveApi()">
+            <div class="api-settings-head">
+              <div class="api-title-block">
+                <p class="eyebrow">Custom API</p>
+                <h2>
+                  {{
+                    apiForm.value.label ||
+                      apiForm.value.basePath ||
+                      'Untitled API'
+                  }}
+                </h2>
+                <code class="base-url" *ngIf="apiForm.value.basePath"
+                  >/api/v2/{{ apiForm.value.basePath }}</code
+                >
+              </div>
+              <div class="api-settings-actions">
+                <span class="status-chip status-{{ apiForm.value.status }}">{{
+                  apiForm.value.status || 'draft'
+                }}</span>
+                <button
+                  mat-button
+                  type="button"
+                  [disabled]="!selectedApiId"
+                  (click)="openApiDocs()">
+                  <mat-icon>description</mat-icon>
+                  API Docs
+                </button>
+                <button
+                  mat-button
+                  color="warn"
+                  type="button"
+                  *ngIf="selectedApiId"
+                  (click)="deleteApi(selectedApiId)">
+                  <mat-icon>delete</mat-icon>
+                  Delete
+                </button>
+              </div>
+            </div>
+            <div class="api-settings-grid">
               <mat-form-field appearance="outline">
                 <mat-label>API Name</mat-label>
                 <input matInput formControlName="label" />
               </mat-form-field>
               <mat-form-field appearance="outline">
-                <mat-label>API URL</mat-label>
+                <mat-label>API URL Segment</mat-label>
                 <input matInput formControlName="basePath" />
+                <mat-hint>Served at /api/v2/&lt;segment&gt;</mat-hint>
+                <mat-error
+                  *ngIf="apiForm.controls.basePath.hasError('required')">
+                  API URL is required.
+                </mat-error>
+                <mat-error
+                  *ngIf="apiForm.controls.basePath.hasError('pattern')">
+                  Use letters, numbers, dashes, or underscores only.
+                </mat-error>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Status</mat-label>
+                <mat-select formControlName="status">
+                  <mat-option value="draft">Draft</mat-option>
+                  <mat-option value="published">Published</mat-option>
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="span-all">
+                <mat-label>Description</mat-label>
+                <textarea
+                  matInput
+                  rows="2"
+                  formControlName="description"></textarea>
               </mat-form-field>
               <button
-                mat-stroked-button
+                mat-flat-button
                 color="primary"
                 type="submit"
+                class="save-api-btn"
                 [disabled]="apiForm.invalid || saving">
                 <mat-icon>save</mat-icon>
                 Save API
               </button>
-            </form>
+            </div>
+          </form>
+        </mat-card>
 
-            <form
-              [formGroup]="endpointForm"
-              class="endpoint-shell"
-              (ngSubmit)="saveEndpoint(false)">
-              <div class="route-preview hero-preview" id="workflow-route">
-                <mat-icon>route</mat-icon>
-                <span>
-                  <strong>{{ generatedRouteLabel }}</strong>
-                  <small>{{ sourceSummary }}</small>
-                </span>
-              </div>
+        <div class="endpoints-section">
+          <div class="endpoints-bar">
+            <div>
+              <h3>Endpoints</h3>
+              <p class="muted">
+                Click an endpoint to edit it, or add a new one.
+              </p>
+            </div>
+            <button
+              mat-flat-button
+              color="primary"
+              type="button"
+              [disabled]="!selectedApiId"
+              (click)="addEndpoint()">
+              <mat-icon>add</mat-icon>
+              Add Endpoint
+            </button>
+          </div>
 
-              <section class="workflow-strip" aria-label="Workflow status">
+          <p class="save-hint" *ngIf="!selectedApiId">
+            <mat-icon>info</mat-icon>
+            <span
+              >Save the API above first — then you can add endpoints to
+              it.</span
+            >
+          </p>
+
+          <div class="endpoint-accordion">
+            <div class="endpoint-card open" *ngIf="addingEndpoint">
+              <div class="endpoint-row">
+                <div class="endpoint-row-main static">
+                  <span class="method-chip method-get">NEW</span>
+                  <span class="ep-path">{{
+                    endpointForm.value.path || 'new endpoint'
+                  }}</span>
+                  <span class="ep-label">{{
+                    endpointForm.value.label || 'Unsaved endpoint'
+                  }}</span>
+                </div>
                 <button
-                  mat-button
+                  mat-icon-button
                   type="button"
-                  class="workflow-step"
-                  *ngFor="let step of workflowSteps"
-                  [class.complete]="step.complete"
-                  (click)="focusWorkflowStep(step.key)">
-                  <span class="step-label">{{ step.label }}</span>
-                  <small>{{ step.detail }}</small>
+                  matTooltip="Discard"
+                  (click)="cancelAddEndpoint()">
+                  <mat-icon>close</mat-icon>
                 </button>
-              </section>
+              </div>
+              <div class="endpoint-editor">
+                <ng-container *ngTemplateOutlet="endpointEditor"></ng-container>
+              </div>
+            </div>
 
+            <div
+              class="endpoint-card"
+              *ngFor="let endpoint of selectedEndpoints; trackBy: trackById"
+              [class.open]="
+                endpoint.id === selectedEndpointId && !addingEndpoint
+              ">
+              <div class="endpoint-row">
+                <button
+                  type="button"
+                  class="endpoint-row-main"
+                  (click)="toggleEndpoint(endpoint)">
+                  <span
+                    class="method-chip method-{{
+                      endpoint.method || 'get' | lowercase
+                    }}"
+                    >{{ endpoint.method }}</span
+                  >
+                  <span class="ep-path">{{ endpoint.path }}</span>
+                  <span class="ep-label">{{
+                    endpoint.label || 'Untitled endpoint'
+                  }}</span>
+                  <span class="spacer"></span>
+                  <mat-icon class="ep-chevron">{{
+                    endpoint.id === selectedEndpointId && !addingEndpoint
+                      ? 'expand_less'
+                      : 'expand_more'
+                  }}</mat-icon>
+                </button>
+                <button
+                  mat-icon-button
+                  class="endpoint-row-delete"
+                  type="button"
+                  matTooltip="Delete endpoint"
+                  (click)="deleteEndpoint(endpoint.id, $event)">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </div>
               <div
-                class="source-builder"
-                [formGroup]="sourceForm"
-                id="workflow-source">
-                <mat-form-field appearance="outline">
-                  <mat-label>Find Source API</mat-label>
-                  <input
-                    matInput
-                    [value]="sourceServiceSearch"
-                    (input)="sourceServiceSearch = $any($event.target).value" />
-                </mat-form-field>
-                <mat-form-field appearance="outline">
-                  <mat-label>Source API</mat-label>
-                  <mat-select
-                    formControlName="service"
-                    (selectionChange)="loadTables($event.value)">
-                    <mat-optgroup
-                      *ngFor="let group of groupedSourceServices"
-                      [label]="group.label">
-                      <mat-option
-                        *ngFor="let service of group.services"
-                        [value]="service.name">
-                        {{ service.label || service.name }}
-                        ({{ service.type }} · {{ introspectionBadge(service) }})
-                      </mat-option>
-                    </mat-optgroup>
-                  </mat-select>
-                </mat-form-field>
-                <div
-                  class="recent-source-chips"
-                  *ngIf="recentSourceServices.length">
-                  <button
-                    mat-stroked-button
-                    type="button"
-                    *ngFor="let recent of recentSourceServices"
-                    (click)="selectRecentSource(recent.name)">
-                    {{ recent.label || recent.name }}
-                  </button>
-                </div>
-                <mat-form-field appearance="outline">
-                  <mat-label>Find Resource</mat-label>
-                  <input
-                    matInput
-                    [value]="sourceTableSearch"
-                    (input)="sourceTableSearch = $any($event.target).value" />
-                </mat-form-field>
-                <mat-form-field appearance="outline">
-                  <mat-label>Table</mat-label>
-                  <mat-select
-                    formControlName="table"
-                    (selectionChange)="loadFields($event.value)">
-                    <mat-option
-                      *ngFor="let table of filteredSourceTables"
-                      [value]="table.name">
-                      {{ table.label || titleFromName(table.name) }}
-                    </mat-option>
-                  </mat-select>
-                </mat-form-field>
-                <p class="source-hint" *ngIf="sourceIntrospectionHint">
-                  {{ sourceIntrospectionHint }}
-                </p>
-                <mat-checkbox
-                  class="id-toggle"
-                  formControlName="includeId"
-                  (change)="generateEndpointFromSource()">
-                  Pass an ID in the URL
-                </mat-checkbox>
-              </div>
-
-              <section
-                class="builder-section"
-                *ngIf="sourceFields.length"
-                id="workflow-shape">
-                <div class="section-heading">
-                  <span>
-                    <strong>Fields</strong>
-                    <small>Uncheck anything this endpoint should hide.</small>
-                  </span>
-                  <span
-                    >{{ selectedFieldNames.length }} of
-                    {{ sourceFields.length }}</span
-                  >
-                </div>
-                <div class="field-toolbar">
-                  <mat-form-field appearance="outline">
-                    <mat-label>Find Fields</mat-label>
-                    <input
-                      matInput
-                      [value]="fieldSearch"
-                      (input)="fieldSearch = $any($event.target).value" />
-                  </mat-form-field>
-                  <button mat-button type="button" (click)="selectAllFields()">
-                    <mat-icon>select_all</mat-icon>
-                    Select All
-                  </button>
-                  <button mat-button type="button" (click)="clearAllFields()">
-                    <mat-icon>deselect</mat-icon>
-                    Clear
-                  </button>
-                </div>
-                <div class="field-grid">
-                  <mat-checkbox
-                    *ngFor="let field of displayedSourceFields"
-                    [checked]="isFieldSelected(field.name)"
-                    (change)="toggleField(field.name, $event.checked)">
-                    <span class="field-name">{{
-                      field.label || titleFromName(field.name)
-                    }}</span>
-                    <small>{{ fieldTypeLabel(field) }}</small>
-                    <span class="field-badge" *ngIf="isPrimaryKey(field)"
-                      >Primary key</span
-                    >
-                    <span class="field-badge" *ngIf="isUnique(field)"
-                      >Unique</span
-                    >
-                    <span class="field-badge" *ngIf="isForeignKey(field)"
-                      >Relationship</span
-                    >
-                    <span
-                      class="field-badge"
-                      *ngIf="field.allowNull ?? field.allow_null"
-                      >Nullable</span
-                    >
-                  </mat-checkbox>
-                </div>
-              </section>
-
-              <section
-                class="builder-section"
-                *ngIf="sourceRelationships.length">
-                <div class="section-heading">
-                  <span>
-                    <strong>Relationships</strong>
-                    <small
-                      >Choose related resources to include in the same
-                      call.</small
-                    >
-                  </span>
-                </div>
-                <div class="relationship-grid">
-                  <mat-checkbox
-                    class="relationship-pill"
-                    *ngFor="let relationship of sourceRelationships"
-                    [checked]="isRelationshipSelected(relationship.name)"
-                    (change)="
-                      toggleRelationship(relationship.name, $event.checked)
-                    ">
-                    <strong>{{
-                      relationship.label || titleFromName(relationship.name)
-                    }}</strong>
-                    <small>
-                      {{ relationship.type || 'relationship' }} to
-                      {{
-                        relationship.refTable ||
-                          relationship.ref_table ||
-                          'related table'
-                      }}
-                    </small>
-                  </mat-checkbox>
-                </div>
-              </section>
-
-              <section class="builder-section" id="workflow-rules">
-                <div class="section-heading">
-                  <span>
-                    <strong>Filters</strong>
-                    <small
-                      >Add simple rules to limit what this endpoint
-                      returns.</small
-                    >
-                  </span>
-                  <button mat-button type="button" (click)="addFilter()">
-                    <mat-icon>add</mat-icon>
-                    Add Filter
-                  </button>
-                </div>
-
-                <div class="filter-empty" *ngIf="filterRules.length === 0">
-                  <mat-icon>filter_alt_off</mat-icon>
-                  <span
-                    >No filters yet. This endpoint will return matching records
-                    from the selected table.</span
-                  >
-                </div>
-
-                <div
-                  class="filter-row"
-                  *ngFor="
-                    let filter of filterRules;
-                    let i = index;
-                    trackBy: trackByFilterIndex
-                  ">
-                  <mat-form-field appearance="outline">
-                    <mat-label>Field</mat-label>
-                    <mat-select
-                      [value]="filter.field"
-                      (selectionChange)="
-                        updateFilter(i, 'field', $event.value)
-                      ">
-                      <mat-option
-                        *ngFor="let field of sourceFields"
-                        [value]="field.name">
-                        {{ field.label || titleFromName(field.name) }}
-                      </mat-option>
-                    </mat-select>
-                  </mat-form-field>
-                  <mat-form-field appearance="outline">
-                    <mat-label>Match</mat-label>
-                    <mat-select
-                      [value]="filter.operator"
-                      (selectionChange)="
-                        updateFilter(i, 'operator', $event.value)
-                      ">
-                      <mat-option
-                        *ngFor="
-                          let option of filterOperatorOptions(filter.field)
-                        "
-                        [value]="option.value">
-                        {{ option.label }}
-                      </mat-option>
-                    </mat-select>
-                  </mat-form-field>
-                  <mat-form-field appearance="outline">
-                    <mat-label>Value</mat-label>
-                    <input
-                      matInput
-                      [value]="filter.value"
-                      (input)="
-                        updateFilter(i, 'value', $any($event.target).value)
-                      " />
-                  </mat-form-field>
-                  <button
-                    mat-icon-button
-                    type="button"
-                    aria-label="Remove filter"
-                    (click)="removeFilter(i)">
-                    <mat-icon>delete</mat-icon>
-                  </button>
-                </div>
-              </section>
-
-              <section class="builder-section" id="workflow-output">
-                <div class="section-heading">
-                  <span>
-                    <strong>Result Options</strong>
-                    <small
-                      >Set the default sort, row limit, and response
-                      wrapper.</small
-                    >
-                  </span>
-                </div>
-                <div class="result-options" [formGroup]="sourceForm">
-                  <mat-form-field appearance="outline">
-                    <mat-label>Sort By</mat-label>
-                    <mat-select
-                      formControlName="sortField"
-                      (selectionChange)="generateEndpointFromSource()">
-                      <mat-option value="">No sort</mat-option>
-                      <mat-option
-                        *ngFor="let field of sourceFields"
-                        [value]="field.name">
-                        {{ field.label || titleFromName(field.name) }}
-                      </mat-option>
-                    </mat-select>
-                  </mat-form-field>
-                  <mat-form-field appearance="outline">
-                    <mat-label>Direction</mat-label>
-                    <mat-select
-                      formControlName="sortDirection"
-                      (selectionChange)="generateEndpointFromSource()">
-                      <mat-option value="ASC">Ascending</mat-option>
-                      <mat-option value="DESC">Descending</mat-option>
-                    </mat-select>
-                  </mat-form-field>
-                  <mat-form-field appearance="outline">
-                    <mat-label>Limit</mat-label>
-                    <input
-                      matInput
-                      type="number"
-                      min="1"
-                      max="1000"
-                      formControlName="limit"
-                      (input)="generateEndpointFromSource()" />
-                  </mat-form-field>
-                  <mat-form-field appearance="outline">
-                    <mat-label>Response Shape</mat-label>
-                    <mat-select
-                      formControlName="outputShape"
-                      (selectionChange)="generateEndpointFromSource()">
-                      <mat-option value="data">data</mat-option>
-                      <mat-option value="table">table name</mat-option>
-                    </mat-select>
-                  </mat-form-field>
-                </div>
-              </section>
-
-              <div class="save-row" id="workflow-publish">
-                <button
-                  mat-flat-button
-                  color="primary"
-                  type="submit"
-                  [disabled]="
-                    endpointForm.invalid ||
-                    saving ||
-                    !canGenerateFromSource ||
-                    hasJsonErrors
-                  ">
-                  <mat-icon>add_link</mat-icon>
-                  {{
-                    selectedEndpointId ? 'Update Endpoint' : 'Create Endpoint'
-                  }}
-                </button>
-                <button
-                  mat-stroked-button
-                  type="button"
-                  [disabled]="
-                    endpointForm.invalid ||
-                    saving ||
-                    !canGenerateFromSource ||
-                    hasJsonErrors
-                  "
-                  (click)="saveEndpoint(true)">
-                  <mat-icon>playlist_add</mat-icon>
-                  Save + New
-                </button>
-                <button
-                  mat-stroked-button
-                  type="button"
-                  [disabled]="saving || previewing || !canGenerateFromSource"
-                  (click)="runPreview()">
-                  <mat-icon>play_arrow</mat-icon>
-                  {{ previewStale ? 'Refresh Preview' : 'Preview Return' }}
-                </button>
-                <button mat-button type="button" (click)="openApiDocs()">
-                  <mat-icon>description</mat-icon>
-                  API Docs
-                </button>
-              </div>
-
-              <section class="builder-section" *ngIf="previewResult">
-                <div class="section-heading">
-                  <span>
-                    <strong>Sample Return</strong>
-                    <small>
-                      {{
-                        previewStale
-                          ? 'Filters or fields changed. Refresh the preview to run this version.'
-                          : 'Result from running the current endpoint definition.'
-                      }}
-                    </small>
-                  </span>
-                </div>
-                <pre>{{ previewResult }}</pre>
-              </section>
-
-              <details class="advanced-contract">
-                <summary>Generated details</summary>
-                <div class="advanced-grid" [formGroup]="endpointForm">
-                  <mat-form-field appearance="outline">
-                    <mat-label>Endpoint Name</mat-label>
-                    <input matInput formControlName="label" />
-                  </mat-form-field>
-                  <mat-form-field appearance="outline">
-                    <mat-label>Path</mat-label>
-                    <input matInput formControlName="path" />
-                  </mat-form-field>
-                </div>
-              </details>
-            </form>
-          </mat-card-content>
-        </mat-card>
-
-        <mat-card class="side-panel">
-          <mat-card-header>
-            <div class="endpoints-header-row">
-              <div>
-                <mat-card-title>Endpoints</mat-card-title>
-                <mat-card-subtitle>Saved routes in this API.</mat-card-subtitle>
-              </div>
-              <div class="endpoint-actions">
-                <button
-                  mat-button
-                  type="button"
-                  [disabled]="!selectedEndpointId"
-                  (click)="duplicateSelectedEndpoint()">
-                  <mat-icon>content_copy</mat-icon>
-                  Duplicate
-                </button>
-                <button
-                  mat-flat-button
-                  color="primary"
-                  type="button"
-                  [disabled]="!selectedApiId"
-                  (click)="newEndpoint()">
-                  <mat-icon>add</mat-icon>
-                  New Endpoint
-                </button>
-              </div>
-            </div>
-          </mat-card-header>
-          <mat-card-content>
-            <div class="list">
-              <button
-                mat-button
-                class="list-row"
-                *ngFor="let endpoint of selectedEndpoints"
-                [class.selected]="endpoint.id === selectedEndpointId"
-                (click)="selectEndpoint(endpoint.id)">
-                <mat-icon>route</mat-icon>
-                <span>
-                  <strong>{{ endpoint.method }} {{ endpoint.path }}</strong>
-                  <small>{{ endpoint.label || 'Untitled endpoint' }}</small>
-                </span>
-              </button>
-              <div class="filter-empty" *ngIf="selectedEndpoints.length === 0">
-                <mat-icon>route</mat-icon>
-                <span>No endpoints saved yet.</span>
+                class="endpoint-editor"
+                *ngIf="endpoint.id === selectedEndpointId && !addingEndpoint">
+                <ng-container *ngTemplateOutlet="endpointEditor"></ng-container>
               </div>
             </div>
 
-            <mat-tab-group class="endpoint-panel-tabs">
-              <mat-tab label="Inspector">
-                <div class="inspector-panel">
-                  <div class="inspector-block">
-                    <strong>Execution Steps</strong>
-                    <div
-                      class="preview-list"
-                      *ngIf="executionStepsPreview.length; else noSteps">
-                      <div
-                        class="preview-row"
-                        *ngFor="let step of executionStepsPreview">
-                        <span>{{ step.title }}</span>
-                        <small>{{ step.detail }}</small>
-                      </div>
-                    </div>
-                    <ng-template #noSteps>
-                      <p class="inspector-empty">
-                        No execution steps in JSON yet.
-                      </p>
-                    </ng-template>
-                  </div>
-
-                  <div class="inspector-block">
-                    <strong>Response Fields</strong>
-                    <div
-                      class="response-tags"
-                      *ngIf="
-                        responseFieldsPreview.length;
-                        else noResponseFields
-                      ">
-                      <span
-                        class="response-tag"
-                        *ngFor="let field of responseFieldsPreview"
-                        >{{ field }}</span
-                      >
-                    </div>
-                    <ng-template #noResponseFields>
-                      <p class="inspector-empty">
-                        No response mapping fields yet.
-                      </p>
-                    </ng-template>
-                  </div>
-                </div>
-              </mat-tab>
-
-              <mat-tab label="Advanced JSON">
-                <div class="advanced-json-panel" [formGroup]="endpointForm">
-                  <mat-form-field appearance="outline" class="json-field">
-                    <mat-label>Execution Plan JSON</mat-label>
-                    <textarea
-                      matInput
-                      rows="10"
-                      formControlName="executionPlan"></textarea>
-                    <mat-error *ngIf="executionPlanError">{{
-                      executionPlanError
-                    }}</mat-error>
-                  </mat-form-field>
-
-                  <mat-form-field appearance="outline" class="json-field">
-                    <mat-label>Response Mapping JSON</mat-label>
-                    <textarea
-                      matInput
-                      rows="8"
-                      formControlName="responseMapping"></textarea>
-                    <mat-error *ngIf="responseMappingError">{{
-                      responseMappingError
-                    }}</mat-error>
-                  </mat-form-field>
-                </div>
-              </mat-tab>
-            </mat-tab-group>
-          </mat-card-content>
-        </mat-card>
+            <div
+              class="empty-state small"
+              *ngIf="
+                selectedApiId &&
+                selectedEndpoints.length === 0 &&
+                !addingEndpoint
+              ">
+              <mat-icon>route</mat-icon>
+              <strong>No endpoints yet</strong>
+              <span>Add an endpoint to expose data from a source.</span>
+            </div>
+          </div>
+        </div>
       </div>
+
+      <ng-template #endpointEditor>
+        <form
+          [formGroup]="endpointForm"
+          class="endpoint-shell"
+          (ngSubmit)="saveEndpoint(false)">
+          <div class="route-preview hero-preview" id="workflow-route">
+            <mat-icon>route</mat-icon>
+            <span>
+              <strong>{{ generatedRouteLabel }}</strong>
+              <small>{{ sourceSummary }}</small>
+            </span>
+          </div>
+
+          <section class="endpoint-identity" [formGroup]="endpointForm">
+            <mat-form-field appearance="outline">
+              <mat-label>Endpoint Name</mat-label>
+              <input
+                matInput
+                formControlName="label"
+                placeholder="e.g. List active customers" />
+              <mat-hint>A friendly name for this endpoint.</mat-hint>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Endpoint URL Path</mat-label>
+              <input matInput formControlName="path" placeholder="/customers" />
+              <mat-hint
+                >The path for this endpoint under the API (e.g.
+                /customers).</mat-hint
+              >
+            </mat-form-field>
+          </section>
+
+          <section class="workflow-strip" aria-label="Workflow status">
+            <button
+              mat-button
+              type="button"
+              class="workflow-step"
+              *ngFor="let step of workflowSteps; trackBy: trackByStepKey"
+              [class.complete]="step.complete"
+              (click)="focusWorkflowStep(step.key)">
+              <span class="step-label">{{ step.label }}</span>
+              <small>{{ step.detail }}</small>
+            </button>
+          </section>
+
+          <div
+            class="source-builder"
+            [formGroup]="sourceForm"
+            id="workflow-source">
+            <mat-form-field appearance="outline" class="span-2">
+              <mat-label>Source API</mat-label>
+              <input
+                matInput
+                type="text"
+                placeholder="Type to search source APIs…"
+                [value]="sourceServiceSearch"
+                (input)="sourceServiceSearch = $any($event.target).value"
+                (focus)="onSourceFocus()"
+                (blur)="onSourceBlur()"
+                [matAutocomplete]="svcAuto" />
+              <mat-icon matSuffix>search</mat-icon>
+              <mat-autocomplete
+                #svcAuto="matAutocomplete"
+                (optionSelected)="chooseSourceService($event.option.value)">
+                <mat-option *ngIf="sourceServicesLoading" disabled>
+                  Loading sources…
+                </mat-option>
+                <mat-option
+                  *ngFor="
+                    let service of filteredSourceServices;
+                    trackBy: trackByName
+                  "
+                  [value]="service.name">
+                  {{ service.label || service.name }}
+                  <small class="option-meta"
+                    >{{ service.type }} ·
+                    {{ introspectionBadge(service) }}</small
+                  >
+                </mat-option>
+                <mat-option
+                  *ngIf="
+                    !sourceServicesLoading &&
+                    filteredSourceServices.length === 0
+                  "
+                  disabled>
+                  No matching source APIs
+                </mat-option>
+              </mat-autocomplete>
+            </mat-form-field>
+            <div
+              class="recent-source-chips"
+              *ngIf="recentSourceServices.length">
+              <button
+                mat-stroked-button
+                type="button"
+                *ngFor="
+                  let recent of recentSourceServices;
+                  trackBy: trackByName
+                "
+                (click)="selectRecentSource(recent.name)">
+                {{ recent.label || recent.name }}
+              </button>
+            </div>
+            <mat-form-field appearance="outline" class="span-2">
+              <mat-label>Table / Resource</mat-label>
+              <input
+                matInput
+                type="text"
+                placeholder="Type to search tables…"
+                [value]="sourceTableSearch"
+                (input)="sourceTableSearch = $any($event.target).value"
+                (focus)="onTableFocus()"
+                (blur)="onTableBlur()"
+                [matAutocomplete]="tblAuto"
+                [disabled]="!sourceForm.value.service" />
+              <mat-icon matSuffix>search</mat-icon>
+              <mat-autocomplete
+                #tblAuto="matAutocomplete"
+                (optionSelected)="chooseSourceTable($event.option.value)">
+                <mat-option
+                  *ngFor="
+                    let table of filteredSourceTables;
+                    trackBy: trackByName
+                  "
+                  [value]="table.name">
+                  {{ table.label || titleFromName(table.name) }}
+                </mat-option>
+                <mat-option *ngIf="filteredSourceTables.length === 0" disabled>
+                  {{
+                    sourceForm.value.service
+                      ? 'No matching tables'
+                      : 'Select a source API first'
+                  }}
+                </mat-option>
+              </mat-autocomplete>
+            </mat-form-field>
+            <p class="source-hint" *ngIf="sourceIntrospectionHint">
+              {{ sourceIntrospectionHint }}
+            </p>
+            <mat-checkbox
+              class="id-toggle"
+              formControlName="includeId"
+              (change)="generateEndpointFromSource()">
+              Pass an ID in the URL
+            </mat-checkbox>
+          </div>
+
+          <section
+            class="builder-section"
+            *ngIf="sourceFields.length"
+            id="workflow-shape">
+            <div class="section-heading">
+              <span>
+                <strong>Fields</strong>
+                <small>Uncheck anything this endpoint should hide.</small>
+              </span>
+              <span
+                >{{ selectedFieldNames.length }} of
+                {{ sourceFields.length }}</span
+              >
+            </div>
+            <div class="field-toolbar">
+              <mat-form-field appearance="outline">
+                <mat-label>Find Fields</mat-label>
+                <input
+                  matInput
+                  [value]="fieldSearch"
+                  (input)="fieldSearch = $any($event.target).value" />
+              </mat-form-field>
+              <button mat-button type="button" (click)="selectAllFields()">
+                <mat-icon>select_all</mat-icon>
+                Select All
+              </button>
+              <button mat-button type="button" (click)="clearAllFields()">
+                <mat-icon>deselect</mat-icon>
+                Clear
+              </button>
+            </div>
+            <div class="field-grid">
+              <div
+                class="field-item"
+                *ngFor="
+                  let field of displayedSourceFields;
+                  trackBy: trackByName
+                ">
+                <mat-checkbox
+                  [checked]="isFieldSelected(field.name)"
+                  (change)="toggleField(field.name, $event.checked)">
+                  <span class="field-name">{{
+                    field.label || titleFromName(field.name)
+                  }}</span>
+                  <small>{{ fieldTypeLabel(field) }}</small>
+                  <span class="field-badge" *ngIf="isPrimaryKey(field)"
+                    >Primary key</span
+                  >
+                  <span class="field-badge" *ngIf="isUnique(field)"
+                    >Unique</span
+                  >
+                  <span class="field-badge" *ngIf="isForeignKey(field)"
+                    >Relationship</span
+                  >
+                  <span
+                    class="field-badge"
+                    *ngIf="field.allowNull ?? field.allow_null"
+                    >Nullable</span
+                  >
+                </mat-checkbox>
+                <input
+                  class="rename-input"
+                  *ngIf="isFieldSelected(field.name)"
+                  [value]="aliasFor(field.name)"
+                  [placeholder]="'rename ' + field.name + '…'"
+                  (input)="setAlias(field.name, $any($event.target).value)" />
+              </div>
+            </div>
+          </section>
+
+          <section class="builder-section" *ngIf="sourceRelationships.length">
+            <div class="section-heading">
+              <span>
+                <strong>Relationships</strong>
+                <small
+                  >Choose related resources to include in the same call.</small
+                >
+              </span>
+            </div>
+            <div class="relationship-grid">
+              <div
+                class="relationship-item"
+                *ngFor="
+                  let relationship of sourceRelationships;
+                  trackBy: trackByName
+                ">
+                <mat-checkbox
+                  class="relationship-pill"
+                  [checked]="isRelationshipSelected(relationship.name)"
+                  (change)="
+                    toggleRelationship(relationship.name, $event.checked)
+                  ">
+                  <strong>{{
+                    relationship.label || titleFromName(relationship.name)
+                  }}</strong>
+                  <small>
+                    {{ relationship.type || 'relationship' }} to
+                    {{
+                      relationship.refTable ||
+                        relationship.ref_table ||
+                        'related table'
+                    }}
+                  </small>
+                </mat-checkbox>
+                <input
+                  class="rename-input"
+                  *ngIf="isRelationshipSelected(relationship.name)"
+                  [value]="aliasFor(relationship.name)"
+                  [placeholder]="'rename to…'"
+                  (input)="
+                    setAlias(relationship.name, $any($event.target).value)
+                  " />
+              </div>
+            </div>
+          </section>
+
+          <section class="builder-section" id="workflow-rules">
+            <div class="section-heading">
+              <span>
+                <strong>Filters</strong>
+                <small
+                  >Add simple rules to limit what this endpoint returns.</small
+                >
+              </span>
+              <button mat-button type="button" (click)="addFilter()">
+                <mat-icon>add</mat-icon>
+                Add Filter
+              </button>
+            </div>
+
+            <div class="filter-empty" *ngIf="filterRules.length === 0">
+              <mat-icon>filter_alt_off</mat-icon>
+              <span
+                >No filters yet. This endpoint will return matching records from
+                the selected table.</span
+              >
+            </div>
+
+            <div
+              class="filter-row"
+              *ngFor="
+                let filter of filterRules;
+                let i = index;
+                trackBy: trackByFilterIndex
+              ">
+              <mat-form-field appearance="outline">
+                <mat-label>Field</mat-label>
+                <mat-select
+                  [value]="filter.field"
+                  (selectionChange)="updateFilter(i, 'field', $event.value)">
+                  <mat-option
+                    *ngFor="let field of sourceFields; trackBy: trackByName"
+                    [value]="field.name">
+                    {{ field.label || titleFromName(field.name) }}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Match</mat-label>
+                <mat-select
+                  [value]="filter.operator"
+                  (selectionChange)="updateFilter(i, 'operator', $event.value)">
+                  <mat-option
+                    *ngFor="
+                      let option of filterOperatorOptions(filter.field);
+                      trackBy: trackByOptionValue
+                    "
+                    [value]="option.value">
+                    {{ option.label }}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Value</mat-label>
+                <input
+                  matInput
+                  [value]="filter.value"
+                  (input)="
+                    updateFilter(i, 'value', $any($event.target).value)
+                  " />
+              </mat-form-field>
+              <button
+                mat-icon-button
+                type="button"
+                aria-label="Remove filter"
+                (click)="removeFilter(i)">
+                <mat-icon>delete</mat-icon>
+              </button>
+            </div>
+          </section>
+
+          <section class="builder-section" id="workflow-output">
+            <div class="section-heading">
+              <span>
+                <strong>Result Options</strong>
+                <small
+                  >Set the default sort, row limit, and response wrapper.</small
+                >
+              </span>
+            </div>
+            <div class="result-options" [formGroup]="sourceForm">
+              <mat-form-field appearance="outline">
+                <mat-label>Sort By</mat-label>
+                <mat-select
+                  formControlName="sortField"
+                  (selectionChange)="generateEndpointFromSource()">
+                  <mat-option value="">No sort</mat-option>
+                  <mat-option
+                    *ngFor="let field of sourceFields; trackBy: trackByName"
+                    [value]="field.name">
+                    {{ field.label || titleFromName(field.name) }}
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Direction</mat-label>
+                <mat-select
+                  formControlName="sortDirection"
+                  (selectionChange)="generateEndpointFromSource()">
+                  <mat-option value="ASC">Ascending</mat-option>
+                  <mat-option value="DESC">Descending</mat-option>
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Limit</mat-label>
+                <input
+                  matInput
+                  type="number"
+                  min="1"
+                  max="1000"
+                  formControlName="limit"
+                  (input)="generateEndpointFromSource()" />
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Response Shape</mat-label>
+                <mat-select
+                  formControlName="outputShape"
+                  (selectionChange)="generateEndpointFromSource()">
+                  <mat-option value="data">Wrap in "data" key</mat-option>
+                  <mat-option value="table">Wrap in table-named key</mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+          </section>
+
+          <p class="save-hint" *ngIf="!selectedApiId">
+            <mat-icon>info</mat-icon>
+            <span
+              >Save the API above first — then you can create endpoints inside
+              it.</span
+            >
+          </p>
+
+          <div class="save-row" id="workflow-publish">
+            <button
+              mat-flat-button
+              color="primary"
+              type="submit"
+              [disabled]="endpointForm.invalid || saving || hasJsonErrors">
+              <mat-icon>add_link</mat-icon>
+              {{ selectedEndpointId ? 'Update Endpoint' : 'Create Endpoint' }}
+            </button>
+            <button
+              mat-stroked-button
+              type="button"
+              [disabled]="endpointForm.invalid || saving || hasJsonErrors"
+              (click)="saveEndpoint(true)">
+              <mat-icon>playlist_add</mat-icon>
+              Save + New
+            </button>
+            <button
+              mat-stroked-button
+              type="button"
+              [disabled]="saving || previewing || !canGenerateFromSource"
+              (click)="runPreview()">
+              <mat-icon>play_arrow</mat-icon>
+              {{ previewStale ? 'Refresh Preview' : 'Preview Return' }}
+            </button>
+            <span class="save-row-spacer"></span>
+            <button
+              mat-button
+              type="button"
+              *ngIf="selectedEndpointId"
+              (click)="duplicateSelectedEndpoint()">
+              <mat-icon>content_copy</mat-icon>
+              Duplicate
+            </button>
+            <button
+              mat-button
+              color="warn"
+              type="button"
+              *ngIf="selectedEndpointId"
+              (click)="deleteEndpoint(selectedEndpointId)">
+              <mat-icon>delete</mat-icon>
+              Delete
+            </button>
+          </div>
+
+          <section class="builder-section" *ngIf="previewResult">
+            <div class="section-heading">
+              <span>
+                <strong>Sample Return</strong>
+                <small>
+                  {{
+                    previewStale
+                      ? 'Filters or fields changed. Refresh the preview to run this version.'
+                      : 'Result from running the current endpoint definition.'
+                  }}
+                </small>
+              </span>
+            </div>
+            <pre>{{ previewResult }}</pre>
+          </section>
+        </form>
+
+        <section class="endpoint-inspect">
+          <p class="inspect-heading">Inspect &amp; advanced</p>
+          <mat-tab-group class="endpoint-panel-tabs">
+            <mat-tab label="Inspector">
+              <div class="inspector-panel">
+                <div class="inspector-block">
+                  <strong>Execution Steps</strong>
+                  <div
+                    class="preview-list"
+                    *ngIf="executionStepsPreview.length; else noSteps">
+                    <div
+                      class="preview-row"
+                      *ngFor="
+                        let step of executionStepsPreview;
+                        trackBy: trackByTitle
+                      ">
+                      <span>{{ step.title }}</span>
+                      <small>{{ step.detail }}</small>
+                    </div>
+                  </div>
+                  <ng-template #noSteps>
+                    <p class="inspector-empty">
+                      No execution steps in JSON yet.
+                    </p>
+                  </ng-template>
+                </div>
+
+                <div class="inspector-block">
+                  <strong>Response Fields</strong>
+                  <div
+                    class="response-tags"
+                    *ngIf="responseFieldsPreview.length; else noResponseFields">
+                    <span
+                      class="response-tag"
+                      *ngFor="
+                        let field of responseFieldsPreview;
+                        trackBy: trackByValue
+                      "
+                      >{{ field }}</span
+                    >
+                  </div>
+                  <ng-template #noResponseFields>
+                    <p class="inspector-empty">
+                      No response mapping fields yet.
+                    </p>
+                  </ng-template>
+                </div>
+              </div>
+            </mat-tab>
+
+            <mat-tab label="Advanced JSON">
+              <div class="advanced-json-panel" [formGroup]="endpointForm">
+                <mat-form-field appearance="outline" class="json-field">
+                  <mat-label>Execution Plan JSON</mat-label>
+                  <textarea
+                    matInput
+                    rows="10"
+                    formControlName="executionPlan"></textarea>
+                  <mat-error *ngIf="executionPlanError">{{
+                    executionPlanError
+                  }}</mat-error>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline" class="json-field">
+                  <mat-label>Response Mapping JSON</mat-label>
+                  <textarea
+                    matInput
+                    rows="8"
+                    formControlName="responseMapping"></textarea>
+                  <mat-error *ngIf="responseMappingError">{{
+                    responseMappingError
+                  }}</mat-error>
+                </mat-form-field>
+              </div>
+            </mat-tab>
+
+            <mat-tab label="Test">
+              <div class="test-panel" [formGroup]="testForm">
+                <p class="inspector-empty" *ngIf="!selectedEndpointId">
+                  Save and select an endpoint to run a live test against it.
+                </p>
+                <ng-container *ngIf="selectedEndpointId">
+                  <mat-form-field appearance="outline" class="json-field">
+                    <mat-label>Path Params JSON</mat-label>
+                    <textarea
+                      matInput
+                      rows="4"
+                      formControlName="pathParams"></textarea>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" class="json-field">
+                    <mat-label>Query JSON</mat-label>
+                    <textarea
+                      matInput
+                      rows="3"
+                      formControlName="query"></textarea>
+                  </mat-form-field>
+                  <button
+                    mat-flat-button
+                    color="primary"
+                    type="button"
+                    [disabled]="saving || testForm.invalid"
+                    (click)="testEndpoint()">
+                    <mat-icon>play_arrow</mat-icon>
+                    Run Test
+                  </button>
+                  <pre *ngIf="testResult">{{ testResult }}</pre>
+                </ng-container>
+              </div>
+            </mat-tab>
+          </mat-tab-group>
+        </section>
+      </ng-template>
     </section>
   `,
   styles: [
@@ -826,6 +1078,19 @@ type WorkflowStep = {
       .header-actions {
         display: flex;
         gap: 8px;
+      }
+
+      .back-link {
+        align-items: center;
+        cursor: pointer;
+        display: inline-flex;
+        font-weight: 600;
+        gap: 6px;
+        opacity: 0.85;
+      }
+
+      .back-link:hover {
+        opacity: 1;
       }
 
       .builder-header h1 {
@@ -850,6 +1115,246 @@ type WorkflowStep = {
         display: grid;
         gap: 16px;
         grid-template-columns: minmax(520px, 1fr) minmax(280px, 0.34fr);
+      }
+
+      /* ===== Restructured API detail view ===== */
+      .api-detail {
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+      }
+
+      .api-settings-card {
+        border-radius: 10px;
+      }
+
+      .api-settings-head {
+        align-items: flex-start;
+        display: flex;
+        gap: 16px;
+        justify-content: space-between;
+        margin-bottom: 14px;
+      }
+
+      .api-title-block h2 {
+        font-size: 22px;
+        line-height: 1.2;
+        margin: 4px 0 8px;
+      }
+
+      .base-url {
+        background: rgba(127, 127, 127, 0.12);
+        border-radius: 6px;
+        font-family:
+          ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 13px;
+        padding: 3px 8px;
+      }
+
+      .api-settings-actions {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .status-chip {
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        padding: 4px 10px;
+        text-transform: uppercase;
+      }
+
+      .status-draft {
+        background: rgba(255, 171, 0, 0.16);
+        color: #b07400;
+      }
+
+      .status-published {
+        background: rgba(34, 197, 94, 0.16);
+        color: #1a7f43;
+      }
+
+      .api-settings-grid {
+        align-items: start;
+        display: grid;
+        gap: 12px 14px;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .api-settings-grid .span-all {
+        grid-column: 1 / -1;
+      }
+
+      .api-settings-grid .save-api-btn {
+        justify-self: start;
+      }
+
+      /* ===== Endpoints section ===== */
+      .endpoints-section {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .endpoints-bar {
+        align-items: center;
+        display: flex;
+        gap: 12px;
+        justify-content: space-between;
+      }
+
+      .endpoints-bar h3 {
+        font-size: 18px;
+        margin: 0;
+      }
+
+      .endpoints-bar .muted {
+        margin: 2px 0 0;
+        opacity: 0.7;
+      }
+
+      .endpoint-accordion {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .endpoint-card {
+        border: 1px solid rgba(127, 127, 127, 0.28);
+        border-radius: 8px;
+        overflow: hidden;
+        transition:
+          border-color 0.15s,
+          box-shadow 0.15s;
+      }
+
+      .endpoint-card.open {
+        border-color: rgba(63, 81, 181, 0.55);
+        box-shadow: 0 1px 12px rgba(63, 81, 181, 0.12);
+      }
+
+      .endpoint-card.new-endpoint {
+        border-color: rgba(34, 197, 94, 0.5);
+      }
+
+      .endpoint-row {
+        align-items: center;
+        display: flex;
+        gap: 4px;
+      }
+
+      .endpoint-row-main {
+        align-items: center;
+        background: transparent;
+        border: none;
+        color: inherit;
+        cursor: pointer;
+        display: flex;
+        flex: 1;
+        font: inherit;
+        gap: 12px;
+        min-width: 0;
+        padding: 12px 14px;
+        text-align: left;
+        width: 100%;
+      }
+
+      .endpoint-row-main.static {
+        cursor: default;
+      }
+
+      .endpoint-row-main:hover:not(.static) {
+        background: rgba(127, 127, 127, 0.06);
+      }
+
+      .method-chip {
+        border-radius: 5px;
+        color: #fff;
+        flex: none;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        min-width: 56px;
+        padding: 4px 8px;
+        text-align: center;
+      }
+
+      .method-get {
+        background: #49cc90;
+      }
+      .method-post {
+        background: #61affe;
+      }
+      .method-put {
+        background: #fca130;
+      }
+      .method-delete {
+        background: #f93e3e;
+      }
+      .method-patch {
+        background: #50e3c2;
+      }
+
+      .ep-path {
+        font-family:
+          ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-weight: 600;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .ep-label {
+        opacity: 0.68;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .spacer {
+        flex: 1;
+      }
+
+      .ep-chevron {
+        flex: none;
+        opacity: 0.55;
+      }
+
+      .endpoint-row-delete {
+        flex: none;
+        opacity: 0.45;
+      }
+
+      .endpoint-row:hover .endpoint-row-delete {
+        opacity: 1;
+      }
+
+      .endpoint-editor {
+        border-top: 1px solid rgba(127, 127, 127, 0.2);
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        padding: 18px 16px;
+      }
+
+      .endpoint-inspect {
+        border-top: 1px solid rgba(127, 127, 127, 0.18);
+        padding-top: 10px;
+      }
+
+      .inspect-heading {
+        font-size: 13px;
+        font-weight: 700;
+        margin: 0 0 4px;
+        opacity: 0.7;
+      }
+
+      .empty-state.small {
+        gap: 6px;
+        padding: 32px 16px;
       }
 
       .endpoints-header-row {
@@ -1062,6 +1567,11 @@ type WorkflowStep = {
         opacity: 0.82;
       }
 
+      .option-meta {
+        margin-left: 6px;
+        opacity: 0.6;
+      }
+
       .source-builder mat-form-field {
         margin-bottom: -20px;
       }
@@ -1077,6 +1587,18 @@ type WorkflowStep = {
 
       .hero-preview {
         background: rgba(63, 81, 181, 0.08);
+      }
+
+      .endpoint-identity {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      }
+
+      @media (max-width: 980px) {
+        .endpoint-identity {
+          grid-template-columns: 1fr;
+        }
       }
 
       .route-preview span {
@@ -1132,10 +1654,28 @@ type WorkflowStep = {
         margin-bottom: -18px;
       }
 
-      .field-grid mat-checkbox {
+      .field-item {
         border: 1px solid rgba(127, 127, 127, 0.22);
         border-radius: 6px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
         padding: 6px 8px;
+      }
+
+      .rename-input {
+        background: rgba(127, 127, 127, 0.06);
+        border: 1px solid rgba(127, 127, 127, 0.28);
+        border-radius: 4px;
+        font-size: 12px;
+        margin-top: 2px;
+        outline: none;
+        padding: 3px 6px;
+        width: 100%;
+      }
+
+      .rename-input:focus {
+        border-color: rgba(63, 81, 181, 0.6);
       }
 
       .field-name {
@@ -1161,13 +1701,19 @@ type WorkflowStep = {
         grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
       }
 
-      .relationship-pill {
+      .relationship-item {
         border: 1px solid rgba(127, 127, 127, 0.28);
         border-radius: 6px;
         display: flex;
         flex-direction: column;
-        gap: 2px;
+        gap: 4px;
         padding: 8px 10px;
+      }
+
+      .relationship-pill {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
       }
 
       .relationship-pill small {
@@ -1209,7 +1755,35 @@ type WorkflowStep = {
       .save-row {
         align-items: center;
         display: flex;
+        flex-wrap: wrap;
         gap: 8px;
+      }
+
+      .save-row-spacer {
+        flex: 1;
+      }
+
+      .count-chip {
+        border: 1px solid rgba(127, 127, 127, 0.35);
+        border-radius: 999px;
+        font-size: 12px;
+        padding: 4px 8px;
+      }
+
+      .save-hint {
+        align-items: center;
+        background: rgba(255, 171, 0, 0.1);
+        border: 1px solid rgba(255, 171, 0, 0.4);
+        border-radius: 8px;
+        display: flex;
+        gap: 8px;
+        margin: 0;
+        padding: 10px 12px;
+      }
+
+      .save-hint mat-icon {
+        color: #c77700;
+        flex: none;
       }
 
       .advanced-contract {
@@ -1309,6 +1883,65 @@ type WorkflowStep = {
         opacity: 0.75;
       }
 
+      .list-row strong,
+      .list-row small {
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .list-row-wrap {
+        align-items: center;
+        display: flex;
+        gap: 4px;
+      }
+
+      .list-row-wrap .list-row {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .list-row-delete {
+        flex: none;
+        opacity: 0.55;
+      }
+
+      .list-row-wrap:hover .list-row-delete,
+      .list-row-delete:focus-visible {
+        opacity: 1;
+      }
+
+      .api-card mat-card-header {
+        position: relative;
+      }
+
+      .api-card-delete {
+        position: absolute;
+        right: 4px;
+        top: 4px;
+      }
+
+      .api-card mat-card-title {
+        overflow: hidden;
+        padding-right: 32px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .route-preview small {
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .test-panel {
+        display: grid;
+        gap: 10px;
+        padding-top: 12px;
+      }
+
       pre {
         background: #101418;
         border-radius: 6px;
@@ -1352,9 +1985,11 @@ export class DfApiBuilderComponent implements OnInit {
   private http = inject(HttpClient);
   private snackBar = inject(MatSnackBar);
   private mapper = inject(ApiBuilderMapperService);
+  private destroyRef = inject(DestroyRef);
 
   apis: ApiDefinition[] = [];
   endpoints: EndpointDefinition[] = [];
+  endpointCounts = new Map<number, number>();
   sourceServices: SourceService[] = [];
   sourceTables: SourceTable[] = [];
   sourceFields: SourceField[] = [];
@@ -1364,9 +1999,49 @@ export class DfApiBuilderComponent implements OnInit {
   sourceTableSearch = '';
   sourceIntrospectionHint = '';
   private readonly recentSourceKey = 'df_api_builder_recent_sources';
+  // Service types that expose no buildable tables/resources, so they are hidden
+  // from the source picker (you can't build a data endpoint off a file store,
+  // mail relay, auth provider, or the docs service).
+  private readonly NON_SOURCE_TYPES = new Set<string>([
+    'local_file',
+    'aws_s3',
+    'azure_blob',
+    'rackspace_cloud_files',
+    'openstack_object_storage',
+    'ftp',
+    'sftp',
+    'webdav',
+    'local_email',
+    'smtp',
+    'mailgun',
+    'mandrill',
+    'sendgrid',
+    'aws_ses',
+    'office365',
+    'user',
+    'oauth',
+    'oauth_azure_ad',
+    'oauth_facebook',
+    'oauth_github',
+    'oauth_google',
+    'oauth_linkedin',
+    'oauth_microsoft',
+    'oauth_twitter',
+    'oidc',
+    'saml',
+    'ldap',
+    'adldap',
+    'azure_ad',
+    'swagger',
+    'system',
+    'api_builder',
+  ]);
   recentSourceNames: string[] = [];
   selectedFields = new Set<string>();
   selectedRelationships = new Set<string>();
+  // Output rename map: source field/relationship name -> alias to emit in the
+  // response. Applied as a cheap key-remap pass on the fetched rows server-side.
+  fieldAliases: Record<string, string> = {};
   private pendingSelectedFieldNames: string[] | null = null;
   filterRules: FilterRule[] = [];
   fieldSearch = '';
@@ -1385,13 +2060,32 @@ export class DfApiBuilderComponent implements OnInit {
   ];
   loading = false;
   saving = false;
+  sourceServicesLoading = false;
   editorOpen = false;
   selectedApiId: number | null = null;
   selectedEndpointId: number | null = null;
+  addingEndpoint = false;
   testResult = '';
   previewResult = '';
   previewStale = false;
   previewing = false;
+
+  // Memo caches for the two JSON-parsing preview getters. These getters are
+  // bound in the template (*ngIf / *ngFor) and run on every change-detection
+  // pass; without memoization they JSON.parse the editor text every tick and
+  // return a fresh array reference each time. The cache key is the exact raw
+  // editor string, so a cache hit is provably identical to a recompute.
+  private executionStepsCache: { key: string; value: StepPreview[] } | null =
+    null;
+  private responseFieldsCache: { key: string; value: string[] } | null = null;
+
+  // Last identity values auto-generated from the source. Used so regeneration
+  // only overwrites path/label/description that the user hasn't manually edited:
+  // if the current field still equals what we last generated (or is empty) it's
+  // safe to refresh; once the user changes it, we leave it alone.
+  private lastGeneratedPath = '';
+  private lastGeneratedLabel = '';
+  private lastGeneratedDescription = '';
 
   apiForm = this.fb.group({
     name: ['', [Validators.pattern(/^[A-Za-z0-9_-]+$/)]],
@@ -1407,11 +2101,11 @@ export class DfApiBuilderComponent implements OnInit {
   endpointForm = this.fb.group({
     apiId: [null as number | null, Validators.required],
     method: ['GET', Validators.required],
-    path: ['/customers/{id}/summary', Validators.required],
+    path: ['', Validators.required],
     label: [''],
     description: [''],
-    executionPlan: [this.sampleExecutionPlan(), Validators.required],
-    responseMapping: [this.sampleResponseMapping(), Validators.required],
+    executionPlan: ['{}', Validators.required],
+    responseMapping: ['{}', Validators.required],
   });
 
   testForm = this.fb.group({
@@ -1540,7 +2234,7 @@ export class DfApiBuilderComponent implements OnInit {
         detail: hasRuleData
           ? `${this.filterRules.length} filters`
           : 'Optional filters',
-        complete: true,
+        complete: hasRuleData,
       },
       {
         key: 'route',
@@ -1571,12 +2265,17 @@ export class DfApiBuilderComponent implements OnInit {
   }
 
   get executionStepsPreview(): StepPreview[] {
+    const key = this.endpointForm.value.executionPlan ?? '';
+    if (this.executionStepsCache?.key === key) {
+      return this.executionStepsCache.value;
+    }
+
     const plan = this.parseJsonObject(this.endpointForm.value.executionPlan);
     const steps: unknown[] = Array.isArray(plan?.['steps'])
       ? (plan?.['steps'] as unknown[])
       : [];
 
-    return steps
+    const value = steps
       .filter(
         (step): step is Record<string, unknown> =>
           !!step && typeof step === 'object'
@@ -1592,17 +2291,23 @@ export class DfApiBuilderComponent implements OnInit {
           detail: resource ? resource : 'Root resource',
         };
       });
+
+    this.executionStepsCache = { key, value };
+    return value;
   }
 
   get responseFieldsPreview(): string[] {
+    const key = this.endpointForm.value.responseMapping ?? '';
+    if (this.responseFieldsCache?.key === key) {
+      return this.responseFieldsCache.value;
+    }
+
     const mapping = this.parseJsonObject(
       this.endpointForm.value.responseMapping
     );
-    if (!mapping) {
-      return [];
-    }
-
-    return Object.keys(mapping);
+    const value = mapping ? Object.keys(mapping) : [];
+    this.responseFieldsCache = { key, value };
+    return value;
   }
 
   get executionPlanError(): string {
@@ -1674,14 +2379,18 @@ export class DfApiBuilderComponent implements OnInit {
   ngOnInit(): void {
     this.recentSourceNames = this.readRecentSources();
     this.validateJsonEditors();
-    this.endpointForm.controls.executionPlan.valueChanges.subscribe(() => {
-      this.validateJsonEditors();
-      this.markPreviewStale();
-    });
-    this.endpointForm.controls.responseMapping.valueChanges.subscribe(() => {
-      this.validateJsonEditors();
-      this.markPreviewStale();
-    });
+    this.endpointForm.controls.executionPlan.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => {
+        this.validateJsonEditors();
+        this.markPreviewStale();
+      });
+    this.endpointForm.controls.responseMapping.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => {
+        this.validateJsonEditors();
+        this.markPreviewStale();
+      });
     this.loadSourceServices();
     this.loadAll();
   }
@@ -1734,8 +2443,68 @@ export class DfApiBuilderComponent implements OnInit {
   }
 
   selectRecentSource(serviceName: string): void {
+    this.chooseSourceService(serviceName);
+  }
+
+  // Autocomplete selection handlers. The "Source API" / "Table" fields are
+  // type-ahead inputs: typing filters the list live, picking an option sets the
+  // form control, syncs the visible label, and triggers introspection.
+  chooseSourceService(serviceName: string): void {
+    if (!serviceName) {
+      return;
+    }
     this.sourceForm.patchValue({ service: serviceName });
+    this.sourceServiceSearch = this.serviceDisplay(serviceName);
     this.loadTables(serviceName);
+  }
+
+  chooseSourceTable(tableName: string): void {
+    if (!tableName) {
+      return;
+    }
+    this.sourceForm.patchValue({ table: tableName });
+    this.sourceTableSearch = this.tableDisplay(tableName);
+    this.loadFields(tableName);
+  }
+
+  // On focus, blank the query so the autocomplete shows the FULL list (otherwise
+  // the pre-filled selected label filters it down to just that one row, which
+  // reads as an empty/broken dropdown). On blur, restore the selected label so
+  // an abandoned search doesn't leave a stray query in the box.
+  onSourceFocus(): void {
+    this.sourceServiceSearch = '';
+  }
+
+  onSourceBlur(): void {
+    // Deferred so a click on an option (which fires optionSelected slightly
+    // after blur) isn't clobbered by re-filtering the list out from under it.
+    setTimeout(() => {
+      const selected = this.sourceForm.value.service;
+      this.sourceServiceSearch = selected ? this.serviceDisplay(selected) : '';
+    }, 150);
+  }
+
+  onTableFocus(): void {
+    this.sourceTableSearch = '';
+  }
+
+  onTableBlur(): void {
+    setTimeout(() => {
+      const selected = this.sourceForm.value.table;
+      this.sourceTableSearch = selected ? this.tableDisplay(selected) : '';
+    }, 150);
+  }
+
+  private serviceDisplay(name: string): string {
+    const service = this.sourceServices.find(item => item.name === name);
+    return service ? service.label || service.name : name;
+  }
+
+  private tableDisplay(name: string): string {
+    const table = this.sourceTables.find(item => item.name === name);
+    return table
+      ? table.label || this.titleFromName(table.name)
+      : this.titleFromName(name);
   }
 
   private rememberRecentSource(serviceName: string): void {
@@ -1786,18 +2555,14 @@ export class DfApiBuilderComponent implements OnInit {
       .subscribe({
         next: response => {
           this.endpoints = response.resource ?? [];
-          if (this.editorOpen && this.selectedApiId) {
-            const endpoint = this.selectedEndpoints[0];
-            if (endpoint) {
-              this.selectEndpoint(endpoint.id);
-            }
-          }
+          this.rebuildEndpointCounts();
         },
         error: () => this.toast('Could not load endpoint definitions.'),
       });
   }
 
   loadSourceServices(): void {
+    this.sourceServicesLoading = true;
     this.http
       .get<GenericListResponse<SourceService & { is_active?: boolean }>>(
         `${BASE_URL}/system/service`,
@@ -1805,6 +2570,7 @@ export class DfApiBuilderComponent implements OnInit {
           params: { fields: 'name,label,type,is_active', limit: 500 },
         }
       )
+      .pipe(finalize(() => (this.sourceServicesLoading = false)))
       .subscribe({
         next: response => {
           const services = response.resource ?? [];
@@ -1812,7 +2578,8 @@ export class DfApiBuilderComponent implements OnInit {
             service =>
               service.name !== 'api_builder' &&
               service.name !== 'system' &&
-              service.is_active !== false
+              service.is_active !== false &&
+              !this.NON_SOURCE_TYPES.has((service.type || '').toLowerCase())
           );
           // Do not auto-load a sample service on page load.
           // In some local environments demo services (e.g. sample_pgsql)
@@ -1957,8 +2724,38 @@ export class DfApiBuilderComponent implements OnInit {
       this.sourceTables[0];
     if (defaultTable) {
       this.sourceForm.patchValue({ table: defaultTable.name });
+      this.sourceTableSearch = this.tableDisplay(defaultTable.name);
       this.loadFields(defaultTable.name);
     }
+  }
+
+  // Populates the table dropdown for an already-selected source WITHOUT the
+  // selection-clearing side effects of loadTables(). Used when restoring a saved
+  // endpoint so the user can still switch tables without re-picking the source.
+  private populateSourceTablesQuietly(serviceName?: string | null): void {
+    if (!serviceName) {
+      return;
+    }
+    this.http
+      .get<
+        GenericListResponse<SourceTable>
+      >(`${BASE_URL}/${serviceName}/_schema`, { params: { fields: 'name,label' } })
+      .subscribe({
+        next: response => {
+          const raw = Array.isArray(response?.resource)
+            ? response.resource
+            : [];
+          if (raw.length) {
+            this.sourceTables = raw.map(table => ({
+              ...table,
+              source: 'schema' as const,
+            }));
+          }
+        },
+        error: () => {
+          /* dropdown stays as-is; not fatal */
+        },
+      });
   }
 
   loadFields(tableName?: string | null): void {
@@ -2020,6 +2817,20 @@ export class DfApiBuilderComponent implements OnInit {
 
   isFieldSelected(fieldName: string): boolean {
     return this.selectedFields.has(fieldName);
+  }
+
+  aliasFor(sourceName: string): string {
+    return this.fieldAliases[sourceName] ?? '';
+  }
+
+  setAlias(sourceName: string, alias: string): void {
+    const trimmed = alias.trim();
+    if (trimmed) {
+      this.fieldAliases[sourceName] = trimmed;
+    } else {
+      delete this.fieldAliases[sourceName];
+    }
+    this.generateEndpointFromSource();
   }
 
   isRelationshipSelected(relationshipName: string): boolean {
@@ -2092,11 +2903,55 @@ export class DfApiBuilderComponent implements OnInit {
     }
 
     (filter as FilterRule)[key] = value as never;
+
+    // When the field changes, its valid operator set may change too (e.g.
+    // numeric -> text drops ">", "<"). Reset to "=" if the current operator
+    // is no longer offered so the Match dropdown never renders blank.
+    if (key === 'field') {
+      const allowed = this.filterOperatorOptions(filter.field);
+      if (!allowed.some(option => option.value === filter.operator)) {
+        filter.operator = '=';
+      }
+    }
+
     this.generateEndpointFromSource();
   }
 
   trackByFilterIndex(index: number): number {
     return index;
+  }
+
+  // trackBy functions keep *ngFor from tearing down and rebuilding every child
+  // view on each change-detection pass. The editor binds several getters that
+  // allocate a new array on every call; without trackBy, Angular destroys and
+  // recreates the animated Material rows each cycle, which reschedules animation
+  // tasks and spins change detection forever (tab freeze on "Create API").
+  trackByStepKey(_index: number, step: { key: string }): string {
+    return step.key;
+  }
+
+  trackByLabel(_index: number, group: { label: string }): string {
+    return group.label;
+  }
+
+  trackByName(_index: number, item: { name: string }): string {
+    return item.name;
+  }
+
+  trackById(_index: number, item: { id: number | string }): number | string {
+    return item.id;
+  }
+
+  trackByTitle(_index: number, item: { title: string }): string {
+    return item.title;
+  }
+
+  trackByOptionValue(_index: number, option: { value: unknown }): unknown {
+    return option.value;
+  }
+
+  trackByValue(_index: number, value: string): string {
+    return value;
   }
 
   filterOperatorOptions(fieldName: string): FilterOperatorOption[] {
@@ -2150,24 +3005,45 @@ export class DfApiBuilderComponent implements OnInit {
       this.sourceForm.value.outputShape === 'table'
         ? this.safeStepId(table)
         : 'data';
-    this.endpointForm.patchValue({
+    const description = `Returns selected fields from ${service}.${table}.`;
+
+    // Output rename map for the selected fields/relationships only. Emitted on
+    // the step; the backend applies it as a key-remap on the fetched rows.
+    const aliases: Record<string, string> = {};
+    for (const name of [
+      ...this.selectedFieldNames,
+      ...this.selectedRelationships,
+    ]) {
+      const alias = this.fieldAliases[name];
+      if (alias && alias !== name) {
+        aliases[name] = alias;
+      }
+    }
+
+    const step: Record<string, unknown> = {
+      id: stepId,
+      type: 'service_request',
+      service,
+      method: 'GET',
+      resource,
+      params,
+    };
+    if (Object.keys(aliases).length) {
+      step['aliases'] = aliases;
+    }
+
+    // The execution plan + response mapping are the functional contract — they
+    // must always track the current source/fields/filters. The identity fields
+    // (path/label/description) are user-facing and are only refreshed while the
+    // user hasn't customized them (still empty or still equal to our last
+    // auto-generated value).
+    const current = this.endpointForm.value;
+    const patch: Record<string, unknown> = {
       apiId: this.selectedApiId,
       method: 'GET',
-      path,
-      label,
-      description: `Returns selected fields from ${service}.${table}.`,
       executionPlan: JSON.stringify(
         {
-          steps: [
-            {
-              id: stepId,
-              type: 'service_request',
-              service,
-              method: 'GET',
-              resource,
-              params,
-            },
-          ],
+          steps: [step],
         },
         null,
         2
@@ -2181,7 +3057,25 @@ export class DfApiBuilderComponent implements OnInit {
         null,
         2
       ),
-    });
+    };
+
+    if (!current.path || current.path === this.lastGeneratedPath) {
+      patch['path'] = path;
+      this.lastGeneratedPath = path;
+    }
+    if (!current.label || current.label === this.lastGeneratedLabel) {
+      patch['label'] = label;
+      this.lastGeneratedLabel = label;
+    }
+    if (
+      !current.description ||
+      current.description === this.lastGeneratedDescription
+    ) {
+      patch['description'] = description;
+      this.lastGeneratedDescription = description;
+    }
+
+    this.endpointForm.patchValue(patch);
     this.testForm.patchValue({
       pathParams: includeId ? '{\n  "id": 1\n}' : '{}',
       query: '{}',
@@ -2225,8 +3119,11 @@ export class DfApiBuilderComponent implements OnInit {
           executionPlan,
           responseMapping,
         },
-        pathParams: this.sourceForm.value.includeId ? { id: 1 } : {},
+        // Backend reads snake_case and defaults dry_run=true (which only echoes
+        // the plan); send dry_run:false so the preview actually runs the query.
+        path_params: this.sourceForm.value.includeId ? { id: 1 } : {},
         query: {},
+        dry_run: false,
       })
       .pipe(finalize(() => (this.previewing = false)))
       .subscribe({
@@ -2439,9 +3336,11 @@ export class DfApiBuilderComponent implements OnInit {
           endpoint,
           ...this.endpoints.filter(existing => existing.id !== endpoint.id),
         ];
+        this.rebuildEndpointCounts();
 
         if (createAnother) {
-          this.newEndpoint();
+          this.resetEndpointEditor();
+          this.addingEndpoint = true;
           return;
         }
 
@@ -2470,9 +3369,10 @@ export class DfApiBuilderComponent implements OnInit {
     this.saving = true;
     this.http
       .post(`${BASE_URL}/api_builder/test`, {
-        endpointId: this.testForm.value.endpointId,
-        pathParams,
+        endpoint_id: this.testForm.value.endpointId,
+        path_params: pathParams,
         query,
+        dry_run: false,
       })
       .pipe(finalize(() => (this.saving = false)))
       .subscribe({
@@ -2496,14 +3396,21 @@ export class DfApiBuilderComponent implements OnInit {
       });
     }
     this.endpointForm.patchValue({ apiId: id });
-    const endpoint = this.selectedEndpoints[0];
-    if (endpoint) {
-      this.selectEndpoint(endpoint.id);
-    }
+    // Start with all endpoints collapsed (Swagger-style) — the user clicks an
+    // endpoint row to expand and edit it.
+    this.selectedEndpointId = null;
+    this.addingEndpoint = false;
   }
 
   selectEndpoint(id: number): void {
     this.selectedEndpointId = id;
+    this.addingEndpoint = false;
+    // A saved endpoint's path/label/description are user content — clear the
+    // generated-value trackers so later regeneration treats them as customized
+    // and never overwrites them.
+    this.lastGeneratedPath = '';
+    this.lastGeneratedLabel = '';
+    this.lastGeneratedDescription = '';
     const endpoint = this.endpoints.find(item => item.id === id);
     if (endpoint) {
       try {
@@ -2547,23 +3454,38 @@ export class DfApiBuilderComponent implements OnInit {
           .map(item => item.trim())
           .filter(Boolean);
         const order = String(params['order'] ?? '');
-        const [sortField = '', sortDirection = 'ASC'] = order.split(/\s+/, 2);
+        const [sortField = '', rawDirection = 'ASC'] = order.split(/\s+/, 2);
+        const sortDirection =
+          (rawDirection || 'ASC').toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
         const limit = Number(params['limit'] ?? 25);
+
+        const aliases = (step?.aliases ?? {}) as Record<string, unknown>;
 
         if (service && table) {
           this.pendingSelectedFieldNames = fields.length ? fields : null;
           this.selectedRelationships = new Set(related);
+          this.fieldAliases = Object.fromEntries(
+            Object.entries(aliases)
+              .filter(([, v]) => typeof v === 'string' && v)
+              .map(([k, v]) => [k, String(v)])
+          );
           this.sourceForm.patchValue({
             service,
             table,
             includeId,
             sortField,
-            sortDirection: sortDirection || 'ASC',
+            sortDirection,
             limit: Number.isFinite(limit) && limit > 0 ? limit : 25,
           });
+          this.sourceServiceSearch = this.serviceDisplay(service);
+          this.sourceTableSearch = this.tableDisplay(table);
           this.filterRules = this.parseFilters(String(params['filter'] ?? ''));
-          this.sourceIntrospectionHint =
-            'Source metadata loading is paused while stabilizing endpoint editor. Use Refresh Source Metadata to reload fields.';
+          this.sourceIntrospectionHint = '';
+          // Re-introspect the saved endpoint's source so the Fields and
+          // Relationships sections render with the saved selections checked.
+          // (pendingSelectedFieldNames + selectedRelationships were set above.)
+          this.loadFields(table);
+          this.populateSourceTablesQuietly(service);
         }
       } catch (error: any) {
         console.error('Failed to load endpoint into builder', {
@@ -2591,20 +3513,26 @@ export class DfApiBuilderComponent implements OnInit {
       description: '',
       status: 'draft',
     });
-    this.newEndpoint();
+    this.resetEndpointEditor();
   }
 
   closeEditor(): void {
     this.editorOpen = false;
     this.selectedApiId = null;
     this.selectedEndpointId = null;
+    this.addingEndpoint = false;
     this.testResult = '';
   }
 
-  endpointCount(apiId: number): number {
-    return this.endpoints.filter(
-      endpoint => (endpoint.apiId ?? endpoint.api_id) === apiId
-    ).length;
+  private rebuildEndpointCounts(): void {
+    const counts = new Map<number, number>();
+    for (const endpoint of this.endpoints) {
+      const apiId = endpoint.apiId ?? endpoint.api_id;
+      if (typeof apiId === 'number') {
+        counts.set(apiId, (counts.get(apiId) ?? 0) + 1);
+      }
+    }
+    this.endpointCounts = counts;
   }
 
   newEndpoint(): void {
@@ -2613,6 +3541,39 @@ export class DfApiBuilderComponent implements OnInit {
       return;
     }
 
+    this.resetEndpointEditor();
+  }
+
+  // Accordion controls for the endpoint list. Adding opens a blank editor panel
+  // (the "new endpoint" draft); toggling an existing row loads it for editing or
+  // collapses it if it is already open.
+  addEndpoint(): void {
+    if (!this.selectedApiId) {
+      this.toast('Save the API first, then add endpoints to it.');
+      return;
+    }
+    this.resetEndpointEditor();
+    this.addingEndpoint = true;
+  }
+
+  cancelAddEndpoint(): void {
+    this.addingEndpoint = false;
+    this.resetEndpointEditor();
+  }
+
+  toggleEndpoint(endpoint: EndpointDefinition): void {
+    if (this.selectedEndpointId === endpoint.id && !this.addingEndpoint) {
+      this.selectedEndpointId = null;
+      return;
+    }
+    this.addingEndpoint = false;
+    this.selectEndpoint(endpoint.id);
+  }
+
+  // Clears the endpoint editor to a blank slate. Called when starting a brand
+  // new API (before any API id exists) and when adding another endpoint, so a
+  // fresh editor never shows leftover sample/inspector data.
+  private resetEndpointEditor(): void {
     this.selectedEndpointId = null;
     this.pendingSelectedFieldNames = null;
     this.endpointForm.reset({
@@ -2631,10 +3592,16 @@ export class DfApiBuilderComponent implements OnInit {
 
     this.selectedFields.clear();
     this.selectedRelationships.clear();
+    this.fieldAliases = {};
     this.filterRules = [];
     this.sourceTables = [];
     this.sourceFields = [];
     this.sourceRelationships = [];
+    this.sourceServiceSearch = '';
+    this.sourceTableSearch = '';
+    this.lastGeneratedPath = '';
+    this.lastGeneratedLabel = '';
+    this.lastGeneratedDescription = '';
     this.sourceForm.patchValue({
       service: '',
       table: '',
@@ -2692,28 +3659,67 @@ export class DfApiBuilderComponent implements OnInit {
     element.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
-  loadSample(): void {
-    this.apiForm.patchValue({
-      name: 'customer_portal',
-      basePath: 'customer-portal',
-      label: 'Customer Portal API',
-      description:
-        'Composes sample_pgsql customer summaries with sample_zendesk tickets.',
-      status: 'draft',
-    });
-    this.endpointForm.patchValue({
-      method: 'GET',
-      path: '/customers/{id}/summary',
-      label: 'Customer Summary',
-      description:
-        'Read customer risk summary from Postgres and tickets from Zendesk.',
-      executionPlan: this.sampleExecutionPlan(),
-      responseMapping: this.sampleResponseMapping(),
-    });
-    this.testForm.patchValue({
-      pathParams: '{\n  "id": 1\n}',
-      query: '{}',
-    });
+  deleteEndpoint(id: number, event?: Event): void {
+    event?.stopPropagation();
+    const endpoint = this.endpoints.find(item => item.id === id);
+    const label = endpoint
+      ? `${endpoint.method} ${endpoint.path}`
+      : `endpoint ${id}`;
+    if (!window.confirm(`Delete ${label}? This cannot be undone.`)) {
+      return;
+    }
+
+    this.saving = true;
+    this.http
+      .delete(`${BASE_URL}/api_builder/endpoints/${id}`)
+      .pipe(finalize(() => (this.saving = false)))
+      .subscribe({
+        next: () => {
+          this.endpoints = this.endpoints.filter(item => item.id !== id);
+          this.rebuildEndpointCounts();
+          this.toast('Endpoint deleted.');
+          if (this.selectedEndpointId === id) {
+            this.newEndpoint();
+          }
+        },
+        error: (error: any) =>
+          this.toast(
+            `Could not delete endpoint. ${this.describeHttpError(error)}`
+          ),
+      });
+  }
+
+  deleteApi(id: number, event?: Event): void {
+    event?.stopPropagation();
+    const api = this.apis.find(item => item.id === id);
+    const label = api ? api.label || api.name : `API ${id}`;
+    if (
+      !window.confirm(
+        `Delete "${label}" and all of its endpoints? This cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    this.loading = true;
+    this.http
+      .delete(`${BASE_URL}/api_builder/apis/${id}`)
+      .pipe(finalize(() => (this.loading = false)))
+      .subscribe({
+        next: () => {
+          this.apis = this.apis.filter(item => item.id !== id);
+          this.endpoints = this.endpoints.filter(
+            endpoint => (endpoint.apiId ?? endpoint.api_id) !== id
+          );
+          this.rebuildEndpointCounts();
+          this.toast('API deleted.');
+          if (this.selectedApiId === id) {
+            this.closeEditor();
+          }
+        },
+        error: (error: any) =>
+          this.toast(`Could not delete API. ${this.describeHttpError(error)}`),
+      });
   }
 
   private validateJsonEditors(): void {
@@ -2772,48 +3778,6 @@ export class DfApiBuilderComponent implements OnInit {
       return 'JSON is required.';
     }
     return '';
-  }
-
-  private sampleExecutionPlan(): string {
-    return JSON.stringify(
-      {
-        steps: [
-          {
-            id: 'summary',
-            type: 'service_request',
-            service: 'sample_pgsql',
-            method: 'GET',
-            resource: '_table/customer_risk_summary',
-            params: {
-              filter: 'customer_id={path.id}',
-            },
-          },
-          {
-            id: 'tickets',
-            type: 'service_request',
-            service: 'sample_zendesk',
-            method: 'GET',
-            resource: 'tickets',
-            params: {
-              customer_id: '{path.id}',
-            },
-          },
-        ],
-      },
-      null,
-      2
-    );
-  }
-
-  private sampleResponseMapping(): string {
-    return JSON.stringify(
-      {
-        summary: '{steps.summary.resource.0}',
-        tickets: '{steps.tickets.tickets}',
-      },
-      null,
-      2
-    );
   }
 
   private withoutEmptyOptionalFields<T extends Record<string, unknown>>(
