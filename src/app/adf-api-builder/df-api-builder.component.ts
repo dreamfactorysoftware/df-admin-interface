@@ -24,6 +24,7 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { finalize } from 'rxjs';
 import { BASE_URL } from '../shared/constants/urls';
+import { DfApiBuilderWorkspaceComponent } from './df-api-builder-workspace.component';
 import { GenericListResponse } from '../shared/types/generic-http';
 import { ApiBuilderMapperService } from './api-builder-mapper.service';
 
@@ -62,14 +63,10 @@ type StepPreview = {
 };
 
 type SourceService = {
+  id?: number;
   name: string;
   label?: string;
   type: string;
-};
-
-type SourceServiceGroup = {
-  label: string;
-  services: SourceService[];
 };
 
 type SourceTable = {
@@ -118,19 +115,6 @@ type SourceRelationship = {
   ref_field?: string;
 };
 
-type SourceSchemaResponse = {
-  service: string;
-  table?: {
-    name: string;
-    label?: string;
-  };
-  primaryKey?: SourceField;
-  primary_key?: SourceField;
-  resource?: SourceTable[] | SourceField[];
-  relationships?: SourceRelationship[];
-  raw?: unknown;
-};
-
 type FilterOperator = '=' | '!=' | '>' | '>=' | '<' | '<=' | 'like';
 
 type FilterRule = {
@@ -139,7 +123,7 @@ type FilterRule = {
   value: string;
 };
 
-type OutputShape = 'data' | 'table';
+type OutputShape = 'resource' | 'data' | 'table';
 
 type FilterOperatorOption = {
   value: FilterOperator;
@@ -186,6 +170,7 @@ type WorkflowStep = {
     MatSnackBarModule,
     MatTabsModule,
     MatTooltipModule,
+    DfApiBuilderWorkspaceComponent,
   ],
   template: `
     <section class="builder-shell">
@@ -372,6 +357,13 @@ type WorkflowStep = {
           </form>
         </mat-card>
 
+        <df-api-builder-workspace
+          *ngIf="selectedApiId"
+          [apiId]="selectedApiId"
+          (workspaceChanged)="
+            loadWorkspaceServices(selectedApiId)
+          "></df-api-builder-workspace>
+
         <div class="endpoints-section">
           <div class="endpoints-bar">
             <div>
@@ -517,14 +509,18 @@ type WorkflowStep = {
 
           <section class="workflow-strip" aria-label="Workflow status">
             <button
-              mat-button
               type="button"
               class="workflow-step"
               *ngFor="let step of workflowSteps; trackBy: trackByStepKey"
               [class.complete]="step.complete"
               (click)="focusWorkflowStep(step.key)">
-              <span class="step-label">{{ step.label }}</span>
-              <small>{{ step.detail }}</small>
+              <span class="step-top">
+                <mat-icon class="step-check">{{
+                  step.complete ? 'check_circle' : 'radio_button_unchecked'
+                }}</mat-icon>
+                <span class="step-label">{{ step.label }}</span>
+              </span>
+              <span class="step-detail">{{ step.detail }}</span>
             </button>
           </section>
 
@@ -868,6 +864,9 @@ type WorkflowStep = {
                 <mat-select
                   formControlName="outputShape"
                   (selectionChange)="generateEndpointFromSource()">
+                  <mat-option value="resource"
+                    >Wrap in "resource" key (DreamFactory default)</mat-option
+                  >
                   <mat-option value="data">Wrap in "data" key</mat-option>
                   <mat-option value="table">Wrap in table-named key</mat-option>
                 </mat-select>
@@ -1111,12 +1110,6 @@ type WorkflowStep = {
         text-transform: uppercase;
       }
 
-      .builder-workbench {
-        display: grid;
-        gap: 16px;
-        grid-template-columns: minmax(520px, 1fr) minmax(280px, 0.34fr);
-      }
-
       /* ===== Restructured API detail view ===== */
       .api-detail {
         display: flex;
@@ -1236,10 +1229,6 @@ type WorkflowStep = {
         box-shadow: 0 1px 12px rgba(63, 81, 181, 0.12);
       }
 
-      .endpoint-card.new-endpoint {
-        border-color: rgba(34, 197, 94, 0.5);
-      }
-
       .endpoint-row {
         align-items: center;
         display: flex;
@@ -1357,20 +1346,6 @@ type WorkflowStep = {
         padding: 32px 16px;
       }
 
-      .endpoints-header-row {
-        align-items: center;
-        display: flex;
-        justify-content: space-between;
-        gap: 10px;
-        width: 100%;
-      }
-
-      .endpoint-actions {
-        align-items: center;
-        display: flex;
-        gap: 8px;
-      }
-
       .endpoint-panel-tabs {
         margin-top: 12px;
       }
@@ -1421,29 +1396,62 @@ type WorkflowStep = {
       }
 
       .workflow-step {
-        align-items: flex-start;
-        border: 1px solid rgba(148, 163, 184, 0.35);
+        align-items: stretch;
+        background: rgba(127, 127, 127, 0.05);
+        border: 1px solid rgba(148, 163, 184, 0.4);
         border-radius: 8px;
+        color: inherit;
+        cursor: pointer;
         display: flex;
         flex-direction: column;
-        gap: 2px;
-        line-height: 1.2;
-        padding: 8px 10px;
+        font: inherit;
+        gap: 5px;
+        line-height: 1.3;
+        padding: 10px 12px;
         text-align: left;
       }
 
+      .workflow-step:hover {
+        border-color: rgba(148, 163, 184, 0.7);
+      }
+
       .workflow-step.complete {
-        border-color: rgba(34, 197, 94, 0.65);
+        background: rgba(34, 197, 94, 0.1);
+        border-color: rgba(34, 197, 94, 0.55);
+      }
+
+      .step-top {
+        align-items: center;
+        display: flex;
+        gap: 6px;
+      }
+
+      .step-check {
+        font-size: 17px;
+        height: 17px;
+        opacity: 0.45;
+        width: 17px;
+      }
+
+      .workflow-step.complete .step-check {
+        color: #16a34a;
+        opacity: 1;
       }
 
       .workflow-step .step-label {
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
       }
 
-      .workflow-step small {
-        font-size: 11px;
-        opacity: 0.85;
+      .workflow-step.complete .step-label {
+        color: #15803d;
+      }
+
+      .workflow-step .step-detail {
+        font-size: 12.5px;
+        opacity: 0.92;
       }
 
       .api-list {
@@ -1501,38 +1509,12 @@ type WorkflowStep = {
         text-align: center;
       }
 
-      .api-strip {
-        align-items: center;
-        display: grid;
-        gap: 12px;
-        grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) auto;
-        margin-bottom: 16px;
-      }
-
-      .api-strip button {
-        margin-bottom: 20px;
-      }
-
       .endpoint-shell {
         display: flex;
         flex-direction: column;
         gap: 16px;
       }
 
-      .section-label {
-        border-top: 1px solid rgba(127, 127, 127, 0.25);
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        margin-top: 6px;
-        padding-top: 14px;
-      }
-
-      .section-label strong {
-        font-size: 14px;
-      }
-
-      .section-label span,
       .preview-row small {
         opacity: 0.72;
       }
@@ -1786,23 +1768,6 @@ type WorkflowStep = {
         flex: none;
       }
 
-      .advanced-contract {
-        border-top: 1px solid rgba(127, 127, 127, 0.2);
-        padding-top: 8px;
-      }
-
-      .advanced-contract summary {
-        cursor: pointer;
-        font-weight: 600;
-        margin-bottom: 10px;
-      }
-
-      .advanced-grid {
-        display: grid;
-        gap: 12px;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-
       .preview-row {
         align-items: flex-start;
         border: 1px solid rgba(127, 127, 127, 0.28);
@@ -1819,19 +1784,6 @@ type WorkflowStep = {
         min-width: 0;
       }
 
-      .field-pills {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-      }
-
-      .field-pills span {
-        border: 1px solid rgba(127, 127, 127, 0.35);
-        border-radius: 999px;
-        font-size: 12px;
-        padding: 5px 9px;
-      }
-
       .muted {
         opacity: 0.72;
       }
@@ -1845,71 +1797,6 @@ type WorkflowStep = {
         font-family:
           ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
           'Liberation Mono', monospace;
-      }
-
-      .list {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        margin-top: 16px;
-      }
-
-      .toolbar {
-        display: flex;
-        justify-content: flex-end;
-        margin-bottom: 8px;
-      }
-
-      .list-row {
-        border-radius: 6px;
-        height: auto;
-        justify-content: flex-start;
-        padding: 10px;
-        text-align: left;
-        width: 100%;
-      }
-
-      .list-row.selected {
-        background: rgba(63, 81, 181, 0.12);
-      }
-
-      .list-row span {
-        display: flex;
-        flex-direction: column;
-        min-width: 0;
-      }
-
-      .list-row small {
-        opacity: 0.75;
-      }
-
-      .list-row strong,
-      .list-row small {
-        max-width: 100%;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-
-      .list-row-wrap {
-        align-items: center;
-        display: flex;
-        gap: 4px;
-      }
-
-      .list-row-wrap .list-row {
-        flex: 1;
-        min-width: 0;
-      }
-
-      .list-row-delete {
-        flex: none;
-        opacity: 0.55;
-      }
-
-      .list-row-wrap:hover .list-row-delete,
-      .list-row-delete:focus-visible {
-        opacity: 1;
       }
 
       .api-card mat-card-header {
@@ -1954,8 +1841,7 @@ type WorkflowStep = {
       }
 
       @media (max-width: 980px) {
-        .builder-header,
-        .builder-workbench {
+        .builder-header {
           display: flex;
           flex-direction: column;
         }
@@ -1964,17 +1850,11 @@ type WorkflowStep = {
           flex-wrap: wrap;
         }
 
-        .api-strip,
         .source-builder,
         .filter-row,
         .field-toolbar,
-        .result-options,
-        .advanced-grid {
+        .result-options {
           grid-template-columns: 1fr;
-        }
-
-        .api-strip button {
-          margin-bottom: 0;
         }
       }
     `,
@@ -2121,7 +2001,7 @@ export class DfApiBuilderComponent implements OnInit {
     sortField: [''],
     sortDirection: ['ASC'],
     limit: [25],
-    outputShape: ['data' as OutputShape],
+    outputShape: ['resource' as OutputShape],
   });
 
   get selectedEndpoints(): EndpointDefinition[] {
@@ -2135,16 +2015,51 @@ export class DfApiBuilderComponent implements OnInit {
   }
 
   get filteredSourceServices(): SourceService[] {
-    const query = this.sourceServiceSearch.trim().toLowerCase();
-    if (!query) {
-      return [...this.sourceServices];
+    // Scope the source picker to this API's workspace. When a workspace is
+    // defined, an endpoint may only build from those services (the executor
+    // enforces the same at runtime). An empty/absent workspace shows all, so
+    // APIs created before workspaces existed keep working.
+    let list = [...this.sourceServices];
+    if (this.workspaceServiceIds && this.workspaceServiceIds.size) {
+      list = list.filter(
+        service =>
+          service.id != null && this.workspaceServiceIds!.has(service.id)
+      );
     }
 
-    return this.sourceServices.filter(service => {
+    const query = this.sourceServiceSearch.trim().toLowerCase();
+    if (!query) {
+      return list;
+    }
+
+    return list.filter(service => {
       const haystack =
         `${service.name} ${service.label ?? ''} ${service.type}`.toLowerCase();
       return haystack.includes(query);
     });
+  }
+
+  /** Service ids in the selected API's workspace, or null when none defined. */
+  workspaceServiceIds: Set<number> | null = null;
+
+  loadWorkspaceServices(apiId: number | null): void {
+    if (!apiId) {
+      this.workspaceServiceIds = null;
+      return;
+    }
+    this.http
+      .get<
+        GenericListResponse<{ serviceId?: number; service_id?: number }>
+      >(`${BASE_URL}/api_builder/services`, { params: { filter: `api_id=${apiId}`, limit: 500 } })
+      .subscribe({
+        next: response => {
+          const ids = (response.resource ?? [])
+            .map(r => r.serviceId ?? r.service_id)
+            .filter((v): v is number => v != null);
+          this.workspaceServiceIds = ids.length ? new Set(ids) : null;
+        },
+        error: () => (this.workspaceServiceIds = null),
+      });
   }
 
   get filteredSourceTables(): SourceTable[] {
@@ -2163,42 +2078,6 @@ export class DfApiBuilderComponent implements OnInit {
     return this.recentSourceNames
       .map(name => this.sourceServices.find(service => service.name === name))
       .filter((service): service is SourceService => !!service);
-  }
-
-  get groupedSourceServices(): SourceServiceGroup[] {
-    const services = this.filteredSourceServices;
-    const recent = this.recentSourceNames
-      .map(name => services.find(service => service.name === name))
-      .filter((service): service is SourceService => !!service);
-
-    const remaining = services.filter(
-      service => !this.recentSourceNames.includes(service.name)
-    );
-
-    const byType = new Map<string, SourceService[]>();
-    remaining.forEach(service => {
-      const group = byType.get(service.type) ?? [];
-      group.push(service);
-      byType.set(service.type, group);
-    });
-
-    const groups: SourceServiceGroup[] = [];
-    if (recent.length) {
-      groups.push({ label: 'Recent', services: recent });
-    }
-
-    Array.from(byType.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .forEach(([type, grouped]) => {
-        groups.push({
-          label: this.titleFromName(type),
-          services: grouped.sort((a, b) =>
-            (a.label || a.name).localeCompare(b.label || b.name)
-          ),
-        });
-      });
-
-    return groups;
   }
 
   get workflowSteps(): WorkflowStep[] {
@@ -2257,11 +2136,6 @@ export class DfApiBuilderComponent implements OnInit {
         complete: hasSavedEndpoint,
       },
     ];
-  }
-
-  get editorTitle(): string {
-    const api = this.apis.find(item => item.id === this.selectedApiId);
-    return api ? api.label || api.name : 'Create API';
   }
 
   get executionStepsPreview(): StepPreview[] {
@@ -2567,7 +2441,7 @@ export class DfApiBuilderComponent implements OnInit {
       .get<GenericListResponse<SourceService & { is_active?: boolean }>>(
         `${BASE_URL}/system/service`,
         {
-          params: { fields: 'name,label,type,is_active', limit: 500 },
+          params: { fields: 'id,name,label,type,is_active', limit: 500 },
         }
       )
       .pipe(finalize(() => (this.sourceServicesLoading = false)))
@@ -2930,10 +2804,6 @@ export class DfApiBuilderComponent implements OnInit {
     return step.key;
   }
 
-  trackByLabel(_index: number, group: { label: string }): string {
-    return group.label;
-  }
-
   trackByName(_index: number, item: { name: string }): string {
     return item.name;
   }
@@ -3001,10 +2871,7 @@ export class DfApiBuilderComponent implements OnInit {
     if (!includeId && limit > 0) {
       params['limit'] = String(limit);
     }
-    const outputKey =
-      this.sourceForm.value.outputShape === 'table'
-        ? this.safeStepId(table)
-        : 'data';
+    const outputKey = this.resolveOutputKey(table);
     const description = `Returns selected fields from ${service}.${table}.`;
 
     // Output rename map for the selected fields/relationships only. Emitted on
@@ -3111,9 +2978,7 @@ export class DfApiBuilderComponent implements OnInit {
             !!this.sourceForm.value.includeId
           ),
           responseSchema: this.buildResponseSchema(
-            this.sourceForm.value.outputShape === 'table'
-              ? this.safeStepId(this.sourceForm.value.table ?? 'data')
-              : 'data',
+            this.resolveOutputKey(this.sourceForm.value.table ?? ''),
             !!this.sourceForm.value.includeId
           ),
           executionPlan,
@@ -3265,9 +3130,7 @@ export class DfApiBuilderComponent implements OnInit {
           !!this.sourceForm.value.includeId
         ),
         responseSchema: this.buildResponseSchema(
-          this.sourceForm.value.outputShape === 'table'
-            ? this.safeStepId(this.sourceForm.value.table ?? 'data')
-            : 'data',
+          this.resolveOutputKey(this.sourceForm.value.table ?? ''),
           !!this.sourceForm.value.includeId
         ),
         executionPlan,
@@ -3385,6 +3248,7 @@ export class DfApiBuilderComponent implements OnInit {
   selectApi(id: number): void {
     this.editorOpen = true;
     this.selectedApiId = id;
+    this.loadWorkspaceServices(id);
     const api = this.apis.find(item => item.id === id);
     if (api) {
       this.apiForm.patchValue({
@@ -3461,6 +3325,19 @@ export class DfApiBuilderComponent implements OnInit {
 
         const aliases = (step?.aliases ?? {}) as Record<string, unknown>;
 
+        // Restore the output wrapper shape from the saved response mapping's
+        // top-level key so reopening the endpoint doesn't silently switch it.
+        const respMap = (endpoint.responseMapping ??
+          endpoint.response_mapping ??
+          {}) as Record<string, unknown>;
+        const outKey = Object.keys(respMap)[0] ?? 'resource';
+        const outputShape: OutputShape =
+          outKey === 'data'
+            ? 'data'
+            : outKey === this.safeStepId(table)
+              ? 'table'
+              : 'resource';
+
         if (service && table) {
           this.pendingSelectedFieldNames = fields.length ? fields : null;
           this.selectedRelationships = new Set(related);
@@ -3476,6 +3353,7 @@ export class DfApiBuilderComponent implements OnInit {
             sortField,
             sortDirection,
             limit: Number.isFinite(limit) && limit > 0 ? limit : 25,
+            outputShape,
           });
           this.sourceServiceSearch = this.serviceDisplay(service);
           this.sourceTableSearch = this.tableDisplay(table);
@@ -3506,6 +3384,7 @@ export class DfApiBuilderComponent implements OnInit {
   newApi(): void {
     this.editorOpen = true;
     this.selectedApiId = null;
+    this.workspaceServiceIds = null;
     this.apiForm.reset({
       name: '',
       basePath: '',
@@ -3609,7 +3488,7 @@ export class DfApiBuilderComponent implements OnInit {
       sortField: '',
       sortDirection: 'ASC',
       limit: 25,
-      outputShape: 'data',
+      outputShape: 'resource',
     });
   }
 
@@ -4151,6 +4030,19 @@ export class DfApiBuilderComponent implements OnInit {
 
   private safeStepId(value: string): string {
     return value.replace(/[^A-Za-z0-9_]+/g, '_');
+  }
+
+  // Top-level key the records are wrapped in. "resource" is DreamFactory's
+  // standard envelope (and the default); "data" and the table name are options.
+  private resolveOutputKey(tableName: string): string {
+    switch (this.sourceForm.value.outputShape) {
+      case 'table':
+        return this.safeStepId(tableName || 'data');
+      case 'data':
+        return 'data';
+      default:
+        return 'resource';
+    }
   }
 
   private describeHttpError(error: any): string {

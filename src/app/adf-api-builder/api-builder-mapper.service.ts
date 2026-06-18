@@ -74,23 +74,4 @@ export class ApiBuilderMapperService {
       response_mapping: input.responseMapping,
     };
   }
-
-  fromApiResponse(api: ApiDefinition): ApiDefinition {
-    return {
-      ...api,
-      basePath: api.basePath ?? api.base_path,
-    };
-  }
-
-  fromEndpointResponse(endpoint: EndpointDefinition): EndpointDefinition {
-    return {
-      ...endpoint,
-      apiId: endpoint.apiId ?? endpoint.api_id,
-      isActive: endpoint.isActive ?? endpoint.is_active,
-      executionPlan: endpoint.executionPlan ?? endpoint.execution_plan,
-      responseMapping: endpoint.responseMapping ?? endpoint.response_mapping,
-      requestSchema: endpoint.requestSchema ?? endpoint.request_schema,
-      responseSchema: endpoint.responseSchema ?? endpoint.response_schema,
-    };
-  }
 }
