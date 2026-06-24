@@ -1046,6 +1046,43 @@ type WorkflowStep = {
                     responseMappingError
                   }}</mat-error>
                 </mat-form-field>
+
+                <details style="margin-top: 4px;">
+                  <summary
+                    style="cursor: pointer; color: #2a4b8d; font-weight: 600;">
+                    Step types &amp; examples
+                  </summary>
+                  <div
+                    style="font-size: 0.88em; color: rgba(0,0,0,0.75); padding: 8px 2px;">
+                    <p>
+                      <strong>service_request</strong> — call a workspace
+                      service (database / file / remote). Selectors are static;
+                      <code>params</code>/<code>body</code> resolve caller input
+                      via <code>&#123;path.*&#125;</code>,
+                      <code>&#123;query.*&#125;</code>,
+                      <code>&#123;body.*&#125;</code>,
+                      <code>&#123;steps.&lt;id&gt;.*&#125;</code>.
+                    </p>
+                    <p>
+                      <strong>transform</strong> — reshape a prior step
+                      in-memory (no request). <code>from</code> = a context path;
+                      <code>ops</code> run in order. Ops: <code>pick</code>,
+                      <code>omit</code>, <code>rename</code>,
+                      <code>defaults</code>, <code>first</code>,
+                      <code>limit</code>, <code>count</code>, <code>wrap</code>,
+                      <code>unwrap</code>.
+                    </p>
+                    <p style="margin-bottom: 4px;">
+                      Example — fetch rows, then shape them:
+                    </p>
+                    <pre
+                      style="background: rgba(0,0,0,0.05); padding: 10px; border-radius: 6px; overflow: auto;">{{ stepExample }}</pre>
+                    <p>
+                      Run <strong>Preview Return</strong> to execute it and see
+                      each step's result, status, and timing.
+                    </p>
+                  </div>
+                </details>
               </div>
             </mat-tab>
 
@@ -1989,6 +2026,20 @@ export class DfApiBuilderComponent implements OnInit {
   previewOk: boolean | null = null;
   previewStale = false;
   previewing = false;
+  stepExample = `{
+  "steps": [
+    { "id": "rows", "type": "service_request",
+      "service": "your_db", "resource": "_table/your_table",
+      "method": "GET", "params": { "limit": "25" } },
+    { "id": "shaped", "type": "transform", "from": "{steps.rows.resource}",
+      "ops": [
+        { "op": "pick", "fields": ["id", "name"] },
+        { "op": "rename", "map": { "name": "title" } }
+      ] }
+  ]
+}
+
+Response Mapping  ->  { "items": "{steps.shaped}" }`;
 
   // Memo caches for the two JSON-parsing preview getters. These getters are
   // bound in the template (*ngIf / *ngFor) and run on every change-detection
