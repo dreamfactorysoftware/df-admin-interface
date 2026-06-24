@@ -99,6 +99,12 @@ export const routes: Routes = [
     pathMatch: 'full',
   },
   {
+    path: ROUTES.ALERTS,
+    loadComponent: () =>
+      import('./adf-alerts/df-alerts.component').then(m => m.DfAlertsComponent),
+    canActivate: [loggedInGuard],
+  },
+  {
     path: ROUTES.API_CONNECTIONS,
     children: [
       {

@@ -136,6 +136,10 @@
     "nextStepFooter": {"header": "Next Step:", "body": "Scroll below to explore generated endpoints that allow you to read, write, and filter your data via REST"}
   },
   "nav": {
+    "alerts": {
+      "nav": "Alerts",
+      "header": "{{nav.alerts.nav}}"
+    },
     "api-builder": {
       "nav": "API Builder",
       "header": "{{nav.api-builder.nav}}"

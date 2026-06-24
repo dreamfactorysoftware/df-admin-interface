@@ -940,6 +940,23 @@ type WorkflowStep = {
                 </small>
               </span>
             </div>
+            <div *ngIf="previewTrace.length" style="margin: 4px 0 12px;">
+              <div style="font-size: 0.8em; color: rgba(0,0,0,0.55); margin-bottom: 4px;">
+                Execution trace — {{ previewTrace.length }} step(s){{ previewOk === false ? ' · failed' : '' }}
+              </div>
+              <div
+                *ngFor="let s of previewTrace"
+                style="display: flex; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid rgba(0,0,0,0.06);">
+                <mat-icon
+                  [style.color]="s.ok === false ? '#d9534f' : '#1a7f1a'"
+                  style="font-size: 18px; width: 18px; height: 18px;">{{ s.ok === false ? 'error' : 'check_circle' }}</mat-icon>
+                <strong>{{ s.key }}</strong>
+                <span style="color: rgba(0,0,0,0.6);">{{ s.method }} {{ s.service }}/{{ s.resource }}</span>
+                <span style="flex: 1;"></span>
+                <span [style.color]="s.ok === false ? '#a11' : 'rgba(0,0,0,0.7)'">{{ s.ok === false ? s.error : s.preview }}</span>
+                <span *ngIf="s.ms != null" style="color: rgba(0,0,0,0.45);">{{ s.ms }}ms</span>
+              </div>
+            </div>
             <pre>{{ previewResult }}</pre>
           </section>
         </form>
@@ -1947,6 +1964,8 @@ export class DfApiBuilderComponent implements OnInit {
   addingEndpoint = false;
   testResult = '';
   previewResult = '';
+  previewTrace: Array<{ key: string; service?: string; resource?: string; method?: string; ok?: boolean; preview?: string; error?: string; ms?: number }> = [];
+  previewOk: boolean | null = null;
   previewStale = false;
   previewing = false;
 
@@ -2989,15 +3008,21 @@ export class DfApiBuilderComponent implements OnInit {
         path_params: this.sourceForm.value.includeId ? { id: 1 } : {},
         query: {},
         dry_run: false,
+        trace: true,
       })
       .pipe(finalize(() => (this.previewing = false)))
       .subscribe({
-        next: result => {
-          this.previewResult = JSON.stringify(result, null, 2);
+        next: (result: any) => {
+          this.previewTrace = result?.trace ?? [];
+          this.previewOk = result?.ok ?? null;
+          this.previewResult = JSON.stringify(result?.result ?? result, null, 2);
           this.previewStale = false;
         },
         error: error => {
-          this.previewResult = JSON.stringify(error?.error ?? error, null, 2);
+          const env = error?.error ?? error;
+          this.previewTrace = env?.trace ?? [];
+          this.previewOk = false;
+          this.previewResult = JSON.stringify(env?.error ?? env, null, 2);
           this.previewStale = false;
         },
       });
@@ -3467,6 +3492,8 @@ export class DfApiBuilderComponent implements OnInit {
     this.testForm.patchValue({ endpointId: null });
     this.testResult = '';
     this.previewResult = '';
+    this.previewTrace = [];
+    this.previewOk = null;
     this.previewStale = false;
 
     this.selectedFields.clear();
