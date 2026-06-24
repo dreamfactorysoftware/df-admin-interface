@@ -140,6 +140,10 @@
       "nav": "Alerts",
       "header": "{{nav.alerts.nav}}"
     },
+    "agents": {
+      "nav": "Agents",
+      "header": "{{nav.agents.nav}}"
+    },
     "api-builder": {
       "nav": "API Builder",
       "header": "{{nav.api-builder.nav}}"

@@ -105,6 +105,12 @@ export const routes: Routes = [
     canActivate: [loggedInGuard],
   },
   {
+    path: ROUTES.AGENTS,
+    loadComponent: () =>
+      import('./adf-agents/df-agents.component').then(m => m.DfAgentsComponent),
+    canActivate: [loggedInGuard],
+  },
+  {
     path: ROUTES.API_CONNECTIONS,
     children: [
       {
