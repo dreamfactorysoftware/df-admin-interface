@@ -11,26 +11,30 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 
+// NOTE: the global caseInterceptor converts /api responses snake->camel (and
+// request bodies camel->snake), so everything from /api/v2 is camelCase here.
+// The /_internal/alerts/log endpoint is NOT under /api, so AgentLogRow stays
+// snake_case (matches the df-alerts admin component).
 type Agent = {
   id: number;
   name: string;
   description: string | null;
-  owner_id: number | null;
-  role_id: number | null;
-  api_key: string;
-  key_ttl_hours: number;
-  key_issued_at: string | null;
-  last_active_at: string | null;
-  is_active: boolean;
+  ownerId: number | null;
+  roleId: number | null;
+  apiKey: string;
+  keyTtlHours: number;
+  keyIssuedAt: string | null;
+  lastActiveAt: string | null;
+  isActive: boolean;
 };
 type AccessRequest = {
   id: number;
-  agent_id: number;
-  requested_services: string[];
-  requested_operations: string[];
+  agentId: number;
+  requestedServices: string[];
+  requestedOperations: string[];
   note: string | null;
   status: string;
-  resolved_at: string | null;
+  resolvedAt: string | null;
 };
 type Named = { id: number; name: string };
 type AgentLogRow = {
@@ -39,8 +43,6 @@ type AgentLogRow = {
   status: string;
   created_at: string;
 };
-
-const OPERATIONS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
 
 /**
  * Agents admin UI (AAN MVP): register/edit agents (role + key TTL, view/revoke
@@ -104,15 +106,15 @@ const OPERATIONS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
           /></mat-form-field>
           <mat-form-field appearance="outline"
             ><mat-label>Role</mat-label>
-            <mat-select [(ngModel)]="newAgent.role_id">
+            <mat-select [(ngModel)]="newAgent.roleId">
               <mat-option *ngFor="let r of roles" [value]="r.id">{{
                 r.name
               }}</mat-option>
             </mat-select></mat-form-field
           >
-          <mat-form-field appearance="outline"
+          <mat-form-field appearance="outline" *ngIf="users.length"
             ><mat-label>Owner</mat-label>
-            <mat-select [(ngModel)]="newAgent.owner_id">
+            <mat-select [(ngModel)]="newAgent.ownerId">
               <mat-option *ngFor="let u of users" [value]="u.id">{{
                 u.name
               }}</mat-option>
@@ -125,13 +127,13 @@ const OPERATIONS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
               type="number"
               min="1"
               max="24"
-              [(ngModel)]="newAgent.key_ttl_hours"
+              [(ngModel)]="newAgent.keyTtlHours"
               matTooltip="1–24 hours"
           /></mat-form-field>
           <button
             mat-flat-button
             color="primary"
-            [disabled]="saving || !newAgent.name || !newAgent.role_id"
+            [disabled]="saving || !newAgent.name || !newAgent.roleId"
             (click)="createAgent()">
             Create
           </button>
@@ -139,19 +141,19 @@ const OPERATIONS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
 
         <p class="muted" *ngIf="!agents.length">No agents yet.</p>
         <div class="row" *ngFor="let a of agents">
-          <span class="badge" [class.on]="a.is_active && !expired(a)">{{
-            !a.is_active ? 'REVOKED' : expired(a) ? 'KEY EXPIRED' : 'ACTIVE'
+          <span class="badge" [class.on]="a.isActive && !expired(a)">{{
+            !a.isActive ? 'REVOKED' : expired(a) ? 'KEY EXPIRED' : 'ACTIVE'
           }}</span>
           <strong>{{ a.name }}</strong>
-          <span class="tag">{{ roleName(a.role_id) }}</span>
+          <span class="tag">{{ roleName(a.roleId) }}</span>
           <span class="muted" *ngIf="a.description">{{ a.description }}</span>
           <span class="spacer"></span>
           <code class="key" matTooltip="Agent API key">{{
-            maskKey(a.api_key)
+            maskKey(a.apiKey)
           }}</code>
-          <span class="muted ttl">TTL {{ a.key_ttl_hours }}h</span>
+          <span class="muted ttl">TTL {{ a.keyTtlHours }}h</span>
           <mat-slide-toggle
-            [checked]="a.is_active"
+            [checked]="a.isActive"
             (change)="toggleActive(a, $event.checked)"
             matTooltip="Revoke / restore key"></mat-slide-toggle>
           <button mat-icon-button (click)="startEdit(a)" matTooltip="Edit">
@@ -173,7 +175,7 @@ const OPERATIONS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
           /></mat-form-field>
           <mat-form-field appearance="outline"
             ><mat-label>Role</mat-label>
-            <mat-select [(ngModel)]="editAgent.role_id">
+            <mat-select [(ngModel)]="editAgent.roleId">
               <mat-option *ngFor="let r of roles" [value]="r.id">{{
                 r.name
               }}</mat-option>
@@ -186,7 +188,7 @@ const OPERATIONS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
               type="number"
               min="1"
               max="24"
-              [(ngModel)]="editAgent.key_ttl_hours"
+              [(ngModel)]="editAgent.keyTtlHours"
           /></mat-form-field>
           <button
             mat-flat-button
@@ -214,14 +216,14 @@ const OPERATIONS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
         </p>
         <div class="row" *ngFor="let q of pendingRequests">
           <mat-icon class="hand">pan_tool</mat-icon>
-          <strong>{{ agentName(q.agent_id) }}</strong>
+          <strong>{{ agentName(q.agentId) }}</strong>
           <span class="muted">requests</span>
           <span class="tag sev-warning">{{
-            (q.requested_operations || []).join(', ') || 'any'
+            (q.requestedOperations || []).join(', ') || 'any'
           }}</span>
           <span class="muted">on</span>
           <span class="tag">{{
-            (q.requested_services || []).join(', ') || 'unspecified'
+            (q.requestedServices || []).join(', ') || 'unspecified'
           }}</span>
           <span class="muted note" *ngIf="q.note">“{{ q.note }}”</span>
           <span class="spacer"></span>
@@ -261,22 +263,14 @@ const OPERATIONS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
               <td>
                 <strong>{{ a.name }}</strong>
               </td>
-              <td class="muted">{{ roleName(a.role_id) }}</td>
+              <td class="muted">{{ roleName(a.roleId) }}</td>
               <td>
-                <span class="badge" [class.on]="a.is_active && !expired(a)">{{
-                  !a.is_active
-                    ? 'revoked'
-                    : expired(a)
-                      ? 'expired'
-                      : 'active'
+                <span class="badge" [class.on]="a.isActive && !expired(a)">{{
+                  !a.isActive ? 'revoked' : expired(a) ? 'expired' : 'active'
                 }}</span>
               </td>
               <td class="muted">
-                {{
-                  a.last_active_at
-                    ? (a.last_active_at | date: 'short')
-                    : 'never'
-                }}
+                {{ a.lastActiveAt ? (a.lastActiveAt | date: 'short') : 'never' }}
               </td>
               <td class="muted">{{ requestCount(a.id) }}</td>
             </tr>
@@ -460,17 +454,17 @@ export class DfAgentsComponent implements OnInit {
   newAgent = {
     name: '',
     description: '',
-    role_id: null as number | null,
-    owner_id: null as number | null,
-    key_ttl_hours: 4,
+    roleId: null as number | null,
+    ownerId: null as number | null,
+    keyTtlHours: 4,
   };
 
   editId: number | null = null;
   editAgent = {
     name: '',
     description: '',
-    role_id: null as number | null,
-    key_ttl_hours: 4,
+    roleId: null as number | null,
+    keyTtlHours: 4,
   };
 
   get pendingRequests(): AccessRequest[] {
@@ -495,7 +489,8 @@ export class DfAgentsComponent implements OnInit {
       .get<{ resource: AccessRequest[] }>('/api/v2/agents/requests?fields=*')
       .subscribe(r => (this.requests = r.resource ?? []));
     // The real per-action agent audit trail is the df-alerts log (agent
-    // actions fire alerts by agent name). Optional dependency — ignore errors.
+    // actions fire alerts by agent name). /_internal is NOT under /api, so the
+    // caseInterceptor leaves these snake_case. Optional dependency — ignore errors.
     this.http
       .get<{ resource: AgentLogRow[] }>('/_internal/alerts/log')
       .subscribe({
@@ -515,15 +510,15 @@ export class DfAgentsComponent implements OnInit {
     return this.agents.find(a => a.id === id)?.name ?? 'agent ' + id;
   }
   requestCount(agentId: number): number {
-    return this.requests.filter(r => r.agent_id === agentId).length;
+    return this.requests.filter(r => r.agentId === agentId).length;
   }
   maskKey(key: string): string {
     return key ? key.slice(0, 6) + '…' + key.slice(-4) : '—';
   }
   expired(a: Agent): boolean {
-    if (!a.key_issued_at) return false;
+    if (!a.keyIssuedAt) return false;
     const expiresAt =
-      new Date(a.key_issued_at).getTime() + a.key_ttl_hours * 3600_000;
+      new Date(a.keyIssuedAt).getTime() + a.keyTtlHours * 3600_000;
     return Date.now() > expiresAt;
   }
 
@@ -539,9 +534,9 @@ export class DfAgentsComponent implements OnInit {
           this.newAgent = {
             name: '',
             description: '',
-            role_id: null,
-            owner_id: null,
-            key_ttl_hours: 4,
+            roleId: null,
+            ownerId: null,
+            keyTtlHours: 4,
           };
           this.refresh();
         },
@@ -554,8 +549,8 @@ export class DfAgentsComponent implements OnInit {
     this.editAgent = {
       name: a.name,
       description: a.description ?? '',
-      role_id: a.role_id,
-      key_ttl_hours: a.key_ttl_hours,
+      roleId: a.roleId,
+      keyTtlHours: a.keyTtlHours,
     };
   }
 
@@ -578,8 +573,11 @@ export class DfAgentsComponent implements OnInit {
   // so the key is rejected on the next request). Restore by toggling back on.
   toggleActive(a: Agent, active: boolean): void {
     this.http
-      .patch(`/api/v2/agents/agents/${a.id}`, { is_active: active })
-      .subscribe(() => (a.is_active = active));
+      .patch(`/api/v2/agents/agents/${a.id}`, { isActive: active })
+      .subscribe({
+        next: () => (a.isActive = active),
+        error: () => this.refresh(), // revert the toggle to server truth
+      });
   }
 
   remove(a: Agent): void {
@@ -592,16 +590,12 @@ export class DfAgentsComponent implements OnInit {
   // ---- request approval --------------------------------------------------
   resolve(q: AccessRequest, status: 'approved' | 'denied'): void {
     this.saving = true;
-    this.http
-      .patch(`/api/v2/agents/requests/${q.id}`, { status })
-      .subscribe({
-        next: () => {
-          this.saving = false;
-          this.refresh();
-        },
-        error: () => (this.saving = false),
-      });
+    this.http.patch(`/api/v2/agents/requests/${q.id}`, { status }).subscribe({
+      next: () => {
+        this.saving = false;
+        this.refresh();
+      },
+      error: () => (this.saving = false),
+    });
   }
-
-  protected readonly OPERATIONS = OPERATIONS;
 }
