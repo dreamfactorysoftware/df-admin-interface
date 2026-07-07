@@ -386,7 +386,7 @@ interface RelRow {
         margin: 0 0 4px;
       }
       .ws-intro p {
-        color: rgba(0, 0, 0, 0.7);
+        color: var(--df-text-2);
         font-size: 13px;
         margin: 0;
         max-width: 720px;
@@ -401,7 +401,7 @@ interface RelRow {
         margin: 14px 0 4px;
       }
       .ws-hint {
-        color: rgba(0, 0, 0, 0.6);
+        color: var(--df-text-muted);
         font-size: 12px;
         margin: 0 0 8px;
         max-width: 720px;
@@ -426,11 +426,11 @@ interface RelRow {
         opacity: 0.6;
       }
       .ws-rel-detail {
-        color: rgba(0, 0, 0, 0.55);
+        color: var(--df-text-muted);
         font-size: 12px;
       }
       .ws-empty {
-        color: rgba(0, 0, 0, 0.45);
+        color: var(--df-text-faint);
         font-style: italic;
       }
       .ws-add,
@@ -455,7 +455,7 @@ interface RelRow {
       }
       .ws-type-hint {
         flex-basis: 100%;
-        color: rgba(0, 0, 0, 0.6);
+        color: var(--df-text-muted);
         font-size: 12px;
         margin: 0;
       }
