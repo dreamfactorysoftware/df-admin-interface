@@ -15,6 +15,8 @@ import {
   faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons';
 import { URLS } from 'src/app/shared/constants/urls';
+import { normalizeError } from 'src/app/shared/utilities/app-error';
+import { toastOff } from 'src/app/shared/utilities/http-contexts';
 
 @Component({
   selector: 'df-config-package',
@@ -52,7 +54,10 @@ export class DfConfigPackageComponent {
     this.message = '';
     this.error = '';
 
-    this.http.get<unknown>(URLS.CONFIG_PACKAGE).subscribe({
+    this.http
+      // The inline error panel owns display; skip the interceptor toast.
+      .get<unknown>(URLS.CONFIG_PACKAGE, { context: toastOff() })
+      .subscribe({
       next: manifest => {
         this.exportedJson = JSON.stringify(manifest, null, 2);
         this.message = 'Config package exported.';
@@ -81,7 +86,12 @@ export class DfConfigPackageComponent {
     const params = new HttpParams().set('overwrite', String(this.overwrite));
 
     this.http
-      .post<unknown>(URLS.CONFIG_PACKAGE, { manifest }, { params })
+      // The inline error panel owns display; skip the interceptor toast.
+      .post<unknown>(
+        URLS.CONFIG_PACKAGE,
+        { manifest },
+        { params, context: toastOff() }
+      )
       .subscribe({
         next: result => {
           this.message = JSON.stringify(result, null, 2);
@@ -119,19 +129,9 @@ export class DfConfigPackageComponent {
   }
 
   private extractError(err: unknown, fallback: string): string {
-    if (typeof err === 'object' && err !== null) {
-      const response = err as {
-        error?: { error?: { message?: string }; message?: string };
-        message?: string;
-      };
-      return (
-        response.error?.error?.message ||
-        response.error?.message ||
-        response.message ||
-        fallback
-      );
-    }
-
-    return fallback;
+    // This panel renders plain English strings, so keep the caller's fallback
+    // when normalizeError yields an errors.* i18n key instead of a message.
+    const message = normalizeError(err).message;
+    return message.startsWith('errors.') ? fallback : message;
   }
 }

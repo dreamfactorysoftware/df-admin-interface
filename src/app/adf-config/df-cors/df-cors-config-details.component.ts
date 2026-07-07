@@ -30,6 +30,10 @@ import {
   GenericUpdateResponse,
 } from 'src/app/shared/types/generic-http';
 import { catchError, throwError } from 'rxjs';
+import {
+  applyServerErrorsToForm,
+  normalizeError,
+} from 'src/app/shared/utilities/app-error';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 import { AsyncPipe } from '@angular/common';
 
@@ -159,11 +163,13 @@ export class DfCorsConfigDetailsComponent implements OnInit {
           )
           .pipe(
             catchError(err => {
+              const e = normalizeError(err);
+              const leftovers = applyServerErrorsToForm(this.corsForm, e);
               this.triggerAlert(
                 'error',
-                err.error.error.context.resource[0].message
+                leftovers.length ? leftovers.join(' ') : e.message
               );
-              return throwError(() => new Error(err));
+              return throwError(() => e);
             })
           )
           .subscribe(res => {
@@ -184,8 +190,9 @@ export class DfCorsConfigDetailsComponent implements OnInit {
           )
           .pipe(
             catchError(err => {
-              this.triggerAlert('error', err.error.error.message);
-              return throwError(() => new Error(err));
+              const e = normalizeError(err);
+              this.triggerAlert('error', e.message);
+              return throwError(() => e);
             })
           )
           .subscribe(res => {

@@ -41,12 +41,9 @@ import {
   distinctUntilChanged,
   catchError,
 } from 'rxjs/operators';
-import {
-  HttpClient,
-  HttpErrorResponse,
-  HttpBackend,
-  HttpHeaders,
-} from '@angular/common/http';
+import { HttpClient, HttpBackend, HttpHeaders } from '@angular/common/http';
+import { normalizeError } from 'src/app/shared/utilities/app-error';
+import { toastOff } from 'src/app/shared/utilities/http-contexts';
 import { BASE_URL } from 'src/app/shared/constants/urls';
 import { Subscription, of, forkJoin } from 'rxjs';
 import { DfApiQuickstartComponent } from '../df-api-quickstart/df-api-quickstart.component';
@@ -223,15 +220,15 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
       this.http
         .get(`${BASE_URL}/${this.serviceName}${endpoint}`, {
           responseType: 'text',
+          // The health banner owns display; a toast per failed probe is noise.
+          context: toastOff(),
         })
         .pipe(
           tap(() => this.setHealthState('healthy')),
-          catchError((error: HttpErrorResponse) => {
+          catchError((error: unknown) => {
             this.setHealthState(
               'unhealthy',
-              `${endpoint}: ${
-                error.message || error.error.message || 'Unknown error'
-              }`
+              `${endpoint}: ${normalizeError(error).message}`
             );
 
             return of(null);

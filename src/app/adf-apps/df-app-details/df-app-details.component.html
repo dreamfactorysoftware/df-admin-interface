@@ -3,7 +3,7 @@
     [showAlert]="showAlert"
     [alertType]="alertType"
     (alertClosed)="showAlert = false">
-    {{ alertMsg }}
+    {{ alertMsg | transloco }}
   </df-alert>
   <form [formGroup]="appForm" (ngSubmit)="save()" class="details-section">
     <mat-form-field
@@ -25,6 +25,9 @@
         [matTooltip]="'apps.createApp.applicationName.tooltip' | transloco" />
       <mat-error *ngIf="appForm.controls['name'].hasError('required')">
         {{ 'apps.createApp.applicationName.error' | transloco }}
+      </mat-error>
+      <mat-error *ngIf="appForm.controls['name'].hasError('server')">
+        {{ appForm.controls['name'].getError('server') | transloco }}
       </mat-error>
     </mat-form-field>
     <mat-form-field
@@ -56,6 +59,9 @@
           {{ role.name }}
         </mat-option>
       </mat-autocomplete>
+      <mat-error *ngIf="appForm.controls['defaultRole'].hasError('server')">
+        {{ appForm.controls['defaultRole'].getError('server') | transloco }}
+      </mat-error>
     </mat-form-field>
     <mat-form-field
       subscriptSizing="dynamic"
@@ -69,6 +75,9 @@
         matInput
         placeholder="{{ 'apps.createApp.description.label' | transloco }}"
         formControlName="description"></textarea>
+      <mat-error *ngIf="appForm.controls['description'].hasError('server')">
+        {{ appForm.controls['description'].getError('server') | transloco }}
+      </mat-error>
       <fa-icon
         class="tool-tip-trigger"
         matSuffix
@@ -196,6 +205,12 @@
               | transloco
           }}"
           formControlName="storageContainer" />
+        <mat-error
+          *ngIf="appForm.controls['storageContainer'].hasError('server')">
+          {{
+            appForm.controls['storageContainer'].getError('server') | transloco
+          }}
+        </mat-error>
         <fa-icon
           class="tool-tip-trigger"
           matSuffix
@@ -231,6 +246,9 @@
               | transloco
           }}"
           formControlName="path" />
+        <mat-error *ngIf="appForm.controls['path'].hasError('server')">
+          {{ appForm.controls['path'].getError('server') | transloco }}
+        </mat-error>
         <fa-icon
           class="tool-tip-trigger"
           matSuffix
@@ -256,6 +274,9 @@
               | transloco
           }}"
           formControlName="url" />
+        <mat-error *ngIf="appForm.controls['url'].hasError('server')">
+          {{ appForm.controls['url'].getError('server') | transloco }}
+        </mat-error>
         <fa-icon
           class="tool-tip-trigger"
           matSuffix

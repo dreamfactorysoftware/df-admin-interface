@@ -38,6 +38,10 @@ import { UntilDestroy } from '@ngneat/until-destroy';
 import { generateApiKey } from 'src/app/shared/utilities/hash';
 import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
 import { catchError, throwError } from 'rxjs';
+import {
+  applyServerErrorsToForm,
+  normalizeError,
+} from 'src/app/shared/utilities/app-error';
 import { AlertType } from 'src/app/shared/components/df-alert/df-alert.component';
 import { DfAlertComponent } from 'src/app/shared/components/df-alert/df-alert.component';
 import { RoleType } from 'src/app/shared/types/role';
@@ -241,8 +245,9 @@ export class DfAppDetailsComponent implements OnInit {
         })
         .pipe(
           catchError(err => {
-            this.triggerAlert('error', err.error.error.message);
-            return throwError(() => new Error(err));
+            const e = normalizeError(err);
+            this.triggerAlert('error', e.message);
+            return throwError(() => e);
           })
         )
         .subscribe(() => {
@@ -260,11 +265,13 @@ export class DfAppDetailsComponent implements OnInit {
         )
         .pipe(
           catchError(err => {
+            const e = normalizeError(err);
+            const leftovers = applyServerErrorsToForm(this.appForm, e);
             this.triggerAlert(
               'error',
-              err.error.error.context.resource[0].message
+              leftovers.length ? leftovers.join(' ') : e.message
             );
-            return throwError(() => new Error(err));
+            return throwError(() => e);
           })
         )
         .subscribe(() => {

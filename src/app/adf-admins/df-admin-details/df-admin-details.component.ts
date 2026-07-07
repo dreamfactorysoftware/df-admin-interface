@@ -9,7 +9,10 @@ import {
   UserProfileType,
 } from 'src/app/shared/types/user';
 import { DfBreakpointService } from 'src/app/shared/services/df-breakpoint.service';
-import { parseError } from 'src/app/shared/utilities/parse-errors';
+import {
+  applyServerErrorsToForm,
+  normalizeError,
+} from 'src/app/shared/utilities/app-error';
 import { DfUserDetailsBaseComponent } from 'src/app/shared/components/df-user-details/df-user-details-base.component';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { ADMIN_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
@@ -95,6 +98,9 @@ export class DfAdminDetailsComponent extends DfUserDetailsBaseComponent<UserProf
 
   save() {
     if (this.userForm.invalid || this.userForm.pristine) {
+      if (this.userForm.invalid) {
+        this.userForm.markAllAsTouched();
+      }
       return;
     }
     const data: AdminProfile = {
@@ -123,13 +129,16 @@ export class DfAdminDetailsComponent extends DfUserDetailsBaseComponent<UserProf
         )
         .pipe(
           catchError(err => {
+            const e = normalizeError(err);
+            const leftovers = applyServerErrorsToForm(this.userForm, e);
+            const messages = leftovers.length ? leftovers : [e.message];
             this.triggerAlert(
               'error',
-              this.translateService.translate(
-                parseError(err.error.error.context.resource[0].message)
-              )
+              messages
+                .map(m => this.translateService.translate(m))
+                .join(' ')
             );
-            return throwError(() => new Error(err));
+            return throwError(() => e);
           })
         )
         .subscribe(res => {
@@ -154,8 +163,12 @@ export class DfAdminDetailsComponent extends DfUserDetailsBaseComponent<UserProf
         )
         .pipe(
           catchError(err => {
-            this.triggerAlert('error', err.error.error.message);
-            return throwError(() => new Error(err));
+            const e = normalizeError(err);
+            this.triggerAlert(
+              'error',
+              this.translateService.translate(e.message)
+            );
+            return throwError(() => e);
           })
         )
         .subscribe(res => {

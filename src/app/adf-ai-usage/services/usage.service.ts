@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable, forkJoin, of } from 'rxjs';
 import { catchError, map, shareReplay } from 'rxjs/operators';
 import { BASE_URL } from 'src/app/shared/constants/urls';
+import { silent } from 'src/app/shared/utilities/http-contexts';
 
 export type TimeRange = '24h' | '7d' | '30d' | 'all';
 
@@ -307,8 +308,16 @@ export class UsageService {
       });
     });
 
+    // Silent by design: every request in this bundle degrades to an empty
+    // dataset (zero-state dashboard / "#N" name fallbacks); a toast per
+    // failed analytics fetch would be noise. Intent is annotated per request.
     return forkJoin({
-      raw: this.http.get<UsageResponse>('/_internal/ai/usage', { params }).pipe(
+      raw: this.http
+        .get<UsageResponse>('/_internal/ai/usage', {
+          params,
+          context: silent(),
+        })
+        .pipe(
         catchError(() =>
           of({
             period,
@@ -344,7 +353,10 @@ export class UsageService {
         )
       ),
       mcp: this.http
-        .get<McpUsageResponse>('/_internal/ai/mcp-usage', { params })
+        .get<McpUsageResponse>('/_internal/ai/mcp-usage', {
+          params,
+          context: silent(),
+        })
         .pipe(
           catchError(() =>
             of({
@@ -401,6 +413,7 @@ export class UsageService {
           filter:
             '(type = "ai_connection") or (type = "ai_chat") or (type = "mcp")',
         },
+        context: silent(),
       })
       .pipe(
         map(res => {
@@ -420,6 +433,7 @@ export class UsageService {
     return this.http
       .get<{ resource: UserLookupRow[] }>(`${BASE_URL}/system/user`, {
         params: { fields: 'id,name,username,email' },
+        context: silent(),
       })
       .pipe(
         map(res => {
@@ -437,6 +451,7 @@ export class UsageService {
     return this.http
       .get<{ resource: RoleLookupRow[] }>(`${BASE_URL}/system/role`, {
         params: { fields: 'id,name' },
+        context: silent(),
       })
       .pipe(
         map(res => {
@@ -452,6 +467,7 @@ export class UsageService {
     return this.http
       .get<{ resource: AppLookupRow[] }>(`${BASE_URL}/system/app`, {
         params: { fields: 'id,name' },
+        context: silent(),
       })
       .pipe(
         map(res => {

@@ -20,6 +20,7 @@ import { HttpClient } from '@angular/common/http';
 import { Subscription, finalize } from 'rxjs';
 import { AiChatService } from './services/ai-chat.service';
 import { DfUserDataService } from 'src/app/shared/services/df-user-data.service';
+import { normalizeError } from 'src/app/shared/utilities/app-error';
 import { BASE_URL } from 'src/app/shared/constants/urls';
 import { ChatMessage, ChatService, ChatSession } from './types/chat';
 import { DfChatInputComponent } from './components/df-chat-input/df-chat-input.component';
@@ -354,15 +355,9 @@ export class DfAiChatComponent implements OnInit, OnDestroy {
   }
 
   private extractError(err: unknown): string {
-    if (typeof err === 'object' && err !== null) {
-      // Angular HttpErrorResponse: err.error.error.message
-      const e = err as {
-        error?: { error?: { message?: string } };
-        message?: string;
-      };
-      return e.error?.error?.message ?? e.message ?? 'Something went wrong.';
-    }
-    return 'Something went wrong.';
+    // AppError rethrown by the error interceptor, a raw Error, or a string;
+    // normalizeError handles all of them and never yields '[object Object]'.
+    return normalizeError(err).message;
   }
 
   get messages(): ChatMessage[] {
