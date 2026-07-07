@@ -66,15 +66,11 @@ interface TestConnectionResponse {
   `,
   styles: [
     `
-      /* Theme tokens: light defaults; dark values apply under the host form's
-         .dark-theme and match the original whites, so dark mode is unchanged. */
-      :host {
-        --p-text-strong: rgba(0, 0, 0, 0.87);
-        --p-text-hint: rgba(0, 0, 0, 0.72);
-      }
+      /* Theme-flip tokens: text defaults to dark (light mode); the
+         dark-theme class restores the original light text. */
       :host-context(.dark-theme) {
-        --p-text-strong: rgba(255, 255, 255, 0.9);
-        --p-text-hint: rgba(255, 255, 255, 0.75);
+        --df-ai-fg: rgba(255, 255, 255, 0.9);
+        --df-ai-fg-muted: rgba(255, 255, 255, 0.75);
       }
 
       .test-conn {
@@ -116,7 +112,7 @@ interface TestConnectionResponse {
 
         &__detail {
           flex: 1;
-          color: var(--p-text-strong);
+          color: var(--df-ai-fg, rgba(0, 0, 0, 0.87));
           display: flex;
           flex-direction: column;
           gap: 0.35rem;
@@ -128,7 +124,7 @@ interface TestConnectionResponse {
 
           p {
             margin: 0;
-            color: var(--p-text-hint);
+            color: var(--df-ai-fg-muted, rgba(0, 0, 0, 0.7));
             font-size: 15px;
           }
         }
@@ -179,7 +175,11 @@ export class DfAiTestConnectionComponent {
     // edited connection's form has baseUrl/apiKey not base_url/api_key.
     // Read both — picks whichever the form actually carries.
     const provider = config.provider;
-    const apiKey = config.api_key ?? config.apiKey ?? null;
+    // The edit form redisplays a saved key as the protection mask. Never
+    // send the mask as a real key — null it so the backend falls back to
+    // the stored secret via service_id.
+    const rawApiKey = config.api_key ?? config.apiKey ?? null;
+    const apiKey = rawApiKey === '**********' ? null : rawApiKey;
     const baseUrl = config.base_url ?? config.baseUrl ?? null;
     const orgId = config.organization_id ?? config.organizationId ?? null;
     const extraHeaders = config.extra_headers ?? config.extraHeaders ?? null;
