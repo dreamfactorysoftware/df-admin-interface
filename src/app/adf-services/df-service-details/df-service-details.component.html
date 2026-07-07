@@ -802,6 +802,20 @@
                   (selectConnection)="setAiServiceId($event)"
                   (selectRole)="setAiRoleId($event)"></df-ai-chat-prereqs>
 
+                <!-- AI Chat: data services multi-select. Replaces the
+                     auto-rendered default_data_services JSON text field. -->
+                <df-ai-data-services
+                  *ngIf="serviceForm.getRawValue().type === 'ai_chat'"
+                  class="full-width"
+                  [form]="serviceForm"></df-ai-data-services>
+
+                <!-- AI Chat: MCP servers multi-select. Replaces the
+                     auto-rendered mcp_servers JSON text field. -->
+                <df-ai-mcp-servers
+                  *ngIf="serviceForm.getRawValue().type === 'ai_chat'"
+                  class="full-width"
+                  [form]="serviceForm"></df-ai-mcp-servers>
+
                 <!-- AI Connection: validate provider + key without saving first.
                      `serviceId` lets the backend fall back to the saved api_key
                      when the form's field is blank — so admins can click Test
@@ -865,7 +879,9 @@
                       !(
                         serviceForm.getRawValue().type === 'ai_chat' &&
                         (item.name === 'aiServiceId' ||
-                          item.name === 'aiRoleId')
+                          item.name === 'aiRoleId' ||
+                          item.name === 'mcpServers' ||
+                          item.name === 'defaultDataServices')
                       ) &&
                       !(
                         serviceForm.getRawValue().type === 'ai_connection' &&

@@ -20,6 +20,22 @@
       <span *ngIf="chatServices.length === 1" class="ai-chat__service-name">
         {{ chatServices[0].label || chatServices[0].name }}
       </span>
+
+      <!-- Admin-only: start a new conversation "as" a role and see exactly
+           what that role sees. Applies to the next New Chat. -->
+      <mat-form-field
+        *ngIf="isSysAdmin && actAsRoles.length > 0"
+        appearance="outline"
+        subscriptSizing="dynamic"
+        class="ai-chat__service-picker">
+        <mat-label>Act as role</mat-label>
+        <mat-select [(value)]="selectedActAsRoleId">
+          <mat-option [value]="null">Myself (admin — full access)</mat-option>
+          <mat-option *ngFor="let r of actAsRoles" [value]="r.id">
+            {{ r.name }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
     </div>
 
     <div class="ai-chat__header-right" *ngIf="dataScope.length > 0">

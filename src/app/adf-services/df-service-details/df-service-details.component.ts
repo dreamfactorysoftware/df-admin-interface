@@ -33,6 +33,8 @@ import { DfAiChatPrereqsComponent } from 'src/app/adf-ai-chat/components/df-ai-c
 import { DfAiTestConnectionComponent } from 'src/app/shared/components/df-ai-test-connection/df-ai-test-connection.component';
 import { DfAiModelPickerComponent } from 'src/app/shared/components/df-ai-model-picker/df-ai-model-picker.component';
 import { DfAiAllowedRolesComponent } from 'src/app/shared/components/df-ai-allowed-roles/df-ai-allowed-roles.component';
+import { DfAiMcpServersComponent } from 'src/app/shared/components/df-ai-mcp-servers/df-ai-mcp-servers.component';
+import { DfAiDataServicesComponent } from 'src/app/shared/components/df-ai-data-services/df-ai-data-services.component';
 import { DfAceEditorComponent } from 'src/app/shared/components/df-ace-editor/df-ace-editor.component';
 import { DfSecurityConfigComponent } from 'src/app/shared/components/df-security-config/df-security-config.component';
 
@@ -158,6 +160,8 @@ interface ServiceResponse {
     DfAiTestConnectionComponent,
     DfAiModelPickerComponent,
     DfAiAllowedRolesComponent,
+    DfAiMcpServersComponent,
+    DfAiDataServicesComponent,
     DfArrayFieldComponent,
     DfAceEditorComponent,
     FontAwesomeModule,

@@ -1,9 +1,12 @@
 .ai-chat {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 8rem);
-  min-height: 500px;
-  margin: 1rem;
+  // Fit within the viewport under the DF top bar + page heading so the message
+  // input stays visible without scrolling the page. Measured chrome above the
+  // chat is ~221px; this offset clears it with a small bottom margin.
+  height: calc(100vh - 24rem);
+  min-height: 420px;
+  margin: 0.75rem 1rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.02);
