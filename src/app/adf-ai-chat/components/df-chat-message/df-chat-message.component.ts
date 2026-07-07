@@ -152,6 +152,7 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
           margin: 0.5rem 0;
           padding: 0.75rem 0.875rem;
           background: var(--chat-code-bg);
+          // Hairline on a panel that stays dark in both themes: keep white.
           border: 1px solid rgba(255, 255, 255, 0.08);
           border-radius: 6px;
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
@@ -159,7 +160,7 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
           line-height: 1.5;
           overflow: auto;
           white-space: pre;
-          color: rgba(255, 255, 255, 0.92);
+          color: var(--df-code-text);
 
           code {
             font-family: inherit;

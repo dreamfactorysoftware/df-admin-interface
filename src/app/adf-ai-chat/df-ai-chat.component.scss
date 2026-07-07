@@ -1,36 +1,22 @@
 .ai-chat {
-  // Theme tokens. Light defaults here; the dark values (in &.dark-theme below)
-  // reproduce the original hardcoded whites, so dark mode is unchanged. Child
-  // components (message, tool-result, session-list) inherit these vars through
-  // the DOM, so this is the single place the chat palette is defined.
+  // Chat palette: aliases onto the global --df-* theme tokens (src/styles.scss;
+  // DfThemeService stamps .dark-theme on <body>). Child components (message,
+  // tool-result, session-list) inherit these vars through the DOM, so this
+  // stays the single place the chat palette is defined.
+  --chat-surface-2: var(--df-surface-2);
+  --chat-hover: var(--df-hover);
+  --chat-border: var(--df-border);
+  --chat-border-2: var(--df-border-2);
+  --chat-text: var(--df-text);
+  --chat-text-2: var(--df-text-2);
+  --chat-text-muted: var(--df-text-muted);
+  --chat-text-faint: var(--df-text-faint);
+  --chat-heading: var(--df-text);
+  --chat-code-bg: var(--df-code-bg);
+  // The chat panel wash is deliberately subtler than --df-surface-2 (0.02 vs
+  // 0.04/0.06), so it keeps its own values; the dark override sits at the
+  // bottom of this file, keyed off the body theme class.
   --chat-surface: rgba(0, 0, 0, 0.02);
-  --chat-surface-2: rgba(0, 0, 0, 0.05);
-  --chat-hover: rgba(0, 0, 0, 0.04);
-  --chat-border: rgba(0, 0, 0, 0.12);
-  --chat-border-2: rgba(0, 0, 0, 0.08);
-  --chat-text: rgba(0, 0, 0, 0.87);
-  --chat-text-2: rgba(0, 0, 0, 0.7);
-  --chat-text-muted: rgba(0, 0, 0, 0.55);
-  --chat-text-faint: rgba(0, 0, 0, 0.4);
-  --chat-heading: rgba(0, 0, 0, 0.87);
-  // Code / JSON console panels keep white text, so their background stays dark
-  // in both themes (an opaque dark in light mode; the original translucent
-  // black over the dark card in dark mode).
-  --chat-code-bg: #17171f;
-
-  &.dark-theme {
-    --chat-surface: rgba(255, 255, 255, 0.02);
-    --chat-surface-2: rgba(255, 255, 255, 0.06);
-    --chat-hover: rgba(255, 255, 255, 0.04);
-    --chat-border: rgba(255, 255, 255, 0.1);
-    --chat-border-2: rgba(255, 255, 255, 0.08);
-    --chat-text: rgba(255, 255, 255, 0.9);
-    --chat-text-2: rgba(255, 255, 255, 0.7);
-    --chat-text-muted: rgba(255, 255, 255, 0.5);
-    --chat-text-faint: rgba(255, 255, 255, 0.4);
-    --chat-heading: rgba(255, 255, 255, 0.85);
-    --chat-code-bg: rgba(0, 0, 0, 0.3);
-  }
 
   display: flex;
   flex-direction: column;
@@ -206,4 +192,8 @@
     font-size: 14px;
     align-self: flex-start;
   }
+}
+
+:host-context(.dark-theme) .ai-chat {
+  --chat-surface: rgba(255, 255, 255, 0.02);
 }

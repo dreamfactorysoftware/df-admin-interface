@@ -53,21 +53,27 @@ import { faPaperPlane } from '@fortawesome/free-solid-svg-icons';
         align-items: flex-end;
         gap: 0.625rem;
         padding: 0.75rem 1rem;
-        border-top: 1px solid rgba(255, 255, 255, 0.08);
-        background: rgba(255, 255, 255, 0.02);
+        border-top: 1px solid var(--df-border-2);
+        background: var(--chat-surface, var(--df-surface-2));
 
         &__field {
           flex: 1;
           min-height: 2.5rem;
           max-height: 8rem;
           padding: 0.625rem 0.875rem;
-          border: 1px solid rgba(255, 255, 255, 0.12);
+          border: 1px solid var(--df-border);
           border-radius: 8px;
-          background: rgba(0, 0, 0, 0.25);
+          // Input well: a light-mode token surface; in dark mode keep the
+          // original darker-than-card translucent black.
+          background: var(--df-surface-2);
           color: inherit;
           font: inherit;
           resize: none;
           line-height: 1.4;
+
+          :host-context(.dark-theme) & {
+            background: rgba(0, 0, 0, 0.25);
+          }
 
           &:focus {
             outline: none;
@@ -98,8 +104,8 @@ import { faPaperPlane } from '@fortawesome/free-solid-svg-icons';
           }
 
           &:disabled {
-            background: rgba(255, 255, 255, 0.08);
-            color: rgba(255, 255, 255, 0.3);
+            background: var(--df-surface-2);
+            color: var(--df-text-faint);
             cursor: not-allowed;
           }
         }

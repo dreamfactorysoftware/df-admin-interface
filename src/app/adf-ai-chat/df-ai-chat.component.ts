@@ -20,7 +20,6 @@ import { HttpClient } from '@angular/common/http';
 import { Subscription, finalize } from 'rxjs';
 import { AiChatService } from './services/ai-chat.service';
 import { DfUserDataService } from 'src/app/shared/services/df-user-data.service';
-import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 import { BASE_URL } from 'src/app/shared/constants/urls';
 import { ChatMessage, ChatService, ChatSession } from './types/chat';
 import { DfChatInputComponent } from './components/df-chat-input/df-chat-input.component';
@@ -53,10 +52,6 @@ export class DfAiChatComponent implements OnInit, OnDestroy {
   private cdr = inject(ChangeDetectorRef);
   private http = inject(HttpClient);
   private userDataService = inject(DfUserDataService);
-
-  // Chat view is its own route with no `.dark-theme` ancestor, so it drives
-  // the theme class on its own root. Children read the color vars it sets.
-  darkMode$ = inject(DfThemeService).darkMode$;
 
   @ViewChild('messageScroll') messageScroll?: ElementRef<HTMLDivElement>;
 

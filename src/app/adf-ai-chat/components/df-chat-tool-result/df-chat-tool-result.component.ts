@@ -110,7 +110,7 @@ import { ChatMessage } from '../../types/chat';
         }
 
         &__body {
-          border-top: 1px solid rgba(255, 255, 255, 0.08);
+          border-top: 1px solid var(--df-border-2);
           padding: 0.75rem 1rem;
           background: var(--chat-code-bg);
         }
@@ -122,7 +122,7 @@ import { ChatMessage } from '../../types/chat';
           line-height: 1.5;
           white-space: pre-wrap;
           word-break: break-word;
-          color: rgba(255, 255, 255, 0.9);
+          color: var(--df-code-text);
           max-height: 320px;
           overflow: auto;
         }
