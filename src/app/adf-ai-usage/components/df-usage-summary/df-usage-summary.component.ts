@@ -263,26 +263,26 @@ import { DfSparklineComponent } from '../df-sparkline/df-sparkline.component';
         }
         &__hint {
           font-size: 11px;
-          color: #999;
+          color: var(--df-text-muted);
           font-style: italic;
         }
         &__label {
           font-size: 12px;
           text-transform: uppercase;
           letter-spacing: 0.06em;
-          color: #666;
+          color: var(--df-text-2);
           font-weight: 600;
         }
         &__value {
           font-size: 28px;
           font-weight: 600;
-          color: #333;
+          color: var(--df-text);
           line-height: 1.1;
 
           small {
             font-size: 12px;
             font-weight: 500;
-            color: #999;
+            color: var(--df-text-muted);
             margin-left: 4px;
           }
         }
@@ -294,12 +294,12 @@ import { DfSparklineComponent } from '../df-sparkline/df-sparkline.component';
           flex-wrap: wrap;
           gap: 12px;
           font-size: 11px;
-          color: #777;
+          color: var(--df-text-muted);
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
           margin-top: 2px;
 
           strong {
-            color: #444;
+            color: var(--df-text);
             font-weight: 600;
           }
         }
@@ -313,7 +313,7 @@ import { DfSparklineComponent } from '../df-sparkline/df-sparkline.component';
         &__delta {
           font-size: 11px;
           font-weight: 600;
-          color: #666;
+          color: var(--df-text-2);
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
           display: inline-flex;
           align-items: center;
@@ -341,26 +341,10 @@ import { DfSparklineComponent } from '../df-sparkline/df-sparkline.component';
 
       :host-context(.dark-theme) {
         .summary {
-          &__label {
-            color: #bbb;
-          }
-          &__value {
-            color: #fff;
-            small {
-              color: #999;
-            }
-          }
           &__card--error .summary__value {
             color: #ff8585;
           }
-          &__latency-tail {
-            color: #999;
-            strong {
-              color: #ddd;
-            }
-          }
           &__delta {
-            color: #aaa;
             &--good {
               color: #81c784;
             }

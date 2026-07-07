@@ -24,7 +24,7 @@
       margin: 0;
       font-size: 24px;
       font-weight: 600;
-      color: #333;
+      color: var(--df-text);
     }
 
     fa-icon {
@@ -35,7 +35,7 @@
 
   &__title-hint {
     font-size: 14px !important;
-    color: #999 !important;
+    color: var(--df-text-muted) !important;
     cursor: help;
 
     &:hover {
@@ -80,7 +80,7 @@
     }
     p {
       margin: 0;
-      color: #666;
+      color: var(--df-text-2);
       font-size: 14px;
       line-height: 1.6;
     }
@@ -114,7 +114,7 @@
   &__section-header--inset {
     margin-top: 16px;
     padding-top: 8px;
-    border-top: 1px solid rgba(0, 0, 0, 0.06);
+    border-top: 1px solid var(--df-border-2);
   }
 
   // Filter card -------------------------------------------------------------
@@ -139,13 +139,13 @@
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: #666;
+    color: var(--df-text-2);
     font-weight: 700;
   }
 
   &__filters-hint {
     font-size: 12px;
-    color: #999;
+    color: var(--df-text-muted);
     font-style: italic;
   }
 
@@ -170,7 +170,7 @@
     flex-wrap: wrap;
     gap: 8px;
     padding-top: 4px;
-    border-top: 1px solid rgba(0, 0, 0, 0.06);
+    border-top: 1px solid var(--df-border-2);
     margin-top: 4px;
     padding-top: 12px;
   }
@@ -190,7 +190,7 @@
     margin: 0;
     font-size: 18px;
     font-weight: 600;
-    color: #333;
+    color: var(--df-text);
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -198,7 +198,7 @@
 
   &__section-hint {
     font-size: 13px;
-    color: #999;
+    color: var(--df-text-muted);
     cursor: help;
 
     &:hover {
@@ -209,14 +209,14 @@
   &__section-subtitle {
     margin: 0;
     font-size: 13px;
-    color: #666;
+    color: var(--df-text-2);
     line-height: 1.5;
   }
 
   &__section-disclaimer {
     margin: 4px 0 0;
     font-size: 13px;
-    color: #444;
+    color: var(--df-text);
     line-height: 1.5;
     background: rgba(255, 152, 0, 0.06);
     border-left: 3px solid #ff9800;
@@ -273,11 +273,11 @@
 
   &__budget-banner-name {
     font-weight: 600;
-    color: #333;
+    color: var(--df-text);
   }
 
   &__budget-banner-projection {
-    color: #666;
+    color: var(--df-text-2);
 
     strong {
       color: #b26500;
@@ -305,7 +305,7 @@
     margin: 0;
     font-size: 16px;
     font-weight: 600;
-    color: #333;
+    color: var(--df-text);
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -313,7 +313,7 @@
 
   &__budgets-period {
     font-size: 12px;
-    color: #999;
+    color: var(--df-text-muted);
     font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
   }
 
@@ -342,13 +342,13 @@
 
   &__budgets-row-name {
     font-weight: 500;
-    color: #333;
+    color: var(--df-text);
   }
 
   &__budgets-row-amount {
     font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
     font-size: 13px;
-    color: #444;
+    color: var(--df-text);
 
     &--over {
       color: #d32f2f;
@@ -359,7 +359,7 @@
   &__budgets-row-bar {
     position: relative;
     height: 8px;
-    background: rgba(0, 0, 0, 0.06);
+    background: var(--df-surface-2);
     border-radius: 999px;
     overflow: hidden;
 
@@ -406,7 +406,7 @@
 
   &__budgets-row-projection-label {
     font-size: 11px;
-    color: #999;
+    color: var(--df-text-muted);
     font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
   }
 
@@ -427,42 +427,40 @@
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: #666;
+    color: var(--df-text-2);
     font-weight: 600;
   }
 
   &__mcp-value {
     font-size: 22px;
     font-weight: 600;
-    color: #333;
+    color: var(--df-text);
     font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
     line-height: 1.2;
 
     small {
       font-size: 12px;
       font-weight: 500;
-      color: #999;
+      color: var(--df-text-muted);
       margin-left: 4px;
     }
   }
 }
 
 // Dark theme --------------------------------------------------------------
+// Text/surface/border colors now come from the global --df-* tokens (which
+// flip with body.dark-theme). Only accent purples and status colors that
+// intentionally differ per theme remain here.
 
 :host-context(.dark-theme) {
   .usage {
     &__title {
-      h2 {
-        color: #fff;
-      }
       fa-icon {
         color: #bb86fc;
       }
     }
 
     &__title-hint {
-      color: #888 !important;
-
       &:hover {
         color: #bb86fc !important;
       }
@@ -473,39 +471,16 @@
       color: #ff8585;
     }
 
-    &__empty p {
-      color: #bbb;
-    }
     &__empty a {
       color: #bb86fc;
     }
 
-    &__filters-label {
-      color: #bbb;
-    }
-    &__filters-hint {
-      color: #888;
-    }
-
-    &__filter-chips {
-      border-top-color: rgba(255, 255, 255, 0.08);
-    }
-
-    &__section-title {
-      color: #fff;
-    }
     &__section-hint {
-      color: #888;
-
       &:hover {
         color: #bb86fc;
       }
     }
-    &__section-subtitle {
-      color: #bbb;
-    }
     &__section-disclaimer {
-      color: #ddd;
       background: rgba(255, 152, 0, 0.1);
 
       strong {
@@ -513,45 +488,21 @@
       }
     }
 
-    &__mcp-label {
-      color: #bbb;
-    }
-    &__mcp-value {
-      color: #fff;
-    }
-
     &__budget-banner-head {
       color: #ffb74d;
     }
-    &__budget-banner-name {
-      color: #fff;
-    }
     &__budget-banner-projection {
-      color: #bbb;
-
       strong {
         color: #ffb74d;
       }
     }
 
-    &__budgets-title,
-    &__budgets-row-name {
-      color: #fff;
-    }
-    &__budgets-period,
-    &__budgets-row-projection-label {
-      color: #888;
-    }
     &__budgets-row-amount {
-      color: #ddd;
-
       &--over {
         color: #ff8585;
       }
     }
     &__budgets-row-bar {
-      background: rgba(255, 255, 255, 0.08);
-
       &--over {
         background: rgba(244, 67, 54, 0.18);
       }
