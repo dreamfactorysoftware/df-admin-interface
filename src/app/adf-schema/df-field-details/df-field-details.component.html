@@ -1,7 +1,6 @@
 <form
   [formGroup]="fieldDetailsForm"
   class="details-section"
-  [class]="(isDarkMode | async) ? 'dark-theme' : ''"
   (ngSubmit)="onSubmit()">
   <div class="full-width">
     <mat-form-field
