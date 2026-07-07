@@ -42,8 +42,11 @@
 .user-management-card-container {
   margin-top: 20vh;
 
-  &.dark-theme {
-    background-color: #1e1e1e;
-    color: #fff;
+  /* Keys off the body-level .dark-theme stamp (DfThemeService); the
+     per-template [class] stamp is gone. Tokens reproduce the old
+     hardcoded dark values (#1e1e1e/#fff). */
+  :host-context(.dark-theme) & {
+    background-color: var(--df-surface);
+    color: var(--df-text);
   }
 }
