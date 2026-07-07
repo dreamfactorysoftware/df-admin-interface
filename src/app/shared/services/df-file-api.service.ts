@@ -3,6 +3,7 @@ import { HttpClient, HttpEventType } from '@angular/common/http';
 import { Observable, catchError, map, tap, filter, throwError } from 'rxjs';
 import { DfUserDataService } from './df-user-data.service';
 import { SESSION_TOKEN_HEADER } from '../constants/http-headers';
+import { normalizeError } from '../utilities/app-error';
 
 export interface GenericListResponse<T> {
   resource: T[];
@@ -348,10 +349,7 @@ export class FileApiService {
           `Error uploading file: ${error.status} ${error.statusText}`,
           error
         );
-        return throwError(() => ({
-          status: error.status,
-          error: error.error || { message: 'File upload failed' },
-        }));
+        return throwError(() => normalizeError(error));
       })
     );
   }

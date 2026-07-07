@@ -14,6 +14,7 @@ import { DfSystemService } from 'src/app/shared/services/df-system.service';
 import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
 import { switchMap, catchError, map } from 'rxjs';
 import { throwError } from 'rxjs';
+import { normalizeError } from 'src/app/shared/utilities/app-error';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faEye, faPen, faLockOpen } from '@fortawesome/free-solid-svg-icons';
 
@@ -374,9 +375,7 @@ export class DfSecurityConfigComponent implements OnInit {
             .pipe(
               catchError(error => {
                 this.snackBar.open(
-                  `Error creating app: ${
-                    error.error?.message || error.message || 'Unknown error'
-                  }`,
+                  `Error creating app: ${normalizeError(error).message}`,
                   'Close',
                   { duration: 5000 }
                 );

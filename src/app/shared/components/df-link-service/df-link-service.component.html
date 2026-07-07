@@ -114,7 +114,7 @@
             </div>
             <div class="link-service-list" *ngIf="!loadingItems">
               <div class="link-service-error" *ngIf="explorerError as err">
-                {{ err }}
+                {{ err | transloco }}
               </div>
               <div
                 class="link-service-empty"
@@ -199,7 +199,7 @@
                 scoped key (reused across all webhook-enabled scripts).
               </mat-hint>
               <mat-hint *ngIf="generateKeyError" class="webhook-key-error">
-                {{ generateKeyError }}
+                {{ generateKeyError | transloco }}
               </mat-hint>
             </mat-form-field>
             <button
