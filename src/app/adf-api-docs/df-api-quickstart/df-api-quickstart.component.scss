@@ -6,7 +6,7 @@ mat-expansion-panel-header {
   font-family: monospace;
   font-size: 0.9em;
   margin: 0;
-  color: var(--df-script-editor-text-color);
+  color: var(--df-text);
   overflow-x: auto;
 }
 
@@ -25,7 +25,7 @@ mat-expansion-panel-header {
 }
 
 .curl-command-note {
-  color: gray !important;
+  color: var(--df-text-muted) !important;
 }
 
 .no-commands-container {
@@ -62,5 +62,5 @@ mat-expansion-panel-header {
 }
 
 .themed-text {
-  color: var(--df-primary-text-color);
+  color: var(--df-text);
 }

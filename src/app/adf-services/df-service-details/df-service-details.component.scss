@@ -145,7 +145,10 @@ mat-icon {
   color: unset !important;
 }
 
-.dark-theme {
+// Dark theme (keyed off body class): radio cards deliberately stay
+// black-with-white-border over the service-type artwork, so these values
+// are intentional, not theme surfaces.
+:host-context(.dark-theme) {
   label.radio-card {
     .card-content-wrapper {
       background: #000;
@@ -188,7 +191,7 @@ mat-icon {
     p {
       margin: 0;
       font-size: 14px;
-      color: rgba(0, 0, 0, 0.87);
+      color: var(--df-text);
     }
 
     .role-link {
@@ -219,8 +222,8 @@ mat-icon {
     cursor: pointer;
     transition: all 0.2s ease-in-out;
     border-radius: 12px;
-    background: white;
-    border: 1px solid rgba(0, 0, 0, 0.12);
+    background: var(--df-surface);
+    border: 1px solid var(--df-border);
     overflow: hidden;
     height: 100%;
     min-height: 180px;
@@ -247,12 +250,12 @@ mat-icon {
       margin: 0;
       font-size: 24px;
       font-weight: 500;
-      color: rgba(0, 0, 0, 0.87);
+      color: var(--df-text);
     }
 
     p {
       margin: 0;
-      color: rgba(0, 0, 0, 0.6);
+      color: var(--df-text-muted);
       font-size: 16px;
       line-height: 1.6;
     }
@@ -287,11 +290,11 @@ mat-icon {
     }
 
     .component-card {
-      border: 1px solid rgba(0, 0, 0, 0.12);
+      border: 1px solid var(--df-border);
       border-radius: 8px;
       transition: all 0.2s ease-in-out;
       cursor: pointer;
-      background: white;
+      background: var(--df-surface);
 
       mat-card-content {
         padding: 24px;
@@ -321,9 +324,9 @@ mat-icon {
     .access-level-section {
       margin-top: 40px;
       padding: 32px;
-      background: white;
+      background: var(--df-surface);
       border-radius: 12px;
-      border: 1px solid rgba(0, 0, 0, 0.12);
+      border: 1px solid var(--df-border);
 
       .hint-widget {
         margin: 0 0 32px 0;
@@ -347,7 +350,7 @@ mat-icon {
         p {
           margin: 0;
           font-size: 14px;
-          color: rgba(0, 0, 0, 0.87);
+          color: var(--df-text);
         }
 
         .role-link {
@@ -366,7 +369,7 @@ mat-icon {
         margin: 0 0 24px 0;
         font-size: 24px;
         font-weight: 500;
-        color: rgba(0, 0, 0, 0.87);
+        color: var(--df-text);
       }
 
       .access-level-controls {
@@ -383,8 +386,8 @@ mat-icon {
         }
 
         .mat-button-toggle {
-          background: white;
-          border: 1px solid rgba(0, 0, 0, 0.12);
+          background: var(--df-surface);
+          border: 1px solid var(--df-border);
           border-radius: 8px;
           height: auto;
           width: 100%;
@@ -404,13 +407,13 @@ mat-icon {
                 margin: 0;
                 font-size: 18px;
                 font-weight: 500;
-                color: rgba(0, 0, 0, 0.87);
+                color: var(--df-text);
               }
 
               p {
                 margin: 8px 0 0 0;
                 font-size: 14px;
-                color: rgba(0, 0, 0, 0.6);
+                color: var(--df-text-muted);
               }
             }
           }
@@ -437,7 +440,7 @@ mat-icon {
 .action-container {
   margin-top: 40px;
   padding-top: 24px;
-  border-top: 1px solid rgba(0, 0, 0, 0.12);
+  border-top: 1px solid var(--df-border);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -447,19 +450,11 @@ mat-icon {
   }
 }
 
-// Dark theme support
-.dark-theme {
+// Dark theme support: cards keep translucent overlay surfaces (not the
+// opaque --df-surface); text/border overrides now come from the tokens.
+:host-context(.dark-theme) {
   .security-option-card {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.12);
-
-    h4 {
-      color: rgba(255, 255, 255, 0.87);
-    }
-
-    p {
-      color: rgba(255, 255, 255, 0.6);
-    }
+    background: var(--df-surface-2);
 
     &.selected {
       background-color: rgba(
@@ -470,8 +465,7 @@ mat-icon {
   }
 
   .component-card {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.12);
+    background: var(--df-surface-2);
 
     &.selected {
       background-color: rgba(
@@ -482,26 +476,10 @@ mat-icon {
   }
 
   .access-level-section {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.12);
-
-    h3 {
-      color: rgba(255, 255, 255, 0.87);
-    }
+    background: var(--df-surface-2);
 
     .mat-button-toggle {
-      background: rgba(255, 255, 255, 0.05);
-      border-color: rgba(255, 255, 255, 0.12);
-
-      .toggle-text {
-        h4 {
-          color: rgba(255, 255, 255, 0.87);
-        }
-
-        p {
-          color: rgba(255, 255, 255, 0.6);
-        }
-      }
+      background: var(--df-surface-2);
 
       &.mat-button-toggle-checked {
         background: rgba(
@@ -518,10 +496,6 @@ mat-icon {
         mat.get-color-from-palette($df-purple-palette, 400),
         0.1
       );
-
-      p {
-        color: rgba(255, 255, 255, 0.87);
-      }
     }
   }
 }
@@ -531,7 +505,7 @@ mat-icon {
     margin: 0 0 16px 0;
     font-size: 24px;
     font-weight: 500;
-    color: rgba(0, 0, 0, 0.87);
+    color: var(--df-text);
   }
 
   .hint-widget {
@@ -543,7 +517,7 @@ mat-icon {
     p {
       margin: 0;
       font-size: 14px;
-      color: rgba(0, 0, 0, 0.87);
+      color: var(--df-text);
     }
 
     .role-link {
@@ -559,22 +533,13 @@ mat-icon {
   }
 }
 
-// Add to dark theme section
-.dark-theme {
+:host-context(.dark-theme) {
   .component-selection {
-    h3 {
-      color: rgba(255, 255, 255, 0.87);
-    }
-
     .hint-widget {
       background: rgba(
         mat.get-color-from-palette($df-purple-palette, 400),
         0.1
       );
-
-      p {
-        color: rgba(255, 255, 255, 0.87);
-      }
     }
   }
 }
@@ -620,12 +585,12 @@ mat-icon {
   td {
     text-align: left;
     padding: 10px 12px;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    border-bottom: 1px solid var(--df-border-2);
   }
 
   th {
     font-weight: 600;
-    color: rgba(0, 0, 0, 0.5);
+    color: var(--df-text-muted);
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -651,7 +616,7 @@ mat-icon {
   padding: 12px 0;
 
   .custom-tools-description {
-    color: rgba(0, 0, 0, 0.6);
+    color: var(--df-text-muted);
     font-size: 14px;
     line-height: 1.6;
     margin-bottom: 20px;
@@ -662,13 +627,13 @@ mat-icon {
   }
 
   .no-tools-message {
-    color: rgba(0, 0, 0, 0.4);
+    color: var(--df-text-faint);
     font-style: italic;
     padding: 24px 16px;
     text-align: center;
-    border: 1px dashed rgba(0, 0, 0, 0.15);
+    border: 1px dashed var(--df-border);
     border-radius: 8px;
-    background: rgba(0, 0, 0, 0.015);
+    background: var(--df-surface-2);
   }
 
   code {
@@ -686,7 +651,7 @@ mat-icon {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: rgba(0, 0, 0, 0.6);
+    color: var(--df-text-muted);
     font-size: 13px;
   }
 }
@@ -762,7 +727,7 @@ mat-icon {
         font-size: 13px;
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        color: rgba(0, 0, 0, 0.55);
+        color: var(--df-text-muted);
       }
     }
 
@@ -774,7 +739,7 @@ mat-icon {
 
     .parameter-card {
       background: rgba(255, 255, 255, 0.7);
-      border: 1px solid rgba(0, 0, 0, 0.1);
+      border: 1px solid var(--df-border);
       border-radius: 10px;
       padding: 16px 20px 8px;
       transition:
@@ -860,12 +825,12 @@ mat-icon {
     }
 
     .no-parameters-hint {
-      color: rgba(0, 0, 0, 0.35);
+      color: var(--df-text-faint);
       font-size: 13px;
       text-align: center;
       padding: 20px 16px;
       margin: 0;
-      border: 1px dashed rgba(0, 0, 0, 0.12);
+      border: 1px dashed var(--df-border);
       border-radius: 10px;
     }
   }
@@ -919,7 +884,7 @@ mat-icon {
       display: block;
       font-size: 13px;
       font-weight: 500;
-      color: rgba(0, 0, 0, 0.6);
+      color: var(--df-text-muted);
       margin-bottom: 8px;
     }
 
@@ -935,7 +900,7 @@ mat-icon {
     }
 
     .editor-wrapper {
-      border: 1px solid rgba(0, 0, 0, 0.15);
+      border: 1px solid var(--df-border);
       border-radius: 8px;
       overflow: hidden;
       transition:
@@ -970,7 +935,7 @@ mat-icon {
     .editor-hint {
       display: block;
       font-size: 12px;
-      color: rgba(0, 0, 0, 0.45);
+      color: var(--df-text-faint);
       margin-top: 6px;
       padding-left: 2px;
     }
@@ -982,7 +947,7 @@ mat-icon {
     gap: 12px;
     margin-top: 24px;
     padding-top: 20px;
-    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    border-top: 1px solid var(--df-border-2);
   }
 }
 
@@ -1013,7 +978,7 @@ mat-icon {
   }
 }
 
-.dark-theme {
+:host-context(.dark-theme) {
   .mcp-tools-container {
     code {
       background: rgba(
@@ -1025,16 +990,6 @@ mat-icon {
   }
 
   .custom-tools-container {
-    .custom-tools-description {
-      color: rgba(255, 255, 255, 0.6);
-    }
-
-    .no-tools-message {
-      color: rgba(255, 255, 255, 0.4);
-      border-color: rgba(255, 255, 255, 0.12);
-      background: rgba(255, 255, 255, 0.03);
-    }
-
     code {
       background: rgba(
         mat.get-color-from-palette($df-purple-palette, 400),
@@ -1045,15 +1000,6 @@ mat-icon {
   }
 
   .mcp-services-table {
-    th,
-    td {
-      border-bottom-color: rgba(255, 255, 255, 0.08);
-    }
-
-    th {
-      color: rgba(255, 255, 255, 0.45);
-    }
-
     tbody tr:hover {
       background-color: rgba(
         mat.get-color-from-palette($df-purple-palette, 400),
@@ -1074,17 +1020,12 @@ mat-icon {
     );
 
     h4 {
-      color: rgba(255, 255, 255, 0.95);
+      color: var(--df-text);
     }
 
     .parameters-section {
-      .section-header h5 {
-        color: rgba(255, 255, 255, 0.45);
-      }
-
       .parameter-card {
-        background: rgba(255, 255, 255, 0.05);
-        border-color: rgba(255, 255, 255, 0.1);
+        background: var(--df-surface-2);
 
         &:hover {
           border-color: rgba(
@@ -1107,35 +1048,16 @@ mat-icon {
           0.12
         );
       }
-
-      .no-parameters-hint {
-        color: rgba(255, 255, 255, 0.3);
-        border-color: rgba(255, 255, 255, 0.1);
-      }
     }
 
     .editor-section {
-      .editor-label {
-        color: rgba(255, 255, 255, 0.6);
-      }
-
       .editor-wrapper {
-        border-color: rgba(255, 255, 255, 0.15);
-
         &:focus-within {
           border-color: mat.get-color-from-palette($df-purple-palette, 300);
           box-shadow: 0 0 0 2px
             rgba(mat.get-color-from-palette($df-purple-palette, 300), 0.12);
         }
       }
-
-      .editor-hint {
-        color: rgba(255, 255, 255, 0.35);
-      }
-    }
-
-    .form-actions {
-      border-top-color: rgba(255, 255, 255, 0.08);
     }
   }
 }
@@ -1147,7 +1069,7 @@ mat-icon {
     margin-bottom: 1.5rem;
     font-size: 1.25rem;
     font-weight: 500;
-    color: rgba(0, 0, 0, 0.87);
+    color: var(--df-text);
   }
 }
 
@@ -1156,13 +1078,6 @@ mat-icon {
   margin-bottom: 2rem;
 }
 
-.dark-theme {
-  .basic-fields-section {
-    .section-title {
-      color: rgba(255, 255, 255, 0.87);
-    }
-  }
-}
 
 // First-time user guidance styles
 .first-time-guidance {
@@ -1183,14 +1098,14 @@ mat-icon {
 
   .guidance-text {
     margin: 0;
-    color: #4a4a4a;
+    color: var(--df-text-2);
     font-size: 14px;
     line-height: 1.5;
     flex: 1;
   }
 }
 
-.dark-theme {
+:host-context(.dark-theme) {
   .first-time-guidance {
     background: linear-gradient(
       135deg,
@@ -1204,7 +1119,7 @@ mat-icon {
     }
 
     .guidance-text {
-      color: rgba(255, 255, 255, 0.87);
+      color: var(--df-text);
     }
   }
 }
