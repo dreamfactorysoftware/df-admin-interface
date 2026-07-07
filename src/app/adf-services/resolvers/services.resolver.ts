@@ -1,6 +1,7 @@
 import { inject } from '@angular/core';
 import { ActivatedRouteSnapshot, ResolveFn } from '@angular/router';
-import { forkJoin, map, switchMap } from 'rxjs';
+import { catchError, forkJoin, map, of, switchMap } from 'rxjs';
+import { emptyListWithError } from 'src/app/shared/utilities/app-error';
 import {
   SERVICES_SERVICE_TOKEN,
   SERVICE_TYPE_SERVICE_TOKEN,
@@ -59,7 +60,10 @@ export const servicesResolver =
                 serviceTypes,
               }))
             );
-        })
+        }),
+        // List resolver: complete navigation on failure so the table shell
+        // renders the error state with Retry.
+        catchError(err => of(emptyListWithError(err)))
       );
     }
 
@@ -71,7 +75,12 @@ export const servicesResolver =
           system ? '(created_by_id is null) and (name != "api_docs")' : ''
         }${filter ? filter : ''}`,
       })
-      .pipe(map(services => ({ ...services })));
+      .pipe(
+        map(services => ({ ...services })),
+        // List resolver: complete navigation on failure so the table shell
+        // renders the error state with Retry.
+        catchError(err => of(emptyListWithError(err)))
+      );
   };
 
 export const serviceResolver: ResolveFn<Service | undefined> = (

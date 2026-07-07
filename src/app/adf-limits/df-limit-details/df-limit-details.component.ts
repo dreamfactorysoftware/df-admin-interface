@@ -7,6 +7,7 @@ import {
 } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
+import { normalizeError } from 'src/app/shared/utilities/app-error';
 import { RoleType } from 'src/app/shared/types/role';
 import { AlertType } from 'src/app/shared/components/df-alert/df-alert.component';
 
@@ -171,9 +172,10 @@ export class DfLimitDetailsComponent implements OnInit {
           .create<GenericCreateResponse>({ resource: [payload] })
           .pipe(
             catchError(err => {
-              this.alertMsg = err.error.error.message;
+              const e = normalizeError(err);
+              this.alertMsg = this.translateService.translate(e.message);
               this.showAlert = true;
-              return throwError(() => new Error(err));
+              return throwError(() => e);
             })
           )
           .subscribe(res => {
@@ -192,9 +194,10 @@ export class DfLimitDetailsComponent implements OnInit {
           )
           .pipe(
             catchError(err => {
-              this.alertMsg = err.error.error.message;
+              const e = normalizeError(err);
+              this.alertMsg = this.translateService.translate(e.message);
               this.showAlert = true;
-              return throwError(() => new Error(err));
+              return throwError(() => e);
             })
           )
           .subscribe(res => {
@@ -204,6 +207,7 @@ export class DfLimitDetailsComponent implements OnInit {
           });
       }
     } else {
+      this.formGroup.markAllAsTouched();
       this.alertMsg = this.translateService.translate('limits.invalidForm');
       this.showAlert = true;
     }

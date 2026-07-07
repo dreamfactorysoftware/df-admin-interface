@@ -11,7 +11,6 @@ import {
   LIMIT_SERVICE_TOKEN,
 } from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
-import { GenericListResponse } from 'src/app/shared/types/generic-http';
 import { TranslocoService } from '@ngneat/transloco';
 import { MatDialog } from '@angular/material/dialog';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
@@ -134,17 +133,12 @@ export class DfManageLimitsTableComponent extends DfManageTableComponent<LimitTa
   }
 
   refreshTable(limit?: number, offset?: number, filter?: string): void {
-    this.limitService
-      .getAll<GenericListResponse<LimitType>>({
-        limit,
-        offset,
-        filter,
-        related:
-          'service_by_service_id,role_by_role_id,user_by_user_id,limit_cache_by_limit_id',
-      })
-      .subscribe(data => {
-        this.dataSource.data = this.mapDataToTable(data.resource);
-        this.tableLength = data.meta.count;
-      });
+    this.fetchTable(this.limitService, {
+      limit,
+      offset,
+      filter,
+      related:
+        'service_by_service_id,role_by_role_id,user_by_user_id,limit_cache_by_limit_id',
+    });
   }
 }

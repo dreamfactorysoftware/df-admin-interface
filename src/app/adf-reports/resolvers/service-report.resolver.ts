@@ -5,7 +5,8 @@ import { GenericListResponse } from 'src/app/shared/types/generic-http';
 import { REPORT_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { ServiceReportData } from 'src/app/shared/types/reports';
 import { DfPaywallService } from 'src/app/shared/services/df-paywall.service';
-import { of, switchMap } from 'rxjs';
+import { catchError, of, switchMap } from 'rxjs';
+import { emptyListWithError } from 'src/app/shared/utilities/app-error';
 
 export const serviceReportsResolver: ResolveFn<
   GenericListResponse<ServiceReportData> | string
@@ -17,7 +18,11 @@ export const serviceReportsResolver: ResolveFn<
       if (activated) {
         return of('paywall');
       }
-      return reportService.getAll<GenericListResponse<ServiceReportData>>();
+      // Complete navigation on failure so the table shell renders the error
+      // state with Retry instead of the router silently cancelling.
+      return reportService
+        .getAll<GenericListResponse<ServiceReportData>>()
+        .pipe(catchError(err => of(emptyListWithError(err))));
     })
   );
 };

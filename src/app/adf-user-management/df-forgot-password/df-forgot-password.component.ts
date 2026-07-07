@@ -6,6 +6,7 @@ import {
   ReactiveFormsModule,
 } from '@angular/forms';
 import { catchError, switchMap, throwError } from 'rxjs';
+import { normalizeError } from 'src/app/shared/utilities/app-error';
 import { DfSystemConfigDataService } from '../../shared/services/df-system-config-data.service';
 import {
   AlertType,
@@ -107,9 +108,10 @@ export class DfForgotPasswordComponent implements OnInit {
       )
       .pipe(
         catchError(err => {
-          this.alertMsg = err.error.error.message;
+          const appError = normalizeError(err);
+          this.alertMsg = appError.message;
           this.showAlert = true;
-          return throwError(() => new Error(err));
+          return throwError(() => appError);
         })
       )
       .subscribe(res => {
@@ -143,9 +145,10 @@ export class DfForgotPasswordComponent implements OnInit {
       )
       .pipe(
         catchError(err => {
-          this.alertMsg = err.error.error.message;
+          const appError = normalizeError(err);
+          this.alertMsg = appError.message;
           this.showAlert = true;
-          return throwError(() => new Error(err));
+          return throwError(() => appError);
         }),
         switchMap(() => {
           const credentials: LoginCredentials = {

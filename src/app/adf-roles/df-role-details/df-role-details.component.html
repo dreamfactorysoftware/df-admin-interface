@@ -5,7 +5,7 @@
   [showAlert]="showAlert"
   [alertType]="alertType"
   (alertClosed)="showAlert = false">
-  {{ alertMsg }}
+  {{ alertMsg | transloco }}
 </df-alert>
 <form
   [formGroup]="roleForm"
@@ -19,6 +19,9 @@
     <input matInput formControlName="name" required />
     <mat-error *ngIf="roleForm.controls['name'].hasError('required')">
       {{ 'roles.rolesOverview.error.name' | transloco }}
+    </mat-error>
+    <mat-error *ngIf="roleForm.controls['name'].hasError('server')">
+      {{ roleForm.controls['name'].getError('server') }}
     </mat-error>
   </mat-form-field>
   <mat-slide-toggle formControlName="active" class="dynamic-width">{{
