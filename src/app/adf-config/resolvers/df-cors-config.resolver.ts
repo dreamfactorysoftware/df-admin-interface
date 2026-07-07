@@ -16,7 +16,7 @@ export const corsConfigResolver: ResolveFn<
     // renders the error state with Retry. The detail branch below keeps its
     // own error contract; never return the list fallback shape from it.
     return corsConfigService
-      .getAll({
+      .getAll<GenericListResponse<CorsConfigData>>({
         includeCount: true,
       })
       .pipe(catchError(err => of(emptyListWithError(err))));
