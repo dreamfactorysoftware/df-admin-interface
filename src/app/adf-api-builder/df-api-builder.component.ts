@@ -2093,9 +2093,9 @@ type WorkflowStep = {
       }
 
       pre {
-        background: #101418;
+        background: var(--df-code-bg);
         border-radius: 6px;
-        color: #f4f7fb;
+        color: var(--df-code-text);
         margin: 16px 0 0;
         max-height: 420px;
         overflow: auto;
