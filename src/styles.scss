@@ -4,6 +4,53 @@
 @import 'src/dark-style.scss';
 $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
 
+/* ============================================================
+   Global theme tokens - THE palette source of truth.
+   Light values on :root; dark values under .dark-theme, which
+   DfThemeService applies once on <body>. Components consume
+   var(--df-*) and never hardcode white/black text colors.
+   Dark values reproduce the pre-token hardcoded whites so dark
+   mode is visually unchanged.
+   ============================================================ */
+:root {
+  /* text emphasis ladder */
+  --df-text: rgba(0, 0, 0, 0.87);
+  --df-text-2: rgba(0, 0, 0, 0.7);
+  --df-text-muted: rgba(0, 0, 0, 0.55);
+  --df-text-faint: rgba(0, 0, 0, 0.4);
+  /* surfaces */
+  --df-surface: #ffffff;
+  --df-surface-2: rgba(0, 0, 0, 0.04);
+  --df-hover: rgba(0, 0, 0, 0.04);
+  --df-code-bg: #17171f; /* code/console panels stay dark in both themes */
+  --df-code-text: rgba(255, 255, 255, 0.9);
+  /* borders */
+  --df-border: rgba(0, 0, 0, 0.12);
+  --df-border-2: rgba(0, 0, 0, 0.08);
+  /* accents (df purple palette 600 / 500) */
+  --df-accent: #5c5699;
+  --df-accent-strong: #423c89;
+  --df-accent-contrast: #ffffff;
+}
+
+.dark-theme {
+  color-scheme: dark;
+  --df-text: rgba(255, 255, 255, 0.9);
+  --df-text-2: rgba(255, 255, 255, 0.7);
+  --df-text-muted: rgba(255, 255, 255, 0.55);
+  --df-text-faint: rgba(255, 255, 255, 0.4);
+  --df-surface: #1c1b21;
+  --df-surface-2: rgba(255, 255, 255, 0.06);
+  --df-hover: rgba(255, 255, 255, 0.04);
+  --df-code-bg: rgba(0, 0, 0, 0.3);
+  --df-code-text: rgba(255, 255, 255, 0.9);
+  --df-border: rgba(255, 255, 255, 0.1);
+  --df-border-2: rgba(255, 255, 255, 0.08);
+  --df-accent: #7571a9;
+  --df-accent-strong: #908cba;
+  --df-accent-contrast: #ffffff;
+}
+
 html,
 body {
   height: 100%;
