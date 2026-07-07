@@ -83,17 +83,21 @@ mat-card.notice-card {
   color: mat.get-color-from-palette($df-purple-palette, 600);
 }
 
-.dark-theme {
+:host-context(.dark-theme) {
   h2,
   p {
-    color: white;
+    color: var(--df-text);
   }
 
+  // The AI CTA banner stays light in both themes; keep its slate copy
+  // readable (the h2/p rule above would otherwise turn it white).
+  .ai-home-cta__copy p {
+    color: #475569;
+  }
+
+  // --df-surface dark (#1c1b21) matches the old palette 1003 (#1c1b20)
   .notice-card {
-    background-color: mat.get-color-from-palette(
-      $df-purple-palette,
-      1003
-    ) !important;
+    background-color: var(--df-surface) !important;
   }
 }
 
