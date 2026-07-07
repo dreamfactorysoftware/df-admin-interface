@@ -11,7 +11,7 @@ h2 {
     display: block;
     font-size: 12px;
     font-weight: normal;
-    color: rgba(0, 0, 0, 0.54);
+    color: var(--df-text-muted);
     margin-top: 4px;
   }
 }
@@ -37,12 +37,12 @@ h2 {
   align-items: center;
   padding: 16px;
   border-radius: 4px;
-  border: 1px solid rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--df-border);
   cursor: pointer;
   transition: background-color 0.2s ease;
 
   &:hover {
-    background-color: rgba(0, 0, 0, 0.04);
+    background-color: var(--df-hover);
   }
 }
 
@@ -59,7 +59,7 @@ h2 {
 
   .file-api-type {
     font-size: 12px;
-    color: rgba(0, 0, 0, 0.54);
+    color: var(--df-text-muted);
   }
 }
 
@@ -149,7 +149,7 @@ h2 {
 
   div {
     margin-top: 16px;
-    color: rgba(0, 0, 0, 0.54);
+    color: var(--df-text-muted);
   }
 }
 
@@ -187,7 +187,7 @@ h2 {
 .empty-directory {
   padding: 24px 16px;
   text-align: center;
-  color: rgba(0, 0, 0, 0.54);
+  color: var(--df-text-muted);
 
   p {
     margin-bottom: 16px;
@@ -203,7 +203,7 @@ h2 {
   margin-top: 24px;
   padding: 16px;
   border-radius: 4px;
-  background-color: rgba(0, 0, 0, 0.04);
+  background-color: var(--df-surface-2);
   text-align: center;
 
   h3 {
@@ -213,32 +213,8 @@ h2 {
 }
 
 :host-context(.dark-theme) {
-  small {
-    color: rgba(255, 255, 255, 0.6);
-  }
-
-  .file-api-card {
-    border-color: rgba(255, 255, 255, 0.12);
-
-    &:hover {
-      background-color: rgba(255, 255, 255, 0.04);
-    }
-  }
-
-  .file-api-type {
-    color: rgba(255, 255, 255, 0.6);
-  }
-
-  .loading-container div,
-  .empty-directory {
-    color: rgba(255, 255, 255, 0.6);
-  }
-
+  /* Indigo selection tint has no shared token equivalent. */
   .selected-row {
     background-color: rgba(103, 121, 221, 0.15);
-  }
-
-  .upload-section {
-    background-color: rgba(255, 255, 255, 0.04);
   }
 }

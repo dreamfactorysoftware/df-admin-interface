@@ -1,6 +1,5 @@
 <div
   class="app-container"
-  [class]="(isDarkMode | async) ? 'dark-theme' : ''"
   [class.small]="isSmallScreen | async"
   [class.logged-in]="isLoggedIn$ | async">
   <ng-container *ngIf="isLoggedIn$ | async">
