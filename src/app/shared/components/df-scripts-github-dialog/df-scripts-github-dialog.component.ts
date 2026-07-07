@@ -16,6 +16,7 @@ import { TranslocoPipe } from '@ngneat/transloco';
 import { GITHUB_REPO_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { UntilDestroy } from '@ngneat/until-destroy';
+import { normalizeError } from 'src/app/shared/utilities/app-error';
 import { isValidHttpUrl } from '../../utilities/url';
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -71,7 +72,6 @@ export class DfScriptsGithubDialogComponent implements OnInit {
           const githubApiEndpoint = `${this.repoOwner}/${this.repoName}`;
           this.githubService
             .get(githubApiEndpoint, {
-              snackbarError: 'server',
               snackbarSuccess: 'getScriptSuccessMsg',
               includeCacheControl: false,
             })
@@ -87,7 +87,7 @@ export class DfScriptsGithubDialogComponent implements OnInit {
                   'password',
                   this.formBuilder.control('', Validators.required)
                 );
-                return throwError(() => new Error(err));
+                return throwError(() => normalizeError(err));
               })
             )
             .subscribe((data: any) => {

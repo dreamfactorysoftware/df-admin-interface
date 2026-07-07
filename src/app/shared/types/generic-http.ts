@@ -50,9 +50,6 @@ export interface RequestOptions {
   offset: number;
   includeCount: boolean;
   snackbarSuccess: string;
-  /** @deprecated no-op: error toasts are default-on in error.interceptor.
-   * ponytail: delete once the call-site sweep removes the remaining usages. */
-  snackbarError: string;
   /** Maps to the ERROR_HANDLING HttpContext token (see
    * shared/utilities/http-contexts.ts). */
   errorHandling: 'default' | 'silent' | 'toast-off';

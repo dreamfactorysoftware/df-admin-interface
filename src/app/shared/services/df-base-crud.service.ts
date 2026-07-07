@@ -179,9 +179,6 @@ export class DfBaseCrudService {
     if (options.snackbarSuccess) {
       context = context.set(SUCCESS_TOAST, options.snackbarSuccess);
     }
-    // ponytail: options.snackbarError is a no-op now that error toasts are
-    // default-on in error.interceptor; the sweep deletes the remaining call
-    // sites and then the RequestOptions field itself.
     if (options.errorHandling) {
       context = context.set(ERROR_HANDLING, options.errorHandling);
     }

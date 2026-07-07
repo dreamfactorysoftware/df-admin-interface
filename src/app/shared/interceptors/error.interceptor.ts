@@ -13,8 +13,6 @@ import { normalizeError } from '../utilities/app-error';
 import { ERROR_HANDLING, SUCCESS_TOAST } from '../utilities/http-contexts';
 import { ROUTES } from '../types/routes';
 
-const LEGACY_HEADERS = ['skip-error', 'snackbar-success', 'snackbar-error'];
-
 /**
  * Default-on error surfacing, severity-routed:
  * - 401 -> clear token, redirect to login with returnUrl (never when already
@@ -32,19 +30,8 @@ export const errorInterceptor: HttpInterceptorFn = (
   req: HttpRequest<unknown>,
   next: HttpHandlerFn
 ) => {
-  // ponytail: legacy header shim. skip-error/snackbar-* headers are still set
-  // by unswept call sites; honor them here (and strip them so they stop
-  // leaking to the wire). The sweep migrates call sites to HttpContext
-  // (silent()/toastOff()/SUCCESS_TOAST), then this block dies.
-  const legacySkip = req.headers.has('skip-error');
-  const successToast =
-    req.context.get(SUCCESS_TOAST) ?? req.headers.get('snackbar-success');
-  if (LEGACY_HEADERS.some(header => req.headers.has(header))) {
-    let headers = req.headers;
-    LEGACY_HEADERS.forEach(header => (headers = headers.delete(header)));
-    req = req.clone({ headers });
-  }
-  const handling = legacySkip ? 'silent' : req.context.get(ERROR_HANDLING);
+  const successToast = req.context.get(SUCCESS_TOAST);
+  const handling = req.context.get(ERROR_HANDLING);
   const inScope =
     req.url.startsWith('/api') || req.url.startsWith('/_internal');
 

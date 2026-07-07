@@ -26,6 +26,7 @@ import { AsyncPipe, CommonModule } from '@angular/common';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { DfBaseCrudService } from '../../services/df-base-crud.service';
+import { normalizeError } from '../../utilities/app-error';
 import { DfSystemService } from 'src/app/shared/services/df-system.service';
 import {
   APP_SERVICE_TOKEN,
@@ -104,7 +105,6 @@ export class DfLinkServiceComponent implements OnInit, OnChanges {
 
   private readonly repoPerPage = 100;
   private readonly repoMaxPages = 20;
-  private readonly skipErrorHeader = [{ key: 'skip-error', value: 'true' }];
 
   currentPath = '';
   pathItems: RepoItem[] = [];
@@ -247,8 +247,8 @@ export class DfLinkServiceComponent implements OnInit, OnChanges {
           { key: 'page', value: page },
           { key: 'per_page', value: this.repoPerPage },
         ],
-        additionalHeaders: this.skipErrorHeader,
-        snackbarError: '',
+        // Silent by design: repo listing failures render inline, not toasts.
+        errorHandling: 'silent',
       });
 
     const parseRepos = (
@@ -342,8 +342,8 @@ export class DfLinkServiceComponent implements OnInit, OnChanges {
     this.baseService
       .get<any>(`${serviceName}/_repo/${repo}`, {
         additionalParams: params,
-        additionalHeaders: this.skipErrorHeader,
-        snackbarError: '',
+        // Silent by design: explorer errors render via explorerError inline.
+        errorHandling: 'silent',
       })
       .subscribe({
         next: res => {
@@ -367,12 +367,11 @@ export class DfLinkServiceComponent implements OnInit, OnChanges {
           this.loadingItems = false;
         },
         error: err => {
-          const message: string =
-            err?.error?.error?.message ?? err?.message ?? '';
+          const e = normalizeError(err);
           const looksLikeMissingRef =
-            /no commit found/i.test(message) ||
-            err?.status === 404 ||
-            err?.status === 422;
+            /no commit found/i.test(e.message) ||
+            e.status === 404 ||
+            e.status === 422;
           if (
             !attemptedFallback &&
             looksLikeMissingRef &&
@@ -386,7 +385,7 @@ export class DfLinkServiceComponent implements OnInit, OnChanges {
             return;
           }
           this.loadingItems = false;
-          this.explorerError = message || 'Unable to load repository contents.';
+          this.explorerError = e.message;
         },
       });
   }
@@ -538,10 +537,7 @@ export class DfLinkServiceComponent implements OnInit, OnChanges {
         },
         error: err => {
           this.generatingKey = false;
-          this.generateKeyError = this.extractError(
-            err,
-            'Could not get webhook key.'
-          );
+          this.generateKeyError = normalizeError(err).message;
         },
       });
   }
@@ -605,7 +601,9 @@ export class DfLinkServiceComponent implements OnInit, OnChanges {
         { role_id: roleId, is_active: true },
         {
           additionalParams: [{ key: 'fields', value: '*' }],
-          snackbarError: '',
+          // Deliberate opt-out: failures surface via generateKeyError inline,
+          // matching the pre-overhaul suppressed-toast behavior.
+          errorHandling: 'silent',
         }
       )
       .pipe(
@@ -685,12 +683,4 @@ export class DfLinkServiceComponent implements OnInit, OnChanges {
       );
   }
 
-  private extractError(err: any, fallback: string): string {
-    return (
-      err?.error?.error?.message ??
-      err?.error?.message ??
-      err?.message ??
-      fallback
-    );
-  }
 }

@@ -14,6 +14,7 @@ import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faPlay, faCheck, faTimes } from '@fortawesome/free-solid-svg-icons';
 
 import { DfUserDataService } from 'src/app/shared/services/df-user-data.service';
+import { normalizeError } from 'src/app/shared/utilities/app-error';
 import { DfCurrentServiceService } from 'src/app/shared/services/df-current-service.service';
 import { ApiKeysService } from '../../../adf-api-docs/services/api-keys.service';
 import { ApiKeyInfo } from 'src/app/shared/types/api-keys';
@@ -240,9 +241,7 @@ export class DfApiTesterComponent implements OnChanges {
           status: error.status || 0,
           error: isAuthError
             ? 'Authentication failed - Access denied'
-            : error.error?.error?.message ||
-              error.message ||
-              'Request failed due to non-authentication error',
+            : normalizeError(error).message,
         };
         this.isTesting = false;
 
