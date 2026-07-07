@@ -2,22 +2,20 @@
   padding: 24px;
   max-width: 1400px;
   margin: 0 auto;
+}
 
-  &.dark-theme {
-    .dashboard-title {
-      color: #ffffff;
-    }
+// ponytail: #424242 mat-card dark bg predates --df-surface (#1c1b21); kept to
+// avoid a visual shift. Fold into a token if cards get restyled.
+:host-context(.dark-theme) {
+  .loading-card,
+  .error-card {
+    background-color: #424242;
+  }
 
-    .loading-card,
-    .error-card {
-      background-color: #424242;
-    }
-
-    .performance-card,
-    .storage-card {
-      background-color: #424242;
-      color: #ffffff;
-    }
+  .performance-card,
+  .storage-card {
+    background-color: #424242;
+    color: var(--df-text);
   }
 }
 
@@ -25,7 +23,7 @@
   font-size: 24px;
   font-weight: 500;
   margin-bottom: 24px;
-  color: #333;
+  color: var(--df-text);
 }
 
 .loading-container,

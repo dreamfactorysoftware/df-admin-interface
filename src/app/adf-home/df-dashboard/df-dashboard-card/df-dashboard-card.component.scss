@@ -94,14 +94,14 @@
   .card-title {
     font-size: 14px;
     font-weight: 400;
-    color: #666;
+    color: var(--df-text-2);
     margin: 0 0 8px 0;
   }
 
   .card-value {
     font-size: 32px;
     font-weight: 600;
-    color: #333;
+    color: var(--df-text);
     line-height: 1.2;
 
     &.zero-state-cta {
@@ -119,7 +119,7 @@
 
   .card-subtitle {
     font-size: 12px;
-    color: #999;
+    color: var(--df-text-faint);
     margin: 4px 0 0 0;
   }
 }
@@ -127,18 +127,18 @@
 .card-footer {
   margin-top: 16px;
   padding-top: 16px;
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  border-top: 1px solid var(--df-border);
 
   .footer-text {
     font-size: 12px;
-    color: #666;
+    color: var(--df-text-2);
   }
 }
 
 // Prompt styling - professional and clean
 ::ng-deep [prompt] {
   font-size: 13px;
-  color: #666;
+  color: var(--df-text-2);
   font-weight: 400;
   display: flex;
   align-items: center;
@@ -247,36 +247,20 @@
 }
 
 // Dark theme
+// ponytail: #424242 mat-card dark bg predates --df-surface (#1c1b21); kept to
+// avoid a visual shift. Text/border overrides moved to global tokens.
 :host-context(.dark-theme) {
   .dashboard-card {
     background-color: #424242;
 
     .card-body {
-      .card-title {
-        color: #bbb;
-      }
-
       .card-value {
-        color: #fff;
-
         &.zero-state-cta {
           background: linear-gradient(135deg, #bb86fc, #9333ea);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;
         }
-      }
-
-      .card-subtitle {
-        color: #999;
-      }
-    }
-
-    .card-footer {
-      border-top-color: rgba(255, 255, 255, 0.1);
-
-      .footer-text {
-        color: #bbb;
       }
     }
 
@@ -309,7 +293,7 @@
   }
 
   ::ng-deep [prompt] {
-    color: #aaa;
-    background: rgba(255, 255, 255, 0.04);
+    color: var(--df-text-2);
+    background: var(--df-hover);
   }
 }

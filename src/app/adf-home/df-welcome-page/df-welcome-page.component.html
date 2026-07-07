@@ -2,7 +2,7 @@
   *ngIf="{
     isFirstTimeUser: isFirstTimeUser$ | async,
   } as data">
-  <div [class]="(isDarkMode | async) ? 'dark-theme' : ''">
+  <div>
     <section
       class="two-column-flex-container"
       [class.mobile]="breakpointService.isSmallScreen | async">
