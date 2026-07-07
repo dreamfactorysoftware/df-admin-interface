@@ -4,11 +4,7 @@
   (alertClosed)="showAlert = false">
   {{ alertMsg }}
 </df-alert>
-<form
-  name="admin-form"
-  [formGroup]="userForm"
-  (ngSubmit)="save()"
-  [class]="(isDarkMode | async) ? 'dark-theme' : ''">
+<form name="admin-form" [formGroup]="userForm" (ngSubmit)="save()">
   <div class="user-details" [class.small]="isSmallScreen | async">
     <df-profile-details formGroupName="profileDetailsGroup" />
     <div class="additional-info">
