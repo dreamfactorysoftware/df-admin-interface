@@ -105,7 +105,7 @@ interface ProviderBreakdown {
           margin: 0;
           font-size: 16px;
           font-weight: 600;
-          color: #333;
+          color: var(--df-text);
         }
         &__total {
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
@@ -116,19 +116,19 @@ interface ProviderBreakdown {
         &__hint {
           margin: 0;
           font-size: 13px;
-          color: #666;
+          color: var(--df-text-2);
           line-height: 1.5;
         }
         &__empty {
           font-size: 14px;
-          color: #999;
+          color: var(--df-text-2);
           font-style: italic;
         }
         &__table {
           width: 100%;
           border-collapse: collapse;
           font-size: 14px;
-          color: #333;
+          color: var(--df-text);
 
           th {
             text-align: left;
@@ -136,13 +136,13 @@ interface ProviderBreakdown {
             font-size: 11px;
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            color: #666;
-            border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+            color: var(--df-text-2);
+            border-bottom: 1px solid var(--df-border);
             font-weight: 600;
           }
           td {
             padding: 10px 12px;
-            border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+            border-bottom: 1px solid var(--df-border-2);
           }
           input {
             width: 90px;
@@ -171,30 +171,13 @@ interface ProviderBreakdown {
 
       :host-context(.dark-theme) {
         .cost {
-          &__title {
-            color: #fff;
-          }
           &__total {
             color: #81c784;
           }
-          &__hint,
-          &__empty {
-            color: #bbb;
-          }
           &__table {
-            color: #fff;
-
-            th {
-              color: #bbb;
-              border-bottom-color: rgba(255, 255, 255, 0.12);
-            }
-            td {
-              border-bottom-color: rgba(255, 255, 255, 0.06);
-            }
             input {
               background: rgba(255, 255, 255, 0.06);
               border-color: rgba(255, 255, 255, 0.2);
-              color: #fff;
 
               &:focus {
                 border-color: #bb86fc;

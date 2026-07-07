@@ -82,14 +82,14 @@ import { GroupRow } from '../../types/usage';
           margin: 0;
           font-size: 16px;
           font-weight: 600;
-          color: #333;
+          color: var(--df-text);
           display: inline-flex;
           align-items: center;
           gap: 8px;
         }
         &__hint {
           font-size: 13px;
-          color: #999;
+          color: var(--df-text-muted);
           cursor: help;
 
           &:hover {
@@ -98,11 +98,11 @@ import { GroupRow } from '../../types/usage';
         }
         &__subtitle {
           font-size: 12px;
-          color: #999;
+          color: var(--df-text-2);
         }
         &__empty {
           padding: 8px 0;
-          color: #999;
+          color: var(--df-text-2);
           font-style: italic;
           font-size: 14px;
         }
@@ -134,7 +134,7 @@ import { GroupRow } from '../../types/usage';
         &__label {
           font-size: 14px;
           font-weight: 500;
-          color: #333;
+          color: var(--df-text);
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
@@ -142,7 +142,7 @@ import { GroupRow } from '../../types/usage';
         &__track {
           display: flex;
           height: 12px;
-          background: rgba(0, 0, 0, 0.06);
+          background: var(--df-surface-2);
           border-radius: 999px;
           overflow: hidden;
           min-width: 80px;
@@ -168,11 +168,11 @@ import { GroupRow } from '../../types/usage';
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
           font-size: 14px;
           font-weight: 600;
-          color: #333;
+          color: var(--df-text);
         }
         &__count {
           font-size: 12px;
-          color: #999;
+          color: var(--df-text-2);
         }
         &__rate {
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
@@ -186,29 +186,14 @@ import { GroupRow } from '../../types/usage';
 
       :host-context(.dark-theme) {
         .bars {
-          &__title,
-          &__label,
-          &__total {
-            color: #fff;
-          }
-          &__subtitle,
-          &__count,
-          &__empty {
-            color: #bbb;
-          }
           &__rate {
             color: #b388ff;
             background: rgba(127, 17, 224, 0.18);
           }
           &__hint {
-            color: #888;
-
             &:hover {
               color: #bb86fc;
             }
-          }
-          &__track {
-            background: rgba(255, 255, 255, 0.08);
           }
           &__row--clickable:hover {
             background: rgba(187, 134, 252, 0.1);

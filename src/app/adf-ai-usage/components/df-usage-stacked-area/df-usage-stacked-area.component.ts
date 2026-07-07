@@ -109,11 +109,11 @@ interface YTick {
           align-items: center;
           gap: 12px 24px;
           font-size: 13px;
-          color: #666;
+          color: var(--df-text-2);
         }
         &__title {
           font-weight: 600;
-          color: #333;
+          color: var(--df-text);
           font-size: 16px;
           margin-right: 8px;
         }
@@ -130,52 +130,29 @@ interface YTick {
         &__legend-total {
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
           font-size: 12px;
-          color: #999;
+          color: var(--df-text-2);
         }
 
         &__svg {
           width: 100%;
           height: var(--chart-h, 280px);
-          background: rgba(0, 0, 0, 0.02);
+          background: var(--df-surface-2);
           border-radius: 4px;
         }
 
         &__grid line {
-          stroke: rgba(0, 0, 0, 0.08);
+          stroke: var(--df-border-2);
           stroke-dasharray: 2 4;
         }
         &__axis text {
-          fill: #999;
+          fill: var(--df-text-2);
           font-size: 12px;
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
         }
         &__empty text {
-          fill: #999;
+          fill: var(--df-text-2);
           font-style: italic;
           font-size: 14px;
-        }
-      }
-
-      :host-context(.dark-theme) {
-        .chart {
-          &__legend {
-            color: #bbb;
-          }
-          &__title {
-            color: #fff;
-          }
-          &__legend-total,
-          &__axis text,
-          &__empty text {
-            color: #bbb;
-            fill: #bbb;
-          }
-          &__svg {
-            background: rgba(255, 255, 255, 0.04);
-          }
-          &__grid line {
-            stroke: rgba(255, 255, 255, 0.08);
-          }
         }
       }
     `,

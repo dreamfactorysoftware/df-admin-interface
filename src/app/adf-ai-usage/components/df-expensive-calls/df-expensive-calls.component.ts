@@ -124,17 +124,17 @@ export interface ExpensiveCallRow {
         }
         &__title {
           font-weight: 600;
-          color: #333;
+          color: var(--df-text);
           font-size: 16px;
         }
         &__subtitle {
           font-size: 12px;
-          color: #999;
+          color: var(--df-text-muted);
         }
 
         &__empty {
           font-style: italic;
-          color: #999;
+          color: var(--df-text-muted);
           font-size: 13px;
           padding: 12px 0;
         }
@@ -152,12 +152,12 @@ export interface ExpensiveCallRow {
         &__th {
           text-align: left;
           font-weight: 600;
-          color: #777;
+          color: var(--df-text-muted);
           font-size: 11px;
           text-transform: uppercase;
           letter-spacing: 0.04em;
           padding: 8px 10px;
-          border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+          border-bottom: 1px solid var(--df-border);
           white-space: nowrap;
 
           &--num,
@@ -189,7 +189,7 @@ export interface ExpensiveCallRow {
         &__td {
           padding: 10px;
           border-bottom: 1px solid rgba(0, 0, 0, 0.04);
-          color: #333;
+          color: var(--df-text);
           vertical-align: top;
 
           &--cost {
@@ -201,7 +201,7 @@ export interface ExpensiveCallRow {
           &--num {
             text-align: right;
             font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
-            color: #666;
+            color: var(--df-text-2);
           }
 
           &--model {
@@ -209,7 +209,7 @@ export interface ExpensiveCallRow {
           }
 
           &--when {
-            color: #666;
+            color: var(--df-text-2);
             white-space: nowrap;
           }
         }
@@ -224,7 +224,7 @@ export interface ExpensiveCallRow {
         }
         &__provider {
           font-size: 11px;
-          color: #999;
+          color: var(--df-text-muted);
           margin-top: 2px;
           text-transform: capitalize;
         }
@@ -236,8 +236,8 @@ export interface ExpensiveCallRow {
           font-size: 11px;
           font-weight: 500;
           text-transform: capitalize;
-          background: rgba(0, 0, 0, 0.06);
-          color: #555;
+          background: var(--df-surface-2);
+          color: var(--df-text-2);
 
           &--success {
             background: rgba(38, 166, 154, 0.15);
@@ -256,20 +256,9 @@ export interface ExpensiveCallRow {
 
       :host-context(.dark-theme) {
         .exp {
-          &__title {
-            color: #fff;
-          }
-          &__subtitle,
-          &__td--num,
-          &__td--when {
-            color: #aaa;
-          }
-          &__th {
-            color: #999;
-            border-bottom-color: rgba(255, 255, 255, 0.1);
-          }
           &__td {
-            color: #ddd;
+            // Deliberately fainter than --df-border-2: these are dense data
+            // rows and the token doubles the separator weight.
             border-bottom-color: rgba(255, 255, 255, 0.04);
           }
           &__row:hover {
@@ -284,13 +273,7 @@ export interface ExpensiveCallRow {
           &__cost {
             color: #b388ff;
           }
-          &__provider {
-            color: #888;
-          }
           &__pill {
-            background: rgba(255, 255, 255, 0.08);
-            color: #ccc;
-
             &--success {
               background: rgba(38, 166, 154, 0.2);
               color: #4db6ac;
