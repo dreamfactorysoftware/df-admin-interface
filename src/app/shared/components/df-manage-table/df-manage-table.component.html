@@ -1,4 +1,4 @@
-<div class="top-action-bar" [class]="(isDarkMode | async) ? 'dark-theme' : ''">
+<div class="top-action-bar">
   <button
     *ngIf="allowCreate"
     mat-mini-fab
@@ -34,9 +34,7 @@
   *ngIf="{
     currentPageSize: currentPageSize$ | async,
   } as data">
-  <div
-    class="table-container"
-    [class]="(isDarkMode | async) ? 'dark-theme' : ''">
+  <div class="table-container">
     <table
       mat-table
       [dataSource]="dataSource"

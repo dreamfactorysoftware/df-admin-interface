@@ -435,7 +435,10 @@ $red-palette: mat.define-palette(mat.$red-palette);
   text-decoration: none;
 }
 
-.dark-theme {
+// Dark styles key off the .dark-theme class DfThemeService stamps on <body>.
+// :host-context is required: these rules are component-scoped, so a bare
+// .dark-theme descendant selector would never match the body class.
+:host-context(.dark-theme) {
   .tool-bar,
   .sidenav-container,
   .sidenav,
@@ -462,14 +465,6 @@ $red-palette: mat.define-palette(mat.$red-palette);
       ) !important;
     }
   }
-  &.active {
-    ::ng-deep .mat-mdc-button-touch-target {
-      background-color: #e3dfff;
-      border-top-right-radius: 50px;
-      border-bottom-right-radius: 50px;
-    }
-  }
-
   .nav-item {
     &.active {
       ::ng-deep .mat-mdc-button-touch-target {
@@ -496,7 +491,7 @@ $red-palette: mat.define-palette(mat.$red-palette);
       $df-purple-palette,
       1002
     ) !important;
-    color: white;
+    color: var(--df-text);
     .page-header {
       color: mat.get-color-from-palette($df-purple-palette, 10) !important;
     }
@@ -506,7 +501,7 @@ $red-palette: mat.define-palette(mat.$red-palette);
       $df-purple-palette,
       1003
     ) !important;
-    color: white;
+    color: var(--df-text);
     .page-header {
       color: mat.get-color-from-palette($df-purple-palette, 10) !important;
     }

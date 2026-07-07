@@ -7,7 +7,7 @@ mat-expansion-panel-header {
 }
 
 .description-text {
-  color: var(--df-secondary-text-color);
+  color: var(--df-text-2);
   margin-bottom: 16px;
 }
 
@@ -72,7 +72,7 @@ mat-expansion-panel-header {
 .endpoint-title,
 .auth-desc {
   font-size: 0.85em;
-  color: var(--df-secondary-text-color);
+  color: var(--df-text-2);
 }
 
 .test-button {
@@ -87,7 +87,7 @@ mat-expansion-panel-header {
 
 .endpoint-info-card {
   margin: 16px 0;
-  background: var(--df-surface-color);
+  background: var(--df-surface);
 
   .endpoint-info-header {
     display: flex;
@@ -97,13 +97,13 @@ mat-expansion-panel-header {
 
     h4 {
       margin: 0;
-      color: var(--df-primary-text-color);
+      color: var(--df-text);
     }
   }
 
   p {
     margin: 0 0 12px 0;
-    color: var(--df-secondary-text-color);
+    color: var(--df-text-2);
   }
 
   .test-details {
@@ -113,10 +113,10 @@ mat-expansion-panel-header {
     font-size: 0.9em;
 
     span {
-      color: var(--df-secondary-text-color);
+      color: var(--df-text-2);
 
       strong {
-        color: var(--df-primary-text-color);
+        color: var(--df-text);
       }
     }
   }
@@ -177,7 +177,7 @@ mat-expansion-panel-header {
       font-size: 0.95em;
 
       strong {
-        color: var(--df-primary-text-color);
+        color: var(--df-text);
       }
     }
   }
@@ -191,7 +191,7 @@ mat-expansion-panel-header {
 
     h5 {
       margin: 0 0 8px 0;
-      color: var(--df-primary-text-color);
+      color: var(--df-text);
       font-size: 0.9em;
     }
 
@@ -201,7 +201,7 @@ mat-expansion-panel-header {
 
       li {
         font-size: 0.85em;
-        color: var(--df-secondary-text-color);
+        color: var(--df-text-2);
         margin-bottom: 4px;
 
         &:last-child {

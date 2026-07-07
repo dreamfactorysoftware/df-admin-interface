@@ -18,7 +18,7 @@
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    color: var(--mat-app-on-surface-variant, rgba(255, 255, 255, 0.6));
+    color: var(--df-text-muted);
   }
 
   &__error {
@@ -41,7 +41,7 @@
     border-radius: 6px;
     background: rgba(46, 160, 67, 0.1);
     border: 1px solid rgba(46, 160, 67, 0.4);
-    color: var(--mat-app-on-surface, rgba(255, 255, 255, 0.92));
+    color: var(--df-text);
     display: flex;
     align-items: flex-start;
     gap: 0.75rem;
@@ -80,7 +80,7 @@
 
   &__description {
     margin: 0.5rem 0 0;
-    color: var(--mat-app-on-surface-variant, rgba(255, 255, 255, 0.7));
+    color: var(--df-text-2);
     font-size: 1rem;
   }
 
@@ -90,12 +90,12 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: var(--mat-app-on-surface-variant, rgba(255, 255, 255, 0.7));
+    color: var(--df-text-2);
   }
 
   &__empty {
     padding: 1rem;
-    color: var(--mat-app-on-surface-variant, rgba(255, 255, 255, 0.6));
+    color: var(--df-text-muted);
     font-style: italic;
   }
 
@@ -119,8 +119,8 @@
     }
 
     &--denied {
-      background: rgba(255, 255, 255, 0.03);
-      border-color: rgba(255, 255, 255, 0.08);
+      background: var(--df-surface-2);
+      border-color: var(--df-border-2);
       display: flex;
       align-items: center;
       gap: 0.75rem;
@@ -155,15 +155,15 @@
     font-size: 0.8125rem;
     padding: 0.2rem 0.625rem;
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.08);
-    color: var(--mat-app-on-surface-variant, rgba(255, 255, 255, 0.75));
+    background: var(--df-surface-2);
+    color: var(--df-text-2);
     text-transform: lowercase;
   }
 
   &__deny-label {
     margin-left: auto;
     font-size: 0.875rem;
-    color: var(--mat-app-on-surface-variant, rgba(255, 255, 255, 0.55));
+    color: var(--df-text-muted);
     font-style: italic;
   }
 
@@ -187,7 +187,7 @@
   &__component {
     font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
     font-size: 0.875rem;
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--df-surface-2);
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
   }
@@ -211,12 +211,12 @@
   &__verb-empty {
     font-size: 0.8125rem;
     font-style: italic;
-    color: var(--mat-app-on-surface-variant, rgba(255, 255, 255, 0.5));
+    color: var(--df-text-muted);
   }
 
   &__requesters {
     font-size: 0.8125rem;
-    color: var(--mat-app-on-surface-variant, rgba(255, 255, 255, 0.55));
+    color: var(--df-text-muted);
   }
 
   &__denied-toggle {
@@ -229,7 +229,7 @@
     padding: 0.5rem 0;
     font-size: 1rem;
     font-weight: 500;
-    color: var(--mat-app-on-surface, rgba(255, 255, 255, 0.87));
+    color: var(--df-text);
 
     &:hover {
       color: #60a5fa;
@@ -238,9 +238,9 @@
 
   &__footer {
     padding-top: 1rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 1px solid var(--df-border-2);
     font-size: 0.9375rem;
-    color: var(--mat-app-on-surface-variant, rgba(255, 255, 255, 0.7));
+    color: var(--df-text-2);
     line-height: 1.5;
   }
 }

@@ -15,7 +15,7 @@
   position: relative;
   width: 90%;
   max-width: 500px;
-  background: #ffffff;
+  background: var(--df-surface);
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
   padding: 24px;
@@ -28,7 +28,7 @@
 
     h2 {
       margin: 0;
-      color: #333333;
+      color: var(--df-text);
       font-size: 1.5rem;
       font-weight: 600;
     }
@@ -40,7 +40,7 @@
 
     p {
       margin: 8px 0;
-      color: #666666;
+      color: var(--df-text-2);
       line-height: 1.5;
     }
   }

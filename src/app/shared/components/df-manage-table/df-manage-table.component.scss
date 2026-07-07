@@ -62,7 +62,7 @@ $red-palette: mat.define-palette(mat.$red-palette);
   }
 }
 
-.dark-theme {
+:host-context(.dark-theme) {
   .search {
     background-color: mat.get-color-from-palette(
       $df-purple-palette,
