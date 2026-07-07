@@ -32,7 +32,7 @@
   border-right: 1px solid #e0e0e0;
   background: #fafafa;
 
-  .dark-theme & {
+  :host-context(.dark-theme) & {
     border-right-color: #424242;
     background: #303030;
   }
@@ -46,7 +46,7 @@
 .explorer-content {
   background: #fff;
 
-  .dark-theme & {
+  :host-context(.dark-theme) & {
     background: #424242;
   }
 }
@@ -69,7 +69,7 @@
   text-align: center;
   padding: 24px;
 
-  .dark-theme & {
+  :host-context(.dark-theme) & {
     color: #bdbdbd;
   }
 
@@ -80,7 +80,7 @@
     color: #bdbdbd;
     margin-bottom: 16px;
 
-    .dark-theme & {
+    :host-context(.dark-theme) & {
       color: #616161;
     }
   }
@@ -91,7 +91,7 @@
     font-weight: 500;
     color: #424242;
 
-    .dark-theme & {
+    :host-context(.dark-theme) & {
       color: #e0e0e0;
     }
   }

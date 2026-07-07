@@ -275,7 +275,7 @@ interface ColumnFilter {
           <div class="api-call-top">
             <span
               class="api-method"
-              matTooltip="HTTP method — GET retrieves records without modifying data"
+              matTooltip="HTTP method: GET retrieves records without modifying data"
               >GET</span
             >
             <code
@@ -296,7 +296,7 @@ interface ColumnFilter {
             <span class="options-label">Include:</span>
             <label
               class="api-option"
-              matTooltip="limit — Maximum number of records to return per request (currently {{
+              matTooltip="limit: Maximum number of records to return per request (currently {{
                 pageSize
               }})">
               <input
@@ -307,7 +307,7 @@ interface ColumnFilter {
             </label>
             <label
               class="api-option"
-              matTooltip="offset — Number of records to skip, used for pagination (currently {{
+              matTooltip="offset: Number of records to skip, used for pagination (currently {{
                 currentOffset
               }})">
               <input
@@ -318,7 +318,7 @@ interface ColumnFilter {
             </label>
             <label
               class="api-option"
-              matTooltip="include_count — Returns total record count in the response metadata">
+              matTooltip="include_count: Returns total record count in the response metadata">
               <input
                 type="checkbox"
                 [checked]="apiIncludeCount"
@@ -333,7 +333,7 @@ interface ColumnFilter {
               *ngFor="let rel of cachedSchema!.related"
               [matTooltip]="
                 rel.type +
-                ' — Include ' +
+                ': Include ' +
                 rel.refTable +
                 ' records linked via ' +
                 rel.field +
@@ -596,7 +596,7 @@ interface ColumnFilter {
         padding: 0 12px;
         height: 49px;
         box-sizing: border-box;
-        border-bottom: 1px solid #e0e0e0;
+        border-bottom: 1px solid var(--df-border);
         background: #fafafa;
         flex-shrink: 0;
 
@@ -613,7 +613,7 @@ interface ColumnFilter {
           .table-title {
             font-size: 15px;
             font-weight: 500;
-            color: #212121;
+            color: var(--df-text);
           }
 
           .readonly-chip {
@@ -640,14 +640,10 @@ interface ColumnFilter {
       }
 
       :host-context(.dark-theme) .grid-toolbar {
-        border-bottom-color: #424242;
         background: #303030;
         .toolbar-left {
           .toolbar-icon {
             color: #ce93d8;
-          }
-          .table-title {
-            color: #e0e0e0;
           }
         }
         .toolbar-right {
@@ -669,11 +665,11 @@ interface ColumnFilter {
         align-items: center;
         justify-content: space-between;
         padding: 2px 12px;
-        border-bottom: 1px solid #e0e0e0;
+        border-bottom: 1px solid var(--df-border);
         background: #fafafa;
         flex-shrink: 0;
         font-size: 12px;
-        color: #757575;
+        color: var(--df-text-muted);
 
         .top-pagination-left {
           .page-info {
@@ -693,12 +689,12 @@ interface ColumnFilter {
             gap: 4px;
 
             .page-size-select {
-              border: 1px solid #e0e0e0;
+              border: 1px solid var(--df-border);
               border-radius: 4px;
               padding: 2px 4px;
               font-size: 12px;
-              background: white;
-              color: #424242;
+              background: var(--df-surface);
+              color: var(--df-text);
               outline: none;
               cursor: pointer;
             }
@@ -728,13 +724,9 @@ interface ColumnFilter {
       }
 
       :host-context(.dark-theme) .top-pagination {
-        border-bottom-color: #424242;
         background: #303030;
-        color: #9e9e9e;
         .page-size-select {
           background: #2c2c2c !important;
-          border-color: #424242 !important;
-          color: #e0e0e0 !important;
         }
       }
 
@@ -747,7 +739,7 @@ interface ColumnFilter {
         justify-content: center;
         gap: 16px;
         padding: 48px 24px;
-        color: #757575;
+        color: var(--df-text-muted);
         font-size: 14px;
         flex: 1;
       }
@@ -842,11 +834,11 @@ interface ColumnFilter {
           font-size: 12px;
           text-transform: uppercase;
           letter-spacing: 0.5px;
-          color: #616161;
+          color: var(--df-text-2);
           background: #f5f5f5;
           white-space: nowrap;
           padding: 0 16px;
-          border-right: 1px solid #e0e0e0;
+          border-right: 1px solid var(--df-border);
           box-sizing: border-box;
 
           .resize-handle {
@@ -883,7 +875,7 @@ interface ColumnFilter {
           flex: none;
           padding: 4px 8px;
           background: #f5f5f5;
-          border-right: 1px solid #e0e0e0;
+          border-right: 1px solid var(--df-border);
           overflow: hidden;
           box-sizing: border-box;
 
@@ -895,12 +887,12 @@ interface ColumnFilter {
 
           .filter-op {
             flex-shrink: 0;
-            border: 1px solid #e0e0e0;
+            border: 1px solid var(--df-border);
             border-radius: 4px;
             padding: 3px 4px;
             font-size: 11px;
-            background: white;
-            color: #424242;
+            background: var(--df-surface);
+            color: var(--df-text);
             outline: none;
             cursor: pointer;
             max-width: 90px;
@@ -913,11 +905,12 @@ interface ColumnFilter {
           .filter-input {
             flex: 1;
             min-width: 0;
-            border: 1px solid #e0e0e0;
+            border: 1px solid var(--df-border);
             border-radius: 4px;
             padding: 4px 8px;
             font-size: 12px;
-            background: white;
+            background: var(--df-surface);
+            color: var(--df-text);
             outline: none;
             box-sizing: border-box;
 
@@ -926,7 +919,7 @@ interface ColumnFilter {
             }
 
             &::placeholder {
-              color: #bdbdbd;
+              color: var(--df-text-faint);
               font-style: italic;
             }
           }
@@ -939,12 +932,13 @@ interface ColumnFilter {
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
-          border-right: 1px solid #f0f0f0;
+          border-right: 1px solid var(--df-border-2);
+          color: var(--df-text);
           font-family: 'Roboto Mono', monospace;
           box-sizing: border-box;
 
           &.null-cell {
-            color: #bdbdbd;
+            color: var(--df-text-faint);
             font-style: italic;
           }
         }
@@ -976,9 +970,7 @@ interface ColumnFilter {
 
       :host-context(.dark-theme) .data-table {
         .header-cell {
-          color: #bdbdbd;
           background: #383838;
-          border-right-color: #424242;
 
           .resize-handle:hover {
             background: rgba(206, 147, 216, 0.1);
@@ -989,12 +981,9 @@ interface ColumnFilter {
         }
         .filter-cell {
           background: #383838;
-          border-right-color: #424242;
 
           .filter-op {
             background: #2c2c2c;
-            border-color: #424242;
-            color: #e0e0e0;
             &:focus {
               border-color: #ce93d8;
             }
@@ -1002,21 +991,9 @@ interface ColumnFilter {
 
           .filter-input {
             background: #2c2c2c;
-            border-color: #424242;
-            color: #e0e0e0;
             &:focus {
               border-color: #ce93d8;
             }
-            &::placeholder {
-              color: #616161;
-            }
-          }
-        }
-        .data-cell {
-          border-right-color: #383838;
-          color: #e0e0e0;
-          &.null-cell {
-            color: #616161;
           }
         }
         tr.mat-mdc-row:hover {
@@ -1033,11 +1010,11 @@ interface ColumnFilter {
         align-items: center;
         gap: 16px;
         padding: 4px 12px;
-        border-top: 1px solid #e0e0e0;
+        border-top: 1px solid var(--df-border);
         background: #f5f5f5;
         flex-shrink: 0;
         font-size: 12px;
-        color: #757575;
+        color: var(--df-text-muted);
 
         .footer-info {
           white-space: nowrap;
@@ -1071,9 +1048,7 @@ interface ColumnFilter {
       }
 
       :host-context(.dark-theme) .grid-footer {
-        border-top-color: #424242;
         background: #2c2c2c;
-        color: #9e9e9e;
       }
 
       /* Quick search in toolbar */
@@ -1081,7 +1056,7 @@ interface ColumnFilter {
         display: flex;
         align-items: center;
         background: #f5f5f5;
-        border: 1px solid #e0e0e0;
+        border: 1px solid var(--df-border);
         border-radius: 4px;
         padding: 0 6px;
         height: 28px;
@@ -1091,7 +1066,7 @@ interface ColumnFilter {
           font-size: 16px;
           width: 16px;
           height: 16px;
-          color: #9e9e9e;
+          color: var(--df-text-faint);
         }
 
         .search-input {
@@ -1100,9 +1075,9 @@ interface ColumnFilter {
           background: transparent;
           font-size: 12px;
           width: 140px;
-          color: #424242;
+          color: var(--df-text);
           &::placeholder {
-            color: #bdbdbd;
+            color: var(--df-text-faint);
           }
         }
 
@@ -1114,36 +1089,20 @@ interface ColumnFilter {
           background: none;
           cursor: pointer;
           padding: 0;
-          color: #9e9e9e;
+          color: var(--df-text-faint);
           mat-icon {
             font-size: 14px;
             width: 14px;
             height: 14px;
           }
           &:hover {
-            color: #616161;
+            color: var(--df-text-2);
           }
         }
       }
 
       :host-context(.dark-theme) .quick-search {
         background: #2c2c2c;
-        border-color: #424242;
-        .search-input {
-          color: #e0e0e0;
-          &::placeholder {
-            color: #616161;
-          }
-        }
-        .search-icon {
-          color: #757575;
-        }
-        .search-clear {
-          color: #757575;
-          &:hover {
-            color: #bdbdbd;
-          }
-        }
       }
 
       /* API call bar */
@@ -1151,7 +1110,7 @@ interface ColumnFilter {
         display: flex;
         flex-direction: column;
         padding: 4px 12px;
-        border-bottom: 1px solid #e0e0e0;
+        border-bottom: 1px solid var(--df-border);
         background: #f0f4f8;
         flex-shrink: 0;
         font-size: 12px;
@@ -1243,7 +1202,6 @@ interface ColumnFilter {
 
       :host-context(.dark-theme) .api-call-bar {
         background: #1a2332;
-        border-bottom-color: #424242;
         .api-call-desc {
           color: #78909c;
         }
@@ -1326,7 +1284,7 @@ interface ColumnFilter {
         align-items: center;
         gap: 8px;
         padding: 4px 12px;
-        border-bottom: 1px solid #e0e0e0;
+        border-bottom: 1px solid var(--df-border);
         background: #f3e5f5;
         flex-shrink: 0;
         font-size: 12px;
@@ -1369,7 +1327,6 @@ interface ColumnFilter {
 
       :host-context(.dark-theme) .nav-filter-bar {
         background: #2d1b3d;
-        border-bottom-color: #424242;
         color: #e1bee7;
 
         .nav-filter-icon {

@@ -92,7 +92,7 @@ import {
         flex-direction: column;
         height: 100%;
         width: 380px;
-        border-left: 1px solid #e0e0e0;
+        border-left: 1px solid var(--df-border);
         background: #fafafa;
         overflow: hidden;
       }
@@ -102,7 +102,7 @@ import {
         align-items: center;
         justify-content: space-between;
         padding: 8px 12px;
-        border-bottom: 1px solid #e0e0e0;
+        border-bottom: 1px solid var(--df-border);
         background: #f5f5f5;
 
         .detail-title {
@@ -110,7 +110,7 @@ import {
           font-weight: 600;
           text-transform: uppercase;
           letter-spacing: 0.5px;
-          color: #616161;
+          color: var(--df-text-2);
         }
 
         .close-btn {
@@ -128,7 +128,7 @@ import {
 
       .field-entry {
         padding: 8px 12px;
-        border-bottom: 1px solid #f0f0f0;
+        border-bottom: 1px solid var(--df-border-2);
 
         .field-label {
           display: flex;
@@ -139,13 +139,13 @@ import {
           .field-key {
             font-size: 12px;
             font-weight: 600;
-            color: #424242;
+            color: var(--df-text);
             font-family: 'Roboto Mono', monospace;
           }
 
           .field-type-badge {
             font-size: 10px;
-            color: #9e9e9e;
+            color: var(--df-text-faint);
             font-family: 'Roboto Mono', monospace;
           }
 
@@ -173,7 +173,7 @@ import {
 
         .field-value {
           font-size: 13px;
-          color: #212121;
+          color: var(--df-text);
           word-break: break-word;
 
           .null-badge {
@@ -181,16 +181,16 @@ import {
             font-size: 11px;
             padding: 1px 8px;
             border-radius: 4px;
-            background: #eeeeee;
-            color: #9e9e9e;
+            background: var(--df-surface-2);
+            color: var(--df-text-faint);
             font-style: italic;
           }
 
           .json-value {
             font-size: 12px;
             font-family: 'Roboto Mono', monospace;
-            background: #f5f5f5;
-            border: 1px solid #e0e0e0;
+            background: var(--df-surface-2);
+            border: 1px solid var(--df-border);
             border-radius: 4px;
             padding: 8px;
             margin: 4px 0 0;
@@ -205,7 +205,7 @@ import {
         }
 
         &.null-value .field-value {
-          color: #9e9e9e;
+          color: var(--df-text-faint);
         }
 
         .field-ref {
@@ -218,7 +218,7 @@ import {
             font-size: 14px;
             width: 14px;
             height: 14px;
-            color: #9e9e9e;
+            color: var(--df-text-faint);
           }
         }
       }
@@ -236,32 +236,9 @@ import {
       :host-context(.dark-theme) {
         .row-detail-panel {
           background: #1e1e1e;
-          border-left-color: #424242;
         }
         .detail-header {
           background: #2c2c2c;
-          border-bottom-color: #424242;
-          .detail-title {
-            color: #bdbdbd;
-          }
-        }
-        .field-entry {
-          border-bottom-color: #2c2c2c;
-          .field-label .field-key {
-            color: #e0e0e0;
-          }
-          .field-value {
-            color: #e0e0e0;
-            .null-badge {
-              background: #333;
-              color: #757575;
-            }
-            .json-value {
-              background: #2c2c2c;
-              border-color: #424242;
-              color: #e0e0e0;
-            }
-          }
         }
         .ref-link {
           color: #64b5f6;
