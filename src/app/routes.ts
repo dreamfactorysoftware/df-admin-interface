@@ -54,7 +54,7 @@ import { systemEventsResolver } from './adf-services/resolvers/system-events.res
 import { checkStatusResolver } from './adf-config/resolvers/df-check-status.resolver';
 import { licenseGuard } from './shared/guards/license.guard';
 import { globalLicenseGuard } from './shared/guards/global-license.guard';
-import { errorGaurd } from './shared/guards/error.guard';
+import { errorGuard } from './shared/guards/error.guard';
 import { paywallGuard } from './shared/guards/paywall.guard';
 import { rootAdminGuard } from './shared/guards/admin.guard';
 import { SERVICE_GROUPS } from './shared/constants/serviceGroups';
@@ -71,7 +71,7 @@ export const routes: Routes = [
       import('./shared/components/df-error/df-error.component').then(
         m => m.DfErrorComponent
       ),
-    canActivate: [errorGaurd],
+    canActivate: [errorGuard],
   },
   {
     path: ROUTES.AUTH,

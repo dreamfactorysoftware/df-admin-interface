@@ -11,7 +11,6 @@ import { USER_COLUMNS } from 'src/app/shared/constants/table-columns';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { ADMIN_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
-import { GenericListResponse } from 'src/app/shared/types/generic-http';
 import { TranslocoService } from '@ngneat/transloco';
 import { MatDialog } from '@angular/material/dialog';
 import { UntilDestroy } from '@ngneat/until-destroy';
@@ -66,12 +65,7 @@ export class DfManageAdminsTableComponent extends DfManageTableComponent<UserRow
   }
 
   refreshTable(limit?: number, offset?: number, filter?: string): void {
-    this.adminService
-      .getAll<GenericListResponse<UserProfile>>({ limit, offset, filter })
-      .subscribe(data => {
-        this.dataSource.data = this.mapDataToTable(data.resource);
-        this.tableLength = data.meta.count;
-      });
+    this.fetchTable(this.adminService, { limit, offset, filter });
   }
 
   uploadAdminList(files: FileList) {

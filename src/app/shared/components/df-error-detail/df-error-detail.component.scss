@@ -1,0 +1,57 @@
+.error-detail {
+  font-size: 13px;
+  color: var(--df-text-2);
+
+  summary {
+    cursor: pointer;
+    color: var(--df-text-muted);
+    user-select: none;
+
+    &:hover {
+      color: var(--df-text);
+    }
+  }
+
+  .error-detail-grid {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 4px 12px;
+    margin: 8px 0;
+
+    dt {
+      color: var(--df-text-muted);
+    }
+
+    dd {
+      margin: 0;
+      color: var(--df-text);
+      word-break: break-all;
+    }
+  }
+
+  .error-detail-fields {
+    margin: 8px 0;
+    padding-left: 20px;
+    color: var(--df-text);
+  }
+
+  .error-detail-raw {
+    max-height: 200px;
+    overflow: auto;
+    margin: 8px 0;
+    padding: 8px 12px;
+    border: 1px solid var(--df-border);
+    border-radius: 4px;
+    background-color: var(--df-code-bg);
+    color: var(--df-code-text);
+    font-size: 12px;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+
+  .copy-btn {
+    fa-icon {
+      margin-right: 6px;
+    }
+  }
+}

@@ -9,7 +9,6 @@ import { APP_INITIALIZER, importProvidersFrom, isDevMode } from '@angular/core';
 import { provideRouter, withHashLocation } from '@angular/router';
 import { sessionTokenInterceptor } from './app/shared/interceptors/session-token.interceptor';
 import { loadingInterceptor } from './app/shared/interceptors/loading.interceptor';
-import { snackbarInterceptor } from './app/shared/interceptors/snackbar.interceptor';
 import { caseInterceptor } from './app/shared/interceptors/case.interceptor';
 import { TranslocoHttpLoader } from './transloco-loader';
 import { provideTransloco } from '@ngneat/transloco';
@@ -43,12 +42,15 @@ bootstrapApplication(AppComponent, {
     },
     provideAnimations(),
     provideHttpClient(
+      // errorInterceptor registered last: it sees errors first on unwind, so
+      // every component-level catchError downstream receives a normalized
+      // AppError. Success toasts (formerly snackbarInterceptor) live in
+      // errorInterceptor's success tap.
       withInterceptors([
         caseInterceptor,
         loadingInterceptor,
-        errorInterceptor,
         sessionTokenInterceptor,
-        snackbarInterceptor,
+        errorInterceptor,
       ])
     ),
     provideRouter(routes, withHashLocation()),

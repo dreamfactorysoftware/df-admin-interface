@@ -3,6 +3,7 @@ import { catchError, map, of, switchMap } from 'rxjs';
 import { DfSystemConfigDataService } from './df-system-config-data.service';
 import { DfErrorService } from './df-error.service';
 import { HttpClient } from '@angular/common/http';
+import { normalizeError } from '../utilities/app-error';
 
 @Injectable({
   providedIn: 'root',
@@ -40,7 +41,7 @@ export class DfPaywallService {
           if (system.resource.length === 0) {
             return this.systemConfigDataService.fetchSystemData().pipe(
               catchError(e => {
-                this.errorService.error = e.error.message;
+                this.errorService.error = normalizeError(e);
                 return of(null);
               })
             );

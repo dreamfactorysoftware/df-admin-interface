@@ -15,7 +15,14 @@ import {
 import { MatSort, Sort, MatSortModule } from '@angular/material/sort';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { ActivatedRoute, Router } from '@angular/router';
-import { debounceTime, distinctUntilChanged, switchMap, map } from 'rxjs';
+import {
+  catchError,
+  debounceTime,
+  distinctUntilChanged,
+  EMPTY,
+  switchMap,
+  map,
+} from 'rxjs';
 import { ROUTES } from 'src/app/shared/types/routes';
 import { IconProp } from '@fortawesome/fontawesome-svg-core';
 import {
@@ -38,10 +45,24 @@ import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { Actions, AdditonalAction, Column } from 'src/app/shared/types/table';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
+import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
+import {
+  GenericListResponse,
+  RequestOptions,
+} from 'src/app/shared/types/generic-http';
+import { AppError, normalizeError } from 'src/app/shared/utilities/app-error';
+import { DfErrorDetailComponent } from '../df-error-detail/df-error-detail.component';
+
+// Re-export: subclasses consume DfErrorDetailComponent through the
+// DfManageTableModules array, so it must be exported from this module (NG3004).
+export { DfErrorDetailComponent };
+
+export type TableState = 'loading' | 'loaded' | 'empty' | 'error';
 
 export const DfManageTableModules = [
   NgIf,
@@ -58,6 +79,8 @@ export const DfManageTableModules = [
   MatFormFieldModule,
   MatInputModule,
   MatSortModule,
+  MatProgressBarModule,
+  DfErrorDetailComponent,
 ];
 
 @UntilDestroy({ checkProperties: true })
@@ -82,6 +105,14 @@ export abstract class DfManageTableComponent<T>
   allowFilter = true;
   currentFilter = new FormControl('');
   schema = false;
+  /** Failed fetches render distinctly from "no data" (error panel + Retry). */
+  tableState: TableState = 'loaded';
+  tableError: AppError | null = null;
+  protected currentPageSize = 10;
+  private lastFetch: {
+    service: DfBaseCrudService;
+    options: Partial<RequestOptions>;
+  } | null = null;
 
   abstract columns: Array<Column<T>>;
 
@@ -129,6 +160,15 @@ export abstract class DfManageTableComponent<T>
     if (!this.tableData) {
       this.activatedRoute.data.subscribe(({ data }) => {
         this.schema = this.router.url.includes('schema');
+        if (data && data['__error']) {
+          // List resolver failed but completed navigation (emptyListWithError);
+          // render the in-table error state instead of a blank shell.
+          this.tableError = data['__error'];
+          this.tableState = 'error';
+          this.dataSource.data = [];
+          this.tableLength = 0;
+          return;
+        }
         if (data && data.resource) {
           this.dataSource.data = this.mapDataToTable(data.resource);
           this.dataSource.paginator = this.paginator;
@@ -136,20 +176,26 @@ export abstract class DfManageTableComponent<T>
         if (data && data.meta) {
           this.tableLength = data.meta.count;
         }
+        this.tableError = null;
+        this.tableState = this.dataSource.data.length ? 'loaded' : 'empty';
       });
     } else {
       this.allowFilter = false;
       this.dataSource.data = this.mapDataToTable(this.tableData);
+      this.tableState = this.dataSource.data.length ? 'loaded' : 'empty';
     }
     this.currentPageSize$.subscribe(currentPageSize => {
-      this.currentFilter.valueChanges
-        .pipe(debounceTime(1000), distinctUntilChanged())
-        .subscribe(filter => {
-          filter
-            ? this.refreshTable(currentPageSize, 0, this.filterQuery(filter))
-            : this.refreshTable();
-        });
+      this.currentPageSize = currentPageSize;
     });
+    // Single subscription: this used to be nested inside currentPageSize$,
+    // which multiplied fetches (and error states) per page-size emission.
+    this.currentFilter.valueChanges
+      .pipe(debounceTime(1000), distinctUntilChanged())
+      .subscribe(filter => {
+        filter
+          ? this.refreshTable(this.currentPageSize, 0, this.filterQuery(filter))
+          : this.refreshTable();
+      });
 
     this.systemConfigDataService.environment$
       .pipe(
@@ -241,6 +287,58 @@ export abstract class DfManageTableComponent<T>
   ): void;
 
   abstract filterQuery(value: string): string;
+
+  /**
+   * Single fetch path with the loading/loaded/empty/error state machine.
+   * Subclass refreshTable() implementations become one call to this:
+   *   this.fetchTable(this.service, { limit, offset, filter });
+   * In-table state only: no global spinner, no toast (toast-off); a failure
+   * renders the error panel with Retry instead.
+   */
+  protected fetchTable(
+    service: DfBaseCrudService,
+    options: Partial<RequestOptions> = {}
+  ): void {
+    this.lastFetch = { service, options };
+    this.tableState = 'loading';
+    this.tableError = null;
+    service
+      .getAll<GenericListResponse<any>>({
+        showSpinner: false,
+        errorHandling: 'toast-off',
+        ...options,
+      })
+      .pipe(
+        catchError(err => {
+          this.tableError = normalizeError(err);
+          this.tableState = 'error';
+          return EMPTY;
+        })
+      )
+      .subscribe(data => {
+        this.dataSource.data = this.mapDataToTable(data.resource ?? []);
+        this.tableLength = data.meta?.count ?? this.dataSource.data.length;
+        this.tableState = this.dataSource.data.length ? 'loaded' : 'empty';
+      });
+  }
+
+  retryLastFetch(): void {
+    if (this.lastFetch) {
+      this.fetchTable(this.lastFetch.service, this.lastFetch.options);
+      return;
+    }
+    // ponytail: subclasses not yet migrated onto fetchTable() refresh without
+    // reporting state back; clear the panel optimistically so a successful
+    // retry doesn't leave a stale error. The sweep migrates every subclass
+    // refreshTable onto fetchTable, then this fallback tightens up.
+    this.tableError = null;
+    this.tableState = 'loaded';
+    this.refreshTable();
+  }
+
+  clearFilter(): void {
+    this.currentFilter.setValue('');
+  }
 
   confirmDelete(row: T): void {
     const dialogRef = this.dialog.open(DfConfirmDialogComponent, {

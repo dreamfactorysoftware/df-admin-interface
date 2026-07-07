@@ -16,7 +16,6 @@ import { DfLicenseCheckService } from './shared/services/df-license-check.servic
 import { UntilDestroy, untilDestroyed } from '@ngneat/until-destroy';
 import { AuthService } from './shared/services/auth.service';
 import { LoggingService } from './shared/services/logging.service';
-import { ErrorSharingService } from './shared/services/error-sharing.service';
 import { LoginResponse } from './shared/types/auth.types';
 import { ROUTES } from './shared/types/routes';
 import { IntercomService } from './shared/services/intercom.service';
@@ -49,7 +48,6 @@ export class AppComponent implements OnInit {
     private router: Router,
     private route: ActivatedRoute,
     private loggingService: LoggingService,
-    private errorSharingService: ErrorSharingService,
     private intercomService: IntercomService,
     private dfUserDataService: DfUserDataService
   ) {}
@@ -124,9 +122,12 @@ export class AppComponent implements OnInit {
     if (error) {
       this.loggingService.log(`OAuth error found: ${error}`);
 
-      // Set error in sharing service and navigate to auth/login
-      this.errorSharingService.setError(error);
-      this.router.navigate(['/auth/login']);
+      // Carry the error in the navigation itself. A shared error bus would
+      // race the NavigationStart clearing in DfErrorService: this navigation
+      // starts before DfLoginComponent subscribes, wiping the error.
+      this.router.navigate(['/auth/login'], {
+        state: { loginError: error },
+      });
       return;
     } else if (jwt) {
       this.loggingService.log(`JWT found in URL: ${jwt.substring(0, 20)}...`);

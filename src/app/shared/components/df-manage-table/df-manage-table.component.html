@@ -34,7 +34,21 @@
   *ngIf="{
     currentPageSize: currentPageSize$ | async,
   } as data">
-  <div class="table-container">
+  <mat-progress-bar
+    *ngIf="tableState === 'loading'"
+    class="table-loading-bar"
+    mode="indeterminate"></mat-progress-bar>
+  <div class="table-error-panel" *ngIf="tableState === 'error' && tableError">
+    <div class="table-error-headline">
+      <fa-icon [icon]="faTriangleExclamation" size="lg"></fa-icon>
+      <span>{{ tableError.message | transloco }}</span>
+      <button mat-stroked-button type="button" (click)="retryLastFetch()">
+        {{ 'retry' | transloco }}
+      </button>
+    </div>
+    <df-error-detail [error]="tableError"></df-error-detail>
+  </div>
+  <div class="table-container" [class.table-stale]="tableState === 'loading'">
     <table
       mat-table
       [dataSource]="dataSource"
@@ -187,7 +201,27 @@
 
       <tr class="mat-row no-data-row" *matNoDataRow>
         <td class="mat-cell" [attr.colspan]="columns.length">
-          {{ 'noEnteries' | transloco }}
+          <ng-container
+            *ngIf="tableState !== 'loading' && tableState !== 'error'">
+            <ng-container *ngIf="currentFilter.value; else noFilterActive">
+              {{ 'noFilterResults' | transloco }}
+              <button
+                mat-button
+                color="primary"
+                type="button"
+                (click)="clearFilter()">
+                {{ 'clearFilter' | transloco }}
+              </button>
+            </ng-container>
+            <ng-template #noFilterActive>
+              {{
+                (allowCreate && tableLength === 0
+                  ? 'noEntriesCreate'
+                  : 'noEntries'
+                ) | transloco
+              }}
+            </ng-template>
+          </ng-container>
         </td>
       </tr>
     </table>

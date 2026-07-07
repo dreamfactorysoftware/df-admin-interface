@@ -16,24 +16,45 @@ import {
   faXmarkCircle,
 } from '@fortawesome/free-solid-svg-icons';
 import { TranslocoPipe } from '@ngneat/transloco';
+import { NgIf } from '@angular/common';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { AppError } from '../../utilities/app-error';
+import { DfErrorDetailDialogComponent } from '../df-error-detail/df-error-detail-dialog.component';
 
 @Component({
   selector: 'df-snackbar',
   templateUrl: './df-snackbar.component.html',
   styleUrls: ['../df-alert/df-alert.component.scss'],
   standalone: true,
-  imports: [MatButtonModule, FontAwesomeModule, TranslocoPipe],
+  imports: [
+    MatButtonModule,
+    FontAwesomeModule,
+    TranslocoPipe,
+    NgIf,
+    MatDialogModule,
+  ],
 })
 export class DfSnackbarComponent {
   faXmark = faXmark;
   message: string;
   alertType: AlertType = 'success';
+  error: AppError | null = null;
   constructor(
     public snackBarRef: MatSnackBarRef<DfSnackbarComponent>,
+    private dialog: MatDialog,
     @Inject(MAT_SNACK_BAR_DATA) public data: any
   ) {
     this.message = data.message;
     this.alertType = data.alertType;
+    this.error = data.error ?? null;
+  }
+
+  openDetails(): void {
+    this.dialog.open(DfErrorDetailDialogComponent, {
+      data: { error: this.error },
+      maxWidth: '640px',
+    });
+    this.snackBarRef.dismiss();
   }
 
   get icon(): IconProp {

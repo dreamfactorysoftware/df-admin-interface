@@ -37,6 +37,42 @@ $red-palette: mat.define-palette(mat.$red-palette);
 .table-container {
   width: 100%;
   overflow-y: auto;
+
+  // Refetch in flight: keep stale rows visible but dimmed under the
+  // progress bar so the table doesn't flash empty.
+  &.table-stale {
+    opacity: 0.6;
+    pointer-events: none;
+  }
+}
+
+.table-loading-bar {
+  margin-bottom: 2px;
+}
+
+.table-error-panel {
+  margin-bottom: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--df-border);
+  border-left: 3px solid mat.get-color-from-palette($red-palette, 500);
+  border-radius: 4px;
+  background-color: var(--df-surface-2);
+  color: var(--df-text);
+
+  .table-error-headline {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+
+    fa-icon {
+      color: mat.get-color-from-palette($red-palette, 500);
+    }
+
+    span {
+      flex: 1;
+    }
+  }
 }
 
 .clickable {
