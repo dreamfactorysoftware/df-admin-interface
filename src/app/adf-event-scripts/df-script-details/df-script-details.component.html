@@ -1,7 +1,6 @@
 <form
   [formGroup]="scriptForm"
   class="details-section"
-  [class]="(isDarkMode | async) ? 'dark-theme' : ''"
   (ngSubmit)="submit()">
   <ng-container *ngIf="type !== 'edit'; else editing">
     <mat-form-field

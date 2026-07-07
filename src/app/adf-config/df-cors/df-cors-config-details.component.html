@@ -5,8 +5,7 @@
   {{ alertMsg }}
 </df-alert>
 <div
-  class="df-cors-config-container"
-  [class]="(isDarkMode | async) ? 'dark-theme' : ''">
+  class="df-cors-config-container">
   <h4>{{ 'cors.pageSubtitle' | transloco }}</h4>
   <form [formGroup]="corsForm" (ngSubmit)="onSubmit()" class="details-section">
     <mat-form-field

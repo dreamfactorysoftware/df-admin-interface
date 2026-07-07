@@ -6,7 +6,6 @@
 </df-alert>
 <div
   class="email-template-details-container"
-  [class]="(isDarkMode | async) ? 'dark-theme' : ''"
   [class.x-small]="breakpointService.isXSmallScreen | async">
   <form
     [formGroup]="emailTemplateForm"
