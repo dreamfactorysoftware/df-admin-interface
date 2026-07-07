@@ -180,7 +180,7 @@ export class DfUserDetailsComponent extends DfUserDetailsBaseComponent<UserProfi
           this.currentProfile.id,
           data,
           {
-            snackbarSuccess: 'admins.alerts.updateSuccess',
+            snackbarSuccess: 'users.alerts.updateSuccess',
           }
         )
         .pipe(
