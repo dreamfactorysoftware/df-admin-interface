@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { silent } from '../shared/utilities/http-contexts';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -492,9 +493,12 @@ export class DfAgentsComponent implements OnInit {
       .subscribe(r => (this.requests = r.resource ?? []));
     // The real per-action agent audit trail is the df-alerts log (agent
     // actions fire alerts by agent name). /_internal is NOT under /api, so the
-    // caseInterceptor leaves these snake_case. Optional dependency — ignore errors.
+    // caseInterceptor leaves these snake_case. Optional dependency: silent()
+    // by design, the panel just renders empty when df-alerts is absent.
     this.http
-      .get<{ resource: AgentLogRow[] }>('/_internal/alerts/log')
+      .get<{ resource: AgentLogRow[] }>('/_internal/alerts/log', {
+        context: silent(),
+      })
       .subscribe({
         next: r =>
           (this.agentLog = (r.resource ?? []).filter(l =>

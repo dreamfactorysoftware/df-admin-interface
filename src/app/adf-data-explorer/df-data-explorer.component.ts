@@ -25,6 +25,7 @@ import { DfDbSelectorComponent } from './df-db-selector.component';
 import { DfSchemaTreeComponent } from './df-schema-tree.component';
 import { DfDataGridComponent } from './df-data-grid.component';
 import { DfThemeService } from '../shared/services/df-theme.service';
+import { normalizeError } from 'src/app/shared/utilities/app-error';
 
 @Component({
   selector: 'df-data-explorer',
@@ -121,8 +122,7 @@ export class DfDataExplorerComponent
           this.loadingDbs = false;
         },
         error: err => {
-          this.errorDbs =
-            err?.error?.error?.message || 'Failed to load databases';
+          this.errorDbs = normalizeError(err).message;
           this.loadingDbs = false;
         },
       });
@@ -147,8 +147,7 @@ export class DfDataExplorerComponent
           this.loadingSchema = false;
         },
         error: err => {
-          this.errorSchema =
-            err?.error?.error?.message || 'Failed to load schema';
+          this.errorSchema = normalizeError(err).message;
           this.loadingSchema = false;
         },
       });

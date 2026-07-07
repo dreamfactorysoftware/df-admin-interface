@@ -4,7 +4,8 @@ import { inject } from '@angular/core';
 import { GenericListResponse } from 'src/app/shared/types/generic-http';
 import { ActivatedRouteSnapshot, ResolveFn } from '@angular/router';
 import { DfPaywallService } from 'src/app/shared/services/df-paywall.service';
-import { of, switchMap } from 'rxjs';
+import { catchError, of, switchMap } from 'rxjs';
+import { emptyListWithError } from 'src/app/shared/utilities/app-error';
 
 export const eventScriptResolver: ResolveFn<ScriptObject | string> = (
   route: ActivatedRouteSnapshot
@@ -24,7 +25,11 @@ export const eventScriptsResolver: ResolveFn<
       if (activated) {
         return of('paywall');
       } else {
-        return eventScriptService.getAll<GenericListResponse<ScriptObject>>();
+        // List branch only: complete navigation on failure so the table
+        // shell renders the error state with Retry.
+        return eventScriptService
+          .getAll<GenericListResponse<ScriptObject>>()
+          .pipe(catchError(err => of(emptyListWithError(err))));
       }
     })
   );

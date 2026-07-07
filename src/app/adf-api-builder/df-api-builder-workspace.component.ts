@@ -19,7 +19,10 @@ import { MatOptionModule } from '@angular/material/core';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { TranslocoService } from '@ngneat/transloco';
 import { BASE_URL } from '../shared/constants/urls';
+import { normalizeError } from '../shared/utilities/app-error';
+import { toastOff } from '../shared/utilities/http-contexts';
 
 interface SvcRow {
   id: number;
@@ -664,6 +667,7 @@ export class DfApiBuilderWorkspaceComponent implements OnChanges {
   @Output() workspaceChanged = new EventEmitter<void>();
 
   private http = inject(HttpClient);
+  private transloco = inject(TranslocoService);
   private snack = inject(MatSnackBar);
 
   allServices: SvcRow[] = [];
@@ -860,10 +864,14 @@ export class DfApiBuilderWorkspaceComponent implements OnChanges {
       return;
     }
     this.http
-      .post(`${BASE_URL}/api_builder/services`, {
-        // camelCase: the case interceptor maps these to api_id/service_id.
-        resource: [{ apiId: this.apiId, serviceId: this.serviceToAdd }],
-      })
+      .post(
+        `${BASE_URL}/api_builder/services`,
+        {
+          // camelCase: the case interceptor maps these to api_id/service_id.
+          resource: [{ apiId: this.apiId, serviceId: this.serviceToAdd }],
+        },
+        { context: toastOff() }
+      )
       .subscribe({
         next: () => {
           this.serviceToAdd = null;
@@ -875,13 +883,17 @@ export class DfApiBuilderWorkspaceComponent implements OnChanges {
   }
 
   removeService(link: WorkspaceLink): void {
-    this.http.delete(`${BASE_URL}/api_builder/services/${link.id}`).subscribe({
-      next: () => {
-        this.loadWorkspace();
-        this.workspaceChanged.emit();
-      },
-      error: e => this.fail(e),
-    });
+    this.http
+      .delete(`${BASE_URL}/api_builder/services/${link.id}`, {
+        context: toastOff(),
+      })
+      .subscribe({
+        next: () => {
+          this.loadWorkspace();
+          this.workspaceChanged.emit();
+        },
+        error: e => this.fail(e),
+      });
   }
 
   sourceChanged(side: 'local' | 'ref' | 'junction'): void {
@@ -998,15 +1010,19 @@ export class DfApiBuilderWorkspaceComponent implements OnChanges {
       payload['junctionField'] = r.junction_field;
       payload['junctionRefField'] = r.junction_ref_field;
     }
-    this.http.post(`${BASE_URL}/api_builder/relationships`, payload).subscribe({
-      next: () => {
-        this.rel = this.emptyRel();
-        this.relationshipEditorOpen = false;
-        this.loadRelationships();
-        this.snack.open('Relationship created.', 'OK', { duration: 2500 });
-      },
-      error: e => this.fail(e),
-    });
+    this.http
+      .post(`${BASE_URL}/api_builder/relationships`, payload, {
+        context: toastOff(),
+      })
+      .subscribe({
+        next: () => {
+          this.rel = this.emptyRel();
+          this.relationshipEditorOpen = false;
+          this.loadRelationships();
+          this.snack.open('Relationship created.', 'OK', { duration: 2500 });
+        },
+        error: e => this.fail(e),
+      });
   }
 
   removeRelationship(r: RelRow): void {
@@ -1019,15 +1035,23 @@ export class DfApiBuilderWorkspaceComponent implements OnChanges {
       return;
     }
     this.http
-      .delete(`${BASE_URL}/api_builder/relationships/${r.id}`)
+      .delete(`${BASE_URL}/api_builder/relationships/${r.id}`, {
+        context: toastOff(),
+      })
       .subscribe({
         next: () => this.loadRelationships(),
         error: e => this.fail(e),
       });
   }
 
-  private fail(e: any): void {
-    const msg = e?.error?.error?.message ?? e?.message ?? 'Request failed.';
-    this.snack.open(msg, 'Dismiss', { duration: 5000 });
+  // Requests that route here are marked toast-off: this snack is the single
+  // error surface, the interceptor must not stack a second toast on it.
+  // AppError.message may be a translation key, so translate before display.
+  private fail(e: unknown): void {
+    this.snack.open(
+      this.transloco.translate(normalizeError(e).message),
+      'Dismiss',
+      { duration: 5000 }
+    );
   }
 }

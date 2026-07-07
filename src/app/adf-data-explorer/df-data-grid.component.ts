@@ -48,6 +48,7 @@ import {
 } from './services/data-explorer.service';
 import { DfSchemaInfoComponent } from './df-schema-info.component';
 import { DfRowDetailComponent } from './df-row-detail.component';
+import { normalizeError } from 'src/app/shared/utilities/app-error';
 
 interface FilterOp {
   value: string;
@@ -360,7 +361,7 @@ interface ColumnFilter {
         <!-- Error -->
         <div class="error-state" *ngIf="error && !initialLoading">
           <mat-icon color="warn">error_outline</mat-icon>
-          <span>{{ error }}</span>
+          <span>{{ error | transloco }}</span>
           <button mat-stroked-button color="primary" (click)="loadData()">
             {{ t('dataExplorer.retry') }}
           </button>
@@ -1516,6 +1517,8 @@ export class DfDataGridComponent
           this.dataSource.data = [...this.dataSource.data];
           this.cdr.detectChanges();
         },
+        // Silent by design: schema enrichment (FK/PK indicators, typed
+        // filters) degrades gracefully; the grid still renders raw rows.
         error: () => {},
       });
   }
@@ -1557,8 +1560,7 @@ export class DfDataGridComponent
           this.initialLoading = false;
         },
         error: err => {
-          this.error =
-            err?.error?.error?.message || 'Failed to load table data';
+          this.error = normalizeError(err).message;
           this.loading = false;
           this.initialLoading = false;
         },

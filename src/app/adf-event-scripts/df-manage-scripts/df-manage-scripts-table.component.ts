@@ -11,7 +11,6 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { TranslocoService } from '@ngneat/transloco';
 import { MatDialog } from '@angular/material/dialog';
-import { GenericListResponse } from 'src/app/shared/types/generic-http';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { Actions } from 'src/app/shared/types/table';
 
@@ -82,12 +81,7 @@ export class DfManageScriptsTableComponent extends DfManageTableComponent<Script
     offset?: number,
     filter?: string
   ): void {
-    this.eventScriptService
-      .getAll<GenericListResponse<ScriptObject>>({ limit, offset, filter })
-      .subscribe(data => {
-        this.dataSource.data = this.mapDataToTable(data.resource);
-        this.tableLength = data.meta.count;
-      });
+    this.fetchTable(this.eventScriptService, { limit, offset, filter });
   }
 
   override deleteRow(row: ScriptObject): void {
