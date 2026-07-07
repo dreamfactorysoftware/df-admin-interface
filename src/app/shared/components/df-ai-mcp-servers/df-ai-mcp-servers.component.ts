@@ -72,34 +72,16 @@ interface McpServerRow {
   `,
   styles: [
     `
-      /* Theme tokens: light defaults; dark values apply when the host form adds
-         .dark-theme to an ancestor (df-service-details does). Dark values match
-         the original hardcoded whites, so dark mode is unchanged. */
-      :host {
-        --p-surface: rgba(0, 0, 0, 0.02);
-        --p-border: rgba(0, 0, 0, 0.12);
-        --p-chip-bg: rgba(0, 0, 0, 0.04);
-        --p-chip-border: rgba(0, 0, 0, 0.14);
-        --p-text-muted: rgba(0, 0, 0, 0.6);
-        --p-text-hint: rgba(0, 0, 0, 0.72);
-      }
-      :host-context(.dark-theme) {
-        --p-surface: rgba(255, 255, 255, 0.02);
-        --p-border: rgba(255, 255, 255, 0.08);
-        --p-chip-bg: rgba(255, 255, 255, 0.04);
-        --p-chip-border: rgba(255, 255, 255, 0.1);
-        --p-text-muted: rgba(255, 255, 255, 0.6);
-        --p-text-hint: rgba(255, 255, 255, 0.75);
-      }
-
+      /* Themed via global --df-* tokens (src/styles.scss); dark values come
+         from the .dark-theme class DfThemeService stamps on <body>. */
       .mcp-servers {
         display: flex;
         flex-direction: column;
         gap: 1rem;
         padding: 1.5rem 1.75rem;
         margin: 1rem 0;
-        background: var(--p-surface);
-        border: 1px solid var(--p-border);
+        background: var(--df-surface-2);
+        border: 1px solid var(--df-border-2);
         border-radius: 8px;
         font-size: 16px;
 
@@ -122,7 +104,7 @@ interface McpServerRow {
 
         &__count {
           font-size: 15px;
-          color: var(--p-text-muted);
+          color: var(--df-text-muted);
         }
 
         &__action {
@@ -138,13 +120,13 @@ interface McpServerRow {
         &__hint {
           margin: 0;
           font-size: 15px;
-          color: var(--p-text-hint);
+          color: var(--df-text-2);
           line-height: 1.55;
         }
 
         &__loading,
         &__empty {
-          color: var(--p-text-muted);
+          color: var(--df-text-muted);
           font-style: italic;
           font-size: 15px;
         }
@@ -169,8 +151,8 @@ interface McpServerRow {
           align-items: center;
           gap: 0.5rem;
           padding: 0.55rem 1.05rem;
-          background: var(--p-chip-bg);
-          border: 1px solid var(--p-chip-border);
+          background: var(--df-hover);
+          border: 1px solid var(--df-border);
           border-radius: 999px;
           font: inherit;
           font-size: 16px;
@@ -188,7 +170,7 @@ interface McpServerRow {
           &--selected {
             border-color: #2dd4bf;
             background: rgba(45, 212, 191, 0.18);
-            color: #fff;
+            color: var(--df-text);
           }
         }
 

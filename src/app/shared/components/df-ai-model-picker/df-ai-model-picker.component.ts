@@ -139,25 +139,16 @@ interface NormalizedModel {
   `,
   styles: [
     `
-      /* Theme-flip tokens: dark text/surfaces by default (light mode);
-         the dark-theme class restores the original light-on-dark look. */
-      :host-context(.dark-theme) {
-        --df-ai-fg: rgba(255, 255, 255, 0.85);
-        --df-ai-fg-muted: rgba(255, 255, 255, 0.7);
-        --df-ai-fg-faint: rgba(255, 255, 255, 0.55);
-        --df-ai-surface: rgba(255, 255, 255, 0.02);
-        --df-ai-surface-strong: rgba(255, 255, 255, 0.08);
-        --df-ai-border: rgba(255, 255, 255, 0.08);
-      }
-
+      /* Themed via global --df-* tokens (src/styles.scss); dark values come
+         from the .dark-theme class DfThemeService stamps on <body>. */
       .model-picker {
         display: flex;
         flex-direction: column;
         gap: 0.875rem;
         padding: 1.25rem 1.5rem;
         margin: 1rem 0;
-        background: var(--df-ai-surface, rgba(0, 0, 0, 0.03));
-        border: 1px solid var(--df-ai-border, rgba(0, 0, 0, 0.12));
+        background: var(--df-surface-2);
+        border: 1px solid var(--df-border-2);
         border-radius: 8px;
         font-size: 16px;
 
@@ -197,14 +188,14 @@ interface NormalizedModel {
         }
         &__option-meta {
           font-size: 14px;
-          color: var(--df-ai-fg-faint, rgba(0, 0, 0, 0.55));
+          color: var(--df-text-muted);
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
         }
 
         &__hint {
           margin: 0;
           font-size: 15px;
-          color: var(--df-ai-fg-muted, rgba(0, 0, 0, 0.6));
+          color: var(--df-text-2);
           font-style: italic;
           line-height: 1.5;
         }
@@ -222,7 +213,7 @@ interface NormalizedModel {
         &__current {
           margin: 0;
           font-size: 15px;
-          color: var(--df-ai-fg, rgba(0, 0, 0, 0.85));
+          color: var(--df-text);
           display: flex;
           align-items: center;
           gap: 0.5rem;
@@ -230,7 +221,7 @@ interface NormalizedModel {
           code {
             font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
             font-size: 14px;
-            background: var(--df-ai-surface-strong, rgba(0, 0, 0, 0.06));
+            background: var(--df-surface-2);
             padding: 0.2rem 0.5rem;
             border-radius: 3px;
           }
