@@ -66,13 +66,8 @@ interface TestConnectionResponse {
   `,
   styles: [
     `
-      /* Theme-flip tokens: text defaults to dark (light mode); the
-         dark-theme class restores the original light text. */
-      :host-context(.dark-theme) {
-        --df-ai-fg: rgba(255, 255, 255, 0.9);
-        --df-ai-fg-muted: rgba(255, 255, 255, 0.75);
-      }
-
+      /* Themed via global --df-* tokens (src/styles.scss); dark values come
+         from the .dark-theme class DfThemeService stamps on <body>. */
       .test-conn {
         display: flex;
         flex-direction: column;
@@ -112,7 +107,7 @@ interface TestConnectionResponse {
 
         &__detail {
           flex: 1;
-          color: var(--df-ai-fg, rgba(0, 0, 0, 0.87));
+          color: var(--df-text);
           display: flex;
           flex-direction: column;
           gap: 0.35rem;
@@ -124,7 +119,7 @@ interface TestConnectionResponse {
 
           p {
             margin: 0;
-            color: var(--df-ai-fg-muted, rgba(0, 0, 0, 0.7));
+            color: var(--df-text-2);
             font-size: 15px;
           }
         }
