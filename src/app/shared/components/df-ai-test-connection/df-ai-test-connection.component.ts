@@ -57,7 +57,7 @@ interface TestConnectionResponse {
           <p *ngIf="result.success && modelCount > 0" class="test-conn__models">
             {{ modelCount }} models available
             <span *ngIf="firstModelLabel"
-              >— including {{ firstModelLabel }}</span
+              >, including {{ firstModelLabel }}</span
             >
           </p>
         </div>
@@ -66,6 +66,17 @@ interface TestConnectionResponse {
   `,
   styles: [
     `
+      /* Theme tokens: light defaults; dark values apply under the host form's
+         .dark-theme and match the original whites, so dark mode is unchanged. */
+      :host {
+        --p-text-strong: rgba(0, 0, 0, 0.87);
+        --p-text-hint: rgba(0, 0, 0, 0.72);
+      }
+      :host-context(.dark-theme) {
+        --p-text-strong: rgba(255, 255, 255, 0.9);
+        --p-text-hint: rgba(255, 255, 255, 0.75);
+      }
+
       .test-conn {
         display: flex;
         flex-direction: column;
@@ -105,7 +116,7 @@ interface TestConnectionResponse {
 
         &__detail {
           flex: 1;
-          color: rgba(255, 255, 255, 0.9);
+          color: var(--p-text-strong);
           display: flex;
           flex-direction: column;
           gap: 0.35rem;
@@ -117,7 +128,7 @@ interface TestConnectionResponse {
 
           p {
             margin: 0;
-            color: rgba(255, 255, 255, 0.75);
+            color: var(--p-text-hint);
             font-size: 15px;
           }
         }

@@ -139,14 +139,33 @@ interface NormalizedModel {
   `,
   styles: [
     `
+      /* Theme tokens: light defaults; dark values apply under the host form's
+         .dark-theme and match the original whites, so dark mode is unchanged. */
+      :host {
+        --p-surface: rgba(0, 0, 0, 0.02);
+        --p-border: rgba(0, 0, 0, 0.12);
+        --p-code-bg: rgba(0, 0, 0, 0.06);
+        --p-text-muted: rgba(0, 0, 0, 0.6);
+        --p-text-hint: rgba(0, 0, 0, 0.72);
+        --p-text-strong: rgba(0, 0, 0, 0.87);
+      }
+      :host-context(.dark-theme) {
+        --p-surface: rgba(255, 255, 255, 0.02);
+        --p-border: rgba(255, 255, 255, 0.08);
+        --p-code-bg: rgba(255, 255, 255, 0.08);
+        --p-text-muted: rgba(255, 255, 255, 0.6);
+        --p-text-hint: rgba(255, 255, 255, 0.75);
+        --p-text-strong: rgba(255, 255, 255, 0.9);
+      }
+
       .model-picker {
         display: flex;
         flex-direction: column;
         gap: 0.875rem;
         padding: 1.25rem 1.5rem;
         margin: 1rem 0;
-        background: rgba(255, 255, 255, 0.02);
-        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: var(--p-surface);
+        border: 1px solid var(--p-border);
         border-radius: 8px;
         font-size: 16px;
 
@@ -186,14 +205,14 @@ interface NormalizedModel {
         }
         &__option-meta {
           font-size: 14px;
-          color: rgba(255, 255, 255, 0.55);
+          color: var(--p-text-muted);
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
         }
 
         &__hint {
           margin: 0;
           font-size: 15px;
-          color: rgba(255, 255, 255, 0.7);
+          color: var(--p-text-hint);
           font-style: italic;
           line-height: 1.5;
         }
@@ -211,7 +230,7 @@ interface NormalizedModel {
         &__current {
           margin: 0;
           font-size: 15px;
-          color: rgba(255, 255, 255, 0.85);
+          color: var(--p-text-strong);
           display: flex;
           align-items: center;
           gap: 0.5rem;
@@ -219,7 +238,7 @@ interface NormalizedModel {
           code {
             font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
             font-size: 14px;
-            background: rgba(255, 255, 255, 0.08);
+            background: var(--p-code-bg);
             padding: 0.2rem 0.5rem;
             border-radius: 3px;
           }

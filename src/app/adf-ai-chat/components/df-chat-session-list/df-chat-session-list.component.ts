@@ -63,8 +63,8 @@ import { ChatSession } from '../../types/chat';
         display: flex;
         flex-direction: column;
         height: 100%;
-        background: rgba(255, 255, 255, 0.02);
-        border-right: 1px solid rgba(255, 255, 255, 0.08);
+        background: var(--chat-surface);
+        border-right: 1px solid var(--chat-border-2);
         overflow: hidden;
 
         &__new {
@@ -77,7 +77,7 @@ import { ChatSession } from '../../types/chat';
 
         &__empty {
           padding: 1rem 1rem 0;
-          color: rgba(255, 255, 255, 0.5);
+          color: var(--chat-text-muted);
           font-style: italic;
           font-size: 14px;
         }
@@ -93,7 +93,7 @@ import { ChatSession } from '../../types/chat';
         &__item {
           display: flex;
           align-items: stretch;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+          border-bottom: 1px solid var(--chat-border-2);
 
           &--active {
             background: rgba(96, 165, 250, 0.08);
@@ -101,7 +101,7 @@ import { ChatSession } from '../../types/chat';
           }
 
           &:hover:not(.session-list__item--active) {
-            background: rgba(255, 255, 255, 0.04);
+            background: var(--chat-hover);
           }
         }
 
@@ -130,13 +130,13 @@ import { ChatSession } from '../../types/chat';
 
         &__meta {
           font-size: 12px;
-          color: rgba(255, 255, 255, 0.5);
+          color: var(--chat-text-muted);
         }
 
         &__delete {
           background: none;
           border: none;
-          color: rgba(255, 255, 255, 0.3);
+          color: var(--chat-text-faint);
           cursor: pointer;
           padding: 0.5rem 0.875rem;
           font-size: 14px;

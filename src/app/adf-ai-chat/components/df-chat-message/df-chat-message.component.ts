@@ -2,7 +2,7 @@ import { Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faRobot, faUser } from '@fortawesome/free-solid-svg-icons';
-import { ChatMessage } from '../../types/chat';
+import { ChatMessage, ToolCall } from '../../types/chat';
 import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-result.component';
 
 @Component({
@@ -40,10 +40,15 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
           <p *ngIf="!message.content" class="msg__empty">(no text response)</p>
           <div *ngIf="hasToolCalls" class="msg__tool-calls">
             <div *ngFor="let tc of message.tool_calls" class="msg__tool-call">
-              <span class="msg__tool-call-name">{{ tc.name }}</span>
-              <span *ngIf="tc.service" class="msg__tool-call-service">{{
-                tc.service
-              }}</span>
+              <div class="msg__tool-call-head">
+                <span class="msg__tool-call-name">{{ tc.name }}</span>
+                <span *ngIf="tc.service" class="msg__tool-call-service">{{
+                  tc.service
+                }}</span>
+              </div>
+              <pre
+                *ngIf="argsText(tc)"
+                class="msg__tool-call-args">{{ argsText(tc) }}</pre>
             </div>
           </div>
           <div *ngIf="hasUsage" class="msg__usage">
@@ -90,8 +95,8 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
           align-items: flex-start;
 
           .msg__bubble {
-            background: rgba(255, 255, 255, 0.06);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: var(--chat-surface-2);
+            border: 1px solid var(--chat-border);
             border-bottom-left-radius: 4px;
           }
         }
@@ -100,8 +105,8 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
           justify-content: center;
 
           .msg__bubble {
-            background: rgba(255, 255, 255, 0.04);
-            color: rgba(255, 255, 255, 0.6);
+            background: var(--chat-hover);
+            color: var(--chat-text-muted);
             font-style: italic;
             font-size: 14px;
           }
@@ -138,7 +143,7 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
         }
 
         &__empty {
-          color: rgba(255, 255, 255, 0.4);
+          color: var(--chat-text-faint);
           font-style: italic;
           font-size: 14px;
         }
@@ -146,7 +151,7 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
         &__code {
           margin: 0.5rem 0;
           padding: 0.75rem 0.875rem;
-          background: rgba(0, 0, 0, 0.35);
+          background: var(--chat-code-bg);
           border: 1px solid rgba(255, 255, 255, 0.08);
           border-radius: 6px;
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
@@ -169,12 +174,18 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
           gap: 0.25rem;
           margin-top: 0.5rem;
           padding-top: 0.5rem;
-          border-top: 1px dashed rgba(255, 255, 255, 0.1);
+          border-top: 1px dashed var(--chat-border);
           font-size: 13px;
-          color: rgba(255, 255, 255, 0.7);
+          color: var(--chat-text-2);
         }
 
         &__tool-call {
+          display: flex;
+          flex-direction: column;
+          gap: 0.25rem;
+        }
+
+        &__tool-call-head {
           display: flex;
           gap: 0.5rem;
           align-items: center;
@@ -185,10 +196,25 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
           font-size: 13px;
         }
 
+        &__tool-call-args {
+          margin: 0;
+          padding: 0.5rem 0.625rem;
+          background: var(--chat-code-bg);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 6px;
+          font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+          font-size: 12px;
+          line-height: 1.45;
+          white-space: pre-wrap;
+          word-break: break-word;
+          color: rgba(255, 255, 255, 0.8);
+          overflow: auto;
+        }
+
         &__tool-call-service {
           padding: 0.1rem 0.4rem;
           border-radius: 999px;
-          background: rgba(255, 255, 255, 0.08);
+          background: var(--chat-surface-2);
           font-size: 11px;
         }
 
@@ -197,9 +223,9 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
           gap: 0.75rem;
           margin-top: 0.5rem;
           padding-top: 0.5rem;
-          border-top: 1px dashed rgba(255, 255, 255, 0.08);
+          border-top: 1px dashed var(--chat-border-2);
           font-size: 11px;
-          color: rgba(255, 255, 255, 0.45);
+          color: var(--chat-text-faint);
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
         }
       }
@@ -214,6 +240,29 @@ export class DfChatMessageComponent {
 
   get hasToolCalls(): boolean {
     return !!(this.message.tool_calls && this.message.tool_calls.length);
+  }
+
+  /** Pretty-print a tool call's arguments; empty string when there are none. */
+  argsText(tc: ToolCall): string {
+    const a = tc.arguments;
+    if (a == null) {
+      return '';
+    }
+    if (typeof a === 'string') {
+      const t = a.trim();
+      if (!t || t === '{}') {
+        return '';
+      }
+      try {
+        return JSON.stringify(JSON.parse(t), null, 2);
+      } catch {
+        return t;
+      }
+    }
+    if (!Object.keys(a).length) {
+      return '';
+    }
+    return JSON.stringify(a, null, 2);
   }
 
   get hasUsage(): boolean {

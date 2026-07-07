@@ -45,9 +45,9 @@ import { ChatMessage } from '../../types/chat';
   styles: [
     `
       .tool-card {
-        border: 1px solid rgba(255, 255, 255, 0.12);
+        border: 1px solid var(--chat-border);
         border-radius: 8px;
-        background: rgba(255, 255, 255, 0.02);
+        background: var(--chat-surface);
         overflow: hidden;
         font-size: 14px;
 
@@ -70,13 +70,13 @@ import { ChatMessage } from '../../types/chat';
           font-size: inherit;
 
           &:hover {
-            background: rgba(255, 255, 255, 0.04);
+            background: var(--chat-hover);
           }
         }
 
         &__chevron {
           width: 0.75rem;
-          color: rgba(255, 255, 255, 0.5);
+          color: var(--chat-text-muted);
         }
 
         &__icon {
@@ -106,13 +106,13 @@ import { ChatMessage } from '../../types/chat';
         &__latency {
           margin-left: auto;
           font-size: 12px;
-          color: rgba(255, 255, 255, 0.5);
+          color: var(--chat-text-muted);
         }
 
         &__body {
           border-top: 1px solid rgba(255, 255, 255, 0.08);
           padding: 0.75rem 1rem;
-          background: rgba(0, 0, 0, 0.25);
+          background: var(--chat-code-bg);
         }
 
         &__content {

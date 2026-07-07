@@ -12,6 +12,10 @@ const filteredFromNav = [
   ROUTES.VIEW,
   ROUTES.ERROR,
   ROUTES.LICENSE_EXPIRED,
+  // Hidden from the left menu for the demo (routes still resolve via deep link).
+  ROUTES.API_BUILDER,
+  ROUTES.ALERTS,
+  ROUTES.AGENTS,
 ];
 
 const navIcons = [

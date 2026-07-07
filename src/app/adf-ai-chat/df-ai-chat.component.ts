@@ -16,8 +16,12 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faDatabase } from '@fortawesome/free-solid-svg-icons';
+import { HttpClient } from '@angular/common/http';
 import { Subscription, finalize } from 'rxjs';
 import { AiChatService } from './services/ai-chat.service';
+import { DfUserDataService } from 'src/app/shared/services/df-user-data.service';
+import { DfThemeService } from 'src/app/shared/services/df-theme.service';
+import { BASE_URL } from 'src/app/shared/constants/urls';
 import { ChatMessage, ChatService, ChatSession } from './types/chat';
 import { DfChatInputComponent } from './components/df-chat-input/df-chat-input.component';
 import { DfChatMessageComponent } from './components/df-chat-message/df-chat-message.component';
@@ -47,6 +51,12 @@ export class DfAiChatComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private cdr = inject(ChangeDetectorRef);
+  private http = inject(HttpClient);
+  private userDataService = inject(DfUserDataService);
+
+  // Chat view is its own route with no `.dark-theme` ancestor, so it drives
+  // the theme class on its own root. Children read the color vars it sets.
+  darkMode$ = inject(DfThemeService).darkMode$;
 
   @ViewChild('messageScroll') messageScroll?: ElementRef<HTMLDivElement>;
 
@@ -63,6 +73,14 @@ export class DfAiChatComponent implements OnInit, OnDestroy {
 
   errorMessage: string | null = null;
 
+  // "Act as role": admins only. Lets an admin start a conversation scoped to a
+  // specific role and see exactly what that role sees. End users always run
+  // under their own login role — they never see this control. Blank = the
+  // admin's own (unrestricted) access.
+  isSysAdmin = false;
+  actAsRoles: { id: number; name: string }[] = [];
+  selectedActAsRoleId: number | null = null;
+
   faDatabase = faDatabase;
 
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
@@ -72,6 +90,28 @@ export class DfAiChatComponent implements OnInit, OnDestroy {
   private autoScrollPinned = true;
 
   ngOnInit(): void {
+    // Only sys admins get the "Act as role" control; for them, load the roles
+    // they can impersonate. End users are always scoped to their own login
+    // role by the backend and never see this.
+    this.subs.push(
+      this.userDataService.userData$.subscribe(userData => {
+        this.isSysAdmin = userData?.isSysAdmin === true;
+        if (this.isSysAdmin && this.actAsRoles.length === 0) {
+          this.http
+            .get<{ resource: { id: number; name: string }[] }>(
+              `${BASE_URL}/system/role`,
+              { params: { fields: 'id,name', sort: 'name' } }
+            )
+            .subscribe({
+              next: res => (this.actAsRoles = res.resource ?? []),
+              error: () => {
+                /* non-fatal: no act-as options */
+              },
+            });
+        }
+      })
+    );
+
     this.api.listChatServices().subscribe({
       next: res => {
         this.chatServices = (res.resource ?? []).filter(
@@ -145,7 +185,13 @@ export class DfAiChatComponent implements OnInit, OnDestroy {
       return;
     }
     this.errorMessage = null;
-    this.api.createSession(this.selectedServiceName, {}).subscribe({
+    // Admins may start the conversation "as" a role (down-scoping only). End
+    // users send nothing here — the backend binds them to their own role.
+    const payload =
+      this.isSysAdmin && this.selectedActAsRoleId != null
+        ? { ai_role_id: this.selectedActAsRoleId }
+        : {};
+    this.api.createSession(this.selectedServiceName, payload).subscribe({
       next: session => {
         // Empty session has no messages; show it immediately.
         this.activeSession = { ...session, messages: [] };
@@ -274,6 +320,12 @@ export class DfAiChatComponent implements OnInit, OnDestroy {
           return;
         }
         this.activeSession = session;
+        // Keep the sidebar entry in sync so its stats (tool-call count,
+        // token totals, title) reflect the just-completed turn — otherwise
+        // it keeps its creation-time zeros.
+        this.sessions = this.sessions.map(s =>
+          s.id === sessionId ? { ...s, ...session } : s
+        );
         this.scrollToBottom();
       },
       error: () => {

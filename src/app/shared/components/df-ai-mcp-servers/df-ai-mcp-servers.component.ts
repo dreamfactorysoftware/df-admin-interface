@@ -6,90 +6,75 @@ import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import {
-  faCheck,
   faCircleCheck,
   faPlus,
-  faShieldHalved,
-  faTriangleExclamation,
+  faPlug,
 } from '@fortawesome/free-solid-svg-icons';
 import { BASE_URL } from 'src/app/shared/constants/urls';
 
-interface RoleRow {
+interface McpServerRow {
   id: number;
   name: string;
-  description?: string;
+  label?: string;
 }
 
 @Component({
-  selector: 'df-ai-allowed-roles',
+  selector: 'df-ai-mcp-servers',
   standalone: true,
   imports: [CommonModule, RouterLink, MatButtonModule, FontAwesomeModule],
   template: `
-    <div class="allowed-roles">
-      <div class="allowed-roles__header">
-        <fa-icon [icon]="faShieldHalved" class="allowed-roles__icon"></fa-icon>
-        <span class="allowed-roles__title">Allowed Roles</span>
-        <span class="allowed-roles__count">
-          {{ selected.length }} selected · {{ roles.length }} available
+    <div class="mcp-servers">
+      <div class="mcp-servers__header">
+        <fa-icon [icon]="faPlug" class="mcp-servers__icon"></fa-icon>
+        <span class="mcp-servers__title">MCP Servers</span>
+        <span class="mcp-servers__count">
+          {{ selected.length }} selected · {{ servers.length }} available
         </span>
         <a
           mat-stroked-button
-          [routerLink]="['/api-connections/role-based-access/create']"
-          class="allowed-roles__action">
+          [routerLink]="['/api-connections/api-types/database']"
+          class="mcp-servers__action">
           <fa-icon [icon]="faPlus"></fa-icon>
-          <span>Create new role</span>
+          <span>Create MCP service</span>
         </a>
       </div>
 
-      <p class="allowed-roles__hint">
-        Pick the DreamFactory roles that may use this AI Connection. Each role's
-        data scope determines what the AI can read while operating under that
-        role. At least one role is required before chat sessions can run.
+      <p class="mcp-servers__hint">
+        Pick the MCP servers this chat may call as tools. The AI sees the
+        intersection of these and what the caller's role can access, so a
+        conversation can never reach a server the person talking to it can't.
+        Leave all unselected to allow every MCP server the role grants.
       </p>
 
-      <div
-        *ngIf="selected.length === 0 && !loading"
-        class="allowed-roles__warn">
-        <fa-icon [icon]="faTriangleExclamation"></fa-icon>
-        <span>
-          No roles selected. Chat sessions will refuse to start until at least
-          one role is allowed.
-        </span>
-      </div>
+      <div *ngIf="loading" class="mcp-servers__loading">Loading MCP servers…</div>
 
-      <div *ngIf="loading" class="allowed-roles__loading">Loading roles…</div>
-
-      <ul *ngIf="!loading && roles.length > 0" class="allowed-roles__list">
-        <li *ngFor="let r of roles">
+      <ul *ngIf="!loading && servers.length > 0" class="mcp-servers__list">
+        <li *ngFor="let s of servers">
           <button
             type="button"
-            class="allowed-roles__chip"
-            [class.allowed-roles__chip--selected]="isSelected(r.id)"
-            (click)="toggle(r.id)">
+            class="mcp-servers__chip"
+            [class.mcp-servers__chip--selected]="isSelected(s.name)"
+            (click)="toggle(s.name)">
             <fa-icon
-              *ngIf="isSelected(r.id)"
+              *ngIf="isSelected(s.name)"
               [icon]="faCircleCheck"
-              class="allowed-roles__chip-check"></fa-icon>
-            <span class="allowed-roles__name">{{ r.name }}</span>
+              class="mcp-servers__chip-check"></fa-icon>
+            <span class="mcp-servers__name">{{ s.label || s.name }}</span>
           </button>
-          <a
-            [routerLink]="['/api-connections/role-based-access', r.id, 'scope']"
-            class="allowed-roles__link"
-            >what can this role see?</a
-          >
         </li>
       </ul>
 
-      <p *ngIf="!loading && roles.length === 0" class="allowed-roles__empty">
-        No DreamFactory roles exist yet. Create one and come back.
+      <p *ngIf="!loading && servers.length === 0" class="mcp-servers__empty">
+        No MCP services exist yet. Create one (service type “MCP Server”) and come
+        back.
       </p>
     </div>
   `,
   styles: [
     `
       /* Theme tokens: light defaults; dark values apply when the host form adds
-         .dark-theme (df-service-details does). Dark values match the original
-         hardcoded whites, so dark mode is unchanged. */
+         .dark-theme to an ancestor (df-service-details does). Dark values match
+         the original hardcoded whites, so dark mode is unchanged. */
       :host {
         --p-surface: rgba(0, 0, 0, 0.02);
         --p-border: rgba(0, 0, 0, 0.12);
@@ -97,7 +82,6 @@ interface RoleRow {
         --p-chip-border: rgba(0, 0, 0, 0.14);
         --p-text-muted: rgba(0, 0, 0, 0.6);
         --p-text-hint: rgba(0, 0, 0, 0.72);
-        --p-chip-selected-fg: rgba(0, 0, 0, 0.87);
       }
       :host-context(.dark-theme) {
         --p-surface: rgba(255, 255, 255, 0.02);
@@ -106,10 +90,9 @@ interface RoleRow {
         --p-chip-border: rgba(255, 255, 255, 0.1);
         --p-text-muted: rgba(255, 255, 255, 0.6);
         --p-text-hint: rgba(255, 255, 255, 0.75);
-        --p-chip-selected-fg: #fff;
       }
 
-      .allowed-roles {
+      .mcp-servers {
         display: flex;
         flex-direction: column;
         gap: 1rem;
@@ -128,7 +111,7 @@ interface RoleRow {
         }
 
         &__icon {
-          color: #a78bfa;
+          color: #2dd4bf;
           font-size: 20px;
         }
 
@@ -157,18 +140,6 @@ interface RoleRow {
           font-size: 15px;
           color: var(--p-text-hint);
           line-height: 1.55;
-        }
-
-        &__warn {
-          display: flex;
-          align-items: flex-start;
-          gap: 0.625rem;
-          padding: 0.875rem 1.125rem;
-          background: rgba(245, 158, 11, 0.1);
-          border: 1px solid rgba(245, 158, 11, 0.4);
-          border-radius: 4px;
-          color: #fbbf24;
-          font-size: 15px;
         }
 
         &__loading,
@@ -210,62 +181,50 @@ interface RoleRow {
             background 120ms ease;
 
           &:hover {
-            border-color: rgba(167, 139, 250, 0.6);
-            background: rgba(167, 139, 250, 0.08);
+            border-color: rgba(45, 212, 191, 0.6);
+            background: rgba(45, 212, 191, 0.08);
           }
 
           &--selected {
-            border-color: #a78bfa;
-            background: rgba(167, 139, 250, 0.18);
-            color: var(--p-chip-selected-fg);
+            border-color: #2dd4bf;
+            background: rgba(45, 212, 191, 0.18);
+            color: #fff;
           }
         }
 
         &__chip-check {
-          color: #c4b5fd;
+          color: #99f6e4;
         }
 
         &__name {
           font-weight: 500;
         }
-
-        &__link {
-          font-size: 14px;
-          color: var(--p-text-muted);
-          text-decoration: none;
-
-          &:hover {
-            color: #a78bfa;
-            text-decoration: underline;
-          }
-        }
       }
     `,
   ],
 })
-export class DfAiAllowedRolesComponent implements OnInit {
-  /** Service form. Reads/writes config.allowedRoles as a JSON array of role IDs. */
+export class DfAiMcpServersComponent implements OnInit {
+  /** Service form. Reads/writes config.mcpServers as a JSON array of MCP
+   *  service NAMES (strings, not ids). */
   @Input({ required: true }) form!: FormGroup;
 
   private http = inject(HttpClient);
 
   loading = true;
-  roles: RoleRow[] = [];
+  servers: McpServerRow[] = [];
 
-  faShieldHalved = faShieldHalved;
-  faCheck = faCheck;
+  faPlug = faPlug;
   faCircleCheck = faCircleCheck;
   faPlus = faPlus;
-  faTriangleExclamation = faTriangleExclamation;
 
   ngOnInit(): void {
     this.http
-      .get<{ resource: RoleRow[] }>(`${BASE_URL}/system/role`, {
-        params: { fields: 'id,name,description', sort: 'name' },
+      .get<{ resource: McpServerRow[] }>(`${BASE_URL}/system/service`, {
+        params: { filter: 'type = "mcp"', fields: 'id,name,label', sort: 'name' },
       })
       .subscribe({
         next: res => {
-          this.roles = res.resource ?? [];
+          this.servers = res.resource ?? [];
           this.loading = false;
         },
         error: () => {
@@ -274,34 +233,34 @@ export class DfAiAllowedRolesComponent implements OnInit {
       });
   }
 
-  /** Read the current allowed_roles list from the form, normalized to numbers. */
-  get selected(): number[] {
-    const raw = this.form.get('config.allowedRoles')?.value;
-    return this.parse(raw);
+  /** Current mcp_servers list from the form, normalized to service names. */
+  get selected(): string[] {
+    return this.parse(this.form.get('config.mcpServers')?.value);
   }
 
-  isSelected(id: number): boolean {
-    return this.selected.includes(id);
+  isSelected(name: string): boolean {
+    return this.selected.includes(name);
   }
 
-  toggle(id: number): void {
+  toggle(name: string): void {
     const cur = this.selected;
-    const next = cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id];
-    this.form.get('config.allowedRoles')?.setValue(next);
+    const next = cur.includes(name)
+      ? cur.filter(x => x !== name)
+      : [...cur, name];
+    this.form.get('config.mcpServers')?.setValue(next);
   }
 
-  /** Backend stores allowed_roles as JSON. Form may already have it parsed
-   *  (camelCased + decoded by the case interceptor) or still as a JSON
-   *  string — handle both. */
-  private parse(raw: unknown): number[] {
+  /** Backend stores mcp_servers as JSON. The form may hand it back already
+   *  decoded (array) or still as a JSON string — handle both. */
+  private parse(raw: unknown): string[] {
     if (Array.isArray(raw)) {
-      return raw.map(Number).filter(n => Number.isFinite(n));
+      return raw.map(String).filter(s => s.length > 0);
     }
     if (typeof raw === 'string' && raw.trim().length > 0) {
       try {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
-          return parsed.map(Number).filter(n => Number.isFinite(n));
+          return parsed.map(String).filter(s => s.length > 0);
         }
       } catch {
         return [];

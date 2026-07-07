@@ -1,4 +1,4 @@
-<div class="ai-chat">
+<div class="ai-chat" [class.dark-theme]="darkMode$ | async">
   <!-- Service picker (top bar): only relevant if multiple services exist -->
   <header class="ai-chat__header">
     <div class="ai-chat__header-left">
@@ -52,14 +52,36 @@
   <div
     *ngIf="!loadingServices && chatServices.length > 0"
     class="ai-chat__body">
-    <df-chat-session-list
-      class="ai-chat__sidebar"
-      [sessions]="sessions"
-      [activeId]="activeSession?.id ?? null"
-      [loading]="loadingSessions"
-      (newSession)="newChat()"
-      (select)="openSession($event.id)"
-      (delete)="deleteSession($event)"></df-chat-session-list>
+    <div class="ai-chat__sidebar">
+      <!-- Admin-only: start the next New Chat "as" a role and see exactly what
+           that role sees. Sits above New chat so the role is picked first. -->
+      <div *ngIf="isSysAdmin && actAsRoles.length > 0" class="ai-chat__act-as">
+        <mat-form-field
+          appearance="outline"
+          subscriptSizing="dynamic"
+          class="ai-chat__act-as-field">
+          <mat-label>Act as role</mat-label>
+          <mat-select [(value)]="selectedActAsRoleId">
+            <mat-option [value]="null">Myself (admin, full access)</mat-option>
+            <mat-option *ngFor="let r of actAsRoles" [value]="r.id">
+              {{ r.name }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+        <span class="ai-chat__act-as-hint">
+          Pick a role before starting a new chat.
+        </span>
+      </div>
+
+      <df-chat-session-list
+        class="ai-chat__session-list"
+        [sessions]="sessions"
+        [activeId]="activeSession?.id ?? null"
+        [loading]="loadingSessions"
+        (newSession)="newChat()"
+        (select)="openSession($event.id)"
+        (delete)="deleteSession($event)"></df-chat-session-list>
+    </div>
 
     <main class="ai-chat__main">
       <div *ngIf="errorMessage" class="ai-chat__error">

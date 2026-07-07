@@ -1,12 +1,49 @@
 .ai-chat {
+  // Theme tokens. Light defaults here; the dark values (in &.dark-theme below)
+  // reproduce the original hardcoded whites, so dark mode is unchanged. Child
+  // components (message, tool-result, session-list) inherit these vars through
+  // the DOM, so this is the single place the chat palette is defined.
+  --chat-surface: rgba(0, 0, 0, 0.02);
+  --chat-surface-2: rgba(0, 0, 0, 0.05);
+  --chat-hover: rgba(0, 0, 0, 0.04);
+  --chat-border: rgba(0, 0, 0, 0.12);
+  --chat-border-2: rgba(0, 0, 0, 0.08);
+  --chat-text: rgba(0, 0, 0, 0.87);
+  --chat-text-2: rgba(0, 0, 0, 0.7);
+  --chat-text-muted: rgba(0, 0, 0, 0.55);
+  --chat-text-faint: rgba(0, 0, 0, 0.4);
+  --chat-heading: rgba(0, 0, 0, 0.87);
+  // Code / JSON console panels keep white text, so their background stays dark
+  // in both themes (an opaque dark in light mode; the original translucent
+  // black over the dark card in dark mode).
+  --chat-code-bg: #17171f;
+
+  &.dark-theme {
+    --chat-surface: rgba(255, 255, 255, 0.02);
+    --chat-surface-2: rgba(255, 255, 255, 0.06);
+    --chat-hover: rgba(255, 255, 255, 0.04);
+    --chat-border: rgba(255, 255, 255, 0.1);
+    --chat-border-2: rgba(255, 255, 255, 0.08);
+    --chat-text: rgba(255, 255, 255, 0.9);
+    --chat-text-2: rgba(255, 255, 255, 0.7);
+    --chat-text-muted: rgba(255, 255, 255, 0.5);
+    --chat-text-faint: rgba(255, 255, 255, 0.4);
+    --chat-heading: rgba(255, 255, 255, 0.85);
+    --chat-code-bg: rgba(0, 0, 0, 0.3);
+  }
+
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 8rem);
-  min-height: 500px;
-  margin: 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--chat-text);
+  // Fit within the viewport under the DF top bar + page heading so the message
+  // input stays visible without scrolling the page. Measured chrome above the
+  // chat is ~221px; this offset clears it with a small bottom margin.
+  height: calc(100vh - 24rem);
+  min-height: 420px;
+  margin: 0.75rem 1rem;
+  border: 1px solid var(--chat-border);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--chat-surface);
   overflow: hidden;
 
   &__header {
@@ -15,7 +52,7 @@
     justify-content: space-between;
     gap: 1rem;
     padding: 1rem 1.25rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: 1px solid var(--chat-border-2);
     flex-wrap: wrap;
   }
 
@@ -38,7 +75,7 @@
   &__service-name {
     padding: 0.25rem 0.625rem;
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--chat-surface-2);
     font-size: 14px;
   }
 
@@ -47,7 +84,7 @@
     align-items: center;
     gap: 0.5rem;
     flex-wrap: wrap;
-    color: rgba(255, 255, 255, 0.7);
+    color: var(--chat-text-2);
     font-size: 14px;
   }
 
@@ -72,13 +109,13 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    color: rgba(255, 255, 255, 0.6);
+    color: var(--chat-text-muted);
     text-align: center;
     padding: 2rem;
 
     h3 {
       margin: 0 0 0.5rem;
-      color: rgba(255, 255, 255, 0.85);
+      color: var(--chat-heading);
     }
 
     a {
@@ -101,6 +138,31 @@
   }
 
   &__sidebar {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  &__act-as {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.875rem 0.875rem 0;
+    flex-shrink: 0;
+    border-right: 1px solid var(--chat-border-2);
+  }
+
+  &__act-as-field {
+    width: 100%;
+  }
+
+  &__act-as-hint {
+    font-size: 12px;
+    color: var(--chat-text-muted);
+  }
+
+  &__session-list {
+    flex: 1;
     min-height: 0;
   }
 
@@ -138,9 +200,9 @@
     align-items: center;
     gap: 0.625rem;
     padding: 0.5rem 0.875rem;
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--chat-hover);
     border-radius: 999px;
-    color: rgba(255, 255, 255, 0.65);
+    color: var(--chat-text-2);
     font-size: 14px;
     align-self: flex-start;
   }
