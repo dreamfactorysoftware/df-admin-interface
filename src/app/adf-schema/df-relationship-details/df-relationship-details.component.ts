@@ -24,6 +24,10 @@ import {
   DfAlertComponent,
 } from 'src/app/shared/components/df-alert/df-alert.component';
 import { catchError, throwError } from 'rxjs';
+import {
+  applyServerErrorsToForm,
+  normalizeError,
+} from 'src/app/shared/utilities/app-error';
 
 interface BasicOption {
   label: string;
@@ -348,11 +352,15 @@ export class DfRelationshipDetailsComponent implements OnInit {
         )
         .pipe(
           catchError(err => {
-            this.triggerAlert(
-              'error',
-              err.error.error.context.resource[0].message
-            );
-            return throwError(() => new Error(err));
+            const e = normalizeError(err);
+            const leftovers = applyServerErrorsToForm(this.relationshipForm, e);
+            if (leftovers.length || !e.fields.length) {
+              this.triggerAlert(
+                'error',
+                leftovers.length ? leftovers.join(' ') : e.message
+              );
+            }
+            return throwError(() => e);
           })
         )
         .subscribe(() => {
@@ -365,8 +373,9 @@ export class DfRelationshipDetailsComponent implements OnInit {
         })
         .pipe(
           catchError(err => {
-            this.triggerAlert('error', err.error.error.message);
-            return throwError(() => new Error(err));
+            const e = normalizeError(err);
+            this.triggerAlert('error', e.message);
+            return throwError(() => e);
           })
         )
         .subscribe(() => {

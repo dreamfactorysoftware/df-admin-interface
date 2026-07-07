@@ -2,7 +2,7 @@
   [showAlert]="showAlert"
   [alertType]="alertType"
   (alertClosed)="showAlert = false">
-  {{ alertMsg }}
+  {{ alertMsg | transloco }}
 </df-alert>
 <form
   [formGroup]="relationshipForm"
@@ -18,6 +18,9 @@
       matInput
       formControlName="name"
       placeholder="{{ 'name' | transloco }}" />
+    <mat-error *ngIf="relationshipForm.controls['name'].hasError('server')">
+      {{ relationshipForm.controls['name'].getError('server') }}
+    </mat-error>
   </mat-form-field>
 
   <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
@@ -25,6 +28,9 @@
       {{ 'schema.alias' | transloco }}
     </mat-label>
     <input matInput formControlName="alias" />
+    <mat-error *ngIf="relationshipForm.controls['alias'].hasError('server')">
+      {{ relationshipForm.controls['alias'].getError('server') }}
+    </mat-error>
   </mat-form-field>
 
   <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
@@ -32,6 +38,9 @@
       {{ 'label' | transloco }}
     </mat-label>
     <input matInput formControlName="label" />
+    <mat-error *ngIf="relationshipForm.controls['label'].hasError('server')">
+      {{ relationshipForm.controls['label'].getError('server') }}
+    </mat-error>
   </mat-form-field>
 
   <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
@@ -39,6 +48,10 @@
       {{ 'description' | transloco }}
     </mat-label>
     <input matInput formControlName="description" />
+    <mat-error
+      *ngIf="relationshipForm.controls['description'].hasError('server')">
+      {{ relationshipForm.controls['description'].getError('server') }}
+    </mat-error>
   </mat-form-field>
 
   <mat-slide-toggle formControlName="alwaysFetch" class="dynamic-width">{{
@@ -56,6 +69,9 @@
     </mat-select>
     <mat-error *ngIf="relationshipForm.controls['type'].hasError('required')">
       {{ 'schema.alerts.tableNameError' | transloco }}
+    </mat-error>
+    <mat-error *ngIf="relationshipForm.controls['type'].hasError('server')">
+      {{ relationshipForm.controls['type'].getError('server') }}
     </mat-error>
   </mat-form-field>
 
@@ -75,6 +91,9 @@
     <mat-error *ngIf="relationshipForm.controls['field'].hasError('required')">
       {{ 'schema.alerts.tableNameError' | transloco }}
     </mat-error>
+    <mat-error *ngIf="relationshipForm.controls['field'].hasError('server')">
+      {{ relationshipForm.controls['field'].getError('server') }}
+    </mat-error>
   </mat-form-field>
 
   <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
@@ -89,6 +108,10 @@
     <mat-error
       *ngIf="relationshipForm.controls['refServiceId'].hasError('required')">
       {{ 'schema.alerts.tableNameError' | transloco }}
+    </mat-error>
+    <mat-error
+      *ngIf="relationshipForm.controls['refServiceId'].hasError('server')">
+      {{ relationshipForm.controls['refServiceId'].getError('server') }}
     </mat-error>
   </mat-form-field>
 
@@ -110,6 +133,9 @@
       *ngIf="relationshipForm.controls['refTable'].hasError('required')">
       {{ 'schema.alerts.tableNameError' | transloco }}
     </mat-error>
+    <mat-error *ngIf="relationshipForm.controls['refTable'].hasError('server')">
+      {{ relationshipForm.controls['refTable'].getError('server') }}
+    </mat-error>
   </mat-form-field>
 
   <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
@@ -130,6 +156,9 @@
       *ngIf="relationshipForm.controls['refField'].hasError('required')">
       {{ 'schema.alerts.tableNameError' | transloco }}
     </mat-error>
+    <mat-error *ngIf="relationshipForm.controls['refField'].hasError('server')">
+      {{ relationshipForm.controls['refField'].getError('server') }}
+    </mat-error>
   </mat-form-field>
 
   <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
@@ -146,6 +175,10 @@
         relationshipForm.controls['junctionServiceId'].hasError('required')
       ">
       {{ 'schema.alerts.tableNameError' | transloco }}
+    </mat-error>
+    <mat-error
+      *ngIf="relationshipForm.controls['junctionServiceId'].hasError('server')">
+      {{ relationshipForm.controls['junctionServiceId'].getError('server') }}
     </mat-error>
   </mat-form-field>
 
@@ -167,6 +200,10 @@
       *ngIf="relationshipForm.controls['junctionTable'].hasError('required')">
       {{ 'schema.alerts.tableNameError' | transloco }}
     </mat-error>
+    <mat-error
+      *ngIf="relationshipForm.controls['junctionTable'].hasError('server')">
+      {{ relationshipForm.controls['junctionTable'].getError('server') }}
+    </mat-error>
   </mat-form-field>
 
   <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
@@ -186,6 +223,10 @@
     <mat-error
       *ngIf="relationshipForm.controls['junctionField'].hasError('required')">
       {{ 'schema.alerts.tableNameError' | transloco }}
+    </mat-error>
+    <mat-error
+      *ngIf="relationshipForm.controls['junctionField'].hasError('server')">
+      {{ relationshipForm.controls['junctionField'].getError('server') }}
     </mat-error>
   </mat-form-field>
 
@@ -210,6 +251,10 @@
         relationshipForm.controls['junctionRefField'].hasError('required')
       ">
       {{ 'schema.alerts.tableNameError' | transloco }}
+    </mat-error>
+    <mat-error
+      *ngIf="relationshipForm.controls['junctionRefField'].hasError('server')">
+      {{ relationshipForm.controls['junctionRefField'].getError('server') }}
     </mat-error>
   </mat-form-field>
 

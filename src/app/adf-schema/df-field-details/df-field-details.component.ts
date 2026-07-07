@@ -329,7 +329,6 @@ export class DfFieldDetailsComponent implements OnInit {
             { resource: [this.fieldDetailsForm.value] },
             {
               snackbarSuccess: 'schema.fieldDetailsForm.updateSuccess',
-              snackbarError: 'server',
             }
           )
           .subscribe(() => {
@@ -343,7 +342,6 @@ export class DfFieldDetailsComponent implements OnInit {
             { resource: [this.fieldDetailsForm.value] },
             {
               snackbarSuccess: 'schema.fieldDetailsForm.createSuccess',
-              snackbarError: 'server',
             },
             `${this.dbName}/_schema/${this.tableName}/_field`
           )

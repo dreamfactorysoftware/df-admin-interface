@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { toastOff } from '../shared/utilities/http-contexts';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -706,7 +707,12 @@ export class DfAlertsComponent implements OnInit {
         status: string;
         code?: number;
         message?: string;
-      }>(`/_internal/alerts/channels/${c.id}/test`, {})
+      }>(
+        `/_internal/alerts/channels/${c.id}/test`,
+        {},
+        // toast-off: the inline testResult marker is the error surface here.
+        { context: toastOff() }
+      )
       .subscribe({
         next: res => {
           this.testing[c.id] = false;

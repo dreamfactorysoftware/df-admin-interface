@@ -79,7 +79,7 @@ import { TableInfo } from './services/data-explorer.service';
       <!-- Error -->
       <div class="error-state" *ngIf="error && !loading">
         <mat-icon color="warn">error_outline</mat-icon>
-        <span>{{ error }}</span>
+        <span>{{ error | transloco }}</span>
         <button mat-stroked-button color="primary" (click)="retry.emit()">
           {{ t('dataExplorer.retry') }}
         </button>

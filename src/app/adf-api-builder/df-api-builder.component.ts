@@ -23,7 +23,10 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { finalize } from 'rxjs';
+import { TranslocoService } from '@ngneat/transloco';
 import { BASE_URL } from '../shared/constants/urls';
+import { normalizeError, rawErrorBody } from '../shared/utilities/app-error';
+import { silent, toastOff } from '../shared/utilities/http-contexts';
 import { DfApiBuilderWorkspaceComponent } from './df-api-builder-workspace.component';
 import { GenericListResponse } from '../shared/types/generic-http';
 import { ApiBuilderMapperService } from './api-builder-mapper.service';
@@ -2132,6 +2135,7 @@ type WorkflowStep = {
 export class DfApiBuilderComponent implements OnInit {
   private fb = inject(FormBuilder);
   private http = inject(HttpClient);
+  private transloco = inject(TranslocoService);
   private snackBar = inject(MatSnackBar);
   private mapper = inject(ApiBuilderMapperService);
   private destroyRef = inject(DestroyRef);
@@ -2343,10 +2347,12 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
       this.workspaceServiceIds = null;
       return;
     }
+    // Silent by design: workspace badges are decorative enrichment; on
+    // failure the UI just shows unfiltered sources instead of toasting.
     this.http
       .get<
         GenericListResponse<{ serviceId?: number; service_id?: number }>
-      >(`${BASE_URL}/api_builder/services`, { params: { filter: `api_id=${apiId}`, limit: 500 } })
+      >(`${BASE_URL}/api_builder/services`, { params: { filter: `api_id=${apiId}`, limit: 500 }, context: silent() })
       .subscribe({
         next: response => {
           const ids = (response.resource ?? [])
@@ -2747,6 +2753,8 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
     this.http
       .get<GenericListResponse<ApiDefinition>>(`${BASE_URL}/api_builder/apis`, {
         params: { limit: 500 },
+        // toast-off: the error callback below is the single toast surface.
+        context: toastOff(),
       })
       .pipe(finalize(() => (this.loading = false)))
       .subscribe({
@@ -2762,7 +2770,7 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
     this.http
       .get<
         GenericListResponse<EndpointDefinition>
-      >(`${BASE_URL}/api_builder/endpoints`, { params: { limit: 500 } })
+      >(`${BASE_URL}/api_builder/endpoints`, { params: { limit: 500 }, context: toastOff() })
       .subscribe({
         next: response => {
           this.endpoints = response.resource ?? [];
@@ -2779,6 +2787,7 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
         `${BASE_URL}/system/service`,
         {
           params: { fields: 'id,name,label,type,is_active', limit: 500 },
+          context: toastOff(),
         }
       )
       .pipe(finalize(() => (this.sourceServicesLoading = false)))
@@ -2824,6 +2833,9 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
         `${BASE_URL}/${serviceName}/_schema`,
         {
           params: { fields: 'name,label' },
+          // Silent by design: introspection falls back _schema -> api_docs
+          // -> _table; a toast per failed hop would be pure noise.
+          context: silent(),
         }
       )
       .subscribe({
@@ -2861,6 +2873,8 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
     this.http
       .get<OpenApiDocument>(`${BASE_URL}/api_docs/${serviceName}`, {
         params: { expand_schema: true },
+        // Silent by design: part of the introspection fallback chain.
+        context: silent(),
       })
       .subscribe({
         next: document => {
@@ -2908,6 +2922,8 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
         `${BASE_URL}/${serviceName}/_table`,
         {
           params: { limit: 500 },
+          // toast-off: the error callback below is the single toast surface.
+          context: toastOff(),
         }
       )
       .subscribe({
@@ -2950,7 +2966,7 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
     this.http
       .get<
         GenericListResponse<SourceTable>
-      >(`${BASE_URL}/${serviceName}/_schema`, { params: { fields: 'name,label' } })
+      >(`${BASE_URL}/${serviceName}/_schema`, { params: { fields: 'name,label' }, context: silent() })
       .subscribe({
         next: response => {
           const raw = Array.isArray(response?.resource)
@@ -2984,7 +3000,10 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
       .get<{
         field?: SourceField[];
         related?: any[];
-      }>(`${BASE_URL}/${serviceName}/_schema/${tableName}`)
+      }>(`${BASE_URL}/${serviceName}/_schema/${tableName}`, {
+        // Silent by design: falls back to loadFieldsFromOpenApi on failure.
+        context: silent(),
+      })
       .subscribe({
         next: response => {
           try {
@@ -3318,30 +3337,35 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
 
     this.previewing = true;
     this.http
-      .post(`${BASE_URL}/api_builder/test`, {
-        endpoint: {
-          apiId: this.selectedApiId ?? 0,
-          method: this.endpointForm.value.method ?? 'GET',
-          path: this.endpointForm.value.path ?? '',
-          label: this.endpointForm.value.label ?? '',
-          isActive: true,
-          requestSchema: this.buildRequestSchema(
-            !!this.sourceForm.value.includeId
-          ),
-          responseSchema: this.buildResponseSchema(
-            this.resolveOutputKey(this.sourceForm.value.table ?? ''),
-            !!this.sourceForm.value.includeId
-          ),
-          executionPlan,
-          responseMapping,
+      .post(
+        `${BASE_URL}/api_builder/test`,
+        {
+          endpoint: {
+            apiId: this.selectedApiId ?? 0,
+            method: this.endpointForm.value.method ?? 'GET',
+            path: this.endpointForm.value.path ?? '',
+            label: this.endpointForm.value.label ?? '',
+            isActive: true,
+            requestSchema: this.buildRequestSchema(
+              !!this.sourceForm.value.includeId
+            ),
+            responseSchema: this.buildResponseSchema(
+              this.resolveOutputKey(this.sourceForm.value.table ?? ''),
+              !!this.sourceForm.value.includeId
+            ),
+            executionPlan,
+            responseMapping,
+          },
+          // Backend reads snake_case and defaults dry_run=true (which only echoes
+          // the plan); send dry_run:false so the preview actually runs the query.
+          path_params: this.sourceForm.value.includeId ? { id: 1 } : {},
+          query: {},
+          dry_run: false,
+          trace: true,
+          // toast-off: failures render in the preview console, not a toast.
         },
-        // Backend reads snake_case and defaults dry_run=true (which only echoes
-        // the plan); send dry_run:false so the preview actually runs the query.
-        path_params: this.sourceForm.value.includeId ? { id: 1 } : {},
-        query: {},
-        dry_run: false,
-        trace: true,
-      })
+        { context: toastOff() }
+      )
       .pipe(finalize(() => (this.previewing = false)))
       .subscribe({
         next: (result: any) => {
@@ -3355,10 +3379,10 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
           this.previewStale = false;
         },
         error: error => {
-          const env = error?.error ?? error;
-          this.previewTrace = env?.trace ?? [];
+          const raw = normalizeError(error).raw as any;
+          this.previewTrace = raw?.trace ?? [];
           this.previewOk = false;
-          this.previewResult = JSON.stringify(env?.error ?? env, null, 2);
+          this.previewResult = JSON.stringify(raw?.error ?? raw, null, 2);
           this.previewStale = false;
         },
       });
@@ -3388,18 +3412,23 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
       return;
     }
 
-    this.http.get(`${BASE_URL}/api_docs/${serviceName}`).subscribe({
-      next: () => {
-        window.location.assign(
-          `${window.location.origin}/dreamfactory/dist/#/api-connections/api-docs/${serviceName}`
-        );
-      },
-      error: (error: any) => {
-        this.toast(
-          `Could not load generated OpenAPI spec for ${serviceName}. ${this.describeHttpError(error)}`
-        );
-      },
-    });
+    this.http
+      .get(`${BASE_URL}/api_docs/${serviceName}`, {
+        // toast-off: the error callback below is the single toast surface.
+        context: toastOff(),
+      })
+      .subscribe({
+        next: () => {
+          window.location.assign(
+            `${window.location.origin}/dreamfactory/dist/#/api-connections/api-docs/${serviceName}`
+          );
+        },
+        error: (error: any) => {
+          this.toast(
+            `Could not load generated OpenAPI spec for ${serviceName}. ${this.describeHttpError(error)}`
+          );
+        },
+      });
   }
 
   saveApi(successMessage = 'API saved.'): void {
@@ -3422,16 +3451,19 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
         status: this.apiForm.value.status ?? 'draft',
       })
     );
+    // toast-off: the error callbacks below are the single toast surface.
     const request: any = this.selectedApiId
       ? this.http.put<ApiDefinition>(
           `${BASE_URL}/api_builder/apis/${this.selectedApiId}`,
-          payload
+          payload,
+          { context: toastOff() }
         )
       : this.http.post<GenericListResponse<ApiDefinition>>(
           `${BASE_URL}/api_builder/apis`,
           {
             resource: [payload],
-          }
+          },
+          { context: toastOff() }
         );
 
     this.saving = true;
@@ -3538,14 +3570,17 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
       targetEndpointId = duplicate.id;
     }
 
+    // toast-off: the error callbacks below are the single toast surface.
     const request: any = targetEndpointId
       ? this.http.put<EndpointDefinition>(
           `${BASE_URL}/api_builder/endpoints/${targetEndpointId}`,
-          payload
+          payload,
+          { context: toastOff() }
         )
       : this.http.post<GenericListResponse<EndpointDefinition>>(
           `${BASE_URL}/api_builder/endpoints`,
-          { resource: [payload] }
+          { resource: [payload] },
+          { context: toastOff() }
         );
 
     this.saving = true;
@@ -3602,17 +3637,24 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
 
     this.saving = true;
     this.http
-      .post(`${BASE_URL}/api_builder/test`, {
-        endpoint_id: this.testForm.value.endpointId,
-        path_params: pathParams,
-        query,
-        dry_run: false,
-      })
+      .post(
+        `${BASE_URL}/api_builder/test`,
+        {
+          endpoint_id: this.testForm.value.endpointId,
+          path_params: pathParams,
+          query,
+          dry_run: false,
+        },
+        // toast-off: failures render in the test console, not a toast.
+        { context: toastOff() }
+      )
       .pipe(finalize(() => (this.saving = false)))
       .subscribe({
         next: result => (this.testResult = JSON.stringify(result, null, 2)),
-        error: error =>
-          (this.testResult = JSON.stringify(error?.error ?? error, null, 2)),
+        error: error => {
+          const e = normalizeError(error);
+          this.testResult = JSON.stringify(e.raw ?? e, null, 2);
+        },
       });
   }
 
@@ -3927,7 +3969,10 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
 
     this.saving = true;
     this.http
-      .delete(`${BASE_URL}/api_builder/endpoints/${id}`)
+      .delete(`${BASE_URL}/api_builder/endpoints/${id}`, {
+        // toast-off: the error callback below is the single toast surface.
+        context: toastOff(),
+      })
       .pipe(finalize(() => (this.saving = false)))
       .subscribe({
         next: () => {
@@ -3959,7 +4004,10 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
 
     this.loading = true;
     this.http
-      .delete(`${BASE_URL}/api_builder/apis/${id}`)
+      .delete(`${BASE_URL}/api_builder/apis/${id}`, {
+        // toast-off: the error callback below is the single toast surface.
+        context: toastOff(),
+      })
       .pipe(finalize(() => (this.loading = false)))
       .subscribe({
         next: () => {
@@ -4092,6 +4140,8 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
     this.http
       .get<OpenApiDocument>(`${BASE_URL}/api_docs/${serviceName}`, {
         params: { expand_schema: true },
+        // Silent by design: part of the introspection fallback chain.
+        context: silent(),
       })
       .subscribe({
         next: document => {
@@ -4431,24 +4481,22 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
   }
 
   private describeHttpError(error: any): string {
-    const message =
-      error?.error?.context?.resource?.[0]?.message ??
-      error?.error?.message ??
-      error?.message ??
-      'Unknown error.';
-    const normalized = String(message)
+    const e = normalizeError(error);
+    // normalizeError hides db-driver internals behind an i18n key, so match
+    // the duplicate-endpoint constraint against the raw body instead.
+    if (rawErrorBody(e).includes('api_id_method_path_unique')) {
+      return 'An endpoint with the same HTTP method and path already exists in this API.';
+    }
+    // All envelope field messages, not just resource[0]; e.message may be a
+    // translation key, so run it through transloco before display.
+    const message = e.fields.length
+      ? e.fields.map(field => field.message).join(' ')
+      : e.message;
+    return this.transloco
+      .translate(String(message))
       .replace(/\s+/g, ' ')
       .replace(/&quot;/g, '"')
       .trim();
-
-    if (
-      normalized.includes('Duplicate entry') &&
-      normalized.includes('api_id_method_path_unique')
-    ) {
-      return 'An endpoint with the same HTTP method and path already exists in this API.';
-    }
-
-    return normalized;
   }
 
   titleFromName(value: string): string {

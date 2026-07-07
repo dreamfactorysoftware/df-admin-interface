@@ -3,6 +3,10 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, forkJoin } from 'rxjs';
 import { map, switchMap } from 'rxjs/operators';
 import { BASE_URL } from '../../shared/constants/urls';
+import { toastOff } from '../../shared/utilities/http-contexts';
+
+// toast-off on every request: the data explorer components render their own
+// in-page error states (with Retry), so the interceptor must not also toast.
 
 export interface DatabaseService {
   id: number;
@@ -88,6 +92,7 @@ export class DataExplorerService {
         {
           params: { fields: 'name', group },
           headers: { 'show-loading': '', 'Cache-Control': 'no-cache, private' },
+          context: toastOff(),
         }
       )
     );
@@ -116,6 +121,7 @@ export class DataExplorerService {
               'show-loading': '',
               'Cache-Control': 'no-cache, private',
             },
+            context: toastOff(),
           })
           .pipe(
             map(res => (res.resource || []).filter(s => s.isActive !== false))
@@ -128,6 +134,7 @@ export class DataExplorerService {
     return this.http
       .get<SchemaResponse>(`${BASE_URL}/${serviceName}/_schema`, {
         headers: { 'show-loading': '' },
+        context: toastOff(),
       })
       .pipe(
         map(res =>
@@ -145,6 +152,7 @@ export class DataExplorerService {
       {
         params: { refresh: 'true' },
         headers: { 'show-loading': '' },
+        context: toastOff(),
       }
     );
   }
@@ -173,6 +181,7 @@ export class DataExplorerService {
       {
         params,
         headers: { 'show-loading': '' },
+        context: toastOff(),
       }
     );
   }

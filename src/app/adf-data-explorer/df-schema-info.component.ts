@@ -22,6 +22,7 @@ import {
   FieldInfo,
   RelatedInfo,
 } from './services/data-explorer.service';
+import { normalizeError } from 'src/app/shared/utilities/app-error';
 
 @Component({
   selector: 'df-schema-info',
@@ -51,7 +52,7 @@ import {
 
       <div class="schema-error" *ngIf="error && !loading">
         <mat-icon color="warn">error_outline</mat-icon>
-        <span>{{ error }}</span>
+        <span>{{ error | transloco }}</span>
       </div>
 
       <div class="schema-body" *ngIf="schema && !loading && !error">
@@ -380,7 +381,7 @@ export class DfSchemaInfoComponent implements OnChanges, OnDestroy {
           this.loading = false;
         },
         error: err => {
-          this.error = err?.error?.error?.message || 'Failed to load schema';
+          this.error = normalizeError(err).message;
           this.loading = false;
         },
       });
