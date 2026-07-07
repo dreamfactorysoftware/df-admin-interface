@@ -131,7 +131,7 @@ import {
         display: flex;
         flex-direction: column;
         height: 100%;
-        border-left: 1px solid #e0e0e0;
+        border-left: 1px solid var(--df-border);
         background: #fafafa;
         width: 320px;
         overflow: hidden;
@@ -142,7 +142,7 @@ import {
         align-items: center;
         justify-content: space-between;
         padding: 8px 12px;
-        border-bottom: 1px solid #e0e0e0;
+        border-bottom: 1px solid var(--df-border);
         background: #f5f5f5;
 
         .schema-title {
@@ -150,7 +150,7 @@ import {
           font-weight: 600;
           text-transform: uppercase;
           letter-spacing: 0.5px;
-          color: #616161;
+          color: var(--df-text-2);
         }
 
         .close-btn {
@@ -186,15 +186,15 @@ import {
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        color: #9e9e9e;
+        color: var(--df-text-faint);
         padding: 12px 12px 6px;
-        border-bottom: 1px solid #eeeeee;
+        border-bottom: 1px solid var(--df-border-2);
       }
 
       .field-list {
         .field-row {
           padding: 6px 12px;
-          border-bottom: 1px solid #f5f5f5;
+          border-bottom: 1px solid var(--df-border-2);
           font-size: 12px;
 
           .field-name {
@@ -202,7 +202,7 @@ import {
             align-items: center;
             gap: 6px;
             font-weight: 500;
-            color: #212121;
+            color: var(--df-text);
             font-family: 'Roboto Mono', monospace;
           }
 
@@ -234,7 +234,7 @@ import {
 
           .field-type {
             font-size: 11px;
-            color: #757575;
+            color: var(--df-text-muted);
             margin-top: 2px;
             font-family: 'Roboto Mono', monospace;
           }
@@ -247,7 +247,7 @@ import {
             .not-null,
             .auto-inc {
               font-size: 10px;
-              color: #9e9e9e;
+              color: var(--df-text-faint);
               text-transform: uppercase;
             }
           }
@@ -262,7 +262,7 @@ import {
               font-size: 14px;
               width: 14px;
               height: 14px;
-              color: #9e9e9e;
+              color: var(--df-text-faint);
             }
           }
         }
@@ -284,7 +284,7 @@ import {
           align-items: flex-start;
           gap: 8px;
           padding: 6px 12px;
-          border-bottom: 1px solid #f5f5f5;
+          border-bottom: 1px solid var(--df-border-2);
 
           .rel-icon {
             font-size: 16px;
@@ -302,13 +302,13 @@ import {
             .rel-type {
               font-size: 10px;
               text-transform: uppercase;
-              color: #9e9e9e;
+              color: var(--df-text-faint);
               letter-spacing: 0.5px;
             }
 
             .rel-field {
               font-size: 11px;
-              color: #757575;
+              color: var(--df-text-muted);
               font-family: 'Roboto Mono', monospace;
             }
           }
@@ -318,36 +318,15 @@ import {
       :host-context(.dark-theme) {
         .schema-info-panel {
           background: #1e1e1e;
-          border-left-color: #424242;
         }
         .schema-header {
           background: #2c2c2c;
-          border-bottom-color: #424242;
-          .schema-title {
-            color: #bdbdbd;
-          }
-        }
-        .section-header {
-          color: #757575;
-          border-bottom-color: #333;
-        }
-        .field-list .field-row {
-          border-bottom-color: #2c2c2c;
-          .field-name {
-            color: #e0e0e0;
-          }
-          .field-type {
-            color: #9e9e9e;
-          }
         }
         .ref-link {
           color: #64b5f6;
         }
-        .rel-list .rel-row {
-          border-bottom-color: #2c2c2c;
-          .rel-icon {
-            color: #ce93d8;
-          }
+        .rel-list .rel-row .rel-icon {
+          color: #ce93d8;
         }
       }
     `,
