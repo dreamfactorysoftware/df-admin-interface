@@ -169,12 +169,7 @@ export class DfManageAppsTableComponent extends DfManageTableComponent<AppRow> {
   }
 
   refreshTable(limit?: number, offset?: number, filter?: string): void {
-    this.appsService
-      .getAll<GenericListResponse<AppType>>({ limit, offset, filter })
-      .subscribe(data => {
-        this.dataSource.data = this.mapDataToTable(data.resource);
-        this.tableLength = data.meta.count;
-      });
+    this.fetchTable(this.appsService, { limit, offset, filter });
   }
 
   duplicateApp(row: AppRow): void {

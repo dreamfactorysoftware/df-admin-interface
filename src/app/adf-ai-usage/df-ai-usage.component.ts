@@ -20,6 +20,7 @@ import {
   faXmark,
 } from '@fortawesome/free-solid-svg-icons';
 import { finalize } from 'rxjs/operators';
+import { normalizeError } from 'src/app/shared/utilities/app-error';
 import {
   DimensionSeriesRowRaw,
   ExpensiveCallRowRaw,
@@ -191,10 +192,12 @@ export class DfAiUsageComponent implements OnInit {
           this.recomputeViews();
         },
         error: err => {
-          this.errorMessage =
-            err?.error?.error?.message ??
-            err?.message ??
-            'Failed to load usage.';
+          // This dashboard renders plain English strings; keep the fallback
+          // when normalizeError yields an errors.* i18n key.
+          const message = normalizeError(err).message;
+          this.errorMessage = message.startsWith('errors.')
+            ? 'Failed to load usage.'
+            : message;
         },
       });
   }

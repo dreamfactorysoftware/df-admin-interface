@@ -2,7 +2,7 @@
   [showAlert]="showAlert"
   [alertType]="alertType"
   (alertClosed)="showAlert = false">
-  {{ alertMsg }}
+  {{ alertMsg | transloco }}
 </df-alert>
 <div
   class="df-cors-config-container">
@@ -14,6 +14,9 @@
       class="dynamic-width">
       <mat-label>{{ 'cors.formControls.path' | transloco }}</mat-label>
       <input matInput type="url" formControlName="path" />
+      <mat-error *ngIf="corsForm.controls['path'].hasError('server')">
+        {{ corsForm.controls['path'].getError('server') | transloco }}
+      </mat-error>
     </mat-form-field>
     <mat-form-field
       appearance="outline"
@@ -21,6 +24,9 @@
       class="dynamic-width">
       <mat-label>{{ 'cors.formControls.origins' | transloco }}</mat-label>
       <input matInput type="text" formControlName="origins" />
+      <mat-error *ngIf="corsForm.controls['origins'].hasError('server')">
+        {{ corsForm.controls['origins'].getError('server') | transloco }}
+      </mat-error>
     </mat-form-field>
     <mat-form-field
       appearance="outline"
@@ -32,6 +38,9 @@
         matInput
         type="text"
         formControlName="description"></textarea>
+      <mat-error *ngIf="corsForm.controls['description'].hasError('server')">
+        {{ corsForm.controls['description'].getError('server') | transloco }}
+      </mat-error>
     </mat-form-field>
     <mat-form-field
       appearance="outline"
@@ -39,6 +48,9 @@
       class="dynamic-width">
       <mat-label>{{ 'cors.formControls.headers' | transloco }}</mat-label>
       <input matInput type="text" formControlName="headers" />
+      <mat-error *ngIf="corsForm.controls['headers'].hasError('server')">
+        {{ corsForm.controls['headers'].getError('server') | transloco }}
+      </mat-error>
     </mat-form-field>
     <mat-form-field
       appearance="outline"
@@ -48,6 +60,10 @@
         'cors.formControls.exposedHeaders' | transloco
       }}</mat-label>
       <input matInput type="text" formControlName="exposedHeaders" />
+      <mat-error
+        *ngIf="corsForm.controls['exposedHeaders'].hasError('server')">
+        {{ corsForm.controls['exposedHeaders'].getError('server') | transloco }}
+      </mat-error>
     </mat-form-field>
     <mat-form-field
       appearance="outline"
@@ -55,6 +71,9 @@
       class="dynamic-width">
       <mat-label>{{ 'cors.formControls.maxAge' | transloco }}</mat-label>
       <input matInput type="number" formControlName="maxAge" />
+      <mat-error *ngIf="corsForm.controls['maxAge'].hasError('server')">
+        {{ corsForm.controls['maxAge'].getError('server') | transloco }}
+      </mat-error>
     </mat-form-field>
     <df-verb-picker
       class="dynamic-width"

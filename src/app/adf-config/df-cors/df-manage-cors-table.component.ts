@@ -12,7 +12,6 @@ import { CorsConfigData } from '../../shared/types/config';
 import { MatDialog } from '@angular/material/dialog';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 import { UntilDestroy } from '@ngneat/until-destroy';
-import { GenericListResponse } from 'src/app/shared/types/generic-http';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -81,16 +80,7 @@ export class DfManageCorsTableComponent extends DfManageTableComponent<CorsConfi
     offset?: number | undefined,
     filter?: string | undefined
   ): void {
-    this.corsService
-      .getAll<GenericListResponse<CorsConfigData>>({
-        limit,
-        offset,
-        filter,
-      })
-      .subscribe(data => {
-        this.dataSource.data = data.resource;
-        this.tableLength = data.meta.count;
-      });
+    this.fetchTable(this.corsService, { limit, offset, filter });
   }
 
   filterQuery = getFilterQuery();

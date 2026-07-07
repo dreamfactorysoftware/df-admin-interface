@@ -32,8 +32,13 @@ export class DfIntercomConfigService {
   }
 
   getConfig(): Observable<IntercomConfig> {
+    // Silent by design: the widget falls back to defaults on failure; a toast
+    // for a background config probe would be noise.
     return this.lookupService
-      .getAll<any>({ filter: `name="${this.INTERCOM_KEY}"` })
+      .getAll<any>({
+        filter: `name="${this.INTERCOM_KEY}"`,
+        errorHandling: 'silent',
+      })
       .pipe(
         map(response => {
           const lookupKey = response?.resource?.[0];
@@ -59,7 +64,11 @@ export class DfIntercomConfigService {
     const value = config.intercomWidget ? 'true' : 'false';
 
     return this.lookupService
-      .getAll<any>({ filter: `name="${this.INTERCOM_KEY}"` })
+      // Silent by design: a failed existence probe falls through to create.
+      .getAll<any>({
+        filter: `name="${this.INTERCOM_KEY}"`,
+        errorHandling: 'silent',
+      })
       .pipe(
         map(response => response?.resource?.[0]),
         catchError(() => of(null)),

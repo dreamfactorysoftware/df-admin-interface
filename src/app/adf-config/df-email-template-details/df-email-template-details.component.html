@@ -2,7 +2,7 @@
   [showAlert]="showAlert"
   [alertType]="alertType"
   (alertClosed)="showAlert = false">
-  {{ alertMsg }}
+  {{ alertMsg | transloco }}
 </df-alert>
 <div
   class="email-template-details-container"
@@ -26,6 +26,9 @@
         *ngIf="emailTemplateForm.controls['name'].hasError('required')">
         {{ 'emailTemplates.templateName.error' | transloco }}
       </mat-error>
+      <mat-error *ngIf="emailTemplateForm.controls['name'].hasError('server')">
+        {{ emailTemplateForm.controls['name'].getError('server') | transloco }}
+      </mat-error>
     </mat-form-field>
 
     <mat-form-field appearance="outline" class="dynamic-width">
@@ -38,6 +41,13 @@
         placeholder="{{
           'emailTemplates.templateDescription.placeholder' | transloco
         }}" />
+      <mat-error
+        *ngIf="emailTemplateForm.controls['description'].hasError('server')">
+        {{
+          emailTemplateForm.controls['description'].getError('server')
+            | transloco
+        }}
+      </mat-error>
     </mat-form-field>
 
     <mat-form-field appearance="outline" class="third-width">
@@ -61,6 +71,12 @@
         matInput
         formControlName="subject"
         placeholder="{{ 'emailTemplates.subject.placeholder' | transloco }}" />
+      <mat-error
+        *ngIf="emailTemplateForm.controls['subject'].hasError('server')">
+        {{
+          emailTemplateForm.controls['subject'].getError('server') | transloco
+        }}
+      </mat-error>
     </mat-form-field>
 
     <mat-form-field appearance="outline" subscriptSizing="dynamic">
@@ -71,6 +87,13 @@
         placeholder="{{
           'emailTemplates.attachment.placeholder' | transloco
         }}" />
+      <mat-error
+        *ngIf="emailTemplateForm.controls['attachment'].hasError('server')">
+        {{
+          emailTemplateForm.controls['attachment'].getError('server')
+            | transloco
+        }}
+      </mat-error>
     </mat-form-field>
 
     <mat-form-field appearance="outline" subscriptSizing="dynamic">
@@ -80,6 +103,9 @@
         matInput
         formControlName="body"
         class="email-template-body"></textarea>
+      <mat-error *ngIf="emailTemplateForm.controls['body'].hasError('server')">
+        {{ emailTemplateForm.controls['body'].getError('server') | transloco }}
+      </mat-error>
     </mat-form-field>
 
     <mat-form-field appearance="outline" class="dynamic-width">
@@ -90,6 +116,13 @@
         placeholder="{{
           'emailTemplates.senderName.placeholder' | transloco
         }}" />
+      <mat-error
+        *ngIf="emailTemplateForm.controls['senderName'].hasError('server')">
+        {{
+          emailTemplateForm.controls['senderName'].getError('server')
+            | transloco
+        }}
+      </mat-error>
     </mat-form-field>
 
     <mat-form-field appearance="outline" class="dynamic-width">
@@ -102,6 +135,13 @@
         placeholder="{{
           'emailTemplates.senderEmail.placeholder' | transloco
         }}" />
+      <mat-error
+        *ngIf="emailTemplateForm.controls['senderEmail'].hasError('server')">
+        {{
+          emailTemplateForm.controls['senderEmail'].getError('server')
+            | transloco
+        }}
+      </mat-error>
     </mat-form-field>
 
     <mat-form-field appearance="outline" class="dynamic-width">
@@ -114,6 +154,13 @@
         placeholder="{{
           'emailTemplates.replyToName.placeholder' | transloco
         }}" />
+      <mat-error
+        *ngIf="emailTemplateForm.controls['replyToName'].hasError('server')">
+        {{
+          emailTemplateForm.controls['replyToName'].getError('server')
+            | transloco
+        }}
+      </mat-error>
     </mat-form-field>
 
     <mat-form-field appearance="outline" class="dynamic-width">
@@ -126,6 +173,13 @@
         placeholder="{{
           'emailTemplates.replyToEmail.placeholder' | transloco
         }}" />
+      <mat-error
+        *ngIf="emailTemplateForm.controls['replyToEmail'].hasError('server')">
+        {{
+          emailTemplateForm.controls['replyToEmail'].getError('server')
+            | transloco
+        }}
+      </mat-error>
     </mat-form-field>
 
     <div class="full-width action-bar">
