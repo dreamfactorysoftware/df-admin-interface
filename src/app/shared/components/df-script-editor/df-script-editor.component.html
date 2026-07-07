@@ -23,9 +23,7 @@
       {{ 'githubFile' | transloco }}
     </button>
   </div>
-  <mat-checkbox
-    [(ngModel)]="checked"
-    (ngModelChange)="onCheckedChange($event)">
+  <mat-checkbox [(ngModel)]="checked" (ngModelChange)="onCheckedChange($event)">
     Add path to file
   </mat-checkbox>
   <ng-container *ngIf="checked">

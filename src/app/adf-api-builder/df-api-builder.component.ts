@@ -27,6 +27,7 @@ import { BASE_URL } from '../shared/constants/urls';
 import { DfApiBuilderWorkspaceComponent } from './df-api-builder-workspace.component';
 import { GenericListResponse } from '../shared/types/generic-http';
 import { ApiBuilderMapperService } from './api-builder-mapper.service';
+import { DfApiBuilderPreviewComponent } from './df-api-builder-preview.component';
 
 type ApiDefinition = {
   id: number;
@@ -170,6 +171,7 @@ type WorkflowStep = {
     MatSnackBarModule,
     MatTabsModule,
     MatTooltipModule,
+    DfApiBuilderPreviewComponent,
     DfApiBuilderWorkspaceComponent,
   ],
   template: `
@@ -179,8 +181,8 @@ type WorkflowStep = {
           <p class="eyebrow">API Builder</p>
           <h1>Custom APIs</h1>
           <p>
-            Manage built APIs, open one to edit its endpoints, or create a new
-            API.
+            Expose purpose-built datasets without publishing your underlying
+            service structure.
           </p>
         </div>
         <a
@@ -294,6 +296,32 @@ type WorkflowStep = {
                   apiForm.value.status || 'draft'
                 }}</span>
                 <button
+                  mat-flat-button
+                  color="primary"
+                  type="button"
+                  *ngIf="selectedApiId && apiForm.value.status !== 'published'"
+                  [disabled]="saving"
+                  (click)="updateApiStatus('published')">
+                  <mat-icon>publish</mat-icon>
+                  Publish API
+                </button>
+                <button
+                  mat-button
+                  type="button"
+                  *ngIf="selectedApiId && apiForm.value.status === 'published'"
+                  [disabled]="saving"
+                  (click)="updateApiStatus('draft')">
+                  Move to draft
+                </button>
+                <button
+                  mat-button
+                  type="button"
+                  *ngIf="selectedApiId"
+                  (click)="apiDetailsOpen = !apiDetailsOpen">
+                  <mat-icon>{{ apiDetailsOpen ? 'close' : 'edit' }}</mat-icon>
+                  {{ apiDetailsOpen ? 'Close details' : 'Edit details' }}
+                </button>
+                <button
                   mat-button
                   type="button"
                   [disabled]="!selectedApiId"
@@ -312,15 +340,19 @@ type WorkflowStep = {
                 </button>
               </div>
             </div>
-            <div class="api-settings-grid">
+            <div
+              class="api-settings-grid"
+              *ngIf="apiDetailsOpen || !selectedApiId">
               <mat-form-field appearance="outline">
                 <mat-label>API Name</mat-label>
                 <input matInput formControlName="label" />
               </mat-form-field>
               <mat-form-field appearance="outline">
-                <mat-label>API URL Segment</mat-label>
+                <mat-label>Base URL Path</mat-label>
                 <input matInput formControlName="basePath" />
-                <mat-hint>Served at /api/v2/&lt;segment&gt;</mat-hint>
+                <mat-hint
+                  >Your endpoints start at /api/v2/&lt;path&gt;</mat-hint
+                >
                 <mat-error
                   *ngIf="apiForm.controls.basePath.hasError('required')">
                   API URL is required.
@@ -329,13 +361,6 @@ type WorkflowStep = {
                   *ngIf="apiForm.controls.basePath.hasError('pattern')">
                   Use letters, numbers, dashes, or underscores only.
                 </mat-error>
-              </mat-form-field>
-              <mat-form-field appearance="outline">
-                <mat-label>Status</mat-label>
-                <mat-select formControlName="status">
-                  <mat-option value="draft">Draft</mat-option>
-                  <mat-option value="published">Published</mat-option>
-                </mat-select>
               </mat-form-field>
               <mat-form-field appearance="outline" class="span-all">
                 <mat-label>Description</mat-label>
@@ -351,7 +376,7 @@ type WorkflowStep = {
                 class="save-api-btn"
                 [disabled]="apiForm.invalid || saving">
                 <mat-icon>save</mat-icon>
-                Save API
+                Save details
               </button>
             </div>
           </form>
@@ -369,7 +394,7 @@ type WorkflowStep = {
             <div>
               <h3>Endpoints</h3>
               <p class="muted">
-                Click an endpoint to edit it, or add a new one.
+                Define the public paths and response shapes consumers will use.
               </p>
             </div>
             <button
@@ -480,501 +505,558 @@ type WorkflowStep = {
           [formGroup]="endpointForm"
           class="endpoint-shell"
           (ngSubmit)="saveEndpoint(false)">
-          <div class="route-preview hero-preview" id="workflow-route">
-            <mat-icon>route</mat-icon>
-            <span>
-              <strong>{{ generatedRouteLabel }}</strong>
-              <small>{{ sourceSummary }}</small>
-            </span>
-          </div>
-
-          <section class="endpoint-identity" [formGroup]="endpointForm">
-            <mat-form-field appearance="outline">
-              <mat-label>Endpoint Name</mat-label>
-              <input
-                matInput
-                formControlName="label"
-                placeholder="e.g. List active customers" />
-              <mat-hint>A friendly name for this endpoint.</mat-hint>
-            </mat-form-field>
-            <mat-form-field appearance="outline">
-              <mat-label>Endpoint URL Path</mat-label>
-              <input matInput formControlName="path" placeholder="/customers" />
-              <mat-hint
-                >The path for this endpoint under the API (e.g.
-                /customers).</mat-hint
-              >
-            </mat-form-field>
-          </section>
-
-          <section class="workflow-strip" aria-label="Workflow status">
-            <button
-              type="button"
-              class="workflow-step"
-              *ngFor="let step of workflowSteps; trackBy: trackByStepKey"
-              [class.complete]="step.complete"
-              (click)="focusWorkflowStep(step.key)">
-              <span class="step-top">
-                <mat-icon class="step-check">{{
-                  step.complete ? 'check_circle' : 'radio_button_unchecked'
-                }}</mat-icon>
-                <span class="step-label">{{ step.label }}</span>
-              </span>
-              <span class="step-detail">{{ step.detail }}</span>
-            </button>
-          </section>
-
-          <div
-            class="source-builder"
-            [formGroup]="sourceForm"
-            id="workflow-source">
-            <mat-form-field appearance="outline" class="span-2">
-              <mat-label>Source API</mat-label>
-              <input
-                matInput
-                type="text"
-                placeholder="Type to search source APIs…"
-                [value]="sourceServiceSearch"
-                (input)="sourceServiceSearch = $any($event.target).value"
-                (focus)="onSourceFocus()"
-                (blur)="onSourceBlur()"
-                [matAutocomplete]="svcAuto" />
-              <mat-icon matSuffix>search</mat-icon>
-              <mat-autocomplete
-                #svcAuto="matAutocomplete"
-                (optionSelected)="chooseSourceService($event.option.value)">
-                <mat-option *ngIf="sourceServicesLoading" disabled>
-                  Loading sources…
-                </mat-option>
-                <mat-option
-                  *ngFor="
-                    let service of filteredSourceServices;
-                    trackBy: trackByName
-                  "
-                  [value]="service.name">
-                  {{ service.label || service.name }}
-                  <small class="option-meta"
-                    >{{ service.type }} ·
-                    {{ introspectionBadge(service) }}</small
+          <div class="endpoint-main">
+            <section class="workflow-stage" id="workflow-route">
+              <div class="stage-heading">
+                <span class="stage-number">1</span>
+                <span>
+                  <strong>Define the public endpoint</strong>
+                  <small
+                    >Name the operation and choose the path consumers
+                    use.</small
                   >
-                </mat-option>
-                <mat-option
-                  *ngIf="
-                    !sourceServicesLoading &&
-                    filteredSourceServices.length === 0
-                  "
-                  disabled>
-                  No matching source APIs
-                </mat-option>
-              </mat-autocomplete>
-            </mat-form-field>
-            <div
-              class="recent-source-chips"
-              *ngIf="recentSourceServices.length">
+                </span>
+              </div>
+              <div class="route-preview hero-preview">
+                <mat-icon>route</mat-icon>
+                <span>
+                  <strong>{{ generatedRouteLabel }}</strong>
+                  <small>{{ sourceSummary }}</small>
+                </span>
+              </div>
+
+              <div class="endpoint-identity" [formGroup]="endpointForm">
+                <mat-form-field appearance="outline">
+                  <mat-label>Endpoint name</mat-label>
+                  <input
+                    matInput
+                    formControlName="label"
+                    placeholder="e.g. List active customers" />
+                  <mat-hint>A friendly name for this endpoint.</mat-hint>
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Public URL path</mat-label>
+                  <input
+                    matInput
+                    formControlName="path"
+                    placeholder="/customers" />
+                  <mat-hint
+                    >The path for this endpoint under the API (e.g.
+                    /customers).</mat-hint
+                  >
+                </mat-form-field>
+              </div>
+            </section>
+
+            <section class="workflow-strip" aria-label="Workflow status">
+              <button
+                type="button"
+                class="workflow-step"
+                *ngFor="let step of workflowSteps; trackBy: trackByStepKey"
+                [class.complete]="step.complete"
+                (click)="focusWorkflowStep(step.key)">
+                <span class="step-top">
+                  <mat-icon class="step-check">{{
+                    step.complete ? 'check_circle' : 'radio_button_unchecked'
+                  }}</mat-icon>
+                  <span class="step-label">{{ step.label }}</span>
+                </span>
+                <span class="step-detail">{{ step.detail }}</span>
+              </button>
+            </section>
+
+            <section class="workflow-stage" id="workflow-source">
+              <div class="stage-heading">
+                <span class="stage-number">2</span>
+                <span>
+                  <strong>Choose the primary data</strong>
+                  <small
+                    >Start with the dataset every response record
+                    represents.</small
+                  >
+                </span>
+              </div>
+              <div class="source-builder" [formGroup]="sourceForm">
+                <mat-form-field appearance="outline" class="span-2">
+                  <mat-label>Data source</mat-label>
+                  <input
+                    matInput
+                    type="text"
+                    placeholder="Search connected data sources…"
+                    [value]="sourceServiceSearch"
+                    (input)="sourceServiceSearch = $any($event.target).value"
+                    (focus)="onSourceFocus()"
+                    (blur)="onSourceBlur()"
+                    [matAutocomplete]="svcAuto" />
+                  <mat-icon matSuffix>search</mat-icon>
+                  <mat-autocomplete
+                    #svcAuto="matAutocomplete"
+                    (optionSelected)="chooseSourceService($event.option.value)">
+                    <mat-option *ngIf="sourceServicesLoading" disabled>
+                      Loading sources…
+                    </mat-option>
+                    <mat-option
+                      *ngFor="
+                        let service of filteredSourceServices;
+                        trackBy: trackByName
+                      "
+                      [value]="service.name">
+                      {{ service.label || service.name }}
+                      <small class="option-meta"
+                        >{{ service.type }} ·
+                        {{ introspectionBadge(service) }}</small
+                      >
+                    </mat-option>
+                    <mat-option
+                      *ngIf="
+                        !sourceServicesLoading &&
+                        filteredSourceServices.length === 0
+                      "
+                      disabled>
+                      No matching data sources
+                    </mat-option>
+                  </mat-autocomplete>
+                </mat-form-field>
+                <div
+                  class="recent-source-chips"
+                  *ngIf="recentSourceServices.length">
+                  <button
+                    mat-stroked-button
+                    type="button"
+                    *ngFor="
+                      let recent of recentSourceServices;
+                      trackBy: trackByName
+                    "
+                    (click)="selectRecentSource(recent.name)">
+                    {{ recent.label || recent.name }}
+                  </button>
+                </div>
+                <mat-form-field appearance="outline" class="span-2">
+                  <mat-label>Dataset / table</mat-label>
+                  <input
+                    matInput
+                    type="text"
+                    placeholder="Search datasets and tables…"
+                    [value]="sourceTableSearch"
+                    (input)="sourceTableSearch = $any($event.target).value"
+                    (focus)="onTableFocus()"
+                    (blur)="onTableBlur()"
+                    [matAutocomplete]="tblAuto"
+                    [disabled]="!sourceForm.value.service" />
+                  <mat-icon matSuffix>search</mat-icon>
+                  <mat-autocomplete
+                    #tblAuto="matAutocomplete"
+                    (optionSelected)="chooseSourceTable($event.option.value)">
+                    <mat-option
+                      *ngFor="
+                        let table of filteredSourceTables;
+                        trackBy: trackByName
+                      "
+                      [value]="table.name">
+                      {{ table.label || titleFromName(table.name) }}
+                    </mat-option>
+                    <mat-option
+                      *ngIf="filteredSourceTables.length === 0"
+                      disabled>
+                      {{
+                        sourceForm.value.service
+                          ? 'No matching tables'
+                          : 'Select a source API first'
+                      }}
+                    </mat-option>
+                  </mat-autocomplete>
+                </mat-form-field>
+                <p class="source-hint" *ngIf="sourceIntrospectionHint">
+                  {{ sourceIntrospectionHint }}
+                </p>
+                <mat-checkbox
+                  class="id-toggle"
+                  formControlName="includeId"
+                  (change)="generateEndpointFromSource()">
+                  Return one record by ID
+                </mat-checkbox>
+              </div>
+            </section>
+
+            <section
+              class="builder-section workflow-stage"
+              *ngIf="sourceFields.length"
+              id="workflow-shape">
+              <div class="section-heading">
+                <span class="stage-title">
+                  <span class="stage-number">3</span>
+                  <span>
+                    <strong>Choose response fields</strong>
+                    <small
+                      >Choose what consumers can see and rename it if
+                      needed.</small
+                    >
+                  </span>
+                </span>
+                <span
+                  >{{ selectedFieldNames.length }} of
+                  {{ sourceFields.length }}</span
+                >
+              </div>
+              <div class="field-toolbar">
+                <mat-form-field appearance="outline">
+                  <mat-label>Find Fields</mat-label>
+                  <input
+                    matInput
+                    [value]="fieldSearch"
+                    (input)="fieldSearch = $any($event.target).value" />
+                </mat-form-field>
+                <button mat-button type="button" (click)="selectAllFields()">
+                  <mat-icon>select_all</mat-icon>
+                  Select All
+                </button>
+                <button mat-button type="button" (click)="clearAllFields()">
+                  <mat-icon>deselect</mat-icon>
+                  Clear
+                </button>
+              </div>
+              <div class="field-grid">
+                <div
+                  class="field-item"
+                  *ngFor="
+                    let field of displayedSourceFields;
+                    trackBy: trackByName
+                  ">
+                  <mat-checkbox
+                    [checked]="isFieldSelected(field.name)"
+                    (change)="toggleField(field.name, $event.checked)">
+                    <span class="field-name">{{
+                      field.label || titleFromName(field.name)
+                    }}</span>
+                    <small>{{ fieldTypeLabel(field) }}</small>
+                    <span class="field-badge" *ngIf="isPrimaryKey(field)"
+                      >Primary key</span
+                    >
+                    <span class="field-badge" *ngIf="isUnique(field)"
+                      >Unique</span
+                    >
+                    <span class="field-badge" *ngIf="isForeignKey(field)"
+                      >Relationship</span
+                    >
+                    <span
+                      class="field-badge"
+                      *ngIf="field.allowNull ?? field.allow_null"
+                      >Nullable</span
+                    >
+                  </mat-checkbox>
+                  <input
+                    class="rename-input"
+                    *ngIf="
+                      isFieldSelected(field.name) && isRenaming(field.name)
+                    "
+                    [value]="aliasFor(field.name)"
+                    [placeholder]="'Return as ' + field.name"
+                    (input)="setAlias(field.name, $any($event.target).value)"
+                    (blur)="finishRenaming(field.name)" />
+                  <button
+                    class="rename-trigger"
+                    type="button"
+                    *ngIf="
+                      isFieldSelected(field.name) && !isRenaming(field.name)
+                    "
+                    (click)="startRenaming(field.name)">
+                    <mat-icon>drive_file_rename_outline</mat-icon>
+                    Rename
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            <section
+              class="builder-section workflow-stage"
+              *ngIf="sourceRelationships.length || selectedRelationships.size">
+              <div class="section-heading">
+                <span class="stage-title">
+                  <span class="stage-number">4</span>
+                  <span>
+                    <strong>Add related data</strong>
+                    <small
+                      >Choose related resources to include in the same
+                      call.</small
+                    >
+                  </span>
+                </span>
+              </div>
+              <div
+                class="contract-warning"
+                *ngIf="relationshipContractWarnings.length">
+                <mat-icon>warning</mat-icon>
+                <span>
+                  <strong>Relationship configuration changed</strong>
+                  <small *ngFor="let warning of relationshipContractWarnings">
+                    {{ warning }}
+                  </small>
+                </span>
+              </div>
+              <div class="relationship-grid">
+                <div
+                  class="relationship-item"
+                  *ngFor="
+                    let relationship of sourceRelationships;
+                    trackBy: trackByName
+                  ">
+                  <mat-checkbox
+                    class="relationship-pill"
+                    [checked]="isRelationshipSelected(relationship.name)"
+                    (change)="
+                      toggleRelationship(relationship.name, $event.checked)
+                    ">
+                    <strong>{{
+                      relationship.label || titleFromName(relationship.name)
+                    }}</strong>
+                    <small>
+                      {{ relationshipTypeLabel(relationship.type) }} ·
+                      {{ relationshipContractLabel(relationship.type) }} ·
+                      {{
+                        relationship.refTable ||
+                          relationship.ref_table ||
+                          'related dataset'
+                      }}
+                    </small>
+                  </mat-checkbox>
+                  <input
+                    class="rename-input"
+                    *ngIf="
+                      isRelationshipSelected(relationship.name) &&
+                      isRenaming(relationship.name)
+                    "
+                    [value]="aliasFor(relationship.name)"
+                    [placeholder]="'Return as ' + relationship.name"
+                    (input)="
+                      setAlias(relationship.name, $any($event.target).value)
+                    "
+                    (blur)="finishRenaming(relationship.name)" />
+                  <button
+                    class="rename-trigger"
+                    type="button"
+                    *ngIf="
+                      isRelationshipSelected(relationship.name) &&
+                      !isRenaming(relationship.name)
+                    "
+                    (click)="startRenaming(relationship.name)">
+                    <mat-icon>drive_file_rename_outline</mat-icon>
+                    Rename response field
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            <section class="builder-section" id="workflow-rules">
+              <div class="section-heading">
+                <span>
+                  <strong>Filter records</strong>
+                  <small
+                    >Add simple rules to limit what this endpoint
+                    returns.</small
+                  >
+                </span>
+                <button mat-button type="button" (click)="addFilter()">
+                  <mat-icon>add</mat-icon>
+                  Add Filter
+                </button>
+              </div>
+
+              <div class="filter-empty" *ngIf="filterRules.length === 0">
+                <mat-icon>filter_alt_off</mat-icon>
+                <span
+                  >No filters yet. This endpoint will return matching records
+                  from the selected table.</span
+                >
+              </div>
+
+              <div
+                class="filter-row"
+                *ngFor="
+                  let filter of filterRules;
+                  let i = index;
+                  trackBy: trackByFilterIndex
+                ">
+                <mat-form-field appearance="outline">
+                  <mat-label>Field</mat-label>
+                  <mat-select
+                    [value]="filter.field"
+                    (selectionChange)="updateFilter(i, 'field', $event.value)">
+                    <mat-option
+                      *ngFor="let field of sourceFields; trackBy: trackByName"
+                      [value]="field.name">
+                      {{ field.label || titleFromName(field.name) }}
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Match</mat-label>
+                  <mat-select
+                    [value]="filter.operator"
+                    (selectionChange)="
+                      updateFilter(i, 'operator', $event.value)
+                    ">
+                    <mat-option
+                      *ngFor="
+                        let option of filterOperatorOptions(filter.field);
+                        trackBy: trackByOptionValue
+                      "
+                      [value]="option.value">
+                      {{ option.label }}
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Value</mat-label>
+                  <input
+                    matInput
+                    [value]="filter.value"
+                    (input)="
+                      updateFilter(i, 'value', $any($event.target).value)
+                    " />
+                </mat-form-field>
+                <button
+                  mat-icon-button
+                  type="button"
+                  aria-label="Remove filter"
+                  (click)="removeFilter(i)">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </div>
+            </section>
+
+            <details
+              class="builder-section collapsible-section"
+              id="workflow-output">
+              <summary class="section-heading">
+                <span>
+                  <strong>Response options</strong>
+                  <small
+                    >Set the default sort, row limit, and response
+                    wrapper.</small
+                  >
+                </span>
+                <mat-icon>expand_more</mat-icon>
+              </summary>
+              <div class="result-options" [formGroup]="sourceForm">
+                <mat-form-field appearance="outline">
+                  <mat-label>Sort By</mat-label>
+                  <mat-select
+                    formControlName="sortField"
+                    (selectionChange)="generateEndpointFromSource()">
+                    <mat-option value="">No sort</mat-option>
+                    <mat-option
+                      *ngFor="let field of sourceFields; trackBy: trackByName"
+                      [value]="field.name">
+                      {{ field.label || titleFromName(field.name) }}
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Direction</mat-label>
+                  <mat-select
+                    formControlName="sortDirection"
+                    (selectionChange)="generateEndpointFromSource()">
+                    <mat-option value="ASC">Ascending</mat-option>
+                    <mat-option value="DESC">Descending</mat-option>
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Limit</mat-label>
+                  <input
+                    matInput
+                    type="number"
+                    min="1"
+                    max="1000"
+                    formControlName="limit"
+                    (input)="generateEndpointFromSource()" />
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Response Shape</mat-label>
+                  <mat-select
+                    formControlName="outputShape"
+                    (selectionChange)="generateEndpointFromSource()">
+                    <mat-option value="resource"
+                      >Wrap in "resource" key (DreamFactory default)</mat-option
+                    >
+                    <mat-option value="data">Wrap in "data" key</mat-option>
+                    <mat-option value="table"
+                      >Wrap in table-named key</mat-option
+                    >
+                  </mat-select>
+                </mat-form-field>
+              </div>
+            </details>
+
+            <p class="save-hint" *ngIf="!selectedApiId">
+              <mat-icon>info</mat-icon>
+              <span
+                >Save the API above first — then you can create endpoints inside
+                it.</span
+              >
+            </p>
+
+            <div class="save-row" id="workflow-publish">
+              <button
+                mat-flat-button
+                color="primary"
+                type="submit"
+                [disabled]="endpointForm.invalid || saving || hasJsonErrors">
+                <mat-icon>add_link</mat-icon>
+                {{ selectedEndpointId ? 'Update Endpoint' : 'Create Endpoint' }}
+              </button>
               <button
                 mat-stroked-button
                 type="button"
-                *ngFor="
-                  let recent of recentSourceServices;
-                  trackBy: trackByName
-                "
-                (click)="selectRecentSource(recent.name)">
-                {{ recent.label || recent.name }}
+                [disabled]="endpointForm.invalid || saving || hasJsonErrors"
+                (click)="saveEndpoint(true)">
+                <mat-icon>playlist_add</mat-icon>
+                Save + New
               </button>
-            </div>
-            <mat-form-field appearance="outline" class="span-2">
-              <mat-label>Table / Resource</mat-label>
-              <input
-                matInput
-                type="text"
-                placeholder="Type to search tables…"
-                [value]="sourceTableSearch"
-                (input)="sourceTableSearch = $any($event.target).value"
-                (focus)="onTableFocus()"
-                (blur)="onTableBlur()"
-                [matAutocomplete]="tblAuto"
-                [disabled]="!sourceForm.value.service" />
-              <mat-icon matSuffix>search</mat-icon>
-              <mat-autocomplete
-                #tblAuto="matAutocomplete"
-                (optionSelected)="chooseSourceTable($event.option.value)">
-                <mat-option
-                  *ngFor="
-                    let table of filteredSourceTables;
-                    trackBy: trackByName
-                  "
-                  [value]="table.name">
-                  {{ table.label || titleFromName(table.name) }}
-                </mat-option>
-                <mat-option *ngIf="filteredSourceTables.length === 0" disabled>
-                  {{
-                    sourceForm.value.service
-                      ? 'No matching tables'
-                      : 'Select a source API first'
-                  }}
-                </mat-option>
-              </mat-autocomplete>
-            </mat-form-field>
-            <p class="source-hint" *ngIf="sourceIntrospectionHint">
-              {{ sourceIntrospectionHint }}
-            </p>
-            <mat-checkbox
-              class="id-toggle"
-              formControlName="includeId"
-              (change)="generateEndpointFromSource()">
-              Pass an ID in the URL
-            </mat-checkbox>
-          </div>
-
-          <section
-            class="builder-section"
-            *ngIf="sourceFields.length"
-            id="workflow-shape">
-            <div class="section-heading">
-              <span>
-                <strong>Fields</strong>
-                <small>Uncheck anything this endpoint should hide.</small>
-              </span>
-              <span
-                >{{ selectedFieldNames.length }} of
-                {{ sourceFields.length }}</span
-              >
-            </div>
-            <div class="field-toolbar">
-              <mat-form-field appearance="outline">
-                <mat-label>Find Fields</mat-label>
-                <input
-                  matInput
-                  [value]="fieldSearch"
-                  (input)="fieldSearch = $any($event.target).value" />
-              </mat-form-field>
-              <button mat-button type="button" (click)="selectAllFields()">
-                <mat-icon>select_all</mat-icon>
-                Select All
-              </button>
-              <button mat-button type="button" (click)="clearAllFields()">
-                <mat-icon>deselect</mat-icon>
-                Clear
-              </button>
-            </div>
-            <div class="field-grid">
-              <div
-                class="field-item"
-                *ngFor="
-                  let field of displayedSourceFields;
-                  trackBy: trackByName
-                ">
-                <mat-checkbox
-                  [checked]="isFieldSelected(field.name)"
-                  (change)="toggleField(field.name, $event.checked)">
-                  <span class="field-name">{{
-                    field.label || titleFromName(field.name)
-                  }}</span>
-                  <small>{{ fieldTypeLabel(field) }}</small>
-                  <span class="field-badge" *ngIf="isPrimaryKey(field)"
-                    >Primary key</span
-                  >
-                  <span class="field-badge" *ngIf="isUnique(field)"
-                    >Unique</span
-                  >
-                  <span class="field-badge" *ngIf="isForeignKey(field)"
-                    >Relationship</span
-                  >
-                  <span
-                    class="field-badge"
-                    *ngIf="field.allowNull ?? field.allow_null"
-                    >Nullable</span
-                  >
-                </mat-checkbox>
-                <input
-                  class="rename-input"
-                  *ngIf="isFieldSelected(field.name)"
-                  [value]="aliasFor(field.name)"
-                  [placeholder]="'rename ' + field.name + '…'"
-                  (input)="setAlias(field.name, $any($event.target).value)" />
-              </div>
-            </div>
-          </section>
-
-          <section class="builder-section" *ngIf="sourceRelationships.length">
-            <div class="section-heading">
-              <span>
-                <strong>Relationships</strong>
-                <small
-                  >Choose related resources to include in the same call.</small
-                >
-              </span>
-            </div>
-            <div class="relationship-grid">
-              <div
-                class="relationship-item"
-                *ngFor="
-                  let relationship of sourceRelationships;
-                  trackBy: trackByName
-                ">
-                <mat-checkbox
-                  class="relationship-pill"
-                  [checked]="isRelationshipSelected(relationship.name)"
-                  (change)="
-                    toggleRelationship(relationship.name, $event.checked)
-                  ">
-                  <strong>{{
-                    relationship.label || titleFromName(relationship.name)
-                  }}</strong>
-                  <small>
-                    {{ relationship.type || 'relationship' }} to
-                    {{
-                      relationship.refTable ||
-                        relationship.ref_table ||
-                        'related table'
-                    }}
-                  </small>
-                </mat-checkbox>
-                <input
-                  class="rename-input"
-                  *ngIf="isRelationshipSelected(relationship.name)"
-                  [value]="aliasFor(relationship.name)"
-                  [placeholder]="'rename to…'"
-                  (input)="
-                    setAlias(relationship.name, $any($event.target).value)
-                  " />
-              </div>
-            </div>
-          </section>
-
-          <section class="builder-section" id="workflow-rules">
-            <div class="section-heading">
-              <span>
-                <strong>Filters</strong>
-                <small
-                  >Add simple rules to limit what this endpoint returns.</small
-                >
-              </span>
-              <button mat-button type="button" (click)="addFilter()">
-                <mat-icon>add</mat-icon>
-                Add Filter
-              </button>
-            </div>
-
-            <div class="filter-empty" *ngIf="filterRules.length === 0">
-              <mat-icon>filter_alt_off</mat-icon>
-              <span
-                >No filters yet. This endpoint will return matching records from
-                the selected table.</span
-              >
-            </div>
-
-            <div
-              class="filter-row"
-              *ngFor="
-                let filter of filterRules;
-                let i = index;
-                trackBy: trackByFilterIndex
-              ">
-              <mat-form-field appearance="outline">
-                <mat-label>Field</mat-label>
-                <mat-select
-                  [value]="filter.field"
-                  (selectionChange)="updateFilter(i, 'field', $event.value)">
-                  <mat-option
-                    *ngFor="let field of sourceFields; trackBy: trackByName"
-                    [value]="field.name">
-                    {{ field.label || titleFromName(field.name) }}
-                  </mat-option>
-                </mat-select>
-              </mat-form-field>
-              <mat-form-field appearance="outline">
-                <mat-label>Match</mat-label>
-                <mat-select
-                  [value]="filter.operator"
-                  (selectionChange)="updateFilter(i, 'operator', $event.value)">
-                  <mat-option
-                    *ngFor="
-                      let option of filterOperatorOptions(filter.field);
-                      trackBy: trackByOptionValue
-                    "
-                    [value]="option.value">
-                    {{ option.label }}
-                  </mat-option>
-                </mat-select>
-              </mat-form-field>
-              <mat-form-field appearance="outline">
-                <mat-label>Value</mat-label>
-                <input
-                  matInput
-                  [value]="filter.value"
-                  (input)="
-                    updateFilter(i, 'value', $any($event.target).value)
-                  " />
-              </mat-form-field>
               <button
-                mat-icon-button
+                mat-stroked-button
                 type="button"
-                aria-label="Remove filter"
-                (click)="removeFilter(i)">
+                [disabled]="saving || previewing || !canGenerateFromSource"
+                (click)="runPreview()">
+                <mat-icon>play_arrow</mat-icon>
+                {{ previewStale ? 'Refresh preview' : 'Preview results' }}
+              </button>
+              <span class="save-row-spacer"></span>
+              <button
+                mat-button
+                type="button"
+                *ngIf="selectedEndpointId"
+                (click)="duplicateSelectedEndpoint()">
+                <mat-icon>content_copy</mat-icon>
+                Duplicate
+              </button>
+              <button
+                mat-button
+                color="warn"
+                type="button"
+                *ngIf="selectedEndpointId"
+                (click)="deleteEndpoint(selectedEndpointId)">
                 <mat-icon>delete</mat-icon>
+                Delete
               </button>
             </div>
-          </section>
-
-          <section class="builder-section" id="workflow-output">
-            <div class="section-heading">
-              <span>
-                <strong>Result Options</strong>
-                <small
-                  >Set the default sort, row limit, and response wrapper.</small
-                >
-              </span>
-            </div>
-            <div class="result-options" [formGroup]="sourceForm">
-              <mat-form-field appearance="outline">
-                <mat-label>Sort By</mat-label>
-                <mat-select
-                  formControlName="sortField"
-                  (selectionChange)="generateEndpointFromSource()">
-                  <mat-option value="">No sort</mat-option>
-                  <mat-option
-                    *ngFor="let field of sourceFields; trackBy: trackByName"
-                    [value]="field.name">
-                    {{ field.label || titleFromName(field.name) }}
-                  </mat-option>
-                </mat-select>
-              </mat-form-field>
-              <mat-form-field appearance="outline">
-                <mat-label>Direction</mat-label>
-                <mat-select
-                  formControlName="sortDirection"
-                  (selectionChange)="generateEndpointFromSource()">
-                  <mat-option value="ASC">Ascending</mat-option>
-                  <mat-option value="DESC">Descending</mat-option>
-                </mat-select>
-              </mat-form-field>
-              <mat-form-field appearance="outline">
-                <mat-label>Limit</mat-label>
-                <input
-                  matInput
-                  type="number"
-                  min="1"
-                  max="1000"
-                  formControlName="limit"
-                  (input)="generateEndpointFromSource()" />
-              </mat-form-field>
-              <mat-form-field appearance="outline">
-                <mat-label>Response Shape</mat-label>
-                <mat-select
-                  formControlName="outputShape"
-                  (selectionChange)="generateEndpointFromSource()">
-                  <mat-option value="resource"
-                    >Wrap in "resource" key (DreamFactory default)</mat-option
-                  >
-                  <mat-option value="data">Wrap in "data" key</mat-option>
-                  <mat-option value="table">Wrap in table-named key</mat-option>
-                </mat-select>
-              </mat-form-field>
-            </div>
-          </section>
-
-          <p class="save-hint" *ngIf="!selectedApiId">
-            <mat-icon>info</mat-icon>
-            <span
-              >Save the API above first — then you can create endpoints inside
-              it.</span
-            >
-          </p>
-
-          <div class="save-row" id="workflow-publish">
-            <button
-              mat-flat-button
-              color="primary"
-              type="submit"
-              [disabled]="endpointForm.invalid || saving || hasJsonErrors">
-              <mat-icon>add_link</mat-icon>
-              {{ selectedEndpointId ? 'Update Endpoint' : 'Create Endpoint' }}
-            </button>
-            <button
-              mat-stroked-button
-              type="button"
-              [disabled]="endpointForm.invalid || saving || hasJsonErrors"
-              (click)="saveEndpoint(true)">
-              <mat-icon>playlist_add</mat-icon>
-              Save + New
-            </button>
-            <button
-              mat-stroked-button
-              type="button"
-              [disabled]="saving || previewing || !canGenerateFromSource"
-              (click)="runPreview()">
-              <mat-icon>play_arrow</mat-icon>
-              {{ previewStale ? 'Refresh Preview' : 'Preview Return' }}
-            </button>
-            <span class="save-row-spacer"></span>
-            <button
-              mat-button
-              type="button"
-              *ngIf="selectedEndpointId"
-              (click)="duplicateSelectedEndpoint()">
-              <mat-icon>content_copy</mat-icon>
-              Duplicate
-            </button>
-            <button
-              mat-button
-              color="warn"
-              type="button"
-              *ngIf="selectedEndpointId"
-              (click)="deleteEndpoint(selectedEndpointId)">
-              <mat-icon>delete</mat-icon>
-              Delete
-            </button>
           </div>
 
-          <section class="builder-section" *ngIf="previewResult">
-            <div class="section-heading">
-              <span>
-                <strong>Sample Return</strong>
-                <small>
-                  {{
-                    previewStale
-                      ? 'Filters or fields changed. Refresh the preview to run this version.'
-                      : 'Result from running the current endpoint definition.'
-                  }}
-                </small>
-              </span>
-            </div>
-            <div *ngIf="previewTrace.length" style="margin: 4px 0 12px;">
-              <div
-                style="font-size: 0.8em; color: rgba(0,0,0,0.55); margin-bottom: 4px;">
-                Execution trace — {{ previewTrace.length }} step(s){{
-                  previewOk === false ? ' · failed' : ''
-                }}
-              </div>
-              <div
-                *ngFor="let s of previewTrace"
-                style="display: flex; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid rgba(0,0,0,0.06);">
-                <mat-icon
-                  [style.color]="s.ok === false ? '#d9534f' : '#1a7f1a'"
-                  style="font-size: 18px; width: 18px; height: 18px;"
-                  >{{ s.ok === false ? 'error' : 'check_circle' }}</mat-icon
-                >
-                <strong>{{ s.key }}</strong>
-                <span style="color: rgba(0,0,0,0.6);"
-                  >{{ s.method }} {{ s.service }}/{{ s.resource }}</span
-                >
-                <span style="flex: 1;"></span>
-                <span
-                  [style.color]="s.ok === false ? '#a11' : 'rgba(0,0,0,0.7)'"
-                  >{{ s.ok === false ? s.error : s.preview }}</span
-                >
-                <span *ngIf="s.ms != null" style="color: rgba(0,0,0,0.45);"
-                  >{{ s.ms }}ms</span
-                >
-              </div>
-            </div>
-            <pre>{{ previewResult }}</pre>
-          </section>
+          <df-api-builder-preview
+            [routeLabel]="generatedRouteLabel"
+            [sourceSummary]="sourceSummary"
+            [fieldNames]="responseContractFields"
+            [relationshipNames]="selectedRelationshipLabels"
+            [previewResult]="previewResult"
+            [previewStale]="previewStale"
+            [previewing]="previewing"
+            [canPreview]="canGenerateFromSource"
+            [previewOk]="previewOk"
+            [trace]="previewTrace"
+            (previewRequested)="runPreview()"></df-api-builder-preview>
         </form>
 
         <section class="endpoint-inspect">
-          <p class="inspect-heading">Inspect &amp; advanced</p>
+          <p class="inspect-heading">Advanced tools</p>
           <mat-tab-group class="endpoint-panel-tabs">
             <mat-tab label="Inspector">
               <div class="inspector-panel">
@@ -1065,9 +1147,9 @@ type WorkflowStep = {
                     </p>
                     <p>
                       <strong>transform</strong> — reshape a prior step
-                      in-memory (no request). <code>from</code> = a context path;
-                      <code>ops</code> run in order. Ops: <code>pick</code>,
-                      <code>omit</code>, <code>rename</code>,
+                      in-memory (no request). <code>from</code> = a context
+                      path; <code>ops</code> run in order. Ops:
+                      <code>pick</code>, <code>omit</code>, <code>rename</code>,
                       <code>defaults</code>, <code>first</code>,
                       <code>limit</code>, <code>count</code>, <code>wrap</code>,
                       <code>unwrap</code>.
@@ -1076,7 +1158,9 @@ type WorkflowStep = {
                       Example — fetch rows, then shape them:
                     </p>
                     <pre
-                      style="background: rgba(0,0,0,0.05); padding: 10px; border-radius: 6px; overflow: auto;">{{ stepExample }}</pre>
+                      style="background: rgba(0,0,0,0.05); padding: 10px; border-radius: 6px; overflow: auto;"
+                      >{{ stepExample }}</pre
+                    >
                     <p>
                       Run <strong>Preview Return</strong> to execute it and see
                       each step's result, status, and timing.
@@ -1240,7 +1324,7 @@ type WorkflowStep = {
         align-items: start;
         display: grid;
         gap: 12px 14px;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
 
       .api-settings-grid .span-all {
@@ -1293,6 +1377,7 @@ type WorkflowStep = {
       .endpoint-card.open {
         border-color: rgba(63, 81, 181, 0.55);
         box-shadow: 0 1px 12px rgba(63, 81, 181, 0.12);
+        overflow: visible;
       }
 
       .endpoint-row {
@@ -1576,9 +1661,56 @@ type WorkflowStep = {
       }
 
       .endpoint-shell {
+        align-items: start;
+        display: grid;
+        gap: 16px;
+        grid-template-columns: minmax(0, 1fr) minmax(290px, 360px);
+      }
+
+      .endpoint-main {
         display: flex;
         flex-direction: column;
         gap: 16px;
+        min-width: 0;
+      }
+
+      .workflow-stage {
+        border: 1px solid rgba(127, 127, 127, 0.24);
+        border-radius: 8px;
+        display: grid;
+        gap: 12px;
+        padding: 12px;
+      }
+
+      .stage-heading,
+      .stage-title {
+        align-items: center;
+        display: flex;
+        gap: 9px;
+      }
+
+      .stage-heading > span:last-child,
+      .section-heading .stage-title > span:last-child {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .stage-heading small {
+        opacity: 0.68;
+      }
+
+      .stage-number {
+        align-items: center;
+        background: #3f51b5;
+        border-radius: 50%;
+        color: #fff;
+        display: inline-flex;
+        flex: none;
+        font-size: 12px;
+        font-weight: 700;
+        height: 24px;
+        justify-content: center;
+        width: 24px;
       }
 
       .preview-row small {
@@ -1591,8 +1723,6 @@ type WorkflowStep = {
       }
 
       .source-builder {
-        border: 1px solid rgba(127, 127, 127, 0.28);
-        border-radius: 8px;
         display: grid;
         align-items: center;
         gap: 12px;
@@ -1600,7 +1730,6 @@ type WorkflowStep = {
             180px,
             auto
           );
-        padding: 12px;
       }
 
       .recent-source-chips {
@@ -1666,6 +1795,29 @@ type WorkflowStep = {
         padding: 12px;
       }
 
+      .collapsible-section > summary {
+        cursor: pointer;
+        list-style: none;
+        margin-bottom: 0;
+      }
+
+      .collapsible-section > summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .collapsible-section[open] > summary {
+        margin-bottom: 10px;
+      }
+
+      .collapsible-section > summary mat-icon {
+        opacity: 0.6;
+        transition: transform 0.15s ease;
+      }
+
+      .collapsible-section[open] > summary mat-icon {
+        transform: rotate(180deg);
+      }
+
       .section-heading {
         align-items: center;
         display: flex;
@@ -1678,6 +1830,11 @@ type WorkflowStep = {
         display: flex;
         flex-direction: column;
         gap: 2px;
+      }
+
+      .section-heading .stage-title {
+        align-items: center;
+        flex-direction: row;
       }
 
       .section-heading small {
@@ -1724,6 +1881,26 @@ type WorkflowStep = {
 
       .rename-input:focus {
         border-color: rgba(63, 81, 181, 0.6);
+      }
+
+      .rename-trigger {
+        align-items: center;
+        align-self: flex-start;
+        background: transparent;
+        border: 0;
+        color: #3f51b5;
+        cursor: pointer;
+        display: inline-flex;
+        font: inherit;
+        font-size: 12px;
+        gap: 4px;
+        padding: 2px 0;
+      }
+
+      .rename-trigger mat-icon {
+        font-size: 15px;
+        height: 15px;
+        width: 15px;
       }
 
       .field-name {
@@ -1775,6 +1952,26 @@ type WorkflowStep = {
         display: flex;
         gap: 8px;
         padding: 12px;
+      }
+
+      .contract-warning {
+        align-items: flex-start;
+        background: rgba(255, 171, 0, 0.1);
+        border: 1px solid rgba(255, 171, 0, 0.4);
+        border-radius: 7px;
+        display: flex;
+        gap: 8px;
+        margin-bottom: 10px;
+        padding: 9px;
+      }
+
+      .contract-warning > span {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .contract-warning mat-icon {
+        color: #b36b00;
       }
 
       .filter-row {
@@ -1923,6 +2120,12 @@ type WorkflowStep = {
           grid-template-columns: 1fr;
         }
       }
+
+      @media (max-width: 1120px) {
+        .endpoint-shell {
+          grid-template-columns: 1fr;
+        }
+      }
     `,
   ],
 })
@@ -1988,6 +2191,7 @@ export class DfApiBuilderComponent implements OnInit {
   // Output rename map: source field/relationship name -> alias to emit in the
   // response. Applied as a cheap key-remap pass on the fetched rows server-side.
   fieldAliases: Record<string, string> = {};
+  renamingFields = new Set<string>();
   private pendingSelectedFieldNames: string[] | null = null;
   filterRules: FilterRule[] = [];
   fieldSearch = '';
@@ -2008,6 +2212,7 @@ export class DfApiBuilderComponent implements OnInit {
   saving = false;
   sourceServicesLoading = false;
   editorOpen = false;
+  apiDetailsOpen = false;
   selectedApiId: number | null = null;
   selectedEndpointId: number | null = null;
   addingEndpoint = false;
@@ -2174,7 +2379,6 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
   get workflowSteps(): WorkflowStep[] {
     const serviceSelected = !!this.sourceForm.value.service;
     const tableSelected = !!this.sourceForm.value.table;
-    const routeReady = !!this.endpointForm.value.path;
     const hasFields = this.selectedFieldNames.length > 0;
     const hasRuleData = this.filterRules.length > 0;
     const hasOutput = !!this.sourceForm.value.outputShape;
@@ -2183,7 +2387,7 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
     return [
       {
         key: 'source',
-        label: 'Source',
+        label: 'Data',
         detail:
           serviceSelected && tableSelected
             ? 'Service + table selected'
@@ -2192,7 +2396,7 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
       },
       {
         key: 'shape',
-        label: 'Shape',
+        label: 'Fields',
         detail: hasFields
           ? `${this.selectedFieldNames.length} fields selected`
           : 'Select fields',
@@ -2200,21 +2404,15 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
       },
       {
         key: 'rules',
-        label: 'Rules',
+        label: 'Filters',
         detail: hasRuleData
           ? `${this.filterRules.length} filters`
-          : 'Optional filters',
-        complete: hasRuleData,
-      },
-      {
-        key: 'route',
-        label: 'Route',
-        detail: routeReady ? this.generatedRouteLabel : 'Generate route',
-        complete: routeReady,
+          : 'None (optional)',
+        complete: true,
       },
       {
         key: 'output',
-        label: 'Output',
+        label: 'Response',
         detail: hasOutput
           ? `Shape: ${this.sourceForm.value.outputShape}`
           : 'Set output options',
@@ -2222,8 +2420,8 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
       },
       {
         key: 'publish',
-        label: 'Publish',
-        detail: hasSavedEndpoint ? 'Saved endpoint selected' : 'Save endpoint',
+        label: 'Save',
+        detail: hasSavedEndpoint ? 'Endpoint saved' : 'Save endpoint',
         complete: hasSavedEndpoint,
       },
     ];
@@ -2293,6 +2491,54 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
 
   get selectedFieldNames(): string[] {
     return Array.from(this.selectedFields);
+  }
+
+  get responseContractFields(): string[] {
+    return this.selectedFieldNames.map(name => this.aliasFor(name) || name);
+  }
+
+  get selectedRelationshipLabels(): string[] {
+    return Array.from(this.selectedRelationships).map(name => {
+      const relationship = this.sourceRelationships.find(
+        item => item.name === name
+      );
+      return (
+        this.aliasFor(name) || relationship?.label || this.titleFromName(name)
+      );
+    });
+  }
+
+  get relationshipContractWarnings(): string[] {
+    const available = new Set(
+      this.sourceRelationships.map(relationship => relationship.name)
+    );
+    return Array.from(this.selectedRelationships)
+      .filter(name => !available.has(name))
+      .map(
+        name =>
+          `"${name}" is no longer available in the selected dataset schema.`
+      );
+  }
+
+  relationshipTypeLabel(type?: string): string {
+    switch (type) {
+      case 'belongs_to':
+        return 'Many to one';
+      case 'has_one':
+        return 'One to one';
+      case 'has_many':
+        return 'One to many';
+      case 'many_many':
+        return 'Many to many';
+      default:
+        return 'Related data';
+    }
+  }
+
+  relationshipContractLabel(type?: string): string {
+    return type === 'belongs_to' || type === 'has_one'
+      ? 'object or null'
+      : 'array';
   }
 
   get displayedSourceFields(): SourceField[] {
@@ -2788,6 +3034,20 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
     return this.fieldAliases[sourceName] ?? '';
   }
 
+  isRenaming(sourceName: string): boolean {
+    return this.renamingFields.has(sourceName) || !!this.aliasFor(sourceName);
+  }
+
+  startRenaming(sourceName: string): void {
+    this.renamingFields.add(sourceName);
+  }
+
+  finishRenaming(sourceName: string): void {
+    if (!this.aliasFor(sourceName)) {
+      this.renamingFields.delete(sourceName);
+    }
+  }
+
   setAlias(sourceName: string, alias: string): void {
     const trimmed = alias.trim();
     if (trimmed) {
@@ -3142,7 +3402,7 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
     });
   }
 
-  saveApi(): void {
+  saveApi(successMessage = 'API saved.'): void {
     if (this.apiForm.invalid) {
       return;
     }
@@ -3185,7 +3445,7 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
         }
 
         const api = { ...payload, ...saved } as ApiDefinition;
-        this.toast('API saved.');
+        this.toast(successMessage);
         this.apis = [
           api,
           ...this.apis.filter(existing => existing.id !== api.id),
@@ -3195,6 +3455,16 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
       error: (error: any) =>
         this.toast(`Could not save API. ${this.describeHttpError(error)}`),
     });
+  }
+
+  updateApiStatus(status: 'draft' | 'published'): void {
+    if (!this.selectedApiId || this.saving) {
+      return;
+    }
+    this.apiForm.patchValue({ status });
+    this.saveApi(
+      status === 'published' ? 'API published.' : 'API moved to draft.'
+    );
   }
 
   saveEndpoint(createAnother = false): void {
@@ -3348,6 +3618,7 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
 
   selectApi(id: number): void {
     this.editorOpen = true;
+    this.apiDetailsOpen = false;
     this.selectedApiId = id;
     this.loadWorkspaceServices(id);
     const api = this.apis.find(item => item.id === id);
@@ -3484,6 +3755,7 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
 
   newApi(): void {
     this.editorOpen = true;
+    this.apiDetailsOpen = true;
     this.selectedApiId = null;
     this.workspaceServiceIds = null;
     this.apiForm.reset({
@@ -3498,6 +3770,7 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
 
   closeEditor(): void {
     this.editorOpen = false;
+    this.apiDetailsOpen = false;
     this.selectedApiId = null;
     this.selectedEndpointId = null;
     this.addingEndpoint = false;
@@ -3575,6 +3848,7 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
     this.selectedFields.clear();
     this.selectedRelationships.clear();
     this.fieldAliases = {};
+    this.renamingFields.clear();
     this.filterRules = [];
     this.sourceTables = [];
     this.sourceFields = [];
@@ -3925,8 +4199,16 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
         ),
         type: String(item?.type ?? 'relationship'),
         field: String(item?.field ?? ''),
-        refTable: String(item?.ref_table ?? item?.table ?? ''),
-        refField: String(item?.ref_field ?? item?.id_field ?? ''),
+        refTable: String(
+          item?.refTable ?? item?.ref_table ?? item?.table ?? ''
+        ),
+        refField: String(
+          item?.refField ??
+            item?.ref_field ??
+            item?.idField ??
+            item?.id_field ??
+            ''
+        ),
       }))
       .filter(item => !!item.name);
   }

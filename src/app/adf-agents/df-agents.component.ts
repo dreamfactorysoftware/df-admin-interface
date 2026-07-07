@@ -270,7 +270,9 @@ type AgentLogRow = {
                 }}</span>
               </td>
               <td class="muted">
-                {{ a.lastActiveAt ? (a.lastActiveAt | date: 'short') : 'never' }}
+                {{
+                  a.lastActiveAt ? (a.lastActiveAt | date: 'short') : 'never'
+                }}
               </td>
               <td class="muted">{{ requestCount(a.id) }}</td>
             </tr>

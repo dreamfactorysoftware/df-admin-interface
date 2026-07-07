@@ -147,8 +147,8 @@ export class DfScriptDetailsComponent implements OnInit {
         : (script.storageServiceId ?? null);
     const scriptItem = {
       ...script,
-      storageServiceId,                     
-      storagePath: script.storagePath || null,  
+      storageServiceId,
+      storagePath: script.storagePath || null,
       name: this.completeScriptName || this.selectedRouteItem,
     };
 

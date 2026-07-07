@@ -83,7 +83,11 @@
                 <p>Published at: {{ convertDateType(release.published_at) }}</p>
               </mat-card-content>
               <mat-card-actions>
-                <a [href]="release.html_url" target="_blank" rel="noopener noreferrer" class="release-btn"
+                <a
+                  [href]="release.html_url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="release-btn"
                   >View Release</a
                 >
               </mat-card-actions>
