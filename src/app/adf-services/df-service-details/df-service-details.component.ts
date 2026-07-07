@@ -72,6 +72,8 @@ import {
   throwError,
   tap,
 } from 'rxjs';
+import { normalizeError } from 'src/app/shared/utilities/app-error';
+import { silent, toastOff } from 'src/app/shared/utilities/http-contexts';
 import {
   GOLD_SERVICES,
   SILVER_SERVICES,
@@ -1243,6 +1245,7 @@ export class DfServiceDetailsComponent implements OnInit {
           group: 'source control',
           fields: 'id,name,label,type',
         },
+        context: silent(),
       })
       .subscribe({
         next: (res: any) => {
@@ -1252,6 +1255,8 @@ export class DfServiceDetailsComponent implements OnInit {
             []
           ).filter((s: any) => s.id && s.name);
         },
+        // Silent by design: SCM dropdown enrichment; the form works without
+        // it, so no toast (see context: silent() above).
         error: () => {
           this.availableScmServices = [];
         },
@@ -1286,6 +1291,8 @@ export class DfServiceDetailsComponent implements OnInit {
       .get(url, {
         params: { branch, content: '1', path },
         responseType: 'text',
+        // The error callback below shows its own contextual toast.
+        context: toastOff(),
       })
       .subscribe({
         next: (content: string) => {
@@ -1298,7 +1305,7 @@ export class DfServiceDetailsComponent implements OnInit {
         },
         error: (err: any) => {
           this.snackbarService.openSnackBar(
-            `Failed to fetch from SCM: ${err?.error?.error?.message || err.message}`,
+            `Failed to fetch from SCM: ${normalizeError(err).message}`,
             'error'
           );
         },
@@ -1660,6 +1667,8 @@ export class DfServiceDetailsComponent implements OnInit {
 
     const data = this.serviceForm.getRawValue();
     if (data.type === '' || data.name === '') {
+      // Show validation errors instead of silently doing nothing.
+      this.serviceForm.markAllAsTouched();
       return;
     }
     if (!this.validateServiceName(data.name)) {
@@ -1669,14 +1678,12 @@ export class DfServiceDetailsComponent implements OnInit {
     const formattedName = this.formatServiceName(data.name);
     this.serviceForm.patchValue({ name: formattedName });
     type Params = {
-      snackbarError?: string;
       snackbarSuccess?: string;
       fields?: string;
       related?: string;
     };
 
     let params: Params = {
-      snackbarError: 'server',
       snackbarSuccess: 'services.createSuccessMsg',
     };
 
@@ -1850,7 +1857,6 @@ export class DfServiceDetailsComponent implements OnInit {
       }
       this.servicesService
         .update(this.serviceData.id, editPayload, {
-          snackbarError: 'server',
           snackbarSuccess: 'services.updateSuccessMsg',
         })
         .subscribe(() => {
@@ -1924,9 +1930,11 @@ export class DfServiceDetailsComponent implements OnInit {
             }
           },
           error: error => {
-            // Use openSnackBar instead of error
+            // Kept deliberately: the interceptor toast covers the raw HTTP
+            // failure, but this path also surfaces the local rollback error
+            // thrown after a failed database connection test above.
             this.snackbarService.openSnackBar(
-              error.message || 'Failed to create service',
+              normalizeError(error).message,
               'error'
             );
           },
@@ -2055,7 +2063,6 @@ export class DfServiceDetailsComponent implements OnInit {
             resource: [payload],
           },
           {
-            snackbarError: 'server',
             snackbarSuccess: 'services.createSuccessMsg',
           }
         )

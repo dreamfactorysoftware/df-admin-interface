@@ -1,7 +1,8 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
-import { catchError, map, of } from 'rxjs';
+import { catchError, map, of, throwError } from 'rxjs';
+import { AppError, normalizeError } from 'src/app/shared/utilities/app-error';
 import { URLS } from '../../shared/constants/urls';
 import {
   HTTP_OPTION_LOGIN_FALSE,
@@ -43,13 +44,33 @@ export class DfAuthService {
           this.userDataService.userData = userData;
           return userData;
         }),
-        catchError(() => {
+        catchError(userErr => {
           return this.http
             .post<UserSession>(URLS.ADMIN_SESSION, credentials, {})
             .pipe(
               map(userData => {
                 this.userDataService.userData = userData;
                 return userData;
+              }),
+              catchError(adminErr => {
+                // Both sessions failed. Rethrow whichever error carries a
+                // real server envelope so a reason like "user disabled" is
+                // not masked by the admin retry's generic "bad password".
+                const userAppErr = normalizeError(userErr);
+                const adminAppErr = normalizeError(adminErr);
+                const fallbacks = [
+                  'errors.network',
+                  'errors.http4xx',
+                  'errors.http5xx',
+                  'errors.unknown',
+                ];
+                const hasEnvelope = (e: AppError) =>
+                  !fallbacks.includes(e.message);
+                return throwError(() =>
+                  hasEnvelope(userAppErr) || !hasEnvelope(adminAppErr)
+                    ? userAppErr
+                    : adminAppErr
+                );
               })
             );
         })

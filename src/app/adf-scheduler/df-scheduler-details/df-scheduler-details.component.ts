@@ -31,6 +31,10 @@ import {
   DfAlertComponent,
 } from 'src/app/shared/components/df-alert/df-alert.component';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
+import {
+  applyServerErrorsToForm,
+  normalizeError,
+} from 'src/app/shared/utilities/app-error';
 
 import { catchError, throwError } from 'rxjs';
 @UntilDestroy({ checkProperties: true })
@@ -158,11 +162,8 @@ export class DfSchedulerDetailsComponent implements OnInit {
         )
         .pipe(
           catchError(err => {
-            this.triggerAlert(
-              'error',
-              err.error.error.context.resource[0].message
-            );
-            return throwError(() => new Error(err));
+            this.showServerErrors(err);
+            return throwError(() => normalizeError(err));
           })
         )
         .subscribe(() =>
@@ -179,13 +180,26 @@ export class DfSchedulerDetailsComponent implements OnInit {
         })
         .pipe(
           catchError(err => {
-            this.triggerAlert('error', err.error.error.message);
-            return throwError(() => new Error(err));
+            this.triggerAlert('error', normalizeError(err).message);
+            return throwError(() => normalizeError(err));
           })
         )
         .subscribe(() =>
           this.router.navigate([ROUTES.SYSTEM_SETTINGS, ROUTES.SCHEDULER])
         );
+    }
+  }
+
+  /** Map server validation errors onto controls; banner shows whatever
+   * could not be mapped (all messages, not just the first). */
+  private showServerErrors(err: unknown) {
+    const e = normalizeError(err);
+    const leftovers = applyServerErrorsToForm(this.formGroup, e);
+    if (leftovers.length || !e.fields.length) {
+      this.triggerAlert(
+        'error',
+        leftovers.length ? leftovers.join('\n') : e.message
+      );
     }
   }
 

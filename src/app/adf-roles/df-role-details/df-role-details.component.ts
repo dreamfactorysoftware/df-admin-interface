@@ -33,6 +33,10 @@ import {
 import { catchError, filter, throwError } from 'rxjs';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
+import {
+  applyServerErrorsToForm,
+  normalizeError,
+} from 'src/app/shared/utilities/app-error';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -271,8 +275,8 @@ export class DfRoleDetailsComponent implements OnInit {
         .update(payload.id, payload)
         .pipe(
           catchError(err => {
-            this.triggerAlert('error', err.error.error.message);
-            return throwError(() => new Error(err));
+            this.showServerErrors(err);
+            return throwError(() => normalizeError(err));
           })
         )
         .subscribe(() => {
@@ -286,16 +290,26 @@ export class DfRoleDetailsComponent implements OnInit {
         })
         .pipe(
           catchError(err => {
-            this.triggerAlert(
-              'error',
-              err.error.error.context.resource[0].message
-            );
-            return throwError(() => new Error(err));
+            this.showServerErrors(err);
+            return throwError(() => normalizeError(err));
           })
         )
         .subscribe(() => {
           this.goBack();
         });
+    }
+  }
+
+  /** Map server validation errors onto controls; banner shows whatever
+   * could not be mapped (all messages, not just the first). */
+  private showServerErrors(err: unknown) {
+    const e = normalizeError(err);
+    const leftovers = applyServerErrorsToForm(this.roleForm, e);
+    if (leftovers.length || !e.fields.length) {
+      this.triggerAlert(
+        'error',
+        leftovers.length ? leftovers.join('\n') : e.message
+      );
     }
   }
 

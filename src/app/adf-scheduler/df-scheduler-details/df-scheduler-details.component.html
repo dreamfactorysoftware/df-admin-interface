@@ -3,7 +3,7 @@
     [showAlert]="showAlert"
     [alertType]="alertType"
     (alertClosed)="showAlert = false">
-    {{ alertMsg }}
+    {{ alertMsg | transloco }}
   </df-alert>
   <mat-tab-group dynamicHeight mat-stretch-tabs="false" mat-align-tabs="start">
     <mat-tab label="Basic">
