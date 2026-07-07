@@ -26,17 +26,11 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
 
   // Step
   .mat-stepper-horizontal {
-    background-color: mat.get-color-from-palette(
-      $df-purple-palette,
-      1002
-    ) !important;
-    border: 1px solid white !important;
+    background-color: mat.get-color-from-palette($df-purple-palette, 1002);
+    border: 1px solid white;
   }
   .mat-step-icon {
-    background-color: mat.get-color-from-palette(
-      $df-purple-palette,
-      300
-    ) !important;
+    background-color: mat.get-color-from-palette($df-purple-palette, 300);
   }
   .mat-step-icon-selected {
     background-color: mat.get-color-from-palette(
@@ -51,7 +45,7 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
     ) !important;
   }
   .mat-stepper-horizontal-line {
-    border-top-color: white !important;
+    border-top-color: white;
   }
 
   .mat-step-label {
@@ -233,19 +227,16 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   // Swagger
   .swagger-ui .info .title,
   .swagger-ui .renderedMarkdown p {
-    color: white !important;
+    color: white;
   }
 
   .swagger-ui .scheme-container {
-    background-color: mat.get-color-from-palette(
-      $df-purple-palette,
-      1002
-    ) !important;
-    border: 1px solid white !important;
-    color: white !important;
+    background-color: mat.get-color-from-palette($df-purple-palette, 1002);
+    border: 1px solid white;
+    color: white;
   }
   .swagger-ui .model-toggle::after {
-    background-color: white !important;
+    background-color: white;
   }
 
   // Editor
