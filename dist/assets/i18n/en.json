@@ -802,5 +802,40 @@
       "python": "Python",
       "mcp": "MCP client"
     }
+  },
+  "onboardingChecklist": {
+    "eyebrow": "Get started",
+    "title": "Set up your first API",
+    "subtitle": "Five steps from a datasource to an AI-ready endpoint.",
+    "done": "Done",
+    "allDoneTitle": "You're set up",
+    "allDoneSubtitle": "Every step is done. This checklist stays out of your way now.",
+    "steps": {
+      "connectDatasource": {
+        "title": "Connect a datasource",
+        "description": "Point DreamFactory at a database or file to generate its API.",
+        "cta": "Connect a datasource"
+      },
+      "generateApi": {
+        "title": "Generate an API",
+        "description": "DreamFactory builds a full REST API from your datasource schema.",
+        "cta": "View your API"
+      },
+      "createApiKey": {
+        "title": "Create an API key",
+        "description": "Issue a key so callers can authenticate against your API.",
+        "cta": "Create an API key"
+      },
+      "firstCall": {
+        "title": "Make your first call",
+        "description": "Run a request from the docs and get a live 200 back.",
+        "cta": "Make your first call"
+      },
+      "scopeRole": {
+        "title": "Scope a role for AI access",
+        "description": "Define what an AI agent can read and write through your API.",
+        "cta": "Scope a role"
+      }
+    }
   }
 }
