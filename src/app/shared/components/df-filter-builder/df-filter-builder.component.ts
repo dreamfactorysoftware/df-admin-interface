@@ -100,7 +100,12 @@ export class DfFilterBuilderComponent {
     { value: '<=', labelKey: 'lte', arity: 'binary' },
     { value: 'like', labelKey: 'like', arity: 'binary' },
     { value: 'contains', labelKey: 'contains', arity: 'binary', wrap: 'both' },
-    { value: 'starts with', labelKey: 'startsWith', arity: 'binary', wrap: 'start' },
+    {
+      value: 'starts with',
+      labelKey: 'startsWith',
+      arity: 'binary',
+      wrap: 'start',
+    },
     { value: 'ends with', labelKey: 'endsWith', arity: 'binary', wrap: 'end' },
     { value: 'in', labelKey: 'in', arity: 'list' },
     { value: 'not in', labelKey: 'notIn', arity: 'list' },

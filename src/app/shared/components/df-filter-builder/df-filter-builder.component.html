@@ -93,7 +93,9 @@
             (ngModelChange)="emit()"
             autocomplete="off" />
         </mat-form-field>
-        <span class="filter-row__value filter-row__value--empty" *ngIf="arityOf(cond.operator) === 'unary'"></span>
+        <span
+          class="filter-row__value filter-row__value--empty"
+          *ngIf="arityOf(cond.operator) === 'unary'"></span>
 
         <button
           mat-icon-button

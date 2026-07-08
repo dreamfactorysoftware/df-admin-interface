@@ -25,7 +25,9 @@
           <span
             class="pipeline-strip__marker"
             [class.pipeline-strip__marker--active]="node.status === 'active'"
-            [class.pipeline-strip__marker--filtered]="node.status === 'filtered'"
+            [class.pipeline-strip__marker--filtered]="
+              node.status === 'filtered'
+            "
             [class.pipeline-strip__marker--handler]="node.status === 'handler'">
             <mat-icon>{{ node.icon }}</mat-icon>
           </span>
@@ -47,9 +49,7 @@
           </p>
 
           <div class="pipeline-strip__actions">
-            <a
-              class="pipeline-strip__link"
-              [routerLink]="node.link">
+            <a class="pipeline-strip__link" [routerLink]="node.link">
               {{ t('view') }}
               <mat-icon>chevron_right</mat-icon>
             </a>

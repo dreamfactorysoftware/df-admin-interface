@@ -53,7 +53,9 @@
       <ng-container *ngFor="let column of columns">
         <ng-container
           [matColumnDef]="column.columnDef"
-          *ngIf="column.columnDef !== 'actions' && column.columnDef !== 'meter'">
+          *ngIf="
+            column.columnDef !== 'actions' && column.columnDef !== 'meter'
+          ">
           <th
             mat-header-cell
             *matHeaderCellDef
@@ -124,7 +126,7 @@
                       : {
                           consumed: row.meter.consumed,
                           cap: row.meter.cap,
-                          period: row.meter.period
+                          period: row.meter.period,
                         }
                 ">
                 <div class="df-meter-track">
@@ -240,9 +242,7 @@
             <ng-template #noFilterActive>
               <df-empty-state
                 [title]="'apps.virtualKey.empty.title' | transloco"
-                [description]="
-                  'apps.virtualKey.empty.description' | transloco
-                "
+                [description]="'apps.virtualKey.empty.description' | transloco"
                 [actionLabel]="
                   allowCreate
                     ? ('apps.virtualKey.empty.action' | transloco)

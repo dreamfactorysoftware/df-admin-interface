@@ -44,13 +44,7 @@ import {
   templateUrl: './df-command-palette.component.html',
   styleUrls: ['./df-command-palette.component.scss'],
   standalone: true,
-  imports: [
-    ReactiveFormsModule,
-    NgFor,
-    NgIf,
-    TranslocoPipe,
-    FontAwesomeModule,
-  ],
+  imports: [ReactiveFormsModule, NgFor, NgIf, TranslocoPipe, FontAwesomeModule],
 })
 export class DfCommandPaletteComponent implements OnInit {
   private registry = inject(ActionRegistryService);

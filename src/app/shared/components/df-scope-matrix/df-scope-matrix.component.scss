@@ -75,7 +75,9 @@
     border-radius: var(--df-radius-sm);
     background: transparent;
     cursor: pointer;
-    transition: background-color 120ms ease, border-color 120ms ease;
+    transition:
+      background-color 120ms ease,
+      border-color 120ms ease;
 
     &:hover:not(:disabled) {
       background: var(--df-hover);

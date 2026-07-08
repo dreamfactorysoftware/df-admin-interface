@@ -42,7 +42,7 @@ interface RoleRow {
           {{
             t('count', {
               selected: selected.length,
-              available: roles.length
+              available: roles.length,
             })
           }}
         </span>

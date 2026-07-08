@@ -195,9 +195,9 @@ export class DfAiChatComponent implements OnInit, OnDestroy {
       return;
     }
     this.http
-      .get<{ config?: { ai_service_id?: number } }>(
-        `${BASE_URL}/system/service/${svc.id}`
-      )
+      .get<{
+        config?: { ai_service_id?: number };
+      }>(`${BASE_URL}/system/service/${svc.id}`)
       .subscribe({
         next: chatSvc => {
           const aiId = chatSvc.config?.ai_service_id;

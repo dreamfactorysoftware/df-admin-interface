@@ -3,10 +3,7 @@ import { CommonModule } from '@angular/common';
 import { TranslocoModule } from '@ngneat/transloco';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import {
-  MAT_DIALOG_DATA,
-  MatDialogModule,
-} from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { DfRoleScopeComponent } from 'src/app/shared/components/df-role-scope/df-role-scope.component';
 import { ScopeVerb } from 'src/app/shared/services/df-scope.service';
 

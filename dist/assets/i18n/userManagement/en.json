@@ -11,8 +11,8 @@
   "register": "Register",
   "registerSuccess": {
     "header": "Registration Success",
-    "title": "Thanks For Registering!",
-    "message": "A confirmation email has been sent to the email address that you registered with. Upon confirmation you will be able to login to the application. Thanks!"
+    "title": "Thanks for registering",
+    "message": "A confirmation email is on its way to the address you registered with. Confirm it, then sign in."
   },
   "oAuth": "OAuth Login",
   "saml": "SAML 2.0 Login",
@@ -124,9 +124,9 @@
       "password": "Password"
     },
     "alerts": {
-      "detailsUpdated": "Profile updated successfully",
-      "securtyQuestionUpdated": "Security question updated successfully",
-      "passwordUpdated": "Password updated successfully"
+      "detailsUpdated": "Profile updated",
+      "securtyQuestionUpdated": "Security question updated",
+      "passwordUpdated": "Password updated"
     }
   }
 }

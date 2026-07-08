@@ -10,7 +10,9 @@ describe('DfFilterBuilderComponent', () => {
     await TestBed.configureTestingModule({
       imports: [DfFilterBuilderComponent],
     }).compileComponents();
-    component = TestBed.createComponent(DfFilterBuilderComponent).componentInstance;
+    component = TestBed.createComponent(
+      DfFilterBuilderComponent
+    ).componentInstance;
   });
 
   it('creates', () => {
@@ -50,9 +52,7 @@ describe('DfFilterBuilderComponent', () => {
   });
 
   it('renders IN as a parenthesised, quoted list', () => {
-    component.conditions = [
-      { field: 'id', operator: 'in', value: '1, 2, 3' },
-    ];
+    component.conditions = [{ field: 'id', operator: 'in', value: '1, 2, 3' }];
     expect(component.compile()).toBe('(id in (1, 2, 3))');
     component.conditions = [
       { field: 'role', operator: 'in', value: 'admin, user' },
@@ -68,9 +68,7 @@ describe('DfFilterBuilderComponent', () => {
   });
 
   it('escapes embedded single quotes', () => {
-    component.conditions = [
-      { field: 'name', operator: '=', value: "O'Brien" },
-    ];
+    component.conditions = [{ field: 'name', operator: '=', value: "O'Brien" }];
     expect(component.compile()).toBe("(name = 'O''Brien')");
   });
 

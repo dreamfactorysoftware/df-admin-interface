@@ -208,7 +208,9 @@ export class DfScopeService {
     return forkJoin({
       roles: this.getRoles(),
       services: this.getServices(),
-    }).pipe(map(({ roles, services }) => this.buildReach(roleId, roles, services)));
+    }).pipe(
+      map(({ roles, services }) => this.buildReach(roleId, roles, services))
+    );
   }
 
   /** Resolve a key/app to its attached role, then its reach. */

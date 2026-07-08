@@ -680,9 +680,7 @@ export class DfTryItComponent implements OnInit {
    *  request (401/403). This is the boundary being proven on screen. */
   get isDenied(): boolean {
     const s = this.response?.status ?? 0;
-    return (
-      this.selectedIdentity?.type === 'key' && (s === 401 || s === 403)
-    );
+    return this.selectedIdentity?.type === 'key' && (s === 401 || s === 403);
   }
 
   /** The role (or key) name to name in the denial message. */

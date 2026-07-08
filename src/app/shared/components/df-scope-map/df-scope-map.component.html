@@ -83,7 +83,9 @@
             <df-badge
               [variant]="e.source === 'inherited' ? 'neutral' : 'accent'"
               [dot]="false"
-              [label]="e.source === 'inherited' ? t('inherited') : t('explicit')">
+              [label]="
+                e.source === 'inherited' ? t('inherited') : t('explicit')
+              ">
             </df-badge>
           </li>
         </ul>

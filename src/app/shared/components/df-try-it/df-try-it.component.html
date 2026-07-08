@@ -202,14 +202,17 @@
       </div>
 
       <!-- Denial: the boundary held. Scoped key hit a 401/403 -->
-      <div class="try-it__denied-banner" *ngIf="isDenied" data-testid="try-it-denied">
+      <div
+        class="try-it__denied-banner"
+        *ngIf="isDenied"
+        data-testid="try-it-denied">
         <mat-icon class="try-it__denied-icon">block</mat-icon>
         <div class="try-it__denied-body">
           <df-badge variant="danger" [label]="t('deniedTitle')"></df-badge>
           <span class="try-it__denied-copy">{{
             t('deniedBoundary', {
               role: deniedIdentityLabel,
-              method: method
+              method: method,
             })
           }}</span>
         </div>

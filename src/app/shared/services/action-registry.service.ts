@@ -12,13 +12,7 @@ import { ROUTES } from '../types/routes';
  * the "+ new" affordances so nav and palette stay in lockstep (spec move 5).
  */
 
-export type PaletteKind =
-  | 'action'
-  | 'service'
-  | 'role'
-  | 'key'
-  | 'mcp'
-  | 'doc';
+export type PaletteKind = 'action' | 'service' | 'role' | 'key' | 'mcp' | 'doc';
 
 export interface PaletteItem {
   /** Stable id for trackBy + recents dedupe. */
@@ -388,9 +382,17 @@ export class ActionRegistryService {
     } else if (url.includes(ROUTES.ROLE_BASED_ACCESS)) {
       ids = [verb('verb.new-role'), verb('verb.new-key'), jump('jump.ai')];
     } else if (url.includes(ROUTES.AI)) {
-      ids = [verb('verb.expose-mcp'), jump('jump.ai-usage'), jump('jump.roles')];
+      ids = [
+        verb('verb.expose-mcp'),
+        jump('jump.ai-usage'),
+        jump('jump.roles'),
+      ];
     } else if (url.includes(ROUTES.RATE_LIMITING)) {
-      ids = [verb('verb.new-limit'), jump('jump.roles'), verb('verb.view-logs')];
+      ids = [
+        verb('verb.new-limit'),
+        jump('jump.roles'),
+        verb('verb.view-logs'),
+      ];
     } else if (url.includes(ROUTES.API_DOCS)) {
       ids = [verb('verb.new-key'), verb('verb.new-role'), jump('jump.ai')];
     } else {

@@ -36,6 +36,7 @@ import { DfLicenseCheckService } from '../../services/df-license-check.service';
 import { debounceTime, distinctUntilChanged, map, of, switchMap } from 'rxjs';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { DfSearchDialogComponent } from '../df-search-dialog/df-search-dialog.component';
+import { DfCommandPaletteService } from '../df-command-palette/df-command-palette.service';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { CommonModule } from '@angular/common';
 import { DfSearchService } from '../../services/df-search.service';
@@ -107,7 +108,8 @@ export class DfSideNavComponent implements OnInit {
     private searchService: DfSearchService,
     private snackbarService: DfSnackbarService,
     private paywallService: DfPaywallService,
-    private systemConfigDataService: DfSystemConfigDataService
+    private systemConfigDataService: DfSystemConfigDataService,
+    private commandPalette: DfCommandPaletteService
   ) {}
 
   ngOnInit(): void {
@@ -326,7 +328,7 @@ export class DfSideNavComponent implements OnInit {
   }
 
   handleSearchClick() {
-    this.dialog.open(DfSearchDialogComponent, { position: { top: '60px' } });
+    this.commandPalette.toggle();
   }
 
   handleLanguageChange(language: string) {

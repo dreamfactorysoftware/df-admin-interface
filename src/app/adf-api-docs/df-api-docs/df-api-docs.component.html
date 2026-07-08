@@ -210,9 +210,7 @@
       </div>
     </div>
 
-    <div
-      class="console-card console-card--filter"
-      *ngIf="showFilterBuilder">
+    <div class="console-card console-card--filter" *ngIf="showFilterBuilder">
       <df-filter-builder
         [fields]="tableFields"
         (filterChange)="onFilterChange($event)"></df-filter-builder>

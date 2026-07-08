@@ -37,24 +37,25 @@
         *ngFor="let row of rows; trackBy: trackByRoleId"
         class="scope-matrix__row"
         role="row">
-        <span class="scope-matrix__role" role="rowheader" [title]="row.roleName">{{
-          row.roleName
-        }}</span>
+        <span
+          class="scope-matrix__role"
+          role="rowheader"
+          [title]="row.roleName"
+          >{{ row.roleName }}</span
+        >
         <button
           *ngFor="let v of verbs; trackBy: trackByVerb"
           type="button"
           class="scope-matrix__cell"
           [class.scope-matrix__cell--full]="cellState(row, v) === 'full'"
-          [class.scope-matrix__cell--filtered]="cellState(row, v) === 'filtered'"
+          [class.scope-matrix__cell--filtered]="
+            cellState(row, v) === 'filtered'
+          "
           [class.scope-matrix__cell--none]="cellState(row, v) === 'none'"
           [disabled]="cellState(row, v) === 'none'"
           role="cell"
           [attr.aria-label]="
-            row.roleName +
-            ' ' +
-            v +
-            ': ' +
-            t('state.' + cellState(row, v))
+            row.roleName + ' ' + v + ': ' + t('state.' + cellState(row, v))
           "
           [title]="t('state.' + cellState(row, v))"
           (click)="onCellClick(row, v)">

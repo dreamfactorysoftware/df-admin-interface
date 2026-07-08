@@ -221,7 +221,10 @@ export class DfAppDetailsComponent implements OnInit {
       })
       .pipe(
         catchError(() =>
-          of({ resource: [], meta: { count: 0 } } as GenericListResponse<LimitType>)
+          of({
+            resource: [],
+            meta: { count: 0 },
+          } as GenericListResponse<LimitType>)
         )
       )
       .subscribe(res => {

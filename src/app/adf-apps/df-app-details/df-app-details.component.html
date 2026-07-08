@@ -323,7 +323,9 @@
 
       <div class="metering-block">
         <h3>{{ 'apps.metering.reachTitle' | transloco }}</h3>
-        <p class="metering-hint" *ngIf="selectedRoleId !== null; else noRoleHint">
+        <p
+          class="metering-hint"
+          *ngIf="selectedRoleId !== null; else noRoleHint">
           {{
             'apps.metering.reachHintRole'
               | transloco: { role: appForm.value.defaultRole?.name }
@@ -349,7 +351,8 @@
               <span class="metering-limit-rate df-numeric"
                 >{{ limit.label }}
                 {{
-                  'apps.metering.perPeriod' | transloco: { period: limit.period }
+                  'apps.metering.perPeriod'
+                    | transloco: { period: limit.period }
                 }}</span
               >
             </div>

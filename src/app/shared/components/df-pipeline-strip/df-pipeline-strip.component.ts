@@ -251,7 +251,9 @@ export class DfPipelineStripComponent implements OnChanges, OnDestroy {
       icon: 'bolt',
       present: true,
       status: 'handler',
-      detailKey: this.serviceType ? 'nodes.handler.detail' : 'nodes.handler.empty',
+      detailKey: this.serviceType
+        ? 'nodes.handler.detail'
+        : 'nodes.handler.empty',
       detailParams: this.serviceType ? { type: this.serviceType } : undefined,
       // The generated API's own docs are the terminal deep-link.
       link: this.serviceName

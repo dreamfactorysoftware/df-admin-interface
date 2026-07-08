@@ -136,7 +136,10 @@ type CallRow = {
               matTooltip="{{ t('refresh') }}">
               <mat-icon>refresh</mat-icon>
             </button>
-            <button mat-flat-button color="primary" (click)="showNew = !showNew">
+            <button
+              mat-flat-button
+              color="primary"
+              (click)="showNew = !showNew">
               <mat-icon>add</mat-icon> {{ t('newAgent') }}
             </button>
           </div>
@@ -152,8 +155,12 @@ type CallRow = {
             <div class="log-controls">
               <mat-form-field appearance="outline" class="ctl">
                 <mat-label>{{ t('log.status') }}</mat-label>
-                <mat-select [(ngModel)]="statusFilter" (ngModelChange)="applyCallFilter()">
-                  <mat-option value="all">{{ t('log.allStatuses') }}</mat-option>
+                <mat-select
+                  [(ngModel)]="statusFilter"
+                  (ngModelChange)="applyCallFilter()">
+                  <mat-option value="all">{{
+                    t('log.allStatuses')
+                  }}</mat-option>
                   <mat-option value="ok">{{ t('log.ok') }}</mat-option>
                   <mat-option value="error">{{ t('log.error') }}</mat-option>
                 </mat-select>
@@ -206,7 +213,9 @@ type CallRow = {
                   tabindex="0"
                   (click)="openCall(c)"
                   (keydown.enter)="openCall(c)">
-                  <td class="muted nowrap">{{ c.createdAt | date: 'MMM d, HH:mm' }}</td>
+                  <td class="muted nowrap">
+                    {{ c.createdAt | date: 'MMM d, HH:mm' }}
+                  </td>
                   <td>{{ c.provider }}</td>
                   <td class="mono">{{ c.model }}</td>
                   <td>
@@ -216,7 +225,8 @@ type CallRow = {
                     </df-badge>
                   </td>
                   <td class="num df-numeric">
-                    {{ c.inputTokens | number }} <span class="arrow">&rarr;</span>
+                    {{ c.inputTokens | number }}
+                    <span class="arrow">&rarr;</span>
                     {{ c.outputTokens | number }}
                   </td>
                   <td class="num df-numeric">{{ usd(c.costUsd) }}</td>
@@ -225,7 +235,9 @@ type CallRow = {
                     <df-badge
                       [variant]="c.roleId != null ? 'success' : 'warning'"
                       [dot]="false"
-                      [label]="c.roleId != null ? t('log.scoped') : t('log.unscoped')">
+                      [label]="
+                        c.roleId != null ? t('log.scoped') : t('log.unscoped')
+                      ">
                     </df-badge>
                   </td>
                 </tr>
@@ -321,13 +333,15 @@ type CallRow = {
                   !a.isActive
                     ? t('state.revoked')
                     : expired(a)
-                    ? t('state.expired')
-                    : t('state.active')
+                      ? t('state.expired')
+                      : t('state.active')
                 ">
               </df-badge>
               <strong>{{ a.name }}</strong>
               <span class="tag">{{ roleName(a.roleId) }}</span>
-              <span class="muted" *ngIf="a.description">{{ a.description }}</span>
+              <span class="muted" *ngIf="a.description">{{
+                a.description
+              }}</span>
               <span class="spacer"></span>
               <code class="key" matTooltip="Agent API key">{{
                 maskKey(a.apiKey)
@@ -409,7 +423,9 @@ type CallRow = {
             [title]="t('pending.empty.title')"
             [description]="t('pending.empty.message')">
           </df-empty-state>
-          <div class="row" *ngFor="let q of pendingRequests; trackBy: trackById">
+          <div
+            class="row"
+            *ngFor="let q of pendingRequests; trackBy: trackById">
             <mat-icon class="hand">pan_tool</mat-icon>
             <strong>{{ agentName(q.agentId) }}</strong>
             <span class="muted">requests</span>
@@ -465,21 +481,27 @@ type CallRow = {
                   <td>
                     <df-badge
                       [variant]="
-                        !a.isActive ? 'danger' : expired(a) ? 'warning' : 'success'
+                        !a.isActive
+                          ? 'danger'
+                          : expired(a)
+                            ? 'warning'
+                            : 'success'
                       "
                       [dot]="false"
                       [label]="
                         !a.isActive
                           ? t('state.revoked')
                           : expired(a)
-                          ? t('state.expired')
-                          : t('state.active')
+                            ? t('state.expired')
+                            : t('state.active')
                       ">
                     </df-badge>
                   </td>
                   <td class="muted">
                     {{
-                      a.lastActiveAt ? (a.lastActiveAt | date: 'short') : 'never'
+                      a.lastActiveAt
+                        ? (a.lastActiveAt | date: 'short')
+                        : 'never'
                     }}
                   </td>
                   <td class="num df-numeric">{{ requestCount(a.id) }}</td>
@@ -542,7 +564,9 @@ type CallRow = {
           <div class="chips">
             <df-badge
               [variant]="selected.ok ? 'success' : 'danger'"
-              [label]="selected.ok ? t('drawer.completed') : t('drawer.failed')">
+              [label]="
+                selected.ok ? t('drawer.completed') : t('drawer.failed')
+              ">
             </df-badge>
             <df-badge
               [variant]="selected.roleId != null ? 'success' : 'warning'"
@@ -634,7 +658,8 @@ type CallRow = {
       }
       @keyframes live-pulse {
         0% {
-          box-shadow: 0 0 0 0 color-mix(in srgb, var(--df-success) 60%, transparent);
+          box-shadow: 0 0 0 0
+            color-mix(in srgb, var(--df-success) 60%, transparent);
         }
         70% {
           box-shadow: 0 0 0 5px transparent;
@@ -1066,18 +1091,30 @@ export class DfAgentsComponent implements OnInit, OnDestroy {
   }
 
   private toCallRow(c: ExpensiveCallRowRaw, bundle: UsageBundle): CallRow {
-    const svc = c.service_id != null ? bundle.services.get(c.service_id) : undefined;
+    const svc =
+      c.service_id != null ? bundle.services.get(c.service_id) : undefined;
     return {
       id: c.id,
       provider: c.provider || '-',
       model: c.model || '-',
       resource: c.resource || '-',
       serviceLabel:
-        svc?.label || svc?.name || (c.service_id != null ? `service #${c.service_id}` : '-'),
-      userLabel: c.user_id != null ? bundle.users.get(c.user_id) ?? `user #${c.user_id}` : '-',
+        svc?.label ||
+        svc?.name ||
+        (c.service_id != null ? `service #${c.service_id}` : '-'),
+      userLabel:
+        c.user_id != null
+          ? (bundle.users.get(c.user_id) ?? `user #${c.user_id}`)
+          : '-',
       roleId: c.role_id ?? null,
-      roleLabel: c.role_id != null ? bundle.roles.get(c.role_id) ?? `role #${c.role_id}` : null,
-      appLabel: c.app_id != null ? bundle.apps.get(c.app_id) ?? `app #${c.app_id}` : null,
+      roleLabel:
+        c.role_id != null
+          ? (bundle.roles.get(c.role_id) ?? `role #${c.role_id}`)
+          : null,
+      appLabel:
+        c.app_id != null
+          ? (bundle.apps.get(c.app_id) ?? `app #${c.app_id}`)
+          : null,
       inputTokens: n(c.input_tokens),
       outputTokens: n(c.output_tokens),
       costUsd: n(c.cost_usd),
@@ -1092,9 +1129,7 @@ export class DfAgentsComponent implements OnInit, OnDestroy {
     this.filteredCalls =
       this.statusFilter === 'all'
         ? this.calls
-        : this.calls.filter(c =>
-            this.statusFilter === 'ok' ? c.ok : !c.ok
-          );
+        : this.calls.filter(c => (this.statusFilter === 'ok' ? c.ok : !c.ok));
   }
 
   openCall(c: CallRow): void {

@@ -45,9 +45,7 @@ interface SessionGroup {
         No sessions yet.
       </div>
 
-      <div
-        *ngIf="!loading && sessions.length > 0"
-        class="session-list__scroll">
+      <div *ngIf="!loading && sessions.length > 0" class="session-list__scroll">
         <section
           *ngFor="let g of groups; trackBy: trackGroup"
           class="session-list__group">
@@ -255,8 +253,11 @@ export class DfChatSessionListComponent {
    *  chat poll ticks every second) is wasted work. Keyed on the sessions
    *  array reference — the parent always reassigns it on change — plus the
    *  calendar day so the Today/Yesterday split stays fresh past midnight. */
-  private groupCache: { ref: ChatSession[]; day: string; groups: SessionGroup[] } | null =
-    null;
+  private groupCache: {
+    ref: ChatSession[];
+    day: string;
+    groups: SessionGroup[];
+  } | null = null;
 
   get groups(): SessionGroup[] {
     const day = new Date().toDateString();

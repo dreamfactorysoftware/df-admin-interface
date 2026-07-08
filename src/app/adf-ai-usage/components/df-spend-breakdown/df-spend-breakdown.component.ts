@@ -68,9 +68,7 @@ interface RenderSlice {
         </div>
 
         <ul class="sbd__list">
-          <li
-            *ngFor="let s of slices; trackBy: trackSlice"
-            class="sbd__row">
+          <li *ngFor="let s of slices; trackBy: trackSlice" class="sbd__row">
             <div class="sbd__row-head">
               <span class="sbd__swatch" [style.background]="s.tint"></span>
               <span

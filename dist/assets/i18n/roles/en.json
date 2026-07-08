@@ -40,7 +40,7 @@
     "noAccess": "This role grants no service access.",
     "noVerbs": "no verbs",
     "noAccessLabel": "no access",
-    "footer": "This role can ONLY access the services and components listed under \"Allowed\" above. All other data is invisible to anything operating under this role — including AI.",
+    "footer": "This role can ONLY access the services and components listed under \"Allowed\" above. All other data is invisible to anything operating under this role, including AI.",
     "back": "Back to role",
     "action": "View scope",
     "errorRecovery": "Back to roles list"
