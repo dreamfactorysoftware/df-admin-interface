@@ -73,6 +73,10 @@
   display: flex;
   align-items: flex-start;
   gap: var(--df-space-2);
+  // Wrap INSIDE the builder: field/operator/value must never spill past the
+  // card's right edge. When the host column is tight they stack, but they stay
+  // on the same row while there is room, so the three read as one control.
+  flex-wrap: wrap;
 
   &__join,
   &__spacer {
@@ -87,19 +91,21 @@
     width: 100%;
   }
 
+  // Shrinkable slots (min-width:0) so a narrow card compresses them instead of
+  // pushing the value input outside the box. flex-basis keeps sane proportions.
   &__field {
-    flex: 1 1 0;
-    min-width: 12rem;
+    flex: 1 1 12rem;
+    min-width: 0;
   }
 
   &__op {
-    flex: 1 1 0;
-    min-width: 12rem;
+    flex: 1 1 8rem;
+    min-width: 0;
   }
 
   &__value {
-    flex: 1 1 0;
-    min-width: 12rem;
+    flex: 1 1 10rem;
+    min-width: 0;
 
     &--empty {
       align-self: stretch;

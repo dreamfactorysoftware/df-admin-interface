@@ -2,7 +2,18 @@
   <section class="try-it" data-testid="df-try-it">
     <!-- Request line: method + path + send -->
     <div class="try-it__request-line">
-      <mat-form-field appearance="outline" class="try-it__method">
+      <!-- Locked: the host (API docs) sets the verb by the chosen operation. -->
+      <span
+        *ngIf="lockMethod"
+        class="try-it__method-chip"
+        [ngClass]="'m-' + method.toLowerCase()"
+        [attr.aria-label]="t('methodLabel')"
+        >{{ method }}</span
+      >
+      <mat-form-field
+        *ngIf="!lockMethod"
+        appearance="outline"
+        class="try-it__method">
         <mat-select
           [(ngModel)]="method"
           [attr.aria-label]="t('methodLabel')"
@@ -51,8 +62,14 @@
           data-testid="try-it-identity">
           <mat-option
             *ngFor="let i of identities; trackBy: trackByIdentity"
-            [value]="i.id">
+            [value]="i.id"
+            [class.try-it__identity-option--session]="i.type === 'session'">
             <span class="try-it__identity-name">{{ i.label }}</span>
+            <span
+              class="try-it__identity-default"
+              *ngIf="i.type === 'session'"
+              >{{ t('sessionDefault') }}</span
+            >
             <span class="try-it__identity-meta" *ngIf="i.roleName">
               {{ i.roleName }}</span
             >

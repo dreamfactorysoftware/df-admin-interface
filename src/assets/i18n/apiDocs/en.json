@@ -30,7 +30,12 @@
     "type": "Type",
     "required": "Required",
     "description": "Description",
-    "requiredLabel": "Required"
+    "requiredLabel": "Required",
+    "addToCall": "Add to the test call"
+  },
+  "table": {
+    "pick": "Table",
+    "hint": "Pick a table to call a real endpoint."
   },
   "response": {
     "code": "Code",

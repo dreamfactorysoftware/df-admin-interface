@@ -51,6 +51,10 @@ export interface TryItIdentity {
   apiKey?: string;
   roleName?: string;
   readOnly?: boolean;
+  /** Privileged app key (admin / api_docs / file_manager, no bound role) that
+   *  the server refuses without the admin JWT. When true the request rides the
+   *  session/HttpClient path so the token is attached and it does not 400. */
+  requiresSession?: boolean;
 }
 
 /** Emitted after every send so a host (e.g. a Recent Requests tab) can log it. */
@@ -137,6 +141,10 @@ const VERB_GET = 1;
 export class DfTryItComponent implements OnInit {
   /** HTTP verb. */
   @Input() method: TryItMethod = 'GET';
+  /** When true the method is fixed by the host (the API docs pick the operation
+   *  on the left, so the console shows the verb as a static chip instead of a
+   *  second, contradictory picker). */
+  @Input() lockMethod = false;
   /** Path appended to `baseUrl`, e.g. `/_table/employees`. */
   @Input() path = '';
   /** Service base, e.g. `/api/v2/mysql`. Falls back to the instance API root. */
@@ -194,7 +202,7 @@ export class DfTryItComponent implements OnInit {
 
   ngOnInit(): void {
     this.identities = [
-      { id: 'session', label: 'Session (you)', type: 'session' },
+      { id: 'session', label: 'Session (You)', type: 'session' },
     ];
     if (this.apiKey) {
       this.identities.push({
@@ -261,8 +269,6 @@ export class DfTryItComponent implements OnInit {
     apps: AppRow[],
     roleMeta: Map<number, { name: string; readOnly: boolean }>
   ): void {
-    let readOnlyDefault: string | null = null;
-
     apps.forEach(app => {
       const key = app.apiKey ?? app.api_key;
       const active = app.isActive ?? app.is_active ?? true;
@@ -281,18 +287,15 @@ export class DfTryItComponent implements OnInit {
         apiKey: key,
         roleName: meta?.name,
         readOnly: meta?.readOnly,
+        // No bound role == a privileged app key (admin/api_docs/file_manager):
+        // it needs the admin JWT or the server 400s "No JWT provided".
+        requiresSession: roleId == null,
       };
       this.identities.push(identity);
-      if (meta?.readOnly && !readOnlyDefault) {
-        readOnlyDefault = key;
-      }
     });
 
-    // Default to a read-only identity when one exists and the caller did not
-    // pin an explicit key.
-    if (!this.apiKey && readOnlyDefault) {
-      this.selectedIdentityId = readOnlyDefault;
-    }
+    // The default identity is ALWAYS the session (you), so the console returns
+    // real data out of the box. A scoped key is a deliberate opt-in.
   }
 
   get selectedIdentity(): TryItIdentity {
@@ -345,13 +348,15 @@ export class DfTryItComponent implements OnInit {
       out['Content-Type'] = 'application/json';
     }
     const identity = this.selectedIdentity;
+    const token = this.userData.token;
     if (identity?.type === 'key' && identity.apiKey) {
       out[API_KEY_HEADER] = identity.apiKey;
-    } else {
-      const token = this.userData.token;
-      if (token) {
+      // Privileged app keys additionally need the admin JWT.
+      if (identity.requiresSession && token) {
         out[SESSION_TOKEN_HEADER] = token;
       }
+    } else if (token) {
+      out[SESSION_TOKEN_HEADER] = token;
     }
     this.headers
       .filter(h => h.enabled && h.key.trim())
@@ -367,6 +372,29 @@ export class DfTryItComponent implements OnInit {
 
   addParam(): void {
     this.params.push({ key: '', value: '', enabled: true });
+  }
+
+  /** Host hook (API docs "click a parameter to add it to the call"). Drops a
+   *  prefilled query-param — or header — row into the builder, ready for a
+   *  value. Re-adding an existing key just re-enables it, never duplicates. */
+  injectParam(name: string, location: 'query' | 'header' = 'query'): void {
+    const key = (name ?? '').trim();
+    if (!key) {
+      return;
+    }
+    const target = location === 'header' ? this.headers : this.params;
+    const existing = target.find(r => r.key.trim() === key);
+    if (existing) {
+      existing.enabled = true;
+      return;
+    }
+    const row = { key, value: '', enabled: true };
+    // Replace the single trailing blank row rather than burying the new one.
+    if (target.length === 1 && !target[0].key.trim()) {
+      target[0] = row;
+    } else {
+      target.push(row);
+    }
   }
 
   removeParam(index: number): void {
@@ -397,14 +425,20 @@ export class DfTryItComponent implements OnInit {
     const identity = this.selectedIdentity;
     const started = performance.now();
 
-    // A scoped API key must fire OUTSIDE Angular's HttpClient. The
-    // session-token interceptor force-injects the admin API key AND the admin
-    // session token onto every /api request, so an HttpClient call would run
-    // as the admin no matter which identity is picked — the switcher would be
-    // theater. A raw fetch with credentials:'omit' carrying only the selected
-    // key's header is the true, unprivileged request: a read-only role really
-    // does 403 on DELETE, and the response panel shows the real boundary.
-    if (identity?.type === 'key' && identity.apiKey) {
+    // A SCOPED API key (bound to a role) must fire OUTSIDE Angular's HttpClient.
+    // The session-token interceptor force-injects the admin API key AND the
+    // admin session token onto every /api request, so an HttpClient call would
+    // run as the admin no matter which identity is picked — the switcher would
+    // be theater. A raw fetch with credentials:'omit' carrying only the
+    // selected key's header is the true, unprivileged request: a read-only role
+    // really does 403 on DELETE, and the response panel shows the real
+    // boundary. Privileged app keys (requiresSession) are the exception — the
+    // server rejects them without the admin JWT, so they take the session path.
+    if (
+      identity?.type === 'key' &&
+      identity.apiKey &&
+      !identity.requiresSession
+    ) {
       void this.sendAsKey(started);
       return;
     }
