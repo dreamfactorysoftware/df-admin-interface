@@ -196,6 +196,44 @@
   "githubFile": "Github Import",
   "schema": "Schema",
   "apiDocs": "API docs",
+  "filterBuilder": {
+    "title": "Filter",
+    "mode": {
+      "visual": "Build",
+      "raw": "Raw",
+      "aria": "Filter input mode"
+    },
+    "conj": {
+      "and": "And",
+      "or": "Or",
+      "aria": "Join conditions with"
+    },
+    "field": "Field",
+    "operator": "Operator",
+    "value": "Value",
+    "valueList": "Values (comma-separated)",
+    "rawLabel": "Filter string",
+    "rawPlaceholder": "(age > 21) and (status = 'active')",
+    "addCondition": "Add condition",
+    "removeRow": "Remove condition",
+    "clear": "Clear",
+    "op": {
+      "eq": "equals",
+      "neq": "not equals",
+      "gt": "greater than",
+      "gte": "greater or equal",
+      "lt": "less than",
+      "lte": "less or equal",
+      "like": "like",
+      "contains": "contains",
+      "startsWith": "starts with",
+      "endsWith": "ends with",
+      "in": "in",
+      "notIn": "not in",
+      "isNull": "is null",
+      "isNotNull": "is not null"
+    }
+  },
   "searchFeatures": "Search Features",
   "scriptType": "Script Type",
   "scriptTypes": {

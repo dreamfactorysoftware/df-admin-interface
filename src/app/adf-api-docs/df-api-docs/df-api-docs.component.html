@@ -210,6 +210,14 @@
       </div>
     </div>
 
+    <div
+      class="console-card console-card--filter"
+      *ngIf="showFilterBuilder">
+      <df-filter-builder
+        [fields]="tableFields"
+        (filterChange)="onFilterChange($event)"></df-filter-builder>
+    </div>
+
     <div class="console-card console-card--tryit">
       <p class="df-eyebrow console-card__label">
         {{ 'apiDocs.console.title' | transloco }}
@@ -220,6 +228,7 @@
         [path]="op.path"
         [serviceName]="serviceName || undefined"
         [apiKey]="selectedApiKey || undefined"
+        [filter]="currentFilter"
         (sent)="onTryItSent($event)"></df-try-it>
     </div>
   </aside>

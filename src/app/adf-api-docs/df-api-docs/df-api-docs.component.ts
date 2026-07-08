@@ -55,6 +55,7 @@ import {
   TryItMethod,
   TryItResult,
 } from 'src/app/shared/components/df-try-it/df-try-it.component';
+import { DfFilterBuilderComponent } from 'src/app/shared/components/df-filter-builder/df-filter-builder.component';
 
 interface ServiceResponse {
   resource: Array<{
@@ -128,6 +129,7 @@ const KNOWN_METHODS: TryItMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
     DfEmptyStateComponent,
     DfPageHeaderComponent,
     DfTryItComponent,
+    DfFilterBuilderComponent,
   ],
 })
 export class DfApiDocsComponent implements OnInit, OnDestroy {
@@ -145,6 +147,11 @@ export class DfApiDocsComponent implements OnInit, OnDestroy {
   // Right column.
   snippetLang: SnippetLang = 'curl';
   selectedApiKey: string | null = null;
+
+  // Filter builder (spec 3.5): compiled ?filter= string + the current table's
+  // columns (when the selected op is a table GET the schema is introspectable).
+  currentFilter = '';
+  tableFields: string[] = [];
 
   // Raw-spec (advanced) demotion.
   showAdvanced = false;
@@ -272,7 +279,11 @@ export class DfApiDocsComponent implements OnInit, OnDestroy {
       .sort((a, b) => a.tag.localeCompare(b.tag));
 
     const first = this.groups[0]?.operations[0] ?? null;
-    this.selectedOp = first;
+    if (first) {
+      this.selectOperation(first);
+    } else {
+      this.selectedOp = null;
+    }
     this.loading = false;
   }
 
@@ -317,6 +328,58 @@ export class DfApiDocsComponent implements OnInit, OnDestroy {
 
   selectOperation(op: DocOperation): void {
     this.selectedOp = op;
+    // A new operation means a fresh filter and, when it targets a real table,
+    // fresh column options for the visual builder.
+    this.currentFilter = '';
+    this.tableFields = [];
+    this.loadTableFields(op);
+  }
+
+  /** True when the selected op is a table-collection GET, i.e. a `?filter=`
+   *  actually shapes the response. Gates the filter builder in the console. */
+  get showFilterBuilder(): boolean {
+    const op = this.selectedOp;
+    return !!op && op.method === 'GET' && /_table\//.test(op.path);
+  }
+
+  /** Pull the table name out of a `/_table/<name>` path. Braced OpenAPI
+   *  placeholders (`{table_name}`) are rejected, so those fall back to the
+   *  builder's free-text field input rather than a bad schema fetch. */
+  private tableFromPath(path: string): string | null {
+    const m = path.match(/_table\/([^/{}]+)(?:\/|$)/);
+    return m ? m[1] : null;
+  }
+
+  /** Best-effort schema introspection so the field slot lists real columns.
+   *  Silent on failure: the builder still works with a free-text field. */
+  private loadTableFields(op: DocOperation): void {
+    if (!this.serviceName || op.method !== 'GET') {
+      return;
+    }
+    const table = this.tableFromPath(op.path);
+    if (!table) {
+      return;
+    }
+    this.subscriptions.push(
+      this.http
+        .get<{ field?: Array<{ name: string }> }>(
+          `${BASE_URL}/${this.serviceName}/_schema/${table}`,
+          { params: { fields: 'name' }, context: toastOff() }
+        )
+        .pipe(
+          map(res => (res.field ?? []).map(f => f.name)),
+          catchError(() => of([] as string[]))
+        )
+        .subscribe(names => {
+          if (this.selectedOp === op) {
+            this.tableFields = names;
+          }
+        })
+    );
+  }
+
+  onFilterChange(filter: string): void {
+    this.currentFilter = filter;
   }
 
   isSelected(op: DocOperation): boolean {
@@ -337,7 +400,11 @@ export class DfApiDocsComponent implements OnInit, OnDestroy {
 
   private get fullUrl(): string {
     const path = this.selectedOp?.path ?? '';
-    return `${window.location.origin}${this.serviceBaseUrl}${path}`;
+    const base = `${window.location.origin}${this.serviceBaseUrl}${path}`;
+    if (this.currentFilter) {
+      return `${base}?filter=${encodeURIComponent(this.currentFilter)}`;
+    }
+    return base;
   }
 
   private get mcpUrl(): string {
