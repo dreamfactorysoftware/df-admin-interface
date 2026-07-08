@@ -499,6 +499,25 @@
         [keys]="artifactKeys"
         (createKey)="onCreateApiKey()">
       </df-artifact-card>
+
+      <!-- Meridian Phase 3: Access. Governance made legible where you build
+           the API. The roles x verbs matrix is derived client-side from the
+           role graph; clicking a granted cell opens the role's resolved scope.
+      -->
+      <section class="service-access" *ngIf="serviceData.id">
+        <df-page-header
+          [eyebrow]="'services.access.eyebrow' | transloco"
+          [title]="'services.access.title' | transloco"
+          [description]="'services.access.description' | transloco">
+        </df-page-header>
+        <p class="service-access__hint">
+          {{ 'services.access.hint' | transloco }}
+        </p>
+        <df-scope-matrix
+          [serviceId]="serviceData.id"
+          (cellClick)="onScopeCellClick($event)">
+        </df-scope-matrix>
+      </section>
     </ng-container>
 
     <mat-form-field

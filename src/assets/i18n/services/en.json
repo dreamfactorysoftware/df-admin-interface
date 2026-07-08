@@ -79,5 +79,17 @@
     "testYourApi": "Test Your API Now",
     "exploreLater": "I'll explore later",
     "autoRedirectTest": "Redirecting to API testing playground..."
+  },
+  "access": {
+    "eyebrow": "Access",
+    "title": "Who can reach this service",
+    "description": "Every role is a row, every HTTP verb a column. Green is full access, amber is filtered, muted is none. Derived live from the role graph.",
+    "hint": "Agents and API keys inherit these grants through their role. Click any granted cell to see exactly what that role can reach across the platform.",
+    "dialog": {
+      "eyebrow": "Resolved scope",
+      "title": "{{verb}} on {{service}}",
+      "hint": "This is everything the role reaches, not just this service. Grants marked inherited come from a wildcard rule; explicit grants target one service. Edit the role to change what agents and keys under it can touch.",
+      "close": "Close"
+    }
   }
 }
