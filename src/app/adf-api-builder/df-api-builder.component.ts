@@ -226,7 +226,7 @@ type WorkflowStep = {
 
         <mat-card
           class="api-card"
-          *ngFor="let api of apis"
+          *ngFor="let api of apis; trackBy: trackById"
           (click)="selectApi(api.id)">
           <mat-card-header>
             <mat-icon mat-card-avatar>api</mat-icon>
@@ -2304,39 +2304,86 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
     outputShape: ['resource' as OutputShape],
   });
 
+  // Getter results below are memoized on their inputs (all list dependencies
+  // are replaced wholesale, never mutated in place) so template bindings get
+  // stable references across change-detection cycles instead of fresh arrays.
+  // Same pattern as executionStepsCache; motivated by the Create API tab
+  // freeze caused by allocating bindings on this screen.
+  private selectedEndpointsCache: {
+    endpoints: EndpointDefinition[];
+    apiId: number | null;
+    value: EndpointDefinition[];
+  } | null = null;
+
   get selectedEndpoints(): EndpointDefinition[] {
-    if (!this.selectedApiId) {
-      return [];
+    const cache = this.selectedEndpointsCache;
+    if (
+      cache &&
+      cache.endpoints === this.endpoints &&
+      cache.apiId === this.selectedApiId
+    ) {
+      return cache.value;
     }
 
-    return this.endpoints.filter(
-      endpoint => (endpoint.apiId ?? endpoint.api_id) === this.selectedApiId
-    );
+    const value = !this.selectedApiId
+      ? []
+      : this.endpoints.filter(
+          endpoint => (endpoint.apiId ?? endpoint.api_id) === this.selectedApiId
+        );
+    this.selectedEndpointsCache = {
+      endpoints: this.endpoints,
+      apiId: this.selectedApiId,
+      value,
+    };
+    return value;
   }
 
+  private filteredSourceServicesCache: {
+    services: SourceService[];
+    workspaceIds: Set<number> | null;
+    search: string;
+    value: SourceService[];
+  } | null = null;
+
   get filteredSourceServices(): SourceService[] {
+    const cache = this.filteredSourceServicesCache;
+    if (
+      cache &&
+      cache.services === this.sourceServices &&
+      cache.workspaceIds === this.workspaceServiceIds &&
+      cache.search === this.sourceServiceSearch
+    ) {
+      return cache.value;
+    }
+
     // Scope the source picker to this API's workspace. When a workspace is
     // defined, an endpoint may only build from those services (the executor
     // enforces the same at runtime). An empty/absent workspace shows all, so
     // APIs created before workspaces existed keep working.
-    let list = [...this.sourceServices];
+    let value = this.sourceServices;
     if (this.workspaceServiceIds && this.workspaceServiceIds.size) {
-      list = list.filter(
+      value = value.filter(
         service =>
           service.id != null && this.workspaceServiceIds!.has(service.id)
       );
     }
 
     const query = this.sourceServiceSearch.trim().toLowerCase();
-    if (!query) {
-      return list;
+    if (query) {
+      value = value.filter(service => {
+        const haystack =
+          `${service.name} ${service.label ?? ''} ${service.type}`.toLowerCase();
+        return haystack.includes(query);
+      });
     }
 
-    return list.filter(service => {
-      const haystack =
-        `${service.name} ${service.label ?? ''} ${service.type}`.toLowerCase();
-      return haystack.includes(query);
-    });
+    this.filteredSourceServicesCache = {
+      services: this.sourceServices,
+      workspaceIds: this.workspaceServiceIds,
+      search: this.sourceServiceSearch,
+      value,
+    };
+    return value;
   }
 
   /** Service ids in the selected API's workspace, or null when none defined. */
@@ -2364,33 +2411,104 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
       });
   }
 
+  private filteredSourceTablesCache: {
+    tables: SourceTable[];
+    search: string;
+    value: SourceTable[];
+  } | null = null;
+
   get filteredSourceTables(): SourceTable[] {
-    const query = this.sourceTableSearch.trim().toLowerCase();
-    if (!query) {
-      return [...this.sourceTables];
+    const cache = this.filteredSourceTablesCache;
+    if (
+      cache &&
+      cache.tables === this.sourceTables &&
+      cache.search === this.sourceTableSearch
+    ) {
+      return cache.value;
     }
 
-    return this.sourceTables.filter(table => {
-      const haystack = `${table.name} ${table.label ?? ''}`.toLowerCase();
-      return haystack.includes(query);
-    });
+    const query = this.sourceTableSearch.trim().toLowerCase();
+    const value = !query
+      ? this.sourceTables
+      : this.sourceTables.filter(table => {
+          const haystack = `${table.name} ${table.label ?? ''}`.toLowerCase();
+          return haystack.includes(query);
+        });
+
+    this.filteredSourceTablesCache = {
+      tables: this.sourceTables,
+      search: this.sourceTableSearch,
+      value,
+    };
+    return value;
   }
+
+  private recentSourceServicesCache: {
+    names: string[];
+    services: SourceService[];
+    value: SourceService[];
+  } | null = null;
 
   get recentSourceServices(): SourceService[] {
-    return this.recentSourceNames
+    const cache = this.recentSourceServicesCache;
+    if (
+      cache &&
+      cache.names === this.recentSourceNames &&
+      cache.services === this.sourceServices
+    ) {
+      return cache.value;
+    }
+
+    const value = this.recentSourceNames
       .map(name => this.sourceServices.find(service => service.name === name))
       .filter((service): service is SourceService => !!service);
+    this.recentSourceServicesCache = {
+      names: this.recentSourceNames,
+      services: this.sourceServices,
+      value,
+    };
+    return value;
   }
 
-  get workflowSteps(): WorkflowStep[] {
-    const serviceSelected = !!this.sourceForm.value.service;
-    const tableSelected = !!this.sourceForm.value.table;
-    const hasFields = this.selectedFieldNames.length > 0;
-    const hasRuleData = this.filterRules.length > 0;
-    const hasOutput = !!this.sourceForm.value.outputShape;
-    const hasSavedEndpoint = !!this.selectedEndpointId;
+  private workflowStepsCache: {
+    service: string | null | undefined;
+    table: string | null | undefined;
+    outputShape: OutputShape | null | undefined;
+    fieldCount: number;
+    ruleCount: number;
+    endpointId: number | null;
+    value: WorkflowStep[];
+  } | null = null;
 
-    return [
+  get workflowSteps(): WorkflowStep[] {
+    const service = this.sourceForm.value.service;
+    const table = this.sourceForm.value.table;
+    const outputShape = this.sourceForm.value.outputShape;
+    const fieldCount = this.selectedFields.size;
+    const ruleCount = this.filterRules.length;
+    const endpointId = this.selectedEndpointId;
+
+    const cache = this.workflowStepsCache;
+    if (
+      cache &&
+      cache.service === service &&
+      cache.table === table &&
+      cache.outputShape === outputShape &&
+      cache.fieldCount === fieldCount &&
+      cache.ruleCount === ruleCount &&
+      cache.endpointId === endpointId
+    ) {
+      return cache.value;
+    }
+
+    const serviceSelected = !!service;
+    const tableSelected = !!table;
+    const hasFields = fieldCount > 0;
+    const hasRuleData = ruleCount > 0;
+    const hasOutput = !!outputShape;
+    const hasSavedEndpoint = !!endpointId;
+
+    const value: WorkflowStep[] = [
       {
         key: 'source',
         label: 'Data',
@@ -2403,25 +2521,19 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
       {
         key: 'shape',
         label: 'Fields',
-        detail: hasFields
-          ? `${this.selectedFieldNames.length} fields selected`
-          : 'Select fields',
+        detail: hasFields ? `${fieldCount} fields selected` : 'Select fields',
         complete: hasFields,
       },
       {
         key: 'rules',
         label: 'Filters',
-        detail: hasRuleData
-          ? `${this.filterRules.length} filters`
-          : 'None (optional)',
+        detail: hasRuleData ? `${ruleCount} filters` : 'None (optional)',
         complete: true,
       },
       {
         key: 'output',
         label: 'Response',
-        detail: hasOutput
-          ? `Shape: ${this.sourceForm.value.outputShape}`
-          : 'Set output options',
+        detail: hasOutput ? `Shape: ${outputShape}` : 'Set output options',
         complete: hasOutput,
       },
       {
@@ -2431,6 +2543,17 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
         complete: hasSavedEndpoint,
       },
     ];
+
+    this.workflowStepsCache = {
+      service,
+      table,
+      outputShape,
+      fieldCount,
+      ruleCount,
+      endpointId,
+      value,
+    };
+    return value;
   }
 
   get executionStepsPreview(): StepPreview[] {
@@ -2495,16 +2618,38 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
     return !!this.executionPlanError || !!this.responseMappingError;
   }
 
+  // selectedFields/selectedRelationships/fieldAliases are mutated in place in
+  // many spots, so these can't be keyed on reference identity like the caches
+  // above. Instead: recompute (cheap — bounded by the user's selection size)
+  // and keep the previous array when contents are unchanged, so *ngFor differs
+  // and child @Input()s ([fieldNames]/[relationshipNames]) see a stable
+  // reference and skip re-render work on every CD cycle.
+  private selectedFieldNamesCache: string[] = [];
+
   get selectedFieldNames(): string[] {
-    return Array.from(this.selectedFields);
+    const next = Array.from(this.selectedFields);
+    if (!sameStringArray(next, this.selectedFieldNamesCache)) {
+      this.selectedFieldNamesCache = next;
+    }
+    return this.selectedFieldNamesCache;
   }
+
+  private responseContractFieldsCache: string[] = [];
 
   get responseContractFields(): string[] {
-    return this.selectedFieldNames.map(name => this.aliasFor(name) || name);
+    const next = this.selectedFieldNames.map(
+      name => this.aliasFor(name) || name
+    );
+    if (!sameStringArray(next, this.responseContractFieldsCache)) {
+      this.responseContractFieldsCache = next;
+    }
+    return this.responseContractFieldsCache;
   }
 
+  private selectedRelationshipLabelsCache: string[] = [];
+
   get selectedRelationshipLabels(): string[] {
-    return Array.from(this.selectedRelationships).map(name => {
+    const next = Array.from(this.selectedRelationships).map(name => {
       const relationship = this.sourceRelationships.find(
         item => item.name === name
       );
@@ -2512,18 +2657,43 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
         this.aliasFor(name) || relationship?.label || this.titleFromName(name)
       );
     });
+    if (!sameStringArray(next, this.selectedRelationshipLabelsCache)) {
+      this.selectedRelationshipLabelsCache = next;
+    }
+    return this.selectedRelationshipLabelsCache;
   }
 
+  // The available-name Set is keyed on sourceRelationships (replaced wholesale
+  // on schema load, never mutated), so it is rebuilt only on schema change.
+  private availableRelationshipNamesCache: {
+    relationships: SourceRelationship[];
+    value: Set<string>;
+  } | null = null;
+  private relationshipContractWarningsCache: string[] = [];
+
   get relationshipContractWarnings(): string[] {
-    const available = new Set(
-      this.sourceRelationships.map(relationship => relationship.name)
-    );
-    return Array.from(this.selectedRelationships)
-      .filter(name => !available.has(name))
+    let available = this.availableRelationshipNamesCache;
+    if (!available || available.relationships !== this.sourceRelationships) {
+      available = {
+        relationships: this.sourceRelationships,
+        value: new Set(
+          this.sourceRelationships.map(relationship => relationship.name)
+        ),
+      };
+      this.availableRelationshipNamesCache = available;
+    }
+
+    const availableNames = available.value;
+    const next = Array.from(this.selectedRelationships)
+      .filter(name => !availableNames.has(name))
       .map(
         name =>
           `"${name}" is no longer available in the selected dataset schema.`
       );
+    if (!sameStringArray(next, this.relationshipContractWarningsCache)) {
+      this.relationshipContractWarningsCache = next;
+    }
+    return this.relationshipContractWarningsCache;
   }
 
   relationshipTypeLabel(type?: string): string {
@@ -2547,17 +2717,38 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
       : 'array';
   }
 
+  private displayedSourceFieldsCache: {
+    fields: SourceField[];
+    search: string;
+    value: SourceField[];
+  } | null = null;
+
   get displayedSourceFields(): SourceField[] {
     const search = this.fieldSearch.trim().toLowerCase();
     if (!search) {
       return this.sourceFields;
     }
 
-    return this.sourceFields.filter(field =>
+    const cache = this.displayedSourceFieldsCache;
+    if (
+      cache &&
+      cache.fields === this.sourceFields &&
+      cache.search === search
+    ) {
+      return cache.value;
+    }
+
+    const filtered = this.sourceFields.filter(field =>
       [field.name, field.label, field.type, field.dbType, field.db_type]
         .filter(Boolean)
         .some(value => String(value).toLowerCase().includes(search))
     );
+    this.displayedSourceFieldsCache = {
+      fields: this.sourceFields,
+      search,
+      value: filtered,
+    };
+    return filtered;
   }
 
   get canGenerateFromSource(): boolean {
@@ -4428,14 +4619,25 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
     return schema;
   }
 
+  // Interpolated per field row inside *ngFor, so it runs rows-per-CD; field
+  // objects are rebuilt on schema load and never mutated, so a WeakMap keyed
+  // on the object is exact and self-evicting.
+  private fieldTypeLabelCache = new WeakMap<SourceField, string>();
+
   fieldTypeLabel(field: SourceField): string {
+    const cached = this.fieldTypeLabelCache.get(field);
+    if (cached !== undefined) {
+      return cached;
+    }
     const pieces = [field.type, field.dbType ?? field.db_type].filter(Boolean);
     const size =
       field.length ??
       (field.precision
         ? `${field.precision}${field.scale ? `,${field.scale}` : ''}`
         : null);
-    return `${pieces.join(' / ')}${size ? ` (${size})` : ''}`;
+    const label = `${pieces.join(' / ')}${size ? ` (${size})` : ''}`;
+    this.fieldTypeLabelCache.set(field, label);
+    return label;
   }
 
   isPrimaryKey(field: SourceField): boolean {
@@ -4499,15 +4701,37 @@ Response Mapping  ->  { "items": "{steps.shaped}" }`;
       .trim();
   }
 
+  // Interpolated inside several *ngFor rows (tables/fields/relationships), so
+  // memoize per name; growth is bounded by distinct schema names seen.
+  private titleFromNameCache = new Map<string, string>();
+
   titleFromName(value: string): string {
-    return value
-      .split(/[_-]+/)
-      .filter(Boolean)
-      .map(part => part.charAt(0).toUpperCase() + part.slice(1))
-      .join(' ');
+    let title = this.titleFromNameCache.get(value);
+    if (title === undefined) {
+      title = value
+        .split(/[_-]+/)
+        .filter(Boolean)
+        .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(' ');
+      this.titleFromNameCache.set(value, title);
+    }
+    return title;
   }
 
   private toast(message: string): void {
     this.snackBar.open(message, 'Dismiss', { duration: 4000 });
   }
+}
+
+/** Element-wise equality; used to keep stable array refs across CD cycles. */
+function sameStringArray(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) {
+      return false;
+    }
+  }
+  return true;
 }
