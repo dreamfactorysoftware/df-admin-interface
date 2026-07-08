@@ -194,9 +194,25 @@ export class DfSideNavComponent implements OnInit {
       const childIdx = nav.findIndex(item => item.route === rule.child);
       const parent = nav.find(item => item.route === rule.parent);
       if (childIdx !== -1 && parent) {
+        // FB4: only top-level pillar/parent items carry an icon. A demoted
+        // child (API Builder, Agents, Alerts) renders as icon-less text like
+        // every other nested sibling, so strip the icon as we nest it.
+        nav[childIdx].icon = '';
         parent.subRoutes = [...(parent.subRoutes ?? []), nav[childIdx]];
         nav.splice(childIdx, 1);
       }
+    }
+    // FB10: Logs belongs to the System pillar only. It is reached from the
+    // System nav via the system-settings/file-logs redirect into the shared
+    // log viewer, whose route still lives at admin-settings/logs (that
+    // redirect and the section-overview cards resolve to it). Drop just the
+    // duplicate Admin Settings nav entry so Logs no longer shows in both
+    // pillars; the route itself is untouched.
+    const adminSettings = nav.find(item => item.route === ROUTES.ADMIN_SETTINGS);
+    if (adminSettings?.subRoutes) {
+      adminSettings.subRoutes = adminSettings.subRoutes.filter(
+        sub => sub.path !== `/${ROUTES.ADMIN_SETTINGS}/${ROUTES.LOGS}`
+      );
     }
     const byRoute = new Map(nav.map(item => [item.route, item]));
     const claimed = new Set<Nav>();
