@@ -107,6 +107,11 @@ import { MatDividerModule } from '@angular/material/divider';
 import { DfSystemService } from 'src/app/shared/services/df-system.service';
 import { DfPaywallModal } from 'src/app/shared/components/df-paywall-modal/df-paywall-modal.component';
 import { DfAnalyticsService } from 'src/app/shared/services/df-analytics.service';
+import { DfPageHeaderComponent } from 'src/app/shared/components/df-page-header/df-page-header.component';
+import {
+  DfArtifactCardComponent,
+  ArtifactKeyOption,
+} from 'src/app/shared/components/df-artifact-card/df-artifact-card.component';
 
 type UnsavedToolChoice = 'save' | 'discard' | 'cancel';
 
@@ -183,6 +188,8 @@ interface ServiceResponse {
     DfSecurityConfigComponent,
     MatMenuModule,
     MatDialogModule,
+    DfPageHeaderComponent,
+    DfArtifactCardComponent,
   ],
 })
 export class DfServiceDetailsComponent implements OnInit {
@@ -213,6 +220,12 @@ export class DfServiceDetailsComponent implements OnInit {
   showSecurityConfig = false;
   currentServiceId: number | null = null;
   isFirstTimeUser = false;
+
+  // Meridian Phase 1: the Live API Card (df-artifact-card) on the service
+  // Overview. Populated only when viewing an existing database service, whose
+  // API exposes /_table/ endpoints the sample curl can hit.
+  artifactKeys: ArtifactKeyOption[] = [];
+  artifactSampleTable = 'your_table';
   availableFileServices: any[] = [];
   mcpServices: {
     name: string;
@@ -655,6 +668,13 @@ export class DfServiceDetailsComponent implements OnInit {
           );
           this.loadMcpServices();
           this.loadAvailableScmServices();
+        }
+
+        // Meridian Phase 1: on the service Overview (viewing an existing
+        // database service), fetch the pieces the Live API Card needs — a real
+        // sample table and any API key whose role can read this service.
+        if (this.edit && this.isDatabase && this.serviceData) {
+          this.loadArtifactCardData();
         }
       });
     if (this.isDatabase) {
@@ -1945,11 +1965,25 @@ export class DfServiceDetailsComponent implements OnInit {
           })
         )
         .subscribe({
-          next: () => {
+          next: (response: ServiceResponse) => {
             if (data.type.toLowerCase().includes('saml')) {
               this.router.navigate(['../'], {
                 relativeTo: this.activatedRoute,
               });
+            } else if (this.isDatabase) {
+              // Meridian Phase 1 proof-of-life: a new database API lands on its
+              // Overview (the Live API Card with a runnable curl), not the
+              // api-docs scavenger hunt. `../{id}` is the sibling :id route.
+              const newId = response?.resource?.[0]?.id;
+              if (newId != null) {
+                this.router.navigate(['../', newId], {
+                  relativeTo: this.activatedRoute,
+                });
+              } else {
+                this.router.navigate([
+                  `/api-connections/api-docs/${formattedName}`,
+                ]);
+              }
             } else {
               this.router.navigate([
                 `/api-connections/api-docs/${formattedName}`,
@@ -2001,6 +2035,100 @@ export class DfServiceDetailsComponent implements OnInit {
 
   goBack() {
     this.router.navigate(['../'], { relativeTo: this.activatedRoute });
+  }
+
+  // Fully-qualified service base for the Live API Card, e.g.
+  // https://host/api/v2/mydb — a real origin so the copied curl runs as-is.
+  get artifactBaseUrl(): string {
+    const name = this.serviceData?.name ?? '';
+    return `${window.location.origin}${BASE_URL}/${name}`;
+  }
+
+  // The card fires this when no key is present; send the user to create one.
+  onCreateApiKey(): void {
+    this.router.navigate(['/api-connections/api-keys/create']);
+  }
+
+  private loadArtifactCardData(): void {
+    const name = this.serviceData?.name;
+    const id = this.serviceData?.id;
+    if (!name) {
+      return;
+    }
+    // Introspect the first table so the sample request hits a real endpoint.
+    this.http
+      .get<any>(`${BASE_URL}/${name}/_table`, { context: silent() })
+      .subscribe({
+        next: res => {
+          const first = res?.resource?.[0];
+          const table = typeof first === 'string' ? first : first?.name;
+          if (table) {
+            this.artifactSampleTable = table;
+          }
+        },
+        // No table (or no read grant for the admin session): keep the
+        // placeholder table; the card shape and curl still render.
+        error: () => undefined,
+      });
+    // Find API keys whose role can GET this service, so the card's default
+    // curl returns 200 rather than 403. None -> card shows the create-key CTA.
+    this.http
+      .get<any>(`${BASE_URL}/system/app`, {
+        params: {
+          fields: 'id,name,api_key,is_active,role_id',
+          related: 'role_by_role_id.role_service_access_by_role_id',
+          limit: '100',
+        },
+        context: silent(),
+      })
+      .subscribe({
+        next: res => {
+          this.artifactKeys = this.toArtifactKeys(res?.resource ?? [], id);
+        },
+        error: () => {
+          this.artifactKeys = [];
+        },
+      });
+  }
+
+  // Reduce the app list to keys whose role grants a GET on this service. The
+  // API may answer in snake or camel case depending on the caller, so read
+  // both. A null service_id means the role covers every service (wildcard);
+  // verb_mask bit 1 is GET.
+  private toArtifactKeys(
+    apps: any[],
+    serviceId: number | undefined
+  ): ArtifactKeyOption[] {
+    const out: ArtifactKeyOption[] = [];
+    for (const app of apps) {
+      const active = app?.is_active ?? app?.isActive;
+      if (active === false) {
+        continue;
+      }
+      const key = app?.api_key ?? app?.apiKey;
+      if (!key) {
+        continue;
+      }
+      const role = app?.role_by_role_id ?? app?.roleByRoleId;
+      const access =
+        role?.role_service_access_by_role_id ??
+        role?.roleServiceAccessByRoleId ??
+        [];
+      const grantsRead = access.some((a: any) => {
+        const sid = a?.service_id ?? a?.serviceId ?? null;
+        const verb = a?.verb_mask ?? a?.verbMask ?? 0;
+        return (sid === null || sid === serviceId) && (verb & 1) === 1;
+      });
+      if (!grantsRead) {
+        continue;
+      }
+      out.push({
+        label: app?.name ?? 'API key',
+        apiKey: key,
+        role: role?.name,
+      });
+    }
+    return out;
   }
 
   getBackgroundImage(typeLabel: string) {
