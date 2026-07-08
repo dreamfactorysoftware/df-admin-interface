@@ -11,6 +11,19 @@ export type SectionLandingAction = {
   primary?: boolean;
 };
 
+// Coordinated category tints (item 21): a card and its icon draw color from
+// the --df-tint-<category>-bg/-fg token pairs in styles.scss. Every theme
+// (light, dark, phosphor) resolves these tokens, so tinting stays correct by
+// construction. Omit `tint` to keep the neutral accent treatment.
+export type SectionLandingTint =
+  | 'build'
+  | 'data'
+  | 'security'
+  | 'system'
+  | 'admin'
+  | 'ai'
+  | 'docs';
+
 export type SectionLandingCard = {
   icon: string;
   title: string;
@@ -19,6 +32,7 @@ export type SectionLandingCard = {
   action: string;
   meta?: string;
   disabled?: boolean;
+  tint?: SectionLandingTint;
 };
 
 export type SectionLandingGroup = {
