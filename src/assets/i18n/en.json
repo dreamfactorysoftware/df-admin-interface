@@ -728,5 +728,31 @@
   },
   "phosphor": {
     "boot": "SHALL WE PLAY A GAME?"
+  },
+  "tryIt": {
+    "methodLabel": "HTTP method",
+    "pathPlaceholder": "/_table/{table}",
+    "send": "Send",
+    "identityLabel": "Test as",
+    "identityHint": "Re-fires under the selected key's role. Fields that role cannot read are dimmed.",
+    "readOnly": "Read-only",
+    "tabs": {
+      "params": "Params",
+      "headers": "Headers",
+      "body": "Body"
+    },
+    "key": "Key",
+    "value": "Value",
+    "addParam": "Add param",
+    "addHeader": "Add header",
+    "removeRow": "Remove row",
+    "authNote": "The auth header is added from the selected identity. You do not need to set it here.",
+    "bodyPlaceholder": "{\n  \"resource\": []\n}",
+    "copy": "Copy",
+    "copyResponse": "Copy response",
+    "ms": "ms",
+    "pretty": "Pretty",
+    "raw": "Raw",
+    "deniedLabel": "Hidden from this identity"
   }
 }
