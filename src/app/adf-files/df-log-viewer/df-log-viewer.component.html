@@ -1,7 +1,16 @@
 <div class="details-section">
-  <button mat-flat-button class="save-btn" (click)="goBack()">
-    {{ 'goBack' | transloco }}
-  </button>
+  <div class="action-bar" style="align-items: center; padding: 0 0 8px">
+    <button mat-flat-button class="save-btn" (click)="goBack()">
+      {{ 'goBack' | transloco }}
+    </button>
+    <span class="spacer"></span>
+    <mat-slide-toggle
+      [checked]="live"
+      (change)="onLiveToggle($event.checked)"
+      color="primary">
+      {{ 'liveTail' | transloco }}
+    </mat-slide-toggle>
+  </div>
   <df-ace-editor
     [readonly]="true"
     [value]="content"
