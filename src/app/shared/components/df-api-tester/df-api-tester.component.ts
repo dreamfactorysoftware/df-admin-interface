@@ -291,34 +291,28 @@ export class DfApiTesterComponent implements OnChanges {
     return key.name;
   }
 
-  getMethodColor(method: string): string {
-    switch (method.toLowerCase()) {
-      case 'get':
-        return '#61affe';
-      case 'post':
-        return '#49cc90';
-      case 'put':
-        return '#fca130';
-      case 'patch':
-        return '#50e3c2';
-      case 'delete':
-        return '#f93e3e';
-      default:
-        return '#9b9b9b';
-    }
+  // Method badge color is a CSS class (styled off --df-* tokens), not an inline
+  // literal. Literals broke phosphor and hard-coded the swagger palette; the
+  // tokenized classes repaint per theme. Unknown methods fall back to the
+  // neutral base .method-badge style.
+  methodClass(method: string): string {
+    return 'method-' + (method || '').toLowerCase();
   }
 
   isAuthenticationError(): boolean {
     return this.testResult?.status === 401 || this.testResult?.status === 403;
   }
 
+  // Returns a token reference (not a literal) for [style.color]. Warning falls
+  // back to the component's themed --tester-warning alias until the global
+  // --df-warning token lands in light/dark.
   getResultIconColor(): string {
     if (this.testResult?.success) {
-      return '#4caf50'; // Green for success
+      return 'var(--df-success)';
     } else if (this.isAuthenticationError()) {
-      return '#f44336'; // Red for auth failure
+      return 'var(--df-danger)';
     } else {
-      return '#ff9800'; // Orange for non-auth failure (auth passed but request failed)
+      return 'var(--df-warning, var(--tester-warning))';
     }
   }
 }

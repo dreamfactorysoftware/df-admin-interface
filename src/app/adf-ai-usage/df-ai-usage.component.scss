@@ -46,6 +46,21 @@
       color: var(--df-accent);
       font-size: 1.8rem;
     }
+
+    // Page identity icon: the AI-category tint chip (coordinated color -
+    // item 21). Higher specificity than the bare fa-icon rule above so the
+    // tint wins; the info-hint icon keeps its own !important overrides. In
+    // phosphor the AI tint is in-palette cyan, so this stays terminal-safe.
+    .usage__title-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--df-tint-ai-fg);
+      background: var(--df-tint-ai-bg);
+      padding: 6px 10px;
+      border-radius: var(--df-radius-sm);
+      font-size: 1.6rem;
+    }
   }
 
   &__title-hint {
@@ -445,11 +460,14 @@
     gap: 8px;
   }
 
+  // Stat-tile label wears the AI-category tint (item 21: stat tiles in usage
+  // dashboards consume their category tint). Coordinated color per theme;
+  // the value below stays --df-text for legibility.
   &__mcp-label {
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: var(--df-text-muted);
+    color: var(--df-tint-ai-fg);
     font-weight: 600;
   }
 

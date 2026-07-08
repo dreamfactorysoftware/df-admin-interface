@@ -30,9 +30,7 @@
               [value]="i">
               <div class="endpoint-option">
                 <div class="endpoint-header">
-                  <span
-                    class="method-badge"
-                    [style.background-color]="getMethodColor(endpoint.method)">
+                  <span class="method-badge" [ngClass]="methodClass(endpoint.method)">
                     {{ endpoint.method }}
                   </span>
                   <span class="endpoint-path">{{ endpoint.endpoint }}</span>
@@ -88,9 +86,7 @@
           <div class="endpoint-info-header">
             <span
               class="method-badge large"
-              [style.background-color]="
-                getMethodColor(getSelectedEndpoint()!.method)
-              ">
+              [ngClass]="methodClass(getSelectedEndpoint()!.method)">
               {{ getSelectedEndpoint()!.method }}
             </span>
             <h4>{{ getSelectedEndpoint()?.title }}</h4>

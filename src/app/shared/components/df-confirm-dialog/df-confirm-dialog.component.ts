@@ -21,6 +21,16 @@ export class DfConfirmDialogComponent {
     @Inject(MAT_DIALOG_DATA) public data: ConfirmDialogData
   ) {}
 
+  // Destructive (delete) confirmations get the danger treatment on the confirm
+  // button instead of the accent. Driven off the existing dialog data: delete
+  // flows pass the 'confirmDelete' message key (df-manage-table.confirmDelete),
+  // so no caller or type change is needed.
+  get isDestructive(): boolean {
+    const m = (this.data?.message ?? '').toLowerCase();
+    const t = (this.data?.title ?? '').toLowerCase();
+    return m.includes('delete') || t.includes('delete');
+  }
+
   onClose(): void {
     this.dialogRef.close(true);
   }

@@ -14,6 +14,7 @@
     (click)="onClose()"
     cdkFocusInitial
     class="save-btn"
+    [class.destructive]="isDestructive"
     data-testid="confirm-dialog-confirm"
     type="button"
     color="primary">
