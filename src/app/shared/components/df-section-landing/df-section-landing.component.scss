@@ -16,8 +16,8 @@
 .section-landing {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 16px 24px;
+  gap: 12px;
+  padding: 12px 24px;
   position: relative;
 }
 
@@ -90,7 +90,7 @@
 
 .section-landing__cards {
   display: grid;
-  gap: 12px;
+  gap: 8px;
   // Narrower min so the 7-card System group packs into a single row at
   // desktop widths (with the sidebar) instead of wrapping to two.
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
@@ -145,8 +145,8 @@
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  min-height: 132px;
-  padding: 14px 16px;
+  min-height: 112px;
+  padding: 11px 16px;
   text-decoration: none;
   transition:
     border-color 160ms ease,
@@ -230,10 +230,10 @@
     color: var(--df-text-2);
     font-size: 1.25rem;
     line-height: 1.4;
-    margin: 0 0 6px;
+    margin: 0 0 5px;
     // Keeps action links roughly aligned across a row (~2 lines) without
     // the old 3-line reserve that inflated every card.
-    min-height: 34px;
+    min-height: 20px;
   }
 
   mat-icon {
