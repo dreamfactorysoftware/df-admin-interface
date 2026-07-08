@@ -136,10 +136,11 @@ interface Tick {
         &__title {
           font-weight: 600;
           color: var(--df-text);
-          font-size: 16px;
+          font-size: 1.5rem;
+          letter-spacing: -0.01em;
         }
         &__subtitle {
-          font-size: 12px;
+          font-size: 1.2rem;
           color: var(--df-text-muted);
         }
 
@@ -148,7 +149,7 @@ interface Tick {
           flex-wrap: wrap;
           align-items: center;
           gap: 8px 16px;
-          font-size: 12px;
+          font-size: 1.2rem;
           color: var(--df-text-2);
         }
         &__legend-item {
@@ -160,6 +161,7 @@ interface Tick {
           width: 10px;
           height: 10px;
           border-radius: 2px;
+          border: 1px solid var(--df-border-2);
         }
         &__legend-other {
           font-style: italic;
@@ -175,7 +177,7 @@ interface Tick {
           width: 100%;
           height: var(--cbd-h, 240px);
           background: var(--df-surface-2);
-          border-radius: 4px;
+          border-radius: var(--df-radius-sm);
         }
 
         &__grid line {

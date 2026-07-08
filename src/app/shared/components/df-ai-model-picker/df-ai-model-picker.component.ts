@@ -139,8 +139,9 @@ interface NormalizedModel {
   `,
   styles: [
     `
-      /* Themed via global --df-* tokens (src/styles.scss); dark values come
-         from the .dark-theme class DfThemeService stamps on <body>. */
+      /* Departure treatment: token-only chrome (light/dark/phosphor come
+         free), flat bordered panel on the shared corner scale, exemplar
+         type hierarchy. */
       .model-picker {
         display: flex;
         flex-direction: column;
@@ -149,8 +150,9 @@ interface NormalizedModel {
         margin: 1rem 0;
         background: var(--df-surface-2);
         border: 1px solid var(--df-border-2);
-        border-radius: 8px;
-        font-size: 16px;
+        border-radius: var(--df-radius);
+        font-size: 1.4rem;
+        color: var(--df-text);
 
         &__header {
           display: flex;
@@ -160,7 +162,8 @@ interface NormalizedModel {
         }
         &__title {
           font-weight: 600;
-          font-size: 18px;
+          font-size: 1.5rem;
+          letter-spacing: -0.01em;
           margin-right: auto;
         }
         &__refresh,
@@ -168,7 +171,7 @@ interface NormalizedModel {
           display: inline-flex !important;
           align-items: center;
           gap: 0.4rem;
-          font-size: 0.95rem !important;
+          font-size: 1.3rem !important;
           padding: 0 0.875rem !important;
           min-height: 38px !important;
         }
@@ -187,14 +190,14 @@ interface NormalizedModel {
           flex: 1;
         }
         &__option-meta {
-          font-size: 14px;
+          font-size: 1.2rem;
           color: var(--df-text-muted);
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
         }
 
         &__hint {
           margin: 0;
-          font-size: 15px;
+          font-size: 1.3rem;
           color: var(--df-text-2);
           font-style: italic;
           line-height: 1.5;
@@ -204,15 +207,15 @@ interface NormalizedModel {
           align-items: flex-start;
           gap: 0.5rem;
           padding: 0.625rem 0.875rem;
-          border-radius: 4px;
-          background: rgba(220, 53, 69, 0.1);
-          border: 1px solid rgba(220, 53, 69, 0.3);
-          color: #ff8585;
-          font-size: 15px;
+          border-radius: var(--df-radius-sm);
+          background: var(--df-danger-soft);
+          border: 1px solid var(--df-danger-border);
+          color: var(--df-danger);
+          font-size: 1.3rem;
         }
         &__current {
           margin: 0;
-          font-size: 15px;
+          font-size: 1.3rem;
           color: var(--df-text);
           display: flex;
           align-items: center;
@@ -220,14 +223,15 @@ interface NormalizedModel {
 
           code {
             font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
-            font-size: 14px;
+            font-size: 1.2rem;
             background: var(--df-surface-2);
+            border: 1px solid var(--df-border-2);
             padding: 0.2rem 0.5rem;
-            border-radius: 3px;
+            border-radius: var(--df-radius-sm);
           }
         }
         &__current-ok {
-          color: #4ade80;
+          color: var(--df-success);
         }
       }
     `,

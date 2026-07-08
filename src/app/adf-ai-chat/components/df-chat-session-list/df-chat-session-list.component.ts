@@ -120,6 +120,10 @@ import { ChatSession } from '../../types/chat';
 
         &__item-button {
           flex: 1;
+          // min-width: 0 lets the button shrink below its content so long
+          // titles ellipsize instead of clipping at the panel edge (flex
+          // children default to min-width: auto, which blocks text-overflow).
+          min-width: 0;
           background: none;
           border: none;
           color: inherit;
@@ -140,6 +144,7 @@ import { ChatSession } from '../../types/chat';
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
+          max-width: 100%;
         }
 
         // !important: dark-style.scss forces span/button color to white

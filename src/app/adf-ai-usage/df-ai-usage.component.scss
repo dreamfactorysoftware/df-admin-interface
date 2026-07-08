@@ -1,4 +1,18 @@
+// ============================================================
+// AI usage dashboard, stream 8 "departure" treatment.
+// Everything rides the global --df-* tokens (src/styles.scss) so
+// light, dark and phosphor all inherit the finish. Chart DATA
+// colors (series palettes, bar fills, sparklines) live in the
+// child chart components and are intentionally literal; all
+// chrome here is tokens.
+// ============================================================
+
 .usage {
+  // Warning accent: no global --df-warning token exists in light/dark yet,
+  // so alias it locally per theme. Phosphor defines --df-warning and stacks
+  // on .dark-theme, so it wins there by construction.
+  --usage-warning: #9a5b00;
+
   display: flex;
   flex-direction: column;
   gap: 24px;
@@ -22,24 +36,25 @@
 
     h2 {
       margin: 0;
-      font-size: 24px;
+      font-size: 2rem;
       font-weight: 600;
+      letter-spacing: -0.02em;
       color: var(--df-text);
     }
 
     fa-icon {
-      color: #7f11e0;
-      font-size: 20px;
+      color: var(--df-accent);
+      font-size: 1.8rem;
     }
   }
 
   &__title-hint {
-    font-size: 14px !important;
+    font-size: 1.4rem !important;
     color: var(--df-text-muted) !important;
     cursor: help;
 
     &:hover {
-      color: #7f11e0 !important;
+      color: var(--df-accent) !important;
     }
   }
 
@@ -63,11 +78,11 @@
 
   &__error {
     padding: 12px 16px;
-    border-radius: 4px;
-    background: rgba(244, 67, 54, 0.08);
-    border: 1px solid rgba(244, 67, 54, 0.3);
-    color: #d32f2f;
-    font-size: 14px;
+    border-radius: var(--df-radius-sm);
+    background: var(--df-danger-soft);
+    border: 1px solid var(--df-danger-border);
+    color: var(--df-danger);
+    font-size: 1.4rem;
   }
 
   &__empty {
@@ -75,17 +90,18 @@
 
     h3 {
       margin: 0 0 8px;
-      font-size: 18px;
+      font-size: 1.6rem;
       font-weight: 600;
+      letter-spacing: -0.01em;
     }
     p {
       margin: 0;
       color: var(--df-text-2);
-      font-size: 14px;
+      font-size: 1.4rem;
       line-height: 1.6;
     }
     a {
-      color: #7f11e0;
+      color: var(--df-accent);
       display: inline-flex;
       align-items: center;
       gap: 4px;
@@ -136,15 +152,15 @@
   }
 
   &__filters-label {
-    font-size: 12px;
+    font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: var(--df-text-2);
-    font-weight: 700;
+    color: var(--df-text-muted);
+    font-weight: 600;
   }
 
   &__filters-hint {
-    font-size: 12px;
+    font-size: 1.2rem;
     color: var(--df-text-muted);
     font-style: italic;
   }
@@ -169,7 +185,6 @@
     align-items: center;
     flex-wrap: wrap;
     gap: 8px;
-    padding-top: 4px;
     border-top: 1px solid var(--df-border-2);
     margin-top: 4px;
     padding-top: 12px;
@@ -188,8 +203,9 @@
 
   &__section-title {
     margin: 0;
-    font-size: 18px;
+    font-size: 1.6rem;
     font-weight: 600;
+    letter-spacing: -0.01em;
     color: var(--df-text);
     display: inline-flex;
     align-items: center;
@@ -197,44 +213,45 @@
   }
 
   &__section-hint {
-    font-size: 13px;
+    font-size: 1.3rem;
     color: var(--df-text-muted);
     cursor: help;
 
     &:hover {
-      color: #7f11e0;
+      color: var(--df-accent);
     }
   }
 
   &__section-subtitle {
     margin: 0;
-    font-size: 13px;
+    font-size: 1.3rem;
     color: var(--df-text-2);
     line-height: 1.5;
   }
 
   &__section-disclaimer {
     margin: 4px 0 0;
-    font-size: 13px;
+    font-size: 1.3rem;
     color: var(--df-text);
     line-height: 1.5;
-    background: rgba(255, 152, 0, 0.06);
-    border-left: 3px solid #ff9800;
+    background: color-mix(
+      in srgb,
+      var(--df-warning, var(--usage-warning)) 8%,
+      transparent
+    );
+    border-left: 3px solid var(--df-warning, var(--usage-warning));
     padding: 8px 12px;
-    border-radius: 0 4px 4px 0;
+    border-radius: 0 var(--df-radius-sm) var(--df-radius-sm) 0;
 
     strong {
-      color: #e65100;
+      color: var(--df-warning, var(--usage-warning));
     }
   }
-
-  // MCP summary tiles -------------------------------------------------------
-  // Tighter than the AI summary because the MCP section is secondary content.
 
   // Budget banner + panel ----------------------------------------------------
 
   &__budget-banner {
-    border-left: 4px solid #ff9800;
+    border-left: 4px solid var(--df-warning, var(--usage-warning));
 
     mat-card-content {
       padding: 14px 18px;
@@ -245,12 +262,11 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    color: #b26500;
-    font-size: 14px;
+    color: var(--df-warning, var(--usage-warning));
+    font-size: 1.4rem;
 
     fa-icon {
-      color: #ff9800;
-      font-size: 16px;
+      font-size: 1.5rem;
     }
   }
 
@@ -261,7 +277,7 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-    font-size: 13px;
+    font-size: 1.3rem;
 
     li {
       display: flex;
@@ -280,7 +296,7 @@
     color: var(--df-text-2);
 
     strong {
-      color: #b26500;
+      color: var(--df-warning, var(--usage-warning));
       font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
     }
   }
@@ -303,8 +319,9 @@
 
   &__budgets-title {
     margin: 0;
-    font-size: 16px;
+    font-size: 1.5rem;
     font-weight: 600;
+    letter-spacing: -0.01em;
     color: var(--df-text);
     display: inline-flex;
     align-items: center;
@@ -312,7 +329,7 @@
   }
 
   &__budgets-period {
-    font-size: 12px;
+    font-size: 1.2rem;
     color: var(--df-text-muted);
     font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
   }
@@ -337,7 +354,7 @@
     justify-content: space-between;
     align-items: baseline;
     gap: 12px;
-    font-size: 14px;
+    font-size: 1.4rem;
   }
 
   &__budgets-row-name {
@@ -347,15 +364,17 @@
 
   &__budgets-row-amount {
     font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
-    font-size: 13px;
+    font-size: 1.3rem;
     color: var(--df-text);
 
     &--over {
-      color: #d32f2f;
+      color: var(--df-danger);
       font-weight: 600;
     }
   }
 
+  // Meter track: stays a rounded capsule on purpose; it is a progress bar,
+  // not product chrome.
   &__budgets-row-bar {
     position: relative;
     height: 8px;
@@ -364,7 +383,7 @@
     overflow: hidden;
 
     &--over {
-      background: rgba(244, 67, 54, 0.12);
+      background: var(--df-danger-soft);
     }
   }
 
@@ -373,12 +392,12 @@
     left: 0;
     top: 0;
     height: 100%;
-    background: #2e7d32;
+    background: var(--df-success);
     transition: width 0.2s ease-out;
   }
 
   &__budgets-row-bar--over &__budgets-row-fill {
-    background: #d32f2f;
+    background: var(--df-danger);
   }
 
   &__budgets-row-projection {
@@ -387,20 +406,20 @@
     height: 100%;
     background: repeating-linear-gradient(
       45deg,
-      rgba(46, 125, 50, 0.4),
-      rgba(46, 125, 50, 0.4) 4px,
-      rgba(46, 125, 50, 0.15) 4px,
-      rgba(46, 125, 50, 0.15) 8px
+      color-mix(in srgb, var(--df-success) 40%, transparent),
+      color-mix(in srgb, var(--df-success) 40%, transparent) 4px,
+      color-mix(in srgb, var(--df-success) 15%, transparent) 4px,
+      color-mix(in srgb, var(--df-success) 15%, transparent) 8px
     );
   }
 
   &__budgets-row-bar--over &__budgets-row-projection {
     background: repeating-linear-gradient(
       45deg,
-      rgba(211, 47, 47, 0.55),
-      rgba(211, 47, 47, 0.55) 4px,
-      rgba(211, 47, 47, 0.2) 4px,
-      rgba(211, 47, 47, 0.2) 8px
+      color-mix(in srgb, var(--df-danger) 55%, transparent),
+      color-mix(in srgb, var(--df-danger) 55%, transparent) 4px,
+      color-mix(in srgb, var(--df-danger) 20%, transparent) 4px,
+      color-mix(in srgb, var(--df-danger) 20%, transparent) 8px
     );
   }
 
@@ -409,6 +428,9 @@
     color: var(--df-text-muted);
     font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
   }
+
+  // MCP summary tiles -------------------------------------------------------
+  // Tighter than the AI summary because the MCP section is secondary content.
 
   &__mcp-summary {
     display: grid;
@@ -424,22 +446,22 @@
   }
 
   &__mcp-label {
-    font-size: 12px;
+    font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: var(--df-text-2);
+    color: var(--df-text-muted);
     font-weight: 600;
   }
 
   &__mcp-value {
-    font-size: 22px;
+    font-size: 2.2rem;
     font-weight: 600;
     color: var(--df-text);
     font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
     line-height: 1.2;
 
     small {
-      font-size: 12px;
+      font-size: 1.2rem;
       font-weight: 500;
       color: var(--df-text-muted);
       margin-left: 4px;
@@ -447,65 +469,8 @@
   }
 }
 
-// Dark theme --------------------------------------------------------------
-// Text/surface/border colors now come from the global --df-* tokens (which
-// flip with body.dark-theme). Only accent purples and status colors that
-// intentionally differ per theme remain here.
-
-:host-context(.dark-theme) {
-  .usage {
-    &__title {
-      fa-icon {
-        color: #bb86fc;
-      }
-    }
-
-    &__title-hint {
-      &:hover {
-        color: #bb86fc !important;
-      }
-    }
-
-    &__error {
-      background: rgba(244, 67, 54, 0.12);
-      color: #ff8585;
-    }
-
-    &__empty a {
-      color: #bb86fc;
-    }
-
-    &__section-hint {
-      &:hover {
-        color: #bb86fc;
-      }
-    }
-    &__section-disclaimer {
-      background: rgba(255, 152, 0, 0.1);
-
-      strong {
-        color: #ffb74d;
-      }
-    }
-
-    &__budget-banner-head {
-      color: #ffb74d;
-    }
-    &__budget-banner-projection {
-      strong {
-        color: #ffb74d;
-      }
-    }
-
-    &__budgets-row-amount {
-      &--over {
-        color: #ff8585;
-      }
-    }
-    &__budgets-row-bar {
-      &--over {
-        background: rgba(244, 67, 54, 0.18);
-      }
-    }
-  }
+// Dark: the warning alias needs a lighter amber to stay AA on dark surfaces.
+// Phosphor overrides via --df-warning, so this only feeds plain dark mode.
+:host-context(.dark-theme) .usage {
+  --usage-warning: #ffb74d;
 }

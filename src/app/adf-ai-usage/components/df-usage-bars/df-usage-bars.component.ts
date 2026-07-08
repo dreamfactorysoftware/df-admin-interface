@@ -86,31 +86,32 @@ import { GroupRow } from '../../types/usage';
         }
         &__title {
           margin: 0;
-          font-size: 16px;
+          font-size: 1.5rem;
           font-weight: 600;
+          letter-spacing: -0.01em;
           color: var(--df-text);
           display: inline-flex;
           align-items: center;
           gap: 8px;
         }
         &__hint {
-          font-size: 13px;
+          font-size: 1.3rem;
           color: var(--df-text-muted);
           cursor: help;
 
           &:hover {
-            color: #7f11e0;
+            color: var(--df-accent);
           }
         }
         &__subtitle {
-          font-size: 12px;
-          color: var(--df-text-2);
+          font-size: 1.2rem;
+          color: var(--df-text-muted);
         }
         &__empty {
           padding: 8px 0;
-          color: var(--df-text-2);
+          color: var(--df-text-muted);
           font-style: italic;
-          font-size: 14px;
+          font-size: 1.35rem;
         }
         &__list {
           list-style: none;
@@ -128,17 +129,17 @@ import { GroupRow } from '../../types/usage';
 
           &--clickable {
             cursor: pointer;
-            border-radius: 4px;
+            border-radius: var(--df-radius-sm);
             padding: 4px 6px;
             margin: 0 -6px;
 
             &:hover {
-              background: rgba(127, 17, 224, 0.06);
+              background: var(--df-hover);
             }
           }
         }
         &__label {
-          font-size: 14px;
+          font-size: 1.35rem;
           font-weight: 500;
           color: var(--df-text);
           white-space: nowrap;
@@ -153,6 +154,9 @@ import { GroupRow } from '../../types/usage';
           overflow: hidden;
           min-width: 80px;
         }
+        // Bar fills are chart DATA colors (input vs output series), kept
+        // literal on purpose; the dark override below keeps the output
+        // series legible on the dark canvas.
         &__fill {
           display: block;
           height: 100%;
@@ -172,38 +176,26 @@ import { GroupRow } from '../../types/usage';
         }
         &__total {
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
-          font-size: 14px;
+          font-size: 1.35rem;
           font-weight: 600;
           color: var(--df-text);
         }
         &__count {
-          font-size: 12px;
-          color: var(--df-text-2);
+          font-size: 1.2rem;
+          color: var(--df-text-muted);
         }
         &__rate {
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
           font-size: 11px;
-          color: #7f11e0;
-          background: rgba(127, 17, 224, 0.08);
+          color: var(--df-accent-strong);
+          background: var(--df-accent-soft);
           padding: 1px 6px;
-          border-radius: 3px;
+          border-radius: var(--df-radius-sm);
         }
       }
 
       :host-context(.dark-theme) {
         .bars {
-          &__rate {
-            color: #b388ff;
-            background: rgba(127, 17, 224, 0.18);
-          }
-          &__hint {
-            &:hover {
-              color: #bb86fc;
-            }
-          }
-          &__row--clickable:hover {
-            background: rgba(187, 134, 252, 0.1);
-          }
           &__fill--output {
             background: #bb86fc;
           }

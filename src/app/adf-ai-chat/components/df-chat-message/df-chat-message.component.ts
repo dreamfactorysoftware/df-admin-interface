@@ -330,6 +330,12 @@ export class DfChatMessageComponent {
   /**
    * Split assistant content into text + fenced-code segments. Pure-text
    * binding only — no innerHTML, so there is no XSS surface.
+   *
+   * ponytail: inline markdown (**bold**, *italic*, `code`) renders as
+   * literal asterisks (rollout punch item 3). Verified there is no
+   * markdown pipeline anywhere in this repo or its history to wire up;
+   * fixing it means adding a sanctioned renderer + sanitizer dependency
+   * (e.g. marked + DOMPurify), which is an integration-level decision.
    */
   get segments(): Array<{ type: 'text' | 'code'; text: string }> {
     const content = this.message.content ?? '';
