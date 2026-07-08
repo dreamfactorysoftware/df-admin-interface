@@ -12,7 +12,9 @@ import {
   faShieldHalved,
   faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons';
+import { TranslocoModule } from '@ngneat/transloco';
 import { BASE_URL } from 'src/app/shared/constants/urls';
+import { DfScopeMapComponent } from '../df-scope-map/df-scope-map.component';
 
 interface RoleRow {
   id: number;
@@ -23,41 +25,48 @@ interface RoleRow {
 @Component({
   selector: 'df-ai-allowed-roles',
   standalone: true,
-  imports: [CommonModule, RouterLink, MatButtonModule, FontAwesomeModule],
+  imports: [
+    CommonModule,
+    RouterLink,
+    MatButtonModule,
+    FontAwesomeModule,
+    TranslocoModule,
+    DfScopeMapComponent,
+  ],
   template: `
-    <div class="allowed-roles">
+    <div class="allowed-roles" *transloco="let t; read: 'aiAllowedRoles'">
       <div class="allowed-roles__header">
         <fa-icon [icon]="faShieldHalved" class="allowed-roles__icon"></fa-icon>
-        <span class="allowed-roles__title">Allowed Roles</span>
+        <span class="allowed-roles__title">{{ t('title') }}</span>
         <span class="allowed-roles__count">
-          {{ selected.length }} selected · {{ roles.length }} available
+          {{
+            t('count', {
+              selected: selected.length,
+              available: roles.length
+            })
+          }}
         </span>
         <a
           mat-stroked-button
           [routerLink]="['/api-connections/role-based-access/create']"
           class="allowed-roles__action">
           <fa-icon [icon]="faPlus"></fa-icon>
-          <span>Create new role</span>
+          <span>{{ t('createRole') }}</span>
         </a>
       </div>
 
-      <p class="allowed-roles__hint">
-        Pick the DreamFactory roles that may use this AI Connection. Each role's
-        data scope determines what the AI can read while operating under that
-        role. At least one role is required before chat sessions can run.
-      </p>
+      <p class="allowed-roles__hint">{{ t('hint') }}</p>
 
       <div
         *ngIf="selected.length === 0 && !loading"
         class="allowed-roles__warn">
         <fa-icon [icon]="faTriangleExclamation"></fa-icon>
-        <span>
-          No roles selected. Chat sessions will refuse to start until at least
-          one role is allowed.
-        </span>
+        <span>{{ t('noneWarning') }}</span>
       </div>
 
-      <div *ngIf="loading" class="allowed-roles__loading">Loading roles…</div>
+      <div *ngIf="loading" class="allowed-roles__loading">
+        {{ t('loading') }}
+      </div>
 
       <ul *ngIf="!loading && roles.length > 0" class="allowed-roles__list">
         <li *ngFor="let r of roles; trackBy: trackById">
@@ -72,17 +81,30 @@ interface RoleRow {
               class="allowed-roles__chip-check"></fa-icon>
             <span class="allowed-roles__name">{{ r.name }}</span>
           </button>
-          <a
-            [routerLink]="['/api-connections/role-based-access', r.id, 'scope']"
-            class="allowed-roles__link"
-            >what can this role see?</a
-          >
         </li>
       </ul>
 
       <p *ngIf="!loading && roles.length === 0" class="allowed-roles__empty">
-        No DreamFactory roles exist yet. Create one and come back.
+        {{ t('empty') }}
       </p>
+
+      <section
+        *ngIf="!loading && selectedRoles.length > 0"
+        class="allowed-roles__reach">
+        <div class="allowed-roles__reach-head">
+          <fa-icon [icon]="faShieldHalved"></fa-icon>
+          <span>{{ t('reachTitle') }}</span>
+        </div>
+        <p class="allowed-roles__hint">{{ t('reachHint') }}</p>
+        <div
+          *ngFor="let r of selectedRoles; trackBy: trackById"
+          class="allowed-roles__reach-role">
+          <div class="allowed-roles__reach-role-name">
+            {{ t('reachRole', { role: r.name }) }}
+          </div>
+          <df-scope-map [roleId]="r.id"></df-scope-map>
+        </div>
+      </section>
     </div>
   `,
   styles: [
@@ -224,15 +246,39 @@ interface RoleRow {
           font-weight: 500;
         }
 
-        &__link {
-          font-size: 1.2rem;
-          color: var(--df-text-muted);
-          text-decoration: none;
+        &__reach {
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+          margin-top: 0.5rem;
+          padding-top: 1.25rem;
+          border-top: 1px solid var(--df-border-2);
+        }
 
-          &:hover {
+        &__reach-head {
+          display: flex;
+          align-items: center;
+          gap: 0.625rem;
+          font-weight: 600;
+          font-size: 1.4rem;
+          letter-spacing: -0.01em;
+
+          fa-icon {
             color: var(--df-accent);
-            text-decoration: underline;
+            font-size: 1.6rem;
           }
+        }
+
+        &__reach-role {
+          display: flex;
+          flex-direction: column;
+          gap: 0.625rem;
+        }
+
+        &__reach-role-name {
+          font-weight: 600;
+          font-size: 1.3rem;
+          color: var(--df-text-2);
         }
       }
 
@@ -281,6 +327,14 @@ export class DfAiAllowedRolesComponent implements OnInit {
 
   isSelected(id: number): boolean {
     return this.selected.includes(id);
+  }
+
+  /** The role records currently attached to this AI connection, in list order.
+   *  Each renders an inline df-scope-map so the resolved reach is visible in
+   *  place instead of behind a link. */
+  get selectedRoles(): RoleRow[] {
+    const ids = this.selected;
+    return this.roles.filter(r => ids.includes(r.id));
   }
 
   toggle(id: number): void {
