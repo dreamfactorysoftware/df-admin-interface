@@ -831,6 +831,18 @@
     "noVerbs": "No operations",
     "grantCount": "{{count}} grant(s)"
   },
+  "aiAllowedRoles": {
+    "title": "Allowed roles",
+    "count": "{{selected}} selected · {{available}} available",
+    "createRole": "Create new role",
+    "hint": "Pick the DreamFactory roles that may use this AI connection. Each role's data scope determines what the AI can read while operating under that role. At least one role is required before chat sessions can run.",
+    "noneWarning": "No roles selected. Chat sessions will refuse to start until at least one role is allowed.",
+    "loading": "Loading roles…",
+    "empty": "No DreamFactory roles exist yet. Create one and come back.",
+    "reachTitle": "What these roles can reach",
+    "reachHint": "Agents and keys under this connection inherit exactly this access. Anything not listed here is out of reach.",
+    "reachRole": "Operating as {{role}}"
+  },
   "onboardingChecklist": {
     "eyebrow": "Get started",
     "title": "Set up your first API",
