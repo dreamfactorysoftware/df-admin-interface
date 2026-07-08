@@ -1,0 +1,63 @@
+<div class="palette" (keydown)="onKeydown($event)">
+  <div class="palette-search">
+    <fa-icon class="palette-search__icon" [icon]="faMagnifyingGlass"></fa-icon>
+    <input
+      #searchInput
+      type="text"
+      class="palette-search__input"
+      autocomplete="off"
+      spellcheck="false"
+      [formControl]="search"
+      [attr.placeholder]="'commandPalette.placeholder' | transloco" />
+    <kbd class="palette-search__hint">esc</kbd>
+  </div>
+
+  <div #list class="palette-list" role="listbox">
+    <ng-container *ngIf="groups.length; else noResults">
+      <div
+        *ngFor="let group of groups; trackBy: trackByGroup"
+        class="palette-group">
+        <div class="palette-group__label">{{ group.labelKey | transloco }}</div>
+        <button
+          *ngFor="let item of group.items; trackBy: trackByItem"
+          type="button"
+          role="option"
+          class="palette-option"
+          [class.active]="isActive(item)"
+          [attr.aria-selected]="isActive(item)"
+          (click)="run(item)">
+          <fa-icon
+            class="palette-option__icon"
+            [class]="'palette-option__icon--' + item.kind"
+            [icon]="icon(item.kind)"></fa-icon>
+          <span class="palette-option__text">
+            <span class="palette-option__label">{{ item.label }}</span>
+            <span class="palette-option__sub" *ngIf="item.sublabel">{{
+              item.sublabel
+            }}</span>
+          </span>
+          <fa-icon
+            class="palette-option__go"
+            [icon]="faArrowRight"></fa-icon>
+        </button>
+      </div>
+    </ng-container>
+
+    <ng-template #noResults>
+      <div class="palette-none">
+        {{ 'commandPalette.noResults' | transloco }}
+      </div>
+    </ng-template>
+  </div>
+
+  <div class="palette-foot">
+    <span class="palette-foot__group">
+      <kbd>&uarr;</kbd><kbd>&darr;</kbd>
+      {{ 'commandPalette.foot.navigate' | transloco }}
+    </span>
+    <span class="palette-foot__group">
+      <kbd>&crarr;</kbd>
+      {{ 'commandPalette.foot.select' | transloco }}
+    </span>
+  </div>
+</div>

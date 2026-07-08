@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, HostListener, OnInit } from '@angular/core';
 import { DfLoadingSpinnerService } from './shared/services/df-loading-spinner.service';
 import { NgIf, AsyncPipe } from '@angular/common';
 import {
@@ -20,6 +20,7 @@ import { LoginResponse } from './shared/types/auth.types';
 import { ROUTES } from './shared/types/routes';
 import { IntercomService } from './shared/services/intercom.service';
 import { DfUserDataService } from './shared/services/df-user-data.service';
+import { DfCommandPaletteService } from './shared/components/df-command-palette/df-command-palette.service';
 import { filter } from 'rxjs';
 
 @UntilDestroy({ checkProperties: true })
@@ -49,8 +50,26 @@ export class AppComponent implements OnInit {
     private route: ActivatedRoute,
     private loggingService: LoggingService,
     private intercomService: IntercomService,
-    private dfUserDataService: DfUserDataService
+    private dfUserDataService: DfUserDataService,
+    private commandPalette: DfCommandPaletteService
   ) {}
+
+  /**
+   * Global Cmd/Ctrl-K opens the command palette from any surface. Bound on
+   * the shell root so it works regardless of focus, except inside the palette
+   * itself (its own input handles Escape). Only when authenticated - there is
+   * nothing to jump to on the login screen.
+   */
+  @HostListener('document:keydown', ['$event'])
+  onGlobalKeydown(event: KeyboardEvent): void {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+      if (!this.authService.isAuthenticated()) {
+        return;
+      }
+      event.preventDefault();
+      this.commandPalette.toggle();
+    }
+  }
 
   ngOnInit() {
     this.loggingService.log('AppComponent initialized');

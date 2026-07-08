@@ -1,0 +1,225 @@
+// Cmd-K palette surface. Tokens only so it holds up under light / dark /
+// phosphor. Motion + elevation ride the Phase 0 tokens; reduced-motion is
+// already zeroed globally on --df-duration-*.
+:host {
+  display: block;
+  width: min(92vw, 600px);
+  animation: palette-in var(--df-duration-fast) var(--df-ease-emphasized);
+  transform-origin: top center;
+}
+
+@keyframes palette-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.palette {
+  display: flex;
+  flex-direction: column;
+  max-height: min(70vh, 560px);
+  background: var(--df-surface);
+  color: var(--df-text);
+  border: 1px solid var(--df-border);
+  border-radius: var(--df-radius);
+  box-shadow: var(--df-shadow-overlay);
+  overflow: hidden;
+}
+
+.palette-search {
+  display: flex;
+  align-items: center;
+  gap: var(--df-space-3);
+  padding: 0 var(--df-space-4);
+  height: 52px;
+  border-bottom: 1px solid var(--df-border-2);
+  flex: 0 0 auto;
+
+  &__icon {
+    color: var(--df-text-muted);
+    font-size: var(--df-font-size-md);
+  }
+
+  &__input {
+    flex: 1 1 auto;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--df-text);
+    font-size: var(--df-font-size-lg);
+    line-height: var(--df-lh-base);
+
+    &::placeholder {
+      color: var(--df-text-muted);
+    }
+  }
+
+  &__hint {
+    color: var(--df-text-muted);
+  }
+}
+
+.palette-list {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: var(--df-space-2);
+}
+
+.palette-group {
+  & + & {
+    margin-top: var(--df-space-2);
+  }
+
+  &__label {
+    padding: var(--df-space-2) var(--df-space-3) var(--df-space-1);
+    font-size: var(--df-font-size-xs);
+    font-weight: var(--df-font-weight-heading);
+    text-transform: uppercase;
+    letter-spacing: var(--df-tracking-eyebrow);
+    color: var(--df-text-muted);
+  }
+}
+
+.palette-option {
+  display: flex;
+  align-items: center;
+  gap: var(--df-space-3);
+  width: 100%;
+  padding: var(--df-space-2) var(--df-space-3);
+  border: 0;
+  border-radius: var(--df-radius-sm);
+  background: transparent;
+  color: var(--df-text);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--df-duration-fast) var(--df-ease-standard);
+
+  &:hover {
+    background: var(--df-hover);
+  }
+
+  // Keyboard highlight wins visually - it's the ListKeyManager cursor.
+  &.active {
+    background: var(--df-accent-soft);
+  }
+
+  &__icon {
+    flex: 0 0 auto;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--df-radius-sm);
+    font-size: var(--df-font-size-xs);
+    color: var(--df-text-2);
+    background: var(--df-surface-2);
+
+    &--action {
+      color: var(--df-tint-build-fg);
+      background: var(--df-tint-build-bg);
+    }
+    &--service {
+      color: var(--df-tint-data-fg);
+      background: var(--df-tint-data-bg);
+    }
+    &--role {
+      color: var(--df-tint-security-fg);
+      background: var(--df-tint-security-bg);
+    }
+    &--key {
+      color: var(--df-tint-system-fg);
+      background: var(--df-tint-system-bg);
+    }
+    &--mcp {
+      color: var(--df-tint-ai-fg);
+      background: var(--df-tint-ai-bg);
+    }
+    &--doc {
+      color: var(--df-tint-docs-fg);
+      background: var(--df-tint-docs-bg);
+    }
+  }
+
+  &__text {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    line-height: var(--df-lh-tight);
+  }
+
+  &__label {
+    font-size: var(--df-font-size-sm);
+    color: var(--df-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__sub {
+    margin-top: 2px;
+    font-size: var(--df-font-size-xs);
+    color: var(--df-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__go {
+    flex: 0 0 auto;
+    font-size: var(--df-font-size-xs);
+    color: var(--df-text-muted);
+    opacity: 0;
+    transition: opacity var(--df-duration-fast) var(--df-ease-standard);
+  }
+
+  &.active &__go {
+    opacity: 1;
+  }
+}
+
+.palette-none {
+  padding: var(--df-space-6) var(--df-space-4);
+  text-align: center;
+  font-size: var(--df-font-size-sm);
+  color: var(--df-text-muted);
+}
+
+.palette-foot {
+  display: flex;
+  gap: var(--df-space-5);
+  align-items: center;
+  padding: var(--df-space-2) var(--df-space-4);
+  border-top: 1px solid var(--df-border-2);
+  flex: 0 0 auto;
+  font-size: var(--df-font-size-xs);
+  color: var(--df-text-muted);
+
+  &__group {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--df-space-2);
+  }
+}
+
+kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 var(--df-space-1);
+  border: 1px solid var(--df-border);
+  border-radius: var(--df-radius-sm);
+  background: var(--df-surface-2);
+  color: var(--df-text-2);
+  font-family: var(--df-font-mono);
+  font-size: var(--df-font-size-xs);
+  line-height: 1;
+}
