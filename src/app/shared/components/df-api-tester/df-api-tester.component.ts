@@ -13,6 +13,7 @@ import { FormsModule } from '@angular/forms';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faPlay, faCheck, faTimes } from '@fortawesome/free-solid-svg-icons';
 
+import { DfBadgeComponent } from 'src/app/shared/components/df-badge/df-badge.component';
 import { DfUserDataService } from 'src/app/shared/services/df-user-data.service';
 import { normalizeError } from 'src/app/shared/utilities/app-error';
 import { DfCurrentServiceService } from 'src/app/shared/services/df-current-service.service';
@@ -55,6 +56,7 @@ interface TestResult {
     MatIconModule,
     FormsModule,
     FontAwesomeModule,
+    DfBadgeComponent,
   ],
 })
 export class DfApiTesterComponent implements OnChanges {
@@ -227,7 +229,7 @@ export class DfApiTesterComponent implements OnChanges {
         };
         this.isTesting = false;
         this.snackBar.open(
-          `✅ Authentication successful! Access granted to ${selectedEndpoint.method} ${selectedEndpoint.endpoint}`,
+          `Access granted to ${selectedEndpoint.method} ${selectedEndpoint.endpoint}.`,
           'Close',
           {
             duration: 4000,
@@ -247,7 +249,7 @@ export class DfApiTesterComponent implements OnChanges {
 
         if (isAuthError) {
           this.snackBar.open(
-            '🔒 Authentication failed! Your credentials do not have access to this endpoint.',
+            'Access denied. These credentials cannot reach this endpoint.',
             'Close',
             {
               duration: 5000,
@@ -255,7 +257,7 @@ export class DfApiTesterComponent implements OnChanges {
           );
         } else {
           this.snackBar.open(
-            `✅ Authentication successful, but request failed due to other reasons (Status: ${error.status}).`,
+            `Authenticated, but the request failed (status ${error.status}).`,
             'Close',
             {
               duration: 4000,

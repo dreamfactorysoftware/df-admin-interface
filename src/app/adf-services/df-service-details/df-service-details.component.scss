@@ -973,3 +973,10 @@ mat-icon {
     flex: 1;
   }
 }
+
+// Meridian Phase 1: spacing under the Live API Card on the service Overview,
+// before the configuration form begins.
+.service-overview-card {
+  display: block;
+  margin-bottom: var(--df-space-5);
+}

@@ -3,6 +3,10 @@
   "definition": "Service Definition",
   "config": "Configuration",
   "options": "Advanced Options",
+  "overview": {
+    "eyebrow": "Live API",
+    "description": "Your API is live. Copy a request and run it."
+  },
   "controls": {
     "serviceType": {
       "label": "Service Type",

@@ -1,5 +1,4 @@
 import {
-  AfterContentInit,
   Component,
   ElementRef,
   OnInit,
@@ -12,6 +11,10 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatIconModule } from '@angular/material/icon';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatListModule } from '@angular/material/list';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { TranslocoModule } from '@ngneat/transloco';
 import { saveRawAsFile } from 'src/app/shared/utilities/file';
 import { UntilDestroy } from '@ngneat/until-destroy';
@@ -20,19 +23,13 @@ import {
   SESSION_TOKEN_HEADER,
   API_KEY_HEADER,
 } from 'src/app/shared/constants/http-headers';
-import { DfThemeService } from 'src/app/shared/services/df-theme.service';
-import { AsyncPipe, NgIf, NgFor, SlicePipe, NgClass } from '@angular/common';
+import { NgIf, NgFor, NgClass, SlicePipe } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { environment } from '../../../../environments/environment';
 import { ApiKeysService } from '../services/api-keys.service';
 import { ApiKeyInfo } from 'src/app/shared/types/api-keys';
 import { Clipboard } from '@angular/cdk/clipboard';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { MatListModule } from '@angular/material/list';
-import { MatTooltipModule } from '@angular/material/tooltip';
-import { MatExpansionModule } from '@angular/material/expansion';
-import { MatCardModule } from '@angular/material/card';
-import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faCopy } from '@fortawesome/free-solid-svg-icons';
 import { DfCurrentServiceService } from 'src/app/shared/services/df-current-service.service';
 import {
   tap,
@@ -45,12 +42,19 @@ import { HttpClient, HttpBackend, HttpHeaders } from '@angular/common/http';
 import { normalizeError } from 'src/app/shared/utilities/app-error';
 import { toastOff } from 'src/app/shared/utilities/http-contexts';
 import { BASE_URL } from 'src/app/shared/constants/urls';
-import { Subscription, of, forkJoin } from 'rxjs';
-import { DfApiQuickstartComponent } from '../df-api-quickstart/df-api-quickstart.component';
+import { Subscription, of } from 'rxjs';
 import { ApiDocJson } from 'src/app/shared/types/files';
 import { healthCheckEndpointsInfo } from '../constants/health-check-endpoints';
-import { MatSlideToggleModule } from '@angular/material/slide-toggle';
-import { FormsModule } from '@angular/forms';
+
+import { DfBadgeComponent } from 'src/app/shared/components/df-badge/df-badge.component';
+import { DfSkeletonComponent } from 'src/app/shared/components/df-skeleton/df-skeleton.component';
+import { DfEmptyStateComponent } from 'src/app/shared/components/df-empty-state/df-empty-state.component';
+import { DfPageHeaderComponent } from 'src/app/shared/components/df-page-header/df-page-header.component';
+import {
+  DfTryItComponent,
+  TryItMethod,
+  TryItResult,
+} from 'src/app/shared/components/df-try-it/df-try-it.component';
 
 interface ServiceResponse {
   resource: Array<{
@@ -60,11 +64,43 @@ interface ServiceResponse {
   }>;
 }
 
-interface HealthCheckResult {
-  endpoint: string;
-  success?: boolean;
-  error?: string;
+/** One documented operation, flattened out of the OpenAPI paths map. */
+interface DocOperation {
+  id: string;
+  method: TryItMethod;
+  path: string;
+  operationId: string;
+  summary: string;
+  description: string;
+  tag: string;
+  parameters: DocParameter[];
+  requestBodySchema: string | null;
+  responses: DocResponse[];
 }
+
+interface DocParameter {
+  name: string;
+  location: string;
+  required: boolean;
+  type: string;
+  description: string;
+}
+
+interface DocResponse {
+  code: string;
+  description: string;
+}
+
+/** A left-nav group: a resource/tag and the operations under it. */
+interface DocGroup {
+  tag: string;
+  operations: DocOperation[];
+}
+
+type SnippetLang = 'js' | 'python' | 'curl' | 'mcp';
+type HealthStatus = 'loading' | 'healthy' | 'unhealthy' | 'warning';
+
+const KNOWN_METHODS: TryItMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -77,42 +113,46 @@ interface HealthCheckResult {
     MatFormFieldModule,
     MatSelectModule,
     MatIconModule,
-    TranslocoModule,
-    FormsModule,
-    AsyncPipe,
-    NgIf,
-    NgFor,
-    SlicePipe,
-    NgClass,
-    FontAwesomeModule,
+    MatButtonToggleModule,
     MatListModule,
     MatTooltipModule,
-    MatExpansionModule,
-    MatCardModule,
-    DfApiQuickstartComponent,
     MatSlideToggleModule,
+    TranslocoModule,
     FormsModule,
+    NgIf,
+    NgFor,
+    NgClass,
+    SlicePipe,
+    DfBadgeComponent,
+    DfSkeletonComponent,
+    DfEmptyStateComponent,
+    DfPageHeaderComponent,
+    DfTryItComponent,
   ],
 })
-export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
-  @ViewChild('apiDocumentation', { static: true }) apiDocElement:
-    | ElementRef
-    | undefined;
-  @ViewChild('swaggerInjectedContentContainer')
-  swaggerInjectedContentContainerRef: ElementRef | undefined;
-  @ViewChild('healthBannerElement') healthBannerElementRef:
-    | ElementRef
-    | undefined;
+export class DfApiDocsComponent implements OnInit, OnDestroy {
+  // Swagger container only exists once the raw-spec panel is opened.
+  @ViewChild('apiDocumentation') apiDocElement: ElementRef | undefined;
 
   apiDocJson: ApiDocJson;
   apiKeys: ApiKeyInfo[] = [];
 
-  trackByApiKey = (_: number, key: ApiKeyInfo): string => key.apiKey;
-  faCopy = faCopy;
+  // Three-column model.
+  loading = true;
+  groups: DocGroup[] = [];
+  selectedOp: DocOperation | null = null;
+
+  // Right column.
+  snippetLang: SnippetLang = 'curl';
+  selectedApiKey: string | null = null;
+
+  // Raw-spec (advanced) demotion.
+  showAdvanced = false;
+  private swaggerRendered = false;
   expandSchema = false;
 
   private subscriptions: Subscription[] = [];
-  healthStatus: 'loading' | 'healthy' | 'unhealthy' | 'warning' = 'loading';
+  healthStatus: HealthStatus = 'loading';
   healthError: string | null = null;
   serviceName: string | null = null;
   showUnhealthyErrorDetails = false;
@@ -123,7 +163,6 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
     private activatedRoute: ActivatedRoute,
     private router: Router,
     private userDataService: DfUserDataService,
-    private themeService: DfThemeService,
     private apiKeysService: ApiKeysService,
     private clipboard: Clipboard,
     private snackBar: MatSnackBar,
@@ -133,12 +172,10 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
   ) {
     this.rawHttp = new HttpClient(httpBackend);
   }
-  isDarkMode = this.themeService.darkMode$;
+
   ngOnInit(): void {
-    // Get the service name from the route
     this.serviceName = this.activatedRoute.snapshot.params['name'];
 
-    // First fetch the service ID by name (use normal http)
     if (this.serviceName) {
       this.subscriptions.push(
         this.http
@@ -157,19 +194,16 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
       );
     }
 
-    // Handle the API documentation
     this.subscriptions.push(
       this.activatedRoute.data.subscribe(({ data }) => {
         if (data) {
-          // Pass the OpenAPI spec as-is to Swagger UI without transformation
-          // The OpenAPI spec has specific property names (like operationId, $ref, etc.)
-          // that must not be transformed, or Swagger UI won't parse them correctly
           this.apiDocJson = data;
+          this.buildOperations();
+          this.checkApiHealth();
         }
       })
     );
 
-    // Subscribe to the current service ID once
     this.subscriptions.push(
       this.currentServiceService
         .getCurrentServiceId()
@@ -181,25 +215,249 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
         )
         .subscribe(keys => {
           this.apiKeys = keys;
+          if (!this.selectedApiKey && keys.length) {
+            this.selectedApiKey = keys[0].apiKey;
+          }
         })
     );
   }
 
-  ngAfterContentInit(): void {
-    this.checkApiHealth();
-    this.generateSwaggerWithApiKey(this.apiDocJson);
-  }
-
   ngOnDestroy(): void {
-    // Clean up subscriptions
     this.subscriptions.forEach(sub => sub.unsubscribe());
   }
 
+  // ---- spec -> operations -------------------------------------------------
+
+  private buildOperations(): void {
+    this.loading = true;
+    const groupMap = new Map<string, DocOperation[]>();
+    const paths = this.apiDocJson?.paths ?? {};
+
+    Object.keys(paths).forEach(path => {
+      const methods = paths[path] ?? {};
+      Object.keys(methods).forEach(rawMethod => {
+        const method = rawMethod.toUpperCase() as TryItMethod;
+        if (!KNOWN_METHODS.includes(method)) {
+          return;
+        }
+        const op = methods[rawMethod];
+        const tag = op?.tags?.[0] || this.serviceName || 'default';
+        const operation: DocOperation = {
+          id: `${method} ${path}`,
+          method,
+          path,
+          operationId: op?.operationId || '',
+          summary: op?.summary || '',
+          description: op?.description || '',
+          tag,
+          parameters: this.buildParameters(op?.parameters),
+          requestBodySchema: this.buildRequestBody(op?.requestBody),
+          responses: this.buildResponses(op?.responses),
+        };
+        const bucket = groupMap.get(tag) ?? [];
+        bucket.push(operation);
+        groupMap.set(tag, bucket);
+      });
+    });
+
+    this.groups = [...groupMap.entries()]
+      .map(([tag, operations]) => ({
+        tag,
+        operations: operations.sort(
+          (a, b) =>
+            a.path.localeCompare(b.path) ||
+            KNOWN_METHODS.indexOf(a.method) - KNOWN_METHODS.indexOf(b.method)
+        ),
+      }))
+      .sort((a, b) => a.tag.localeCompare(b.tag));
+
+    const first = this.groups[0]?.operations[0] ?? null;
+    this.selectedOp = first;
+    this.loading = false;
+  }
+
+  private buildParameters(params: any[] | undefined): DocParameter[] {
+    if (!Array.isArray(params)) {
+      return [];
+    }
+    return params.map(p => ({
+      name: p?.name || '',
+      location: p?.in || '',
+      required: !!p?.required,
+      type: p?.schema?.type || p?.type || p?.schema?.items?.type || '',
+      description: p?.description || '',
+    }));
+  }
+
+  private buildRequestBody(requestBody: any): string | null {
+    const schema = requestBody?.content?.['application/json']?.schema;
+    if (!schema) {
+      return null;
+    }
+    try {
+      return JSON.stringify(schema, null, 2);
+    } catch {
+      return null;
+    }
+  }
+
+  private buildResponses(responses: any): DocResponse[] {
+    if (!responses || typeof responses !== 'object') {
+      return [];
+    }
+    return Object.keys(responses).map(code => ({
+      code,
+      description: responses[code]?.description || '',
+    }));
+  }
+
+  get hasOperations(): boolean {
+    return this.groups.length > 0;
+  }
+
+  selectOperation(op: DocOperation): void {
+    this.selectedOp = op;
+  }
+
+  isSelected(op: DocOperation): boolean {
+    return this.selectedOp?.id === op.id;
+  }
+
+  /** Method -> category tint class (punch item 22: GET=data, POST=security,
+   *  PUT=system, PATCH=docs, DELETE=danger). Class only, no literals. */
+  methodClass(method: string): string {
+    return `m-${(method || '').toLowerCase()}`;
+  }
+
+  // ---- right column: live snippets ----------------------------------------
+
+  get serviceBaseUrl(): string {
+    return `${BASE_URL}/${this.serviceName ?? ''}`;
+  }
+
+  private get fullUrl(): string {
+    const path = this.selectedOp?.path ?? '';
+    return `${window.location.origin}${this.serviceBaseUrl}${path}`;
+  }
+
+  private get mcpUrl(): string {
+    return `${window.location.origin}${this.serviceBaseUrl}/_mcp`;
+  }
+
+  private get authHeaderName(): string {
+    return this.selectedApiKey ? API_KEY_HEADER : SESSION_TOKEN_HEADER;
+  }
+
+  private get authHeaderValue(): string {
+    if (this.selectedApiKey) {
+      return this.selectedApiKey;
+    }
+    return this.userDataService.token || 'YOUR_SESSION_TOKEN';
+  }
+
+  get snippet(): string {
+    if (!this.selectedOp) {
+      return '';
+    }
+    switch (this.snippetLang) {
+      case 'js':
+        return this.jsSnippet();
+      case 'python':
+        return this.pythonSnippet();
+      case 'mcp':
+        return this.mcpSnippet();
+      default:
+        return this.curlSnippet();
+    }
+  }
+
+  private curlSnippet(): string {
+    const method = this.selectedOp!.method;
+    return [
+      `curl -X ${method} '${this.fullUrl}'`,
+      `  -H 'Accept: application/json'`,
+      `  -H '${this.authHeaderName}: ${this.authHeaderValue}'`,
+    ].join(' \\\n');
+  }
+
+  private jsSnippet(): string {
+    const method = this.selectedOp!.method;
+    return [
+      `const resp = await fetch('${this.fullUrl}', {`,
+      `  method: '${method}',`,
+      `  headers: {`,
+      `    'Accept': 'application/json',`,
+      `    '${this.authHeaderName}': '${this.authHeaderValue}',`,
+      `  },`,
+      `});`,
+      `console.log(resp.status, await resp.json());`,
+    ].join('\n');
+  }
+
+  private pythonSnippet(): string {
+    const method = this.selectedOp!.method.toLowerCase();
+    return [
+      `import requests`,
+      ``,
+      `resp = requests.${method}(`,
+      `    '${this.fullUrl}',`,
+      `    headers={`,
+      `        'Accept': 'application/json',`,
+      `        '${this.authHeaderName}': '${this.authHeaderValue}',`,
+      `    },`,
+      `)`,
+      `print(resp.status_code, resp.json())`,
+    ].join('\n');
+  }
+
+  /** MCP client config: point any MCP-aware client at this service's gateway
+   *  endpoint with the live key. Positioning no competitor ships. */
+  private mcpSnippet(): string {
+    const key = this.selectedApiKey || 'YOUR_API_KEY';
+    const name = `dreamfactory-${this.serviceName ?? 'service'}`;
+    const config = {
+      mcpServers: {
+        [name]: {
+          url: this.mcpUrl,
+          headers: {
+            [API_KEY_HEADER]: key,
+          },
+        },
+      },
+    };
+    return JSON.stringify(config, null, 2);
+  }
+
+  copySnippet(): void {
+    this.clipboard.copy(this.snippet);
+  }
+
+  // ---- df-try-it host log --------------------------------------------------
+
+  onTryItSent(_result: TryItResult): void {
+    // Placeholder for a future "Recent Requests" tab (spec 3.5). Kept as a
+    // typed sink so the console's `sent` output is bound and observable.
+  }
+
+  // ---- health -------------------------------------------------------------
+
+  get healthVariant(): 'neutral' | 'success' | 'warning' | 'danger' {
+    switch (this.healthStatus) {
+      case 'healthy':
+        return 'success';
+      case 'unhealthy':
+        return 'danger';
+      case 'warning':
+        return 'warning';
+      default:
+        return 'neutral';
+    }
+  }
+
   private checkApiHealth(): void {
-    let endpointsInfoToValidate =
+    const endpointsInfoToValidate =
       healthCheckEndpointsInfo[this.apiDocJson.info.group];
     if (this.serviceName && endpointsInfoToValidate) {
-      // Perform health check
       this.performHealthCheck(endpointsInfoToValidate[0].endpoint);
     } else {
       this.setHealthState('warning');
@@ -222,7 +480,6 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
       this.http
         .get(`${BASE_URL}/${this.serviceName}${endpoint}`, {
           responseType: 'text',
-          // The health banner owns display; a toast per failed probe is noise.
           context: toastOff(),
         })
         .pipe(
@@ -232,7 +489,6 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
               'unhealthy',
               `${endpoint}: ${normalizeError(error).message}`
             );
-
             return of(null);
           })
         )
@@ -240,12 +496,18 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
     );
   }
 
+  toggleUnhealthyErrorDetails(): void {
+    this.showUnhealthyErrorDetails = !this.showUnhealthyErrorDetails;
+  }
+
+  // ---- nav + top actions ---------------------------------------------------
+
   goBackToList(): void {
     this.currentServiceService.clearCurrentServiceId();
     this.router.navigate(['../'], { relativeTo: this.activatedRoute });
   }
 
-  downloadApiDoc() {
+  downloadApiDoc(): void {
     saveRawAsFile(
       JSON.stringify(this.apiDocJson, undefined, 2),
       'api-spec.json',
@@ -253,64 +515,27 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
     );
   }
 
-  copyApiKey(key: string) {
+  copyApiKey(key: string): void {
     this.clipboard.copy(key);
-    this.snackBar.open('API Key copied to clipboard!', 'Close', {
+    this.snackBar.open('API Key copied to clipboard', 'Close', {
       duration: 2000,
     });
   }
 
-  toggleUnhealthyErrorDetails(): void {
-    this.showUnhealthyErrorDetails = !this.showUnhealthyErrorDetails;
+  // ---- raw spec (demoted swagger) -----------------------------------------
+
+  toggleAdvanced(): void {
+    this.showAdvanced = !this.showAdvanced;
+    if (this.showAdvanced && !this.swaggerRendered) {
+      // Wait for the *ngIf container to enter the DOM, then render once.
+      setTimeout(() => this.renderSwagger());
+    }
   }
 
-  private generateSwaggerWithApiKey(apiDocumentation: ApiDocJson): void {
-    SwaggerUI({
-      spec: apiDocumentation,
-      domNode: this.apiDocElement?.nativeElement,
-      requestInterceptor: (req: SwaggerUI.Request) => {
-        req['headers'][SESSION_TOKEN_HEADER] = this.userDataService.token;
-        req['headers'][API_KEY_HEADER] = environment.dfApiDocsApiKey;
-        // Parse the request URL
-        const url = new URL(req['url']);
-        const params = new URLSearchParams(url.search);
-        // Decode all parameters
-        params.forEach((value, key) => {
-          params.set(key, decodeURIComponent(value));
-        });
-        // Update the URL with decoded parameters
-        url.search = params.toString();
-        req['url'] = url.toString();
-        return req;
-      },
-      showMutatedRequest: true,
-      onComplete: () => {
-        if (
-          this.apiDocElement &&
-          this.apiDocElement.nativeElement &&
-          this.swaggerInjectedContentContainerRef &&
-          this.swaggerInjectedContentContainerRef.nativeElement
-        ) {
-          const swaggerContainer = this.apiDocElement.nativeElement;
-          const customContentNode =
-            this.swaggerInjectedContentContainerRef.nativeElement;
-
-          const infoContainer = swaggerContainer.querySelector(
-            '.information-container .main'
-          );
-
-          this.injectCustomContent(
-            swaggerContainer,
-            infoContainer,
-            customContentNode
-          );
-        }
-      },
-    });
-  }
-
-  reloadApiDocs() {
-    if (!this.serviceName) return;
+  reloadApiDocs(): void {
+    if (!this.serviceName) {
+      return;
+    }
     const params = this.expandSchema ? '?expand_schema=true' : '';
     const headers = new HttpHeaders({
       'X-DreamFactory-API-Key': environment.dfApiDocsApiKey,
@@ -323,27 +548,43 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
       .subscribe(data => {
         if (data) {
           this.apiDocJson = data;
+          this.buildOperations();
         }
-        this.ngAfterContentInit();
+        this.swaggerRendered = false;
+        if (this.showAdvanced) {
+          setTimeout(() => this.renderSwagger());
+        }
       });
   }
 
-  private injectCustomContent(
-    swaggerContainer: HTMLElement,
-    infoContainer: HTMLElement | null,
-    customContentNode: HTMLElement
-  ): void {
-    if (infoContainer) {
-      infoContainer.appendChild(customContentNode);
-    } else {
-      if (swaggerContainer.firstChild) {
-        swaggerContainer.insertBefore(
-          customContentNode,
-          swaggerContainer.firstChild
-        );
-      } else {
-        swaggerContainer.appendChild(customContentNode);
-      }
+  private renderSwagger(): void {
+    if (!this.apiDocElement?.nativeElement) {
+      return;
     }
+    this.swaggerRendered = true;
+    SwaggerUI({
+      spec: this.apiDocJson,
+      domNode: this.apiDocElement.nativeElement,
+      requestInterceptor: (req: SwaggerUI.Request) => {
+        req['headers'][SESSION_TOKEN_HEADER] = this.userDataService.token;
+        req['headers'][API_KEY_HEADER] = environment.dfApiDocsApiKey;
+        const url = new URL(req['url']);
+        const urlParams = new URLSearchParams(url.search);
+        urlParams.forEach((value, key) => {
+          urlParams.set(key, decodeURIComponent(value));
+        });
+        url.search = urlParams.toString();
+        req['url'] = url.toString();
+        return req;
+      },
+      showMutatedRequest: true,
+    });
   }
+
+  trackByApiKey = (_: number, key: ApiKeyInfo): string => key.apiKey;
+  trackByGroup = (_: number, group: DocGroup): string => group.tag;
+  trackByOperation = (_: number, op: DocOperation): string => op.id;
+  trackByParam = (_: number, p: DocParameter): string =>
+    `${p.location}:${p.name}`;
+  trackByResponse = (_: number, r: DocResponse): string => r.code;
 }
