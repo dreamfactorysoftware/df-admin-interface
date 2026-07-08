@@ -12,6 +12,21 @@
   gap: 16px;
 }
 
+// ---- Meridian Phase 3: Access section (scope matrix under the overview) ----
+.service-access {
+  margin-top: 3.2rem;
+  padding-top: 3.2rem;
+  border-top: 1px solid var(--df-border-2);
+
+  &__hint {
+    margin: 0 0 1.6rem;
+    max-width: 68ch;
+    color: var(--df-text-muted);
+    font-size: 1.3rem;
+    line-height: 1.5;
+  }
+}
+
 // ---- Departure type scale for in-form section headers ----
 .section-header h3,
 .basic-fields-section .section-title,

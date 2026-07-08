@@ -113,6 +113,9 @@ import {
   DfArtifactCardComponent,
   ArtifactKeyOption,
 } from 'src/app/shared/components/df-artifact-card/df-artifact-card.component';
+import { DfScopeMatrixComponent } from 'src/app/shared/components/df-scope-matrix/df-scope-matrix.component';
+import { ScopeVerb } from 'src/app/shared/services/df-scope.service';
+import { DfServiceRoleScopeDialogComponent } from './df-service-role-scope-dialog.component';
 
 type UnsavedToolChoice = 'save' | 'discard' | 'cancel';
 
@@ -191,6 +194,7 @@ interface ServiceResponse {
     MatDialogModule,
     DfPageHeaderComponent,
     DfArtifactCardComponent,
+    DfScopeMatrixComponent,
   ],
 })
 export class DfServiceDetailsComponent implements OnInit {
@@ -2049,6 +2053,22 @@ export class DfServiceDetailsComponent implements OnInit {
   // The card fires this when no key is present; send the user to create one.
   onCreateApiKey(): void {
     this.router.navigate(['/api-connections/api-keys/create']);
+  }
+
+  // Meridian Phase 3: a granted scope-matrix cell opens the role's resolved
+  // scope in a dialog. df-scope-matrix only emits for non-'none' cells, so
+  // there is always a real grant to inspect here.
+  onScopeCellClick(event: { roleId: number; verb: ScopeVerb }): void {
+    this.dialog.open(DfServiceRoleScopeDialogComponent, {
+      width: '640px',
+      maxWidth: '92vw',
+      autoFocus: false,
+      data: {
+        roleId: event.roleId,
+        verb: event.verb,
+        serviceLabel: this.serviceData?.label || this.serviceData?.name || '',
+      },
+    });
   }
 
   // Resolve a key + sample table for the Live API Card whose curl PROVABLY
