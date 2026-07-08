@@ -145,6 +145,10 @@ export class DfTryItComponent implements OnInit {
    *  on the left, so the console shows the verb as a static chip instead of a
    *  second, contradictory picker). */
   @Input() lockMethod = false;
+  /** When true the console drops its own method + path request line: the host
+   *  (API docs request builder) owns the URL, so the console renders only the
+   *  value editors, Send, response, and export. */
+  @Input() hideRequestLine = false;
   /** Path appended to `baseUrl`, e.g. `/_table/employees`. */
   @Input() path = '';
   /** Service base, e.g. `/api/v2/mysql`. Falls back to the instance API root. */
@@ -183,7 +187,7 @@ export class DfTryItComponent implements OnInit {
   selectedIdentityId = 'session';
 
   viewMode: 'pretty' | 'raw' = 'pretty';
-  snippetLang: 'curl' | 'python' | 'js' = 'curl';
+  snippetLang: 'curl' | 'python' | 'js' | 'mcp' = 'curl';
 
   loading = false;
   response: TryItResponseView | null = null;
@@ -394,6 +398,34 @@ export class DfTryItComponent implements OnInit {
       target[0] = row;
     } else {
       target.push(row);
+    }
+  }
+
+  /** Host query (API docs parameter list): is a named param/header already an
+   *  enabled row in the builder? Drives the always-visible add/remove toggle. */
+  isInjected(name: string, location: 'query' | 'header' = 'query'): boolean {
+    const key = (name ?? '').trim();
+    if (!key) {
+      return false;
+    }
+    const target = location === 'header' ? this.headers : this.params;
+    return target.some(r => r.enabled && r.key.trim() === key);
+  }
+
+  /** Host hook: pull a previously-injected param/header back out of the call.
+   *  The trailing blank editor row is preserved so the tab never empties. */
+  removeInjected(name: string, location: 'query' | 'header' = 'query'): void {
+    const key = (name ?? '').trim();
+    if (!key) {
+      return;
+    }
+    const target = location === 'header' ? this.headers : this.params;
+    const idx = target.findIndex(r => r.key.trim() === key);
+    if (idx >= 0) {
+      target.splice(idx, 1);
+      if (!target.length) {
+        target.push({ key: '', value: '', enabled: true });
+      }
     }
   }
 
@@ -631,9 +663,30 @@ export class DfTryItComponent implements OnInit {
         return this.pythonSnippet();
       case 'js':
         return this.jsSnippet();
+      case 'mcp':
+        return this.mcpSnippet();
       default:
         return this.curlSnippet();
     }
+  }
+
+  /** MCP client config for the built request's service: point any MCP-aware
+   *  client at this service's `_mcp` gateway with the selected identity's key.
+   *  The differentiator no competitor ships. */
+  private mcpSnippet(): string {
+    const identity = this.selectedIdentity;
+    const key = identity?.apiKey || 'YOUR_API_KEY';
+    const svc = this.serviceName ?? 'service';
+    const url = `${window.location.origin}${BASE_URL}/${svc}/_mcp`;
+    const config = {
+      mcpServers: {
+        [`dreamfactory-${svc}`]: {
+          url,
+          headers: { [API_KEY_HEADER]: key },
+        },
+      },
+    };
+    return JSON.stringify(config, null, 2);
   }
 
   private bodyForSnippet(): string | null {

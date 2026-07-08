@@ -88,6 +88,18 @@
     white-space: nowrap;
   }
 
+  // ---- send + identity (co-located above the response) ------------------
+  &__send-area {
+    display: flex;
+    align-items: center;
+    gap: var(--df-space-3);
+    flex-wrap: wrap;
+  }
+
+  &__send-spacer {
+    flex: 1 1 auto;
+  }
+
   // ---- identity switcher ------------------------------------------------
   &__identity {
     display: flex;
@@ -214,6 +226,15 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--df-space-2);
+  }
+
+  &__snippet-lang {
+    flex-wrap: wrap;
+
+    // MCP export is the differentiator: brand it when active.
+    .try-it__snippet-lang-mcp.mat-button-toggle-checked {
+      color: var(--df-accent);
+    }
   }
 
   &__copy {

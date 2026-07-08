@@ -1,8 +1,9 @@
 <ng-container *transloco="let t; read: 'tryIt'">
   <section class="try-it" data-testid="df-try-it">
-    <!-- Request line: method + path + send -->
-    <div class="try-it__request-line">
-      <!-- Locked: the host (API docs) sets the verb by the chosen operation. -->
+    <!-- Request line: method + path. The host (API docs builder) can hide this
+         and own the URL itself; standalone use keeps it. -->
+    <div class="try-it__request-line" *ngIf="!hideRequestLine">
+      <!-- Locked: the host sets the verb by the chosen operation. -->
       <span
         *ngIf="lockMethod"
         class="try-it__method-chip"
@@ -35,55 +36,9 @@
           autocapitalize="off"
           autocomplete="off" />
       </mat-form-field>
-
-      <button
-        mat-flat-button
-        color="primary"
-        class="try-it__send"
-        type="button"
-        [disabled]="loading"
-        (click)="send()"
-        data-testid="try-it-send">
-        <mat-spinner *ngIf="loading" diameter="16"></mat-spinner>
-        <span *ngIf="!loading">{{ t('send') }}</span>
-      </button>
     </div>
 
-    <!-- Resolved URL preview -->
-    <p class="try-it__url df-numeric" [title]="requestUrl">{{ requestUrl }}</p>
-
-    <!-- Identity switcher: Test as key / role -->
-    <div class="try-it__identity">
-      <mat-form-field appearance="outline" class="try-it__identity-select">
-        <mat-label>{{ t('identityLabel') }}</mat-label>
-        <mat-select
-          [(ngModel)]="selectedIdentityId"
-          (selectionChange)="onIdentityChange()"
-          data-testid="try-it-identity">
-          <mat-option
-            *ngFor="let i of identities; trackBy: trackByIdentity"
-            [value]="i.id"
-            [class.try-it__identity-option--session]="i.type === 'session'">
-            <span class="try-it__identity-name">{{ i.label }}</span>
-            <span
-              class="try-it__identity-default"
-              *ngIf="i.type === 'session'"
-              >{{ t('sessionDefault') }}</span
-            >
-            <span class="try-it__identity-meta" *ngIf="i.roleName">
-              {{ i.roleName }}</span
-            >
-          </mat-option>
-        </mat-select>
-      </mat-form-field>
-      <df-badge
-        *ngIf="selectedIdentity?.readOnly"
-        variant="neutral"
-        [label]="t('readOnly')"></df-badge>
-      <span class="try-it__identity-hint">{{ t('identityHint') }}</span>
-    </div>
-
-    <!-- Params / Headers / Body -->
+    <!-- Params / Headers / Body: fill in the values for the built call -->
     <mat-tab-group
       class="try-it__tabs"
       [disableRipple]="true"
@@ -167,28 +122,51 @@
       </mat-tab>
     </mat-tab-group>
 
-    <!-- Copy-as snippet -->
-    <div class="try-it__snippet">
-      <div class="try-it__snippet-bar">
-        <mat-button-toggle-group
-          [(ngModel)]="snippetLang"
-          class="try-it__snippet-lang">
-          <mat-button-toggle value="curl">curl</mat-button-toggle>
-          <mat-button-toggle value="python">Python</mat-button-toggle>
-          <mat-button-toggle value="js">JS</mat-button-toggle>
-        </mat-button-toggle-group>
-        <button
-          mat-button
-          type="button"
-          class="try-it__copy"
-          (click)="copySnippet()">
-          <mat-icon>content_copy</mat-icon>{{ t('copy') }}
-        </button>
-      </div>
-      <pre class="try-it__code"><code>{{ snippet }}</code></pre>
+    <!-- Send + identity, co-located directly above the response. -->
+    <div class="try-it__send-area">
+      <mat-form-field appearance="outline" class="try-it__identity-select">
+        <mat-label>{{ t('identityLabel') }}</mat-label>
+        <mat-select
+          [(ngModel)]="selectedIdentityId"
+          (selectionChange)="onIdentityChange()"
+          data-testid="try-it-identity">
+          <mat-option
+            *ngFor="let i of identities; trackBy: trackByIdentity"
+            [value]="i.id"
+            [class.try-it__identity-option--session]="i.type === 'session'">
+            <span class="try-it__identity-name">{{ i.label }}</span>
+            <span
+              class="try-it__identity-default"
+              *ngIf="i.type === 'session'"
+              >{{ t('sessionDefault') }}</span
+            >
+            <span class="try-it__identity-meta" *ngIf="i.roleName">
+              {{ i.roleName }}</span
+            >
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <df-badge
+        *ngIf="selectedIdentity?.readOnly"
+        variant="neutral"
+        [label]="t('readOnly')"></df-badge>
+      <span class="try-it__send-spacer"></span>
+      <button
+        mat-flat-button
+        color="primary"
+        class="try-it__send"
+        type="button"
+        [disabled]="loading"
+        (click)="send()"
+        data-testid="try-it-send">
+        <mat-spinner *ngIf="loading" diameter="16"></mat-spinner>
+        <span *ngIf="!loading">{{ t('send') }}</span>
+      </button>
     </div>
+    <p class="try-it__url df-numeric" [title]="requestUrl">{{ requestUrl }}</p>
+    <span class="try-it__identity-hint">{{ t('identityHint') }}</span>
 
-    <!-- Response -->
+    <!-- Response: directly below Send. -->
     <div class="try-it__response" *ngIf="response">
       <div class="try-it__response-meta">
         <df-badge
@@ -251,5 +229,29 @@
     </div>
 
     <p class="try-it__error" *ngIf="errorMessage">{{ errorMessage }}</p>
+
+    <!-- Export: copy the built request as curl / Python / JS / MCP config. -->
+    <div class="try-it__snippet">
+      <div class="try-it__snippet-bar">
+        <mat-button-toggle-group
+          [(ngModel)]="snippetLang"
+          class="try-it__snippet-lang">
+          <mat-button-toggle value="curl">curl</mat-button-toggle>
+          <mat-button-toggle value="python">Python</mat-button-toggle>
+          <mat-button-toggle value="js">JS</mat-button-toggle>
+          <mat-button-toggle value="mcp" class="try-it__snippet-lang-mcp"
+            >MCP</mat-button-toggle
+          >
+        </mat-button-toggle-group>
+        <button
+          mat-button
+          type="button"
+          class="try-it__copy"
+          (click)="copySnippet()">
+          <mat-icon>content_copy</mat-icon>{{ t('copy') }}
+        </button>
+      </div>
+      <pre class="try-it__code"><code>{{ snippet }}</code></pre>
+    </div>
   </section>
 </ng-container>

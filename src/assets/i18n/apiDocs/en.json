@@ -22,7 +22,16 @@
     "required": "Required",
     "description": "Description",
     "requiredLabel": "Required",
-    "addToCall": "Add to the test call"
+    "addToCall": "Add to the test call",
+    "removeFromCall": "Remove from the test call",
+    "add": "Add",
+    "added": "Added",
+    "headerTag": "header"
+  },
+  "builder": {
+    "request": "Request",
+    "reference": "Reference",
+    "pathParams": "Path parameters"
   },
   "table": {
     "header": {

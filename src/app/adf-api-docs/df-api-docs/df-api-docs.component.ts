@@ -111,7 +111,13 @@ interface DocGroup {
   operations: DocOperation[];
 }
 
-type SnippetLang = 'js' | 'python' | 'curl' | 'mcp';
+/** One piece of the request line: either a literal path chunk (`token` null)
+ *  or a `{token}` placeholder rendered as an inline picker. */
+interface PathSegment {
+  text: string;
+  token: PathToken | null;
+}
+
 type HealthStatus = 'loading' | 'healthy' | 'unhealthy' | 'warning';
 
 const KNOWN_METHODS: TryItMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
@@ -177,9 +183,14 @@ export class DfApiDocsComponent implements OnInit, OnDestroy {
   groups: DocGroup[] = [];
   selectedOp: DocOperation | null = null;
 
-  // Right column.
-  snippetLang: SnippetLang = 'curl';
-  selectedApiKey: string | null = null;
+  // Request builder (right column), computed once per selected operation so the
+  // *ngFor lists never re-allocate on every change-detection pass (the getter-
+  // in-*ngFor CD-loop trap): the request line split into inline segments, and
+  // the operation's parameters partitioned into the addable list (query/header,
+  // section 2) vs the path params shown in the tamed reference.
+  pathSegments: PathSegment[] = [];
+  addableParams: DocParameter[] = [];
+  pathParams: DocParameter[] = [];
 
   // Filter builder (spec 3.5): compiled ?filter= string + the current table's
   // columns (when the selected op is a table GET the schema is introspectable).
@@ -368,6 +379,11 @@ export class DfApiDocsComponent implements OnInit, OnDestroy {
     this.pathTokens = this.parsePathTokens(op.path);
     this.tokenValues = {};
     this.tokenOptions = {};
+    // Precompute the request-line segments + the parameter partition (stable for
+    // the life of the selected op; values live in tokenValues / df-try-it).
+    this.pathSegments = this.buildPathSegments(op);
+    this.addableParams = op.parameters.filter(p => this.isAddableParam(p));
+    this.pathParams = op.parameters.filter(p => !this.isAddableParam(p));
     if (this.pathTokens.length) {
       // Templated path — resolve every `{token}` into its picker.
       this.pathTokens.forEach(t => this.resolveToken(t));
@@ -402,6 +418,30 @@ export class DfApiDocsComponent implements OnInit, OnDestroy {
       });
     }
     return out;
+  }
+
+  /** Split the op path into literal chunks and `{token}` placeholders so the
+   *  request line can render each token as an inline picker (fill-in-the-blank)
+   *  instead of a separate list of dropdowns above the path. */
+  private buildPathSegments(op: DocOperation): PathSegment[] {
+    const segs: PathSegment[] = [];
+    const re = /\{([^}]+)\}/g;
+    let last = 0;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(op.path)) !== null) {
+      if (m.index > last) {
+        segs.push({ text: op.path.slice(last, m.index), token: null });
+      }
+      const token =
+        this.pathTokens.find(t => t.token === m![1]) ??
+        ({ token: m[1], kind: 'text', labelKey: null } as PathToken);
+      segs.push({ text: '', token });
+      last = re.lastIndex;
+    }
+    if (last < op.path.length) {
+      segs.push({ text: op.path.slice(last), token: null });
+    }
+    return segs;
   }
 
   private tokenKind(token: string): TokenKind {
@@ -726,15 +766,41 @@ export class DfApiDocsComponent implements OnInit, OnDestroy {
     return p.location === 'query' || p.location === 'header';
   }
 
-  /** Click a parameter in the metadata table to drop it into the live console,
-   *  ready for a value. */
-  addParamToTest(p: DocParameter): void {
+  private paramLocation(p: DocParameter): 'query' | 'header' {
+    return p.location === 'header' ? 'header' : 'query';
+  }
+
+  /** Is this parameter already a row in the console's request? Drives the
+   *  always-visible add/remove toggle in the compact parameter list. */
+  isParamAdded(p: DocParameter): boolean {
+    return this.tryIt?.isInjected(p.name, this.paramLocation(p)) ?? false;
+  }
+
+  /** One obvious control per parameter row: add it to the call, or (if already
+   *  added) pull it back out. Values are then filled in the console's Params /
+   *  Headers tab. */
+  toggleParam(p: DocParameter): void {
     if (!this.isAddableParam(p)) {
       return;
     }
-    this.tryIt?.injectParam(
-      p.name,
-      p.location === 'header' ? 'header' : 'query'
+    const location = this.paramLocation(p);
+    if (this.tryIt?.isInjected(p.name, location)) {
+      this.tryIt.removeInjected(p.name, location);
+    } else {
+      this.tryIt?.injectParam(p.name, location);
+    }
+  }
+
+  /** True when the tamed reference disclosure has anything to show (long prose,
+   *  path params, request-body schema, or response codes). */
+  get hasReference(): boolean {
+    const op = this.selectedOp;
+    return (
+      !!op &&
+      (!!op.description ||
+        !!op.requestBodySchema ||
+        op.responses.length > 0 ||
+        this.pathParams.length > 0)
     );
   }
 
@@ -748,111 +814,14 @@ export class DfApiDocsComponent implements OnInit, OnDestroy {
     return `m-${(method || '').toLowerCase()}`;
   }
 
-  // ---- right column: live snippets ----------------------------------------
+  // ---- right column: base URL ---------------------------------------------
+  // The curl / Python / JS / MCP export moved into df-try-it, which generates
+  // its snippets from the ACTUAL composed request (path + added params +
+  // identity) rather than a re-derived one. This component only supplies the
+  // service base URL the console builds on.
 
   get serviceBaseUrl(): string {
     return `${BASE_URL}/${this.serviceName ?? ''}`;
-  }
-
-  private get fullUrl(): string {
-    const path = this.effectivePath;
-    const base = `${window.location.origin}${this.serviceBaseUrl}${path}`;
-    if (this.currentFilter) {
-      return `${base}?filter=${encodeURIComponent(this.currentFilter)}`;
-    }
-    return base;
-  }
-
-  private get mcpUrl(): string {
-    return `${window.location.origin}${this.serviceBaseUrl}/_mcp`;
-  }
-
-  private get authHeaderName(): string {
-    return this.selectedApiKey ? API_KEY_HEADER : SESSION_TOKEN_HEADER;
-  }
-
-  private get authHeaderValue(): string {
-    if (this.selectedApiKey) {
-      return this.selectedApiKey;
-    }
-    return this.userDataService.token || 'YOUR_SESSION_TOKEN';
-  }
-
-  get snippet(): string {
-    if (!this.selectedOp) {
-      return '';
-    }
-    switch (this.snippetLang) {
-      case 'js':
-        return this.jsSnippet();
-      case 'python':
-        return this.pythonSnippet();
-      case 'mcp':
-        return this.mcpSnippet();
-      default:
-        return this.curlSnippet();
-    }
-  }
-
-  private curlSnippet(): string {
-    const method = this.selectedOp!.method;
-    return [
-      `curl -X ${method} '${this.fullUrl}'`,
-      `  -H 'Accept: application/json'`,
-      `  -H '${this.authHeaderName}: ${this.authHeaderValue}'`,
-    ].join(' \\\n');
-  }
-
-  private jsSnippet(): string {
-    const method = this.selectedOp!.method;
-    return [
-      `const resp = await fetch('${this.fullUrl}', {`,
-      `  method: '${method}',`,
-      `  headers: {`,
-      `    'Accept': 'application/json',`,
-      `    '${this.authHeaderName}': '${this.authHeaderValue}',`,
-      `  },`,
-      `});`,
-      `console.log(resp.status, await resp.json());`,
-    ].join('\n');
-  }
-
-  private pythonSnippet(): string {
-    const method = this.selectedOp!.method.toLowerCase();
-    return [
-      `import requests`,
-      ``,
-      `resp = requests.${method}(`,
-      `    '${this.fullUrl}',`,
-      `    headers={`,
-      `        'Accept': 'application/json',`,
-      `        '${this.authHeaderName}': '${this.authHeaderValue}',`,
-      `    },`,
-      `)`,
-      `print(resp.status_code, resp.json())`,
-    ].join('\n');
-  }
-
-  /** MCP client config: point any MCP-aware client at this service's gateway
-   *  endpoint with the live key. Positioning no competitor ships. */
-  private mcpSnippet(): string {
-    const key = this.selectedApiKey || 'YOUR_API_KEY';
-    const name = `dreamfactory-${this.serviceName ?? 'service'}`;
-    const config = {
-      mcpServers: {
-        [name]: {
-          url: this.mcpUrl,
-          headers: {
-            [API_KEY_HEADER]: key,
-          },
-        },
-      },
-    };
-    return JSON.stringify(config, null, 2);
-  }
-
-  copySnippet(): void {
-    this.clipboard.copy(this.snippet);
   }
 
   // ---- df-try-it host log --------------------------------------------------
@@ -1005,6 +974,7 @@ export class DfApiDocsComponent implements OnInit, OnDestroy {
   }
 
   trackByApiKey = (_: number, key: ApiKeyInfo): string => key.apiKey;
+  trackBySegment = (i: number): number => i;
   trackByToken = (_: number, t: PathToken): string => t.token;
   trackByOption = (_: number, option: string): string => option;
   trackByGroup = (_: number, group: DocGroup): string => group.tag;
