@@ -85,6 +85,43 @@
     gap: 8px;
   }
 
+  // Scope lens bar: the promoted single control that re-slices every chart.
+  // Reuses the time-range toggle pattern, so it inherits the themed
+  // mat-button-toggle finish; only layout lives here.
+  &__scope {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--df-surface-2);
+    border: 1px solid var(--df-border-2);
+    border-radius: var(--df-radius-sm);
+  }
+
+  &__scope-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--df-text-muted);
+    font-weight: 600;
+  }
+
+  &__scope-member {
+    min-width: 220px;
+
+    ::ng-deep .mat-mdc-form-field-subscript-wrapper {
+      display: none;
+    }
+  }
+
+  &__scope-hint {
+    font-size: 1.2rem;
+    color: var(--df-text-muted);
+    font-style: italic;
+    margin-left: auto;
+  }
+
   &__loading {
     padding: 48px;
     display: flex;
@@ -139,6 +176,14 @@
   &__cost-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(480px, 1fr));
+    gap: 16px;
+  }
+
+  // Categorical spend breakdowns (share of the bill). Same responsive grid
+  // rhythm as the bars panels.
+  &__breakdown-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
     gap: 16px;
   }
 
@@ -380,12 +425,16 @@
   &__budgets-row-amount {
     font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
     font-size: 1.3rem;
-    color: var(--df-text);
+    color: var(--df-text-2);
 
-    &--over {
-      color: var(--df-danger);
+    strong {
+      color: var(--df-text);
       font-weight: 600;
     }
+  }
+
+  &__budgets-row-share {
+    color: var(--df-text-muted);
   }
 
   // Meter track: stays a rounded capsule on purpose; it is a progress bar,
@@ -396,10 +445,6 @@
     background: var(--df-surface-2);
     border-radius: 999px;
     overflow: hidden;
-
-    &--over {
-      background: var(--df-danger-soft);
-    }
   }
 
   &__budgets-row-fill {
@@ -408,11 +453,8 @@
     top: 0;
     height: 100%;
     background: var(--df-success);
-    transition: width 0.2s ease-out;
-  }
-
-  &__budgets-row-bar--over &__budgets-row-fill {
-    background: var(--df-danger);
+    transition: width var(--df-duration-standard, 0.2s)
+      var(--df-ease-standard, ease-out);
   }
 
   &__budgets-row-projection {
@@ -428,14 +470,46 @@
     );
   }
 
-  &__budgets-row-bar--over &__budgets-row-projection {
-    background: repeating-linear-gradient(
-      45deg,
-      color-mix(in srgb, var(--df-danger) 55%, transparent),
-      color-mix(in srgb, var(--df-danger) 55%, transparent) 4px,
-      color-mix(in srgb, var(--df-danger) 20%, transparent) 4px,
-      color-mix(in srgb, var(--df-danger) 20%, transparent) 8px
-    );
+  // Budget health drives the meter color off tokens, so all three themes
+  // (incl. phosphor, where warning rides amber and danger rides red) stay
+  // legible. ok = success (default above); warning = amber; danger = red.
+  &__budgets-row[data-status='warning'] {
+    .usage__budgets-row-fill {
+      background: var(--df-warning);
+    }
+    .usage__budgets-row-amount strong {
+      color: var(--df-warning);
+    }
+    .usage__budgets-row-projection {
+      background: repeating-linear-gradient(
+        45deg,
+        color-mix(in srgb, var(--df-warning) 50%, transparent),
+        color-mix(in srgb, var(--df-warning) 50%, transparent) 4px,
+        color-mix(in srgb, var(--df-warning) 18%, transparent) 4px,
+        color-mix(in srgb, var(--df-warning) 18%, transparent) 8px
+      );
+    }
+  }
+
+  &__budgets-row[data-status='danger'] {
+    .usage__budgets-row-bar {
+      background: var(--df-danger-soft);
+    }
+    .usage__budgets-row-fill {
+      background: var(--df-danger);
+    }
+    .usage__budgets-row-amount strong {
+      color: var(--df-danger);
+    }
+    .usage__budgets-row-projection {
+      background: repeating-linear-gradient(
+        45deg,
+        color-mix(in srgb, var(--df-danger) 55%, transparent),
+        color-mix(in srgb, var(--df-danger) 55%, transparent) 4px,
+        color-mix(in srgb, var(--df-danger) 20%, transparent) 4px,
+        color-mix(in srgb, var(--df-danger) 20%, transparent) 8px
+      );
+    }
   }
 
   &__budgets-row-projection-label {
