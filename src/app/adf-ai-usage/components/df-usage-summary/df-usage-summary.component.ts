@@ -281,7 +281,11 @@ import { DfSparklineComponent } from '../df-sparkline/df-sparkline.component';
           font-size: 11px;
           text-transform: uppercase;
           letter-spacing: 0.06em;
-          color: var(--df-text-muted);
+          /* AI-category tint (item 21: stat tiles consume their category
+             tint). Coordinated color per theme; the big value stays
+             --df-text for legibility, semantic tiles keep their own value
+             color (error/cost). Phosphor tint is in-palette cyan. */
+          color: var(--df-tint-ai-fg);
           font-weight: 600;
         }
         &__value {

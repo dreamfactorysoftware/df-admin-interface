@@ -66,7 +66,10 @@ const CUSTOM = '__custom__';
     <div class="alerts-page">
       <div class="alerts-head">
         <div>
-          <h1>Alerts</h1>
+          <div class="title-row">
+            <span class="head-icon"><mat-icon>notifications_active</mat-icon></span>
+            <h1>Alerts</h1>
+          </div>
           <p class="sub">
             Real-time notifications when your APIs change, break, or are
             accessed.
@@ -395,6 +398,29 @@ const CUSTOM = '__custom__';
         justify-content: space-between;
         align-items: flex-start;
       }
+      /* AI-category identity chip (item 21: bring coordinated color back;
+         icons in colored chips get their category tint). Phosphor tint is
+         in-palette cyan, so this stays terminal-safe. */
+      .title-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .head-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        border-radius: var(--df-radius-sm);
+        background: var(--df-tint-ai-bg);
+        color: var(--df-tint-ai-fg);
+      }
+      .head-icon mat-icon {
+        font-size: 22px;
+        width: 22px;
+        height: 22px;
+      }
       h1 {
         margin: 0;
         font-size: 2rem;
@@ -523,8 +549,8 @@ const CUSTOM = '__custom__';
         font-size: 1.2rem;
       }
       .tag {
-        background: var(--df-accent-soft);
-        color: var(--df-accent-strong);
+        background: var(--df-tint-ai-bg);
+        color: var(--df-tint-ai-fg);
         padding: 2px 10px;
         border-radius: var(--df-radius-sm);
         font-size: 1.2rem;
