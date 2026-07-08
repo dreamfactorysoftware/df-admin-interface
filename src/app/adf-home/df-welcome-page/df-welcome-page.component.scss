@@ -1,8 +1,4 @@
-@use '@angular/material' as mat;
-@use 'src/theme' as theme;
 @import '../adf-home.module.scss';
-$df-purple-palette: mat.define-palette(theme.$df-purple-palette);
-$df-coral-palette: mat.define-palette(theme.$df-coral-palette);
 
 .two-column-flex-container {
   display: flex;
@@ -70,29 +66,18 @@ $df-coral-palette: mat.define-palette(theme.$df-coral-palette);
 mat-card.notice-card {
   padding: 30px;
   margin-bottom: 40px;
+  background-color: var(--df-surface);
 
   p {
     a {
-      color: mat.get-color-from-palette($df-purple-palette, 600);
+      color: var(--df-accent);
     }
   }
 }
 
 .pre-heading-icon {
   margin-right: 10px;
-  color: mat.get-color-from-palette($df-purple-palette, 600);
-}
-
-:host-context(.dark-theme) {
-  h2,
-  p {
-    color: var(--df-text);
-  }
-
-  // --df-surface dark (#1c1b21) matches the old palette 1003 (#1c1b20)
-  .notice-card {
-    background-color: var(--df-surface) !important;
-  }
+  color: var(--df-accent);
 }
 
 .release-container {

@@ -134,7 +134,7 @@
           <ng-container
             *ngFor="let group of navGroups; trackBy: trackByGroupLabel">
             <div class="shell-group-label" *ngIf="group.label">
-              {{ group.label }}
+              {{ group.label | transloco }}
             </div>
             <ng-container
               *ngTemplateOutlet="
@@ -152,13 +152,18 @@
             class="banner"
             *ngIf="(hasError$ | async) === false && currentCrumb">
             <h1 class="page-header">
-              <ng-container
-                *ngIf="currentCrumb!.translationKey; else pageTitleLabel">
-                {{ currentCrumb!.translationKey | transloco }}
+              <ng-container *ngIf="pageLabelOverride; else crumbTitle">
+                {{ pageLabelOverride }}
               </ng-container>
-              <ng-template #pageTitleLabel>{{
-                currentCrumb!.label
-              }}</ng-template>
+              <ng-template #crumbTitle>
+                <ng-container
+                  *ngIf="currentCrumb!.translationKey; else pageTitleLabel">
+                  {{ currentCrumb!.translationKey | transloco }}
+                </ng-container>
+                <ng-template #pageTitleLabel>{{
+                  currentCrumb!.label
+                }}</ng-template>
+              </ng-template>
             </h1>
           </div>
         </ng-container>

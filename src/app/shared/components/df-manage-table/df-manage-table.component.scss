@@ -1,16 +1,17 @@
-@use '@angular/material' as mat;
-@use 'src/theme' as theme;
-
-$df-purple-palette: mat.define-palette(theme.$df-purple-palette);
-$green-palette: mat.define-palette(mat.$green-palette);
-$red-palette: mat.define-palette(mat.$red-palette);
+// Departure language: tokens only, hairline borders, flat surfaces.
+// Status colors ride --df-success / --df-danger so light, dark, and
+// phosphor all stay legible without per-theme overrides.
 
 .active {
-  color: mat.get-color-from-palette($green-palette, 500);
+  color: var(--df-success);
 }
 
 .inactive {
-  color: mat.get-color-from-palette($red-palette, 500);
+  color: var(--df-danger);
+}
+
+.log-warning {
+  color: var(--df-danger);
 }
 
 .top-action-bar {
@@ -50,13 +51,14 @@ $red-palette: mat.define-palette(mat.$red-palette);
   margin-bottom: 2px;
 }
 
+// Error state: same flat bordered treatment as the chat error panel
+// (df-ai-chat __error): danger-soft wash inside a danger hairline.
 .table-error-panel {
   margin-bottom: 12px;
   padding: 12px 16px;
-  border: 1px solid var(--df-border);
-  border-left: 3px solid mat.get-color-from-palette($red-palette, 500);
-  border-radius: 4px;
-  background-color: var(--df-surface-2);
+  border: 1px solid var(--df-danger-border);
+  border-radius: var(--df-radius-sm);
+  background-color: var(--df-danger-soft);
   color: var(--df-text);
 
   .table-error-headline {
@@ -66,13 +68,21 @@ $red-palette: mat.define-palette(mat.$red-palette);
     margin-bottom: 8px;
 
     fa-icon {
-      color: mat.get-color-from-palette($red-palette, 500);
+      color: var(--df-danger);
     }
 
     span {
       flex: 1;
+      font-size: 1.4rem;
     }
   }
+}
+
+// Empty state (matNoDataRow): quiet, centered, muted. The 32px cell
+// padding comes from the global .no-data-row rule.
+.no-data-row td {
+  color: var(--df-text-muted);
+  font-size: 1.35rem;
 }
 
 .clickable {
@@ -85,7 +95,7 @@ $red-palette: mat.define-palette(mat.$red-palette);
   &.mat-mdc-row:focus,
   &.mat-mdc-row:focus-within {
     .mat-mdc-cell:first-child {
-      border-left: 2px solid mat.get-color-from-palette($df-purple-palette, 500);
+      border-left: 2px solid var(--df-accent);
     }
   }
 
@@ -93,17 +103,8 @@ $red-palette: mat.define-palette(mat.$red-palette);
   &.mat-mdc-row:focus-within,
   &.mat-mdc-row:hover {
     .mat-mdc-cell {
-      background-color: mat.get-color-from-palette($df-purple-palette, 100);
+      background-color: var(--df-hover);
     }
-  }
-}
-
-:host-context(.dark-theme) {
-  .search {
-    background-color: mat.get-color-from-palette(
-      $df-purple-palette,
-      1004
-    ) !important;
   }
 }
 

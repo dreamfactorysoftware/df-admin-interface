@@ -13,9 +13,18 @@ const ERROR_DEDUPE_WINDOW_MS = 3000;
 export class DfSnackbarService {
   snackbarLastEle$ = new BehaviorSubject<string>('');
   isEditPage$ = new BehaviorSubject<boolean>(false);
+  /** Entity label for the current detail page, keyed by router URL so a
+   * stale label can never paint another page's title. Detail components
+   * publish it; df-side-nav uses it for the H1 when the last breadcrumb
+   * is a raw dynamic segment (e.g. a numeric service id). */
+  pageLabel$ = new BehaviorSubject<{ url: string; label: string } | null>(null);
   private lastErrorToast: { key: string; at: number } | null = null;
 
   constructor(private snackBar: MatSnackBar) {}
+
+  setPageLabel(url: string, label: string): void {
+    this.pageLabel$.next({ url, label });
+  }
 
   /** Error toast for a normalized AppError with a Details action; dedupes
    * identical errors within 3s so N parallel failures show one toast. */

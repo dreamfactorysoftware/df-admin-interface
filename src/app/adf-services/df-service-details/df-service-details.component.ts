@@ -431,6 +431,15 @@ export class DfServiceDetailsComponent implements OnInit {
         } else {
           this.snackbarService.setSnackbarLastEle('Unknown label', false);
         }
+        // Punch 5: the shell H1 falls back to the raw :id URL segment on
+        // edit pages; publish the service label (name as fallback, id if
+        // neither) keyed to this URL so the title reads "MyDB" not "48".
+        if (this.edit && data) {
+          this.snackbarService.setPageLabel(
+            this.router.url,
+            data.label || data.name || String(data.id ?? '')
+          );
+        }
         if (this.isDatabase) {
           if (licenseType === 'SILVER') {
             this.notIncludedServices.push(

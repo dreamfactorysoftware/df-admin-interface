@@ -97,6 +97,12 @@ export const routes: Routes = [
     path: ROUTES.API_BUILDER,
     redirectTo: `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_TYPES}/${ROUTES.API_BUILDER}`,
     pathMatch: 'full',
+    // navLinkPath lets the side-nav link straight to the destination and
+    // match it for the active state; a redirect's own path never appears
+    // in router.url, so without this the item could never highlight.
+    data: {
+      navLinkPath: `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_TYPES}/${ROUTES.API_BUILDER}`,
+    },
   },
   {
     path: ROUTES.ALERTS,

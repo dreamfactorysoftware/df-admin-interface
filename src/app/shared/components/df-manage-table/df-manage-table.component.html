@@ -93,7 +93,7 @@
                 *ngIf="!!column?.cell(row)"
                 [icon]="faTriangleExclamation"
                 size="lg"
-                style="color: red"></fa-icon>
+                class="log-warning"></fa-icon>
               <span *ngIf="!!column?.cell(row) === false">{{ '-' }}</span>
             </ng-container>
           </td>
