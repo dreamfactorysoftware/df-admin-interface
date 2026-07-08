@@ -100,7 +100,7 @@ import { TableInfo } from './services/data-explorer.service';
         class="table-list">
         <a
           mat-list-item
-          *ngFor="let table of filteredTables"
+          *ngFor="let table of filteredTables; trackBy: trackByTableName"
           (click)="tableSelected.emit(table)"
           [class.selected]="selectedTable?.name === table.name"
           class="table-item">
@@ -317,6 +317,10 @@ export class DfSchemaTreeComponent implements OnChanges {
     if (changes['tables']) {
       this.filterTables();
     }
+  }
+
+  trackByTableName(_index: number, table: TableInfo): string {
+    return table.name;
   }
 
   filterTables(): void {

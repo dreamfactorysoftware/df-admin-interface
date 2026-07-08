@@ -106,15 +106,24 @@ export class DfArrayFieldComponent implements OnInit, ControlValueAccessor {
         ] as Array<ConfigSchema>);
   }
 
+  // Memoized on the schema input reference: mat-table re-diffs its column
+  // defs when *matHeaderRowDef receives a new array, so allocating one per
+  // CD cycle forced a re-diff on every tick.
+  private _displayedColumns: string[] = [];
+  private _displayedColumnsSchema?: ConfigSchema;
   get displayedColumns() {
-    const columns =
-      this.schema.type === 'array'
-        ? this.schema.items === 'string'
-          ? [this.schema.name]
-          : this.schemas.map(s => s.name)
-        : ['key', 'value'];
-    columns.push('actions');
-    return columns;
+    if (this._displayedColumnsSchema !== this.schema) {
+      this._displayedColumnsSchema = this.schema;
+      const columns =
+        this.schema.type === 'array'
+          ? this.schema.items === 'string'
+            ? [this.schema.name]
+            : this.schemas.map(s => s.name)
+          : ['key', 'value'];
+      columns.push('actions');
+      this._displayedColumns = columns;
+    }
+    return this._displayedColumns;
   }
 
   getFormGroup(index: number) {

@@ -20,6 +20,7 @@ import {
   debounceTime,
   distinctUntilChanged,
   EMPTY,
+  Observable,
   switchMap,
   map,
 } from 'rxjs';
@@ -231,8 +232,17 @@ export abstract class DfManageTableComponent<T>
     return !!cellValue;
   }
 
+  // Memoized on the columns array reference: mat-table re-diffs its column
+  // defs whenever *matHeaderRowDef receives a new array, so returning a fresh
+  // .map() per CD cycle forced a re-diff on every tick of every list screen.
+  private _displayedColumns: string[] = [];
+  private _displayedColumnsSource?: Array<Column<T>>;
   get displayedColumns() {
-    return this.columns.map(c => c.columnDef);
+    if (this._displayedColumnsSource !== this.columns) {
+      this._displayedColumnsSource = this.columns;
+      this._displayedColumns = this.columns.map(c => c.columnDef);
+    }
+    return this._displayedColumns;
   }
 
   // get defaultPageSize() {
@@ -392,10 +402,19 @@ export abstract class DfManageTableComponent<T>
     }
   }
 
+  // Cached per header: returning a new selectTranslate observable each CD
+  // cycle made the async pipe unsubscribe/resubscribe every tick, and each
+  // re-emission scheduled another CD pass (subscription-in-getter pattern).
+  private sortDescriptions = new Map<string, Observable<string>>();
   sortDescription(header: string) {
-    return this.translateService.selectTranslate('sortDescription', {
-      header,
-    });
+    let description$ = this.sortDescriptions.get(header);
+    if (!description$) {
+      description$ = this.translateService.selectTranslate('sortDescription', {
+        header,
+      });
+      this.sortDescriptions.set(header, description$);
+    }
+    return description$;
   }
 
   isClickable(row: T) {

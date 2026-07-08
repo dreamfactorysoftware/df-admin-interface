@@ -30,7 +30,7 @@
                     [matAutocomplete]="auto" />
                   <mat-autocomplete requireSelection #auto="matAutocomplete">
                     <mat-option
-                      *ngFor="let app of availableApps"
+                      *ngFor="let app of availableApps; trackBy: trackByAppId"
                       [value]="app.name">
                       {{ app.name }}
                     </mat-option>
@@ -53,7 +53,9 @@
                     formControlName="role"
                     [matAutocomplete]="auto" />
                   <mat-autocomplete requireSelection #auto="matAutocomplete">
-                    <mat-option *ngFor="let role of roles" [value]="role.name">
+                    <mat-option
+                      *ngFor="let role of roles; trackBy: trackByRoleName"
+                      [value]="role.name">
                       {{ role.name }}
                     </mat-option>
                   </mat-autocomplete>

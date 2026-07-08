@@ -83,6 +83,14 @@ export class DfDynamicFieldComponent implements OnInit, DoCheck, AfterViewInit {
   filteredEventList: Observable<string[]>;
   isDarkMode = this.themeService.darkMode$;
 
+  trackByOptionName(_index: number, option: { name: string }): string {
+    return option.name;
+  }
+
+  trackByValue(_index: number, option: string): string {
+    return option;
+  }
+
   ngOnInit(): void {
     if (this.schema.type === 'event_picklist') {
       this.activedRoute.data.subscribe((data: any) => {

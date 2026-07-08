@@ -9,6 +9,7 @@ import {
   ViewChild,
   AfterViewInit,
   ChangeDetectorRef,
+  NgZone,
 } from '@angular/core';
 import { NgIf, NgFor, NgClass, JsonPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -331,7 +332,7 @@ interface ColumnFilter {
             <span class="options-label">Related:</span>
             <label
               class="api-option"
-              *ngFor="let rel of cachedSchema!.related"
+              *ngFor="let rel of cachedSchema!.related; trackBy: trackByRelName"
               [matTooltip]="
                 rel.type +
                 ': Include ' +
@@ -344,9 +345,7 @@ interface ColumnFilter {
               <input
                 type="checkbox"
                 [checked]="apiSelectedRelated[rel.name]"
-                (change)="
-                  apiSelectedRelated[rel.name] = !apiSelectedRelated[rel.name]
-                " />
+                (change)="toggleApiRelated(rel.name)" />
               {{ rel.name }}
             </label>
           </div>
@@ -1452,7 +1451,8 @@ export class DfDataGridComponent
 
   constructor(
     private dataExplorerService: DataExplorerService,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private ngZone: NgZone
   ) {
     this.filterSubject$
       .pipe(debounceTime(500), takeUntil(this.destroy$))
@@ -1494,6 +1494,7 @@ export class DfDataGridComponent
     this.currentOffset = 0;
     this.currentSort = undefined;
     this.columnFilters = {};
+    this.apiStateVersion++;
     this.activeFilterCount = 0;
     this.selectedRow = null;
     this.cachedSchema = null;
@@ -1513,6 +1514,7 @@ export class DfDataGridComponent
         next: schema => {
           this.cachedSchema = schema;
           this.apiSelectedRelated = {};
+          this.apiStateVersion++;
           // Force mat-table to re-render cells so FK/PK indicators and type-aware filters appear
           this.dataSource.data = [...this.dataSource.data];
           this.cdr.detectChanges();
@@ -1651,19 +1653,34 @@ export class DfDataGridComponent
     this.loadData();
   }
 
-  /** Find schema FieldInfo for a JSON response key, handling camelCase vs snake_case */
+  /**
+   * Find schema FieldInfo for a JSON response key, handling camelCase vs
+   * snake_case. Memoized per schema: template cell bindings (isForeignKey/
+   * isPrimaryKey) call this O(rows x cols) per CD cycle, and the fuzzy-match
+   * fallback ran toLowerCase()+replace per schema field on every miss.
+   */
+  private fieldInfoCache = new Map<string, FieldInfo | null>();
+  private fieldInfoCacheSchema: TableSchemaResponse | null = null;
   private getFieldInfo(jsonKey: string): FieldInfo | null {
     if (!this.cachedSchema?.field) return null;
+    if (this.fieldInfoCacheSchema !== this.cachedSchema) {
+      this.fieldInfoCacheSchema = this.cachedSchema;
+      this.fieldInfoCache.clear();
+    }
+    const cached = this.fieldInfoCache.get(jsonKey);
+    if (cached !== undefined) return cached;
     // Try exact match first
     const exact = this.cachedSchema.field.find(f => f.name === jsonKey);
-    if (exact) return exact;
-    // Try case-insensitive match (camelCase vs snake_case)
+    // Then case-insensitive match (camelCase vs snake_case)
     const lower = jsonKey.toLowerCase();
-    return (
+    const result =
+      exact ||
       this.cachedSchema.field.find(
         f => f.name.toLowerCase().replace(/_/g, '') === lower
-      ) || null
-    );
+      ) ||
+      null;
+    this.fieldInfoCache.set(jsonKey, result);
+    return result;
   }
 
   /** Map a JSON response key back to the actual DB column name via schema */
@@ -1701,8 +1718,12 @@ export class DfDataGridComponent
       this.cdr.detectChanges();
     };
 
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
+    // Outside the zone: mousemove during a drag would otherwise trigger full
+    // app CD per event on top of the rAF-throttled detectChanges below.
+    this.ngZone.runOutsideAngular(() => {
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    });
   }
 
   // --- Filter operator logic ---
@@ -1769,6 +1790,7 @@ export class DfDataGridComponent
 
   clearAllFilters(): void {
     this.columnFilters = {};
+    this.apiStateVersion++;
     this.activeFilterCount = 0;
     this.pageIndex = 0;
     this.currentOffset = 0;
@@ -1776,6 +1798,8 @@ export class DfDataGridComponent
   }
 
   private updateActiveFilterCount(): void {
+    // Called after every columnFilters edit; also invalidates the API URL cache.
+    this.apiStateVersion++;
     this.activeFilterCount = Object.keys(this.columnFilters).filter(k => {
       const f = this.columnFilters[k];
       return f.value || this.isNullOp(f.op);
@@ -1929,7 +1953,19 @@ export class DfDataGridComponent
 
   // --- API URL builder ---
 
+  // Memoized: this is bound in the template ({{ buildApiUrl() }}) and the
+  // grid fires CD per keystroke/scroll while the API bar is visible. The
+  // cheap key check below replaces URLSearchParams + Object.entries + filter
+  // string rebuilds per CD. apiStateVersion is bumped wherever the non-
+  // primitive deps (columnFilters, apiSelectedRelated) are mutated.
+  private apiStateVersion = 0;
+  private apiUrlCacheKey = '';
+  private apiUrlCache = '';
   buildApiUrl(): string {
+    const key = `${this.serviceName}|${this.tableName}|${this.apiIncludeLimit}|${this.apiIncludeOffset}|${this.apiIncludeCount}|${this.pageSize}|${this.currentOffset}|${this.currentSort}|${this.navigationFilter}|${this.apiStateVersion}`;
+    if (key === this.apiUrlCacheKey) {
+      return this.apiUrlCache;
+    }
     const base = `${window.location.origin}/api/v2/${this.serviceName}/_table/${this.tableName}`;
     const params = new URLSearchParams();
     if (this.apiIncludeLimit) {
@@ -1957,7 +1993,18 @@ export class DfDataGridComponent
       params.set('related', relatedNames.join(','));
     }
     const qs = params.toString();
-    return qs ? `${base}?${qs}` : base;
+    this.apiUrlCacheKey = key;
+    this.apiUrlCache = qs ? `${base}?${qs}` : base;
+    return this.apiUrlCache;
+  }
+
+  toggleApiRelated(name: string): void {
+    this.apiSelectedRelated[name] = !this.apiSelectedRelated[name];
+    this.apiStateVersion++;
+  }
+
+  trackByRelName(_index: number, rel: { name: string }): string {
+    return rel.name;
   }
 
   copyApiUrl(): void {
