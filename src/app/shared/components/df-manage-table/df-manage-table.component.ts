@@ -104,6 +104,15 @@ export abstract class DfManageTableComponent<T>
   faRefresh = faRefresh;
   allowCreate = true;
   allowFilter = true;
+  /**
+   * Teaching empty state (punch 15a). When a subclass sets these i18n keys,
+   * an empty table renders one line of what-this-is plus a primary CTA
+   * instead of the bare "No entries" text. Resolved by the shared template's
+   * global transloco scope, so the copy lives in the root en.json under
+   * emptyState.<entity>. Left unset, the generic fallback still applies.
+   */
+  @Input() emptyStateMessage?: string;
+  @Input() emptyStateActionLabel?: string;
   currentFilter = new FormControl('');
   schema = false;
   /** Failed fetches render distinctly from "no data" (error panel + Retry). */

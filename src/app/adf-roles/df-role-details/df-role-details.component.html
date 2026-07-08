@@ -20,6 +20,7 @@
     <mat-error *ngIf="roleForm.controls['name'].hasError('server')">
       {{ roleForm.controls['name'].getError('server') }}
     </mat-error>
+    <mat-hint>{{ 'roles.rolesOverview.nameHint' | transloco }}</mat-hint>
   </mat-form-field>
   <mat-slide-toggle formControlName="active" class="dynamic-width">{{
     'active' | transloco

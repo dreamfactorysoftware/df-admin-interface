@@ -6,7 +6,7 @@
   "deleteApp": "Delete app",
   "deleteSelectedApps": "Delete selected apps",
   "launchApp": "Launch app",
-  "createSuccess": "App created successfully",
+  "createSuccess": "API key created. Give it a role to control what it can access, or start calling your APIs with it.",
   "updateSuccess": "App successfully updated",
   "sampleApps": {
     "label": "Sample Apps",
@@ -37,6 +37,7 @@
     "defaultRole": {
       "label": "Assign a Default Role",
       "tooltip": "Unauthenticated or guest users of the app will have this role.",
+      "hint": "The role sets what this API key can access. Without one, the key reaches only open, non-role endpoints.",
       "options": {
         "noRole": "-- No available filtered roles --"
       }

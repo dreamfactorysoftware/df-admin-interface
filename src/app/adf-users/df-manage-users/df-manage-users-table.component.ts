@@ -26,6 +26,8 @@ import { UntilDestroy } from '@ngneat/until-destroy';
   imports: DfManageTableModules,
 })
 export class DfManageUsersTableComponent extends DfManageTableComponent<UserRow> {
+  override emptyStateMessage = 'emptyState.users.message';
+  override emptyStateActionLabel = 'emptyState.users.action';
   constructor(
     @Inject(USER_SERVICE_TOKEN)
     private userService: DfBaseCrudService,

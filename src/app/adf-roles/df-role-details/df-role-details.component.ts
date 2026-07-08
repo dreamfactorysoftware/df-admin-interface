@@ -285,6 +285,7 @@ export class DfRoleDetailsComponent implements OnInit {
     } else {
       this.roleService
         .create(createPayload, {
+          snackbarSuccess: 'roles.createSuccess',
           fields: '*',
           related: 'role_service_access_by_role_id,lookup_by_role_id',
         })

@@ -45,6 +45,8 @@ import { catchError, throwError } from 'rxjs';
   ],
 })
 export class DfManageRolesTableComponent extends DfManageTableComponent<RoleRow> {
+  override emptyStateMessage = 'emptyState.roles.message';
+  override emptyStateActionLabel = 'emptyState.roles.action';
   expandedElement: any | null;
   constructor(
     @Inject(ROLE_SERVICE_TOKEN)

@@ -34,6 +34,8 @@ import { catchError, throwError } from 'rxjs';
   imports: DfManageTableModules,
 })
 export class DfManageAppsTableComponent extends DfManageTableComponent<AppRow> {
+  override emptyStateMessage = 'emptyState.apps.message';
+  override emptyStateActionLabel = 'emptyState.apps.action';
   constructor(
     @Inject(APP_SERVICE_TOKEN)
     private appsService: DfBaseCrudService,

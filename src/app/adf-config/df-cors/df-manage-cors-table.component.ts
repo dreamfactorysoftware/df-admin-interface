@@ -25,6 +25,8 @@ import { UntilDestroy } from '@ngneat/until-destroy';
   imports: DfManageTableModules,
 })
 export class DfManageCorsTableComponent extends DfManageTableComponent<CorsConfigData> {
+  override emptyStateMessage = 'emptyState.cors.message';
+  override emptyStateActionLabel = 'emptyState.cors.action';
   constructor(
     router: Router,
     activatedRoute: ActivatedRoute,

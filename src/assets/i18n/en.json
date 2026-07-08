@@ -110,6 +110,48 @@
   "noFilterResults": "No results match your filter.",
   "clearFilter": "Clear filter",
   "retry": "Retry",
+  "emptyState": {
+    "services": {
+      "message": "Services connect DreamFactory to a database, file store, or remote API so you can generate a secure REST API from it.",
+      "action": "Create a service"
+    },
+    "roles": {
+      "message": "Roles decide what an API key or user can reach, table by table and endpoint by endpoint.",
+      "action": "Create a role"
+    },
+    "apps": {
+      "message": "API keys let your apps and scripts call your generated APIs. Each key carries a role that sets what it can access.",
+      "action": "Create an API key"
+    },
+    "admins": {
+      "message": "Admins configure this instance: services, roles, and system settings. Invite the people who help you run it.",
+      "action": "Invite an admin"
+    },
+    "users": {
+      "message": "Users are the app end-users who sign in to your APIs. Add them here or let them self-register.",
+      "action": "Create a user"
+    },
+    "limits": {
+      "message": "Rate limits cap how often a user, role, or API key can call your endpoints, protecting your data sources from overload.",
+      "action": "Create a limit"
+    },
+    "scheduler": {
+      "message": "Scheduled tasks call an API endpoint on an interval you set, for syncs, cleanups, and other recurring jobs.",
+      "action": "Create a scheduled task"
+    },
+    "eventScripts": {
+      "message": "Event scripts run your own logic before or after an API call, for validation, data transforms, and integrations.",
+      "action": "Create an event script"
+    },
+    "cors": {
+      "message": "CORS entries let browser apps on other domains call your APIs. Add an origin to allow it through.",
+      "action": "Add a CORS entry"
+    },
+    "emailTemplates": {
+      "message": "Email templates define the messages DreamFactory sends for invites, password resets, and your own workflows.",
+      "action": "Create an email template"
+    }
+  },
   "errors": {
     "network": "Can't reach the server. Check your connection and try again.",
     "http4xx": "The request could not be completed.",

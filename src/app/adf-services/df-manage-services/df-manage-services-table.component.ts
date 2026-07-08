@@ -35,6 +35,8 @@ export class DfManageServicesTableComponent
   extends DfManageTableComponent<ServiceRow>
   implements OnInit
 {
+  override emptyStateMessage = 'emptyState.services.message';
+  override emptyStateActionLabel = 'emptyState.services.action';
   serviceTypes: Array<ServiceType> = [];
   system = false;
   private scopedByGroups = false;

@@ -85,6 +85,26 @@
   font-size: 1.35rem;
 }
 
+// Teaching empty state (punch 15a): one line of what-this-is plus the
+// primary CTA. Centered, muted copy, tokens only so all three themes
+// stay legible without overrides.
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  text-align: center;
+
+  .empty-state-message {
+    margin: 0;
+    max-width: 46rem;
+    color: var(--df-text-muted);
+    font-size: 1.4rem;
+    line-height: 1.5;
+  }
+}
+
 .clickable {
   &.mat-mdc-row {
     outline: 0;
