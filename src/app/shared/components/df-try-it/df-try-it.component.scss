@@ -212,6 +212,35 @@
     overflow: auto;
   }
 
+  // ---- denial banner (the boundary, proven) -----------------------------
+  &__denied-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--df-space-3);
+    padding: var(--df-space-3);
+    background: var(--df-danger-soft);
+    border: 1px solid var(--df-danger-border);
+    border-radius: var(--df-radius-sm);
+  }
+
+  &__denied-icon {
+    color: var(--df-danger);
+    flex: 0 0 auto;
+  }
+
+  &__denied-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--df-space-2);
+    align-items: flex-start;
+  }
+
+  &__denied-copy {
+    color: var(--df-text-2);
+    font-size: var(--df-font-size-sm);
+    line-height: var(--df-line-height-normal);
+  }
+
   // ---- denied fields (provable scope) -----------------------------------
   &__denied {
     display: flex;

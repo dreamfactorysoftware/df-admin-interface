@@ -779,7 +779,9 @@
     "ms": "ms",
     "pretty": "Pretty",
     "raw": "Raw",
-    "deniedLabel": "Hidden from this identity"
+    "deniedLabel": "Hidden from this identity",
+    "deniedTitle": "Denied",
+    "deniedBoundary": "The \"{{role}}\" role has no {{method}} grant on this resource. DreamFactory enforced the boundary, not the UI."
   },
   "artifactCard": {
     "eyebrow": "Live API",
