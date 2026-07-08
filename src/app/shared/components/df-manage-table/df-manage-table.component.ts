@@ -229,6 +229,24 @@ export abstract class DfManageTableComponent<T>
     return active ? faCheckCircle : faXmarkCircle;
   }
 
+  // Presentational only (Meridian table spec 1.7): flags id / foreign-key /
+  // hash / count columns so the template can apply the global .df-numeric
+  // utility (tabular figures) and right-align them. No behavior change; pure
+  // class binding keyed off the column name.
+  private static readonly NUMERIC_COLUMNS = new Set([
+    'id',
+    'apiKey',
+    'maxAge',
+    'rate',
+    'counter',
+  ]);
+  isNumericColumn(columnDef: string): boolean {
+    return (
+      DfManageTableComponent.NUMERIC_COLUMNS.has(columnDef) ||
+      columnDef.endsWith('Id')
+    );
+  }
+
   isCellActive(
     cellValue: string | number | boolean | null | undefined
   ): boolean {
