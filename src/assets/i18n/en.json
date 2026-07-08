@@ -199,7 +199,10 @@
     "title": "Quickstart: Test Your API Connection:",
     "quickStartDetails": "Start by testing your API with these sample curl commands. They return real data and confirm your connection is active.",
     "copyTooltip": "Copy",
-    "nextStepFooter": {"header": "Next Step:", "body": "Scroll below to explore generated endpoints that allow you to read, write, and filter your data via REST"}
+    "nextStepFooter": {
+      "header": "Next Step:",
+      "body": "Scroll below to explore generated endpoints that allow you to read, write, and filter your data via REST"
+    }
   },
   "sectionOverviews": {
     "shared": {
@@ -589,8 +592,8 @@
         "header": "{{nav.system-settings.logs.nav}}",
         "create": {
           "header": "Create Log"
-          }
-        },
+        }
+      },
       "file-logs": {
         "nav": "Logs",
         "header": "{{nav.system-settings.file-logs.nav}}"
@@ -614,7 +617,9 @@
           "nav": "Create a new admin",
           "header": "{{nav.admin-settings.admins.create.nav}}"
         },
-        "edit": { "header": "{{edit}}" }
+        "edit": {
+          "header": "{{edit}}"
+        }
       },
       "schema": {
         "nav": "Schema",
@@ -644,16 +649,37 @@
           "nav": "Create a new user",
           "header": "{{nav.admin-settings.users.create.nav}}"
         },
-        "edit": { "header": "{{edit}}" }
+        "edit": {
+          "header": "{{edit}}"
+        }
       },
-      "files": { "nav": "{{files}}", "header": "{{files}}" },
-      "logs": { "nav": "{{logs}}", "header": "{{logs}}" }
+      "files": {
+        "nav": "{{files}}",
+        "header": "{{files}}"
+      },
+      "logs": {
+        "nav": "{{logs}}",
+        "header": "{{logs}}"
+      }
     },
-    "profile": { "header": "Profile" },
-    "logout": { "header": "Logout" },
-    "data": { "nav": "{{data}}", "header": "{{data}}" },
-    "package-manager": { "nav": "{{packages}}", "header": "{{packages}}" },
-    "launchpad": { "nav": "{{launchpad}}", "header": "{{launchpad}}" }
+    "profile": {
+      "header": "Profile"
+    },
+    "logout": {
+      "header": "Logout"
+    },
+    "data": {
+      "nav": "{{data}}",
+      "header": "{{data}}"
+    },
+    "package-manager": {
+      "nav": "{{packages}}",
+      "header": "{{packages}}"
+    },
+    "launchpad": {
+      "nav": "{{launchpad}}",
+      "header": "{{launchpad}}"
+    }
   },
   "alerts": {
     "duplicateEmail": "Email address already exists",
@@ -728,5 +754,27 @@
   },
   "phosphor": {
     "boot": "SHALL WE PLAY A GAME?"
+  },
+  "artifactCard": {
+    "eyebrow": "Live API",
+    "title": "Your API is live",
+    "subtitle": "Real endpoint, real key. Copy a request and run it.",
+    "baseUrlLabel": "Base URL",
+    "authHeaderLabel": "Auth header",
+    "keyLabel": "Key",
+    "formatLabel": "Format",
+    "noKeyBadge": "No key yet",
+    "noKeyHint": "Create one to authenticate this request.",
+    "createKey": "Create a key",
+    "copy": "Copy",
+    "copied": "Copied",
+    "runNote": "Reads the first rows from {{table}} and returns 200.",
+    "mcpNote": "Point any MCP client at this service. Its tables become scoped tools under the same key.",
+    "tabs": {
+      "curl": "curl",
+      "javascript": "JavaScript",
+      "python": "Python",
+      "mcp": "MCP client"
+    }
   }
 }
