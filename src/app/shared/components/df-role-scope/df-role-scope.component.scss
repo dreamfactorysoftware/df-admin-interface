@@ -1,35 +1,35 @@
 .df-role-scope {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-  padding: 1.75rem 2rem;
+  gap: 2.4rem;
+  padding: 2.8rem 3.2rem;
   border: 1px solid
     var(--mdc-outlined-card-outline-color, rgba(255, 255, 255, 0.12));
   border-radius: 8px;
   background: var(--mat-app-surface, transparent);
-  font-size: 1rem;
+  font-size: 1.4rem;
 
   &.compact {
-    padding: 1rem 1.25rem;
-    gap: 0.75rem;
+    padding: 1.6rem 2rem;
+    gap: 1.2rem;
   }
 
   &__loading {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 1.2rem;
     color: var(--df-text-muted);
   }
 
   &__error {
-    padding: 1rem 1.25rem;
+    padding: 1.6rem 2rem;
     border-radius: 6px;
     background: rgba(220, 53, 69, 0.12);
     color: #ff6b6b;
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
-    font-size: 1rem;
+    gap: 1.2rem;
+    font-size: 1.4rem;
 
     p {
       margin: 0;
@@ -37,30 +37,30 @@
   }
 
   &__wildcard {
-    padding: 0.875rem 1.125rem;
+    padding: 1.4rem 1.8rem;
     border-radius: 6px;
     background: rgba(46, 160, 67, 0.1);
     border: 1px solid rgba(46, 160, 67, 0.4);
     color: var(--df-text);
     display: flex;
     align-items: flex-start;
-    gap: 0.75rem;
-    font-size: 1rem;
+    gap: 1.2rem;
+    font-size: 1.4rem;
     line-height: 1.5;
 
     fa-icon {
       color: #4ade80;
-      font-size: 1.15rem;
+      font-size: 1.6rem;
       flex-shrink: 0;
-      margin-top: 0.1rem;
+      margin-top: 0.16rem;
     }
 
     code {
       font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
       background: rgba(255, 255, 255, 0.1);
-      padding: 0.1rem 0.4rem;
+      padding: 0.16rem 0.64rem;
       border-radius: 3px;
-      font-size: 0.9rem;
+      font-size: 1.3rem;
     }
 
     strong {
@@ -72,21 +72,21 @@
   &__header {
     h3 {
       margin: 0;
-      font-size: 1.5rem;
+      font-size: 2rem;
       font-weight: 600;
       line-height: 1.3;
     }
   }
 
   &__description {
-    margin: 0.5rem 0 0;
+    margin: 0.8rem 0 0;
     color: var(--df-text-2);
-    font-size: 1rem;
+    font-size: 1.4rem;
   }
 
   &__section-title {
-    margin: 0 0 0.75rem;
-    font-size: 0.875rem;
+    margin: 0 0 1.2rem;
+    font-size: 1.2rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.06em;
@@ -94,7 +94,7 @@
   }
 
   &__empty {
-    padding: 1rem;
+    padding: 1.6rem;
     color: var(--df-text-muted);
     font-style: italic;
   }
@@ -105,12 +105,12 @@
     margin: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 1.2rem;
   }
 
   &__service {
     border-radius: 8px;
-    padding: 1rem 1.25rem;
+    padding: 1.6rem 2rem;
     border: 1px solid transparent;
 
     &--allowed {
@@ -123,19 +123,19 @@
       border-color: var(--df-border-2);
       display: flex;
       align-items: center;
-      gap: 0.75rem;
-      padding: 0.75rem 1rem;
+      gap: 1.2rem;
+      padding: 1.2rem 1.6rem;
     }
   }
 
   &__service-header {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 1.2rem;
   }
 
   &__icon {
-    font-size: 1.1rem;
+    font-size: 1.6rem;
 
     &--allow {
       color: #4ade80;
@@ -148,12 +148,12 @@
 
   &__service-name {
     font-weight: 600;
-    font-size: 1.05rem;
+    font-size: 1.5rem;
   }
 
   &__service-type {
-    font-size: 0.8125rem;
-    padding: 0.2rem 0.625rem;
+    font-size: 1.2rem;
+    padding: 0.32rem 1rem;
     border-radius: 999px;
     background: var(--df-surface-2);
     color: var(--df-text-2);
@@ -162,46 +162,46 @@
 
   &__deny-label {
     margin-left: auto;
-    font-size: 0.875rem;
+    font-size: 1.2rem;
     color: var(--df-text-muted);
     font-style: italic;
   }
 
   &__rule-list {
-    margin: 0.75rem 0 0;
-    padding: 0 0 0 1.85rem;
+    margin: 1.2rem 0 0;
+    padding: 0 0 0 2.96rem;
     list-style: none;
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.8rem;
   }
 
   &__rule {
     display: flex;
     align-items: center;
-    gap: 0.625rem;
+    gap: 1rem;
     flex-wrap: wrap;
-    font-size: 0.95rem;
+    font-size: 1.4rem;
   }
 
   &__component {
     font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
-    font-size: 0.875rem;
+    font-size: 1.2rem;
     background: var(--df-surface-2);
-    padding: 0.25rem 0.5rem;
+    padding: 0.4rem 0.8rem;
     border-radius: 4px;
   }
 
   &__verbs {
     display: inline-flex;
-    gap: 0.375rem;
+    gap: 0.6rem;
     flex-wrap: wrap;
   }
 
   &__verb-chip {
-    font-size: 0.75rem;
+    font-size: 1.1rem;
     font-weight: 700;
-    padding: 0.225rem 0.5rem;
+    padding: 0.36rem 0.8rem;
     border-radius: 4px;
     background: #2563eb;
     color: #fff;
@@ -209,25 +209,25 @@
   }
 
   &__verb-empty {
-    font-size: 0.8125rem;
+    font-size: 1.2rem;
     font-style: italic;
     color: var(--df-text-muted);
   }
 
   &__requesters {
-    font-size: 0.8125rem;
+    font-size: 1.2rem;
     color: var(--df-text-muted);
   }
 
   &__denied-toggle {
     display: inline-flex;
     align-items: center;
-    gap: 0.625rem;
+    gap: 1rem;
     background: none;
     border: none;
     cursor: pointer;
-    padding: 0.5rem 0;
-    font-size: 1rem;
+    padding: 0.8rem 0;
+    font-size: 1.4rem;
     font-weight: 500;
     color: var(--df-text);
 
@@ -237,9 +237,9 @@
   }
 
   &__footer {
-    padding-top: 1rem;
+    padding-top: 1.6rem;
     border-top: 1px solid var(--df-border-2);
-    font-size: 0.9375rem;
+    font-size: 1.5rem;
     color: var(--df-text-2);
     line-height: 1.5;
   }
