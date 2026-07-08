@@ -1,0 +1,85 @@
+<ng-container *transloco="let t; read: 'scopeMatrix'">
+  <section class="scope-matrix" data-testid="df-scope-matrix">
+    <!-- Loading: skeleton grid -->
+    <div *ngIf="loading" class="scope-matrix__loading">
+      <df-skeleton variant="table-row" [count]="4"></df-skeleton>
+    </div>
+
+    <!-- Empty: no roles to place on the grid -->
+    <df-empty-state
+      *ngIf="!loading && rows.length === 0"
+      icon="security"
+      [title]="t('emptyTitle')"
+      [description]="t('emptyHint')">
+    </df-empty-state>
+
+    <!-- The grid: roles (rows) x verbs (cols) -->
+    <div
+      *ngIf="!loading && rows.length > 0"
+      class="scope-matrix__grid"
+      role="table"
+      [attr.aria-label]="t('ariaLabel')">
+      <!-- Header row -->
+      <div class="scope-matrix__row scope-matrix__row--head" role="row">
+        <span class="scope-matrix__corner" role="columnheader">{{
+          t('roleHeader')
+        }}</span>
+        <span
+          *ngFor="let v of verbs; trackBy: trackByVerb"
+          class="scope-matrix__verb"
+          role="columnheader"
+          >{{ v }}</span
+        >
+      </div>
+
+      <!-- One row per role -->
+      <div
+        *ngFor="let row of rows; trackBy: trackByRoleId"
+        class="scope-matrix__row"
+        role="row">
+        <span class="scope-matrix__role" role="rowheader" [title]="row.roleName">{{
+          row.roleName
+        }}</span>
+        <button
+          *ngFor="let v of verbs; trackBy: trackByVerb"
+          type="button"
+          class="scope-matrix__cell"
+          [class.scope-matrix__cell--full]="cellState(row, v) === 'full'"
+          [class.scope-matrix__cell--filtered]="cellState(row, v) === 'filtered'"
+          [class.scope-matrix__cell--none]="cellState(row, v) === 'none'"
+          [disabled]="cellState(row, v) === 'none'"
+          role="cell"
+          [attr.aria-label]="
+            row.roleName +
+            ' ' +
+            v +
+            ': ' +
+            t('state.' + cellState(row, v))
+          "
+          [title]="t('state.' + cellState(row, v))"
+          (click)="onCellClick(row, v)">
+          <span class="scope-matrix__dot" aria-hidden="true"></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Legend -->
+    <div
+      *ngIf="!loading && rows.length > 0"
+      class="scope-matrix__legend"
+      aria-hidden="true">
+      <span class="scope-matrix__legend-item">
+        <span class="scope-matrix__dot scope-matrix__dot--full"></span
+        >{{ t('state.full') }}</span
+      >
+      <span class="scope-matrix__legend-item">
+        <span class="scope-matrix__dot scope-matrix__dot--filtered"></span
+        >{{ t('state.filtered') }}</span
+      >
+      <span class="scope-matrix__legend-item">
+        <span class="scope-matrix__dot scope-matrix__dot--none"></span
+        >{{ t('state.none') }}</span
+      >
+    </div>
+  </section>
+</ng-container>
