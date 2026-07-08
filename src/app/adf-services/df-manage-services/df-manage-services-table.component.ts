@@ -20,6 +20,10 @@ import { DfDuplicateDialogComponent } from 'src/app/shared/components/df-duplica
 import { faCopy } from '@fortawesome/free-solid-svg-icons';
 import { catchError, forkJoin, map, of, switchMap, throwError } from 'rxjs';
 import { PLATFORM_SERVICES_FILTER } from 'src/app/shared/constants/services';
+import {
+  DfServiceHealthService,
+  ServiceHealthContext,
+} from './df-service-health.service';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-manage-services-table',
@@ -49,14 +53,30 @@ export class DfManageServicesTableComponent
     private serviceService: DfBaseCrudService,
     @Inject(SERVICE_TYPE_SERVICE_TOKEN)
     private serviceTypeService: DfBaseCrudService,
+    private healthService: DfServiceHealthService,
     dialog: MatDialog
   ) {
     super(router, activatedRoute, liveAnnouncer, translateService, dialog);
   }
 
+  private healthContext?: ServiceHealthContext;
+
   override ngOnInit(): void {
     // Call parent's ngOnInit first to set up the data source
     super.ngOnInit();
+
+    // Score the catalog client-side. The context loads once; mapDataToTable
+    // (every fetch path funnels through it) derives per-row health when it is
+    // ready, and this re-derives whatever rows already rendered first.
+    this.healthService.getContext().subscribe(context => {
+      this.healthContext = context;
+      if (this.dataSource.data.length) {
+        this.dataSource.data = this.dataSource.data.map(row => ({
+          ...row,
+          health: this.healthService.derive(row, context),
+        }));
+      }
+    });
 
     // Then subscribe to route data for additional setup
     this._activatedRoute.data.subscribe(routeData => {
@@ -179,6 +199,13 @@ export class DfManageServicesTableComponent
       header: 'type',
     },
     {
+      columnDef: 'health',
+      // Rendered by the shared table's dedicated 'health' branch (df-badge +
+      // "why" mat-menu); cell() is unused for this column.
+      cell: (row: ServiceRow) => row.health?.level,
+      header: 'services.health.header',
+    },
+    {
       columnDef: 'scripting',
       cell: (row: ServiceRow) => row.scripting,
       header: 'Scripting',
@@ -191,16 +218,25 @@ export class DfManageServicesTableComponent
   private eventScripts: Service[] = [];
 
   override mapDataToTable(data: any[]): ServiceRow[] {
-    return data.map(service => ({
-      id: service.id,
-      name: service.name,
-      label: service.label,
-      description: service.description,
-      scripting: this.scriptingFor(service.name),
-      active: service.isActive,
-      deletable: service.deletable,
-      type: service.type,
-    }));
+    return data.map(service => {
+      const row: ServiceRow = {
+        id: service.id,
+        name: service.name,
+        label: service.label,
+        description: service.description,
+        scripting: this.scriptingFor(service.name),
+        active: service.isActive,
+        deletable: service.deletable,
+        type: service.type,
+        // Opt-in signal; absent on stock DF services so the deprecated rule
+        // never fires unless a service explicitly carries the flag.
+        deprecated: service.deprecated === true,
+      };
+      if (this.healthContext) {
+        row.health = this.healthService.derive(row, this.healthContext);
+      }
+      return row;
+    });
   }
 
   private scriptingFor(serviceName: string): string {

@@ -2,6 +2,21 @@
 // Status colors ride --df-success / --df-danger so light, dark, and
 // phosphor all stay legible without per-theme overrides.
 
+// Health chip trigger: strip the native button chrome so only the df-badge
+// pill shows, keep it a real focusable button for the "why" mat-menu. No color
+// here (the badge owns its tokens); structural reset only.
+.df-health-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
 .active {
   color: var(--df-success);
 }
