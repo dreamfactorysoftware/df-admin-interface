@@ -8,11 +8,16 @@
 // micro-headers, no elevation shadows.
 // ============================================================
 
+// Density note (FB3): tuned so the tallest landing (System: 5 stats + 13
+// cards + 3 notes) clears a 1920x1080 desktop at 100% zoom with no vertical
+// scroll. Spacing, card min-height, and the intro block are all tightened;
+// tints, tokens, and copy stay untouched. Levers are proportional so light,
+// dark, and phosphor all fit identically.
 .section-landing {
   display: flex;
   flex-direction: column;
-  gap: 24px;
-  padding: 24px;
+  gap: 16px;
+  padding: 16px 24px;
   position: relative;
 }
 
@@ -22,21 +27,21 @@
   display: flex;
   gap: 24px;
   justify-content: space-between;
-  padding-bottom: 24px;
+  padding-bottom: 14px;
 
   h2 {
     color: var(--df-text);
-    font-size: 2.2rem;
+    font-size: 1.9rem;
     font-weight: 700;
     letter-spacing: -0.02em;
     line-height: 1.2;
-    margin: 6px 0 10px;
+    margin: 4px 0 6px;
   }
 
   p {
     color: var(--df-text-2);
-    font-size: 1.4rem;
-    line-height: 1.5;
+    font-size: 1.3rem;
+    line-height: 1.4;
     margin: 0;
     max-width: 760px;
   }
@@ -68,7 +73,7 @@
 
 .section-landing__groups {
   display: grid;
-  gap: 26px;
+  gap: 16px;
 }
 
 .section-landing__group {
@@ -78,15 +83,17 @@
     font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.06em;
-    margin: 0 0 12px;
+    margin: 0 0 8px;
     text-transform: uppercase;
   }
 }
 
 .section-landing__cards {
   display: grid;
-  gap: 14px;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+  // Narrower min so the 7-card System group packs into a single row at
+  // desktop widths (with the sidebar) instead of wrapping to two.
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
 }
 
 // Categorical tint (punch 21). A card/stat maps its data-category to the
@@ -138,8 +145,8 @@
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  min-height: 178px;
-  padding: 20px;
+  min-height: 132px;
+  padding: 14px 16px;
   text-decoration: none;
   transition:
     border-color 160ms ease,
@@ -174,14 +181,14 @@
   background: transparent;
   border: 0;
   color: var(--df-accent);
-  height: 38px;
-  margin-bottom: 12px;
-  width: 38px;
+  height: 34px;
+  margin-bottom: 8px;
+  width: 34px;
 
   mat-icon {
-    font-size: 32px;
-    height: 32px;
-    width: 32px;
+    font-size: 28px;
+    height: 28px;
+    width: 28px;
   }
 }
 
@@ -192,14 +199,14 @@
   border-radius: var(--df-radius-sm);
   color: var(--tile-tint-fg);
   display: inline-flex;
-  height: 44px;
+  height: 40px;
   justify-content: center;
-  width: 44px;
+  width: 40px;
 
   mat-icon {
-    font-size: 24px;
-    height: 24px;
-    width: 24px;
+    font-size: 22px;
+    height: 22px;
+    width: 22px;
   }
 }
 
@@ -212,19 +219,21 @@
 
   h4 {
     color: var(--df-text);
-    font-size: 1.5rem;
+    font-size: 1.4rem;
     font-weight: 600;
     letter-spacing: -0.01em;
     line-height: 1.25;
-    margin: 0 0 6px;
+    margin: 0 0 4px;
   }
 
   p {
     color: var(--df-text-2);
-    font-size: 1.35rem;
-    line-height: 1.5;
-    margin: 0 0 8px;
-    min-height: 63px;
+    font-size: 1.25rem;
+    line-height: 1.4;
+    margin: 0 0 6px;
+    // Keeps action links roughly aligned across a row (~2 lines) without
+    // the old 3-line reserve that inflated every card.
+    min-height: 34px;
   }
 
   mat-icon {
@@ -239,7 +248,7 @@
   align-items: center;
   color: var(--df-accent);
   display: inline-flex;
-  font-size: 1.3rem;
+  font-size: 1.25rem;
   font-weight: 600;
   gap: 4px;
 }
@@ -256,15 +265,15 @@
     align-items: center;
     border-radius: var(--df-radius-sm);
     display: inline-flex;
-    height: 44px;
+    height: 40px;
     justify-content: center;
-    margin-bottom: 14px;
-    width: 44px;
+    margin-bottom: 8px;
+    width: 40px;
 
     mat-icon {
-      font-size: 24px;
-      height: 24px;
-      width: 24px;
+      font-size: 22px;
+      height: 22px;
+      width: 22px;
     }
   }
 }
@@ -295,7 +304,7 @@
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.06em;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   text-transform: uppercase;
 }
 
@@ -305,8 +314,8 @@
 
 .section-landing__stats {
   display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
 .section-stat {
@@ -315,9 +324,9 @@
   border-radius: var(--df-radius);
   box-shadow: none;
   display: grid;
-  gap: 4px;
+  gap: 3px;
   grid-template-columns: 28px minmax(0, 1fr);
-  padding: 14px;
+  padding: 10px 12px;
 
   mat-icon {
     color: var(--df-accent);
@@ -366,7 +375,7 @@
 
   div {
     background: var(--df-surface);
-    padding: 18px;
+    padding: 12px 14px;
   }
 
   mat-icon {
@@ -375,16 +384,16 @@
 
   h3 {
     color: var(--df-text);
-    font-size: 1.4rem;
+    font-size: 1.35rem;
     font-weight: 600;
     letter-spacing: -0.01em;
-    margin: 8px 0 6px;
+    margin: 6px 0 4px;
   }
 
   p {
     color: var(--df-text-2);
-    font-size: 1.3rem;
-    line-height: 1.45;
+    font-size: 1.25rem;
+    line-height: 1.4;
     margin: 0;
   }
 }
