@@ -11,13 +11,15 @@
 
     .error-message {
       color: var(--df-text-2);
+      font-size: 1.4rem;
 
       .error-status {
         display: inline-block;
         margin-right: 8px;
         padding: 2px 8px;
         border: 1px solid var(--df-border);
-        border-radius: 4px;
+        border-radius: var(--df-radius-sm);
+        background-color: var(--df-surface-2);
         color: var(--df-text-muted);
         font-variant-numeric: tabular-nums;
       }

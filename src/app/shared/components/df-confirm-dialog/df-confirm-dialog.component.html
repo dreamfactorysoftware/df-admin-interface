@@ -4,6 +4,7 @@
   <button
     mat-flat-button
     mat-dialog-close
+    class="cancel-btn"
     data-testid="confirm-dialog-cancel"
     type="button">
     {{ 'no' | transloco }}
@@ -12,6 +13,7 @@
     mat-flat-button
     (click)="onClose()"
     cdkFocusInitial
+    class="save-btn"
     data-testid="confirm-dialog-confirm"
     type="button"
     color="primary">
