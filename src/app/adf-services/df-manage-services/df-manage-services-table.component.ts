@@ -19,6 +19,7 @@ import { UntilDestroy } from '@ngneat/until-destroy';
 import { DfDuplicateDialogComponent } from 'src/app/shared/components/df-duplicate-dialog/df-duplicate-dialog.component';
 import { faCopy } from '@fortawesome/free-solid-svg-icons';
 import { catchError, forkJoin, map, of, switchMap, throwError } from 'rxjs';
+import { PLATFORM_SERVICES_FILTER } from 'src/app/shared/constants/services';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-manage-services-table',
@@ -128,13 +129,13 @@ export class DfManageServicesTableComponent
             serviceTypes.length > 0
               ? `${
                   this.system
-                    ? '(created_by_id is null) and (name != "api_docs") and '
+                    ? `${PLATFORM_SERVICES_FILTER} and `
                     : ''
                 }(type in ("${serviceTypes.map(src => src.name).join('","')}"))`
               : this.scopedByGroups
                 ? '(id = -1)'
                 : this.system
-                  ? '(created_by_id is null) and (name != "api_docs")'
+                  ? PLATFORM_SERVICES_FILTER
                   : undefined;
 
           return this.serviceService

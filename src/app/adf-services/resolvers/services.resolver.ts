@@ -8,6 +8,7 @@ import {
 } from 'src/app/shared/constants/tokens';
 import { GenericListResponse, Meta } from 'src/app/shared/types/generic-http';
 import { Service, ServiceType } from 'src/app/shared/types/service';
+import { PLATFORM_SERVICES_FILTER } from 'src/app/shared/constants/services';
 
 export const servicesResolver =
   (
@@ -48,7 +49,7 @@ export const servicesResolver =
               sort: 'name',
               filter: `${
                 system
-                  ? '(created_by_id is null) and (name != "api_docs") and '
+                  ? `${PLATFORM_SERVICES_FILTER} and `
                   : ''
               }(type in ("${serviceTypes.map(src => src.name).join('","')}"))${
                 filter ? ` and ${filter}` : ''
@@ -72,7 +73,7 @@ export const servicesResolver =
         limit,
         sort: 'name',
         filter: `${
-          system ? '(created_by_id is null) and (name != "api_docs")' : ''
+          system ? PLATFORM_SERVICES_FILTER : ''
         }${filter ? filter : ''}`,
       })
       .pipe(
