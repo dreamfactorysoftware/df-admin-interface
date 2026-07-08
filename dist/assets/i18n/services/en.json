@@ -10,7 +10,8 @@
     },
     "namespace": {
       "label": "Namespace",
-      "tooltip": "Select a namespace used for the API’s URI structure, such as /api/v2/{type}/{namespace}. It should be lowercase and alphanumeric."
+      "tooltip": "Select a namespace used for the API’s URI structure, such as /api/v2/{type}/{namespace}. It should be lowercase and alphanumeric.",
+      "hint": "This becomes the URL segment for the generated API, like /api/v2/your-namespace. Use lowercase letters, numbers, and underscores."
     },
     "label": {
       "label": "Label",
@@ -26,7 +27,7 @@
   },
   "firstTimeGuidance": "Welcome! Since this is your first API, we'll guide you through setting up security configuration to ensure your API is properly protected.",
   "deleteSuccessMsg": "Service successfully deleted",
-  "createSuccessMsg": "Service successfully created",
+  "createSuccessMsg": "Service created. Generate its API docs to try it out, or lock it down with a role.",
   "updateSuccessMsg": "Service successfully updated",
   "celebration": {
     "title": "🎉 Your First API is Live!",

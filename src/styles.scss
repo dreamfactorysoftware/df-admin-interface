@@ -57,6 +57,10 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   --df-success: #1a7f37;
   --df-success-soft: rgba(26, 127, 55, 0.08);
   --df-success-border: rgba(26, 127, 55, 0.35);
+  /* warning: amber, AA-legible on --df-surface. warmth-details deferred this
+     global; consumers read var(--df-warning, <themed local alias>) and now
+     resolve it here in light/dark instead of their per-component fallback. */
+  --df-warning: #b45309;
 
   /* ------------------------------------------------------------
      Shell tokens. Captain 2026-07-07: light means light, dark
@@ -118,6 +122,8 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   --df-success: #4ade80;
   --df-success-soft: rgba(74, 222, 128, 0.12);
   --df-success-border: rgba(74, 222, 128, 0.35);
+  /* warning: brighter amber for the dark canvas (warmth-details deferred). */
+  --df-warning: #fbbf24;
   /* shell sits a hair below the dark canvas so the border reads */
   --df-shell-bg: #131218;
   --df-shell-border: rgba(255, 255, 255, 0.09);
@@ -707,6 +713,16 @@ a {
     border-radius: 12px !important;
     overflow: hidden !important;
   }
+}
+
+// Dialog corners (warmth-details deferred global): the MDC surface node sits
+// above each token-painted dialog host (confirm, duplicate, search, error
+// detail), out of reach of scoped styles, so round + clip it globally on the
+// shared radius. The celebration dialog keeps its own 12px via a more specific
+// selector above.
+.mat-mdc-dialog-surface {
+  border-radius: var(--df-radius);
+  overflow: hidden;
 }
 
 /* swagger tokens - stream8-rollout(api-docs) */
