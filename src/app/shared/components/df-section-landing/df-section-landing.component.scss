@@ -1,9 +1,14 @@
+// ============================================================
+// Section landing pages, "departure" language (stream 8 rollout).
+// Tokens only (var(--df-*)): light, dark, and phosphor all come
+// free from src/styles.scss. This replaces the prototype's pastel
+// literal palette, which was light-theme-only and unreadable in
+// dark (grey #64748b/#9ca3af meta text on dark surfaces).
+// Flat bordered cards, hairline borders, 11px uppercase
+// micro-headers, no elevation shadows.
+// ============================================================
+
 .section-landing {
-  background: linear-gradient(
-    180deg,
-    rgba(240, 253, 250, 0.72),
-    rgba(255, 255, 255, 0) 260px
-  );
   display: flex;
   flex-direction: column;
   gap: 24px;
@@ -13,33 +18,38 @@
 
 .section-landing__header {
   align-items: flex-start;
-  border-bottom: 1px solid rgba(31, 41, 55, 0.14);
+  border-bottom: 1px solid var(--df-border);
   display: flex;
   gap: 24px;
   justify-content: space-between;
   padding-bottom: 24px;
 
   h2 {
-    color: #0f172a;
-    font-size: 30px;
+    color: var(--df-text);
+    font-size: 2.2rem;
     font-weight: 700;
+    letter-spacing: -0.02em;
     line-height: 1.2;
     margin: 6px 0 10px;
   }
 
   p {
-    color: #4b5563;
-    font-size: 15px;
+    color: var(--df-text-2);
+    font-size: 1.4rem;
     line-height: 1.5;
     margin: 0;
     max-width: 760px;
   }
 }
 
+// !important on span-level colors below: dark-style.scss still forces
+// `span { color: white !important }` under .dark-theme (punchlist item 8;
+// integration owns killing it). Tokens either way, so all themes stay AA.
 .section-landing__eyebrow {
-  color: #0f766e;
-  font-size: 12px;
-  font-weight: 700;
+  color: var(--df-accent) !important;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -51,7 +61,7 @@
   min-width: 260px;
 
   a {
-    border-radius: 6px;
+    border-radius: var(--df-radius-sm);
   }
 
   mat-icon {
@@ -65,11 +75,14 @@
 }
 
 .section-landing__group {
+  // Group titles use the shared table/section micro-header treatment.
   h3 {
-    color: #0f172a;
-    font-size: 18px;
-    font-weight: 700;
+    color: var(--df-text-muted);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
     margin: 0 0 12px;
+    text-transform: uppercase;
   }
 }
 
@@ -80,11 +93,11 @@
 }
 
 .section-card {
+  background: var(--df-surface);
+  border: 1px solid var(--df-border);
+  border-radius: var(--df-radius);
+  box-shadow: none;
   color: inherit;
-  background: rgba(255, 255, 255, 0.94);
-  border: 1px solid rgba(15, 23, 42, 0.1);
-  border-radius: 8px;
-  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.055);
   cursor: pointer;
   display: flex;
   flex-direction: column;
@@ -93,85 +106,33 @@
   text-decoration: none;
   transition:
     border-color 160ms ease,
-    box-shadow 160ms ease,
-    transform 160ms ease;
-}
-
-.section-card:nth-child(6n + 1) {
-  background: rgba(127, 17, 224, 0.08);
-
-  .section-card__icon,
-  h4 {
-    color: rgb(127, 17, 224);
-  }
-}
-
-.section-card:nth-child(6n + 2) {
-  background: rgba(92, 35, 154, 0.08);
-
-  .section-card__icon,
-  h4 {
-    color: rgb(92, 35, 154);
-  }
-}
-
-.section-card:nth-child(6n + 3) {
-  background: rgb(235, 253, 245);
-
-  .section-card__icon,
-  h4 {
-    color: rgb(25, 97, 80);
-  }
-}
-
-.section-card:nth-child(6n + 4) {
-  background: rgb(255, 251, 236);
-
-  .section-card__icon,
-  h4 {
-    color: rgb(136, 72, 43);
-  }
-}
-
-.section-card:nth-child(6n + 5) {
-  background: rgba(80, 105, 137, 0.1);
-
-  .section-card__icon,
-  h4 {
-    color: rgb(80, 105, 137);
-  }
-}
-
-.section-card:nth-child(6n + 6) {
-  background: rgba(217, 54, 138, 0.08);
-
-  .section-card__icon,
-  h4 {
-    color: rgb(217, 54, 138);
-  }
+    background-color 160ms ease;
 }
 
 .section-card:hover {
-  border-color: rgba(15, 118, 110, 0.35);
-  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.09);
-  transform: translateY(-1px);
+  background: var(--df-hover);
+  border-color: var(--df-accent);
 }
 
 .section-card--opening {
-  border-color: rgba(15, 118, 110, 0.5);
-  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.09);
+  background: var(--df-accent-soft);
+  border-color: var(--df-accent-strong);
 }
 
 .section-card--disabled {
-  background: #f8fafc;
-  box-shadow: none;
-  transform: none;
+  background: var(--df-surface-2);
+  cursor: default;
+
+  .section-card__icon,
+  h4 {
+    color: var(--df-text-muted);
+  }
 }
 
 .section-card__icon {
   background: transparent;
   border: 0;
-  color: #0f766e;
+  color: var(--df-accent);
   height: 38px;
   margin-bottom: 12px;
   width: 38px;
@@ -187,16 +148,17 @@
   min-width: 0;
 
   h4 {
-    color: #0f172a;
-    font-size: 17px;
-    font-weight: 700;
+    color: var(--df-text);
+    font-size: 1.5rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
     line-height: 1.25;
     margin: 0 0 6px;
   }
 
   p {
-    color: #4b5563;
-    font-size: 14px;
+    color: var(--df-text-2);
+    font-size: 1.35rem;
     line-height: 1.5;
     margin: 0 0 8px;
     min-height: 63px;
@@ -212,25 +174,28 @@
 
 .section-card__action {
   align-items: center;
-  color: #0f766e;
+  color: var(--df-accent) !important;
   display: inline-flex;
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 1.3rem;
+  font-weight: 600;
   gap: 4px;
 }
 
+// Meta and unavailable lines: previously literal greys, the source of the
+// dark-theme contrast bug on the security and system landing cards.
 .section-card__meta,
 .section-card__unavailable {
-  color: #64748b;
+  color: var(--df-text-muted) !important;
   display: block;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   margin-bottom: 8px;
   text-transform: uppercase;
 }
 
 .section-card__unavailable {
-  color: #9ca3af;
+  color: var(--df-text-faint) !important;
 }
 
 .section-landing__stats {
@@ -240,17 +205,17 @@
 }
 
 .section-stat {
-  background: #ffffff;
-  border: 1px solid rgba(15, 23, 42, 0.1);
-  border-radius: 8px;
-  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
+  background: var(--df-surface);
+  border: 1px solid var(--df-border);
+  border-radius: var(--df-radius);
+  box-shadow: none;
   display: grid;
   gap: 4px;
   grid-template-columns: 28px minmax(0, 1fr);
   padding: 14px;
 
   mat-icon {
-    color: #0f766e;
+    color: var(--df-accent);
     font-size: 22px;
     grid-row: span 2;
     height: 22px;
@@ -258,46 +223,53 @@
   }
 
   span {
-    color: #64748b;
-    font-size: 12px;
-    font-weight: 700;
+    color: var(--df-text-muted) !important;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
   }
 
   strong {
-    color: #0f172a;
-    font-size: 15px;
-    font-weight: 700;
+    color: var(--df-text);
+    font-size: 1.4rem;
+    font-weight: 600;
     line-height: 1.25;
     overflow-wrap: anywhere;
   }
 }
 
+// Notes strip: hairline grid. The container background paints the 1px gaps
+// between cells, so it uses the border token, not a surface literal.
 .section-landing__notes {
-  background: #e2e8f0;
-  border-radius: 8px;
+  background: var(--df-border-2);
+  border: 1px solid var(--df-border-2);
+  border-radius: var(--df-radius);
   display: grid;
   gap: 1px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   overflow: hidden;
 
   div {
-    background: #f8fafc;
+    background: var(--df-surface);
     padding: 18px;
   }
 
   mat-icon {
-    color: #0f766e;
+    color: var(--df-accent);
   }
 
   h3 {
-    font-size: 15px;
+    color: var(--df-text);
+    font-size: 1.4rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
     margin: 8px 0 6px;
   }
 
   p {
-    color: #4b5563;
-    font-size: 13px;
+    color: var(--df-text-2);
+    font-size: 1.3rem;
     line-height: 1.45;
     margin: 0;
   }
