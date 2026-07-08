@@ -1,0 +1,86 @@
+// ============================================================
+// df-page-header (Meridian Phase 0). Tokens only: type, space and
+// color read --df-* tokens so light, dark and phosphor resolve
+// from src/styles.scss (VT323 rides the display layer under
+// phosphor via the H1/eyebrow). Depends on the Phase 0 type/space
+// token layer owned by the tokens-theme wave, incl. the responsive
+// --df-page-gutter bump at >=1440px defined there.
+// ============================================================
+
+.page-header {
+  padding: var(--df-space-6) var(--df-page-gutter) 0;
+}
+
+// One shared measure for every route. The hairline separates the title zone
+// from page content; a tabs slot renders above it.
+.page-header__inner {
+  border-bottom: 1px solid var(--df-border);
+  margin: 0 auto;
+  max-width: var(--df-content-max);
+  padding-bottom: var(--df-space-5);
+}
+
+.page-header__bar {
+  align-items: flex-start;
+  display: flex;
+  gap: var(--df-space-5);
+  justify-content: space-between;
+}
+
+.page-header__heading {
+  min-width: 0;
+}
+
+.page-header__eyebrow {
+  color: var(--df-text-muted);
+  display: block;
+  font-size: var(--df-font-size-xs);
+  font-weight: var(--df-font-weight-medium);
+  letter-spacing: var(--df-tracking-eyebrow);
+  margin-bottom: var(--df-space-2);
+  text-transform: uppercase;
+}
+
+.page-header__title {
+  color: var(--df-text);
+  font-size: var(--df-font-size-2xl);
+  font-weight: var(--df-font-weight-heading);
+  letter-spacing: var(--df-tracking-tight);
+  line-height: var(--df-lh-tight);
+  margin: 0;
+}
+
+.page-header__description {
+  color: var(--df-text-2);
+  font-size: var(--df-font-size-sm);
+  line-height: var(--df-lh-base);
+  margin: var(--df-space-2) 0 0;
+  max-width: 68ch;
+}
+
+// Right-aligned page actions. Empty when nothing is projected, so it collapses
+// to zero width and the title keeps the full row.
+.page-header__actions {
+  align-items: center;
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: var(--df-space-2);
+  justify-content: flex-end;
+}
+
+// Tabs slot sits inside the bordered inner, spaced off the title zone only
+// when a consumer actually projects tabs (else it collapses to nothing).
+.page-header__tabs:has(> *) {
+  margin-top: var(--df-space-4);
+}
+
+@media (max-width: 820px) {
+  .page-header__bar {
+    flex-direction: column;
+  }
+
+  .page-header__actions {
+    justify-content: flex-start;
+  }
+}
