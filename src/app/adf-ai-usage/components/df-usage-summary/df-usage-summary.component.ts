@@ -141,7 +141,7 @@ import { DfSparklineComponent } from '../df-sparkline/df-sparkline.component';
 
       <mat-card
         class="summary__card summary__card--latency"
-        matTooltip="p50 = median (typical user). p95 = the slowest 5% of calls — what unhappy users feel. p99 = the worst tail. Avg gets pulled around by outliers; trust p50 for the typical case and p95 to answer is-this-fast-enough."
+        matTooltip="p50 = median (typical user). p95 = the slowest 5% of calls, what unhappy users feel. p99 = the worst tail. Avg gets pulled around by outliers; trust p50 for the typical case and p95 to answer is-this-fast-enough."
         matTooltipPosition="above">
         <mat-card-content>
           <span class="summary__label">Latency</span>
@@ -229,7 +229,13 @@ import { DfSparklineComponent } from '../df-sparkline/df-sparkline.component';
   `,
   styles: [
     `
+      /* Departure: stat tiles are flat bordered cards (global .mat-mdc-card),
+         chrome on --df-* tokens only. Sparkline colors are chart DATA colors
+         and stay literal in the template. Warning amber has no global token
+         in light/dark yet, so it is aliased locally per theme; phosphor's
+         --df-warning wins there by construction. */
       .summary {
+        --summary-warning: #9a5b00;
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
         gap: 16px;
@@ -244,22 +250,26 @@ import { DfSparklineComponent } from '../df-sparkline/df-sparkline.component';
 
           &--error {
             mat-card-content {
-              background: rgba(244, 67, 54, 0.06);
+              background: var(--df-danger-soft);
             }
             .summary__value {
-              color: #d32f2f;
+              color: var(--df-danger);
             }
           }
           &--partial {
             mat-card-content {
-              background: rgba(255, 152, 0, 0.05);
+              background: color-mix(
+                in srgb,
+                var(--df-warning, var(--summary-warning)) 6%,
+                transparent
+              );
             }
             .summary__value {
-              color: #e65100;
+              color: var(--df-warning, var(--summary-warning));
             }
           }
           &--cost .summary__value {
-            color: #2e7d32;
+            color: var(--df-success);
           }
         }
         &__hint {
@@ -268,27 +278,27 @@ import { DfSparklineComponent } from '../df-sparkline/df-sparkline.component';
           font-style: italic;
         }
         &__label {
-          font-size: 12px;
+          font-size: 11px;
           text-transform: uppercase;
           letter-spacing: 0.06em;
-          color: var(--df-text-2);
+          color: var(--df-text-muted);
           font-weight: 600;
         }
         &__value {
-          font-size: 28px;
+          font-size: 2.8rem;
           font-weight: 600;
           color: var(--df-text);
           line-height: 1.1;
 
           small {
-            font-size: 12px;
+            font-size: 1.2rem;
             font-weight: 500;
             color: var(--df-text-muted);
             margin-left: 4px;
           }
         }
         &__value--latency {
-          font-size: 24px;
+          font-size: 2.4rem;
         }
         &__latency-tail {
           display: flex;
@@ -327,10 +337,10 @@ import { DfSparklineComponent } from '../df-sparkline/df-sparkline.component';
           }
 
           &--good {
-            color: #2e7d32;
+            color: var(--df-success);
           }
           &--bad {
-            color: #d32f2f;
+            color: var(--df-danger);
           }
         }
         &__spark {
@@ -340,20 +350,8 @@ import { DfSparklineComponent } from '../df-sparkline/df-sparkline.component';
         }
       }
 
-      :host-context(.dark-theme) {
-        .summary {
-          &__card--error .summary__value {
-            color: #ff8585;
-          }
-          &__delta {
-            &--good {
-              color: #81c784;
-            }
-            &--bad {
-              color: #ff8585;
-            }
-          }
-        }
+      :host-context(.dark-theme) .summary {
+        --summary-warning: #ffb74d;
       }
     `,
   ],

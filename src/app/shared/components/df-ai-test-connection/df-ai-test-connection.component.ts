@@ -66,21 +66,21 @@ interface TestConnectionResponse {
   `,
   styles: [
     `
-      /* Themed via global --df-* tokens (src/styles.scss); dark values come
-         from the .dark-theme class DfThemeService stamps on <body>. */
+      /* Departure treatment: token-only chrome (light/dark/phosphor come
+         free), status surfaces on the shared success/danger tokens. */
       .test-conn {
         display: flex;
         flex-direction: column;
         gap: 0.75rem;
         margin: 1rem 0;
-        font-size: 16px;
+        font-size: 1.4rem;
 
         &__button {
           align-self: flex-start;
           display: inline-flex !important;
           align-items: center;
           gap: 0.5rem;
-          font-size: 0.95rem !important;
+          font-size: 1.3rem !important;
           min-height: 38px !important;
         }
 
@@ -88,20 +88,20 @@ interface TestConnectionResponse {
           display: flex;
           gap: 0.75rem;
           padding: 0.875rem 1.125rem;
-          border-radius: 6px;
+          border-radius: var(--df-radius-sm);
           align-items: flex-start;
-          font-size: 16px;
+          font-size: 1.4rem;
 
           &--ok {
-            background: rgba(46, 160, 67, 0.1);
-            border: 1px solid rgba(46, 160, 67, 0.4);
-            color: #4ade80;
+            background: var(--df-success-soft);
+            border: 1px solid var(--df-success-border);
+            color: var(--df-success);
           }
 
           &--err {
-            background: rgba(220, 53, 69, 0.1);
-            border: 1px solid rgba(220, 53, 69, 0.4);
-            color: #ff6b6b;
+            background: var(--df-danger-soft);
+            border: 1px solid var(--df-danger-border);
+            color: var(--df-danger);
           }
         }
 
@@ -114,18 +114,18 @@ interface TestConnectionResponse {
 
           strong {
             font-weight: 600;
-            font-size: 16px;
+            font-size: 1.4rem;
           }
 
           p {
             margin: 0;
             color: var(--df-text-2);
-            font-size: 15px;
+            font-size: 1.3rem;
           }
         }
 
         &__models {
-          font-size: 15px;
+          font-size: 1.3rem;
         }
       }
     `,

@@ -337,7 +337,7 @@ export class DfAiUsageComponent implements OnInit {
       const id = row.role_id ?? 0;
       const label = id
         ? (this.bundle?.roles.get(id) ?? `role #${id}`)
-        : '— no role —';
+        : '(no role)';
       return this.toRow(String(id), label, row);
     });
 
@@ -352,7 +352,7 @@ export class DfAiUsageComponent implements OnInit {
       const id = row.app_id ?? 0;
       const label = id
         ? (this.bundle?.apps.get(id) ?? `app #${id}`)
-        : '— no app —';
+        : '(no app)';
       return this.toRow(String(id), label, row);
     });
 
@@ -550,7 +550,7 @@ export class DfAiUsageComponent implements OnInit {
       const id = row.app_id ?? 0;
       const label = id
         ? (this.bundle?.apps.get(id) ?? `app #${id}`)
-        : '— no app —';
+        : '(no app)';
       return {
         key: String(id),
         label,
@@ -773,10 +773,10 @@ export class DfAiUsageComponent implements OnInit {
       const appId = r.app_id ?? 0;
       const userLabel = userId
         ? (this.bundle?.users.get(userId) ?? `user #${userId}`)
-        : '—';
+        : '-';
       const appLabel = appId
         ? (this.bundle?.apps.get(appId) ?? `app #${appId}`)
-        : '—';
+        : '-';
       const svc = this.bundle?.services.get(r.service_id);
       const serviceLabel =
         svc?.label || svc?.name || `service #${r.service_id}`;

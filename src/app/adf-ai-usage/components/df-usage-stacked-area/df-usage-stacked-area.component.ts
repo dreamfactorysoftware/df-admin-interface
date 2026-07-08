@@ -108,13 +108,14 @@ interface YTick {
           flex-wrap: wrap;
           align-items: center;
           gap: 12px 24px;
-          font-size: 13px;
+          font-size: 1.3rem;
           color: var(--df-text-2);
         }
         &__title {
           font-weight: 600;
           color: var(--df-text);
-          font-size: 16px;
+          font-size: 1.5rem;
+          letter-spacing: -0.01em;
           margin-right: 8px;
         }
         &__legend-item {
@@ -126,10 +127,11 @@ interface YTick {
           width: 12px;
           height: 12px;
           border-radius: 2px;
+          border: 1px solid var(--df-border-2);
         }
         &__legend-total {
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
-          font-size: 12px;
+          font-size: 1.2rem;
           color: var(--df-text-2);
         }
 
@@ -137,7 +139,7 @@ interface YTick {
           width: 100%;
           height: var(--chart-h, 280px);
           background: var(--df-surface-2);
-          border-radius: 4px;
+          border-radius: var(--df-radius-sm);
         }
 
         &__grid line {
@@ -145,14 +147,14 @@ interface YTick {
           stroke-dasharray: 2 4;
         }
         &__axis text {
-          fill: var(--df-text-2);
-          font-size: 12px;
+          fill: var(--df-text-muted);
+          font-size: 11px;
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
         }
         &__empty text {
-          fill: var(--df-text-2);
+          fill: var(--df-text-muted);
           font-style: italic;
-          font-size: 14px;
+          font-size: 1.3rem;
         }
       }
     `,

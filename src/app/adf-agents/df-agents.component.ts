@@ -317,9 +317,19 @@ type AgentLogRow = {
   `,
   styles: [
     `
+      /* Departure treatment: token-only chrome (light/dark/phosphor come
+         free), hairline separators, 6px corners, 11px uppercase table
+         micro-headers, 44px rows. Warning amber is aliased locally per
+         theme (no global --df-warning in light/dark); phosphor's token
+         wins by construction. */
       .agents-page {
+        --page-warning: #9a5b00;
         padding: 24px;
         max-width: 1080px;
+        color: var(--df-text);
+      }
+      :host-context(.dark-theme) .agents-page {
+        --page-warning: #ffb74d;
       }
       .agents-head {
         display: flex;
@@ -328,14 +338,20 @@ type AgentLogRow = {
       }
       h1 {
         margin: 0;
+        font-size: 2rem;
+        font-weight: 600;
+        letter-spacing: -0.02em;
       }
       .sub {
-        color: rgba(0, 0, 0, 0.6);
+        color: var(--df-text-2);
         margin: 4px 0 16px;
         max-width: 720px;
       }
       .sub2 {
         margin: 18px 0 6px;
+        font-size: 1.5rem;
+        font-weight: 600;
+        letter-spacing: -0.01em;
       }
       .card {
         margin-bottom: 16px;
@@ -350,6 +366,9 @@ type AgentLogRow = {
       }
       h2 {
         margin: 0;
+        font-size: 1.6rem;
+        font-weight: 600;
+        letter-spacing: -0.01em;
       }
       .new-form {
         display: flex;
@@ -357,14 +376,15 @@ type AgentLogRow = {
         gap: 12px;
         align-items: center;
         padding: 12px 0 4px;
-        border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+        border-bottom: 1px solid var(--df-border-2);
         margin-bottom: 8px;
       }
       .new-form.edit {
-        background: rgba(0, 0, 0, 0.02);
-        border-radius: 6px;
+        background: var(--df-surface-2);
+        border: 1px solid var(--df-border-2);
+        border-radius: var(--df-radius-sm);
         padding: 12px;
-        border-bottom: 0;
+        border-bottom-width: 1px;
       }
       .new-form mat-form-field {
         min-width: 150px;
@@ -381,8 +401,12 @@ type AgentLogRow = {
         display: flex;
         align-items: center;
         gap: 10px;
-        padding: 8px 10px;
-        border-top: 1px solid rgba(0, 0, 0, 0.06);
+        min-height: 44px;
+        padding: 4px 10px;
+        border-top: 1px solid var(--df-border-2);
+      }
+      .row:hover {
+        background: var(--df-hover);
       }
       .row:first-of-type {
         border-top: 0;
@@ -391,53 +415,75 @@ type AgentLogRow = {
         flex: 1;
       }
       .muted {
-        color: rgba(0, 0, 0, 0.55);
+        color: var(--df-text-muted);
       }
       .note {
         font-style: italic;
       }
       .ttl,
       .key {
-        font-size: 0.85em;
+        font-size: 1.2rem;
       }
       .key {
-        background: rgba(0, 0, 0, 0.05);
+        background: var(--df-surface-2);
+        border: 1px solid var(--df-border-2);
         padding: 2px 8px;
-        border-radius: 6px;
+        border-radius: var(--df-radius-sm);
+        font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
       }
       .hand {
-        color: #e0a341;
+        color: var(--df-warning, var(--page-warning));
       }
       .tag {
-        background: #eef;
-        color: #336;
+        background: var(--df-accent-soft);
+        color: var(--df-accent-strong);
         padding: 2px 10px;
-        border-radius: 12px;
+        border-radius: var(--df-radius-sm);
+        font-size: 1.2rem;
       }
       .sev-warning {
-        background: #fde8c8;
-        color: #8a5a00;
+        background: color-mix(
+          in srgb,
+          var(--df-warning, var(--page-warning)) 12%,
+          transparent
+        );
+        color: var(--df-warning, var(--page-warning));
       }
       .badge {
-        background: #e0e0e0;
-        color: #555;
+        background: var(--df-surface-2);
+        border: 1px solid var(--df-border-2);
+        color: var(--df-text-2);
         padding: 2px 10px;
-        border-radius: 12px;
-        font-size: 0.85em;
+        border-radius: var(--df-radius-sm);
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
       }
       .badge.on,
       .status-sent {
-        background: #d7f0d7;
-        color: #1a7f1a;
+        background: var(--df-success-soft);
+        border-color: var(--df-success-border);
+        color: var(--df-success);
       }
       .status-failed {
-        background: #fcd6d6;
-        color: #a11;
+        background: var(--df-danger-soft);
+        border-color: var(--df-danger-border);
+        color: var(--df-danger);
       }
       .status-throttled,
       .status-skipped {
-        background: #fdebc8;
-        color: #8a5a00;
+        background: color-mix(
+          in srgb,
+          var(--df-warning, var(--page-warning)) 12%,
+          transparent
+        );
+        border-color: color-mix(
+          in srgb,
+          var(--df-warning, var(--page-warning)) 35%,
+          transparent
+        );
+        color: var(--df-warning, var(--page-warning));
       }
       table {
         width: 100%;
@@ -447,7 +493,22 @@ type AgentLogRow = {
       td {
         text-align: left;
         padding: 10px 8px;
-        border-top: 1px solid rgba(0, 0, 0, 0.06);
+        border-top: 1px solid var(--df-border-2);
+      }
+      th {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--df-text-muted);
+        border-top: 0;
+        border-bottom: 1px solid var(--df-border);
+      }
+      tbody tr {
+        height: 44px;
+      }
+      tbody tr:hover {
+        background: var(--df-hover);
       }
     `,
   ],
@@ -543,7 +604,7 @@ export class DfAgentsComponent implements OnInit {
 
   // ---- lookups -----------------------------------------------------------
   roleName(id: number | null): string {
-    return this.roles.find(r => r.id === id)?.name ?? (id ? 'role ' + id : '—');
+    return this.roles.find(r => r.id === id)?.name ?? (id ? 'role ' + id : '-');
   }
   agentName(id: number): string {
     return this.agents.find(a => a.id === id)?.name ?? 'agent ' + id;
@@ -553,7 +614,7 @@ export class DfAgentsComponent implements OnInit {
     return this.memoRequestCounts.get(agentId) ?? 0;
   }
   maskKey(key: string): string {
-    return key ? key.slice(0, 6) + '…' + key.slice(-4) : '—';
+    return key ? key.slice(0, 6) + '…' + key.slice(-4) : '-';
   }
   // Called per agent row per change-detection pass; cache the parsed expiry
   // timestamp per data load instead of allocating a Date on every call. The

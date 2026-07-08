@@ -6,7 +6,7 @@
       <fa-icon
         class="usage__title-hint"
         [icon]="faCircleInfo"
-        matTooltip="Every AI request that flows through DreamFactory — direct REST calls to AI Connections, chats from the DF chat UI, and inbound MCP tool calls from external AI agents. Use the filters to drill into a specific user, app, or model."
+        matTooltip="Every AI request that flows through DreamFactory: direct REST calls to AI Connections, chats from the DF chat UI, and inbound MCP tool calls from external AI agents. Use the filters to drill into a specific user, app, or model."
         matTooltipPosition="below"></fa-icon>
     </div>
 
@@ -156,7 +156,7 @@
         <mat-form-field
           appearance="outline"
           class="usage__filter-field"
-          matTooltip="The DF role active on the request — this is what gates which data tables an AI tool call could read."
+          matTooltip="The DF role active on the request. This is what gates which data tables an AI tool call could read."
           matTooltipPosition="above">
           <mat-label>Role</mat-label>
           <mat-select
@@ -231,7 +231,7 @@
       <mat-card-content>
         <h3>No AI requests in this period</h3>
         <p>
-          This view tracks every AI request through DreamFactory — direct REST
+          This view tracks every AI request through DreamFactory: direct REST
           calls to your AI Connections from any client app, plus chats started
           from the
           <a [routerLink]="['/ai/chat']">
@@ -249,7 +249,7 @@
           <fa-icon
             class="usage__section-hint"
             [icon]="faCircleInfo"
-            matTooltip="Outbound calls from DreamFactory to AI providers (Anthropic, OpenAI, etc.). DF pays for the tokens here — these are the numbers that hit your provider invoice."
+            matTooltip="Outbound calls from DreamFactory to AI providers (Anthropic, OpenAI, etc.). DF pays for the tokens here; these are the numbers that hit your provider invoice."
             matTooltipPosition="above"></fa-icon>
         </h3>
         <p class="usage__section-subtitle">
@@ -271,7 +271,7 @@
             matTooltipPosition="above"></fa-icon>
         </h3>
         <p class="usage__section-subtitle">
-          Stacked spend over time per dimension — find the model, user, app, or
+          Stacked spend over time per dimension. Find the model, user, app, or
           provider eating budget at a glance
         </p>
       </header>
@@ -316,7 +316,7 @@
           (rowClick)="drillByRole($event)"></df-usage-bars>
         <df-usage-bars
           title="By app / API key"
-          hint="Spend per DF API key. Each integration or customer should ideally have its own key — gives you per-tenant cost visibility."
+          hint="Spend per DF API key. Each integration or customer should ideally have its own key, giving you per-tenant cost visibility."
           [rows]="byApp"
           [limit]="8"
           [clickable]="true"
@@ -427,7 +427,7 @@
             matTooltipPosition="above"></fa-icon>
         </h3>
         <p class="usage__section-disclaimer">
-          Token cost is borne by the calling AI agent —
+          Token cost is borne by the calling AI agent,
           <strong>not</strong> billed to DreamFactory. Bytes track what flowed
           through the gateway, not provider tokens.
         </p>
@@ -456,7 +456,7 @@
         </mat-card>
         <mat-card
           class="usage__mcp-card"
-          matTooltip="Bytes returned to MCP clients (tool results). Streaming SSE responses don't count exactly — they're recorded as 0."
+          matTooltip="Bytes returned to MCP clients (tool results). Streaming SSE responses don't count exactly; they're recorded as 0."
           matTooltipPosition="above">
           <mat-card-content>
             <span class="usage__mcp-label">Bytes out</span>

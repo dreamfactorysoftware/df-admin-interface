@@ -70,8 +70,9 @@ const DATA_GROUPS = new Set(['Database', 'Big Data', 'File', 'Excel']);
   `,
   styles: [
     `
-      /* Themed via global --df-* tokens (src/styles.scss); dark values come
-         from the .dark-theme class DfThemeService stamps on <body>. */
+      /* Departure treatment: token-only chrome (light/dark/phosphor come
+         free); selection chips ride the shared accent + corner scale so
+         all the df-ai-* pickers read as one product. */
       .data-services {
         display: flex;
         flex-direction: column;
@@ -80,8 +81,9 @@ const DATA_GROUPS = new Set(['Database', 'Big Data', 'File', 'Excel']);
         margin: 1rem 0;
         background: var(--df-surface-2);
         border: 1px solid var(--df-border-2);
-        border-radius: 8px;
-        font-size: 16px;
+        border-radius: var(--df-radius);
+        font-size: 1.4rem;
+        color: var(--df-text);
 
         &__header {
           display: flex;
@@ -91,23 +93,24 @@ const DATA_GROUPS = new Set(['Database', 'Big Data', 'File', 'Excel']);
         }
 
         &__icon {
-          color: #4ade80;
-          font-size: 20px;
+          color: var(--df-accent);
+          font-size: 1.8rem;
         }
 
         &__title {
           font-weight: 600;
-          font-size: 18px;
+          font-size: 1.5rem;
+          letter-spacing: -0.01em;
         }
 
         &__count {
-          font-size: 15px;
+          font-size: 1.3rem;
           color: var(--df-text-muted);
         }
 
         &__hint {
           margin: 0;
-          font-size: 15px;
+          font-size: 1.3rem;
           color: var(--df-text-2);
           line-height: 1.55;
         }
@@ -116,7 +119,7 @@ const DATA_GROUPS = new Set(['Database', 'Big Data', 'File', 'Excel']);
         &__empty {
           color: var(--df-text-muted);
           font-style: italic;
-          font-size: 15px;
+          font-size: 1.3rem;
         }
 
         &__list {
@@ -138,12 +141,12 @@ const DATA_GROUPS = new Set(['Database', 'Big Data', 'File', 'Excel']);
           display: inline-flex;
           align-items: center;
           gap: 0.5rem;
-          padding: 0.55rem 1.05rem;
-          background: var(--df-hover);
+          padding: 0.5rem 1rem;
+          background: var(--df-surface);
           border: 1px solid var(--df-border);
-          border-radius: 999px;
+          border-radius: var(--df-radius-sm);
           font: inherit;
-          font-size: 16px;
+          font-size: 1.4rem;
           color: inherit;
           cursor: pointer;
           transition:
@@ -151,19 +154,19 @@ const DATA_GROUPS = new Set(['Database', 'Big Data', 'File', 'Excel']);
             background 120ms ease;
 
           &:hover {
-            border-color: rgba(74, 222, 128, 0.6);
-            background: rgba(74, 222, 128, 0.08);
+            border-color: var(--df-accent);
+            background: var(--df-hover);
           }
 
           &--selected {
-            border-color: #4ade80;
-            background: rgba(74, 222, 128, 0.18);
+            border-color: var(--df-accent);
+            background: var(--df-accent-soft);
             color: var(--df-text);
           }
         }
 
         &__chip-check {
-          color: #86efac;
+          color: var(--df-accent);
         }
 
         &__name {
