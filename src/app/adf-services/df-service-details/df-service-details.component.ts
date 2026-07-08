@@ -71,7 +71,6 @@ import {
   of,
   throwError,
   tap,
-  firstValueFrom,
 } from 'rxjs';
 import { normalizeError } from 'src/app/shared/utilities/app-error';
 import { silent, toastOff } from 'src/app/shared/utilities/http-contexts';
@@ -108,6 +107,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { DfSystemService } from 'src/app/shared/services/df-system.service';
 import { DfPaywallModal } from 'src/app/shared/components/df-paywall-modal/df-paywall-modal.component';
 import { DfAnalyticsService } from 'src/app/shared/services/df-analytics.service';
+import { DfArtifactResolverService } from 'src/app/shared/services/df-artifact-resolver.service';
 import { DfPageHeaderComponent } from 'src/app/shared/components/df-page-header/df-page-header.component';
 import {
   DfArtifactCardComponent,
@@ -322,7 +322,8 @@ export class DfServiceDetailsComponent implements OnInit {
     private currentServiceService: DfCurrentServiceService,
     private snackBar: MatSnackBar,
     private systemService: DfSystemService,
-    private analyticsService: DfAnalyticsService
+    private analyticsService: DfAnalyticsService,
+    private artifactResolver: DfArtifactResolverService
   ) {
     this.serviceForm = this.fb.group({
       type: ['', Validators.required],
@@ -2051,12 +2052,9 @@ export class DfServiceDetailsComponent implements OnInit {
   }
 
   // Resolve a key + sample table for the Live API Card whose curl PROVABLY
-  // returns 200. Prior versions embedded any key whose role claimed access,
-  // but seed keys can be expired (agent keys have a TTL) or scoped to tables
-  // other than the auto-picked one, so the on-screen curl 400/403'd. This
-  // probes each candidate key (raw fetch, API key only, no session token) on a
-  // table its role grants and surfaces the first that returns 200; working
-  // keys sort first so the default curl works out of the box.
+  // returns 200. The probe (candidate resolution + per-key 200 check) lives in
+  // the shared DfArtifactResolverService so Home, Overview, Docs, and
+  // post-create mount the card off one implementation.
   private async loadArtifactCardData(): Promise<void> {
     const name = this.serviceData?.name;
     const id = this.serviceData?.id;
@@ -2064,152 +2062,13 @@ export class DfServiceDetailsComponent implements OnInit {
       this.artifactKeys = [];
       return;
     }
-    try {
-      const tables = await this.introspectArtifactTables(name);
-      if (tables[0]) {
-        this.artifactSampleTable = tables[0];
-      }
-      const candidates = await this.resolveArtifactCandidates(id);
-      if (!candidates.length) {
-        this.artifactKeys = [];
-        return;
-      }
-      const origin = window.location.origin;
-      const working: Array<{ option: ArtifactKeyOption; table: string }> = [];
-      const rest: ArtifactKeyOption[] = [];
-      for (const c of candidates) {
-        const option: ArtifactKeyOption = { label: c.label, apiKey: c.apiKey };
-        const tryTables = (
-          c.grantsAll ? tables : c.tables.filter(t => tables.includes(t))
-        ).slice(0, 5);
-        let hit = '';
-        for (const t of tryTables) {
-          try {
-            const r = await fetch(
-              `${origin}${BASE_URL}/${name}/_table/${encodeURIComponent(
-                t
-              )}?limit=1`,
-              { headers: { 'X-DreamFactory-API-Key': c.apiKey } }
-            );
-            if (r.ok) {
-              hit = t;
-              break;
-            }
-          } catch {
-            // network hiccup; try the next table
-          }
-        }
-        if (hit) {
-          working.push({ option, table: hit });
-        } else {
-          rest.push(option);
-        }
-      }
-      if (working.length) {
-        this.artifactSampleTable = working[0].table;
-        this.artifactKeys = [...working.map(w => w.option), ...rest];
-      } else {
-        this.artifactKeys = rest;
-      }
-    } catch {
-      this.artifactKeys = [];
-    }
-  }
-
-  // Roles that can reach this service, resolved to their apps' keys plus the
-  // GET-granted table names parsed from each role's service access (grantsAll
-  // when the role grants _table/* or *). Own two-step query because
-  // ApiKeysService drops the access components this needs.
-  private async resolveArtifactCandidates(serviceId: number): Promise<
-    Array<{ label: string; apiKey: string; tables: string[]; grantsAll: boolean }>
-  > {
-    const rolesRes = await firstValueFrom(
-      this.http.get<any>(
-        `${BASE_URL}/system/role?related=role_service_access_by_role_id&limit=200`,
-        { context: silent() }
-      )
+    const res = await this.artifactResolver.resolveWorkingKeyAndTable(
+      id,
+      name,
+      this.artifactSampleTable
     );
-    const perRole = new Map<number, { tables: string[]; grantsAll: boolean }>();
-    for (const role of rolesRes?.resource ?? []) {
-      if (role?.isActive === false) {
-        continue;
-      }
-      let grantsAll = false;
-      const tables: string[] = [];
-      for (const a of role?.roleServiceAccessByRoleId ?? []) {
-        if (a?.serviceId !== serviceId || ((a?.verbMask ?? 0) & 1) === 0) {
-          continue;
-        }
-        const comp: string = a?.component ?? '';
-        if (comp === '' || comp === '*' || comp === '_table/*') {
-          grantsAll = true;
-        } else if (comp.startsWith('_table/')) {
-          const t = comp
-            .slice('_table/'.length)
-            .replace(/\/\*$/, '')
-            .replace(/\/$/, '');
-          if (t && t !== '*') {
-            tables.push(t);
-          }
-        }
-      }
-      if (grantsAll || tables.length) {
-        perRole.set(role.id, { tables, grantsAll });
-      }
-    }
-    if (!perRole.size) {
-      return [];
-    }
-    const roleIds = [...perRole.keys()];
-    const appResps = await Promise.all(
-      roleIds.map(roleId =>
-        firstValueFrom(
-          this.http.get<any>(
-            `${BASE_URL}/system/app?filter=role_id=${roleId}&fields=*`,
-            { context: silent() }
-          )
-        ).catch(() => ({ resource: [] }))
-      )
-    );
-    const out: Array<{
-      label: string;
-      apiKey: string;
-      tables: string[];
-      grantsAll: boolean;
-    }> = [];
-    roleIds.forEach((roleId, i) => {
-      const grant = perRole.get(roleId);
-      if (!grant) {
-        return;
-      }
-      for (const app of appResps[i]?.resource ?? []) {
-        if (app?.isActive === false || !app?.apiKey) {
-          continue;
-        }
-        out.push({
-          label: app.name || 'API key',
-          apiKey: app.apiKey,
-          tables: grant.tables,
-          grantsAll: grant.grantsAll,
-        });
-      }
-    });
-    return out;
-  }
-
-  // Table names for the service (admin session lists them even when a scoped
-  // key cannot). Empty on failure; the card keeps its placeholder table.
-  private async introspectArtifactTables(name: string): Promise<string[]> {
-    try {
-      const res = await firstValueFrom(
-        this.http.get<any>(`${BASE_URL}/${name}/_table`, { context: silent() })
-      );
-      return (res?.resource ?? [])
-        .map((t: any) => (typeof t === 'string' ? t : t?.name))
-        .filter((t: any): t is string => !!t);
-    } catch {
-      return [];
-    }
+    this.artifactSampleTable = res.sampleTable;
+    this.artifactKeys = res.keys;
   }
 
   getBackgroundImage(typeLabel: string) {
