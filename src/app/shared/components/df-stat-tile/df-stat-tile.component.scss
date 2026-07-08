@@ -1,0 +1,81 @@
+// df-stat-tile — dashboard KPI tile. Flat, border-defined surface (no shadow),
+// equal-height when dropped in a CSS grid. Tokens only; the value uses the
+// global .df-numeric (tabular figures) and the label the global .df-eyebrow.
+.df-stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--df-space-2);
+  height: 100%;
+  padding: var(--df-space-4);
+  background-color: var(--df-surface);
+  border: 1px solid var(--df-border);
+  border-radius: var(--df-radius);
+  color: var(--df-text);
+  text-decoration: none;
+  transition:
+    border-color var(--df-duration-fast) var(--df-ease-standard),
+    background-color var(--df-duration-fast) var(--df-ease-standard);
+
+  &--clickable {
+    cursor: pointer;
+
+    &:hover {
+      border-color: var(--df-border-2);
+      background-color: var(--df-hover);
+    }
+  }
+
+  // Keyboard focus only (RouterLink makes the anchor focusable when a route is
+  // set). Suppress the ring on mouse click.
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--df-focus-ring);
+  }
+  &:focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  &__value-row {
+    display: flex;
+    align-items: baseline;
+    gap: var(--df-space-2);
+  }
+
+  &__value {
+    font-size: var(--df-font-size-xl);
+    font-weight: var(--df-font-weight-heading);
+    line-height: var(--df-lh-tight);
+    color: var(--df-text);
+  }
+
+  &__delta {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--df-space-1);
+    font-size: var(--df-font-size-xs);
+    font-weight: var(--df-font-weight-medium);
+
+    &--positive {
+      color: var(--df-success);
+    }
+    &--negative {
+      color: var(--df-danger);
+    }
+    &--flat {
+      color: var(--df-text-muted);
+    }
+  }
+
+  &__delta-caption {
+    color: var(--df-text-muted);
+    font-weight: var(--df-font-weight-body);
+  }
+
+  &__spark {
+    margin-top: auto; // pin the sparkline to the bottom of an equal-height tile
+
+    &:empty {
+      display: none;
+    }
+  }
+}
