@@ -11,9 +11,12 @@ import {
   Validators,
   ReactiveFormsModule,
 } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AppPayload, AppType } from '../../shared/types/apps';
-import { APP_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
+import {
+  APP_SERVICE_TOKEN,
+  LIMIT_SERVICE_TOKEN,
+} from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 
 import { MatSelectModule } from '@angular/material/select';
@@ -37,7 +40,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { generateApiKey } from 'src/app/shared/utilities/hash';
 import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
-import { catchError, throwError } from 'rxjs';
+import { catchError, of, throwError } from 'rxjs';
 import {
   applyServerErrorsToForm,
   normalizeError,
@@ -47,6 +50,30 @@ import { DfAlertComponent } from 'src/app/shared/components/df-alert/df-alert.co
 import { RoleType } from 'src/app/shared/types/role';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
+import { DfScopeMapComponent } from 'src/app/shared/components/df-scope-map/df-scope-map.component';
+import { DecimalPipe, CurrencyPipe } from '@angular/common';
+import { LimitType } from 'src/app/shared/types/limit';
+import { UsageService, n } from 'src/app/adf-ai-usage/services/usage.service';
+import { GenericListResponse } from 'src/app/shared/types/generic-http';
+import { ROUTES } from 'src/app/shared/types/routes';
+
+/** One rate limit governing this key's role, resolved to a live meter. */
+interface RoleLimitMeter {
+  name: string;
+  consumed: number;
+  cap: number;
+  ratio: number;
+  period: string;
+  variant: 'ok' | 'warning' | 'danger';
+  label: string;
+}
+
+/** This key's 30-day usage, from the AI usage aggregate. */
+interface KeyUsage {
+  tokens: number;
+  spend: number;
+  requests: number;
+}
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-app-details',
@@ -71,6 +98,10 @@ import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
     MatTooltipModule,
     DfAlertComponent,
     AsyncPipe,
+    DfScopeMapComponent,
+    DecimalPipe,
+    CurrencyPipe,
+    RouterLink,
   ],
 })
 export class DfAppDetailsComponent implements OnInit {
@@ -89,10 +120,24 @@ export class DfAppDetailsComponent implements OnInit {
   showAlert = false;
   alertType: AlertType = 'error';
 
+  // ---- Access & metering (all real, all live) ---------------------------
+  /** Role currently selected in the form. Drives the scope-map preview and the
+   *  rate-limit read-out, updating live as the user picks a different role. */
+  selectedRoleId: number | null = null;
+  /** Rate limits that govern the selected role, resolved to live meters. */
+  roleLimits: RoleLimitMeter[] = [];
+  /** This key's 30-day usage, or null when it has driven no traffic. */
+  keyUsage: KeyUsage | null = null;
+  limitsRoute = ['/', ROUTES.API_SECURITY, ROUTES.RATE_LIMITING];
+  private allLimits: LimitType[] = [];
+
   constructor(
     private fb: FormBuilder,
     @Inject(APP_SERVICE_TOKEN)
     private appsService: DfBaseCrudService,
+    @Inject(LIMIT_SERVICE_TOKEN)
+    private limitService: DfBaseCrudService,
+    private usageService: UsageService,
     private systemConfigDataService: DfSystemConfigDataService,
     private activatedRoute: ActivatedRoute,
     private router: Router,
@@ -152,6 +197,89 @@ export class DfAppDetailsComponent implements OnInit {
     });
 
     this.appForm.controls['storageServiceId'].updateValueAndValidity();
+
+    // Metering wiring: seed from the saved role, then track the form so the
+    // scope-map preview and rate-limit read-out follow the pending selection.
+    this.selectedRoleId = this.editApp?.roleId ?? null;
+    this.appForm.controls['defaultRole'].valueChanges.subscribe(
+      (role: RoleType | null) => {
+        this.selectedRoleId = role?.id ?? null;
+        this.recomputeRoleLimits();
+      }
+    );
+    this.loadMetering();
+  }
+
+  /** Pull the two real metering sources once: the rate-limit list (for the
+   *  cap + live counter) and this key's slice of the AI usage aggregate. Both
+   *  degrade silently to an honest empty. */
+  private loadMetering(): void {
+    this.limitService
+      .getAll<GenericListResponse<LimitType>>({
+        limit: 0,
+        related: 'limit_cache_by_limit_id',
+      })
+      .pipe(catchError(() => of({ resource: [] } as GenericListResponse<LimitType>)))
+      .subscribe(res => {
+        this.allLimits = res.resource ?? [];
+        this.recomputeRoleLimits();
+      });
+
+    if (this.editApp?.id != null) {
+      const appId = this.editApp.id;
+      this.usageService
+        .loadAll('30d')
+        .pipe(catchError(() => of(null)))
+        .subscribe(bundle => {
+          const row = bundle?.raw.by_app?.find(r => r.app_id === appId);
+          this.keyUsage = row
+            ? {
+                tokens: n(row.input_tokens) + n(row.output_tokens),
+                spend: n(row.cost_usd),
+                requests: n(row.requests),
+              }
+            : null;
+        });
+    }
+  }
+
+  /** Resolve every active rate limit bound to the selected role into a live
+   *  meter. Consumed and cap both come off the limit cache counter. */
+  private recomputeRoleLimits(): void {
+    const roleId = this.selectedRoleId;
+    if (roleId == null) {
+      this.roleLimits = [];
+      return;
+    }
+    this.roleLimits = this.allLimits
+      .filter(l => l.isActive && l.roleId === roleId)
+      .map(l => this.toMeter(l))
+      .filter((m): m is RoleLimitMeter => m !== null);
+  }
+
+  private toMeter(limit: LimitType): RoleLimitMeter | null {
+    const cache = limit.limitCacheByLimitId?.[0];
+    const cap = cache?.max ?? limit.rate;
+    if (!cap || cap <= 0) {
+      return null;
+    }
+    const consumed = cache?.attempts ?? 0;
+    const ratio = Math.max(0, Math.min(1, consumed / cap));
+    let variant: 'ok' | 'warning' | 'danger' = 'ok';
+    if (ratio >= 0.9) {
+      variant = 'danger';
+    } else if (ratio >= 0.75) {
+      variant = 'warning';
+    }
+    return {
+      name: limit.name,
+      consumed,
+      cap,
+      ratio,
+      period: limit.period,
+      variant,
+      label: `${consumed} / ${cap}`,
+    };
   }
 
   filter(): void {
