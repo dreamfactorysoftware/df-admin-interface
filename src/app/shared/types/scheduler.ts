@@ -35,6 +35,10 @@ export type CreateSchedulePayload = {
   serviceName: string;
   verb: string;
   verbMask: number;
+  // Optional "run as" identity: when set, the scheduled task runs under a real
+  // session (role + lookups) instead of the legacy session-less context.
+  appId?: number | null;
+  userId?: number | null;
 };
 
 export interface SchedulerTaskData {
@@ -52,6 +56,8 @@ export interface SchedulerTaskData {
   lastModifiedById: number | null;
   verb: string;
   verbMask: number;
+  appId?: number | null;
+  userId?: number | null;
   taskLogByTaskId: {
     taskId: number;
     statusCode: number;
