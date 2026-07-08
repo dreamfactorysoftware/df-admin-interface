@@ -176,9 +176,9 @@
   "errors": {
     "network": "Can't reach the server. Check your connection and try again.",
     "http4xx": "The request could not be completed.",
-    "http5xx": "Something went wrong on the server. Please try again.",
+    "http5xx": "The server hit an error. Try again.",
     "databaseConstraint": "That change conflicts with existing data.",
-    "unknown": "Something went wrong.",
+    "unknown": "The request failed. Try again.",
     "details": "Details",
     "copyForSupport": "Copy for support",
     "copied": "Copied",
@@ -748,7 +748,7 @@
   },
   "services": {
     "alerts": {
-      "duplicateSuccess": "Service duplicated successfully"
+      "duplicateSuccess": "Service duplicated"
     },
     "duplicate": {
       "title": "Duplicate Service",
@@ -758,7 +758,7 @@
   },
   "roles": {
     "alerts": {
-      "duplicateSuccess": "Role duplicated successfully"
+      "duplicateSuccess": "Role duplicated"
     },
     "duplicate": {
       "title": "Duplicate Role",
@@ -768,7 +768,7 @@
   },
   "apps": {
     "alerts": {
-      "duplicateSuccess": "App duplicated successfully"
+      "duplicateSuccess": "App duplicated"
     },
     "duplicate": {
       "title": "Duplicate App",
@@ -780,11 +780,11 @@
     "label": "Lookup Keys",
     "desc": "Lookup keys for service configuration and credentials must be made private.",
     "noKeys": "No lookup keys.",
-    "fullDesc": "The DreamFactory administrator can create any number of 'key, value' pairs attached to a role. The key values are automatically substituted on the server. For example, key names can be used in the username and password fields required to hook up a SQL or NoSQL database. They can also be used in Email Templates or as parameters for external REST services. Any Lookup Key can be marked as private, and in this case the key value is securely ncrypted on the server and is no longer accessible through the platform interface. Lookup keys for service configuration and credentials must be made private.",
+    "fullDesc": "The DreamFactory administrator can create any number of 'key, value' pairs attached to a role. The key values are automatically substituted on the server. For example, key names can be used in the username and password fields required to hook up a SQL or NoSQL database. They can also be used in Email Templates or as parameters for external REST services. Any Lookup Key can be marked as private, and in this case the key value is securely encrypted on the server and is no longer accessible through the platform interface. Lookup keys for service configuration and credentials must be made private.",
     "alerts": {
-      "createSuccess": "Lookup keys created successfully.",
-      "updateSuccess": "Lookup keys updated successfully.",
-      "deleteSuccess": "Lookup keys deleted successfully."
+      "createSuccess": "Lookup keys created.",
+      "updateSuccess": "Lookup keys updated.",
+      "deleteSuccess": "Lookup keys deleted."
     }
   },
   "licenseExpired": {

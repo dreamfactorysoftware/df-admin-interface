@@ -13,7 +13,7 @@
     "enabled": "Enabled"
   },
   "alerts": {
-    "createSuccess": "CORS entry created successfully.",
-    "updateSuccess": "CORS entry updated successfully."
+    "createSuccess": "CORS entry created",
+    "updateSuccess": "CORS entry updated"
   }
 }

@@ -7,7 +7,7 @@
   "deleteSelectedApps": "Delete selected apps",
   "launchApp": "Launch app",
   "createSuccess": "API key created. Give it a role to control what it can access, or start calling your APIs with it.",
-  "updateSuccess": "App successfully updated",
+  "updateSuccess": "App updated",
   "sampleApps": {
     "label": "Sample Apps",
     "options": {

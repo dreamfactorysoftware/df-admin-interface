@@ -2213,10 +2213,7 @@ export class DfServiceDetailsComponent implements OnInit {
       this.currentServiceId = createdService.id;
 
       // Show success message using DfSnackbarService
-      this.snackbarService.openSnackBar(
-        'Service successfully created',
-        'success'
-      );
+      this.snackbarService.openSnackBar('Service created', 'success');
 
       // Show security config section
       this.showSecurityConfig = true;

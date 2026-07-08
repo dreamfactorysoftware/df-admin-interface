@@ -44,12 +44,12 @@
     "securityConfig": "Security Config",
     "nextSecurityConfig": "Next: Security Configuration"
   },
-  "firstTimeGuidance": "Welcome! Since this is your first API, we'll guide you through setting up security configuration to ensure your API is properly protected.",
-  "deleteSuccessMsg": "Service successfully deleted",
+  "firstTimeGuidance": "This is your first API. We'll walk you through the security configuration that protects it.",
+  "deleteSuccessMsg": "Service deleted",
   "createSuccessMsg": "Service created. Generate its API docs to try it out, or lock it down with a role.",
-  "updateSuccessMsg": "Service successfully updated",
+  "updateSuccessMsg": "Service updated",
   "celebration": {
-    "title": "🎉 Your First API is Live!",
+    "title": "Your first API is live",
     "subtitle": "{{name}} is ready to use",
     "whatHappened": "Here's what just happened in under 1 second:",
     "steps": {
@@ -74,11 +74,11 @@
     "endpointHint": "(lists all tables)",
     "yourApiKey": "Authentication Key:",
     "copyKey": "Copy API Key",
-    "keyCopied": "Copied!",
+    "keyCopied": "Copied",
     "usageHint": "Add the API key to the 'X-DreamFactory-Api-Key' header in your requests",
     "testYourApi": "Test Your API Now",
     "exploreLater": "I'll explore later",
-    "autoRedirectTest": "Redirecting to API testing playground..."
+    "autoRedirectTest": "Opening the API testing playground"
   },
   "access": {
     "eyebrow": "Access",

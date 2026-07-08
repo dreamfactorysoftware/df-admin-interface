@@ -119,12 +119,12 @@
   },
   "dashboard": {
     "title": "Quick Stats",
-    "loading": "Loading stats...",
-    "error": "Unable to load stats. Please try again later.",
+    "loading": "Loading stats",
+    "error": "Couldn't load stats. Retry.",
     "services": {
       "title": "API Services",
       "total": "Your Services",
-      "createPrompt": "🚀 Get started! Create your first API service above!"
+      "createPrompt": "Create your first API service above."
     },
     "admins": {
       "title": "Admins",
@@ -133,12 +133,12 @@
     "apiKeys": {
       "title": "API Keys",
       "total": "Your API Keys",
-      "createPrompt": "🔑 Secure your APIs! Generate an API key now!"
+      "createPrompt": "Generate an API key to secure your APIs."
     },
     "roles": {
       "title": "Roles",
       "total": "Your Roles",
-      "createPrompt": "🔒 Control access! Set up your first role!"
+      "createPrompt": "Set up your first role to control access."
     }
   }
 }
