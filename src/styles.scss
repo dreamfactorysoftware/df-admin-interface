@@ -4,6 +4,18 @@
 @import 'src/dark-style.scss';
 $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
 
+/* VT323 - phosphor display typeface (OFL, self-hosted, license at
+   assets/fonts/VT323/OFL.txt). Applied ONLY under .phosphor-theme to the
+   display layer (titles, headers, nav, breadcrumbs, stat numbers); body and
+   dense tables stay on the mono stack. See the .phosphor-theme block below. */
+@font-face {
+  font-family: 'VT323';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('assets/fonts/VT323/VT323-Regular.ttf') format('truetype');
+}
+
 /* ============================================================
    Global theme tokens - THE palette source of truth.
    Light values on :root; dark values under .dark-theme, which
@@ -209,6 +221,40 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
     font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
   }
 
+  /* ---- VT323 display layer (item 16) ----
+     Pixel typeface ONLY on the chrome that reads as a title/label: page
+     titles, section + card headers, sidebar nav + group labels,
+     breadcrumbs, and stat numbers. Bumped ~18% because VT323 runs small.
+     Body copy, forms, and dense tables deliberately stay on the mono/Inter
+     stack for legibility (the table/code/pre rule above wins). */
+  .page-header,
+  h1,
+  h2,
+  h3,
+  .section-header,
+  .section-title,
+  .usage__section-header,
+  .usage__section-title,
+  .card-title,
+  .df-role-scope__section-title,
+  .section-landing__title,
+  .shell-group-label,
+  .shell-brand,
+  .parent-route,
+  .nav-item,
+  .topbar-breadcrumbs,
+  .breadcrumb-link,
+  .breadcrumb-current,
+  .breadcrumb-sep,
+  .section-stat strong,
+  .card-value,
+  .usage__mcp-value,
+  .header-stats .trend {
+    font-family: 'VT323', 'SFMono-Regular', Menlo, Consolas, monospace;
+    font-size: 1.18em;
+    letter-spacing: 0.01em;
+  }
+
   // Rollout-verify fixes: primary actions still wore the compiled indigo
   // Material palette (tokens set per .mat-primary class, consumed by
   // MatButton's injected styles). Re-point them at the phosphor accent;
@@ -239,6 +285,113 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
     --mdc-switch-selected-focus-state-layer-color: var(--df-accent);
     --mdc-switch-selected-hover-state-layer-color: var(--df-accent);
     --mdc-switch-selected-pressed-state-layer-color: var(--df-accent);
+  }
+}
+
+/* ---- Phosphor boot sequence (item 17) ----
+   A full-screen overlay the theme toggle spawns ONLY on a live phosphor
+   toggle-ON. CRT power-on flicker (~400ms), then "SHALL WE PLAY A GAME?"
+   types out in VT323, then the overlay fades and the themed UI shows
+   through. All color comes from the phosphor tokens (the overlay only ever
+   lives under body.phosphor-theme). The toggle removes the node to end it. */
+.phosphor-boot {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--df-bg);
+  cursor: pointer;
+  overflow: hidden;
+  animation: phosphor-boot-flicker 0.4s steps(1, end);
+  transition: opacity 0.3s ease;
+}
+.phosphor-boot--out {
+  opacity: 0;
+}
+.phosphor-boot__scanline {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    var(--df-surface-2) 50%,
+    transparent 50%
+  );
+  background-size: 100% 4px;
+  opacity: 0.5;
+}
+.phosphor-boot__line {
+  position: relative;
+  font-family: 'VT323', 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: clamp(2.4rem, 5vw, 4.8rem);
+  letter-spacing: 0.06em;
+  color: var(--df-accent-strong);
+  text-shadow: 0 0 8px var(--df-accent-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  width: 0;
+  border-right: 0.08em solid var(--df-accent-strong);
+  /* type over ~0.9s starting after the 0.4s flicker; 21 glyphs */
+  animation:
+    phosphor-boot-type 0.9s steps(21, end) 0.4s forwards,
+    phosphor-boot-caret 0.6s step-end 0.4s 4;
+}
+@keyframes phosphor-boot-flicker {
+  0% {
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  14% {
+    opacity: 0.3;
+  }
+  22% {
+    opacity: 1;
+  }
+  30% {
+    opacity: 0.6;
+  }
+  38% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes phosphor-boot-type {
+  from {
+    width: 0;
+  }
+  to {
+    /* --boot-w is set inline from the resolved string length so the
+       type-out matches whatever the phosphor.boot i18n value is. */
+    width: var(--boot-w, 21ch);
+  }
+}
+@keyframes phosphor-boot-caret {
+  0%,
+  100% {
+    border-color: transparent;
+  }
+  50% {
+    border-color: var(--df-accent-strong);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* No flicker, no typing: reveal the whole line at rest and let the
+     toggle tear the overlay down on its short reduced-motion timer. */
+  .phosphor-boot {
+    animation: none;
+  }
+  .phosphor-boot__line {
+    width: var(--boot-w, 21ch);
+    border-right-color: transparent;
+    animation: none;
+  }
+  .phosphor-boot__scanline {
+    display: none;
   }
 }
 

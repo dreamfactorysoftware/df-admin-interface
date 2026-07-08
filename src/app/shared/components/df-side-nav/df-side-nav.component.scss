@@ -244,6 +244,18 @@ $red-palette: mat.define-palette(mat.$red-palette);
         width: auto;
         display: block;
       }
+
+      // Wordmark goes 16-bit green in phosphor (item 18): tint to the
+      // phosphor glyph color and render chunky. Reduced height + pixelated
+      // upscale gives the raster wordmark hard pixel edges.
+      :host-context(.phosphor-theme) & .shell-brand-logo {
+        height: 13px;
+        filter: brightness(0) invert(1) sepia(1) saturate(4) hue-rotate(70deg)
+          brightness(1.1);
+        image-rendering: pixelated;
+        transform: scale(1.5);
+        transform-origin: left center;
+      }
     }
 
     .shell-nav {
@@ -321,6 +333,16 @@ $red-palette: mat.define-palette(mat.$red-palette);
       :host-context(.phosphor-theme) & img {
         filter: brightness(0) invert(1) sepia(1) saturate(4) hue-rotate(70deg)
           brightness(1.1);
+        // 16-bit pixel icons (item 18): paint the source small, then
+        // nearest-neighbor upscale so the glyph reads as chunky green
+        // pixels. Reduced-size-scaled-up is what forces even vector art to
+        // rasterize coarse; image-rendering keeps the upscale hard-edged.
+        // Phosphor-only, so the slight box change never touches other themes.
+        width: 10px;
+        height: 10px;
+        image-rendering: pixelated;
+        transform: scale(1.6);
+        transform-origin: center;
       }
 
       ::ng-deep .mat-mdc-button-touch-target {
