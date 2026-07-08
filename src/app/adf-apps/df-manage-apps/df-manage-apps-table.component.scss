@@ -2,3 +2,68 @@
   max-width: 300px;
   text-overflow: ellipsis;
 }
+
+// Numeric metric columns stay narrow so the meter has room to breathe.
+.mat-column-tokens,
+.mat-column-spend {
+  white-space: nowrap;
+}
+
+// A metric with no real source: quiet, unmistakably empty, never a fake zero.
+.df-metric-empty {
+  color: var(--df-text-faint);
+  font-size: 1.2rem;
+}
+
+// Rate-limit meter: consumed vs cap, pulled live from the limit cache.
+// Thresholds shift the fill color; the track and label are token-driven so
+// light, dark, and phosphor all inherit correctly.
+.df-meter-cell {
+  min-width: 14rem;
+}
+
+.df-meter {
+  display: flex;
+  align-items: center;
+  gap: var(--df-space-2);
+}
+
+.df-meter-track {
+  position: relative;
+  flex: 1;
+  height: 0.6rem;
+  min-width: 6rem;
+  border-radius: var(--df-radius-sm);
+  background: var(--df-surface-2);
+  border: 1px solid var(--df-border);
+  overflow: hidden;
+}
+
+.df-meter-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--df-accent);
+  transition: width 0.24s ease;
+}
+
+.df-meter--warning .df-meter-fill {
+  background: var(--df-warning);
+}
+
+.df-meter--danger .df-meter-fill {
+  background: var(--df-danger);
+}
+
+.df-meter-label {
+  flex: none;
+  font-size: 1.2rem;
+  color: var(--df-text-muted);
+}
+
+.df-meter--warning .df-meter-label {
+  color: var(--df-warning);
+}
+
+.df-meter--danger .df-meter-label {
+  color: var(--df-danger);
+}

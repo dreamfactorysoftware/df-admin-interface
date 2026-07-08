@@ -313,6 +313,99 @@
         </mat-card-actions>
       </mat-card>
     </div>
+    <!-- Access & metering: what this key can reach, and how it is metered.
+         Every figure here is live. No synthesized numbers. -->
+    <section class="metering full-width">
+      <header class="metering-head">
+        <h2>{{ 'apps.metering.title' | transloco }}</h2>
+        <p>{{ 'apps.metering.subtitle' | transloco }}</p>
+      </header>
+
+      <div class="metering-block">
+        <h3>{{ 'apps.metering.reachTitle' | transloco }}</h3>
+        <p class="metering-hint" *ngIf="selectedRoleId !== null; else noRoleHint">
+          {{
+            'apps.metering.reachHintRole'
+              | transloco: { role: appForm.value.defaultRole?.name }
+          }}
+        </p>
+        <ng-template #noRoleHint>
+          <p class="metering-hint">
+            {{ 'apps.metering.reachHintPending' | transloco }}
+          </p>
+        </ng-template>
+        <df-scope-map [roleId]="selectedRoleId"></df-scope-map>
+      </div>
+
+      <div class="metering-block">
+        <h3>{{ 'apps.metering.limitsTitle' | transloco }}</h3>
+        <ng-container *ngIf="roleLimits.length; else noLimits">
+          <div
+            class="metering-limit"
+            *ngFor="let limit of roleLimits"
+            [class]="'df-meter--' + limit.variant">
+            <div class="metering-limit-head">
+              <span class="metering-limit-name">{{ limit.name }}</span>
+              <span class="metering-limit-rate df-numeric"
+                >{{ limit.label }}
+                {{
+                  'apps.metering.perPeriod' | transloco: { period: limit.period }
+                }}</span
+              >
+            </div>
+            <div class="df-meter-track">
+              <div
+                class="df-meter-fill"
+                [style.width.%]="limit.ratio * 100"></div>
+            </div>
+          </div>
+        </ng-container>
+        <ng-template #noLimits>
+          <p class="metering-hint">
+            {{ 'apps.metering.limitsEmpty' | transloco }}
+          </p>
+        </ng-template>
+        <a class="metering-link" [routerLink]="limitsRoute">
+          {{ 'apps.metering.limitsManage' | transloco }}
+        </a>
+      </div>
+
+      <div class="metering-block" *ngIf="editApp">
+        <h3>{{ 'apps.metering.usageTitle' | transloco }}</h3>
+        <div class="metering-stats" *ngIf="keyUsage; else noUsage">
+          <div class="metering-stat">
+            <span class="metering-stat-value df-numeric">{{
+              keyUsage.tokens | number
+            }}</span>
+            <span class="metering-stat-label">{{
+              'apps.metering.tokensLabel' | transloco
+            }}</span>
+          </div>
+          <div class="metering-stat">
+            <span class="metering-stat-value df-numeric">{{
+              keyUsage.spend | currency: 'USD' : 'symbol' : '1.2-2'
+            }}</span>
+            <span class="metering-stat-label">{{
+              'apps.metering.spendLabel' | transloco
+            }}</span>
+          </div>
+          <div class="metering-stat">
+            <span class="metering-stat-value df-numeric">{{
+              keyUsage.requests | number
+            }}</span>
+            <span class="metering-stat-label">{{
+              'apps.metering.requestsLabel' | transloco
+            }}</span>
+          </div>
+        </div>
+        <ng-template #noUsage>
+          <p class="metering-hint">
+            {{ 'apps.metering.usageEmpty' | transloco }}
+          </p>
+        </ng-template>
+      </div>
+    </section>
+
     <!-- submit -->
     <div class="full-width action-bar">
       <button

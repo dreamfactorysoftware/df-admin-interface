@@ -95,6 +95,35 @@
       }
     }
   },
+  "virtualKey": {
+    "tokens": "Tokens",
+    "spend": "Spend",
+    "rateLimit": "Rate limit",
+    "noUsage": "No usage yet",
+    "noCap": "No cap",
+    "meterAria": "{{consumed}} of {{cap}} calls per {{period}} used",
+    "empty": {
+      "title": "No API keys yet",
+      "description": "API keys are metered virtual keys. Each carries a role that sets what it can reach, and its usage and limits show up right here.",
+      "action": "Create an API key"
+    }
+  },
+  "metering": {
+    "title": "Access and metering",
+    "subtitle": "What this key can reach, and how it is metered. Every figure below is live.",
+    "reachTitle": "What this key can reach",
+    "reachHintRole": "Resolved from the {{role}} role.",
+    "reachHintPending": "Pick a role above to scope this key. Without one, it reaches only open, non-role endpoints.",
+    "limitsTitle": "Rate limits",
+    "limitsEmpty": "No rate limit applies to this key's role. Add one to cap how often it can call your APIs.",
+    "limitsManage": "Manage limits",
+    "usageTitle": "Usage, last 30 days",
+    "usageEmpty": "No usage yet. Metrics appear here once this key starts calling your APIs.",
+    "tokensLabel": "Tokens",
+    "spendLabel": "Spend",
+    "requestsLabel": "Requests",
+    "perPeriod": "per {{period}}"
+  },
   "importApp": {
     "title": "Import Application",
     "subtitle": "Select App Package File",
