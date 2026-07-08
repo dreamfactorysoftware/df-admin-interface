@@ -1,0 +1,82 @@
+// df-badge — status/label pill. Tokens only; no color or size literals so it
+// survives the phosphor theme. The wash and the foreground come from a paired
+// set of --df-* tokens selected per variant; the dot and the text share the
+// foreground token. Two private custom properties keep the variant rules to a
+// single line each.
+.df-badge {
+  --_badge-bg: var(--df-hover);
+  --_badge-fg: var(--df-text-muted);
+
+  display: inline-flex;
+  align-items: center;
+  gap: var(--df-space-1);
+  padding: var(--df-space-1) var(--df-space-2);
+  border-radius: var(--df-radius-sm);
+  background-color: var(--_badge-bg);
+  color: var(--_badge-fg);
+  font-size: var(--df-font-size-xs);
+  font-weight: var(--df-font-weight-medium);
+  line-height: var(--df-lh-tight);
+  white-space: nowrap;
+  vertical-align: middle;
+
+  &__dot {
+    flex: 0 0 auto;
+    width: var(--df-space-2); // 8px, within the spec's 6-8px dot
+    height: var(--df-space-2);
+    border-radius: 50%;
+    background-color: var(--_badge-fg);
+  }
+
+  // ---- status vocabulary ----
+  &--neutral {
+    --_badge-bg: var(--df-hover);
+    --_badge-fg: var(--df-text-muted);
+  }
+  &--success {
+    --_badge-bg: var(--df-success-soft);
+    --_badge-fg: var(--df-success);
+  }
+  &--warning {
+    --_badge-bg: var(--df-warning-soft);
+    --_badge-fg: var(--df-warning);
+  }
+  &--danger {
+    --_badge-bg: var(--df-danger-soft);
+    --_badge-fg: var(--df-danger);
+  }
+  &--accent {
+    --_badge-bg: var(--df-accent-soft);
+    --_badge-fg: var(--df-accent-strong);
+  }
+
+  // ---- section category tints (identity cue, never a status) ----
+  &--build {
+    --_badge-bg: var(--df-tint-build-bg);
+    --_badge-fg: var(--df-tint-build-fg);
+  }
+  &--data {
+    --_badge-bg: var(--df-tint-data-bg);
+    --_badge-fg: var(--df-tint-data-fg);
+  }
+  &--security {
+    --_badge-bg: var(--df-tint-security-bg);
+    --_badge-fg: var(--df-tint-security-fg);
+  }
+  &--system {
+    --_badge-bg: var(--df-tint-system-bg);
+    --_badge-fg: var(--df-tint-system-fg);
+  }
+  &--admin {
+    --_badge-bg: var(--df-tint-admin-bg);
+    --_badge-fg: var(--df-tint-admin-fg);
+  }
+  &--ai {
+    --_badge-bg: var(--df-tint-ai-bg);
+    --_badge-fg: var(--df-tint-ai-fg);
+  }
+  &--docs {
+    --_badge-bg: var(--df-tint-docs-bg);
+    --_badge-fg: var(--df-tint-docs-fg);
+  }
+}

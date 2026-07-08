@@ -1,0 +1,25 @@
+<a
+  class="df-stat-tile"
+  [class.df-stat-tile--clickable]="route"
+  [routerLink]="route || null">
+  <span class="df-eyebrow df-stat-tile__label">{{ label }}</span>
+
+  <div class="df-stat-tile__value-row">
+    <span class="df-numeric df-stat-tile__value">{{ value }}</span>
+
+    <span
+      *ngIf="delta != null"
+      class="df-stat-tile__delta"
+      [class]="'df-stat-tile__delta--' + deltaTone">
+      <fa-icon [icon]="deltaIcon" aria-hidden="true"></fa-icon>
+      <span class="df-numeric">{{ deltaDisplay }}</span>
+      <span *ngIf="deltaCaption" class="df-stat-tile__delta-caption">{{
+        deltaCaption
+      }}</span>
+    </span>
+  </div>
+
+  <div class="df-stat-tile__spark">
+    <ng-content select="[sparkline]"></ng-content>
+  </div>
+</a>
