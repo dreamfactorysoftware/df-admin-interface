@@ -1,3 +1,6 @@
+@use '@angular/material' as mat;
+@use 'src/theme' as theme;
+$df-purple-palette: mat.define-palette(theme.$df-purple-palette);
 .icon-link-container {
   display: flex;
   flex-direction: column;
