@@ -50,7 +50,9 @@ export interface AppError {
 
 export function isAppError(x: unknown): x is AppError {
   return (
-    !!x && typeof x === 'object' && (x as { __appError?: unknown }).__appError === true
+    !!x &&
+    typeof x === 'object' &&
+    (x as { __appError?: unknown }).__appError === true
   );
 }
 
@@ -142,8 +144,8 @@ export function normalizeError(
       err instanceof Error
         ? err.message || 'errors.unknown'
         : typeof err === 'string' && err
-        ? err
-        : 'errors.unknown';
+          ? err
+          : 'errors.unknown';
     return {
       __appError: true,
       kind: 'client',

@@ -100,10 +100,7 @@ export class DfBaseCrudService {
       : id
         ? `${this.url}/${id}`
         : `${this.url}`;
-    return this.http.delete(
-      url,
-      this.getOptions({ ...options })
-    );
+    return this.http.delete(url, this.getOptions({ ...options }));
   }
 
   patch<T, S>(id: string | number, data: S, options?: Partial<RequestOptions>) {

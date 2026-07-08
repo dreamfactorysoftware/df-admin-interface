@@ -1,7 +1,4 @@
-<form
-  [formGroup]="scriptForm"
-  class="details-section"
-  (ngSubmit)="submit()">
+<form [formGroup]="scriptForm" class="details-section" (ngSubmit)="submit()">
   <ng-container *ngIf="type !== 'edit'; else editing">
     <mat-form-field
       appearance="outline"
@@ -11,7 +8,9 @@
       <mat-select
         [(value)]="selectedServiceItem"
         (selectionChange)="selectedServiceItemEvent()">
-        <mat-option *ngFor="let service of storeServiceArray; trackBy: trackByValue" [value]="service">
+        <mat-option
+          *ngFor="let service of storeServiceArray; trackBy: trackByValue"
+          [value]="service">
           {{ service }}
         </mat-option>
       </mat-select>
@@ -24,7 +23,9 @@
       <mat-select
         [(value)]="selectedEventItem"
         (selectionChange)="selectedEventItemEvent()">
-        <mat-option *ngFor="let item of ungroupedEventItems; trackBy: trackByValue" [value]="item">
+        <mat-option
+          *ngFor="let item of ungroupedEventItems; trackBy: trackByValue"
+          [value]="item">
           {{ item }}
         </mat-option>
       </mat-select>
@@ -47,7 +48,9 @@
       <mat-select
         [(value)]="selectedRouteItem"
         (selectionChange)="selectedRoute()">
-        <mat-option *ngFor="let item of ungroupedRouteOptions; trackBy: trackByValue" [value]="item">
+        <mat-option
+          *ngFor="let item of ungroupedRouteOptions; trackBy: trackByValue"
+          [value]="item">
           {{ item }}
         </mat-option>
       </mat-select>
@@ -74,7 +77,9 @@
           <ng-template #procedure>Name</ng-template>
         </mat-label>
         <mat-select [(value)]="selectTable" (selectionChange)="selectedTable()">
-          <mat-option *ngFor="let item of tableOptions; trackBy: trackByValue" [value]="item">
+          <mat-option
+            *ngFor="let item of tableOptions; trackBy: trackByValue"
+            [value]="item">
             {{ item }}
           </mat-option>
         </mat-select>

@@ -94,10 +94,11 @@ export class DfAiChatComponent implements OnInit, OnDestroy {
         this.isSysAdmin = userData?.isSysAdmin === true;
         if (this.isSysAdmin && this.actAsRoles.length === 0) {
           this.http
-            .get<{ resource: { id: number; name: string }[] }>(
-              `${BASE_URL}/system/role`,
-              { params: { fields: 'id,name', sort: 'name' } }
-            )
+            .get<{
+              resource: { id: number; name: string }[];
+            }>(`${BASE_URL}/system/role`, {
+              params: { fields: 'id,name', sort: 'name' },
+            })
             .subscribe({
               next: res => (this.actAsRoles = res.resource ?? []),
               error: () => {

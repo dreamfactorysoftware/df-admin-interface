@@ -7,10 +7,7 @@
   (alertClosed)="showAlert = false">
   {{ alertMsg | transloco }}
 </df-alert>
-<form
-  [formGroup]="roleForm"
-  (ngSubmit)="onSubmit()"
-  class="details-section">
+<form [formGroup]="roleForm" (ngSubmit)="onSubmit()" class="details-section">
   <mat-form-field
     appearance="outline"
     subscriptSizing="dynamic"

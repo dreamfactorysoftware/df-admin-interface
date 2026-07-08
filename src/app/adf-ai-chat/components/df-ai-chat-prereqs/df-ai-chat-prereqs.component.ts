@@ -101,8 +101,8 @@ interface RoleRow {
         </ul>
 
         <p *ngIf="!loading && connections.length === 0" class="prereqs__hint">
-          No AI Connections yet. The chat service can't run without one. Use
-          the button above to create one, then come back.
+          No AI Connections yet. The chat service can't run without one. Use the
+          button above to create one, then come back.
         </p>
       </section>
 

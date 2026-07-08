@@ -13,7 +13,10 @@
           <mat-label>Select Service</mat-label>
           <mat-select formControlName="serviceList">
             <mat-option
-              *ngFor="let service of storageServices; trackBy: trackByServiceName"
+              *ngFor="
+                let service of storageServices;
+                trackBy: trackByServiceName
+              "
               [value]="service.label">
               {{ service.label }}
             </mat-option>

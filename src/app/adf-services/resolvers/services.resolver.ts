@@ -48,9 +48,7 @@ export const servicesResolver =
               limit,
               sort: 'name',
               filter: `${
-                system
-                  ? `${PLATFORM_SERVICES_FILTER} and `
-                  : ''
+                system ? `${PLATFORM_SERVICES_FILTER} and ` : ''
               }(type in ("${serviceTypes.map(src => src.name).join('","')}"))${
                 filter ? ` and ${filter}` : ''
               }`,

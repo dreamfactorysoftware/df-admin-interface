@@ -128,9 +128,7 @@ export class DfManageServicesTableComponent
           const filter =
             serviceTypes.length > 0
               ? `${
-                  this.system
-                    ? `${PLATFORM_SERVICES_FILTER} and `
-                    : ''
+                  this.system ? `${PLATFORM_SERVICES_FILTER} and ` : ''
                 }(type in ("${serviceTypes.map(src => src.name).join('","')}"))`
               : this.scopedByGroups
                 ? '(id = -1)'

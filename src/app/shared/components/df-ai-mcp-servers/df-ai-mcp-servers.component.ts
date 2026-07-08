@@ -46,7 +46,9 @@ interface McpServerRow {
         Leave all unselected to allow every MCP server the role grants.
       </p>
 
-      <div *ngIf="loading" class="mcp-servers__loading">Loading MCP servers…</div>
+      <div *ngIf="loading" class="mcp-servers__loading">
+        Loading MCP servers…
+      </div>
 
       <ul *ngIf="!loading && servers.length > 0" class="mcp-servers__list">
         <li *ngFor="let s of servers; trackBy: trackByName">
@@ -65,8 +67,8 @@ interface McpServerRow {
       </ul>
 
       <p *ngIf="!loading && servers.length === 0" class="mcp-servers__empty">
-        No MCP services exist yet. Create one (service type “MCP Server”) and come
-        back.
+        No MCP services exist yet. Create one (service type “MCP Server”) and
+        come back.
       </p>
     </div>
   `,
@@ -205,7 +207,11 @@ export class DfAiMcpServersComponent implements OnInit {
   ngOnInit(): void {
     this.http
       .get<{ resource: McpServerRow[] }>(`${BASE_URL}/system/service`, {
-        params: { filter: 'type = "mcp"', fields: 'id,name,label', sort: 'name' },
+        params: {
+          filter: 'type = "mcp"',
+          fields: 'id,name,label',
+          sort: 'name',
+        },
       })
       .subscribe({
         next: res => {

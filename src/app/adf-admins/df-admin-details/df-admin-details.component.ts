@@ -134,9 +134,7 @@ export class DfAdminDetailsComponent extends DfUserDetailsBaseComponent<UserProf
             const messages = leftovers.length ? leftovers : [e.message];
             this.triggerAlert(
               'error',
-              messages
-                .map(m => this.translateService.translate(m))
-                .join(' ')
+              messages.map(m => this.translateService.translate(m)).join(' ')
             );
             return throwError(() => e);
           })

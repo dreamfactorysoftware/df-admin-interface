@@ -78,8 +78,8 @@ interface ProviderBreakdown {
         </table>
         <ng-template #noConn>
           <p class="cost__empty">
-            No AI Connections configured, so tokens can't be attributed to providers
-            yet.
+            No AI Connections configured, so tokens can't be attributed to
+            providers yet.
           </p>
         </ng-template>
       </mat-card-content>

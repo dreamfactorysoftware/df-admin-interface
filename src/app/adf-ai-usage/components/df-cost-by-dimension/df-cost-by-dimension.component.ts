@@ -58,7 +58,9 @@ interface Tick {
         </div>
 
         <div *ngIf="layers.length > 0" class="cbd__legend">
-          <span *ngFor="let l of layers; trackBy: trackLayer" class="cbd__legend-item">
+          <span
+            *ngFor="let l of layers; trackBy: trackLayer"
+            class="cbd__legend-item">
             <span class="cbd__legend-swatch" [style.background]="l.fill"></span>
             <span [class.cbd__legend-other]="l.isOther">{{ l.label }}</span>
             <span class="cbd__legend-cost">{{ formatUsd(l.totalCost) }}</span>

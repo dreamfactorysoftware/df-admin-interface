@@ -90,7 +90,9 @@ interface NormalizedModel {
           <mat-select
             [value]="currentValue"
             (selectionChange)="select($event.value)">
-            <mat-option *ngFor="let m of models; trackBy: trackModel" [value]="m.id">
+            <mat-option
+              *ngFor="let m of models; trackBy: trackModel"
+              [value]="m.id">
               <span class="model-picker__option">
                 <span class="model-picker__option-label">{{ m.label }}</span>
                 <span *ngIf="m.context" class="model-picker__option-meta"

@@ -111,9 +111,8 @@ type AgentLogRow = {
               <mat-option
                 *ngFor="let r of roles; trackBy: trackById"
                 [value]="r.id"
-                >{{
-                r.name
-              }}</mat-option>
+                >{{ r.name }}</mat-option
+              >
             </mat-select></mat-form-field
           >
           <mat-form-field appearance="outline" *ngIf="users.length"
@@ -122,9 +121,8 @@ type AgentLogRow = {
               <mat-option
                 *ngFor="let u of users; trackBy: trackById"
                 [value]="u.id"
-                >{{
-                u.name
-              }}</mat-option>
+                >{{ u.name }}</mat-option
+              >
             </mat-select></mat-form-field
           >
           <mat-form-field appearance="outline" class="narrow"
@@ -186,9 +184,8 @@ type AgentLogRow = {
               <mat-option
                 *ngFor="let r of roles; trackBy: trackById"
                 [value]="r.id"
-                >{{
-                r.name
-              }}</mat-option>
+                >{{ r.name }}</mat-option
+              >
             </mat-select></mat-form-field
           >
           <mat-form-field appearance="outline" class="narrow"

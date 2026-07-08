@@ -164,9 +164,8 @@ const CUSTOM = '__custom__';
               <mat-option
                 *ngFor="let e of events; trackBy: trackByPattern"
                 [value]="e.pattern"
-                >{{
-                e.label
-              }}</mat-option>
+                >{{ e.label }}</mat-option
+              >
               <mat-option [value]="CUSTOM">Custom pattern…</mat-option>
             </mat-select></mat-form-field
           >
@@ -183,9 +182,8 @@ const CUSTOM = '__custom__';
               <mat-option
                 *ngFor="let c of channels; trackBy: trackById"
                 [value]="c.id"
-                >{{
-                c.name
-              }}</mat-option>
+                >{{ c.name }}</mat-option
+              >
             </mat-select></mat-form-field
           >
           <mat-form-field appearance="outline"
@@ -265,9 +263,8 @@ const CUSTOM = '__custom__';
                 <mat-option
                   *ngFor="let e of events; trackBy: trackByPattern"
                   [value]="e.pattern"
-                  >{{
-                  e.label
-                }}</mat-option>
+                  >{{ e.label }}</mat-option
+                >
                 <mat-option [value]="CUSTOM">Custom pattern…</mat-option>
               </mat-select></mat-form-field
             >
@@ -281,9 +278,8 @@ const CUSTOM = '__custom__';
                 <mat-option
                   *ngFor="let c of channels; trackBy: trackById"
                   [value]="c.id"
-                  >{{
-                  c.name
-                }}</mat-option>
+                  >{{ c.name }}</mat-option
+                >
               </mat-select></mat-form-field
             >
             <mat-form-field appearance="outline"

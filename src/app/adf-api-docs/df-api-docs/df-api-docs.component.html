@@ -92,9 +92,7 @@
     *ngIf="serviceName"
     [apiDocJson]="apiDocJson"
     [serviceName]="serviceName"></df-api-quickstart>
-  <div
-    *ngIf="apiDocJson?.info?.group === 'Database'"
-    class="expand-schema-row">
+  <div *ngIf="apiDocJson?.info?.group === 'Database'" class="expand-schema-row">
     <mat-slide-toggle
       [(ngModel)]="expandSchema"
       (ngModelChange)="reloadApiDocs()">

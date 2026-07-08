@@ -8,7 +8,11 @@ import {
   normalizeError,
 } from './app-error';
 
-function httpError(status: number, body: unknown, url = '/api/v2/system/admin') {
+function httpError(
+  status: number,
+  body: unknown,
+  url = '/api/v2/system/admin'
+) {
   return new HttpErrorResponse({ status, error: body, url });
 }
 

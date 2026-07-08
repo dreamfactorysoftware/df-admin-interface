@@ -72,8 +72,7 @@ export class DfLoginComponent implements OnInit {
   oauthServices: AuthService[] = [];
   samlServices: AuthService[] = [];
 
-  trackByName = (_: number, service: { name: string }): string =>
-    service.name;
+  trackByName = (_: number, service: { name: string }): string => service.name;
 
   fpRoute = `/${ROUTES.AUTH}/${ROUTES.FORGOT_PASSWORD}`;
 
@@ -113,7 +112,9 @@ export class DfLoginComponent implements OnInit {
   ngOnInit() {
     if (this.navLoginError) {
       // Decode the error message properly (remove URL encoding)
-      this.alertMsg = decodeURIComponent(this.navLoginError.replace(/\+/g, ' '));
+      this.alertMsg = decodeURIComponent(
+        this.navLoginError.replace(/\+/g, ' ')
+      );
       this.showAlert = true;
       this.alertType = 'error';
     }
@@ -217,8 +218,7 @@ export class DfLoginComponent implements OnInit {
         }
         // Honor a validated internal returnUrl (set by the 401 interceptor
         // redirect or loggedInGuard); anything else goes home.
-        const returnUrl =
-          this.activatedRoute.snapshot.queryParams['returnUrl'];
+        const returnUrl = this.activatedRoute.snapshot.queryParams['returnUrl'];
         if (
           typeof returnUrl === 'string' &&
           returnUrl.startsWith('/') &&

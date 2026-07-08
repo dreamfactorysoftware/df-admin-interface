@@ -58,16 +58,16 @@ export class DfConfigPackageComponent {
       // The inline error panel owns display; skip the interceptor toast.
       .get<unknown>(URLS.CONFIG_PACKAGE, { context: toastOff() })
       .subscribe({
-      next: manifest => {
-        this.exportedJson = JSON.stringify(manifest, null, 2);
-        this.message = 'Config package exported.';
-        this.loading = false;
-      },
-      error: err => {
-        this.error = this.extractError(err, 'Export failed.');
-        this.loading = false;
-      },
-    });
+        next: manifest => {
+          this.exportedJson = JSON.stringify(manifest, null, 2);
+          this.message = 'Config package exported.';
+          this.loading = false;
+        },
+        error: err => {
+          this.error = this.extractError(err, 'Export failed.');
+          this.loading = false;
+        },
+      });
   }
 
   importConfig(): void {

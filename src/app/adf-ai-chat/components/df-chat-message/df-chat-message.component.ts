@@ -54,9 +54,9 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
                   tc.service
                 }}</span>
               </div>
-              <pre
-                *ngIf="argsText(tc)"
-                class="msg__tool-call-args">{{ argsText(tc) }}</pre>
+              <pre *ngIf="argsText(tc)" class="msg__tool-call-args">{{
+                argsText(tc)
+              }}</pre>
             </div>
           </div>
           <div *ngIf="hasUsage" class="msg__usage">

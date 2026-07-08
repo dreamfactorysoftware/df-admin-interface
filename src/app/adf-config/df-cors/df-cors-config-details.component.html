@@ -4,8 +4,7 @@
   (alertClosed)="showAlert = false">
   {{ alertMsg | transloco }}
 </df-alert>
-<div
-  class="df-cors-config-container">
+<div class="df-cors-config-container">
   <h4>{{ 'cors.pageSubtitle' | transloco }}</h4>
   <form [formGroup]="corsForm" (ngSubmit)="onSubmit()" class="details-section">
     <mat-form-field
@@ -60,8 +59,7 @@
         'cors.formControls.exposedHeaders' | transloco
       }}</mat-label>
       <input matInput type="text" formControlName="exposedHeaders" />
-      <mat-error
-        *ngIf="corsForm.controls['exposedHeaders'].hasError('server')">
+      <mat-error *ngIf="corsForm.controls['exposedHeaders'].hasError('server')">
         {{ corsForm.controls['exposedHeaders'].getError('server') | transloco }}
       </mat-error>
     </mat-form-field>

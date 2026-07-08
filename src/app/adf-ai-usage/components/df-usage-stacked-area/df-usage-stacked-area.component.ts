@@ -32,7 +32,9 @@ interface YTick {
       <mat-card-content>
         <div class="chart__legend">
           <span class="chart__title">Tokens over time</span>
-          <span *ngFor="let l of layers; trackBy: trackLayer" class="chart__legend-item">
+          <span
+            *ngFor="let l of layers; trackBy: trackLayer"
+            class="chart__legend-item">
             <span
               class="chart__legend-swatch"
               [style.background]="l.fill"></span>

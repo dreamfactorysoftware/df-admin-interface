@@ -63,44 +63,46 @@ export class DfIntercomConfigService {
   updateConfig(config: IntercomConfig): Observable<any> {
     const value = config.intercomWidget ? 'true' : 'false';
 
-    return this.lookupService
-      // Silent by design: a failed existence probe falls through to create.
-      .getAll<any>({
-        filter: `name="${this.INTERCOM_KEY}"`,
-        errorHandling: 'silent',
-      })
-      .pipe(
-        map(response => response?.resource?.[0]),
-        catchError(() => of(null)),
-        switchMap(existingKey => {
-          if (existingKey) {
-            return this.lookupService.patch(existingKey.id, { value }).pipe(
-              tap(() => {
-                this.configSubject.next(config);
-              })
-            );
-          } else {
-            const payload = {
-              resource: [
-                {
-                  name: this.INTERCOM_KEY,
-                  value,
-                  private: false,
-                },
-              ],
-            };
-            return this.lookupService.create(payload).pipe(
-              tap(() => {
-                this.configSubject.next(config);
-              })
-            );
-          }
-        }),
-        catchError(error => {
-          console.error('Failed to update Intercom config:', error);
-          throw error;
+    return (
+      this.lookupService
+        // Silent by design: a failed existence probe falls through to create.
+        .getAll<any>({
+          filter: `name="${this.INTERCOM_KEY}"`,
+          errorHandling: 'silent',
         })
-      );
+        .pipe(
+          map(response => response?.resource?.[0]),
+          catchError(() => of(null)),
+          switchMap(existingKey => {
+            if (existingKey) {
+              return this.lookupService.patch(existingKey.id, { value }).pipe(
+                tap(() => {
+                  this.configSubject.next(config);
+                })
+              );
+            } else {
+              const payload = {
+                resource: [
+                  {
+                    name: this.INTERCOM_KEY,
+                    value,
+                    private: false,
+                  },
+                ],
+              };
+              return this.lookupService.create(payload).pipe(
+                tap(() => {
+                  this.configSubject.next(config);
+                })
+              );
+            }
+          }),
+          catchError(error => {
+            console.error('Failed to update Intercom config:', error);
+            throw error;
+          })
+        )
+    );
   }
 
   get currentConfig(): IntercomConfig {
