@@ -38,6 +38,13 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   /* corner radius scale: sharper, product-chrome corners */
   --df-radius: 8px;
   --df-radius-sm: 6px;
+  /* status colors: AA-legible against --df-surface in each theme */
+  --df-danger: #b3261e;
+  --df-danger-soft: rgba(179, 38, 30, 0.08);
+  --df-danger-border: rgba(179, 38, 30, 0.35);
+  --df-success: #1a7f37;
+  --df-success-soft: rgba(26, 127, 55, 0.08);
+  --df-success-border: rgba(26, 127, 55, 0.35);
 
   /* ------------------------------------------------------------
      Shell tokens: the app shell (sidebar) is always dark in BOTH
@@ -72,6 +79,12 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   --df-accent-contrast: #ffffff;
   --df-bg: #121118;
   --df-accent-soft: rgba(144, 140, 186, 0.16);
+  --df-danger: #ff8a80;
+  --df-danger-soft: rgba(220, 53, 69, 0.14);
+  --df-danger-border: rgba(220, 53, 69, 0.45);
+  --df-success: #4ade80;
+  --df-success-soft: rgba(74, 222, 128, 0.12);
+  --df-success-border: rgba(74, 222, 128, 0.35);
   /* shell sits a hair below the dark canvas so the border reads */
   --df-shell-bg: #131218;
   --df-shell-border: rgba(255, 255, 255, 0.09);
@@ -289,18 +302,16 @@ a {
   border-color: mat.get-color-from-palette($df-purple-palette, 600) !important;
 }
 
-// Button
+// Button: the shared departure treatment. Primary = solid accent,
+// secondary = quiet bordered text button. Both on the shared corner scale.
 .save-btn {
-  background-color: mat.get-color-from-palette(
-    $df-purple-palette,
-    400
-  ) !important;
-  color: white !important;
+  background-color: var(--df-accent) !important;
+  color: var(--df-accent-contrast) !important;
   border-radius: var(--df-radius-sm) !important;
 }
 .cancel-btn {
-  color: mat.get-color-from-palette($df-purple-palette, 1001) !important;
-  border: 1px solid mat.get-color-from-palette($df-purple-palette, 1001) !important;
+  color: var(--df-text-2) !important;
+  border: 1px solid var(--df-border) !important;
   border-radius: var(--df-radius-sm) !important;
 }
 .action-btn {

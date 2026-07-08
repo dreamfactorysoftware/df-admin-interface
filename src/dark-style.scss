@@ -24,32 +24,33 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
     border-left-color: var(--df-border) !important;
   }
 
-  // Step
+  // Step: ride the theme tokens so the stepper reads as part of the
+  // content card in dark mode instead of its own palette surface.
   .mat-stepper-horizontal {
-    background-color: mat.get-color-from-palette($df-purple-palette, 1002);
-    border: 1px solid var(--df-border);
+    background-color: transparent;
+    border: none;
   }
   .mat-step-icon {
-    background-color: mat.get-color-from-palette($df-purple-palette, 300);
+    background-color: var(--df-surface-2);
+    color: var(--df-text-muted);
   }
   .mat-step-icon-selected {
-    background-color: mat.get-color-from-palette(
-      $df-purple-palette,
-      700
-    ) !important;
+    background-color: var(--df-accent) !important;
+    color: var(--df-accent-contrast) !important;
   }
   .mat-step-icon-state-edit {
-    background-color: mat.get-color-from-palette(
-      $df-purple-palette,
-      700
-    ) !important;
+    background-color: var(--df-accent) !important;
+    color: var(--df-accent-contrast) !important;
   }
   .mat-stepper-horizontal-line {
-    border-top-color: var(--df-border);
+    border-top-color: var(--df-border-2);
   }
 
   .mat-step-label {
-    color: white !important;
+    color: var(--df-text-2) !important;
+  }
+  .mat-step-label-selected {
+    color: var(--df-text) !important;
   }
   .mat-expansion-panel-body {
     background-color: mat.get-color-from-palette(
@@ -95,21 +96,16 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   .mat-mdc-select-disabled {
     color: #a3a1a1 !important;
   }
-  // Button
+  // Button: shared departure treatment — the tokens are already re-tuned
+  // for dark under .dark-theme, so both classes just ride them.
   .save-btn {
-    background-color: mat.get-color-from-palette(
-      $df-purple-palette,
-      600
-    ) !important;
-    color: mat.get-color-from-palette($df-purple-palette, 700) !important;
+    background-color: var(--df-accent) !important;
+    color: var(--df-accent-contrast) !important;
   }
   .cancel-btn {
-    background-color: mat.get-color-from-palette(
-      $df-purple-palette,
-      1002
-    ) !important;
-    color: mat.get-color-from-palette($df-purple-palette, 200) !important;
-    border: 1px solid mat.get-color-from-palette($df-purple-palette, 200) !important;
+    background-color: transparent !important;
+    color: var(--df-text-2) !important;
+    border: 1px solid var(--df-border) !important;
   }
   .copy-btn {
     color: white !important;

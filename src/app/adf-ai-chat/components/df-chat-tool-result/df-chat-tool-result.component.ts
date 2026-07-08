@@ -54,15 +54,15 @@ import { ChatMessage } from '../../types/chat';
   styles: [
     `
       .tool-card {
-        border: 1px solid var(--chat-border);
-        border-radius: 8px;
+        border: 1px solid var(--chat-border-2);
+        border-radius: var(--df-radius-sm);
         background: var(--chat-surface);
         overflow: hidden;
-        font-size: 14px;
+        font-size: 1.35rem;
 
         &--error {
-          border-color: rgba(220, 53, 69, 0.4);
-          background: rgba(220, 53, 69, 0.06);
+          border-color: var(--df-danger-border);
+          background: var(--df-danger-soft);
         }
 
         &__header {
@@ -89,11 +89,11 @@ import { ChatMessage } from '../../types/chat';
         }
 
         &__icon {
-          color: #60a5fa;
+          color: var(--df-accent);
         }
 
         &--error &__icon {
-          color: #ff6b6b;
+          color: var(--df-danger);
         }
 
         &__title {
@@ -101,21 +101,24 @@ import { ChatMessage } from '../../types/chat';
           font-weight: 600;
         }
 
+        // !important on badge/latency: dark-style.scss forces span color
+        // to white under .dark-theme; tokens keep these AA in both themes.
         &__badge {
           font-size: 11px;
           font-weight: 700;
           padding: 0.125rem 0.4rem;
-          border-radius: 3px;
-          background: rgba(220, 53, 69, 0.25);
-          color: #ff8585;
+          border-radius: 4px;
+          background: var(--df-danger-soft);
+          border: 1px solid var(--df-danger-border);
+          color: var(--df-danger) !important;
           text-transform: uppercase;
-          letter-spacing: 0.04em;
+          letter-spacing: 0.06em;
         }
 
         &__latency {
           margin-left: auto;
           font-size: 12px;
-          color: var(--chat-text-muted);
+          color: var(--chat-text-muted) !important;
         }
 
         &__body {
