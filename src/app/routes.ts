@@ -326,6 +326,11 @@ export const routes: Routes = [
             resolve: {
               data: apiDocResolver,
             },
+            // Angular reuses this component when navigating between services;
+            // re-run the resolver on every :name change so the doc (and the
+            // component's serviceName / token pickers) refresh for the new
+            // service instead of showing the previously-loaded one.
+            runGuardsAndResolvers: 'paramsChange',
           },
         ],
         providers: [provideTranslocoScope('apiDocs')],

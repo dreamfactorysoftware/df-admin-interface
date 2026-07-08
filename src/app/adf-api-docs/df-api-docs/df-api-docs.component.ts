@@ -225,28 +225,14 @@ export class DfApiDocsComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    this.serviceName = this.activatedRoute.snapshot.params['name'];
-
-    if (this.serviceName) {
-      this.subscriptions.push(
-        this.http
-          .get<ServiceResponse>(
-            `${BASE_URL}/system/service?filter=name=${this.serviceName}`
-          )
-          .pipe(
-            map(response => response?.resource?.[0]?.id || -1),
-            tap(id => {
-              if (id !== -1) {
-                this.currentServiceService.setCurrentServiceId(id);
-              }
-            })
-          )
-          .subscribe()
-      );
-    }
-
     this.subscriptions.push(
       this.activatedRoute.data.subscribe(({ data }) => {
+        // Read the current service on EVERY navigation, not once: Angular
+        // reuses this component across /api-docs/:name changes, so a snapshot
+        // read in ngOnInit went stale and the token pickers kept introspecting
+        // the previously-loaded service's tables/fields/procs.
+        this.serviceName = this.activatedRoute.snapshot.params['name'];
+        this.resolveServiceId();
         if (data) {
           this.apiDocJson = data;
           this.buildOperations();
@@ -274,6 +260,29 @@ export class DfApiDocsComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.subscriptions.forEach(sub => sub.unsubscribe());
+  }
+
+  // Resolve the current service's id for the api-key loader. Runs on every
+  // navigation so a service switch re-scopes the keys too.
+  private resolveServiceId(): void {
+    if (!this.serviceName) {
+      return;
+    }
+    this.subscriptions.push(
+      this.http
+        .get<ServiceResponse>(
+          `${BASE_URL}/system/service?filter=name=${this.serviceName}`
+        )
+        .pipe(
+          map(response => response?.resource?.[0]?.id || -1),
+          tap(id => {
+            if (id !== -1) {
+              this.currentServiceService.setCurrentServiceId(id);
+            }
+          })
+        )
+        .subscribe()
+    );
   }
 
   // ---- spec -> operations -------------------------------------------------
