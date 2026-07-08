@@ -1,11 +1,16 @@
 .error-detail {
-  font-size: 13px;
+  font-size: 1.3rem;
   color: var(--df-text-2);
 
+  // Expander toggle speaks in the shared micro-header voice.
   summary {
     cursor: pointer;
-    color: var(--df-text-muted);
     user-select: none;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--df-text-muted);
 
     &:hover {
       color: var(--df-text);
@@ -41,10 +46,11 @@
     margin: 8px 0;
     padding: 8px 12px;
     border: 1px solid var(--df-border);
-    border-radius: 4px;
+    border-radius: var(--df-radius-sm);
     background-color: var(--df-code-bg);
     color: var(--df-code-text);
-    font-size: 12px;
+    font-size: 1.2rem;
+    font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
     white-space: pre-wrap;
     word-break: break-all;
   }

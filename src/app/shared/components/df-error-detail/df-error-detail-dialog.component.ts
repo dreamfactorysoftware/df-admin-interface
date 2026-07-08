@@ -16,11 +16,12 @@ import { DfErrorDetailComponent } from './df-error-detail.component';
       </df-error-detail>
     </mat-dialog-content>
     <mat-dialog-actions align="end">
-      <button mat-button mat-dialog-close type="button">
+      <button mat-button mat-dialog-close class="cancel-btn" type="button">
         {{ 'close' | transloco }}
       </button>
     </mat-dialog-actions>
   `,
+  styleUrls: ['./df-error-detail-dialog.component.scss'],
   standalone: true,
   imports: [
     MatDialogModule,

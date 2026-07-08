@@ -11,6 +11,7 @@ import { ConfirmDialogData } from '../../types/dialog';
 @Component({
   selector: 'df-confirm-dialog',
   templateUrl: './df-confirm-dialog.component.html',
+  styleUrls: ['./df-confirm-dialog.component.scss'],
   standalone: true,
   imports: [MatDialogModule, MatButtonModule, TranslocoPipe],
 })
