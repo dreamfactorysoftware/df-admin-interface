@@ -110,6 +110,9 @@
   "noFilterResults": "No results match your filter.",
   "clearFilter": "Clear filter",
   "retry": "Retry",
+  "skeleton": {
+    "loading": "Loading content"
+  },
   "emptyState": {
     "services": {
       "message": "Services connect DreamFactory to a database, file store, or remote API so you can generate a secure REST API from it.",
