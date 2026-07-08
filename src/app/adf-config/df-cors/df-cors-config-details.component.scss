@@ -1,0 +1,11 @@
+// Departure treatment: in-form section header on the exemplar type
+// scale. Tokens only, all three themes inherit.
+.df-cors-config-container {
+  h4 {
+    margin: 8px 0 4px;
+    font-size: 1.5rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--df-text);
+  }
+}
