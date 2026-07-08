@@ -1,0 +1,32 @@
+<div class="empty-state" role="status">
+  <div class="empty-state__icon" *ngIf="icon" aria-hidden="true">
+    <mat-icon>{{ icon }}</mat-icon>
+  </div>
+  <ng-content select="[emptyStateIcon]"></ng-content>
+
+  <h3 class="empty-state__title">{{ title }}</h3>
+  <p class="empty-state__description" *ngIf="description">{{ description }}</p>
+
+  <div class="empty-state__actions" *ngIf="actionLabel || secondaryLabel">
+    <button
+      *ngIf="actionLabel"
+      mat-flat-button
+      color="primary"
+      type="button"
+      data-testid="empty-state-action"
+      (click)="action.emit()">
+      <mat-icon *ngIf="actionIcon">{{ actionIcon }}</mat-icon>
+      {{ actionLabel }}
+    </button>
+    <button
+      *ngIf="secondaryLabel"
+      mat-stroked-button
+      type="button"
+      data-testid="empty-state-secondary"
+      (click)="secondaryAction.emit()">
+      {{ secondaryLabel }}
+    </button>
+  </div>
+
+  <ng-content select="[emptyStateSnippet]"></ng-content>
+</div>
