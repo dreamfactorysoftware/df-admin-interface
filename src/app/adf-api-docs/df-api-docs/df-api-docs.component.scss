@@ -1,3 +1,31 @@
+/* ============================================================
+   API docs screen, stream 8 "departure" rollout.
+   Tokens only: every color rides var(--df-*) so light, dark and
+   phosphor all come free. Swagger-scoped embed styling lives in
+   the bounded block at the END of src/styles.scss.
+
+   SCROLL CONTRACT (punch item 9 - keep this or the recurring
+   "cannot scroll with docs open" bug comes back):
+   - Page scrolling is owned by .mat-drawer-content (the shell).
+     The shell's .content-wrapper is height-capped (height: 100%),
+     so this screen's content reaches the scroller only by
+     overflowing that wrapper with overflow VISIBLE all the way up.
+   - Therefore: NEVER put height, max-height, overflow, overflow-x
+     or contain on :host or any full-page wrapper in this
+     component. Even overflow-x: auto forces overflow-y to auto
+     and turns the wrapper into a nested scroller (or a clip),
+     which kills page scroll.
+   - Wide swagger content (pre/code) scrolls horizontally inside
+     its own blocks instead - see the swagger token block in
+     src/styles.scss.
+   ============================================================ */
+
+:host {
+  /* Angular host elements default to display:inline; block gives the
+     docs page a sane box so the overflow chain above stays predictable. */
+  display: block;
+}
+
 .api-doc-button-container {
   display: flex;
   justify-content: space-between;
@@ -23,7 +51,7 @@
 
     .key-preview {
       font-size: 0.85em;
-      color: rgba(0, 0, 0, 0.6);
+      color: var(--df-text-muted);
       font-family: monospace;
     }
   }
@@ -42,30 +70,34 @@
   margin-top: 16px;
 }
 
+/* Health banner: flat bordered card on the shared corner scale with a
+   status-colored spine. Status tokens are AA against --df-surface in
+   every theme; text stays on the normal emphasis ladder. */
 .api-health-banner {
   display: flex;
   align-items: center;
-  padding: 8px 12px;
-  border-radius: 4px;
-  border-left-width: 4px;
+  padding: 10px 14px;
+  border: 1px solid var(--df-border);
+  border-left-width: 3px;
   border-left-style: solid;
+  border-radius: var(--df-radius-sm);
+  background-color: var(--df-surface-2);
+  color: var(--df-text);
 
   p {
     margin: 0;
-    font-size: 0.9em;
+    font-size: 1.3rem;
   }
 
   &.status-healthy {
-    border-left-color: #28a745;
-    background-color: #e9f5ec;
-    color: #155724;
+    border-left-color: var(--df-success);
+    background-color: var(--df-success-soft);
   }
 
   &.status-unhealthy,
   &.status-error {
-    border-left-color: #dc3545;
-    background-color: #f8d7da;
-    color: #721c24;
+    border-left-color: var(--df-danger);
+    background-color: var(--df-danger-soft);
   }
 
   &.status-unhealthy {
@@ -86,17 +118,18 @@
           flex-shrink: 0;
           padding: 2px 8px;
           line-height: normal;
-          font-size: 0.9em;
+          font-size: 1.2rem;
           min-width: auto;
+          color: var(--df-danger);
         }
       }
 
       .unhealthy-error-details {
-        margin-top: 0;
+        margin-top: 8px;
         padding: 8px 12px;
-        background-color: rgba(0, 0, 0, 0.03);
-        border: 1px solid rgba(0, 0, 0, 0.06);
-        border-radius: 4px;
+        background-color: var(--df-code-bg);
+        border: 1px solid var(--df-border-2);
+        border-radius: var(--df-radius-sm);
         width: 100%;
         box-sizing: border-box;
         max-height: 150px;
@@ -106,24 +139,33 @@
           margin: 0;
           white-space: pre-wrap;
           word-break: break-word;
-          font-size: 0.85em;
-          color: inherit;
+          font-size: 1.2rem;
+          color: var(--df-code-text);
         }
       }
     }
   }
 
   &.status-loading {
-    border-left-color: #007bff;
-    background-color: #e7f3ff;
-    color: #004085;
+    border-left-color: var(--df-accent);
+    background-color: var(--df-accent-soft);
   }
 
+  /* --df-warning only exists in phosphor (amber is reserved for warnings
+     there); light/dark fall back to a neutral notice. No literals. */
   &.status-warning {
-    border-left-color: #ffc107;
-    background-color: #fff3cd;
-    color: #856404;
+    border-left-color: var(--df-warning, var(--df-text-faint));
   }
+}
+
+/* Expand-schema toggle row (classes replace old inline styles). */
+.expand-schema-row {
+  margin: 16px 0 8px 0;
+}
+.expand-schema-hint {
+  font-size: 1.2rem;
+  color: var(--df-text-muted);
+  margin-left: 40px;
 }
 
 // Styles for elements within Swagger UI, piercing encapsulation

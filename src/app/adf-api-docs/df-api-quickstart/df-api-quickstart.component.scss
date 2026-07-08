@@ -1,12 +1,20 @@
+/* Quickstart panel, stream 8 "departure": tokens only so all three
+   themes (light/dark/phosphor) come free. */
+
 mat-expansion-panel-header {
   padding: 0 12px;
 }
+/* curl commands read as console panels: dark in every theme by design
+   (--df-code-bg/--df-code-text stay dark-on-light and dark-on-dark). */
 .curl-command-text {
   white-space: pre;
   font-family: monospace;
-  font-size: 0.9em;
+  font-size: 1.25rem;
   margin: 0;
-  color: var(--df-text);
+  padding: 10px 12px;
+  background-color: var(--df-code-bg);
+  color: var(--df-code-text);
+  border-radius: var(--df-radius-sm);
   overflow-x: auto;
 }
 
@@ -21,7 +29,7 @@ mat-expansion-panel-header {
 
 .curl-command-title {
   margin: 0;
-  font-weight: bold;
+  font-weight: 600;
 }
 
 .curl-command-note {
@@ -36,28 +44,33 @@ mat-expansion-panel-header {
     }
   }
 
+  /* Method chips: soft token washes instead of swagger's literal palette.
+     GET rides the accent, POST success, DELETE danger; PUT/PATCH stay
+     neutral (no amber token outside phosphor). */
   span[class^='method-'] {
-    font-weight: bold;
+    font-weight: 600;
     font-family: monospace;
     padding: 2px 6px;
-    border-radius: 4px;
-    color: white;
+    border-radius: var(--df-radius-sm);
+    border: 1px solid var(--df-border);
+    background-color: var(--df-surface-2);
+    color: var(--df-text-2);
   }
 
   .method-get {
-    background-color: #61affe; // blue
+    background-color: var(--df-accent-soft);
+    border-color: var(--df-accent);
+    color: var(--df-accent);
   }
   .method-post {
-    background-color: #49cc90; // green
-  }
-  .method-put {
-    background-color: #fca130; // orange
-  }
-  .method-patch {
-    background-color: #fca130; // orange
+    background-color: var(--df-success-soft);
+    border-color: var(--df-success-border);
+    color: var(--df-success);
   }
   .method-delete {
-    background-color: #f93e3e; // red
+    background-color: var(--df-danger-soft);
+    border-color: var(--df-danger-border);
+    color: var(--df-danger);
   }
 }
 

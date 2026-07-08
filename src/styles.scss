@@ -467,3 +467,395 @@ a {
     overflow: hidden !important;
   }
 }
+
+/* swagger tokens - stream8-rollout(api-docs) */
+/* ------------------------------------------------------------
+   Departure-language restyle of the swagger-ui embed (API Docs).
+   Swagger-scoped selectors ONLY. Tokens only: light, dark and
+   phosphor all ride var(--df-*).
+   Cascade notes:
+   - swagger-ui.css loads AFTER styles.scss (angular.json styles
+     order), so every rule is prefixed with `body` to outrank
+     swagger's own selectors without blanket !importants.
+   - The few !importants below defend text colors against
+     dark-style.scss's blanket `span/button { color: white
+     !important }` (punch item 8); relax them when that rule dies.
+   - NEVER add overflow/height to .swagger-ui itself: page scroll
+     depends on this content overflowing the shell's height-capped
+     .content-wrapper (see df-api-docs.component.scss).
+   ------------------------------------------------------------ */
+
+/* base: inherit Inter and ride the text ladder */
+body .swagger-ui {
+  color: var(--df-text);
+  font-family: inherit;
+}
+body .swagger-ui .info .title,
+body .swagger-ui .info h1,
+body .swagger-ui .info h2,
+body .swagger-ui .info h3,
+body .swagger-ui .info h4,
+body .swagger-ui .info h5,
+body .swagger-ui .info li,
+body .swagger-ui .info p,
+body .swagger-ui .info table,
+body .swagger-ui .opblock .opblock-summary-path,
+body .swagger-ui .opblock .opblock-summary-operation-id,
+body .swagger-ui .parameter__name,
+body .swagger-ui table thead tr td,
+body .swagger-ui .response-col_status,
+body .swagger-ui .responses-inner h4,
+body .swagger-ui .responses-inner h5,
+body .swagger-ui .opblock-section-header label,
+body .swagger-ui .model,
+body .swagger-ui .model-title,
+body .swagger-ui section.models h4,
+body .swagger-ui section.models h5,
+body .swagger-ui .dialog-ux .modal-ux-header h3,
+body .swagger-ui .dialog-ux .modal-ux-content h4,
+body .swagger-ui .dialog-ux .modal-ux-content p,
+body .swagger-ui .auth-container label,
+body .swagger-ui .checkbox p,
+body .swagger-ui label {
+  color: var(--df-text);
+}
+body .swagger-ui .opblock .opblock-summary-description,
+body .swagger-ui .opblock-description-wrapper p,
+body .swagger-ui .opblock-external-docs-wrapper p,
+body .swagger-ui .opblock-title_normal p,
+body .swagger-ui .renderedMarkdown p,
+body .swagger-ui .markdown p,
+body .swagger-ui .markdown li,
+body .swagger-ui .tab li,
+body .swagger-ui .response-col_links,
+body .swagger-ui .scheme-container .schemes > label,
+body .swagger-ui .servers > label {
+  color: var(--df-text-2);
+}
+body .swagger-ui .info .base-url,
+body .swagger-ui .parameter__type,
+body .swagger-ui .parameter__extension,
+body .swagger-ui .prop-format,
+body .swagger-ui .servers-title,
+body .swagger-ui .response-col_status .response-undocumented {
+  color: var(--df-text-muted);
+}
+body .swagger-ui .parameter__in {
+  color: var(--df-text-faint);
+}
+body .swagger-ui .parameter__name.required::after,
+body .swagger-ui .parameter__name.required span {
+  color: var(--df-danger);
+}
+body .swagger-ui .info a {
+  color: var(--df-accent);
+}
+body .swagger-ui .prop-type {
+  color: var(--df-accent);
+}
+
+/* type hierarchy: the page banner already carries the service name,
+   so the embedded spec title steps down to section scale */
+body .swagger-ui .info {
+  margin: 24px 0;
+}
+body .swagger-ui .info .title {
+  font-size: 2rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+body .swagger-ui .info .title small {
+  background-color: var(--df-surface-2);
+  border: 1px solid var(--df-border);
+  border-radius: var(--df-radius-sm);
+  top: -2px;
+}
+body .swagger-ui .info .title small pre {
+  color: var(--df-text-2);
+  background: transparent;
+  font-family: inherit;
+}
+body .swagger-ui .info .title small.version-stamp {
+  background-color: var(--df-accent-soft);
+  border-color: var(--df-accent);
+}
+body .swagger-ui .info .title small.version-stamp pre.version {
+  color: var(--df-accent) !important;
+}
+
+/* section micro-headers: 11px uppercase letterspaced, per the language */
+body .swagger-ui .opblock-tag {
+  font-size: 1.1rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--df-text-muted);
+  border-bottom: 1px solid var(--df-border-2);
+  padding: 8px 0;
+}
+body .swagger-ui .opblock-tag small {
+  font-size: 1.1rem;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--df-text-muted);
+}
+body .swagger-ui table thead tr th,
+body .swagger-ui .opblock .opblock-section-header h4,
+body .swagger-ui .opblock .opblock-section-header > label {
+  font-size: 1.1rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--df-text-muted);
+  border-bottom-color: var(--df-border);
+}
+
+/* opblocks: flat bordered cards on the shared corner scale, no
+   method-tinted washes, no shadows */
+body .swagger-ui .opblock,
+body .swagger-ui .opblock.opblock-get,
+body .swagger-ui .opblock.opblock-post,
+body .swagger-ui .opblock.opblock-put,
+body .swagger-ui .opblock.opblock-patch,
+body .swagger-ui .opblock.opblock-delete,
+body .swagger-ui .opblock.opblock-head,
+body .swagger-ui .opblock.opblock-options {
+  background-color: var(--df-surface);
+  border: 1px solid var(--df-border);
+  border-radius: var(--df-radius-sm);
+  box-shadow: none;
+  margin: 0 0 8px;
+}
+body .swagger-ui .opblock .opblock-summary,
+body .swagger-ui .opblock.opblock-get .opblock-summary,
+body .swagger-ui .opblock.opblock-post .opblock-summary,
+body .swagger-ui .opblock.opblock-put .opblock-summary,
+body .swagger-ui .opblock.opblock-patch .opblock-summary,
+body .swagger-ui .opblock.opblock-delete .opblock-summary,
+body .swagger-ui .opblock.opblock-head .opblock-summary,
+body .swagger-ui .opblock.opblock-options .opblock-summary {
+  border-color: var(--df-border-2);
+  min-height: 44px;
+  padding: 4px 10px;
+}
+body .swagger-ui .opblock .opblock-section-header {
+  box-shadow: none;
+  border-bottom: 1px solid var(--df-border-2);
+  min-height: 44px;
+}
+/* swagger paints a heavy literal focus ring on every mouse click;
+   keep the ring for keyboard focus only and ride the accent */
+body .swagger-ui .opblock-summary-control:focus {
+  outline: none;
+}
+body .swagger-ui .opblock-summary-control:focus-visible {
+  outline: 2px solid var(--df-accent);
+  outline-offset: -2px;
+}
+
+/* method chips: soft token washes. GET rides the accent, POST success,
+   DELETE danger, the rest neutral (no amber token outside phosphor). */
+body .swagger-ui .opblock .opblock-summary-method {
+  background-color: var(--df-surface-2);
+  border: 1px solid var(--df-border);
+  border-radius: var(--df-radius-sm);
+  color: var(--df-text-2) !important;
+  font-weight: 600;
+  text-shadow: none;
+  min-width: 72px;
+}
+body .swagger-ui .opblock.opblock-get .opblock-summary-method {
+  background-color: var(--df-accent-soft);
+  border-color: var(--df-accent);
+  color: var(--df-accent) !important;
+}
+body .swagger-ui .opblock.opblock-post .opblock-summary-method {
+  background-color: var(--df-success-soft);
+  border-color: var(--df-success-border);
+  color: var(--df-success) !important;
+}
+body .swagger-ui .opblock.opblock-delete .opblock-summary-method {
+  background-color: var(--df-danger-soft);
+  border-color: var(--df-danger-border);
+  color: var(--df-danger) !important;
+}
+
+/* tables: hairline separators, comfortable rows */
+body .swagger-ui table thead tr th,
+body .swagger-ui table thead tr td {
+  border-bottom: 1px solid var(--df-border);
+  padding: 12px 0;
+}
+body .swagger-ui .parameters-col_description input,
+body .swagger-ui .parameters-col_description select {
+  max-width: 340px;
+}
+
+/* forms: token surfaces, hairline borders, shared corner scale */
+body .swagger-ui input[type='text'],
+body .swagger-ui input[type='password'],
+body .swagger-ui input[type='search'],
+body .swagger-ui input[type='email'],
+body .swagger-ui input[type='file'],
+body .swagger-ui textarea {
+  background-color: var(--df-surface);
+  color: var(--df-text);
+  border: 1px solid var(--df-border);
+  border-radius: var(--df-radius-sm);
+  box-shadow: none;
+}
+body .swagger-ui select {
+  background-color: var(--df-surface);
+  color: var(--df-text);
+  border: 1px solid var(--df-border);
+  border-radius: var(--df-radius-sm);
+  box-shadow: none;
+  /* swagger ships a black svg arrow that vanishes on dark surfaces;
+     the native arrow follows color-scheme in every theme */
+  appearance: auto;
+  -webkit-appearance: auto;
+  background-image: none;
+}
+body .swagger-ui input[disabled],
+body .swagger-ui select[disabled],
+body .swagger-ui textarea[disabled] {
+  background-color: var(--df-surface-2);
+  color: var(--df-text-muted);
+  border-color: var(--df-border-2);
+}
+body .swagger-ui textarea.curl {
+  background-color: var(--df-code-bg);
+  color: var(--df-code-text);
+}
+
+/* buttons: quiet bordered secondaries, accent-solid execute */
+body .swagger-ui .btn {
+  background-color: transparent;
+  border: 1px solid var(--df-border);
+  border-radius: var(--df-radius-sm);
+  color: var(--df-text-2) !important;
+  box-shadow: none;
+  font-weight: 600;
+}
+body .swagger-ui .btn:hover {
+  box-shadow: none;
+  border-color: var(--df-text-faint);
+}
+body .swagger-ui .btn.execute {
+  background-color: var(--df-accent);
+  border-color: var(--df-accent);
+  color: var(--df-accent-contrast) !important;
+}
+body .swagger-ui .btn.cancel {
+  border-color: var(--df-danger-border);
+  color: var(--df-danger) !important;
+}
+body .swagger-ui .btn.authorize {
+  border-color: var(--df-accent);
+  color: var(--df-accent) !important;
+}
+body .swagger-ui .btn.authorize span {
+  color: var(--df-accent) !important;
+}
+body .swagger-ui .btn.authorize svg {
+  fill: currentColor;
+}
+body .swagger-ui .download-contents {
+  background-color: var(--df-accent);
+  color: var(--df-accent-contrast) !important;
+  border-radius: var(--df-radius-sm);
+}
+body .swagger-ui .authorization__btn svg,
+body .swagger-ui .expand-methods svg,
+body .swagger-ui .expand-operation svg,
+body .swagger-ui .opblock-tag svg,
+body .swagger-ui section.models h4 svg {
+  fill: var(--df-text-muted);
+}
+
+/* code/console panels stay dark in every theme by design */
+body .swagger-ui .opblock-body pre,
+body .swagger-ui .opblock-body pre.microlight,
+body .swagger-ui .highlight-code pre,
+body .swagger-ui .curl-command pre,
+body .swagger-ui .request-url pre,
+body .swagger-ui .responses-inner pre {
+  background-color: var(--df-code-bg) !important;
+  color: var(--df-code-text);
+  border-radius: var(--df-radius-sm);
+  /* wide payloads scroll inside their own block, never the page */
+  overflow-x: auto;
+}
+body .swagger-ui .renderedMarkdown code,
+body .swagger-ui .markdown code {
+  background-color: var(--df-surface-2);
+  color: var(--df-text);
+  border-radius: var(--df-radius-sm);
+}
+
+/* servers / schemes strip: quiet, borderless-card treatment */
+body .swagger-ui .scheme-container {
+  background-color: transparent;
+  box-shadow: none;
+  border-top: 1px solid var(--df-border-2);
+  border-bottom: 1px solid var(--df-border-2);
+  padding: 16px 0;
+  margin: 0 0 20px;
+}
+
+/* models: flat bordered cards */
+body .swagger-ui section.models {
+  border: 1px solid var(--df-border-2);
+  border-radius: var(--df-radius);
+}
+body .swagger-ui section.models.is-open h4 {
+  border-bottom: 1px solid var(--df-border-2);
+}
+body .swagger-ui section.models .model-container,
+body .swagger-ui .model-box {
+  background-color: var(--df-surface-2);
+  border-radius: var(--df-radius-sm);
+}
+
+/* authorize dialog: token surfaces */
+body .swagger-ui .dialog-ux .modal-ux {
+  background-color: var(--df-surface);
+  border: 1px solid var(--df-border);
+  border-radius: var(--df-radius);
+  box-shadow: none;
+}
+body .swagger-ui .dialog-ux .modal-ux-header {
+  border-bottom: 1px solid var(--df-border-2);
+}
+body .swagger-ui .dialog-ux .modal-ux-content h4,
+body .swagger-ui .dialog-ux .modal-ux-content section,
+body .swagger-ui .auth-container,
+body .swagger-ui .auth-container code {
+  color: var(--df-text);
+}
+body .swagger-ui .dialog-ux .modal-ux-header .close-modal {
+  background: transparent;
+}
+
+/* errors: danger tokens */
+body .swagger-ui .errors-wrapper {
+  background-color: var(--df-danger-soft);
+  border: 1px solid var(--df-danger-border);
+  border-radius: var(--df-radius-sm);
+}
+body .swagger-ui .errors-wrapper .errors h4,
+body .swagger-ui .errors-wrapper .error-wrapper,
+body .swagger-ui .errors-wrapper hgroup h4 {
+  color: var(--df-danger);
+}
+
+/* loading spinner rides the accent */
+body .swagger-ui .loading-container .loading::after {
+  border-color: var(--df-border);
+  border-top-color: var(--df-accent);
+}
+body .swagger-ui .loading-container .loading::before {
+  border-color: var(--df-border);
+  border-top-color: var(--df-accent);
+}
+/* end swagger tokens */

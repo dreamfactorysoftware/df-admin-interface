@@ -1,6 +1,4 @@
-<div
-  class="api-doc-button-container"
-  style="display: flex; align-items: center; gap: 16px">
+<div class="api-doc-button-container">
   <button class="cancel-btn" mat-raised-button (click)="goBackToList()">
     {{ 'goBack' | transloco }}
   </button>
@@ -96,14 +94,13 @@
     [serviceName]="serviceName"></df-api-quickstart>
   <div
     *ngIf="apiDocJson?.info?.group === 'Database'"
-    style="margin: 16px 0 8px 0">
+    class="expand-schema-row">
     <mat-slide-toggle
       [(ngModel)]="expandSchema"
       (ngModelChange)="reloadApiDocs()">
       Populate table/field names in API docs
     </mat-slide-toggle>
-    <div
-      style="font-size: 12px; color: var(--df-text-muted); margin-left: 40px">
+    <div class="expand-schema-hint">
       When enabled, the API documentation will include live table and field
       names from your database. (May be slow for large databases)
     </div>
