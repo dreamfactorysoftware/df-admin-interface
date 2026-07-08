@@ -1,0 +1,93 @@
+<ng-container *transloco="let t; read: 'scopeMap'">
+  <section class="scope-map" data-testid="df-scope-map">
+    <!-- No identity wired -->
+    <df-empty-state
+      *ngIf="!resolved"
+      icon="link_off"
+      [title]="t('unresolvedTitle')"
+      [description]="t('unresolvedHint')">
+    </df-empty-state>
+
+    <!-- Loading -->
+    <div *ngIf="resolved && loading" class="scope-map__loading">
+      <df-skeleton variant="block" [count]="3"></df-skeleton>
+    </div>
+
+    <!-- No reach: role grants nothing -->
+    <df-empty-state
+      *ngIf="resolved && !loading && groups.length === 0"
+      icon="shield"
+      [title]="t('emptyTitle')"
+      [description]="t('emptyHint')">
+    </df-empty-state>
+
+    <!-- Resolved reach: one panel per service -->
+    <mat-accordion
+      *ngIf="resolved && !loading && groups.length > 0"
+      class="scope-map__accordion"
+      multi>
+      <mat-expansion-panel
+        *ngFor="let g of groups; trackBy: trackByGroup"
+        class="scope-map__panel">
+        <mat-expansion-panel-header>
+          <mat-panel-title class="scope-map__title">
+            <df-badge
+              [variant]="g.allow ? 'success' : 'danger'"
+              [label]="g.allow ? t('allow') : t('deny')">
+            </df-badge>
+            <span class="scope-map__service">{{ g.serviceLabel }}</span>
+          </mat-panel-title>
+          <mat-panel-description class="scope-map__desc">
+            <df-badge
+              [variant]="g.allInherited ? 'neutral' : 'accent'"
+              [dot]="false"
+              [label]="g.allInherited ? t('inherited') : t('explicit')">
+            </df-badge>
+            <span class="scope-map__count">{{
+              t('grantCount', { count: g.entries.length })
+            }}</span>
+          </mat-panel-description>
+        </mat-expansion-panel-header>
+
+        <ul class="scope-map__entries">
+          <li
+            *ngFor="let e of g.entries; trackBy: trackByEntry"
+            class="scope-map__entry">
+            <span
+              class="scope-map__state"
+              [class.scope-map__state--allow]="e.allow"
+              [class.scope-map__state--deny]="!e.allow"
+              [attr.aria-label]="e.allow ? t('allow') : t('deny')">
+              <span class="scope-map__dot" aria-hidden="true"></span>
+            </span>
+            <span class="scope-map__target" [title]="e.component">{{
+              e.target
+            }}</span>
+            <span class="scope-map__verbs">
+              <span
+                *ngFor="let v of e.verbs"
+                class="scope-map__verb"
+                [class.scope-map__verb--filtered]="e.scope === 'filtered'"
+                >{{ v }}</span
+              >
+              <span *ngIf="e.verbs.length === 0" class="scope-map__verb-none">{{
+                t('noVerbs')
+              }}</span>
+            </span>
+            <span
+              *ngIf="e.scope === 'filtered'"
+              class="scope-map__scope-tag"
+              [title]="t('filteredHint')"
+              >{{ t('filtered') }}</span
+            >
+            <df-badge
+              [variant]="e.source === 'inherited' ? 'neutral' : 'accent'"
+              [dot]="false"
+              [label]="e.source === 'inherited' ? t('inherited') : t('explicit')">
+            </df-badge>
+          </li>
+        </ul>
+      </mat-expansion-panel>
+    </mat-accordion>
+  </section>
+</ng-container>

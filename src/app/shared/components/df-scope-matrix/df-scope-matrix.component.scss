@@ -1,0 +1,139 @@
+// df-scope-matrix — roles x verbs grid. Tokens only; no color/space/type
+// literals so cells resolve in light, dark, and phosphor. Cell fill is the
+// status trio: --df-success (full) / --df-warning (filtered) / --df-text-muted
+// (none). Dots ride a ~14% alpha wash of the same hue, like df-badge.
+:host {
+  display: block;
+}
+
+.scope-matrix {
+  display: flex;
+  flex-direction: column;
+  gap: var(--df-space-4);
+
+  &__loading {
+    padding: var(--df-space-2) 0;
+  }
+
+  // ---- the grid ----
+  &__grid {
+    display: flex;
+    flex-direction: column;
+    gap: var(--df-space-1);
+    overflow-x: auto;
+    padding-bottom: var(--df-space-1);
+  }
+
+  &__row {
+    display: grid;
+    // role label + 5 verb columns
+    grid-template-columns: minmax(12rem, 1.4fr) repeat(5, minmax(4.4rem, 1fr));
+    align-items: center;
+    gap: var(--df-space-2);
+    min-width: 40rem;
+
+    &--head {
+      padding-bottom: var(--df-space-1);
+      border-bottom: 1px solid var(--df-border-2);
+    }
+  }
+
+  &__corner {
+    font-size: var(--df-font-size-xs);
+    font-weight: var(--df-font-weight-heading);
+    color: var(--df-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  &__verb {
+    justify-self: center;
+    font-size: var(--df-font-size-xs);
+    font-weight: var(--df-font-weight-heading);
+    color: var(--df-text-2);
+    letter-spacing: 0.02em;
+  }
+
+  &__role {
+    font-size: var(--df-font-size-sm);
+    color: var(--df-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  // ---- a cell: a clickable dot ----
+  &__cell {
+    justify-self: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.8rem;
+    height: 2.8rem;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: var(--df-radius-sm);
+    background: transparent;
+    cursor: pointer;
+    transition: background-color 120ms ease, border-color 120ms ease;
+
+    &:hover:not(:disabled) {
+      background: var(--df-hover);
+      border-color: var(--df-border);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--df-accent);
+      outline-offset: 1px;
+    }
+
+    &:disabled {
+      cursor: default;
+    }
+  }
+
+  // ---- the dot itself (shared with legend) ----
+  &__dot {
+    width: 1.2rem;
+    height: 1.2rem;
+    border-radius: 50%;
+    display: inline-block;
+    flex: none;
+    background: var(--df-text-muted);
+    box-shadow: 0 0 0 0.3rem transparent;
+  }
+
+  &__cell--full &__dot,
+  &__dot--full {
+    background: var(--df-success);
+    box-shadow: 0 0 0 0.3rem var(--df-success-soft);
+  }
+
+  &__cell--filtered &__dot,
+  &__dot--filtered {
+    background: var(--df-warning);
+    box-shadow: 0 0 0 0.3rem var(--df-warning-soft);
+  }
+
+  &__cell--none &__dot,
+  &__dot--none {
+    background: var(--df-text-faint);
+    box-shadow: none;
+  }
+
+  // ---- legend ----
+  &__legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--df-space-4);
+    padding-top: var(--df-space-1);
+  }
+
+  &__legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--df-space-2);
+    font-size: var(--df-font-size-xs);
+    color: var(--df-text-muted);
+  }
+}
