@@ -4,25 +4,25 @@
   margin: 0 auto;
 }
 
-// ponytail: #424242 mat-card dark bg predates --df-surface (#1c1b21); kept to
-// avoid a visual shift. Fold into a token if cards get restyled.
+// Stream 8 restyle: dark cards now ride the shared surface token.
 :host-context(.dark-theme) {
   .loading-card,
   .error-card {
-    background-color: #424242;
+    background-color: var(--df-surface);
   }
 
   .performance-card,
   .storage-card {
-    background-color: #424242;
+    background-color: var(--df-surface);
     color: var(--df-text);
   }
 }
 
 .dashboard-title {
-  font-size: 24px;
-  font-weight: 500;
-  margin-bottom: 24px;
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  margin-bottom: 20px;
   color: var(--df-text);
 }
 

@@ -7,27 +7,27 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
 .dark-theme {
   // Font
   .breadcrumb-link > span {
-    color: mat.get-color-from-palette($df-purple-palette, 500) !important;
+    color: var(--df-text-2) !important;
   }
 
   // Divider
   .mat-divider {
-    border-color: white !important;
+    border-color: var(--df-border) !important;
   }
   .system-info-container
     .system-info-instance
     .system-info-packages
     .package-header {
-    border-bottom-color: white !important;
+    border-bottom-color: var(--df-border) !important;
   }
   .system-info-container .system-info-instance .system-info-packages {
-    border-left-color: white !important;
+    border-left-color: var(--df-border) !important;
   }
 
   // Step
   .mat-stepper-horizontal {
     background-color: mat.get-color-from-palette($df-purple-palette, 1002);
-    border: 1px solid white;
+    border: 1px solid var(--df-border);
   }
   .mat-step-icon {
     background-color: mat.get-color-from-palette($df-purple-palette, 300);
@@ -45,23 +45,16 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
     ) !important;
   }
   .mat-stepper-horizontal-line {
-    border-top-color: white;
+    border-top-color: var(--df-border);
   }
 
   .mat-step-label {
     color: white !important;
   }
-  .parent-route,
   .mat-expansion-panel-body {
     background-color: mat.get-color-from-palette(
       $df-purple-palette,
       1003
-    ) !important;
-  }
-  .nav-item .active > .mdc-button__label > .mat-mdc-button-touch-target {
-    background-color: mat.get-color-from-palette(
-      $df-purple-palette,
-      700
     ) !important;
   }
   // Radio Button
@@ -136,7 +129,7 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
       1002
     ) !important;
     color: white !important;
-    border: 1px solid white !important;
+    border: 1px solid var(--df-border) !important;
   }
   .mat-mdc-card-header {
     background-color: mat.get-color-from-palette(
@@ -154,7 +147,8 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
       $df-purple-palette,
       1002
     ) !important;
-    border: 1px soild white !important;
+    // No border here: this also matches the side-nav's expansion panels,
+    // which the always-dark shell styles itself (accordions get theirs below).
     color: white !important;
   }
   .mat-expansion-panel-header {
@@ -162,7 +156,7 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   }
 
   .mat-accordion .mat-expansion-panel {
-    border: 1px solid white !important;
+    border: 1px solid var(--df-border) !important;
   }
   .mat-expansion-panel-header-title,
   .mat-expansion-indicator::after {
@@ -186,13 +180,13 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
           1002
         ) !important;
         color: white !important;
-        border-color: white !important;
+        border-color: var(--df-border) !important;
       }
     }
     .mat-mdc-row {
       .mat-mdc-cell {
         color: white !important;
-        border-color: white !important;
+        border-color: var(--df-border) !important;
       }
     }
     .action-btn {
@@ -232,7 +226,7 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
 
   .swagger-ui .scheme-container {
     background-color: mat.get-color-from-palette($df-purple-palette, 1002);
-    border: 1px solid white;
+    border: 1px solid var(--df-border);
     color: white;
   }
   .swagger-ui .model-toggle::after {
@@ -246,6 +240,6 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
       $df-purple-palette,
       1002
     ) !important;
-    border: 1px solid white;
+    border: 1px solid var(--df-border);
   }
 }

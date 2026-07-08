@@ -1,12 +1,14 @@
 @use '@angular/material' as mat;
 @use 'src/theme' as theme;
-$df-purple-palette: mat.define-palette(theme.$df-purple-palette);
 $red-palette: mat.define-palette(mat.$red-palette);
 
-.logo {
-  height: 40px;
-  cursor: pointer;
-}
+// ============================================================
+// App shell, stream 8 "departure" direction.
+// Sidebar: always dark (var(--df-shell-*), theme-invariant).
+// Top bar + content canvas: follow the light/dark theme via
+// the global --df-* tokens. No hardcoded palette values here
+// except the logged-out marketing panel's brand navy.
+// ============================================================
 
 .app-container {
   height: 100%;
@@ -15,65 +17,133 @@ $red-palette: mat.define-palette(mat.$red-palette);
   flex-direction: column;
 }
 
-.mat-toolbar {
-  background-color: #f6f2fa;
-  padding: 16px;
-  min-height: 72px;
+/* ---------------- Top bar ---------------- */
+
+.mat-toolbar.tool-bar {
+  background-color: var(--df-surface);
+  border-bottom: 1px solid var(--df-border-2);
+  padding: 0 12px 0 6px;
+  height: 52px;
+  min-height: 52px;
   display: flex;
   align-items: center;
+  gap: 10px;
+  font-size: 1.3rem;
 
   .button-wrapper {
     display: flex;
     align-items: center;
-    gap: 16px;
-    img {
-      margin-bottom: -4px;
+  }
+
+  .toggle-icon {
+    color: var(--df-text-muted);
+    font-size: 1.4rem;
+  }
+}
+
+.topbar-breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 1.3rem;
+
+  .breadcrumb-link {
+    color: var(--df-text-muted);
+    text-decoration: none;
+    border-radius: 4px;
+
+    &:hover {
+      color: var(--df-text);
     }
   }
 
-  .search-bar {
-    margin-left: 24px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
+  .breadcrumb-current {
+    color: var(--df-text);
+    font-weight: 600;
+  }
+
+  .breadcrumb-sep {
+    color: var(--df-text-faint);
+    user-select: none;
+  }
+}
+
+// Command-palette-style search affordance (opens the existing search dialog).
+.cmdk-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  min-width: 200px;
+  padding: 0 10px;
+  border: 1px solid var(--df-border);
+  border-radius: var(--df-radius-sm);
+  background-color: var(--df-surface-2);
+  color: var(--df-text-muted) !important;
+  font-family: inherit;
+  font-size: 1.25rem;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+
+  &:hover,
+  &:focus-visible {
+    border-color: var(--df-accent);
+    color: var(--df-text-2) !important;
+  }
+
+  .cmdk-icon {
+    font-size: 1.2rem;
+  }
+
+  .cmdk-label {
     flex: 1 1 auto;
-    border: 1px solid #ebe7ef;
-    border-radius: 50px;
-    background-color: #ebe7ef;
-    overflow: hidden;
-    width: 300px;
-    height: 50px;
-    font-size: 24px;
+    text-align: left;
   }
-  .search-input {
-    border: none;
-    background-color: #ebe7ef;
-    color: #47464f;
-    font-size: 20px;
-    &:focus {
-      outline: none;
-    }
+
+  .cmdk-kbd {
+    font-size: 1rem;
+    line-height: 1;
+    padding: 3px 5px;
+    border: 1px solid var(--df-border);
+    border-radius: 4px;
+    background-color: var(--df-surface);
+    color: var(--df-text-faint) !important;
+    letter-spacing: 0.03em;
   }
-  .search-icon {
-    color: #47464f;
-    padding-left: 14px;
-  }
+}
+
+.profile-icon {
+  color: var(--df-text-2);
 }
 
 .app-container.small {
   .mat-toolbar {
-    gap: 8px;
-    min-height: 56px;
+    gap: 6px;
+    height: 52px;
+    min-height: 52px;
     overflow: hidden;
-    padding: 8px;
+    padding: 0 8px;
 
     .button-wrapper {
-      gap: 8px;
       min-width: 0;
     }
 
-    .search-bar {
+    .topbar-breadcrumbs {
       display: none;
+    }
+
+    .cmdk-btn {
+      min-width: 0;
+
+      .cmdk-label,
+      .cmdk-kbd {
+        display: none;
+      }
     }
 
     .spacer {
@@ -97,36 +167,19 @@ $red-palette: mat.define-palette(mat.$red-palette);
   }
 }
 
-.search-btn {
-  font-size: 1.6rem;
-  font-weight: 400;
-  height: 46px;
-  background: none;
-  border: none;
-  padding: 0 16px;
-  font-family: var(--mat-expansion-header-text-font);
-  color: var(--mat-expansion-container-text-color);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-
-  span {
-    margin-left: 6px;
-  }
-}
-
-.profile-icon {
-  color: #0f0761;
-}
+/* ---------------- Sidebar ---------------- */
 
 .sidenav-container {
-  background-color: #f6f2fa;
+  background-color: var(--df-bg);
   flex: 1 1 auto;
+
   .sidenav {
+    // Logged-out marketing panel keeps the brand navy.
     background-color: #0f0761;
     min-width: 40%;
     border: none;
-    transition: min-width 0.3s ease-out;
+    border-right: 1px solid var(--df-shell-border);
+    transition: min-width 0.2s ease-out;
     max-width: 450px;
 
     .login-side-container {
@@ -161,176 +214,136 @@ $red-palette: mat.define-palette(mat.$red-palette);
     .small & {
       min-width: 0;
     }
+    // Logged-in shell: slim, always dark, fixed width.
     .logged-in & {
-      min-width: 20%;
-      background-color: #f6f2fa;
+      background-color: var(--df-shell-bg);
+      width: 248px;
+      min-width: 248px;
+      max-width: 248px;
     }
     .logged-in.small & {
-      min-width: 40%;
+      width: 272px;
+      min-width: 272px;
+      max-width: 272px;
     }
-    .parent-route {
-      font-size: 1.6rem;
-      font-weight: 400;
-      height: 48px;
-      padding: 0 16px;
-      gap: 4px;
-      background: #f6f2fa;
-    }
-    ::ng-deep {
-      .mat-expansion-panel-body {
-        padding: 0 0 0 16px !important;
-        background: #f6f2fa;
-      }
-    }
-    .nav-item {
-      // background-color: #f6f2fa;
-      height: 48px;
-      width: 100%;
-      font-size: 1.6rem;
-      font-weight: 400;
-      border-radius: 0;
-      justify-content: left;
+
+    .shell-brand {
       display: flex;
       align-items: center;
-      gap: 6px;
-      ::ng-deep .mat-mdc-button-touch-target {
-        background-color: #f6f2fa;
+      height: 52px;
+      padding: 0 18px;
+      border-bottom: 1px solid var(--df-shell-border);
+
+      .shell-brand-link {
+        display: flex;
+        align-items: center;
       }
 
-      // Special styling for AI navigation item
-      &.ai-nav-item {
-        position: relative;
-        overflow: hidden;
+      .shell-brand-logo {
+        height: 20px;
+        width: auto;
+        display: block;
+      }
+    }
 
-        &::before {
-          content: '';
-          position: absolute;
-          top: 0;
-          left: -100%;
-          width: 100%;
-          height: 100%;
-          background: linear-gradient(
-            90deg,
-            transparent,
-            rgba(220, 20, 60, 0.15),
-            rgba(255, 69, 0, 0.15),
-            rgba(255, 165, 0, 0.15),
-            rgba(50, 205, 50, 0.15),
-            rgba(30, 144, 255, 0.15),
-            rgba(138, 43, 226, 0.15),
-            transparent
-          );
-          animation: rainbow-slide 3s ease-in-out infinite;
-        }
+    .shell-nav {
+      padding: 8px 0 16px;
+    }
 
-        span {
-          background: linear-gradient(
-            45deg,
-            #dc143c,
-            #ff4500,
-            #ffa500,
-            #32cd32,
-            #1e90ff,
-            #8a2be2
-          );
-          background-size: 300% 300%;
-          -webkit-background-clip: text;
-          background-clip: text;
-          -webkit-text-fill-color: transparent;
-          animation: rainbow-text 2s ease-in-out infinite;
-          font-weight: 700;
-          text-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
-          filter: drop-shadow(0 0 8px rgba(0, 0, 0, 0.2));
-        }
+    .shell-group-label {
+      padding: 18px 18px 6px;
+      font-size: 1.05rem;
+      font-weight: 600;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      color: var(--df-shell-text-muted);
+      user-select: none;
+    }
+
+    .parent-route {
+      font-size: 1.35rem;
+      font-weight: 500;
+      height: 36px;
+      margin: 1px 10px;
+      padding: 0 8px;
+      gap: 4px;
+      border-radius: var(--df-radius-sm);
+      background: transparent !important;
+      color: var(--df-shell-text-2);
+
+      &:hover {
+        background: var(--df-shell-hover) !important;
+      }
+    }
+
+    .expansion-panel,
+    ::ng-deep .mat-expansion-panel {
+      background: transparent !important;
+      color: var(--df-shell-text-2);
+    }
+
+    // Tree line for nested items, Linear-style.
+    ::ng-deep .mat-expansion-panel-body {
+      padding: 2px 0 4px 10px !important;
+      margin-left: 20px;
+      border-left: 1px solid var(--df-shell-border);
+      background: transparent !important;
+    }
+
+    ::ng-deep .mat-expansion-indicator::after {
+      color: var(--df-shell-text-muted);
+    }
+
+    .nav-item {
+      height: 34px;
+      width: 100%;
+      font-size: 1.35rem;
+      font-weight: 500;
+      border-radius: var(--df-radius-sm);
+      justify-content: flex-start;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--df-shell-text-2) !important;
+      letter-spacing: 0;
+
+      img {
+        width: 17px;
+        height: 17px;
+        // Force any icon artwork to crisp white on the dark shell.
+        filter: brightness(0) invert(1);
+        opacity: 0.72;
+      }
+
+      ::ng-deep .mat-mdc-button-touch-target {
+        background-color: transparent;
+      }
+    }
+
+    a.nav-item {
+      background-color: transparent;
+      margin: 1px 10px;
+      width: calc(100% - 20px);
+      padding: 0 8px;
+
+      &:hover {
+        background-color: var(--df-shell-hover);
+      }
+
+      &.active {
+        background-color: var(--df-shell-active-bg) !important;
+        color: var(--df-shell-text) !important;
+        box-shadow: inset 2px 0 0 var(--df-shell-accent);
 
         img {
-          filter: hue-rotate(0deg) saturate(2) brightness(0.8) contrast(1.3);
-          animation: rainbow-icon 4s linear infinite;
-          drop-shadow: 0 0 6px rgba(0, 0, 0, 0.3);
+          opacity: 1;
         }
 
-        &:hover {
-          &::before {
-            animation-duration: 1s;
-          }
-
-          span {
-            animation-duration: 1s;
-          }
-
-          img {
-            animation-duration: 2s;
-          }
-        }
-      }
-
-      @keyframes rainbow-slide {
-        0% {
-          left: -100%;
-        }
-        50% {
-          left: 100%;
-        }
-        100% {
-          left: -100%;
-        }
-      }
-
-      @keyframes rainbow-text {
-        0%,
-        100% {
-          background-position: 0% 50%;
-        }
-        50% {
-          background-position: 100% 50%;
-        }
-      }
-
-      @keyframes rainbow-icon {
-        0% {
-          filter: hue-rotate(0deg) saturate(2) brightness(0.8) contrast(1.3)
-            drop-shadow(0 0 6px rgba(220, 20, 60, 0.4));
-        }
-        16.66% {
-          filter: hue-rotate(60deg) saturate(2.2) brightness(0.7) contrast(1.4)
-            drop-shadow(0 0 6px rgba(255, 69, 0, 0.4));
-        }
-        33.33% {
-          filter: hue-rotate(120deg) saturate(2.4) brightness(0.6) contrast(1.5)
-            drop-shadow(0 0 6px rgba(255, 165, 0, 0.4));
-        }
-        50% {
-          filter: hue-rotate(180deg) saturate(2.2) brightness(0.7) contrast(1.4)
-            drop-shadow(0 0 6px rgba(50, 205, 50, 0.4));
-        }
-        66.66% {
-          filter: hue-rotate(240deg) saturate(2) brightness(0.8) contrast(1.3)
-            drop-shadow(0 0 6px rgba(30, 144, 255, 0.4));
-        }
-        83.33% {
-          filter: hue-rotate(300deg) saturate(2.2) brightness(0.7) contrast(1.4)
-            drop-shadow(0 0 6px rgba(138, 43, 226, 0.4));
-        }
-        100% {
-          filter: hue-rotate(360deg) saturate(2) brightness(0.8) contrast(1.3)
-            drop-shadow(0 0 6px rgba(220, 20, 60, 0.4));
-        }
-      }
-      &.active {
         ::ng-deep .mat-mdc-button-touch-target {
-          background-color: #e3dfff;
-          border-top-right-radius: 50px;
-          border-bottom-right-radius: 50px;
+          background-color: transparent !important;
         }
-        background-color: #e3dfff !important;
-        border-top-right-radius: 50px;
-        border-bottom-right-radius: 50px;
-        border-top-left-radius: 0;
-        width: 95%;
       }
-      .expansion-panel {
-        background-color: #f6f2fa;
-      }
+
       &.commercial-feature {
         opacity: 0.7;
         position: relative;
@@ -339,13 +352,15 @@ $red-palette: mat.define-palette(mat.$red-palette);
           content: '';
           background-image: url('~src/assets/img/lock-icon.svg');
           background-size: contain;
-          width: 14px;
-          height: 14px;
+          background-repeat: no-repeat;
+          filter: brightness(0) invert(1);
+          width: 13px;
+          height: 13px;
           position: absolute;
-          right: 12px;
+          right: 10px;
           top: 50%;
           transform: translateY(-50%);
-          opacity: 0.6;
+          opacity: 0.55;
         }
 
         &:hover {
@@ -358,40 +373,56 @@ $red-palette: mat.define-palette(mat.$red-palette);
       }
     }
   }
+
+  /* ---------------- Content canvas ---------------- */
+
   .sidenav-content {
     display: flex;
     flex-direction: column;
     height: 100%;
-    padding: 8px 20px 24px;
-    background: #f6f2fa;
+    padding: 0;
+    background: var(--df-bg);
+
     .content-wrapper {
       height: 100%;
-      padding: 2px;
-      border: 1px solid #f6f2fa;
-      background-color: #f6f2fa;
-      border-radius: 6px !important;
+      display: flex;
+      flex-direction: column;
+      padding: 20px 28px 28px;
+      background-color: transparent;
+      border: none;
     }
+
     .banner {
       flex-shrink: 0;
       width: 100%;
-      padding-bottom: 40px;
-      background-color: #fff;
+      padding: 2px 2px 16px;
+      background-color: transparent;
+
       .page-header {
-        padding: 32px 16px 0 16px;
+        margin: 0;
+        padding: 0;
+        font-size: 2.2rem;
+        font-weight: 650;
+        letter-spacing: -0.02em;
+        line-height: 1.2;
+        color: var(--df-text);
       }
     }
+
     .main {
       flex-grow: 1;
+
       &.no-error {
         .logged-in & {
-          margin-top: -60px;
-          padding: 16px 20px;
-          background-color: white;
+          margin-top: 0;
+          padding: 20px 24px;
+          background-color: var(--df-surface);
+          border: 1px solid var(--df-border-2);
+          border-radius: var(--df-radius);
         }
         .logged-in.small & {
           margin: 0;
-          margin-top: -60px;
-          padding: 16px 20px;
+          padding: 16px;
         }
       }
     }
@@ -403,18 +434,12 @@ $red-palette: mat.define-palette(mat.$red-palette);
     .mat-expansion-panel-header {
       padding: 0 8px;
     }
-    .mat-expansion-panel-body {
-      padding: 0 8px 8px 8px !important;
-    }
   }
 }
 
 ::ng-deep {
   .mat-expansion-panel-body {
     overflow-x: auto;
-  }
-  .mat-expansion-panel {
-    background: #f6f2fa;
   }
 }
 
@@ -433,87 +458,4 @@ $red-palette: mat.define-palette(mat.$red-palette);
 .breadcrumb-link {
   color: inherit;
   text-decoration: none;
-}
-
-// Dark styles key off the .dark-theme class DfThemeService stamps on <body>.
-// :host-context is required: these rules are component-scoped, so a bare
-// .dark-theme descendant selector would never match the body class.
-:host-context(.dark-theme) {
-  .tool-bar,
-  .sidenav-container,
-  .sidenav,
-  .nav-item,
-  .expansion-panel {
-    background-color: mat.get-color-from-palette(
-      $df-purple-palette,
-      1003
-    ) !important;
-  }
-
-  .parent-route {
-    background-color: mat.get-color-from-palette(
-      $df-purple-palette,
-      1003
-    ) !important;
-  }
-
-  .nav-item {
-    ::ng-deep .mat-mdc-button-touch-target {
-      background-color: mat.get-color-from-palette(
-        $df-purple-palette,
-        1003
-      ) !important;
-    }
-  }
-  .nav-item {
-    &.active {
-      ::ng-deep .mat-mdc-button-touch-target {
-        background-color: mat.get-color-from-palette(
-          $df-purple-palette,
-          600
-        ) !important;
-      }
-      ::ng-deep .mdc-button__label > span {
-        background-color: mat.get-color-from-palette(
-          $df-purple-palette,
-          600
-        ) !important;
-      }
-    }
-
-    img {
-      filter: invert(1) !important;
-    }
-  }
-  .banner,
-  .main {
-    background-color: mat.get-color-from-palette(
-      $df-purple-palette,
-      1002
-    ) !important;
-    color: var(--df-text);
-    .page-header {
-      color: mat.get-color-from-palette($df-purple-palette, 10) !important;
-    }
-  }
-  .sidenav-content {
-    background-color: mat.get-color-from-palette(
-      $df-purple-palette,
-      1003
-    ) !important;
-    color: var(--df-text);
-    .page-header {
-      color: mat.get-color-from-palette($df-purple-palette, 10) !important;
-    }
-  }
-
-  .content-wrapper {
-    padding: 2px;
-    border: 1px solid mat.get-color-from-palette($df-purple-palette, 1001) !important;
-    background-color: mat.get-color-from-palette(
-      $df-purple-palette,
-      1002
-    ) !important;
-    border-radius: 6px !important;
-  }
 }

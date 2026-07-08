@@ -12,10 +12,6 @@ const filteredFromNav = [
   ROUTES.VIEW,
   ROUTES.ERROR,
   ROUTES.LICENSE_EXPIRED,
-  // Hidden from the left menu for the demo (routes still resolve via deep link).
-  ROUTES.API_BUILDER,
-  ROUTES.ALERTS,
-  ROUTES.AGENTS,
 ];
 
 const navIcons = [
@@ -25,6 +21,9 @@ const navIcons = [
   'api-connections',
   'api-security',
   'system-settings',
+  'api-builder',
+  'agents',
+  'alerts',
 ];
 
 export function transformRoutes(routes: Routes, root = ''): Array<Nav> {
