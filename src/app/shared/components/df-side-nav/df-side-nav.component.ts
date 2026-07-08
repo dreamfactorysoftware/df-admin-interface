@@ -206,19 +206,21 @@ export class DfSideNavComponent implements OnInit {
           claimed.add(item);
           return true;
         });
+    // Labels are transloco keys (nav.pillars.* in en.json); the template
+    // pipes them through | transloco.
     const groups = [
       { label: '', items: pick([ROUTES.HOME]) },
       {
-        label: 'Build',
+        label: 'nav.pillars.build',
         items: pick([ROUTES.API_CONNECTIONS]),
       },
-      { label: 'Secure & Manage', items: pick([ROUTES.API_SECURITY]) },
+      { label: 'nav.pillars.secureManage', items: pick([ROUTES.API_SECURITY]) },
       {
-        label: 'AI Gateway',
+        label: 'nav.pillars.aiGateway',
         items: pick([ROUTES.AI]),
       },
       {
-        label: 'System',
+        label: 'nav.pillars.system',
         items: pick([ROUTES.SYSTEM_SETTINGS, ROUTES.ADMIN_SETTINGS]),
       },
       { label: '', items: nav.filter(item => !claimed.has(item)) },
@@ -237,12 +239,30 @@ export class DfSideNavComponent implements OnInit {
     return crumbs.length ? crumbs[crumbs.length - 1] : undefined;
   }
 
+  /** Punch 5: detail pages publish their entity label keyed by URL
+   * (DfSnackbarService.setPageLabel); prefer it over a raw dynamic URL
+   * segment (e.g. the numeric service id) for the H1. URL keying means a
+   * stale label can never title another page. */
+  get pageLabelOverride(): string | undefined {
+    const crumb = this.currentCrumb;
+    if (!crumb || crumb.translationKey) {
+      return undefined;
+    }
+    const override = this.snackbarService.pageLabel$.value;
+    return override && override.url === this.router.url
+      ? override.label
+      : undefined;
+  }
+
   logout() {
     this.authService.logout();
   }
 
   isActive(nav: Nav) {
-    return this.router.url.startsWith(nav.path);
+    // Redirect-backed items (linkPath, e.g. API Builder) must match on
+    // their destination URL: the redirect's own path never appears in
+    // router.url, so matching nav.path alone can never highlight them.
+    return this.router.url.startsWith(nav.linkPath ?? nav.path);
   }
 
   // Nav routes are static, so the label key is computed once per route

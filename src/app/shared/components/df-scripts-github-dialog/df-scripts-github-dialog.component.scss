@@ -1,0 +1,20 @@
+// Departure language pass: dialog title on the shared type scale,
+// tokened actions row. Field chrome comes from the global Material
+// overrides in styles.scss.
+
+h1[mat-dialog-title] {
+  font-size: 1.8rem;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  color: var(--df-text);
+}
+
+[mat-dialog-content] {
+  min-width: min(480px, 80vw);
+}
+
+[mat-dialog-actions] {
+  gap: 8px;
+  padding: 8px 24px 16px;
+  justify-content: flex-end;
+}

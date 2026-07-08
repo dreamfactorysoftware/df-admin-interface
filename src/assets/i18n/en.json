@@ -157,6 +157,12 @@
     "nextStepFooter": {"header": "Next Step:", "body": "Scroll below to explore generated endpoints that allow you to read, write, and filter your data via REST"}
   },
   "nav": {
+    "pillars": {
+      "build": "Build",
+      "secureManage": "Secure & Manage",
+      "aiGateway": "AI Gateway",
+      "system": "System"
+    },
     "alerts": {
       "nav": "Alerts",
       "header": "{{nav.alerts.nav}}"
