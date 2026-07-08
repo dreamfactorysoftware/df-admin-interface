@@ -32,6 +32,8 @@ export interface PaletteItem {
   path: string;
   /** Extra tokens folded into the fuzzy match (type, synonyms). */
   keywords?: string;
+  /** Satisfies CDK ListKeyManagerOption; never set (no item is disabled). */
+  disabled?: boolean;
 }
 
 export interface PaletteGroup {

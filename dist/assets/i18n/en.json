@@ -44,6 +44,24 @@
   "sortedAsc": "Sorted ascending",
   "sortedDesc": "Sorted descending",
   "search": "Search",
+  "commandPalette": {
+    "placeholder": "Search or jump to anything",
+    "noResults": "Nothing matches that.",
+    "groups": {
+      "actions": "Actions",
+      "services": "Services",
+      "roles": "Roles",
+      "keys": "Keys",
+      "mcp": "MCP servers",
+      "docs": "Go to",
+      "recent": "Recent",
+      "suggested": "Likely next"
+    },
+    "foot": {
+      "navigate": "Navigate",
+      "select": "Open"
+    }
+  },
   "newEntry": "Create a new entry",
   "clearLimitCounter": "Clear limit counter",
   "clearLimitCounters": "Clear limit counters",
@@ -178,6 +196,44 @@
   "githubFile": "Github Import",
   "schema": "Schema",
   "apiDocs": "API docs",
+  "filterBuilder": {
+    "title": "Filter",
+    "mode": {
+      "visual": "Build",
+      "raw": "Raw",
+      "aria": "Filter input mode"
+    },
+    "conj": {
+      "and": "And",
+      "or": "Or",
+      "aria": "Join conditions with"
+    },
+    "field": "Field",
+    "operator": "Operator",
+    "value": "Value",
+    "valueList": "Values (comma-separated)",
+    "rawLabel": "Filter string",
+    "rawPlaceholder": "(age > 21) and (status = 'active')",
+    "addCondition": "Add condition",
+    "removeRow": "Remove condition",
+    "clear": "Clear",
+    "op": {
+      "eq": "equals",
+      "neq": "not equals",
+      "gt": "greater than",
+      "gte": "greater or equal",
+      "lt": "less than",
+      "lte": "less or equal",
+      "like": "like",
+      "contains": "contains",
+      "startsWith": "starts with",
+      "endsWith": "ends with",
+      "in": "in",
+      "notIn": "not in",
+      "isNull": "is null",
+      "isNotNull": "is not null"
+    }
+  },
   "searchFeatures": "Search Features",
   "scriptType": "Script Type",
   "scriptTypes": {
@@ -999,6 +1055,47 @@
       "emptyAlerts": {
         "title": "No agent alerts yet",
         "message": "Agent actions appear here once df-alerts is configured with a channel."
+      }
+    }
+  },
+  "pipelineStrip": {
+    "view": "View",
+    "addPolicy": "Add policy",
+    "error": {
+      "title": "Pipeline unavailable",
+      "hint": "The request chain could not be derived. Reload to try again."
+    },
+    "status": {
+      "active": "Active",
+      "filtered": "Filtered",
+      "open": "Open",
+      "handler": "Generated"
+    },
+    "nodes": {
+      "key": {
+        "title": "API key",
+        "detail": "{{count}} keys can authenticate a request.",
+        "empty": "No key exists. Nothing can call this service yet."
+      },
+      "role": {
+        "title": "Role gate",
+        "detail": "{{count}} roles grant access to this service.",
+        "empty": "No role grants access. Requests are denied at the gate."
+      },
+      "rate": {
+        "title": "Rate limit",
+        "detail": "{{rate}} requests per {{period}}.",
+        "empty": "Unmetered. Requests are not capped."
+      },
+      "filter": {
+        "title": "Field filter",
+        "detail": "{{count}} grants narrow the rows or fields returned.",
+        "empty": "No field filters. Roles reach whole tables."
+      },
+      "handler": {
+        "title": "Generated handler",
+        "detail": "{{type}} REST API, generated from the schema.",
+        "empty": "REST API, generated from the schema."
       }
     }
   }

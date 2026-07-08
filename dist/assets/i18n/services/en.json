@@ -91,5 +91,11 @@
       "hint": "This is everything the role reaches, not just this service. Grants marked inherited come from a wildcard rule; explicit grants target one service. Edit the role to change what agents and keys under it can touch.",
       "close": "Close"
     }
+  },
+  "pipeline": {
+    "eyebrow": "Pipeline",
+    "title": "The request pipeline",
+    "description": "The ordered chain every request runs before it reaches your data. Each step deep-links to the config that governs it.",
+    "hint": "Derived live from keys, roles, and limits. Open steps are policies you have not set yet."
   }
 }
