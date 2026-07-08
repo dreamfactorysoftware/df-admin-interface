@@ -1,3 +1,10 @@
+// Auth screens (login, register, forgot password, password reset),
+// "departure" language: flat bordered card on the theme canvas (--df-bg),
+// tokens only, so light, dark, and phosphor all render legibly. The global
+// .mat-mdc-card rule (src/styles.scss) supplies radius/no-shadow; this
+// file must not re-add elevation or a 4px shape on top of it. The old
+// dark-only container repaint is gone: the card carries its own surface
+// tokens in every theme now.
 .user-management-card-container {
   display: flex;
   flex-direction: column;
@@ -9,17 +16,46 @@
     margin: 0 auto;
     min-width: 300px;
     max-width: 445px;
-    box-shadow: var(--mdc-elevated-card-container-elevation);
-    --mdc-elevated-card-container-shape: 4px;
-    --mdc-outlined-card-container-shape: 4px;
+    // !important on surface/text: dark-style.scss repaints .mat-mdc-card
+    // with a palette literal + white text (!important) under .dark-theme;
+    // the departure card must sit on the theme tokens in all three themes.
+    background: var(--df-surface) !important;
+    color: var(--df-text) !important;
+    border: 1px solid var(--df-border) !important;
+    border-radius: var(--df-radius);
+    box-shadow: none !important;
+    --mdc-elevated-card-container-shape: var(--df-radius);
+    --mdc-outlined-card-container-shape: var(--df-radius);
     --mdc-outlined-card-outline-width: 1px;
+
     mat-card-header {
       padding-bottom: 16px;
+      // dark-style.scss paints .mat-mdc-card-header with a palette literal;
+      // the header rides the card surface here.
+      background: transparent !important;
+    }
+    mat-card-title {
+      color: var(--df-text);
+      font-size: 1.8rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+    mat-divider {
+      border-top-color: var(--df-border-2);
     }
     mat-card-content {
       padding-top: 16px;
       .services-section {
         padding-top: 32px;
+        // OAuth / SAML dividers get the section micro-header treatment.
+        h3 {
+          color: var(--df-text-muted);
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 0.06em;
+          margin: 0 0 8px;
+          text-transform: uppercase;
+        }
         .services-container {
           display: flex;
           flex-wrap: wrap;
@@ -35,18 +71,14 @@
     .action-links {
       display: flex;
       justify-content: flex-end;
+
+      a {
+        color: var(--df-accent);
+      }
     }
   }
 }
 
 .user-management-card-container {
   margin-top: 20vh;
-
-  /* Keys off the body-level .dark-theme stamp (DfThemeService); the
-     per-template [class] stamp is gone. Tokens reproduce the old
-     hardcoded dark values (#1e1e1e/#fff). */
-  :host-context(.dark-theme) & {
-    background-color: var(--df-surface);
-    color: var(--df-text);
-  }
 }
