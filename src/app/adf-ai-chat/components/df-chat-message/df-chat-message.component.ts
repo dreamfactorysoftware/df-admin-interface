@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faRobot, faUser } from '@fortawesome/free-solid-svg-icons';
@@ -8,6 +8,12 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
 @Component({
   selector: 'df-chat-message',
   standalone: true,
+  // OnPush is safe here: the parent never mutates a ChatMessage in place —
+  // messages always arrive as fresh objects from the API poll (or a fresh
+  // optimistic object), so the `message` input reference changes whenever
+  // content changes. This confines the 1s poll-tick re-render to messages
+  // whose input identity actually changed.
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, FontAwesomeModule, DfChatToolResultComponent],
   template: `
     <ng-container [ngSwitch]="message.role">
@@ -30,7 +36,7 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
         </div>
         <div class="msg__bubble">
           <ng-container *ngIf="message.content">
-            <ng-container *ngFor="let seg of segments">
+            <ng-container *ngFor="let seg of segments; trackBy: trackSeg">
               <pre
                 *ngIf="seg.type === 'code'"
                 class="msg__code"><code>{{ seg.text }}</code></pre>
@@ -39,7 +45,9 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
           </ng-container>
           <p *ngIf="!message.content" class="msg__empty">(no text response)</p>
           <div *ngIf="hasToolCalls" class="msg__tool-calls">
-            <div *ngFor="let tc of message.tool_calls" class="msg__tool-call">
+            <div
+              *ngFor="let tc of message.tool_calls; trackBy: trackToolCall"
+              class="msg__tool-call">
               <div class="msg__tool-call-head">
                 <span class="msg__tool-call-name">{{ tc.name }}</span>
                 <span *ngIf="tc.service" class="msg__tool-call-service">{{
@@ -243,8 +251,27 @@ export class DfChatMessageComponent {
     return !!(this.message.tool_calls && this.message.tool_calls.length);
   }
 
+  /** Memo for argsText: JSON parse/stringify per template evaluation (it is
+   *  called twice per tool call per CD cycle) is a CD storm during the chat
+   *  poll. Keyed on the ToolCall object, revalidated on its `arguments`
+   *  reference so a replaced payload recomputes. */
+  private argsCache = new WeakMap<
+    ToolCall,
+    { args: ToolCall['arguments']; text: string }
+  >();
+
   /** Pretty-print a tool call's arguments; empty string when there are none. */
   argsText(tc: ToolCall): string {
+    const cached = this.argsCache.get(tc);
+    if (cached && cached.args === tc.arguments) {
+      return cached.text;
+    }
+    const text = this.computeArgsText(tc);
+    this.argsCache.set(tc, { args: tc.arguments, text });
+    return text;
+  }
+
+  private computeArgsText(tc: ToolCall): string {
     const a = tc.arguments;
     if (a == null) {
       return '';
@@ -266,6 +293,16 @@ export class DfChatMessageComponent {
     return JSON.stringify(a, null, 2);
   }
 
+  trackToolCall(i: number, tc: ToolCall): string | number {
+    return tc.id ?? i;
+  }
+
+  /** Segments carry no id; index-based tracking keeps existing <p>/<pre>
+   *  DOM nodes alive when the memoized array is rebuilt on content growth. */
+  trackSeg(i: number): number {
+    return i;
+  }
+
   get hasUsage(): boolean {
     return (
       this.message.input_tokens != null ||
@@ -274,12 +311,30 @@ export class DfChatMessageComponent {
     );
   }
 
+  /** Memo for segments: without it the getter returned a fresh array of
+   *  fresh objects per CD cycle, so the default *ngFor differ destroyed and
+   *  rebuilt every <p>/<pre> on every tick of the 1s chat poll. Keyed on
+   *  message.content, which is the getter's only input. */
+  private segCache: {
+    content: string;
+    segs: Array<{ type: 'text' | 'code'; text: string }>;
+  } | null = null;
+
   /**
    * Split assistant content into text + fenced-code segments. Pure-text
    * binding only — no innerHTML, so there is no XSS surface.
    */
   get segments(): Array<{ type: 'text' | 'code'; text: string }> {
-    const c = this.message.content ?? '';
+    const content = this.message.content ?? '';
+    if (this.segCache?.content !== content) {
+      this.segCache = { content, segs: this.computeSegments(content) };
+    }
+    return this.segCache.segs;
+  }
+
+  private computeSegments(
+    c: string
+  ): Array<{ type: 'text' | 'code'; text: string }> {
     if (!c) {
       return [];
     }

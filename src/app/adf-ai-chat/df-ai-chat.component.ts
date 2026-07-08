@@ -315,6 +315,13 @@ export class DfAiChatComponent implements OnInit, OnDestroy {
         if (this.activeSession?.id !== sessionId) {
           return;
         }
+        // Skip the reassignment when the payload hasn't changed since the
+        // last tick — otherwise every 1s poll replaces activeSession and
+        // rebuilds this.sessions, forcing the whole transcript through
+        // change detection for nothing.
+        if (this.sessionUnchanged(this.activeSession, session)) {
+          return;
+        }
         this.activeSession = session;
         // Keep the sidebar entry in sync so its stats (tool-call count,
         // token totals, title) reflect the just-completed turn — otherwise
@@ -370,5 +377,33 @@ export class DfAiChatComponent implements OnInit, OnDestroy {
 
   trackMsg(_: number, m: ChatMessage): number | string {
     return m.id ?? m.created_at ?? _;
+  }
+
+  trackServiceName(_: number, s: ChatService): string {
+    return s.name;
+  }
+
+  trackRoleId(_: number, r: { id: number }): number {
+    return r.id;
+  }
+
+  /** Cheap same-payload check for the poll loop: message count, session
+   *  timestamp, and the tail message's content/tool-call count. Anything
+   *  the assistant streams in changes at least one of these. */
+  private sessionUnchanged(prev: ChatSession, next: ChatSession): boolean {
+    const prevMsgs = prev.messages ?? [];
+    const nextMsgs = next.messages ?? [];
+    if (prevMsgs.length !== nextMsgs.length) {
+      return false;
+    }
+    if (prev.updated_at !== next.updated_at || prev.title !== next.title) {
+      return false;
+    }
+    const a = prevMsgs[prevMsgs.length - 1];
+    const b = nextMsgs[nextMsgs.length - 1];
+    return (
+      (a?.content ?? '') === (b?.content ?? '') &&
+      (a?.tool_calls?.length ?? 0) === (b?.tool_calls?.length ?? 0)
+    );
   }
 }

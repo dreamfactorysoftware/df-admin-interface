@@ -47,7 +47,7 @@ const DATA_GROUPS = new Set(['Database', 'Big Data', 'File', 'Excel']);
       </div>
 
       <ul *ngIf="!loading && services.length > 0" class="data-services__list">
-        <li *ngFor="let s of services">
+        <li *ngFor="let s of services; trackBy: trackByName">
           <button
             type="button"
             class="data-services__chip"
@@ -247,5 +247,9 @@ export class DfAiDataServicesComponent implements OnInit {
       }
     }
     return [];
+  }
+
+  trackByName(_: number, s: ServiceRow): string {
+    return s.name;
   }
 }

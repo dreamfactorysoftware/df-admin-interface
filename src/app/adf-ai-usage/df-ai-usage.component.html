@@ -50,7 +50,7 @@
         </strong>
       </div>
       <ul class="usage__budget-banner-list">
-        <li *ngFor="let b of budgetWarnings">
+        <li *ngFor="let b of budgetWarnings; trackBy: trackBudget">
           <span class="usage__budget-banner-name">{{ b.serviceLabel }}</span>
           <span class="usage__budget-banner-projection">
             projected
@@ -99,7 +99,7 @@
             multiple
             [ngModel]="filters.service_id"
             (ngModelChange)="onSelectChange('service_id', $event)">
-            <mat-option *ngFor="let s of serviceOptions" [value]="s.id">
+            <mat-option *ngFor="let s of serviceOptions; trackBy: trackOptionId" [value]="s.id">
               {{ s.label }}
             </mat-option>
           </mat-select>
@@ -131,7 +131,7 @@
             multiple
             [ngModel]="filters.app_id"
             (ngModelChange)="onSelectChange('app_id', $event)">
-            <mat-option *ngFor="let a of appOptions" [value]="a.id">
+            <mat-option *ngFor="let a of appOptions; trackBy: trackOptionId" [value]="a.id">
               {{ a.label }}
             </mat-option>
           </mat-select>
@@ -147,7 +147,7 @@
             multiple
             [ngModel]="filters.user_id"
             (ngModelChange)="onSelectChange('user_id', $event)">
-            <mat-option *ngFor="let u of userOptions" [value]="u.id">
+            <mat-option *ngFor="let u of userOptions; trackBy: trackOptionId" [value]="u.id">
               {{ u.label }}
             </mat-option>
           </mat-select>
@@ -163,7 +163,7 @@
             multiple
             [ngModel]="filters.role_id"
             (ngModelChange)="onSelectChange('role_id', $event)">
-            <mat-option *ngFor="let r of roleOptions" [value]="r.id">
+            <mat-option *ngFor="let r of roleOptions; trackBy: trackOptionId" [value]="r.id">
               {{ r.label }}
             </mat-option>
           </mat-select>
@@ -205,7 +205,7 @@
       <div class="usage__filter-chips" *ngIf="hasActiveFilters()">
         <mat-chip-set>
           <mat-chip
-            *ngFor="let chip of activeChips"
+            *ngFor="let chip of activeChips; trackBy: trackChip"
             (removed)="removeChip(chip)">
             {{ chip.label }}
             <button matChipRemove [attr.aria-label]="'remove ' + chip.label">
@@ -370,7 +370,7 @@
             </span>
           </header>
           <ul class="usage__budgets-list">
-            <li *ngFor="let b of budgets" class="usage__budgets-row">
+            <li *ngFor="let b of budgets; trackBy: trackBudget" class="usage__budgets-row">
               <div class="usage__budgets-row-head">
                 <span class="usage__budgets-row-name">{{
                   b.serviceLabel

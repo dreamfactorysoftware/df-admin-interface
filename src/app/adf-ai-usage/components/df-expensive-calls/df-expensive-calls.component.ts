@@ -2,6 +2,7 @@ import { CommonModule, DatePipe } from '@angular/common';
 import { Component, Input } from '@angular/core';
 import { MatCardModule } from '@angular/material/card';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { USD_4DP } from '../../utils/cost';
 
 /**
  * Top-N most expensive single AI calls in the window. The drill-down hook
@@ -65,7 +66,7 @@ export interface ExpensiveCallRow {
             </thead>
             <tbody>
               <tr
-                *ngFor="let r of data"
+                *ngFor="let r of data; trackBy: trackRow"
                 class="exp__row"
                 [class.exp__row--error]="r.status === 'error'"
                 [class.exp__row--partial]="r.status === 'partial'">
@@ -296,15 +297,17 @@ export class DfExpensiveCallsComponent {
   @Input() data: ExpensiveCallRow[] = [];
   @Input() title = 'Most expensive calls';
 
+  trackRow(_: number, r: ExpensiveCallRow): number {
+    return r.id;
+  }
+
   formatUsd(v: number): string {
     if (!Number.isFinite(v) || v === 0) return '$0';
     if (v < 0.01) return '<$0.01';
     if (v < 1) return `$${v.toFixed(4)}`;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      maximumFractionDigits: 4,
-    }).format(v);
+    // Shared, hoisted formatter — this runs per row per CD cycle; building
+    // an Intl.NumberFormat per call is one of the priciest ctors in JS.
+    return USD_4DP.format(v);
   }
 
   formatTokens(v: number): string {

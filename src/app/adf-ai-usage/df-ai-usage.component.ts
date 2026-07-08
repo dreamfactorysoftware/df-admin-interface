@@ -37,7 +37,7 @@ import {
   TimeBucket,
   UsageSummary,
 } from './types/usage';
-import { ratesFromBundle } from './utils/cost';
+import { formatUSD, ratesFromBundle } from './utils/cost';
 import { DfUsageStackedAreaComponent } from './components/df-usage-stacked-area/df-usage-stacked-area.component';
 import { DfUsageBarsComponent } from './components/df-usage-bars/df-usage-bars.component';
 import { DfUsageSummaryComponent } from './components/df-usage-summary/df-usage-summary.component';
@@ -681,13 +681,24 @@ export class DfAiUsageComponent implements OnInit {
   }
 
   formatUsd(v: number): string {
-    if (!Number.isFinite(v)) return '$0.00';
-    if (v > 0 && v < 0.01) return '<$0.01';
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      maximumFractionDigits: v < 1 ? 4 : 2,
-    }).format(v);
+    // Delegates to the shared, hoisted Intl formatters — this is called from
+    // *ngFor rows in the template, i.e. rows × change-detection cycles.
+    return formatUSD(v);
+  }
+
+  // trackBy helpers for the template's *ngFor loops — without them the
+  // default differ tears down and rebuilds every row whenever the source
+  // array is replaced (each fetch/filter change).
+  trackBudget(_: number, b: BudgetRow): number {
+    return b.serviceId;
+  }
+
+  trackChip(_: number, chip: ActiveFilterChip): string {
+    return `${String(chip.dimension)}:${chip.value}`;
+  }
+
+  trackOptionId(_: number, o: { id: number }): number {
+    return o.id;
   }
 
   /** Map raw error_class identifier into a human label for the bars panel. */

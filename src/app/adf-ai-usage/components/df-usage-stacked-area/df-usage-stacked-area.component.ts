@@ -32,7 +32,7 @@ interface YTick {
       <mat-card-content>
         <div class="chart__legend">
           <span class="chart__title">Tokens over time</span>
-          <span *ngFor="let l of layers" class="chart__legend-item">
+          <span *ngFor="let l of layers; trackBy: trackLayer" class="chart__legend-item">
             <span
               class="chart__legend-swatch"
               [style.background]="l.fill"></span>
@@ -48,7 +48,7 @@ interface YTick {
           aria-label="Tokens over time">
           <g class="chart__grid">
             <line
-              *ngFor="let t of yTicks"
+              *ngFor="let t of yTicks; trackBy: trackIndex"
               [attr.x1]="paddingX"
               [attr.x2]="width - paddingX"
               [attr.y1]="t.y"
@@ -56,7 +56,7 @@ interface YTick {
           </g>
 
           <path
-            *ngFor="let layer of layers"
+            *ngFor="let layer of layers; trackBy: trackLayer"
             [attr.d]="layer.d"
             [attr.fill]="layer.fill"
             fill-opacity="0.85"
@@ -64,7 +64,7 @@ interface YTick {
 
           <g class="chart__axis chart__axis--x">
             <text
-              *ngFor="let t of xTicks"
+              *ngFor="let t of xTicks; trackBy: trackIndex"
               [attr.x]="t.x"
               [attr.y]="height - 4"
               text-anchor="middle">
@@ -73,7 +73,7 @@ interface YTick {
           </g>
           <g class="chart__axis chart__axis--y">
             <text
-              *ngFor="let t of yTicks"
+              *ngFor="let t of yTicks; trackBy: trackIndex"
               [attr.x]="paddingX - 6"
               [attr.y]="t.y + 4"
               text-anchor="end">
@@ -252,6 +252,14 @@ export class DfUsageStackedAreaComponent implements OnChanges {
 
   formatK(n: number): string {
     return formatK(n);
+  }
+
+  trackLayer(_: number, l: Layer): string {
+    return l.label;
+  }
+
+  trackIndex(i: number): number {
+    return i;
   }
 }
 

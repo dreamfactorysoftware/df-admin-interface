@@ -58,6 +58,20 @@ export function estimateCost(
   );
 }
 
+/** Shared formatter instances — Intl.NumberFormat construction is expensive
+ *  (locale data lookup), so never build one per call in code reachable from
+ *  templates (it would run on every change-detection cycle). */
+export const USD_2DP = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  maximumFractionDigits: 2,
+});
+export const USD_4DP = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  maximumFractionDigits: 4,
+});
+
 export function formatUSD(value: number): string {
   if (!Number.isFinite(value)) {
     return '$0.00';
@@ -65,9 +79,5 @@ export function formatUSD(value: number): string {
   if (value < 0.01 && value > 0) {
     return '<$0.01';
   }
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: value < 1 ? 4 : 2,
-  }).format(value);
+  return (value < 1 ? USD_4DP : USD_2DP).format(value);
 }

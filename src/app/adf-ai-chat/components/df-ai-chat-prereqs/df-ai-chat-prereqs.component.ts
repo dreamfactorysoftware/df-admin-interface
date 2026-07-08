@@ -85,7 +85,7 @@ interface RoleRow {
           Click one to use it for this chat service:
         </p>
         <ul *ngIf="connections.length" class="prereqs__list">
-          <li *ngFor="let c of connections">
+          <li *ngFor="let c of connections; trackBy: trackById">
             <button
               type="button"
               class="prereqs__chip"
@@ -138,7 +138,7 @@ interface RoleRow {
           Click one to scope the AI's data access:
         </p>
         <ul *ngIf="roles.length" class="prereqs__list">
-          <li *ngFor="let r of roles">
+          <li *ngFor="let r of roles; trackBy: trackById">
             <button
               type="button"
               class="prereqs__chip"
@@ -392,5 +392,9 @@ export class DfAiChatPrereqsComponent implements OnInit {
       this.roles = roles.resource ?? [];
       this.loading = false;
     });
+  }
+
+  trackById(_: number, row: { id: number }): number {
+    return row.id;
   }
 }

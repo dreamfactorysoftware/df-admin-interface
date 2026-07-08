@@ -12,7 +12,9 @@
         <mat-select
           [value]="selectedServiceName"
           (selectionChange)="selectService($event.value)">
-          <mat-option *ngFor="let s of chatServices" [value]="s.name">
+          <mat-option
+            *ngFor="let s of chatServices; trackBy: trackServiceName"
+            [value]="s.name">
             {{ s.label || s.name }}
           </mat-option>
         </mat-select>
@@ -63,7 +65,9 @@
           <mat-label>Act as role</mat-label>
           <mat-select [(value)]="selectedActAsRoleId">
             <mat-option [value]="null">Myself (admin, full access)</mat-option>
-            <mat-option *ngFor="let r of actAsRoles" [value]="r.id">
+            <mat-option
+              *ngFor="let r of actAsRoles; trackBy: trackRoleId"
+              [value]="r.id">
               {{ r.name }}
             </mat-option>
           </mat-select>
