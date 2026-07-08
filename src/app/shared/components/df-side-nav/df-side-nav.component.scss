@@ -310,9 +310,17 @@ $red-palette: mat.define-palette(mat.$red-palette);
       img {
         width: 17px;
         height: 17px;
-        // Force any icon artwork to crisp white on the dark shell.
-        filter: brightness(0) invert(1);
+        // Icon artwork follows the shell: dark glyphs on the light rail,
+        // crisp white on the dark rail, phosphor green in phosphor.
+        filter: brightness(0);
         opacity: 0.72;
+      }
+      :host-context(.dark-theme) & img {
+        filter: brightness(0) invert(1);
+      }
+      :host-context(.phosphor-theme) & img {
+        filter: brightness(0) invert(1) sepia(1) saturate(4) hue-rotate(70deg)
+          brightness(1.1);
       }
 
       ::ng-deep .mat-mdc-button-touch-target {
@@ -353,7 +361,10 @@ $red-palette: mat.define-palette(mat.$red-palette);
           background-image: url('~src/assets/img/lock-icon.svg');
           background-size: contain;
           background-repeat: no-repeat;
-          filter: brightness(0) invert(1);
+          filter: brightness(0);
+          :host-context(.dark-theme) & {
+            filter: brightness(0) invert(1);
+          }
           width: 13px;
           height: 13px;
           position: absolute;

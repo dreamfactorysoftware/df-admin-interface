@@ -47,18 +47,18 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   --df-success-border: rgba(26, 127, 55, 0.35);
 
   /* ------------------------------------------------------------
-     Shell tokens: the app shell (sidebar) is always dark in BOTH
-     themes by design; these are declared here once and re-tuned
-     under .dark-theme so shell and canvas stay visually fused.
+     Shell tokens. Captain 2026-07-07: light means light, dark
+     means dark - the shell follows the theme. Light values here,
+     dark values under .dark-theme.
      ------------------------------------------------------------ */
-  --df-shell-bg: #17161d;
-  --df-shell-border: rgba(255, 255, 255, 0.08);
-  --df-shell-text: rgba(255, 255, 255, 0.92);
-  --df-shell-text-2: rgba(255, 255, 255, 0.7);
-  --df-shell-text-muted: rgba(255, 255, 255, 0.52);
-  --df-shell-hover: rgba(255, 255, 255, 0.06);
-  --df-shell-active-bg: rgba(144, 140, 186, 0.2);
-  --df-shell-accent: #aca8d6;
+  --df-shell-bg: #faf9fc;
+  --df-shell-border: rgba(0, 0, 0, 0.08);
+  --df-shell-text: rgba(0, 0, 0, 0.87);
+  --df-shell-text-2: rgba(0, 0, 0, 0.66);
+  --df-shell-text-muted: rgba(0, 0, 0, 0.5);
+  --df-shell-hover: rgba(0, 0, 0, 0.04);
+  --df-shell-active-bg: rgba(92, 86, 153, 0.12);
+  --df-shell-accent: #5c5699;
 }
 
 .dark-theme {
@@ -88,6 +88,67 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   /* shell sits a hair below the dark canvas so the border reads */
   --df-shell-bg: #131218;
   --df-shell-border: rgba(255, 255, 255, 0.09);
+  --df-shell-text: rgba(255, 255, 255, 0.92);
+  --df-shell-text-2: rgba(255, 255, 255, 0.7);
+  --df-shell-text-muted: rgba(255, 255, 255, 0.52);
+  --df-shell-hover: rgba(255, 255, 255, 0.06);
+  --df-shell-active-bg: rgba(144, 140, 186, 0.2);
+  --df-shell-accent: #aca8d6;
+}
+
+/* ------------------------------------------------------------
+   PHOSPHOR (Captain, 2026-07-07): the secret third theme.
+   WarGames green voice, Fallout amber accents, Blade Runner cyan
+   links, SG-1 black chassis. Applied as a class stacked ON TOP of
+   .dark-theme on <body>, so every dark style applies and these
+   tokens repaint it. Toggle: the >_ button beside the theme switch.
+   ------------------------------------------------------------ */
+.phosphor-theme {
+  --df-bg: #060806;
+  --df-surface: #0a0d0a;
+  --df-surface-2: rgba(51, 255, 102, 0.06);
+  --df-hover: rgba(51, 255, 102, 0.08);
+  --df-text: #33ff66;
+  --df-text-2: #2edd5b;
+  --df-text-muted: #23a847;
+  --df-text-faint: #1a7d35;
+  --df-border: rgba(51, 255, 102, 0.28);
+  --df-border-2: rgba(51, 255, 102, 0.16);
+  --df-code-bg: #050705;
+  --df-code-text: #33ff66;
+  --df-accent: #ffb642;
+  --df-accent-strong: #ffc966;
+  --df-accent-contrast: #0a0d0a;
+  --df-accent-soft: rgba(255, 182, 66, 0.14);
+  --df-danger: #ff5533;
+  --df-danger-soft: rgba(255, 85, 51, 0.15);
+  --df-danger-border: rgba(255, 85, 51, 0.5);
+  --df-success: #33ff66;
+  --df-success-soft: rgba(51, 255, 102, 0.1);
+  --df-success-border: rgba(51, 255, 102, 0.4);
+  --df-shell-bg: #050705;
+  --df-shell-border: rgba(51, 255, 102, 0.25);
+  --df-shell-text: #33ff66;
+  --df-shell-text-2: #2edd5b;
+  --df-shell-text-muted: #23a847;
+  --df-shell-hover: rgba(51, 255, 102, 0.08);
+  --df-shell-active-bg: rgba(255, 182, 66, 0.18);
+  --df-shell-accent: #ffb642;
+
+  a {
+    color: #4dd8e6;
+  }
+  h1,
+  h2,
+  h3 {
+    text-shadow: 0 0 6px rgba(51, 255, 102, 0.35);
+  }
+  table,
+  .mat-mdc-table,
+  code,
+  pre {
+    font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+  }
 }
 
 html,
