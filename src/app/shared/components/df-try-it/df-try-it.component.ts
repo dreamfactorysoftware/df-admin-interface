@@ -1,10 +1,16 @@
-import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
+import {
+  Component,
+  EventEmitter,
+  Input,
+  NgZone,
+  OnInit,
+  Output,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   HttpClient,
   HttpErrorResponse,
   HttpHeaders,
-  HttpResponse,
 } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -175,7 +181,8 @@ export class DfTryItComponent implements OnInit {
 
   constructor(
     private http: HttpClient,
-    private userData: DfUserDataService
+    private userData: DfUserDataService,
+    private zone: NgZone
   ) {}
 
   ngOnInit(): void {
@@ -377,10 +384,28 @@ export class DfTryItComponent implements OnInit {
     this.errorMessage = null;
     this.deniedFields = [];
 
-    const url = this.requestUrl;
-    const headers = new HttpHeaders(this.requestHeaders);
+    const identity = this.selectedIdentity;
     const started = performance.now();
 
+    // A scoped API key must fire OUTSIDE Angular's HttpClient. The
+    // session-token interceptor force-injects the admin API key AND the admin
+    // session token onto every /api request, so an HttpClient call would run
+    // as the admin no matter which identity is picked — the switcher would be
+    // theater. A raw fetch with credentials:'omit' carrying only the selected
+    // key's header is the true, unprivileged request: a read-only role really
+    // does 403 on DELETE, and the response panel shows the real boundary.
+    if (identity?.type === 'key' && identity.apiKey) {
+      void this.sendAsKey(started);
+      return;
+    }
+    this.sendAsSession(started);
+  }
+
+  /** Admin path: HttpClient, interceptors attach the session token + admin key
+   *  as usual. This is the normal, fully-privileged send. */
+  private sendAsSession(started: number): void {
+    const url = this.requestUrl;
+    const headers = new HttpHeaders(this.requestHeaders);
     const outBody =
       this.methodHasBody && this.bodyText.trim() ? this.bodyText : undefined;
 
@@ -392,19 +417,61 @@ export class DfTryItComponent implements OnInit {
         responseType: 'text',
       })
       .subscribe({
-        next: res => this.handleResponse(res, started, true),
+        next: res =>
+          this.applyResult(
+            res.status,
+            res.statusText,
+            true,
+            res.body ?? '',
+            started
+          ),
         error: (err: HttpErrorResponse) => this.handleError(err, started),
       });
   }
 
-  private handleResponse(
-    res: HttpResponse<string>,
-    started: number,
-    ok: boolean
+  /** Scoped-identity path: a raw fetch that bypasses every interceptor. Only
+   *  the selected key's `X-DreamFactory-API-Key` header is sent, and
+   *  credentials:'omit' strips the admin session cookie, so the DreamFactory
+   *  RBAC layer resolves the request purely from that key's role. */
+  private async sendAsKey(started: number): Promise<void> {
+    const url = this.requestUrl;
+    const headers = this.requestHeaders; // key header, no session token
+    const outBody =
+      this.methodHasBody && this.bodyText.trim() ? this.bodyText : undefined;
+
+    try {
+      const res = await fetch(url, {
+        method: this.method,
+        headers,
+        body: outBody,
+        credentials: 'omit',
+      });
+      const raw = await res.text();
+      this.zone.run(() =>
+        this.applyResult(res.status, res.statusText, res.ok, raw, started)
+      );
+    } catch {
+      this.zone.run(() => {
+        const durationMs = Math.round(performance.now() - started);
+        const view = this.toView(0, 'Error', false, durationMs, '');
+        this.response = view;
+        this.loading = false;
+        this.errorMessage = 'Request could not reach the instance.';
+        this.emitResult(view);
+      });
+    }
+  }
+
+  /** Shared result handler for both the HttpClient and fetch paths. */
+  private applyResult(
+    status: number,
+    statusText: string,
+    ok: boolean,
+    raw: string,
+    started: number
   ): void {
     const durationMs = Math.round(performance.now() - started);
-    const raw = res.body ?? '';
-    const view = this.toView(res.status, res.statusText, ok, durationMs, raw);
+    const view = this.toView(status, statusText, ok, durationMs, raw);
     this.response = view;
     this.loading = false;
     this.computeDenied(raw);
@@ -597,6 +664,21 @@ export class DfTryItComponent implements OnInit {
     return this.viewMode === 'pretty'
       ? this.response.bodyPretty
       : this.response.bodyRaw;
+  }
+
+  /** True when the active identity is a scoped key and the instance refused the
+   *  request (401/403). This is the boundary being proven on screen. */
+  get isDenied(): boolean {
+    const s = this.response?.status ?? 0;
+    return (
+      this.selectedIdentity?.type === 'key' && (s === 401 || s === 403)
+    );
+  }
+
+  /** The role (or key) name to name in the denial message. */
+  get deniedIdentityLabel(): string {
+    const identity = this.selectedIdentity;
+    return identity?.roleName ?? identity?.label ?? '';
   }
 
   get statusVariant(): 'success' | 'warning' | 'danger' | 'neutral' {

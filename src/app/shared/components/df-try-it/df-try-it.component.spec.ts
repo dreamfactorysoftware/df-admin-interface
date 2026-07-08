@@ -88,6 +88,44 @@ describe('DfTryItComponent', () => {
     expect(component.deniedFields).toEqual(['ssn']);
   });
 
+  it('flags a scoped key 403 as denied, but not a session 403', () => {
+    const c = component as any;
+    c.response = { status: 403 };
+    // Active identity is the key from beforeEach.
+    expect(component.isDenied).toBe(true);
+    // A 200 under the same key is not a denial.
+    c.response = { status: 200 };
+    expect(component.isDenied).toBe(false);
+    // The admin session is never "denied" in this sense.
+    component.identities.unshift({
+      id: 'session',
+      label: 'Session',
+      type: 'session',
+    });
+    component.selectedIdentityId = 'session';
+    c.response = { status: 403 };
+    expect(component.isDenied).toBe(false);
+  });
+
+  it('names the role (falling back to the key label) in the denial copy', () => {
+    component.identities = [
+      {
+        id: 'k',
+        label: 'Reader key',
+        type: 'key',
+        apiKey: 'K',
+        roleName: 'Analyst RO',
+      },
+    ];
+    component.selectedIdentityId = 'k';
+    expect(component.deniedIdentityLabel).toBe('Analyst RO');
+    component.identities = [
+      { id: 'k', label: 'Reader key', type: 'key', apiKey: 'K' },
+    ];
+    component.selectedIdentityId = 'k';
+    expect(component.deniedIdentityLabel).toBe('Reader key');
+  });
+
   it('formats byte sizes', () => {
     expect(component.formatSize(512)).toBe('512 B');
     expect(component.formatSize(2048)).toBe('2.0 KB');
