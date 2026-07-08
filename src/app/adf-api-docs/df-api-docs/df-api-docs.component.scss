@@ -142,9 +142,18 @@
   }
 }
 
-/* ---- right column: metadata (top, scroll) over test (bottom) ----
+/* ---- right column: metadata (top) over test (bottom) ----
    Sticky + self-scoped max-height keeps page scroll intact (see SCROLL
-   CONTRACT above); the two halves scroll independently inside it. */
+   CONTRACT above): overflow lives on THIS sticky rail only, exactly like
+   .docs-nav, so the ancestor height chain is never clipped.
+
+   Both children size to their NATURAL content height (flex: 0 0 auto). The
+   previous `flex: 1 1 0` + `min-height: 0` model collapsed them to zero on the
+   first (programmatic) render because a flex column with an auto/max-height
+   container has no definite height to distribute, so grow had nothing to grow
+   into and min-height:0 killed the content floor -- the right column read
+   blank until a manual click forced a reflow. Natural height renders metadata
+   and the console visible on load; the rail scrolls as one unit when tall. */
 .docs-right {
   position: sticky;
   top: var(--df-space-4);
@@ -154,13 +163,13 @@
   gap: var(--df-space-4);
   min-width: 0;
   max-height: calc(100vh - var(--df-space-8));
+  overflow-y: auto;
 }
 
-/* TOP HALF: endpoint metadata, its own scroll. */
+/* TOP HALF: endpoint metadata, natural height (visible on load). */
 .docs-meta {
-  flex: 1 1 0;
+  flex: 0 0 auto;
   min-height: 0;
-  overflow-y: auto;
   padding-right: var(--df-space-2);
 
   &__summary {
@@ -178,11 +187,10 @@
   }
 }
 
-/* BOTTOM HALF: live test area. */
+/* BOTTOM HALF: live test area, natural height (visible on load). */
 .docs-test {
-  flex: 1 1 0;
+  flex: 0 0 auto;
   min-height: 0;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: var(--df-space-3);

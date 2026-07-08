@@ -20,6 +20,7 @@ import { Environment } from '../shared/types/system';
   selector: 'df-system-overview',
   standalone: true,
   imports: [CommonModule, DfSectionLandingComponent],
+  styleUrls: ['./df-system-overview.component.scss'],
   template: `
     <df-section-landing
       eyebrow="System"
