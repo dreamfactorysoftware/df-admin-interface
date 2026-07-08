@@ -22,7 +22,11 @@
             [(ngModel)]="selectedEndpointIndex"
             (selectionChange)="onEndpointChange()">
             <mat-option
-              *ngFor="let endpoint of availableEndpoints; let i = index"
+              *ngFor="
+                let endpoint of availableEndpoints;
+                let i = index;
+                trackBy: trackByEndpoint
+              "
               [value]="i">
               <div class="endpoint-option">
                 <div class="endpoint-header">
@@ -50,7 +54,7 @@
               </div>
             </mat-option>
             <mat-option
-              *ngFor="let key of availableApiKeys"
+              *ngFor="let key of availableApiKeys; trackBy: trackByKeyName"
               [value]="key.apiKey">
               <div class="auth-option">
                 <span class="auth-name">{{ key.name }}</span>

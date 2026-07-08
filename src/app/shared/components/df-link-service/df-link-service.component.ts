@@ -431,8 +431,24 @@ export class DfLinkServiceComponent implements OnInit, OnChanges {
     this.loadPath(target);
   }
 
+  // Memoized on currentPath: bound in the breadcrumb *ngFor, so the
+  // split/filter otherwise allocated a fresh array on every CD cycle.
+  private _pathSegments: string[] = [];
+  private _pathSegmentsSource?: string;
   get pathSegments(): string[] {
-    return this.currentPath.split('/').filter(Boolean);
+    if (this._pathSegmentsSource !== this.currentPath) {
+      this._pathSegmentsSource = this.currentPath;
+      this._pathSegments = this.currentPath.split('/').filter(Boolean);
+    }
+    return this._pathSegments;
+  }
+
+  trackByItemPath(_index: number, item: RepoItem): string {
+    return item.path || item.name;
+  }
+
+  trackByServiceName(_index: number, service: Service): string {
+    return service.name;
   }
 
   onViewLatest() {

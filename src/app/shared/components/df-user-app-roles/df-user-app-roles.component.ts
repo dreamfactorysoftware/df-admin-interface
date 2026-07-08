@@ -60,6 +60,9 @@ export class DfUserAppRolesComponent implements OnInit {
       this.rootForm.markAllAsTouched();
     });
     this.appRoles = this.rootForm.get('appRoles') as FormArray;
+    this.appRoles.valueChanges.subscribe(
+      () => (this._availableAppsStale = true)
+    );
     this.updateDataSource();
   }
 
@@ -67,11 +70,30 @@ export class DfUserAppRolesComponent implements OnInit {
     this.dataSource = new MatTableDataSource(this.appRoles.controls);
   }
 
+  // Recomputed only when the form value or apps input changes: this is bound
+  // in the panel description and per-row autocompletes, so the O(apps x roles)
+  // filter otherwise ran on every CD cycle.
+  private _availableApps: Array<AppType> = [];
+  private _availableAppsStale = true;
+  private _availableAppsSource?: Array<AppType>;
   get availableApps() {
-    return this.apps.filter(
-      app =>
-        !this.appRoles.value.find((appRole: any) => appRole.app === app.name)
-    );
+    if (this._availableAppsStale || this._availableAppsSource !== this.apps) {
+      this._availableAppsSource = this.apps;
+      this._availableApps = this.apps.filter(
+        app =>
+          !this.appRoles.value.find((appRole: any) => appRole.app === app.name)
+      );
+      this._availableAppsStale = false;
+    }
+    return this._availableApps;
+  }
+
+  trackByAppId(_index: number, app: AppType): number {
+    return app.id;
+  }
+
+  trackByRoleName(_index: number, role: RoleType): string {
+    return role.name;
   }
 
   get showAddButton() {

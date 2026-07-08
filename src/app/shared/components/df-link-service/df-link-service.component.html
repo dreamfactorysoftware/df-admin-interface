@@ -13,7 +13,7 @@
           <mat-label>Select Service</mat-label>
           <mat-select formControlName="serviceList">
             <mat-option
-              *ngFor="let service of storageServices"
+              *ngFor="let service of storageServices; trackBy: trackByServiceName"
               [value]="service.label">
               {{ service.label }}
             </mat-option>
@@ -124,7 +124,7 @@
                 Empty folder.
               </div>
               <button
-                *ngFor="let item of pathItems"
+                *ngFor="let item of pathItems; trackBy: trackByItemPath"
                 mat-button
                 type="button"
                 class="link-service-item"

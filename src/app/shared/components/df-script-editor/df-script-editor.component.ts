@@ -220,11 +220,20 @@ export class DfScriptEditorComponent implements OnInit {
     );
   }
 
+  // Parsed Date cached per snapshotTimestamp input: allocating a fresh Date
+  // per CD also defeated the pure date pipe's memoization in the template
+  // ('snap | date' re-formatted every cycle on a new object reference).
+  private _snapshotDate: Date | null = null;
+  private _snapshotDateSource?: string | Date | null;
   get snapshotDisplayDate(): Date | null {
     if (this.lastRefreshedAt) return this.lastRefreshedAt;
     if (!this.snapshotTimestamp) return null;
-    const d = new Date(this.snapshotTimestamp);
-    return isNaN(d.getTime()) ? null : d;
+    if (this._snapshotDateSource !== this.snapshotTimestamp) {
+      this._snapshotDateSource = this.snapshotTimestamp;
+      const d = new Date(this.snapshotTimestamp);
+      this._snapshotDate = isNaN(d.getTime()) ? null : d;
+    }
+    return this._snapshotDate;
   }
 
   get snapshotLocked(): boolean {

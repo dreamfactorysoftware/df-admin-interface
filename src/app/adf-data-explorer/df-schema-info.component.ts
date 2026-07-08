@@ -61,7 +61,9 @@ import { normalizeError } from 'src/app/shared/utilities/app-error';
           {{ t('dataExplorer.columns') }} ({{ schema.field.length }})
         </div>
         <div class="field-list">
-          <div class="field-row" *ngFor="let field of schema.field">
+          <div
+            class="field-row"
+            *ngFor="let field of schema.field; trackBy: trackByFieldName">
             <div class="field-name">
               <span>{{ field.name }}</span>
               <mat-chip-set class="field-badges">
@@ -105,7 +107,9 @@ import { normalizeError } from 'src/app/shared/utilities/app-error';
             {{ t('dataExplorer.relationships') }} ({{ schema.related!.length }})
           </div>
           <div class="rel-list">
-            <div class="rel-row" *ngFor="let rel of schema.related">
+            <div
+              class="rel-row"
+              *ngFor="let rel of schema.related; trackBy: trackByRelName">
               <mat-icon class="rel-icon">{{
                 rel.type === 'belongs_to' ? 'arrow_back' : 'arrow_forward'
               }}</mat-icon>
@@ -357,6 +361,14 @@ export class DfSchemaInfoComponent implements OnChanges, OnDestroy {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  trackByFieldName(_index: number, field: { name: string }): string {
+    return field.name;
+  }
+
+  trackByRelName(_index: number, rel: { name: string }): string {
+    return rel.name;
   }
 
   loadSchema(): void {

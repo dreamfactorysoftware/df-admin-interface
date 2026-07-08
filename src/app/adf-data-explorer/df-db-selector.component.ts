@@ -61,7 +61,7 @@ import { DatabaseService } from './services/data-explorer.service';
         class="db-list">
         <a
           mat-list-item
-          *ngFor="let db of databases"
+          *ngFor="let db of databases; trackBy: trackByDbName"
           (click)="databaseSelected.emit(db)"
           [matTooltip]="db.description || db.name"
           matTooltipPosition="right"
@@ -206,4 +206,8 @@ export class DfDbSelectorComponent {
   @Output() retry = new EventEmitter<void>();
 
   faDatabase = faDatabase;
+
+  trackByDbName(_index: number, db: DatabaseService): string {
+    return db.name;
+  }
 }

@@ -283,6 +283,14 @@ export class DfApiTesterComponent implements OnChanges {
     this.testResult = null;
   }
 
+  trackByEndpoint(_index: number, endpoint: TestEndpoint): string {
+    return `${endpoint.method} ${endpoint.endpoint}`;
+  }
+
+  trackByKeyName(_index: number, key: ApiKeyInfo): string {
+    return key.name;
+  }
+
   getMethodColor(method: string): string {
     switch (method.toLowerCase()) {
       case 'get':

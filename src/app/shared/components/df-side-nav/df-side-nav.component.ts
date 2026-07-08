@@ -176,16 +176,33 @@ export class DfSideNavComponent implements OnInit {
     return this.router.url.startsWith(nav.path);
   }
 
+  // Nav routes are static, so the label key is computed once per route
+  // instead of allocating split/join intermediates on every CD cycle.
+  private navLabelCache = new Map<string, string>();
   navLabel(route: string) {
-    const segments = route.replace('/', '').split('/').join('.');
-    return `nav.${segments}.nav`;
+    let label = this.navLabelCache.get(route);
+    if (label === undefined) {
+      const segments = route.replace('/', '').split('/').join('.');
+      label = `nav.${segments}.nav`;
+      this.navLabelCache.set(route, label);
+    }
+    return label;
   }
 
   navLink(nav: Nav) {
     return nav.linkPath ?? nav.path;
   }
+  // Memoized on router.url: generateBreadcrumb walks the route table
+  // recursively and allocates arrays per visited route, and the side-nav
+  // renders on every page, so this ran on every CD tick app-wide.
+  private _breadCrumbs: ReturnType<typeof generateBreadcrumb> = [];
+  private _breadCrumbsUrl?: string;
   get breadCrumbs() {
-    return generateBreadcrumb(routes, this.router.url);
+    if (this._breadCrumbsUrl !== this.router.url) {
+      this._breadCrumbsUrl = this.router.url;
+      this._breadCrumbs = generateBreadcrumb(routes, this.router.url);
+    }
+    return this._breadCrumbs;
   }
 
   handleNavClick(nav: Nav) {
