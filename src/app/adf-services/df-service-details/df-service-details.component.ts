@@ -112,6 +112,8 @@ import {
   DfArtifactCardComponent,
   ArtifactKeyOption,
 } from 'src/app/shared/components/df-artifact-card/df-artifact-card.component';
+import { ApiKeysService } from 'src/app/adf-api-docs/services/api-keys.service';
+import { ApiKeyInfo } from 'src/app/shared/types/api-keys';
 
 type UnsavedToolChoice = 'save' | 'discard' | 'cancel';
 
@@ -321,7 +323,8 @@ export class DfServiceDetailsComponent implements OnInit {
     private currentServiceService: DfCurrentServiceService,
     private snackBar: MatSnackBar,
     private systemService: DfSystemService,
-    private analyticsService: DfAnalyticsService
+    private analyticsService: DfAnalyticsService,
+    private apiKeysService: ApiKeysService
   ) {
     this.serviceForm = this.fb.group({
       type: ['', Validators.required],
@@ -2070,65 +2073,29 @@ export class DfServiceDetailsComponent implements OnInit {
         // placeholder table; the card shape and curl still render.
         error: () => undefined,
       });
-    // Find API keys whose role can GET this service, so the card's default
-    // curl returns 200 rather than 403. None -> card shows the create-key CTA.
-    this.http
-      .get<any>(`${BASE_URL}/system/app`, {
-        params: {
-          fields: 'id,name,api_key,is_active,role_id',
-          related: 'role_by_role_id.role_service_access_by_role_id',
-          limit: '100',
-        },
-        context: silent(),
-      })
-      .subscribe({
-        next: res => {
-          this.artifactKeys = this.toArtifactKeys(res?.resource ?? [], id);
-        },
-        error: () => {
-          this.artifactKeys = [];
-        },
-      });
-  }
-
-  // Reduce the app list to keys whose role grants a GET on this service. The
-  // API may answer in snake or camel case depending on the caller, so read
-  // both. A null service_id means the role covers every service (wildcard);
-  // verb_mask bit 1 is GET.
-  private toArtifactKeys(
-    apps: any[],
-    serviceId: number | undefined
-  ): ArtifactKeyOption[] {
-    const out: ArtifactKeyOption[] = [];
-    for (const app of apps) {
-      const active = app?.is_active ?? app?.isActive;
-      if (active === false) {
-        continue;
-      }
-      const key = app?.api_key ?? app?.apiKey;
-      if (!key) {
-        continue;
-      }
-      const role = app?.role_by_role_id ?? app?.roleByRoleId;
-      const access =
-        role?.role_service_access_by_role_id ??
-        role?.roleServiceAccessByRoleId ??
-        [];
-      const grantsRead = access.some((a: any) => {
-        const sid = a?.service_id ?? a?.serviceId ?? null;
-        const verb = a?.verb_mask ?? a?.verbMask ?? 0;
-        return (sid === null || sid === serviceId) && (verb & 1) === 1;
-      });
-      if (!grantsRead) {
-        continue;
-      }
-      out.push({
-        label: app?.name ?? 'API key',
-        apiKey: key,
-        role: role?.name,
-      });
+    // Find API keys whose role can reach this service, so the card's default
+    // curl returns 200 rather than 400/403. None -> card shows create-key CTA.
+    // Reuse ApiKeysService (the proven api-docs path): it resolves keys in two
+    // steps — roles?related=role_service_access_by_role_id, then apps filtered
+    // by role_id. The single-request double-nested related
+    // (system/app?related=role_by_role_id.role_service_access_by_role_id) does
+    // NOT expand on the app LIST endpoint, so it returned an empty access array
+    // and no key ever qualified, leaving the literal YOUR_API_KEY placeholder.
+    if (typeof id !== 'number') {
+      this.artifactKeys = [];
+      return;
     }
-    return out;
+    this.apiKeysService.getApiKeysForService(id).subscribe({
+      next: (keys: ApiKeyInfo[]) => {
+        this.artifactKeys = keys.map(k => ({
+          label: k.name || 'API key',
+          apiKey: k.apiKey,
+        }));
+      },
+      error: () => {
+        this.artifactKeys = [];
+      },
+    });
   }
 
   getBackgroundImage(typeLabel: string) {
