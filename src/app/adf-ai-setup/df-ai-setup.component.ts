@@ -42,6 +42,7 @@ export class DfAiSetupComponent {
           text: 'Connect model providers or OpenAI-compatible gateways, configure credentials, choose defaults, and test before wiring AI into apps.',
           route: `/${ROUTES.AI}/${ROUTES.AI_CONNECTIONS}`,
           action: 'Manage connections',
+          category: 'ai',
         },
         {
           icon: 'admin_panel_settings',
@@ -49,6 +50,7 @@ export class DfAiSetupComponent {
           text: 'Create least-privilege DreamFactory roles so AI tool calls can reach only the data and services they should.',
           route: `/${ROUTES.API_CONNECTIONS}/${ROUTES.ROLE_BASED_ACCESS}`,
           action: 'Manage roles',
+          category: 'security',
         },
         {
           icon: 'chat',
@@ -56,6 +58,7 @@ export class DfAiSetupComponent {
           text: 'Bind model connections to AI roles, default services, tool limits, and system prompts for governed in-DF chat.',
           route: `/${ROUTES.AI}/${ROUTES.AI_CHAT_SERVICES}`,
           action: 'Configure chat',
+          category: 'ai',
         },
         {
           icon: 'forum',
@@ -63,6 +66,7 @@ export class DfAiSetupComponent {
           text: 'Test chat workflows, verify the service reaches the right data, and confirm permissions block anything outside scope.',
           route: `/${ROUTES.AI}/${ROUTES.AI_CHAT_UI}`,
           action: 'Open conversations',
+          category: 'ai',
         },
         {
           icon: 'account_tree',
@@ -70,6 +74,7 @@ export class DfAiSetupComponent {
           text: 'Expose governed DreamFactory tools to external AI clients when agent workflows need controlled data access.',
           route: `/${ROUTES.AI}/${ROUTES.AI_MCP}`,
           action: 'Manage MCP',
+          category: 'ai',
         },
         {
           icon: 'monitoring',
@@ -77,6 +82,7 @@ export class DfAiSetupComponent {
           text: 'Track requests, token burn, provider mix, MCP activity, expensive calls, and budget pressure before it surprises anyone.',
           route: `/${ROUTES.AI}/${ROUTES.AI_USAGE}`,
           action: 'View usage',
+          category: 'docs',
         },
       ],
     },

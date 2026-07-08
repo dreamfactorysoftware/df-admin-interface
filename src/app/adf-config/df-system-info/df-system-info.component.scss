@@ -1,4 +1,9 @@
 .system-info-container {
+  // punch 13 (HOT): text and dividers were unthemed. In phosphor the body
+  // rendered near-black on the dark-green surface and the #000 dividers could
+  // not be repainted. Anchor text and every rule to tokens so all three
+  // themes stay legible by construction.
+  color: var(--df-text);
   padding-bottom: 32px;
 
   ul {
@@ -12,7 +17,7 @@
   }
 
   h2 {
-    border-bottom: 1px solid #e5e5e5;
+    border-bottom: 1px solid var(--df-border);
     padding-bottom: 10px;
   }
 
@@ -24,13 +29,13 @@
 
     .system-info-packages {
       padding-left: 20px;
-      border-left: 1px dashed #000;
+      border-left: 1px dashed var(--df-border);
       max-width: 40%;
       .package-header {
         display: flex;
         justify-content: space-between;
         font-weight: bold;
-        border-bottom: 2px solid #000;
+        border-bottom: 2px solid var(--df-border);
         padding-bottom: 5px;
         margin-bottom: 5px;
       }
@@ -44,7 +49,7 @@
         justify-content: space-between;
         gap: 10px;
         padding-bottom: 0.2rem;
-        border-bottom: 1px dotted #bdbdbd;
+        border-bottom: 1px dotted var(--df-border-2);
       }
     }
 

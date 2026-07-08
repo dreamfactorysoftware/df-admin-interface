@@ -105,26 +105,31 @@ export class DfSystemOverviewComponent implements OnInit {
         icon: 'api',
         label: 'DreamFactory',
         value: environment.platform?.version || 'Unknown',
+        category: 'system',
       },
       {
         icon: 'database',
         label: 'System DB',
         value: environment.platform?.dbDriver || 'Unknown',
+        category: 'data',
       },
       {
         icon: 'article',
         label: 'Log Level',
         value: environment.platform?.logLevel || 'Unknown',
+        category: 'docs',
       },
       {
         icon: 'dns',
         label: 'Operating System',
         value: this.osLabel(environment),
+        category: 'system',
       },
       {
         icon: 'memory',
         label: 'PHP / Laravel',
         value: `${environment.php?.core?.phpVersion || 'Unknown'} / ${this.laravelVersion(environment)}`,
+        category: 'build',
       },
     ];
   }
@@ -152,6 +157,7 @@ export class DfSystemOverviewComponent implements OnInit {
             text: 'Review installed version, environment paths, cache state, and runtime status.',
             route: `/${ROUTES.SYSTEM_SETTINGS}/${ROUTES.CONFIG}/${ROUTES.SYSTEM_INFO}`,
             action: 'View system info',
+            category: 'system',
           },
           {
             icon: 'cached',
@@ -159,6 +165,7 @@ export class DfSystemOverviewComponent implements OnInit {
             text: 'Inspect and clear DreamFactory cache entries when configuration changes need to settle.',
             route: `/${ROUTES.SYSTEM_SETTINGS}/${ROUTES.CONFIG}/${ROUTES.CACHE}`,
             action: 'Manage cache',
+            category: 'system',
           },
           {
             icon: 'import_export',
@@ -166,6 +173,7 @@ export class DfSystemOverviewComponent implements OnInit {
             text: 'Move services, roles, role access, and app bindings between DreamFactory instances with portable manifests.',
             route: `/${ROUTES.SYSTEM_SETTINGS}/${ROUTES.CONFIG}/${ROUTES.CONFIG_PACKAGE}`,
             action: 'Open config package',
+            category: 'build',
           },
           {
             icon: 'schedule',
@@ -173,6 +181,7 @@ export class DfSystemOverviewComponent implements OnInit {
             text: 'Create and manage scheduled jobs that call services or platform endpoints.',
             route: `/${ROUTES.SYSTEM_SETTINGS}/${ROUTES.SCHEDULER}`,
             action: 'Manage scheduler',
+            category: 'system',
           },
           {
             icon: 'article',
@@ -180,6 +189,7 @@ export class DfSystemOverviewComponent implements OnInit {
             text: 'Browse DreamFactory log files from the existing admin log viewer.',
             route: `/${ROUTES.ADMIN_SETTINGS}/${ROUTES.LOGS}`,
             action: 'View logs',
+            category: 'docs',
           },
           {
             icon: 'outbox',
@@ -187,6 +197,7 @@ export class DfSystemOverviewComponent implements OnInit {
             text: 'Configure installed log service connectors for forwarding runtime events.',
             route: `/${ROUTES.SYSTEM_SETTINGS}/${ROUTES.LOGS}`,
             action: 'Manage Logstash',
+            category: 'docs',
             meta: this.connectorMeta(logstashCount),
             disabled: logstashCount === 0,
           },
@@ -196,6 +207,7 @@ export class DfSystemOverviewComponent implements OnInit {
             text: 'Review service reports and operational usage summaries.',
             route: `/${ROUTES.SYSTEM_SETTINGS}/${ROUTES.REPORTING}`,
             action: 'View reporting',
+            category: 'docs',
           },
         ],
       },
@@ -208,6 +220,7 @@ export class DfSystemOverviewComponent implements OnInit {
             text: 'Manage browser access rules for applications calling DreamFactory APIs.',
             route: `/${ROUTES.SYSTEM_SETTINGS}/${ROUTES.CONFIG}/${ROUTES.CORS}`,
             action: 'Manage CORS',
+            category: 'security',
           },
           {
             icon: 'mail',
@@ -215,6 +228,7 @@ export class DfSystemOverviewComponent implements OnInit {
             text: 'Edit system email templates used for account and notification workflows.',
             route: `/${ROUTES.SYSTEM_SETTINGS}/${ROUTES.CONFIG}/${ROUTES.EMAIL_TEMPLATES}`,
             action: 'Manage templates',
+            category: 'system',
           },
           {
             icon: 'key',
@@ -222,6 +236,7 @@ export class DfSystemOverviewComponent implements OnInit {
             text: 'Manage reusable key-value settings shared across services and scripts.',
             route: `/${ROUTES.SYSTEM_SETTINGS}/${ROUTES.CONFIG}/${ROUTES.GLOBAL_LOOKUP_KEYS}`,
             action: 'Manage keys',
+            category: 'build',
           },
           {
             icon: 'forum',
@@ -229,6 +244,7 @@ export class DfSystemOverviewComponent implements OnInit {
             text: 'Configure support messaging integration for this admin interface.',
             route: `/${ROUTES.SYSTEM_SETTINGS}/${ROUTES.CONFIG}/${ROUTES.INTERCOM}`,
             action: 'Configure Intercom',
+            category: 'system',
           },
           {
             icon: 'api',
@@ -236,6 +252,7 @@ export class DfSystemOverviewComponent implements OnInit {
             text: 'Review built-in platform services exposed by DreamFactory itself.',
             route: `/${ROUTES.SYSTEM_SETTINGS}/${ROUTES.DF_PLATFORM_APIS}`,
             action: 'Open platform APIs',
+            category: 'data',
           },
         ],
       },

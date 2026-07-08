@@ -11,6 +11,18 @@ export type SectionLandingAction = {
   primary?: boolean;
 };
 
+// Semantic tint categories map to the --df-tint-<category>-* token pairs in
+// styles.scss (punch 21). Optional: cards/stats without a category fall back
+// to the monochrome accent, so landing pages not yet audited are unchanged.
+export type SectionLandingCategory =
+  | 'build'
+  | 'data'
+  | 'security'
+  | 'system'
+  | 'admin'
+  | 'ai'
+  | 'docs';
+
 export type SectionLandingCard = {
   icon: string;
   title: string;
@@ -19,6 +31,7 @@ export type SectionLandingCard = {
   action: string;
   meta?: string;
   disabled?: boolean;
+  category?: SectionLandingCategory;
 };
 
 export type SectionLandingGroup = {
@@ -36,6 +49,7 @@ export type SectionLandingStat = {
   label: string;
   value: string;
   icon?: string;
+  category?: SectionLandingCategory;
 };
 
 @Component({

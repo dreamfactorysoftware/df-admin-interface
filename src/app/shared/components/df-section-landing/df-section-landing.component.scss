@@ -89,6 +89,46 @@
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
+// Categorical tint (punch 21). A card/stat maps its data-category to the
+// shared --df-tint-<cat>-* token pair via two local vars; the chip, action
+// link, and hover border below read those vars. No category = accent
+// fallback, so un-audited landing pages render exactly as before. Zero
+// literals: light/dark/phosphor all come from styles.scss.
+.section-card,
+.section-stat {
+  --tile-tint-bg: transparent;
+  --tile-tint-fg: var(--df-accent);
+}
+
+[data-category='build'] {
+  --tile-tint-bg: var(--df-tint-build-bg);
+  --tile-tint-fg: var(--df-tint-build-fg);
+}
+[data-category='data'] {
+  --tile-tint-bg: var(--df-tint-data-bg);
+  --tile-tint-fg: var(--df-tint-data-fg);
+}
+[data-category='security'] {
+  --tile-tint-bg: var(--df-tint-security-bg);
+  --tile-tint-fg: var(--df-tint-security-fg);
+}
+[data-category='system'] {
+  --tile-tint-bg: var(--df-tint-system-bg);
+  --tile-tint-fg: var(--df-tint-system-fg);
+}
+[data-category='admin'] {
+  --tile-tint-bg: var(--df-tint-admin-bg);
+  --tile-tint-fg: var(--df-tint-admin-fg);
+}
+[data-category='ai'] {
+  --tile-tint-bg: var(--df-tint-ai-bg);
+  --tile-tint-fg: var(--df-tint-ai-fg);
+}
+[data-category='docs'] {
+  --tile-tint-bg: var(--df-tint-docs-bg);
+  --tile-tint-fg: var(--df-tint-docs-fg);
+}
+
 .section-card {
   background: var(--df-surface);
   border: 1px solid var(--df-border);
@@ -109,6 +149,10 @@
 .section-card:hover {
   background: var(--df-hover);
   border-color: var(--df-accent);
+}
+
+.section-card[data-category]:hover {
+  border-color: var(--tile-tint-fg);
 }
 
 .section-card--opening {
@@ -139,6 +183,28 @@
     height: 32px;
     width: 32px;
   }
+}
+
+// Categorized cards render the icon as a tinted chip in the category hue.
+.section-card[data-category] .section-card__icon {
+  align-items: center;
+  background: var(--tile-tint-bg);
+  border-radius: var(--df-radius-sm);
+  color: var(--tile-tint-fg);
+  display: inline-flex;
+  height: 44px;
+  justify-content: center;
+  width: 44px;
+
+  mat-icon {
+    font-size: 24px;
+    height: 24px;
+    width: 24px;
+  }
+}
+
+.section-card[data-category] .section-card__action {
+  color: var(--tile-tint-fg);
 }
 
 .section-card__body {
@@ -234,6 +300,15 @@
     line-height: 1.25;
     overflow-wrap: anywhere;
   }
+}
+
+// Categorized stat chips: the leading icon takes the category hue.
+.section-stat[data-category] mat-icon {
+  background: var(--tile-tint-bg);
+  border-radius: var(--df-radius-sm);
+  box-sizing: content-box;
+  color: var(--tile-tint-fg);
+  padding: 3px;
 }
 
 // Notes strip: hairline grid. The container background paints the 1px gaps
