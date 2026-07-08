@@ -1,81 +1,71 @@
-.dashboard-container {
-  padding: 24px;
-  max-width: 1400px;
+// Home activation cockpit (Meridian Phase 2, spec 3.1). Tokens only: no color,
+// size, or spacing literals, so light / dark / phosphor repaint by construction.
+
+:host {
+  display: block;
+}
+
+.home-body {
+  max-width: var(--df-content-max);
   margin: 0 auto;
+  padding: 0 var(--df-page-gutter) var(--df-space-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--df-space-5);
 }
 
-// Departure micro-header for the overview section (11px uppercase
-// letterspaced, same as table headers and the chat scope label).
-.dashboard-title {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-bottom: 20px;
-  color: var(--df-text-muted);
+// Equal-height KPI grid, hairline-bordered tiles, no shadow (owned by the tile
+// itself). Collapses gracefully on narrow viewports.
+.tile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--df-space-4);
 }
 
-.loading-container,
-.error-container {
+.cockpit-controls {
+  display: flex;
+  justify-content: flex-end;
+
+  mat-form-field {
+    min-width: 180px;
+  }
+}
+
+.provision-row {
   display: flex;
   justify-content: center;
+}
+
+// Unprotected-endpoints alert strip: a warning-toned, full-width call to the
+// fix. The whole strip is the link.
+.unprotected-strip {
+  display: flex;
   align-items: center;
-  min-height: 400px;
-}
-
-.loading-card,
-.error-card {
-  text-align: center;
-  padding: 32px;
-  background-color: var(--df-surface);
-  color: var(--df-text-muted);
-}
-
-.error-card {
-  border-color: var(--df-danger-border);
-  background-color: var(--df-danger-soft);
+  gap: var(--df-space-3);
+  padding: var(--df-space-3) var(--df-space-4);
+  border: 1px solid var(--df-warning-border);
+  border-radius: var(--df-radius);
+  background: var(--df-warning-soft);
   color: var(--df-text);
-}
+  text-decoration: none;
+  transition: background-color var(--df-duration-fast, 120ms)
+    var(--df-ease-standard, ease);
 
-.error-icon {
-  font-size: 48px;
-  color: var(--df-danger);
-  margin-bottom: 16px;
-}
-
-.dashboard-content {
-  animation: fadeIn 0.3s ease-in;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
+  fa-icon {
+    color: var(--df-warning);
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+
+  &:hover {
+    background: var(--df-hover);
   }
 }
 
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 20px;
-  margin-bottom: 24px;
-}
-
-// Mobile responsiveness
-@media (max-width: 768px) {
-  .dashboard-container {
-    padding: 16px;
-  }
-
-  .stats-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .charts-row {
-    grid-template-columns: 1fr;
-  }
+.unprotected-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--df-space-1);
+  margin-left: auto;
+  font-size: var(--df-font-size-sm);
+  font-weight: var(--df-font-weight-medium, 500);
+  color: var(--df-accent);
 }

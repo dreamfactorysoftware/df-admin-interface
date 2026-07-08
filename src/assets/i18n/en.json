@@ -837,5 +837,33 @@
         "cta": "Scope a role"
       }
     }
+  },
+  "homeCockpit": {
+    "title": "DreamFactory",
+    "description": "See who can reach your data, through what path, at what cost.",
+    "provisionSample": "Provision sample database",
+    "provisionSampleSuccess": "Sample database created. Its API is live.",
+    "error": {
+      "title": "Home could not load",
+      "description": "The service data did not come back. Retry to load your APIs.",
+      "retry": "Retry"
+    },
+    "tiles": {
+      "totalApis": "Total APIs",
+      "percentProtected": "Protected",
+      "deprecated": "Deprecated",
+      "requestsToday": "Requests",
+      "spendToday": "Spend"
+    },
+    "ranges": {
+      "24h": "Last 24 hours",
+      "7d": "Last 7 days",
+      "30d": "Last 30 days",
+      "all": "All time"
+    },
+    "unprotected": {
+      "label": "{{count}} services have no role protection",
+      "cta": "Fix access"
+    }
   }
 }
