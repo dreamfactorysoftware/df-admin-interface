@@ -7,16 +7,27 @@
   src: url('assets/fonts/Inter/Inter-VariableFont_slnt\,wght.ttf');
 }
 
+// Meridian type scale (spec 1.1): 13px base so mat-body, mat-table cells
+// and mat-form-field inherit --df-font-size-sm instead of Material's 16px.
+// Values mirror the --df-font-size-* tokens 1:1 (Material's Sass API needs
+// compile-time values); the CSS-var token layer stays the runtime source of
+// truth for everything outside Material's internals. Line-heights are px per
+// the file's existing convention; weights top out at 600, never 700.
 $df-typography-config: mat.define-typography-config(
   $font-family: 'Inter',
+  $headline-1: mat.define-typography-level(56px, 62px, 600),
+  $headline-2: mat.define-typography-level(44px, 50px, 600),
+  $headline-3: mat.define-typography-level(36px, 43px, 600),
+  $headline-4: mat.define-typography-level(28px, 34px, 600), // page H1 (2xl)
+  $headline-5: mat.define-typography-level(20px, 24px, 600), // sub-page H1 (xl)
+  $headline-6: mat.define-typography-level(16px, 21px, 600), // card/section (lg)
+  $subtitle-1: mat.define-typography-level(16px, 22px, 600),
+  $subtitle-2: mat.define-typography-level(13px, 19px, 500),
+  $body-1: mat.define-typography-level(13px, 19px, 400), // form-field input (sm)
+  $body-2: mat.define-typography-level(13px, 19px, 400), // BODY + table cell (sm)
+  $caption: mat.define-typography-level(12px, 16px, 400), // meta (xs)
+  $button: mat.define-typography-level(13px, 19px, 500)
 );
-// $headline-1: mat.define-typography-level(64px, 72px, 600),
-// $headline-5: mat.define-typography-level(48px, 54px, 600),
-// $headline-6: mat.define-typography-level(32px, 42px, 600),
-//   $subtitle-1: mat.define-typography-level(24px, 32px, 600),
-//   $body-1: mat.define-typography-level(22px, 28px, 600),
-//   $body-2: mat.define-typography-level(16px, 24px, 300),
-//   $subtitle-2: mat.define-typography-level(20px, 28px, 300),
 
 $df-purple-palette: (
   10: #e5e1e9,
@@ -77,6 +88,9 @@ $my-primary: mat.define-palette($df-purple-palette, 900);
 $my-accent: mat.define-palette($df-coral-palette, 400);
 $my-warn: mat.define-palette(mat.$red-palette);
 
+// Meridian density (spec 1.2): -2 across tables, form-fields and buttons.
+// Targets ~38px rows / 40px fields; the --df-row-height override in
+// styles.scss pins rows to exactly 38px on top of this.
 $my-theme: mat.define-light-theme(
   (
     color: (
@@ -85,7 +99,47 @@ $my-theme: mat.define-light-theme(
       warn: $my-warn,
     ),
     typography: $df-typography-config,
+    density: -2,
   )
 );
 @include mat.all-component-themes($my-theme);
 @include mat.typography-hierarchy($df-typography-config);
+
+/* ============================================================
+   Meridian Phase 0 Material overrides (spec 1.3, 1.4, 1.5).
+   Plain CSS emitted once from the theme module. Tokens only.
+   ============================================================ */
+
+// Motion (spec 1.5): kill the animated ripple everywhere; it is acceptable
+// only on primary (filled/raised) buttons and FABs. Hover/press state layers
+// stay; this removes just the expanding ripple circle.
+.mat-ripple-element {
+  display: none !important;
+}
+.mat-mdc-unelevated-button.mat-primary .mat-ripple-element,
+.mat-mdc-raised-button.mat-primary .mat-ripple-element,
+.mat-mdc-fab .mat-ripple-element,
+.mat-mdc-mini-fab .mat-ripple-element {
+  display: block !important;
+}
+
+// Elevation (spec 1.3): static chrome is border-defined, not shadowed. Cards
+// are already flattened in styles.scss; kill the toolbar drop shadow too.
+// --df-shadow-overlay stays reserved for CDK overlays (menus, dialogs, toasts).
+.mat-toolbar {
+  box-shadow: none !important;
+}
+
+// Color roles (spec 1.4): neutralize the coral wordmark to the text ladder so
+// it stops fighting the indigo accent. The raster logo ships coral;
+// brightness(0) collapses it to one ink and the opacity lands it on
+// --df-text's alpha (0.87 light / 0.9 dark). Phosphor keeps its own green
+// tint via the more-specific :host-context rule in df-side-nav.
+.shell-brand-logo {
+  filter: brightness(0);
+  opacity: 0.87;
+}
+.dark-theme .shell-brand-logo {
+  filter: brightness(0) invert(1);
+  opacity: 0.9;
+}

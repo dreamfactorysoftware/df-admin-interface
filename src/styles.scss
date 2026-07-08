@@ -96,6 +96,78 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   --df-tint-ai-fg: #be185d;
   --df-tint-docs-bg: rgba(13, 148, 136, 0.1);
   --df-tint-docs-fg: #0d9488;
+
+  /* ============================================================
+     MERIDIAN PHASE 0 - net-new token layers (spec 1.1-1.6).
+     Type/space/motion/focus are theme-agnostic and live only here;
+     .dark-theme + .phosphor-theme override only what must shift
+     (overlay shadow, warning companions, skeleton).
+     ============================================================ */
+
+  /* --- 1.1 Typography scale. 13px base kills Material's 16px body. --- */
+  --df-font-size-xs: 12px; /* meta, table sub-labels, kbd */
+  --df-font-size-sm: 13px; /* BODY DEFAULT, table cells, form fields */
+  --df-font-size-md: 14px; /* emphasis, active row */
+  --df-font-size-lg: 16px; /* card titles, section titles */
+  --df-font-size-xl: 20px; /* stat-tile values, sub-page H1 */
+  --df-font-size-2xl: 28px; /* page H1 */
+  --df-lh-tight: 1.2; /* headings */
+  --df-lh-base: 1.45; /* body */
+  --df-font-weight-body: 400;
+  --df-font-weight-medium: 500;
+  --df-font-weight-heading: 600; /* never 700 black */
+  --df-tracking-tight: -0.011em; /* font-size-xl and up */
+  --df-tracking-eyebrow: 0.04em; /* uppercase micro-labels */
+  --df-font-mono: 'SFMono-Regular', ui-monospace, 'JetBrains Mono', Menlo,
+    monospace;
+
+  /* --- 1.2 Spacing + rhythm. Strict 4px base; calm outside, dense
+     inside. Components pull margins from these, never arbitrary px. --- */
+  --df-space-1: 4px;
+  --df-space-2: 8px;
+  --df-space-3: 12px;
+  --df-space-4: 16px;
+  --df-space-5: 24px;
+  --df-space-6: 32px;
+  --df-space-8: 48px;
+  --df-content-max: 1120px; /* page content max-width */
+  --df-page-gutter: var(--df-space-5); /* 24px; 32px at >=1440px (below) */
+  --df-row-height: 38px; /* table/list rows (was Material 48-56) */
+  --df-field-height: 40px; /* dense form fields */
+
+  /* --- 1.3 Elevation. Flat, border-defined. Shadow is reserved for
+     true floating layers (CDK overlays) only. dark deepens; phosphor
+     swaps the drop shadow for a border-glow (see theme blocks). --- */
+  --df-shadow-overlay: 0 8px 24px rgba(0, 0, 0, 0.18),
+    0 2px 6px rgba(0, 0, 0, 0.08);
+
+  /* --- 1.4 Warning companions. --df-warning already exists; complete
+     the soft/border trio to match success/danger. --- */
+  --df-warning-soft: rgba(180, 83, 9, 0.1);
+  --df-warning-border: rgba(180, 83, 9, 0.35);
+
+  /* --- 1.5 Motion. Fast, subtle, interruptible. Reduced-motion zeroes
+     the durations in the media block after the theme definitions. --- */
+  --df-duration-fast: 120ms;
+  --df-duration-standard: 200ms;
+  --df-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --df-ease-emphasized: cubic-bezier(0.3, 0, 0, 1);
+
+  /* --- 1.6 Focus. Keyboard-only ring; auto-adapts per theme via the
+     surface + accent tokens it references. --- */
+  --df-focus-ring: 0 0 0 2px var(--df-surface), 0 0 0 4px var(--df-accent);
+
+  /* --- Skeleton loaders (Phase 0 kit). Base block + moving shine,
+     per theme; df-skeleton consumes these. --- */
+  --df-skeleton-bg: rgba(0, 0, 0, 0.07);
+  --df-skeleton-shine: rgba(0, 0, 0, 0.03);
+}
+
+/* Wider viewports earn a wider page gutter (spec 1.2). */
+@media (min-width: 1440px) {
+  :root {
+    --df-page-gutter: var(--df-space-6); /* 32px */
+  }
 }
 
 .dark-theme {
@@ -149,6 +221,15 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   --df-tint-ai-fg: #f472b6;
   --df-tint-docs-bg: rgba(45, 212, 191, 0.12);
   --df-tint-docs-fg: #2dd4bf;
+
+  /* Meridian per-theme (spec 1.3-1.5): only overlay/warning/skeleton
+     shift for dark; type/space/motion/focus inherit from :root. */
+  --df-shadow-overlay: 0 10px 30px rgba(0, 0, 0, 0.5),
+    0 3px 8px rgba(0, 0, 0, 0.35);
+  --df-warning-soft: rgba(251, 191, 36, 0.12);
+  --df-warning-border: rgba(251, 191, 36, 0.35);
+  --df-skeleton-bg: rgba(255, 255, 255, 0.06);
+  --df-skeleton-shine: rgba(255, 255, 255, 0.11);
 }
 
 /* ------------------------------------------------------------
@@ -212,6 +293,16 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   --df-tint-ai-fg: #33ff66;
   --df-tint-docs-bg: rgba(51, 255, 102, 0.08);
   --df-tint-docs-fg: #2edd5b;
+
+  /* Meridian per-theme (spec 1.3-1.4): no drop shadow on a terminal -
+     the overlay is a border-glow. Amber is warnings-only in phosphor
+     (Captain rule), so the warning trio rides the phosphor amber. */
+  --df-shadow-overlay: 0 0 0 1px var(--df-accent-soft),
+    0 0 12px rgba(51, 255, 102, 0.18);
+  --df-warning-soft: rgba(217, 159, 74, 0.15);
+  --df-warning-border: rgba(217, 159, 74, 0.5);
+  --df-skeleton-bg: rgba(51, 255, 102, 0.06);
+  --df-skeleton-shine: rgba(51, 255, 102, 0.12);
 
   a {
     color: #4dd8e6;
@@ -292,6 +383,16 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
     --mdc-switch-selected-focus-state-layer-color: var(--df-accent);
     --mdc-switch-selected-hover-state-layer-color: var(--df-accent);
     --mdc-switch-selected-pressed-state-layer-color: var(--df-accent);
+  }
+}
+
+/* Reduced-motion gate (spec 1.5): zero the duration tokens so every
+   token-driven transition collapses to an instant cut. The phosphor
+   boot sequence has its own reduced-motion handling further below. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --df-duration-fast: 0.01ms;
+    --df-duration-standard: 0.01ms;
   }
 }
 
@@ -412,7 +513,9 @@ html {
   font-size: 62.5%;
 }
 body {
-  font-size: 1.4rem;
+  /* Meridian body default (spec 1.1): 13px, driven by the type token. */
+  font-size: var(--df-font-size-sm);
+  line-height: var(--df-lh-base);
   margin: 0;
   /* Inter is the product typeface (see theme.scss); the old Roboto stack
      here silently overrode it for non-Material text. */
@@ -664,17 +767,19 @@ a {
 
 // Tables: quieter header row, tighter rows, hairline separators.
 .mat-mdc-header-cell {
-  font-size: 11px !important;
-  font-weight: 600 !important;
+  font-size: var(--df-font-size-xs) !important;
+  font-weight: var(--df-font-weight-heading) !important;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: var(--df-tracking-eyebrow);
   color: var(--df-text-muted) !important;
 }
+// Row rhythm rides --df-row-height (spec 1.2, 38px) so it stays in lockstep
+// with Material density -2; the token wins over the density-computed height.
 .mat-mdc-header-row {
-  height: 40px !important;
+  height: var(--df-row-height) !important;
 }
 .mat-mdc-row {
-  height: 44px !important;
+  height: var(--df-row-height) !important;
 }
 .mat-mdc-cell,
 .mat-mdc-header-cell {
@@ -724,6 +829,50 @@ a {
 .mat-mdc-dialog-surface {
   border-radius: var(--df-radius);
   overflow: hidden;
+}
+
+/* ============================================================
+   Meridian Phase 0 utilities + focus (spec 1.1, 1.6).
+   ============================================================ */
+
+/* Tabular numerics: apply to every number in a table, stat tile, usage
+   counter, cost figure, request/token count, key hash, and ID. Pair with
+   right-alignment on those cells. */
+.df-numeric {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'zero' 1;
+}
+
+/* Uppercase micro-label for stat-tile labels, card section headers,
+   table-section labels. */
+.df-eyebrow {
+  font-size: var(--df-font-size-xs);
+  font-weight: var(--df-font-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: var(--df-tracking-eyebrow);
+  color: var(--df-text-muted);
+}
+
+/* Focus (spec 1.6): one ring, keyboard-only. Mouse focus shows nothing;
+   :focus-visible paints the two-stop ring (surface gap + accent). Custom
+   table rows, nav items, and the palette list opt in per surface; this
+   sets the interactive-element baseline and overrides Material's mixed
+   focus overlays. */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible,
+[role='button']:focus-visible,
+.mat-mdc-button-base:focus-visible,
+.mat-mdc-list-item:focus-visible,
+.mat-mdc-row.clickable:focus-visible {
+  outline: none;
+  box-shadow: var(--df-focus-ring);
 }
 
 /* swagger tokens - stream8-rollout(api-docs) */
