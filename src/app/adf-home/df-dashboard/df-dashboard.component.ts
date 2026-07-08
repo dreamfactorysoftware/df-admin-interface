@@ -1,7 +1,7 @@
 import { Component, Inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { Router, RouterModule } from '@angular/router';
+import { RouterModule } from '@angular/router';
 import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { FormsModule } from '@angular/forms';
@@ -11,6 +11,11 @@ import { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import {
   faShieldHalved,
   faArrowRight,
+  faDatabase,
+  faUserShield,
+  faKey,
+  faPlug,
+  faBookOpen,
 } from '@fortawesome/free-solid-svg-icons';
 import { firstValueFrom } from 'rxjs';
 
@@ -25,13 +30,10 @@ import {
   HomeMetrics,
 } from 'src/app/shared/services/df-home-metrics.service';
 import { ServiceScopePosture } from 'src/app/shared/services/df-scope.service';
-import { DfArtifactResolverService } from 'src/app/shared/services/df-artifact-resolver.service';
-import { ArtifactKeyOption } from 'src/app/shared/components/df-artifact-card/df-artifact-card.component';
 
 import { DfPageHeaderComponent } from 'src/app/shared/components/df-page-header/df-page-header.component';
 import { DfOnboardingChecklistComponent } from 'src/app/shared/components/df-onboarding-checklist/df-onboarding-checklist.component';
 import { DfStatTileComponent } from 'src/app/shared/components/df-stat-tile/df-stat-tile.component';
-import { DfArtifactCardComponent } from 'src/app/shared/components/df-artifact-card/df-artifact-card.component';
 import { DfBadgeComponent } from 'src/app/shared/components/df-badge/df-badge.component';
 import { DfEmptyStateComponent } from 'src/app/shared/components/df-empty-state/df-empty-state.component';
 import { DfSkeletonComponent } from 'src/app/shared/components/df-skeleton/df-skeleton.component';
@@ -70,6 +72,17 @@ interface ServiceRow {
   type?: string;
 }
 
+/** One quick-action CTA: a single verb that routes straight into a create (or
+ *  relevant) flow. Not a nav mirror, not a counter - the thing an admin does
+ *  next. `category` picks the --df-tint-* wash so all three themes repaint. */
+interface QuickAction {
+  icon: IconDefinition;
+  titleKey: string;
+  descKey: string;
+  route: string;
+  category: 'build' | 'security' | 'ai' | 'docs';
+}
+
 /** One KPI tile rendered in State B. Built only from metrics with a real
  *  value; a null metric is dropped upstream so no tile is ever fabricated. */
 interface KpiTile {
@@ -93,11 +106,12 @@ type HomeState = 'loading' | 'error' | 'onboarding' | 'cockpit';
  *    empty state ends in one working API.
  *  - State B (>=1 service): a df-stat-tile KPI grid (every value derived from a
  *    REAL endpoint via DfHomeMetricsService; null metrics are omitted, never
- *    faked) governed by one time-range select, the df-artifact-card Live API
- *    Card wired through the shared resolver so its curl returns 200, and an
- *    exposure alert strip when any user service is OPEN - broadly reachable
- *    (whole-service read+write) through an active role. Deny-by-default: a
- *    service no role grants is LOCKED, not a risk, and is never flagged.
+ *    faked) governed by one time-range select, an exposure alert strip when any
+ *    user service is OPEN - broadly reachable (whole-service read+write) through
+ *    an active role (deny-by-default: a service no role grants is LOCKED, not a
+ *    risk, and is never flagged), and a row of task-oriented quick-action CTAs
+ *    that route straight into the create flows. Reads as a dashboard, not a
+ *    landing hero: the Live API Card lives on the service page, not Home.
  *
  * Loading renders df-skeleton tiles + checklist rows; a hard fetch failure
  * renders df-empty-state with retry. Tokens only, i18n via transloco.
@@ -118,7 +132,6 @@ type HomeState = 'loading' | 'error' | 'onboarding' | 'cockpit';
     DfPageHeaderComponent,
     DfOnboardingChecklistComponent,
     DfStatTileComponent,
-    DfArtifactCardComponent,
     DfBadgeComponent,
     DfEmptyStateComponent,
     DfSkeletonComponent,
@@ -146,12 +159,6 @@ export class DfDashboardComponent implements OnInit {
   ];
   tilesLoading = false;
   tiles: KpiTile[] = [];
-
-  // Live API Card inputs (resolved so the curl returns 200).
-  artifactServiceName = '';
-  artifactBaseUrl = '';
-  artifactSampleTable = 'your_table';
-  artifactKeys: ArtifactKeyOption[] = [];
 
   // Exposure alert strip: user services classified OPEN (whole-service write
   // via some active role). Empty = nothing broadly exposed; the strip hides.
@@ -181,13 +188,54 @@ export class DfDashboardComponent implements OnInit {
   readonly rolesRoute = `/${ROUTES.API_CONNECTIONS}/${ROUTES.ROLE_BASED_ACCESS}`;
   readonly apiKeysRoute = `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_KEYS}`;
 
+  // Quick actions: one verb each, routing straight into the create/relevant
+  // flow. Order is the natural build sequence (make an API, lock it down, hand
+  // out a key, wire an agent, read the docs). Future: an "errors in last 24h"
+  // widget belongs on this row once the server exposes a real error-count
+  // endpoint - do NOT fabricate it from client-side guesses.
+  readonly actions: QuickAction[] = [
+    {
+      icon: faDatabase,
+      titleKey: 'homeCockpit.actions.generateApi.title',
+      descKey: 'homeCockpit.actions.generateApi.desc',
+      route: `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_TYPES}/${ROUTES.DATABASE}/${ROUTES.CREATE}`,
+      category: 'build',
+    },
+    {
+      icon: faUserShield,
+      titleKey: 'homeCockpit.actions.createRole.title',
+      descKey: 'homeCockpit.actions.createRole.desc',
+      route: `/${ROUTES.API_CONNECTIONS}/${ROUTES.ROLE_BASED_ACCESS}/${ROUTES.CREATE}`,
+      category: 'security',
+    },
+    {
+      icon: faKey,
+      titleKey: 'homeCockpit.actions.createKey.title',
+      descKey: 'homeCockpit.actions.createKey.desc',
+      route: `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_KEYS}/${ROUTES.CREATE}`,
+      category: 'security',
+    },
+    {
+      icon: faPlug,
+      titleKey: 'homeCockpit.actions.connectMcp.title',
+      descKey: 'homeCockpit.actions.connectMcp.desc',
+      route: `/${ROUTES.AI}/${ROUTES.AI_MCP}/${ROUTES.CREATE}`,
+      category: 'ai',
+    },
+    {
+      icon: faBookOpen,
+      titleKey: 'homeCockpit.actions.apiDocs.title',
+      descKey: 'homeCockpit.actions.apiDocs.desc',
+      route: `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_DOCS}`,
+      category: 'docs',
+    },
+  ];
+
   private userServices: ServiceRow[] = [];
 
   constructor(
     private http: HttpClient,
     private homeMetrics: DfHomeMetricsService,
-    private artifactResolver: DfArtifactResolverService,
-    private router: Router,
     @Inject(SERVICES_SERVICE_TOKEN) private servicesService: DfBaseCrudService
   ) {}
 
@@ -282,7 +330,6 @@ export class DfDashboardComponent implements OnInit {
     this.tiles = this.buildTiles(metrics);
     this.firstCallMade = (metrics.requestsToday.value ?? 0) > 0;
     this.openServices = metrics.openServices;
-    await this.loadArtifactCard();
   }
 
   /** Omit any tile whose metric has no real source (value === null). A real 0
@@ -339,28 +386,6 @@ export class DfDashboardComponent implements OnInit {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     })}`;
-  }
-
-  // Resolve a working key + sample table for the first user service so the Live
-  // API Card's curl returns 200 (shared probe, same as service Overview).
-  private async loadArtifactCard(): Promise<void> {
-    const first = this.userServices[0];
-    if (!first) {
-      return;
-    }
-    this.artifactServiceName = first.name;
-    this.artifactBaseUrl = `${window.location.origin}${BASE_URL}/${first.name}`;
-    const res = await this.artifactResolver.resolveWorkingKeyAndTable(
-      first.id,
-      first.name,
-      this.artifactSampleTable
-    );
-    this.artifactSampleTable = res.sampleTable;
-    this.artifactKeys = res.keys;
-  }
-
-  onCreateApiKey(): void {
-    this.router.navigate([this.apiKeysRoute]);
   }
 
   // --- data fetch ----------------------------------------------------------

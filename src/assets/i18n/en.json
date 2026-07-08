@@ -961,6 +961,28 @@
     "exposure": {
       "label": "{{count}} services allow broad read and write access",
       "cta": "Review access"
+    },
+    "actions": {
+      "generateApi": {
+        "title": "Generate an API from your database",
+        "desc": "Connect a database and get a secured REST API in minutes."
+      },
+      "createRole": {
+        "title": "Create a role",
+        "desc": "Scope what a key can reach, table by table."
+      },
+      "createKey": {
+        "title": "Create an API key",
+        "desc": "Issue a key bound to a role and start making calls."
+      },
+      "connectMcp": {
+        "title": "Connect an MCP server",
+        "desc": "Expose your data to agents over the Model Context Protocol."
+      },
+      "apiDocs": {
+        "title": "Open API docs",
+        "desc": "Browse and try every endpoint live in the console."
+      }
     }
   },
   "agents": {

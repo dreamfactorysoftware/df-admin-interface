@@ -5,13 +5,17 @@
   display: block;
 }
 
+// FB3: the whole cockpit must fit at 100% zoom on a ~1920x1080 desktop with no
+// vertical scroll. Spacing is tightened (space-4 stack gap, space-5 bottom
+// pad) so the header + range select + KPI row + exposure strip + quick-action
+// row all sit above the fold. Values are tokens, so density stays consistent.
 .home-body {
   max-width: var(--df-content-max);
   margin: 0 auto;
-  padding: 0 var(--df-page-gutter) var(--df-space-8);
+  padding: 0 var(--df-page-gutter) var(--df-space-5);
   display: flex;
   flex-direction: column;
-  gap: var(--df-space-5);
+  gap: var(--df-space-4);
 }
 
 // Equal-height KPI grid, hairline-bordered tiles, no shadow (owned by the tile
@@ -29,6 +33,101 @@
   mat-form-field {
     min-width: 180px;
   }
+}
+
+// Quick-action CTA row: compact task tiles, marketing-CTA feel. Auto-fit so
+// the five verbs sit on one row on desktop and wrap on narrow viewports. Each
+// tile is the whole link. Category wash + icon/arrow color ride the
+// categorical --df-tint-* tokens, so all three themes repaint by construction
+// with no color literal in this file.
+.quick-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--df-space-3);
+}
+
+.action-tile {
+  --tile-tint-bg: var(--df-surface);
+  --tile-tint-fg: var(--df-accent);
+
+  display: flex;
+  align-items: center;
+  gap: var(--df-space-3);
+  padding: var(--df-space-3) var(--df-space-4);
+  border: 1px solid var(--df-border-2);
+  border-radius: var(--df-radius);
+  background: var(--tile-tint-bg);
+  color: var(--df-text);
+  text-decoration: none;
+  transition:
+    border-color var(--df-duration-fast, 120ms) var(--df-ease-standard, ease),
+    background-color var(--df-duration-fast, 120ms) var(--df-ease-standard, ease);
+
+  &:hover {
+    border-color: var(--df-accent);
+
+    .action-arrow {
+      opacity: 1;
+      transform: translateX(2px);
+    }
+  }
+
+  &[data-category='build'] {
+    --tile-tint-bg: var(--df-tint-build-bg);
+    --tile-tint-fg: var(--df-tint-build-fg);
+  }
+  &[data-category='security'] {
+    --tile-tint-bg: var(--df-tint-security-bg);
+    --tile-tint-fg: var(--df-tint-security-fg);
+  }
+  &[data-category='ai'] {
+    --tile-tint-bg: var(--df-tint-ai-bg);
+    --tile-tint-fg: var(--df-tint-ai-fg);
+  }
+  &[data-category='docs'] {
+    --tile-tint-bg: var(--df-tint-docs-bg);
+    --tile-tint-fg: var(--df-tint-docs-fg);
+  }
+}
+
+.action-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--df-font-size-lg, 1.6rem);
+  color: var(--tile-tint-fg);
+}
+
+.action-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--df-space-1);
+  min-width: 0;
+}
+
+.action-title {
+  font-size: var(--df-font-size-sm, 1.4rem);
+  font-weight: var(--df-font-weight-medium, 500);
+  line-height: 1.3;
+  color: var(--df-text);
+}
+
+.action-desc {
+  font-size: var(--df-font-size-xs, 1.2rem);
+  line-height: 1.35;
+  color: var(--df-text-2);
+}
+
+.action-arrow {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-size: var(--df-font-size-sm, 1.4rem);
+  color: var(--tile-tint-fg);
+  opacity: 0.6;
+  transition:
+    opacity var(--df-duration-fast, 120ms) var(--df-ease-standard, ease),
+    transform var(--df-duration-fast, 120ms) var(--df-ease-standard, ease);
 }
 
 .provision-row {

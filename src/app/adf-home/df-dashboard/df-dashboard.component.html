@@ -93,14 +93,26 @@
       </span>
     </a>
 
-    <!-- Live API Card: real base URL + resolved key + curl that returns 200 -->
-    <df-artifact-card
-      *ngIf="artifactServiceName"
-      [serviceName]="artifactServiceName"
-      [baseUrl]="artifactBaseUrl"
-      [sampleTable]="artifactSampleTable"
-      [keys]="artifactKeys"
-      (createKey)="onCreateApiKey()">
-    </df-artifact-card>
+    <!-- Quick actions: task-oriented CTAs that route straight into the create
+         flow. Not nav mirrors, not counters - the verb an admin runs next. The
+         Live API Card is gone from Home by design; it lives on the service page.
+         Future: an "errors in last 24h" widget belongs on this row once a real
+         error-count endpoint exists - do NOT build it from client guesses. -->
+    <div class="quick-actions">
+      <a
+        *ngFor="let action of actions"
+        class="action-tile"
+        [routerLink]="action.route"
+        [attr.data-category]="action.category">
+        <span class="action-icon">
+          <fa-icon [icon]="action.icon"></fa-icon>
+        </span>
+        <span class="action-body">
+          <span class="action-title">{{ action.titleKey | transloco }}</span>
+          <span class="action-desc">{{ action.descKey | transloco }}</span>
+        </span>
+        <fa-icon class="action-arrow" [icon]="faArrowRight"></fa-icon>
+      </a>
+    </div>
   </ng-container>
 </div>
