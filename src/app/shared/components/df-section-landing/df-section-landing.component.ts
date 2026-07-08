@@ -11,11 +11,11 @@ export type SectionLandingAction = {
   primary?: boolean;
 };
 
-// Coordinated category tints (item 21): a card and its icon draw color from
-// the --df-tint-<category>-bg/-fg token pairs in styles.scss. Every theme
-// (light, dark, phosphor) resolves these tokens, so tinting stays correct by
-// construction. Omit `tint` to keep the neutral accent treatment.
-export type SectionLandingTint =
+// Semantic tint categories map to the --df-tint-<category>-* token pairs in
+// styles.scss (punch 21). A card/stat and its icon draw color from these
+// tokens; every theme (light, dark, phosphor) resolves them, so tinting stays
+// correct by construction. Omit to keep the neutral accent treatment.
+export type SectionLandingCategory =
   | 'build'
   | 'data'
   | 'security'
@@ -23,6 +23,11 @@ export type SectionLandingTint =
   | 'admin'
   | 'ai'
   | 'docs';
+
+// Alias kept for the build/secure landing wave, which introduced the `tint`
+// field name for the same token-driven categorical color. Both spellings
+// resolve to the same union and the same --df-tint-<cat> tokens.
+export type SectionLandingTint = SectionLandingCategory;
 
 export type SectionLandingCard = {
   icon: string;
@@ -32,7 +37,10 @@ export type SectionLandingCard = {
   action: string;
   meta?: string;
   disabled?: boolean;
+  // Two spellings, one behavior: `tint` (build/secure wave) and `category`
+  // (system/admin/ai wave) both drive the same categorical color.
   tint?: SectionLandingTint;
+  category?: SectionLandingCategory;
 };
 
 export type SectionLandingGroup = {
@@ -50,6 +58,7 @@ export type SectionLandingStat = {
   label: string;
   value: string;
   icon?: string;
+  category?: SectionLandingCategory;
 };
 
 @Component({
