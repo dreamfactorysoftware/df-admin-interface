@@ -37,6 +37,51 @@
     </div>
   </header>
 
+  <div class="usage__scope">
+    <span class="usage__scope-label">Scope</span>
+    <mat-button-toggle-group
+      class="usage__scope-toggle"
+      [value]="scopeDim"
+      (change)="setScopeDim($event.value)"
+      aria-label="Usage scope"
+      matTooltip="One lens across every chart below. Tenant = AI Connection, Role = RBAC role, Key = App / API key."
+      matTooltipPosition="above">
+      <mat-button-toggle value="none">All</mat-button-toggle>
+      <mat-button-toggle value="tenant">Tenant</mat-button-toggle>
+      <mat-button-toggle value="role">Role</mat-button-toggle>
+      <mat-button-toggle value="key">Key</mat-button-toggle>
+    </mat-button-toggle-group>
+
+    <mat-form-field
+      *ngIf="scopeDim !== 'none'"
+      appearance="outline"
+      class="usage__scope-member">
+      <mat-label>{{ scopeMemberLabel() }}</mat-label>
+      <mat-select
+        [ngModel]="scopeValue"
+        (ngModelChange)="onScopeValueChange($event)">
+        <mat-option [value]="null">All {{ scopeMemberLabel() }}s</mat-option>
+        <mat-option
+          *ngFor="let o of scopeMemberOptions(); trackBy: trackOptionId"
+          [value]="o.id">
+          {{ o.label }}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <span class="usage__scope-hint">
+      {{
+        scopeDim === 'none'
+          ? 'Slice every chart by a tenant, role, or API key.'
+          : scopeValue == null
+            ? 'Pick one to re-slice every chart below.'
+            : 'Every chart below is scoped to this ' +
+              scopeMemberLabel().toLowerCase() +
+              '.'
+      }}
+    </span>
+  </div>
+
   <mat-card *ngIf="budgetWarnings.length > 0" class="usage__budget-banner">
     <mat-card-content>
       <div class="usage__budget-banner-head">
@@ -303,6 +348,18 @@
           [data]="costByAppSeries"></df-cost-by-dimension>
       </div>
 
+      <!-- Categorical spend share. "By model" is real (by_model carries
+           cost); "by tag" is intentionally omitted — ai_usage_log has no tag
+           column, so there is no honest per-record source to draw it from. -->
+      <div *ngIf="hasModelSpend" class="usage__breakdown-grid">
+        <df-spend-breakdown
+          title="Spend by model"
+          subtitle="Share of the bill per model this period"
+          hint="Total cost attributed to each model, largest first. The long tail folds into Other. Colour is the categorical tint palette; the model name and dollar figure carry the meaning."
+          [rows]="spendByModel"
+          [limit]="8"></df-spend-breakdown>
+      </div>
+
       <df-expensive-calls
         title="Top 10 most expensive calls"
         [data]="expensiveCalls"></df-expensive-calls>
@@ -361,40 +418,40 @@
           [limit]="8"></df-usage-bars>
       </div>
 
-      <mat-card *ngIf="budgets.length > 0" class="usage__budgets">
+      <mat-card *ngIf="visibleBudgets.length > 0" class="usage__budgets">
         <mat-card-content>
           <header class="usage__budgets-head">
             <h4 class="usage__budgets-title">
-              Budget status
+              Budget vs actual spend
               <fa-icon
                 class="usage__section-hint"
                 [icon]="faCircleInfo"
-                matTooltip="Spend this calendar month vs. your configured budget per AI Connection. Projection extrapolates today's burn rate to month-end. Set or adjust budgets on each connection's edit page."
+                matTooltip="A dollar budget per AI Connection, measured against real month-to-date spend. Projection extrapolates today's burn rate to month-end. Set or adjust the budget on each connection's edit page."
                 matTooltipPosition="above"></fa-icon>
             </h4>
             <span class="usage__budgets-period">
-              day {{ budgets[0].daysIntoMonth }} of
-              {{ budgets[0].daysInMonth }}
+              day {{ visibleBudgets[0].daysIntoMonth }} of
+              {{ visibleBudgets[0].daysInMonth }}
             </span>
           </header>
           <ul class="usage__budgets-list">
             <li
-              *ngFor="let b of budgets; trackBy: trackBudget"
-              class="usage__budgets-row">
+              *ngFor="let b of visibleBudgets; trackBy: trackBudget"
+              class="usage__budgets-row"
+              [attr.data-status]="b.status">
               <div class="usage__budgets-row-head">
                 <span class="usage__budgets-row-name">{{
                   b.serviceLabel
                 }}</span>
-                <span
-                  class="usage__budgets-row-amount"
-                  [class.usage__budgets-row-amount--over]="!b.onTrack">
-                  {{ formatUsd(b.spentMonthUsd) }} /
-                  {{ formatUsd(b.budgetUsd) }}
+                <span class="usage__budgets-row-amount">
+                  <strong>{{ formatUsd(b.spentMonthUsd) }}</strong>
+                  of {{ formatUsd(b.budgetUsd) }}
+                  <span class="usage__budgets-row-share"
+                    >({{ b.spentRatio * 100 | number: '1.0-0' }}%)</span
+                  >
                 </span>
               </div>
-              <div
-                class="usage__budgets-row-bar"
-                [class.usage__budgets-row-bar--over]="!b.onTrack">
+              <div class="usage__budgets-row-bar">
                 <div
                   class="usage__budgets-row-fill"
                   [style.width.%]="
