@@ -71,6 +71,7 @@ import {
   of,
   throwError,
   tap,
+  firstValueFrom,
 } from 'rxjs';
 import { normalizeError } from 'src/app/shared/utilities/app-error';
 import { silent, toastOff } from 'src/app/shared/utilities/http-contexts';
@@ -112,8 +113,6 @@ import {
   DfArtifactCardComponent,
   ArtifactKeyOption,
 } from 'src/app/shared/components/df-artifact-card/df-artifact-card.component';
-import { ApiKeysService } from 'src/app/adf-api-docs/services/api-keys.service';
-import { ApiKeyInfo } from 'src/app/shared/types/api-keys';
 
 type UnsavedToolChoice = 'save' | 'discard' | 'cancel';
 
@@ -323,8 +322,7 @@ export class DfServiceDetailsComponent implements OnInit {
     private currentServiceService: DfCurrentServiceService,
     private snackBar: MatSnackBar,
     private systemService: DfSystemService,
-    private analyticsService: DfAnalyticsService,
-    private apiKeysService: ApiKeysService
+    private analyticsService: DfAnalyticsService
   ) {
     this.serviceForm = this.fb.group({
       type: ['', Validators.required],
@@ -2052,50 +2050,166 @@ export class DfServiceDetailsComponent implements OnInit {
     this.router.navigate(['/api-connections/api-keys/create']);
   }
 
-  private loadArtifactCardData(): void {
+  // Resolve a key + sample table for the Live API Card whose curl PROVABLY
+  // returns 200. Prior versions embedded any key whose role claimed access,
+  // but seed keys can be expired (agent keys have a TTL) or scoped to tables
+  // other than the auto-picked one, so the on-screen curl 400/403'd. This
+  // probes each candidate key (raw fetch, API key only, no session token) on a
+  // table its role grants and surfaces the first that returns 200; working
+  // keys sort first so the default curl works out of the box.
+  private async loadArtifactCardData(): Promise<void> {
     const name = this.serviceData?.name;
     const id = this.serviceData?.id;
-    if (!name) {
-      return;
-    }
-    // Introspect the first table so the sample request hits a real endpoint.
-    this.http
-      .get<any>(`${BASE_URL}/${name}/_table`, { context: silent() })
-      .subscribe({
-        next: res => {
-          const first = res?.resource?.[0];
-          const table = typeof first === 'string' ? first : first?.name;
-          if (table) {
-            this.artifactSampleTable = table;
-          }
-        },
-        // No table (or no read grant for the admin session): keep the
-        // placeholder table; the card shape and curl still render.
-        error: () => undefined,
-      });
-    // Find API keys whose role can reach this service, so the card's default
-    // curl returns 200 rather than 400/403. None -> card shows create-key CTA.
-    // Reuse ApiKeysService (the proven api-docs path): it resolves keys in two
-    // steps — roles?related=role_service_access_by_role_id, then apps filtered
-    // by role_id. The single-request double-nested related
-    // (system/app?related=role_by_role_id.role_service_access_by_role_id) does
-    // NOT expand on the app LIST endpoint, so it returned an empty access array
-    // and no key ever qualified, leaving the literal YOUR_API_KEY placeholder.
-    if (typeof id !== 'number') {
+    if (!name || typeof id !== 'number') {
       this.artifactKeys = [];
       return;
     }
-    this.apiKeysService.getApiKeysForService(id).subscribe({
-      next: (keys: ApiKeyInfo[]) => {
-        this.artifactKeys = keys.map(k => ({
-          label: k.name || 'API key',
-          apiKey: k.apiKey,
-        }));
-      },
-      error: () => {
+    try {
+      const tables = await this.introspectArtifactTables(name);
+      if (tables[0]) {
+        this.artifactSampleTable = tables[0];
+      }
+      const candidates = await this.resolveArtifactCandidates(id);
+      if (!candidates.length) {
         this.artifactKeys = [];
-      },
+        return;
+      }
+      const origin = window.location.origin;
+      const working: Array<{ option: ArtifactKeyOption; table: string }> = [];
+      const rest: ArtifactKeyOption[] = [];
+      for (const c of candidates) {
+        const option: ArtifactKeyOption = { label: c.label, apiKey: c.apiKey };
+        const tryTables = (
+          c.grantsAll ? tables : c.tables.filter(t => tables.includes(t))
+        ).slice(0, 5);
+        let hit = '';
+        for (const t of tryTables) {
+          try {
+            const r = await fetch(
+              `${origin}${BASE_URL}/${name}/_table/${encodeURIComponent(
+                t
+              )}?limit=1`,
+              { headers: { 'X-DreamFactory-API-Key': c.apiKey } }
+            );
+            if (r.ok) {
+              hit = t;
+              break;
+            }
+          } catch {
+            // network hiccup; try the next table
+          }
+        }
+        if (hit) {
+          working.push({ option, table: hit });
+        } else {
+          rest.push(option);
+        }
+      }
+      if (working.length) {
+        this.artifactSampleTable = working[0].table;
+        this.artifactKeys = [...working.map(w => w.option), ...rest];
+      } else {
+        this.artifactKeys = rest;
+      }
+    } catch {
+      this.artifactKeys = [];
+    }
+  }
+
+  // Roles that can reach this service, resolved to their apps' keys plus the
+  // GET-granted table names parsed from each role's service access (grantsAll
+  // when the role grants _table/* or *). Own two-step query because
+  // ApiKeysService drops the access components this needs.
+  private async resolveArtifactCandidates(serviceId: number): Promise<
+    Array<{ label: string; apiKey: string; tables: string[]; grantsAll: boolean }>
+  > {
+    const rolesRes = await firstValueFrom(
+      this.http.get<any>(
+        `${BASE_URL}/system/role?related=role_service_access_by_role_id&limit=200`,
+        { context: silent() }
+      )
+    );
+    const perRole = new Map<number, { tables: string[]; grantsAll: boolean }>();
+    for (const role of rolesRes?.resource ?? []) {
+      if (role?.isActive === false) {
+        continue;
+      }
+      let grantsAll = false;
+      const tables: string[] = [];
+      for (const a of role?.roleServiceAccessByRoleId ?? []) {
+        if (a?.serviceId !== serviceId || ((a?.verbMask ?? 0) & 1) === 0) {
+          continue;
+        }
+        const comp: string = a?.component ?? '';
+        if (comp === '' || comp === '*' || comp === '_table/*') {
+          grantsAll = true;
+        } else if (comp.startsWith('_table/')) {
+          const t = comp
+            .slice('_table/'.length)
+            .replace(/\/\*$/, '')
+            .replace(/\/$/, '');
+          if (t && t !== '*') {
+            tables.push(t);
+          }
+        }
+      }
+      if (grantsAll || tables.length) {
+        perRole.set(role.id, { tables, grantsAll });
+      }
+    }
+    if (!perRole.size) {
+      return [];
+    }
+    const roleIds = [...perRole.keys()];
+    const appResps = await Promise.all(
+      roleIds.map(roleId =>
+        firstValueFrom(
+          this.http.get<any>(
+            `${BASE_URL}/system/app?filter=role_id=${roleId}&fields=*`,
+            { context: silent() }
+          )
+        ).catch(() => ({ resource: [] }))
+      )
+    );
+    const out: Array<{
+      label: string;
+      apiKey: string;
+      tables: string[];
+      grantsAll: boolean;
+    }> = [];
+    roleIds.forEach((roleId, i) => {
+      const grant = perRole.get(roleId);
+      if (!grant) {
+        return;
+      }
+      for (const app of appResps[i]?.resource ?? []) {
+        if (app?.isActive === false || !app?.apiKey) {
+          continue;
+        }
+        out.push({
+          label: app.name || 'API key',
+          apiKey: app.apiKey,
+          tables: grant.tables,
+          grantsAll: grant.grantsAll,
+        });
+      }
     });
+    return out;
+  }
+
+  // Table names for the service (admin session lists them even when a scoped
+  // key cannot). Empty on failure; the card keeps its placeholder table.
+  private async introspectArtifactTables(name: string): Promise<string[]> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<any>(`${BASE_URL}/${name}/_table`, { context: silent() })
+      );
+      return (res?.resource ?? [])
+        .map((t: any) => (typeof t === 'string' ? t : t?.name))
+        .filter((t: any): t is string => !!t);
+    } catch {
+      return [];
+    }
   }
 
   getBackgroundImage(typeLabel: string) {
