@@ -25,6 +25,11 @@ export class DfDashboardCardComponent {
   @Input() zeroStateText?: string = 'Click to get started!';
   @Input() color: 'primary' | 'accent' | 'success' | 'info' | 'warn' =
     'primary';
+  // Semantic tint category (build | data | security | system | admin | ai |
+  // docs). When set, the icon chip pulls its wash + glyph color from the
+  // --df-tint-<category>-* tokens so the Quick Stats chips get their old
+  // coordinated color back across all three themes. No literals.
+  @Input() category?: string;
   @Input() clickable?: boolean = false;
   @Output() cardClick = new EventEmitter<void>();
 

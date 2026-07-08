@@ -31,6 +31,16 @@
   }
 }
 
+// Guidance line under the page title: says what this screen is for
+// (punch item 15 guidance layer). Muted, token-driven, all three themes.
+.home-intro {
+  color: var(--df-text-2);
+  font-size: 1.4rem;
+  line-height: 1.5;
+  margin: 0 0 20px;
+  max-width: 62ch;
+}
+
 .video-link {
   position: relative;
 }

@@ -23,7 +23,8 @@
         [zeroStateText]="'Create your first API'"
         [clickable]="stats.services.total === 0"
         (cardClick)="onServicesCardClick()"
-        color="primary">
+        color="primary"
+        category="build">
         <div prompt class="service-prompt" *ngIf="stats.services.total === 0">
           <span>{{ 'home.dashboard.services.createPrompt' | transloco }}</span>
         </div>
@@ -40,7 +41,8 @@
         [zeroStateText]="'Generate your API key'"
         [clickable]="stats.apiKeys.total === 0"
         (cardClick)="onApiKeysCardClick()"
-        color="success">
+        color="success"
+        category="data">
         <div prompt class="key-prompt" *ngIf="stats.apiKeys.total === 0">
           <span>{{ 'home.dashboard.apiKeys.createPrompt' | transloco }}</span>
         </div>
@@ -57,7 +59,8 @@
         [zeroStateText]="'Set up your first role'"
         [clickable]="stats.roles.total === 0"
         (cardClick)="onRolesCardClick()"
-        color="info">
+        color="info"
+        category="security">
         <div prompt class="role-prompt" *ngIf="stats.roles.total === 0">
           <span>{{ 'home.dashboard.roles.createPrompt' | transloco }}</span>
         </div>

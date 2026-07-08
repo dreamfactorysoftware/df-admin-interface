@@ -5,27 +5,61 @@
   text-decoration: none;
 }
 
-// Departure language: flat bordered card on tokens. The template still
-// binds per-card literal colors ([style.background-color] /
-// [style.color] from the TS data); those literals break dark and
-// phosphor by construction, so the !importants below neutralize the
-// inline styles without a template change (CSS-only wave rule).
+// Departure language kept (flat bordered card, same density), but color
+// is back per Captain's coordinated-tint directive (punch item 21). The
+// card wash and the icon/heading color ride the categorical --df-tint-*
+// tokens set by [data-category] below, so all three themes repaint by
+// construction and there is not a single color literal in this file.
 .df-generate-api-card {
+  // Local vars default to a neutral surface; each category overrides them.
+  --card-tint-bg: var(--df-surface);
+  --card-tint-fg: var(--df-accent);
+
   cursor: pointer;
   width: 100%;
   height: 100%;
   min-height: 160px;
   display: flex;
   flex-direction: column;
-  background-color: var(--df-surface) !important;
+  background-color: var(--card-tint-bg);
   border: 1px solid var(--df-border-2);
   transition:
     border-color 0.2s ease,
     background-color 0.2s ease;
 
   &:hover {
+    // Keep the category wash on hover; signal with the accent border only
+    // so the color that "means something" never washes out on interaction.
     border-color: var(--df-accent);
-    background-color: var(--df-hover) !important;
+  }
+
+  &[data-category='build'] {
+    --card-tint-bg: var(--df-tint-build-bg);
+    --card-tint-fg: var(--df-tint-build-fg);
+  }
+  &[data-category='data'] {
+    --card-tint-bg: var(--df-tint-data-bg);
+    --card-tint-fg: var(--df-tint-data-fg);
+  }
+  &[data-category='security'] {
+    --card-tint-bg: var(--df-tint-security-bg);
+    --card-tint-fg: var(--df-tint-security-fg);
+  }
+  &[data-category='system'] {
+    --card-tint-bg: var(--df-tint-system-bg);
+    --card-tint-fg: var(--df-tint-system-fg);
+  }
+  &[data-category='admin'] {
+    --card-tint-bg: var(--df-tint-admin-bg);
+    --card-tint-fg: var(--df-tint-admin-fg);
+  }
+  &[data-category='ai'] {
+    --card-tint-bg: var(--df-tint-ai-bg);
+    --card-tint-fg: var(--df-tint-ai-fg);
+  }
+  &[data-category='docs'] {
+    --card-tint-bg: var(--df-tint-docs-bg);
+    --card-tint-fg: var(--df-tint-docs-fg);
   }
 }
 
@@ -41,7 +75,8 @@
     margin-bottom: 12px;
     flex-shrink: 0;
     font-size: 2rem;
-    color: var(--df-accent) !important;
+    // Icon takes the category foreground tint.
+    color: var(--card-tint-fg);
   }
 
   .df-card-header {
@@ -50,7 +85,10 @@
     letter-spacing: -0.01em;
     margin-bottom: 8px;
     line-height: 1.3;
-    color: var(--df-text) !important;
+    // Heading takes the category foreground tint too (per directive:
+    // "fg on icon/heading"). The tint fg tokens are tuned per theme for
+    // readable foreground contrast, so legibility holds in all three.
+    color: var(--card-tint-fg);
   }
   .df-card-description {
     font-size: 1.4rem;

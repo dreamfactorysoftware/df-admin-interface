@@ -67,6 +67,61 @@
       color: var(--df-danger);
     }
   }
+
+  // Coordinated category tint (punch item 21): when [data-category] is set,
+  // the chip's wash + glyph take the --df-tint-<category>-* tokens. This
+  // brings the old purple/green/blue chip energy back, but token-driven so
+  // every theme repaints for free. Placed after the color classes so it
+  // wins by source order at equal specificity. Zero color literals.
+  &[data-category='build'] {
+    background: var(--df-tint-build-bg);
+    border-color: var(--df-border-2);
+    fa-icon {
+      color: var(--df-tint-build-fg);
+    }
+  }
+  &[data-category='data'] {
+    background: var(--df-tint-data-bg);
+    border-color: var(--df-border-2);
+    fa-icon {
+      color: var(--df-tint-data-fg);
+    }
+  }
+  &[data-category='security'] {
+    background: var(--df-tint-security-bg);
+    border-color: var(--df-border-2);
+    fa-icon {
+      color: var(--df-tint-security-fg);
+    }
+  }
+  &[data-category='system'] {
+    background: var(--df-tint-system-bg);
+    border-color: var(--df-border-2);
+    fa-icon {
+      color: var(--df-tint-system-fg);
+    }
+  }
+  &[data-category='admin'] {
+    background: var(--df-tint-admin-bg);
+    border-color: var(--df-border-2);
+    fa-icon {
+      color: var(--df-tint-admin-fg);
+    }
+  }
+  &[data-category='ai'] {
+    background: var(--df-tint-ai-bg);
+    border-color: var(--df-border-2);
+    fa-icon {
+      color: var(--df-tint-ai-fg);
+    }
+  }
+  &[data-category='docs'] {
+    background: var(--df-tint-docs-bg);
+    border-color: var(--df-border-2);
+    fa-icon {
+      color: var(--df-tint-docs-fg);
+    }
+  }
 }
 
 .header-stats {

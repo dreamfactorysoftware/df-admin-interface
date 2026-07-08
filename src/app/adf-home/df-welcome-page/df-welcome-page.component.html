@@ -11,6 +11,9 @@
           <h2>
             {{ 'home.welcomePage.generateYourApis' | transloco }}
           </h2>
+          <p class="home-intro">
+            {{ 'home.welcomePage.intro' | transloco }}
+          </p>
           <aside class="ai-home-cta">
             <div class="ai-home-cta__icon">
               <mat-icon>auto_awesome</mat-icon>
@@ -33,8 +36,7 @@
               [headerText]="card.headerTextKey"
               [text]="card.textKey"
               [route]="card.route"
-              [cardFinalBackgroundColor]="card.bgColor"
-              [cardFinalHeaderColor]="card.headerColor">
+              [category]="card.category">
             </df-generate-api-card>
           </div>
         </article>
