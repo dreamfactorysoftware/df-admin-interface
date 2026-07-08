@@ -77,6 +77,9 @@ export class DfRelationshipDetailsComponent implements OnInit {
 
   fieldOptions: BasicOption[];
 
+  trackByValue = (_: number, option: BasicOption): string | number =>
+    option.value;
+
   isXSmallScreen = this.breakpointService.isXSmallScreen;
   alertMsg = '';
   showAlert = false;

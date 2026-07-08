@@ -1481,18 +1481,41 @@ export class DfServiceDetailsComponent implements OnInit {
     );
   }
 
-  get viewSchema() {
-    const result = this.configSchema?.filter(
-      control => !['storageServiceId', 'storagePath'].includes(control.name)
-    );
+  // These schema-view getters are bound all over the template (*ngFor +
+  // *ngIf) and several call each other, so a single change-detection pass
+  // used to allocate 10+ fresh copies of the config schema array — every
+  // keystroke in the form re-filtered everything and tore down the *ngFor
+  // children (same hang pattern fixed in df-api-builder). configSchema is
+  // only ever reassigned (never mutated in place), so recompute the derived
+  // views only when configSchema or the service-type flags change and hand
+  // back stable array refs otherwise.
+  private schemaMemoSrc: Array<ConfigSchema> | null = null;
+  private schemaMemoIsDatabase: boolean | null = null;
+  private schemaMemoIsNetwork: boolean | null = null;
+  private memoViewSchema: Array<ConfigSchema> = [];
+  private memoHasStandardFields = false;
+  private memoBasicFields: Array<ConfigSchema> = [];
+  private memoAdvancedFields: Array<ConfigSchema> = [];
+  private memoNetworkRequiredFields: Array<ConfigSchema> = [];
+  private memoNetworkAdvancedFields: Array<ConfigSchema> = [];
 
-    return result || [];
-  }
-
-  get hasStandardFields(): boolean {
-    if (!this.isDatabase || !this.viewSchema) {
-      return false;
+  private syncSchemaViews(): void {
+    if (
+      this.schemaMemoSrc === (this.configSchema ?? null) &&
+      this.schemaMemoIsDatabase === this.isDatabase &&
+      this.schemaMemoIsNetwork === this.isNetworkService
+    ) {
+      return;
     }
+    this.schemaMemoSrc = this.configSchema ?? null;
+    this.schemaMemoIsDatabase = this.isDatabase;
+    this.schemaMemoIsNetwork = this.isNetworkService;
+
+    const viewSchema =
+      this.configSchema?.filter(
+        control => !['storageServiceId', 'storagePath'].includes(control.name)
+      ) || [];
+    this.memoViewSchema = viewSchema;
 
     const standardFieldNames = [
       'host',
@@ -1501,56 +1524,63 @@ export class DfServiceDetailsComponent implements OnInit {
       'username',
       'password',
     ];
-    const fieldNames = this.viewSchema.map(field => field.name.toLowerCase());
+    const fieldNames = viewSchema.map(field => field.name.toLowerCase());
+    // Standard connection form only when at least 3 of the standard fields exist
+    this.memoHasStandardFields =
+      this.isDatabase &&
+      standardFieldNames.filter(name => fieldNames.includes(name)).length >= 3;
 
-    // Check if at least 3 of the standard fields exist
-    const matchingFields = standardFieldNames.filter(name =>
-      fieldNames.includes(name)
-    );
-    return matchingFields.length >= 3;
+    if (!this.isDatabase) {
+      this.memoBasicFields = [];
+      this.memoAdvancedFields = [];
+    } else if (!this.memoHasStandardFields) {
+      // If not standard fields, return all fields as basic
+      this.memoBasicFields = viewSchema;
+      this.memoAdvancedFields = [];
+    } else {
+      this.memoBasicFields = viewSchema.filter(field =>
+        standardFieldNames.includes(field.name.toLowerCase())
+      );
+      this.memoAdvancedFields = viewSchema.filter(
+        field => !standardFieldNames.includes(field.name.toLowerCase())
+      );
+    }
+
+    // Base URL is the primary required field for network services; all other
+    // fields are considered advanced
+    const requiredFieldNames = ['baseUrl'];
+    if (!this.isNetworkService) {
+      this.memoNetworkRequiredFields = [];
+      this.memoNetworkAdvancedFields = [];
+    } else {
+      this.memoNetworkRequiredFields = viewSchema.filter(field =>
+        requiredFieldNames.includes(field.name)
+      );
+      this.memoNetworkAdvancedFields = viewSchema.filter(
+        field =>
+          !requiredFieldNames.includes(field.name) && field.name !== 'content'
+      );
+    }
+  }
+
+  get viewSchema() {
+    this.syncSchemaViews();
+    return this.memoViewSchema;
+  }
+
+  get hasStandardFields(): boolean {
+    this.syncSchemaViews();
+    return this.memoHasStandardFields;
   }
 
   get basicFields() {
-    if (!this.isDatabase || !this.viewSchema) {
-      return [];
-    }
-
-    if (!this.hasStandardFields) {
-      // If not standard fields, return all fields as basic
-      return this.viewSchema;
-    }
-
-    const basicFieldNames = [
-      'host',
-      'port',
-      'database',
-      'username',
-      'password',
-    ];
-    return this.viewSchema.filter(field =>
-      basicFieldNames.includes(field.name.toLowerCase())
-    );
+    this.syncSchemaViews();
+    return this.memoBasicFields;
   }
 
   get advancedFields() {
-    if (!this.isDatabase || !this.viewSchema) {
-      return [];
-    }
-
-    if (!this.hasStandardFields) {
-      return [];
-    }
-
-    const basicFieldNames = [
-      'host',
-      'port',
-      'database',
-      'username',
-      'password',
-    ];
-    return this.viewSchema.filter(
-      field => !basicFieldNames.includes(field.name.toLowerCase())
-    );
+    this.syncSchemaViews();
+    return this.memoAdvancedFields;
   }
 
   get showAdvancedOptions(): boolean {
@@ -1563,29 +1593,17 @@ export class DfServiceDetailsComponent implements OnInit {
 
   // Network service field categorization
   get networkRequiredFields() {
-    if (!this.isNetworkService || !this.viewSchema) {
-      return [];
-    }
-
-    // Base URL is the primary required field for network services
-    const requiredFieldNames = ['baseUrl'];
-    return this.viewSchema.filter(field =>
-      requiredFieldNames.includes(field.name)
-    );
+    this.syncSchemaViews();
+    return this.memoNetworkRequiredFields;
   }
 
   get networkAdvancedFields() {
-    if (!this.isNetworkService || !this.viewSchema) {
-      return [];
-    }
-
-    // All other fields are considered advanced
-    const requiredFieldNames = ['baseUrl'];
-    return this.viewSchema.filter(
-      field =>
-        !requiredFieldNames.includes(field.name) && field.name !== 'content'
-    );
+    this.syncSchemaViews();
+    return this.memoNetworkAdvancedFields;
   }
+
+  trackByName = (_: number, item: { name: string }): string => item.name;
+  trackById = (_: number, item: { id: number }): number => item.id;
 
   get showNetworkAdvancedOptions(): boolean {
     return this.isNetworkService;
@@ -1984,12 +2002,29 @@ export class DfServiceDetailsComponent implements OnInit {
     return image ? image.src : '';
   }
 
+  // Bound to the service-type picker grid *ngFor; without memoization every
+  // change-detection pass re-filtered the whole list and returned a new array
+  // (the api-builder hang pattern). Recompute only when the list ref or the
+  // search term changes.
+  private memoServiceTypesSrc: Array<ServiceType> | null = null;
+  private memoServiceTypesSearch: string | null = null;
+  private memoFilteredServiceTypes: Array<ServiceType> = [];
+
   get filteredServiceTypes() {
-    return this.serviceTypes.filter(
-      type =>
-        type.label.toLowerCase().includes(this.search.toLowerCase()) ||
-        type.name.toLowerCase().includes(this.search.toLowerCase())
-    );
+    if (
+      this.memoServiceTypesSrc !== this.serviceTypes ||
+      this.memoServiceTypesSearch !== this.search
+    ) {
+      this.memoServiceTypesSrc = this.serviceTypes;
+      this.memoServiceTypesSearch = this.search;
+      const term = this.search.toLowerCase();
+      this.memoFilteredServiceTypes = this.serviceTypes.filter(
+        type =>
+          type.label.toLowerCase().includes(term) ||
+          type.name.toLowerCase().includes(term)
+      );
+    }
+    return this.memoFilteredServiceTypes;
   }
 
   nextStep(stepper: MatStepper) {

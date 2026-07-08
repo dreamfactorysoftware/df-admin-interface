@@ -108,7 +108,10 @@ type AgentLogRow = {
           <mat-form-field appearance="outline"
             ><mat-label>Role</mat-label>
             <mat-select [(ngModel)]="newAgent.roleId">
-              <mat-option *ngFor="let r of roles" [value]="r.id">{{
+              <mat-option
+                *ngFor="let r of roles; trackBy: trackById"
+                [value]="r.id"
+                >{{
                 r.name
               }}</mat-option>
             </mat-select></mat-form-field
@@ -116,7 +119,10 @@ type AgentLogRow = {
           <mat-form-field appearance="outline" *ngIf="users.length"
             ><mat-label>Owner</mat-label>
             <mat-select [(ngModel)]="newAgent.ownerId">
-              <mat-option *ngFor="let u of users" [value]="u.id">{{
+              <mat-option
+                *ngFor="let u of users; trackBy: trackById"
+                [value]="u.id"
+                >{{
                 u.name
               }}</mat-option>
             </mat-select></mat-form-field
@@ -141,7 +147,7 @@ type AgentLogRow = {
         </div>
 
         <p class="muted" *ngIf="!agents.length">No agents yet.</p>
-        <div class="row" *ngFor="let a of agents">
+        <div class="row" *ngFor="let a of agents; trackBy: trackById">
           <span class="badge" [class.on]="a.isActive && !expired(a)">{{
             !a.isActive ? 'REVOKED' : expired(a) ? 'KEY EXPIRED' : 'ACTIVE'
           }}</span>
@@ -177,7 +183,10 @@ type AgentLogRow = {
           <mat-form-field appearance="outline"
             ><mat-label>Role</mat-label>
             <mat-select [(ngModel)]="editAgent.roleId">
-              <mat-option *ngFor="let r of roles" [value]="r.id">{{
+              <mat-option
+                *ngFor="let r of roles; trackBy: trackById"
+                [value]="r.id"
+                >{{
                 r.name
               }}</mat-option>
             </mat-select></mat-form-field
@@ -215,7 +224,7 @@ type AgentLogRow = {
         <p class="muted" *ngIf="!pendingRequests.length">
           No pending requests.
         </p>
-        <div class="row" *ngFor="let q of pendingRequests">
+        <div class="row" *ngFor="let q of pendingRequests; trackBy: trackById">
           <mat-icon class="hand">pan_tool</mat-icon>
           <strong>{{ agentName(q.agentId) }}</strong>
           <span class="muted">requests</span>
@@ -260,7 +269,7 @@ type AgentLogRow = {
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let a of agents">
+            <tr *ngFor="let a of agents; trackBy: trackById">
               <td>
                 <strong>{{ a.name }}</strong>
               </td>
@@ -294,7 +303,7 @@ type AgentLogRow = {
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let l of agentLog">
+            <tr *ngFor="let l of agentLog; trackBy: trackById">
               <td class="muted">{{ l.created_at | date: 'short' }}</td>
               <td>{{ l.event_name }}</td>
               <td>
@@ -470,9 +479,33 @@ export class DfAgentsComponent implements OnInit {
     keyTtlHours: 4,
   };
 
-  get pendingRequests(): AccessRequest[] {
-    return this.requests.filter(r => r.status === 'pending');
+  // pendingRequests / requestCount are bound in the template, so they run on
+  // every change-detection pass. Derive both from `requests` once per data
+  // load (the array ref only changes in refresh()) instead of re-filtering
+  // per evaluation.
+  private memoRequests: AccessRequest[] | null = null;
+  private memoPendingRequests: AccessRequest[] = [];
+  private memoRequestCounts = new Map<number, number>();
+
+  private syncRequestViews(): void {
+    if (this.memoRequests === this.requests) return;
+    this.memoRequests = this.requests;
+    this.memoPendingRequests = this.requests.filter(
+      r => r.status === 'pending'
+    );
+    const counts = new Map<number, number>();
+    for (const r of this.requests) {
+      counts.set(r.agentId, (counts.get(r.agentId) ?? 0) + 1);
+    }
+    this.memoRequestCounts = counts;
   }
+
+  get pendingRequests(): AccessRequest[] {
+    this.syncRequestViews();
+    return this.memoPendingRequests;
+  }
+
+  trackById = (_: number, item: { id: number }): number => item.id;
 
   ngOnInit(): void {
     this.http
@@ -516,15 +549,29 @@ export class DfAgentsComponent implements OnInit {
     return this.agents.find(a => a.id === id)?.name ?? 'agent ' + id;
   }
   requestCount(agentId: number): number {
-    return this.requests.filter(r => r.agentId === agentId).length;
+    this.syncRequestViews();
+    return this.memoRequestCounts.get(agentId) ?? 0;
   }
   maskKey(key: string): string {
     return key ? key.slice(0, 6) + '…' + key.slice(-4) : '—';
   }
+  // Called per agent row per change-detection pass; cache the parsed expiry
+  // timestamp per data load instead of allocating a Date on every call. The
+  // Date.now() comparison stays live so keys still flip to expired over time.
+  private memoAgents: Agent[] | null = null;
+  private memoExpiresAt = new Map<number, number>();
+
   expired(a: Agent): boolean {
     if (!a.keyIssuedAt) return false;
-    const expiresAt =
-      new Date(a.keyIssuedAt).getTime() + a.keyTtlHours * 3600_000;
+    if (this.memoAgents !== this.agents) {
+      this.memoAgents = this.agents;
+      this.memoExpiresAt.clear();
+    }
+    let expiresAt = this.memoExpiresAt.get(a.id);
+    if (expiresAt === undefined) {
+      expiresAt = new Date(a.keyIssuedAt).getTime() + a.keyTtlHours * 3600_000;
+      this.memoExpiresAt.set(a.id, expiresAt);
+    }
     return Date.now() > expiresAt;
   }
 

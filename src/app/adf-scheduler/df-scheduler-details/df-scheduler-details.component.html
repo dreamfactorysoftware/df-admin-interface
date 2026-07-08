@@ -47,7 +47,7 @@
           }}</mat-label>
           <mat-select formControlName="serviceId">
             <mat-option
-              *ngFor="let service of userServicesDropdownOptions"
+              *ngFor="let service of userServicesDropdownOptions; trackBy: trackById"
               [value]="service.id">
               {{ service.name }}
             </mat-option>
@@ -62,7 +62,7 @@
           }}</mat-label>
           <mat-select formControlName="component">
             <mat-option
-              *ngFor="let item of componentDropdownOptions"
+              *ngFor="let item of componentDropdownOptions; trackBy: trackByValue"
               [value]="item"
               >{{ item }}</mat-option
             >

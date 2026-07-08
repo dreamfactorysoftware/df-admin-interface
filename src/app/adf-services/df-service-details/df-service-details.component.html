@@ -45,7 +45,7 @@
             <div class="grid-wrapper grid-col-auto">
               <label
                 class="radio-card"
-                *ngFor="let type of filteredServiceTypes; let i = index">
+                *ngFor="let type of filteredServiceTypes; let i = index; trackBy: trackByName">
                 <input
                   formControlName="type"
                   type="radio"
@@ -66,7 +66,7 @@
               </label>
               <label
                 class="radio-card"
-                *ngFor="let type of notIncludedServices; let i = index">
+                *ngFor="let type of notIncludedServices; let i = index; trackBy: trackByName">
                 <input
                   formControlName="type"
                   type="radio"
@@ -204,7 +204,7 @@
             <ng-container *ngIf="!isDatabase || !hasStandardFields">
               <mat-accordion class="full-width">
                 <div class="details-section">
-                  <ng-container *ngFor="let item of viewSchema">
+                  <ng-container *ngFor="let item of viewSchema; trackBy: trackByName">
                     <ng-container
                       *ngIf="
                         item.type === 'text' && item.name === 'content';
@@ -265,7 +265,7 @@
 
             <ng-container *ngIf="isDatabase && hasStandardFields">
               <div class="details-section basic-fields-section">
-                <ng-container *ngFor="let item of basicFields">
+                <ng-container *ngFor="let item of basicFields; trackBy: trackByName">
                   <df-dynamic-field
                     *ngIf="
                       [
@@ -301,7 +301,7 @@
                       {{ 'services.options' | transloco }}
                     </mat-expansion-panel-header>
                     <div class="details-section">
-                      <ng-container *ngFor="let item of advancedFields">
+                      <ng-container *ngFor="let item of advancedFields; trackBy: trackByName">
                         <ng-container
                           *ngIf="
                             item.type === 'text' && item.name === 'content';
@@ -477,7 +477,7 @@
         (selectionChange)="
           onServiceTypeSelect(getServiceTypeLabel($event.value))
         ">
-        <mat-option *ngFor="let type of serviceTypes" [value]="type.name">
+        <mat-option *ngFor="let type of serviceTypes; trackBy: trackByName" [value]="type.name">
           {{ type.label }}
         </mat-option>
       </mat-select>
@@ -510,7 +510,7 @@
         <mat-label>Storage Service *</mat-label>
         <mat-select formControlName="storageServiceId" required>
           <mat-option
-            *ngFor="let service of availableFileServices"
+            *ngFor="let service of availableFileServices; trackBy: trackById"
             [value]="service.id">
             {{ service.label || service.name }}
           </mat-option>
@@ -578,7 +578,7 @@
         <!-- Network Service Configuration -->
         <ng-container *ngIf="this.isNetworkService">
           <!-- Required Fields (Base URL) - Always visible at the top -->
-          <ng-container *ngFor="let item of networkRequiredFields">
+          <ng-container *ngFor="let item of networkRequiredFields; trackBy: trackByName">
             <df-dynamic-field
               *ngIf="
                 [
@@ -661,7 +661,7 @@
                 </ng-container>
 
                 <!-- Other Advanced Fields -->
-                <ng-container *ngFor="let item of networkAdvancedFields">
+                <ng-container *ngFor="let item of networkAdvancedFields; trackBy: trackByName">
                   <df-dynamic-field
                     *ngIf="
                       [
@@ -743,7 +743,7 @@
                 </df-ace-editor>
 
                 <!-- Other configuration fields if any -->
-                <ng-container *ngFor="let item of viewSchema">
+                <ng-container *ngFor="let item of viewSchema; trackBy: trackByName">
                   <ng-container *ngIf="item.name !== 'content'">
                     <df-dynamic-field
                       *ngIf="
@@ -869,7 +869,7 @@
                     [formControl]="getConfigControl('excelContent')"
                     [mode]="excelMode"></df-ace-editor>
                 </ng-container>
-                <ng-container *ngFor="let item of viewSchema">
+                <ng-container *ngFor="let item of viewSchema; trackBy: trackByName">
                   <!-- ai_chat: aiServiceId and aiRoleId picked via prereqs panel above
                        ai_connection: defaultModel picked via model-picker above
                        ai_connection: allowedRoles picked via allowed-roles chips above
@@ -1025,7 +1025,7 @@
 
               <!-- Per-service tools -->
               <mat-expansion-panel
-                *ngFor="let svc of mcpServices"
+                *ngFor="let svc of mcpServices; trackBy: trackByName"
                 [expanded]="svc.expanded">
                 <mat-expansion-panel-header>
                   <mat-panel-title class="mcp-service-header">
@@ -1051,7 +1051,7 @@
                   </thead>
                   <tbody>
                     <tr
-                      *ngFor="let tool of svc.tools"
+                      *ngFor="let tool of svc.tools; trackBy: trackByName"
                       [class.disabled-row]="!isToolEnabled(tool.name)">
                       <td class="toggle-col">
                         <mat-slide-toggle
@@ -1162,7 +1162,7 @@
                 <mat-menu #urlLookupMenu="matMenu">
                   <button
                     mat-menu-item
-                    *ngFor="let lookup of availableLookups"
+                    *ngFor="let lookup of availableLookups; trackBy: trackByName"
                     (click)="insertLookup(lookup.name, 'url')">
                     {{ lookup.name }}
                   </button>
@@ -1304,7 +1304,7 @@
                       <mat-select formControlName="storageServiceId">
                         <mat-option [value]="null">None</mat-option>
                         <mat-option
-                          *ngFor="let svc of availableScmServices"
+                          *ngFor="let svc of availableScmServices; trackBy: trackById"
                           [value]="svc.id">
                           {{ svc.label || svc.name }}
                         </mat-option>
@@ -1382,7 +1382,7 @@
                   <mat-menu #fnLookupMenu="matMenu">
                     <button
                       mat-menu-item
-                      *ngFor="let lookup of availableLookups"
+                      *ngFor="let lookup of availableLookups; trackBy: trackByName"
                       (click)="insertLookup(lookup.name, 'function')">
                       {{ lookup.name }}
                     </button>
@@ -1420,7 +1420,7 @@
                   <mat-menu #hdrLookupMenu="matMenu">
                     <button
                       mat-menu-item
-                      *ngFor="let lookup of availableLookups"
+                      *ngFor="let lookup of availableLookups; trackBy: trackByName"
                       (click)="insertLookup(lookup.name, 'headers')">
                       {{ lookup.name }}
                     </button>

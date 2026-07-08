@@ -106,6 +106,8 @@ export class DfApiDocsComponent implements OnInit, AfterContentInit, OnDestroy {
 
   apiDocJson: ApiDocJson;
   apiKeys: ApiKeyInfo[] = [];
+
+  trackByApiKey = (_: number, key: ApiKeyInfo): string => key.apiKey;
   faCopy = faCopy;
   expandSchema = false;
 

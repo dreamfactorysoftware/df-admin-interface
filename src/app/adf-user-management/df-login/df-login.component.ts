@@ -72,6 +72,9 @@ export class DfLoginComponent implements OnInit {
   oauthServices: AuthService[] = [];
   samlServices: AuthService[] = [];
 
+  trackByName = (_: number, service: { name: string }): string =>
+    service.name;
+
   fpRoute = `/${ROUTES.AUTH}/${ROUTES.FORGOT_PASSWORD}`;
 
   isDarkMode = this.themeService.darkMode$;

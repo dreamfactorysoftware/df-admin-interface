@@ -165,7 +165,13 @@ export class DfWelcomePageComponent {
 
   ngOnInit(): void {
     this.servicesService.getReleases().subscribe((data: any) => {
-      this.releases = data.slice(0, 3);
+      // Precompute the display date once per load; the template used to call
+      // convertDateType per row per change-detection pass (new Date +
+      // toISOString each time).
+      this.releases = data.slice(0, 3).map((release: any) => ({
+        ...release,
+        publishedDate: this.convertDateType(release.published_at),
+      }));
     });
     this.storageService.setIsFirstUser();
   }

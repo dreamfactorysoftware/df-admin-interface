@@ -68,6 +68,9 @@ export class DfSchedulerDetailsComponent implements OnInit {
 
   componentDropdownOptions: string[] = [];
 
+  trackById = (_: number, item: { id: number }): number => item.id;
+  trackByValue = (_: number, item: string): string => item;
+
   scheduleToEdit: SchedulerTaskData | undefined;
   log = '';
   alertMsg = '';

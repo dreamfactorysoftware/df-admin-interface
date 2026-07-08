@@ -83,7 +83,22 @@ export class DfSystemOverviewComponent implements OnInit {
       .subscribe(serviceTypes => (this.serviceTypes = serviceTypes));
   }
 
+  // stats/groups feed child [inputs]; returning a fresh array per
+  // change-detection pass forces the landing component to re-diff its cards
+  // every cycle. Memoize on the async-loaded sources (environment ref /
+  // serviceTypes ref) so the refs stay stable between data loads.
+  private memoStatsEnv: Environment | null = null;
+  private memoStats: SectionLandingStat[] = [];
+
   get stats(): SectionLandingStat[] {
+    if (this.memoStatsEnv !== this.environment) {
+      this.memoStatsEnv = this.environment;
+      this.memoStats = this.buildStats();
+    }
+    return this.memoStats;
+  }
+
+  private buildStats(): SectionLandingStat[] {
     const environment = this.environment;
     return [
       {
@@ -114,7 +129,18 @@ export class DfSystemOverviewComponent implements OnInit {
     ];
   }
 
+  private memoGroupsTypes: ServiceType[] | null | undefined = undefined;
+  private memoGroups: SectionLandingGroup[] = [];
+
   get groups(): SectionLandingGroup[] {
+    if (this.memoGroupsTypes !== this.serviceTypes) {
+      this.memoGroupsTypes = this.serviceTypes;
+      this.memoGroups = this.buildGroups();
+    }
+    return this.memoGroups;
+  }
+
+  private buildGroups(): SectionLandingGroup[] {
     const logstashCount = this.countServiceTypes(SERVICE_GROUPS[ROUTES.LOGS]);
     return [
       {
