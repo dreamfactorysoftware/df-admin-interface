@@ -137,8 +137,7 @@
     [content]="getControl('content')"
     [scmRepository]="getControl('scmRepository')"
     [scmReference]="getControl('scmReference')"
-    [hideScmActions]="true"
-    [snapshotTimestamp]="scriptDetails?.lastModifiedDate"></df-script-editor>
+    [hideScmActions]="true"></df-script-editor>
   <div class="full-width action-bar">
     <button class="cancel-btn" mat-flat-button type="button" (click)="goBack()">
       {{ 'cancel' | transloco }}
