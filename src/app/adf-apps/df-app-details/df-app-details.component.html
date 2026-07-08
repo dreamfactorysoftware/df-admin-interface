@@ -64,6 +64,7 @@
       <mat-error *ngIf="appForm.controls['defaultRole'].hasError('server')">
         {{ appForm.controls['defaultRole'].getError('server') | transloco }}
       </mat-error>
+      <mat-hint>{{ 'apps.createApp.defaultRole.hint' | transloco }}</mat-hint>
     </mat-form-field>
     <mat-form-field
       subscriptSizing="dynamic"

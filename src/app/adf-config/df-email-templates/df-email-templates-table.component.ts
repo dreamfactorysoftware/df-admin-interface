@@ -27,6 +27,8 @@ import { UntilDestroy } from '@ngneat/until-destroy';
   imports: DfManageTableModules,
 })
 export class DfEmailTemplatesTableComponent extends DfManageTableComponent<EmailTemplateRow> {
+  override emptyStateMessage = 'emptyState.emailTemplates.message';
+  override emptyStateActionLabel = 'emptyState.emailTemplates.action';
   constructor(
     @Inject(EMAIL_TEMPLATES_SERVICE_TOKEN)
     private emailTemplateService: DfBaseCrudService,

@@ -25,6 +25,8 @@ import { UntilDestroy } from '@ngneat/until-destroy';
   imports: DfManageTableModules,
 })
 export class DfManageSchedulerTableComponent extends DfManageTableComponent<SchedulerTaskData> {
+  override emptyStateMessage = 'emptyState.scheduler.message';
+  override emptyStateActionLabel = 'emptyState.scheduler.action';
   userServices: Service[];
 
   constructor(

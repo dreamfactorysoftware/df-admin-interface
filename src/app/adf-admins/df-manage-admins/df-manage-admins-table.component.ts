@@ -27,6 +27,8 @@ import { UntilDestroy } from '@ngneat/until-destroy';
   imports: DfManageTableModules,
 })
 export class DfManageAdminsTableComponent extends DfManageTableComponent<UserRow> {
+  override emptyStateMessage = 'emptyState.admins.message';
+  override emptyStateActionLabel = 'emptyState.admins.action';
   constructor(
     router: Router,
     activatedRoute: ActivatedRoute,

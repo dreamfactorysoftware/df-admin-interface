@@ -214,12 +214,28 @@
               </button>
             </ng-container>
             <ng-template #noFilterActive>
-              {{
-                (allowCreate && tableLength === 0
-                  ? 'noEntriesCreate'
-                  : 'noEntries'
-                ) | transloco
-              }}
+              <div class="empty-state" *ngIf="emptyStateMessage; else genericEmpty">
+                <p class="empty-state-message">
+                  {{ emptyStateMessage | transloco }}
+                </p>
+                <button
+                  *ngIf="allowCreate"
+                  mat-flat-button
+                  color="primary"
+                  type="button"
+                  data-testid="empty-state-create"
+                  (click)="createRow()">
+                  {{ (emptyStateActionLabel || 'create') | transloco }}
+                </button>
+              </div>
+              <ng-template #genericEmpty>
+                {{
+                  (allowCreate && tableLength === 0
+                    ? 'noEntriesCreate'
+                    : 'noEntries'
+                  ) | transloco
+                }}
+              </ng-template>
             </ng-template>
           </ng-container>
         </td>

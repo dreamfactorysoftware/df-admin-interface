@@ -30,6 +30,8 @@ import { Actions } from 'src/app/shared/types/table';
   imports: DfManageTableModules,
 })
 export class DfManageLimitsTableComponent extends DfManageTableComponent<LimitTableRowData> {
+  override emptyStateMessage = 'emptyState.limits.message';
+  override emptyStateActionLabel = 'emptyState.limits.action';
   constructor(
     @Inject(LIMIT_SERVICE_TOKEN)
     private limitService: DfBaseCrudService,

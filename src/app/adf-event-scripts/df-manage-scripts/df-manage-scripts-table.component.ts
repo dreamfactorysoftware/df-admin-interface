@@ -26,6 +26,8 @@ import { Actions } from 'src/app/shared/types/table';
   imports: DfManageTableModules,
 })
 export class DfManageScriptsTableComponent extends DfManageTableComponent<ScriptObject> {
+  override emptyStateMessage = 'emptyState.eventScripts.message';
+  override emptyStateActionLabel = 'emptyState.eventScripts.action';
   columns = [
     {
       columnDef: 'active',
