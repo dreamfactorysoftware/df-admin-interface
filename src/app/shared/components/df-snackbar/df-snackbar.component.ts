@@ -24,7 +24,7 @@ import { DfErrorDetailDialogComponent } from '../df-error-detail/df-error-detail
 @Component({
   selector: 'df-snackbar',
   templateUrl: './df-snackbar.component.html',
-  styleUrls: ['../df-alert/df-alert.component.scss'],
+  styleUrls: ['./df-snackbar.component.scss'],
   standalone: true,
   imports: [
     MatButtonModule,
