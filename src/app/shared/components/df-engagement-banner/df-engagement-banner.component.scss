@@ -28,11 +28,8 @@
     position: relative;
   }
 
-  // !important: counters dark-style.scss's blanket `span/button
-  // { color: white !important }` under .dark-theme (punchlist item 8).
-  // Tokens either way, so all three themes stay legible.
   .banner-text {
-    color: var(--df-text) !important;
+    color: var(--df-text);
     font-size: 1.4rem;
     font-weight: 500;
     line-height: 1.4;
@@ -40,7 +37,7 @@
 
   .cta-button {
     background-color: var(--df-accent);
-    color: var(--df-accent-contrast) !important;
+    color: var(--df-accent-contrast);
     border: none;
     padding: 8px 20px;
     border-radius: var(--df-radius-sm);

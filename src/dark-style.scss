@@ -58,43 +58,58 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
       1003
     ) !important;
   }
-  // Radio Button
+  // Radio Button: unchecked ring rides the text ladder (Material's dark
+  // spec is 54% white; --df-text-muted is the token equivalent).
   .mat-mdc-radio-button
     .mdc-radio
     .mdc-radio__native-control
     + .mdc-radio__background
     .mdc-radio__outer-circle {
-    border-color: white !important;
+    border-color: var(--df-text-muted) !important;
   }
   // Checkbox
   .mat-mdc-checkbox .mdc-checkbox__background,
   .mdc-checkbox__ripple {
-    border-color: white !important;
+    border-color: var(--df-text-muted) !important;
   }
 
-  // Form Element
+  // Form Element: outlines on the token ladder, not always-white.
   .mdc-notched-outline > * {
-    border-color: white !important;
+    border-color: var(--df-text-faint) !important;
   }
 
-  mat-label,
-  mat-select,
-  mat-option,
-  input,
-  textarea,
-  button,
-  span,
-  .themed-text {
-    color: white !important;
+  // Item 8: the blanket `mat-label, mat-select, mat-option, input,
+  // textarea, button, span { color: white !important }` is dead. Only a
+  // light Material theme is compiled, so dark mode re-inks just the MDC
+  // form internals that sit on dark page surfaces — tokens, so phosphor
+  // repaints them too. Overlay panels (menus, select/autocomplete) stay
+  // light-theme surfaces with their own dark ink; the blanket was making
+  // those white-on-white. Component copy owns its colors via var(--df-*).
+  .mdc-floating-label {
+    color: var(--df-text-2) !important;
+  }
+  .mdc-text-field__input {
+    color: var(--df-text) !important;
+    caret-color: var(--df-text);
+  }
+  .mat-mdc-select-value {
+    color: var(--df-text) !important;
+  }
+  .mat-mdc-select-disabled .mat-mdc-select-value {
+    color: var(--df-text-muted) !important;
+  }
+  // Text-style buttons (raised/flat keep their compiled contrast labels).
+  .mat-mdc-button,
+  .mat-mdc-outlined-button,
+  .mat-mdc-icon-button {
+    color: var(--df-text);
   }
   .mat-mdc-form-field-required-marker {
-    color: white !important;
+    color: var(--df-text-2) !important;
   }
+  // Checkbox / radio labels.
   .mdc-form-field > label {
-    color: white !important;
-  }
-  .mat-mdc-select-disabled {
-    color: #a3a1a1 !important;
+    color: var(--df-text) !important;
   }
   // Button: shared departure treatment — the tokens are already re-tuned
   // for dark under .dark-theme, so both classes just ride them.
@@ -108,10 +123,10 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
     border: 1px solid var(--df-border) !important;
   }
   .copy-btn {
-    color: white !important;
+    color: var(--df-text) !important;
   }
   .refresh-btn {
-    color: #a3a1a1 !important;
+    color: var(--df-text-muted) !important;
   }
   .close-btn {
     color: mat.get-color-from-palette($df-purple-palette, 200) !important;
@@ -124,7 +139,7 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
       $df-purple-palette,
       1002
     ) !important;
-    color: white !important;
+    color: var(--df-text) !important;
     border: 1px solid var(--df-border) !important;
   }
   .mat-mdc-card-header {
@@ -132,10 +147,10 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
       $df-purple-palette,
       1002
     ) !important;
-    color: white !important;
+    color: var(--df-text) !important;
   }
   .mat-mdc-card-subtitle {
-    color: #a3a1a1 !important;
+    color: var(--df-text-muted) !important;
   }
 
   .mat-expansion-panel {
@@ -145,10 +160,10 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
     ) !important;
     // No border here: this also matches the side-nav's expansion panels,
     // which the always-dark shell styles itself (accordions get theirs below).
-    color: white !important;
+    color: var(--df-text) !important;
   }
   .mat-expansion-panel-header {
-    color: white !important;
+    color: var(--df-text) !important;
   }
 
   .mat-accordion .mat-expansion-panel {
@@ -156,10 +171,10 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   }
   .mat-expansion-panel-header-title,
   .mat-expansion-indicator::after {
-    color: white;
+    color: var(--df-text);
   }
   .mat-expansion-panel-header-description {
-    color: #a3a1a1;
+    color: var(--df-text-muted);
   }
 
   // Table
@@ -175,13 +190,13 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
           $df-purple-palette,
           1002
         ) !important;
-        color: white !important;
+        color: var(--df-text) !important;
         border-color: var(--df-border) !important;
       }
     }
     .mat-mdc-row {
       .mat-mdc-cell {
-        color: white !important;
+        color: var(--df-text) !important;
         border-color: var(--df-border) !important;
       }
     }
@@ -190,7 +205,7 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
     }
   }
   .no-data-row td {
-    color: white !important;
+    color: var(--df-text) !important;
   }
 
   .clickable {
@@ -217,16 +232,16 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   // Swagger
   .swagger-ui .info .title,
   .swagger-ui .renderedMarkdown p {
-    color: white;
+    color: var(--df-text);
   }
 
   .swagger-ui .scheme-container {
     background-color: mat.get-color-from-palette($df-purple-palette, 1002);
     border: 1px solid var(--df-border);
-    color: white;
+    color: var(--df-text);
   }
   .swagger-ui .model-toggle::after {
-    background-color: white;
+    background-color: var(--df-text);
   }
 
   // Editor

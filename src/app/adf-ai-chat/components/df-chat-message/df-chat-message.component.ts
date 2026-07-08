@@ -237,12 +237,6 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
           font-size: 11px;
           color: var(--chat-text-faint);
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
-
-          // dark-style.scss forces span color to white under .dark-theme;
-          // keep usage metadata faint in both themes.
-          span {
-            color: var(--chat-text-faint) !important;
-          }
         }
       }
     `,

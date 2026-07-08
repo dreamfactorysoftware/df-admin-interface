@@ -147,23 +147,21 @@ import { ChatSession } from '../../types/chat';
           max-width: 100%;
         }
 
-        // !important: dark-style.scss forces span/button color to white
-        // under .dark-theme; these keep the muted hierarchy in both themes.
         &__meta {
           font-size: 1.1rem;
-          color: var(--chat-text-muted) !important;
+          color: var(--chat-text-muted);
         }
 
         &__delete {
           background: none;
           border: none;
-          color: var(--chat-text-faint) !important;
+          color: var(--chat-text-faint);
           cursor: pointer;
           padding: 0.5rem 0.875rem;
           font-size: 1.3rem;
 
           &:hover {
-            color: var(--df-danger) !important;
+            color: var(--df-danger);
           }
         }
       }

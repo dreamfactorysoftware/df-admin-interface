@@ -155,10 +155,6 @@
   span {
     position: relative;
     flex: 1;
-    // dark-style.scss still forces spans white under .dark-theme
-    // (punchlist item 8, integration-owned); inherit keeps the prompt on
-    // its tokened color in the meantime.
-    color: inherit !important;
   }
 }
 

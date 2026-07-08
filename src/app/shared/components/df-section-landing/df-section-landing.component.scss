@@ -42,11 +42,8 @@
   }
 }
 
-// !important on span-level colors below: dark-style.scss still forces
-// `span { color: white !important }` under .dark-theme (punchlist item 8;
-// integration owns killing it). Tokens either way, so all themes stay AA.
 .section-landing__eyebrow {
-  color: var(--df-accent) !important;
+  color: var(--df-accent);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.06em;
@@ -174,7 +171,7 @@
 
 .section-card__action {
   align-items: center;
-  color: var(--df-accent) !important;
+  color: var(--df-accent);
   display: inline-flex;
   font-size: 1.3rem;
   font-weight: 600;
@@ -185,7 +182,7 @@
 // dark-theme contrast bug on the security and system landing cards.
 .section-card__meta,
 .section-card__unavailable {
-  color: var(--df-text-muted) !important;
+  color: var(--df-text-muted);
   display: block;
   font-size: 11px;
   font-weight: 600;
@@ -195,7 +192,7 @@
 }
 
 .section-card__unavailable {
-  color: var(--df-text-faint) !important;
+  color: var(--df-text-faint);
 }
 
 .section-landing__stats {
@@ -223,7 +220,7 @@
   }
 
   span {
-    color: var(--df-text-muted) !important;
+    color: var(--df-text-muted);
     font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.06em;

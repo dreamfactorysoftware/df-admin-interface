@@ -376,15 +376,12 @@
   line-height: 1.4;
 }
 
-// !important on span-borne colors below: dark-style.scss still forces
-// `span { color: white !important }` under .dark-theme (punchlist item 8,
-// integration-owned); these keep the tokened hierarchy legible meanwhile.
 .step-timing {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   font-size: 1.2rem;
-  color: var(--df-success) !important;
+  color: var(--df-success);
   font-weight: 500;
 
   .timing-icon {
@@ -442,7 +439,7 @@
 
   .endpoint-hint {
     font-size: 1.1rem;
-    color: var(--df-text-faint) !important;
+    color: var(--df-text-faint);
     font-style: italic;
   }
 }
@@ -508,10 +505,6 @@
   font-size: 1.2rem;
   color: var(--df-text-2);
   line-height: 1.4;
-
-  span {
-    color: var(--df-text-2) !important;
-  }
 
   .info-icon {
     color: var(--df-accent);

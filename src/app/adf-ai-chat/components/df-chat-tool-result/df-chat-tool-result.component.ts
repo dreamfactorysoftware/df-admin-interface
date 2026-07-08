@@ -101,8 +101,6 @@ import { ChatMessage } from '../../types/chat';
           font-weight: 600;
         }
 
-        // !important on badge/latency: dark-style.scss forces span color
-        // to white under .dark-theme; tokens keep these AA in both themes.
         &__badge {
           font-size: 11px;
           font-weight: 700;
@@ -110,7 +108,7 @@ import { ChatMessage } from '../../types/chat';
           border-radius: 4px;
           background: var(--df-danger-soft);
           border: 1px solid var(--df-danger-border);
-          color: var(--df-danger) !important;
+          color: var(--df-danger);
           text-transform: uppercase;
           letter-spacing: 0.06em;
         }
@@ -118,7 +116,7 @@ import { ChatMessage } from '../../types/chat';
         &__latency {
           margin-left: auto;
           font-size: 12px;
-          color: var(--chat-text-muted) !important;
+          color: var(--chat-text-muted);
         }
 
         &__body {
