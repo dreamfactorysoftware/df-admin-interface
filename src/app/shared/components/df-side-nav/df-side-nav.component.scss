@@ -418,6 +418,10 @@ $red-palette: mat.define-palette(mat.$red-palette);
 
     .content-wrapper {
       height: 100%;
+      // Include the 20/28px padding in the 100% height so the content pane
+      // does not overflow its scroll container (was pushing every page ~48px
+      // past the fold, clipping the bottom row).
+      box-sizing: border-box;
       display: flex;
       flex-direction: column;
       padding: 20px 28px 28px;
