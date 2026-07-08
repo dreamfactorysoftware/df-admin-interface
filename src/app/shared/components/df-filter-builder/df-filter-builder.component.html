@@ -1,0 +1,140 @@
+<div class="filter-builder">
+  <div class="filter-builder__head">
+    <p class="df-eyebrow filter-builder__label">
+      {{ 'filterBuilder.title' | transloco }}
+    </p>
+    <mat-button-toggle-group
+      class="filter-builder__mode"
+      [value]="mode"
+      (change)="onModeChange($event.value)"
+      [attr.aria-label]="'filterBuilder.mode.aria' | transloco">
+      <mat-button-toggle value="visual">
+        {{ 'filterBuilder.mode.visual' | transloco }}
+      </mat-button-toggle>
+      <mat-button-toggle value="raw">
+        {{ 'filterBuilder.mode.raw' | transloco }}
+      </mat-button-toggle>
+    </mat-button-toggle-group>
+  </div>
+
+  <!-- VISUAL: field + operator + value rows joined by one conjunction. -->
+  <ng-container *ngIf="mode === 'visual'">
+    <div class="filter-builder__rows">
+      <div
+        class="filter-row"
+        *ngFor="let cond of conditions; let i = index; trackBy: trackByIndex">
+        <span class="filter-row__join" *ngIf="i > 0">
+          <mat-button-toggle-group
+            class="filter-row__conj"
+            [(ngModel)]="conjunction"
+            (change)="emit()"
+            [attr.aria-label]="'filterBuilder.conj.aria' | transloco">
+            <mat-button-toggle value="and">
+              {{ 'filterBuilder.conj.and' | transloco }}
+            </mat-button-toggle>
+            <mat-button-toggle value="or">
+              {{ 'filterBuilder.conj.or' | transloco }}
+            </mat-button-toggle>
+          </mat-button-toggle-group>
+        </span>
+        <span class="filter-row__spacer" *ngIf="i === 0"></span>
+
+        <!-- Field: mat-select when schema is known, free text otherwise. -->
+        <mat-form-field
+          appearance="outline"
+          class="filter-row__field"
+          *ngIf="fields.length; else fieldText">
+          <mat-label>{{ 'filterBuilder.field' | transloco }}</mat-label>
+          <mat-select [(ngModel)]="cond.field" (selectionChange)="emit()">
+            <mat-option
+              *ngFor="let f of fields; trackBy: trackByIndex"
+              [value]="f">
+              {{ f }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+        <ng-template #fieldText>
+          <mat-form-field appearance="outline" class="filter-row__field">
+            <mat-label>{{ 'filterBuilder.field' | transloco }}</mat-label>
+            <input
+              matInput
+              [(ngModel)]="cond.field"
+              (ngModelChange)="emit()"
+              autocomplete="off" />
+          </mat-form-field>
+        </ng-template>
+
+        <!-- Operator -->
+        <mat-form-field appearance="outline" class="filter-row__op">
+          <mat-label>{{ 'filterBuilder.operator' | transloco }}</mat-label>
+          <mat-select [(ngModel)]="cond.operator" (selectionChange)="emit()">
+            <mat-option
+              *ngFor="let op of operators; trackBy: trackByIndex"
+              [value]="op.value">
+              {{ 'filterBuilder.op.' + op.labelKey | transloco }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <!-- Value (hidden for is null / is not null). -->
+        <mat-form-field
+          appearance="outline"
+          class="filter-row__value"
+          *ngIf="arityOf(cond.operator) !== 'unary'">
+          <mat-label>{{
+            (arityOf(cond.operator) === 'list'
+              ? 'filterBuilder.valueList'
+              : 'filterBuilder.value'
+            ) | transloco
+          }}</mat-label>
+          <input
+            matInput
+            [(ngModel)]="cond.value"
+            (ngModelChange)="emit()"
+            autocomplete="off" />
+        </mat-form-field>
+        <span class="filter-row__value filter-row__value--empty" *ngIf="arityOf(cond.operator) === 'unary'"></span>
+
+        <button
+          mat-icon-button
+          type="button"
+          class="filter-row__remove"
+          [matTooltip]="'filterBuilder.removeRow' | transloco"
+          (click)="removeCondition(i)">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+    </div>
+
+    <div class="filter-builder__actions">
+      <button mat-stroked-button type="button" (click)="addCondition()">
+        <mat-icon>add</mat-icon>
+        {{ 'filterBuilder.addCondition' | transloco }}
+      </button>
+      <button mat-button type="button" (click)="clear()">
+        {{ 'filterBuilder.clear' | transloco }}
+      </button>
+    </div>
+  </ng-container>
+
+  <!-- RAW: hand-write the filter string. -->
+  <ng-container *ngIf="mode === 'raw'">
+    <mat-form-field appearance="outline" class="filter-builder__raw">
+      <mat-label>{{ 'filterBuilder.rawLabel' | transloco }}</mat-label>
+      <textarea
+        matInput
+        rows="2"
+        [(ngModel)]="rawFilter"
+        (ngModelChange)="emit()"
+        [placeholder]="'filterBuilder.rawPlaceholder' | transloco"
+        autocomplete="off"
+        spellcheck="false"></textarea>
+    </mat-form-field>
+  </ng-container>
+
+  <!-- Compiled preview: the exact string flowing into ?filter=. -->
+  <div class="filter-builder__preview" *ngIf="currentFilter">
+    <span class="filter-builder__preview-key">filter=</span>
+    <code class="filter-builder__preview-value">{{ currentFilter }}</code>
+  </div>
+</div>

@@ -155,6 +155,13 @@ export class DfTryItComponent implements OnInit {
     this.bodyText =
       typeof value === 'string' ? value : JSON.stringify(value, null, 2);
   }
+  /** Compiled `?filter=` string, typically from df-filter-builder. Folded into
+   *  the query so the fired request and the generated snippets both carry it,
+   *  without touching the user's manually-added params. */
+  @Input() set filter(value: string | undefined) {
+    this.filterParam = (value ?? '').trim();
+  }
+  private filterParam = '';
   /** Emits after each send. Feeds a host-owned request log. */
   @Output() sent = new EventEmitter<TryItResult>();
 
@@ -311,11 +318,14 @@ export class DfTryItComponent implements OnInit {
 
   private buildQuery(): string {
     const pairs = this.params
-      .filter(p => p.enabled && p.key.trim())
+      .filter(p => p.enabled && p.key.trim() && p.key.trim() !== 'filter')
       .map(
         p =>
           `${encodeURIComponent(p.key.trim())}=${encodeURIComponent(p.value)}`
       );
+    if (this.filterParam) {
+      pairs.push(`filter=${encodeURIComponent(this.filterParam)}`);
+    }
     return pairs.length ? `?${pairs.join('&')}` : '';
   }
 
