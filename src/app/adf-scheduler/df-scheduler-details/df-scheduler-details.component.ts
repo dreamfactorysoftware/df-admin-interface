@@ -117,9 +117,9 @@ export class DfSchedulerDetailsComponent implements OnInit {
       })
       .subscribe(res => (this.runAsApps = res.resource));
     this.userService
-      .getAll<GenericListResponse<{ id: number; name: string; email: string }>>(
-        { fields: 'id,name,email', limit: 1000, sort: 'name' }
-      )
+      .getAll<
+        GenericListResponse<{ id: number; name: string; email: string }>
+      >({ fields: 'id,name,email', limit: 1000, sort: 'name' })
       .subscribe(res => (this.runAsUsers = res.resource));
 
     this.activatedRoute.data.subscribe((data: any) => {
@@ -155,6 +155,14 @@ export class DfSchedulerDetailsComponent implements OnInit {
 
     this.formGroup.get('serviceId')?.valueChanges.subscribe(data => {
       this.getServiceAccessList(data);
+    });
+
+    // The "run as user" field is hidden (*ngIf) when no app is selected, but
+    // hiding it does not clear its control. Without this, picking an app + user
+    // and then setting the app back to "None" submits a userId with no appId —
+    // an identity shape the backend does not support.
+    this.formGroup.get('appId')?.valueChanges.subscribe(appId => {
+      if (!appId) this.formGroup.get('userId')?.setValue(null);
     });
   }
 
