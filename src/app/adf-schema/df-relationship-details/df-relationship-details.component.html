@@ -84,7 +84,7 @@
       {{ 'schema.relationships.field.label' | transloco }}
     </mat-label>
     <mat-select formControlName="field">
-      <mat-option *ngFor="let option of fieldOptions" [value]="option.value">
+      <mat-option *ngFor="let option of fieldOptions; trackBy: trackByValue" [value]="option.value">
         {{ option.label }}
       </mat-option>
     </mat-select>
@@ -101,7 +101,7 @@
       {{ 'schema.relationships.referenceService.label' | transloco }}
     </mat-label>
     <mat-select formControlName="refServiceId">
-      <mat-option *ngFor="let option of serviceOptions" [value]="option.value">
+      <mat-option *ngFor="let option of serviceOptions; trackBy: trackByValue" [value]="option.value">
         {{ option.name }}
       </mat-option>
     </mat-select>
@@ -124,7 +124,7 @@
         - {{ 'schema.relationships.referenceTable.default' | transloco }} -
       </mat-option>
       <mat-option
-        *ngFor="let option of referenceTableOptions"
+        *ngFor="let option of referenceTableOptions; trackBy: trackByValue"
         [value]="option.value">
         {{ option.label }}
       </mat-option>
@@ -147,7 +147,7 @@
         - {{ 'schema.relationships.referenceField.default' | transloco }} -
       </mat-option>
       <mat-option
-        *ngFor="let option of referenceFieldOptions"
+        *ngFor="let option of referenceFieldOptions; trackBy: trackByValue"
         [value]="option.value">
         {{ option.label }}
       </mat-option>
@@ -166,7 +166,7 @@
       {{ 'schema.relationships.junctionService.label' | transloco }}
     </mat-label>
     <mat-select formControlName="junctionServiceId">
-      <mat-option *ngFor="let option of serviceOptions" [value]="option.value">
+      <mat-option *ngFor="let option of serviceOptions; trackBy: trackByValue" [value]="option.value">
         {{ option.label }}
       </mat-option>
     </mat-select>
@@ -191,7 +191,7 @@
         - {{ 'schema.relationships.junctionTable.default' | transloco }} -
       </mat-option>
       <mat-option
-        *ngFor="let option of junctionTableOptions"
+        *ngFor="let option of junctionTableOptions; trackBy: trackByValue"
         [value]="option.value">
         {{ option.label }}
       </mat-option>
@@ -215,7 +215,7 @@
         - {{ 'schema.relationships.junctionField.default' | transloco }} -
       </mat-option>
       <mat-option
-        *ngFor="let option of junctionFieldOptions"
+        *ngFor="let option of junctionFieldOptions; trackBy: trackByValue"
         [value]="option.value">
         {{ option.label }}
       </mat-option>
@@ -241,7 +241,7 @@
         -
       </mat-option>
       <mat-option
-        *ngFor="let option of junctionFieldOptions"
+        *ngFor="let option of junctionFieldOptions; trackBy: trackByValue"
         [value]="option.value">
         {{ option.label }}
       </mat-option>

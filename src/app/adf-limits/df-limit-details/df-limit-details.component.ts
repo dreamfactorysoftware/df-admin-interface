@@ -72,6 +72,8 @@ export class DfLimitDetailsComponent implements OnInit {
   userDropdownOptions: UserProfile[] = [];
   serviceDropdownOptions: Service[] = [];
 
+  trackById = (_: number, item: { id: number }): number => item.id;
+
   alertMsg = '';
   showAlert = false;
   alertType: AlertType = 'error';

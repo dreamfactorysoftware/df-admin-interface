@@ -78,6 +78,8 @@ export class DfAppDetailsComponent implements OnInit {
   appForm: FormGroup;
   roles: RoleType[] = [];
   filteredRoles: RoleType[] = [];
+
+  trackById = (_: number, item: { id: number }): number => item.id;
   editApp: AppType;
   urlOrigin: string;
   faCopy = faCopy;

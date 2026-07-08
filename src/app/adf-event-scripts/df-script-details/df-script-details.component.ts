@@ -69,6 +69,8 @@ export class DfScriptDetailsComponent implements OnInit {
   ungroupedRouteOptions: string[];
   tableOptions: string[];
   storeServiceArray: string[];
+
+  trackByValue = (_: number, item: string): string => item;
   selectedStorageItem: string;
   selectedServiceItem: string;
   selectedEventItem: string;

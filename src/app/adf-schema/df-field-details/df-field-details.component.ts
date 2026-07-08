@@ -91,6 +91,8 @@ export class DfFieldDetailsComponent implements OnInit {
   referenceFieldDropdownMenuOptions: DatabaseSchemaFieldType[] = [];
   type = '';
 
+  trackByName = (_: number, item: { name: string }): string => item.name;
+
   constructor(
     @Inject(BASE_SERVICE_TOKEN)
     private service: DfBaseCrudService,

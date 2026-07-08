@@ -120,7 +120,7 @@ const CUSTOM = '__custom__';
           </button>
         </div>
         <p class="muted" *ngIf="!channels.length">No channels configured.</p>
-        <div class="row" *ngFor="let c of channels">
+        <div class="row" *ngFor="let c of channels; trackBy: trackById">
           <span class="badge" [class.on]="c.is_active">{{
             c.is_active ? 'ACTIVE' : 'OFF'
           }}</span>
@@ -161,7 +161,10 @@ const CUSTOM = '__custom__';
             <mat-select
               [ngModel]="newChoice"
               (ngModelChange)="onNewEvent($event)">
-              <mat-option *ngFor="let e of events" [value]="e.pattern">{{
+              <mat-option
+                *ngFor="let e of events; trackBy: trackByPattern"
+                [value]="e.pattern"
+                >{{
                 e.label
               }}</mat-option>
               <mat-option [value]="CUSTOM">Custom pattern…</mat-option>
@@ -177,7 +180,10 @@ const CUSTOM = '__custom__';
           <mat-form-field appearance="outline"
             ><mat-label>Send to</mat-label>
             <mat-select [(ngModel)]="newRule.channel_id">
-              <mat-option *ngFor="let c of channels" [value]="c.id">{{
+              <mat-option
+                *ngFor="let c of channels; trackBy: trackById"
+                [value]="c.id"
+                >{{
                 c.name
               }}</mat-option>
             </mat-select></mat-form-field
@@ -225,7 +231,7 @@ const CUSTOM = '__custom__';
         </div>
 
         <p class="muted" *ngIf="!rules.length">No rules configured.</p>
-        <ng-container *ngFor="let r of rules">
+        <ng-container *ngFor="let r of rules; trackBy: trackById">
           <div class="row sevbar-{{ r.severity }}" *ngIf="editId !== r.id">
             <mat-slide-toggle
               [checked]="r.is_active"
@@ -256,7 +262,10 @@ const CUSTOM = '__custom__';
               <mat-select
                 [ngModel]="editChoice"
                 (ngModelChange)="onEditEvent($event)">
-                <mat-option *ngFor="let e of events" [value]="e.pattern">{{
+                <mat-option
+                  *ngFor="let e of events; trackBy: trackByPattern"
+                  [value]="e.pattern"
+                  >{{
                   e.label
                 }}</mat-option>
                 <mat-option [value]="CUSTOM">Custom pattern…</mat-option>
@@ -269,7 +278,10 @@ const CUSTOM = '__custom__';
             <mat-form-field appearance="outline"
               ><mat-label>Send to</mat-label>
               <mat-select [(ngModel)]="editRule.channel_id">
-                <mat-option *ngFor="let c of channels" [value]="c.id">{{
+                <mat-option
+                  *ngFor="let c of channels; trackBy: trackById"
+                  [value]="c.id"
+                  >{{
                   c.name
                 }}</mat-option>
               </mat-select></mat-form-field
@@ -353,7 +365,7 @@ const CUSTOM = '__custom__';
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let l of filteredLog">
+            <tr *ngFor="let l of filteredLog; trackBy: trackById">
               <td class="muted">{{ l.created_at | date: 'short' }}</td>
               <td>{{ eventLabel(l.event_name) }}</td>
               <td>
@@ -576,16 +588,41 @@ export class DfAlertsComponent implements OnInit {
   };
   editChoice = '';
 
+  // filteredLog is bound in the template (*ngIf x2 + *ngFor), so the getter
+  // runs on every change-detection pass. Memoize on its inputs and hand back
+  // the same array ref until one of them changes; combined with trackBy this
+  // keeps the log table from re-filtering and re-rendering per CD.
+  private memoLog: LogRow[] | null = null;
+  private memoFilterText: string | null = null;
+  private memoFilterStatus: string | null = null;
+  private memoEvents: EventOpt[] | null = null;
+  private memoFilteredLog: LogRow[] = [];
+
   get filteredLog(): LogRow[] {
-    const t = this.filterText.trim().toLowerCase();
-    return this.log.filter(
-      l =>
-        (this.filterStatus === 'all' || l.status === this.filterStatus) &&
-        (!t ||
-          this.eventLabel(l.event_name).toLowerCase().includes(t) ||
-          l.event_name.toLowerCase().includes(t))
-    );
+    if (
+      this.memoLog !== this.log ||
+      this.memoFilterText !== this.filterText ||
+      this.memoFilterStatus !== this.filterStatus ||
+      this.memoEvents !== this.events
+    ) {
+      this.memoLog = this.log;
+      this.memoFilterText = this.filterText;
+      this.memoFilterStatus = this.filterStatus;
+      this.memoEvents = this.events;
+      const t = this.filterText.trim().toLowerCase();
+      this.memoFilteredLog = this.log.filter(
+        l =>
+          (this.filterStatus === 'all' || l.status === this.filterStatus) &&
+          (!t ||
+            this.eventLabel(l.event_name).toLowerCase().includes(t) ||
+            l.event_name.toLowerCase().includes(t))
+      );
+    }
+    return this.memoFilteredLog;
   }
+
+  trackById = (_: number, item: { id: number }): number => item.id;
+  trackByPattern = (_: number, e: EventOpt): string => e.pattern;
 
   ngOnInit(): void {
     this.http

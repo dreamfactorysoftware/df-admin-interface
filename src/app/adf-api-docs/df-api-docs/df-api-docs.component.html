@@ -27,7 +27,9 @@
           </div>
         </div>
       </mat-option>
-      <mat-option *ngFor="let key of apiKeys" [value]="key.apiKey">
+      <mat-option
+        *ngFor="let key of apiKeys; trackBy: trackByApiKey"
+        [value]="key.apiKey">
         <div class="api-key-option">
           <div class="key-info">
             <span class="key-name">{{ key.name }}</span>

@@ -55,7 +55,9 @@
         requireSelection
         #auto="matAutocomplete"
         [displayWith]="displayFn">
-        <mat-option *ngFor="let role of filteredRoles" [value]="role">
+        <mat-option
+          *ngFor="let role of filteredRoles; trackBy: trackById"
+          [value]="role">
           {{ role.name }}
         </mat-option>
       </mat-autocomplete>

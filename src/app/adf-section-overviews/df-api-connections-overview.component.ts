@@ -76,7 +76,21 @@ export class DfApiConnectionsOverviewComponent implements OnInit {
       .subscribe(serviceTypes => (this.serviceTypes = serviceTypes));
   }
 
+  // groups feeds a child [input]; a fresh array per change-detection pass
+  // forces the landing component to re-diff its cards every cycle. Rebuild
+  // only when the async-loaded serviceTypes ref changes.
+  private memoGroupsTypes: ServiceType[] | null | undefined = undefined;
+  private memoGroups: SectionLandingGroup[] = [];
+
   get groups(): SectionLandingGroup[] {
+    if (this.memoGroupsTypes !== this.serviceTypes) {
+      this.memoGroupsTypes = this.serviceTypes;
+      this.memoGroups = this.buildGroups();
+    }
+    return this.memoGroups;
+  }
+
+  private buildGroups(): SectionLandingGroup[] {
     return [
       {
         title: 'Create APIs',
