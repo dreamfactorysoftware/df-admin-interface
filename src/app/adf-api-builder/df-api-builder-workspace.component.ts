@@ -105,7 +105,9 @@ interface RelRow {
       <p class="ws-hint">Endpoints can only read from sources listed here.</p>
 
       <div class="ws-source-list" *ngIf="workspace.length; else noSources">
-        <div class="ws-source" *ngFor="let link of workspace">
+        <div
+          class="ws-source"
+          *ngFor="let link of workspace; trackBy: trackById">
           <span>
             <mat-icon class="ws-li-icon">storage</mat-icon>
             <strong>{{ serviceLabel(link.serviceId) }}</strong>
@@ -131,7 +133,9 @@ interface RelRow {
         <mat-form-field appearance="outline">
           <mat-label>Add a data source</mat-label>
           <mat-select [(ngModel)]="serviceToAdd">
-            <mat-option *ngFor="let s of addableServices()" [value]="s.id">
+            <mat-option
+              *ngFor="let s of addableServices; trackBy: trackById"
+              [value]="s.id">
               {{ s.label || s.name }} ({{ s.type }})
             </mat-option>
           </mat-select>
@@ -169,7 +173,9 @@ interface RelRow {
       </div>
 
       <div class="ws-relationships" *ngIf="relationships.length">
-        <div class="ws-relationship" *ngFor="let r of relationships">
+        <div
+          class="ws-relationship"
+          *ngFor="let r of relationships; trackBy: trackById">
           <mat-icon>account_tree</mat-icon>
           <span>
             <strong>{{ r.alias || r.name }}</strong>
@@ -207,7 +213,7 @@ interface RelRow {
               [(ngModel)]="rel.service"
               (selectionChange)="sourceChanged('local')">
               <mat-option
-                *ngFor="let s of workspaceServices()"
+                *ngFor="let s of workspaceServices; trackBy: trackById"
                 [value]="s.name">
                 {{ s.label || s.name }}
               </mat-option>
@@ -260,7 +266,7 @@ interface RelRow {
               [(ngModel)]="rel.ref_service"
               (selectionChange)="sourceChanged('ref')">
               <mat-option
-                *ngFor="let s of workspaceServices()"
+                *ngFor="let s of workspaceServices; trackBy: trackById"
                 [value]="s.name">
                 {{ s.label || s.name }}
               </mat-option>
@@ -305,7 +311,7 @@ interface RelRow {
                 [(ngModel)]="rel.junction_service"
                 (selectionChange)="sourceChanged('junction')">
                 <mat-option
-                  *ngFor="let s of workspaceServices()"
+                  *ngFor="let s of workspaceServices; trackBy: trackById"
                   [value]="s.name">
                   {{ s.label || s.name }}
                 </mat-option>
@@ -738,14 +744,22 @@ export class DfApiBuilderWorkspaceComponent implements OnChanges {
     return this.allServices.find(s => s.id === id)?.type ?? 'service';
   }
 
-  workspaceServices(): SvcRow[] {
+  // Memoized service lists for the mat-option *ngFor loops. These were method
+  // calls that rebuilt a Set + filtered array on every change-detection cycle
+  // — the same allocating-binding pattern behind the Create API tab freeze in
+  // df-api-builder.component.ts. Recomputed only when workspace/allServices
+  // actually load.
+  workspaceServices: SvcRow[] = [];
+  addableServices: SvcRow[] = [];
+
+  private refreshServiceLists(): void {
     const ids = new Set(this.workspace.map(w => w.serviceId));
-    return this.allServices.filter(s => ids.has(s.id));
+    this.workspaceServices = this.allServices.filter(s => ids.has(s.id));
+    this.addableServices = this.allServices.filter(s => !ids.has(s.id));
   }
 
-  addableServices(): SvcRow[] {
-    const ids = new Set(this.workspace.map(w => w.serviceId));
-    return this.allServices.filter(s => !ids.has(s.id));
+  trackById(_index: number, item: { id: number }): number {
+    return item.id;
   }
 
   relReady(): boolean {
@@ -840,7 +854,10 @@ export class DfApiBuilderWorkspaceComponent implements OnChanges {
       .get<{ resource: SvcRow[] }>(`${BASE_URL}/system/service`, {
         params: { fields: 'id,name,type,label', limit: 500 },
       })
-      .subscribe(r => (this.allServices = r.resource ?? []));
+      .subscribe(r => {
+        this.allServices = r.resource ?? [];
+        this.refreshServiceLists();
+      });
   }
 
   private loadWorkspace(): void {
@@ -848,7 +865,10 @@ export class DfApiBuilderWorkspaceComponent implements OnChanges {
       .get<{ resource: WorkspaceLink[] }>(`${BASE_URL}/api_builder/services`, {
         params: { filter: `api_id=${this.apiId}` },
       })
-      .subscribe(r => (this.workspace = r.resource ?? []));
+      .subscribe(r => {
+        this.workspace = r.resource ?? [];
+        this.refreshServiceLists();
+      });
   }
 
   private loadRelationships(): void {

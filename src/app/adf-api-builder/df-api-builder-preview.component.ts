@@ -94,7 +94,9 @@ export interface ApiBuilderPreviewTrace {
             trace.length === 1 ? '' : 's'
           }}
         </summary>
-        <div class="trace-row" *ngFor="let step of trace">
+        <div
+          class="trace-row"
+          *ngFor="let step of trace; trackBy: trackByIndex">
           <mat-icon [class.failed]="step.ok === false">
             {{ step.ok === false ? 'error' : 'check_circle' }}
           </mat-icon>
@@ -293,4 +295,10 @@ export class DfApiBuilderPreviewComponent {
   @Input() previewOk: boolean | null = null;
   @Input() trace: ApiBuilderPreviewTrace[] = [];
   @Output() previewRequested = new EventEmitter<void>();
+
+  // Trace rows are append-only within a run; index identity keeps existing
+  // rows in place when a fresh trace array arrives.
+  trackByIndex(index: number): number {
+    return index;
+  }
 }
