@@ -152,8 +152,7 @@
       <div class="try-it__snippet-bar">
         <mat-button-toggle-group
           [(ngModel)]="snippetLang"
-          class="try-it__snippet-lang"
-          [hideSingleSelectionIndicator]="true">
+          class="try-it__snippet-lang">
           <mat-button-toggle value="curl">curl</mat-button-toggle>
           <mat-button-toggle value="python">Python</mat-button-toggle>
           <mat-button-toggle value="js">JS</mat-button-toggle>
@@ -184,8 +183,7 @@
         <span class="try-it__response-spacer"></span>
         <mat-button-toggle-group
           [(ngModel)]="viewMode"
-          class="try-it__view-toggle"
-          [hideSingleSelectionIndicator]="true">
+          class="try-it__view-toggle">
           <mat-button-toggle value="pretty" [disabled]="!response.isJson">{{
             t('pretty')
           }}</mat-button-toggle>

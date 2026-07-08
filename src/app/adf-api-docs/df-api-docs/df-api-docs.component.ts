@@ -250,9 +250,9 @@ export class DfApiDocsComponent implements OnInit, OnDestroy {
           summary: op?.summary || '',
           description: op?.description || '',
           tag,
-          parameters: this.buildParameters(op?.parameters),
-          requestBodySchema: this.buildRequestBody(op?.requestBody),
-          responses: this.buildResponses(op?.responses),
+          parameters: this.buildParameters(op?.['parameters']),
+          requestBodySchema: this.buildRequestBody(op?.['requestBody']),
+          responses: this.buildResponses(op?.['responses']),
         };
         const bucket = groupMap.get(tag) ?? [];
         bucket.push(operation);
