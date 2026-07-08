@@ -24,12 +24,29 @@
       </span>
     </div>
 
-    <div class="ai-chat__header-right" *ngIf="dataScope.length > 0">
-      <fa-icon [icon]="faDatabase"></fa-icon>
-      <span class="ai-chat__scope-label">Data scope:</span>
-      <span *ngFor="let svc of dataScope" class="ai-chat__scope-chip">
-        {{ svc }}
-      </span>
+    <div class="ai-chat__header-right">
+      <!-- Resolved reach for the "act as" role: the boundary, made visible
+           before the first message. -->
+      <div
+        *ngIf="actAsScopeChips.length > 0"
+        class="ai-chat__scope-group"
+        title="What this role can reach">
+        <fa-icon [icon]="faUserShield"></fa-icon>
+        <span class="ai-chat__scope-label">Role can reach:</span>
+        <df-badge
+          *ngFor="let chip of actAsScopeChips"
+          [variant]="chip.inherited ? 'neutral' : 'data'"
+          [dot]="false"
+          [label]="chip.label"></df-badge>
+      </div>
+
+      <div *ngIf="dataScope.length > 0" class="ai-chat__scope-group">
+        <fa-icon [icon]="faDatabase"></fa-icon>
+        <span class="ai-chat__scope-label">Data scope:</span>
+        <span *ngFor="let svc of dataScope" class="ai-chat__scope-chip">
+          {{ svc }}
+        </span>
+      </div>
     </div>
   </header>
 
@@ -37,12 +54,12 @@
   <div
     *ngIf="!loadingServices && chatServices.length === 0"
     class="ai-chat__empty">
-    <h3>No AI Chat services yet</h3>
-    <p>
-      Create one under
-      <a [routerLink]="['/ai/chat-services/create']">AI / Chat Services</a>
-      to start chatting.
-    </p>
+    <df-empty-state
+      icon="forum"
+      title="No AI Chat services yet"
+      description="Create one under AI / Chat Services to start chatting."
+      actionLabel="Create chat service"
+      (action)="goToCreateService()"></df-empty-state>
   </div>
 
   <!-- Loading services -->
@@ -63,7 +80,9 @@
           subscriptSizing="dynamic"
           class="ai-chat__act-as-field">
           <mat-label>Act as role</mat-label>
-          <mat-select [(value)]="selectedActAsRoleId">
+          <mat-select
+            [(value)]="selectedActAsRoleId"
+            (selectionChange)="onActAsRoleChange()">
             <mat-option [value]="null">Myself (admin, full access)</mat-option>
             <mat-option
               *ngFor="let r of actAsRoles; trackBy: trackRoleId"
@@ -95,7 +114,12 @@
       <div
         *ngIf="!activeSession && !loadingSession"
         class="ai-chat__placeholder">
-        <p>Select a session, or start a new chat.</p>
+        <df-empty-state
+          icon="chat"
+          title="Start a conversation"
+          description="Select a session on the left, or start a new chat."
+          actionLabel="New chat"
+          (action)="newChat()"></df-empty-state>
       </div>
 
       <div *ngIf="loadingSession" class="ai-chat__loading">
@@ -108,11 +132,17 @@
           #messageScroll
           (scroll)="onMessagesScroll($event)">
           <div *ngIf="messages.length === 0" class="ai-chat__placeholder">
-            <p>Ask anything about your data.</p>
+            <df-empty-state
+              icon="storage"
+              title="Ask anything about your data"
+              description="This assistant answers over the services and tables its role can reach."></df-empty-state>
           </div>
           <df-chat-message
             *ngFor="let m of messages; trackBy: trackMsg"
             [message]="m"
+            [rate]="chatRate"
+            [model]="chatModel"
+            (regenerate)="regenerateFrom($event)"
             class="ai-chat__message"></df-chat-message>
           <div *ngIf="awaitingAssistant" class="ai-chat__thinking">
             <mat-spinner diameter="16"></mat-spinner>
