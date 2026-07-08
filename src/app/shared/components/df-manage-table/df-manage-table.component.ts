@@ -14,7 +14,7 @@ import {
 } from '@angular/material/paginator';
 import { MatSort, Sort, MatSortModule } from '@angular/material/sort';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
   catchError,
   debounceTime,
@@ -58,6 +58,7 @@ import {
 } from 'src/app/shared/types/generic-http';
 import { AppError, normalizeError } from 'src/app/shared/utilities/app-error';
 import { DfErrorDetailComponent } from '../df-error-detail/df-error-detail.component';
+import { DfBadgeComponent } from '../df-badge/df-badge.component';
 
 // Re-export: subclasses consume DfErrorDetailComponent through the
 // DfManageTableModules array, so it must be exported from this module (NG3004).
@@ -82,6 +83,8 @@ export const DfManageTableModules = [
   MatSortModule,
   MatProgressBarModule,
   DfErrorDetailComponent,
+  DfBadgeComponent,
+  RouterLink,
 ];
 
 @UntilDestroy({ checkProperties: true })
