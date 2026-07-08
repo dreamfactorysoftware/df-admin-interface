@@ -739,6 +739,29 @@ a {
   border-color: var(--df-accent) !important;
 }
 
+// Segmented controls (mat-button-toggle-group): Material emits its standard
+// button-toggle tokens once at :root from the LIGHT theme, and the .dark-theme /
+// .phosphor-theme blocks only repaint --df-* tokens - never the --mat-* ones. So
+// an unstyled toggle group (ai-usage range/scope bars, the api-docs snippet
+// language switch) kept a white track in dark and phosphor. Re-point the standard
+// button-toggle tokens at --df-* tokens on the group element so all three themes
+// resolve correctly. Set on the element (not :root) so it beats Material's
+// :root defaults, and components that style their own toggles still win on
+// component-scoped specificity.
+.mat-button-toggle-group.mat-button-toggle-group-appearance-standard {
+  --mat-standard-button-toggle-background-color: var(--df-surface);
+  --mat-standard-button-toggle-text-color: var(--df-text-2);
+  --mat-standard-button-toggle-state-layer-color: var(--df-text);
+  --mat-standard-button-toggle-selected-state-background-color: var(
+    --df-accent-soft
+  );
+  --mat-standard-button-toggle-selected-state-text-color: var(
+    --df-accent-strong
+  );
+  --mat-standard-button-toggle-divider-color: var(--df-border);
+  border-color: var(--df-border);
+}
+
 // Swagger
 .swagger-ui .opblock .opblock-section-header {
   background: unset !important;
