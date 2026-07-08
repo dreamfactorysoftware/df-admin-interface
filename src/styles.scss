@@ -116,10 +116,14 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   --df-border-2: rgba(51, 255, 102, 0.16);
   --df-code-bg: #050705;
   --df-code-text: #33ff66;
-  --df-accent: #ffb642;
-  --df-accent-strong: #ffc966;
-  --df-accent-contrast: #0a0d0a;
-  --df-accent-soft: rgba(255, 182, 66, 0.14);
+  /* Captain iterations: amber-as-primary read "Halloween town" against the
+     green. Actions are now phosphor green (pure WarGames terminal); amber
+     is reserved for warnings only. */
+  --df-accent: #2edd5b;
+  --df-accent-strong: #33ff66;
+  --df-accent-contrast: #04120a;
+  --df-accent-soft: rgba(51, 255, 102, 0.12);
+  --df-warning: #d99f4a;
   --df-danger: #ff5533;
   --df-danger-soft: rgba(255, 85, 51, 0.15);
   --df-danger-border: rgba(255, 85, 51, 0.5);
@@ -132,8 +136,8 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   --df-shell-text-2: #2edd5b;
   --df-shell-text-muted: #23a847;
   --df-shell-hover: rgba(51, 255, 102, 0.08);
-  --df-shell-active-bg: rgba(255, 182, 66, 0.18);
-  --df-shell-accent: #ffb642;
+  --df-shell-active-bg: rgba(51, 255, 102, 0.14);
+  --df-shell-accent: #2edd5b;
 
   a {
     color: #4dd8e6;
